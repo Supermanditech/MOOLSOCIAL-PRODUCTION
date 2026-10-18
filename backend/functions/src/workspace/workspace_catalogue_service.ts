@@ -72,6 +72,20 @@ export interface PublicCatalogueListingBinding {
 export interface CatalogueSave {
   ownerUserId: string; profile: WorkspaceProfileRecord; expectedRevision: number;
   idempotencyKey: string; fingerprint: string; input: StoreSkuInput; observedAt: string;
+  reviewCandidate?: {revision: number; fingerprint: string};
+}
+export interface StoreReviewedProductCandidate {
+  schemaVersion: 1; realm: "evaluation" | "production"; storeId: string; skuId: string;
+  revision: number; fingerprint: string; source: CatalogueSubmissionReference;
+  identity: CatalogueIdentity; sku: StoreSkuInput; expectedMirrorRevision: number;
+  reviewedBy: string; reviewedAt: string; expiresAt: string;
+  terms: Array<{kind: StoreSkuChannel["kind"]; offerId: string; termSnapshotId: string; termSnapshotSha256: string;
+    effectiveFrom: string; expiresAt: string}>;
+}
+export interface StoreProductReviewReadback {
+  record: StoreProductSubmissionRecord | null;
+  review: {version: 1; state: "pending" | "awaiting_media" | "ready" | "bound" | "outdated" | "unavailable";
+    candidate: StoreReviewedProductCandidate | null};
 }
 /** Explicitly public, descriptive owner text. Never upload private settings. */
 export interface StorePublicDetailsInput {
@@ -101,6 +115,8 @@ export interface WorkspaceCatalogueRepository {
   submitProduct?(command: StoreProductSubmissionCommand): Promise<StoreProductSubmissionRecord>;
   reconcileProduct?(command: StoreProductSubmissionCommand): Promise<StoreProductSubmissionRecord | undefined>;
   readProductSubmission?(storeId: string, skuId: string, ownerUserId: string): Promise<StoreProductSubmissionRecord | undefined>;
+  readReviewedProductSubmission?(storeId: string, skuId: string, ownerUserId: string,
+    identity: CatalogueIdentity): Promise<StoreProductReviewReadback>;
   /** Complete bounded directory, never public product facts or approval. */
   publicDiscoveryBindings?(): Promise<PublicCatalogueListingBinding[]>;
   publicListingBindings?(record: StoreSkuRecord): Promise<PublicCatalogueListingBinding[] | undefined>;
@@ -421,13 +437,21 @@ export class WorkspaceCatalogueService {
   async handleProductSubmission(ownerUserId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const action = storeProductSubmissionOperation(operation);
     if (!action || body.productSubmissionVersion !== 1) invalid();
-    const {productSubmissionVersion: _, ...request} = structuredClone(body);
+    const {productSubmissionVersion: _, productReviewVersion, ...request} = structuredClone(body);
+    if (productReviewVersion !== undefined && (productReviewVersion !== 1 || action !== "read")) invalid();
+    let review: StoreProductReviewReadback["review"] | undefined;
     let storeId: string, skuId: string, key: string | null = null, record: StoreProductSubmissionRecord | undefined;
     if (action === "read") {
       exact(request, ["storeId", "skuId"]);
       storeId = id(request.storeId); skuId = id(request.skuId);
       if (!this.repository.readProductSubmission) throw new WorkspaceProfileError("unavailable", "Product review is not connected.", 503);
-      record = await this.repository.readProductSubmission(storeId, skuId, id(ownerUserId));
+      if (productReviewVersion === 1) {
+        if (!this.identity || !this.repository.readReviewedProductSubmission) {
+          throw new WorkspaceProfileError("unavailable", "Product review readback is not connected.", 503);
+        }
+        const result = await this.repository.readReviewedProductSubmission(storeId, skuId, id(ownerUserId), {...this.identity});
+        record = result.record ?? undefined; review = result.review;
+      } else record = await this.repository.readProductSubmission(storeId, skuId, id(ownerUserId));
     } else {
       const command = storeProductSubmission(ownerUserId, this.repository.realm, request, this.now().toISOString());
       storeId = command.storeId; skuId = command.product.skuId; key = command.idempotencyKey;
@@ -437,7 +461,8 @@ export class WorkspaceCatalogueService {
     return {schemaVersion: 1, productSubmissionVersion: 1, realm: this.repository.realm, storeId, skuId,
       observedAt: this.now().toISOString(), idempotencyKey: key,
       state: record ? record.product.mediaIntent.pendingUpload ? "awaiting_media" : "submitted" : action === "reconcile" ? "not_found" : "none",
-      approved: false, publicationConfirmed: false, orderingAvailable: false, record: record ?? null};
+      approved: false, publicationConfirmed: false, orderingAvailable: false, record: record ?? null,
+      ...(review ? {productReviewVersion: 1, review} : {})};
   }
 
   /** Complete bounded discovery, not serviceability, Stock or ordering authority.
@@ -708,6 +733,7 @@ export class WorkspaceCatalogueService {
   }
 
   async saveSku(ownerUserId: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    if (body.reviewCandidate !== undefined) invalid("A reviewed candidate needs explicit reviewed binding.");
     const command = await this.saveCommand(ownerUserId, body);
     const record = await this.repository.save(command);
     return this.savedResult(command.profile.workspaceId!, record);
@@ -738,15 +764,17 @@ export class WorkspaceCatalogueService {
 
   private async saveCommand(ownerUserId: string, body: Readonly<Record<string, unknown>>): Promise<CatalogueSave> {
     body = structuredClone(body);
-    exact(body, ["storeId", "sku", "expectedRevision", "idempotencyKey"]);
+    exact(body, ["storeId", "sku", "expectedRevision", "idempotencyKey"], ["reviewCandidate"]);
     const storeId = id(body.storeId);
     const input = normalizeSku(body.sku, storeId);
     const expectedRevision = integer(body.expectedRevision, 0, 1_000_000_000);
     const idempotencyKey = id(body.idempotencyKey);
     const profile = requireStore(await this.repository.store(storeId), storeId, ownerUserId);
+    const reviewCandidate = body.reviewCandidate === undefined ? undefined : reviewedCandidateReference(body.reviewCandidate);
     return {ownerUserId, profile, input,
       expectedRevision, idempotencyKey,
-      fingerprint: cataloguePayloadHash({storeId, input, expectedRevision}),
+      ...(reviewCandidate ? {reviewCandidate} : {}),
+      fingerprint: cataloguePayloadHash({storeId, input, expectedRevision, ...(reviewCandidate ? {reviewCandidate} : {})}),
       observedAt: this.now().toISOString()};
   }
 
@@ -1282,6 +1310,108 @@ export function planStoreProductSubmission(command: StoreProductSubmissionComman
     fingerprint: command.fingerprint, product: normalized.product};
 }
 
+function reviewedCandidateReference(raw: unknown): {revision: number; fingerprint: string} {
+  const value = exact(raw, ["revision", "fingerprint"]);
+  if (typeof value.fingerprint !== "string" || !/^[A-F0-9]{64}$/u.test(value.fingerprint)) invalid();
+  return {revision: integer(value.revision, 1, 1000000000), fingerprint: value.fingerprint};
+}
+function candidateSku(source: StoreProductSubmissionRecord, productId: string, packId: string,
+  rawOffers: unknown): StoreSkuInput {
+  // Reuse the media-wait check, without inventing an approved asset from a nomination.
+  submittedCatalogueInput(source, {type: "propose_pack", commandId: "candidate-validation",
+    expectedVersion: 1, productId, packId, codes: []});
+  const offers = list(rawOffers, 2).map(raw => {
+    const row = exact(raw, ["kind", "offerId"]);
+    if (typeof row.kind !== "string" || !["retail", "wholesale", "bulk"].includes(row.kind)) invalid();
+    return {kind: row.kind, offerId: id(row.offerId)};
+  });
+  if (offers.length !== source.product.channels.length || new Set(offers.map(o => o.kind)).size !== offers.length) invalid();
+  return normalizeSku({skuId: source.skuId, sku: source.product.sku, canonicalProductId: id(productId),
+    verifiedPackId: id(packId), publicListing: true, content: {...source.product.content, media: []}, pack: source.product.pack,
+    provenance: source.product.provenance, channels: source.product.channels.map(channel => {
+      const offer = offers.find(o => o.kind === channel.kind); if (!offer) invalid();
+      return {...channel, offerId: offer.offerId};
+    })}, source.storeId);
+}
+function independentProductReview(catalogue: CatalogueAggregate, sku: StoreSkuInput, author: string): void {
+  const hash = cataloguePayloadHash(sku.content), product = catalogue.products.find(p => p.productId === sku.canonicalProductId);
+  const revision = product?.contentRevisions?.find(r => r.state === "verified" && r.contentSha256 === hash);
+  const original = product?.contentSha256.toUpperCase() === hash;
+  const reviewer = original ? product?.reviewedBy : revision?.reviewedBy;
+  const requireEvidence = (entityId: string, fingerprint: string, reviewedBy: string | undefined,
+    proposalType: "product_proposed" | "product_content_revision_proposed" | "pack_proposed",
+    reviewType: "product_verified" | "product_content_revision_verified" | "pack_verified",
+    proposedAt: string | undefined, reviewedAt: string | undefined, proposedBy?: string) => {
+    const review = catalogue.auditEvents.filter(event => event.eventType === reviewType && event.entityId === entityId &&
+      event.hashReferences.at(-1)?.toUpperCase() === fingerprint && event.actorId === reviewedBy && event.occurredAt === reviewedAt);
+    const approved = review.length === 1 ? review[0] : undefined;
+    // Same content may be rejected and reproposed. Bind the approval to its
+    // immediate preceding proposal by audit version, not global hash uniqueness.
+    const proposal = approved && catalogue.auditEvents.filter(event => event.eventType === proposalType && event.entityId === entityId &&
+      event.hashReferences.at(-1)?.toUpperCase() === fingerprint && event.aggregateVersion < approved.aggregateVersion)
+      .sort((a, b) => b.aggregateVersion - a.aggregateVersion)[0];
+    if (!reviewedBy || reviewedBy === author || !approved || !proposal || proposal.actorId === reviewedBy ||
+        proposal.occurredAt !== proposedAt || proposedBy !== undefined && proposal.actorId !== proposedBy) {
+      throw new WorkspaceProfileError("forbidden", "Independent product and pack review is required.", 403);
+    }
+  };
+  requireEvidence(sku.canonicalProductId, hash, reviewer, original ? "product_proposed" : "product_content_revision_proposed",
+    original ? "product_verified" : "product_content_revision_verified", original ? product?.proposedAt : revision?.proposedAt,
+    original ? product?.reviewedAt : revision?.reviewedAt, original ? undefined : revision?.proposedByActorId);
+  const pack = catalogue.packs.find(p => p.packId === sku.verifiedPackId);
+  requireEvidence(sku.verifiedPackId, cataloguePayloadHash(sku.pack), pack?.reviewedBy, "pack_proposed", "pack_verified", pack?.proposedAt, pack?.reviewedAt);
+}
+function checkedReviewedCandidate(raw: unknown): StoreReviewedProductCandidate {
+  const value = exact(raw, ["schemaVersion", "realm", "storeId", "skuId", "revision", "fingerprint", "source", "identity",
+    "sku", "expectedMirrorRevision", "reviewedBy", "reviewedAt", "expiresAt", "terms"]);
+  const reference = reviewedCandidateReference({revision: value.revision, fingerprint: value.fingerprint});
+  const source = submissionReference(value.source), identity = exact(value.identity, ["catalogueId", "tenantId"]);
+  const reviewedAt = text(value.reviewedAt, 32), expiresAt = text(value.expiresAt, 32);
+  if (value.schemaVersion !== 1 || value.realm !== source.realm || value.storeId !== source.storeId || value.skuId !== source.skuId ||
+      !Number.isFinite(Date.parse(reviewedAt)) || new Date(reviewedAt).toISOString() !== reviewedAt ||
+      !Number.isFinite(Date.parse(expiresAt)) || new Date(expiresAt).toISOString() !== expiresAt || expiresAt <= reviewedAt) invalid();
+  const sku = normalizeSku(value.sku, source.storeId);
+  if (sku.skuId !== source.skuId || !sku.publicListing) invalid();
+  const terms = list(value.terms, 2).map(rawTerm => {
+    const term = exact(rawTerm, ["kind", "offerId", "termSnapshotId", "termSnapshotSha256", "effectiveFrom", "expiresAt"]);
+    const channel = sku.channels.find(c => c.kind === term.kind && c.offerId === term.offerId);
+    if (!channel || term.termSnapshotSha256 !== cataloguePayloadHash(channelTerms(channel))) invalid();
+    const effectiveFrom = text(term.effectiveFrom, 32), until = text(term.expiresAt, 32);
+    if (!Number.isFinite(Date.parse(effectiveFrom)) || new Date(effectiveFrom).toISOString() !== effectiveFrom ||
+        !Number.isFinite(Date.parse(until)) || new Date(until).toISOString() !== until || effectiveFrom > reviewedAt || until < expiresAt) invalid();
+    return {kind: channel.kind, offerId: channel.offerId, termSnapshotId: id(term.termSnapshotId),
+      termSnapshotSha256: term.termSnapshotSha256 as string, effectiveFrom, expiresAt: until};
+  });
+  if (terms.length !== sku.channels.length || new Set(terms.map(t => t.kind)).size !== terms.length) invalid();
+  const candidate = {schemaVersion: 1 as const, realm: source.realm, storeId: source.storeId, skuId: source.skuId,
+    revision: reference.revision, source, identity: {catalogueId: id(identity.catalogueId), tenantId: id(identity.tenantId)},
+    sku, expectedMirrorRevision: integer(value.expectedMirrorRevision, 0, 1000000000),
+    reviewedBy: id(value.reviewedBy), reviewedAt, expiresAt, terms};
+  if (cataloguePayloadHash(candidate) !== reference.fingerprint) invalid("Saved review candidate is invalid.");
+  return {...candidate, fingerprint: reference.fingerprint};
+}
+function validateReviewedCandidate(candidate: StoreReviewedProductCandidate, source: StoreProductSubmissionRecord,
+  profile: WorkspaceProfileRecord, catalogue: CatalogueAggregate | undefined, authority: CatalogueProducerAuthority | undefined,
+  participant: SupplyParticipantWorkspace | undefined, current: StoreSkuRecord | undefined, at: string): void {
+  if (!catalogue || candidate.source.fingerprint !== source.fingerprint || candidate.source.revision !== source.revision ||
+      candidate.storeId !== source.storeId || candidate.skuId !== source.skuId || candidate.realm !== source.realm ||
+      candidate.reviewedBy === source.submittedBy || at < candidate.reviewedAt || at >= candidate.expiresAt ||
+      cataloguePayloadHash(candidate.sku) !== cataloguePayloadHash(candidateSku(source, candidate.sku.canonicalProductId,
+        candidate.sku.verifiedPackId, candidate.sku.channels.map(c => ({kind: c.kind, offerId: c.offerId}))))) {
+    invalid("Reviewed product source or terms changed.");
+  }
+  independentProductReview(catalogue, candidate.sku, source.submittedBy);
+  for (const term of candidate.terms) {
+    const offer = catalogue.offers.find(o => o.offerId === term.offerId), currentTerm = offer && referencedOfferTermAt(offer, at);
+    if (!currentTerm || cataloguePayloadHash(currentTerm) !== cataloguePayloadHash({termSnapshotId: term.termSnapshotId,
+      termSnapshotSha256: term.termSnapshotSha256, effectiveFrom: term.effectiveFrom, expiresAt: term.expiresAt})) invalid("Reviewed offer window changed.");
+  }
+  const fingerprint = cataloguePayloadHash({storeId: candidate.storeId, input: candidate.sku, expectedRevision: candidate.expectedMirrorRevision});
+  planReviewedCatalogueSave({ownerUserId: source.submittedBy, profile, expectedRevision: candidate.expectedMirrorRevision,
+    idempotencyKey: "validate-reviewed-candidate", fingerprint, input: candidate.sku, observedAt: at}, candidate.identity,
+  catalogue, authority, participant, current, undefined, at);
+}
+
 function normalizeProductFacts(value: unknown): StoreSkuProductFacts {
   const facts = exact(value, ["schemaVersion", "compliance", "composition", "regulatoryNote", "requiresPrescription"]);
   if (facts.schemaVersion !== 1) invalid();
@@ -1503,7 +1633,9 @@ export function planCatalogueSave(command: CatalogueSave, current?: StoreSkuReco
   const storeId = id(command.profile.workspaceId);
   requireStore(command.profile, storeId, command.ownerUserId);
   const input = normalizeSku(command.input, storeId);
-  const fingerprint = cataloguePayloadHash({storeId, input, expectedRevision: command.expectedRevision});
+  const reviewCandidate = command.reviewCandidate === undefined ? undefined : reviewedCandidateReference(command.reviewCandidate);
+  const fingerprint = cataloguePayloadHash({storeId, input, expectedRevision: command.expectedRevision,
+    ...(reviewCandidate ? {reviewCandidate} : {})});
   if (command.fingerprint !== fingerprint) invalid();
   const conflict = () => new WorkspaceProfileError("conflict", "This product changed. Refresh before saving again.", 409);
   if (receipt) {
@@ -1701,6 +1833,112 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       await this.productSubmissionOwner(transaction, storeId, ownerUserId);
       const doc = await transaction.get(head);
       return doc.exists ? checkedProductSubmission(doc.data(), this.realm, storeId, skuId) : undefined;
+    });
+  }
+  /** Trusted resolution only; creates a PRIVATE candidate, never a Store mirror. */
+  async resolveProductReview(operatorUserId: string, identity: CatalogueIdentity,
+    raw: Readonly<Record<string, unknown>>): Promise<StoreReviewedProductCandidate> {
+    const body = structuredClone(raw);
+    exact(body, ["source", "expectedReviewRevision", "idempotencyKey", "canonicalProductId", "verifiedPackId", "offers"]);
+    const source = submissionReference(body.source), operator = id(operatorUserId), key = id(body.idempotencyKey);
+    if (source.realm !== this.realm) invalid();
+    const expectedRevision = integer(body.expectedReviewRevision, 0, 999999999);
+    identity = {catalogueId: id(identity.catalogueId), tenantId: id(identity.tenantId)};
+    const fingerprint = cataloguePayloadHash({operator, identity, body});
+    const root = this.root(source.storeId), catalogueRoot = this.firestore.collection("workspaceCatalogues").doc(this.realm);
+    const head = root.collection("productReviews").doc(source.skuId);
+    const receipt = head.collection("receipts").doc(cataloguePayloadHash([operator, key]));
+    return this.firestore.runTransaction(async transaction => {
+      const [authority, catalogueDoc, profiles, currentReview, receiptDoc, submissionDoc, currentSubmission, currentSku, participant] = await Promise.all([
+        transaction.get(catalogueRoot.collection("producerAuthorities").doc(operator)),
+        transaction.get(catalogueRoot.collection("canonicalCatalogues").doc(identity.catalogueId)),
+        transaction.get(this.firestore.collection("workspaceProfiles").where("workspaceId", "==", source.storeId).limit(2)),
+        transaction.get(head), transaction.get(receipt),
+        transaction.get(this.productSubmissionHead(source.storeId, source.skuId).collection("revisions").doc(String(source.revision))),
+        transaction.get(this.productSubmissionHead(source.storeId, source.skuId)),
+        transaction.get(root.collection("skus").doc(source.skuId)),
+        transaction.get(catalogueRoot.collection("participants").doc(source.storeId))]);
+      const at = this.now().toISOString(), actor = producerActor(operator, identity, at, authority.data() as CatalogueProducerAuthority | undefined);
+      if (!actor.scopes.includes("supply.catalogue.review")) throw new WorkspaceProfileError("forbidden", "Product review authority is required.", 403);
+      const profile = requireStore(profiles.size === 1 && profiles.docs[0]!.get("caseId") === profiles.docs[0]!.id
+        ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined, source.storeId);
+      if (receiptDoc.exists) {
+        const saved = exact(receiptDoc.data(), ["fingerprint", "record"]), candidate = checkedReviewedCandidate(saved.record);
+        if (saved.fingerprint !== fingerprint || cataloguePayloadHash(candidate.source) !== cataloguePayloadHash(source) ||
+            cataloguePayloadHash(candidate.identity) !== cataloguePayloadHash(identity) || candidate.reviewedBy !== operator) {
+          throw new WorkspaceProfileError("conflict", "Product review request changed. Recover its original result.", 409);
+        }
+        return candidate;
+      }
+      if ((currentReview.exists ? checkedReviewedCandidate(currentReview.data()).revision : 0) !== expectedRevision) {
+        throw new WorkspaceProfileError("revision_conflict", "Product review changed. Refresh its original source.", 409);
+      }
+      if (!submissionDoc.exists || !currentSubmission.exists) invalid("Saved product source is unavailable.");
+      const submission = checkedProductSubmission(submissionDoc.data(), this.realm, source.storeId, source.skuId);
+      const latest = checkedProductSubmission(currentSubmission.data(), this.realm, source.storeId, source.skuId);
+      if (submission.fingerprint !== source.fingerprint || submission.revision !== source.revision ||
+          latest.fingerprint !== source.fingerprint || latest.revision !== source.revision) {
+        throw new WorkspaceProfileError("conflict", "Saved product source changed before review resolution.", 409);
+      }
+      requireStore(profile, source.storeId, submission.submittedBy);
+      if (operator === submission.submittedBy) throw new WorkspaceProfileError("forbidden", "Independent product review is required.", 403);
+      const ownerAuthority = await transaction.get(catalogueRoot.collection("producerAuthorities").doc(submission.submittedBy));
+      const sku = candidateSku(submission, id(body.canonicalProductId), id(body.verifiedPackId), body.offers);
+      const catalogue = catalogueDoc.data() as CatalogueAggregate | undefined;
+      if (!catalogue) invalid("Reviewed catalogue is unavailable.");
+      const terms = sku.channels.map(channel => {
+        const offer = catalogue.offers.find(o => o.offerId === channel.offerId), term = offer && referencedOfferTermAt(offer, at);
+        if (!term) invalid("Reviewed selling terms are unavailable.");
+        return {kind: channel.kind, offerId: channel.offerId, ...term};
+      });
+      const candidateData = {schemaVersion: 1 as const, realm: this.realm, storeId: source.storeId, skuId: source.skuId,
+        revision: expectedRevision + 1, source, identity, sku, expectedMirrorRevision: currentSku.exists ? normalizeRecord(currentSku.data(), source.storeId).revision : 0,
+        reviewedBy: operator, reviewedAt: at, expiresAt: terms.map(t => t.expiresAt).sort()[0]!, terms};
+      const candidate = checkedReviewedCandidate({...candidateData, fingerprint: cataloguePayloadHash(candidateData)});
+      validateReviewedCandidate(candidate, submission, profile, catalogue, ownerAuthority.data() as CatalogueProducerAuthority | undefined,
+        participant.data() as SupplyParticipantWorkspace | undefined, currentSku.exists ? normalizeRecord(currentSku.data(), source.storeId) : undefined, at);
+      transaction.set(head, candidate);
+      transaction.create(head.collection("revisions").doc(String(candidate.revision)), candidate);
+      transaction.create(receipt, {fingerprint, record: candidate});
+      return candidate;
+    });
+  }
+  async readReviewedProductSubmission(storeId: string, skuId: string, ownerUserId: string,
+    identity: CatalogueIdentity): Promise<StoreProductReviewReadback> {
+    storeId = id(storeId); skuId = id(skuId); ownerUserId = id(ownerUserId);
+    identity = {catalogueId: id(identity.catalogueId), tenantId: id(identity.tenantId)};
+    const root = this.root(storeId), catalogueRoot = this.firestore.collection("workspaceCatalogues").doc(this.realm);
+    return this.firestore.runTransaction(async transaction => {
+      const profile = await this.productSubmissionOwner(transaction, storeId, ownerUserId);
+      const [source, resolved, current, catalogue, authority, participant] = await transaction.getAll(
+        this.productSubmissionHead(storeId, skuId), root.collection("productReviews").doc(skuId), root.collection("skus").doc(skuId),
+        catalogueRoot.collection("canonicalCatalogues").doc(identity.catalogueId),
+        catalogueRoot.collection("producerAuthorities").doc(ownerUserId), catalogueRoot.collection("participants").doc(storeId));
+      const record = source?.exists ? checkedProductSubmission(source.data(), this.realm, storeId, skuId) : null;
+      const result = (state: StoreProductReviewReadback["review"]["state"], candidate: StoreReviewedProductCandidate | null = null): StoreProductReviewReadback =>
+        ({record, review: {version: 1, state, candidate}});
+      if (!record) return result("pending");
+      if (record.product.mediaIntent.pendingUpload || record.product.mediaIntent.publishedReferences.length !== 0) return result("awaiting_media");
+      if (!resolved?.exists) return result("pending");
+      const candidate = checkedReviewedCandidate(resolved.data());
+      if (candidate.storeId !== storeId || candidate.skuId !== skuId || candidate.realm !== this.realm ||
+          cataloguePayloadHash(candidate.identity) !== cataloguePayloadHash(identity)) invalid("Product review scope changed.");
+      if (candidate.source.fingerprint !== record.fingerprint || candidate.source.revision !== record.revision) return result("outdated");
+      const mirror = current?.exists ? normalizeRecord(current.data(), storeId) : undefined;
+      if (mirror && mirror.revision === candidate.expectedMirrorRevision + 1) {
+        const {schemaVersion: _v, storeId: _s, revision: _r, observedAt: _a, ...input} = mirror;
+        if (cataloguePayloadHash(input) === cataloguePayloadHash(candidate.sku)) return result("bound", candidate);
+      }
+      if ((mirror?.revision ?? 0) !== candidate.expectedMirrorRevision) return result("outdated");
+      try {
+        validateReviewedCandidate(candidate, record, profile, catalogue?.data() as CatalogueAggregate | undefined,
+          authority?.data() as CatalogueProducerAuthority | undefined, participant?.data() as SupplyParticipantWorkspace | undefined,
+          mirror, this.now().toISOString());
+        return result("ready", candidate);
+      } catch (error) {
+        if (error instanceof WorkspaceProfileError) return result("unavailable");
+        throw error;
+      }
     });
   }
   async submitVariantFamily(original: StoreVariantFamilySubmission): Promise<StoreVariantFamilyCandidate> {
@@ -1913,6 +2151,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
     // Freeze original intent before computing paths or yielding to a transaction.
     command = structuredClone(command);
     reviewedIdentity = reviewedIdentity && structuredClone(reviewedIdentity);
+    if (command.reviewCandidate && !reviewedIdentity) invalid("Reviewed candidate identity is required.");
     const root = this.root(command.profile.workspaceId!);
     const head = root.collection("skus").doc(command.input.skuId);
     const receiptRef = root.collection("receipts").doc(cataloguePayloadHash([
@@ -1931,6 +2170,21 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
           source.collection("canonicalCatalogues").doc(id(reviewedIdentity.catalogueId)),
           source.collection("producerAuthorities").doc(id(command.ownerUserId)),
           source.collection("participants").doc(id(fresh.workspaceId)));
+        if (command.reviewCandidate && !original) {
+          const reference = reviewedCandidateReference(command.reviewCandidate), reviewHead = root.collection("productReviews").doc(command.input.skuId);
+          const [candidateDoc, latestReview, submission] = await transaction.getAll(
+            reviewHead.collection("revisions").doc(String(reference.revision)), reviewHead,
+            this.productSubmissionHead(fresh.workspaceId!, command.input.skuId));
+          if (!candidateDoc?.exists || !latestReview?.exists || !submission?.exists) invalid("Reviewed product candidate is unavailable.");
+          const candidate = checkedReviewedCandidate(candidateDoc.data()), latest = checkedReviewedCandidate(latestReview.data());
+          if (candidate.fingerprint !== reference.fingerprint || candidate.revision !== reference.revision || latest.fingerprint !== candidate.fingerprint ||
+              cataloguePayloadHash(candidate.identity) !== cataloguePayloadHash(reviewedIdentity) ||
+              cataloguePayloadHash(candidate.sku) !== cataloguePayloadHash(command.input) ||
+              candidate.expectedMirrorRevision !== command.expectedRevision) invalid("Reviewed product candidate changed.");
+          validateReviewedCandidate(candidate, checkedProductSubmission(submission.data(), this.realm, fresh.workspaceId!, command.input.skuId),
+            fresh, catalogue?.data() as CatalogueAggregate | undefined, authority?.data() as CatalogueProducerAuthority | undefined,
+            participant?.data() as SupplyParticipantWorkspace | undefined, prior, this.now().toISOString());
+        }
         result = planReviewedCatalogueSave({...command, profile: fresh}, reviewedIdentity,
           catalogue?.data() as CatalogueAggregate | undefined,
           authority?.data() as CatalogueProducerAuthority | undefined,

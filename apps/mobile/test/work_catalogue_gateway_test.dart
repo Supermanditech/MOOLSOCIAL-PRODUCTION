@@ -1100,6 +1100,125 @@ void main() {
     expect((await gateway.writeProductSubmission(original, current: () => true, reconcile: true)).state, WorkspaceProductSubmissionWriteState.notFound);
     expect((await gateway.writeProductSubmission(original, current: () => true)).state, WorkspaceProductSubmissionWriteState.unknown);
   });
+  final reviewLog = Platform.environment['LF03_REVIEW_LOG'];
+  if (reviewLog != null) {
+    Map<String, dynamic> reviewCapture(String marker) {
+      final lines = File(reviewLog).readAsLinesSync().where((line) => line.contains(marker)).toList();
+      expect(lines, hasLength(1));
+      return jsonDecode(lines.single.split(marker).last) as Map<String, dynamic>;
+    }
+    Object? sortedReview(Object? raw) {
+      if (raw is List) return raw.map(sortedReview).toList();
+      if (raw is Map) { return {for (final key in raw.keys.cast<String>().toList()..sort()) key: sortedReview(raw[key])}; }
+      return raw;
+    }
+    void hashReview(Map<String, dynamic> value) {
+      final data = Map<String, dynamic>.of(value)..remove('fingerprint');
+      value['fingerprint'] = sha256.convert(utf8.encode(jsonEncode(sortedReview(data)))).toString().toUpperCase();
+    }
+    AuthenticatedWorkspaceCatalogueGateway reviewGateway(OwnerTransport transport, {bool supported = true, DateTime? now}) =>
+      AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), transport: transport, realm: submissionScope.realm, ownerAccountId: submissionScope.account,
+        productSubmissionSupported: true, reviewedProductSubmissionSupported: supported, now: () => now ?? at);
+    test('LF03-REVIEW actual reviewed candidate negotiates exact facts and immutable versioned binding intent', () async {
+      final actual = reviewCapture('LF_REVIEW_CANDIDATE_PROJECTION=');
+      final transport = OwnerTransport((body) async {
+        expect(body, {'operation': 'readStoreProductSubmission', 'productSubmissionVersion': 1, 'productReviewVersion': 1,
+          'storeId': 'store-one', 'skuId': 'sku-one'});
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': actual}));
+      });
+      final source = reviewGateway(transport), result = await source.readReviewedProductSubmission(submissionScope, current: () => true);
+      expect(result.state, 'ready'); expect(result.candidate!.toJson(), actual['review']['candidate']);
+      expect(result.record!.toJson(), actual['record']);
+      expect(result.candidate!.sku['channels'].first['priceMinor'], 10025);
+      expect(source.forOwnerAccount('another-owner').reviewedProductSubmissionSupported, isTrue);
+      final intent = result.candidate!.publicationIntent(accountId: submissionScope.account, idempotencyKey: 'explicit-publication');
+      expect(intent.toJson()['schemaVersion'], 2); expect(intent.body['reviewCandidate'],
+        {'revision': result.candidate!.revision, 'fingerprint': result.candidate!.fingerprint});
+      expect(WorkspaceCatalogueBindingIntent.fromJson(intent.toJson()).toJson(), intent.toJson());
+      expect(intent.reviewedSource!.toJson(), actual['record']);
+      expect(intent.body.containsKey('reviewedSource'), isFalse, reason: 'Private recovery context is journalled, not sent as owner-selected review facts');
+      final legacy = WorkspaceCatalogueBindingIntent(accountId: intent.accountId, realm: intent.realm, storeId: intent.storeId,
+        expectedRevision: intent.expectedRevision, idempotencyKey: 'legacy', sku: intent.sku);
+      expect(legacy.toJson()['schemaVersion'], 1); expect(legacy.body.containsKey('reviewCandidate'), isFalse);
+      expect(WorkspaceCatalogueBindingIntent.fromJson(legacy.toJson()).toJson(), legacy.toJson());
+      final edited = jsonDecode(jsonEncode(intent.toJson())) as Map<String, dynamic>;
+      edited['reviewCandidate']['revision'] = 99; edited['sku']['content']['title'] = 'Caller mutation';
+      expect(intent.body['reviewCandidate'], isNot(edited['reviewCandidate']));
+      expect(result.candidate!.sku['content']['title'], isNot('Caller mutation'));
+    });
+    test('LF03-REVIEW actual candidate rejects altered facts self review scope and late replies even with rehashed data', () async {
+      final edits = <void Function(Map<String, dynamic>)>[
+        (v) {v['review']['candidate']['sku']['channels'][0]['priceMinor'] = 1;},
+        (v) {v['review']['candidate']['source']['fingerprint'] = 'A' * 64;},
+        (v) {v['review']['candidate']['source']['revision'] = 1.0;},
+        (v) {v['review']['candidate']['reviewedBy'] = 'owner-one';},
+        (v) {v['review']['candidate']['terms'][0]['termSnapshotSha256'] = 'A' * 64;},
+        (v) {v['review']['candidate']['realm'] = 'production';},
+        (v) {v['review']['candidate']['sku']['content']['description'] = 'Not the saved description';},
+        (v) {v['review']['candidate']['reviewedAt'] = '2026-10-16T12:00:00+00:00';},
+      ];
+      for (final edit in edits) {
+        final actual = reviewCapture('LF_REVIEW_CANDIDATE_PROJECTION='); edit(actual); hashReview(actual['review']['candidate'] as Map<String, dynamic>);
+        final source = reviewGateway(OwnerTransport((_) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': actual}))));
+        await expectLater(source.readReviewedProductSubmission(submissionScope, current: () => true), throwsFormatException);
+      }
+      final actual = reviewCapture('LF_REVIEW_CANDIDATE_PROJECTION=');
+      final late = reviewGateway(OwnerTransport((_) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': actual}))),
+        now: at.add(const Duration(hours: 1)));
+      await expectLater(late.readReviewedProductSubmission(submissionScope, current: () => true), throwsFormatException);
+      var current = true;
+      final retired = reviewGateway(OwnerTransport((_) async { current = false;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': actual})); }));
+      await expectLater(retired.readReviewedProductSubmission(submissionScope, current: () => current), throwsFormatException);
+      final disabledTransport = OwnerTransport((_) async => throw StateError('Must not send'));
+      await expectLater(reviewGateway(disabledTransport, supported: false).readReviewedProductSubmission(submissionScope, current: () => true), throwsFormatException);
+      expect(disabledTransport.calls, 0);
+    });
+    test('LF03-REVIEW actual binding acknowledgement stays journalled until local identity completion succeeds', () async {
+      final capture = reviewCapture('LF_REVIEW_BINDING_PROJECTION='), request = capture['request'] as Map<String, dynamic>;
+      final original = WorkspaceCatalogueBindingIntent(accountId: submissionScope.account, realm: submissionScope.realm,
+        storeId: submissionScope.store, expectedRevision: request['expectedRevision'] as int, idempotencyKey: request['idempotencyKey'] as String,
+        sku: request['sku'] as Map<String, dynamic>, reviewCandidate: request['reviewCandidate'] as Map<String, dynamic>,
+        reviewedSource: WorkspaceProductSubmissionRecord.decode(capture['source'], submissionScope, at));
+      final operations = <String>[];
+      final source = reviewGateway(OwnerTransport((body) async {
+        operations.add(body['operation']! as String);
+        expect(Map<String, Object?>.of(body)..remove('operation'), original.body);
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': capture['response']}));
+      }));
+      FlutterSecureStorage.setMockInitialValues({});
+      SecureWorkCatalogueBindingPendingStore journal() => SecureWorkCatalogueBindingPendingStore(currentAccount: () => submissionScope.account);
+      final scope = (account: submissionScope.account, store: submissionScope.store, realm: submissionScope.realm);
+      final first = WorkspaceCatalogueListingController(scope: scope, gateway: source, pendingStore: journal(), context: () => 'same-owner');
+      addTearDown(first.dispose);
+      expect((await first.submit(original, inputCurrent: () => true)).state, WorkspaceCatalogueBindingState.unknown);
+      expect((await journal().readPending(scope))!.toJson(), original.toJson());
+      var completed = false, finishes = 0;
+      final restarted = WorkspaceCatalogueListingController(scope: scope, gateway: source, pendingStore: journal(), context: () => 'same-owner',
+        completeReviewedBinding: (intent, saved, current) async { finishes++; expect(current(), isTrue);
+          expect(intent.toJson(), original.toJson()); expect(saved.canonicalProductId, original.sku['canonicalProductId']); return completed; });
+      addTearDown(restarted.dispose);
+      expect((await restarted.reconcile()).state, WorkspaceCatalogueBindingState.unknown);
+      expect((await journal().readPending(scope))!.toJson(), original.toJson());
+      completed = true;
+      expect((await restarted.reconcile()).state, WorkspaceCatalogueBindingState.saved);
+      expect(await journal().readPending(scope), isNull); expect(finishes, 2);
+      expect(operations, ['bindReviewedStoreCatalogueSku', 'reconcileStoreCatalogueBinding', 'reconcileStoreCatalogueBinding']);
+    });
+    test('LF03-REVIEW historical version2 original restores after a device clock rollback', () {
+      final capture = reviewCapture('LF_REVIEW_BINDING_PROJECTION='), request = capture['request'] as Map<String, dynamic>;
+      // Labelled host clock simulation: the original was received under a later
+      // clock. Do not alter native time or treat this as a fresh provider result.
+      final laterClock = DateTime.utc(2050, 1, 1), record = capture['source'] as Map<String, dynamic>;
+      record['submittedAt'] = laterClock.toIso8601String();
+      final original = WorkspaceCatalogueBindingIntent(accountId: submissionScope.account, realm: submissionScope.realm,
+        storeId: submissionScope.store, expectedRevision: request['expectedRevision'] as int, idempotencyKey: request['idempotencyKey'] as String,
+        sku: request['sku'] as Map<String, dynamic>, reviewCandidate: request['reviewCandidate'] as Map<String, dynamic>,
+        reviewedSource: WorkspaceProductSubmissionRecord.decode(record, submissionScope, laterClock));
+      expect(WorkspaceCatalogueBindingIntent.fromJson(original.toJson()).toJson(), original.toJson());
+    });
+  }
   final submissionLog = Platform.environment['LF03_SUBMISSION_LOG'];
   if (submissionLog != null) { test('LF03-SUBMIT actual emulator receipt decodes without approving or publishing', () async {
     const marker = 'LF_SUBMISSION_PROJECTION=';

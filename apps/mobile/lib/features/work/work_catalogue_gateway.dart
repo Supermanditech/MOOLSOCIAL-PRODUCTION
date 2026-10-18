@@ -200,6 +200,90 @@ abstract interface class WorkspaceProductSubmissionOwnerGateway {
     {required bool Function() current, bool reconcile = false});
 }
 
+/// Negotiated private review results, never public visibility or ordering proof.
+abstract interface class WorkspaceReviewedProductSubmissionGateway {
+  bool get reviewedProductSubmissionSupported;
+  Future<WorkspaceProductReviewReadback> readReviewedProductSubmission(WorkspaceProductSubmissionScope scope,
+    {required bool Function() current});
+}
+class WorkspaceReviewedProductCandidate {
+  WorkspaceReviewedProductCandidate._(this._encoded, this.source);
+  final String _encoded;
+  final WorkspaceProductSubmissionRecord source;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  Map<String, dynamic> get sku => _map(toJson()['sku']);
+  int get revision => toJson()['revision'] as int;
+  String get fingerprint => toJson()['fingerprint'] as String;
+  DateTime get expiresAt => _time(toJson()['expiresAt']);
+  static WorkspaceReviewedProductCandidate decode(Object? raw, WorkspaceProductSubmissionRecord source,
+      WorkspaceProductSubmissionScope scope, DateTime observed, {bool requireCurrent = true}) {
+    final value = _map(raw);
+    _keys(value, ['schemaVersion', 'realm', 'storeId', 'skuId', 'revision', 'fingerprint', 'source', 'identity',
+      'sku', 'expectedMirrorRevision', 'reviewedBy', 'reviewedAt', 'expiresAt', 'terms']);
+    final reference = _map(value['source']);
+    _keys(reference, ['realm', 'storeId', 'skuId', 'revision', 'fingerprint']);
+    _int(reference['revision'], 1, 1000000000);
+    final identity = _map(value['identity']); _keys(identity, ['catalogueId', 'tenantId']);
+    _id(identity['catalogueId']); _id(identity['tenantId']);
+    _int(value['revision'], 1, 1000000000); _int(value['expectedMirrorRevision'], 0, 1000000000);
+    final reviewedAt = _time(value['reviewedAt']), expires = _time(value['expiresAt']);
+    final body = source.input.toJson(), sku = _map(value['sku']); _ownerSkuInput(sku, scope.store);
+    final content = Map<String, dynamic>.of(_map(body['content']))..['media'] = <Object>[];
+    final channels = (sku['channels'] as List).map((raw) => Map<String, dynamic>.of(_map(raw))..remove('offerId')).toList();
+    final noImages = body['mediaIntent']['pendingUpload'] == false && (body['mediaIntent']['publishedReferences'] as List).isEmpty;
+    final hashed = Map<String, dynamic>.of(value)..remove('fingerprint');
+    if (_int(value['schemaVersion'], 1, 1) != 1 || value['realm'] != scope.realm || value['storeId'] != scope.store || value['skuId'] != scope.sku ||
+        reference['realm'] != scope.realm || reference['storeId'] != scope.store || reference['skuId'] != scope.sku ||
+        reference['revision'] != source.revision || reference['fingerprint'] != source.fingerprint ||
+        value['fingerprint'] != _catalogueHash(hashed) || _id(value['reviewedBy']) == source.toJson()['submittedBy'] ||
+        reviewedAt.toIso8601String() != value['reviewedAt'] || expires.toIso8601String() != value['expiresAt'] ||
+        reviewedAt.isAfter(observed) || reviewedAt.isBefore(_time(source.toJson()['submittedAt'])) || !expires.isAfter(reviewedAt) ||
+        requireCurrent && !expires.isAfter(observed) || !noImages || sku['publicListing'] != true ||
+        sku['skuId'] != scope.sku || sku['sku'] != body['sku'] ||
+        jsonEncode(_sorted(sku['content'])) != jsonEncode(_sorted(content)) ||
+        jsonEncode(_sorted(sku['pack'])) != jsonEncode(_sorted(body['pack'])) ||
+        jsonEncode(_sorted(sku['provenance'])) != jsonEncode(_sorted(body['provenance'])) ||
+        jsonEncode(_sorted(channels)) != jsonEncode(_sorted(body['channels']))) { throw const FormatException(); }
+    final terms = value['terms'];
+    if (terms is! List || terms.length != channels.length) throw const FormatException();
+    final kinds = <String>{};
+    for (final raw in terms) {
+      final term = _map(raw); _keys(term, ['kind', 'offerId', 'termSnapshotId', 'termSnapshotSha256', 'effectiveFrom', 'expiresAt']);
+      final kind = _string(term['kind']);
+      final channel = (sku['channels'] as List).map(_map).where((c) => c['kind'] == kind && c['offerId'] == term['offerId']).firstOrNull;
+      if (channel == null || !kinds.add(kind)) throw const FormatException();
+      final termsBody = <String, dynamic>{'currency': 'INR', ...channel}..remove('offerId');
+      _id(term['termSnapshotId']);
+      if (term['termSnapshotSha256'] != _catalogueHash(termsBody) || _time(term['effectiveFrom']).isAfter(reviewedAt) ||
+          _time(term['expiresAt']).isBefore(expires) || _time(term['effectiveFrom']).toIso8601String() != term['effectiveFrom'] ||
+          _time(term['expiresAt']).toIso8601String() != term['expiresAt']) { throw const FormatException(); }
+    }
+    return WorkspaceReviewedProductCandidate._(jsonEncode(_sorted(value)), source);
+  }
+  WorkspaceCatalogueBindingIntent publicationIntent({required String accountId, required String idempotencyKey}) =>
+    WorkspaceCatalogueBindingIntent(accountId: accountId, realm: toJson()['realm'] as String,
+      storeId: toJson()['storeId'] as String, expectedRevision: toJson()['expectedMirrorRevision'] as int,
+      idempotencyKey: idempotencyKey, sku: sku, reviewCandidate: {'revision': revision, 'fingerprint': fingerprint}, reviewedSource: source);
+}
+String _catalogueHash(Object value) => crypto.sha256.convert(utf8.encode(jsonEncode(_sorted(value)))).toString().toUpperCase();
+class WorkspaceProductReviewReadback {
+  const WorkspaceProductReviewReadback({required this.record, required this.state, this.candidate});
+  final WorkspaceProductSubmissionRecord? record;
+  final String state;
+  final WorkspaceReviewedProductCandidate? candidate;
+  static WorkspaceProductReviewReadback decodeReview(Object? raw, WorkspaceProductSubmissionRecord? record,
+      WorkspaceProductSubmissionScope scope, DateTime observed) {
+    final review = _map(raw); _keys(review, ['version', 'state', 'candidate']);
+    final state = _string(review['state']);
+    if (_int(review['version'], 1, 1) != 1 || !{'pending', 'awaiting_media', 'ready', 'bound', 'outdated', 'unavailable'}.contains(state) ||
+        ({'ready', 'bound'}.contains(state) ? record == null || review['candidate'] == null : review['candidate'] != null) ||
+        state == 'awaiting_media' && record == null) { throw const FormatException(); }
+    final candidate = review['candidate'] == null ? null : WorkspaceReviewedProductCandidate.decode(review['candidate'], record!, scope,
+      observed, requireCurrent: state != 'bound');
+    return WorkspaceProductReviewReadback(record: record, state: state, candidate: candidate);
+  }
+}
+
 abstract interface class WorkspaceProductSubmissionJournal {
   Future<WorkspaceProductSubmissionIntent?> readPending(WorkspaceProductSubmissionScope scope);
   Future<void> savePending(WorkspaceProductSubmissionIntent original);
@@ -991,7 +1075,9 @@ class WorkspaceCatalogueBindingIntent {
     required this.expectedRevision,
     required this.idempotencyKey,
     required Map<String, dynamic> sku,
-  }) : _encodedSku = jsonEncode(sku) {
+    Map<String, dynamic>? reviewCandidate,
+    this.reviewedSource,
+  }) : _encodedSku = jsonEncode(sku), _encodedReviewCandidate = reviewCandidate == null ? null : jsonEncode(reviewCandidate) {
     _id(accountId);
     if (!{'production', 'evaluation'}.contains(realm)) {
       throw const FormatException();
@@ -1000,8 +1086,18 @@ class WorkspaceCatalogueBindingIntent {
     _id(idempotencyKey);
     _int(expectedRevision, 0, 1000000000);
     _ownerSkuInput(_map(jsonDecode(_encodedSku)), storeId);
+    if ((_encodedReviewCandidate == null) != (reviewedSource == null)) throw const FormatException();
+    if (reviewedSource != null && (reviewedSource!.input.skuId != skuId || reviewedSource!.toJson()['submittedBy'] != accountId ||
+        reviewedSource!.toJson()['realm'] != realm || reviewedSource!.toJson()['storeId'] != storeId)) { throw const FormatException(); }
+    if (_encodedReviewCandidate != null) {
+      final ref = _map(jsonDecode(_encodedReviewCandidate)); _keys(ref, ['revision', 'fingerprint']);
+      _int(ref['revision'], 1, 1000000000);
+      if (ref['fingerprint'] is! String || !RegExp(r'^[A-F0-9]{64}$').hasMatch(ref['fingerprint'] as String)) throw const FormatException();
+    }
   }
   final String accountId, realm, storeId, idempotencyKey, _encodedSku;
+  final String? _encodedReviewCandidate;
+  final WorkspaceProductSubmissionRecord? reviewedSource;
   final int expectedRevision;
   Map<String, dynamic> get sku => _map(jsonDecode(_encodedSku));
   String get skuId => sku['skuId'] as String;
@@ -1010,12 +1106,14 @@ class WorkspaceCatalogueBindingIntent {
     'sku': sku,
     'expectedRevision': expectedRevision,
     'idempotencyKey': idempotencyKey,
+    if (_encodedReviewCandidate != null) 'reviewCandidate': jsonDecode(_encodedReviewCandidate),
   };
   Map<String, Object?> toJson() => {
-    'schemaVersion': 1,
+    'schemaVersion': _encodedReviewCandidate == null ? 1 : 2,
     'accountId': accountId,
     'realm': realm,
     ...body,
+    if (reviewedSource != null) 'reviewedSource': reviewedSource!.toJson(),
   };
   static WorkspaceCatalogueBindingIntent fromJson(Object? value) {
     final raw = _map(value);
@@ -1027,8 +1125,10 @@ class WorkspaceCatalogueBindingIntent {
       'sku',
       'expectedRevision',
       'idempotencyKey',
+      if (raw['schemaVersion'] == 2) 'reviewCandidate',
+      if (raw['schemaVersion'] == 2) 'reviewedSource',
     ]);
-    if (raw['schemaVersion'] != 1) throw const FormatException();
+    if (raw['schemaVersion'] is! int || !{1, 2}.contains(raw['schemaVersion'])) throw const FormatException();
     return WorkspaceCatalogueBindingIntent(
       accountId: _id(raw['accountId']),
       realm: _string(raw['realm']),
@@ -1036,6 +1136,10 @@ class WorkspaceCatalogueBindingIntent {
       expectedRevision: _int(raw['expectedRevision'], 0, 1000000000),
       idempotencyKey: _id(raw['idempotencyKey']),
       sku: _map(raw['sku']),
+      reviewCandidate: raw['schemaVersion'] == 2 ? _map(raw['reviewCandidate']) : null,
+      reviewedSource: raw['schemaVersion'] == 2 ? WorkspaceProductSubmissionRecord.decode(raw['reviewedSource'],
+        (account: _id(raw['accountId']), store: _id(raw['storeId']), realm: _string(raw['realm']), sku: _id(_map(raw['sku'])['skuId'])),
+        _time(_map(raw['reviewedSource'])['submittedAt'])) : null,
     );
   }
 }
@@ -1061,11 +1165,14 @@ class WorkspaceCatalogueListingController extends ChangeNotifier {
     required this.gateway,
     required this.pendingStore,
     required this.context,
+    this.completeReviewedBinding,
   });
   final WorkspaceCatalogueBindingScope scope;
   final WorkspaceCatalogueOwnerGateway gateway;
   final WorkspaceCatalogueBindingPendingStore pendingStore;
   final Object? Function() context;
+  final Future<bool> Function(WorkspaceCatalogueBindingIntent original, WorkspaceCatalogueOwnedSku saved,
+    bool Function() current)? completeReviewedBinding;
   WorkspaceCatalogueBindingIntent? pending;
   bool busy = false, ready = false, _closed = false;
   Future<bool>? _restoring;
@@ -1238,6 +1345,13 @@ class WorkspaceCatalogueListingController extends ChangeNotifier {
       return const WorkspaceCatalogueBindingResult(
         WorkspaceCatalogueBindingState.unknown,
       );
+    }
+    if (result.state == WorkspaceCatalogueBindingState.saved && exact && original.body.containsKey('reviewCandidate')) {
+      final complete = completeReviewedBinding;
+      if (complete == null || !await complete(original, saved, () => _current(owner)).timeout(const Duration(seconds: 10)) || !_current(owner)) {
+        error = 'The reviewed listing result is kept. Finish restoring this product before another update.';
+        return const WorkspaceCatalogueBindingResult(WorkspaceCatalogueBindingState.unknown);
+      }
     }
     await pendingStore
         .removePending(original)
@@ -2110,6 +2224,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway() {
     unbrandedProduceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_UNBRANDED_PRODUCE_V1'),
     reviewedFamilyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_REVIEWED_FAMILIES_V1'),
     productSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_SUBMISSIONS_V1'),
+    reviewedProductSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_REVIEW_V1'),
     storeClassificationReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_STORE_CLASSIFICATION_V1'),
   );
 }
@@ -2125,7 +2240,8 @@ bool _validEndpoint(Uri value) =>
 
 class AuthenticatedWorkspaceCatalogueGateway
     implements WorkspaceCatalogueGateway, WorkspaceCatalogueOwnerGateway, WorkspacePublicProductGateway,
-      WorkspacePublicDetailsOwnerGateway, WorkspaceVariantFamilyOwnerGateway, WorkspaceProductSubmissionOwnerGateway {
+      WorkspacePublicDetailsOwnerGateway, WorkspaceVariantFamilyOwnerGateway, WorkspaceProductSubmissionOwnerGateway,
+      WorkspaceReviewedProductSubmissionGateway {
   AuthenticatedWorkspaceCatalogueGateway({
     required this.endpoint,
     required this.credentials,
@@ -2138,6 +2254,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     WorkspacePublicVariantSource? reviewedVariants,
     this.reviewedFamilyReadbackSupported = false,
     this.productSubmissionSupported = false,
+    this.reviewedProductSubmissionSupported = false,
     this.storeClassificationReadbackSupported = false,
     DateTime Function()? now,
   }) : _reviewedVariantsOverride = reviewedVariants, now = now ?? DateTime.now {
@@ -2160,6 +2277,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool reviewedFamilyReadbackSupported;
   @override
   final bool productSubmissionSupported;
+  @override
+  final bool reviewedProductSubmissionSupported;
   final bool storeClassificationReadbackSupported;
   @override
   bool get variantFamilySubmissionSupported => reviewedFamilyReadbackSupported;
@@ -2187,6 +2306,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       reviewedVariants: _reviewedVariantsOverride,
       reviewedFamilyReadbackSupported: reviewedFamilyReadbackSupported,
       productSubmissionSupported: productSubmissionSupported,
+      reviewedProductSubmissionSupported: reviewedProductSubmissionSupported,
       storeClassificationReadbackSupported: storeClassificationReadbackSupported,
       now: now,
     );
@@ -2221,6 +2341,23 @@ class AuthenticatedWorkspaceCatalogueGateway
     final envelope = _map(jsonDecode(response!.body));
     if (envelope['ok'] != true) throw const FormatException();
     return _productSubmissionResponse(envelope['data'], scope, key: null, reconcile: false);
+  }
+  @override
+  Future<WorkspaceProductReviewReadback> readReviewedProductSubmission(WorkspaceProductSubmissionScope scope,
+      {required bool Function() current}) async {
+    if (!reviewedProductSubmissionSupported || !_productSubmissionOwner(scope, current)) throw const FormatException('Product review is not connected.');
+    final response = await _ownerRequest({'operation': 'readStoreProductSubmission', 'productSubmissionVersion': 1,
+      'productReviewVersion': 1, 'storeId': scope.store, 'skuId': scope.sku}, current, mutation: false);
+    if (!_productSubmissionOwner(scope, current) || response?.statusCode != 200) throw const FormatException();
+    final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
+    if (envelope['ok'] != true) throw const FormatException();
+    final value = _map(envelope['data']);
+    if (_int(value['productReviewVersion'], 1, 1) != 1) throw const FormatException();
+    final legacy = Map<String, dynamic>.of(value)..remove('productReviewVersion')..remove('review');
+    final record = _productSubmissionResponse(legacy, scope, key: null, reconcile: false);
+    final readback = WorkspaceProductReviewReadback.decodeReview(value['review'], record, scope, _time(value['observedAt']));
+    if (readback.state == 'ready' && !readback.candidate!.expiresAt.isAfter(now().toUtc())) throw const FormatException();
+    return readback;
   }
   @override
   Future<WorkspaceProductSubmissionWriteResult> writeProductSubmission(WorkspaceProductSubmissionIntent original,

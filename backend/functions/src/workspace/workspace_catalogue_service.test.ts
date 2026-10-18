@@ -30,6 +30,11 @@ test('LF03-SOURCE persisted submission has an actual source-bound catalogue prop
   assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>)
     .proposeSubmittedCatalogue, 'function');
 });
+test('LF03-REVIEW has persistent private candidate production and negotiated owner readback', () => {
+  const repository = FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>;
+  assert.equal(typeof repository.resolveProductReview, 'function');
+  assert.equal(typeof repository.readReviewedProductSubmission, 'function');
+});
 test("LF-DISCOVERY resolves directory candidates through reviewed public readback", () => {
   assert.equal(typeof (WorkspaceCatalogueService.prototype as unknown as Record<string, unknown>).publicDiscovery, "function");
   assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>).publicDiscoveryBindings, "function");
@@ -388,6 +393,136 @@ function productionCommands(value = input()): Array<Record<string, unknown>> {
         effectiveFrom: at, expiresAt: "2026-10-16T13:00:00.000Z"}]},
   ];
 }
+test('LF03-REVIEW emulator private reviewed candidate to negotiated readback and explicit source-bound publication', {
+  skip: process.env.FIRESTORE_EMULATOR_HOST === undefined,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-review-${randomUUID().slice(0, 8)}`}, `review-${randomUUID()}`);
+  const db = getFirestore(app), root = db.collection('workspaceCatalogues').doc('evaluation');
+  const repository = (clock = at) => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(clock));
+  const service = (clock = at) => new WorkspaceCatalogueService(repository(clock), catalogueIdentity, () => new Date(clock));
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    await root.collection('participants').doc('store-one').set(producerParticipant());
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    const product = submittedProduct(); product.channels[0]!.priceMinor = 10025;
+    const saved = await repository().submitProduct(productCommand({product}));
+    const source = {realm: 'evaluation' as const, storeId: saved.storeId, skuId: saved.skuId,
+      revision: saved.revision, fingerprint: saved.fingerprint};
+    const read = {productSubmissionVersion: 1, storeId: 'store-one', skuId: 'sku-one'};
+    const reviewRead = {...read, productReviewVersion: 1};
+    const before = await service().handleProductSubmission('owner-one', 'readStoreProductSubmission', reviewRead) as any;
+    assert.equal(before.review.state, 'pending'); assert.equal(before.review.candidate, null);
+    const value = {...input(), content: {...product.content, media: []}, provenance: product.provenance,
+      channels: product.channels.map(channel => ({...channel, offerId: 'offer-one'}))};
+    const commands = productionCommands(value);
+    await repository().produceCatalogue('reviewer-one', catalogueIdentity, commands[0]!);
+    const {contentSha256: _, categoryId: __, ...productProposal} = commands[1]!;
+    await repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, source, productProposal);
+    const resolution = {source, expectedReviewRevision: 0, idempotencyKey: 'resolve-private',
+      canonicalProductId: value.canonicalProductId, verifiedPackId: value.verifiedPackId,
+      offers: [{kind: 'retail', offerId: 'offer-one'}]};
+    await assert.rejects(repository().resolveProductReview('reviewer-one', catalogueIdentity, resolution));
+    await repository().produceCatalogue('reviewer-one', catalogueIdentity, commands[2]!);
+    const {descriptorSha256: ___, ...packProposal} = commands[3]!;
+    await repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, source, packProposal);
+    await repository().produceCatalogue('reviewer-one', catalogueIdentity, commands[4]!);
+    await assert.rejects(repository().resolveProductReview('reviewer-one', catalogueIdentity, resolution));
+    await repository().produceCatalogue('owner-one', catalogueIdentity, commands[5]!);
+    await assert.rejects(repository().resolveProductReview('owner-one', catalogueIdentity, resolution), {code: 'forbidden'});
+    const aggregateRef = root.collection('canonicalCatalogues').doc(catalogueIdentity.catalogueId);
+    const approved = (await aggregateRef.get()).data() as CatalogueAggregate;
+    // Negative isolated privileged-store fixtures: a resolver must not turn
+    // self-reviewed or mismatched audit evidence into an owner-ready candidate.
+    for (const change of [
+      (c: any) => {c.products[0].reviewedBy = 'owner-one'; c.auditEvents.find((e: any) => e.eventType === 'product_verified').actorId = 'owner-one';},
+      (c: any) => {c.auditEvents.find((e: any) => e.eventType === 'product_proposed').actorId = 'reviewer-one';},
+      (c: any) => {c.auditEvents = c.auditEvents.filter((e: any) => e.eventType !== 'product_proposed');},
+      (c: any) => {c.packs[0].reviewedBy = 'owner-one'; c.auditEvents.find((e: any) => e.eventType === 'pack_verified').actorId = 'owner-one';},
+    ]) {
+      const corrupt = structuredClone(approved); change(corrupt); await aggregateRef.set(corrupt);
+      await assert.rejects(repository().resolveProductReview('reviewer-one', catalogueIdentity, resolution), {code: 'forbidden'});
+      assert.equal((await root.collection('stores').doc('store-one').collection('productReviews').get()).size, 0);
+    }
+    await aggregateRef.set(approved);
+    await assert.rejects(repository().resolveProductReview('reviewer-one', {...catalogueIdentity, tenantId: 'other-tenant'}, resolution), {code: 'forbidden'});
+    const candidate = await repository().resolveProductReview('reviewer-one', catalogueIdentity, resolution);
+    assert.deepEqual(candidate.sku, value); assert.equal(candidate.expectedMirrorRevision, 0);
+    assert.equal(candidate.expiresAt, '2026-10-16T13:00:00.000Z');
+    assert.deepEqual(await repository().resolveProductReview('reviewer-one', catalogueIdentity, resolution), candidate);
+    await assert.rejects(repository().resolveProductReview('reviewer-one', catalogueIdentity,
+      {...resolution, verifiedPackId: 'changed-pack'}), {code: 'conflict'});
+    await assert.rejects(repository().resolveProductReview('reviewer-one', catalogueIdentity,
+      {...resolution, idempotencyKey: 'stale-resolution'}), {code: 'revision_conflict'});
+    const legacy = await service().handleProductSubmission('owner-one', 'readStoreProductSubmission', read) as any;
+    assert.equal(Object.hasOwn(legacy, 'review'), false); assert.equal(Object.hasOwn(legacy, 'productReviewVersion'), false);
+    const ready = await service().handleProductSubmission('owner-one', 'readStoreProductSubmission', reviewRead) as any;
+    assert.equal(ready.review.state, 'ready'); assert.deepEqual(ready.review.candidate, candidate);
+    assert.equal(ready.approved, false); assert.equal(ready.publicationConfirmed, false); assert.equal(ready.orderingAvailable, false);
+    assert.equal((await root.collection('stores').doc('store-one').collection('skus').get()).size, 0);
+    assert.equal((await root.collection('publicListingBindings').get()).size, 0);
+    await assert.rejects(service().handleProductSubmission('other-owner', 'readStoreProductSubmission', reviewRead), {code: 'not_found'});
+    await assert.rejects(service().handleProductSubmission('owner-one', 'submitStoreProduct', {...productRequest(), productReviewVersion: 1}));
+    const expired = await service('2026-10-16T13:00:00.000Z').handleProductSubmission('owner-one', 'readStoreProductSubmission', reviewRead) as any;
+    assert.equal(expired.review.state, 'unavailable'); assert.equal(expired.review.candidate, null);
+    await root.collection('producerAuthorities').doc('owner-one').update({enabled: false});
+    const revoked = await service().handleProductSubmission('owner-one', 'readStoreProductSubmission', reviewRead) as any;
+    assert.equal(revoked.review.state, 'unavailable'); assert.equal(revoked.review.candidate, null);
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    const request = {storeId: 'store-one', sku: value, expectedRevision: 0, idempotencyKey: 'publish-reviewed',
+      reviewCandidate: {revision: candidate.revision, fingerprint: candidate.fingerprint}};
+    await assert.rejects(service().saveSku('owner-one', request));
+    await assert.rejects(service().bindReviewedSku('owner-one', {...request, reviewCandidate: {...request.reviewCandidate, fingerprint: 'A'.repeat(64)}}));
+    await assert.rejects(service().bindReviewedSku('owner-one', {...request, sku: {...value, channels: [{...value.channels[0]!, priceMinor: 1}]}}));
+    // Newer owner edits invalidate the candidate for NEW publication, not its historical receipt.
+    const changed = structuredClone(product); changed.content.title = 'Reviewed second version';
+    const saved2 = await repository().submitProduct(productCommand({expectedRevision: 1, idempotencyKey: 'edit-two', product: changed}));
+    await assert.rejects(service().bindReviewedSku('owner-one', request));
+    const stale = await service().handleProductSubmission('owner-one', 'readStoreProductSubmission', reviewRead) as any;
+    assert.equal(stale.review.state, 'outdated'); assert.equal(stale.review.candidate, null);
+    assert.deepEqual(await repository().resolveProductReview('reviewer-one', catalogueIdentity, resolution), candidate);
+    const source2 = {...source, revision: saved2.revision, fingerprint: saved2.fingerprint};
+    const changedValue = {...value, content: {...changed.content, media: []}};
+    await repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, source2,
+      {type: 'propose_product_revision', commandId: 'reviewed-edit-proposal', expectedVersion: 6,
+        productId: value.canonicalProductId, previousContentSha256: cataloguePayloadHash(value.content)});
+    await repository().produceCatalogue('reviewer-one', catalogueIdentity,
+      {type: 'review_product_revision', commandId: 'reviewed-edit-approval', expectedVersion: 7,
+        productId: value.canonicalProductId, revision: 2, previousContentSha256: cataloguePayloadHash(value.content),
+        contentSha256: cataloguePayloadHash(changedValue.content), decision: 'reject', reasonCode: 'more-review-needed'});
+    await repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, source2,
+      {type: 'propose_product_revision', commandId: 'reviewed-edit-reproposal', expectedVersion: 8,
+        productId: value.canonicalProductId, previousContentSha256: cataloguePayloadHash(value.content)});
+    await repository().produceCatalogue('reviewer-one', catalogueIdentity,
+      {type: 'review_product_revision', commandId: 'reviewed-edit-final-approval', expectedVersion: 9,
+        productId: value.canonicalProductId, revision: 3, previousContentSha256: cataloguePayloadHash(value.content),
+        contentSha256: cataloguePayloadHash(changedValue.content), decision: 'verify', reasonCode: 'independent-check'});
+    const candidate2 = await repository().resolveProductReview('reviewer-one', catalogueIdentity,
+      {...resolution, source: source2, expectedReviewRevision: 1, idempotencyKey: 'resolve-edit'});
+    assert.equal(candidate2.revision, 2); assert.equal(candidate2.source.revision, 2);
+    const request2 = {...request, sku: changedValue, idempotencyKey: 'publish-reviewed-edit',
+      reviewCandidate: {revision: candidate2.revision, fingerprint: candidate2.fingerprint}};
+    const bound = await service().bindReviewedSku('owner-one', request2) as any;
+    assert.equal(bound.saved.skuId, 'sku-one'); assert.equal(bound.saved.revision, 1);
+    assert.equal(bound.publicationConfirmed, false);
+    const finalRead = await service().handleProductSubmission('owner-one', 'readStoreProductSubmission', reviewRead) as any;
+    assert.equal(finalRead.review.state, 'bound');
+    const publicRead = await service().publicCatalogue({storeId: 'store-one'}) as any;
+    assert.equal(publicRead.items[0].content.title, changed.content.title);
+    assert.equal(publicRead.items[0].channels[0].priceMinor, 10025);
+    const later = structuredClone(changed); later.channels[0]!.priceMinor = 10026;
+    const saved3 = await repository().submitProduct(productCommand({expectedRevision: 2, idempotencyKey: 'edit-three', product: later}));
+    await assert.rejects(repository().resolveProductReview('reviewer-one', catalogueIdentity, {...resolution,
+      source: {...source, revision: saved3.revision, fingerprint: saved3.fingerprint}, expectedReviewRevision: 2, idempotencyKey: 'unreviewed-new-price'}), {code: 'invalid_input'});
+    assert.deepEqual(await service('2026-10-16T13:00:00.000Z').reconcileBinding('owner-one', request2), bound);
+    assert.equal((await root.collection('stores').doc('store-one').collection('skus').doc('sku-one').get()).get('revision'), 1);
+    if (process.env.LF03_REVIEW_CAPTURE === 'true') {
+      console.log(`LF_REVIEW_CANDIDATE_PROJECTION=${JSON.stringify(ready)}`);
+      console.log(`LF_REVIEW_BINDING_PROJECTION=${JSON.stringify({request: request2, response: bound, source: saved2})}`);
+    }
+  } finally {await db.terminate(); await deleteApp(app);}
+});
 function produceAll(value = input(), canonicalBrandId: string | null = "brand-host", canonicalCategoryId = value.content.categoryId) {
   let aggregate: CatalogueAggregate | undefined;
   const participant = producerParticipant("store-one", canonicalCategoryId), receipts: CatalogueProductionReceipt[] = [];
