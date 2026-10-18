@@ -233,6 +233,7 @@ final class _VariantFamilyAdapter implements BuyV2VariantFamilySource {
   _VariantFamilyAdapter(this.products);
   final List<BuyV2Product> products;
   String fault = '';
+  bool fullFamily = false;
   final Set<String> withdrawn = {};
   int requests = 0;
   Future<BuyV2VariantFamilySnapshot> Function(
@@ -256,7 +257,7 @@ final class _VariantFamilyAdapter implements BuyV2VariantFamilySource {
         .where(
           (product) =>
               !withdrawn.contains(product.id) &&
-              product.variantAttributes
+              (fullFamily || product.variantAttributes
                       .where(
                         (a) => !current.variantAttributes.any(
                           (v) =>
@@ -265,7 +266,7 @@ final class _VariantFamilyAdapter implements BuyV2VariantFamilySource {
                         ),
                       )
                       .length <=
-                  1,
+                  1),
         )
         .toList();
     if (fault == 'foreign') {
@@ -1312,6 +1313,56 @@ void main() {
     final sibling = bound(ownerFamily()[1], 'production', 'b');
     expect(first.resolveVariantOption([first, sibling], 'storage', '256'), isNull);
   });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF03-COMBINATIONS explicit complete SKU changes two options without inventing a hybrid text$scale', (tester) async {
+      tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(360, 800);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset); addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      // Host-only reviewed products; no phone inventory or provider injection.
+      final all = boundOwnerFamily(), family = [all.first, all.last.copyWith(priceMinor: 1400025)];
+      final first = family.first, next = family.last, adapter = _VariantFamilyAdapter(family)..fullFamily = true;
+      expect(first.resolveVariantOption(family, 'colour', next.variantAttributes.first.optionId), isNull);
+      expect(first.resolveVariantOption(family, 'storage', next.variantAttributes.last.optionId), isNull);
+      final core = BuySession();
+      final session = BuyV2Session(core: core, variantFamilySource: adapter,
+        commerceAdapter: _MediaCommerce(first), reviewDataEnabled: false,
+        productFactsAdapter: QualifiedTestProductFacts(family.map((p) => p.id).toSet()));
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      await session.restoreCommerce();
+      await tester.pumpWidget(r66VisualCaptureRoot(MaterialApp(theme: MoolTheme.light(),
+        home: BuyV2Screen(session: session, productId: first.id))));
+      await tester.pumpAndSettle();
+      expect(session.variantFamilyFor(first)?.candidates.length, 2);
+      final group = find.byKey(ValueKey('buy-product-variants-${first.canonicalId}'));
+      final scroll = find.descendant(of: find.byKey(PageStorageKey('buy-product-${first.id}')),
+        matching: find.byType(Scrollable)).first;
+      await tester.scrollUntilVisible(group, 140, scrollable: scroll);
+      final choice = find.byKey(ValueKey('buy-product-combination-${next.id}'));
+      await tester.ensureVisible(choice); await tester.pumpAndSettle();
+      // Capture the group heading as well as its action, not an aligned-to-top
+      // child with its explanatory label above the viewport.
+      await tester.ensureVisible(group); await tester.pumpAndSettle();
+      expect(choice.hitTestable(), findsOneWidget);
+      expect(tester.getTopLeft(find.text('Choose full combination')).dy, greaterThanOrEqualTo(0));
+      expect(tester.getSize(choice).height, greaterThanOrEqualTo(48));
+      expect(find.text('Choose full combination'), findsOneWidget);
+      expect(find.text('Colour: black · Storage: 256 GB'), findsOneWidget);
+      await capturePack(tester, 'lf03-full-combination-${scale.toStringAsFixed(1)}');
+      await tester.tap(choice); await tester.pumpAndSettle();
+      expect(session.selectedProductId, next.id); expect(session.selectedProduct!.canonicalId, next.canonicalId);
+      expect(session.selectedProduct!.publicListingIdentity, next.publicListingIdentity);
+      expect(session.selectedProduct!.priceMinor, 1400025); expect(session.cartLines, isEmpty);
+      adapter.withdrawn.add(first.id);
+      expect(await session.refreshVariantFamily(next), isTrue);
+      expect(session.selectProductVariant(first.id), isFalse); expect(session.selectedProductId, next.id);
+      adapter.fault = 'expired';
+      expect(await session.refreshVariantFamily(next), isFalse);
+      expect(session.selectProductVariant(first.id), isFalse); expect(session.cartLines, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   test('LF03 explicit family snapshot and session retain exact selected identity', () async {
     final family = ownerFamily();

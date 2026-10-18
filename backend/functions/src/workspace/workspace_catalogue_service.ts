@@ -827,7 +827,8 @@ export class WorkspaceCatalogueService {
     const detailsRequested = body.storeDetailsReadbackVersion === 1;
     if (body.storeDetailsReadbackVersion !== undefined && !detailsRequested) invalid();
     if (classificationRequested && !detailsRequested) invalid();
-    if (body.cataloguePageVersion !== 1) invalid();
+    if (body.cataloguePageVersion !== 1 && body.cataloguePageVersion !== 2) invalid();
+    const pageVersion = body.cataloguePageVersion, exactMoney = pageVersion === 2;
     const storeId = id(body.storeId), pageSize = integer(body.pageSize, 1, 50), query = publicPageQuery(body.query);
     if (!this.identity || !this.repository.publicCatalogueSource) {
       throw new WorkspaceProfileError("unavailable", "Store catalogue is not connected.", 503);
@@ -860,13 +861,13 @@ export class WorkspaceCatalogueService {
           query.maximumPriceMinor !== null && channel.priceMinor > query.maximumPriceMinor ||
           query.search && ![row.content.title, row.content.brand, row.content.variant, row.pack.label]
             .join(" ").toLowerCase().replace(/\s+/gu, " ").includes(query.search)) continue;
-      // Current Buy prices are whole INR; don't count then silently drop an
-      // unrepresentable item on the client. Exact fractional packs obey its model.
+      // Preserve legacy whole-INR readers; v2 explicitly supports integer paise.
+      // Pack representability remains identical in both versions.
       const quantities = [BigInt(row.pack.quantityMilli), BigInt(row.pack.quantityMilli) * 1000n];
       const count = BigInt(row.pack.unitsPerCase);
       const amount = quantities.find((value, i) => (i === 0 || row.pack.unit !== "count") && value % count === 0n);
-      if (channel.priceMinor % 100 || channel.mrpMinor !== null && channel.mrpMinor % 100 ||
-          channel.tiers.some(tier => tier.unitPriceMinor % 100) || amount === undefined ||
+      if (!exactMoney && (channel.priceMinor % 100 || channel.mrpMinor !== null && channel.mrpMinor % 100 ||
+          channel.tiers.some(tier => tier.unitPriceMinor % 100)) || amount === undefined ||
           row.pack.unit === "count" && amount / count % 1000n !== 0n) {
         throw new WorkspaceProfileError("unsupported_representation", "Update required to display exact Store prices or packs.", 409);
       }
@@ -876,7 +877,7 @@ export class WorkspaceCatalogueService {
       query.sort === "priceHighToLow" ? b.price - a.price : 0) ||
       (a.listingId < b.listingId ? -1 : a.listingId === b.listingId ? 0 : 1));
     const stableRows = stablePublicProjection(data);
-    const queryHash = cataloguePayloadHash([storeId, query]).toLowerCase();
+    const queryHash = cataloguePayloadHash(exactMoney ? [storeId, query, pageVersion, 'paise'] : [storeId, query]).toLowerCase();
     const snapshotId = cataloguePayloadHash([sourceHash, stableRows]).toLowerCase();
     let index = 0;
     if (body.cursor !== undefined) {
@@ -884,7 +885,7 @@ export class WorkspaceCatalogueService {
       let cursor: Record<string, unknown>;
       try { cursor = exact(JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")), ["v", "q", "s", "n", "i"]); }
       catch { invalid("Catalogue cursor is invalid. Refresh the Store."); }
-      if (Buffer.from(JSON.stringify(cursor)).toString("base64url") !== encoded || cursor.v !== 1 ||
+      if (Buffer.from(JSON.stringify(cursor)).toString("base64url") !== encoded || cursor.v !== pageVersion ||
           cursor.q !== queryHash || cursor.s !== snapshotId || cursor.n !== pageSize) {
         throw new WorkspaceProfileError("stale_cursor", "Store catalogue changed. Refresh the Store.", 409);
       }
@@ -909,10 +910,11 @@ export class WorkspaceCatalogueService {
       throw new WorkspaceProfileError("stale_snapshot", "Store catalogue changed. Refresh the Store.", 409);
     }
     const cursorAt = (offset: number) => Buffer.from(JSON.stringify(
-      {v: 1, q: queryHash, s: snapshotId, n: pageSize, i: offset})).toString("base64url");
+      {v: pageVersion, q: queryHash, s: snapshotId, n: pageSize, i: offset})).toString("base64url");
     const previousCursor = index === 0 ? null : cursorAt(Math.max(0, index - pageSize));
     const nextCursor = index + pageSize < selected.length ? cursorAt(index + pageSize) : null;
-    return {...data, observedAt: responseAt, cataloguePageVersion: 1, query,
+    return {...data, observedAt: responseAt, cataloguePageVersion: pageVersion,
+      ...(exactMoney ? {moneyUnit: 'paise'} : {}), query,
       items: selected.slice(index, index + pageSize).map(({channel, row}) => ({channel, row})),
       nextCursor, page: {snapshotId, startIndex: index, totalCount: selected.length, previousCursor, nextCursor}};
   }

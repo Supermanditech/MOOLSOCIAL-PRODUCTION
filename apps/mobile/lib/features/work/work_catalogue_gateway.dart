@@ -1925,7 +1925,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
     final contentOwner = contentReadback?.context();
     if (pageSize < 1 || pageSize > 50 || !active()) throw const FormatException();
     final response = await gateway._ownerRequest({'operation': 'readPublicStoreCatalogue',
-      'storeId': storeId, 'cataloguePageVersion': 1, 'query': request, 'pageSize': pageSize,
+      'storeId': storeId, 'cataloguePageVersion': gateway.minorMoneyReadbackSupported ? 2 : 1, 'query': request, 'pageSize': pageSize,
       if (gateway.productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
       'storeDetailsReadbackVersion': 1,
       if (gateway.storeClassificationReadbackSupported) 'storeClassificationReadbackVersion': 1,
@@ -1938,7 +1938,9 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
     _checkProduceReadback(data, supported: gateway.unbrandedProduceReadbackSupported);
     _checkStoreClassificationReadback(data, supported: gateway.storeClassificationReadbackSupported);
     if (gateway.storeClassificationReadbackSupported && data['storeClassificationReadbackVersion'] != 1) throw const FormatException();
-    if (data['cataloguePageVersion'] != 1 || data['schemaVersion'] != 1 || data['realm'] != gateway.realm ||
+    if (data['cataloguePageVersion'] is! int || data['cataloguePageVersion'] != (gateway.minorMoneyReadbackSupported ? 2 : 1) ||
+        (gateway.minorMoneyReadbackSupported ? data['moneyUnit'] != 'paise' : data.containsKey('moneyUnit')) ||
+        data['schemaVersion'] != 1 || data['realm'] != gateway.realm ||
         data['storeId'] != storeId || data['state'] != 'ready' || data['listingReadbackVersion'] != 1 ||
         data['mediaReadbackVersion'] != 1 || data['listingCoverage'] != 'complete' ||
         data['coverage'] != 'verified_public_only' || data['orderingAvailable'] != false ||
@@ -2208,7 +2210,8 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
     credentials: FirebaseSocialContentCredentials(), transport: IoSocialContentTransport(), realm: realm,
     ownerAccountId: _id(accountUserId), policyReadbackRequired: true,
     productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
-    reviewedFamilyReadbackSupported: true, storeClassificationReadbackSupported: true);
+    reviewedFamilyReadbackSupported: true, storeClassificationReadbackSupported: true,
+    minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'));
   return WorkspacePublicDiscoverySource(gateway: gateway, current: current);
 }
 
@@ -2249,6 +2252,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway() {
     productSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_SUBMISSIONS_V1'),
     reviewedProductSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_REVIEW_V1'),
     storeClassificationReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_STORE_CLASSIFICATION_V1'),
+    minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
   );
 }
 
@@ -2279,6 +2283,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.productSubmissionSupported = false,
     this.reviewedProductSubmissionSupported = false,
     this.storeClassificationReadbackSupported = false,
+    this.minorMoneyReadbackSupported = false,
     DateTime Function()? now,
   }) : _reviewedVariantsOverride = reviewedVariants, now = now ?? DateTime.now {
     if (!_validEndpoint(endpoint) ||
@@ -2305,6 +2310,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   @override
   DateTime get productReviewNow => now().toUtc();
   final bool storeClassificationReadbackSupported;
+  // Opt-in only for the matching integer-paise paged contract; legacy stays v1.
+  final bool minorMoneyReadbackSupported;
   @override
   bool get variantFamilySubmissionSupported => reviewedFamilyReadbackSupported;
   final WorkspacePublicVariantSource? _reviewedVariantsOverride;
@@ -2333,6 +2340,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       productSubmissionSupported: productSubmissionSupported,
       reviewedProductSubmissionSupported: reviewedProductSubmissionSupported,
       storeClassificationReadbackSupported: storeClassificationReadbackSupported,
+      minorMoneyReadbackSupported: minorMoneyReadbackSupported,
       now: now,
     );
   }

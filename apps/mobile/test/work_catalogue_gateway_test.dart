@@ -674,6 +674,22 @@ class _AdoptionGateway implements WorkspaceCatalogueGateway, WorkspaceCatalogueO
   @override Future<WorkspaceCatalogueBindingResult> reconcileBinding(WorkspaceCatalogueBindingIntent original, {required bool Function() current}) =>
     source.reconcileBinding(original, current: current);
 }
+class _LoopbackFamilyHttpOverrides extends HttpOverrides {}
+class _LoopbackFamilyTransport implements SocialContentTransport {
+  _LoopbackFamilyTransport(this.forward);
+  final Future<SocialContentResponse> Function(Map<String, Object?>, Map<String, String>) forward;
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {required Map<String, String> headers,
+    required Map<String, Object?> body}) => forward(body, headers);
+}
+class _ConnectedFamilyGateway extends _AdoptionGateway implements WorkspaceVariantFamilyOwnerGateway {
+  _ConnectedFamilyGateway(super.source);
+  @override bool get variantFamilySubmissionSupported => source.variantFamilySubmissionSupported;
+  @override Future<WorkspaceCatalogueContentResult> read(BuyV2Product product) => source.read(product);
+  @override Future<WorkspaceVariantFamilyHead> readVariantFamily(WorkspaceVariantFamilyScope scope,
+    {required bool Function() current}) => source.readVariantFamily(scope, current: current);
+  @override Future<WorkspaceVariantFamilyWriteResult> writeVariantFamily(WorkspaceVariantFamilyIntent original,
+    {required bool Function() current, bool reconcile = false}) => source.writeVariantFamily(original, current: current, reconcile: reconcile);
+}
 class _AdoptionInventory implements WorkInventoryStore, WorkInventoryReceiptProjectionGuard {
   _AdoptionInventory(this.source);
   final SecureWorkInventoryStore source;
@@ -987,6 +1003,170 @@ Future<void> openListingEditor(WidgetTester tester, WorkSession work, {Size size
 }
 
 void main() {
+  if (Platform.environment['LF03_FAMILY_SERVER'] == 'true') {
+    test('LF03-CONNECTED Store saved variants to real reviewed service restart and public selection', () async {
+      final emulator = Platform.environment['FIRESTORE_EMULATOR_HOST'] ?? '';
+      expect(emulator, matches(r'^127\.0\.0\.1:\d+$'));
+      FlutterSecureStorage.setMockInitialValues({}); SharedPreferences.setMockInitialValues({});
+      final child = await Process.start('node', ['--test', '--test-isolation=none',
+        '--test-name-pattern=LF03-CONNECTED live family bridge', 'lib/workspace/workspace_catalogue_service.test.js'],
+        workingDirectory: Directory('../../backend/functions').absolute.path);
+      final ready = Completer<Map<String, dynamic>>(), diagnostics = <String>[];
+      void consume(String line) {
+        const marker = 'LF03_FAMILY_READY=';
+        if (line.contains(marker)) {
+          if (!ready.isCompleted) ready.complete(jsonDecode(line.split(marker).last) as Map<String, dynamic>);
+        } else {
+          diagnostics.add(line); if (diagnostics.length > 100) diagnostics.removeAt(0);
+        }
+      }
+      final stdout = child.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen(consume);
+      final stderr = child.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen(consume);
+      // Only this opt-in loopback client uses real IO; keep the widget binding's
+      // network prohibition unchanged for every ordinary test and production path.
+      final client = HttpOverrides.runWithHttpOverrides(() => HttpClient(), _LoopbackFamilyHttpOverrides())
+        ..connectionTimeout = const Duration(seconds: 5);
+      addTearDown(() async {
+        client.close(force: true); child.kill();
+        await child.exitCode.timeout(const Duration(seconds: 10));
+        await stdout.cancel(); await stderr.cancel();
+      });
+      final configuration = await ready.future.timeout(const Duration(seconds: 20),
+        onTimeout: () => throw StateError('Host family bridge not ready: ${diagnostics.join('\n')}'));
+      final port = configuration['port'] as int;
+      expect(port, inInclusiveRange(1, 65535));
+      Future<SocialContentResponse> post(String path, Map<String, Object?> body, Map<String, String> headers) async {
+        final request = await client.postUrl(Uri.parse('http://127.0.0.1:$port/$path'));
+        headers.forEach(request.headers.set); request.headers.contentType = ContentType.json;
+        request.write(jsonEncode(body));
+        final response = await request.close().timeout(const Duration(seconds: 15));
+        final text = await response.transform(utf8.decoder).join();
+        if (response.statusCode != 200) {
+          // Actual isolated service failure; do not rewrite it into a fixture.
+          debugPrint('LF03_CONNECTED_ERROR=${jsonEncode({'operation': body['operation'], 'status': response.statusCode, 'response': text})}');
+        }
+        return SocialContentResponse(statusCode: response.statusCode, body: text);
+      }
+      Future<Map<String, dynamic>> control(Map<String, Object?> input) async {
+        final response = await post('control', input, {'x-lf-control': configuration['controlToken'] as String});
+        expect(response.statusCode, 200, reason: response.body);
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      final transport = _LoopbackFamilyTransport((body, headers) => post('gateway', body, headers));
+      final connection = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), transport: transport, ownerAccountId: 'owner-one', realm: 'evaluation',
+        productSubmissionSupported: true, reviewedProductSubmissionSupported: true,
+        productFactsReadbackSupported: true, reviewedFamilyReadbackSupported: true, minorMoneyReadbackSupported: true, now: () => at);
+      final account = ListingAccount();
+      WorkSession fresh() => WorkSession(contactDraftStore: account, catalogueGateway: _ConnectedFamilyGateway(connection),
+        inventoryStore: SecureWorkInventoryStore(accountScope: () => account.owner),
+        productSubmissionJournalFactory: (_) => SecureWorkProductSubmissionJournal(currentAccount: () => account.owner),
+        variantFamilyJournalFactory: (_) => SecureWorkVariantFamilyJournal(currentAccount: () => account.owner),
+        catalogueBindingPendingStoreFactory: (_) => SecureWorkCatalogueBindingPendingStore(currentAccount: () => account.owner))
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery',
+          profileId: 'retailer-grocery', area: 'Jaipur', verified: true) ..workspaceId = 'store-one';
+      final work = fresh();
+      var workDisposed = false;
+      addTearDown(() { if (!workDisposed) work.dispose(); });
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      const content = WorkspaceProductContent(description: 'Isolated host device description', specifications: {'Model': 'Host device'});
+      final family = WorkspaceVariantFamily(id: 'family-one', revision: 1, title: 'Host device', brand: 'Host brand',
+        categoryId: 'electronics', content: content, options: const [
+          BuyV2VariantAttribute(dimensionId: 'colour', dimensionLabel: 'Colour', optionId: 'black', optionLabel: 'Black', kind: BuyV2VariantDimensionKind.colour),
+          BuyV2VariantAttribute(dimensionId: 'colour', dimensionLabel: 'Colour', optionId: 'blue', optionLabel: 'Blue', kind: BuyV2VariantDimensionKind.colour),
+          BuyV2VariantAttribute(dimensionId: 'storage', dimensionLabel: 'Storage', optionId: '128', optionLabel: '128 GB', kind: BuyV2VariantDimensionKind.storage),
+          BuyV2VariantAttribute(dimensionId: 'storage', dimensionLabel: 'Storage', optionId: '512', optionLabel: '512 GB', kind: BuyV2VariantDimensionKind.storage),
+        ]);
+      for (final second in [false, true]) {
+        final skuId = second ? 'sku-two' : 'sku-one', base = listingItem();
+        final item = WorkspaceCatalogueItem.fromInventoryJson({...base.toInventoryJson(), 'id': skuId,
+          'canonicalId': 'local-$skuId', 'sku': 'HOST-$skuId', 'pack': '1 phone',
+          'stockEntry': {...base.stockEntry!.toJson(), 'productId': skuId, 'sku': 'HOST-$skuId', 'pack': '1 phone'}})
+          .copyWith(title: family.title, brand: family.brand, categoryId: family.categoryId, content: content,
+            variant: second ? 'Blue 512 GB' : 'Black 128 GB', sellingPriceMinor: second ? 1689950 : 1289925,
+            mrpMinor: 2000000, packMeasure: const WorkspacePackMeasure(unit: BuyV2ComparisonUnit.count, quantityMilli: 1000),
+            variantMembership: WorkspaceVariantMembership(familyId: family.id,
+              selections: {'colour': second ? 'blue' : 'black', 'storage': second ? '512' : '128'}));
+        expect(work.addOrUpdateWorkspaceProduct(item, variantFamily: family,
+          stockEntryMethod: WorkspaceStockEntryMethod.manual), isTrue, reason: work.errorMessage);
+      }
+      expect(await work.workspaceInventorySaved, isTrue);
+      final before = {for (final item in work.workspaceCatalogueItems) item.id: item.toInventoryJson()};
+      final stockBefore = work.workspaceStockMovements.map((movement) => movement.contentIdentity).toList();
+      for (final skuId in ['sku-one', 'sku-two']) {
+        expect(await work.submitWorkspaceProduct(skuId, inputCurrent: () => true), isTrue,
+          reason: work.workspaceProductSubmission(skuId)?.message ?? work.errorMessage);
+        await control({'action': 'review-product', 'skuId': skuId});
+        expect(await work.checkWorkspaceProductSubmission(skuId), isTrue, reason: work.workspaceProductSubmission(skuId)?.message);
+        expect(work.canPublishReviewedWorkspaceProduct(skuId), isTrue);
+        expect(await work.publishReviewedWorkspaceProduct(skuId, inputCurrent: () => true), isTrue, reason: work.errorMessage);
+        expect(work.workspaceCatalogueItems.firstWhere((p) => p.id == skuId).toInventoryJson(), {...before[skuId]!, 'publicListing': true});
+      }
+      final saved = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+      expect(work.workspaceStockMovements.map((movement) => movement.contentIdentity).toList(), stockBefore);
+      expect(work.workspaceInvoices, isEmpty); expect(work.workspaceOrders, isEmpty);
+      work.dispose();
+      workDisposed = true;
+      final restored = fresh(); addTearDown(restored.dispose);
+      expect(await restored.loadWorkspaceInventory(), isTrue);
+      expect(restored.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), saved);
+      expect(restored.workspaceStockMovements.map((movement) => movement.contentIdentity).toList(), stockBefore);
+      for (final skuId in ['sku-one', 'sku-two']) {
+        expect(restored.workspaceReviewedCatalogueLink(skuId)!.canonicalProductId, 'resolved-$skuId');
+        expect(restored.workspaceCatalogueItems.firstWhere((p) => p.id == skuId).canonicalId, 'local-$skuId');
+      }
+      expect(await restored.checkWorkspaceVariantFamily(family.id), isTrue);
+      expect(await restored.submitWorkspaceVariantFamily(family.id, inputCurrent: () => true), isTrue, reason: restored.errorMessage);
+      await control({'action': 'review-family'});
+      final entry = await connection.readPublicEntry(storeId: 'store-one', skuId: 'sku-one',
+        channel: BuyV2OfferClass.retail, current: () => true);
+      expect(entry, isNotNull); expect(entry!.product.variantFamilyId, family.id);
+      final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true, gateway: connection);
+      final query = BuyV2CatalogueQuery(destination: BuyV2Destination.shop, regionId: null, storeId: 'store-one',
+        areaScope: BuyV2CatalogueAreaScope.allAreas);
+      final firstPage = await source.loadProducts(query, pageSize: 1);
+      expect(firstPage.items, hasLength(1));
+      final peek = await connection.reviewedVariants!.readFamily(firstPage.items.single, query, current: () => true);
+      expect(peek.isValidFor(firstPage.items.single, query, at), isTrue, reason: 'Actual family snapshot validity');
+      Object comparable(BuyV2Product p) => [p.id, p.canonicalId, p.categoryId, p.title, p.brand, p.variant,
+        p.variantFamilyId, p.sellerType, p.priceMinor, p.mrpMinor, p.minimumOrder, p.quantityStep, p.pack,
+        p.publicListingIdentity?.toJson(), p.packTerms?.revision, p.packTerms?.sellUnit, p.packTerms?.containedUnits,
+        p.packTerms?.netContentMilli, p.packTerms?.contentUnit, p.packTerms?.priceObservedAt?.toIso8601String(),
+        p.packTerms?.priceValidUntil?.toIso8601String(),
+        for (final a in p.variantAttributes) [a.dimensionId, a.dimensionLabel, a.optionId, a.optionLabel, a.kind.name, a.swatchArgb]];
+      expect(comparable(peek.candidates.singleWhere((p) => p.id == firstPage.items.single.id)), comparable(firstPage.items.single),
+        reason: 'Actual family selected candidate must match its paged source');
+      final resolved = await source.loadVariantFamily(firstPage.items.single, query);
+      expect(resolved.candidates.map((p) => p.sourceSkuId).toSet(), {'sku-one', 'sku-two'});
+      expect(resolved.candidates, hasLength(2), reason: 'No generated Cartesian combinations');
+      final core = BuySession();
+      final buyer = BuyV2Session(core: core, cataloguePageSource: source,
+        reviewDataEnabled: false, catalogueNow: () => at);
+      addTearDown(core.dispose); addTearDown(buyer.dispose);
+      final pager = buyer.acquireCatalogueProducts('connected-family'); await pager.open(query);
+      expect(buyer.openProduct(entry.product.id), isTrue);
+      expect(await buyer.refreshVariantFamily(buyer.selectedProduct!), isTrue);
+      final sibling = resolved.candidates.singleWhere((p) => p.sourceSkuId == 'sku-two');
+      expect(buyer.selectedProduct!.id, isNot(sibling.id), reason: 'Must select another real SKU, not the same opaque listing');
+      expect(buyer.selectProductVariant(sibling.id), isTrue);
+      expect(buyer.selectedProduct!.sourceSkuId, 'sku-two'); expect(buyer.selectedProduct!.canonicalId, 'resolved-sku-two');
+      expect(buyer.selectedProduct!.publicListingIdentity!.verifiedPackId, 'resolved-pack-sku-two');
+      expect(buyer.selectedProduct!.priceMinor, 1689950);
+      buyer.releaseCatalogueProducts('connected-family');
+      final localSibling = restored.workspaceCatalogueItems.firstWhere((p) => p.id == 'sku-two');
+      expect(restored.addOrUpdateWorkspaceProduct(localSibling.copyWith(sellingPriceMinor: 1689951)), isTrue);
+      expect(await restored.workspaceInventorySaved, isTrue);
+      final unchangedPublic = await connection.readPublicEntry(storeId: 'store-one', skuId: 'sku-two',
+        channel: BuyV2OfferClass.retail, current: () => true);
+      expect(unchangedPublic!.product.priceMinor, 1689950, reason: 'Private price edit is not publication');
+      expect(await restored.requestWorkspaceProductListing('sku-two', listed: true), isFalse);
+      expect(await restored.requestWorkspaceProductListing('sku-two', listed: false), isTrue, reason: restored.errorMessage);
+      await expectLater(source.loadVariantFamily(entry.product, query), throwsFormatException);
+      await control({'action': 'finish'});
+      expect(await child.exitCode.timeout(const Duration(seconds: 15)), 0, reason: diagnostics.join('\n'));
+    }, timeout: const Timeout(Duration(minutes: 4)));
+  }
   test('LF03-ADOPT inventory restores a separate reviewed identity without rewriting the saved SKU', () {
     final item = listingItem();
     final raw = WorkspaceSavedInventory(account: 'owner-one', store: 'store-one', qa: true, revision: 1,
@@ -2828,6 +3008,39 @@ void main() {
       'items': [if (!empty) {'channel': 'retail', 'row': source}], 'nextCursor': null,
       'page': {'snapshotId': 'c' * 64, 'startIndex': 0, 'totalCount': empty ? 0 : 1,
         'previousCursor': null, 'nextCursor': null}};
+  }
+  test('LF-MONEY2 Store pager preserves paise and owner clones negotiate the same contract', () async {
+    final transport = OwnerTransport((body) async {
+      expect(body['cataloguePageVersion'], 2);
+      final data = pageData(body)..['cataloguePageVersion'] = 2..['moneyUnit'] = 'paise';
+      final terms = (((data['items'] as List).single['row'] as Map)['channels'] as List).single as Map;
+      terms['priceMinor'] = 26025; terms['mrpMinor'] = 28050;
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    });
+    final gateway = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, now: () => at, minorMoneyReadbackSupported: true);
+    final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true, gateway: gateway.forOwnerAccount('owner-one'));
+    expect(source.gateway.minorMoneyReadbackSupported, isTrue);
+    final product = (await source.loadProducts(storeQuery(), pageSize: 40)).items.single;
+    expect(product.priceMinor, 26025); expect(product.mrpMinor, 28050);
+  });
+  for (final failure in ['missing unit', 'wrong unit', 'downgrade', 'double version', 'unsolicited']) {
+    test('LF-MONEY2 Store pager rejects $failure without admission', () async {
+      final transport = OwnerTransport((body) async {
+        final data = pageData(body)..['cataloguePageVersion'] = 2..['moneyUnit'] = 'paise';
+        if (failure == 'missing unit') data.remove('moneyUnit');
+        if (failure == 'wrong unit') data['moneyUnit'] = 'INR';
+        if (failure == 'downgrade') data['cataloguePageVersion'] = 1;
+        if (failure == 'double version') data['cataloguePageVersion'] = 2.0;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      });
+      final gateway = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), transport: transport, now: () => at, minorMoneyReadbackSupported: failure != 'unsolicited');
+      final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true, gateway: gateway);
+      await expectLater(source.loadProducts(storeQuery(), pageSize: 40), throwsFormatException);
+    });
   }
   AuthenticatedWorkspaceCatalogueGateway pageGateway(OwnerTransport transport) =>
     AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(

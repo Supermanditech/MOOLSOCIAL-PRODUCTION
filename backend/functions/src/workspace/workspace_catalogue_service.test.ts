@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {randomUUID} from "node:crypto";
+import {createServer} from "node:http";
 import {initializeApp, deleteApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingBindings, channelTerms, planCatalogueSave, normalizeSku,
@@ -659,6 +660,115 @@ test('LF03-REVISION emulator approved updates preserve another Store original an
         description: (item.listing.items[0] as unknown as {content: StoreSkuContent}).content.description})), descriptions);
     } finally { await db.terminate(); await deleteApp(app); }
   });
+
+test('LF03-CONNECTED live family bridge', {
+  skip: process.env.LF03_FAMILY_SERVER !== 'true', timeout: 180000,
+}, async () => {
+  // One opt-in cross-language acceptance test, never imported by index.ts or
+  // used by a phone. Ordinary requests cannot select the actor or invoke review.
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST ?? '', /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-family-${randomUUID().slice(0, 8)}`}, `family-${randomUUID()}`);
+  const db = getFirestore(app), root = db.collection('workspaceCatalogues').doc('evaluation');
+  const repository = new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at));
+  const service = new WorkspaceCatalogueService(repository, catalogueIdentity, () => new Date(at));
+  const controlToken = randomUUID(), operations: string[] = [];
+  let explicitFinish = false;
+  let complete!: () => void;
+  const finished = new Promise<void>(resolve => {complete = resolve;});
+  const server = createServer(async (request, response) => {
+    try {
+      if (request.method !== 'POST') throw new Error('Host bridge requires POST');
+      let size = 0; const chunks: Buffer[] = [];
+      for await (const raw of request) {
+        const chunk = Buffer.from(raw); size += chunk.length;
+        if (size > 384 * 1024) throw new Error('Host bridge body too large');
+        chunks.push(chunk);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>;
+      let data: object;
+      if (request.url === '/control') {
+        if (request.headers['x-lf-control'] !== controlToken) {response.writeHead(403).end(); return;}
+        if (body.action === 'review-product') {
+          assert.match(String(body.skuId), /^sku-(one|two)$/u);
+          const skuId = String(body.skuId), saved = await repository.readProductSubmission('store-one', skuId, 'owner-one');
+          assert.ok(saved);
+          const source: CatalogueSubmissionReference = {realm: 'evaluation', storeId: 'store-one', skuId,
+            revision: saved.revision, fingerprint: saved.fingerprint};
+          const value: StoreSkuInput = {skuId, sku: saved.product.sku, canonicalProductId: `resolved-${skuId}`,
+            verifiedPackId: `resolved-pack-${skuId}`, publicListing: true, content: {...saved.product.content, media: []},
+            pack: saved.product.pack, provenance: saved.product.provenance,
+            channels: saved.product.channels.map(channel => ({...channel, offerId: `offer-${skuId}`}))};
+          let aggregate = await repository.catalogue(catalogueIdentity.catalogueId);
+          if (!aggregate) aggregate = await repository.produceCatalogue('reviewer-one', catalogueIdentity,
+            {type: 'create', commandId: 'bridge-create'});
+          const commands = productionCommands(value);
+          for (let index = 1; index < commands.length; index++) {
+            const command = {...commands[index]!, commandId: `bridge-${skuId}-${index}`, expectedVersion: aggregate.version};
+            if (index === 1 || index === 3) {
+              const nomination: Record<string, unknown> = {...command, codes: [{type: 'internal', value: `${skuId}-${index}`}]};
+              delete nomination.contentSha256; delete nomination.categoryId; delete nomination.descriptorSha256;
+              aggregate = await repository.proposeSubmittedCatalogue('owner-one', catalogueIdentity, source, nomination);
+            } else aggregate = await repository.produceCatalogue(index === 5 ? 'owner-one' : 'reviewer-one', catalogueIdentity, command);
+          }
+          const resolution = {source, expectedReviewRevision: 0, idempotencyKey: `resolve-${skuId}`,
+            canonicalProductId: value.canonicalProductId, verifiedPackId: value.verifiedPackId,
+            offers: [{kind: 'retail', offerId: `offer-${skuId}`}]};
+          await assert.rejects(repository.resolveProductReview('owner-one', catalogueIdentity, resolution), {code: 'forbidden'});
+          data = await repository.resolveProductReview('reviewer-one', catalogueIdentity, resolution);
+        } else if (body.action === 'review-family') {
+          const head = await repository.readVariantFamily('store-one', 'family-one', 'owner-one'); assert.ok(head?.candidate);
+          const review = {expectedCandidateRevision: head.candidate.revision, expectedCandidateFingerprint: head.candidate.fingerprint,
+            expectedReviewRevision: 0, decision: 'verify', reasonCode: 'checked-source', idempotencyKey: 'bridge-family-review'};
+          await assert.rejects(repository.reviewVariantFamily('owner-one', catalogueIdentity, 'store-one', 'family-one', review), {code: 'forbidden'});
+          data = await repository.reviewVariantFamily('reviewer-one', catalogueIdentity, 'store-one', 'family-one', review);
+        } else if (body.action === 'finish') {
+          assert.equal((await root.collection('stores').doc('store-one').collection('skus').get()).size, 2);
+          for (const operation of ['submitStoreProduct', 'bindReviewedStoreCatalogueSku', 'submitStoreVariantFamily', 'readPublicStoreVariantFamilies']) {
+            assert.ok(operations.includes(operation), `Missing actual request ${operation}`);
+          }
+          explicitFinish = true; data = {finished: true}; response.once('finish', complete);
+        } else throw new Error('Unknown host control');
+      } else {
+        if (request.url !== '/gateway' || request.headers.authorization !== 'Bearer isolated-host-token') {
+          response.writeHead(403).end(); return;
+        }
+        const {operation, ...input} = body;
+        assert.equal(typeof operation, 'string'); operations.push(operation as string);
+        if (storeProductSubmissionOperation(operation)) data = await service.handleProductSubmission('owner-one', operation as string, input);
+        else if (operation === 'listStoreCatalogueSkus') data = await service.listSkus('owner-one', input);
+        else if (operation === 'bindReviewedStoreCatalogueSku') data = await service.bindReviewedSku('owner-one', input);
+        else if (operation === 'reconcileStoreCatalogueBinding') data = await service.reconcileBinding('owner-one', input);
+        else if (operation === 'readPublicStoreCatalogue') data = await service.publicCatalogue(input);
+        else if (operation === 'readPublicStoreVariantFamilies') data = await service.publicVariantFamilies(input);
+        else if (storeVariantFamilyOperation(operation)) data = await service.handleStoreVariantFamily('owner-one', operation as string, input);
+        else throw new Error('Unsupported host operation');
+      }
+      response.writeHead(200, {'content-type': 'application/json'}).end(JSON.stringify({ok: true, data}));
+    } catch (error) {
+      const value = error as {httpStatus?: number; code?: string; message?: string};
+      response.writeHead(value.httpStatus ?? 500, {'content-type': 'application/json'})
+        .end(JSON.stringify({ok: false, error: {code: value.code ?? 'host_failure', message: value.message ?? 'Host failure'}}));
+    }
+  });
+  server.requestTimeout = 10000; server.headersTimeout = 10000;
+  const deadline = setTimeout(complete, 150000);
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    await root.collection('participants').doc('store-one').set(producerParticipant('store-one', 'electronics'));
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address(); assert.ok(address && typeof address !== 'string');
+    console.log(`LF03_FAMILY_READY=${JSON.stringify({port: address.port, controlToken})}`);
+    await finished;
+    assert.equal(explicitFinish, true, 'Bridge deadline/abort is not successful completion');
+    assert.ok(operations.includes('readPublicStoreVariantFamilies'), 'Bridge did not finish public selection');
+  } finally {
+    clearTimeout(deadline); server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    await db.terminate(); await deleteApp(app);
+  }
+});
 
 test("family submission freezes only actual combinations, not a Cartesian inventory", () => {
   const {family, candidate} = familyFixture();
@@ -1889,6 +1999,32 @@ test('LF-PAGER unsupported semantics capacity and monetary precision never becom
       termSnapshotSha256: cataloguePayloadHash(channelTerms(saved.channels[0]!))}))}))};
   await assert.rejects(subject(paise).publicCatalogue(viewRequest()), {code: 'unsupported_representation'});
 });
+for (const field of ['price', 'mrp', 'tier'] as const) test(`LF-MONEY2 exact ${field} is negotiated without loosening legacy money`, async () => {
+  const repository = await viewRepository(1), row = repository.records.get('store-one/sku-000')!;
+  if (field === 'price') row.channels[0]!.priceMinor = 26001;
+  if (field === 'mrp') row.channels[0]!.mrpMinor = 28001;
+  if (field === 'tier') row.channels[0]!.tiers = [{minimumQuantity: 1, unitPriceMinor: 26000}, {minimumQuantity: 2, unitPriceMinor: 25999}];
+  repository.aggregate = {...repository.aggregate!, offers: repository.aggregate!.offers.map(offer => ({...offer,
+    termWindows: offer.termWindows.map(window => ({...window, termSnapshotSha256: cataloguePayloadHash(channelTerms(row.channels[0]!))}))}))};
+  await assert.rejects(subject(repository).publicCatalogue(viewRequest()), {code: 'unsupported_representation'});
+  const result = await subject(repository).publicCatalogue(viewRequest({cataloguePageVersion: 2})) as any;
+  assert.equal(result.cataloguePageVersion, 2); assert.equal(result.moneyUnit, 'paise');
+  assert.equal(result.page.totalCount, 1); assert.deepEqual(result.items[0].row.channels[0], {
+    ...row.channels[0], revision: 'term-host-one', validUntil: '2026-10-16T13:00:00.000Z'});
+});
+test('LF-MONEY2 cursor versions never cross while legacy response stays unchanged', async () => {
+  const service = subject(await viewRepository(3));
+  const old = await service.publicCatalogue(viewRequest({pageSize: 1})) as any;
+  const exact = await service.publicCatalogue(viewRequest({cataloguePageVersion: 2, pageSize: 1})) as any;
+  assert.equal(Object.hasOwn(old, 'moneyUnit'), false); assert.equal(old.cataloguePageVersion, 1);
+  assert.equal(exact.page.totalCount, 3);
+  await assert.rejects(service.publicCatalogue(viewRequest({cataloguePageVersion: 2, pageSize: 1, cursor: old.nextCursor})), {code: 'stale_cursor'});
+  await assert.rejects(service.publicCatalogue(viewRequest({pageSize: 1, cursor: exact.nextCursor})), {code: 'stale_cursor'});
+  const next = await service.publicCatalogue(viewRequest({cataloguePageVersion: 2, pageSize: 1, cursor: exact.nextCursor})) as any;
+  assert.equal(next.page.startIndex, 1); assert.equal(next.moneyUnit, 'paise');
+  for (const version of ['2', [2], null, 3]) await assert.rejects(service.publicCatalogue(viewRequest({cataloguePageVersion: version})), {code: 'invalid_input'});
+});
+
 test('LF-PAGER rejects array-valued query enums instead of coercing them', async () => {
   const repository = await viewRepository(1);
   for (const query of [{...viewQuery, destination: ['shop'], tradeType: 'bulk'},

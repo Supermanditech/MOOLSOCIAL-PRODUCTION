@@ -323,8 +323,9 @@ abstract interface class BuyV2CataloguePageSource {
   Future<List<BuyV2Product>> resolveProducts(Set<String> productIds);
 }
 
-/// Complete dimension choices for one selected SKU, plus only its selectable
-/// neighbours. Providers resolve combinations; clients never build a Cartesian
+/// Complete dimension choices and real published family SKUs. A dimension tap
+/// preserves other choices; an explicit full-SKU choice may change several.
+/// Providers resolve combinations; clients never build a Cartesian
 /// catalogue or infer missing choices from the current discovery page.
 abstract interface class BuyV2VariantFamilySource {
   Future<BuyV2VariantFamilySnapshot> loadVariantFamily(
@@ -460,8 +461,7 @@ class BuyV2VariantFamilySnapshot {
         combination[attribute.dimensionId] = attribute.optionId;
       }
       final ordered = combination.keys.toList()..sort();
-      if (changed > 1 ||
-          (candidate.id == selected.id && changed != 0) ||
+      if ((candidate.id == selected.id && changed != 0) ||
           (candidate.id != selected.id && changed == 0) ||
           !combinations.add(
             jsonEncode([

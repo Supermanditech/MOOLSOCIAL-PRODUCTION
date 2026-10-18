@@ -4098,6 +4098,10 @@ class _StructuredProductVariants extends StatelessWidget {
   Widget build(BuildContext context) {
     final largeText = MediaQuery.textScalerOf(context).scale(12) > 18;
     final viewport = MediaQuery.sizeOf(context).width - 32;
+    final completeChoices = (session.variantFamilyFor(product)?.candidates ?? const <BuyV2Product>[])
+      .where((candidate) => candidate.id != product.id && product.variantAttributes.where((selected) =>
+        candidate.variantAttributes.any((value) => value.dimensionId == selected.dimensionId &&
+          value.optionId != selected.optionId)).length > 1).toList(growable: false);
     return BuyV2CartAvoidanceRegion(
       child: SingleChildScrollView(
         key: ValueKey('buy-product-variants-${product.canonicalId}'),
@@ -4109,6 +4113,23 @@ class _StructuredProductVariants extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: _dimension(context, selected, largeText, viewport),
+              ),
+            if (completeChoices.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Choose full combination', style: context.buyBody.copyWith(fontSize: 11)),
+                  const SizedBox(height: 6),
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    for (final candidate in completeChoices)
+                      Padding(padding: const EdgeInsets.only(right: 8), child: _ProductVariantOption(
+                        session: session, option: candidate, selected: false,
+                        width: largeText ? viewport.clamp(220.0, 340.0).toDouble() : 220,
+                        optionKey: 'buy-product-combination-${candidate.id}',
+                        optionLabel: candidate.variantAttributes.map((a) => '${a.dimensionLabel}: ${a.optionLabel}').join(' · '),
+                      )),
+                  ]),
+                ]),
               ),
             if (session.hasVariantFamilySourceFor(product))
               IconButton(
