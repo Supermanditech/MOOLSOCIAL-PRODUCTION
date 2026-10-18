@@ -253,6 +253,92 @@ function attributedReceipt() {
   }))};
 }
 
+function scheduledReceipt() {
+  const value = JSON.parse(JSON.stringify(variantReceipt()));
+  value.schemaVersion = 4;
+  for (const store of value.stores) for (const line of store.lines) line.scheduledFulfilment = null;
+  const store = value.stores[0], line = store.lines[0];
+  line.scheduledFulfilment = {schemaVersion: 1, method: "scheduled", listing: {
+    schemaVersion: 1, realm: "evaluation",
+    listingId: `listing-${createHash("sha256").update(JSON.stringify([1, "evaluation", store.storeId, line.skuId, "retail"])).digest("hex")}`,
+    storeId: store.storeId, skuId: line.skuId, canonicalProductId: line.canonicalProductId,
+    verifiedPackId: line.verifiedPackId, channel: "retail"},
+    sourceRevision: "eligibility-original-one", locationKey: "opaque-destination-one", slotId: "slot-original-one",
+    startsAt: "2026-10-15T23:59:59.123456Z", endsAt: "2026-10-16T00:00:00.000001Z"};
+  return value;
+}
+
+test("LF-SCHEDULE original preserves exact historical desired context and explicit null without booking claims", () => {
+  const input = scheduledReceipt();
+  const result = normalizePlacement(input, "evaluation");
+  assert.deepEqual(result, input);
+  const line = result.stores[0]!.lines[0] as unknown as {scheduledFulfilment: {startsAt: string}};
+  assert.equal(line.scheduledFulfilment.startsAt, "2026-10-15T23:59:59.123456Z");
+});
+
+test("LF-SCHEDULE maximum Dart timestamp cannot overflow by one microsecond", () => {
+  const input = scheduledReceipt(), s = input.stores[0].lines[0].scheduledFulfilment;
+  s.startsAt = "+275760-09-12T23:59:59.999999Z";
+  s.endsAt = "+275760-09-13T00:00:00.000Z";
+  assert.deepEqual(normalizePlacement(input, "evaluation"), input);
+  s.endsAt = "+275760-09-13T00:00:00.000001Z";
+  assert.throws(() => normalizePlacement(input, "evaluation"), rejectsCode("invalid_input"));
+});
+
+test("LF-SCHEDULE all-null supplied context stays new-version, not legacy or Quick", () => {
+  const value = scheduledReceipt();
+  for (const store of value.stores) for (const line of store.lines) line.scheduledFulfilment = null;
+  const result = normalizePlacement(value, "evaluation");
+  assert.equal(result.schemaVersion, 4);
+  assert.equal(result.stores.every(s => s.lines.every(l => l.scheduledFulfilment === null)), true);
+});
+
+for (const [start, end] of [
+  ["2026-10-15T23:59:59.123456Z", "2026-10-15T23:59:59.123457Z"],
+  ["2026-10-15T23:59:59.123Z", "2026-10-16T00:00:00.000Z"],
+  ["0000-02-29T23:59:59.000001Z", "0000-03-01T00:00:00.000Z"],
+  ["-0001-01-01T00:00:00.000001Z", "-0001-01-01T00:00:00.000002Z"],
+  ["+010000-01-01T00:00:00.123456Z", "+010000-01-01T00:00:00.123457Z"],
+]) {
+  test(`LF-SCHEDULE retains canonical UTC precision ${start}`, () => {
+    const value = scheduledReceipt(), selected = value.stores[0].lines[0].scheduledFulfilment;
+    selected.startsAt = start; selected.endsAt = end;
+    assert.deepEqual(normalizePlacement(value, "evaluation"), value);
+  });
+}
+for (const fault of ["missing", "boolean", "array", "object", "version", "method", "nested-version", "realm", "store", "sku", "product", "pack", "listing", "channel", "revision", "location", "slot", "extra", "invalid-day", "invalid-hour", "offset", "precision", "redundant-zero", "equal", "micro-before", "old-version"]) {
+  test(`LF-SCHEDULE rejects ${fault} rather than silently converting desired context`, () => {
+    const value = scheduledReceipt(), line = value.stores[0].lines[0], s = line.scheduledFulfilment;
+    if (fault === "missing") delete line.scheduledFulfilment;
+    if (fault === "boolean") line.scheduledFulfilment = false;
+    if (fault === "array") line.scheduledFulfilment = [];
+    if (fault === "object") line.scheduledFulfilment = {};
+    if (fault === "version") s.schemaVersion = true;
+    if (fault === "method") s.method = "quick";
+    if (fault === "nested-version") s.listing.schemaVersion = 2;
+    if (fault === "realm") s.listing.realm = "production";
+    if (fault === "store") s.listing.storeId = "other-store";
+    if (fault === "sku") s.listing.skuId = "other-sku";
+    if (fault === "product") s.listing.canonicalProductId = "other-product";
+    if (fault === "pack") s.listing.verifiedPackId = "other-pack";
+    if (fault === "listing") s.listing.listingId = "made-up-listing";
+    if (fault === "channel") s.listing.channel = "unknown";
+    if (fault === "revision") s.sourceRevision = " ";
+    if (fault === "location") delete s.locationKey;
+    if (fault === "slot") s.slotId = null;
+    if (fault === "extra") s.booked = true;
+    if (fault === "invalid-day") s.startsAt = "2026-02-30T00:00:00.000Z";
+    if (fault === "invalid-hour") s.startsAt = "2026-10-15T24:00:00.000Z";
+    if (fault === "offset") s.startsAt = "2026-10-15T23:59:59.123456+00:00";
+    if (fault === "precision") s.startsAt = "2026-10-15T23:59:59.1234567Z";
+    if (fault === "redundant-zero") s.startsAt = "2026-10-15T23:59:59.123000Z";
+    if (fault === "equal") s.endsAt = s.startsAt;
+    if (fault === "micro-before") s.endsAt = "2026-10-15T23:59:59.123455Z";
+    if (fault === "old-version") value.schemaVersion = 3;
+    assert.throws(() => normalizePlacement(value, "evaluation"), rejectsCode("invalid_input"));
+  });
+}
+
 function variantReceipt(): TrustedPlacementReceipt {
   const base = normalizePlacement(attributedReceipt(), "evaluation");
   const stores = base.stores.map((s, i) => ({...s, lines: s.lines.map(l => ({...l,
@@ -335,17 +421,25 @@ for (const fault of ["missing", "null", "version", "extra", "unknown-line", "dup
   });
 }
 
-for (const includeVariants of [false, true]) {
-test(`LF-ATTR actual materializer retains exact source allocations across restart and Store partitions variants=${includeVariants}`, {
+for (const context of ["attribution", "variants", "scheduled"]) {
+const includeVariants = context !== "attribution", includeScheduled = context === "scheduled";
+test(`LF-ATTR actual materializer retains exact source allocations across restart and Store partitions context=${context}`, {
   skip: !process.env.FIRESTORE_EMULATOR_HOST,
 }, async () => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
   const app = initializeApp({projectId: "demo-lf-benefit-original"}, `benefits-${randomUUID()}`);
   const db = getFirestore(app), suffix = randomUUID();
-  const input: TrustedPlacementReceipt = {...(includeVariants ? variantReceipt() : normalizePlacement(attributedReceipt(), "evaluation")),
-    receiptId: `benefit-${suffix}`, buyerUserId: `buyer-${suffix}`, schemaVersion: includeVariants ? 3 : 2};
+  const input: TrustedPlacementReceipt = {...(includeScheduled ? normalizePlacement(scheduledReceipt(), "evaluation") :
+    includeVariants ? variantReceipt() : normalizePlacement(attributedReceipt(), "evaluation")),
+    receiptId: `benefit-${suffix}`, buyerUserId: `buyer-${suffix}`, schemaVersion: includeScheduled ? 4 : includeVariants ? 3 : 2};
   input.stores.forEach((s, i) => {
     s.storeId = `store-${suffix}-${i}`; s.caseId = `case-${suffix}-${i}`; s.ownerUserId = `owner-${suffix}-${i}`;
+    for (const l of s.lines) if (l.scheduledFulfilment) {
+      l.scheduledFulfilment.listing.storeId = s.storeId;
+      l.scheduledFulfilment.listing.listingId = `listing-${createHash("sha256").update(JSON.stringify([1, "evaluation", s.storeId, l.skuId, "retail"])).digest("hex")}`;
+      l.scheduledFulfilment.startsAt = "2026-10-16T23:59:59.123456Z";
+      l.scheduledFulfilment.endsAt = "2026-10-17T00:00:00.000001Z";
+    }
   });
   for (const s of input.stores) await db.collection("workspaceProfiles").doc(s.caseId).set({
     schemaVersion: 1, caseId: s.caseId, workspaceId: s.storeId, ownerUserId: s.ownerUserId,
@@ -361,19 +455,23 @@ test(`LF-ATTR actual materializer retains exact source allocations across restar
     if (!includeVariants && process.env.LF_ATTR_PROJECTION_CAPTURE === "true") {
       console.log(`LF_ATTR_PROJECTION=${JSON.stringify(buyer)}`);
     }
-    if (includeVariants && process.env.LF_VARIANT_PROJECTION_CAPTURE === "true") {
+    if (includeVariants && !includeScheduled && process.env.LF_VARIANT_PROJECTION_CAPTURE === "true") {
       console.log(`LF_VARIANT_PROJECTION=${JSON.stringify(buyer)}`);
     }
-    assert.equal(buyer.schemaVersion, includeVariants ? 4 : 3); assert.equal(buyer.orders.length, 2);
+    if (includeScheduled && process.env.LF_SCHEDULE_PROJECTION_CAPTURE === "true") {
+      console.log(`LF_SCHEDULE_PROJECTION=${JSON.stringify(buyer)}`);
+    }
+    assert.equal(buyer.schemaVersion, includeScheduled ? 5 : includeVariants ? 4 : 3); assert.equal(buyer.orders.length, 2);
     for (const original of buyer.orders) {
       const source = input.stores.find(s => s.storeId === original.storeId)!;
-      assert.equal(original.factsVersion, includeVariants ? 4 : 3);
+      assert.equal(original.factsVersion, includeScheduled ? 5 : includeVariants ? 4 : 3);
       assert.deepEqual(original.original.totals, source.totals);
       const allocated = original.original.lines.find(l => l.skuId === source.lines[0]!.skuId)!;
       assert.equal(original.original.benefitAttribution!.components[0]!.allocations[0]!.lineId, allocated.lineId);
       assert.equal(original.original.benefitAttribution!.components[1]!.amountBasis, "maximum");
       for (const line of original.original.lines) {
         assert.equal(line.variant, source.lines.find(l => l.skuId === line.skuId)!.variant);
+        assert.deepEqual(line.scheduledFulfilment, source.lines.find(l => l.skuId === line.skuId)!.scheduledFulfilment);
       }
     }
     const first = input.stores[0]!, order = buyer.orders.find(o => o.storeId === first.storeId)!;
@@ -388,7 +486,7 @@ test(`LF-ATTR actual materializer retains exact source allocations across restar
       () => new Date("2026-10-16T12:00:00.000Z"));
     await ops.initialize("benefit-operation-source");
     const operational = await ops.read(first.ownerUserId, "seller", tuple);
-    assert.equal(operational.originalFactsVersion, includeVariants ? 4 : 3); assert.deepEqual(operational.original, order.original);
+    assert.equal(operational.originalFactsVersion, includeScheduled ? 5 : includeVariants ? 4 : 3); assert.deepEqual(operational.original, order.original);
     const result = await ops.command(first.ownerUserId, {...tuple, version: 2, operationId: "STORE-ORDER-attribution_nonce==",
       expectedRevision: 1, action: "accept", reason: null});
     assert.deepEqual(result.snapshot.original, order.original);
@@ -396,7 +494,7 @@ test(`LF-ATTR actual materializer retains exact source allocations across restar
       expectedRevision: 1, action: "accept", reason: null}, true)).snapshot.original, order.original);
     const legacyInput: TrustedPlacementReceipt = {...input, schemaVersion: 1, receiptId: `legacy-${suffix}`,
       stores: input.stores.map(({benefitAttribution: _attribution, ...store}) => ({...store,
-        lines: store.lines.map(({variant: _variant, ...line}) => line)}))};
+        lines: store.lines.map(({variant: _variant, scheduledFulfilment: _scheduled, ...line}) => line)}))};
     const legacyWriter = new WorkspacePurchaseProjectionService(db, "evaluation", {readFinalPlacement: async () => legacyInput});
     const legacyCreated = await legacyWriter.materialize("legacy-original-source");
     const legacyRead = await restarted.readBuyer(input.buyerUserId, {purchaseId: legacyCreated.purchaseId});
@@ -409,6 +507,20 @@ test(`LF-ATTR actual materializer retains exact source allocations across restar
     for (const ref of mixedStore.references) {
       const read = await restarted.readStore(first.ownerUserId, {purchaseId: ref.purchaseId, storeId: ref.storeId, orderId: ref.orderId});
       assert.equal(read.orders[0]!.originalFingerprint, ref.originalFingerprint);
+    }
+    if (includeScheduled) {
+      const none = structuredClone(input); none.receiptId = `all-null-${suffix}`;
+      for (const store of none.stores) for (const line of store.lines) line.scheduledFulfilment = null;
+      const allNullWriter = new WorkspacePurchaseProjectionService(db, "evaluation", {readFinalPlacement: async () => none});
+      const allNullCreated = await allNullWriter.materialize("all-null-requested-context");
+      const allNullOriginals = await restarted.readBuyer(input.buyerUserId, {purchaseId: allNullCreated.purchaseId});
+      assert.equal(allNullOriginals.schemaVersion, 5);
+      assert.equal(allNullOriginals.orders.every(o => o.factsVersion === 5 && o.original.lines.every(l => l.scheduledFulfilment === null)), true);
+      const selected = input.stores[0]!.lines[0]!.scheduledFulfilment!;
+      const original = selected.slotId; selected.slotId = "changed-slot";
+      await assert.rejects(writer.materialize("original-benefit-source"), rejectsCode("conflict"));
+      assert.deepEqual(await restarted.readBuyer(input.buyerUserId, {purchaseId: created.purchaseId}), buyer);
+      selected.slotId = original;
     }
     if (includeVariants) {
       const original = input.stores[0]!.lines[0]!.variant!;

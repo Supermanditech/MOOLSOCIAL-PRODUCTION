@@ -45,6 +45,67 @@ class _OrderPending implements WorkOrderPendingStore {
 void main() {
   for (final role in ['buyer', 'seller']) {
     for (final scale in [1.0, 2.0]) {
+      testWidgets('LF-SCHEDULE original requested window is readable and not a booking $role $scale', (tester) async {
+        await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
+        tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final details = fixtures.scheduledPurchaseResponse(role: role), order = details['orders'][0] as Map<String, dynamic>;
+        final line = order['original']['lines'][0], selected = line['scheduledFulfilment'];
+        line['name'] = 'Evaluation phone';
+        selected['startsAt'] = '2026-10-15T17:30:00.123456Z';
+        selected['endsAt'] = '2026-10-16T19:30:00.000001Z';
+        fixtures.rehashPurchaseOrder(order);
+        final refs = fixtures.referenceResponse(role: role);
+        refs['references'][0]['originalFingerprint'] = order['originalFingerprint'];
+        final wire = fixtures.Transport()..respond = (body) => body['operation'].toString().startsWith('list') ? refs : details;
+        final capture = GlobalKey();
+        await tester.pumpWidget(RepaintBoundary(key: capture, child: MaterialApp(theme: ThemeData(fontFamily: 'Inter'), home: Scaffold(body: MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(scale)), child: SingleChildScrollView(
+            child: WorkspacePurchaseOriginals(gateway: fixtures.projectionGateway(wire,
+              account: role == 'buyer' ? 'buyer-1' : 'owner-1'),
+              role: role == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller,
+              realm: 'evaluation', storeId: role == 'seller' ? 'store-one' : null)))))));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('original-order-order-v2'))); await tester.pumpAndSettle();
+        final window = find.byKey(const ValueKey('original-scheduled-line-one'));
+        await tester.ensureVisible(window); await tester.pumpAndSettle();
+        final text = tester.widget<Text>(window), local = MaterialLocalizations.of(tester.element(window));
+        expect(text.data, contains('Requested Scheduled window'));
+        expect(text.data, contains(local.formatFullDate(DateTime.parse(selected['startsAt'] as String).toLocal())));
+        expect(text.data, contains(local.formatFullDate(DateTime.parse(selected['endsAt'] as String).toLocal())));
+        expect(text.maxLines, isNull); expect(text.overflow, isNot(TextOverflow.ellipsis));
+        expect(find.textContaining('opaque-destination'), findsNothing);
+        expect(find.textContaining('eligibility-original'), findsNothing);
+        expect(find.textContaining('slot-original'), findsNothing);
+        expect(find.textContaining('Booking confirmed'), findsNothing);
+        expect(tester.takeException(), isNull);
+        const root = String.fromEnvironment('LF_SCHEDULE_CAPTURE_ROOT');
+        if (root.isNotEmpty) {
+          final boundary = capture.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+          await tester.runAsync(() async {
+            final directory = Directory(root); await directory.create(recursive: true);
+            final file = File('$root/requested-scheduled-$role-$scale.png'); expect(await file.exists(), isFalse);
+            final image = await boundary.toImage(); final bytes = await image.toByteData(format: ui.ImageByteFormat.png); image.dispose();
+            await file.writeAsBytes(bytes!.buffer.asUint8List());
+          });
+        }
+      });
+    }
+  }
+  for (final supplied in [false, true]) {
+    testWidgets('LF-SCHEDULE null and legacy original create no empty controls $supplied', (tester) async {
+      final wire = fixtures.Transport()..data = supplied ? fixtures.scheduledPurchaseResponse(selected: false) : fixtures.variantPurchaseResponse();
+      final original = (await fixtures.projectionGateway(wire).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: 'purchase-v2'))!.orders.single;
+      expect(original.lines.single.hasScheduledFulfilmentSnapshot, supplied);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: WorkspaceOriginalScheduledForLine(line: original.lines.single))));
+      expect(find.byType(Text), findsNothing);
+      expect(tester.getSize(find.byType(WorkspaceOriginalScheduledForLine)), Size.zero);
+    });
+  }
+  for (final role in ['buyer', 'seller']) {
+    for (final scale in [1.0, 2.0]) {
       testWidgets('LF-VARIANT original description is readable on $role originals $scale', (tester) async {
         await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
         tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
@@ -229,12 +290,13 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
   }
-  for (final scenario in [(1.0, 'delivery'), (2.0, 'delivery'), (1.0, 'collection'), (1.0, 'attribution'), (2.0, 'attribution'), (1.0, 'variant'), (2.0, 'variant')]) {
+  for (final scenario in [(1.0, 'delivery'), (2.0, 'delivery'), (1.0, 'collection'), (1.0, 'attribution'), (2.0, 'attribution'), (1.0, 'variant'), (2.0, 'variant'), (1.0, 'scheduled'), (2.0, 'scheduled')]) {
   testWidgets('configured Store feed supports exact facts ${scenario.$2} scale ${scenario.$1}', (tester) async {
     await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
     tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
-    final raw = scenario.$2 == 'variant' ? fixtures.variantOperationalResponse(role: 'seller')
+    final raw = scenario.$2 == 'scheduled' ? fixtures.scheduledOperationalResponse(role: 'seller')
+      : scenario.$2 == 'variant' ? fixtures.variantOperationalResponse(role: 'seller')
       : scenario.$2 == 'attribution' ? fixtures.attributedOperationalResponse(role: 'seller')
       : fixtures.operationalResponse(role: 'seller');
     if (scenario.$2 == 'collection') {
@@ -304,6 +366,11 @@ void main() {
       expect(find.byKey(Key('work-operational-total-$key')), findsOneWidget);
     }
     expect(find.text('1 pack × ₹100.51'), findsOneWidget);
+    if (scenario.$2 == 'scheduled') {
+      expect(find.textContaining('Requested Scheduled window'), findsOneWidget);
+      expect(find.textContaining('opaque-destination'), findsNothing);
+      expect(work.workspaceOrders.single.operational!.original.factsVersion, 5);
+    }
     if (scenario.$2 == 'variant') {
       expect(find.text('Pink · 128 GB'), findsOneWidget);
       expect(work.workspaceOrders.single.operational!.original.factsVersion, 4);

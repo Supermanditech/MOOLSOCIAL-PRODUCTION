@@ -90,6 +90,125 @@ class Transport implements SocialContentTransport {
 }
 
 void main() {
+  if (Platform.environment['LF_SCHEDULE_PROJECTION_LOG'] case final path?) {
+    test('LF-SCHEDULE actual emulator originals preserve exact requested context across Dart', () async {
+      const marker = 'LF_SCHEDULE_PROJECTION=';
+      final captured = File(path).readAsLinesSync().singleWhere((line) => line.contains(marker));
+      final data = (jsonDecode(captured.split(marker).last) as Map).cast<String, dynamic>();
+      final wire = Transport()..data = data;
+      final result = await projectionGateway(wire, account: data['viewerUserId'] as String).readPurchaseProjection(
+        role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: data['purchaseId'] as String);
+      expect(result, isNotNull);
+      var selected = 0, unselected = 0;
+      for (final order in result!.orders) {
+        expect(order.factsVersion, 5);
+        final raw = (data['orders'] as List).singleWhere((row) => row['orderId'] == order.orderId);
+        for (final line in order.lines) {
+          final original = (raw['original']['lines'] as List).singleWhere((row) => row['lineId'] == line.lineId);
+          expect(line.toJson(), original);
+          expect(line.hasScheduledFulfilmentSnapshot, isTrue);
+          if (line.scheduledFulfilment == null) { unselected++; } else {
+            selected++;
+            expect(line.scheduledFulfilment!.startsAt.microsecond, 456);
+            expect(line.scheduledFulfilment!.listing.storeId, order.storeId);
+            final copy = line.scheduledFulfilment!.toJson();
+            copy['slotId'] = 'later-mutable-feed';
+            expect(line.scheduledFulfilment!.slotId, 'slot-original-one');
+          }
+        }
+      }
+      expect(selected, 1); expect(unselected, 2);
+    });
+  }
+  test('LF-SCHEDULE all-null originals preserve new-version presence while legacy stays unknown', () async {
+    final wire = Transport()..data = scheduledPurchaseResponse(selected: false);
+    final gateway = projectionGateway(wire);
+    final result = (await gateway.readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+      realm: 'evaluation', purchaseId: 'purchase-v2'))!.orders.single;
+    expect(result.factsVersion, 5);
+    expect(result.lines.single.hasScheduledFulfilmentSnapshot, isTrue);
+    expect(result.lines.single.toJson().containsKey('scheduledFulfilment'), isTrue);
+    expect(result.lines.single.scheduledFulfilment, isNull);
+    wire.data = variantPurchaseResponse();
+    final legacy = (await gateway.readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+      realm: 'evaluation', purchaseId: 'purchase-v2'))!.orders.single;
+    expect(legacy.factsVersion, 4);
+    expect(legacy.lines.single.hasScheduledFulfilmentSnapshot, isFalse);
+    expect(legacy.lines.single.toJson().containsKey('scheduledFulfilment'), isFalse);
+  });
+  for (final dates in [
+    ('2026-10-15T23:59:59.123456Z', '2026-10-15T23:59:59.123457Z'),
+    ('2026-10-15T23:59:59.123Z', '2026-10-16T00:00:00.000Z'),
+    ('0000-02-29T23:59:59.000001Z', '0000-03-01T00:00:00.000Z'),
+    ('-0001-01-01T00:00:00.000001Z', '-0001-01-01T00:00:00.000002Z'),
+    ('+010000-01-01T00:00:00.123456Z', '+010000-01-01T00:00:00.123457Z'),
+    ('+275760-09-12T23:59:59.999999Z', '+275760-09-13T00:00:00.000Z'),
+  ]) {
+    test('LF-SCHEDULE canonical microsecond range remains exact ${dates.$1}', () async {
+      final data = scheduledPurchaseResponse(), order = data['orders'][0];
+      final selected = order['original']['lines'][0]['scheduledFulfilment'];
+      selected['startsAt'] = dates.$1; selected['endsAt'] = dates.$2;
+      rehashPurchaseOrder(order as Map<String, dynamic>);
+      final wire = Transport()..data = data;
+      final result = await projectionGateway(wire).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: 'purchase-v2');
+      expect(result, isNotNull);
+      expect(result!.orders.single.lines.single.scheduledFulfilment!.toJson(), selected);
+    });
+  }
+  for (final fault in ['missing', 'boolean', 'array', 'object', 'version', 'method', 'nested-version', 'realm', 'store', 'sku', 'product', 'pack', 'listing', 'channel', 'revision', 'location', 'slot', 'extra', 'invalid-day', 'invalid-hour', 'offset', 'precision', 'redundant-zero', 'equal', 'micro-before', 'range-overflow', 'old-version', 'mixed-version']) {
+    test('LF-SCHEDULE rejects $fault even with recomputed original hash', () async {
+      final data = scheduledPurchaseResponse(), order = data['orders'][0];
+      final line = order['original']['lines'][0], s = line['scheduledFulfilment'];
+      if (fault == 'missing') line.remove('scheduledFulfilment');
+      if (fault == 'boolean') line['scheduledFulfilment'] = false;
+      if (fault == 'array') line['scheduledFulfilment'] = [];
+      if (fault == 'object') line['scheduledFulfilment'] = {};
+      if (fault == 'version') s['schemaVersion'] = true;
+      if (fault == 'method') s['method'] = 'quick';
+      if (fault == 'nested-version') s['listing']['schemaVersion'] = 2;
+      if (fault == 'realm') s['listing']['realm'] = 'production';
+      if (fault == 'store') s['listing']['storeId'] = 'other-store';
+      if (fault == 'sku') s['listing']['skuId'] = 'other-sku';
+      if (fault == 'product') s['listing']['canonicalProductId'] = 'other-product';
+      if (fault == 'pack') s['listing']['verifiedPackId'] = 'other-pack';
+      if (fault == 'listing') s['listing']['listingId'] = 'made-up';
+      if (fault == 'channel') s['listing']['channel'] = 'unknown';
+      if (fault == 'revision') s['sourceRevision'] = ' ';
+      if (fault == 'location') s.remove('locationKey');
+      if (fault == 'slot') s['slotId'] = null;
+      if (fault == 'extra') s['booked'] = true;
+      if (fault == 'invalid-day') s['startsAt'] = '2026-02-30T00:00:00.000Z';
+      if (fault == 'invalid-hour') s['startsAt'] = '2026-10-15T24:00:00.000Z';
+      if (fault == 'offset') s['startsAt'] = '2026-10-15T23:59:59.123456+00:00';
+      if (fault == 'precision') s['startsAt'] = '2026-10-15T23:59:59.1234567Z';
+      if (fault == 'redundant-zero') s['startsAt'] = '2026-10-15T23:59:59.123000Z';
+      if (fault == 'equal') s['endsAt'] = s['startsAt'];
+      if (fault == 'micro-before') s['endsAt'] = '2026-10-15T23:59:59.123455Z';
+      if (fault == 'range-overflow') {s['startsAt'] = '+275760-09-12T23:59:59.999999Z'; s['endsAt'] = '+275760-09-13T00:00:00.000001Z';}
+      if (fault == 'old-version') {data['schemaVersion'] = 4; order['factsVersion'] = 4;}
+      if (fault == 'mixed-version') data['schemaVersion'] = 4;
+      rehashPurchaseOrder(order as Map<String, dynamic>);
+      final wire = Transport()..data = data;
+      expect(await projectionGateway(wire).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: 'purchase-v2'), isNull);
+    });
+  }
+  test('LF-SCHEDULE changing a requested slot cannot reuse the original fingerprint', () async {
+    final data = scheduledPurchaseResponse();
+    data['orders'][0]['original']['lines'][0]['scheduledFulfilment']['slotId'] = 'changed-slot';
+    final wire = Transport()..data = data;
+    expect(await projectionGateway(wire).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+      realm: 'evaluation', purchaseId: 'purchase-v2'), isNull);
+  });
+  test('LF-SCHEDULE original consumes exact supplied desired window without current eligibility', () async {
+    final wire = Transport()..data = scheduledPurchaseResponse();
+    final result = await projectionGateway(wire).readPurchaseProjection(
+      role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: 'purchase-v2');
+    expect(result, isNotNull);
+    expect(result!.orders.single.factsVersion, 5);
+    expect((result.orders.single.lines.single.toJson()['scheduledFulfilment'] as Map)['startsAt'], '2026-10-15T23:59:59.123456Z');
+  });
   if (Platform.environment['LF_VARIANT_PROJECTION_LOG'] case final path?) {
     test('LF-VARIANT actual emulator originals cross the strict Dart boundary with immutable descriptions', () async {
       const marker = 'LF_VARIANT_PROJECTION=';
@@ -227,6 +346,20 @@ void main() {
     expect(() => supplied.orders.single.benefitAttribution!.components.first.allocations.clear(), throwsUnsupportedError);
   });
   for (final role in ['buyer', 'seller']) {
+    test('LF-SCHEDULE operational $role readback retains only requested context', () async {
+      final raw = scheduledOperationalResponse(role: role);
+      final reference = WorkspacePurchaseReference(purchaseId: 'purchase-v2', storeId: 'store-one', orderId: 'order-v2',
+        sourceRevision: 'revision-1', originalFingerprint: raw['originalFingerprint']);
+      final wire = Transport()..data = raw;
+      final result = await AuthenticatedWorkspaceOrderOperationsGateway(
+        projectionGateway(wire, account: role == 'buyer' ? 'buyer-1' : 'owner-1')).read(
+          role: role == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller,
+          realm: 'evaluation', reference: reference);
+      expect(result, isNotNull);
+      expect(result!.original.factsVersion, 5);
+      expect(result.original.lines.single.scheduledFulfilment!.slotId, 'slot-original-one');
+      expect(result.original.totals['totalMinor'], 10015);
+    });
     test('LF-VARIANT operational $role consumer preserves exact original variant', () async {
       final raw = variantOperationalResponse(role: role);
       final reference = WorkspacePurchaseReference(purchaseId: 'purchase-v2', storeId: 'store-one', orderId: 'order-v2',
@@ -1043,6 +1176,26 @@ Map<String, dynamic> purchaseResponse({String role = 'buyer'}) {
   };
 }
 
+Map<String, dynamic> scheduledPurchaseResponse({String role = 'buyer', bool selected = true}) {
+  final response = (jsonDecode(jsonEncode(variantPurchaseResponse(role: role))) as Map).cast<String, dynamic>();
+  response['schemaVersion'] = 5;
+  final order = response['orders'][0] as Map<String, dynamic>;
+  order['factsVersion'] = 5;
+  final line = order['original']['lines'][0] as Map<String, dynamic>;
+  line['scheduledFulfilment'] = selected ? {
+    'schemaVersion': 1, 'method': 'scheduled', 'listing': {
+      'schemaVersion': 1, 'realm': 'evaluation',
+      'listingId': 'listing-${sha256.convert(utf8.encode(jsonEncode([1, 'evaluation', order['storeId'], line['skuId'], 'retail'])))}',
+      'storeId': order['storeId'], 'skuId': line['skuId'], 'canonicalProductId': line['canonicalProductId'],
+      'verifiedPackId': line['verifiedPackId'], 'channel': 'retail'},
+    'sourceRevision': 'eligibility-original-one', 'locationKey': 'opaque-destination-one', 'slotId': 'slot-original-one',
+    'startsAt': '2026-10-15T23:59:59.123456Z', 'endsAt': '2026-10-16T00:00:00.000001Z',
+  } : null;
+  rehashPurchaseOrder(order);
+  // Represent actual decoded JSON, including malformed nullable fields in tests.
+  return (jsonDecode(jsonEncode(response)) as Map).cast<String, dynamic>();
+}
+
 Map<String, dynamic> variantPurchaseResponse({String role = 'buyer', String variant = 'Pink · 128 GB'}) {
   final response = attributedPurchaseResponse(role: role)..['schemaVersion'] = 4;
   final order = response['orders'][0] as Map<String, dynamic>;
@@ -1090,6 +1243,12 @@ Map<String, dynamic> attributedOperationalResponse({String role = 'buyer'}) {
 Map<String, dynamic> variantOperationalResponse({String role = 'buyer'}) {
   final order = variantPurchaseResponse(role: role)['orders'][0];
   return operationalResponse(role: role)..['originalFactsVersion'] = 4
+    ..['original'] = order['original'] ..['originalFingerprint'] = order['originalFingerprint'];
+}
+
+Map<String, dynamic> scheduledOperationalResponse({String role = 'buyer'}) {
+  final order = scheduledPurchaseResponse(role: role)['orders'][0];
+  return operationalResponse(role: role)..['originalFactsVersion'] = 5
     ..['original'] = order['original'] ..['originalFingerprint'] = order['originalFingerprint'];
 }
 

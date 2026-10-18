@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 
+import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
 
 enum WorkspaceOrderIdentityState { linked, unlinked, unavailable }
@@ -325,7 +326,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         'state',
         'orders',
       ]);
-      if (data['schemaVersion'] is! int || !const [2, 3, 4].contains(data['schemaVersion']) ||
+      if (data['schemaVersion'] is! int || !const [2, 3, 4, 5].contains(data['schemaVersion']) ||
           data['realm'] != realm ||
           data['authNamespace'] != 'firebase-default' ||
           data['viewerRole'] != role.name ||
@@ -343,7 +344,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
           role == WorkspaceOrderIdentityRole.seller && rawOrders.length != 1) {
         return null;
       }
-      final orders = rawOrders.map(_decodePurchaseOrder).toList();
+      final orders = rawOrders.map((order) => _decodePurchaseOrder(order, realm)).toList();
       if (orders.any((o) => o.factsVersion != data['schemaVersion']) ||
           orders.map((o) => o.storeId).toSet().length != orders.length ||
           orders.map((o) => o.orderId).toSet().length != orders.length ||
@@ -668,7 +669,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
   ) {
     final source = _map(value);
     final enriched = source.containsKey('originalFactsVersion');
-    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4].contains(source['originalFactsVersion']))) {
+    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4, 5].contains(source['originalFactsVersion']))) {
       throw const FormatException('Unsupported original facts.');
     }
     final data = _exactMap(source, [
@@ -773,7 +774,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
       'orderId': ref.orderId,
       'originalFingerprint': ref.originalFingerprint,
       'original': data['original'],
-    });
+    }, realm);
     return WorkspaceOperationalOrderSnapshot._(
       realm: realm,
       viewerRole: role,
@@ -992,7 +993,8 @@ class WorkspacePurchaseOrder {
   final List<WorkspacePurchasedSkuLine> lines;
   final Map<String, int> totals;
   final WorkspaceOriginalBenefitAttribution? benefitAttribution;
-  int get factsVersion => lines.any((line) => line.variant != null) ? 4 : benefitAttribution == null ? 2 : 3;
+  int get factsVersion => lines.any((line) => line.hasScheduledFulfilmentSnapshot) ? 5 :
+    lines.any((line) => line.variant != null) ? 4 : benefitAttribution == null ? 2 : 3;
 }
 
 /// Frozen final-placement facts, not current coupons or cashback entitlement.
@@ -1037,6 +1039,8 @@ class WorkspacePurchasedSkuLine {
     required this.unitPriceMinor,
     required this.lineTotalMinor,
     this.variant,
+    this.hasScheduledFulfilmentSnapshot = false,
+    this.scheduledFulfilment,
   });
   final String lineId,
       skuId,
@@ -1047,13 +1051,16 @@ class WorkspacePurchasedSkuLine {
   final String name, packLabel, quantityUnit;
   /// Null is legacy unknown; empty is a supplied original with no extra variant.
   final String? variant;
+  /// Presence is retained even for an explicit null; legacy omission is unknown.
+  final bool hasScheduledFulfilmentSnapshot;
+  final BuyV2ScheduledFulfilment? scheduledFulfilment;
   final int quantityMilli, unitPriceMinor, lineTotalMinor;
   String get quantityLabel {
     final fraction = quantityMilli % 1000;
     final digits = fraction == 0 ? '' : '.${fraction.toString().padLeft(3, '0').replaceFirst(RegExp(r'0+$'), '')}';
     return '${quantityMilli ~/ 1000}$digits $quantityUnit';
   }
-  Map<String, Object> toJson() => {
+  Map<String, Object?> toJson() => {
     'lineId': lineId,
     'skuId': skuId,
     'canonicalProductId': canonicalProductId,
@@ -1067,6 +1074,7 @@ class WorkspacePurchasedSkuLine {
     'unitPriceMinor': unitPriceMinor,
     'lineTotalMinor': lineTotalMinor,
     'variant': ?variant,
+    if (hasScheduledFulfilmentSnapshot) 'scheduledFulfilment': scheduledFulfilment?.toJson(),
   };
 }
 
@@ -1162,7 +1170,7 @@ WorkspaceOriginalBenefitAttribution _decodeBenefits(Object? value, List<Workspac
   return WorkspaceOriginalBenefitAttribution._(components);
 }
 
-WorkspacePurchaseOrder _decodePurchaseOrder(Object? value) {
+WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
   final data = _exactMap(value, const [
     'factsVersion',
     'storeId',
@@ -1171,7 +1179,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value) {
     'originalFingerprint',
   ]);
   final version = data['factsVersion'];
-  if (version is! int || !const [2, 3, 4].contains(version) ||
+  if (version is! int || !const [2, 3, 4, 5].contains(version) ||
       !_id(data['storeId']) ||
       !_id(data['orderId'])) {
     throw const FormatException('Unsupported order reference.');
@@ -1191,12 +1199,19 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value) {
   }
   final lines = <WorkspacePurchasedSkuLine>[];
   for (final raw in rawLines) {
-    final l = _exactMap(raw, [..._purchaseLineKeys, if (version == 4) 'variant']);
-    if (version == 4 && (l['variant'] is! String ||
+    final l = _exactMap(raw, [..._purchaseLineKeys, if (version >= 4) 'variant', if (version == 5) 'scheduledFulfilment']);
+    if (version >= 4 && (l['variant'] is! String ||
         (l['variant'] as String).trim() != l['variant'] ||
         (l['variant'] as String).length > 240 ||
         RegExp(r'[\u0000-\u0008\u000b\u000c\u000e-\u001f]').hasMatch(l['variant'] as String))) {
       throw const FormatException('Invalid original variant.');
+    }
+    final scheduled = version == 5 && l['scheduledFulfilment'] != null
+      ? BuyV2ScheduledFulfilment.fromJson(l['scheduledFulfilment']) : null;
+    if (scheduled != null && (scheduled.listing.realm != realm || scheduled.listing.storeId != data['storeId'] ||
+        scheduled.listing.skuId != l['skuId'] || scheduled.listing.canonicalProductId != l['canonicalProductId'] ||
+        scheduled.listing.verifiedPackId != l['verifiedPackId'])) {
+      throw const FormatException('Original Scheduled selection conflicts with its purchased line.');
     }
     if ([
           'lineId',
@@ -1238,7 +1253,9 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value) {
         quantityUnit: l['quantityUnit'] as String,
         unitPriceMinor: l['unitPriceMinor'] as int,
         lineTotalMinor: l['lineTotalMinor'] as int,
-        variant: version == 4 ? l['variant'] as String : null,
+        variant: version >= 4 ? l['variant'] as String : null,
+        hasScheduledFulfilmentSnapshot: version == 5,
+        scheduledFulfilment: scheduled,
       ),
     );
   }

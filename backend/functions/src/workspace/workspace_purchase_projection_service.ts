@@ -11,6 +11,14 @@ export interface PlacementLine {
   unitPriceMinor: number; lineTotalMinor: number;
   /** Absent in legacy originals; explicit empty means no additional variant. */
   variant?: string;
+  /** Existing Buy desired-window DTO, not a reservation or quote acknowledgement. */
+  scheduledFulfilment?: OriginalScheduledFulfilment | null;
+}
+export interface OriginalScheduledFulfilment {
+  schemaVersion: 1; method: "scheduled";
+  listing: {schemaVersion: 1; realm: Realm; listingId: string; storeId: string; skuId: string;
+    canonicalProductId: string; verifiedPackId: string; channel: "retail" | "wholesale" | "bulk"};
+  sourceRevision: string; locationKey: string; slotId: string; startsAt: string; endsAt: string;
 }
 export interface PurchaseTotals {
   itemsMinor: number; discountMinor: number; taxMinor: number; deliveryMinor: number;
@@ -37,7 +45,7 @@ export interface OriginalBenefitAttribution {schemaVersion: 1; components: Origi
 /** Server-owned FINAL PLACEMENT, not a quote, client command, payment or stock proof.
  * No real upstream implementation is configured in this local slice. */
 export interface TrustedPlacementReceipt {
-  schemaVersion: 1 | 2 | 3; realm: Realm; authNamespace: "firebase-default";
+  schemaVersion: 1 | 2 | 3 | 4; realm: Realm; authNamespace: "firebase-default";
   finalPlacement: true; issuer: string; receiptId: string; revision: string;
   buyerUserId: string; stores: PlacementStore[];
 }
@@ -50,17 +58,17 @@ export interface PurchaseOriginal {
   benefitAttribution?: OriginalBenefitAttribution;
 }
 export interface PurchaseStoreProjection {
-  factsVersion: 2 | 3 | 4; storeId: string; orderId: string; original: PurchaseOriginal;
+  factsVersion: 2 | 3 | 4 | 5; storeId: string; orderId: string; original: PurchaseOriginal;
   originalFingerprint: string;
 }
 interface StoredOrder extends PurchaseStoreProjection {caseId: string; ownerUserId: string}
 interface PurchaseAggregate {
-  schemaVersion: 2 | 3 | 4; realm: Realm; authNamespace: "firebase-default";
+  schemaVersion: 2 | 3 | 4 | 5; realm: Realm; authNamespace: "firebase-default";
   purchaseId: string; buyerUserId: string; buyerId: string; sourceRevision: string;
   sourceFingerprint: string; createdAt: string; orders: StoredOrder[]; integrity: string;
 }
 export interface PurchaseProjection {
-  schemaVersion: 2 | 3 | 4; realm: Realm; authNamespace: "firebase-default";
+  schemaVersion: 2 | 3 | 4 | 5; realm: Realm; authNamespace: "firebase-default";
   viewerRole: "buyer" | "seller"; viewerUserId: string;
   purchaseId: string; buyerId: string; sourceRevision: string;
   // Not a mutable payment/fulfilment/eligibility status.
@@ -157,7 +165,7 @@ export interface OperationalOrderSnapshot {
   viewerRole: "buyer" | "seller"; viewerUserId: string;
   purchaseId: string; storeId: string; orderId: string;
   sourceRevision: string; originalFingerprint: string; original: PurchaseOriginal;
-  originalFactsVersion?: 3 | 4;
+  originalFactsVersion?: 3 | 4 | 5;
   operationalSourceRevision: string; revision: number; stage: OperationalOrderStage;
   fulfilment: "delivery" | "collection"; placedAt: string;
   acceptanceDeadline: string | null; fulfilmentDeadline: string | null;
@@ -441,8 +449,43 @@ function totals(v: unknown, items: number): PurchaseTotals {
       result.paymentFeeMinor + result.tipMinor) fail();
   return result;
 }
-function line(v: unknown, withVariant = false): PlacementLine {
-  const r = exact(v, [...lineKeys, ...(withVariant ? ["variant"] : [])]);
+/** Preserve Dart's canonical UTC precision: milliseconds plus optional nonzero
+ * microseconds. Date's millisecond round-trip alone would reject or lose data. */
+function scheduledInstantMicros(value: unknown): bigint {
+  if (typeof value !== "string") fail();
+  const m = /^(-?\d{4}|[+-]\d{6})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{3})(\d{3})?Z$/u.exec(value);
+  if (!m || m[8] === "000") fail();
+  const [year, month, day, hour, minute, second, millis] = m.slice(1, 8).map(Number) as [number, number, number, number, number, number, number];
+  const canonicalYear = Math.abs(year) <= 9999
+    ? `${year < 0 ? "-" : ""}${String(Math.abs(year)).padStart(4, "0")}`
+    : `${year < 0 ? "-" : "+"}${String(Math.abs(year)).padStart(6, "0")}`;
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day); date.setUTCHours(hour, minute, second, millis);
+  if (m[1] !== canonicalYear || !Number.isFinite(date.getTime()) || date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day || date.getUTCHours() !== hour ||
+      date.getUTCMinutes() !== minute || date.getUTCSeconds() !== second || date.getUTCMilliseconds() !== millis) fail();
+  const micros = BigInt(date.getTime()) * 1000n + BigInt(m[8] ?? 0);
+  if (micros < -8640000000000000000n || micros > 8640000000000000000n) fail();
+  return micros;
+}
+function scheduledOriginal(value: unknown, realm: Realm, storeId: string, line: PlacementLine): OriginalScheduledFulfilment | null {
+  if (value === null) return null;
+  const s = exact(value, ["schemaVersion", "method", "listing", "sourceRevision", "locationKey", "slotId", "startsAt", "endsAt"]);
+  const l = exact(s.listing, ["schemaVersion", "realm", "listingId", "storeId", "skuId", "canonicalProductId", "verifiedPackId", "channel"]);
+  if (s.schemaVersion !== 1 || s.method !== "scheduled" || l.schemaVersion !== 1 || l.realm !== realm ||
+      l.storeId !== storeId || l.skuId !== line.skuId || l.canonicalProductId !== line.canonicalProductId ||
+      l.verifiedPackId !== line.verifiedPackId || typeof l.listingId !== "string" || !/^listing-[a-f0-9]{64}$/u.test(l.listingId) ||
+      typeof l.channel !== "string" || !["retail", "wholesale", "bulk"].includes(l.channel) ||
+      [s.sourceRevision, s.locationKey, s.slotId].some(v => typeof v !== "string" || !v.length || v !== v.trim()) ||
+      scheduledInstantMicros(s.endsAt) <= scheduledInstantMicros(s.startsAt)) fail();
+  return {schemaVersion: 1, method: "scheduled", listing: {schemaVersion: 1, realm,
+    listingId: l.listingId, storeId, skuId: line.skuId, canonicalProductId: line.canonicalProductId,
+    verifiedPackId: line.verifiedPackId, channel: l.channel as OriginalScheduledFulfilment["listing"]["channel"]},
+    sourceRevision: s.sourceRevision as string, locationKey: s.locationKey as string, slotId: s.slotId as string,
+    startsAt: s.startsAt as string, endsAt: s.endsAt as string};
+}
+function line(v: unknown, withVariant = false, scheduledScope?: {realm: Realm; storeId: string}): PlacementLine {
+  const r = exact(v, [...lineKeys, ...(withVariant ? ["variant"] : []), ...(scheduledScope ? ["scheduledFulfilment"] : [])]);
   // Match reviewed catalogue variant text, including its permitted line breaks.
   if (withVariant && (typeof r.variant !== "string" || r.variant !== r.variant.trim() ||
       r.variant.length > 240 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(r.variant))) fail();
@@ -453,6 +496,7 @@ function line(v: unknown, withVariant = false): PlacementLine {
     quantityUnit: r.quantityUnit as PlacementLine["quantityUnit"],
     unitPriceMinor: integer(r.unitPriceMinor), lineTotalMinor: integer(r.lineTotalMinor),
     ...(withVariant ? {variant: r.variant as string} : {})};
+  if (scheduledScope) result.scheduledFulfilment = scheduledOriginal(r.scheduledFulfilment, scheduledScope.realm, scheduledScope.storeId, result);
   // Contract: gross unit price per quantityUnit; quantity in thousandths;
   // gross line rounded half-up to paise. Discounts are explicit order totals.
   // This validates supplied facts, never derives a price/discount/eligibility.
@@ -463,12 +507,13 @@ function line(v: unknown, withVariant = false): PlacementLine {
 export function normalizePlacement(value: unknown, realm: Realm): TrustedPlacementReceipt {
   const r = exact(value, ["schemaVersion", "realm", "authNamespace", "finalPlacement", "issuer",
     "receiptId", "revision", "buyerUserId", "stores"]);
-  if ((r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
+  if ((r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
       r.finalPlacement !== true || !["evaluation", "production"].includes(realm)) fail();
   const stores = array(r.stores, 10).map(raw => {
     const s = exact(raw, ["storeId", "caseId", "ownerUserId", "lines", "totals",
       ...(r.schemaVersion !== 1 ? ["benefitAttribution"] : [])]);
-    const lines = array(s.lines, 100).map(value => line(value, r.schemaVersion === 3)).sort((a,b) => compare(a.sourceLineId, b.sourceLineId));
+    const lines = array(s.lines, 100).map(value => line(value, (r.schemaVersion as number) >= 3,
+      r.schemaVersion === 4 ? {realm, storeId: id(s.storeId)} : undefined)).sort((a,b) => compare(a.sourceLineId, b.sourceLineId));
     unique(lines.map(l => l.sourceLineId));
     const amounts = totals(s.totals, lines.reduce((sum, l) => sum + l.lineTotalMinor, 0));
     return {storeId: id(s.storeId), caseId: id(s.caseId), ownerUserId: id(s.ownerUserId), lines, totals: amounts,
@@ -494,14 +539,14 @@ function requireStore(value: unknown, expected: {caseId: string; storeId: string
       p.status !== "live" || p.shopEnabled !== true) fail("not_found", 404);
 }
 export function purchaseOriginalFingerprint(storeId: string, orderId: string, original: PurchaseOriginal): string {
-  return digest({factsVersion: original.lines.some(l => l.variant !== undefined) ? 4 :
+  return digest({factsVersion: original.lines.some(l => l.scheduledFulfilment !== undefined) ? 5 : original.lines.some(l => l.variant !== undefined) ? 4 :
     original.benefitAttribution === undefined ? 2 : 3, storeId, orderId, original});
 }
 function validateAggregate(value: unknown, purchaseId: string, realm: Realm): PurchaseAggregate {
   try {
     const r = exact(value, ["schemaVersion", "realm", "authNamespace", "purchaseId", "buyerUserId",
       "buyerId", "sourceRevision", "sourceFingerprint", "createdAt", "orders", "integrity"]);
-    if ((r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
+    if ((r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
         r.purchaseId !== purchaseId || !/^[a-f0-9]{64}$/u.test(String(r.sourceFingerprint))) fail();
     id(r.buyerUserId); id(r.buyerId); id(r.sourceRevision);
     if (typeof r.createdAt !== "string" || new Date(r.createdAt).toISOString() !== r.createdAt) fail();
@@ -512,16 +557,18 @@ function validateAggregate(value: unknown, purchaseId: string, realm: Realm): Pu
         ...(o.factsVersion !== 2 ? ["benefitAttribution"] : [])]);
       if (original.currency !== "INR") fail();
       const lines = array(original.lines, 100).map(rawLine => {
-        const l = exact(rawLine, [...lineKeys.filter(k => k !== "sourceLineId"), "lineId", ...(o.factsVersion === 4 ? ["variant"] : [])]);
+        const l = exact(rawLine, [...lineKeys.filter(k => k !== "sourceLineId"), "lineId",
+          ...((o.factsVersion as number) >= 4 ? ["variant"] : []), ...(o.factsVersion === 5 ? ["scheduledFulfilment"] : [])]);
         const {lineId, ...rest} = l;
-        const {sourceLineId, ...normalized} = line({...rest, sourceLineId: lineId}, o.factsVersion === 4);
+        const {sourceLineId, ...normalized} = line({...rest, sourceLineId: lineId}, (o.factsVersion as number) >= 4,
+          o.factsVersion === 5 ? {realm, storeId: id(o.storeId)} : undefined);
         return {lineId: sourceLineId, ...normalized};
       }).sort((a,b) => compare(a.lineId, b.lineId));
       unique(lines.map(l => l.lineId));
       const canonical: PurchaseOriginal = {currency: "INR", lines,
         totals: totals(original.totals, lines.reduce((sum,l) => sum + l.lineTotalMinor, 0))};
       if (o.factsVersion !== 2) canonical.benefitAttribution = benefits(original.benefitAttribution, lines, canonical.totals.discountMinor);
-      const result: StoredOrder = {factsVersion: o.factsVersion as 2 | 3 | 4, storeId: id(o.storeId), orderId: id(o.orderId),
+      const result: StoredOrder = {factsVersion: o.factsVersion as 2 | 3 | 4 | 5, storeId: id(o.storeId), orderId: id(o.orderId),
         original: canonical, originalFingerprint: String(o.originalFingerprint),
         caseId: id(o.caseId), ownerUserId: id(o.ownerUserId)};
       if (result.originalFingerprint !== purchaseOriginalFingerprint(result.storeId, result.orderId, canonical)) fail();
@@ -591,11 +638,11 @@ export class WorkspacePurchaseProjectionService {
             ...c, allocations: c.allocations.map(a => ({...a, lineId: savedIds.get(a.lineId)!})),
           }))};
         }
-        return {factsVersion: (input.schemaVersion + 1) as 2 | 3 | 4, storeId: s.storeId, orderId: s.orderId, original,
+        return {factsVersion: (input.schemaVersion + 1) as 2 | 3 | 4 | 5, storeId: s.storeId, orderId: s.orderId, original,
           originalFingerprint: purchaseOriginalFingerprint(s.storeId, s.orderId, original),
           caseId: s.caseId, ownerUserId: s.ownerUserId};
       });
-      const body = {schemaVersion: (input.schemaVersion + 1) as 2 | 3 | 4, realm: this.realm, authNamespace: "firebase-default" as const,
+      const body = {schemaVersion: (input.schemaVersion + 1) as 2 | 3 | 4 | 5, realm: this.realm, authNamespace: "firebase-default" as const,
         purchaseId, buyerUserId: input.buyerUserId, buyerId, sourceRevision: input.revision,
         sourceFingerprint, createdAt, orders};
       // Saved UUID line IDs expand each allocation. Bound the actual buyer

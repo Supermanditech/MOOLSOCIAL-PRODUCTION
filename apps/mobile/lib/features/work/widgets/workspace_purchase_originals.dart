@@ -316,6 +316,7 @@ class _WorkspacePurchaseOriginalsState
                                   '${_quantity(line.quantityMilli)} ${line.quantityUnit} · ${line.packLabel}',
                                 ),
                                 WorkspaceOriginalVariantForLine(line: line),
+                                WorkspaceOriginalScheduledForLine(line: line),
                                 _amount(line.lineTotalMinor),
                                 WorkspaceOriginalBenefitsForLine(original: details, lineId: line.lineId),
                               ],
@@ -407,6 +408,25 @@ class WorkspaceOriginalVariantForLine extends StatelessWidget {
     ? const SizedBox.shrink()
     : Text(line.variant!, key: ValueKey('original-variant-${line.lineId}'),
         style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.4));
+}
+
+/// Historical desired selection only. No current availability or booking claim.
+class WorkspaceOriginalScheduledForLine extends StatelessWidget {
+  const WorkspaceOriginalScheduledForLine({super.key, required this.line});
+  final WorkspacePurchasedSkuLine line;
+  @override
+  Widget build(BuildContext context) {
+    final selected = line.scheduledFulfilment;
+    if (!line.hasScheduledFulfilmentSnapshot || selected == null) return const SizedBox.shrink();
+    final local = MaterialLocalizations.of(context);
+    final start = selected.startsAt.toLocal(), end = selected.endsAt.toLocal();
+    String time(DateTime value) => local.formatTimeOfDay(TimeOfDay.fromDateTime(value),
+      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context));
+    final window = '${local.formatFullDate(start)} · ${time(start)} – '
+      '${DateUtils.isSameDay(start, end) ? '' : '${local.formatFullDate(end)} · '}${time(end)}';
+    return Text('Requested Scheduled window · $window', key: ValueKey('original-scheduled-${line.lineId}'),
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.4));
+  }
 }
 
 /// Same immutable breakdown on buyer originals and Store operational details.
