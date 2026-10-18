@@ -157,6 +157,12 @@ if ($RequireLfPublicationProbes) {
     $cases++
   }
   if ($null -ne $continuation.PSObject.Properties['batch02Chat']) {
+    $chatScreenOwner='apps/mobile/lib/features/chat/screens/chat_thread_screen.dart'
+    $legacyChat=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $legacyChat.batch02Chat.owners=@($legacyChat.batch02Chat.owners | Where-Object { $_ -cne $chatScreenOwner })
+    Assert-Fixture (Test-Lf27Batch01Continuation $legacyChat @()) 'Historical Chat owner list rejected.'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacyChat @($chatScreenOwner))) 'Unclaimed Chat screen admitted.'
+    $cases+=2
     foreach($owner in $continuation.batch02Chat.owners) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact Batch02 Chat owner rejected.'
       $cases++

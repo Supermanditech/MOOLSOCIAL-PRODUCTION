@@ -1,12 +1,16 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/chat/chat_entry_context.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
+import 'package:moolsocial/features/chat/chat_models.dart';
+import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_chat_route_adapter.dart';
@@ -14,6 +18,12 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_shop_chat.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+
+class _DraftAttachmentPicker implements ChatAttachmentPicker {
+  @override
+  Future<ChatPickedAttachment?> pick(ChatAttachmentKind kind) async => ChatPickedAttachment(
+      kind: kind, name: 'host-only-draft.pdf', contentType: 'application/pdf', bytes: Uint8List.fromList([1, 2, 3]));
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -298,6 +308,80 @@ void main() {
     );
     await session.start();
     return session;
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    for (final remount in [true, false]) {
+    testWidgets('LF03 Ask draft retains original product until confirmed replacement at $scale remount $remount', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(400, 900);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final journey = await readyJourney(), chat = ChatSession.production(
+          gateway: const UnavailableChatGateway(), attachmentPicker: _DraftAttachmentPicker());
+      addTearDown(journey.dispose); addTearDown(chat.dispose);
+      final products = BuyV2Catalogue.products.where((p) => p.destination == BuyV2Destination.shop).take(2).toList();
+      final a = products[0].copyWith(storeId: 'store-draft', seller: 'Host same Store', priceMinor: 1025);
+      final b = products[1].copyWith(storeId: 'store-draft', seller: 'Host same Store', priceMinor: 2050);
+      const adapter = BuyV2ChatRouteAdapter();
+      final aRoute = adapter.productQuestionLocationFor(product: a), bRoute = adapter.productQuestionLocationFor(product: b);
+      final thread = Uri.parse(aRoute).pathSegments.last;
+      expect(Uri.parse(bRoute).pathSegments.last, thread);
+      var opened = false;
+      Future<void> open(String route) async {
+        if (opened && !remount) {
+          GoRouter.of(tester.element(find.byKey(const Key('chat-thread-screen')))).go(route);
+          await tester.pumpAndSettle();
+          return;
+        }
+        await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+        await tester.pumpWidget(r66VisualCaptureRoot(MoolSocialApp(key: UniqueKey(), session: journey, chatSession: chat, initialLocation: route)));
+        await tester.pumpAndSettle();
+        opened = true;
+      }
+      await open(aRoute);
+      final field = find.byKey(const Key('chat-message-field'));
+      await tester.enterText(field, 'Please confirm this original pack');
+      final original = chat.commerceContext(thread)!;
+      expect(original.productId, a.canonicalId);
+      await open(bRoute);
+      expect(tester.widget<TextField>(field).controller!.text, 'Please confirm this original pack');
+      expect(chat.commerceContext(thread)!.productId, a.canonicalId);
+      expect(chat.commerceContext(thread)!.productAppRoute, original.productAppRoute);
+      final replace = find.byKey(const Key('chat-use-incoming-product'));
+      expect(replace, findsOneWidget);
+      if (remount) await captureR66Visual(tester, 'lf03-chat-draft-kept-$scale');
+      await tester.ensureVisible(replace); await tester.tap(replace); await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'First replacement confirmation must fit');
+      if (remount) await captureR66Visual(tester, 'lf03-chat-draft-confirmation-$scale');
+      await tester.tap(find.byKey(const Key('chat-keep-original-draft'))); await tester.pumpAndSettle();
+      expect(chat.commerceContext(thread)!.productId, a.canonicalId);
+      expect(chat.draftTextForSession(thread), 'Please confirm this original pack');
+      await tester.tap(replace); await tester.pumpAndSettle();
+      chat.setDraftTextForSession(thread, 'Newer draft while confirmation was open');
+      await tester.tap(find.byKey(const Key('chat-replace-original-draft'))); await tester.pumpAndSettle();
+      expect(chat.commerceContext(thread)!.productId, a.canonicalId);
+      expect(chat.draftTextForSession(thread), 'Newer draft while confirmation was open');
+      await tester.enterText(field, 'Please confirm this original pack');
+      await tester.tap(replace); await tester.pumpAndSettle();
+      expect(await chat.selectAttachment(thread, ChatAttachmentKind.document), isTrue);
+      final attachment = chat.selectedAttachment(thread);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'Attachment arriving during confirmation must fit');
+      await tester.tap(find.byKey(const Key('chat-replace-original-draft'))); await tester.pumpAndSettle();
+      expect(chat.selectedAttachment(thread), same(attachment));
+      expect(chat.commerceContext(thread)!.productId, a.canonicalId);
+      await tester.tap(replace); await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'Replacement with staged attachment must fit');
+      await tester.tap(find.byKey(const Key('chat-replace-original-draft'))); await tester.pumpAndSettle();
+      expect(chat.commerceContext(thread)!.productId, b.canonicalId);
+      expect(chat.commerceContext(thread)!.price, '20.50');
+      expect(chat.draftTextForSession(thread), Uri.parse(bRoute).queryParameters['draft']);
+      expect(replace, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+    }
   }
 
   test(

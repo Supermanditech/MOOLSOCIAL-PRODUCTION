@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -47,6 +48,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   String? _highlightedMessageId;
   bool _applyingDraftText = false;
   String? _boundCommerceRoute;
+  ChatCommerceContext? _incomingCommerceContext;
   ChatWorkspaceApplicationContext? _workspaceApplicationContext;
   bool _draftBound = false;
   bool _restoringSupportDraft = false;
@@ -83,6 +85,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
       _messageKeys.clear();
       _highlightedMessageId = null;
       _boundCommerceRoute = null;
+      _incomingCommerceContext = null;
       _bindCommerceContextFromRoute();
       _applyInitialDraftIfEmpty(widget.initialMessageDraft);
       unawaited(_recoverInterruptedPhoto(widget.threadId));
@@ -117,20 +120,131 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
       } else {
         _restoringSupportDraft = false;
         _supportDraftRequest++;
-        _applyInitialDraftIfEmpty(widget.initialMessageDraft);
       }
     }
     if (uri != null) {
-      widget.session.bindCommerceContext(
-        widget.threadId,
-        ChatCommerceContext.maybeFromUri(uri),
-      );
+      final incoming = ChatCommerceContext.maybeFromUri(uri);
+      final retained = widget.session.commerceContext(widget.threadId);
+      Map<String, String>? facts(ChatCommerceContext? value) => value == null
+          ? null
+          : (Map<String, String>.of(value.values)
+              ..remove('return')
+              ..remove('draft'));
+      final keepDraft =
+          widget.session.hasDraftForSession(
+            widget.threadId,
+            workspaceApplicationId: _applicationId,
+          ) &&
+          !mapEquals(facts(retained), facts(incoming));
+      _incomingCommerceContext = keepDraft ? incoming : null;
+      if (!keepDraft) {
+        widget.session.bindCommerceContext(widget.threadId, incoming);
+      }
     }
+    if (_incomingCommerceContext == null) {
+      _applyInitialDraftIfEmpty(widget.initialMessageDraft);
+    }
+  }
+
+  Widget? _draftContextNotice() => _incomingCommerceContext == null
+      ? null
+      : Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            children: [
+              const Text('Your earlier draft is kept.'),
+              TextButton(
+                key: const Key('chat-use-incoming-product'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: widget.session.busy ? null : _replaceCommerceDraft,
+                child: const Text('Use new enquiry'),
+              ),
+            ],
+          ),
+        );
+
+  Widget _stateWithDraftContextNotice(Widget state) {
+    final notice = _draftContextNotice();
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [?notice, state],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _replaceCommerceDraft() async {
+    final incoming = _incomingCommerceContext, session = widget.session;
+    if (incoming == null ||
+        session.busy ||
+        _applicationId != null ||
+        session.isRecordingVoice(widget.threadId)) {
+      return;
+    }
+    final thread = widget.threadId, route = _boundCommerceRoute;
+    final generation = session.draftSessionGeneration;
+    final revision = session.draftRevision(thread);
+    final photo = session.selectedPhoto(thread);
+    final attachment = session.selectedAttachment(thread);
+    final reply = session.replyTarget(thread);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Replace your earlier draft?'),
+        content: Text(
+          'Start a new enquiry about ${incoming.productTitle ?? incoming.orderId ?? incoming.title}. '
+          'Your current draft text and attachments will be removed.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('chat-keep-original-draft'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep draft'),
+          ),
+          TextButton(
+            key: const Key('chat-replace-original-draft'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Replace draft'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true ||
+        !mounted ||
+        !identical(session, widget.session) ||
+        thread != widget.threadId ||
+        route != _boundCommerceRoute ||
+        session.busy ||
+        !session.isDraftSessionCurrent(generation) ||
+        session.draftRevision(thread) != revision ||
+        session.isRecordingVoice(thread) ||
+        !identical(photo, session.selectedPhoto(thread)) ||
+        !identical(attachment, session.selectedAttachment(thread)) ||
+        !identical(reply, session.replyTarget(thread)) ||
+        !identical(incoming, _incomingCommerceContext)) {
+      return;
+    }
+    session.discardDraftForSession(thread);
+    session.bindCommerceContext(thread, incoming);
+    _restoreDraft(thread);
+    setState(() => _incomingCommerceContext = null);
+    _applyInitialDraftIfEmpty(widget.initialMessageDraft);
   }
 
   void _applyInitialDraftIfEmpty(String? initialDraft) {
     final draft = initialDraft?.trim();
-    if (_restoringSupportDraft ||
+    if (_incomingCommerceContext != null ||
+        _restoringSupportDraft ||
         draft == null ||
         draft.isEmpty ||
         _messageController.text.isNotEmpty ||
@@ -828,16 +942,20 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                   widget.session.messages(thread.id).isEmpty
               ? ChatFiniteIncomingMotion(
                   stateKey: 'chat-thread-loading-state',
-                  child: _ThreadLoadingState(title: thread.title),
+                  child: _stateWithDraftContextNotice(
+                    _ThreadLoadingState(title: thread.title),
+                  ),
                 )
               : widget.session.messageLoadError(thread.id) != null &&
                     widget.session.messages(thread.id).isEmpty
               ? ChatFiniteIncomingMotion(
                   stateKey: 'chat-thread-error-state',
-                  child: _ThreadErrorState(
-                    message: widget.session.messageLoadError(thread.id)!,
-                    onRetry: () =>
-                        widget.session.loadMessages(thread.id, refresh: true),
+                  child: _stateWithDraftContextNotice(
+                    _ThreadErrorState(
+                      message: widget.session.messageLoadError(thread.id)!,
+                      onRetry: () =>
+                          widget.session.loadMessages(thread.id, refresh: true),
+                    ),
                   ),
                 )
               : _ThreadBody(
@@ -848,6 +966,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                   highlightedMessageId: _highlightedMessageId,
                   onRetryMessage: _retryMessage,
                   workspaceApplicationContext: _workspaceApplicationContext,
+                  draftContextNotice: _draftContextNotice(),
                 ),
           bottom: ChatFiniteIncomingMotion(
             stateKey: widget.session.chatAvailableForSession(thread.id)
@@ -1838,6 +1957,7 @@ class _ThreadBody extends StatelessWidget {
     required this.highlightedMessageId,
     required this.onRetryMessage,
     this.workspaceApplicationContext,
+    this.draftContextNotice,
   });
 
   final ChatSession session;
@@ -1847,12 +1967,15 @@ class _ThreadBody extends StatelessWidget {
   final String? highlightedMessageId;
   final Future<void> Function(String messageId) onRetryMessage;
   final ChatWorkspaceApplicationContext? workspaceApplicationContext;
+  final Widget? draftContextNotice;
 
   @override
   Widget build(BuildContext context) {
     final messages = session.messages(thread.id);
     final commerceContext = session.commerceContext(thread.id);
+    final noticeOffset = draftContextNotice == null ? 0 : 1;
     final contextOffset =
+        noticeOffset +
         (commerceContext == null ? 0 : 1) +
         (workspaceApplicationContext == null ? 0 : 1);
     final emptyOffset = messages.isEmpty ? 1 : 0;
@@ -1867,6 +1990,7 @@ class _ThreadBody extends StatelessWidget {
       ),
       itemCount: messages.length + contextOffset + emptyOffset,
       itemBuilder: (context, index) {
+        if (noticeOffset == 1 && index == 0) return draftContextNotice!;
         if (workspaceApplicationContext != null && index == contextOffset - 1) {
           return Padding(
             key: const Key('chat-workspace-application-context'),
@@ -1891,7 +2015,7 @@ class _ThreadBody extends StatelessWidget {
             ),
           );
         }
-        if (commerceContext != null && index == 0) {
+        if (commerceContext != null && index == noticeOffset) {
           return Padding(
             padding: const EdgeInsets.only(bottom: MoolSpacing.sm),
             child: _ChatCommerceContextCard(

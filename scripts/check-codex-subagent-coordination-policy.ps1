@@ -7963,6 +7963,10 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     $chat=$Continuation.batch02Chat
     $chatOwners=@('apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart')
+    if ($null -ne $chat -and $null -ne $chat.PSObject.Properties['owners'] -and
+        @($chat.owners) -ccontains 'apps/mobile/lib/features/chat/screens/chat_thread_screen.dart') {
+      $chatOwners += 'apps/mobile/lib/features/chat/screens/chat_thread_screen.dart'
+    }
     if ($null -eq $chat -or $chat -isnot [pscustomobject]) { return $false }
     foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
       if($null -eq $chat.PSObject.Properties[$key]) { return $false }
@@ -8410,6 +8414,9 @@ function Invoke-Lf01Admission {
       $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart'
     }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Chat']) {
+      if (@($record.frontendContinuation.batch02Chat.owners) -ccontains 'apps/mobile/lib/features/chat/screens/chat_thread_screen.dart') {
+        $owners += 'apps/mobile/lib/features/chat/screens/chat_thread_screen.dart'
+      }
       Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',
         '275ef9cca32f644af366d03316fc74d1c1cd9e0d','HEAD') | Out-Null
     }
