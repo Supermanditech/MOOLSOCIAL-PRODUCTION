@@ -63,6 +63,24 @@ export interface CanonicalProductRecord {
   readonly reviewedAt?: string;
   readonly reasonCode?: string;
   readonly mergedIntoProductId?: string;
+  /** Additive reviewed content, not withdrawal of an earlier approved version. */
+  readonly contentRevisions?: readonly CanonicalProductContentRevision[];
+}
+
+export interface CanonicalProductContentRevision {
+  readonly catalogueId: string;
+  readonly tenantId: string;
+  readonly productId: string;
+  readonly revision: number;
+  readonly previousContentSha256: string;
+  readonly contentSha256: string;
+  readonly state: CatalogueReviewState;
+  readonly proposedByActorId: string;
+  readonly proposedByWorkspaceId: string;
+  readonly proposedAt: string;
+  readonly reviewedBy?: string;
+  readonly reviewedAt?: string;
+  readonly reasonCode?: string;
 }
 
 export interface VerifiedPackRecord {
@@ -118,6 +136,9 @@ export type CatalogueAuditEventType =
   | "product_proposed"
   | "product_verified"
   | "product_rejected"
+  | "product_content_revision_proposed"
+  | "product_content_revision_verified"
+  | "product_content_revision_rejected"
   | "pack_proposed"
   | "pack_verified"
   | "pack_rejected"
@@ -191,6 +212,23 @@ export interface ReviewCanonicalProductCommand extends CatalogueCommandBase {
   readonly reasonCode: string;
 }
 
+export interface ProposeProductContentRevisionCommand extends CatalogueCommandBase {
+  readonly type: "propose_product_revision";
+  readonly productId: string;
+  readonly previousContentSha256: string;
+  readonly contentSha256: string;
+}
+
+export interface ReviewProductContentRevisionCommand extends CatalogueCommandBase {
+  readonly type: "review_product_revision";
+  readonly productId: string;
+  readonly revision: number;
+  readonly previousContentSha256: string;
+  readonly contentSha256: string;
+  readonly decision: "verify" | "reject";
+  readonly reasonCode: string;
+}
+
 export interface ProposeVerifiedPackCommand extends CatalogueCommandBase {
   readonly type: "propose_pack";
   readonly packId: string;
@@ -238,6 +276,8 @@ export interface ResolveCatalogueDuplicateDisputeCommand
 export type CatalogueCommand =
   | ProposeCanonicalProductCommand
   | ReviewCanonicalProductCommand
+  | ProposeProductContentRevisionCommand
+  | ReviewProductContentRevisionCommand
   | ProposeVerifiedPackCommand
   | ReviewVerifiedPackCommand
   | CreateParticipantOfferCommand
@@ -259,13 +299,14 @@ function fail(code: CatalogueContractErrorCode, message: string): never {
 }
 
 function identifier(value: string, label: string): string {
-  if (!IDENTIFIER_PATTERN.test(value)) {
+  if (typeof value !== "string" || !IDENTIFIER_PATTERN.test(value)) {
     fail("invalid_input", `${label} must be an identifier-safe value.`);
   }
   return value;
 }
 
 function timestamp(value: string, label: string): string {
+  if (typeof value !== "string") fail("invalid_input", `${label} must be a timestamp string.`);
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) {
     fail("invalid_input", `${label} must be a valid timestamp.`);
@@ -274,7 +315,7 @@ function timestamp(value: string, label: string): string {
 }
 
 function sha256(value: string, label: string): string {
-  if (!SHA256_PATTERN.test(value)) {
+  if (typeof value !== "string" || !SHA256_PATTERN.test(value)) {
     fail("invalid_input", `${label} must be a SHA-256 reference.`);
   }
   return value.toUpperCase();
@@ -522,6 +563,63 @@ function productById(
   return product;
 }
 
+function checkedContentRevisions(catalogue: CatalogueAggregate,
+  product: CanonicalProductRecord): readonly CanonicalProductContentRevision[] {
+  if (!Object.hasOwn(product, "contentRevisions")) return [];
+  const revisions = product.contentRevisions;
+  const invalid = () => fail("invalid_input", "Canonical content revision history is invalid.");
+  if (!Array.isArray(revisions) || revisions.length === 0 || revisions.length > 100 ||
+      typeof product.reviewedBy !== "string" || typeof product.reviewedAt !== "string" ||
+      timestamp(product.reviewedAt, "original review") !== product.reviewedAt) return invalid();
+  identifier(product.reviewedBy, "original product reviewer");
+  let head = sha256(product.contentSha256, "original product content"), latest = product.reviewedAt;
+  const approved = new Set([head]);
+  const required = ["catalogueId", "tenantId", "productId", "revision", "previousContentSha256", "contentSha256",
+    "state", "proposedByActorId", "proposedByWorkspaceId", "proposedAt"];
+  const review = ["reviewedBy", "reviewedAt", "reasonCode"];
+  for (let i = 0; i < revisions.length; i++) {
+    const item = revisions[i] as CanonicalProductContentRevision;
+    if (item === null || typeof item !== "object" || Array.isArray(item) ||
+        required.some(key => !Object.hasOwn(item, key)) ||
+        Object.keys(item).some(key => ![...required, ...review].includes(key)) ||
+        item.catalogueId !== catalogue.catalogueId || item.tenantId !== catalogue.tenantId || item.productId !== product.productId ||
+        !Number.isSafeInteger(item.revision) || item.revision !== i + 2 ||
+        typeof item.previousContentSha256 !== "string" || item.previousContentSha256 !== head ||
+        typeof item.contentSha256 !== "string" || sha256(item.contentSha256, "revised content") !== item.contentSha256 ||
+        approved.has(item.contentSha256) ||
+        typeof item.proposedByActorId !== "string" || typeof item.proposedByWorkspaceId !== "string" ||
+        typeof item.proposedAt !== "string" || timestamp(item.proposedAt, "revision proposal") !== item.proposedAt ||
+        Date.parse(item.proposedAt) < Date.parse(latest) || !["pending_review", "verified", "rejected"].includes(item.state)) return invalid();
+    identifier(item.proposedByActorId, "revision proposer"); identifier(item.proposedByWorkspaceId, "revision workspace");
+    if (item.state === "pending_review") {
+      if (i !== revisions.length - 1 || review.some(key => Object.hasOwn(item, key))) return invalid();
+      latest = item.proposedAt;
+    } else {
+      if (typeof item.reviewedBy !== "string" || item.reviewedBy === item.proposedByActorId ||
+          typeof item.reviewedAt !== "string" || timestamp(item.reviewedAt, "revision review") !== item.reviewedAt ||
+          Date.parse(item.reviewedAt) < Date.parse(item.proposedAt) || typeof item.reasonCode !== "string") return invalid();
+      identifier(item.reviewedBy, "revision reviewer"); identifier(item.reasonCode, "revision review reason");
+      latest = item.reviewedAt;
+      if (item.state === "verified") { head = item.contentSha256; approved.add(head); }
+    }
+  }
+  return revisions;
+}
+
+/** Same identity, exact approved content only. Earlier approvals remain valid;
+ * neither a pending/rejected candidate nor a merged/revoked base is resolvable.
+ */
+export function reviewedCanonicalProduct(catalogue: CatalogueAggregate,
+  productId: string, contentSha256: string): CanonicalProductRecord | undefined {
+  const product = catalogue.products.find(item => item.productId === productId);
+  if (!product || product.state !== "verified") return undefined;
+  const revisions = checkedContentRevisions(catalogue, product);
+  const expected = sha256(contentSha256, "requested product content");
+  if (product.contentSha256.toUpperCase() !== expected &&
+      !revisions.some(item => item.state === "verified" && item.contentSha256 === expected)) return undefined;
+  return {...product, contentSha256: expected};
+}
+
 function packById(
   catalogue: CatalogueAggregate,
   packId: string,
@@ -607,6 +705,7 @@ export function applyCatalogueCommand(
 ): CatalogueAggregate {
   const participantCommand =
     command.type === "propose_product" ||
+    command.type === "propose_product_revision" ||
     command.type === "propose_pack" ||
     command.type === "create_offer";
   const workspace = participantCommand
@@ -617,6 +716,54 @@ export function applyCatalogueCommand(
   if (duplicate !== undefined) return duplicate;
 
   switch (command.type) {
+    case "propose_product_revision": {
+      if (workspace === undefined) fail("unauthorized", "workspace is required.");
+      const product = productById(catalogue, identifier(command.productId, "product id"));
+      if (product.state !== "verified") fail("invalid_transition", "Content update requires a verified canonical product.");
+      if (typeof product.reviewedBy !== "string" || typeof product.reviewedAt !== "string" ||
+          timestamp(product.reviewedAt, "original review") !== product.reviewedAt) fail("invalid_input", "Original review is incomplete.");
+      identifier(product.reviewedBy, "original product reviewer");
+      if (!isSupplyCapabilityActive(workspace, {capability: "product_master_stewardship",
+        at: command.occurredAt, categoryId: product.categoryId})) fail("capability_inactive", "Product stewardship is not active.");
+      const revisions = checkedContentRevisions(catalogue, product);
+      if (revisions.length >= 100 || revisions.some(item => item.state === "pending_review")) {
+        fail("invalid_transition", "Check the existing revision before another content update.");
+      }
+      const head = [...revisions].reverse().find(item => item.state === "verified")?.contentSha256 ?? product.contentSha256.toUpperCase();
+      const previous = sha256(command.previousContentSha256, "previous approved content");
+      const content = sha256(command.contentSha256, "new content"), at = timestamp(command.occurredAt, "revision proposal");
+      const latest = revisions.at(-1)?.reviewedAt ?? product.reviewedAt;
+      if (!latest || Date.parse(at) < Date.parse(latest) || previous !== head) fail("version_conflict", "Approved content changed. Refresh the product.");
+      if (reviewedCanonicalProduct(catalogue, product.productId, content)) fail("duplicate_candidate", "This content is already approved.");
+      const revision: CanonicalProductContentRevision = {catalogueId: catalogue.catalogueId, tenantId: catalogue.tenantId,
+        productId: product.productId, revision: revisions.length + 2, previousContentSha256: previous,
+        contentSha256: content, state: "pending_review", proposedByActorId: identifier(command.actor.actorId, "revision proposer"),
+        proposedByWorkspaceId: identifier(workspace.workspaceId, "revision workspace"), proposedAt: at};
+      return commit(catalogue, command, {eventType: "product_content_revision_proposed", entityType: "product",
+        entityId: product.productId, hashReferences: [previous, content]}, {
+        products: catalogue.products.map(item => item.productId === product.productId
+          ? {...product, contentRevisions: [...revisions, revision]} : item)});
+    }
+    case "review_product_revision": {
+      const product = productById(catalogue, identifier(command.productId, "product id"));
+      if (product.state !== "verified") fail("invalid_transition", "Content review requires a verified canonical product.");
+      const revisions = checkedContentRevisions(catalogue, product), candidate = revisions.at(-1);
+      if (!candidate || candidate.state !== "pending_review" || !Number.isSafeInteger(command.revision) ||
+          candidate.revision !== command.revision || candidate.previousContentSha256 !== sha256(command.previousContentSha256, "previous content") ||
+          candidate.contentSha256 !== sha256(command.contentSha256, "candidate content")) fail("version_conflict", "Content revision changed.");
+      if (candidate.proposedByActorId === command.actor.actorId) fail("unauthorized", "Independent content review is required.");
+      if (typeof command.decision !== "string" || !["verify", "reject"].includes(command.decision)) fail("invalid_input", "Invalid review decision.");
+      const at = timestamp(command.occurredAt, "revision review");
+      if (Date.parse(at) < Date.parse(candidate.proposedAt)) fail("invalid_input", "Review precedes the original submission.");
+      const reviewed: CanonicalProductContentRevision = {...candidate,
+        state: command.decision === "verify" ? "verified" : "rejected", reviewedBy: command.actor.actorId,
+        reviewedAt: at, reasonCode: identifier(command.reasonCode, "review reason")};
+      return commit(catalogue, command, {eventType: command.decision === "verify"
+        ? "product_content_revision_verified" : "product_content_revision_rejected", entityType: "product",
+        entityId: product.productId, hashReferences: [candidate.previousContentSha256, candidate.contentSha256]}, {
+        products: catalogue.products.map(item => item.productId === product.productId
+          ? {...product, contentRevisions: [...revisions.slice(0, -1), reviewed]} : item)});
+    }
     case "propose_product": {
       if (workspace === undefined) fail("unauthorized", "workspace is required.");
       const productId = identifier(command.productId, "product id");

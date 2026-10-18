@@ -1,6 +1,6 @@
 import {createHash} from "node:crypto";
 import {FieldPath, type Firestore} from "firebase-admin/firestore";
-import {applyCatalogueCommand, createCatalogueAggregate, referencedOfferTermAt,
+import {applyCatalogueCommand, createCatalogueAggregate, referencedOfferTermAt, reviewedCanonicalProduct,
   type CatalogueAggregate, type CatalogueCommand} from "../commerce/catalogue_contract.js";
 import {isSupplyCapabilityActive, type SupplyActor,
   type SupplyCapabilityQuery, type SupplyParticipantWorkspace} from "../commerce/supply_participant_contract.js";
@@ -236,6 +236,8 @@ function productionInput(raw: Readonly<Record<string, unknown>>): Record<string,
     create: [],
     propose_product: ["productId", "categoryId", "brandId", "contentSha256", "codes"],
     review_product: ["productId", "decision", "reasonCode", "expectedContentSha256"],
+    propose_product_revision: ["productId", "previousContentSha256", "contentSha256"],
+    review_product_revision: ["productId", "revision", "previousContentSha256", "contentSha256", "decision", "reasonCode"],
     propose_pack: ["packId", "productId", "descriptorSha256", "codes"],
     review_pack: ["packId", "decision", "reasonCode", "expectedDescriptorSha256"],
     create_offer: ["offerId", "packId", "buyingContext", "serviceAreaIds", "termWindows"],
@@ -245,11 +247,12 @@ function productionInput(raw: Readonly<Record<string, unknown>>): Record<string,
   const input = structuredClone(raw) as Record<string, unknown>;
   input.commandId = id(input.commandId);
   if (type !== "create") input.expectedVersion = integer(input.expectedVersion, 1, 1_000_000_000);
+  if (type === "review_product_revision") input.revision = integer(input.revision, 2, 101);
   for (const key of ["productId", "categoryId", "brandId", "packId", "offerId", "reasonCode"]) {
     if (key === "brandId" && input[key] === null && type === "propose_product" && input.categoryId === "fruits-vegetables") continue;
     if (key in input) input[key] = id(input[key]);
   }
-  for (const key of ["contentSha256", "descriptorSha256", "expectedContentSha256", "expectedDescriptorSha256"]) {
+  for (const key of ["contentSha256", "previousContentSha256", "descriptorSha256", "expectedContentSha256", "expectedDescriptorSha256"]) {
     if (key in input) {
       const hash = text(input[key], 64);
       if (!/^[A-Fa-f0-9]{64}$/u.test(hash)) invalid();
@@ -282,7 +285,7 @@ export function planCatalogueProduction(command: CatalogueProduction,
     value.catalogueId === identity.catalogueId && value.tenantId === identity.tenantId &&
     Number.isSafeInteger(value.version) && value.version >= 1;
   if (current && !validAggregate(current)) invalid("Catalogue identity changed.");
-  const participantOperation = ["propose_product", "propose_pack", "create_offer"].includes(String(input.type));
+  const participantOperation = ["propose_product", "propose_product_revision", "propose_pack", "create_offer"].includes(String(input.type));
   if (!participantOperation) {
     if (!actor.scopes.includes("supply.catalogue.review")) throw deny();
   } else {
@@ -848,7 +851,7 @@ export class WorkspaceCatalogueService {
     const rows = records.map(r => normalizeRecord(r, query.storeId));
     const items = rows.flatMap(record => {
       if (!record.publicListing || record.observedAt > readbackAt) return [];
-      const product = catalogue.products.find(p => p.productId === record.canonicalProductId);
+      const product = reviewedCanonicalProduct(catalogue, record.canonicalProductId, cataloguePayloadHash(record.content));
       const pack = catalogue.packs.find(p => p.packId === record.verifiedPackId);
       if (product?.state !== "verified" || pack?.state !== "verified" ||
           pack.productId !== product.productId ||
@@ -1293,7 +1296,7 @@ export function planStoreVariantFamilyReview(operatorUserId: string, identity: C
     if (!catalogue || catalogue.schemaVersion !== 1 || !Number.isSafeInteger(catalogue.version) || catalogue.version < 1 ||
         catalogue.catalogueId !== identity.catalogueId || catalogue.tenantId !== identity.tenantId) invalid();
     for (const record of familyMembers(candidate, records)) {
-      const product = catalogue.products.find(p => p.productId === record.canonicalProductId);
+      const product = reviewedCanonicalProduct(catalogue, record.canonicalProductId, cataloguePayloadHash(record.content));
       const pack = catalogue.packs.find(p => p.packId === record.verifiedPackId);
       if (!record.publicListing || product?.state !== "verified" || pack?.state !== "verified" ||
           pack.productId !== product.productId || !canonicalContentMatches(product, record.content) ||
@@ -1367,7 +1370,7 @@ export function planReviewedCatalogueSave(command: CatalogueSave, identity: Cata
   if (receipt) return planCatalogueSave(command, current, receipt);
   if (!catalogue || catalogue.schemaVersion !== 1 || catalogue.catalogueId !== identity.catalogueId ||
       catalogue.tenantId !== identity.tenantId) invalid("Reviewed catalogue is not available.");
-  const product = catalogue.products.find(p => p.productId === input.canonicalProductId);
+  const product = reviewedCanonicalProduct(catalogue, input.canonicalProductId, cataloguePayloadHash(input.content));
   const pack = catalogue.packs.find(p => p.packId === input.verifiedPackId);
   if (product?.state !== "verified" || pack?.state !== "verified" || pack.productId !== product.productId ||
       !canonicalContentMatches(product, input.content) ||
@@ -1412,7 +1415,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       const [authorityDoc, aggregateDoc, receiptDoc] = await transaction.getAll(authorityRef, aggregateRef, receiptRef);
       const authority = authorityDoc?.data() as CatalogueProducerAuthority | undefined;
       let participant: SupplyParticipantWorkspace | undefined, profile: WorkspaceProfileRecord | undefined;
-      if (["propose_product", "propose_pack", "create_offer"].includes(String(normalized.type)) &&
+      if (["propose_product", "propose_product_revision", "propose_pack", "create_offer"].includes(String(normalized.type)) &&
           authority?.actor?.workspaceId) {
         const workspaceId = id(authority.actor.workspaceId);
         const [participantDoc, stores] = await Promise.all([

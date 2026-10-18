@@ -138,6 +138,96 @@ function familyFixture() {
   return {family, records, command, candidate, review, aggregate: produceAll(value).aggregate};
 }
 
+test('LF03-REVISION reviewed family can retain an original member beside an approved revised member', () => {
+  const fixture = familyFixture(), {records, family} = fixture, revised = records[0]!;
+  revised.content.description = 'Independently reviewed updated details'; revised.revision = 2;
+  family.members[0]!.skuRevision = 2;
+  const previous = cataloguePayloadHash(records[1]!.content), next = cataloguePayloadHash(revised.content);
+  const proposal = {type: 'propose_product_revision', commandId: 'propose-content-revision', expectedVersion: fixture.aggregate.version,
+    productId: revised.canonicalProductId, previousContentSha256: previous, contentSha256: next};
+  const pending = planCatalogueProduction({operatorUserId: 'owner-one', identity: catalogueIdentity,
+    input: proposal, observedAt: at}, producerAuthority(), fixture.aggregate, producerParticipant(), profile).aggregate;
+  assert.throws(() => planStoreVariantFamilyReview('reviewer-one', catalogueIdentity, fixture.review,
+    producerAuthority(false), fixture.candidate, records, pending, at));
+  const aggregate = planCatalogueProduction({operatorUserId: 'reviewer-one', identity: catalogueIdentity,
+    input: {type: 'review_product_revision', commandId: 'review-content-revision', expectedVersion: pending.version,
+      productId: revised.canonicalProductId, revision: 2, previousContentSha256: previous, contentSha256: next,
+      decision: 'verify', reasonCode: 'checked-revision'}, observedAt: at}, producerAuthority(false), pending).aggregate;
+  const command = storeVariantFamilySubmission('owner-one', 'evaluation', {storeId: 'store-one',
+    expectedRevision: 0, idempotencyKey: 'revised-family', family}, at);
+  const candidate = planStoreVariantFamilySubmission(command, profile, records);
+  const review = planStoreVariantFamilyReview('reviewer-one', catalogueIdentity,
+    {...fixture.review, expectedCandidateFingerprint: candidate.fingerprint}, producerAuthority(false), candidate, records, aggregate, at);
+  assert.equal(review.decision, 'verify'); assert.equal(review.candidate.family.members.length, 2);
+});
+
+test('LF03-REVISION emulator approved updates preserve another Store original and historical receipts',
+  {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+    assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+    const app = initializeApp({projectId: `demo-lf03-revisions-${randomUUID().slice(0, 8)}`}, `revision-${randomUUID()}`);
+    const db = getFirestore(app), root = db.collection('workspaceCatalogues').doc('evaluation');
+    const repository = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at));
+    const service = () => new WorkspaceCatalogueService(repository(), catalogueIdentity, () => new Date(at));
+    try {
+      await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+      await root.collection('participants').doc('store-one').set(producerParticipant());
+      await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+      await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+      for (const command of productionCommands()) {
+        const owner = ['propose_product', 'propose_pack', 'create_offer'].includes(String(command.type));
+        await repository().produceCatalogue(owner ? 'owner-one' : 'reviewer-one', catalogueIdentity, command);
+      }
+      const original = await service().bindReviewedSku('owner-one', save()) as {saved: StoreSkuRecord};
+      const second = input('sku-two'); second.channels[0]!.offerId = 'offer-two'; second.channels[0]!.priceMinor = 10025;
+      await db.collection('workspaceProfiles').doc('case-two').set({...profile, caseId: 'case-two', workspaceId: 'store-two', name: 'Second original Store'});
+      await root.collection('participants').doc('store-two').set(producerParticipant('store-two'));
+      await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority(true, 'store-two'));
+      await repository().produceCatalogue('owner-one', catalogueIdentity,
+        {...productionCommands(second).at(-1)!, commandId: 'second-original-offer', expectedVersion: 6});
+      await service().bindReviewedSku('owner-one', save(second, {storeId: 'store-two'}));
+      await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+      const updated = input(); updated.content.description = 'Independently reviewed updated product details';
+      const previousContentSha256 = cataloguePayloadHash(input().content), contentSha256 = cataloguePayloadHash(updated.content);
+      const proposal = {type: 'propose_product_revision', commandId: 'actual-content-update', expectedVersion: 7,
+        productId: updated.canonicalProductId, previousContentSha256, contentSha256};
+      const pending = await repository().produceCatalogue('owner-one', catalogueIdentity, proposal);
+      assert.equal(pending.version, 8);
+      const updateRequest = save(updated, {expectedRevision: 1, idempotencyKey: 'publish-reviewed-update'});
+      await assert.rejects(service().bindReviewedSku('owner-one', updateRequest));
+      const review = {type: 'review_product_revision', commandId: 'actual-independent-review', expectedVersion: 8,
+        productId: updated.canonicalProductId, revision: 2, previousContentSha256, contentSha256,
+        decision: 'verify', reasonCode: 'checked-source'};
+      const approved = await repository().produceCatalogue('reviewer-one', catalogueIdentity, review);
+      assert.equal(approved.version, 9);
+      assert.deepEqual(await repository().produceCatalogue('owner-one', catalogueIdentity, proposal), pending);
+      const saved = await service().bindReviewedSku('owner-one', updateRequest) as {saved: StoreSkuRecord};
+      assert.equal(saved.saved.revision, 2); assert.equal(saved.saved.skuId, original.saved.skuId);
+      assert.deepEqual(saved.saved.provenance, original.saved.provenance);
+      const page = await service().publicDiscovery(discoveryRequest({pageSize: 50})) as DiscoveryResult;
+      assert.equal(page.page.totalCount, 2);
+      assert.doesNotMatch(JSON.stringify(page), /contentRevisions|proposedByActorId|reviewedBy|previousContentSha256/u);
+      const descriptions = page.items.map(item => ({storeId: item.listing.storeId,
+        description: (item.listing.items[0] as unknown as {content: StoreSkuContent}).content.description}));
+      assert.deepEqual(descriptions, [{storeId: 'store-two', description: input().content.description},
+        {storeId: 'store-one', description: updated.content.description}]);
+      console.log(`LF_REVISION_PROJECTION=${JSON.stringify(page)}`); // Actual isolated emulator output, never native data.
+      const replay = await service().bindReviewedSku('owner-one', save()) as {saved: StoreSkuRecord};
+      assert.deepEqual(replay.saved, original.saved);
+      assert.equal((await root.collection('stores').doc('store-one').collection('skus').doc('sku-one').get()).get('revision'), 2);
+      const rejected = input(); rejected.content.description = 'Rejected later content';
+      await repository().produceCatalogue('owner-one', catalogueIdentity, {type: 'propose_product_revision',
+        commandId: 'rejected-next', expectedVersion: 9, productId: rejected.canonicalProductId,
+        previousContentSha256: contentSha256, contentSha256: cataloguePayloadHash(rejected.content)});
+      await repository().produceCatalogue('reviewer-one', catalogueIdentity, {type: 'review_product_revision',
+        commandId: 'reject-third', expectedVersion: 10, productId: rejected.canonicalProductId, revision: 3,
+        previousContentSha256: contentSha256, contentSha256: cataloguePayloadHash(rejected.content), decision: 'reject', reasonCode: 'incorrect-details'});
+      await assert.rejects(service().bindReviewedSku('owner-one', save(rejected, {expectedRevision: 2, idempotencyKey: 'unapproved-third'})));
+      const final = await service().publicDiscovery(discoveryRequest({pageSize: 50})) as DiscoveryResult;
+      assert.deepEqual(final.items.map(item => ({storeId: item.listing.storeId,
+        description: (item.listing.items[0] as unknown as {content: StoreSkuContent}).content.description})), descriptions);
+    } finally { await db.terminate(); await deleteApp(app); }
+  });
+
 test("family submission freezes only actual combinations, not a Cartesian inventory", () => {
   const {family, candidate} = familyFixture();
   assert.equal(candidate.family.members.length, 2);

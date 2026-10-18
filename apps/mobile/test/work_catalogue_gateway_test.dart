@@ -1393,6 +1393,31 @@ void main() {
     expect(session.productFactsFor(pager.page!.items.first).eligibility, isNull);
     session.releaseCatalogueProducts('host-discovery-contract');
   }); }
+  final revisionLog = Platform.environment['LF03_REVISION_PUBLIC_LOG'];
+  if (revisionLog != null) {
+    test('LF03-REVISION actual approved update and other Store original reach the existing public content cache', () async {
+      const marker = 'LF_REVISION_PROJECTION=';
+      final captures = File(revisionLog).readAsLinesSync().where((line) => line.contains(marker)).toList();
+      expect(captures, hasLength(1));
+      final actual = jsonDecode(captures.single.split(marker).last) as Map<String, dynamic>;
+      final source = WorkspacePublicDiscoverySource(current: () => true,
+        gateway: discoveryGateway(OwnerTransport((body) async {
+          expect(body['query'], actual['query']);
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': actual}));
+        }), realm: 'evaluation'));
+      addTearDown(source.dispose);
+      final products = await source.loadProducts(BuyV2CatalogueQuery(destination: BuyV2Destination.shop, regionId: null,
+        areaScope: BuyV2CatalogueAreaScope.allAreas, sort: BuyV2ProductSort.priceLowToHigh), pageSize: 50);
+      final updated = products.items.singleWhere((p) => p.storeId == 'store-one');
+      final original = products.items.singleWhere((p) => p.storeId == 'store-two');
+      expect(updated.sourceSkuId, 'sku-one'); expect(updated.canonicalId, original.canonicalId);
+      expect(source.snapshotFor(updated).description, 'Independently reviewed updated product details');
+      expect(source.snapshotFor(original).description, 'Isolated test description');
+      expect(updated.priceMinor, 26000); expect(original.priceMinor, 10025);
+      expect(source.snapshotFor(updated).state, BuyV2ProductContentState.ready);
+      expect(source.snapshotFor(original).state, BuyV2ProductContentState.ready);
+    });
+  }
   // LF04 readonly public-service fixtures. No owner draft or native feed injection.
   Map<String, dynamic> promotionRow({String id = 'promotion-one', int revision = 1}) {
     final sku = row(publicPage())..remove('listings');

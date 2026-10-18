@@ -9,6 +9,9 @@ import {
   matchVerifiedPackByCode,
   normalizeCatalogueCode,
   referencedOfferTermAt,
+  reviewedCanonicalProduct,
+  type ProposeProductContentRevisionCommand,
+  type ReviewProductContentRevisionCommand,
   type CatalogueAggregate,
   type CatalogueCodeReference,
   type CatalogueContractErrorCode,
@@ -284,6 +287,135 @@ for (const categoryId of ["fruits-vegetables", "category.fmcg", "electronics"]) 
     });
   }
 }
+
+test("LF03-REVISION existing canonical identity accepts a separately reviewed content revision", () => {
+  const {catalogue, workspace} = verifiedProduct();
+  const command = {type: "propose_product_revision", commandId: "command.content-update",
+    catalogueId: catalogue.catalogueId, expectedVersion: catalogue.version,
+    occurredAt: "2026-08-03T03:00:00.000Z", actor: workspaceActor,
+    productId: "product.oil-001", previousContentSha256: HASH_A, contentSha256: HASH_B};
+  const pending = applyCatalogueCommand(catalogue,
+    command as unknown as Parameters<typeof applyCatalogueCommand>[1], workspace);
+  assert.equal(pending.version, catalogue.version + 1);
+  assert.equal(pending.products.length, 1);
+  assert.equal(pending.products[0]!.productId, "product.oil-001");
+});
+
+function contentProposal(catalogue: CatalogueAggregate, hash = HASH_B, previous = HASH_A,
+  key = "command.content-revision"): ProposeProductContentRevisionCommand {
+  return {type: "propose_product_revision", commandId: key, catalogueId: catalogue.catalogueId,
+    expectedVersion: catalogue.version, occurredAt: "2026-08-03T03:00:00.000Z", actor: workspaceActor,
+    productId: "product.oil-001", previousContentSha256: previous, contentSha256: hash};
+}
+function contentReview(catalogue: CatalogueAggregate, decision: "verify" | "reject" = "verify",
+  key = "command.content-review"): ReviewProductContentRevisionCommand {
+  const candidate = catalogue.products[0]!.contentRevisions!.at(-1)!;
+  return {type: "review_product_revision", commandId: key, catalogueId: catalogue.catalogueId,
+    expectedVersion: catalogue.version, occurredAt: "2026-08-03T03:00:00.000Z", actor: catalogueReviewer,
+    productId: candidate.productId, revision: candidate.revision, previousContentSha256: candidate.previousContentSha256,
+    contentSha256: candidate.contentSha256, decision, reasonCode: "review.checked-source"};
+}
+test("LF03-REVISION pending and rejected content cannot replace an approved Store version", () => {
+  const {catalogue, workspace} = verifiedProduct(), original = JSON.stringify(catalogue);
+  assert.equal(Object.hasOwn(catalogue.products[0]!, "contentRevisions"), false);
+  const pending = applyCatalogueCommand(catalogue, contentProposal(catalogue), workspace);
+  assert.equal(reviewedCanonicalProduct(pending, "product.oil-001", HASH_B), undefined);
+  assert.equal(reviewedCanonicalProduct(pending, "product.oil-001", HASH_A)!.contentSha256, HASH_A);
+  const approved = applyCatalogueCommand(pending, contentReview(pending));
+  assert.equal(reviewedCanonicalProduct(approved, "product.oil-001", HASH_B)!.contentSha256, HASH_B);
+  assert.equal(reviewedCanonicalProduct(approved, "product.oil-001", HASH_A)!.contentSha256, HASH_A);
+  assert.equal(approved.products[0]!.contentSha256, HASH_A);
+  assert.equal(approved.products[0]!.brandId, catalogue.products[0]!.brandId);
+  assert.equal(JSON.stringify(catalogue), original);
+  const rejected = applyCatalogueCommand(pending, contentReview(pending, "reject"));
+  const next = applyCatalogueCommand(rejected, contentProposal(rejected, HASH_C, HASH_A, "command.after-rejection"), workspace);
+  assert.equal(next.products[0]!.contentRevisions!.at(-1)!.revision, 3);
+  assert.equal(next.products[0]!.contentRevisions!.at(-1)!.previousContentSha256, HASH_A);
+  const confirmed = applyCatalogueCommand(next, contentReview(next, "verify", "command.confirm-third"));
+  assert.equal(reviewedCanonicalProduct(confirmed, "product.oil-001", HASH_B), undefined);
+  assert.equal(reviewedCanonicalProduct(confirmed, "product.oil-001", HASH_C)!.contentSha256, HASH_C);
+});
+test("LF03-REVISION pins the current approved head and forbids fork duplicate and self review", () => {
+  const {catalogue, workspace} = verifiedProduct(), proposal = contentProposal(catalogue);
+  const pending = applyCatalogueCommand(catalogue, proposal, workspace), review = contentReview(pending);
+  expectCode(() => applyCatalogueCommand(pending, contentProposal(pending, HASH_C, HASH_A, "command.fork"), workspace), "invalid_transition");
+  for (const patch of [{revision: 3}, {previousContentSha256: HASH_C}, {contentSha256: HASH_C}]) {
+    expectCode(() => applyCatalogueCommand(pending, {...review, ...patch}), "version_conflict");
+  }
+  expectCode(() => applyCatalogueCommand(pending, {...review,
+    actor: {...catalogueReviewer, actorId: workspaceActor.actorId}}), "unauthorized");
+  const approved = applyCatalogueCommand(pending, review);
+  expectCode(() => applyCatalogueCommand(approved, contentProposal(approved, HASH_C, HASH_A, "command.stale-head"), workspace), "version_conflict");
+  expectCode(() => applyCatalogueCommand(approved, contentProposal(approved, HASH_A, HASH_B, "command.already-approved"), workspace), "duplicate_candidate");
+  assert.equal(applyCatalogueCommand(approved, proposal, workspace), approved);
+  assert.equal(applyCatalogueCommand(approved, review), approved);
+  expectCode(() => applyCatalogueCommand(approved, {...proposal, contentSha256: HASH_C}, workspace), "idempotency_conflict");
+});
+test("LF03-REVISION retains tenant stewardship and base revocation boundaries", () => {
+  const {catalogue, workspace} = verifiedProduct(), proposal = contentProposal(catalogue);
+  expectCode(() => applyCatalogueCommand(catalogue, proposal, supplyWorkspace([])), "capability_inactive");
+  expectCode(() => applyCatalogueCommand(catalogue, {...proposal, actor: {...workspaceActor, tenantId: "other.tenant"}}, workspace), "tenant_mismatch");
+  expectCode(() => applyCatalogueCommand(catalogue, {...proposal, actor: {...workspaceActor, workspaceId: "other.workspace"}}, workspace), "workspace_mismatch");
+  const pending = applyCatalogueCommand(catalogue, proposal, workspace), approved = applyCatalogueCommand(pending, contentReview(pending));
+  for (const state of ["merged", "rejected", "pending_review"] as const) {
+    const revoked = {...approved, products: approved.products.map(item => ({...item, state}))};
+    assert.equal(reviewedCanonicalProduct(revoked, "product.oil-001", HASH_A), undefined);
+    assert.equal(reviewedCanonicalProduct(revoked, "product.oil-001", HASH_B), undefined);
+    expectCode(() => applyCatalogueCommand(revoked, contentProposal(revoked, HASH_C, HASH_B, "command.revoked"), workspace), "invalid_transition");
+  }
+});
+test("LF03-REVISION malformed persisted lineage is never an approval allowlist", () => {
+  const {catalogue, workspace} = verifiedProduct(), pending = applyCatalogueCommand(catalogue, contentProposal(catalogue), workspace);
+  const approved = applyCatalogueCommand(pending, contentReview(pending));
+  for (const fault of ["product", "catalogue", "ordinal", "parent", "self", "proposer", "approval", "time", "empty", "shape", "extra"]) {
+    const raw = structuredClone(approved) as unknown as {products: Array<Record<string, unknown>>};
+    const revisions = raw.products[0]!.contentRevisions as Array<Record<string, unknown>>, item = revisions[0]!;
+    if (fault === "product") item.productId = "other.product";
+    if (fault === "catalogue") item.catalogueId = "other.catalogue";
+    if (fault === "ordinal") item.revision = 3;
+    if (fault === "parent") item.previousContentSha256 = HASH_C;
+    if (fault === "self") item.reviewedBy = item.proposedByActorId;
+    if (fault === "proposer") delete item.proposedByActorId;
+    if (fault === "approval") delete item.reviewedAt;
+    if (fault === "time") item.reviewedAt = "2026-08-03T01:00:00.000Z";
+    if (fault === "empty") raw.products[0]!.contentRevisions = [];
+    if (fault === "shape") raw.products[0]!.contentRevisions = {contentSha256: HASH_B};
+    if (fault === "extra") item.approved = true;
+    expectCode(() => reviewedCanonicalProduct(raw as unknown as CatalogueAggregate, "product.oil-001", HASH_A), "invalid_input");
+  }
+});
+test("LF03-REVISION rejects coercive reviewer facts instead of producing unreadable history", () => {
+  const {catalogue, workspace} = verifiedProduct(), pending = applyCatalogueCommand(catalogue, contentProposal(catalogue), workspace);
+  const review = contentReview(pending);
+  expectCode(() => applyCatalogueCommand(pending, {...review, reasonCode: [review.reasonCode]} as unknown as ReviewProductContentRevisionCommand), "invalid_input");
+  for (const field of ["contentSha256", "previousContentSha256", "occurredAt", "productId"] as const) {
+    expectCode(() => applyCatalogueCommand(pending, {...review, [field]: [review[field]]} as unknown as ReviewProductContentRevisionCommand), "invalid_input");
+  }
+});
+test("LF03-REVISION rejects unreadable proposer identity without changing the original aggregate", () => {
+  const {catalogue, workspace} = verifiedProduct(), before = JSON.stringify(catalogue), proposal = contentProposal(catalogue);
+  for (const actorId of ["", [workspaceActor.actorId]]) {
+    expectCode(() => applyCatalogueCommand(catalogue, {...proposal,
+      actor: {...workspaceActor, actorId}} as unknown as ProposeProductContentRevisionCommand, workspace), "invalid_input");
+    assert.equal(JSON.stringify(catalogue), before);
+  }
+  expectCode(() => applyCatalogueCommand(catalogue, {...proposal,
+    actor: {...workspaceActor, workspaceId: ""}}, {...workspace, workspaceId: ""}), "invalid_input");
+  assert.equal(JSON.stringify(catalogue), before);
+});
+test("LF03-REVISION bounded history preserves all accepted ordinals and rejects silent truncation", () => {
+  const fixture = verifiedProduct(); let catalogue = fixture.catalogue, head = HASH_A;
+  for (let i = 1; i <= 100; i++) {
+    const hash = i.toString(16).toUpperCase().padStart(64, "0");
+    catalogue = applyCatalogueCommand(catalogue, contentProposal(catalogue, hash, head, `command.propose-${i}`), fixture.workspace);
+    catalogue = applyCatalogueCommand(catalogue, contentReview(catalogue, "verify", `command.review-${i}`));
+    head = hash;
+  }
+  assert.equal(catalogue.products[0]!.contentRevisions!.length, 100);
+  assert.equal(catalogue.products[0]!.contentRevisions!.at(-1)!.revision, 101);
+  assert.equal(reviewedCanonicalProduct(catalogue, "product.oil-001", HASH_A)!.contentSha256, HASH_A);
+  expectCode(() => applyCatalogueCommand(catalogue, contentProposal(catalogue, HASH_B, head, "command.capacity"), fixture.workspace), "invalid_transition");
+});
 
 test("catalogue creation requires governance and starts empty", () => {
   const catalogue = emptyCatalogue();
