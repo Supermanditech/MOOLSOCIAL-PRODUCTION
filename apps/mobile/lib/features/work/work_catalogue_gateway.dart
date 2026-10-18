@@ -719,6 +719,22 @@ void _checkProductFactsReadbackVersion(Map<String, dynamic> data) {
   }
 }
 
+void _checkProduceReadback(Map<String, dynamic> data, {bool supported = true}) {
+  if (data.containsKey('unbrandedProduceReadbackVersion') &&
+      (!supported || data['unbrandedProduceReadbackVersion'] is! int ||
+       data['unbrandedProduceReadbackVersion'] != 1)) {
+    throw const FormatException();
+  }
+}
+
+String _catalogueBrand(Map<String, dynamic> content, {Map<String, dynamic>? readback}) {
+  final brand = _string(content['brand'], 240, _id(content['categoryId']) == 'fruits-vegetables');
+  if (brand.isEmpty && readback != null && readback['unbrandedProduceReadbackVersion'] != 1) {
+    throw const FormatException();
+  }
+  return brand;
+}
+
 class WorkspacePublicCatalogueEntry {
   const WorkspacePublicCatalogueEntry({required this.product, required this.readback});
   final BuyV2Product product;
@@ -735,6 +751,7 @@ class WorkspacePublicCatalogueEntry {
     required DateTime now,
   }) {
     _checkProductFactsReadbackVersion(data);
+    _checkProduceReadback(data);
     if (!{'production', 'evaluation'}.contains(realm) ||
         data['realm'] != realm || data['storeId'] != storeId ||
         data['state'] != 'ready' || data['listingCoverage'] != 'complete' ||
@@ -778,7 +795,7 @@ class WorkspacePublicCatalogueEntry {
     final product = BuyV2Product(id: identity.listingId, canonicalId: _id(row['canonicalProductId']),
       storeId: storeId, publicListingIdentity: identity,
       destination: channel == BuyV2OfferClass.retail ? BuyV2Destination.shop : BuyV2Destination.wholesale,
-      categoryId: _id(content['categoryId']), brand: _string(content['brand']),
+      categoryId: _id(content['categoryId']), brand: _catalogueBrand(content, readback: data),
       title: _string(content['title']), variant: _string(content['variant'], 240, true),
       compliance: facts?.compliance, composition: facts?.composition,
       regulatoryNote: facts?.regulatoryNote, requiresPrescription: facts?.requiresPrescription ?? false,
@@ -1006,6 +1023,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
     if (envelope['ok'] != true) throw const FormatException();
     final data = _map(envelope['data']);
     _checkProductFactsReadbackVersion(data);
+    _checkProduceReadback(data, supported: gateway.unbrandedProduceReadbackSupported);
     if (data['cataloguePageVersion'] != 1 || data['schemaVersion'] != 1 || data['realm'] != gateway.realm ||
         data['storeId'] != storeId || data['state'] != 'ready' || data['listingReadbackVersion'] != 1 ||
         data['mediaReadbackVersion'] != 1 || data['listingCoverage'] != 'complete' ||
@@ -1147,6 +1165,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway() {
     transport: IoSocialContentTransport(),
     policyReadbackRequired: true,
     productFactsReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_FACTS_V1'),
+    unbrandedProduceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_UNBRANDED_PRODUCE_V1'),
   );
 }
 
@@ -1169,6 +1188,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.ownerAccountId,
     this.policyReadbackRequired = false,
     this.productFactsReadbackSupported = false,
+    this.unbrandedProduceReadbackSupported = false,
     this.reviewedVariants,
     DateTime Function()? now,
   }) : now = now ?? DateTime.now {
@@ -1186,6 +1206,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool policyReadbackRequired;
   // Enable only with the matching service contract; do not break strict legacy endpoints.
   final bool productFactsReadbackSupported;
+  // Negotiated only with a matching service; legacy strict endpoints reject new keys.
+  final bool unbrandedProduceReadbackSupported;
   final WorkspacePublicVariantSource? reviewedVariants;
   final Map<String, WorkspaceReviewedVariantMembership> _variantMemberships = {};
   final Map<String, String> _variantInputs = {};
@@ -1204,6 +1226,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       ownerAccountId: accountId,
       policyReadbackRequired: policyReadbackRequired,
       productFactsReadbackSupported: productFactsReadbackSupported,
+      unbrandedProduceReadbackSupported: unbrandedProduceReadbackSupported,
       reviewedVariants: reviewedVariants,
       now: now,
     );
@@ -1348,9 +1371,11 @@ class AuthenticatedWorkspaceCatalogueGateway
         return null;
       }
       final data = _map(envelope['data']);
-      _keys(Map<String, dynamic>.of(data)..remove('mediaReadbackVersion')..remove('productFactsReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'items', 'nextCursor']);
+      _keys(Map<String, dynamic>.of(data)..remove('mediaReadbackVersion')..remove('productFactsReadbackVersion')
+        ..remove('unbrandedProduceReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'items', 'nextCursor']);
       if (data.containsKey('mediaReadbackVersion') && data['mediaReadbackVersion'] != 1) throw const FormatException();
       _checkProductFactsReadbackVersion(data);
+      _checkProduceReadback(data, supported: unbrandedProduceReadbackSupported);
       if (data['schemaVersion'] != 1 ||
           data['realm'] != realm ||
           data['storeId'] != storeId ||
@@ -1369,6 +1394,7 @@ class AuthenticatedWorkspaceCatalogueGateway
         realm: realm,
       );
       final content = _map(owned.input['content']);
+      _catalogueBrand(content, readback: data);
       if (content.containsKey('productFacts') && data['productFactsReadbackVersion'] != 1) return null;
       if (_list(content['media'], 10).any((raw) => _map(_map(raw)['file']).containsKey('frameCount')) &&
           data['mediaReadbackVersion'] != 1) { return null; }
@@ -1409,6 +1435,12 @@ class AuthenticatedWorkspaceCatalogueGateway
   }) async {
     var sent = false;
     try {
+      // Do not start a new binding that this connection cannot read back.
+      // An original uncertain attempt must still use its existing reconciliation.
+      if (!reconciliation && !recoveringUnknown && !unbrandedProduceReadbackSupported &&
+          _map(original.sku['content'])['brand'] == '') {
+        return const WorkspaceCatalogueBindingResult(WorkspaceCatalogueBindingState.notSent);
+      }
       if (ownerAccountId == null ||
           original.accountId != ownerAccountId ||
           original.realm != realm) {
@@ -1532,7 +1564,12 @@ class AuthenticatedWorkspaceCatalogueGateway
                   .padLeft(2, '0'),
             ).join(),
           },
-          body: body,
+          body: {
+            ...body,
+            if (unbrandedProduceReadbackSupported &&
+                {'listStoreCatalogueSkus', 'readPublicStoreCatalogue'}.contains(body['operation']))
+              'unbrandedProduceReadbackVersion': 1,
+          },
         )
         .timeout(const Duration(seconds: 20));
   }
@@ -1541,6 +1578,7 @@ class AuthenticatedWorkspaceCatalogueGateway
   Future<WorkspaceCatalogueContentResult> read(BuyV2Product product) async {
     final policyRequired = policyResolutionRequired || product.publicListingIdentity != null;
     try {
+      if (product.brand.isEmpty && !unbrandedProduceReadbackSupported) throw const FormatException();
       if (!productFactsReadbackSupported && !WorkspaceCatalogueProductFacts.fromProduct(product).isEmpty) {
         throw const FormatException();
       }
@@ -1571,6 +1609,7 @@ class AuthenticatedWorkspaceCatalogueGateway
               'operation': 'readPublicStoreCatalogue',
               'mediaReadbackVersion': 1,
               if (productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
+              if (unbrandedProduceReadbackSupported) 'unbrandedProduceReadbackVersion': 1,
               if (policyRequired) 'policyReadbackVersion': 1,
               if (product.publicListingIdentity != null) 'listingReadbackVersion': 1,
               'storeId': product.storeId,
@@ -1582,6 +1621,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       final envelope = _map(jsonDecode(response.body));
       if (envelope['ok'] != true) throw const FormatException();
       final data = _map(envelope['data']);
+      _checkProduceReadback(data, supported: unbrandedProduceReadbackSupported);
       final items = data['items'];
       if (items is List && items.any((item) => item is Map && item.containsKey('supplierPolicy'))) {
         _policyObserved = true;
@@ -1610,6 +1650,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       if (!current() || response == null || response.statusCode != 200) return null;
       final envelope = _map(jsonDecode(response.body));
       if (envelope['ok'] != true) return null;
+      _checkProduceReadback(_map(envelope['data']), supported: unbrandedProduceReadbackSupported);
       final entry = WorkspacePublicCatalogueEntry.fromResponse(_map(envelope['data']),
         storeId: storeId, realm: realm, channel: channel, now: now().toUtc());
       // The response is scoped to the requested raw SKU, not merely a same-Store
@@ -1981,7 +2022,7 @@ void _ownerSkuInput(Map<String, dynamic> sku, String storeId) {
     'media',
   ]);
   _string(content['title']);
-  _string(content['brand']);
+  _catalogueBrand(content);
   _string(content['variant'], 240, true);
   _id(content['categoryId']);
   if (content.containsKey('productFacts')) WorkspaceCatalogueProductFacts.fromJson(content['productFacts']);
@@ -2094,6 +2135,7 @@ WorkspaceCatalogueContentResult _decode(
   bool policyRequired = false,
 }) {
   _checkProductFactsReadbackVersion(data);
+  _checkProduceReadback(data);
   if (data['schemaVersion'] != 1 ||
       data['realm'] != realm ||
       data['storeId'] != product.storeId ||
@@ -2163,6 +2205,7 @@ WorkspaceCatalogueContentResult _decode(
       content['categoryId'] != product.categoryId) {
     throw const FormatException();
   }
+  _catalogueBrand(content, readback: data);
   if (content.containsKey('productFacts')) {
     final facts = WorkspaceCatalogueProductFacts.fromJson(content['productFacts']);
     if (data['productFactsReadbackVersion'] != 1 ||

@@ -264,7 +264,8 @@ if ($RequireLfPublicationProbes) {
       $cases++
     }
     foreach ($optionalOwner in @('apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
-        'apps/mobile/lib/features/work/work_publication_data.dart')) {
+        'apps/mobile/lib/features/work/work_publication_data.dart',
+        'backend/functions/src/workspace/workspace_promotion_service.ts')) {
       $legacyFacts=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
       $legacyFacts.batch02Facts.owners=@($legacyFacts.batch02Facts.owners | Where-Object { $_ -cne $optionalOwner })
       Assert-Fixture (Test-Lf27Batch01Continuation $legacyFacts @()) 'Historical facts owner list rejected.'

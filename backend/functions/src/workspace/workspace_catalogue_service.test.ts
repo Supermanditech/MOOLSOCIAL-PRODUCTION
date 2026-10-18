@@ -10,6 +10,7 @@ import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingB
   planStorePublicDetailsSave, normalizeStorePublicDetails, type StorePublicDetailsCommand,
   type StorePublicDetailsRecord, type StorePublicDetailsReceipt} from "./workspace_catalogue_service.js";
 import type {WorkspaceProfileRecord} from "./workspace_profile_service.js";
+import {WorkspacePromotionService, planPromotionSave, type PromotionRepository, type PromotionRecord} from "./workspace_promotion_service.js";
 import {createCatalogueAggregate, type CatalogueAggregate} from "../commerce/catalogue_contract.js";
 import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
   type SupplyParticipantWorkspace} from "../commerce/supply_participant_contract.js";
@@ -50,7 +51,7 @@ function producerAuthority(owner = true, storeId = "store-one"): CatalogueProduc
       scopes: [owner ? "supply.workspace.admin" : "supply.catalogue.review"]},
     validFrom: "2026-10-16T00:00:00.000Z", expiresAt: "2026-10-17T00:00:00.000Z"};
 }
-function producerParticipant(storeId = "store-one"): SupplyParticipantWorkspace {
+function producerParticipant(storeId = "store-one", categoryId = "grocery"): SupplyParticipantWorkspace {
   const actor = producerAuthority(true, storeId).actor;
   let result = registerSupplyParticipantWorkspace({commandId: "fixture-register", occurredAt: at,
     workspaceId: storeId, tenantId: "tenant-one", legalEntityReference: "fixture-legal",
@@ -59,7 +60,7 @@ function producerParticipant(storeId = "store-one"): SupplyParticipantWorkspace 
     result = applySupplyParticipantCommand(result, {type: "request_capability", actor,
       commandId: `request-${capability}`, workspaceId: storeId, expectedVersion: result.version,
       occurredAt: at, capability, evidence: [{kind: "identity", sha256: "A".repeat(64)}],
-      qualifiers: {categoryIds: ["grocery"], serviceAreaIds: capability === "product_master_stewardship" ? [] : ["host-area"]}});
+      qualifiers: {categoryIds: [categoryId], serviceAreaIds: capability === "product_master_stewardship" ? [] : ["host-area"]}});
     result = applySupplyParticipantCommand(result, {type: "review_capability",
       actor: {actorId: "capability-reviewer", tenantId: "tenant-one", scopes: ["supply.capability.review"]},
       commandId: `verify-${capability}`, workspaceId: storeId, expectedVersion: result.version,
@@ -92,7 +93,7 @@ function productionCommands(value = input()): Array<Record<string, unknown>> {
 }
 function produceAll(value = input()) {
   let aggregate: CatalogueAggregate | undefined;
-  const participant = producerParticipant(), receipts: CatalogueProductionReceipt[] = [];
+  const participant = producerParticipant("store-one", value.content.categoryId), receipts: CatalogueProductionReceipt[] = [];
   for (const command of productionCommands(value)) {
     const owner = ["propose_product", "propose_pack", "create_offer"].includes(String(command.type));
     const authority = producerAuthority(owner);
@@ -293,6 +294,18 @@ test("LF-FACTS legacy absence preserves exact input and hash", () => {
   assert.equal(cataloguePayloadHash(normalizeSku(legacy, "store-one")), hash);
   assert.equal(Object.hasOwn(normalizeSku(legacy, "store-one").content, "productFacts"), false);
 });
+test("LF-PRODUCE empty brand is exact optional produce data, not a generated brand", () => {
+  const value = input(); value.content.categoryId = "fruits-vegetables"; value.content.brand = "";
+  assert.deepEqual(normalizeSku(value, "store-one"), value);
+  assert.equal(cataloguePayloadHash(normalizeSku(value, "store-one")), cataloguePayloadHash(value));
+});
+test("LF-PRODUCE other categories and malformed produce brand remain rejected", () => {
+  for (const [category, brand] of [["grocery", ""], ["electronics", ""],
+    ["fruits-vegetables", " "], ["fruits-vegetables", null], ["fruits-vegetables", 7]]) {
+    const value = input(); Object.assign(value.content, {categoryId: category, brand});
+    assert.throws(() => normalizeSku(value, "store-one"), {code: "invalid_input"});
+  }
+});
 test("LF-FACTS strict versioned descriptive facts survive normalization", () => {
   const value = input(), facts = descriptiveFacts();
   Object.assign(value.content, {productFacts: facts});
@@ -428,6 +441,88 @@ class ViewMemory extends BoundMemory {
 }
 const viewQuery = {destination: 'shop', search: '', categoryId: 'all', sort: 'relevance',
   brands: [], maximumPriceMinor: null, tradeType: null, listingIds: []};
+test('LF-PRODUCE negotiated owner public and paged readback preserve reviewed empty brand', async () => {
+  const repository = new ViewMemory(), value = input();
+  value.content.categoryId = 'fruits-vegetables'; value.content.brand = '';
+  repository.aggregate = produceAll(value).aggregate;
+  await subject(repository).saveSku('owner-one', save(value));
+  const capability = {unbrandedProduceReadbackVersion: 1};
+  await assert.rejects(subject(repository).listSkus('owner-one', {storeId: 'store-one'}), {code: 'unsupported_version'});
+  await assert.rejects(subject(repository).publicCatalogue({storeId: 'store-one'}), {code: 'unsupported_version'});
+  const request = {storeId: 'store-one', cataloguePageVersion: 1, query: viewQuery, pageSize: 10};
+  await assert.rejects(subject(repository).publicCatalogue(request), {code: 'unsupported_version'});
+  const owned = await subject(repository).listSkus('owner-one', {storeId: 'store-one', ...capability}) as
+    {unbrandedProduceReadbackVersion: number; items: Array<{content: StoreSkuContent}>};
+  const published = await subject(repository).publicCatalogue({storeId: 'store-one', ...capability}) as typeof owned;
+  const paged = await subject(repository).publicCatalogue({...request, ...capability}) as
+    {unbrandedProduceReadbackVersion: number; items: Array<{row: {content: StoreSkuContent}}>; page: {totalCount: number}};
+  assert.equal(owned.unbrandedProduceReadbackVersion, 1);
+  assert.equal(published.unbrandedProduceReadbackVersion, 1);
+  assert.equal(paged.unbrandedProduceReadbackVersion, 1);
+  assert.deepEqual(owned.items[0]!.content, value.content);
+  assert.deepEqual(published.items[0]!.content, value.content);
+  assert.deepEqual(paged.items[0]!.row.content, value.content);
+  assert.equal(paged.page.totalCount, 1);
+  await assert.rejects(subject(repository).listSkus('other-owner', {storeId: 'store-one', ...capability}), {code: 'not_found'});
+  repository.records.get('store-one/sku-one')!.content.description = 'Unreviewed change';
+  const changed = await subject(repository).publicCatalogue({storeId: 'store-one', ...capability}) as {items: unknown[]};
+  assert.deepEqual(changed.items, []);
+});
+test('LF-PRODUCE promotions preserve branded and unbranded reviewed source facts together', async () => {
+  const values = [input('sku-branded'), input('sku-produce')];
+  values[1]!.content.categoryId = 'fruits-vegetables'; values[1]!.content.brand = '';
+  Object.assign(values[1]!.content, {productFacts: descriptiveFacts()});
+  const sources = new Map<string, WorkspaceCatalogueService>();
+  const publications: PromotionRecord[] = [];
+  for (const value of values) {
+    const repository = new Memory(); repository.aggregate = produceAll(value).aggregate;
+    const catalogue = subject(repository); sources.set(value.skuId, catalogue);
+    await catalogue.saveSku('owner-one', save(value));
+    const promotion = {skuId: value.skuId, skuRevision: 1, channel: 'retail' as const,
+      headline: 'Host source promotion', detail: 'Isolated host fixture, not an applied discount',
+      validFrom: at, validUntil: '2026-10-16T12:30:00.000Z', active: true};
+    publications.push(planPromotionSave({ownerUserId: 'owner-one', realm: 'evaluation', storeId: 'store-one',
+      placementId: `promotion-${value.skuId}`, expectedRevision: 0, idempotencyKey: `key-${value.skuId}`,
+      promotion, fingerprint: cataloguePayloadHash(promotion), observedAt: at}, profile,
+      repository.records.get(`store-one/${value.skuId}`)));
+  }
+  const repository: PromotionRepository = {realm: 'evaluation', store: async () => profile,
+    page: async () => structuredClone(publications),
+    read: async (_store, id) => structuredClone(publications.find(p => p.placementId === id)),
+    save: async () => { throw Error('Read-only host test'); },
+    reconcile: async () => { throw Error('Read-only host test'); }};
+  const service = new WorkspacePromotionService(repository, {publicCatalogue: async body => {
+    assert.equal(body.unbrandedProduceReadbackVersion, 1);
+    assert.equal(body.productFactsReadbackVersion, 1);
+    assert.equal(Object.hasOwn(body, 'limit'), false, 'Exact SKU lookup implies one result; limit plus skuId is invalid.');
+    return sources.get(String(body.skuId))!.publicCatalogue(body);
+  }}, () => new Date(at));
+  const page = await service.publicPage({storeId: 'store-one', limit: 10});
+  assert.equal(page.state, 'ready'); assert.equal(page.items.length, 2);
+  assert.deepEqual(page.items.map(p => (p.product.content as StoreSkuContent).brand), ['Host fixture', '']);
+  assert.deepEqual((page.items[1]!.product.content as StoreSkuContent).productFacts, descriptiveFacts());
+  assert.equal(Object.hasOwn(page, 'unbrandedProduceReadbackVersion'), false,
+    'The existing promotion envelope stays exact; public listing resolution negotiates independently.');
+});
+test('LF-PRODUCE new capability leaves branded records and response shape unchanged', async () => {
+  const repository = new ViewMemory(), value = input(); repository.aggregate = produceAll(value).aggregate;
+  await subject(repository).saveSku('owner-one', save(value));
+  const request = {storeId: 'store-one'};
+  assert.deepEqual(await subject(repository).publicCatalogue({...request, unbrandedProduceReadbackVersion: 1}),
+    await subject(repository).publicCatalogue(request));
+  assert.deepEqual(await subject(repository).listSkus('owner-one', {...request, unbrandedProduceReadbackVersion: 1}),
+    await subject(repository).listSkus('owner-one', request));
+});
+test('LF-PRODUCE malformed capability is rejected before owner public or paged readback', async () => {
+  const repository = new ViewMemory();
+  for (const version of [null, 2, '1', true]) {
+    const request = {storeId: 'store-one', unbrandedProduceReadbackVersion: version};
+    await assert.rejects(subject(repository).listSkus('owner-one', request), {code: 'invalid_input'});
+    await assert.rejects(subject(repository).publicCatalogue(request), {code: 'invalid_input'});
+    await assert.rejects(subject(repository).publicCatalogue({...request, cataloguePageVersion: 1,
+      query: viewQuery, pageSize: 10}), {code: 'invalid_input'});
+  }
+});
 test('LF-FACTS paged readback carries the same reviewed extension and snapshot identity', async () => {
   const repository = new ViewMemory(), value = input(), facts = descriptiveFacts();
   Object.assign(value.content, {productFacts: facts});

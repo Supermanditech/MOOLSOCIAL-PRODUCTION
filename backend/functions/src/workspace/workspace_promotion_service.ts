@@ -185,7 +185,8 @@ export class WorkspacePromotionService {
       for (const promotion of rows) {
         let now = this.now().toISOString();
         if (!promotion.active || promotion.observedAt > now || promotion.validFrom > now || promotion.validUntil <= now) continue;
-        const response = object(await this.catalogue.publicCatalogue({storeId, skuId: promotion.skuId, limit: 1, policyReadbackVersion: 1}));
+        const response = object(await this.catalogue.publicCatalogue({storeId, skuId: promotion.skuId,
+          policyReadbackVersion: 1, productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1}));
         if (response.schemaVersion !== 1 || response.realm !== this.repository.realm || response.storeId !== storeId ||
             response.state !== "ready" || response.orderingAvailable !== false || response.coverage !== "verified_public_only" ||
             time(response.observedAt) > this.now().toISOString() || !Array.isArray(response.items) || response.items.length > 1) fail();

@@ -1002,6 +1002,26 @@ void main() {
     },
     'composition': 'Host ingredients', 'regulatoryNote': 'Host pack directions', 'requiresPrescription': false,
   };
+  test('LF-PRODUCE reviewed empty brand survives public mapping without a fabricated label', () {
+    final data = publicPage()..['unbrandedProduceReadbackVersion'] = 1;
+    (row(data)['content'] as Map)..['categoryId'] = 'fruits-vegetables'..['brand'] = '';
+    final entry = WorkspacePublicCatalogueEntry.fromResponse(data,
+      storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at);
+    expect(entry.product.brand, isEmpty);
+    expect(entry.product.categoryId, 'fruits-vegetables');
+    expect(entry.product.sourceSkuId, 'sku-one');
+    expect(entry.product.priceMinor, 26000);
+    expect(entry.readback.content.state, BuyV2ProductContentState.ready);
+  });
+  test('LF-PRODUCE local owned record retains empty produce brand and listing intent exactly', () {
+    final original = ownerRow();
+    (original['content'] as Map)..['categoryId'] = 'fruits-vegetables'..['brand'] = '';
+    final owned = WorkspaceCatalogueOwnedSku.decode(original,
+      storeId: 'store-one', skuId: 'sku-one', realm: 'production', now: at);
+    expect((owned.input['content'] as Map)['brand'], '');
+    expect(owned.listingIntent(accountId: 'owner-one', listed: true,
+      idempotencyKey: 'produce-intent').sku['content'], original['content']);
+  });
   test('LF-FACTS exact public factory carries reviewed dedicated facts without losing pack or money', () {
     final data = publicPage()..['productFactsReadbackVersion'] = 1;
     (row(data)['content'] as Map)['productFacts'] = descriptiveFacts();
@@ -1287,6 +1307,111 @@ void main() {
     AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
       'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
       credentials: Credentials(), transport: transport, now: () => at);
+  Map<String, dynamic> producePage() {
+    final data = publicPage()..['unbrandedProduceReadbackVersion'] = 1;
+    (row(data)['content'] as Map)..['categoryId'] = 'fruits-vegetables'..['brand'] = '';
+    return data;
+  }
+  AuthenticatedWorkspaceCatalogueGateway produceGateway(SocialContentTransport transport) =>
+    AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, now: () => at,
+      unbrandedProduceReadbackSupported: true);
+  test('LF-PRODUCE promotion resolves the negotiated public SKU without changing promotion envelope', () async {
+    final transport = OwnerTransport((body) async {
+      if (body['operation'] == 'readPublicStorePromotions') {
+        expect(body.containsKey('unbrandedProduceReadbackVersion'), isFalse);
+        final publication = promotionRow();
+        publication['product'] = row(producePage())..remove('listings');
+        return SocialContentResponse(statusCode: 200,
+          body: jsonEncode({'ok': true, 'data': promotionPage([publication])}));
+      }
+      expect(body['unbrandedProduceReadbackVersion'], 1);
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': producePage()}));
+    });
+    final source = WorkspaceStoreCatalogueSource(gateway: produceGateway(transport),
+      storeId: 'store-one', current: () => true);
+    final offers = await source.loadStoreOffers(storeId: 'store-one', destination: BuyV2Destination.shop);
+    expect(offers.single.product.brand, '');
+    expect(offers.single.product.sourceSkuId, 'sku-one');
+    expect(offers.single.product.priceMinor, 26000);
+  });
+  for (final version in [null, 2, 1.0, '1']) {
+    test('LF-PRODUCE missing or malformed version cannot admit blank public brand $version ${version.runtimeType}', () async {
+      final data = producePage();
+      if (version == null) { data.remove('unbrandedProduceReadbackVersion'); }
+      else { data['unbrandedProduceReadbackVersion'] = version; }
+      expect(() => WorkspacePublicCatalogueEntry.fromResponse(data,
+        storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at), throwsFormatException);
+      final entry = WorkspacePublicCatalogueEntry.fromResponse(producePage(),
+        storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at);
+      expect((await produceGateway(Transport(data)).read(entry.product)).content.state,
+        BuyV2ProductContentState.unavailable);
+    });
+  }
+  for (final bad in ['', ' ', 7, null]) {
+    test('LF-PRODUCE nonproduce empty and malformed brands stay invalid $bad ${bad.runtimeType}', () {
+      final data = producePage();
+      (row(data)['content'] as Map)..['categoryId'] = bad == '' ? 'electronics' : 'fruits-vegetables'..['brand'] = bad;
+      expect(() => WorkspacePublicCatalogueEntry.fromResponse(data,
+        storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at), throwsFormatException);
+    });
+  }
+  test('LF-PRODUCE owner clone negotiates exact optional-brand record without changing its intent', () async {
+    final record = ownerRow();
+    (record['content'] as Map)..['categoryId'] = 'fruits-vegetables'..['brand'] = '';
+    final transport = OwnerTransport((body) async {
+      expect(body['unbrandedProduceReadbackVersion'], 1);
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+        'schemaVersion': 1, 'realm': 'production', 'storeId': 'store-one', 'items': [record],
+        'nextCursor': null, 'unbrandedProduceReadbackVersion': 1}}));
+    });
+    final owner = produceGateway(transport).forOwnerAccount('owner-one');
+    expect(owner.unbrandedProduceReadbackSupported, isTrue);
+    final saved = await owner.readOwnedSku(storeId: 'store-one', skuId: 'sku-one', current: () => true);
+    expect((saved!.input['content'] as Map)['brand'], '');
+  });
+  test('LF-PRODUCE direct content and paged public readers propagate negotiated capability', () async {
+    final transport = OwnerTransport((body) async {
+      expect(body['unbrandedProduceReadbackVersion'], 1);
+      final data = producePage();
+      if (body.containsKey('cataloguePageVersion')) {
+        final record = row(data);
+        data.addAll({'cataloguePageVersion': 1, 'query': body['query'],
+          'items': [{'channel': 'retail', 'row': record}], 'nextCursor': null,
+          'page': {'snapshotId': 'c' * 64, 'startIndex': 0, 'totalCount': 1,
+            'previousCursor': null, 'nextCursor': null}});
+      }
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    });
+    final connection = produceGateway(transport);
+    final entry = await connection.readPublicEntry(storeId: 'store-one', skuId: 'sku-one',
+      channel: BuyV2OfferClass.retail, current: () => true);
+    expect(entry!.product.brand, '');
+    expect((await connection.read(entry.product)).content.state, BuyV2ProductContentState.ready);
+    final source = WorkspaceStoreCatalogueSource(gateway: connection, storeId: 'store-one', current: () => true);
+    final page = await source.loadProducts(storeQuery(), pageSize: 10);
+    expect(page.items.single.brand, '');
+    expect(page.totalCount, 1);
+  });
+  test('LF-PRODUCE legacy connection cannot accept unsolicited capability or start a blank-brand binding', () async {
+    final transport = Transport(producePage());
+    expect(await gateway(transport).readPublicEntry(storeId: 'store-one', skuId: 'sku-one',
+      channel: BuyV2OfferClass.retail, current: () => true), isNull);
+    final record = ownerRow();
+    (record['content'] as Map)..['categoryId'] = 'fruits-vegetables'..['brand'] = '';
+    final original = WorkspaceCatalogueOwnedSku.decode(record,
+      storeId: 'store-one', skuId: 'sku-one', realm: 'production', now: at)
+      .listingIntent(accountId: 'owner-one', listed: true, idempotencyKey: 'produce-original');
+    final ownerTransport = OwnerTransport((body) async => ownerAck(body));
+    final owner = ownerGateway(ownerTransport);
+    expect((await owner.bindReviewed(original, current: () => true, recoveringUnknown: false)).state,
+      WorkspaceCatalogueBindingState.notSent);
+    expect(ownerTransport.calls, 0);
+    // Read-only recovery of an original attempt must not become a new write.
+    expect((await owner.reconcileBinding(original, current: () => true)).state, WorkspaceCatalogueBindingState.saved);
+    expect(ownerTransport.calls, 1);
+  });
   WorkspaceReviewedVariantMembership reviewedMember(WorkspacePublicCatalogueEntry entry,
     {int revision = 1, DateTime? expiry, String? familyId = 'host-reviewed-family', String colour = 'pink'}) =>
     WorkspaceReviewedVariantMembership(listing: entry.product.publicListingIdentity!,

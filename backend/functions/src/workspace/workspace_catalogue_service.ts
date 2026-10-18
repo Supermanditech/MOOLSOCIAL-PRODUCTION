@@ -382,6 +382,9 @@ export class WorkspaceCatalogueService {
 
   async listSkus(ownerUserId: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const queryBody = structuredClone(body) as Record<string, unknown>;
+    const produceRequested = queryBody.unbrandedProduceReadbackVersion === 1;
+    if (Object.hasOwn(queryBody, "unbrandedProduceReadbackVersion") && !produceRequested) invalid();
+    delete queryBody.unbrandedProduceReadbackVersion;
     const factsRequested = queryBody.productFactsReadbackVersion === 1;
     if (queryBody.productFactsReadbackVersion !== undefined && !factsRequested) invalid();
     delete queryBody.productFactsReadbackVersion;
@@ -392,6 +395,9 @@ export class WorkspaceCatalogueService {
     const profile = requireStore(await this.repository.store(query.storeId), query.storeId, ownerUserId);
     const records = await this.repository.page(profile, ownerUserId, query.after, query.limit, query.skuId);
     const items = records.map(r => normalizeRecord(r, query.storeId));
+    if (!produceRequested && items.some(item => item.content.brand === "")) {
+      throw new WorkspaceProfileError("unsupported_version", "Update MoolSocial to open these product details. Saved data is unchanged.", 409);
+    }
     if (!factsRequested && items.some(item => item.content.productFacts !== undefined)) {
       throw new WorkspaceProfileError("unsupported_version", "Update MoolSocial to open these saved product details. Saved data is unchanged.", 409);
     }
@@ -401,13 +407,16 @@ export class WorkspaceCatalogueService {
       throw new WorkspaceProfileError("unsupported_version", "Update MoolSocial to open these saved photo details. Saved data is unchanged.", 409);
     }
     return {schemaVersion: 1, realm: this.repository.realm, storeId: query.storeId, items,
+      ...(produceRequested && items.some(item => item.content.brand === "") ? {unbrandedProduceReadbackVersion: 1} : {}),
       ...(factsRequested ? {productFactsReadbackVersion: 1} : {}),
       ...(mediaRequested ? {mediaReadbackVersion: 1} : {}),
       nextCursor: !query.skuId && items.length === query.limit ? items.at(-1)!.skuId : null};
   }
 
   private async publicCataloguePage(body: Readonly<Record<string, unknown>>): Promise<object> {
-    exact(body, ["storeId", "cataloguePageVersion", "query", "pageSize"], ["cursor", "storeDetailsReadbackVersion", "productFactsReadbackVersion"]);
+    exact(body, ["storeId", "cataloguePageVersion", "query", "pageSize"], ["cursor", "storeDetailsReadbackVersion", "productFactsReadbackVersion", "unbrandedProduceReadbackVersion"]);
+    const produceRequested = body.unbrandedProduceReadbackVersion === 1;
+    if (Object.hasOwn(body, "unbrandedProduceReadbackVersion") && !produceRequested) invalid();
     const factsRequested = body.productFactsReadbackVersion === 1;
     if (body.productFactsReadbackVersion !== undefined && !factsRequested) invalid();
     const detailsRequested = body.storeDetailsReadbackVersion === 1;
@@ -423,6 +432,7 @@ export class WorkspaceCatalogueService {
     }
     const sourceHash = cataloguePayloadHash(source);
     const data = await this.publicCatalogue({storeId, listingReadbackVersion: 1,
+      ...(produceRequested ? {unbrandedProduceReadbackVersion: 1} : {}),
       ...(factsRequested ? {productFactsReadbackVersion: 1} : {}),
       ...(detailsRequested ? {storeDetailsReadbackVersion: 1} : {}),
       policyReadbackVersion: 1, mediaReadbackVersion: 1}, source) as Record<string, unknown>;
@@ -483,6 +493,7 @@ export class WorkspaceCatalogueService {
     // of ALL candidates, including offers which were not active on the first pass.
     const finalProjection = await new WorkspaceCatalogueService(this.repository, this.identity,
       () => new Date(responseAt), this.policyReader).publicCatalogue({storeId, listingReadbackVersion: 1,
+      ...(produceRequested ? {unbrandedProduceReadbackVersion: 1} : {}),
       ...(factsRequested ? {productFactsReadbackVersion: 1} : {}),
       ...(detailsRequested ? {storeDetailsReadbackVersion: 1} : {}),
       policyReadbackVersion: 1, mediaReadbackVersion: 1}, current) as Record<string, unknown>;
@@ -501,6 +512,9 @@ export class WorkspaceCatalogueService {
   async publicCatalogue(body: Readonly<Record<string, unknown>>, source?: PublicCatalogueSource): Promise<object> {
     if (Object.hasOwn(body, "cataloguePageVersion")) return this.publicCataloguePage(body);
     const queryBody = structuredClone(body) as Record<string, unknown>;
+    const produceRequested = queryBody.unbrandedProduceReadbackVersion === 1;
+    if (Object.hasOwn(queryBody, "unbrandedProduceReadbackVersion") && !produceRequested) invalid();
+    delete queryBody.unbrandedProduceReadbackVersion;
     const factsRequested = queryBody.productFactsReadbackVersion === 1;
     if (queryBody.productFactsReadbackVersion !== undefined && !factsRequested) invalid();
     delete queryBody.productFactsReadbackVersion;
@@ -564,6 +578,10 @@ export class WorkspaceCatalogueService {
       // A saved trade type cannot silently become another channel or partial offer.
       if (terms.some(t => t === null)) return [];
       const publicContent = structuredClone(record.content);
+      if (!produceRequested && publicContent.brand === "") {
+        // Mixed pages fail as unsupported; never silently omit the produce SKU.
+        throw new WorkspaceProfileError("unsupported_version", "Update MoolSocial to open these product details.", 409);
+      }
       if (!factsRequested && publicContent.productFacts !== undefined) {
         // Never omit reviewed descriptive facts to make an older client decode.
         throw new WorkspaceProfileError("unsupported_version", "Update MoolSocial to open these product details.", 409);
@@ -633,6 +651,7 @@ export class WorkspaceCatalogueService {
       const liveLinked = linked.filter(item => item.channels.every(c => c!.validUntil > responseAt));
       const coverage = liveLinked.length === publicItems.length ? "complete" : "partial";
       return {...base, observedAt: responseAt,
+        ...(produceRequested && liveLinked.some(item => item.content.brand === "") ? {unbrandedProduceReadbackVersion: 1} : {}),
         state: liveLinked.length === 0 && publicItems.length > 0 ? "unavailable" : "ready",
         catalogueVersion: catalogue.version, listingCoverage: coverage,
         publicStore: {id: store.workspaceId, name: store.name, profileId: store.profileId,
@@ -640,6 +659,7 @@ export class WorkspaceCatalogueService {
         items: liveLinked, nextCursor: !query.skuId && rows.length === query.limit ? rows.at(-1)!.skuId : null};
     }
     return {...base, observedAt: readbackAt, state: "ready", catalogueVersion: catalogue.version, items: publicItems,
+      ...(produceRequested && publicItems.some(item => item.content.brand === "") ? {unbrandedProduceReadbackVersion: 1} : {}),
       nextCursor: !query.skuId && rows.length === query.limit ? rows.at(-1)!.skuId : null};
   }
 }
@@ -769,7 +789,7 @@ export function normalizeSku(value: unknown, storeId: string): StoreSkuInput {
       (channels.some(c => c.kind === "wholesale") && channels.some(c => c.kind === "bulk"))) invalid();
   return {skuId, canonicalProductId, verifiedPackId: id(v.verifiedPackId), sku: text(v.sku, 80),
     publicListing: boolean(v.publicListing),
-    content: {title: text(c.title), brand: text(c.brand), variant: text(c.variant, 240, true),
+    content: {title: text(c.title), brand: text(c.brand, 240, c.categoryId === "fruits-vegetables"), variant: text(c.variant, 240, true),
       categoryId: id(c.categoryId), description: text(c.description, 4000, true),
       highlights: list(c.highlights, 20).map(h => text(h, 500)),
       specifications: list(c.specifications, 40).map(s => {
