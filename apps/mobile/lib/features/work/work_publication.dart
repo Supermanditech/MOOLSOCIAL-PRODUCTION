@@ -478,7 +478,7 @@ abstract final class WorkspacePublicationContract {
     }
     for (final field in {
       'title': item.title,
-      'brand': item.brand,
+      if (item.categoryId != 'fruits-vegetables') 'brand': item.brand,
       'pack': item.pack,
       'categoryId': item.categoryId,
       'unitPrice': item.packMeasure?.valid == true

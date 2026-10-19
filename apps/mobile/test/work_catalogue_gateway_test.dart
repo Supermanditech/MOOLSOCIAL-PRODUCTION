@@ -5300,6 +5300,29 @@ void main() {
     (row(data)['content'] as Map)..['categoryId'] = 'fruits-vegetables'..['brand'] = '';
     return data;
   }
+  for (final category in ['fruits-vegetables', 'electronics', 'grocery']) {
+    test('LF-PRODUCE readiness blank brand is category-specific for $category', () {
+      final item = publication_fixture.fixture().copyWith(categoryId: category, brand: '');
+      expect(item.customerFieldsCompleteFor(BuyV2Destination.shop), category == 'fruits-vegetables');
+      final issues = WorkspacePublicationContract.productIssues(item, storeId: 'store-one', storeName: 'Host Store');
+      expect(issues.any((i) => i.field.endsWith(':brand')), category != 'fruits-vegetables');
+      // A category-only change cannot approve the old branded photo or publish.
+      expect(item.published, isFalse);
+    });
+  }
+  test('LF-PRODUCE readiness does not fill missing required fields or confer publication', () {
+    final base = publication_fixture.fixture().copyWith(categoryId: 'fruits-vegetables', brand: '');
+    for (final item in [base.copyWith(title: ''), base.copyWith(pack: ''), base.copyWith(deliveryPromise: ''),
+      base.copyWith(origin: ''), base.copyWith(sellingPrice: 0)]) {
+      expect(item.customerProductFieldsComplete, isFalse); expect(item.published, isFalse);
+    }
+    for (final item in [base.copyWith(catalogueFactsRequireReview: true), base.copyWith(available: false), base.copyWith(stock: 0)]) {
+      expect(item.published, isFalse);
+    }
+    expect(WorkspacePublicationContract.inspect(store: const WorkWorkspace(id: 'store-one', name: 'Host Store',
+      profileLabel: 'Grocery', area: 'Jaipur', verified: true), products: [base]).issues
+      .any((i) => i.field == 'publication.confirmation'), isTrue);
+  });
   AuthenticatedWorkspaceCatalogueGateway produceGateway(SocialContentTransport transport) =>
     AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
       'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),

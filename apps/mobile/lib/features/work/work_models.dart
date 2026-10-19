@@ -10654,7 +10654,7 @@ class WorkspaceCatalogueItem {
         id,
         canonicalId,
         title,
-        brand,
+        if (categoryId != 'fruits-vegetables') brand,
         pack,
         categoryId,
         if (packMeasure?.valid != true) unitPrice,
