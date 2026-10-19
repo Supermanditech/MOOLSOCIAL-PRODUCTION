@@ -387,6 +387,15 @@ export interface ProductPresentation {
   listingId: string; skuRevision: number; catalogueVersion: number;
 }
 export interface ProductPresentationQuery {storeId: string; start: string; end: string; skuIds: string[]}
+export interface StorePresentation {
+  schemaVersion: 1; presentationId: string; storeId: string; catalogueVersion: number; observedAt: string;
+}
+function storePresentation(raw: unknown): StorePresentation {
+  const v = exact(raw, ['schemaVersion', 'presentationId', 'storeId', 'catalogueVersion', 'observedAt']);
+  if (v.schemaVersion !== 1 || typeof v.presentationId !== 'string' || !/^[a-f0-9]{32}$/u.test(v.presentationId)) invalid();
+  return {schemaVersion: 1, presentationId: v.presentationId, storeId: id(v.storeId),
+    catalogueVersion: integer(v.catalogueVersion, 1, 1000000001), observedAt: presentationTime(v.observedAt)};
+}
 function presentationTime(value: unknown): string {
   if (typeof value !== 'string' || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) invalid();
   return value;
@@ -427,6 +436,9 @@ export interface WorkspaceCatalogueRepository {
   recordProductPresentation?(actor: string, input: ProductPresentation, identity: CatalogueIdentity,
     admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object>;
   readProductPresentations?(owner: string, query: ProductPresentationQuery): Promise<object>;
+  recordStorePresentation?(actor: string, input: StorePresentation, identity: CatalogueIdentity,
+    admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object>;
+  readStorePresentations?(owner: string, query: ProductPresentationQuery): Promise<object>;
   /** Complete bounded directory, never public product facts or approval. */
   publicDiscoveryBindings?(): Promise<PublicCatalogueListingBinding[]>;
   publicListingBindings?(record: StoreSkuRecord): Promise<PublicCatalogueListingBinding[] | undefined>;
@@ -859,6 +871,21 @@ export class WorkspaceCatalogueService {
     const query = productPresentationQuery(body);
     if (!this.repository.readProductPresentations) throw mediaUnavailable();
     return this.repository.readProductPresentations(id(owner), query);
+  }
+  async recordStorePresentation(actor: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    const input = storePresentation(body);
+    if (!this.identity || !this.repository.recordStorePresentation) throw mediaUnavailable();
+    return this.repository.recordStorePresentation(id(actor), input, this.identity, async source => {
+      const page = await this.publicCatalogue({storeId: input.storeId, listingReadbackVersion: 1, mediaReadbackVersion: 1,
+        productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1,
+        storeDetailsReadbackVersion: 1, storeClassificationReadbackVersion: 1}, source) as {state: string; catalogueVersion?: number};
+      return page.state === 'ready' && page.catalogueVersion === input.catalogueVersion;
+    });
+  }
+  async readStorePresentations(owner: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    const query = productPresentationQuery(body);
+    if (!this.repository.readStorePresentations) throw mediaUnavailable();
+    return this.repository.readStorePresentations(id(owner), query);
   }
   async publicProductMedia(body: Readonly<Record<string, unknown>>): Promise<Buffer> {
     exact(body, ["realm", "storeId", "skuId", "assetId"]);
@@ -2893,6 +2920,80 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       }
       return {...base, state: 'ready', coverage: 'partial', collectionStartedAt: startedAt, coveredFrom: from, coveredUntil: until, count,
         products: [...products.values()].sort((a, b) => b.count - a.count || a.skuId.localeCompare(b.skuId))};
+    });
+  }
+  async recordStorePresentation(actor: string, input: StorePresentation, identity: CatalogueIdentity,
+    admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object> {
+    input = storePresentation(structuredClone(input)); actor = id(actor);
+    const root = this.root(input.storeId), fingerprint = cataloguePayloadHash(input),
+      visitorKey = cataloguePayloadHash([1, 'store-visitor', this.realm, input.storeId, actor]),
+      path = root.collection('storePresentations').doc(cataloguePayloadHash([1, this.realm, actor, input.presentationId]));
+    return this.firestore.runTransaction(async tx => {
+      const saved = await tx.get(path);
+      const result = (acceptedAt: string) => ({...input, realm: this.realm, acceptedAt, state: 'recorded', orderingAvailable: false});
+      if (saved.exists) {
+        const prior = exact(saved.data(), ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'visitorKey', 'integrity']);
+        const {integrity, ...retained} = prior;
+        if (prior.schemaVersion !== 1 || prior.realm !== this.realm || prior.fingerprint !== fingerprint ||
+            cataloguePayloadHash(storePresentation(prior.input)) !== fingerprint || prior.visitorKey !== visitorKey ||
+            integrity !== cataloguePayloadHash(retained)) {
+          throw new WorkspaceProfileError('conflict', 'This Store visit was already recorded with different details.', 409);
+        }
+        return result(presentationTime(prior.acceptedAt));
+      }
+      const source = await this.publicCatalogueSource(input.storeId, identity, false, tx);
+      if (!source || source.profile.ownerUserId === actor || !await admit(source)) throw mediaUnavailable();
+      const admissionAt = this.now().toISOString();
+      if (input.observedAt > admissionAt || Date.parse(admissionAt) - Date.parse(input.observedAt) > 300000) throw mediaUnavailable();
+      const day = root.collection('storePresentationDays').doc(admissionAt.slice(0, 10)), coverage = root.collection('storePresentationCoverage').doc('current');
+      const [daily, collection] = await tx.getAll(day, coverage);
+      if (daily?.exists && daily.get('schemaVersion') !== 1 || collection?.exists && collection.get('schemaVersion') !== 1) invalid();
+      const count = daily?.exists ? integer(daily.get('count'), 0, 5000) : 0;
+      if (count >= 5000) throw mediaUnavailable();
+      if (!await admit(source)) throw mediaUnavailable();
+      const acceptedAt = this.now().toISOString();
+      if (acceptedAt.slice(0, 10) !== admissionAt.slice(0, 10) || input.observedAt > acceptedAt ||
+          Date.parse(acceptedAt) - Date.parse(input.observedAt) > 300000) throw mediaUnavailable();
+      const startedAt = collection?.exists ? presentationTime(collection.get('startedAt')) : acceptedAt;
+      if (startedAt > acceptedAt) throw mediaUnavailable();
+      const record = {schemaVersion: 1, realm: this.realm, fingerprint, input, acceptedAt, visitorKey};
+      tx.create(path, {...record, integrity: cataloguePayloadHash(record)});
+      tx.set(day, {schemaVersion: 1, count: count + 1});
+      if (!collection?.exists) tx.create(coverage, {schemaVersion: 1, startedAt});
+      return result(acceptedAt);
+    });
+  }
+  async readStorePresentations(owner: string, query: ProductPresentationQuery): Promise<object> {
+    query = productPresentationQuery({schemaVersion: 1, ...structuredClone(query)}); owner = id(owner);
+    return this.firestore.runTransaction(async tx => {
+      const profiles = await tx.get(this.firestore.collection('workspaceProfiles').where('workspaceId', '==', query.storeId).limit(2));
+      if (profiles.size !== 1 || profiles.docs[0]!.id !== profiles.docs[0]!.get('caseId')) throw mediaUnavailable();
+      requireStore(profiles.docs[0]!.data() as WorkspaceProfileRecord, query.storeId, owner);
+      const root = this.root(query.storeId), observedAt = this.now().toISOString(),
+        collection = await tx.get(root.collection('storePresentationCoverage').doc('current'));
+      const base = {schemaVersion: 1, realm: this.realm, ...query, observedAt, source: 'Recorded signed-in Store visits'};
+      const unavailable = (collectionStartedAt: string | null = null) => ({...base, state: 'unavailable', coverage: 'unknown',
+        collectionStartedAt, coveredFrom: null, coveredUntil: null, count: null, visitors: null});
+      if (!collection.exists) return unavailable();
+      if (collection.get('schemaVersion') !== 1) invalid();
+      const startedAt = presentationTime(collection.get('startedAt'));
+      // Store visits are never silently attributed to a selected SKU.
+      if (query.skuIds.length) return unavailable(startedAt);
+      const from = [query.start, startedAt].sort().at(-1)!, until = [query.end, observedAt].sort()[0]!;
+      if (from >= until) return unavailable(startedAt);
+      const events = await tx.get(root.collection('storePresentations').where('acceptedAt', '>=', from).where('acceptedAt', '<', until).orderBy('acceptedAt').limit(5001));
+      if (events.size > 5000) return unavailable(startedAt);
+      const visitors = new Set<string>();
+      for (const doc of events.docs) {
+        const event = exact(doc.data(), ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'visitorKey', 'integrity']), input = storePresentation(event.input);
+        const {integrity, ...retained} = event;
+        if (event.schemaVersion !== 1 || event.realm !== this.realm || input.storeId !== query.storeId ||
+            event.fingerprint !== cataloguePayloadHash(input) || integrity !== cataloguePayloadHash(retained) || typeof event.visitorKey !== 'string' ||
+            !/^[a-f0-9]{64}$/iu.test(event.visitorKey) || presentationTime(event.acceptedAt) < from || presentationTime(event.acceptedAt) >= until) invalid();
+        visitors.add(event.visitorKey);
+      }
+      return {...base, state: 'ready', coverage: 'signed_in_partial', collectionStartedAt: startedAt,
+        coveredFrom: from, coveredUntil: until, count: events.size, visitors: visitors.size};
     });
   }
   async publicCatalogueSource(storeId: string, identity: CatalogueIdentity, includeFamilies = false, existingTransaction?: Transaction): Promise<PublicCatalogueSource | undefined> {

@@ -205,7 +205,8 @@ if ($RequireLfPublicationProbes) {
     foreach ($starsOwner in @('apps/mobile/lib/features/work/work_customer_feedback.dart',
         'apps/mobile/lib/features/work/widgets/store_customer_feedback.dart',
         'apps/mobile/test/work_customer_feedback_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart')) {
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart')) {
       if (@($continuation.batch05ProductReportRecovery.owners) -ccontains $starsOwner) {
         Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($starsOwner)) 'Exact stars frontend owner rejected.'
         $historical=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json

@@ -8165,7 +8165,8 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     foreach ($starsOwner in @('apps/mobile/lib/features/work/work_customer_feedback.dart',
         'apps/mobile/lib/features/work/widgets/store_customer_feedback.dart',
         'apps/mobile/test/work_customer_feedback_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart')) {
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart')) {
       if (@($reports.owners) -ccontains $starsOwner) { $reportOwners += $starsOwner }
     }
     if ($reports.ticket -cne 'LF-13-C01' -or
@@ -8376,6 +8377,7 @@ function Invoke-Lf01Admission {
       'apps/mobile/lib/features/work/widgets/store_customer_feedback.dart',
       'apps/mobile/test/work_customer_feedback_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart',
       'apps/mobile/.flutter-plugins-dependencies',
       'apps/mobile/lib/features/journey01/journey_services.dart',
       'apps/mobile/lib/features/journey01/review_journey_services.dart',

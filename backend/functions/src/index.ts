@@ -2910,6 +2910,10 @@ export const moolSocialWorkspace = onRequest(
       const variantFamilyOperation = storeVariantFamilyOperation(operation);
       const productSubmissionOperation = storeProductSubmissionOperation(operation);
       const productMediaOperation = ["prepareStoreProductMedia", "confirmStoreProductMedia", "readStoreProductMedia"].includes(operation);
+      const storePresentationOperation = ['recordPublicStorePresentation', 'readStorePublicPresentations'].includes(operation);
+      if (storePresentationOperation && process.env.MOOLSOCIAL_STORE_PRESENTATIONS_V1 !== 'true') {
+        throw new WorkspaceProfileError('service_unavailable', 'Store visit reporting is unavailable.', 503);
+      }
       const productPresentationOperation = ['recordPublicProductPresentation', 'readStoreProductPresentations'].includes(operation);
       if (productPresentationOperation && process.env.MOOLSOCIAL_PRODUCT_PRESENTATIONS_V1 !== 'true') {
         throw new WorkspaceProfileError('service_unavailable', 'Product view reporting is not connected.', 503);
@@ -2924,7 +2928,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStorePublicDetails" ||
         variantFamilyOperation === "submit" || productSubmissionOperation === "submit" ||
-        operation === "prepareStoreProductMedia" || operation === "confirmStoreProductMedia" || operation === 'recordPublicProductPresentation';
+        operation === "prepareStoreProductMedia" || operation === "confirmStoreProductMedia" || operation === 'recordPublicProductPresentation' || operation === 'recordPublicStorePresentation';
       const supplierPolicyOperation = ["readStoreSupplierPolicy", "saveStoreSupplierPolicy",
         "reconcileStoreSupplierPolicy"].includes(operation);
       const promotionOperation = ["readStorePromotion", "saveStorePromotion", "reconcileStorePromotion",
@@ -2957,7 +2961,7 @@ export const moolSocialWorkspace = onRequest(
             ),
           verifyIdToken: async (token) => {
             const verified = await getAuth().verifyIdToken(token);
-            if (purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation) {
+            if (purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation) {
               requireDefaultPurchaseTenant(verified.firebase?.tenant);
             }
             return verified;
@@ -2976,7 +2980,11 @@ export const moolSocialWorkspace = onRequest(
       const service = workspaceProfileService();
       const orders = retailerOrderService();
       const {operation: _operation, ...catalogueBody} = body;
-      const result = operation === 'recordPublicProductPresentation'
+      const result = operation === 'recordPublicStorePresentation'
+        ? await workspaceCatalogueService().recordStorePresentation(ownerUserId, catalogueBody)
+        : operation === 'readStorePublicPresentations'
+        ? await workspaceCatalogueService().readStorePresentations(ownerUserId, catalogueBody)
+        : operation === 'recordPublicProductPresentation'
         ? await workspaceCatalogueService().recordProductPresentation(ownerUserId, catalogueBody)
         : operation === 'readStoreProductPresentations'
         ? await workspaceCatalogueService().readProductPresentations(ownerUserId, catalogueBody)

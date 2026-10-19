@@ -292,6 +292,7 @@ class BuyV2CataloguePage<T> {
     this.previousCursor,
     this.nextCursor,
     this.offerCoverage,
+    this.storeObservation,
   }) : items = List.unmodifiable(items);
 
   final String queryKey;
@@ -304,6 +305,20 @@ class BuyV2CataloguePage<T> {
   /// Null preserves legacy complete-feed contracts. A scoped feed must name
   /// its connected publishers; its count is not an all-publisher total.
   final BuyV2OfferCoverage? offerCoverage;
+  /// Present only on a successfully decoded exact-Store page, not a preview.
+  final BuyV2PublicStoreObservation? storeObservation;
+}
+
+@immutable
+class BuyV2PublicStoreObservation {
+  const BuyV2PublicStoreObservation({required this.realm, required this.storeId,
+    required this.catalogueVersion, required this.observedAt});
+  final String realm, storeId;
+  final int catalogueVersion;
+  final DateTime observedAt;
+  bool currentFor(String store, DateTime now) => store == storeId &&
+    const ['evaluation', 'production'].contains(realm) && catalogueVersion >= 1 && catalogueVersion <= 1000000001 &&
+    !observedAt.isAfter(now.toUtc()) && now.toUtc().difference(observedAt) <= const Duration(minutes: 5);
 }
 
 @immutable

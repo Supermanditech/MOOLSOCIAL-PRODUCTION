@@ -1948,6 +1948,153 @@ void main() {
         now: () => DateTime.parse(presentationCapture()['aggregate']['observedAt'] as String));
     WorkspaceAnalyticsRequest presentationRequest() => WorkspaceAnalyticsRequest(accountScope: 'owner-one', storeId: 'store-one',
       start: DateTime.parse(presentationCapture()['aggregate']['start'] as String), end: DateTime.parse(presentationCapture()['aggregate']['end'] as String));
+    Map<String, dynamic> storeVisitCapture() {
+      const marker = 'LF14_STORE_VISITS_PROJECTION=';
+      return (jsonDecode(File(presentationLog).readAsLinesSync().singleWhere((l) => l.startsWith(marker)).substring(marker.length)) as Map).cast<String, dynamic>();
+    }
+    WorkspaceProductPresentationGateway visitGateway(OwnerTransport transport, {bool product = true,
+      bool Function()? current, SocialContentCredentials? credentials}) => WorkspaceProductPresentationGateway(
+      current: current ?? () => true, displayed: (_) => presentationEntry(presentationCapture()).readback,
+      productPresentationsEnabled: product, storePresentationsEnabled: true,
+      gateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: credentials ?? Credentials(), transport: transport, realm: 'evaluation', ownerAccountId: 'owner-one',
+        now: () => DateTime.parse(storeVisitCapture()['aggregate']['observedAt'] as String)));
+    test('LF14-VISITS actual service events and unique signed-in visitors preserve existing product metrics in Work', () async {
+      final capture = storeVisitCapture(), event = capture['event'] as Map, credentials = Credentials();
+      final gateway = visitGateway(OwnerTransport((body) async => SocialContentResponse(statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': switch (body['operation']) {
+          'recordPublicStorePresentation' => capture['accepted'], 'readStorePublicPresentations' => capture['aggregate'],
+          _ => presentationCapture()['aggregate'],
+        }}))), credentials: credentials);
+      final original = gateway.prepareStore(BuyV2PublicStoreObservation(realm: 'evaluation', storeId: event['storeId'],
+        catalogueVersion: event['catalogueVersion'], observedAt: DateTime.parse(event['observedAt'])), event['presentationId'])!;
+      expect(original, event); expect(await gateway.record(original, visible: () => true, storeVisit: true), isTrue);
+      final work = WorkSession(contactDraftStore: ListingAccount())
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Jaipur', verified: true)
+        ..workspaceId = 'store-one';
+      addTearDown(work.dispose); work.bindProductPresentationReader(gateway);
+      final snapshot = await work.readWorkspaceAnalytics(presentationRequest());
+      expect(snapshot.state, WorkspaceAnalyticsState.verified); expect(snapshot.coverage, WorkspaceAnalyticsCoverage.partial);
+      expect({for (final metric in snapshot.metrics) metric.id: metric.value}, {'product-views': 1, 'store-views': 3, 'visits': 3, 'visitors': 2});
+      expect(snapshot.metrics.every((m) => m.coverage == WorkspaceAnalyticsCoverage.partial && m.cohortId == null), isTrue);
+      expect(snapshot.breakdowns.single.id, 'most-viewed-products');
+      expect(credentials.modes, [SocialAppCheckTokenMode.limitedUse, SocialAppCheckTokenMode.standard, SocialAppCheckTokenMode.standard]);
+    });
+    for (final fault in ['realm', 'Store', 'extra', 'coverage', 'visitors exceed visits', 'zero visitors with visits', 'future', 'collection', 'range']) {
+      test('LF14-VISITS corrupt $fault source stays unavailable, never zero', () async {
+        final data = storeVisitCapture()['aggregate'] as Map<String, dynamic>;
+        switch (fault) {
+          case 'realm': data['realm'] = 'production';
+          case 'Store': data['storeId'] = 'other-store';
+          case 'extra': data['visitorIds'] = ['private'];
+          case 'coverage': data['coverage'] = 'complete';
+          case 'visitors exceed visits': data['visitors'] = 4;
+          case 'zero visitors with visits': data['visitors'] = 0;
+          case 'future': data['observedAt'] = '2026-10-20T00:00:00.000Z';
+          case 'collection': data['collectionStartedAt'] = '2026-10-16T12:00:04.000Z';
+          case 'range': data['start'] = '2026-10-01T00:00:00.000Z';
+        }
+        final gateway = visitGateway(OwnerTransport((_) async => SocialContentResponse(statusCode: 200,
+          body: jsonEncode({'ok': true, 'data': data}))), product: false);
+        final snapshot = await gateway.readAnalytics(presentationRequest());
+        expect(snapshot.state, WorkspaceAnalyticsState.unavailable); expect(snapshot.metrics, isEmpty);
+      });
+    }
+    test('LF14-VISITS absent feed retains verified product views and SKU requests cannot acquire whole-Store visitors', () async {
+      var missing = true;
+      final gateway = visitGateway(OwnerTransport((body) async {
+        if (body['operation'] == 'readStorePublicPresentations') {
+          return SocialContentResponse(statusCode: missing ? 503 : 200,
+            body: jsonEncode({'ok': true, 'data': storeVisitCapture()['sku']}));
+        }
+        final data = presentationCapture()['aggregate'] as Map<String, dynamic>;
+        data['skuIds'] = body['skuIds'];
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      }));
+      final snapshot = await gateway.readAnalytics(presentationRequest());
+      expect(snapshot.metrics.single.id, 'product-views'); expect(snapshot.metrics.single.value, 1);
+      missing = false;
+      final request = presentationRequest();
+      final scoped = await gateway.readAnalytics(WorkspaceAnalyticsRequest(accountScope: request.accountScope, storeId: request.storeId,
+        start: request.start, end: request.end, skuIds: ['sku-one']));
+      expect(scoped.metrics.single.id, 'product-views');
+    });
+    test('LF14-VISITS age, realm and visibility fences prevent replacement events and retired replies', () async {
+      final capture = storeVisitCapture(), event = capture['event'] as Map;
+      var live = true;
+      final transport = OwnerTransport((_) async {live = false; return SocialContentResponse(statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': capture['accepted']}));});
+      final gateway = visitGateway(transport, current: () => live);
+      final observed = DateTime.parse(event['observedAt']);
+      expect(gateway.prepareStore(BuyV2PublicStoreObservation(realm: 'production', storeId: 'store-one', catalogueVersion: 6, observedAt: observed), 'c' * 32), isNull);
+      expect(gateway.prepareStore(BuyV2PublicStoreObservation(realm: 'evaluation', storeId: 'store-one', catalogueVersion: 6,
+        observedAt: observed.subtract(const Duration(minutes: 10))), 'c' * 32), isNull);
+      final original = gateway.prepareStore(BuyV2PublicStoreObservation(realm: 'evaluation', storeId: 'store-one', catalogueVersion: 6, observedAt: observed), 'c' * 32)!;
+      expect(await gateway.record(original, visible: () => false, storeVisit: true), isFalse); expect(transport.calls, 0);
+      expect(await gateway.record(original, visible: () => true, storeVisit: true), isFalse); expect(transport.calls, 1);
+      expect(await gateway.record(original, visible: () => true, storeVisit: true), isFalse); expect(transport.calls, 1);
+    });
+    test('LF14-VISITS only a decoded exact Store page supplies a fresh Store observation', () async {
+      final capture = storeVisitCapture();
+      final gateway = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), realm: 'evaluation', ownerAccountId: 'buyer-one', productFactsReadbackSupported: true,
+        minorMoneyReadbackSupported: true, now: () => DateTime.parse(capture['aggregate']['observedAt']),
+        transport: OwnerTransport((_) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': capture['page']}))));
+      final source = WorkspaceStoreCatalogueSource(gateway: gateway, storeId: 'store-one', current: () => true);
+      final page = await source.loadProducts(BuyV2CatalogueQuery(destination: BuyV2Destination.shop, storeId: 'store-one', regionId: null,
+        areaScope: BuyV2CatalogueAreaScope.allAreas), pageSize: 40);
+      expect(page.storeObservation, isNotNull); expect(page.storeObservation!.catalogueVersion, capture['page']['catalogueVersion']);
+      expect(page.storeObservation!.currentFor('store-one', DateTime.parse(capture['aggregate']['observedAt'])), isTrue);
+      expect(page.storeObservation!.currentFor('other-store', DateTime.parse(capture['aggregate']['observedAt'])), isFalse);
+    });
+    testWidgets('LF14-VISITS actual Visit Store paint counts once per opening, not prefetch rebuild or refresh', (tester) async {
+      final capture = storeVisitCapture(), sent = <Map<String, Object?>>[], core = BuySession();
+      var live = true;
+      final now = DateTime.parse(capture['aggregate']['observedAt']);
+      final wire = OwnerTransport((body) async {
+        if (body['operation'] == 'recordPublicStorePresentation') {
+          sent.add(body);
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+            ...Map<String, Object?>.of(body)..remove('operation'), 'realm': 'evaluation', 'acceptedAt': now.toIso8601String(),
+            'state': 'recorded', 'orderingAvailable': false}}));
+        }
+        if (body['operation'] == 'readPublicStoreCatalogue') {
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': capture['page']}));
+        }
+        return const SocialContentResponse(statusCode: 503, body: '{}');
+      });
+      final owner = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), transport: wire, realm: 'evaluation', ownerAccountId: 'buyer-one', productFactsReadbackSupported: true,
+        minorMoneyReadbackSupported: true, now: () => now);
+      final source = WorkspaceStoreCatalogueSource(gateway: owner, storeId: 'store-one', current: () => live);
+      final reporting = WorkspaceProductPresentationGateway(gateway: owner, current: () => live, displayed: (_) => null,
+        productPresentationsEnabled: false, storePresentationsEnabled: true);
+      final session = BuyV2Session(core: core, cataloguePageSource: source, reviewDataEnabled: false,
+        productPresentations: reporting, catalogueNow: () => now);
+      final pager = session.acquireCatalogueProducts('host-visit-entry');
+      try {
+        await pager.open(session.catalogueQuery(storeId: 'store-one'));
+        final product = pager.page!.items.first;
+        expect(sent, isEmpty);
+        final navigator = GlobalKey<NavigatorState>();
+        await tester.pumpWidget(MaterialApp(navigatorKey: navigator, theme: MoolTheme.light(), home: Builder(builder: (context) =>
+          Scaffold(body: TextButton(onPressed: () => unawaited(showBuyV2PartnerCatalogue(context, session, product)), child: const Text('Open actual Store'))))));
+        await tester.tap(find.text('Open actual Store')); await tester.pumpAndSettle();
+        expect(sent, hasLength(1)); expect(sent.single['catalogueVersion'], capture['page']['catalogueVersion']);
+        session.notifyListeners(); await tester.pumpAndSettle(); expect(sent, hasLength(1));
+        await pager.refresh(); await tester.pumpAndSettle(); expect(sent, hasLength(1));
+        navigator.currentState!.pop(); await tester.pumpAndSettle();
+        await tester.tap(find.text('Open actual Store')); await tester.pumpAndSettle(); expect(sent, hasLength(2));
+        expect(sent[0]['presentationId'], isNot(sent[1]['presentationId']));
+        navigator.currentState!.pop(); await tester.pumpAndSettle();
+        live = false;
+        await tester.tap(find.text('Open actual Store')); await tester.pumpAndSettle(); expect(sent, hasLength(2));
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        session.releaseCatalogueProducts('host-visit-entry'); session.dispose(); core.dispose();
+      }
+    });
     test('LF14-CLIENT actual service projection feeds only product presentations and the existing Work analytics boundary', () async {
       final capture = presentationCapture(), entry = presentationEntry(capture), credentials = Credentials(), sent = <Map<String, Object?>>[];
       final gateway = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => entry.readback,

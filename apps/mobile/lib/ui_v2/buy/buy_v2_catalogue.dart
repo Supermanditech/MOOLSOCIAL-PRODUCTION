@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show immutable, kDebugMode, listEquals;
 import 'package:flutter/material.dart';
@@ -1567,6 +1568,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
     this.includeStoreSearch = false,
     this.onResetFilters,
     this.savedOnly = false,
+    this.recordStoreVisit = false,
   });
 
   final BuyV2Session session;
@@ -1585,6 +1587,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
   final bool includeStoreSearch;
   final VoidCallback? onResetFilters;
   final bool savedOnly;
+  final bool recordStoreVisit;
 
   @override
   State<BuyV2PagedProductCatalogue> createState() =>
@@ -1602,6 +1605,42 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
   Timer? _publicationExpiry;
   bool _restoring = false;
   int _openSequence = 0;
+  BuyV2Session? _reportedStoreSession;
+  String? _reportedStoreId;
+  bool _storeVisitScheduled = false;
+
+  void _scheduleStoreVisit(BuyV2CataloguePage<Object>? page) {
+    final observation = page?.storeObservation, session = widget.session, storeId = widget.query.storeId;
+    final gateway = session.productPresentations;
+    if (!widget.recordStoreVisit || !widget.storeContext || widget.publishedOffers || observation == null || storeId == null ||
+        gateway == null || !gateway.storePresentationsEnabled || _storeVisitScheduled ||
+        identical(_reportedStoreSession, session) && _reportedStoreId == storeId) {
+      return;
+    }
+    bool visible() {
+      if (!mounted || !widget.recordStoreVisit || !identical(widget.session, session) ||
+          !identical(session.productPresentations, gateway) || widget.query.storeId != storeId || _pager.query != widget.query ||
+          !identical(_pager.page, page) || _pager.loading || _pager.message != null ||
+          ModalRoute.of(context)?.isCurrent != true || !TickerMode.valuesOf(context).enabled ||
+          WidgetsBinding.instance.lifecycleState != null && WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        return false;
+      }
+      var hidden = false;
+      context.visitAncestorElements((e) {if (e.widget case Offstage(offstage: true)) hidden = true; return !hidden;});
+      return !hidden;
+    }
+    _storeVisitScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _storeVisitScheduled = false;
+      if (!visible() || !observation.currentFor(storeId, session.catalogueNow())) return;
+      final id = List.generate(16, (_) => math.Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+      final original = gateway.prepareStore(observation, id);
+      if (original == null) return;
+      // An uncertain telemetry result never generates another ID from rebuilds.
+      _reportedStoreSession = session; _reportedStoreId = storeId;
+      unawaited(gateway.record(original, visible: visible, storeVisit: true));
+    });
+  }
 
   @override
   void initState() {
@@ -1837,7 +1876,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed ||
-        !widget.publishedOffers ||
+        (!widget.publishedOffers && !widget.recordStoreVisit) ||
         !mounted) {
       return;
     }
@@ -1896,6 +1935,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
         (_storeSearchPager!.query != widget.query ||
             _storeSearchPager!.loading);
     final message = _pager.query == widget.query ? _pager.message : null;
+    if (!loading && message == null) _scheduleStoreVisit(page);
     final offers = widget.publishedOffers
         ? (widget.savedOnly && _pager.query == widget.query
                   ? _pager.cachedItems
@@ -9087,6 +9127,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
           session: widget.session,
           scopeKey: _scope,
           storeContext: true,
+          recordStoreVisit: widget.storefront,
           onResetFilters: () => setState(() => _maximumPrice = null),
           query: widget.storefront
               ? BuyV2CatalogueQuery(

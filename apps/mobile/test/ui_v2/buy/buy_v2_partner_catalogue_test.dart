@@ -2049,64 +2049,22 @@ void main() {
         await tester.tap(visibleTitle);
         await tester.pumpAndSettle();
         expect(session.selectedProductId, product.id);
-        final report = find.byKey(ValueKey('buy-report-product-${product.id}'));
-        final productScroll = find
-            .descendant(
-              of: find.byKey(PageStorageKey('buy-product-${product.id}')),
-              matching: find.byType(Scrollable),
-            )
-            .first;
-        await tester.scrollUntilVisible(
-          report,
-          240,
-          scrollable: productScroll,
-          maxScrolls: 40,
-        );
-        await tester.pumpAndSettle();
-        expect(report.hitTestable(), findsOneWidget);
-        await tester.tap(report);
-        await tester.pumpAndSettle();
-        final identity = find.byKey(
-          ValueKey('buy-feedback-product-${product.id}'),
-        );
+        // Ratings/issues now belong to actual purchases, not arbitrary SKUs.
+        // Keep the original Cart/money assertions and verify the real product
+        // title rather than reopening the superseded report composer.
+        expect(find.byKey(ValueKey('buy-report-product-${product.id}')), findsNothing);
+        expect(find.byKey(ValueKey('buy-review-product-${product.id}')), findsNothing);
+        final identity = find.byKey(ValueKey('buy-product-title-${product.id}'));
         expect(identity, findsOneWidget);
+        await tester.ensureVisible(identity);
+        await tester.pumpAndSettle();
         expectComplete(identity);
-        expect(
-          find.descendant(
-            of: identity,
-            matching: find.text(product.customerTitle),
-          ),
-          findsOneWidget,
-        );
+        expect(tester.widget<Text>(identity).data, product.customerTitle);
         expect(tester.takeException(), isNull);
         await captureR66Visual(
           tester,
-          'sku-long-report-${destination.name}-$scale',
+          'sku-long-product-facts-${destination.name}-$scale',
         );
-        final reportViewport = find.byKey(
-          const ValueKey('buy-product-report-reasons-scroll'),
-        );
-        for (final field
-            in find
-                .descendant(of: identity, matching: find.byType(Text))
-                .evaluate()) {
-          await Scrollable.ensureVisible(field, alignment: .5);
-          await tester.pumpAndSettle();
-          final bounds = tester.getRect(find.byWidget(field.widget));
-          final viewport = tester.getRect(reportViewport);
-          expect(bounds.top, greaterThanOrEqualTo(viewport.top - .1));
-          expect(bounds.bottom, lessThanOrEqualTo(viewport.bottom + .1));
-        }
-        await captureR66Visual(
-          tester,
-          'sku-long-report-facts-${destination.name}-$scale',
-        );
-        final close = find.byKey(const ValueKey('buy-close-product-report'));
-        await tester.ensureVisible(close);
-        await tester.pumpAndSettle();
-        await tester.tap(close);
-        await tester.pumpAndSettle();
-        expect(identity, findsNothing);
         expect(session.quantityFor(product.id), product.minimumOrder);
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();

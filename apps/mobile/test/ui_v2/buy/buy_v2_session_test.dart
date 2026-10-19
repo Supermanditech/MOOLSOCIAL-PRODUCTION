@@ -15941,21 +15941,25 @@ void main() {
       expect(prefs.writesStarted, writes); expect(prefs.values.values.single, original);
     });
     for (final scale in [1.0, 2.0]) {
-      testWidgets('LF13 report journal retained explanation fits product UI scale=$scale', (tester) async {
+      testWidgets('LF13 retained report recovery stays protected without SKU actions scale=$scale', (tester) async {
         tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(390, 844); addTearDown(tester.view.reset);
         final f = await _openProductionCheckout(outcome: BuyV2OrderPlacementOutcome.failed, productReportsAvailable: true);
         addTearDown(f.session.dispose); f.adapter.reportResult = const BuyV2MutationResult(accepted: false, customerMessage: '');
         expect(await f.session.reportProductOnline(productId: f.product.id, reason: 'Wrong pack'), isFalse);
+        final retained = f.session.productReportRetentionMessage(f.product.id);
+        expect(retained, contains('Check with support before submitting again.'));
         await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
           builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
           home: BuyV2Screen(session: f.session, productId: f.product.id)));
         await tester.pumpAndSettle();
-        final message = find.byKey(ValueKey('buy-product-report-retention-${f.product.id}'));
-        await tester.scrollUntilVisible(message, 200, scrollable: find.descendant(
-          of: find.byKey(PageStorageKey('buy-product-${f.product.id}')).last, matching: find.byType(Scrollable)).first);
-        await Scrollable.ensureVisible(tester.element(message), alignment: .5); await tester.pumpAndSettle();
-        expect(tester.widget<Text>(message).maxLines, isNull);
-        expect(find.textContaining('Check with support before submitting again.'), findsOneWidget);
+        // Founder superseded all feedback/report controls on arbitrary SKU pages.
+        // The original pending journal still protects against duplicate sends.
+        expect(find.byKey(ValueKey('buy-product-report-retention-${f.product.id}')), findsNothing);
+        expect(find.byKey(ValueKey('buy-report-product-${f.product.id}')), findsNothing);
+        expect(find.byKey(ValueKey('buy-review-product-${f.product.id}')), findsNothing);
+        expect(f.session.productReportRetentionMessage(f.product.id), retained);
+        expect(await f.session.reportProductOnline(productId: f.product.id, reason: 'Repeat'), isFalse);
+        expect(f.adapter.reportCalls, 1);
         expect(f.session.canReportProduct(f.product.id), isFalse); expect(tester.takeException(), isNull);
       });
     }
