@@ -1175,9 +1175,26 @@ test("actual atomic producer, recovery and exact-Store projections", {
   const service = new WorkspacePurchaseProjectionService(db, "evaluation", trusted);
   const reader = new WorkspacePurchaseProjectionService(fresh, "evaluation");
   const root = db.collection("workspacePurchaseProjections").doc("evaluation");
-  const before = (await root.collection("purchases").get()).size;
-  const receiptsBefore = (await root.collection("receipts").get()).size;
+  let phase = "initial-counts";
+  // Keep both calls concurrent, but never tear down a client while its sibling
+  // is still running. Report only static phases/statuses, not private facts.
+  async function concurrentPair<T>(left: Promise<T>, right: Promise<T>): Promise<[T, T]> {
+    const results = await Promise.allSettled([left, right]);
+    console.info(`LF10_ATOMIC_PHASE=${phase}; outcomes=${results.map(r => r.status).join(",")}`);
+    for (const result of results) {
+      if (result.status === "rejected") throw result.reason;
+    }
+    assert.equal(results[0]!.status, "fulfilled");
+    assert.equal(results[1]!.status, "fulfilled");
+    return [
+      (results[0] as PromiseFulfilledResult<T>).value,
+      (results[1] as PromiseFulfilledResult<T>).value,
+    ];
+  }
   try {
+    const before = (await root.collection("purchases").get()).size;
+    const receiptsBefore = (await root.collection("receipts").get()).size;
+    phase = "missing-profile-atomicity";
     await assert.rejects(reader.materialize("missing-ref"), rejectsCode("service_unavailable"));
     source.set("trusted-ref", value);
     // No partial first Store, buyer directory or receipt when second profile missing.
@@ -1195,8 +1212,10 @@ test("actual atomic producer, recovery and exact-Store projections", {
       ownerUserId: value.stores[1]!.ownerUserId, familyId: "products-trade",
       profileId: "wholesaler", status: "live", shopEnabled: true,
     });
-    const [a, b] = await Promise.all([service.materialize("trusted-ref"), service.materialize("trusted-ref")]);
+    phase = "same-receipt-concurrency";
+    const [a, b] = await concurrentPair(service.materialize("trusted-ref"), service.materialize("trusted-ref"));
     assert.deepEqual(a, b);
+    phase = "replay-and-authorized-readback";
     source.set("trusted-ref", reverseMaps(value) as TrustedPlacementReceipt);
     assert.deepEqual(await service.materialize("trusted-ref"), a);
     const storedRef = root.collection("purchases").doc(a.purchaseId);
@@ -1223,6 +1242,7 @@ test("actual atomic producer, recovery and exact-Store projections", {
     await assert.rejects(reader.listStore(value.stores[1]!.ownerUserId, storeBody), rejectsCode("not_found"));
     await assert.rejects(reader.listBuyer("other-buyer", {limit: 1, cursor: buyerPage.nextCursor}), rejectsCode("invalid_input"));
     // Existing v2 aggregate unchanged when its missing pointer projection is repaired.
+    phase = "reference-repair-and-privacy";
     const pointer = root.collection("stores").doc(order.storeId).collection("orderReferences").doc(order.orderId);
     const originalAggregate = (await storedRef.get()).data();
     await pointer.delete();
@@ -1254,6 +1274,7 @@ test("actual atomic producer, recovery and exact-Store projections", {
     changed.revision = value.revision; changed.stores[0]!.lines[0]!.name = "Changed";
     await assert.rejects(service.materialize("trusted-ref"), rejectsCode("conflict"));
     // New receipt for same actor converges on directory identity, not losing candidate.
+    phase = "second-receipt-and-paging";
     const next = structuredClone(value); next.receiptId += "-next";
     source.set("second-ref", next);
     const c = await service.materialize("second-ref");
@@ -1267,8 +1288,10 @@ test("actual atomic producer, recovery and exact-Store projections", {
     concurrentOne.buyerUserId = concurrentTwo.buyerUserId = `new-buyer-${suffix}`;
     concurrentTwo.receiptId += "-different";
     source.set("concurrent-one", concurrentOne); source.set("concurrent-two", concurrentTwo);
-    const [d, e] = await Promise.all([service.materialize("concurrent-one"), service.materialize("concurrent-two")]);
+    phase = "distinct-receipt-shared-buyer-concurrency";
+    const [d, e] = await concurrentPair(service.materialize("concurrent-one"), service.materialize("concurrent-two"));
     assert.notEqual(d.purchaseId, e.purchaseId); assert.equal(d.buyerId, e.buyerId);
+    phase = "suspension-and-historical-repair";
     await db.collection("workspaceProfiles").doc(value.stores[0]!.caseId).update({status: "suspended"});
     await assert.rejects(reader.listStore(value.stores[0]!.ownerUserId, storeBody), rejectsCode("not_found"));
     // Historical index repair for active Store B is not blocked by suspended Store A.
@@ -1282,12 +1305,17 @@ test("actual atomic producer, recovery and exact-Store projections", {
       purchaseId: a.purchaseId, storeId: order.storeId, orderId: order.orderId,
     }), rejectsCode("not_found"));
     // Immutable buyer facts remain readable after Store suspension; no current eligibility claim.
+    phase = "immutable-buyer-and-corruption-guard";
     assert.equal((await reader.readBuyer(value.buyerUserId, {purchaseId: a.purchaseId})).orders.length, 2);
     const doc = root.collection("purchases").doc(a.purchaseId);
     const corrupt = (await doc.get()).data()!;
     corrupt.orders[0].original.totals.totalMinor++;
     await doc.set(corrupt);
     await assert.rejects(reader.readBuyer(value.buyerUserId, {purchaseId: a.purchaseId}), rejectsCode("invalid_state"));
+  } catch (error) {
+    const code = (error as {code?: unknown})?.code;
+    console.error(`LF10_ATOMIC_FAILURE=${phase}; code=${typeof code === "number" ? code : "non-numeric"}`);
+    throw error;
   } finally {
     await Promise.all([db.terminate(), fresh.terminate()]);
     await Promise.all([deleteApp(firstApp), deleteApp(secondApp)]);
