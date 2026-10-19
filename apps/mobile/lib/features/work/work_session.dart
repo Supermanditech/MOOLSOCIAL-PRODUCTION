@@ -635,6 +635,7 @@ class WorkSession extends ChangeNotifier {
     this.productPromotionGateway,
     this.productPromotionRealm,
     this.productPromotionPendingStoreFactory,
+    this.storeCouponPendingStoreFactory,
   }) : _productionSession = false,
        gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
@@ -703,6 +704,7 @@ class WorkSession extends ChangeNotifier {
     this.productPromotionGateway,
     this.productPromotionRealm,
     this.productPromotionPendingStoreFactory,
+    this.storeCouponPendingStoreFactory,
   }) : _productionSession = true,
        catalogueGateway = catalogueGateway ?? buildWorkspaceCatalogueGateway(),
        gateway = gateway ?? buildWorkGateway(),
@@ -942,7 +944,24 @@ class WorkSession extends ChangeNotifier {
   final StorePromotionGateway? productPromotionGateway;
   final String? productPromotionRealm;
   final StorePromotionPendingStore Function(StorePromotionScope scope)? productPromotionPendingStoreFactory;
+  final StoreCouponPendingStore Function(StorePromotionScope scope)? storeCouponPendingStoreFactory;
   final Map<StorePromotionScope, StorePromotionController> _productPromotions = {};
+  final Map<StorePromotionScope, StoreCouponController> _storeCoupons = {};
+  StoreCouponController? get workspaceStoreCoupons {
+    final account = _contactAccountScope, store = activeWorkspace?.id, connection = productPromotionGateway;
+    final realm = productPromotionRealm ?? (connection is AuthenticatedStorePromotionGateway ? connection.realm : null);
+    if (_disposed || account == null || account.isEmpty || store == null || !workspaceStoreAuthoringAvailable ||
+        connection is! StoreCouponGateway || !(connection as StoreCouponGateway).storeCouponTermsSupported ||
+        !{'evaluation', 'production'}.contains(realm)) { return null; }
+    final scope = (account: account, store: store, realm: realm!), epoch = navigationScopeRevision;
+    final existing = _storeCoupons[scope];
+    if (existing?.active == true) return existing;
+    existing?.dispose();
+    return _storeCoupons[scope] = StoreCouponController(scope: scope, gateway: connection as StoreCouponGateway,
+      pendingStore: storeCouponPendingStoreFactory?.call(scope) ?? SecureStoreCouponPendingStore(),
+      context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store ||
+        navigationScopeRevision != epoch ? null : publicationPreferencesContext);
+  }
   String _promotionSelectionSignature(String skuId) {
     final item = workspaceCatalogueItems.where((p) => p.id == skuId).firstOrNull;
     if (item == null) return '';
@@ -13416,6 +13435,8 @@ class WorkSession extends ChangeNotifier {
     _catalogueReadbacks.clear();
     for (final promotion in _productPromotions.values) { promotion.dispose(); }
     _productPromotions.clear();
+    for (final coupon in _storeCoupons.values) { coupon.dispose(); }
+    _storeCoupons.clear();
     for (final feedback in _customerFeedback.values) { feedback.dispose(); }
     _customerFeedback.clear();
     _counterDraftRecovery.clear();

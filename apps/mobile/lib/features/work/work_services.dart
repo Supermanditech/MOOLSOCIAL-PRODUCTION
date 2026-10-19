@@ -4480,6 +4480,69 @@ class SecureWorkVariantFamilyJournal implements WorkspaceVariantFamilyJournal {
 /// Encrypted private policy draft and original request. Native tails remain
 /// serialized across instances through actual completion, not caller timeouts.
 /// Secure original-request recovery, not a local published-promotion database.
+class SecureStoreCouponPendingStore implements StoreCouponPendingStore {
+  SecureStoreCouponPendingStore({FlutterSecureStorage? storage, String? Function()? currentAccount})
+    : _storage = storage ?? const FlutterSecureStorage(),
+      _currentAccount = currentAccount ?? SecureWorkOrderPendingStore._signedInAccount;
+  final FlutterSecureStorage _storage;
+  final String? Function() _currentAccount;
+  static final Map<String, Future<void>> _tails = {};
+  String _key(StorePromotionScope scope) =>
+    'moolsocial.workspace.store-coupon-command.v1.${base64UrlEncode(utf8.encode(jsonEncode([scope.account, scope.store, scope.realm])))}';
+  void _check(StorePromotionScope scope) {
+    if (_currentAccount() != scope.account || scope.account.isEmpty || scope.store.isEmpty ||
+        !{'evaluation', 'production'}.contains(scope.realm)) {
+      throw const WorkGatewayException('Sign in again to check this coupon update.');
+    }
+  }
+  Future<T> _serial<T>(StorePromotionScope scope, Future<T> Function() action) {
+    final key = _key(scope), result = (_tails[_key(scope)] ?? Future<void>.value()).then((_) => action());
+    final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _tails[key] = tail;
+    unawaited(tail.then((_) {if (identical(_tails[key], tail)) _tails.remove(key);}));
+    return result;
+  }
+  Future<StoreCouponIntent?> _read(StorePromotionScope scope) async {
+    _check(scope);
+    final raw = await _storage.read(key: _key(scope));
+    _check(scope);
+    if (raw == null) return null;
+    final row = jsonDecode(raw);
+    if (row is! Map || row.length != 5 || row['schemaVersion'] != 1 || row['accountId'] != scope.account ||
+        row['storeId'] != scope.store || row['realm'] != scope.realm || !row.containsKey('original')) {
+      throw const FormatException('Saved coupon update needs checking.');
+    }
+    final original = StoreCouponIntent.fromJson(row['original']);
+    if (original.scope != scope) throw const FormatException('Wrong coupon request owner.');
+    return original;
+  }
+  @override
+  Future<StoreCouponIntent?> read(StorePromotionScope scope) => _serial(scope, () => _read(scope));
+  @override
+  Future<void> save(StoreCouponIntent original) => _serial(original.scope, () async {
+    StoreCouponIntent.fromJson(original.toJson());
+    final previous = await _read(original.scope);
+    if (previous != null && previous.fingerprint != original.fingerprint) {
+      throw const FormatException('Check the original coupon update first.');
+    }
+    if (previous != null) return;
+    _check(original.scope);
+    await _storage.write(key: _key(original.scope), value: jsonEncode({'schemaVersion': 1,
+      'accountId': original.scope.account, 'storeId': original.scope.store, 'realm': original.scope.realm,
+      'original': original.toJson()}));
+    _check(original.scope);
+  });
+  @override
+  Future<void> clear(StoreCouponIntent original) => _serial(original.scope, () async {
+    final previous = await _read(original.scope);
+    if (previous == null) return;
+    if (previous.fingerprint != original.fingerprint) throw const FormatException('Keep the original coupon update.');
+    _check(original.scope);
+    await _storage.delete(key: _key(original.scope));
+    _check(original.scope);
+  });
+}
+
 class SecureStorePromotionPendingStore implements StorePromotionPendingStore {
   SecureStorePromotionPendingStore({FlutterSecureStorage? storage, String? Function()? currentAccount})
     : _storage = storage ?? const FlutterSecureStorage(),

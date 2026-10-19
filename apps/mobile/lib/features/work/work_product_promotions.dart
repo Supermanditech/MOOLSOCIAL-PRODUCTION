@@ -82,6 +82,269 @@ String encodeStoreCouponCampaigns(List<StoreCouponCampaign> campaigns) => jsonEn
   'schemaVersion': 1, 'campaigns': campaigns.map((row) => row.toJson()).toList(),
 });
 
+const _couponKeys = ['name', 'percentage', 'discount', 'minimumSpendMinor',
+  'maximumSavingMinor', 'startsAt', 'endsAt', 'totalUses', 'usesPerCustomer', 'active'];
+
+/// Exact advertised campaign terms, not an evaluated saving or a private revision.
+@immutable
+class StoreCouponInput {
+  StoreCouponInput.fromCampaign(StoreCouponCampaign campaign, {required bool active})
+    : this.fromJson({for (final key in _couponKeys.where((k) => k != 'active'))
+        key: campaign.toJson()[key], 'startsAt': _iso(campaign.startsAt),
+        'endsAt': _iso(campaign.endsAt), 'active': active});
+  StoreCouponInput.fromJson(Object? raw) : _encoded = _validate(raw);
+  static String _validate(Object? raw) {
+    final row = _map(raw, _couponKeys);
+    if (row['active'] is! bool) throw const FormatException('Check the coupon status.');
+    // Share owner validation without adopting its local revision or identity.
+    StoreCouponCampaign.fromJson({'id': 'coupon-check', 'storeId': 'store-check',
+      'revision': 1, for (final key in _couponKeys.where((k) => k != 'active')) key: row[key]}, 'store-check');
+    for (final key in ['startsAt', 'endsAt']) {
+      if (_iso(_time(row[key])) != row[key]) throw const FormatException('Check the coupon date.');
+    }
+    return jsonEncode({for (final key in _couponKeys) key: row[key]});
+  }
+  final String _encoded;
+  Map<String, dynamic> toJson() => jsonDecode(_encoded) as Map<String, dynamic>;
+  String get fingerprint => _encoded;
+  String get name => toJson()['name'] as String;
+  bool get active => toJson()['active'] as bool;
+  DateTime get endsAt => _time(toJson()['endsAt']);
+  StoreCouponInput paused() => StoreCouponInput.fromJson({...toJson(), 'active': false});
+  void validateForSave(DateTime now) {
+    if (active && !endsAt.isAfter(now.toUtc())) {
+      throw const FormatException('Choose a future coupon expiry.');
+    }
+  }
+}
+
+@immutable
+class StoreCouponIntent {
+  StoreCouponIntent({required this.scope, required this.couponId,
+    required this.expectedRevision, required this.idempotencyKey,
+    required this.input, required bool fundingAcknowledged}) {
+    _scope(scope); _id(couponId); _id(idempotencyKey); _revision(expectedRevision);
+    if (!fundingAcknowledged || expectedRevision >= 1000000000) {
+      throw const FormatException('Confirm Store funding and refresh the coupon.');
+    }
+  }
+  final StorePromotionScope scope;
+  final String couponId, idempotencyKey;
+  final int expectedRevision;
+  final StoreCouponInput input;
+  Map<String, dynamic> get body => {'storeId': scope.store, 'couponId': couponId,
+    'expectedRevision': expectedRevision, 'idempotencyKey': idempotencyKey,
+    'coupon': input.toJson(), 'fundingAcknowledged': true};
+  Map<String, dynamic> toJson() => {'schemaVersion': 1, 'storeCouponTermsVersion': 1, 'accountId': scope.account,
+    'realm': scope.realm, ...body};
+  String get fingerprint => jsonEncode(toJson());
+  factory StoreCouponIntent.fromJson(Object? raw) {
+    final row = _map(raw, ['schemaVersion', 'storeCouponTermsVersion', 'accountId', 'realm', 'storeId', 'couponId',
+      'expectedRevision', 'idempotencyKey', 'coupon', 'fundingAcknowledged']);
+    if (row['schemaVersion'] != 1 || row['storeCouponTermsVersion'] != 1 || row['fundingAcknowledged'] != true) {
+      throw const FormatException('Keep the original coupon request.');
+    }
+    return StoreCouponIntent(scope: (account: _id(row['accountId']), store: _id(row['storeId']),
+      realm: _text(row['realm'], 16)), couponId: _id(row['couponId']),
+      expectedRevision: _revision(row['expectedRevision']), idempotencyKey: _id(row['idempotencyKey']),
+      input: StoreCouponInput.fromJson(row['coupon']), fundingAcknowledged: true);
+  }
+}
+
+@immutable
+class StoreCouponRecord {
+  const StoreCouponRecord._(this.scope, this.couponId, this.revision, this.observedAt, this.input);
+  final StorePromotionScope scope;
+  final String couponId;
+  final int revision;
+  final DateTime observedAt;
+  final StoreCouponInput input;
+  static StoreCouponRecord decode(Object? raw, StorePromotionScope scope, DateTime now) {
+    _scope(scope);
+    final row = _map(raw, [..._couponKeys, 'schemaVersion', 'realm', 'storeId', 'couponId', 'revision', 'observedAt']);
+    final observed = _time(row['observedAt']);
+    if (row['schemaVersion'] != 1 || row['realm'] != scope.realm || row['storeId'] != scope.store || observed.isAfter(now.toUtc())) {
+      throw const FormatException('Refresh the Store coupon.');
+    }
+    return StoreCouponRecord._(scope, _id(row['couponId']), _revision(row['revision'], 1), observed,
+      StoreCouponInput.fromJson({for (final key in _couponKeys) key: row[key]}));
+  }
+  bool acknowledges(StoreCouponIntent original) => scope == original.scope && couponId == original.couponId &&
+    revision == original.expectedRevision + 1 && input.fingerprint == original.input.fingerprint;
+}
+
+class StoreCouponResult {
+  const StoreCouponResult(this.state, {this.record});
+  final StorePromotionResultState state;
+  final StoreCouponRecord? record;
+}
+
+class StoreCouponPage {
+  StoreCouponPage(List<StoreCouponRecord> records, this.nextCursor) : records = List.unmodifiable(records);
+  final List<StoreCouponRecord> records;
+  final String? nextCursor;
+}
+
+abstract interface class StoreCouponGateway {
+  bool get storeCouponTermsSupported;
+  Future<StoreCouponRecord?> readCoupon(StorePromotionScope scope, String couponId, bool Function() current);
+  Future<StoreCouponPage> listCoupons(StorePromotionScope scope, bool Function() current, {String? after, int limit = 20});
+  Future<StoreCouponResult> saveCoupon(StoreCouponIntent original, bool Function() current);
+  Future<StoreCouponResult> reconcileCoupon(StoreCouponIntent original, bool Function() current);
+}
+
+abstract interface class StoreCouponPendingStore {
+  Future<StoreCouponIntent?> read(StorePromotionScope scope);
+  Future<void> save(StoreCouponIntent original);
+  Future<void> clear(StoreCouponIntent original);
+}
+
+/// Owner publication workflow. A receipt proves an original write, not that the
+/// coupon is currently public, eligible or redeemed. Always refresh current state.
+class StoreCouponController extends ChangeNotifier {
+  StoreCouponController({required this.scope, required this.gateway, required this.pendingStore,
+    required this.context, DateTime Function()? now}) : now = now ?? DateTime.now, _lifetime = context() {
+    _scope(scope);
+  }
+  final StorePromotionScope scope;
+  final StoreCouponGateway gateway;
+  final StoreCouponPendingStore pendingStore;
+  final Object? Function() context;
+  final DateTime Function() now;
+  final Object? _lifetime;
+  bool _closed = false, ready = false, busy = false;
+  bool get active => !_closed && _lifetime != null && context() == _lifetime;
+  String? loadedCouponId, message;
+  StoreCouponRecord? currentRecord, lastAcknowledged;
+  StoreCouponIntent? pending;
+  Future<bool>? _restoring;
+  void _emit() {if (!_closed) notifyListeners();}
+  Future<bool> restore() {
+    if (!active) return Future.value(false);
+    if (ready) return Future.value(true);
+    return _restoring ??= _restore().whenComplete(() => _restoring = null);
+  }
+  Future<bool> _restore() async {
+    try {
+      final retained = await pendingStore.read(scope).timeout(const Duration(seconds: 10));
+      if (!active) return false;
+      if (retained != null && retained.scope != scope) throw const FormatException();
+      pending = retained; ready = true; message = null;
+      return true;
+    } on Object {
+      if (active) {ready = false; message = 'Saved coupon update could not be opened. Nothing was replaced.';}
+      return false;
+    } finally {if (active) _emit();}
+  }
+  Future<bool> refresh(String couponId) async {
+    if (!active || busy || !gateway.storeCouponTermsSupported) return false;
+    _id(couponId); busy = true; _emit();
+    try {
+      if (!await restore() || !active || pending != null) return false;
+      loadedCouponId = null;
+      final result = await gateway.readCoupon(scope, couponId, () => active).timeout(const Duration(seconds: 25));
+      if (!active) return false;
+      if (result != null && (result.scope != scope || result.couponId != couponId)) throw const FormatException();
+      currentRecord = result; loadedCouponId = couponId; message = null;
+      return true;
+    } on Object {
+      if (active) {loadedCouponId = null; message = 'Current coupon could not be checked. Your draft is kept.';}
+      return false;
+    } finally {busy = false; _emit();}
+  }
+  Future<StoreCouponResult> submit(String couponId, StoreCouponInput input,
+    {required bool fundingAcknowledged, required bool Function() inputCurrent}) async {
+    const notSent = StoreCouponResult(StorePromotionResultState.notSent);
+    if (!active || busy || !gateway.storeCouponTermsSupported || !fundingAcknowledged) return notSent;
+    busy = true; _emit();
+    try {
+      if (!await restore() || !active || pending != null || loadedCouponId != couponId) return notSent;
+      bool current() => active && inputCurrent();
+      if (!current()) return notSent;
+      input.validateForSave(now());
+      if (!input.active && (currentRecord == null || input.fingerprint != currentRecord!.input.paused().fingerprint)) return notSent;
+      final original = StoreCouponIntent(scope: scope, couponId: couponId,
+        expectedRevision: currentRecord?.revision ?? 0, idempotencyKey: _key(), input: input, fundingAcknowledged: true);
+      pending = original;
+      try {
+        await pendingStore.save(original).timeout(const Duration(seconds: 10));
+      } on Object {
+        // No transport has begun. Exact cleanup is queued behind real writes.
+        try {
+          await pendingStore.clear(original).timeout(const Duration(seconds: 10));
+          if (active) pending = null;
+        } on Object { /* Keep the exact original when local cleanup is uncertain. */ }
+        if (active) message = 'Coupon was not sent. Check saved recovery before another update.';
+        return notSent;
+      }
+      if (!active) return const StoreCouponResult(StorePromotionResultState.unknown);
+      try {
+        if (!current()) return await _finish(original, notSent);
+        input.validateForSave(now());
+      } on Object {return await _finish(original, notSent);}
+      final result = await gateway.saveCoupon(original, current).timeout(const Duration(seconds: 25));
+      return await _finish(original, result);
+    } on Object {
+      if (active) message = pending == null ? 'Check the coupon details.' : 'Check the original coupon update before another save.';
+      return StoreCouponResult(pending == null ? StorePromotionResultState.notSent : StorePromotionResultState.unknown);
+    } finally {busy = false; _emit();}
+  }
+  Future<StoreCouponResult> reconcile() async {
+    const unknown = StoreCouponResult(StorePromotionResultState.unknown);
+    if (!active || busy || !gateway.storeCouponTermsSupported) return unknown;
+    busy = true; _emit();
+    try {
+      if (!await restore() || !active || pending == null) return unknown;
+      final original = pending!;
+      final result = await gateway.reconcileCoupon(original, () => active).timeout(const Duration(seconds: 25));
+      if (result.state != StorePromotionResultState.saved) return unknown;
+      return await _finish(original, result);
+    } on Object {
+      if (active) message = 'The original coupon result is still unconfirmed.';
+      return unknown;
+    } finally {busy = false; _emit();}
+  }
+  /// Deliberate owner action only. Reuses the frozen ID/key/CAS/terms; an absent
+  /// receipt is not rejection, and an unsent retry cannot erase a prior attempt.
+  Future<StoreCouponResult> retryOriginal({required bool fundingAcknowledged}) async {
+    const unknown = StoreCouponResult(StorePromotionResultState.unknown);
+    if (!active || busy || !gateway.storeCouponTermsSupported || !fundingAcknowledged) return unknown;
+    busy = true; _emit();
+    try {
+      if (!await restore() || !active || pending == null) return unknown;
+      final original = pending!;
+      final result = await gateway.saveCoupon(original, () => active).timeout(const Duration(seconds: 25));
+      if (result.state != StorePromotionResultState.saved) {
+        if (active) message = 'The original update is still held. No replacement request was created; check its result again.';
+        return unknown;
+      }
+      return await _finish(original, result);
+    } on Object {
+      if (active) message = 'The original coupon result is still unconfirmed.';
+      return unknown;
+    } finally {busy = false; _emit();}
+  }
+  Future<StoreCouponResult> _finish(StoreCouponIntent original, StoreCouponResult result) async {
+    const unknown = StoreCouponResult(StorePromotionResultState.unknown);
+    if (!active || pending?.fingerprint != original.fingerprint) return unknown;
+    if (result.state == StorePromotionResultState.unknown ||
+        result.state == StorePromotionResultState.saved && result.record?.acknowledges(original) != true) {
+      message = 'Check the original coupon update before another save.'; return unknown;
+    }
+    try {
+      await pendingStore.clear(original).timeout(const Duration(seconds: 10));
+      if (!active) return unknown;
+      pending = null; loadedCouponId = null;
+      if (result.state == StorePromotionResultState.saved) lastAcknowledged = result.record;
+      message = result.state == StorePromotionResultState.saved
+        ? 'Coupon update saved. Refresh to check its current state; savings are not confirmed.'
+        : 'Coupon was not saved. Refresh before trying again.';
+      return result;
+    } on Object {message = 'The original coupon update needs checking before another save.'; return unknown;}
+  }
+  @override void dispose() {_closed = true; super.dispose();}
+}
+
 Map<String, dynamic> _map(Object? raw, List<String> keys) {
   if (raw is! Map<String, dynamic> ||
       raw.length != keys.length ||
@@ -380,7 +643,7 @@ abstract interface class StorePromotionTermsCapability {
   bool get benefitTermsSupported;
 }
 
-class AuthenticatedStorePromotionGateway implements StorePromotionGateway, StorePromotionTermsCapability {
+class AuthenticatedStorePromotionGateway implements StorePromotionGateway, StorePromotionTermsCapability, StoreCouponGateway {
   AuthenticatedStorePromotionGateway({
     required this.endpoint,
     required this.credentials,
@@ -388,6 +651,7 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
     required this.ownerAccountId,
     required this.realm,
     this.benefitTermsSupported = false,
+    this.storeCouponTermsSupported = false,
     DateTime Function()? now,
   }) : now = now ?? DateTime.now {
     if (endpoint.scheme != 'https' ||
@@ -408,6 +672,7 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
   final SocialContentTransport transport;
   final String ownerAccountId, realm;
   @override final bool benefitTermsSupported;
+  @override final bool storeCouponTermsSupported;
   final DateTime Function() now;
   void _check(StorePromotionScope scope, bool Function() current) {
     _scope(scope);
@@ -423,8 +688,10 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
     required bool mutation,
     required void Function() onSend,
     void Function()? beforeSend,
+    bool storeCoupon = false,
   }) async {
     _check(scope, current);
+    if (storeCoupon && !storeCouponTermsSupported) throw _NotSent();
     if (!benefitTermsSupported && body['promotion'] is Map && (body['promotion'] as Map).containsKey('benefitTerms')) {
       throw _NotSent();
     }
@@ -448,9 +715,86 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
             'x-firebase-appcheck': check,
             'x-request-id': _key(),
           },
-          body: {...body, if (benefitTermsSupported) 'promotionTermsVersion': 1},
+          body: {...body, if (storeCoupon) 'storeCouponTermsVersion': 1,
+            if (!storeCoupon && benefitTermsSupported) 'promotionTermsVersion': 1},
         )
         .timeout(const Duration(seconds: 20));
+  }
+
+  Map<String, dynamic> _couponEnvelope(SocialContentResponse response, StorePromotionScope scope, List<String> fields) {
+    if (response.statusCode != 200) throw const FormatException('Coupons could not be checked.');
+    final envelope = jsonDecode(response.body);
+    if (envelope is! Map || envelope['ok'] != true) throw const FormatException('Coupons could not be checked.');
+    final row = _map(envelope['data'], ['schemaVersion', 'storeCouponTermsVersion', 'realm', 'storeId',
+      'orderingAvailable', 'redemptionAvailable', 'publicationConfirmed', ...fields]);
+    if (row['schemaVersion'] != 1 || row['storeCouponTermsVersion'] != 1 || row['realm'] != scope.realm ||
+        row['storeId'] != scope.store || row['orderingAvailable'] != false ||
+        row['redemptionAvailable'] != false || row['publicationConfirmed'] != false) {
+      throw const FormatException('Coupon response changed.');
+    }
+    return row;
+  }
+  StoreCouponRecord? _couponRecord(SocialContentResponse response, StorePromotionScope scope, String couponId) {
+    final row = _couponEnvelope(response, scope, ['record']);
+    if (row['record'] == null) return null;
+    final value = StoreCouponRecord.decode(row['record'], scope, now());
+    if (value.couponId != couponId) throw const FormatException('Wrong coupon returned.');
+    return value;
+  }
+  @override
+  Future<StoreCouponRecord?> readCoupon(StorePromotionScope scope, String couponId, bool Function() current) async {
+    _id(couponId);
+    final response = await _request(scope, {'operation': 'readStoreCoupon', 'storeId': scope.store, 'couponId': couponId},
+      current, mutation: false, onSend: () {}, storeCoupon: true);
+    _check(scope, current);
+    return _couponRecord(response, scope, couponId);
+  }
+  @override
+  Future<StoreCouponPage> listCoupons(StorePromotionScope scope, bool Function() current, {String? after, int limit = 20}) async {
+    if (limit < 1 || limit > 20) throw const FormatException('Check the coupon page.');
+    if (after != null) _id(after);
+    final response = await _request(scope, {'operation': 'listStoreCoupons', 'storeId': scope.store, 'limit': limit, 'after': ?after},
+      current, mutation: false, onSend: () {}, storeCoupon: true);
+    _check(scope, current);
+    final row = _couponEnvelope(response, scope, ['items', 'nextCursor']), items = row['items'];
+    if (items is! List || items.length > limit) throw const FormatException('Coupon page changed.');
+    final values = <StoreCouponRecord>[];
+    var previous = after;
+    for (final item in items) {
+      final value = StoreCouponRecord.decode(item, scope, now());
+      if (previous != null && value.couponId.compareTo(previous) <= 0) throw const FormatException('Coupon page order changed.');
+      values.add(value); previous = value.couponId;
+    }
+    final next = row['nextCursor'] == null ? null : _id(row['nextCursor']);
+    if (next != (values.length == limit ? values.last.couponId : null)) throw const FormatException('Coupon cursor changed.');
+    return StoreCouponPage(values, next);
+  }
+  @override
+  Future<StoreCouponResult> saveCoupon(StoreCouponIntent original, bool Function() current) => _writeCoupon(original, current, recovery: false);
+  @override
+  Future<StoreCouponResult> reconcileCoupon(StoreCouponIntent original, bool Function() current) => _writeCoupon(original, current, recovery: true);
+  Future<StoreCouponResult> _writeCoupon(StoreCouponIntent original, bool Function() current, {required bool recovery}) async {
+    var sent = false;
+    try {
+      if (!recovery) original.input.validateForSave(now());
+      final response = await _request(original.scope, {'operation': recovery ? 'reconcileStoreCoupon' : 'saveStoreCoupon', ...original.body},
+        current, mutation: !recovery, onSend: () => sent = true, storeCoupon: true,
+        beforeSend: recovery ? null : () => original.input.validateForSave(now()));
+      _check(original.scope, current);
+      if (!recovery && response.statusCode >= 400 && response.statusCode < 500) {
+        final error = jsonDecode(response.body);
+        if (error is Map && error['ok'] == false && error['error'] is Map &&
+            {'invalid_input', 'conflict', 'not_found', 'invalid_state', 'forbidden', 'authentication_required'}.contains(error['error']['code'])) {
+          return const StoreCouponResult(StorePromotionResultState.rejected);
+        }
+      }
+      final record = _couponRecord(response, original.scope, original.couponId);
+      return record?.acknowledges(original) == true
+        ? StoreCouponResult(StorePromotionResultState.saved, record: record)
+        : const StoreCouponResult(StorePromotionResultState.unknown);
+    } on Object {
+      return StoreCouponResult(sent || recovery ? StorePromotionResultState.unknown : StorePromotionResultState.notSent);
+    }
   }
 
   Map<String, dynamic> _envelope(

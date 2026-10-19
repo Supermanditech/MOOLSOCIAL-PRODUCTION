@@ -45,6 +45,15 @@ class _StoreCouponCampaignPanelState extends State<StoreCouponCampaignPanel> {
           campaign: campaign, current: () => _current)));
     if (_current) setState(() {});
   }
+  Future<void> _publication(StoreCouponCampaign campaign) async {
+    final controller = widget.session.workspaceStoreCoupons;
+    if (!_current || !_ready || controller == null) return;
+    bool current() => _current && widget.session.workspaceStoreCouponCampaigns.any((saved) =>
+      saved.id == campaign.id && saved.revision == campaign.revision &&
+      StoreCouponInput.fromCampaign(saved, active: true).fingerprint == StoreCouponInput.fromCampaign(campaign, active: true).fingerprint);
+    await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true,
+      builder: (_) => _StoreCouponPublicationSheet(controller: controller, campaign: campaign, current: current));
+  }
   @override Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.session, builder: (context, _) {
       if (!_current) return const Text('Reopen Store offers to continue.');
@@ -60,6 +69,7 @@ class _StoreCouponCampaignPanelState extends State<StoreCouponCampaignPanel> {
         ]);
       }
       final campaigns = widget.session.workspaceStoreCouponCampaigns;
+      final publisher = widget.session.workspaceStoreCoupons;
       return Column(key: const Key('work-store-coupons'),
         crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(
@@ -78,20 +88,128 @@ class _StoreCouponCampaignPanelState extends State<StoreCouponCampaignPanel> {
                 icon: const Icon(Icons.add), label: const Text('Create Store coupon')),
             ])),
           const SizedBox(height: 10),
-          const Text('Save once, reopen and edit anytime. Drafts stay private on this device; public publishing is not connected yet.',
-            style: TextStyle(fontSize: 12, height: 1.4, color: Color(0xff566572))),
+          Text(publisher == null
+            ? 'Save once, reopen and edit anytime. Drafts stay private on this device; public publishing is not connected yet.'
+            : 'Save drafts here. Check and publish each campaign separately; saving a draft does not update its public version.',
+            style: const TextStyle(fontSize: 12, height: 1.4, color: Color(0xff566572))),
           for (final campaign in campaigns) ListTile(
             key: ValueKey('work-coupon-${campaign.id}'), contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.confirmation_number_outlined, color: Color(0xff256b78)),
             title: Text(campaign.name),
-            subtitle: Text('${_couponSaving(campaign)} · Store-wide\nSaved draft · not published'),
+            subtitle: Text('${_couponSaving(campaign)} · Store-wide\n${publisher == null ? 'Saved draft · not published' : 'Saved draft · check public version separately'}'),
             isThreeLine: true,
-            trailing: IconButton(tooltip: 'Edit ${campaign.name}',
+            onTap: publisher == null ? null : () => _publication(campaign),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (publisher != null) IconButton(tooltip: 'Manage publishing for ${campaign.name}',
+                onPressed: () => _publication(campaign), icon: const Icon(Icons.cloud_upload_outlined)),
+              IconButton(tooltip: 'Edit ${campaign.name}',
               onPressed: widget.session.workspaceOfferDraftSaving ? null : () => _edit(campaign),
-              icon: const Icon(Icons.edit_outlined))),
+              icon: const Icon(Icons.edit_outlined))])),
           const SizedBox(height: 18),
         ]);
     });
+}
+
+class _StoreCouponPublicationSheet extends StatefulWidget {
+  const _StoreCouponPublicationSheet({required this.controller, required this.campaign, required this.current});
+  final StoreCouponController controller;
+  final StoreCouponCampaign campaign;
+  final bool Function() current;
+  @override State<_StoreCouponPublicationSheet> createState() => _StoreCouponPublicationSheetState();
+}
+class _StoreCouponPublicationSheetState extends State<_StoreCouponPublicationSheet> {
+  bool _funding = false;
+  StoreCouponController get _controller => widget.controller;
+  bool get _current => mounted && widget.current() && _controller.active;
+  @override void initState() {super.initState(); unawaited(_refresh());}
+  Future<void> _refresh() async {
+    if (!_current) return;
+    setState(() => _funding = false);
+    await _controller.refresh(widget.campaign.id);
+  }
+  Future<void> _reconcile() async {
+    if (!_current) return;
+    setState(() => _funding = false);
+    await _controller.reconcile();
+    if (_current) setState(() => _funding = false);
+  }
+  Future<void> _submit({required bool pause}) async {
+    if (!_current || !_funding || _controller.busy) return;
+    final input = pause ? _controller.currentRecord?.input.paused()
+      : StoreCouponInput.fromCampaign(widget.campaign, active: true);
+    if (input == null) return;
+    await _controller.submit(widget.campaign.id, input, fundingAcknowledged: _funding, inputCurrent: () => _current);
+    if (_current) setState(() => _funding = false);
+  }
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: _controller, builder: (context, _) {
+    final current = _current, record = _controller.currentRecord;
+    final loaded = _controller.loadedCouponId == widget.campaign.id;
+    final held = _controller.pending != null;
+    return ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
+      child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 16, 20, 24), child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+          Row(children: [const Icon(Icons.local_offer_outlined, color: Color(0xff256b78)), const SizedBox(width: 10),
+            const Expanded(child: Text('Coupon publishing', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700))),
+            IconButton(tooltip: 'Close coupon publishing', onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close))]),
+          const SizedBox(height: 12),
+          Text(widget.campaign.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6), Text('${_couponSaving(widget.campaign)} · Store-wide'),
+          Text('Minimum Store bill ₹${_couponAmount(widget.campaign.minimumSpendMinor)}'),
+          _couponValidityAndLimits(context, StoreCouponInput.fromCampaign(widget.campaign, active: true)),
+          const SizedBox(height: 8),
+          const Text('One coupon saving applies to this Store’s eligible basket, not separately to every product. Other Stores are unaffected.'),
+          const SizedBox(height: 12),
+          if (!current) const Text('Store, account or draft changed. Close and reopen this campaign.')
+          else if (_controller.busy) const LinearProgressIndicator()
+          else if (held) ...[
+            const Text('An earlier coupon update is not confirmed. Check that original update before publishing again.'),
+            const SizedBox(height: 8),
+            Text('Original coupon: ${_controller.pending!.input.name}'),
+            Text('Original action: ${_controller.pending!.input.active ? 'Publish / update' : 'Pause'}'),
+            Text('Exact original terms: ${_controller.pending!.input.toJson()['percentage'] == true
+              ? '${_couponAmount(_controller.pending!.input.toJson()['discount'] as int)}% off'
+              : '₹${_couponAmount(_controller.pending!.input.toJson()['discount'] as int)} off'} · '
+              'minimum ₹${_couponAmount(_controller.pending!.input.toJson()['minimumSpendMinor'] as int)} · '
+              'maximum saving ₹${_couponAmount(_controller.pending!.input.toJson()['maximumSavingMinor'] as int)}'),
+            _couponValidityAndLimits(context, _controller.pending!.input),
+            OutlinedButton.icon(onPressed: _reconcile, icon: const Icon(Icons.refresh),
+              label: const Text('Check original coupon update')),
+            CheckboxListTile(value: _funding, contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading,
+              onChanged: (value) => setState(() => _funding = value == true),
+              title: const Text('I confirm Store funding and retrying only that original coupon update.')),
+            OutlinedButton(onPressed: _funding ? () async {
+              await _controller.retryOriginal(fundingAcknowledged: true);
+              if (_current) setState(() => _funding = false);
+            } : null, child: const Text('Retry exact original update')),
+          ] else ...[
+            Text(!loaded ? 'Current server version has not been checked.' : record == null
+              ? 'No saved server version. Your device draft is separate.'
+              : '${record.input.active ? 'Active' : 'Paused'} settings on service · revision ${record.revision}\n${record.input.name}'),
+            const SizedBox(height: 8),
+            const Text('Published terms do not guarantee eligibility or savings. Checkout must confirm the actual discount; configured usage limits are not remaining uses.'),
+            TextButton.icon(onPressed: _refresh, icon: const Icon(Icons.refresh), label: const Text('Check current coupon')),
+            if (loaded) ...[
+              CheckboxListTile(value: _funding, contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading,
+                onChanged: (value) => setState(() => _funding = value == true),
+                title: const Text('This Store funds the coupon savings. I confirm this update.')),
+              FilledButton.icon(onPressed: _funding ? () => _submit(pause: false) : null,
+                icon: const Icon(Icons.cloud_upload_outlined), label: Text(record == null ? 'Publish coupon terms' : 'Publish updated terms')),
+              if (record?.input.active == true) OutlinedButton.icon(onPressed: _funding ? () => _submit(pause: true) : null,
+                icon: const Icon(Icons.pause_circle_outline), label: const Text('Pause coupon')),
+            ],
+          ],
+          if (_controller.message != null) Padding(padding: const EdgeInsets.only(top: 12),
+            child: Text(_controller.message!, semanticsLabel: _controller.message)),
+        ])));
+  });
+}
+
+Widget _couponValidityAndLimits(BuildContext context, StoreCouponInput input) {
+  final terms = input.toJson(), dates = MaterialLocalizations.of(context);
+  final start = DateTime.parse(terms['startsAt'] as String).toLocal();
+  final end = DateTime.parse(terms['endsAt'] as String).toLocal();
+  String at(DateTime value) => '${dates.formatMediumDate(value)} ${dates.formatTimeOfDay(TimeOfDay.fromDateTime(value))}';
+  return Text('Valid ${at(start)} – ${at(end)}\nConfigured limits: ${terms['totalUses']} total uses · ${terms['usesPerCustomer']} per customer');
 }
 
 String _couponAmount(int minor) => (minor / 100).toStringAsFixed(minor % 100 == 0 ? 0 : 2);
@@ -277,8 +395,10 @@ class _StoreCouponEditorState extends State<_StoreCouponEditor> {
               const SizedBox(height: 12),
               _field('Uses per customer', 'work-coupon-customer-uses', _perCustomer, integer: true),
               const SizedBox(height: 14),
-              const Text('These are your configured limits, not actual usage. Your Store funds the coupon. Public activation and Checkout confirmation are not connected yet.',
-                style: TextStyle(fontSize: 12, color: Color(0xff566572), height: 1.4)),
+              Text(widget.session.workspaceStoreCoupons == null
+                ? 'These are your configured limits, not actual usage. Your Store funds the coupon. Public activation and Checkout confirmation are not connected yet.'
+                : 'These are your configured limits, not actual usage. Your Store funds the coupon. Saving keeps a private draft; manage publishing separately. Checkout must confirm savings.',
+                style: const TextStyle(fontSize: 12, color: Color(0xff566572), height: 1.4)),
               if (_error != null) Padding(padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Semantics(liveRegion: true, child: Text(_error!, style: const TextStyle(color: Color(0xff9c2737))))),
               const SizedBox(height: 12),
