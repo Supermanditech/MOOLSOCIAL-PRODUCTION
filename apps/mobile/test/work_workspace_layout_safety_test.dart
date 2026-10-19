@@ -17651,6 +17651,37 @@ void main() {
         FocusManager.instance.primaryFocus?.unfocus();
         await tester.pumpAndSettle();
       }
+      final mrpInput = find.byKey(const Key('work-receive-mrp-0'));
+      await tester.enterText(mrpInput, '125.');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final lotTitle = find.descendant(of: lot, matching: find.text('Batch & pack details · optional'));
+      await Scrollable.ensureVisible(tester.element(lotTitle), alignment: .4);
+      await tester.pumpAndSettle();
+      await tester.tap(lotTitle);
+      await tester.pumpAndSettle();
+      expect(find.text('Check batch & pack details'), findsOneWidget,
+        reason: 'Collapsing optional input must not conceal its invalid amount.');
+      await tester.tap(lotTitle);
+      await tester.pumpAndSettle();
+      await Scrollable.ensureVisible(tester.element(mrpInput), alignment: .4);
+      await tester.pumpAndSettle();
+      await tester.enterText(mrpInput, '125.50');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      expect(find.text('Check batch & pack details'), findsNothing);
+      final batchInput = find.byKey(const Key('work-receive-batch-0'));
+      await Scrollable.ensureVisible(tester.element(batchInput), alignment: .4);
+      await tester.pumpAndSettle();
+      await tester.enterText(batchInput, 'x' * 241);
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      expect(find.text('Use up to 240 characters without control characters'), findsOneWidget);
+      expect(find.text('Check batch & pack details'), findsOneWidget);
+      await tester.enterText(batchInput, 'HOST-RECOVERY-LOT');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      expect(find.text('Check batch & pack details'), findsNothing);
       final before = (await work.readLedgerForm(draftKey))!.fields;
       expect(before['arrivalId'], isNotEmpty);
       expect(before['groupId'], isNotEmpty);

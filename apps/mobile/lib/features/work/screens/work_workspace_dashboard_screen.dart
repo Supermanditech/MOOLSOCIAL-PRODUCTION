@@ -17461,6 +17461,14 @@ class _ReceivingLineInput {
   final TextEditingController unit, factor, expected, delivered, damaged, short;
   final TextEditingController batch, manufactured, expiry, mrp;
   List<TextEditingController> get lotControllers => [batch, manufactured, expiry, mrp];
+  String? printedLabelError(TextEditingController controller) {
+    final value = controller.text.trim();
+    return value.isEmpty || WorkspaceReceivingLotDetails(batch: value).valid ? null
+      : 'Use up to 240 characters without control characters';
+  }
+  String? get lotError => [batch, manufactured, expiry].any((c) => printedLabelError(c) != null) ||
+    (mrp.text.trim().isNotEmpty && workspacePriceMinorFromInput(mrp.text, maximumMinor: 9007199254740991) == null)
+      ? 'Check batch & pack details' : null;
   final Map<String, TextEditingController> prior;
   static String _quantity(int value) => (value / 1000).toStringAsFixed(3).replaceFirst(RegExp(r'\.?0+$'), '');
   static int? milli(String text) {
@@ -18124,12 +18132,14 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       ExpansionTile(key: ValueKey('work-receive-lot-$index'), tilePadding: EdgeInsets.zero,
         dense: true, initiallyExpanded: line.lotControllers.any((c) => c.text.isNotEmpty),
         title: const Text('Batch & pack details · optional', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        subtitle: const Text('Only for this delivery · not published', style: TextStyle(fontSize: 12)),
+        subtitle: Semantics(liveRegion: line.lotError != null,
+          child: Text(line.lotError ?? 'Only for this delivery · not published',
+            style: TextStyle(fontSize: 12, color: line.lotError == null ? null : Theme.of(context).colorScheme.error))),
         children: [
           const Text('Copy the pack label as printed, including month/year or best-before wording. Leave unknown details blank. For multiple batches, use a separate item line for each batch. These details do not change Stock cost.', style: TextStyle(fontSize: 12)),
-          _field('Batch / lot number', line.batch, 'work-receive-batch-$index', number: false),
-          _field('Manufactured · as printed', line.manufactured, 'work-receive-manufactured-$index', number: false),
-          _field('Expiry / best before / use by · as printed', line.expiry, 'work-receive-expiry-$index', number: false),
+          _field('Batch / lot number', line.batch, 'work-receive-batch-$index', number: false, errorText: line.printedLabelError(line.batch)),
+          _field('Manufactured · as printed', line.manufactured, 'work-receive-manufactured-$index', number: false, errorText: line.printedLabelError(line.manufactured)),
+          _field('Expiry / best before / use by · as printed', line.expiry, 'work-receive-expiry-$index', number: false, errorText: line.printedLabelError(line.expiry)),
           Text('Pack MRP is for one saved Stock unit: ${product?.pack ?? 'choose a product'}', style: const TextStyle(fontSize: 12)),
           _field('Pack MRP ₹', line.mrp, 'work-receive-mrp-$index',
             errorText: line.mrp.text.trim().isNotEmpty && workspacePriceMinorFromInput(line.mrp.text, maximumMinor: 9007199254740991) == null ? 'Enter an amount with up to 2 decimal places' : null),
