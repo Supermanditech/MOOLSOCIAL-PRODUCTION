@@ -957,6 +957,20 @@ class ListingAccount implements WorkPendingProofStore {
   @override
   Future<void> clear(String scope) async {}
 }
+// Host-only owner changes/held reads; never injected into the phone.
+class _HeldWorkspaceAccount extends ListingAccount {
+  final holds = <String, Completer<Map<String, Object?>?>>{};
+  final entered = <String, Completer<void>>{}, failing = <String>{};
+  final reads = <String>[], clears = <String>[];
+  final restored = <String, Map<String, Object?>>{};
+  @override Future<Map<String, Object?>?> read(String scope) async {
+    reads.add(scope);
+    final signal = entered[scope]; if (signal != null && !signal.isCompleted) signal.complete();
+    if (failing.contains(scope)) throw StateError('Host failed owner recovery read');
+    return holds[scope]?.future ?? restored[scope];
+  }
+  @override Future<void> clear(String scope) async {clears.add(scope);}
+}
 
 class SessionCatalogue extends ListingGateway
     implements WorkspaceCatalogueGateway {
@@ -1088,6 +1102,169 @@ Future<void> openListingEditor(WidgetTester tester, WorkSession work, {Size size
 }
 
 void main() {
+  testWidgets('H22-OWNER unknown storage owner hides Store until its first read settles', (tester) async {
+    final account = _HeldWorkspaceAccount(), held = Completer<Map<String, Object?>?>();
+    account.holds['owner-one'] = held;
+    final work = WorkSession(contactDraftStore: account)
+      ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Private initial Store', profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Jaipur', verified: true)
+      ..workspaceId = 'store-one' ..retailerSetupSaved = true ..reviewStage = WorkReviewStage.live;
+    work.workspaceCatalogueItems.add(listingItem());
+    final core = BuySession(), buyer = BuyV2Session(core: core, reviewDataEnabled: false);
+    addTearDown(() {if (!held.isCompleted) held.complete(null);});
+    addTearDown(work.dispose); addTearDown(core.dispose); addTearDown(buyer.dispose);
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: WorkWorkspaceDashboardScreen(
+      session: work, procurementSession: buyer, accountAuthenticated: true, initialSection: 'stock')));
+    await tester.pump();
+    expect(find.textContaining('Private initial Store'), findsNothing);
+    expect(find.byKey(const Key('work-account-recovery')), findsOneWidget);
+    expect(find.byKey(const Key('work-local-navigation')), findsNothing);
+    expect(find.byKey(const Key('work-global-chat')), findsNothing);
+    expect(account.reads, ['owner-one']);
+    held.complete(null); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-catalogue-edit-sku-one')), findsOneWidget, reason: 'Retain the initial Stock operation after same-owner binding.');
+    expect(work.hasVerifiedWorkspace, isTrue, reason: 'The trusted same-owner Store is not approval from the draft.');
+    expect(tester.takeException(), isNull);
+  });
+  for (final proofOnly in [false, true]) {
+    testWidgets('H22-OWNER explicit review or proof-only initialization cannot strand a pending surface proof=$proofOnly', (tester) async {
+      final proof = _HeldWorkspaceAccount();
+      final work = WorkSession(pendingProofStore: proofOnly ? proof : null)
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Trusted review Store', profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Jaipur', verified: true)
+        ..workspaceId = 'store-one' ..retailerSetupSaved = true ..reviewStage = WorkReviewStage.live;
+      work.workspaceCatalogueItems.add(listingItem());
+      final core = BuySession(), buyer = BuyV2Session(core: core, reviewDataEnabled: false);
+      addTearDown(work.dispose); addTearDown(core.dispose); addTearDown(buyer.dispose);
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: WorkWorkspaceDashboardScreen(
+        session: work, procurementSession: buyer, initialSection: 'stock', accountAuthenticated: proofOnly)));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-account-recovery')), findsNothing);
+      expect(find.byKey(const Key('work-catalogue-edit-sku-one')), findsOneWidget);
+      expect(proof.reads, isEmpty, reason: 'Only the root may restore/consume the pending document.');
+      expect(proof.clears, isEmpty); expect(tester.takeException(), isNull);
+    });
+  }
+  for (final initiallyStale in [false, true]) {
+  testWidgets('H22-OWNER account change hides old Store during held recovery and A B A initial=$initiallyStale', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final account = _HeldWorkspaceAccount(), inventory = SecureWorkInventoryStore(accountScope: () => account.owner);
+    final work = WorkSession(contactDraftStore: account, inventoryStore: inventory);
+    await work.recoverPendingProof(accountReady: true);
+    work.activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Private owner A Store', profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Jaipur', verified: true);
+    work.workspaceId = 'store-one'; work.retailerSetupSaved = true; work.reviewStage = WorkReviewStage.live;
+    work.workspaceCatalogueItems.add(listingItem());
+    expect(await work.loadWorkspaceInventory(), isTrue); expect(await work.retryWorkspaceInventorySave(), isTrue);
+    // Independent host verification remains bound to A; it is not the B UI/storage adapter.
+    final ownerAVerifier = SecureWorkInventoryStore(accountScope: () => 'owner-one');
+    final original = (await ownerAVerifier.read('owner-one', 'store-one', qa: true))!.toJson();
+    final core = BuySession(), buyer = BuyV2Session(core: core, reviewDataEnabled: false);
+    addTearDown(work.dispose); addTearDown(core.dispose); addTearDown(buyer.dispose);
+    final heldB = Completer<Map<String, Object?>?>(), heldA = Completer<Map<String, Object?>?>();
+    addTearDown(() {if (!heldB.isCompleted) heldB.complete(null); if (!heldA.isCompleted) heldA.complete(null);});
+    if (initiallyStale) {account.holds['owner-two'] = heldB; account.owner = 'owner-two';}
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: WorkWorkspaceDashboardScreen(
+      session: work, procurementSession: buyer, accountAuthenticated: true)));
+    if (!initiallyStale) {
+      await tester.pumpAndSettle(); expect(find.textContaining('Private owner A Store'), findsWidgets);
+      account.holds['owner-two'] = heldB; account.owner = 'owner-two'; work.dismissMessages();
+    }
+    await tester.pump();
+    expect(work.activeWorkspace, isNull);
+    expect(find.textContaining('Private owner A Store'), findsNothing);
+    expect(find.byKey(const Key('work-account-recovery')), findsOneWidget);
+    expect(find.text('No approved Workspace yet'), findsNothing, reason: 'A held read has not established absence.');
+    expect(account.reads.where((scope) => scope == 'owner-two'), hasLength(1));
+    account.holds['owner-one'] = heldA; account.owner = 'owner-one';
+    work.dismissMessages(); await tester.pump();
+    heldB.complete({'version': 1, 'savedAt': DateTime.now().toUtc().toIso8601String(), 'name': 'Obsolete B details'});
+    await tester.pump(); await tester.pump(const Duration(milliseconds: 20));
+    expect(work.activeWorkspace, isNull); expect(work.workName, isNot('Obsolete B details'));
+    expect(find.byKey(const Key('work-account-recovery')), findsOneWidget, reason: 'An old completion cannot release A recovery.');
+    heldA.complete({'version': 1, 'savedAt': DateTime.now().toUtc().toIso8601String(), 'name': 'Current A details',
+      'approved': true, 'workspaceId': 'store-one'});
+    await tester.pumpAndSettle();
+    expect(work.workName, 'Current A details'); expect(work.activeWorkspace, isNull, reason: 'Local draft approval fields are not Store authority.');
+    expect(find.text('No approved Workspace yet'), findsOneWidget);
+    expect((await ownerAVerifier.read('owner-one', 'store-one', qa: true))!.toJson(), original);
+    expect(account.clears, isEmpty); expect(tester.takeException(), isNull);
+  });
+  }
+  testWidgets('H22-OWNER failed recovery stays unavailable and stale retry cannot replace current edits', (tester) async {
+    final account = _HeldWorkspaceAccount(), work = WorkSession(contactDraftStore: account);
+    await work.recoverPendingProof(accountReady: true);
+    work.activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Private owner A Store', profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Jaipur', verified: true);
+    work.workspaceId = 'store-one'; work.retailerSetupSaved = true; work.reviewStage = WorkReviewStage.live;
+    final core = BuySession(), buyer = BuyV2Session(core: core, reviewDataEnabled: false);
+    addTearDown(work.dispose); addTearDown(core.dispose); addTearDown(buyer.dispose);
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: WorkWorkspaceDashboardScreen(
+      session: work, procurementSession: buyer, accountAuthenticated: true)));
+    await tester.pumpAndSettle();
+    account.owner = 'owner-two'; account.failing.add('owner-two'); work.dismissMessages();
+    await tester.pumpAndSettle();
+    expect(work.activeWorkspace, isNull); expect(find.textContaining('Private owner A Store'), findsNothing);
+    expect(find.byKey(const Key('work-account-recovery-error')), findsOneWidget); expect(find.text('No approved Workspace yet'), findsNothing);
+    final retry = find.byKey(const Key('work-account-recovery-error-action'));
+    final obsoleteRetry = tester.widget<OutlinedButton>(retry).onPressed!;
+    final held = Completer<Map<String, Object?>?>(); addTearDown(() {if (!held.isCompleted) held.complete(null);});
+    account.failing.clear(); account.holds['owner-two'] = held;
+    await tester.tap(retry); await tester.pump(); expect(find.byKey(const Key('work-account-recovery')), findsOneWidget);
+    obsoleteRetry(); await tester.pump(); expect(account.reads.where((scope) => scope == 'owner-two'), hasLength(2));
+    work.saveBusinessRelationship('Current B input');
+    held.complete({'version': 1, 'savedAt': DateTime.now().toUtc().toIso8601String(), 'name': 'Older B read'});
+    await tester.pumpAndSettle();
+    expect(work.workspaceAccountRecoveryPending, isFalse); expect(work.businessRelationship, 'Current B input');
+    expect(work.workName, isNot('Older B read')); expect(work.activeWorkspace, isNull);
+    expect(find.text('No approved Workspace yet'), findsOneWidget); expect(tester.takeException(), isNull);
+  });
+  Map<String, Object?> pendingOwnerProof() => {'version': 1, 'savedAt': DateTime.now().toUtc().toIso8601String(),
+    'profileId': 'retailer-grocery', 'source': 'camera', 'proofId': 'host-unselected-proof', 'name': 'Original A pending details'};
+  test('H22-OWNER old root held contact read cannot claim a newer A B A proof generation', () async {
+    final contact = _HeldWorkspaceAccount(), proof = _HeldWorkspaceAccount();
+    final work = WorkSession(contactDraftStore: contact, pendingProofStore: proof);
+    final first = Completer<Map<String, Object?>?>(), current = Completer<Map<String, Object?>?>();
+    final enteredFirst = Completer<void>(), enteredCurrent = Completer<void>();
+    addTearDown(() {if (!first.isCompleted) first.complete(null); if (!current.isCompleted) current.complete(null);});
+    addTearDown(work.dispose);
+    contact.holds['owner-one'] = first; contact.entered['owner-one'] = enteredFirst;
+    final oldRoot = work.recoverPendingProof(accountReady: true); await enteredFirst.future;
+    contact.owner = proof.owner = 'owner-two'; await work.recoverWorkspaceAccount(accountReady: true);
+    contact.holds['owner-one'] = current; contact.entered['owner-one'] = enteredCurrent;
+    contact.owner = proof.owner = 'owner-one'; proof.restored['owner-one'] = pendingOwnerProof();
+    final currentRoot = work.recoverPendingProof(accountReady: true); await enteredCurrent.future;
+    first.complete(null);
+    expect(await oldRoot, isFalse);
+    expect(proof.reads, isEmpty); expect(proof.clears, isEmpty); expect(work.selectedProfile, isNull);
+    current.complete(null); expect(await currentRoot, isTrue);
+    expect(proof.reads, ['owner-one']); expect(proof.clears, ['owner-one']);
+    expect(await work.recoverPendingProof(accountReady: true), isFalse);
+  });
+  test('H22-OWNER proof-only storage ownership detaches old Store without consuming the pending route', () async {
+    final proof = _HeldWorkspaceAccount(), work = WorkSession(pendingProofStore: proof);
+    addTearDown(work.dispose);
+    await work.recoverPendingProof(accountReady: true);
+    work.activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Private A', profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Jaipur', verified: true);
+    final before = proof.reads.length; proof.owner = 'owner-two'; proof.restored['owner-two'] = pendingOwnerProof();
+    expect(await work.recoverWorkspaceAccount(accountReady: true), isTrue);
+    expect(work.activeWorkspace, isNull); expect(proof.reads, hasLength(before)); expect(proof.clears, isEmpty);
+    expect(await work.recoverPendingProof(accountReady: true), isTrue);
+    expect(work.hasVerifiedWorkspace, isFalse); expect(work.selectedProfile!.id, 'retailer-grocery'); expect(proof.clears, ['owner-two']);
+    expect(await work.recoverPendingProof(accountReady: true), isFalse); expect(proof.clears, ['owner-two']);
+  });
+  test('H22-OWNER old proof completion after A B A cannot restore or consume original checkpoint', () async {
+    final contact = _HeldWorkspaceAccount(), proof = _HeldWorkspaceAccount(), work = WorkSession(contactDraftStore: contact, pendingProofStore: proof);
+    addTearDown(work.dispose);
+    final held = Completer<Map<String, Object?>?>(), entered = Completer<void>();
+    addTearDown(() {if (!held.isCompleted) held.complete(null);});
+    proof.holds['owner-one'] = held; proof.entered['owner-one'] = entered;
+    final original = work.recoverPendingProof(accountReady: true); await entered.future;
+    contact.owner = proof.owner = 'owner-two'; await work.recoverWorkspaceAccount(accountReady: true);
+    contact.owner = proof.owner = 'owner-one'; await work.recoverWorkspaceAccount(accountReady: true);
+    expect(proof.reads, ['owner-one']); expect(proof.clears, isEmpty);
+    held.complete(pendingOwnerProof()); expect(await original, isFalse);
+    expect(work.selectedProfile, isNull); expect(work.workName, isEmpty); expect(work.recoveredDocumentStep, isFalse); expect(proof.clears, isEmpty);
+    expect(await work.recoverPendingProof(accountReady: true), isTrue);
+    expect(work.workName, 'Original A pending details'); expect(work.hasVerifiedWorkspace, isFalse); expect(proof.clears, ['owner-one']);
+    expect(await work.recoverPendingProof(accountReady: true), isFalse); expect(proof.reads, ['owner-one', 'owner-one']);
+  });
   test('LF03-UPLOAD matching private media capability is explicit and disabled by default', () {
     final source = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
       credentials: Credentials(), transport: Transport({}));

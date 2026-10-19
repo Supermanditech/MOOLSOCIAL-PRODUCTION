@@ -4599,6 +4599,23 @@ class WorkSession extends ChangeNotifier {
   String? _contactDraftScope;
   bool _contactDraftScopeKnown = false;
   Future<void>? _contactDraftRecovery;
+  bool _contactDraftRecoveryBusy = false, _contactDraftRecoveryFailed = false;
+  bool workspaceAccountCurrent({required bool accountReady}) => !_disposed &&
+    ((contactDraftStore == null && pendingProofStore == null) ||
+      (_contactDraftScopeKnown && _contactDraftScope == (accountReady ? _contactAccountScope : null)));
+  bool get workspaceAccountRecoveryPending => _contactDraftRecoveryBusy;
+  bool get workspaceAccountRecoveryFailed => _contactDraftRecoveryFailed;
+  Object get workspaceAccountRecoveryContext => (source: this, owner: _contactAccountScope, revision: _contactDraftRevision);
+  /// Reconcile account ownership without consuming the root-owned proof route.
+  Future<bool> recoverWorkspaceAccount({required bool accountReady, bool retry = false}) async {
+    if (_disposed) return false;
+    if (retry && workspaceAccountCurrent(accountReady: accountReady) && !_contactDraftRecoveryBusy && _contactDraftRecoveryFailed) {
+      _contactDraftRevision++;
+      _contactDraftRecovery = null;
+    }
+    await _recoverContactDraft(accountReady);
+    return workspaceAccountCurrent(accountReady: accountReady) && !_contactDraftRecoveryFailed;
+  }
   Future<void>? _contactDraftWrite;
   ({String scope, Map<String, Object?> draft})? _queuedContactDraft;
   int _contactDraftRevision = 0;
@@ -13927,10 +13944,12 @@ class WorkSession extends ChangeNotifier {
 
   Future<void> _recoverContactDraft(bool accountReady) async {
     final store = contactDraftStore;
-    if (store == null) return;
-    final scope = accountReady ? store.accountScope : null;
+    if (_disposed || store == null && pendingProofStore == null) return;
+    final scope = accountReady ? _contactAccountScope : null;
     if (!_contactDraftScopeKnown || scope != _contactDraftScope) {
+      if (pendingProofStore != null) _synchronizePendingProofOwner(scope);
       if (_contactDraftScopeKnown) {
+        clearMessages();
         _workspaceApplications.clear();
         _workspaceApplicationId = null;
         reviewStatusNeedsRefresh = false;
@@ -13977,11 +13996,26 @@ class WorkSession extends ChangeNotifier {
       _contactDraftRevision++;
       _queuedContactDraft = null;
       _contactDraftRecovery = null;
+      _contactDraftRecoveryBusy = false;
+      _contactDraftRecoveryFailed = false;
       contactDraftMessage = null;
     }
-    if (scope == null) return;
+    if (scope == null || store == null) return;
     final revision = _contactDraftRevision;
-    _contactDraftRecovery ??= _readContactDraft(store, scope, revision);
+    if (_contactDraftRecovery == null) {
+      _contactDraftRecoveryBusy = true;
+      _contactDraftRecoveryFailed = false;
+      late final Future<void> owned;
+      owned = _readContactDraft(store, scope, revision).whenComplete(() {
+        // Future identity is the recovery generation: an edit may invalidate
+        // its payload, but only the current read may release its busy state.
+        if (!_disposed && identical(_contactDraftRecovery, owned) && _contactDraftScope == scope && _contactAccountScope == scope) {
+          _contactDraftRecoveryBusy = false;
+          notifyListeners();
+        }
+      });
+      _contactDraftRecovery = owned;
+    }
     await _contactDraftRecovery;
   }
 
@@ -14092,6 +14126,7 @@ class WorkSession extends ChangeNotifier {
       }
     } on Object {
       if (current()) {
+        _contactDraftRecoveryFailed = true;
         contactDraftMessage =
             'Saved details could not be restored. Please enter your details to continue.';
       }
@@ -14562,12 +14597,28 @@ class WorkSession extends ChangeNotifier {
   /// Resumes only the document operation owned by the currently signed-in
   /// account. This does not restore sign-in, OTP secrets or approval authority.
   Future<bool> recoverPendingProof({required bool accountReady}) async {
+    if (_disposed) return false;
+    // Owner synchronization starts synchronously. Pin this invocation before
+    // waiting: an A -> B -> A return is a new operation, not the original A.
+    final contactRecovery = _recoverContactDraft(accountReady);
     final store = pendingProofStore;
-    if (store == null) {
-      await _recoverContactDraft(accountReady);
-      return false;
-    }
-    final scope = accountReady ? store.accountScope : null;
+    final scope = accountReady ? _contactAccountScope : null;
+    if (store != null) _synchronizePendingProofOwner(scope);
+    final generation = _pendingProofGeneration;
+    bool current() => !_disposed && generation == _pendingProofGeneration &&
+      scope == _pendingProofScope && scope == (accountReady ? _contactAccountScope : null) &&
+      (store == null || scope == store.accountScope);
+    await contactRecovery;
+    if (!current() || store == null || scope == null) return false;
+    _pendingProofRecovery ??= _restorePendingDocument(store, scope, generation);
+    await _pendingProofRecovery;
+    if (!current()) return false;
+    final redirect = _pendingProofRoute;
+    _pendingProofRoute = false;
+    return redirect;
+  }
+
+  void _synchronizePendingProofOwner(String? scope) {
     if (_pendingProofScope != scope) {
       if (_pendingProofScope != null) {
         _workspaceApplications.clear();
@@ -14595,20 +14646,6 @@ class WorkSession extends ChangeNotifier {
         _hasRecoveredDraft = false;
       }
     }
-    await _recoverContactDraft(accountReady);
-    if (scope == null) return false;
-    final generation = _pendingProofGeneration;
-    _pendingProofRecovery ??= _restorePendingDocument(store, scope, generation);
-    await _pendingProofRecovery;
-    if (_disposed ||
-        generation != _pendingProofGeneration ||
-        scope != store.accountScope ||
-        scope != _pendingProofScope) {
-      return false;
-    }
-    final redirect = _pendingProofRoute;
-    _pendingProofRoute = false;
-    return redirect;
   }
 
   Future<void> _restorePendingDocument(
@@ -14620,7 +14657,7 @@ class WorkSession extends ChangeNotifier {
         !_disposed &&
         generation == _pendingProofGeneration &&
         scope == store.accountScope &&
-        scope == _pendingProofScope;
+        scope == _pendingProofScope && scope == _contactAccountScope;
     try {
       final draft = await store.read(scope);
       if (draft == null || !current()) return;

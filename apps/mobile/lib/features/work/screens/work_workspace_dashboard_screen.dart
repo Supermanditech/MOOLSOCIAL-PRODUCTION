@@ -669,6 +669,21 @@ class _WorkWorkspaceDashboardScreenState
       widget.accountAuthenticated == visit.authenticated;
 
   void _searchScopeChanged() {
+    if (!session.workspaceAccountCurrent(accountReady: widget.accountAuthenticated)) {
+      // Storage identity drift is not permission to keep showing the former
+      // Store. Detach through its existing recovery owner, not a second reset.
+      _retainedSavedSearch = null;
+      _focusedOrderId = _focusedCustomerId = null;
+      _salesVisitEpoch++;
+      _salesTask = null; _salesTaskScope = null;
+      final previousWorkspace = session.activeWorkspace;
+      _recoverDashboardAccount();
+      // Initial owner binding may retain a trusted same-owner Store. Keep its
+      // requested operation; a real owner transition detaches it synchronously.
+      if (!identical(session.activeWorkspace, previousWorkspace)) {
+        _view = _WorkspaceControlView.dashboard;
+      }
+    }
     final visit = _savedSearchVisit;
     if (visit == null || _searchScopeCurrent(visit)) return;
     _savedSearchVisit = null;
@@ -680,6 +695,22 @@ class _WorkWorkspaceDashboardScreenState
     // Reconcile only this obsolete local surface. Never clear the replacement
     // account/Store's session query from an old visit's notification/callback.
     if (_view == _WorkspaceControlView.search) _view = _WorkspaceControlView.dashboard;
+  }
+  void _recoverDashboardAccount({bool retry = false}) {
+    final source = session, authenticated = widget.accountAuthenticated;
+    final pending = source.recoverWorkspaceAccount(accountReady: authenticated, retry: retry);
+    final owner = source.workspaceAccountRecoveryContext;
+    if (retry && mounted) setState(() {});
+    unawaited(pending.then((restored) {
+      if (!restored || !mounted || !identical(session, source) || widget.accountAuthenticated != authenticated ||
+          source.workspaceAccountRecoveryContext != owner) {
+        return;
+      }
+      // The root retains document restoration/redirect ownership. This local
+      // account reconciliation never consumes a pending proof operation.
+      setState(() {});
+      GoRouter.maybeOf(context)?.refresh();
+    }));
   }
   final ScrollController _alertsScroll = ScrollController();
   final ScrollController _settingsScroll = ScrollController();
@@ -778,6 +809,7 @@ class _WorkWorkspaceDashboardScreenState
       text: session.workspaceSearchQuery,
     );
     session.addListener(_searchScopeChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {if (mounted) _searchScopeChanged();});
     _storeProcurement?.addListener(_observeProcurementQuery);
     _observeProcurementQuery();
     final section = switch (widget.initialSection) {
@@ -868,6 +900,24 @@ class _WorkWorkspaceDashboardScreenState
     return AnimatedBuilder(
       animation: session,
       builder: (context, _) {
+        final pending = !session.workspaceAccountCurrent(accountReady: widget.accountAuthenticated) || session.workspaceAccountRecoveryPending;
+        if (pending || session.workspaceAccountRecoveryFailed) {
+          final owner = session.workspaceAccountRecoveryContext, authenticated = widget.accountAuthenticated;
+          return WorkPageScaffold(session: session, title: 'Your Workspace', subtitle: 'Account access',
+            fallbackBackRoute: '/app/work/earn', activeLocalAction: 'workspace', showHeaderChat: false, showTrailingAction: false,
+            showBottomNavigation: false, showMessageBanner: false,
+            body: pending ? const Center(child: SingleChildScrollView(child: Padding(padding: EdgeInsets.all(24),
+              child: Column(key: Key('work-account-recovery'), mainAxisSize: MainAxisSize.min, children: [
+                CircularProgressIndicator(semanticsLabel: 'Restoring your Workspace'), SizedBox(height: 16),
+                Text('Restoring your Workspace…', textAlign: TextAlign.center),
+              ])))) : WorkEmptyState(keyName: 'work-account-recovery-error', title: 'Workspace access unavailable',
+              detail: 'Saved details could not be restored. Your saved Store data is kept.', actionLabel: 'Try again',
+              onAction: () {
+                if (mounted && session.workspaceAccountRecoveryContext == owner && widget.accountAuthenticated == authenticated) {
+                  _recoverDashboardAccount(retry: true);
+                }
+              }));
+        }
         final workspace = session.activeWorkspace;
         final profile = workspace == null
             ? null

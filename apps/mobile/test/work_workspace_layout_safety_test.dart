@@ -50522,7 +50522,7 @@ void main() {
   }
 
   testWidgets(
-    'H22 same Store account change after Back does not restore old query',
+    'H22 account change after Back detaches old Store and cannot restore its query',
     (tester) async {
       final account = _ContactDraftFixtureStore();
       final work = storeViewFixture(null, account);
@@ -50534,19 +50534,14 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(work.workspaceSearchQuery, 'fortune');
-      final storeId = work.activeWorkspace!.id;
       account.accountScope = 'other-labelled-host-account';
       work.dismissMessages();
       await tester.pumpAndSettle();
-      expect(work.activeWorkspace!.id, storeId);
-      // The notification cannot write into the replacement scope. Explicit new
-      // search entry clears only the known shared-session leftover from old scope.
-      expect(work.workspaceSearchQuery, 'fortune');
-      await openSavedStoreRecordSearch(tester);
+      expect(work.activeWorkspace, isNull);
+      expect(find.text('No approved Workspace yet'), findsOneWidget);
+      // A different account has not acquired Store authority or the old
+      // Store's saved query. Do not manufacture a new search visit.
       expect(work.workspaceSearchQuery, isEmpty);
-      expect(tester.widget<TextField>(field).controller!.text, isEmpty);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
       expect(field, findsNothing);
       expect(tester.takeException(), isNull);
     },
