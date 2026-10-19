@@ -260,6 +260,27 @@ class _T07TimedCoupon extends BuyV2SeededCartBenefitsAdapter {
       : const [];
 }
 
+// Explicit local test quote for the existing five-rupee preflight fixture.
+class _T04LiveCouponQuote extends TestPaymentQuote {
+  @override
+  Future<BuyV2CheckoutQuoteSnapshot> loadQuote({required List<BuyV2FulfilmentGroup> groups,
+    required BuyV2Address address, required String selectedPaymentMethod,
+    required List<BuyV2CartBenefit> selectedBenefits, required Map<String, int> tipAmountsByFulfilmentKey}) async {
+    final base = (await super.loadQuote(groups: groups, address: address, selectedPaymentMethod: selectedPaymentMethod,
+      selectedBenefits: selectedBenefits, tipAmountsByFulfilmentKey: tipAmountsByFulfilmentKey)).quote!;
+    final coupons = selectedBenefits.where((b) => b.kind == BuyV2CartBenefitKind.coupon).toList();
+    if (coupons.isEmpty) return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready, quote: base);
+    expect(coupons, hasLength(1)); expect(coupons.single.savingAmount, 5);
+    final line = base.lines.single;
+    return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready,
+      quote: BuyV2CheckoutQuote(id: base.id, sourceId: base.sourceId, evaluatedAt: base.evaluatedAt,
+        validUntil: base.validUntil, total: base.total - 5, lines: [BuyV2CheckoutQuoteLine(
+          fulfilmentKey: line.fulfilmentKey, itemSubtotal: line.itemSubtotal, couponSaving: 5,
+          tax: line.tax, freight: line.freight, deliveryFee: line.deliveryFee,
+          tip: line.tip, paymentCharge: line.paymentCharge, total: line.total - 5)]));
+  }
+}
+
 class _T04LiveBenefits extends _T04CartBenefits
     implements BuyV2LiveCartBenefitsAdapter {
   Completer<BuyV2CartBenefitsSnapshot>? gate;
@@ -5489,6 +5510,7 @@ void main() {
       commerceAdapter: adapter,
       productFactsAdapter: _T01CDeliveryFactsAdapter(),
       cartBenefitsAdapter: benefits,
+      checkoutQuoteAdapter: _T04LiveCouponQuote(),
     );
     addTearDown(session.dispose);
     addTearDown(core.dispose);

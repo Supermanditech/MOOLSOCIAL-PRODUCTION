@@ -1,4 +1,8 @@
+import 'dart:async';
 import 'buy_v2_qualified_provider_fixture.dart';
+import 'package:flutter/material.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'buy_v2_session_test.dart' show prepaidCommerceFixture;
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -41,6 +45,150 @@ class QualificationDeliveryFacts implements BuyV2ProductFactsAdapter {
 }
 
 void main() {
+  const liveQuoteCoupon = BuyV2CartBenefit(id: 'host-live-coupon', kind: BuyV2CartBenefitKind.coupon,
+    destination: BuyV2Destination.shop, title: 'Host coupon', detail: 'Isolated eligibility result',
+    sourceId: 'host-live-source', savingAmount: 10);
+  Future<BuyV2Session> liveQuoteSession({bool live = true, bool selected = true,
+      BuyV2CheckoutQuoteAdapter? quote, BuyV2CommercialPaymentTermsAdapter? terms}) async {
+    final core = BuySession();
+    final session = BuyV2Session(core: core, checkoutQuoteAdapter: quote, commercialPaymentTermsAdapter: terms,
+      cartBenefitsAdapter: live ? _LiveBenefitsAdapter(BuyV2CartBenefitsSnapshot(
+        state: BuyV2CartBenefitsLoadState.ready, evaluatedAt: DateTime.now(), benefits: const [liveQuoteCoupon]))
+        : const _Batch01LocalBenefits([liveQuoteCoupon]),
+      productFactsAdapter: const QualificationDeliveryFacts(), commerceAdapter: prepaidCommerceFixture());
+    addTearDown(session.dispose); addTearDown(core.dispose);
+    expect(session.addProduct('s-tomato'), isTrue);
+    if (live) expect(await session.refreshCartBenefits(), isTrue);
+    if (selected) expect(session.chooseCartBenefit(liveQuoteCoupon), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop); expect(session.openCheckout(), isTrue);
+    return session;
+  }
+  test('LF08 LIVE-COUPON missing quote does not dispatch payment terms', () async {
+    final terms = _LiveCouponTerms(), session = await liveQuoteSession(terms: terms);
+    terms.calls = 0;
+    expect(await session.refreshCommercialPaymentTerms(), isFalse);
+    expect(terms.calls, 0);
+    expect(session.commercialPaymentTermsLoadState, BuyV2CommerceLoadState.unavailable);
+    expect(session.commercialPaymentTermsMessage, contains('total'));
+  });
+  test('LF08 LIVE-COUPON selection retires delayed earlier payment terms', () async {
+    final terms = _LiveCouponTerms(), session = await liveQuoteSession(selected: false, terms: terms);
+    terms.calls = 0; terms.gate = Completer<BuyV2CommercialPaymentTermsSnapshot>();
+    final pending = session.refreshCommercialPaymentTerms();
+    expect(terms.calls, 1);
+    expect(session.chooseCartBenefit(liveQuoteCoupon), isTrue);
+    terms.gate!.complete(const BuyV2CommercialPaymentTermsSnapshot(state: BuyV2CommerceLoadState.ready));
+    expect(await pending, isFalse);
+    expect(terms.calls, 1);
+    expect(session.commercialPaymentTermsLoadState, BuyV2CommerceLoadState.unavailable);
+    expect(session.checkoutQuoteReviewRequired, isTrue);
+  });
+  test('LF08 LIVE-COUPON informational payment offer alone needs no coupon quote', () async {
+    const info = BuyV2CartBenefit(id: 'host-information', kind: BuyV2CartBenefitKind.paymentOffer,
+      destination: BuyV2Destination.shop, title: 'Host bank information', detail: 'No payable saving',
+      sourceId: 'host-bank-source', strategy: BuyV2CartBenefitStrategy.financialProduct,
+      sponsor: BuyV2CartBenefitSponsor.bank, savingAmount: 0);
+    final core = BuySession(), session = BuyV2Session(core: core,
+      productFactsAdapter: const QualificationDeliveryFacts(), cartBenefitsAdapter: _LiveBenefitsAdapter(
+        BuyV2CartBenefitsSnapshot(state: BuyV2CartBenefitsLoadState.ready, evaluatedAt: DateTime.now(), benefits: const [info])));
+    addTearDown(session.dispose); addTearDown(core.dispose);
+    expect(session.addProduct('s-tomato'), isTrue); expect(await session.refreshCartBenefits(), isTrue);
+    expect(session.chooseCartBenefit(info), isTrue); session.openCart(); expect(session.openCheckout(), isTrue);
+    expect(session.checkoutQuoteRequired, isFalse); expect(session.checkoutQuoteReviewRequired, isFalse);
+    expect(await session.refreshCheckoutQuote(), isTrue); expect(session.checkoutCouponSaving, 0);
+  });
+  test('LF08 LIVE-COUPON another destination coupon cannot hold this Checkout', () async {
+    final session = await liveQuoteSession();
+    expect(session.addProduct('w-notebook'), isTrue);
+    session.openCart(scope: BuyV2CartScope.all); expect(await session.refreshCartBenefits(), isTrue);
+    expect(session.chooseCartBenefit(liveQuoteCoupon), isTrue);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    session.selectCartProduct('s-tomato', false);
+    expect(session.openCheckout(), isTrue);
+    expect(session.checkoutDestinations, {BuyV2Destination.wholesale});
+    expect(session.checkoutQuoteRequired, isFalse); expect(session.checkoutQuoteReviewRequired, isFalse);
+    expect(await session.refreshCheckoutQuote(), isTrue);
+  });
+  for (final state in ['unselected', 'removed', 'static', 'current', 'expired', 'unavailable', 'eligibility lost']) {
+    test('LF08 LIVE-COUPON quote boundary handles $state', () async {
+      final quoted = const {'current', 'expired', 'unavailable'}.contains(state);
+      final quote = quoted ? _LiveCouponQuote(expired: state == 'expired', unavailable: state == 'unavailable') : null;
+      final session = await liveQuoteSession(live: state != 'static', selected: state != 'unselected', quote: quote);
+      if (state == 'removed') {
+        session.removeCartBenefit(kind: BuyV2CartBenefitKind.coupon, destination: BuyV2Destination.shop);
+        expect(session.checkoutQuoteMessage, isNull);
+      }
+      if (state == 'eligibility lost') {
+        final source = session.cartBenefitsAdapter as _LiveBenefitsAdapter;
+        source.snapshot = BuyV2CartBenefitsSnapshot(state: BuyV2CartBenefitsLoadState.unavailable, evaluatedAt: DateTime.now());
+        expect(await session.refreshCartBenefits(), isFalse);
+      }
+      final held = const {'expired', 'unavailable', 'eligibility lost'}.contains(state);
+      expect(await session.refreshCheckoutQuote(), !held);
+      expect(session.checkoutQuoteReviewRequired, held);
+      if (state == 'current') {
+        expect(session.checkoutQuote!.lines.single.couponSaving, 10);
+        expect(session.checkoutPayableTotal, session.checkoutTotal - 10);
+      }
+      expect(session.cartLines, hasLength(1)); expect(session.confirmedOrders, isEmpty);
+      expect(session.checkoutPaymentAttempt, isNull); expect(session.legacyCheckoutAttempt, isNull);
+    });
+  }
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF08 LIVE-COUPON missing quote is explained without Retry at $scale', (tester) async {
+      tester.view.physicalSize = const Size(320, 568); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      final session = await liveQuoteSession();
+      session.checkoutStep = BuyV2CheckoutStep.confirm;
+      final invoice = BuyV2GstInvoiceController(); addTearDown(invoice.dispose);
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+        builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+        home: Scaffold(body: BuyV2CheckoutView(session: session, gstInvoiceController: invoice))));
+      await tester.pumpAndSettle();
+      final card = find.byKey(const ValueKey('buy-checkout-quote-unavailable'));
+      await tester.scrollUntilVisible(card, 200, scrollable: find.byType(Scrollable).first);
+      expect(find.descendant(of: card, matching: find.text('Coupon total not confirmed')), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-checkout-quote-retry')), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+  for (final action in ['readiness', 'refresh', 'direct confirmation', 'submit']) {
+    test('LF08 LIVE-COUPON missing quote holds $action without losing the Cart', () async {
+      const coupon = BuyV2CartBenefit(id: 'host-live-coupon', kind: BuyV2CartBenefitKind.coupon,
+        destination: BuyV2Destination.shop, title: 'Host coupon', detail: 'Isolated eligibility result',
+        sourceId: 'host-live-source', savingAmount: 10);
+      final adapter = _LiveBenefitsAdapter(BuyV2CartBenefitsSnapshot(
+        state: BuyV2CartBenefitsLoadState.ready, evaluatedAt: DateTime.now(), benefits: const [coupon]));
+      final core = BuySession();
+      final session = BuyV2Session(core: core, cartBenefitsAdapter: adapter,
+        productFactsAdapter: const QualificationDeliveryFacts(), commerceAdapter: prepaidCommerceFixture());
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      expect(session.addProduct('s-tomato'), isTrue);
+      expect(await session.refreshCartBenefits(), isTrue);
+      expect(session.chooseCartBenefit(coupon), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      final before = session.cartLines.map((line) => (line.product.id, line.quantity)).toList();
+      if (action == 'readiness') {
+        expect(session.checkoutQuoteReviewRequired, isTrue);
+      } else if (action == 'refresh') {
+        expect(await session.refreshCheckoutQuote(), isFalse);
+        expect(session.checkoutQuoteLoadState, BuyV2CommerceLoadState.unavailable);
+      } else if (action == 'direct confirmation') {
+        expect(session.confirmOrder(), isFalse);
+        expect(session.notice, contains('total'));
+      } else {
+        expect(await session.submitOrder(), isFalse);
+        expect(session.notice, contains('total'));
+      }
+      expect(session.cartLines.map((line) => (line.product.id, line.quantity)).toList(), before);
+      expect(session.selectedCartBenefitsFor({BuyV2Destination.shop}).single.id, coupon.id);
+      expect(session.confirmedOrders, isEmpty);
+      expect(session.checkoutPaymentAttempt, isNull);
+      expect(session.legacyCheckoutAttempt, isNull);
+    });
+  }
   test(
     'custom delivery notes stay basket scoped and reach confirmed orders',
     () {
@@ -1335,6 +1483,7 @@ void main() {
           core: BuySession(),
           commerceAdapter: prepaidCommerceFixture(),
           cartBenefitsAdapter: adapter,
+          checkoutQuoteAdapter: _LiveCouponQuote(),
         );
         addTearDown(session.dispose);
         final product = BuyV2Catalogue.products.firstWhere(
@@ -1395,6 +1544,40 @@ class _Batch01LocalBenefits implements BuyV2CartBenefitsAdapter {
     required Set<BuyV2Destination> destinations,
     required int itemTotal,
   }) => benefits;
+}
+
+// Explicit isolated single-group 10-rupee quote, never a production calculator.
+class _LiveCouponTerms implements BuyV2CommercialPaymentTermsAdapter {
+  int calls = 0;
+  Completer<BuyV2CommercialPaymentTermsSnapshot>? gate;
+  @override
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod, required Map<String, int> quotedTotalsByFulfilmentKey}) {
+    calls++;
+    return gate?.future ?? Future.value(const BuyV2CommercialPaymentTermsSnapshot(state: BuyV2CommerceLoadState.unavailable));
+  }
+}
+
+class _LiveCouponQuote implements BuyV2CheckoutQuoteAdapter {
+  _LiveCouponQuote({this.expired = false, this.unavailable = false});
+  final bool expired, unavailable;
+  @override
+  Future<BuyV2CheckoutQuoteSnapshot> loadQuote({required List<BuyV2FulfilmentGroup> groups,
+    required BuyV2Address address, required String selectedPaymentMethod,
+    required List<BuyV2CartBenefit> selectedBenefits, required Map<String, int> tipAmountsByFulfilmentKey}) async {
+    if (unavailable) return const BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.unavailable);
+    final group = groups.single, now = DateTime.now();
+    final coupons = selectedBenefits.where((benefit) => benefit.kind == BuyV2CartBenefitKind.coupon).toList();
+    expect(coupons.length, lessThanOrEqualTo(1));
+    if (coupons.isNotEmpty) expect(coupons.single.savingAmountMinor, 1000);
+    final saving = coupons.isEmpty ? 0 : 10, tip = tipAmountsByFulfilmentKey[group.key] ?? 0;
+    final total = group.total - saving + tip;
+    return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready,
+      quote: BuyV2CheckoutQuote(id: 'host-coupon-quote', sourceId: 'host-authoritative-quote', evaluatedAt: now,
+        validUntil: expired ? now.subtract(const Duration(minutes: 1)) : now.add(const Duration(minutes: 10)),
+        total: total, lines: [BuyV2CheckoutQuoteLine(fulfilmentKey: group.key, itemSubtotal: group.total,
+          couponSaving: saving, tax: 0, freight: 0, deliveryFee: 0, tip: tip, paymentCharge: 0, total: total)]));
+  }
 }
 
 class _LiveBenefitsAdapter implements BuyV2LiveCartBenefitsAdapter {

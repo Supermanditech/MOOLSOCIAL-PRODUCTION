@@ -10080,7 +10080,7 @@ class _CheckoutQuoteCard extends StatelessWidget {
         ),
       );
     }
-    if (!session.checkoutQuoteEnabled) return const SizedBox.shrink();
+    if (!session.checkoutQuoteRequired) return const SizedBox.shrink();
     final quote = session.checkoutQuote;
     if (session.checkoutQuoteLoadState != BuyV2CommerceLoadState.ready ||
         quote == null ||
@@ -10114,20 +10114,22 @@ class _CheckoutQuoteCard extends StatelessWidget {
                   Text(
                     loading
                         ? 'Checking the current total'
-                        : 'Checkout total needs a refresh',
+                        : session.checkoutQuoteEnabled
+                        ? 'Checkout total needs a refresh' : 'Coupon total not confirmed',
                     style: context.buyTitle.copyWith(fontSize: 13),
                   ),
                   Text(
                     loading
                         ? 'Confirming tax, freight, delivery and savings.'
-                        : session.checkoutQuoteMessage ??
-                              'The previous total has expired. Try again.',
+                        : session.checkoutQuoteMessage ?? (session.checkoutQuoteEnabled
+                              ? 'The previous total has expired. Try again.'
+                              : 'Coupon savings need a confirmed Checkout total. Your Cart is unchanged.'),
                     style: context.buyMeta.copyWith(fontSize: 9),
                   ),
                 ],
               ),
             ),
-            if (!loading)
+            if (!loading && session.checkoutQuoteEnabled)
               TextButton(
                 key: const ValueKey('buy-checkout-quote-retry'),
                 onPressed: session.refreshCheckoutQuote,
@@ -12350,7 +12352,7 @@ class _CheckoutOrderDetails extends StatelessWidget {
           session: session,
         ),
         const SizedBox(height: 8),
-        if (session.checkoutQuoteEnabled ||
+        if (session.checkoutQuoteRequired ||
             session.checkoutRequiresResolution) ...[
           _CheckoutQuoteCard(session: session),
           const SizedBox(height: 8),

@@ -11339,11 +11339,21 @@ class BuyV2Session extends ChangeNotifier {
 
   bool get checkoutQuoteEnabled => checkoutQuoteAdapter != null;
 
+  // Keep original references authoritative while eligibility is refreshing or
+  // unavailable. Collection has its own independent quote/commitment lifecycle.
+  bool get _liveCouponQuoteRequired => liveCartBenefitsEnabled &&
+      !collectionCheckoutSelected && collectionCheckout?.unresolved != true &&
+      checkoutDestinations.any((destination) => _selectedCartBenefitRefs.containsKey(
+        _cartBenefitSelectionKey(destination, BuyV2CartBenefitKind.coupon)));
+  bool get checkoutQuoteRequired => checkoutQuoteEnabled || _liveCouponQuoteRequired;
+
   bool get checkoutQuoteBusy =>
       checkoutQuoteLoadState == BuyV2CommerceLoadState.loading;
 
   bool get checkoutQuoteReviewRequired {
-    if (!checkoutQuoteEnabled) return checkoutLines.any((line) => line.scheduledFulfilment != null);
+    if (!checkoutQuoteEnabled) {
+      return _liveCouponQuoteRequired || checkoutLines.any((line) => line.scheduledFulfilment != null);
+    }
     final quote = _checkoutQuote;
     return checkoutQuoteLoadState != BuyV2CommerceLoadState.ready ||
         quote == null ||
@@ -11380,6 +11390,11 @@ class BuyV2Session extends ChangeNotifier {
     final address = selectedAddressOrNull;
     final groups = checkoutFulfilmentGroups;
     if (adapter == null) {
+      if (_liveCouponQuoteRequired) {
+        _invalidateCheckoutQuote();
+        _invalidateCommercialPaymentTerms();
+        notifyListeners(); return false;
+      }
       if (checkoutLines.any((line) => line.scheduledFulfilment != null)) {
         checkoutQuoteLoadState = BuyV2CommerceLoadState.unavailable;
         checkoutQuoteMessage = 'Scheduled delivery needs confirmation. Your Cart is unchanged.';
@@ -11628,7 +11643,15 @@ class BuyV2Session extends ChangeNotifier {
   ]);
 
   void _invalidateCheckoutQuote() {
-    if (!checkoutQuoteEnabled) return;
+    if (!checkoutQuoteEnabled) {
+      _checkoutQuoteRequestSequence += 1;
+      _checkoutQuote = null; _checkoutQuoteFingerprint = null;
+      checkoutQuoteLoadState = _liveCouponQuoteRequired
+          ? BuyV2CommerceLoadState.unavailable : BuyV2CommerceLoadState.ready;
+      checkoutQuoteMessage = _liveCouponQuoteRequired
+          ? 'Coupon savings need a confirmed Checkout total. Your Cart is unchanged.' : null;
+      return;
+    }
     _checkoutQuoteRequestSequence += 1;
     _checkoutQuote = null;
     _checkoutQuoteFingerprint = null;
@@ -11729,7 +11752,7 @@ class BuyV2Session extends ChangeNotifier {
     late final Map<String, int> payablesMinor;
     late final String fingerprint;
     try {
-      if (checkoutQuoteEnabled && checkoutQuoteReviewRequired) {
+      if (checkoutQuoteRequired && checkoutQuoteReviewRequired) {
         unavailable('Check the current total before choosing payment terms.'); return false;
       }
       payablesMinor = Map.unmodifiable(_checkoutGroupPayablesMinor());
@@ -11744,7 +11767,7 @@ class BuyV2Session extends ChangeNotifier {
         requestSequence == _commercialPaymentTermsRequestSequence;
     bool currentInputs() {
       try {
-        return (!checkoutQuoteEnabled || !checkoutQuoteReviewRequired) &&
+        return (!checkoutQuoteRequired || !checkoutQuoteReviewRequired) &&
           fingerprint == _commercialPaymentTermsFingerprint(checkoutFulfilmentGroups);
       } on FormatException { return false; }
     }
@@ -12271,7 +12294,8 @@ class BuyV2Session extends ChangeNotifier {
     );
     _invalidateAndRefreshCheckoutPricingContracts();
     notice =
-        current.kind == BuyV2CartBenefitKind.coupon && current.savingAmountMinor > 0
+        current.kind == BuyV2CartBenefitKind.coupon && current.savingAmountMinor > 0 &&
+          (!liveCartBenefitsEnabled || !checkoutQuoteReviewRequired)
         ? '${current.title} applied. Your total now includes the saving.'
         : '${current.title} selected for Checkout review.';
     notifyListeners();
@@ -17070,6 +17094,10 @@ class BuyV2Session extends ChangeNotifier {
     }
     if (!_allowProcurementLines(checkoutLines)) return false;
     if (checkoutBusy || checkoutRequiresResolution) return false;
+    if (_liveCouponQuoteRequired && checkoutQuoteReviewRequired) {
+      showNotice(checkoutQuoteMessage ?? 'Confirm the Checkout total before ordering. Your Cart is unchanged.');
+      return false;
+    }
     if (!_checkoutSupplierPoliciesCurrent()) return false;
     if (collectionCheckoutSelected || collectionCheckout?.unresolved == true) {
       return false;
@@ -17243,7 +17271,7 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
     }
-    if (checkoutQuoteEnabled) {
+    if (checkoutQuoteRequired) {
       await refreshCheckoutQuote();
       if (checkoutQuoteReviewRequired) {
         notice =
@@ -17393,7 +17421,7 @@ class BuyV2Session extends ChangeNotifier {
       }
     }
     if (!_refreshCheckoutFactsForProduction(lines)) return false;
-    if (checkoutQuoteEnabled) {
+    if (checkoutQuoteRequired) {
       await refreshCheckoutQuote();
       if (checkoutQuoteReviewRequired) {
         notice =
