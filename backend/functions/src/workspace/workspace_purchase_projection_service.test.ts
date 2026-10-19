@@ -6,6 +6,7 @@ import {getFirestore} from "firebase-admin/firestore";
 import {WorkspaceProfileError} from "./workspace_profile_service.js";
 import {WorkspacePurchaseProjectionService, normalizePlacement, requireDefaultPurchaseTenant,
   WorkspaceOrderOperationsService, normalizeOperationalOrder,
+  normalizeOrderCompletion, type TrustedOrderCompletionEvidence,
   type TrustedOperationalOrderEvidence, type TrustedPlacementReceipt} from "./workspace_purchase_projection_service.js";
 
 function operationalEvidence(): TrustedOperationalOrderEvidence {
@@ -19,6 +20,138 @@ function operationalEvidence(): TrustedOperationalOrderEvidence {
     acceptanceDeadline: new Date(now.getTime() + 60000).toISOString(),
     fulfilmentDeadline: new Date(now.getTime() + 3600000).toISOString(),
     initialStage: "Confirmed", allowedActions: ["accept", "ready", "reject"]};
+}
+
+test("completion has an explicit internal producer and separate authorized reader, never inferred from Ready", () => {
+  assert.equal(typeof Reflect.get(WorkspaceOrderOperationsService.prototype, "recordCompletion"), "function");
+  assert.equal(typeof Reflect.get(WorkspaceOrderOperationsService.prototype, "readCompletion"), "function");
+});
+
+function completionEvidence(): TrustedOrderCompletionEvidence {
+  return {schemaVersion: 1, realm: "evaluation", authNamespace: "firebase-default", issuer: "trusted-fulfilment",
+    receiptId: "completion-receipt", revision: "completion-v1", purchaseId: "purchase-one", storeId: "store-one", orderId: "order-one",
+    originalFingerprint: "a".repeat(64), sourceRevision: "revision-1", operationalSourceRevision: "operations-v1",
+    operationalRevision: 3, outcome: "delivered", occurredAt: "2026-10-16T12:00:00.000Z"};
+}
+test("completion proof is strict scoped source evidence, not payment or client confirmation", () => {
+  const proof = completionEvidence(), now = new Date(proof.occurredAt);
+  assert.deepEqual(normalizeOrderCompletion(proof, "evaluation", now), proof);
+  for (const patch of [{realm: "production"}, {authNamespace: "tenant-other"}, {issuer: ""}, {receiptId: ""},
+    {revision: ""}, {operationalRevision: 0}, {operationalRevision: 1.5}, {operationalSourceRevision: ""},
+    {outcome: ["delivered"]}, {outcome: "ready"}, {originalFingerprint: "wrong"}, {originalFingerprint: ["a".repeat(64)]},
+    {occurredAt: "2026-10-16T12:00:00.001Z"}, {occurredAt: "2026-10-16T12:00:00Z"},
+    {paid: true}, {customerContact: "not-public"}]) {
+    assert.throws(() => normalizeOrderCompletion({...proof, ...patch}, "evaluation", now), rejectsCode("invalid_input"));
+  }
+});
+for (const fulfilment of ["delivery", "collection"] as const) {
+test(`completion ${fulfilment} is atomic, authorized, durable and never inferred`, {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: "demo-lf-completion"}, `completion-${randomUUID()}`), db = getFirestore(app);
+  const value = receipt(randomUUID()), suffix = randomUUID(), now = new Date("2026-10-16T12:00:00.000Z");
+  value.buyerUserId = `buyer-${suffix}`;
+  for (const [i, store] of value.stores.entries()) {
+    store.caseId = `case-${suffix}-${i}`; store.storeId = `store-${suffix}-${i}`; store.ownerUserId = `owner-${suffix}-${i}`;
+    await db.collection("workspaceProfiles").doc(store.caseId).set({schemaVersion: 1, caseId: store.caseId,
+      workspaceId: store.storeId, ownerUserId: store.ownerUserId, familyId: "products-trade",
+      profileId: "retailer-grocery", status: "live", shopEnabled: true});
+  }
+  try {
+    const originals = new WorkspacePurchaseProjectionService(db, "evaluation", {readFinalPlacement: async () => value});
+    const made = await originals.materialize(`source-${suffix}`);
+    const original = await originals.readBuyer(value.buyerUserId, {purchaseId: made.purchaseId}), partition = original.orders[0]!;
+    const scope = {purchaseId: made.purchaseId, storeId: partition.storeId, orderId: partition.orderId}, owner = value.stores[0]!.ownerUserId;
+    const op: TrustedOperationalOrderEvidence = {...operationalEvidence(), ...scope, fulfilment,
+      originalFingerprint: partition.originalFingerprint, sourceRevision: original.sourceRevision,
+      initialStage: fulfilment === "delivery" ? "Confirmed" : "Ready", allowedActions: fulfilment === "delivery" ? ["accept", "ready", "reject"] : []};
+    let proof: TrustedOrderCompletionEvidence | undefined = {...completionEvidence(), ...scope,
+      receiptId: `completion-${suffix}`,
+      originalFingerprint: partition.originalFingerprint, sourceRevision: original.sourceRevision,
+      operationalRevision: fulfilment === "delivery" ? 3 : 1, outcome: fulfilment === "delivery" ? "delivered" : "collected"};
+    let reads = 0;
+    const service = new WorkspaceOrderOperationsService(db, "evaluation", {readOperationalOrder: async () => op}, () => now,
+      {issuer: "trusted-fulfilment", readCompletion: async () => {reads++; return proof;}});
+    const fresh = new WorkspaceOrderOperationsService(db, "evaluation", undefined, () => now);
+    await assert.rejects(fresh.recordCompletion("unconfigured"), rejectsCode("service_unavailable"));
+    await service.initialize("trusted-operations");
+    const absent = await fresh.readCompletion(value.buyerUserId, "buyer", scope) as Record<string, unknown>;
+    assert.equal(absent.state, "not_supplied"); assert.equal(absent.completion, null);
+    if (fulfilment === "delivery") {
+      await assert.rejects(service.recordCompletion("too-early"), rejectsCode("invalid_state"));
+      const accept = {version: 2, ...scope, operationId: "accepted-before-completion", expectedRevision: 1, action: "accept", reason: null};
+      assert.equal((await fresh.command(owner, accept)).state, "applied");
+      const ready = {version: 2, ...scope, operationId: "ready-before-completion", expectedRevision: 2, action: "ready", reason: null};
+      const readyAck = await fresh.command(owner, ready);
+      assert.equal(readyAck.state, "applied");
+      assert.equal((await fresh.readCompletion(value.buyerUserId, "buyer", scope) as Record<string, unknown>).state, "not_supplied");
+    }
+    const valid = proof!;
+    for (const patch of [{issuer: "unconfigured-issuer"}, {originalFingerprint: "b".repeat(64)},
+      {sourceRevision: "different-original"}, {operationalSourceRevision: "different-operation"},
+      {operationalRevision: 99}, {outcome: fulfilment === "delivery" ? "collected" : "delivered"},
+      {occurredAt: "2026-10-16T11:59:58.000Z"}]) {
+      proof = {...valid, ...patch} as TrustedOrderCompletionEvidence;
+      await assert.rejects(service.recordCompletion(`invalid-${randomUUID()}`), e => e instanceof WorkspaceProfileError);
+    }
+    proof = valid;
+    const reference = `completion-${suffix}`;
+    const [first, second, competing] = await Promise.allSettled([service.recordCompletion(reference), service.recordCompletion(reference),
+      fresh.command(owner, {version: 2, ...scope, operationId: "competing-rejection", expectedRevision: valid.operationalRevision, action: "reject", reason: "Late rejection"})]);
+    if (first.status === "rejected") throw first.reason;
+    if (second.status === "rejected") throw second.reason;
+    if (competing.status === "rejected") throw competing.reason;
+    assert.deepEqual(first.value, second.value); assert.equal(competing.value.state, "rejected");
+    const ack = first.value;
+    assert.equal(ack.completion.outcome, valid.outcome);
+    assert.deepEqual(await originals.readBuyer(value.buyerUserId, {purchaseId: made.purchaseId}), original);
+    assert.equal((await fresh.read(owner, "seller", scope)).permittedActions.length, 0);
+    await assert.rejects(service.recordCompletion("another-reference"), rejectsCode("conflict"));
+    const other = original.orders[1]!;
+    const otherScope = {purchaseId: made.purchaseId, storeId: other.storeId, orderId: other.orderId};
+    const otherProof = {...op, ...otherScope, originalFingerprint: other.originalFingerprint, initialStage: "Ready" as const};
+    const otherService = new WorkspaceOrderOperationsService(db, "evaluation", {readOperationalOrder: async () => otherProof}, () => now,
+      {issuer: "trusted-fulfilment", readCompletion: async () => ({...valid, ...otherScope,
+        originalFingerprint: other.originalFingerprint, operationalRevision: 1})});
+    await otherService.initialize("second-store-operations");
+    await assert.rejects(otherService.recordCompletion(`reused-source-receipt-${suffix}`), rejectsCode("conflict"));
+    assert.equal((await fresh.readCompletion(value.buyerUserId, "buyer", otherScope) as Record<string, unknown>).state, "not_supplied");
+    const beforeReplay = reads; proof = undefined;
+    assert.deepEqual(await service.recordCompletion(reference), ack); assert.equal(reads, beforeReplay);
+    const restarted = new WorkspaceOrderOperationsService(db, "evaluation", undefined, () => now,
+      {issuer: "trusted-fulfilment", readCompletion: async () => {throw new Error("source unavailable after acceptance");}});
+    assert.deepEqual(await restarted.recordCompletion(reference), ack);
+    await assert.rejects(fresh.readCompletion("unrelated-buyer", "buyer", scope), rejectsCode("not_found"));
+    await assert.rejects(fresh.readCompletion(value.stores[1]!.ownerUserId, "seller", scope), rejectsCode("not_found"));
+    await db.collection("workspaceProfiles").doc(value.stores[0]!.caseId).update({shopEnabled: false});
+    const seller = await fresh.readCompletion(owner, "seller", scope) as Record<string, unknown>;
+    const buyer = await fresh.readCompletion(value.buyerUserId, "buyer", scope) as Record<string, unknown>;
+    console.log(`LF_COMPLETION_PROJECTION=${JSON.stringify({buyer, seller})}`);
+    assert.equal(seller.state, "recorded"); assert.deepEqual(seller.completion, buyer.completion);
+    assert.equal(JSON.stringify(seller).includes("trusted-fulfilment"), false);
+    for (const privateKey of ["proof", "address", "customerLabel", "ownerUserId", "buyerUserId", "orders"]) assert.equal(privateKey in seller, false);
+    if (fulfilment === "delivery") {
+      const reconciled = await fresh.command(owner, {version: 2, ...scope, operationId: "ready-before-completion", expectedRevision: 2, action: "ready", reason: null}, true);
+      assert.equal(reconciled.state, "applied"); assert.equal(reconciled.snapshot.revision, 3);
+    }
+    const terminal = db.collection("workspacePurchaseProjections").doc("evaluation").collection("orderCompletions").doc(scope.orderId);
+    const stored = (await terminal.get()).data()!; await terminal.update({recordedAt: "2026-10-16T11:00:00.000Z"});
+    await assert.rejects(fresh.readCompletion(owner, "seller", scope), rejectsCode("invalid_state"));
+    await terminal.set(stored);
+    function canonicalCompletion(v: unknown): unknown {
+      if (Array.isArray(v)) return v.map(canonicalCompletion);
+      if (v !== null && typeof v === "object") return Object.fromEntries(Object.entries(v)
+        .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, value]) => [key, canonicalCompletion(value)]));
+      return v;
+    }
+    for (const field of ["referenceDigest", "operationalProofFingerprint"]) {
+      const {integrity: _ignored, ...body} = {...stored, [field]: [stored[field]]};
+      const malformed = {...body, integrity: createHash("sha256").update(JSON.stringify(canonicalCompletion(body))).digest("hex")};
+      await terminal.set(malformed);
+      await assert.rejects(fresh.readCompletion(owner, "seller", scope), rejectsCode("invalid_state"));
+      await terminal.set(stored);
+    }
+  } finally {await db.terminate(); await deleteApp(app);}
+});
 }
 
 test("operational bootstrap requires genuine bounded operational evidence", () => {

@@ -590,12 +590,36 @@ class WorkspaceOperationalCommandResult {
   final WorkspaceOperationalOrderSnapshot snapshot;
 }
 
+/// A received trusted completion projection, separate from mutable preparation,
+/// payment/Stock authority and rating permission. Null is no supplied evidence,
+/// not proof that delivery/collection did not happen.
+class WorkspaceOrderCompletionSnapshot {
+  const WorkspaceOrderCompletionSnapshot._({required this.reference, required this.realm,
+    required this.viewerRole, required this.viewerUserId, required this.completion});
+  final WorkspacePurchaseReference reference;
+  final String realm, viewerUserId;
+  final WorkspaceOrderIdentityRole viewerRole;
+  final WorkspaceOrderCompletion? completion;
+}
+class WorkspaceOrderCompletion {
+  const WorkspaceOrderCompletion._({required this.id, required this.revision, required this.outcome,
+    required this.occurredAt, required this.recordedAt});
+  final String id, revision, outcome;
+  final DateTime occurredAt, recordedAt;
+  @override
+  bool operator ==(Object other) => other is WorkspaceOrderCompletion && id == other.id && revision == other.revision &&
+    outcome == other.outcome && occurredAt == other.occurredAt && recordedAt == other.recordedAt;
+  @override
+  int get hashCode => Object.hash(id, revision, outcome, occurredAt, recordedAt);
+}
+
 /// Explicit operational adapter; the composed identity reader stays read-only.
 /// No automatic retries. The existing Store journal/controller owns command
 /// persistence and uncertain-attempt recovery before this adapter is bound.
 class AuthenticatedWorkspaceOrderOperationsGateway {
-  const AuthenticatedWorkspaceOrderOperationsGateway(this.identity);
+  const AuthenticatedWorkspaceOrderOperationsGateway(this.identity, {this.now = DateTime.now});
   final AuthenticatedWorkspaceOrderIdentityGateway identity;
+  final DateTime Function() now;
   bool get isCurrent => identity.isCurrent;
   bool _validReference(String realm, WorkspacePurchaseReference ref) =>
       isCurrent &&
@@ -793,6 +817,45 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
       address: data['address'],
       rejectionReason: data['rejectionReason'],
     );
+  }
+
+  Future<WorkspaceOrderCompletionSnapshot?> readCompletion({
+    required WorkspaceOrderIdentityRole role, required String realm,
+    required WorkspacePurchaseReference reference,
+  }) async {
+    if (!_validReference(realm, reference)) return null;
+    try {
+      final raw = await _call(role == WorkspaceOrderIdentityRole.buyer
+        ? 'readBuyerOrderCompletion' : 'readStoreOrderCompletion', {
+          'purchaseId': reference.purchaseId, 'storeId': reference.storeId, 'orderId': reference.orderId,
+        });
+      if (raw == null || !isCurrent) return null;
+      final data = _exactMap(raw, const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId',
+        'purchaseId', 'storeId', 'orderId', 'sourceRevision', 'originalFingerprint', 'state', 'completion']);
+      if (data['schemaVersion'] is! int || data['schemaVersion'] != 1 || data['realm'] != realm ||
+          data['authNamespace'] != 'firebase-default' || data['viewerRole'] != role.name ||
+          data['viewerUserId'] != identity.accountUserId || data['purchaseId'] != reference.purchaseId ||
+          data['storeId'] != reference.storeId || data['orderId'] != reference.orderId ||
+          data['sourceRevision'] != reference.sourceRevision || data['originalFingerprint'] != reference.originalFingerprint) {
+        throw const FormatException('Completion scope mismatch.');
+      }
+      WorkspaceOrderCompletion? completion;
+      if (data['state'] == 'recorded') {
+        final value = _exactMap(_map(data['completion']), const ['id', 'revision', 'outcome', 'occurredAt', 'recordedAt']);
+        if (value['id'] is! String || !RegExp(r'^completion-[a-f0-9]{64}$').hasMatch(value['id']) ||
+            !_id(value['revision']) || !const ['delivered', 'collected'].contains(value['outcome'])) {
+          throw const FormatException('Invalid completion evidence.');
+        }
+        final occurredAt = _date(value['occurredAt']), recordedAt = _date(value['recordedAt']);
+        if (occurredAt.isAfter(recordedAt) || recordedAt.isAfter(now().toUtc())) throw const FormatException();
+        completion = WorkspaceOrderCompletion._(id: value['id'], revision: value['revision'], outcome: value['outcome'],
+          occurredAt: occurredAt, recordedAt: recordedAt);
+      } else if (data['state'] != 'not_supplied' || data['completion'] != null) {
+        throw const FormatException('Unavailable completion evidence.');
+      }
+      return WorkspaceOrderCompletionSnapshot._(reference: reference, realm: realm, viewerRole: role,
+        viewerUserId: identity.accountUserId, completion: completion);
+    } on Object {return null;}
   }
 
   Future<WorkspaceOperationalOrderSnapshot?> read({

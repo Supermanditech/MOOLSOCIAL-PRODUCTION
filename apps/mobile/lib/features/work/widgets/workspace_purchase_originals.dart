@@ -26,6 +26,8 @@ class _WorkspacePurchaseOriginalsState
   final _references = <WorkspacePurchaseReference>[];
   final _details = <String, WorkspacePurchaseOrder>{};
   final _updates = <String, WorkspaceOperationalOrderSnapshot>{};
+  final _completions = <String, WorkspaceOrderCompletion>{};
+  final _completionFailed = <String>{};
   final _updatePending = <String>{}, _updateFailed = <String>{};
   final _pending = <String>{}, _failed = <String>{};
   int _generation = 0;
@@ -47,6 +49,7 @@ class _WorkspacePurchaseOriginalsState
       _references.clear();
       _details.clear();
       _updates.clear();
+      _completions.clear(); _completionFailed.clear();
       _updatePending.clear();
       _updateFailed.clear();
       _pending.clear();
@@ -72,6 +75,7 @@ class _WorkspacePurchaseOriginalsState
           _references.clear();
           _details.clear();
           _updates.clear();
+          _completions.clear(); _completionFailed.clear();
           _updatePending.clear();
           _updateFailed.clear();
           _failed.clear();
@@ -147,34 +151,46 @@ class _WorkspacePurchaseOriginalsState
       _updatePending.add(reference.orderId);
       _updateFailed.remove(reference.orderId);
     });
-    final update = await AuthenticatedWorkspaceOrderOperationsGateway(
-      widget.gateway,
-    ).read(role: widget.role, realm: widget.realm, reference: reference);
+    final gateway = AuthenticatedWorkspaceOrderOperationsGateway(widget.gateway);
+    final preparing = gateway.read(role: widget.role, realm: widget.realm, reference: reference);
+    final completing = gateway.readCompletion(role: widget.role, realm: widget.realm, reference: reference);
+    final update = await preparing, completion = await completing;
     if (!_current(generation)) return;
     setState(() {
       _updatePending.remove(reference.orderId);
       final previous = _updates[reference.orderId];
       if (update == null ||
           previous != null &&
-              (update.revision < previous.revision ||
+              (update.fulfilment != previous.fulfilment || update.revision < previous.revision ||
                   update.revision == previous.revision &&
                       update.stage != previous.stage)) {
         _updateFailed.add(reference.orderId);
       } else {
         _updates[reference.orderId] = update;
       }
+      final previousCompletion = _completions[reference.orderId], next = completion?.completion;
+      final admitted = _updates[reference.orderId];
+      final contradictoryMode = next != null && admitted != null &&
+        next.outcome != (admitted.fulfilment == 'collection' ? 'collected' : 'delivered');
+      if (completion == null || contradictoryMode || previousCompletion != null && previousCompletion != next) {
+        _completionFailed.add(reference.orderId);
+      } else {
+        _completionFailed.remove(reference.orderId);
+        if (next != null) _completions[reference.orderId] = next;
+      }
     });
   }
 
   Widget _orderUpdate(WorkspacePurchaseReference reference) {
     final update = _updates[reference.orderId];
+    final completion = _completions[reference.orderId];
     final loading = _updatePending.contains(reference.orderId);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (update != null)
+        if (update != null || completion != null)
           Text(
-            switch (update.stage) {
+            completion != null ? (completion.outcome == 'collected' ? 'Collected' : 'Delivered') : switch (update!.stage) {
               'Confirmed' => 'Awaiting Store acceptance',
               'Rejected' => 'Not accepted by Store',
               _ => update.stage,
@@ -182,6 +198,13 @@ class _WorkspacePurchaseOriginalsState
             key: ValueKey('purchase-order-status-${reference.orderId}'),
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
+        if (completion != null)
+          Text('Completed ${MaterialLocalizations.of(context).formatShortDate(completion.occurredAt.toLocal())} · '
+            '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(completion.occurredAt.toLocal()))}',
+            key: ValueKey('purchase-order-completion-${reference.orderId}')),
+        if (_completionFailed.contains(reference.orderId))
+          Text(completion == null ? 'Delivery/collection update unavailable.'
+            : 'Latest completion update unavailable; showing the recorded result.'),
         if (update?.rejectionReason case final reason?) Text(reason),
         if (_updateFailed.contains(reference.orderId))
           Text(

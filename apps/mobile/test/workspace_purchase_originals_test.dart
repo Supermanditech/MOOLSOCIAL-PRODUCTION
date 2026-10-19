@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/rendering.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -623,7 +624,8 @@ void main() {
       await tester.tap(find.text('Check order update'));
       await tester.pumpAndSettle();
       expect(find.text('Awaiting Store acceptance'), findsOneWidget);
-      expect(wire.sent!['operation'], 'readStoreOperationalOrder');
+      expect(wire.requests.any((r) => r['operation'] == 'readStoreOperationalOrder'), isTrue);
+      expect(wire.requests.any((r) => r['operation'] == 'readStoreOrderCompletion'), isTrue);
       expect(work.workspaceOrders, orderedEquals(before));
       expect(tester.takeException(), isNull);
     },
@@ -632,26 +634,135 @@ void main() {
     WidgetTester tester,
     AuthenticatedWorkspaceOrderIdentityGateway gateway, {
     double scale = 1,
+    WorkspaceOrderIdentityRole role = WorkspaceOrderIdentityRole.buyer,
+    GlobalKey? capture,
+    ThemeData? theme,
   }) async {
-    await tester.pumpWidget(
-      MaterialApp(
+    final app = MaterialApp(theme: theme,
         home: Scaffold(
           body: MediaQuery(
             data: MediaQueryData(textScaler: TextScaler.linear(scale)),
             child: SingleChildScrollView(
               child: WorkspacePurchaseOriginals(
                 gateway: gateway,
-                role: WorkspaceOrderIdentityRole.buyer,
+                role: role,
                 realm: 'evaluation',
+                storeId: role == WorkspaceOrderIdentityRole.seller ? 'store-one' : null,
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    await tester.pumpWidget(capture == null ? app : RepaintBoundary(key: capture, child: app));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Saved purchase details'));
     await tester.pumpAndSettle();
+  }
+
+  for (final role in WorkspaceOrderIdentityRole.values) {
+    for (final scale in [1.0, 2.0]) {
+      for (final collected in [false, true]) {
+        testWidgets('LF-COMPLETE shared details render exact completion and retain it on failed or contradictory refresh ${role.name} $scale $collected', (tester) async {
+          await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
+          tester.view.physicalSize = const Size(320, 850); tester.view.devicePixelRatio = 1; addTearDown(tester.view.reset);
+          final op = fixtures.operationalResponse(role: role.name)..['stage'] = 'Ready'..['revision'] = 3..['permittedActions'] = <String>[];
+          op['fulfilment'] = collected ? 'collection' : 'delivery';
+          final completion = {for (final key in const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId',
+            'purchaseId', 'storeId', 'orderId', 'sourceRevision', 'originalFingerprint']) key: op[key],
+            'state': 'recorded', 'completion': {'id': 'completion-${'a' * 64}', 'revision': 'completion-v1',
+              'outcome': collected ? 'collected' : 'delivered', 'occurredAt': '2026-10-16T12:01:00.000Z', 'recordedAt': '2026-10-16T12:01:01.000Z'}};
+          final wire = fixtures.Transport()..respond = (body) {
+            final operation = body['operation'].toString();
+            return operation.startsWith('list') ? fixtures.referenceResponse(role: role.name)
+              : operation.endsWith('OrderCompletion') ? completion
+              : operation.endsWith('OperationalOrder') ? op : fixtures.purchaseResponse(role: role.name);
+          };
+          final capture = GlobalKey();
+          await mount(tester, fixtures.projectionGateway(wire, account: role == WorkspaceOrderIdentityRole.buyer ? 'buyer-1' : 'owner-1'),
+            role: role, scale: scale, capture: capture, theme: MoolTheme.light());
+          await tester.tap(find.byKey(const ValueKey('original-order-order-v2'))); await tester.pumpAndSettle();
+          await tester.ensureVisible(find.text('Check order update')); await tester.tap(find.text('Check order update')); await tester.pumpAndSettle();
+          final expected = collected ? 'Collected' : 'Delivered';
+          expect(find.text(expected), findsOneWidget);
+          expect(find.byKey(const ValueKey('purchase-order-completion-order-v2')), findsOneWidget);
+          if (Platform.environment['LF_COMPLETION_CAPTURE_DIR'] case final path?) {
+            if (scale == 2 && (role == WorkspaceOrderIdentityRole.buyer) != collected) {
+              await tester.ensureVisible(find.text(expected)); await tester.pumpAndSettle();
+              await tester.runAsync(() async {
+                final boundary = capture.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+                final image = await boundary.toImage();
+                try {
+                  final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+                  await Directory(path).create(recursive: true);
+                  final file = File('$path/host-completion-${role.name}-${collected ? 'collected' : 'delivered'}-320-2x.png');
+                  if (await file.exists()) throw StateError('Preserve the prior capture; choose a new output directory.');
+                  await file.writeAsBytes(bytes.buffer.asUint8List());
+                } finally {image.dispose();}
+              });
+            }
+          }
+          completion['state'] = 'not_supplied'; completion['completion'] = null;
+          await tester.ensureVisible(find.text('Refresh order update')); await tester.tap(find.text('Refresh order update')); await tester.pumpAndSettle();
+          expect(find.text(expected), findsOneWidget);
+          expect(find.text('Latest completion update unavailable; showing the recorded result.'), findsOneWidget);
+          wire.fail = true;
+          await tester.tap(find.text('Refresh order update')); await tester.pumpAndSettle();
+          expect(find.text(expected), findsOneWidget);
+          expect(find.text('Pay'), findsNothing); expect(find.text('Accept order'), findsNothing);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  }
+
+  testWidgets('LF-COMPLETE contradictory preparation and completion fulfilment cannot display success', (tester) async {
+    final op = fixtures.operationalResponse()..['stage'] = 'Ready'..['permittedActions'] = <String>[];
+    final completion = {for (final key in const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId',
+      'purchaseId', 'storeId', 'orderId', 'sourceRevision', 'originalFingerprint']) key: op[key],
+      'state': 'recorded', 'completion': {'id': 'completion-${'a' * 64}', 'revision': 'completion-v1',
+        'outcome': 'collected', 'occurredAt': '2026-10-16T12:01:00.000Z', 'recordedAt': '2026-10-16T12:01:01.000Z'}};
+    final wire = fixtures.Transport()..respond = (body) {
+      final action = body['operation'].toString();
+      return action.startsWith('list') ? fixtures.referenceResponse()
+        : action.endsWith('OrderCompletion') ? completion
+        : action.endsWith('OperationalOrder') ? op : fixtures.purchaseResponse();
+    };
+    await mount(tester, fixtures.projectionGateway(wire));
+    await tester.tap(find.byKey(const ValueKey('original-order-order-v2'))); await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Check order update')); await tester.tap(find.text('Check order update')); await tester.pumpAndSettle();
+    expect(find.text('Collected'), findsNothing); expect(find.text('Delivered'), findsNothing);
+    expect(find.text('Delivery/collection update unavailable.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final drift in ['missing', 'older', 'same-revision-mode']) {
+    testWidgets('LF-COMPLETE retained delivery mode fences completion after $drift preparation', (tester) async {
+      var nextRead = false;
+      final op = fixtures.operationalResponse()..['revision'] = 2..['stage'] = 'Preparing';
+      final completion = {for (final key in const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId',
+        'purchaseId', 'storeId', 'orderId', 'sourceRevision', 'originalFingerprint']) key: op[key],
+        'state': 'recorded', 'completion': {'id': 'completion-${'a' * 64}', 'revision': 'completion-v1',
+          'outcome': 'collected', 'occurredAt': '2026-10-16T12:01:00.000Z', 'recordedAt': '2026-10-16T12:01:01.000Z'}};
+      final wire = fixtures.Transport()..respond = (body) {
+        final operation = body['operation'].toString();
+        if (operation.startsWith('list')) return fixtures.referenceResponse();
+        if (operation.endsWith('OrderCompletion')) return nextRead ? completion : {...completion, 'state': 'not_supplied', 'completion': null};
+        if (operation.endsWith('OperationalOrder')) {
+          return !nextRead ? op : drift == 'missing' ? <String, dynamic>{}
+            : {...op, 'revision': drift == 'older' ? 1 : 2, 'fulfilment': 'collection'};
+        }
+        return fixtures.purchaseResponse();
+      };
+      await mount(tester, fixtures.projectionGateway(wire));
+      await tester.tap(find.byKey(const ValueKey('original-order-order-v2'))); await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Check order update')); await tester.tap(find.text('Check order update')); await tester.pumpAndSettle();
+      expect(find.text('Preparing'), findsOneWidget);
+      nextRead = true;
+      await tester.tap(find.text('Refresh order update')); await tester.pumpAndSettle();
+      expect(find.text('Preparing'), findsOneWidget); expect(find.text('Collected'), findsNothing);
+      expect(find.byKey(const ValueKey('purchase-order-completion-order-v2')), findsNothing);
+      expect(find.text('Delivery/collection update unavailable.'), findsOneWidget); expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets(
@@ -667,7 +778,8 @@ void main() {
       await tester.tap(find.text('Check order update'));
       await tester.pumpAndSettle();
       expect(find.text('Awaiting Store acceptance'), findsOneWidget);
-      expect(wire.sent!['operation'], 'readBuyerOperationalOrder');
+      expect(wire.requests.any((r) => r['operation'] == 'readBuyerOperationalOrder'), isTrue);
+      expect(wire.requests.any((r) => r['operation'] == 'readBuyerOrderCompletion'), isTrue);
       wire.data
         ..['revision'] = 2
         ..['stage'] = 'Preparing';

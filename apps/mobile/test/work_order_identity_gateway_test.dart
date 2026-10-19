@@ -90,6 +90,91 @@ class Transport implements SocialContentTransport {
 }
 
 void main() {
+  Map<String, dynamic> completionResponse({String role = 'buyer', bool supplied = true}) {
+    final original = operationalResponse(role: role);
+    return {for (final key in const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId',
+      'purchaseId', 'storeId', 'orderId', 'sourceRevision', 'originalFingerprint']) key: original[key],
+      'state': supplied ? 'recorded' : 'not_supplied',
+      'completion': supplied ? {'id': 'completion-${'a' * 64}', 'revision': 'completion-v1', 'outcome': 'delivered',
+        'occurredAt': '2026-10-16T12:01:00.000Z', 'recordedAt': '2026-10-16T12:01:01.000Z'} : null};
+  }
+  for (final role in WorkspaceOrderIdentityRole.values) {
+    for (final supplied in [false, true]) {
+      test('LF-COMPLETE strict ${role.name} projection distinguishes absent evidence supplied=$supplied', () async {
+        final wire = Transport()..data = completionResponse(role: role.name, supplied: supplied);
+        final gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire,
+          account: role == WorkspaceOrderIdentityRole.buyer ? 'buyer-1' : 'owner-1'), now: () => DateTime.utc(2026, 10, 19));
+        final result = await gateway.readCompletion(role: role, realm: 'evaluation', reference: operationalReference());
+        expect(result, isNotNull); expect(result!.reference.orderId, operationalReference().orderId);
+        expect(result.completion != null, supplied);
+        if (supplied) {expect(result.completion!.outcome, 'delivered'); expect(result.completion!.revision, 'completion-v1');}
+        expect(wire.sent!['operation'], role == WorkspaceOrderIdentityRole.buyer ? 'readBuyerOrderCompletion' : 'readStoreOrderCompletion');
+      });
+    }
+  }
+  for (final fault in <String, void Function(Map<String, dynamic>)>{
+    'schema type': (d) => d['schemaVersion'] = 1.0,
+    'realm': (d) => d['realm'] = 'production',
+    'namespace': (d) => d['authNamespace'] = 'tenant-other',
+    'viewer': (d) => d['viewerUserId'] = 'another-account',
+    'role': (d) => d['viewerRole'] = 'seller',
+    'purchase': (d) => d['purchaseId'] = 'another-purchase',
+    'Store': (d) => d['storeId'] = 'another-store',
+    'order': (d) => d['orderId'] = 'another-order',
+    'fingerprint': (d) => d['originalFingerprint'] = 'b' * 64,
+    'source revision': (d) => d['sourceRevision'] = 'another-original',
+    'unknown state': (d) => d['state'] = 'delivered',
+    'missing evidence': (d) => d['completion'] = null,
+    'absent with evidence': (d) => d['state'] = 'not_supplied',
+    'unknown outcome': (d) => d['completion']['outcome'] = 'ready',
+    'unknown ID': (d) => d['completion']['id'] = 'owner-confirmed',
+    'blank revision': (d) => d['completion']['revision'] = '',
+    'future': (d) => d['completion']['recordedAt'] = '2099-10-16T12:01:01.000Z',
+    'reversed dates': (d) => d['completion']['recordedAt'] = '2026-10-16T12:00:00.000Z',
+    'time precision': (d) => d['completion']['occurredAt'] = '2026-10-16T12:01:00.000001Z',
+    'private proof': (d) => d['completion']['proof'] = 'private-provider-proof',
+    'invented payment': (d) => d['paymentVerified'] = true,
+  }.entries) {
+    test('LF-COMPLETE rejects ${fault.key}', () async {
+      final data = completionResponse(); fault.value(data);
+      final wire = Transport()..data = data;
+      expect(await AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire)).readCompletion(
+        role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: operationalReference()), isNull);
+    });
+  }
+  test('LF-COMPLETE retired A B A response cannot enter the replacement session', () async {
+    Object? generation = Object();
+    final wire = Transport()..data = completionResponse()..pending = Completer<void>();
+    final gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, lifetime: () => generation));
+    final pending = gateway.readCompletion(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: operationalReference());
+    for (var i = 0; i < 100 && wire.calls == 0; i++) {await Future<void>.delayed(Duration.zero);}
+    expect(wire.calls, 1); generation = Object(); generation = Object();
+    wire.pending!.complete(); expect(await pending, isNull);
+    expect(await gateway.readCompletion(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: operationalReference()), isNull);
+    expect(wire.calls, 1);
+  });
+  if (Platform.environment['LF_COMPLETION_PROJECTION_LOG'] case final path?) {
+    test('LF-COMPLETE actual local completion producer crosses strict Dart readback for both roles and fulfilments', () async {
+      const marker = 'LF_COMPLETION_PROJECTION=';
+      final rows = File(path).readAsLinesSync().where((line) => line.contains(marker)).toList();
+      expect(rows, hasLength(2)); final outcomes = <String>{};
+      for (final row in rows) {
+        final payload = (jsonDecode(row.substring(row.indexOf(marker) + marker.length)) as Map).cast<String, dynamic>();
+        for (final role in WorkspaceOrderIdentityRole.values) {
+          final data = (payload[role == WorkspaceOrderIdentityRole.buyer ? 'buyer' : 'seller'] as Map).cast<String, dynamic>();
+          final wire = Transport()..data = data;
+          final ref = WorkspacePurchaseReference(purchaseId: data['purchaseId'], storeId: data['storeId'],
+            orderId: data['orderId'], sourceRevision: data['sourceRevision'], originalFingerprint: data['originalFingerprint']);
+          final result = await AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, account: data['viewerUserId'])).readCompletion(
+            role: role, realm: 'evaluation', reference: ref);
+          expect(result, isNotNull); expect(result!.completion, isNotNull);
+          outcomes.add(result.completion!.outcome);
+          expect(result.completion!.id, data['completion']['id']);
+        }
+      }
+      expect(outcomes, {'delivered', 'collected'});
+    });
+  }
   if (Platform.environment['LF_SCHEDULE_PROJECTION_LOG'] case final path?) {
     test('LF-SCHEDULE actual emulator originals preserve exact requested context across Dart', () async {
       const marker = 'LF_SCHEDULE_PROJECTION=';

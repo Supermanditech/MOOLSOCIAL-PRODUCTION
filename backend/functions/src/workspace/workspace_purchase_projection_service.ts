@@ -116,6 +116,45 @@ export interface TrustedOperationalOrderEvidence {
 export interface OperationalOrderSource {
   readOperationalOrder(reference: string): Promise<TrustedOperationalOrderEvidence | undefined>;
 }
+/** Server integration boundary, never buyer/Store submitted completion claims. */
+export interface TrustedOrderCompletionEvidence {
+  schemaVersion: 1; realm: Realm; authNamespace: "firebase-default";
+  issuer: string; receiptId: string; revision: string;
+  purchaseId: string; storeId: string; orderId: string;
+  originalFingerprint: string; sourceRevision: string;
+  operationalSourceRevision: string; operationalRevision: number;
+  outcome: "delivered" | "collected"; occurredAt: string;
+}
+export interface OrderCompletionSource {
+  readonly issuer: string;
+  readCompletion(reference: string): Promise<TrustedOrderCompletionEvidence | undefined>;
+}
+interface StoredOrderCompletion {
+  schemaVersion: 1; proof: TrustedOrderCompletionEvidence;
+  operationalProofFingerprint: string; referenceDigest: string; recordedAt: string; integrity: string;
+}
+export interface OrderCompletionAcknowledgment extends OperationalScope {
+  schemaVersion: 1; realm: Realm; authNamespace: "firebase-default";
+  originalFingerprint: string; sourceRevision: string;
+  state: "recorded";
+  completion: {id: string; revision: string; outcome: "delivered" | "collected"; occurredAt: string; recordedAt: string};
+}
+export function normalizeOrderCompletion(value: unknown, realm: Realm, now: Date): TrustedOrderCompletionEvidence {
+  const r = exact(value, ["schemaVersion", "realm", "authNamespace", "issuer", "receiptId", "revision",
+    "purchaseId", "storeId", "orderId", "originalFingerprint", "sourceRevision", "operationalSourceRevision",
+    "operationalRevision", "outcome", "occurredAt"]);
+  if (r.schemaVersion !== 1 || r.realm !== realm || !["evaluation", "production"].includes(realm) ||
+      r.authNamespace !== "firebase-default" || !["delivered", "collected"].includes(String(r.outcome)) ||
+      typeof r.outcome !== "string" || typeof r.originalFingerprint !== "string" ||
+      !/^[a-f0-9]{64}$/u.test(r.originalFingerprint)) fail();
+  const occurredAt = timestamp(r.occurredAt);
+  if (occurredAt > now.toISOString()) fail();
+  return {schemaVersion: 1, realm, authNamespace: "firebase-default", issuer: id(r.issuer),
+    receiptId: id(r.receiptId), revision: id(r.revision), purchaseId: id(r.purchaseId), storeId: id(r.storeId),
+    orderId: id(r.orderId), originalFingerprint: String(r.originalFingerprint), sourceRevision: id(r.sourceRevision),
+    operationalSourceRevision: id(r.operationalSourceRevision), operationalRevision: integer(r.operationalRevision, Number.MAX_SAFE_INTEGER, 1),
+    outcome: r.outcome as "delivered" | "collected", occurredAt};
+}
 const operationProofKeys = ["schemaVersion", "realm", "authNamespace", "issuer", "receiptId", "revision",
   "purchaseId", "storeId", "orderId", "originalFingerprint", "sourceRevision", "customerLabel",
   "fulfilment", "address", "placedAt", "acceptanceDeadline", "fulfilmentDeadline", "initialStage", "allowedActions"];
@@ -188,11 +227,109 @@ function operationalScope(raw: Readonly<Record<string, unknown>>): OperationalSc
  * handover, refund, delivered-state or time-extension implementation is implied. */
 export class WorkspaceOrderOperationsService {
   constructor(private readonly db: Firestore, private readonly realm: Realm,
-    private readonly source?: OperationalOrderSource, private readonly now: () => Date = () => new Date()) {
+    private readonly source?: OperationalOrderSource, private readonly now: () => Date = () => new Date(),
+    private readonly completionSource?: OrderCompletionSource) {
     if (!["evaluation", "production"].includes(realm)) fail("service_unavailable", 503);
   }
   private root() {return this.db.collection("workspacePurchaseProjections").doc(this.realm);}
   private path(scope: OperationalScope) {return this.root().collection("operationalOrders").doc(scope.orderId);}
+  private completionPath(scope: OperationalScope) {return this.root().collection("orderCompletions").doc(scope.orderId);}
+  private completionStored(value: unknown): StoredOrderCompletion {
+    try {
+      const r = exact(value, ["schemaVersion", "proof", "operationalProofFingerprint", "referenceDigest", "recordedAt", "integrity"]);
+      const {integrity, ...body} = r;
+      const proof = normalizeOrderCompletion(r.proof, this.realm, this.now());
+      if (r.schemaVersion !== 1 || integrity !== integrityHash(body) ||
+          typeof r.referenceDigest !== "string" || typeof r.operationalProofFingerprint !== "string" ||
+          !/^[a-f0-9]{64}$/u.test(r.referenceDigest) ||
+          !/^[a-f0-9]{64}$/u.test(r.operationalProofFingerprint) ||
+          timestamp(r.recordedAt) < proof.occurredAt || timestamp(r.recordedAt) > this.now().toISOString()) fail();
+      return {schemaVersion: 1, proof, operationalProofFingerprint: r.operationalProofFingerprint,
+        referenceDigest: r.referenceDigest, recordedAt: String(r.recordedAt), integrity: String(integrity)};
+    } catch {return fail("invalid_state", 409);}
+  }
+  private completionBound(saved: StoredOrderCompletion, a: PurchaseAggregate, o: StoredOrder,
+    operational?: StoredOperationalOrder): void {
+    const p = saved.proof;
+    if (p.purchaseId !== a.purchaseId || p.storeId !== o.storeId || p.orderId !== o.orderId ||
+        p.originalFingerprint !== o.originalFingerprint || p.sourceRevision !== a.sourceRevision ||
+        (operational !== undefined && (saved.operationalProofFingerprint !== operational.proofFingerprint ||
+          p.operationalSourceRevision !== operational.proof.revision || p.operationalRevision !== operational.revision ||
+          operational.stage !== "Ready" || p.occurredAt < operational.proof.placedAt ||
+          p.outcome !== (operational.proof.fulfilment === "collection" ? "collected" : "delivered")))) {
+      fail("invalid_state", 409);
+    }
+  }
+  private completionAck(saved: StoredOrderCompletion): OrderCompletionAcknowledgment {
+    const p = saved.proof;
+    return {schemaVersion: 1, realm: this.realm, authNamespace: "firebase-default",
+      purchaseId: p.purchaseId, storeId: p.storeId, orderId: p.orderId,
+      originalFingerprint: p.originalFingerprint, sourceRevision: p.sourceRevision, state: "recorded",
+      completion: {id: `completion-${digest([p.issuer, p.receiptId])}`, revision: p.revision,
+        outcome: p.outcome, occurredAt: p.occurredAt, recordedAt: saved.recordedAt}};
+  }
+  /** Internal trusted-source materializer only. There is deliberately no HTTP write operation. */
+  async recordCompletion(reference: string): Promise<OrderCompletionAcknowledgment> {
+    id(reference);
+    const source = this.completionSource;
+    if (!source) fail("service_unavailable", 503);
+    const issuer = id(source.issuer), referenceDigest = digest([issuer, reference]);
+    const commandPath = this.root().collection("completionReceipts").doc(`reference-${referenceDigest}`);
+    const replay = async (tx: Transaction): Promise<OrderCompletionAcknowledgment | undefined> => {
+      const doc = await tx.get(commandPath);
+      if (!doc.exists) return undefined;
+      const saved = this.completionStored(doc.data());
+      if (saved.referenceDigest !== referenceDigest || saved.proof.issuer !== issuer) fail("invalid_state", 409);
+      const {aggregate, order} = await this.original(tx, saved.proof);
+      this.completionBound(saved, aggregate, order);
+      return this.completionAck(saved);
+    };
+    // Reconciliation of the original reference does not call a missing/changed
+    // external source or reassess later readiness as permission to complete again.
+    const earlier = await this.db.runTransaction(replay);
+    if (earlier) return earlier;
+    const raw = await source.readCompletion(reference);
+    if (!raw) fail("not_found", 404);
+    const proof = normalizeOrderCompletion(raw, this.realm, this.now());
+    if (proof.issuer !== issuer) fail("forbidden", 403);
+    return this.db.runTransaction(async tx => {
+      const accepted = await replay(tx);
+      if (accepted) return accepted;
+      const {aggregate, order} = await this.original(tx, proof);
+      const operational = this.stored((await tx.get(this.path(proof))).data(), aggregate, order);
+      const recordedAt = this.now().toISOString();
+      const body = {schemaVersion: 1 as const, proof, operationalProofFingerprint: operational.proofFingerprint,
+        referenceDigest, recordedAt};
+      const saved = {...body, integrity: integrityHash(body)};
+      this.completionStored(saved);
+      this.completionBound(saved, aggregate, order, operational);
+      const receiptPath = this.root().collection("completionReceipts").doc(`source-${digest([issuer, proof.receiptId])}`);
+      const existingOrder = await tx.get(this.completionPath(proof)), existingReceipt = await tx.get(receiptPath);
+      if (existingOrder.exists || existingReceipt.exists) fail("conflict", 409);
+      tx.create(this.completionPath(proof), saved); tx.create(commandPath, saved); tx.create(receiptPath, saved);
+      return this.completionAck(saved);
+    });
+  }
+  async readCompletion(actor: string, role: "buyer" | "seller", body: Readonly<Record<string, unknown>>): Promise<object> {
+    id(actor); exact(body, ["purchaseId", "storeId", "orderId"]);
+    if (role !== "buyer" && role !== "seller") fail();
+    const scope = operationalScope(body);
+    return this.db.runTransaction(async tx => {
+      const {aggregate, order} = await this.original(tx, scope);
+      if (role === "seller") await this.seller(tx, order, actor);
+      else if (aggregate.buyerUserId !== actor) fail("not_found", 404);
+      const operational = this.stored((await tx.get(this.path(scope))).data(), aggregate, order);
+      const doc = await tx.get(this.completionPath(scope));
+      let acknowledgment: OrderCompletionAcknowledgment | undefined;
+      if (doc.exists) {
+        const saved = this.completionStored(doc.data()); this.completionBound(saved, aggregate, order, operational);
+        acknowledgment = this.completionAck(saved);
+      }
+      return {schemaVersion: 1, realm: this.realm, authNamespace: "firebase-default", viewerRole: role,
+        viewerUserId: actor, ...scope, sourceRevision: aggregate.sourceRevision, originalFingerprint: order.originalFingerprint,
+        state: acknowledgment ? "recorded" : "not_supplied", completion: acknowledgment?.completion ?? null};
+    });
+  }
   private async original(tx: Transaction, scope: OperationalScope) {
     const doc = await tx.get(this.root().collection("purchases").doc(scope.purchaseId));
     if (!doc.exists) fail("not_found", 404);
@@ -291,7 +428,11 @@ export class WorkspaceOrderOperationsService {
       if (role === "seller") await this.seller(tx, order, actor);
       else if (aggregate.buyerUserId !== actor) fail("not_found", 404);
       const doc = await tx.get(this.path(scope));
-      return this.snapshot(aggregate, order, this.stored(doc.data(), aggregate, order), actor, role);
+      const record = this.stored(doc.data(), aggregate, order);
+      const completion = await tx.get(this.completionPath(scope));
+      if (completion.exists) this.completionBound(this.completionStored(completion.data()), aggregate, order, record);
+      const snapshot = this.snapshot(aggregate, order, record, actor, role);
+      return completion.exists ? {...snapshot, permittedActions: []} : snapshot;
     });
   }
 
@@ -311,6 +452,8 @@ export class WorkspaceOrderOperationsService {
       await this.seller(tx, order, actor);
       const doc = await tx.get(this.path(scope));
       const record = this.stored(doc.data(), aggregate, order);
+      const completion = await tx.get(this.completionPath(scope));
+      if (completion.exists) this.completionBound(this.completionStored(completion.data()), aggregate, order, record);
       const commandPath = this.path(scope).collection("commands").doc(digest([actor, operationId]));
       const receipt = await tx.get(commandPath);
       if (receipt.exists) {
@@ -357,7 +500,7 @@ export class WorkspaceOrderOperationsService {
         snapshot: this.snapshot(aggregate, order, record, actor, "seller")};
       const permitted = this.permitted(record).includes(action) &&
         (action === "reject" ? reason !== null && reason.length >= 3 : reason === null);
-      const applied = expectedRevision === record.revision && permitted && record.revision < Number.MAX_SAFE_INTEGER;
+      const applied = !completion.exists && expectedRevision === record.revision && permitted && record.revision < Number.MAX_SAFE_INTEGER;
       const updated = applied ? {...record, revision: record.revision + 1,
         stage: ({accept: "Preparing", ready: "Ready", reject: "Rejected"} as const)[action],
         rejectionReason: action === "reject" ? reason : null} : record;

@@ -2942,6 +2942,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "readStorePurchaseProjection" ||
         operation === "listBuyerPurchaseReferences" || operation === "listStorePurchaseReferences";
       const operationalRead = operation === "readBuyerOperationalOrder" || operation === "readStoreOperationalOrder";
+      const completionRead = operation === "readBuyerOrderCompletion" || operation === "readStoreOrderCompletion";
       const operationalCommand = operation === "submitStoreOrderCommand";
       const operationalReconcile = operation === "reconcileStoreOrderCommand";
       const ownerUserId = await verifySocialInvocation(
@@ -2954,7 +2955,7 @@ export const moolSocialWorkspace = onRequest(
             ),
           verifyIdToken: async (token) => {
             const verified = await getAuth().verifyIdToken(token);
-            if (purchaseProjectionRead || operationalRead || operationalCommand || operationalReconcile || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation) {
+            if (purchaseProjectionRead || operationalRead || completionRead || operationalCommand || operationalReconcile || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation) {
               requireDefaultPurchaseTenant(verified.firebase?.tenant);
             }
             return verified;
@@ -2989,6 +2990,9 @@ export const moolSocialWorkspace = onRequest(
         ? await workspaceCatalogueService().handleStoreVariantFamily(ownerUserId, operation, catalogueBody)
         : supplierPolicyOperation
         ? await workspaceSupplierPolicyService().handleOwnerOperation(ownerUserId, operation, catalogueBody)
+        : completionRead
+        ? await workspaceOrderOperationsService().readCompletion(ownerUserId,
+          operation === "readBuyerOrderCompletion" ? "buyer" : "seller", catalogueBody)
         : operationalRead
         ? await workspaceOrderOperationsService().read(ownerUserId,
           operation === "readBuyerOperationalOrder" ? "buyer" : "seller", catalogueBody)
