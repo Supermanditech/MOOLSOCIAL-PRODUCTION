@@ -162,6 +162,10 @@ abstract interface class StoreFeedbackAdapter {
   Future<StoreFeedbackResult> reconcile(StoreFeedbackCommand original);
 }
 
+/// The MVP connection is private product stars, not public written reviews.
+/// Legacy adapters/journals retain their existing capabilities and data.
+abstract interface class StoreStarsOnlyFeedbackAdapter implements StoreFeedbackAdapter {}
+
 /// One unresolved original request per authenticated account/Store. Production
 /// implementations must serialize reads/writes/removals across instances.
 abstract interface class StoreFeedbackPendingStore {
@@ -182,6 +186,7 @@ class StoreFeedbackController extends ChangeNotifier {
   final StoreFeedbackScope scope;
   final Object? Function() context;
   final StoreFeedbackAdapter? adapter;
+  bool get starsOnly => adapter is StoreStarsOnlyFeedbackAdapter;
   // Optional only for isolated session fixtures. WorkSession supplies its secure
   // implementation; absence must never be claimed as restart qualification.
   final StoreFeedbackPendingStore? pendingStore;
@@ -254,7 +259,11 @@ class StoreFeedbackController extends ChangeNotifier {
     if (_disposed || loading) return;
     final origin = context();
     if (origin == null) return;
-    if (!await restorePending() || !_matches(origin) || loading) return;
+    final restored = await restorePending();
+    // Private ratings are read-only. An unavailable legacy command journal
+    // must still block actions, but cannot grant or deny the feed's own auth.
+    final readOnlyStars = starsOnly && adapter?.commandRecoveryReady == false;
+    if ((!restored && !readOnlyStars) || !_matches(origin) || loading) return;
     final cursor = more ? nextCursor : null;
     if (more && (cursor == null || _pageContext != origin)) return;
     final epoch = ++_readEpoch;
@@ -265,7 +274,7 @@ class StoreFeedbackController extends ChangeNotifier {
       coverage = StoreFeedbackCoverage.unavailable;
     }
     _pageContext = origin;
-    message = null;
+    message = restored ? null : 'Saved requests could not be checked. No changes can be sent.';
     if (adapter == null) {
       notifyListeners();
       return;

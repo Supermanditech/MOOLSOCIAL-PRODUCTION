@@ -8160,11 +8160,18 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     foreach ($key in @('ticket','parentCheckpoint','state','owners')) {
       if ($null -eq $reports.PSObject.Properties[$key]) { return $false }
     }
+    # Existing LF13 stars-only Store frontend; optional for historical records.
+    $reportOwners=@($reportOwner)
+    foreach ($starsOwner in @('apps/mobile/lib/features/work/work_customer_feedback.dart',
+        'apps/mobile/lib/features/work/widgets/store_customer_feedback.dart',
+        'apps/mobile/test/work_customer_feedback_test.dart')) {
+      if (@($reports.owners) -ccontains $starsOwner) { $reportOwners += $starsOwner }
+    }
     if ($reports.ticket -cne 'LF-13-C01' -or
         $reports.parentCheckpoint -cne 'b6cc919b2d4671bb32dfb4023030b8c7c41576cb' -or
         $reports.state -cne 'local_original_owner_report_recovery_qualified_live_provider_pending' -or
-        (@($reports.owners) -join '|') -cne $reportOwner) { return $false }
-    $allowedOwners += $reportOwner
+        (@($reports.owners | Sort-Object) -join '|') -cne (@($reportOwners | Sort-Object) -join '|')) { return $false }
+    $allowedOwners += $reportOwners
   }
   return (@($Continuation.owners | Sort-Object) -join '|') -ceq
       (@($exactOwners | Sort-Object) -join '|') -and

@@ -202,6 +202,18 @@ if ($RequireLfPublicationProbes) {
   }
   if ($null -ne $continuation.PSObject.Properties['batch05ProductReportRecovery']) {
     $reportOwner='apps/mobile/test/ui_v2/buy/buy_v2_feedback_scope_test.dart'
+    foreach ($starsOwner in @('apps/mobile/lib/features/work/work_customer_feedback.dart',
+        'apps/mobile/lib/features/work/widgets/store_customer_feedback.dart',
+        'apps/mobile/test/work_customer_feedback_test.dart')) {
+      if (@($continuation.batch05ProductReportRecovery.owners) -ccontains $starsOwner) {
+        Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($starsOwner)) 'Exact stars frontend owner rejected.'
+        $historical=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+        $historical.batch05ProductReportRecovery.owners=@($historical.batch05ProductReportRecovery.owners | Where-Object { $_ -cne $starsOwner })
+        Assert-Fixture (Test-Lf27Batch01Continuation $historical @()) 'Historical feedback owner list rejected.'
+        Assert-Fixture (-not (Test-Lf27Batch01Continuation $historical @($starsOwner))) 'Unclaimed stars frontend owner admitted.'
+        $cases+=3
+      }
+    }
     Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($reportOwner)) 'Exact report fixture rejected.'
     $cases++
     foreach ($key in @('ticket','parentCheckpoint','state','owners')) {

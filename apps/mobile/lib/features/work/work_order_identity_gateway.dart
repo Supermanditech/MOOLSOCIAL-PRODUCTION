@@ -6,10 +6,46 @@ import 'package:crypto/crypto.dart';
 
 import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
+import 'work_customer_feedback.dart';
 
 enum WorkspaceOrderIdentityState { linked, unlinked, unavailable }
 
 enum WorkspaceOrderIdentityRole { buyer, seller }
+
+/// Read-only bridge into the existing Store inbox. Reader/account/realm are
+/// resolved per request, never captured from a retired root session.
+class WorkspacePrivateStarsFeedbackAdapter implements StoreStarsOnlyFeedbackAdapter {
+  const WorkspacePrivateStarsFeedbackAdapter({required this.reader, required this.realm});
+  final AuthenticatedWorkspaceOrderIdentityGateway? Function() reader;
+  final String Function() realm;
+  @override
+  bool get commandRecoveryReady => false;
+  @override
+  Future<StoreFeedbackPage> load(StoreFeedbackScope scope, {String? cursor}) async {
+    StoreFeedbackPage unavailable() => StoreFeedbackPage(scope: scope, coverage: StoreFeedbackCoverage.unavailable);
+    final identity = reader(), sourceRealm = realm();
+    if (identity == null || !identity.isCurrent || identity.accountUserId != scope.account ||
+        !const ['evaluation', 'production'].contains(sourceRealm)) {
+      return unavailable();
+    }
+    final page = await AuthenticatedWorkspaceOrderOperationsGateway(identity)
+      .listStoreProductStars(realm: sourceRealm, storeId: scope.store, cursor: cursor);
+    if (page == null || !identity.isCurrent || !identical(reader(), identity) || realm() != sourceRealm) return unavailable();
+    return StoreFeedbackPage(scope: scope, coverage: StoreFeedbackCoverage.partial, nextCursor: page.nextCursor,
+      entries: page.ratings.map((rating) => StoreFeedbackEntry(storeId: scope.store, id: rating.target.id,
+        version: rating.revision.toString(), kind: StoreFeedbackKind.product, authorLabel: 'Customer',
+        text: '', stars: rating.stars, orderId: rating.target.reference.orderId,
+        productId: rating.target.productId, productLabel: rating.target.productLabel)).toList());
+  }
+  // Old uncertain reply/report requests remain in their original journals.
+  // This stars-only reader cannot acknowledge, discard or resubmit them.
+  @override
+  Future<StoreFeedbackResult> submit(StoreFeedbackCommand command) async =>
+    StoreFeedbackResult(command: command, outcome: StoreFeedbackOutcome.unknown);
+  @override
+  Future<StoreFeedbackResult> reconcile(StoreFeedbackCommand original) async =>
+    StoreFeedbackResult(command: original, outcome: StoreFeedbackOutcome.unknown);
+}
 
 /// Identity only: not payment, fulfilment, document or seller-action authority.
 class WorkspaceOrderIdentityResult {

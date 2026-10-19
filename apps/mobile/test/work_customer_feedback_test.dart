@@ -75,6 +75,10 @@ class Adapter implements StoreFeedbackAdapter {
   }
 }
 
+class StarsAdapter extends Adapter implements StoreStarsOnlyFeedbackAdapter {
+  StarsAdapter() {commandRecoveryReady = false;}
+}
+
 class FeedbackStorage extends FlutterSecureStorage {
   final values = <String, String>{};
   bool failRead = false, failWrite = false, loseWriteResponse = false;
@@ -132,6 +136,37 @@ void main() {
   Future<void> ready() async {
     await controller.load();
   }
+
+  test('LF-STARS failed legacy journal restore does not block private reads or permit any writes', () async {
+    final storage = FeedbackStorage()..failRead = true;
+    final stars = StarsAdapter(); var reads = 0;
+    stars.read = (_) async {reads++; return page(entries: [StoreFeedbackEntry(storeId: scope.store,
+      id: 'private-stars', version: '1', kind: StoreFeedbackKind.product, authorLabel: 'Customer',
+      text: '', stars: 1, productId: 'exact-sku', productLabel: 'Actual pack')], coverage: StoreFeedbackCoverage.partial);};
+    final value = StoreFeedbackController(scope: scope, context: () => current, adapter: stars,
+      pendingStore: SecureStoreFeedbackPendingStore(storage: storage, currentAccount: () => scope.account));
+    addTearDown(value.dispose);
+    await value.load();
+    expect(reads, 1); expect(value.entries.single.stars, 1);
+    expect(value.recoveryReady, isFalse); expect(value.actionsReady, isFalse);
+    expect(storage.writes, 0); expect(stars.submitted, isEmpty); expect(stars.reconciled, isEmpty);
+    expect(value.message, contains('Saved requests'));
+  });
+  test('LF-STARS unavailable feed and failed old recovery preserve journal bytes without zero claim', () async {
+    final storage = FeedbackStorage(), journal = SecureStoreFeedbackPendingStore(storage: storage, currentAccount: () => scope.account);
+    const original = StoreFeedbackCommand(scope: scope, reviewId: 'old-comment', version: '1', operationId: 'original-report',
+      action: StoreFeedbackAction.report, audience: StoreFeedbackAudience.moderation, content: 'Retained private draft');
+    await journal.savePending(original); final before = Map<String, String>.of(storage.values), writes = storage.writes;
+    storage.failRead = true;
+    final stars = StarsAdapter()..read = (_) async => page(entries: [], coverage: StoreFeedbackCoverage.unavailable);
+    final value = StoreFeedbackController(scope: scope, context: () => current, adapter: stars, pendingStore: journal);
+    addTearDown(value.dispose); await value.load();
+    expect(value.coverage, StoreFeedbackCoverage.unavailable); expect(value.recoveryReady, isFalse);
+    expect(value.actionsReady, isFalse); expect(value.message, contains('Saved requests'));
+    expect(storage.values, before); expect(storage.writes, writes);
+    stars.commandRecoveryReady = true; var reads = 0; stars.read = (_) async {reads++; return page();};
+    await value.load(); expect(reads, 0); expect(storage.values, before);
+  });
 
   void draft(
     String text, [
@@ -813,6 +848,27 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF-STARS private inbox shows one-star product without legacy tabs or empty text scale=$scale', (tester) async {
+      final stars = StarsAdapter()..read = (_) async => page(entries: [StoreFeedbackEntry(
+        storeId: scope.store, id: 'private-stars', version: '1', kind: StoreFeedbackKind.product,
+        authorLabel: 'Customer', text: '', stars: 1, orderId: 'this-store-suborder', productId: 'exact-sku', productLabel: 'Actual pack')],
+        coverage: StoreFeedbackCoverage.partial);
+      final value = StoreFeedbackController(scope: scope, context: () => current, adapter: stars);
+      addTearDown(value.dispose);
+      await mount(tester, value: value, size: const Size(320, 640), scale: scale);
+      expect(find.textContaining('Only your Store'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('1 / 5 stars'), 120);
+      expect(find.text('1 / 5 stars'), findsOneWidget); expect(find.text('Actual pack'), findsOneWidget);
+      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.text(''), findsNothing);
+      await tester.ensureVisible(find.text('Actual pack')); await tester.tap(find.text('Actual pack')); await tester.pumpAndSettle();
+      expect(find.text('1 / 5 stars'), findsOneWidget); expect(find.text('Reply'), findsNothing); expect(find.text('Report'), findsNothing);
+      expect(find.text('Replies and reports are not available yet.'), findsNothing);
+      expect(stars.submitted, isEmpty); expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('restored request is reachable with an empty feed at larger text', (tester) async {

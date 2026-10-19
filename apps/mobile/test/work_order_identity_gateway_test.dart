@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/work/work_order_identity_gateway.dart';
+import 'package:moolsocial/features/work/work_customer_feedback.dart';
 
 // Isolated contract fixtures; no native storage, real order or provider calls.
 Map<String, dynamic> response({String role = 'buyer'}) {
@@ -155,6 +156,28 @@ void main() {
     expect(await gateway.listStoreProductStars(realm: 'evaluation', storeId: 'store-one'), isNull);
     wire.data.remove('buyerUserId'); wire.data['storeId'] = 'another-store';
     expect(await gateway.listStoreProductStars(realm: 'evaluation', storeId: 'store-one'), isNull);
+  });
+  test('LF-STARS Store adapter resolves later identity and fences retired replies without exposing actions', () async {
+    final wire = Transport()..data = {'schemaVersion': 1, 'realm': 'evaluation', 'authNamespace': 'firebase-default',
+      'viewerRole': 'seller', 'viewerUserId': 'owner-1', 'storeId': 'store-one',
+      'coverage': 'recorded_private_product_stars', 'ratings': [starResult()['rating']], 'nextCursor': null};
+    AuthenticatedWorkspaceOrderIdentityGateway? reader;
+    var realm = 'evaluation';
+    final adapter = WorkspacePrivateStarsFeedbackAdapter(reader: () => reader, realm: () => realm);
+    const scope = (account: 'owner-1', store: 'store-one');
+    expect((await adapter.load(scope)).coverage, StoreFeedbackCoverage.unavailable); expect(wire.calls, 0);
+    reader = projectionGateway(wire, account: 'owner-1');
+    final page = await adapter.load(scope), value = page.entries.single;
+    expect(value.stars, 1); expect(value.text, isEmpty); expect(value.authorLabel, 'Customer');
+    expect(value.replyAudiences, isEmpty); expect(value.canReport, isFalse); expect(adapter.commandRecoveryReady, isFalse);
+    expect(page.coverage, StoreFeedbackCoverage.partial);
+    expect((await adapter.load((account: 'other', store: 'store-one'))).coverage, StoreFeedbackCoverage.unavailable);
+    wire.pending = Completer<void>(); final pending = adapter.load(scope);
+    for (var i = 0; i < 100 && wire.calls < 2; i++) {await Future<void>.delayed(Duration.zero);}
+    expect(wire.calls, 2); reader = projectionGateway(wire, account: 'owner-1'); wire.pending!.complete();
+    expect((await pending).coverage, StoreFeedbackCoverage.unavailable);
+    realm = 'production'; wire.pending = null;
+    expect((await adapter.load(scope)).coverage, StoreFeedbackCoverage.unavailable);
   });
   if (Platform.environment['LF_PRIVATE_PRODUCT_STARS_LOG'] case final path?) {
     test('LF-STARS actual saved private backend stars cross buyer and seller strict readers', () async {

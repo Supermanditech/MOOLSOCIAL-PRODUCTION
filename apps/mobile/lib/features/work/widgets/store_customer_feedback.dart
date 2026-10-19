@@ -140,6 +140,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
+    final starsOnly = controller?.starsOnly == true;
     final scoped = controller != null && controller.context() != null;
     final entries = scoped && controller.current
         ? controller.entries
@@ -147,7 +148,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
     final selected = entries.where((e) => e.id == _selected).firstOrNull;
     final visible = entries.where(
       (e) =>
-          e.kind == _kind &&
+          e.kind == (starsOnly ? StoreFeedbackKind.product : _kind) &&
           (widget.orderId == null || e.orderId == widget.orderId),
     );
     final unavailable =
@@ -211,6 +212,11 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
             ],
           ),
           if (widget.orderId != null) const Text('Feedback for this order'),
+          if (starsOnly)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('Private product ratings · 1–5 stars\nOnly your Store can see these ratings.'),
+            ),
           if (controller?.pending != null && scoped) ...[
             const Text(
               'A request is awaiting confirmation. Do not send it again.',
@@ -241,11 +247,11 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
           if (selected == null) ...[
             if (unavailable &&
                 controller?.loading != true &&
-                controller?.message == null) ...[
-              const Padding(
-                padding: EdgeInsets.only(top: 8, bottom: 8),
+                (controller?.message == null || starsOnly)) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8),
                 child: Icon(
-                  Icons.rate_review_outlined,
+                  starsOnly ? Icons.star_outline_rounded : Icons.rate_review_outlined,
                   color: MoolColors.navy,
                   size: 32,
                 ),
@@ -255,11 +261,13 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
-                  'Reviews, replies and reports will appear here when available. '
-                  'This does not mean there are no reviews.',
+                  starsOnly ? 'Ratings will appear when the connection is available. '
+                    'This does not mean customers have given no ratings.'
+                    : 'Reviews, replies and reports will appear here when available. '
+                      'This does not mean there are no reviews.',
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -271,7 +279,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
                   'Only some feedback is available. These are not complete Store totals.',
                 ),
               ),
-            Wrap(
+            if (!starsOnly) Wrap(
               spacing: 8,
               runSpacing: 2,
               children: [
@@ -316,7 +324,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
                     if (entry.mixedOrder)
                       const Text('Mixed-Store order · Overall order feedback'),
                     if (entry.productLabel != null) Text(entry.productLabel!),
-                    Text(
+                    if (entry.text.trim().isNotEmpty) Text(
                       entry.text,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
@@ -341,7 +349,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
                     : () => unawaited(controller.load(more: true)),
                 child: const Text('Load more feedback'),
               ),
-          ] else ...[
+          ] else if (controller != null) ...[
             Text(
               '${_label(selected.kind)} feedback',
               style: const TextStyle(fontWeight: FontWeight.w700),
@@ -359,7 +367,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
             ),
             if (selected.stars != null) Text('${selected.stars} / 5 stars'),
             if (selected.productLabel != null) Text(selected.productLabel!),
-            SelectableText(selected.text),
+            if (selected.text.trim().isNotEmpty) SelectableText(selected.text),
             if (selected.ownerReply != null)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -370,16 +378,16 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
                 onPressed: orderBinding == null
                     ? null
                     : () {
-                        final id = controller?.orderForReview(orderBinding);
+                        final id = controller.orderForReview(orderBinding);
                         if (id != null) widget.onOpenOrder!(id);
                       },
                 icon: const Icon(Icons.receipt_long_outlined),
                 label: const Text('View this Store’s order'),
               ),
             const Divider(),
-            if (controller!.adapter?.commandRecoveryReady != true)
+            if (!starsOnly && controller.adapter?.commandRecoveryReady != true)
               const Text('Replies and reports are not available yet.')
-            else
+            else if (!starsOnly)
               Wrap(
                 spacing: 12,
                 children: [

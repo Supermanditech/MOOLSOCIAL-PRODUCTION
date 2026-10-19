@@ -1603,10 +1603,12 @@ class WorkSession extends ChangeNotifier {
     if (_disposed || account == null || account.isEmpty || store == null) return null;
     final scope = (account: account, store: store);
     return _customerFeedback.putIfAbsent(scope, () => StoreFeedbackController(
-      scope: scope, adapter: customerFeedbackAdapter,
+      scope: scope, adapter: customerFeedbackAdapter ?? WorkspacePrivateStarsFeedbackAdapter(
+        reader: () => originalPurchaseReader, realm: () => originalPurchaseRealm),
       pendingStore: customerFeedbackPendingStoreFactory?.call(scope) ?? SecureStoreFeedbackPendingStore(),
       context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store
-          ? null : publicationPreferencesContext,
+          ? null : customerFeedbackAdapter != null ? publicationPreferencesContext
+            : (publicationPreferencesContext, originalPurchaseReader, originalPurchaseRealm),
     ));
   }
   final WorkPendingProofStore Function(String storeId)? offerDraftStoreFactory;
