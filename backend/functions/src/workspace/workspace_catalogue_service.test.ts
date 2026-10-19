@@ -32,6 +32,188 @@ import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
 
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
 const at = "2026-10-16T12:00:00.000Z";
+
+test('LF03-EXEC trusted catalogue commands have an existing-service runtime facade', () => {
+  assert.equal(typeof (WorkspaceCatalogueService.prototype as unknown as Record<string, unknown>).handleCatalogueProduction, 'function');
+  assert.equal(typeof (catalogueModule as unknown as Record<string, unknown>).catalogueProductionOperation, 'function');
+});
+
+for (const kind of ['product', 'pack'] as const) {
+  test(`LF03-EXEC dual-role owner cannot review its own base ${kind} proposal`, () => {
+    let aggregate: CatalogueAggregate | undefined;
+    const commands = productionCommands();
+    const reviewIndex = kind === 'product' ? 2 : 4;
+    for (let index = 0; index < reviewIndex; index++) {
+      const owner = index === 1 || index === 3;
+      aggregate = planCatalogueProduction({operatorUserId: owner ? 'owner-one' : 'reviewer-one',
+        identity: catalogueIdentity, observedAt: at, input: commands[index]!}, producerAuthority(owner), aggregate,
+        owner ? producerParticipant() : undefined, owner ? profile : undefined).aggregate;
+    }
+    const original = structuredClone(aggregate), owner = producerAuthority(), dual = {...owner,
+      actor: {...owner.actor, scopes: [...owner.actor.scopes, 'supply.catalogue.review']}};
+    assert.throws(() => planCatalogueProduction({operatorUserId: 'owner-one', identity: catalogueIdentity,
+      observedAt: at, input: commands[reviewIndex]!}, dual, aggregate), {code: 'forbidden'});
+    assert.deepEqual(aggregate, original);
+    const snapshot = aggregate!, eventType = `${kind}_proposed`, proposal = snapshot.auditEvents.find(e => e.eventType === eventType)!;
+    for (const corrupted of [
+      {...snapshot, auditEvents: snapshot.auditEvents.filter(e => e !== proposal)},
+      {...snapshot, auditEvents: [...snapshot.auditEvents, proposal]},
+      {...snapshot, auditEvents: snapshot.auditEvents.map(e => e === proposal ? {...e, hashReferences: ['F'.repeat(64)]} : e)},
+      {...snapshot, auditEvents: snapshot.auditEvents.map(e => e === proposal ? {...e, tenantId: 'foreign-tenant'} : e)},
+      {...snapshot, commandReceipts: snapshot.commandReceipts.filter(r => r.commandId !== proposal.commandId)},
+    ]) {
+      assert.throws(() => planCatalogueProduction({operatorUserId: 'reviewer-one', identity: catalogueIdentity,
+        observedAt: at, input: commands[reviewIndex]!}, producerAuthority(false), corrupted), {code: 'forbidden'});
+    }
+    const reviewed = planCatalogueProduction({operatorUserId: 'reviewer-one', identity: catalogueIdentity,
+      observedAt: at, input: commands[reviewIndex]!}, producerAuthority(false), snapshot);
+    assert.equal(reviewed.aggregate.version, snapshot.version + 1);
+    assert.equal(planCatalogueProduction({operatorUserId: 'reviewer-one', identity: catalogueIdentity,
+      observedAt: at, input: commands[reviewIndex]!}, producerAuthority(false), reviewed.aggregate, undefined, undefined,
+      {fingerprint: reviewed.fingerprint, result: reviewed.aggregate}).replayed, true);
+  });
+}
+
+test('LF03-EXEC exact caller envelopes cannot nominate actor, authority or configured scope', async () => {
+  const classify = catalogueModule.catalogueProductionOperation;
+  assert.deepEqual(['submitCatalogueSourceProposal', 'executeCatalogueProduction', 'resolveStoreProductReview'].map(classify), ['proposal', 'command', 'resolve']);
+  for (const op of [null, {}, ['executeCatalogueProduction'], 'executeCatalogueProduction ', 'executeCatalogueProductionExtra', 'approveMyProduct']) assert.equal(classify(op), undefined);
+  const calls: unknown[] = [];
+  const repository = {realm: 'evaluation', produceCatalogue: async (...args: unknown[]) => {
+    calls.push(args); return {version: 7, privateAuthority: 'must-never-return'} as unknown as CatalogueAggregate;
+  }} as unknown as WorkspaceCatalogueRepository;
+  const service = new WorkspaceCatalogueService(repository, catalogueIdentity, () => new Date(at));
+  const body = {command: {type: 'create', commandId: 'operator-create'}};
+  assert.deepEqual(await service.handleCatalogueProduction('reviewer-one', 'executeCatalogueProduction', body), {
+    schemaVersion: 1, realm: 'evaluation', operation: 'executeCatalogueProduction', state: 'recorded', commandId: 'operator-create', catalogueVersion: 7,
+  });
+  assert.deepEqual(calls[0], ['reviewer-one', catalogueIdentity, body.command]);
+  for (const field of ['operatorUserId', 'ownerUserId', 'actor', 'authority', 'scopes', 'realm', 'catalogueId', 'tenantId', 'identity']) {
+    await assert.rejects(service.handleCatalogueProduction('owner-one', 'executeCatalogueProduction', {...body, [field]: 'reviewer-one'}));
+    await assert.rejects(service.handleCatalogueProduction('owner-one', 'executeCatalogueProduction', {command: {...body.command, [field]: 'reviewer-one'}}));
+  }
+  for (const command of [productionCommands()[1]!, productionCommands()[3]!]) {
+    await assert.rejects(service.handleCatalogueProduction('owner-one', 'executeCatalogueProduction', {command}));
+  }
+  assert.equal(calls.length, 1);
+  await assert.rejects(new WorkspaceCatalogueService(repository).handleCatalogueProduction('reviewer-one', 'executeCatalogueProduction', body));
+  await assert.rejects(new WorkspaceCatalogueService({realm: 'evaluation'} as WorkspaceCatalogueRepository, catalogueIdentity)
+    .handleCatalogueProduction('reviewer-one', 'executeCatalogueProduction', body));
+  await assert.rejects(service.handleCatalogueProduction('reviewer-one', 'approveMyProduct', body));
+});
+
+test('LF03-EXEC existing HTTP dispatch pins privileged actions to verified mutation identity and default-off activation', () => {
+  const index = readFileSync(`${__dirname}/../../src/index.ts`, 'utf8');
+  const start = index.indexOf('export const moolSocialWorkspace = onRequest('), end = index.indexOf('function workspaceOrderOperationsService', start);
+  assert.ok(start >= 0 && end > start);
+  const route = index.slice(start, end);
+  assert.ok(route.includes('process.env.MOOLSOCIAL_CATALOGUE_PRODUCER_V1 !== "true"'));
+  assert.ok(route.indexOf('process.env.MOOLSOCIAL_CATALOGUE_PRODUCER_V1') < route.indexOf('await verifySocialInvocation('));
+  assert.ok(route.slice(route.indexOf('const mutation ='), route.indexOf('const supplierPolicyOperation')).includes('catalogueProductionAction !== undefined'));
+  assert.ok(route.slice(route.indexOf('const catalogueOperation ='), route.indexOf('const orderMutation =')).includes('catalogueProductionAction !== undefined'));
+  assert.ok(route.includes('requireDefaultPurchaseTenant(verified.firebase?.tenant)'));
+  assert.ok(route.includes('consume ? { consume: true } : undefined'));
+  assert.ok(route.includes('handleCatalogueProduction(ownerUserId, operation, catalogueBody)'));
+  const factory = index.slice(index.indexOf('function workspaceCatalogueService()'), index.indexOf('export const youtubeOAuthCallback'));
+  for (const name of ['MOOLSOCIAL_CATALOGUE_REALM', 'MOOLSOCIAL_CATALOGUE_ID', 'MOOLSOCIAL_CATALOGUE_TENANT_ID']) assert.ok(factory.includes(`process.env.${name}`));
+});
+
+test('LF03-EXEC emulator caller path preserves source, independent review, private candidate and explicit public adoption', {
+  skip: process.env.FIRESTORE_EMULATOR_HOST === undefined,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-exec-${randomUUID().slice(0, 8)}`}, `exec-${randomUUID()}`);
+  const db = getFirestore(app), root = db.collection('workspaceCatalogues').doc('evaluation');
+  const repository = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at));
+  const service = () => new WorkspaceCatalogueService(repository(), catalogueIdentity, () => new Date(at));
+  const invoke = (actor: string, operation: string, body: Record<string, unknown>) => service().handleCatalogueProduction(actor, operation, body);
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    await root.collection('participants').doc('store-one').set(producerParticipant());
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    const product = submittedProduct(); product.channels[0]!.priceMinor = 10025;
+    const submitted = await service().handleProductSubmission('owner-one', 'submitStoreProduct', productRequest({product})) as any;
+    const record = submitted.record as StoreProductSubmissionRecord;
+    const source: CatalogueSubmissionReference = {realm: 'evaluation', storeId: record.storeId, skuId: record.skuId, revision: record.revision, fingerprint: record.fingerprint};
+    const value: StoreSkuInput = {...input(), content: {...product.content, media: []}, provenance: product.provenance,
+      channels: product.channels.map(channel => ({...channel, offerId: 'offer-one'}))};
+    const commands = productionCommands(value), {contentSha256: _, categoryId: __, ...proposal} = commands[1]!,
+      {descriptorSha256: ___, ...packProposal} = commands[3]!;
+    const reviewIndependently = async (command: Record<string, unknown>) => {
+      const owner = producerAuthority(), dual = {...owner, actor: {...owner.actor, scopes: [...owner.actor.scopes, 'supply.catalogue.review']}};
+      const catalogueRef = root.collection('canonicalCatalogues').doc(catalogueIdentity.catalogueId);
+      const before = (await catalogueRef.get()).data(), receipts = (await catalogueRef.collection('producerReceipts').get()).docs.map(d => [d.id, d.data()]);
+      await root.collection('producerAuthorities').doc('owner-one').set(dual);
+      await assert.rejects(invoke('owner-one', 'executeCatalogueProduction', {command}), {code: 'forbidden'});
+      assert.deepEqual((await catalogueRef.get()).data(), before);
+      assert.deepEqual((await catalogueRef.collection('producerReceipts').get()).docs.map(d => [d.id, d.data()]), receipts);
+      await root.collection('producerAuthorities').doc('owner-one').set(owner);
+      return invoke('reviewer-one', 'executeCatalogueProduction', {command});
+    };
+    await assert.rejects(invoke('stranger', 'executeCatalogueProduction', {command: commands[0]!}), {code: 'forbidden'});
+    await invoke('reviewer-one', 'executeCatalogueProduction', {command: commands[0]!});
+    await assert.rejects(invoke('stranger', 'submitCatalogueSourceProposal', {source: {...source, fingerprint: 'F'.repeat(64)}, command: proposal}), {code: 'forbidden'});
+    await assert.rejects(invoke('reviewer-one', 'submitCatalogueSourceProposal', {source, command: proposal}), {code: 'forbidden'});
+    await assert.rejects(invoke('owner-one', 'submitCatalogueSourceProposal', {source: {...source, storeId: 'foreign-store'}, command: proposal}));
+    await assert.rejects(invoke('owner-one', 'submitCatalogueSourceProposal', {source: {...source, fingerprint: 'F'.repeat(64)}, command: proposal}), {code: 'conflict'});
+    const catalogueRef = root.collection('canonicalCatalogues').doc(catalogueIdentity.catalogueId);
+    const beforePrivateDenials = (await catalogueRef.get()).data(), beforePrivateReceipts = (await catalogueRef.collection('producerReceipts').get()).docs.map(d => [d.id, d.data()]);
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({ownerUserId: 'prior-owner'});
+    await assert.rejects(invoke('owner-one', 'submitCatalogueSourceProposal', {source: {...source, fingerprint: 'F'.repeat(64)}, command: proposal}), {code: 'forbidden'});
+    const previousAuthor = await service().handleProductSubmission('prior-owner', 'submitStoreProduct',
+      productRequest({product: submittedProduct('prior-author-sku'), idempotencyKey: 'prior-author-source'})) as any;
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({ownerUserId: 'owner-one'});
+    const priorSource = {realm: 'evaluation', storeId: 'store-one', skuId: 'prior-author-sku', revision: previousAuthor.record.revision, fingerprint: 'F'.repeat(64)};
+    await assert.rejects(invoke('owner-one', 'submitCatalogueSourceProposal', {source: priorSource, command: proposal}), {code: 'forbidden'});
+    assert.deepEqual((await catalogueRef.get()).data(), beforePrivateDenials);
+    assert.deepEqual((await catalogueRef.collection('producerReceipts').get()).docs.map(d => [d.id, d.data()]), beforePrivateReceipts);
+    const first = await invoke('owner-one', 'submitCatalogueSourceProposal', {source, command: proposal});
+    assert.equal(Object.hasOwn(first, 'products'), false);
+    assert.deepEqual(await invoke('owner-one', 'submitCatalogueSourceProposal', {source, command: proposal}), first);
+    await assert.rejects(invoke('owner-one', 'submitCatalogueSourceProposal', {source, command: {...proposal, productId: 'changed-under-receipt'}}), {code: 'conflict'});
+    await root.collection('producerAuthorities').doc('owner-one').update({enabled: false});
+    await assert.rejects(invoke('owner-one', 'submitCatalogueSourceProposal', {source, command: proposal}), {code: 'forbidden'});
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await assert.rejects(new WorkspaceCatalogueService(repository(), {...catalogueIdentity, tenantId: 'foreign-tenant'}, () => new Date(at))
+      .handleCatalogueProduction('owner-one', 'submitCatalogueSourceProposal', {source, command: proposal}), {code: 'forbidden'});
+    await reviewIndependently(commands[2]!);
+    await invoke('owner-one', 'submitCatalogueSourceProposal', {source, command: packProposal});
+    await reviewIndependently(commands[4]!);
+    await invoke('owner-one', 'executeCatalogueProduction', {command: commands[5]!});
+    const resolution = {source, expectedReviewRevision: 0, idempotencyKey: 'resolve-caller', canonicalProductId: value.canonicalProductId,
+      verifiedPackId: value.verifiedPackId, offers: [{kind: 'retail', offerId: 'offer-one'}]};
+    for (const field of ['operatorUserId', 'authority', 'identity', 'realm', 'catalogueId', 'tenantId']) {
+      await assert.rejects(invoke('owner-one', 'submitCatalogueSourceProposal', {source, command: proposal, [field]: 'reviewer-one'}), {code: 'invalid_input'});
+      await assert.rejects(invoke('reviewer-one', 'resolveStoreProductReview', {...resolution, [field]: 'owner-one'}), {code: 'invalid_input'});
+    }
+    const owner = producerAuthority(), ownerReview = {...owner,
+      actor: {...owner.actor, scopes: [...owner.actor.scopes, 'supply.catalogue.review']}};
+    await root.collection('producerAuthorities').doc('owner-one').set(ownerReview);
+    await assert.rejects(invoke('owner-one', 'resolveStoreProductReview', resolution), {code: 'forbidden'});
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    const resolved = await invoke('reviewer-one', 'resolveStoreProductReview', resolution) as any;
+    assert.equal(resolved.state, 'reviewed_candidate'); assert.equal(resolved.reviewRevision, 1);
+    assert.equal(Object.hasOwn(resolved, 'sku'), false); assert.equal(Object.hasOwn(resolved, 'reviewedBy'), false);
+    assert.deepEqual(await invoke('reviewer-one', 'resolveStoreProductReview', resolution), resolved);
+    await root.collection('producerAuthorities').doc('reviewer-one').update({expiresAt: at});
+    await assert.rejects(invoke('reviewer-one', 'resolveStoreProductReview', resolution), {code: 'forbidden'});
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    assert.equal((await root.collection('stores').doc('store-one').collection('skus').get()).size, 0);
+    assert.deepEqual((await service().publicCatalogue({storeId: 'store-one'}) as any).items, []);
+    const read = await service().handleProductSubmission('owner-one', 'readStoreProductSubmission',
+      {productSubmissionVersion: 1, productReviewVersion: 1, storeId: 'store-one', skuId: product.skuId}) as any;
+    const candidate = read.review.candidate;
+    await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: candidate.sku, expectedRevision: 0,
+      idempotencyKey: 'explicit-caller-adoption', reviewCandidate: {revision: candidate.revision, fingerprint: candidate.fingerprint}});
+    const page = await service().publicCatalogue({storeId: 'store-one'}) as any;
+    assert.equal(page.items[0].channels[0].priceMinor, 10025); assert.deepEqual(page.items[0].content, value.content);
+    const changed = structuredClone(product); changed.content.title = 'Changed private source';
+    await service().handleProductSubmission('owner-one', 'submitStoreProduct', productRequest({product: changed, expectedRevision: 1, idempotencyKey: 'next-private-source'}));
+    await assert.rejects(invoke('reviewer-one', 'resolveStoreProductReview', {...resolution, expectedReviewRevision: 1, idempotencyKey: 'new-command-stale-source'}), {code: 'conflict'});
+    assert.deepEqual(await invoke('reviewer-one', 'resolveStoreProductReview', resolution), resolved);
+  } finally {await db.terminate(); await deleteApp(app);}
+});
 test('LF11 saved selling-Store stock has a producer and exact public quantity-query reader', () => {
   assert.equal(typeof Reflect.get(WorkspaceCatalogueService.prototype, 'handleStoreStock'), 'function');
   assert.equal(typeof Reflect.get(FirestoreWorkspaceCatalogueRepository.prototype, 'storeStock'), 'function');
@@ -1114,7 +1296,7 @@ test('LF03-SOURCE emulator saved submission to catalogue proposals to exact revi
     await assert.rejects(repository().proposeSubmittedCatalogue('reviewer-one', catalogueIdentity, source, productProposal), {code: 'forbidden'});
     await assert.rejects(repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, {...source, fingerprint: 'F'.repeat(64)}, productProposal), {code: 'conflict'});
     await assert.rejects(repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, {...source, realm: 'production'}, productProposal));
-    await assert.rejects(repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, {...source, storeId: 'other-store'}, productProposal), {code: 'not_found'});
+    await assert.rejects(repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, {...source, storeId: 'other-store'}, productProposal), {code: 'forbidden'});
     await assert.rejects(repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, source,
       {...productProposal, productId: 'changed-under-same-command'}), {code: 'conflict'});
     await assert.rejects(repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, source, commands[2]!));

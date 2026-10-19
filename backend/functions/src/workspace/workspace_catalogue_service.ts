@@ -418,6 +418,12 @@ function productPresentationQuery(raw: unknown): ProductPresentationQuery {
 
 export interface WorkspaceCatalogueRepository {
   readonly realm: "evaluation" | "production";
+  produceCatalogue?(operatorUserId: string, identity: CatalogueIdentity,
+    input: Readonly<Record<string, unknown>>): Promise<CatalogueAggregate>;
+  proposeSubmittedCatalogue?(operatorUserId: string, identity: CatalogueIdentity,
+    source: CatalogueSubmissionReference, input: Readonly<Record<string, unknown>>): Promise<CatalogueAggregate>;
+  resolveProductReview?(operatorUserId: string, identity: CatalogueIdentity,
+    input: Readonly<Record<string, unknown>>): Promise<StoreReviewedProductCandidate>;
   storeStock?(owner: string | undefined, action: StoreStockAction, request: StoreStockRequest,
     identity: CatalogueIdentity, admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object>;
   store(storeId: string): Promise<WorkspaceProfileRecord | undefined>;
@@ -794,6 +800,26 @@ export function planCatalogueProduction(command: CatalogueProduction,
       ?.contentSha256.toUpperCase() !== expectedContentSha256) invalid("Review content changed.");
     if (input.type === "review_pack" && current.packs.find(p => p.packId === input.packId)
       ?.descriptorSha256.toUpperCase() !== expectedDescriptorSha256) invalid("Review pack changed.");
+    if (input.type === "review_product" || input.type === "review_pack") {
+      const product = input.type === "review_product" ? current.products.find(p => p.productId === input.productId) : undefined;
+      const pack = input.type === "review_pack" ? current.packs.find(p => p.packId === input.packId) : undefined;
+      const entityType = product ? "product" : "pack", entityId = product?.productId ?? pack?.packId;
+      const proposalHash = product?.contentSha256 ?? pack?.descriptorSha256;
+      if (!Array.isArray(current.auditEvents) || !Array.isArray(current.commandReceipts)) throw deny();
+      const proposals = current.auditEvents.filter(event => event?.eventType === `${entityType}_proposed` &&
+        event.entityType === entityType && event.entityId === entityId);
+      const proposal = proposals[0];
+      // Base records predate proposedByActorId; use their exact immutable audit
+      // evidence, not the Store's current owner or a caller-supplied proposer.
+      // Historical receipt replay above remains a read of its original result.
+      if (proposals.length !== 1 || !proposal || typeof proposal.actorId !== "string" || !proposal.actorId ||
+          proposal.actorId === operator || proposal.catalogueId !== identity.catalogueId || proposal.tenantId !== identity.tenantId ||
+          proposal.occurredAt !== (product?.proposedAt ?? pack?.proposedAt) ||
+          !Number.isSafeInteger(proposal.aggregateVersion) || proposal.aggregateVersion < 1 || proposal.aggregateVersion > current.version ||
+          proposal.eventId !== `${identity.catalogueId}:${proposal.aggregateVersion}` ||
+          !Array.isArray(proposal.hashReferences) || proposal.hashReferences.length !== 1 || proposal.hashReferences[0] !== proposalHash ||
+          current.commandReceipts.filter(r => r.commandId === proposal.commandId && r.aggregateVersion === proposal.aggregateVersion).length !== 1) throw deny();
+    }
     aggregate = applyCatalogueCommand(current, {...fields, catalogueId: identity.catalogueId,
       occurredAt: at, actor} as unknown as CatalogueCommand, participant);
   }
@@ -807,6 +833,12 @@ export function storeVariantFamilyOperation(operation: unknown): "submit" | "own
   if (operation === "readPublicStoreVariantFamilies") return "public_read";
   return undefined;
 }
+export function catalogueProductionOperation(operation: unknown): "proposal" | "command" | "resolve" | undefined {
+  return operation === "submitCatalogueSourceProposal" ? "proposal"
+    : operation === "executeCatalogueProduction" ? "command"
+    : operation === "resolveStoreProductReview" ? "resolve" : undefined;
+}
+
 export function storeProductSubmissionOperation(operation: unknown): "submit" | "read" | "reconcile" | undefined {
   if (operation === "submitStoreProduct") return "submit";
   if (operation === "readStoreProductSubmission") return "read";
@@ -876,6 +908,44 @@ export class WorkspaceCatalogueService {
     private readonly identity?: CatalogueIdentity,
     private readonly now: () => Date = () => new Date(),
     private readonly policyReader?: Pick<WorkspaceSupplierPolicyService, "forPublicSku">) {}
+
+  /** Privileged caller facade. HTTP activation is default-off. Current authority
+   * is checked by the existing repository transaction, including receipt replay.
+   * Never return the full private aggregate or accept caller-supplied authority. */
+  async handleCatalogueProduction(verifiedUserId: string, operation: string,
+    raw: Readonly<Record<string, unknown>>): Promise<object> {
+    const action = catalogueProductionOperation(operation), body = structuredClone(raw);
+    if (!action) invalid();
+    const actor = id(verifiedUserId);
+    const unavailable = () => new WorkspaceProfileError("service_unavailable", "Catalogue operations are not connected.", 503);
+    if (!this.identity) throw unavailable();
+    const identity = {catalogueId: id(this.identity.catalogueId), tenantId: id(this.identity.tenantId)};
+    if (action === "resolve") {
+      exact(body, ["source", "expectedReviewRevision", "idempotencyKey", "canonicalProductId", "verifiedPackId", "offers"]);
+      if (!this.repository.resolveProductReview) throw unavailable();
+      const candidate = await this.repository.resolveProductReview(actor, identity, body);
+      return {schemaVersion: 1, realm: this.repository.realm, operation, state: "reviewed_candidate",
+        source: candidate.source, reviewRevision: candidate.revision,
+        candidateFingerprint: candidate.fingerprint, expiresAt: candidate.expiresAt};
+    }
+    exact(body, action === "proposal" ? ["source", "command"] : ["command"]);
+    const command = object(body.command);
+    let aggregate: CatalogueAggregate;
+    if (action === "proposal") {
+      const source = submissionReference(body.source);
+      if (source.realm !== this.repository.realm) invalid();
+      if (!this.repository.proposeSubmittedCatalogue) throw unavailable();
+      aggregate = await this.repository.proposeSubmittedCatalogue(actor, identity, source, command);
+    } else {
+      const canonical = productionInput(command);
+      // Product/pack proposals must use the immutable Store submission path.
+      if (["propose_product", "propose_product_revision", "propose_pack"].includes(String(canonical.type))) invalid();
+      if (!this.repository.produceCatalogue) throw unavailable();
+      aggregate = await this.repository.produceCatalogue(actor, identity, canonical);
+    }
+    return {schemaVersion: 1, realm: this.repository.realm, operation, state: "recorded",
+      commandId: id(command.commandId), catalogueVersion: aggregate.version};
+  }
 
   /** Store-reported checkpoint only: never allocation, reservation or delivery authority. */
   async handleStoreStock(actor: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
@@ -2520,14 +2590,14 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
     return result(completed.record, completed.current);
   }
 
-  /** Internal only: resolves private authority inside the committing transaction.
-   * No HTTP operation, automatic grants, approval shortcut or runtime seeds.
+  /** Resolves private authority inside the committing transaction. The guarded
+   * caller facade supplies verified identity, never grants or runtime seeds.
    */
   async produceCatalogue(operatorUserId: string, identity: CatalogueIdentity,
     input: Readonly<Record<string, unknown>>): Promise<CatalogueAggregate> {
     return this.produceCatalogueCommand(operatorUserId, identity, input);
   }
-  /** Internal proposal bridge. No HTTP review operation or automatic publication. */
+  /** Source-bound proposal bridge; no automatic review or publication. */
   async proposeSubmittedCatalogue(operatorUserId: string, identity: CatalogueIdentity,
     source: CatalogueSubmissionReference, input: Readonly<Record<string, unknown>>): Promise<CatalogueAggregate> {
     return this.produceCatalogueCommand(operatorUserId, identity, input, source);
@@ -2546,16 +2616,28 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
     const authorityRef = root.collection("producerAuthorities").doc(operator);
     return this.firestore.runTransaction(async transaction => {
       const [authorityDoc, aggregateDoc, receiptDoc] = await transaction.getAll(authorityRef, aggregateRef, receiptRef);
+      const currentActor = producerActor(operator, resolvedIdentity, this.now().toISOString(),
+        authorityDoc?.data() as CatalogueProducerAuthority | undefined);
+      if (pinned && (currentActor.workspaceId !== pinned.storeId || !currentActor.scopes.includes("supply.workspace.admin"))) {
+        throw new WorkspaceProfileError("forbidden", "Catalogue authority is not available.", 403);
+      }
       let normalized: Record<string, unknown>, mediaIndex: {ref: DocumentReference; exists: boolean} | undefined;
       if (pinned) {
+        try { await this.productSubmissionOwner(transaction, pinned.storeId, operator); }
+        catch (error) {
+          if (error instanceof WorkspaceProfileError && ["not_found", "invalid_state"].includes(error.code)) {
+            throw new WorkspaceProfileError("forbidden", "Catalogue authority is not available.", 403);
+          }
+          throw error;
+        }
         const saved = await transaction.get(this.productSubmissionHead(pinned.storeId, pinned.skuId)
           .collection("revisions").doc(String(pinned.revision)));
         if (!saved.exists) throw new WorkspaceProfileError("not_found", "Saved product submission is not available.", 404);
+        if (saved.get("submittedBy") !== operator) throw new WorkspaceProfileError("forbidden", "Use the original Store owner submission.", 403);
         const record = checkedProductSubmission(saved.data(), this.realm, pinned.storeId, pinned.skuId);
         if (record.revision !== pinned.revision || record.fingerprint !== pinned.fingerprint) {
           throw new WorkspaceProfileError("conflict", "Saved product source changed.", 409);
         }
-        if (record.submittedBy !== operator) throw new WorkspaceProfileError("forbidden", "Use the original Store owner submission.", 403);
         if (pinned.media) {
           await this.submissionMedia(transaction, pinned, record);
           const ref = this.root(pinned.storeId).collection("productMediaAssets").doc(pinned.media.assetId), existing = await transaction.get(ref);
