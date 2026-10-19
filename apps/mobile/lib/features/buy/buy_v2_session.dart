@@ -16063,26 +16063,33 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   /// Published buyer consent applies to new attempts, not original recovery.
-  bool _checkoutSupplierPoliciesCurrent() {
+  bool _checkoutSupplierPoliciesCurrent({
+    Iterable<BuyV2CartLine>? lines,
+    bool presentFailure = true,
+  }) {
     _ensureSupplierPolicyOwner();
     if (_pendingSupplierPolicyAdd != null || _supplierPolicyConsentBusy) {
       return false;
     }
-    for (final line in checkoutLines) {
+    for (final line in lines ?? checkoutLines) {
       final item = line.product;
       final content = _freshSupplierPolicyContent(item);
       final identity = _buyV2ProductIdentityKey(item);
       if (_unresolvedSupplierPolicyProducts.contains(identity)) {
-        _persistCustomerState();
-        notice = 'Store policy could not be confirmed. Refresh this product.';
-        notifyListeners();
+        if (presentFailure) {
+          _persistCustomerState();
+          notice = 'Store policy could not be confirmed. Refresh this product.';
+          notifyListeners();
+        }
         return false;
       }
       if (!_requiredSupplierPolicyProducts.contains(identity)) continue;
       final policy = content?.supplierPolicy;
       if (policy?.appliesTo(item, catalogueNow()) != true) {
-        notice = 'Store policy could not be confirmed. Refresh this product.';
-        notifyListeners();
+        if (presentFailure) {
+          notice = 'Store policy could not be confirmed. Refresh this product.';
+          notifyListeners();
+        }
         return false;
       }
       final owner = customerStateStore?.ownerScope;
@@ -16091,6 +16098,9 @@ class BuyV2Session extends ChangeNotifier {
               policy.acceptanceFingerprint(owner)) {
         continue;
       }
+      // A post-save guard must first restore the never-submitted attempt.
+      // The next explicit Checkout action can present the normal consent UI.
+      if (!presentFailure) return false;
       _pendingSupplierPolicyAdd = BuyV2SupplierPolicyAddIntent(
         product: item,
         productIdentity: identity,
@@ -17580,6 +17590,9 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     final stockChanged = _stockRequestHasShortage(request);
+    final policiesCurrent = _checkoutSupplierPoliciesCurrent(
+      lines: request.lines, presentFailure: false);
+    if (!_legacyOperationCurrent(attempt, sequence, identity, procurementEpoch)) return false;
     // Judge the frozen request's agreement, not a successor global payment
     // selection. Scheduled delivery still requires its current input grant.
     final agreementChanged = (checkoutQuoteEnabled &&
@@ -17588,7 +17601,7 @@ class BuyV2Session extends ChangeNotifier {
         termsAgreement != _checkoutTermsAgreement(termKeys) ||
         (originalQuote != null && (request.checkoutQuoteId != originalQuote.id ||
           !catalogueNow().isBefore(originalQuote.validUntil)));
-    if (!retained || stockChanged ||
+    if (!retained || stockChanged || !policiesCurrent ||
         agreementChanged ||
         (request.lines.any((line) => line.scheduledFulfilment != null) &&
           (!_selectedScheduledInputsCurrent(request) || checkoutQuoteReviewRequired || originalQuote == null)) ||
@@ -17604,6 +17617,7 @@ class BuyV2Session extends ChangeNotifier {
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.failed;
       notice = retained
           ? stockChanged ? 'Stock changed. Review the affected products before payment.'
+            : !policiesCurrent ? 'Store policy changed. Review Checkout before payment.'
             : request.lines.any((line) => line.scheduledFulfilment != null)
               ? 'Scheduled delivery changed. Review Checkout before payment.'
               : 'Order agreement changed. Check them before payment.'
@@ -18054,6 +18068,11 @@ class BuyV2Session extends ChangeNotifier {
     }
     while (group != null) {
       final request = group.request;
+      if (!_checkoutSupplierPoliciesCurrent(lines: request.lines, presentFailure: false)) {
+        notice = 'Store policy changed. Review remaining checkout. Completed orders are kept.';
+        notifyListeners();
+        return false;
+      }
       // Cached purchased products supply historical facts only. Live Cart
       // eligibility must still authorize every never-submitted line.
       final liveLinesMatch = request.lines.every((line) {
@@ -18139,14 +18158,18 @@ class BuyV2Session extends ChangeNotifier {
       // This group has not dispatched yet. Recovery of a submitted group uses
       // the separate original-attempt path and must not require a fresh grant.
       final stockChanged = _stockRequestHasShortage(request);
+      final policiesCurrent = _checkoutSupplierPoliciesCurrent(
+        lines: request.lines, presentFailure: false);
+      if (!_groupOperationCurrent(attempt, group, sequence, identity)) return false;
       final agreementChanged = !catalogueNow().isBefore(attempt.quoteValidUntil) ||
           quoteAgreement != _checkoutQuoteAgreement(_checkoutQuote) ||
           termsAgreement != _checkoutTermsAgreement(group.fulfilmentKeys);
-      if (stockChanged || agreementChanged ||
+      if (stockChanged || !policiesCurrent || agreementChanged ||
           request.lines.any((line) => line.scheduledFulfilment != null) && !_selectedScheduledInputsCurrent(request)) {
         checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
         _syncCheckoutGroupState(); _checkoutIdempotencyKey = null;
         notice = stockChanged ? 'Stock changed. Review the affected products before payment.'
+          : !policiesCurrent ? 'Store policy changed. Review Checkout before payment.'
           : agreementChanged ? 'Order agreement changed. Review Checkout before payment.'
           : 'Scheduled delivery changed before payment. Review Checkout.';
         _persistCustomerState(); notifyListeners(); return false;
@@ -19077,6 +19100,11 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     _retainedCheckoutPaymentAttempts.add(attempt);
+    // Replanning cannot retain a sheet or in-flight tick for the old checkout.
+    _pendingSupplierPolicyAdd = null;
+    _supplierPolicyAcceptancesInFlight = null;
+    _supplierPolicyConsentBusy = false;
+    _supplierPolicyConsentSequence++;
     _checkoutPaymentAttempt = null;
     _clearCheckoutPaymentAttempt();
     checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;

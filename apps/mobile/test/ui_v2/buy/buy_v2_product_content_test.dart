@@ -22,7 +22,8 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart'
     show buyV2BuyerDeliveryPromise, BuyV2ActionStyle, BuyV2ThemeScope, BuyV2ThemeSpec;
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 import 'buy_v2_qualified_provider_fixture.dart'
-    show TestPaymentCommerce, TestPaymentQuote, testPaymentSnapshot;
+    show TestPaymentCommerce, TestPaymentQuote, testPaymentSnapshot,
+      TestLegacyRecoveryCommerce, TestGroupedPaymentCommerce;
 import 'buy_v2_discovery_refinement_test.dart' show BuyTestEligibilityFacts;
 
 // Isolated presentation facts; this does not supply live delivery evidence.
@@ -195,6 +196,75 @@ void main() {
       );
       session.openCart();
       expect(session.openCheckout(), isTrue);
+    }
+
+    for (final grouped in [false, true]) {
+      for (final change in ['body', 'missing', 'expired', 'unchanged']) {
+        test('LF08 policy before new dispatch grouped=$grouped change=$change', () async {
+          final isolatedCore = BuySession();
+          final connector = grouped ? TestGroupedPaymentCommerce() : TestLegacyRecoveryCommerce();
+          connector.snapshot = (session.commerceAdapter as TestPaymentCommerce).snapshot;
+          final isolatedQuote = TestPaymentQuote();
+          if (grouped) {
+            isolatedQuote.groupsFor = (lines, method) => [
+              for (var i = 0; i < lines.length; i++) BuyV2CheckoutPaymentGroup(
+                id: 'policy-group-$i', fulfilmentKeys: {lines[i].fulfilmentKey},
+                paymentMethod: method, total: lines[i].total, amountDueNow: lines[i].total),
+            ];
+          }
+          final isolated = BuyV2Session(core: isolatedCore,
+            commerceAdapter: connector, customerStateStore: store,
+            productContentAdapter: content, checkoutQuoteAdapter: isolatedQuote,
+            reviewDataEnabled: false, productFactsAdapter: const BuyTestEligibilityFacts());
+          addTearDown(isolated.dispose);
+          addTearDown(isolatedCore.dispose);
+          await isolated.restoreCommerce();
+          await isolated.restoreCustomerState();
+          expect(isolated.addProduct('s-milk', quantity: 2), isFalse);
+          expect(await isolated.acceptSupplierPolicyAndAdd(isolated.pendingSupplierPolicyAdd), isTrue);
+          isolated.openCart();
+          expect(isolated.openCheckout(), isTrue, reason: isolated.notice);
+          expect(await isolated.refreshCheckoutQuote(), isTrue);
+          await isolated.retainedAccountState();
+          final writes = store.writes.length, hold = Completer<void>();
+          store.pending = hold;
+          final placing = isolated.submitOrder();
+          for (var i = 0; i < 100 && store.writes.length == writes; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+          }
+          expect(store.writes.length, greaterThan(writes));
+          expect(connector.requests, isEmpty);
+          if (change == 'body') content.body = 'Changed while saving the new order.';
+          if (change == 'missing' || change == 'expired') content.mode = change;
+          hold.complete();
+          await placing;
+          expect(connector.requests, hasLength(change == 'unchanged' ? 1 : 0));
+          expect(isolated.quantityFor('s-milk'), 2);
+          if (change != 'unchanged') {
+            if (grouped) {
+              expect(isolated.currentCheckoutPaymentGroup!.state, BuyV2CheckoutSubmissionState.idle);
+            } else {
+              expect(isolated.legacyCheckoutAttempt, isNull);
+            }
+            if (change == 'body') {
+              if (grouped) {
+                expect(isolated.pendingSupplierPolicyAdd, isNull);
+                expect(isolated.reviewRemainingGroupedCheckout(), isTrue);
+                expect(await isolated.refreshCheckoutQuote(), isTrue);
+              }
+              expect(await isolated.submitOrder(), isFalse);
+              final review = isolated.pendingSupplierPolicyAdd;
+              expect(review, isNotNull);
+              expect(await isolated.acceptSupplierPolicyAndAdd(review), isTrue,
+                reason: 'Use normal consent after explicit remaining-checkout review.');
+              expect(connector.requests, isEmpty);
+              expect(isolated.quantityFor('s-milk'), 2);
+              await isolated.submitOrder();
+              expect(connector.requests, hasLength(1));
+            }
+          }
+        });
+      }
     }
 
     test(
@@ -1896,7 +1966,8 @@ void main() {
       );
       expect(
         find.descendant(of: card, matching: find.textContaining('4.2 stars')),
-        findsOneWidget,
+        findsNothing,
+        reason: 'MVP purchased-item stars stay private even when a legacy trust adapter supplies ratings.',
       );
       expect(
         find.descendant(of: card, matching: find.textContaining('MRP')),
@@ -3194,7 +3265,8 @@ void main() {
       expect(panel, findsOneWidget);
       expect(
         find.descendant(of: panel, matching: find.text('4.6')),
-        findsOneWidget,
+        findsNothing,
+        reason: 'Do not expose a public Store rating in the private-stars MVP.',
       );
       expect(
         find.descendant(of: panel, matching: find.text('128')),
@@ -4328,7 +4400,7 @@ void main() {
 
       expectVisibleLabel();
       expect(find.text('Customer rating'), findsNothing);
-      expect(find.text('Customer ratings'), findsOneWidget);
+      expect(find.text('Customer ratings'), findsNothing);
       expect(session.addProduct('s-milk'), isTrue);
       final quantity = session.quantityFor('s-milk');
       session.openCart();
@@ -4375,12 +4447,11 @@ void main() {
       find.text('Description'),
     );
     expect(tabParagraph.text.style?.fontFamily, isNotNull);
-    final reviewParagraph = tester.renderObject<RenderParagraph>(
-      find.text('Rate or review'),
-    );
+    expect(find.text('Rate or review'), findsNothing);
+    expect(find.text('Customer ratings'), findsNothing);
     expect(
-      reviewParagraph.getBoxesForSelection(
-        const TextSelection(baseOffset: 8, extentOffset: 14),
+      tabParagraph.getBoxesForSelection(
+        const TextSelection(baseOffset: 0, extentOffset: 11),
       ),
       hasLength(1),
     );

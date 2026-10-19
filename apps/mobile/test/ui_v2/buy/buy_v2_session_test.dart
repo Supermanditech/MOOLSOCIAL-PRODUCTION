@@ -607,11 +607,14 @@ final class _Lf11ScheduledFacts implements BuyV2ProductFactsAdapter {
 
 class _Lf11WindowPolicy implements BuyV2ProductContentAdapter {
   String revision = 'host-policy-A';
+  final revisionsByProduct = <String, String>{};
+  bool perProductIds = false;
   @override
   BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) => BuyV2ProductContentSnapshot(
     productId: product.id, state: BuyV2ProductContentState.ready, sourceId: 'host-window-policy',
     supplierPolicyAcceptanceRequired: true, supplierPolicy: BuyV2SupplierPolicy(
-      id: 'host-policy', storeId: product.storeId!, revision: revision,
+      id: perProductIds ? 'host-policy-${product.id}' : 'host-policy',
+      storeId: product.storeId!, revision: revisionsByProduct[product.id] ?? revision,
       title: 'Store policy', body: 'Host delivery and return terms', productIds: {product.sourceSkuId},
       sourceRealm: product.publicListingIdentity?.realm, requiresAcceptance: true));
 }
@@ -3495,6 +3498,7 @@ void main() {
     bool allCredit = false,
     bool manualDispose = false,
     DateTime Function()? clock,
+    BuyV2ProductContentAdapter? content,
   }) async {
     final core = BuySession();
     final commerce = TestGroupedPaymentCommerce();
@@ -3539,17 +3543,23 @@ void main() {
       catalogueNow: clock ?? DateTime.now,
       checkoutQuoteAdapter: quote,
       commercialPaymentTermsAdapter: credit ? terms : null,
+      productContentAdapter: content,
     );
     if (!manualDispose) addTearDown(session.dispose);
     addTearDown(core.dispose);
     await session.restoreCommerce();
+    Future<bool> addFixtureProduct(String id) async {
+      if (session.addProduct(id)) return true;
+      return session.pendingSupplierPolicyAdd != null &&
+          await session.acceptSupplierPolicyAndAdd(session.pendingSupplierPolicyAdd);
+    }
     expect(
-      session.addProduct(allCredit ? 'w-notebook' : 's-tomato'),
+      await addFixtureProduct(allCredit ? 'w-notebook' : 's-tomato'),
       isTrue,
       reason: session.notice,
     );
     expect(
-      session.addProduct(
+      await addFixtureProduct(
         allCredit
             ? 'w-rice'
             : credit
@@ -3576,6 +3586,68 @@ void main() {
     expect(session.checkoutPaymentGroups, hasLength(2));
     return (session, commerce, store, quote);
   }
+
+  test('LF08 policy isolates current group and preserves submitted reconciliation', () async {
+    final policy = _Lf11WindowPolicy();
+    final (session, commerce, store, _) = await groupedFixture(content: policy);
+    await session.retainedAccountState();
+    final writes = store.writeCalls, hold = Completer<void>();
+    store.pendingWrite = hold;
+    final placing = session.submitOrder();
+    for (var i = 0; i < 100 && store.writeCalls == writes; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    expect(store.writeCalls, greaterThan(writes));
+    final frozen = session.currentCheckoutPaymentGroup!.request;
+    final currentIds = frozen.lines.map((line) => line.product.id).toSet();
+    final otherId = session.checkoutLines.firstWhere((line) => !currentIds.contains(line.product.id)).product.id;
+    policy.revisionsByProduct[otherId] = 'other-store-policy-changed';
+    hold.complete();
+    await placing;
+    expect(commerce.requests, hasLength(1));
+    expect(commerce.requests.single.idempotencyKey, frozen.idempotencyKey);
+    policy.revision = 'submitted-policy-now-changed';
+    await session.reconcilePayment();
+    expect(commerce.requests, hasLength(1), reason: 'Never resubmit an original payment.');
+    expect(commerce.reconciledKeys, [frozen.idempotencyKey]);
+  });
+
+  test('LF08 policy stops automatic next group and preserves completed order through review', () async {
+    final policy = _Lf11WindowPolicy()..perProductIds = true;
+    final (session, commerce, _, _) = await groupedFixture(credit: true, content: policy);
+    commerce.onGroup = (request) {
+      if (request.amountDueNow == 0) policy.revisionsByProduct['s-tomato'] = 'next-policy-changed';
+      return testGroupedPlacement(request);
+    };
+    expect(await session.submitOrder(), isFalse);
+    expect(commerce.requests, hasLength(1));
+    expect(commerce.requests.single.amountDueNow, 0);
+    expect(session.orders, hasLength(1));
+    final completedId = session.orders.single.id;
+    expect(session.currentCheckoutPaymentGroup!.state, BuyV2CheckoutSubmissionState.idle);
+    expect(session.notice, contains('Store policy changed'));
+    expect(session.pendingSupplierPolicyAdd, isNull);
+    expect(session.reviewRemainingGroupedCheckout(), isTrue);
+    expect(await session.refreshCheckoutQuote(), isTrue);
+    await session.refreshCommercialPaymentTerms();
+    for (final group in session.checkoutFulfilmentGroups) {
+      expect(session.chooseCommercialPaymentTerm(session.commercialPaymentTermsFor(group.key).first), isTrue);
+    }
+    expect(await session.submitOrder(), isFalse);
+    expect(session.pendingSupplierPolicyAdd, isNotNull);
+    expect(await session.acceptSupplierPolicyAndAdd(session.pendingSupplierPolicyAdd), isTrue);
+    expect(session.orders.single.id, completedId);
+    expect(commerce.requests, hasLength(1));
+    expect(await session.submitOrder(), isFalse);
+    expect(session.checkoutDeliveryPromiseChanges, isNotEmpty);
+    expect(session.acceptCheckoutPromiseChanges(), isTrue);
+    expect(commerce.requests, hasLength(1), reason: 'Review never places another order.');
+    expect(await session.submitOrder(), isTrue, reason: session.notice);
+    expect(commerce.requests, hasLength(2));
+    expect(commerce.requests.last.lines.single.product.id, 's-tomato');
+    expect(session.orders, hasLength(2));
+    expect(session.orders.where((order) => order.id == completedId), hasLength(1));
+  });
 
   for (final grouped in [false, true]) {
     for (final changed in [false, true]) {
