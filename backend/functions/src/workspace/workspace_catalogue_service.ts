@@ -382,11 +382,15 @@ export interface StorePublicDetailsCommand {
   publishedAt: string; details: StorePublicDetailsInput;
 }
 export interface StorePublicDetailsReceipt {fingerprint: string; record: StorePublicDetailsRecord}
+export const productDiscoverySurfaces = ['quick', 'scheduled', 'wholesale', 'bulk', 'offers', 'visit_store', 'unknown'] as const;
+export type ProductDiscoverySurface = typeof productDiscoverySurfaces[number];
 export interface ProductPresentation {
-  schemaVersion: 1; presentationId: string; storeId: string; skuId: string;
+  schemaVersion: 1 | 2; presentationId: string; storeId: string; skuId: string;
   listingId: string; skuRevision: number; catalogueVersion: number;
+  /** Immediate client-reported entry surface, not channel, people or conversion. */
+  discoverySurface?: ProductDiscoverySurface;
 }
-export interface ProductPresentationQuery {storeId: string; start: string; end: string; skuIds: string[]}
+export interface ProductPresentationQuery {storeId: string; start: string; end: string; skuIds: string[]; discoverySourcesVersion?: 1}
 type ProductActivityAdmission = boolean | {validUntil: string};
 export interface StorePresentation {
   schemaVersion: 1; presentationId: string; storeId: string; catalogueVersion: number; observedAt: string;
@@ -402,18 +406,23 @@ function presentationTime(value: unknown): string {
   return value;
 }
 function productPresentation(raw: unknown): ProductPresentation {
-  const value = exact(raw, ['schemaVersion', 'presentationId', 'storeId', 'skuId', 'listingId', 'skuRevision', 'catalogueVersion']);
-  if (value.schemaVersion !== 1 || typeof value.presentationId !== 'string' || !/^[a-f0-9]{32}$/u.test(value.presentationId) ||
+  const version2 = raw !== null && typeof raw === 'object' && (raw as Record<string, unknown>).schemaVersion === 2;
+  const value = exact(raw, ['schemaVersion', 'presentationId', 'storeId', 'skuId', 'listingId', 'skuRevision', 'catalogueVersion',
+    ...(version2 ? ['discoverySurface'] : [])]);
+  if (![1, 2].includes(value.schemaVersion as number) || typeof value.presentationId !== 'string' || !/^[a-f0-9]{32}$/u.test(value.presentationId) ||
+      version2 && !productDiscoverySurfaces.includes(value.discoverySurface as ProductDiscoverySurface) ||
       typeof value.listingId !== 'string' || !/^listing-[a-f0-9]{64}$/u.test(value.listingId)) invalid();
-  return {schemaVersion: 1, presentationId: value.presentationId, storeId: id(value.storeId), skuId: id(value.skuId),
-    listingId: value.listingId, skuRevision: integer(value.skuRevision, 1, 1000000000), catalogueVersion: integer(value.catalogueVersion, 1, 1000000001)};
+  return {schemaVersion: value.schemaVersion as 1 | 2, presentationId: value.presentationId, storeId: id(value.storeId), skuId: id(value.skuId),
+    listingId: value.listingId, skuRevision: integer(value.skuRevision, 1, 1000000000), catalogueVersion: integer(value.catalogueVersion, 1, 1000000001),
+    ...(version2 ? {discoverySurface: value.discoverySurface as ProductDiscoverySurface} : {})};
 }
 function productPresentationQuery(raw: unknown): ProductPresentationQuery {
-  const value = exact(raw, ['schemaVersion', 'storeId', 'start', 'end', 'skuIds']);
-  if (value.schemaVersion !== 1 || !Array.isArray(value.skuIds) || value.skuIds.length > 50) invalid();
+  const value = exact(raw, ['schemaVersion', 'storeId', 'start', 'end', 'skuIds'], ['discoverySourcesVersion']);
+  const sources = Object.hasOwn(value, 'discoverySourcesVersion');
+  if (value.schemaVersion !== 1 || sources && value.discoverySourcesVersion !== 1 || !Array.isArray(value.skuIds) || value.skuIds.length > 50) invalid();
   const start = presentationTime(value.start), end = presentationTime(value.end), skuIds = value.skuIds.map(id).sort();
   if (start >= end || Date.parse(end) - Date.parse(start) > 31 * 86400000 || new Set(skuIds).size !== skuIds.length) invalid();
-  return {storeId: id(value.storeId), start, end, skuIds};
+  return {storeId: id(value.storeId), start, end, skuIds, ...(sources ? {discoverySourcesVersion: 1 as const} : {})};
 }
 
 export interface WorkspaceCatalogueRepository {
@@ -1053,6 +1062,7 @@ export class WorkspaceCatalogueService {
   }
   private async recordProductActivity(actor: string, body: Readonly<Record<string, unknown>>, cart: boolean): Promise<object> {
     const input = productPresentation(body);
+    if (cart && input.schemaVersion !== 1) invalid();
     const record = cart ? this.repository.recordCartAddition : this.repository.recordProductPresentation;
     if (!this.identity || !record) throw mediaUnavailable();
     return record.call(this.repository, id(actor), input, this.identity, async source => {
@@ -1078,6 +1088,7 @@ export class WorkspaceCatalogueService {
   }
   async readCartAdditions(owner: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const query = productPresentationQuery(body);
+    if (query.discoverySourcesVersion !== undefined) invalid();
     if (!this.repository.readCartAdditions) throw mediaUnavailable();
     return this.repository.readCartAdditions(id(owner), query);
   }
@@ -1094,6 +1105,7 @@ export class WorkspaceCatalogueService {
   }
   async readStorePresentations(owner: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const query = productPresentationQuery(body);
+    if (query.discoverySourcesVersion !== undefined) invalid();
     if (!this.repository.readStorePresentations) throw mediaUnavailable();
     return this.repository.readStorePresentations(id(owner), query);
   }
@@ -3236,6 +3248,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
   private async recordProductActivity(actor: string, input: ProductPresentation, identity: CatalogueIdentity,
     admit: (source: PublicCatalogueSource) => Promise<ProductActivityAdmission>, cart: boolean): Promise<object> {
     input = productPresentation(structuredClone(input)); actor = id(actor);
+    if (cart && input.schemaVersion !== 1) invalid();
     const root = this.root(input.storeId), fingerprint = cataloguePayloadHash(input),
       // Actor-bound opaque key prevents another account from retrieving a receipt. Raw buyer identity is never stored.
       receipt = root.collection(cart ? 'cartAdditions' : 'productPresentations').doc(cataloguePayloadHash([this.realm, actor, input.presentationId])),
@@ -3302,6 +3315,8 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
   }
   private async readProductActivity(owner: string, query: ProductPresentationQuery, cart: boolean): Promise<object> {
     query = productPresentationQuery({schemaVersion: 1, ...structuredClone(query)}); owner = id(owner);
+    if (cart && query.discoverySourcesVersion !== undefined) invalid();
+    const discovery = query.discoverySourcesVersion === 1;
     return this.firestore.runTransaction(async transaction => {
       const profiles = await transaction.get(this.firestore.collection('workspaceProfiles').where('workspaceId', '==', query.storeId).limit(2));
       if (profiles.size !== 1 || profiles.docs[0]!.id !== profiles.docs[0]!.get('caseId')) throw mediaUnavailable();
@@ -3311,7 +3326,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       const base = {schemaVersion: 1, realm: this.realm, ...query, observedAt,
         source: cart ? 'Reported signed-in Cart additions' : 'Recorded product views'};
       const unavailable = (collectionStartedAt: string | null = null) => ({...base, state: 'unavailable', coverage: 'unknown', collectionStartedAt,
-        coveredFrom: null, coveredUntil: null, count: null, products: [], ...(cart ? {customers: null} : {})});
+        coveredFrom: null, coveredUntil: null, count: null, products: [], ...(cart ? {customers: null} : {}), ...(discovery ? {discoverySources: []} : {})});
       if (!collection.exists) return unavailable();
       if (collection.get('schemaVersion') !== 1) invalid();
       const startedAt = presentationTime(collection.get('startedAt')), from = [query.start, startedAt].sort().at(-1)!, until = [query.end, observedAt].sort()[0]!;
@@ -3320,6 +3335,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       if (events.size > 5000) return unavailable(startedAt); // Never silently truncate a count/ranking.
       const products = new Map<string, {skuId: string; label: string; count: number}>();
       const customers = new Set<string>();
+      const discoveryCounts = new Map<ProductDiscoverySurface, number>();
       let count = 0;
       for (const doc of events.docs) {
         const event = exact(doc.data(), ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'label', ...(cart ? ['customerKey', 'integrity'] : [])]), input = productPresentation(event.input);
@@ -3331,11 +3347,16 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
         }
         if (query.skuIds.length && !query.skuIds.includes(input.skuId)) continue;
         if (cart) customers.add(event.customerKey as string);
+        if (discovery) {
+          const surface = input.discoverySurface ?? 'unknown';
+          discoveryCounts.set(surface, (discoveryCounts.get(surface) ?? 0) + 1);
+        }
         const label = text(event.label, 240), previous = products.get(input.skuId);
         products.set(input.skuId, {skuId: input.skuId, label, count: (previous?.count ?? 0) + 1}); count++;
       }
       return {...base, state: 'ready', coverage: 'partial', collectionStartedAt: startedAt, coveredFrom: from, coveredUntil: until, count,
-        products: [...products.values()].sort((a, b) => b.count - a.count || a.skuId.localeCompare(b.skuId)), ...(cart ? {customers: customers.size} : {})};
+        products: [...products.values()].sort((a, b) => b.count - a.count || a.skuId.localeCompare(b.skuId)), ...(cart ? {customers: customers.size} : {}),
+        ...(discovery ? {discoverySources: [...discoveryCounts].map(([id, count]) => ({id, count})).sort((a, b) => a.id.localeCompare(b.id))} : {})};
     });
   }
   async recordStorePresentation(actor: string, input: StorePresentation, identity: CatalogueIdentity,
@@ -3381,6 +3402,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
   }
   async readStorePresentations(owner: string, query: ProductPresentationQuery): Promise<object> {
     query = productPresentationQuery({schemaVersion: 1, ...structuredClone(query)}); owner = id(owner);
+    if (query.discoverySourcesVersion !== undefined) invalid();
     return this.firestore.runTransaction(async tx => {
       const profiles = await tx.get(this.firestore.collection('workspaceProfiles').where('workspaceId', '==', query.storeId).limit(2));
       if (profiles.size !== 1 || profiles.docs[0]!.id !== profiles.docs[0]!.get('caseId')) throw mediaUnavailable();

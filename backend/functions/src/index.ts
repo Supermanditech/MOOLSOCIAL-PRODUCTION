@@ -2928,6 +2928,10 @@ export const moolSocialWorkspace = onRequest(
       if (productPresentationOperation && process.env.MOOLSOCIAL_PRODUCT_PRESENTATIONS_V1 !== 'true') {
         throw new WorkspaceProfileError('service_unavailable', 'Product view reporting is not connected.', 503);
       }
+      if (productPresentationOperation && (body.schemaVersion === 2 || Object.hasOwn(body, 'discoverySourcesVersion')) &&
+          process.env.MOOLSOCIAL_PRODUCT_DISCOVERY_SOURCES_V1 !== 'true') {
+        throw new WorkspaceProfileError('service_unavailable', 'Product discovery-source reporting is not connected.', 503);
+      }
       const cartAdditionOperation = ['recordPublicCartAddition', 'readStoreCartAdditions'].includes(operation);
       if (cartAdditionOperation && process.env.MOOLSOCIAL_CART_ADDITIONS_V1 !== 'true') {
         throw new WorkspaceProfileError('service_unavailable', 'Cart activity reporting is not connected.', 503);

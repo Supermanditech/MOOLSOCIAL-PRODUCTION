@@ -4,6 +4,7 @@ import {createHash, generateKeyPairSync, randomUUID} from "node:crypto";
 import {createServer} from "node:http";
 import {Readable} from "node:stream";
 import {readFileSync} from "node:fs";
+import {resolve} from "node:path";
 import {EventEmitter} from "node:events";
 import {Storage} from "@google-cloud/storage";
 import sharp from "sharp";
@@ -461,6 +462,85 @@ test('LF14 rendered-product producer and owner aggregate are implemented in the 
     assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>)[method], 'function');
   }
 });
+test('LF14 discovery source contract keeps the existing HTTP reporting activation default off', () => {
+  const source = readFileSync(resolve(__dirname, '../../src/index.ts'), 'utf8');
+  assert.match(source, /productPresentationOperation && \(body\.schemaVersion === 2 \|\| Object\.hasOwn\(body, 'discoverySourcesVersion'\)\) &&\s*process\.env\.MOOLSOCIAL_PRODUCT_DISCOVERY_SOURCES_V1 !== 'true'/u);
+  assert.match(source, /process\.env\.MOOLSOCIAL_PRODUCT_PRESENTATIONS_V1 !== 'true'/u);
+  // Supplements real service/emulator coverage; does not prove endpoint/auth deployment.
+});
+
+test('LF14 discovery surfaces keep legacy Unknown and immutable scoped source counts', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  // Isolated local producer fixture, not native events or live Store statistics.
+  const app = initializeApp({projectId: `demo-lf-sources-${randomUUID().slice(0, 8)}`}, `sources-${randomUUID()}`), db = getFirestore(app);
+  const root = db.collection('workspaceCatalogues').doc('evaluation');
+  let clock = at;
+  const repository = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(clock));
+  const service = () => new WorkspaceCatalogueService(repository(), catalogueIdentity, () => new Date(clock));
+  const range = {schemaVersion: 1, storeId: 'store-one', start: '2026-10-16T00:00:00.000Z', end: '2026-10-17T00:00:00.000Z', skuIds: []};
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    await root.collection('participants').doc('store-one').set(producerParticipant());
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    const sku = input(), commands = productionCommands(sku);
+    for (let index = 0; index < commands.length; index++) {
+      await repository().produceCatalogue([0, 2, 4].includes(index) ? 'reviewer-one' : 'owner-one', catalogueIdentity, commands[index]!);
+    }
+    await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku, expectedRevision: 0, idempotencyKey: 'publish-source-product'});
+    const page = await service().publicCatalogue({storeId: 'store-one', skuId: 'sku-one', listingReadbackVersion: 1,
+      mediaReadbackVersion: 1, productFactsReadbackVersion: 1, policyReadbackVersion: 1, storeDetailsReadbackVersion: 1}) as any;
+    const legacy = {schemaVersion: 1, presentationId: '1'.repeat(32), storeId: 'store-one', skuId: 'sku-one',
+      listingId: page.items[0].listings[0].listingId, skuRevision: 1, catalogueVersion: 6};
+    const legacyReceipt = await service().recordProductPresentation('buyer-one', legacy);
+    const quick = {...legacy, schemaVersion: 2, presentationId: '2'.repeat(32), discoverySurface: 'quick'};
+    const quickReceipt = await service().recordProductPresentation('buyer-one', quick);
+    assert.deepEqual(await service().recordProductPresentation('buyer-one', quick), quickReceipt);
+    await assert.rejects(service().recordProductPresentation('buyer-one', {...quick, discoverySurface: 'offers'}), {code: 'conflict'});
+    await service().recordProductPresentation('buyer-two', {...quick, presentationId: '3'.repeat(32), discoverySurface: 'offers'});
+    for (const invalid of [
+      {...quick, discoverySurface: 'query=private'}, {...quick, discoverySurface: null},
+      {...quick, schemaVersion: 1}, {...quick, schemaVersion: 3}, {...quick, query: 'private'},
+    ]) {
+      await assert.rejects(service().recordProductPresentation('buyer-one', invalid), {code: 'invalid_input'});
+    }
+    await assert.rejects(service().recordProductPresentation('owner-one', {...quick, presentationId: '4'.repeat(32)}));
+    await assert.rejects(service().recordCartAddition('buyer-one', quick), {code: 'invalid_input'});
+    clock = new Date(Date.parse(at) + 1000).toISOString();
+    const requested = {...range, discoverySourcesVersion: 1};
+    const aggregate = await service().readProductPresentations('owner-one', requested) as any;
+    assert.equal(aggregate.count, 3);
+    assert.deepEqual(aggregate.discoverySources, [
+      {id: 'offers', count: 1}, {id: 'quick', count: 1}, {id: 'unknown', count: 1},
+    ]);
+    assert.equal(aggregate.discoverySources.reduce((sum: number, row: any) => sum + row.count, 0), aggregate.count);
+    const oldRead = await service().readProductPresentations('owner-one', range) as any;
+    assert.equal(oldRead.count, 3); assert.equal('discoverySources' in oldRead, false);
+    const empty = await service().readProductPresentations('owner-one', {...requested, skuIds: ['another-sku']}) as any;
+    assert.equal(empty.count, 0); assert.deepEqual(empty.discoverySources, []);
+    await assert.rejects(service().readProductPresentations('buyer-one', requested), {code: 'not_found'});
+    await assert.rejects(service().readProductPresentations('owner-one', {...requested, discoverySourcesVersion: 2}), {code: 'invalid_input'});
+    await assert.rejects(service().readCartAdditions('owner-one', requested), {code: 'invalid_input'});
+    await assert.rejects(service().readStorePresentations('owner-one', requested), {code: 'invalid_input'});
+    assert.deepEqual(await service().recordProductPresentation('buyer-one', legacy), legacyReceipt);
+    assert.equal(JSON.stringify(aggregate).includes('buyer-one'), false);
+    assert.equal(JSON.stringify(aggregate).includes('buyer-two'), false);
+    if (process.env.LF14_DISCOVERY_CAPTURE === 'true') {
+      console.log(`LF14_DISCOVERY_PROJECTION=${JSON.stringify({legacy, legacyReceipt, quick, quickReceipt, aggregate, empty, page})}`);
+    }
+    for (const [index, surface] of catalogueModule.productDiscoverySurfaces.entries()) {
+      const next = {...quick, presentationId: (index + 5).toString(16).repeat(32), discoverySurface: surface};
+      assert.equal((await service().recordProductPresentation('buyer-one', next) as any).discoverySurface, surface);
+    }
+    clock = new Date(Date.parse(clock) + 1000).toISOString();
+    const all = await service().readProductPresentations('owner-one', requested) as any;
+    assert.equal(all.count, 10);
+    assert.equal(all.discoverySources.length, catalogueModule.productDiscoverySurfaces.length);
+    assert.equal(all.discoverySources.reduce((sum: number, row: any) => sum + row.count, 0), 10);
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+
 test('LF14 emulator reviewed public product to immutable presentation and restarted owner-only partial aggregate', {
   skip: !process.env.FIRESTORE_EMULATOR_HOST,
 }, async t => {
