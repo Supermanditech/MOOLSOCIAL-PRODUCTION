@@ -507,13 +507,75 @@ test('LF14 emulator reviewed public product to immutable presentation and restar
         });
         // Settle both before continuing the independent expiry/privacy tests.
         // A failed child remains a failed suite; never convert it into a pass.
-        const results = await Promise.allSettled([service().recordCartAddition('buyer-one', event), service().recordCartAddition('buyer-one', event)]);
+        const observe = (attempt: Promise<object>) => attempt.catch(async error => {
+          if (process.env.LF14_CART_TRACE === 'true') {
+            // Diagnostic read only, at failure time rather than after the sibling
+            // settles. Never acknowledge, retry or weaken the original failure.
+            const saved = await store.collection('cartAdditions').doc(cataloguePayloadHash(['evaluation', 'buyer-one', event.presentationId]))
+              .get().catch(() => undefined);
+            console.log(`LF14_CART_FAILURE=${JSON.stringify({code: error?.code, details: error?.details,
+              stack: error instanceof Error ? error.stack : String(error), originalPresent: saved?.exists ?? null,
+              matchingFingerprint: saved?.exists ? saved.get('fingerprint') === cataloguePayloadHash(event) : null})}`);
+          }
+          throw error;
+        });
+        const results = await Promise.allSettled([observe(service().recordCartAddition('buyer-one', event)), observe(service().recordCartAddition('buyer-one', event))]);
         for (const result of results) assert.equal(result.status, 'fulfilled', result.status === 'rejected' ? String(result.reason) : undefined);
         assert.deepEqual((results[0] as PromiseFulfilledResult<object>).value, (results[1] as PromiseFulfilledResult<object>).value);
       } finally { if (process.env.LF14_CART_TRACE === 'true') setLogFunction(null); }
     });
     // Original-key readback/replay is separate from the child concurrency result.
     const cartAccepted = await service().recordCartAddition('buyer-one', event);
+    await t.test('LF14 original Cart receipt read recovers only the witnessed transport uncertainty', async t => {
+      // Actual isolated producer receipt, not a native record or fabricated success.
+      const originalKey = cataloguePayloadHash(['evaluation', 'buyer-one', event.presentationId]);
+      const original = (await store.collection('cartAdditions').doc(originalKey).get()).data()!;
+      const expectedPath = ['workspaceCatalogues', 'evaluation', 'stores', 'store-one', 'cartAdditions', originalKey];
+      for (const fault of ['none', 'missing', 'corrupt schema', 'corrupt input', 'corrupt customer', 'corrupt integrity',
+        'corrupt acceptedAt', 'mismatched input', 'other actor', 'other Store', 'other realm', 'read failure',
+        'business error', 'other code', 'other details']) {
+        await t.test(fault, async () => {
+          const error = Object.assign(new Error('Host transaction read failure'), {code: 3 as string | number,
+            details: 'Transaction is invalid or closed.'});
+          if (fault === 'business error') error.code = 'forbidden';
+          if (fault === 'other code') error.code = 14;
+          if (fault === 'other details') error.details = 'Invalid request field.';
+          const raw = structuredClone(original), path: string[] = [];
+          if (fault === 'corrupt schema') raw.schemaVersion = 2;
+          if (fault === 'corrupt input') raw.input.skuRevision++;
+          if (fault === 'corrupt customer') raw.customerKey = '0'.repeat(64);
+          if (fault === 'corrupt integrity') raw.integrity = '0'.repeat(64);
+          if (fault === 'corrupt acceptedAt') raw.acceptedAt = 'not-a-timestamp';
+          let transactions = 0, reads = 0;
+          // Capture the exact path and expose only that independently persisted
+          // receipt. No callback/write runs when the SDK rejects its transaction.
+          const ref = {collection(name: string) {path.push(name); return this;},
+            doc(name: string) {path.push(name); return this;},
+            async get() {reads++;
+              if (fault === 'read failure') throw new Error('Host receipt read unavailable');
+              return {exists: fault !== 'missing' && JSON.stringify(path) === JSON.stringify(expectedPath), data: () => raw};
+            }};
+          const wrapped = new Proxy(db, {get(target, property) {
+            if (property === 'runTransaction') return async () => {transactions++; throw error;};
+            if (property === 'collection') return (name: string) => ref.collection(name);
+            const value = Reflect.get(target, property, target); return typeof value === 'function' ? value.bind(target) : value;
+          }});
+          const realm = fault === 'other realm' ? 'production' : 'evaluation';
+          const subject = new WorkspaceCatalogueService(new FirestoreWorkspaceCatalogueRepository(wrapped, realm,
+            () => new Date('2026-10-16T12:00:02.000Z')), catalogueIdentity);
+          const request = {...event, ...(fault === 'mismatched input' ? {skuRevision: 2} : {}),
+            ...(fault === 'other Store' ? {storeId: 'other-store'} : {})};
+          const attempt = subject.recordCartAddition(fault === 'other actor' ? 'other-buyer' : 'buyer-one', request);
+          if (fault === 'none') assert.deepEqual(await attempt, cartAccepted);
+          else await assert.rejects(attempt, caught => caught === error);
+          assert.equal(transactions, 1); assert.equal(reads, ['business error', 'other code', 'other details'].includes(fault) ? 0 : 1);
+          if (!['business error', 'other code', 'other details', 'other actor', 'other Store', 'other realm'].includes(fault)) assert.deepEqual(path, expectedPath);
+        });
+      }
+      assert.deepEqual((await store.collection('cartAdditions').doc(originalKey).get()).data(), original);
+      assert.equal((await store.collection('cartAdditions').get()).size, 1);
+      assert.equal((await store.collection('cartAdditionDays').doc('2026-10-16').get()).get('count'), 1);
+    });
     const secondPage = await service().publicCatalogue({storeId: 'store-one', skuId: 'sku-two', listingReadbackVersion: 1,
       mediaReadbackVersion: 1, productFactsReadbackVersion: 1, policyReadbackVersion: 1, storeDetailsReadbackVersion: 1}) as any;
     const secondAdd = {...event, presentationId: 'b'.repeat(32), skuId: 'sku-two', listingId: secondPage.items[0].listings[0].listingId};

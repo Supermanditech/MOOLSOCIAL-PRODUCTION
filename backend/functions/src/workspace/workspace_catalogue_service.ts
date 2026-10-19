@@ -3240,45 +3240,59 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       // Actor-bound opaque key prevents another account from retrieving a receipt. Raw buyer identity is never stored.
       receipt = root.collection(cart ? 'cartAdditions' : 'productPresentations').doc(cataloguePayloadHash([this.realm, actor, input.presentationId])),
       customerKey = cataloguePayloadHash([1, 'cart-customer', this.realm, input.storeId, actor]);
-    return this.firestore.runTransaction(async transaction => {
-      const saved = await transaction.get(receipt);
-      const result = (acceptedAt: string) => ({...input, realm: this.realm, acceptedAt, state: 'recorded', orderingAvailable: false});
-      if (saved.exists) {
-        const prior = exact(saved.data(), ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'label', ...(cart ? ['customerKey', 'integrity'] : [])]);
-        if (prior.schemaVersion !== 1 || prior.realm !== this.realm || prior.fingerprint !== fingerprint ||
-            cataloguePayloadHash(productPresentation(prior.input)) !== fingerprint) throw new WorkspaceProfileError('conflict', 'This presentation was already recorded with different details.', 409);
-        if (cart) {
-          const {integrity, ...record} = prior;
-          if (prior.customerKey !== customerKey || integrity !== cataloguePayloadHash(record)) throw mediaUnavailable();
-        }
-        return result(presentationTime(prior.acceptedAt));
-      }
-      const source = await this.publicCatalogueSource(input.storeId, identity, false, transaction);
-      if (!source || source.profile.ownerUserId === actor || !await admit(source)) throw new WorkspaceProfileError('unavailable', 'This public product presentation could not be confirmed.', 503);
-      let acceptedAt = this.now().toISOString();
-      const admissionDay = acceptedAt.slice(0, 10), day = root.collection(cart ? 'cartAdditionDays' : 'productPresentationDays').doc(admissionDay),
-        coverage = root.collection(cart ? 'cartAdditionCoverage' : 'productPresentationCoverage').doc('current');
-      const [daily, collection] = await transaction.getAll(day, coverage);
-      if (daily?.exists && daily.get('schemaVersion') !== 1 || collection?.exists && collection.get('schemaVersion') !== 1) invalid();
-      const count = daily?.exists ? integer(daily.get('count'), 0, 5000) : 0;
-      if (count >= 5000) throw new WorkspaceProfileError('service_unavailable', 'Product view reporting is at capacity.', 503, true);
-      let startedAt = collection?.exists ? presentationTime(collection.get('startedAt')) : acceptedAt;
-      const finalAdmission = await admit(source);
-      if (startedAt > acceptedAt || !finalAdmission) throw mediaUnavailable(); // Recheck after awaited capacity reads.
+    const result = (acceptedAt: string) => ({...input, realm: this.realm, acceptedAt, state: 'recorded', orderingAvailable: false});
+    const replay = (raw: unknown) => {
+      const prior = exact(raw, ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'label', ...(cart ? ['customerKey', 'integrity'] : [])]);
+      if (prior.schemaVersion !== 1 || prior.realm !== this.realm || prior.fingerprint !== fingerprint ||
+          cataloguePayloadHash(productPresentation(prior.input)) !== fingerprint) throw new WorkspaceProfileError('conflict', 'This presentation was already recorded with different details.', 409);
       if (cart) {
-        acceptedAt = this.now().toISOString();
-        if (typeof finalAdmission !== 'object' || acceptedAt >= presentationTime(finalAdmission.validUntil) ||
-            startedAt > acceptedAt || acceptedAt.slice(0, 10) !== admissionDay) throw mediaUnavailable();
-        if (!collection?.exists) startedAt = acceptedAt;
+        const {integrity, ...record} = prior;
+        if (prior.customerKey !== customerKey || integrity !== cataloguePayloadHash(record)) throw mediaUnavailable();
       }
-      const item = source.records.find(row => row.skuId === input.skuId)!;
-      const label = `${item.content.title} · ${item.pack.label}`.slice(0, 240);
-      const record = {schemaVersion: 1, realm: this.realm, fingerprint, input, acceptedAt, label, ...(cart ? {customerKey} : {})};
-      transaction.create(receipt, cart ? {...record, integrity: cataloguePayloadHash(record)} : record);
-      transaction.set(day, {schemaVersion: 1, count: count + 1});
-      if (!collection?.exists) transaction.create(coverage, {schemaVersion: 1, startedAt});
-      return result(acceptedAt);
-    });
+      return result(presentationTime(prior.acceptedAt));
+    };
+    try {
+      return await this.firestore.runTransaction(async transaction => {
+        const saved = await transaction.get(receipt);
+        if (saved.exists) return replay(saved.data());
+        const source = await this.publicCatalogueSource(input.storeId, identity, false, transaction);
+        if (!source || source.profile.ownerUserId === actor || !await admit(source)) throw new WorkspaceProfileError('unavailable', 'This public product presentation could not be confirmed.', 503);
+        let acceptedAt = this.now().toISOString();
+        const admissionDay = acceptedAt.slice(0, 10), day = root.collection(cart ? 'cartAdditionDays' : 'productPresentationDays').doc(admissionDay),
+          coverage = root.collection(cart ? 'cartAdditionCoverage' : 'productPresentationCoverage').doc('current');
+        const [daily, collection] = await transaction.getAll(day, coverage);
+        if (daily?.exists && daily.get('schemaVersion') !== 1 || collection?.exists && collection.get('schemaVersion') !== 1) invalid();
+        const count = daily?.exists ? integer(daily.get('count'), 0, 5000) : 0;
+        if (count >= 5000) throw new WorkspaceProfileError('service_unavailable', 'Product view reporting is at capacity.', 503, true);
+        let startedAt = collection?.exists ? presentationTime(collection.get('startedAt')) : acceptedAt;
+        const finalAdmission = await admit(source);
+        if (startedAt > acceptedAt || !finalAdmission) throw mediaUnavailable(); // Recheck after awaited capacity reads.
+        if (cart) {
+          acceptedAt = this.now().toISOString();
+          if (typeof finalAdmission !== 'object' || acceptedAt >= presentationTime(finalAdmission.validUntil) ||
+              startedAt > acceptedAt || acceptedAt.slice(0, 10) !== admissionDay) throw mediaUnavailable();
+          if (!collection?.exists) startedAt = acceptedAt;
+        }
+        const item = source.records.find(row => row.skuId === input.skuId)!;
+        const label = `${item.content.title} · ${item.pack.label}`.slice(0, 240);
+        const record = {schemaVersion: 1, realm: this.realm, fingerprint, input, acceptedAt, label, ...(cart ? {customerKey} : {})};
+        transaction.create(receipt, cart ? {...record, integrity: cataloguePayloadHash(record)} : record);
+        transaction.set(day, {schemaVersion: 1, count: count + 1});
+        if (!collection?.exists) transaction.create(coverage, {schemaVersion: 1, startedAt});
+        return result(acceptedAt);
+      });
+    } catch (error) {
+      // Witnessed read-stream uncertainty can race an already committed same-key
+      // receipt. Read that immutable original once; never retry or acknowledge a
+      // write merely because the transaction failed. All other failures stand.
+      if (!cart || typeof error !== 'object' || error === null || !('code' in error) || error.code !== 3 ||
+          !('details' in error) || error.details !== 'Transaction is invalid or closed.') throw error;
+      try {
+        const saved = await receipt.get();
+        if (saved.exists) return replay(saved.data());
+      } catch { /* Unreadable or invalid original cannot establish acceptance. */ }
+      throw error;
+    }
   }
   async readProductPresentations(owner: string, query: ProductPresentationQuery): Promise<object> {
     return this.readProductActivity(owner, query, false);
