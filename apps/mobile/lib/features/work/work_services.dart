@@ -4266,6 +4266,84 @@ class SecureWorkProductSubmissionJournal implements WorkspaceProductSubmissionJo
 }
 
 /// The family journal remains a separate original from each SKU submission.
+class SecureWorkProductMediaJournal implements WorkspaceProductMediaJournal {
+  SecureWorkProductMediaJournal({FlutterSecureStorage? storage, String? Function()? currentAccount, DateTime Function()? now})
+    : _storage = storage ?? const FlutterSecureStorage(), _currentAccount = currentAccount ?? SecureWorkOrderPendingStore._signedInAccount,
+      _now = now ?? DateTime.now;
+  final FlutterSecureStorage _storage;
+  final String? Function() _currentAccount;
+  final DateTime Function() _now;
+  static final _tails = <String, Future<void>>{};
+  String _key(WorkspaceProductSubmissionScope scope) => 'moolsocial.workspace.product-media.v1.${
+    base64UrlEncode(utf8.encode(jsonEncode([scope.account, scope.store, scope.realm, scope.sku])))}';
+  void _check(WorkspaceProductSubmissionScope scope) {
+    if (_currentAccount() != scope.account || scope.account.isEmpty || scope.store.isEmpty || scope.sku.isEmpty ||
+      !{'evaluation', 'production'}.contains(scope.realm)) {throw const WorkGatewayException('Sign in again to recover the product photo.');}
+  }
+  Future<T> _serial<T>(WorkspaceProductSubmissionScope scope, Future<T> Function() action) {
+    final key = _key(scope), result = (_tails[key] ?? Future<void>.value()).then((_) => action());
+    final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {}); _tails[key] = tail;
+    unawaited(tail.then((_) {if (identical(_tails[key], tail)) _tails.remove(key);})); return result;
+  }
+  Future<WorkspaceProductMediaRecovery?> _read(WorkspaceProductSubmissionScope scope) async {
+    _check(scope); final raw = await _storage.read(key: _key(scope)); _check(scope);
+    if (raw == null) return null;
+    final value = jsonDecode(raw), keys = {'schemaVersion', 'original', 'result', 'history'};
+    if (value is! Map || value.length < 3 || value.length > 4 || value.keys.any((k) => !keys.contains(k)) ||
+      !value.containsKey('original') || !value.containsKey('result') || value['schemaVersion'] is! int || value['schemaVersion'] != 1) {
+      throw const FormatException('Keep the saved photo recovery record.');
+    }
+    WorkspaceProductMediaRecovery pair(Object? raw) {
+      if (raw is! Map || raw.length != 2 || !raw.containsKey('original') || !raw.containsKey('result')) throw const FormatException();
+      final original = WorkspaceProductMediaIntent.fromJson(raw['original']);
+      if (original.scope != scope) throw const FormatException();
+      final result = raw['result'] == null ? null : WorkspaceProductMediaResult.decode(raw['result'], original, _now().toUtc(), historical: true);
+      return WorkspaceProductMediaRecovery(original, result);
+    }
+    final current = pair({'original': value['original'], 'result': value['result']}), rawHistory = value['history'] ?? const [];
+    if (rawHistory is! List || rawHistory.length > 8) throw const FormatException('Keep earlier photo recovery records.');
+    final history = rawHistory.map(pair).toList();
+    if ({current.original.fingerprint, ...history.map((entry) => entry.original.fingerprint)}.length != history.length + 1) throw const FormatException();
+    return WorkspaceProductMediaRecovery(current.original, current.result, List.unmodifiable(history));
+  }
+  Future<void> _write(WorkspaceProductMediaIntent original, WorkspaceProductMediaResult? result, List<WorkspaceProductMediaRecovery> history) async {
+    _check(original.scope);
+    await _storage.write(key: _key(original.scope), value: jsonEncode({'schemaVersion': 1, 'original': original.toJson(), 'result': result?.toJson(),
+      'history': [for (final entry in history) {'original': entry.original.toJson(), 'result': entry.result?.toJson()}]}));
+    _check(original.scope);
+  }
+  @override
+  Future<WorkspaceProductMediaRecovery?> read(WorkspaceProductSubmissionScope scope) => _serial(scope, () => _read(scope));
+  @override
+  Future<void> saveOriginal(WorkspaceProductMediaIntent original) => _serial(original.scope, () async {
+    WorkspaceProductMediaIntent.fromJson(original.toJson());
+    final old = await _read(original.scope);
+    final history = old?.history.where((entry) => entry.result?.processed != true).toList() ?? <WorkspaceProductMediaRecovery>[];
+    if (old != null) {
+      if (old.original.fingerprint == original.fingerprint) return;
+      if (old.result == null || !old.result!.processed && old.result!.current) throw const FormatException('Keep the uncertain original photo request.');
+      if (!old.result!.processed) history.add(WorkspaceProductMediaRecovery(old.original, old.result));
+    }
+    if (history.length > 8) throw const FormatException('Check earlier saved photo requests before another upload. All originals are kept.');
+    await _write(original, null, history);
+  });
+  @override
+  Future<void> saveResult(WorkspaceProductMediaIntent original, WorkspaceProductMediaResult result) => _serial(original.scope, () async {
+    final prior = await _read(original.scope);
+    if (prior == null) throw const FormatException('Keep the original photo request.');
+    final active = prior.original.fingerprint == original.fingerprint;
+    final index = prior.history.indexWhere((entry) => entry.original.fingerprint == original.fingerprint);
+    if (!active && index < 0) throw const FormatException('Keep the original photo request.');
+    final previous = active ? prior.result : prior.history[index].result;
+    final checked = WorkspaceProductMediaResult.decode(result.toJson(), original, _now().toUtc(), historical: true);
+    if (previous?.processed == true && (!checked.processed ||
+      jsonEncode(previous!.toJson()['processed']) != jsonEncode(checked.toJson()['processed']))) {throw const FormatException('Processed photo evidence changed.');}
+    final history = prior.history.toList();
+    if (!active) history[index] = WorkspaceProductMediaRecovery(original, checked);
+    await _write(prior.original, active ? checked : prior.result, history);
+  });
+}
+
 class SecureWorkVariantFamilyJournal implements WorkspaceVariantFamilyJournal {
   SecureWorkVariantFamilyJournal({FlutterSecureStorage? storage, String? Function()? currentAccount})
     : _storage = storage ?? const FlutterSecureStorage(),

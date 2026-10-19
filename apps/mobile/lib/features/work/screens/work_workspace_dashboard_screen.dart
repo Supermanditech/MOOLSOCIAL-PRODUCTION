@@ -25102,6 +25102,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   late final String? _storeId;
   late final Object _reviewEditorContext;
   bool get _reviewEditorCurrent => mounted && widget.session.publicationPreferencesContext == _reviewEditorContext;
+  bool get _mediaEditorCurrent => _reviewEditorCurrent && (ModalRoute.of(context)?.isCurrent ?? true);
   late final bool _wasOwned;
   bool _saved = false;
   bool _savingInventory = false;
@@ -25449,6 +25450,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     if (_wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (_reviewEditorCurrent) { await widget.session.workspaceProductSubmission(widget.product.id)?.restore(); }
+        if (_reviewEditorCurrent) { await widget.session.workspaceProductMedia(widget.product.id)?.restore(); }
       });
     }
     if (_listingRecoveryRequired) {
@@ -25632,19 +25634,49 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     if (!_reviewEditorCurrent) { return const Text('Your Store changed. Reopen this product before checking review.'); }
     final controller = widget.session.workspaceProductSubmission(widget.product.id);
     if (controller == null) return const SizedBox.shrink();
-    return ListenableBuilder(listenable: Listenable.merge([controller, widget.session, ..._importControllers.values]),
+    final media = widget.session.workspaceProductMedia(widget.product.id);
+    return ListenableBuilder(listenable: Listenable.merge([controller, ?media, widget.session, ..._importControllers.values]),
       builder: (context, _) {
         final busy = !_reviewEditorCurrent || !controller.active || _savingInventory || widget.session.workspaceProductSubmissionBusy(widget.product.id) ||
           widget.session.workspaceCatalogueListingBusy;
         final pending = controller.pending != null;
+        final photoProcessed = media?.fresh == true && media?.result?.processed == true && media?.result?.current == true &&
+          media?.original?.submissionFingerprint == controller.head?.fingerprint;
         return Padding(padding: const EdgeInsets.only(top: 8), child: Column(
           key: const Key('work-product-review-submission'), crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(controller.message ?? 'Save keeps this product private. Submit saved details for review separately.',
-              style: Theme.of(context).textTheme.bodySmall),
+            Text(photoProcessed
+              ? media!.message!
+              : controller.message ?? 'Save keeps this product private. Submit saved details for review separately.',
+              key: photoProcessed ? const Key('work-product-photo-status') : null, style: Theme.of(context).textTheme.bodySmall),
+            if (media?.message != null && !photoProcessed) Text(media!.message!, key: const Key('work-product-photo-status'), style: Theme.of(context).textTheme.bodySmall),
             if (_hasUnsavedEdits && !pending) Text('Save product changes before submitting.', style: Theme.of(context).textTheme.bodySmall),
             if (controller.review?.state == 'ready' && !widget.session.localInventoryEnabled)
               Text('Reviewed details need connected saved-product storage before publishing.', style: Theme.of(context).textTheme.bodySmall),
             Wrap(spacing: 8, runSpacing: 2, children: [
+              if (media != null && _privatePhoto != null && controller.head?.input.mediaPending == true && !photoProcessed)
+                TextButton.icon(key: const Key('work-product-photo-upload'), style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                  onPressed: busy || _choosingPhoto || _hasUnsavedEdits || pending || !controller.headLoaded ? null : () async {
+                    if (!_mediaEditorCurrent) return;
+                    await widget.session.uploadWorkspaceProductMedia(widget.product.id,
+                      current: () => _mediaEditorCurrent && !_savingInventory && !_choosingPhoto && !_hasUnsavedEdits);
+                    if (_reviewEditorCurrent) setState(() {});
+                  }, icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                  label: Text(media.original == null ? 'Upload saved photo for review' : 'Retry saved photo request')),
+              if (media?.original != null) TextButton.icon(key: const Key('work-product-photo-check'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)), onPressed: busy ? null : () async {
+                  if (!_reviewEditorCurrent) return;
+                  await widget.session.checkWorkspaceProductMedia(widget.product.id, current: () => _mediaEditorCurrent);
+                  if (_reviewEditorCurrent) setState(() {});
+                }, icon: const Icon(Icons.history, size: 18), label: const Text('Check original photo')),
+              if (media != null && media.history.any((entry) => entry.result?.processed != true)) PopupMenuButton<String>(
+                key: const Key('work-product-photo-earlier'), enabled: !busy, tooltip: 'Choose an earlier photo request',
+                itemBuilder: (_) => [for (final entry in media.history.where((entry) => entry.result?.processed != true))
+                  PopupMenuItem(value: entry.original.idempotencyKey, child: Text('Earlier photo · saved version ${entry.original.submissionRevision}'))],
+                onSelected: (key) async {
+                  if (!_reviewEditorCurrent) return;
+                  await widget.session.checkWorkspaceProductMedia(widget.product.id, current: () => _mediaEditorCurrent, earlier: true, earlierKey: key);
+                  if (_reviewEditorCurrent) setState(() {});
+                }, child: const Padding(padding: EdgeInsets.all(12), child: Text('Check earlier photo requests'))),
               if (controller.review?.state == 'ready') TextButton.icon(key: const Key('work-product-review-publish'),
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                 onPressed: busy || _choosingPhoto || _hasUnsavedEdits || !widget.session.canPublishReviewedWorkspaceProduct(widget.product.id) ? null : () async {

@@ -103,6 +103,7 @@ export interface StoreProductMediaRequest {
 export interface StoreProductMediaUpload extends StoreProductMediaRequest {
   schemaVersion: 1; realm: "evaluation" | "production"; ownerUserId: string;
   uploadId: string; fingerprint: string; preparedAt: string; expiresAt: string;
+  grantIssuedAt?: string;
   processed: null | {assetId: string; originalGeneration: string; derivativeGeneration: string;
     processedAt: string; source: NormalizedStoreProductImage["source"]; file: NormalizedStoreProductImage["file"];
     meetsPublicSourceFloor: boolean};
@@ -131,17 +132,18 @@ function mediaObjectPath(upload: StoreProductMediaUpload): string {
 }
 function checkedMediaUpload(raw: unknown, asOf: string): StoreProductMediaUpload {
   const value = exact(raw, ["schemaVersion", "realm", "ownerUserId", "uploadId", "fingerprint", "preparedAt", "expiresAt", "processed",
-    "storeId", "skuId", "submissionRevision", "submissionFingerprint", "sourceSha256", "sourceByteLength", "sourceMimeType", "idempotencyKey"]);
-  const {schemaVersion, realm, ownerUserId, uploadId, fingerprint, preparedAt, expiresAt, processed, ...request} = value;
+    "storeId", "skuId", "submissionRevision", "submissionFingerprint", "sourceSha256", "sourceByteLength", "sourceMimeType", "idempotencyKey"], ["grantIssuedAt"]);
+  const {schemaVersion, realm, ownerUserId, uploadId, fingerprint, preparedAt, expiresAt, processed, grantIssuedAt, ...request} = value;
   const input = mediaRequest({productMediaVersion: 1, ...request}), owner = id(ownerUserId);
   const iso = (v: unknown): string => {
     if (typeof v !== "string" || !Number.isFinite(Date.parse(v)) || new Date(v).toISOString() !== v) invalid();
     return v;
   };
   const prepared = iso(preparedAt), expires = iso(expiresAt);
+  const issued = grantIssuedAt === undefined ? prepared : iso(grantIssuedAt);
   if (schemaVersion !== 1 || typeof realm !== "string" || !["evaluation", "production"].includes(realm) ||
       uploadId !== cataloguePayloadHash([realm, input.storeId, input.skuId, owner, input.idempotencyKey]) ||
-      fingerprint !== cataloguePayloadHash({realm, ownerUserId: owner, ...input}) || prepared > asOf || Date.parse(expires) - Date.parse(prepared) !== 300000) invalid();
+      fingerprint !== cataloguePayloadHash({realm, ownerUserId: owner, ...input}) || prepared > issued || issued > asOf || Date.parse(expires) - Date.parse(issued) !== 300000) invalid();
   if (processed !== null) {
     const p = exact(processed, ["assetId", "originalGeneration", "derivativeGeneration", "processedAt", "source", "file", "meetsPublicSourceFloor"]);
     for (const g of [p.originalGeneration, p.derivativeGeneration]) if (typeof g !== "string" || !/^[1-9][0-9]*$/u.test(g)) invalid();
@@ -1990,6 +1992,12 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
         const preparedAt = this.now().toISOString(), expiresAt = new Date(Date.parse(preparedAt) + 300000).toISOString();
         record = {...request, schemaVersion: 1, realm: this.realm, ownerUserId: owner, uploadId, fingerprint, preparedAt, expiresAt, processed: null};
         transaction.create(ref, record);
+      } else if (record && !record.processed && action === "prepare" && current && record.expiresAt <= this.now().toISOString()) {
+        // A renewed grant still writes the original object with generation-match zero.
+        // Never change the original body/key/source, or treat expiry as proof that its upload failed.
+        record.grantIssuedAt = this.now().toISOString();
+        record.expiresAt = new Date(Date.parse(record.grantIssuedAt) + 300000).toISOString();
+        transaction.set(ref, checkedMediaUpload(record, this.now().toISOString()));
       }
       return {record, current};
     });

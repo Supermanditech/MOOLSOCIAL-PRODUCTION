@@ -624,6 +624,7 @@ class WorkSession extends ChangeNotifier {
     this.catalogueBindingPendingStoreFactory,
     this.variantFamilyJournalFactory,
     this.productSubmissionJournalFactory,
+    this.productMediaJournalFactory,
     this.supplierPolicyGateway,
     this.supplierPolicyRealm,
     this.supplierPolicyJournalFactory,
@@ -691,6 +692,7 @@ class WorkSession extends ChangeNotifier {
     this.catalogueBindingPendingStoreFactory,
     this.variantFamilyJournalFactory,
     this.productSubmissionJournalFactory,
+    this.productMediaJournalFactory,
     this.supplierPolicyGateway,
     this.supplierPolicyRealm,
     this.supplierPolicyJournalFactory,
@@ -1067,6 +1069,57 @@ class WorkSession extends ChangeNotifier {
   final WorkspaceCatalogueBindingPendingStore Function(WorkspaceCatalogueBindingScope scope)? catalogueBindingPendingStoreFactory;
   final WorkspaceVariantFamilyJournal Function(WorkspaceVariantFamilyScope scope)? variantFamilyJournalFactory;
   final WorkspaceProductSubmissionJournal Function(WorkspaceProductSubmissionScope scope)? productSubmissionJournalFactory;
+  final WorkspaceProductMediaJournal Function(WorkspaceProductSubmissionScope scope)? productMediaJournalFactory;
+  final Map<WorkspaceProductSubmissionScope, WorkspaceProductMediaController> _productMedia = {};
+  WorkspaceProductMediaController? workspaceProductMedia(String skuId) {
+    final submission = workspaceProductSubmission(skuId), source = submission?.gateway;
+    if (submission == null || source is! WorkspaceProductMediaGateway || !(source as WorkspaceProductMediaGateway).productMediaSupported) return null;
+    final scope = submission.scope, previous = _productMedia[scope];
+    if (previous != null && !previous.active) {
+      _productMedia.remove(scope); previous.removeListener(notifyListeners); previous.dispose();
+    }
+    return _productMedia.putIfAbsent(scope, () => WorkspaceProductMediaController(scope: scope, gateway: source as WorkspaceProductMediaGateway,
+      journal: productMediaJournalFactory?.call(scope) ?? SecureWorkProductMediaJournal(),
+      context: () => _disposed || _contactAccountScope != scope.account || activeWorkspace?.id != scope.store ? null : publicationPreferencesContext)
+      ..addListener(notifyListeners));
+  }
+  Future<bool> checkWorkspaceProductMedia(String skuId, {required bool Function() current, bool earlier = false, String? earlierKey}) async {
+    final media = workspaceProductMedia(skuId), owner = publicationPreferencesContext;
+    if (media == null || !current()) return false;
+    bool active() => !_disposed && publicationPreferencesContext == owner && current();
+    return earlier ? media.checkEarlier(current: active, requestKey: earlierKey) : media.check(current: active);
+  }
+  Future<bool> uploadWorkspaceProductMedia(String skuId, {required bool Function() current}) async {
+    final media = workspaceProductMedia(skuId), submission = workspaceProductSubmission(skuId), owner = publicationPreferencesContext;
+    bool active() => !_disposed && publicationPreferencesContext == owner && current();
+    if (media == null || submission == null || media.busy || workspaceProductSubmissionBusy(skuId) || !active()) return false;
+    try {
+      if (localInventoryEnabled && !await workspaceInventorySaved || !active()) return false;
+      if (!submission.headLoaded && !await submission.refresh() || !active()) return false;
+      final head = submission.head, saved = workspaceCatalogueItems.where((p) => p.id == skuId).firstOrNull;
+      if (head == null || saved?.privatePhoto == null || _savedProductSubmission(skuId)?.fingerprint != head.input.fingerprint) {
+        showError('Save and submit this exact product/photo before uploading.'); return false;
+      }
+      final photo = saved!.privatePhoto!;
+      if (photo.byteLength > 8 * 1024 * 1024) {showError('This saved photo is over the 8 MB upload limit. It is kept unchanged.'); return false;}
+      final candidate = WorkspaceProductMediaIntent(scope: submission.scope, submissionRevision: head.revision,
+        submissionFingerprint: head.fingerprint, sourceSha256: photo.sha256, sourceByteLength: photo.byteLength,
+        idempotencyKey: 'photo-${List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join()}');
+      if (!candidate.matchesSubmission(head)) {showError('Check the original saved photo and product submission.'); return false;}
+      final frozen = head.input.fingerprint, loader = privateProductPhotos;
+      if (loader == null) return false;
+      bool unchanged() {try {return active() && _savedProductSubmission(skuId)?.fingerprint == frozen;} catch (_) {return false;}}
+      return media.upload(candidate, current: unchanged, readBytes: (original) async {
+        if (!unchanged() || !original.sameSource(candidate)) throw const FormatException();
+        final bytes = await loader.read(saved);
+        if (!unchanged()) throw const FormatException();
+        return bytes;
+      });
+    } catch (_) {
+      if (active()) showError('Photo processing is unconfirmed. Your saved photo and original request are kept.');
+      return false;
+    }
+  }
   final Map<WorkspaceProductSubmissionScope, WorkspaceProductSubmissionController> _productSubmissions = {};
   final Map<WorkspaceProductSubmissionScope, WorkspaceProductSubmissionController> _productSubmissionLoads = {};
   WorkspaceProductSubmissionController? workspaceProductSubmission(String skuId) {
@@ -1091,7 +1144,7 @@ class WorkSession extends ChangeNotifier {
   }
   bool workspaceProductSubmissionBusy(String skuId) {
     final controller = workspaceProductSubmission(skuId);
-    return controller != null && (controller.busy || identical(_productSubmissionLoads[controller.scope], controller));
+    return controller != null && (controller.busy || _productMedia[controller.scope]?.busy == true || identical(_productSubmissionLoads[controller.scope], controller));
   }
   WorkspaceProductSubmissionInput? _savedProductSubmission(String skuId) {
     final item = workspaceCatalogueItems.where((p) => p.id == skuId).firstOrNull;
@@ -13146,6 +13199,8 @@ class WorkSession extends ChangeNotifier {
     _variantFamilyPublishers.clear();
     for (final publisher in _productSubmissions.values) { publisher.dispose(); }
     _productSubmissions.clear();
+    for (final media in _productMedia.values) {media.dispose();}
+    _productMedia.clear();
     for (final reader in _catalogueReadbacks.values) { reader.dispose(); }
     _catalogueReadbacks.clear();
     for (final promotion in _productPromotions.values) { promotion.dispose(); }

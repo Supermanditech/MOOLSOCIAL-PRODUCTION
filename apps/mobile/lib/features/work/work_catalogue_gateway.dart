@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -290,6 +291,289 @@ abstract interface class WorkspaceProductSubmissionJournal {
   Future<WorkspaceProductSubmissionIntent?> readPending(WorkspaceProductSubmissionScope scope);
   Future<void> savePending(WorkspaceProductSubmissionIntent original);
   Future<void> removePending(WorkspaceProductSubmissionIntent original);
+}
+
+/// Frozen private upload original; contains no bytes, picker path, signed URL or publication claim.
+class WorkspaceProductMediaIntent {
+  WorkspaceProductMediaIntent({required this.scope, required this.submissionRevision, required this.submissionFingerprint,
+    required this.sourceSha256, required this.sourceByteLength, required this.idempotencyKey}) {
+    for (final value in [scope.account, scope.store, scope.sku, idempotencyKey]) { _id(value); }
+    _int(submissionRevision, 1, 100000000);
+    _int(sourceByteLength, 1, 8 * 1024 * 1024);
+    if (!{'evaluation', 'production'}.contains(scope.realm) || !RegExp(r'^[a-f0-9]{64}$').hasMatch(sourceSha256) ||
+      !RegExp(r'^[A-F0-9]{64}$').hasMatch(submissionFingerprint)) {throw const FormatException('Check the saved photo and original submission.');}
+  }
+  final WorkspaceProductSubmissionScope scope;
+  final int submissionRevision, sourceByteLength;
+  final String submissionFingerprint, sourceSha256, idempotencyKey;
+  String get uploadId => _catalogueHash([scope.realm, scope.store, scope.sku, scope.account, idempotencyKey]);
+  Map<String, Object?> get body => {'storeId': scope.store, 'skuId': scope.sku, 'submissionRevision': submissionRevision,
+    'submissionFingerprint': submissionFingerprint, 'sourceSha256': sourceSha256, 'sourceByteLength': sourceByteLength,
+    'sourceMimeType': 'image/png', 'idempotencyKey': idempotencyKey};
+  String get serverFingerprint => _catalogueHash({'realm': scope.realm, 'ownerUserId': scope.account, ...body});
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'accountId': scope.account, 'realm': scope.realm, ...body};
+  String get fingerprint => jsonEncode(_sorted(toJson()));
+  bool sameSource(WorkspaceProductMediaIntent other) => scope == other.scope && submissionRevision == other.submissionRevision &&
+    submissionFingerprint == other.submissionFingerprint && sourceSha256 == other.sourceSha256 && sourceByteLength == other.sourceByteLength;
+  bool matchesSubmission(WorkspaceProductSubmissionRecord head) => head.revision == submissionRevision && head.fingerprint == submissionFingerprint &&
+    head.toJson()['submittedBy'] == scope.account && head.input.skuId == scope.sku && head.input.mediaPending &&
+    head.input.toJson()['mediaIntent']['pendingSelectionSha256'] == _catalogueHash({'privateSha256': sourceSha256, 'skuId': scope.sku});
+  static WorkspaceProductMediaIntent fromJson(Object? raw) {
+    final value = _map(raw);
+    _keys(value, ['schemaVersion', 'accountId', 'realm', 'storeId', 'skuId', 'submissionRevision', 'submissionFingerprint',
+      'sourceSha256', 'sourceByteLength', 'sourceMimeType', 'idempotencyKey']);
+    if (_int(value['schemaVersion'], 1, 1) != 1 || value['sourceMimeType'] != 'image/png') throw const FormatException();
+    return WorkspaceProductMediaIntent(scope: (account: _id(value['accountId']), store: _id(value['storeId']),
+      realm: _string(value['realm']), sku: _id(value['skuId'])), submissionRevision: _int(value['submissionRevision']),
+      submissionFingerprint: _string(value['submissionFingerprint']), sourceSha256: _string(value['sourceSha256']),
+      sourceByteLength: _int(value['sourceByteLength']), idempotencyKey: _id(value['idempotencyKey']));
+  }
+}
+class WorkspaceProductMediaResult {
+  WorkspaceProductMediaResult._(this._encoded, this.uploadUrl, this.requiredHeaders);
+  final String _encoded;
+  final Uri? uploadUrl;
+  final Map<String, String> requiredHeaders;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  String get state => toJson()['state'] as String;
+  bool get current => toJson()['current'] as bool;
+  bool get processed => state == 'processed';
+  bool get meetsPublicSourceFloor => processed && toJson()['processed']['meetsPublicSourceFloor'] == true;
+  static WorkspaceProductMediaResult decode(Object? raw, WorkspaceProductMediaIntent original, DateTime now, {bool grantAllowed = false, bool historical = false}) {
+    if (historical && grantAllowed) throw const FormatException();
+    DateTime time(Object? raw) {
+      final parsed = _time(raw);
+      if (parsed.toIso8601String() != raw) throw const FormatException();
+      return parsed;
+    }
+    final value = _map(raw);
+    final hasGrant = value.containsKey('uploadUrl') || value.containsKey('requiredHeaders');
+    _keys(value, ['schemaVersion', 'productMediaVersion', 'realm', 'storeId', 'skuId', 'idempotencyKey', 'uploadId', 'current', 'state',
+      'preparedAt', 'expiresAt', 'source', 'processed', 'approved', 'publicationConfirmed', if (hasGrant) ...['uploadUrl', 'requiredHeaders']]);
+    final source = _map(value['source']); _keys(source, ['revision', 'fingerprint']);
+    if (_int(value['schemaVersion'], 1, 1) != 1 || _int(value['productMediaVersion'], 1, 1) != 1 || value['realm'] != original.scope.realm ||
+      value['storeId'] != original.scope.store || value['skuId'] != original.scope.sku || value['idempotencyKey'] != original.idempotencyKey ||
+      value['uploadId'] != original.uploadId || value['current'] is! bool || value['approved'] != false || value['publicationConfirmed'] != false ||
+      _int(source['revision']) != original.submissionRevision || source['fingerprint'] != original.submissionFingerprint ||
+      !{'not_found', 'awaiting_upload', 'processed'}.contains(value['state'])) {throw const FormatException();}
+    if (value['state'] == 'not_found') {
+      if (value['preparedAt'] != null || value['expiresAt'] != null || value['processed'] != null || hasGrant) throw const FormatException();
+    } else {
+      final prepared = time(value['preparedAt']), expiry = time(value['expiresAt']);
+      if (!historical && prepared.isAfter(now.toUtc()) || expiry.difference(prepared) < const Duration(minutes: 5)) throw const FormatException();
+      if (value['state'] == 'processed') {
+        final p = _map(value['processed']); _keys(p, ['assetId', 'originalGeneration', 'derivativeGeneration', 'processedAt', 'source', 'file', 'meetsPublicSourceFloor']);
+        for (final key in ['originalGeneration', 'derivativeGeneration']) {
+          if (p[key] is! String || !RegExp(r'^[1-9][0-9]*$').hasMatch(p[key] as String)) throw const FormatException();
+        }
+        final input = _map(p['source']), output = _map(p['file']);
+        _keys(input, ['sha256', 'byteLength', 'width', 'height', 'mimeType']);
+        _keys(output, ['sha256', 'byteLength', 'width', 'height', 'mimeType', 'normalized', 'frameCount']);
+        final width = _int(input['width'], 1, 16384), height = _int(input['height'], 1, 16384), processedAt = time(p['processedAt']);
+        if (input['sha256'] != original.sourceSha256.toUpperCase() || _int(input['byteLength']) != original.sourceByteLength || input['mimeType'] != 'image/png' ||
+          width * height > 16 * 1024 * 1024 || output['sha256'] is! String || !RegExp(r'^[A-F0-9]{64}$').hasMatch(output['sha256'] as String) ||
+          _int(output['byteLength'], 1, 8 * 1024 * 1024) < 1 || _int(output['width'], 1, 1024) * _int(output['height'], 1, 1024) > width * height ||
+          output['mimeType'] != 'image/png' || output['normalized'] != true || _int(output['frameCount'], 1, 1) != 1 ||
+          p['meetsPublicSourceFloor'] != (width >= 512 && height >= 512) || processedAt.isBefore(prepared) || !historical && processedAt.isAfter(now.toUtc()) ||
+          p['assetId'] != _catalogueHash({'uploadId': original.uploadId, 'generation': p['originalGeneration'], 'sha256': output['sha256']}) || hasGrant) {throw const FormatException();}
+      } else if (value['processed'] != null) { throw const FormatException(); }
+    }
+    Uri? url; final headers = <String, String>{};
+    if (hasGrant) {
+      if (!grantAllowed || value['state'] != 'awaiting_upload' || value['current'] != true || !_time(value['expiresAt']).isAfter(now.toUtc())) throw const FormatException();
+      url = Uri.parse(_string(value['uploadUrl'], 8192));
+      final suffix = '/private/product-media/v1/${original.scope.realm}/${original.uploadId}/original';
+      if (url.scheme != 'https' || url.host != 'storage.googleapis.com' || url.hasPort || url.userInfo.isNotEmpty || url.hasFragment ||
+        !url.path.endsWith(suffix) || url.path.substring(0, url.path.length - suffix.length).split('/').where((p) => p.isNotEmpty).length != 1 ||
+        url.pathSegments.any((p) => p == '.' || p == '..' || p.contains('/'))) {throw const FormatException();}
+      const queryKeys = {'X-Goog-Algorithm', 'X-Goog-Credential', 'X-Goog-Date', 'X-Goog-Expires', 'X-Goog-SignedHeaders', 'X-Goog-Signature'};
+      if (url.queryParametersAll.length != queryKeys.length || url.queryParametersAll.entries.any((e) => !queryKeys.contains(e.key) || e.value.length != 1) ||
+        url.queryParameters['X-Goog-Algorithm'] != 'GOOG4-RSA-SHA256' ||
+        !RegExp(r'^\d{8}T\d{6}Z$').hasMatch(url.queryParameters['X-Goog-Date'] ?? '') ||
+        !RegExp(r'^[a-fA-F0-9]+$').hasMatch(url.queryParameters['X-Goog-Signature'] ?? '') ||
+        (int.tryParse(url.queryParameters['X-Goog-Expires'] ?? '') ?? 0) < 1 ||
+        (int.tryParse(url.queryParameters['X-Goog-Expires'] ?? '') ?? 301) > 300 ||
+        !(url.queryParameters['X-Goog-Credential'] ?? '').endsWith('/auto/storage/goog4_request')) {throw const FormatException();}
+      final issued = DateTime.parse(url.queryParameters['X-Goog-Date']!);
+      final signedExpiry = issued.add(Duration(seconds: int.parse(url.queryParameters['X-Goog-Expires']!)));
+      if (issued.isAfter(now.toUtc()) || !signedExpiry.isAfter(now.toUtc()) ||
+        _time(value['expiresAt']).difference(signedExpiry).isNegative ||
+        _time(value['expiresAt']).difference(signedExpiry) > const Duration(seconds: 1)) {throw const FormatException();}
+      final rawHeaders = _map(value['requiredHeaders']);
+      final expected = <String, String>{'content-type': 'image/png', 'content-length': '${original.sourceByteLength}', 'x-goog-if-generation-match': '0',
+        'x-goog-meta-moolsocial-schema': 'private-product-media-v1', 'x-goog-meta-moolsocial-binding': original.serverFingerprint,
+        'x-goog-meta-moolsocial-owner': _catalogueHash(original.scope.account), 'x-goog-meta-moolsocial-source': original.sourceSha256};
+      _keys(rawHeaders, expected.keys.toList());
+      if (expected.entries.any((e) => rawHeaders[e.key] != e.value)) throw const FormatException();
+      headers.addAll(expected);
+      final signed = [...expected.keys, 'host']..sort();
+      if (url.queryParameters['X-Goog-SignedHeaders'] != signed.join(';')) throw const FormatException();
+    }
+    final sanitized = Map<String, dynamic>.of(value)..remove('uploadUrl')..remove('requiredHeaders');
+    return WorkspaceProductMediaResult._(jsonEncode(_sorted(sanitized)), url, Map.unmodifiable(headers));
+  }
+}
+abstract interface class WorkspaceProductMediaGateway {
+  bool get productMediaSupported;
+  Future<WorkspaceProductMediaResult> readProductMedia(WorkspaceProductMediaIntent original, {required bool Function() current, bool confirm = false});
+  Future<WorkspaceProductMediaResult> uploadProductMedia(WorkspaceProductMediaIntent original,
+    {required Future<Uint8List> Function() readBytes, required bool Function() current});
+}
+class WorkspaceProductMediaRecovery {
+  const WorkspaceProductMediaRecovery(this.original, [this.result, this.history = const []]);
+  final WorkspaceProductMediaIntent original;
+  final WorkspaceProductMediaResult? result;
+  final List<WorkspaceProductMediaRecovery> history;
+}
+abstract interface class WorkspaceProductMediaJournal {
+  Future<WorkspaceProductMediaRecovery?> read(WorkspaceProductSubmissionScope scope);
+  Future<void> saveOriginal(WorkspaceProductMediaIntent original);
+  Future<void> saveResult(WorkspaceProductMediaIntent original, WorkspaceProductMediaResult result);
+}
+/// Explicit editor actions only. A saved original survives uncertain prepare/PUT/confirm and restart.
+class WorkspaceProductMediaController extends ChangeNotifier {
+  WorkspaceProductMediaController({required this.scope, required this.gateway, required this.journal, required this.context}) : _lifetime = context();
+  final WorkspaceProductSubmissionScope scope;
+  final WorkspaceProductMediaGateway gateway;
+  final WorkspaceProductMediaJournal journal;
+  final Object? Function() context;
+  final Object? _lifetime;
+  bool _closed = false, ready = false, busy = false, fresh = false;
+  WorkspaceProductMediaIntent? original;
+  WorkspaceProductMediaResult? result;
+  List<WorkspaceProductMediaRecovery> history = const [];
+  String? message;
+  Future<bool>? _restoring;
+  bool get active => !_closed && _lifetime != null && context() == _lifetime;
+  void _notify() {if (active) notifyListeners();}
+  Future<bool> restore() => ready ? Future.value(active) : _restoring ??= _restore().whenComplete(() => _restoring = null);
+  Future<bool> _restore() async {
+    if (!active) return false;
+    try {
+      final saved = await journal.read(scope).timeout(const Duration(seconds: 10));
+      if (!active) return false;
+      if (saved != null && saved.original.scope != scope) throw const FormatException();
+      original = saved?.original; result = saved?.result; history = saved?.history ?? const []; ready = true; fresh = false;
+      message = original == null ? null : 'A saved photo request is kept. Check its original status before another upload.';
+      return true;
+    } catch (_) {
+      if (active) {ready = false; message = 'Photo recovery could not be opened. Your saved photo is kept.';}
+      return false;
+    } finally {_notify();}
+  }
+  Future<bool> _record(WorkspaceProductMediaIntent intent, WorkspaceProductMediaResult next, bool Function() current) async {
+    if (!active || !current() || original?.fingerprint != intent.fingerprint) return false;
+    await journal.saveResult(intent, next).timeout(const Duration(seconds: 10));
+    if (!active || !current() || original?.fingerprint != intent.fingerprint) return false;
+    result = next; fresh = true;
+    message = next.processed ? !next.current ? 'The earlier photo was processed privately. It does not replace the newer saved photo.'
+      : next.meetsPublicSourceFloor ? 'Photo processed privately. Independent review and publication are still required.'
+        : 'Photo processed privately. This saved copy is too small for public review; choose a larger image when available.'
+      : !next.current ? 'This photo request belongs to earlier saved details. It cannot replace the current photo.'
+        : 'Photo processing is not confirmed. The original request is kept.';
+    return next.processed;
+  }
+  Future<bool> check({required bool Function() current}) async {
+    if (!active || busy || !gateway.productMediaSupported || !current()) return false;
+    busy = true; _notify();
+    try {
+      if (!await restore() || !current() || original == null) return false;
+      final intent = original!;
+      var next = await gateway.readProductMedia(intent, current: () => active && current());
+      if (!active || !current()) return false;
+      if (!next.processed && next.state != 'not_found') {
+        try {next = await gateway.readProductMedia(intent, current: () => active && current(), confirm: true);}
+        catch (_) {if (!active || !current()) return false;}
+      }
+      return await _record(intent, next, current);
+    } catch (_) {
+      if (active && current()) message = 'Original photo processing is unconfirmed. Keep the saved photo and check again.';
+      return false;
+    } finally {busy = false; _notify();}
+  }
+  Future<bool> upload(WorkspaceProductMediaIntent candidate, {required bool Function() current,
+      required Future<Uint8List> Function(WorkspaceProductMediaIntent) readBytes}) async {
+    if (!active || busy || !gateway.productMediaSupported || candidate.scope != scope || !current()) return false;
+    busy = true; _notify();
+    try {
+      if (!await restore() || !active || !current()) return false;
+      final prior = original;
+      if (prior != null && !prior.sameSource(candidate)) {
+        final old = await gateway.readProductMedia(prior, current: () => active && current());
+        if (!active || !current()) return false;
+        await _record(prior, old, current);
+        if (!active || !current()) return false;
+        if (!old.processed && old.current) {message = 'Check the original photo request before uploading changed details.'; return false;}
+      }
+      final intent = prior != null && prior.sameSource(candidate) ? prior : candidate;
+      // Keep the original in memory on failed storage too; never dispatch until durable save succeeds.
+      if (original?.fingerprint != intent.fingerprint) result = null;
+      ready = false; original = intent; fresh = false;
+      await journal.saveOriginal(intent).timeout(const Duration(seconds: 10));
+      if (!active || !current()) return false;
+      final retained = await journal.read(scope).timeout(const Duration(seconds: 10));
+      if (!active || !current() || retained?.original.fingerprint != intent.fingerprint) return false;
+      history = retained!.history; ready = true;
+      final next = await gateway.uploadProductMedia(intent, readBytes: () => readBytes(intent), current: () => active && current());
+      return await _record(intent, next, current);
+    } catch (_) {
+      ready = false; fresh = false;
+      if (active && current()) {message = 'Photo upload or processing is unconfirmed. The original request and saved photo are kept.';}
+      return false;
+    } finally {busy = false; _notify();}
+  }
+  Future<bool> checkEarlier({required bool Function() current, String? requestKey}) async {
+    if (!active || busy || !current()) return false;
+    busy = true; _notify();
+    try {
+      if (!await restore() || !active || !current()) return false;
+      final retained = history.where((entry) => entry.result?.processed != true && (requestKey == null || entry.original.idempotencyKey == requestKey)).firstOrNull;
+      if (retained == null) return true;
+      var next = await gateway.readProductMedia(retained.original, current: () => active && current());
+      if (!active || !current()) return false;
+      if (!next.processed && next.state != 'not_found') {
+        try {next = await gateway.readProductMedia(retained.original, current: () => active && current(), confirm: true);}
+        catch (_) {if (!active || !current()) return false;}
+      }
+      await journal.saveResult(retained.original, next).timeout(const Duration(seconds: 10));
+      if (!active || !current()) return false;
+      final saved = await journal.read(scope).timeout(const Duration(seconds: 10));
+      if (!active || !current()) return false;
+      history = saved?.history ?? history;
+      message = next.processed ? 'Earlier photo processing is recovered privately. The current photo is unchanged.'
+        : 'Earlier photo processing is still unconfirmed. Its original request remains saved.';
+      return next.processed;
+    } catch (_) {
+      if (active && current()) message = 'The earlier photo request is kept for checking. No current photo was replaced.';
+      return false;
+    } finally {busy = false; _notify();}
+  }
+  @override
+  void dispose() {_closed = true; super.dispose();}
+}
+abstract interface class WorkspaceProductMediaUploadTransport {
+  Future<int> put(Uri url, Map<String, String> headers, Uint8List bytes, {required bool Function() current});
+}
+class IoWorkspaceProductMediaUploadTransport implements WorkspaceProductMediaUploadTransport {
+  IoWorkspaceProductMediaUploadTransport({HttpClient? client}) : _client = client ?? HttpClient();
+  final HttpClient _client;
+  @override
+  Future<int> put(Uri url, Map<String, String> headers, Uint8List bytes, {required bool Function() current}) async {
+    if (!current() || url.scheme != 'https' || url.host != 'storage.googleapis.com' || url.hasPort || url.userInfo.isNotEmpty || url.hasFragment) throw const FormatException();
+    final request = await _client.putUrl(url).timeout(const Duration(seconds: 15));
+    request.followRedirects = false;
+    if (!current()) {request.abort(); throw const FormatException();}
+    request.contentLength = bytes.length;
+    headers.forEach((key, value) {if (key != 'content-length') request.headers.set(key, value);});
+    request.add(bytes);
+    final response = await request.close().timeout(const Duration(seconds: 45));
+    var read = 0;
+    await for (final chunk in response.timeout(const Duration(seconds: 10))) {
+      read += chunk.length; if (read > 64 * 1024) throw const FormatException();
+    }
+    if (!current()) throw const FormatException();
+    return response.statusCode;
+  }
 }
 
 /// One journalled original per saved SKU. Recovery never rebuilds current edits.
@@ -2355,6 +2639,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway() {
     unbrandedProduceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_UNBRANDED_PRODUCE_V1'),
     reviewedFamilyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_REVIEWED_FAMILIES_V1'),
     productSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_SUBMISSIONS_V1'),
+    productMediaSupported: const bool.fromEnvironment('MOOLSOCIAL_PRODUCT_MEDIA_V1'),
     reviewedProductSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_REVIEW_V1'),
     storeClassificationReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_STORE_CLASSIFICATION_V1'),
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
@@ -2373,7 +2658,7 @@ bool _validEndpoint(Uri value) =>
 class AuthenticatedWorkspaceCatalogueGateway
     implements WorkspaceCatalogueGateway, WorkspaceCatalogueOwnerGateway, WorkspacePublicProductGateway,
       WorkspacePublicDetailsOwnerGateway, WorkspaceVariantFamilyOwnerGateway, WorkspaceProductSubmissionOwnerGateway,
-      WorkspaceReviewedProductSubmissionGateway {
+      WorkspaceReviewedProductSubmissionGateway, WorkspaceProductMediaGateway {
   AuthenticatedWorkspaceCatalogueGateway({
     required this.endpoint,
     required this.credentials,
@@ -2386,12 +2671,14 @@ class AuthenticatedWorkspaceCatalogueGateway
     WorkspacePublicVariantSource? reviewedVariants,
     this.reviewedFamilyReadbackSupported = false,
     this.productSubmissionSupported = false,
+    this.productMediaSupported = false,
+    WorkspaceProductMediaUploadTransport? productMediaTransport,
     this.reviewedProductSubmissionSupported = false,
     this.storeClassificationReadbackSupported = false,
     this.minorMoneyReadbackSupported = false,
     this.promotionDiscoverySupported = false,
     DateTime Function()? now,
-  }) : _reviewedVariantsOverride = reviewedVariants, now = now ?? DateTime.now {
+  }) : _reviewedVariantsOverride = reviewedVariants, _productMediaTransportOverride = productMediaTransport, now = now ?? DateTime.now {
     if (!_validEndpoint(endpoint) ||
         !{'production', 'evaluation'}.contains(realm)) {
       throw ArgumentError('Invalid catalogue connection.');
@@ -2411,6 +2698,10 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool reviewedFamilyReadbackSupported;
   @override
   final bool productSubmissionSupported;
+  @override
+  final bool productMediaSupported;
+  final WorkspaceProductMediaUploadTransport? _productMediaTransportOverride;
+  late final WorkspaceProductMediaUploadTransport _productMediaTransport = _productMediaTransportOverride ?? IoWorkspaceProductMediaUploadTransport();
   @override
   final bool reviewedProductSubmissionSupported;
   @override
@@ -2445,6 +2736,8 @@ class AuthenticatedWorkspaceCatalogueGateway
       reviewedVariants: _reviewedVariantsOverride,
       reviewedFamilyReadbackSupported: reviewedFamilyReadbackSupported,
       productSubmissionSupported: productSubmissionSupported,
+      productMediaSupported: productMediaSupported,
+      productMediaTransport: _productMediaTransportOverride,
       reviewedProductSubmissionSupported: reviewedProductSubmissionSupported,
       storeClassificationReadbackSupported: storeClassificationReadbackSupported,
       minorMoneyReadbackSupported: minorMoneyReadbackSupported,
@@ -2455,6 +2748,49 @@ class AuthenticatedWorkspaceCatalogueGateway
 
   bool _productSubmissionOwner(WorkspaceProductSubmissionScope scope, bool Function() current) => current() &&
     productSubmissionSupported && scope.realm == realm && ownerAccountId == scope.account;
+  Future<WorkspaceProductMediaResult> _mediaRequest(WorkspaceProductMediaIntent original, String operation,
+      bool Function() current, {bool grant = false}) async {
+    if (!productMediaSupported || !_productSubmissionOwner(original.scope, current)) throw const FormatException();
+    final response = await _ownerRequest({'operation': operation, 'productMediaVersion': 1, ...original.body},
+      () => productMediaSupported && _productSubmissionOwner(original.scope, current), mutation: operation != 'readStoreProductMedia');
+    if (!_productSubmissionOwner(original.scope, current) || response?.statusCode != 200) throw const FormatException('Photo processing is unconfirmed. Keep the original request.');
+    final value = _map(jsonDecode(response!.body)); _keys(value, ['ok', 'data']);
+    if (value['ok'] != true) throw const FormatException();
+    return WorkspaceProductMediaResult.decode(value['data'], original, now().toUtc(), grantAllowed: grant);
+  }
+  @override
+  Future<WorkspaceProductMediaResult> readProductMedia(WorkspaceProductMediaIntent original,
+      {required bool Function() current, bool confirm = false}) =>
+    _mediaRequest(original, confirm ? 'confirmStoreProductMedia' : 'readStoreProductMedia', current);
+  @override
+  Future<WorkspaceProductMediaResult> uploadProductMedia(WorkspaceProductMediaIntent original,
+      {required Future<Uint8List> Function() readBytes, required bool Function() current}) async {
+    final existing = await readProductMedia(original, current: current);
+    if (existing.processed) return existing;
+    if (existing.state != 'not_found') {
+      try {
+        final confirmed = await readProductMedia(original, current: current, confirm: true);
+        if (confirmed.processed) return confirmed;
+      } catch (_) {if (!current()) rethrow;}
+      if (!existing.current) return existing; // Keep historical recovery distinct from the current photo.
+    }
+    final bytes = Uint8List.fromList(await readBytes());
+    if (!current() || bytes.length != original.sourceByteLength ||
+      crypto.sha256.convert(bytes).toString() != original.sourceSha256) {throw const FormatException('Saved photo changed. The original request is kept.');}
+    final grant = await _mediaRequest(original, 'prepareStoreProductMedia', current, grant: true);
+    if (grant.processed) return grant;
+    if (!current() || grant.uploadUrl == null) throw const FormatException();
+    // No bearer/AppCheck tokens go to storage; only strictly validated signed headers and frozen bytes.
+    try {
+      final status = await _productMediaTransport.put(grant.uploadUrl!, grant.requiredHeaders, bytes, current: current);
+      if (!current() || !(status >= 200 && status < 300 || status == 412)) throw const FormatException();
+    } catch (_) {
+      if (!current()) rethrow;
+      // A lost PUT reply is not a failed upload. Confirm the same original, never allocate a new key.
+      return readProductMedia(original, current: current, confirm: true);
+    }
+    return readProductMedia(original, current: current, confirm: true);
+  }
   WorkspaceProductSubmissionRecord? _productSubmissionResponse(Object? raw, WorkspaceProductSubmissionScope scope,
       {required String? key, required bool reconcile}) {
     final value = _map(raw);

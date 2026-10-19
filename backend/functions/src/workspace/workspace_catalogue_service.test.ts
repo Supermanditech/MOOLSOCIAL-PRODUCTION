@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {createHash, randomUUID} from "node:crypto";
+import {createHash, generateKeyPairSync, randomUUID} from "node:crypto";
 import {createServer} from "node:http";
 import {Readable} from "node:stream";
+import {Storage} from "@google-cloud/storage";
 import sharp from "sharp";
 import * as catalogueModule from "./workspace_catalogue_service.js";
 import {GoogleCloudStoreProductMediaObjects, type StoreProductMediaObjects, type StoreProductMediaUpload,
@@ -292,11 +293,20 @@ test("LF03-MEDIA emulator persists source-bound processing, original recovery an
     await db.collection("workspaceProfiles").doc(profile.caseId).update({ownerUserId: "owner-one"});
     const current = (await repository().readProductSubmission("store-one", "sku-one", "owner-one"))!;
     const expiring = {...request, idempotencyKey: "host-expiry", submissionRevision: current.revision, submissionFingerprint: current.fingerprint};
-    await prepare(expiring); clock = "2026-10-16T12:06:00.000Z";
-    await assert.rejects(prepare(expiring), {code: "upload_expired"});
+    const oldGrant = await prepare(expiring); clock = "2026-10-16T12:06:00.000Z";
+    const renewed = await prepare(expiring);
+    assert.equal(renewed.uploadId, oldGrant.uploadId);
+    assert.equal(renewed.state, "awaiting_upload");
+    const savedRenewal = (await root.collection("productMediaUploads").doc(renewed.uploadId).get()).data() as StoreProductMediaUpload;
+    assert.equal(savedRenewal.preparedAt, at); assert.equal(savedRenewal.grantIssuedAt, clock);
+    assert.equal(savedRenewal.expiresAt, "2026-10-16T12:11:00.000Z");
+    originals.set(renewed.uploadId, bytes);
+    clock = "2026-10-16T12:12:00.000Z";
+    assert.equal((await confirm(expiring)).state, "processed"); // Grant expiry does not invalidate uploaded original bytes.
     // Disabled actual storage stays unavailable and cannot produce an accepted result.
     const disabled = new WorkspaceCatalogueService(new FirestoreWorkspaceCatalogueRepository(db, "evaluation"));
-    await assert.rejects(disabled.handleProductMedia("owner-one", "confirmStoreProductMedia", {productMediaVersion: 1, ...expiring}), {code: "service_unavailable"});
+    const noStorage = {...expiring, idempotencyKey: "host-disabled"};
+    await assert.rejects(disabled.handleProductMedia("owner-one", "prepareStoreProductMedia", {productMediaVersion: 1, ...noStorage}), {code: "service_unavailable"});
   } finally {await db.terminate(); await deleteApp(app);}
 });
 function hostMediaBucket() {
@@ -386,6 +396,23 @@ test("LF03-MEDIA GCS derivative recovery is immutable, verified, private and met
   await assert.rejects(host.adapter.save(upload, "17", image as NormalizedStoreProductImage), {code: "invalid_image"});
   host.setPrivate(false);
   await assert.rejects(host.adapter.save(upload, "17", image as NormalizedStoreProductImage), {code: "service_unavailable"});
+});
+test("LF03-MEDIA actual offline GCS signer agrees with the strict client grant contract", async () => {
+  // Ephemeral host-only key, never written/logged; no real Google credential, network request or upload.
+  const {privateKey} = generateKeyPairSync("rsa", {modulusLength: 2048,
+    privateKeyEncoding: {type: "pkcs8", format: "pem"}, publicKeyEncoding: {type: "spki", format: "pem"}});
+  const bucket = new Storage({projectId: "demo-private-media", credentials: {client_email: "host@invalid", private_key: privateKey}}).bucket("host-private");
+  Object.assign(bucket, {getMetadata: async () => [{iamConfiguration: {publicAccessPrevention: "enforced", uniformBucketLevelAccess: {enabled: true}}}]});
+  const {upload} = await hostUpload(), now = new Date();
+  upload.preparedAt = now.toISOString(); upload.expiresAt = new Date(now.getTime() + 300000).toISOString();
+  const grant = await new GoogleCloudStoreProductMediaObjects(bucket).prepare(upload), url = new URL(grant.uploadUrl);
+  assert.equal(url.host, "storage.googleapis.com");
+  assert.equal(url.pathname, `/host-private/private/product-media/v1/evaluation/${upload.uploadId}/original`);
+  assert.equal(url.searchParams.get("X-Goog-SignedHeaders"), [...Object.keys(grant.requiredHeaders), "host"].sort().join(";"));
+  assert.equal(url.searchParams.get("X-Goog-Algorithm"), "GOOG4-RSA-SHA256");
+  assert.ok(url.searchParams.get("X-Goog-Credential")!.endsWith("/auto/storage/goog4_request"));
+  assert.ok(Number(url.searchParams.get("X-Goog-Expires")) <= 300);
+  assert.ok(grant.uploadUrl.length > 240 && grant.uploadUrl.length < 8192);
 });
 test('LF03-SUBMIT new saved SKU has a private submission producer without a reviewed mirror prerequisite', () => {
   assert.equal(typeof (WorkspaceCatalogueService.prototype as unknown as Record<string, unknown>).handleProductSubmission, 'function');

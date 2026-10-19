@@ -478,6 +478,89 @@ class Credentials implements SocialContentCredentials {
     return 'isolated-host-appcheck';
   }
 }
+// Private-media host fixtures. No native provider injection or publication/commerce acceptance.
+String _mediaHash(Object? value) {
+  Object? sorted(Object? item) => item is Map ? {for (final key in (item.keys.cast<String>().toList()..sort())) key: sorted(item[key])}
+    : item is List ? item.map(sorted).toList() : item;
+  return sha256.convert(utf8.encode(jsonEncode(sorted(value)))).toString().toUpperCase();
+}
+WorkspaceProductMediaIntent _mediaOriginal(Uint8List bytes, {String key = 'photo-original', int revision = 1}) => WorkspaceProductMediaIntent(
+  scope: (account: 'owner-one', store: 'store-one', realm: 'evaluation', sku: 'sku-one'), submissionRevision: revision,
+  submissionFingerprint: 'A' * 64, sourceSha256: sha256.convert(bytes).toString(), sourceByteLength: bytes.length, idempotencyKey: key);
+Map<String, dynamic> _mediaReply(WorkspaceProductMediaIntent original, Uint8List bytes,
+    {String state = 'not_found', bool current = true, bool grant = false}) {
+  final outputHash = sha256.convert(bytes).toString().toUpperCase();
+  final headers = {'content-type': 'image/png', 'content-length': '${original.sourceByteLength}', 'x-goog-if-generation-match': '0',
+    'x-goog-meta-moolsocial-schema': 'private-product-media-v1', 'x-goog-meta-moolsocial-binding': original.serverFingerprint,
+    'x-goog-meta-moolsocial-owner': _mediaHash(original.scope.account), 'x-goog-meta-moolsocial-source': original.sourceSha256};
+  final signed = [...headers.keys, 'host']..sort();
+  return {'schemaVersion': 1, 'productMediaVersion': 1, 'realm': original.scope.realm, 'storeId': original.scope.store,
+    'skuId': original.scope.sku, 'idempotencyKey': original.idempotencyKey, 'uploadId': original.uploadId, 'current': current, 'state': state,
+    'preparedAt': state == 'not_found' ? null : at.toIso8601String(), 'expiresAt': state == 'not_found' ? null : at.add(const Duration(minutes: 5)).toIso8601String(),
+    'source': {'revision': original.submissionRevision, 'fingerprint': original.submissionFingerprint}, 'approved': false, 'publicationConfirmed': false,
+    'processed': state == 'processed' ? {'assetId': _mediaHash({'uploadId': original.uploadId, 'generation': '17', 'sha256': outputHash}),
+      'originalGeneration': '17', 'derivativeGeneration': '23', 'processedAt': at.toIso8601String(),
+      'source': {'sha256': original.sourceSha256.toUpperCase(), 'byteLength': original.sourceByteLength, 'width': 512, 'height': 512, 'mimeType': 'image/png'},
+      'file': {'sha256': outputHash, 'byteLength': bytes.length, 'width': 512, 'height': 512, 'mimeType': 'image/png', 'normalized': true, 'frameCount': 1},
+      'meetsPublicSourceFloor': true} : null,
+    if (grant) ...{'requiredHeaders': headers, 'uploadUrl': Uri.https('storage.googleapis.com', '/host-private/private/product-media/v1/evaluation/${original.uploadId}/original',
+      {'X-Goog-Algorithm': 'GOOG4-RSA-SHA256', 'X-Goog-Credential': 'host@invalid/20261016/auto/storage/goog4_request',
+        'X-Goog-Date': '20261016T120000Z', 'X-Goog-Expires': '300', 'X-Goog-SignedHeaders': signed.join(';'), 'X-Goog-Signature': 'ab' * 128}).toString()}};
+}
+class _MediaApi implements SocialContentTransport {
+  _MediaApi(this.reply);
+  final FutureOr<Map<String, dynamic>> Function(Map<String, Object?>) reply;
+  final bodies = <Map<String, Object?>>[];
+  @override
+  Future<SocialContentResponse> postJson(Uri endpoint, {required Map<String, String> headers, required Map<String, Object?> body}) async {
+    bodies.add(Map.of(body)); return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': await reply(body)}));
+  }
+}
+class _MediaPut implements WorkspaceProductMediaUploadTransport {
+  int calls = 0, status = 200;
+  Future<void> Function()? afterWrite;
+  final urls = <Uri>[];
+  Uint8List? bytes;
+  @override
+  Future<int> put(Uri url, Map<String, String> headers, Uint8List bytes, {required bool Function() current}) async {
+    expect(current(), isTrue); expect(headers.keys.any((k) => k.toLowerCase().contains('authorization') || k.contains('appcheck')), isFalse);
+    calls++; urls.add(url); this.bytes = Uint8List.fromList(bytes);
+    if (afterWrite != null) await afterWrite!(); return status;
+  }
+}
+AuthenticatedWorkspaceCatalogueGateway _mediaGateway(SocialContentTransport api, _MediaPut put, {Credentials? credentials, DateTime Function()? now}) =>
+  AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+    credentials: credentials ?? Credentials(), transport: api, realm: 'evaluation', ownerAccountId: 'owner-one', productSubmissionSupported: true,
+    productMediaSupported: true, productMediaTransport: put, now: now ?? () => at);
+class _MediaJournal implements WorkspaceProductMediaJournal {
+  WorkspaceProductMediaRecovery? saved;
+  bool failOriginal = false, failResult = false;
+  Future<void> Function()? beforeOriginal;
+  @override
+  Future<WorkspaceProductMediaRecovery?> read(WorkspaceProductSubmissionScope scope) async => saved;
+  @override
+  Future<void> saveOriginal(WorkspaceProductMediaIntent original) async {
+    if (beforeOriginal != null) await beforeOriginal!();
+    if (failOriginal) throw StateError('Host original save failed');
+    saved = WorkspaceProductMediaRecovery(original, saved?.original.fingerprint == original.fingerprint ? saved?.result : null);
+  }
+  @override
+  Future<void> saveResult(WorkspaceProductMediaIntent original, WorkspaceProductMediaResult result) async {
+    if (failResult) throw StateError('Host result save failed');
+    expect(saved!.original.fingerprint, original.fingerprint); saved = WorkspaceProductMediaRecovery(original, result);
+  }
+}
+class _ProductMediaOwner extends _ProductOwner implements WorkspaceProductMediaGateway {
+  late WorkspaceProductMediaGateway media;
+  @override
+  bool get productMediaSupported => true;
+  @override
+  Future<WorkspaceProductMediaResult> readProductMedia(WorkspaceProductMediaIntent original, {required bool Function() current, bool confirm = false}) =>
+    media.readProductMedia(original, current: current, confirm: confirm);
+  @override
+  Future<WorkspaceProductMediaResult> uploadProductMedia(WorkspaceProductMediaIntent original,
+    {required Future<Uint8List> Function() readBytes, required bool Function() current}) => media.uploadProductMedia(original, readBytes: readBytes, current: current);
+}
 
 // Host-only originals; never injected into native Store storage or a live service.
 class _ProductJournal implements WorkspaceProductSubmissionJournal {
@@ -1005,6 +1088,253 @@ Future<void> openListingEditor(WidgetTester tester, WorkSession work, {Size size
 }
 
 void main() {
+  test('LF03-UPLOAD matching private media capability is explicit and disabled by default', () {
+    final source = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: Transport({}));
+    expect((source as dynamic).productMediaSupported, false);
+  });
+  Future<Uint8List> mediaBytes() async {
+    final recorder = ui.PictureRecorder(); ui.Canvas(recorder).drawColor(const ui.Color(0xff287348), ui.BlendMode.src);
+    final picture = recorder.endRecording(), image = await picture.toImage(512, 512);
+    try {return (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();}
+    finally {image.dispose(); picture.dispose();}
+  }
+  test('LF03-UPLOAD frozen original, signed headers and processed receipt agree; account clone keeps capability', () async {
+    final bytes = await mediaBytes(), original = _mediaOriginal(bytes), put = _MediaPut(), credentials = Credentials();
+    var uploaded = false;
+    put.afterWrite = () async {uploaded = true;};
+    final api = _MediaApi((body) => _mediaReply(original, bytes, state: body['operation'] == 'prepareStoreProductMedia' ? 'awaiting_upload'
+      : uploaded ? 'processed' : 'not_found', grant: body['operation'] == 'prepareStoreProductMedia'));
+    final gateway = _mediaGateway(api, put, credentials: credentials).forOwnerAccount('owner-one');
+    expect(gateway.productMediaSupported, isTrue);
+    final result = await gateway.uploadProductMedia(original, readBytes: () async => bytes, current: () => true);
+    expect(result.processed, isTrue); expect(result.current, isTrue); expect(put.bytes, bytes);
+    expect(put.calls, 1); expect(result.uploadUrl, isNull); expect(result.toJson().toString(), isNot(contains('X-Goog-Signature')));
+    expect(credentials.modes, [SocialAppCheckTokenMode.standard, SocialAppCheckTokenMode.limitedUse, SocialAppCheckTokenMode.limitedUse]);
+    expect((await gateway.uploadProductMedia(original, readBytes: () async => throw StateError('Do not reread processed photo'), current: () => true)).processed, isTrue);
+    expect(put.calls, 1); expect(api.bodies.every((body) => body['idempotencyKey'] == original.idempotencyKey), isTrue);
+    expect(() => WorkspaceProductMediaIntent.fromJson({...original.toJson(), 'sourceByteLength': 8 * 1024 * 1024 + 1}), throwsFormatException);
+  });
+  for (final fault in ['lost PUT', 'precondition conflict', 'lost prepare', 'lost confirm']) {
+    test('LF03-UPLOAD $fault recovers the same object/key without replacement', () async {
+      final bytes = await mediaBytes(), original = _mediaOriginal(bytes), put = _MediaPut();
+      var prepared = fault == 'precondition conflict', uploaded = false, processed = false, failed = false;
+      put.status = fault == 'precondition conflict' ? 412 : 200;
+      put.afterWrite = () async {uploaded = true; if (fault == 'lost PUT' && !failed) {failed = true; throw TimeoutException('Host lost upload reply');}};
+      final api = _MediaApi((body) {
+        final op = body['operation'];
+        if (op == 'prepareStoreProductMedia') {
+          prepared = true;
+          if (fault == 'lost prepare' && !failed) {failed = true; throw TimeoutException('Host lost grant reply');}
+          return _mediaReply(original, bytes, state: 'awaiting_upload', grant: true);
+        }
+        if (op == 'confirmStoreProductMedia' && uploaded) {
+          processed = true;
+          if (fault == 'lost confirm' && !failed) {failed = true; throw TimeoutException('Host lost confirmation reply');}
+        } else if (op == 'confirmStoreProductMedia' && prepared) {throw StateError('Host original not uploaded yet');}
+        return _mediaReply(original, bytes, state: processed ? 'processed' : prepared ? 'awaiting_upload' : 'not_found');
+      });
+      final gateway = _mediaGateway(api, put);
+      if (fault == 'lost prepare' || fault == 'lost confirm') {
+        await expectLater(gateway.uploadProductMedia(original, readBytes: () async => bytes, current: () => true), throwsA(anything));
+      }
+      final done = await gateway.uploadProductMedia(original, readBytes: () async => bytes, current: () => true);
+      expect(done.processed, isTrue); expect(put.calls, 1);
+      expect(put.urls.single.path, endsWith('/${original.uploadId}/original'));
+      expect(api.bodies.every((body) => body['idempotencyKey'] == original.idempotencyKey), isTrue);
+    });
+  }
+  test('LF03-UPLOAD expired successful upload confirms without another PUT or byte read', () async {
+    final bytes = await mediaBytes(), original = _mediaOriginal(bytes), put = _MediaPut();
+    final api = _MediaApi((body) => _mediaReply(original, bytes, state: body['operation'] == 'confirmStoreProductMedia' ? 'processed' : 'awaiting_upload'));
+    final result = await _mediaGateway(api, put, now: () => at.add(const Duration(minutes: 6)))
+      .uploadProductMedia(original, readBytes: () async => throw StateError('No resend after expired grant'), current: () => true);
+    expect(result.processed, isTrue); expect(put.calls, 0); expect(api.bodies, hasLength(2));
+  });
+  for (final fault in ['host', 'object', 'header', 'signature', 'expiry', 'scope', 'schema', 'current', 'mime']) {
+    test('LF03-UPLOAD malformed $fault grant cannot dispatch photo bytes', () async {
+      final bytes = await mediaBytes(), original = _mediaOriginal(bytes), put = _MediaPut();
+      final api = _MediaApi((body) {
+        if (body['operation'] != 'prepareStoreProductMedia') return _mediaReply(original, bytes);
+        final response = _mediaReply(original, bytes, state: 'awaiting_upload', grant: true);
+        final url = Uri.parse(response['uploadUrl'] as String);
+        switch (fault) {
+          case 'host': response['uploadUrl'] = url.replace(host: 'storage.googleapis.com.evil.invalid').toString();
+          case 'object': response['uploadUrl'] = url.replace(path: url.path.replaceFirst(original.uploadId, 'other-upload')).toString();
+          case 'header': (response['requiredHeaders'] as Map)['authorization'] = 'Bearer forbidden';
+          case 'signature': response['uploadUrl'] = url.replace(queryParameters: {...url.queryParameters, 'X-Goog-SignedHeaders': 'host'}).toString();
+          case 'expiry': response['uploadUrl'] = url.replace(queryParameters: {...url.queryParameters, 'X-Goog-Expires': '600'}).toString();
+          case 'scope': response['storeId'] = 'other-store';
+          case 'schema': response['schemaVersion'] = 1.0;
+          case 'current': response['current'] = false;
+          case 'mime': (response['requiredHeaders'] as Map)['content-type'] = 'image/jpeg';
+        }
+        return response;
+      });
+      await expectLater(_mediaGateway(api, put).uploadProductMedia(original, readBytes: () async => bytes, current: () => true), throwsA(anything));
+      expect(put.calls, 0);
+    });
+  }
+  test('LF03-UPLOAD changed saved bytes and retired credential generation cannot prepare or upload', () async {
+    final bytes = await mediaBytes(), original = _mediaOriginal(bytes), put = _MediaPut();
+    final api = _MediaApi((_) => _mediaReply(original, bytes));
+    await expectLater(_mediaGateway(api, put).uploadProductMedia(original, readBytes: () async => Uint8List(bytes.length), current: () => true), throwsFormatException);
+    expect(api.bodies.map((b) => b['operation']), ['readStoreProductMedia']); expect(put.calls, 0);
+    var active = true;
+    final gateway = _mediaGateway(api, put, credentials: RetiringOwnerCredentials(() {active = false;}));
+    await expectLater(gateway.uploadProductMedia(original, readBytes: () async => bytes, current: () => active), throwsA(anything));
+    expect(api.bodies, hasLength(1)); expect(put.calls, 0);
+  });
+  test('LF03-UPLOAD secure original and completion survive restart, exclude URLs and preserve uncertain records', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final bytes = await mediaBytes(), original = _mediaOriginal(bytes);
+    String? account = original.scope.account;
+    SecureWorkProductMediaJournal journal() => SecureWorkProductMediaJournal(currentAccount: () => account, now: () => at);
+    await journal().saveOriginal(original);
+    await expectLater(journal().saveOriginal(_mediaOriginal(bytes, key: 'new-uncertain')), throwsFormatException);
+    expect((await journal().read(original.scope))!.original.fingerprint, original.fingerprint);
+    final result = WorkspaceProductMediaResult.decode(_mediaReply(original, bytes, state: 'processed'), original, at);
+    await journal().saveResult(original, result);
+    final fresh = await journal().read(original.scope);
+    expect(fresh!.result!.processed, isTrue); expect(fresh.original.fingerprint, original.fingerprint);
+    expect((await const FlutterSecureStorage().readAll()).values.join(), isNot(contains('uploadUrl')));
+    await expectLater(journal().saveResult(original, WorkspaceProductMediaResult.decode(_mediaReply(original, bytes, state: 'awaiting_upload'), original, at)), throwsFormatException);
+    account = 'other-owner'; await expectLater(journal().read(original.scope), throwsA(isA<WorkGatewayException>()));
+    account = original.scope.account;
+    await journal().saveOriginal(_mediaOriginal(bytes, key: 'replacement-after-confirmed', revision: 2));
+    expect((await journal().read(original.scope))!.original.submissionRevision, 2);
+  });
+  test('LF03-UPLOAD clock rollback retains historical originals without granting freshness or signed URLs', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final bytes = await mediaBytes(), original = _mediaOriginal(bytes);
+    final store = SecureWorkProductMediaJournal(currentAccount: () => original.scope.account, now: () => at);
+    await store.saveOriginal(original);
+    final complete = WorkspaceProductMediaResult.decode(_mediaReply(original, bytes, state: 'processed'), original, at);
+    await store.saveResult(original, complete);
+    final rolled = SecureWorkProductMediaJournal(currentAccount: () => original.scope.account, now: () => at.subtract(const Duration(days: 2)));
+    expect((await rolled.read(original.scope))!.result!.processed, isTrue);
+    expect(() => WorkspaceProductMediaResult.decode(complete.toJson(), original, at.subtract(const Duration(days: 2))), throwsFormatException);
+    final controller = WorkspaceProductMediaController(scope: original.scope, gateway: _mediaGateway(_MediaApi((_) => complete.toJson()), _MediaPut()),
+      journal: rolled, context: Object.new); // A changing lifetime cannot become a current upload.
+    addTearDown(controller.dispose); expect(await controller.restore(), isFalse);
+    final lifetime = Object(), restored = WorkspaceProductMediaController(scope: original.scope,
+      gateway: _mediaGateway(_MediaApi((_) => complete.toJson()), _MediaPut()), journal: rolled, context: () => lifetime);
+    addTearDown(restored.dispose); expect(await restored.restore(), isTrue); expect(restored.fresh, isFalse);
+  });
+  test('LF03-UPLOAD unresolved noncurrent original remains reachable when a replacement is saved', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final bytes = await mediaBytes(), original = _mediaOriginal(bytes), next = _mediaOriginal(bytes, key: 'new-source', revision: 2);
+    SecureWorkProductMediaJournal journal() => SecureWorkProductMediaJournal(currentAccount: () => original.scope.account, now: () => at);
+    await journal().saveOriginal(original);
+    await journal().saveResult(original, WorkspaceProductMediaResult.decode(_mediaReply(original, bytes, state: 'awaiting_upload', current: false), original, at));
+    await journal().saveOriginal(next);
+    final restart = await journal().read(original.scope);
+    expect(restart!.original.fingerprint, next.fingerprint); expect(restart.history.single.original.fingerprint, original.fingerprint);
+    final put = _MediaPut(), api = _MediaApi((body) => _mediaReply(original, bytes, state: 'processed', current: false)), lifetime = Object();
+    final controller = WorkspaceProductMediaController(scope: next.scope, gateway: _mediaGateway(api, put), journal: journal(), context: () => lifetime);
+    addTearDown(controller.dispose); expect(await controller.restore(), isTrue);
+    expect(await controller.checkEarlier(current: () => true), isTrue);
+    expect(controller.original!.fingerprint, next.fingerprint); expect(controller.result, isNull);
+    final recovered = await journal().read(next.scope);
+    expect(recovered!.history.single.result!.processed, isTrue); expect(recovered.history.single.result!.current, isFalse); expect(put.calls, 0);
+  });
+  test('LF03-UPLOAD earlier selection reaches a later recoverable original without dropping the first unresolved one', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final bytes = await mediaBytes(), one = _mediaOriginal(bytes, key: 'earlier-one'), two = _mediaOriginal(bytes, key: 'earlier-two', revision: 2),
+      latest = _mediaOriginal(bytes, key: 'latest-photo', revision: 3);
+    final journal = SecureWorkProductMediaJournal(currentAccount: () => one.scope.account, now: () => at);
+    for (final original in [one, two]) {
+      await journal.saveOriginal(original);
+      await journal.saveResult(original, WorkspaceProductMediaResult.decode(_mediaReply(original, bytes, state: 'awaiting_upload', current: false), original, at));
+    }
+    await journal.saveOriginal(latest);
+    final api = _MediaApi((body) {expect(body['idempotencyKey'], two.idempotencyKey); return _mediaReply(two, bytes, state: 'processed', current: false);}), lifetime = Object();
+    final controller = WorkspaceProductMediaController(scope: latest.scope, gateway: _mediaGateway(api, _MediaPut()), journal: journal, context: () => lifetime);
+    addTearDown(controller.dispose);
+    expect(await controller.checkEarlier(current: () => true, requestKey: two.idempotencyKey), isTrue);
+    final saved = (await journal.read(one.scope))!;
+    expect(saved.original.fingerprint, latest.fingerprint); expect(saved.history[0].result!.processed, isFalse); expect(saved.history[1].result!.processed, isTrue);
+  });
+  test('LF03-UPLOAD rejected history-cap replacement restores the durable original before another action', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final bytes = await mediaBytes(), old = _mediaOriginal(bytes, key: 'retained-8', revision: 9), candidate = _mediaOriginal(bytes, key: 'cannot-save-new', revision: 10);
+    final journal = SecureWorkProductMediaJournal(currentAccount: () => old.scope.account, now: () => at);
+    for (var index = 0; index <= 8; index++) {
+      final original = _mediaOriginal(bytes, key: 'retained-$index', revision: index + 1);
+      await journal.saveOriginal(original);
+      await journal.saveResult(original, WorkspaceProductMediaResult.decode(_mediaReply(original, bytes, state: 'awaiting_upload', current: false), original, at));
+    }
+    var recover = false; final put = _MediaPut(), lifetime = Object();
+    final api = _MediaApi((body) {expect(body['idempotencyKey'], old.idempotencyKey); return _mediaReply(old, bytes, state: recover ? 'processed' : 'awaiting_upload', current: false);});
+    final controller = WorkspaceProductMediaController(scope: old.scope, gateway: _mediaGateway(api, put), journal: journal, context: () => lifetime);
+    addTearDown(controller.dispose);
+    expect(await controller.upload(candidate, current: () => true, readBytes: (_) async => bytes), isFalse); expect(controller.ready, isFalse);
+    expect((await journal.read(old.scope))!.original.fingerprint, old.fingerprint); expect(put.calls, 0);
+    recover = true; expect(await controller.check(current: () => true), isTrue);
+    expect(controller.original!.fingerprint, old.fingerprint); expect((await journal.read(old.scope))!.history, hasLength(8));
+  });
+  test('LF03-UPLOAD source change during failed journal replacement cannot leave recovery pointing at the unsaved candidate', () async {
+    final bytes = await mediaBytes(), old = _mediaOriginal(bytes), candidate = _mediaOriginal(bytes, key: 'unsaved-replacement', revision: 2);
+    final journal = _MediaJournal()..saved = WorkspaceProductMediaRecovery(old,
+      WorkspaceProductMediaResult.decode(_mediaReply(old, bytes, state: 'awaiting_upload', current: false), old, at));
+    final entered = Completer<void>(), release = Completer<void>();
+    journal.beforeOriginal = () async {entered.complete(); await release.future;};
+    journal.failOriginal = true;
+    var unchanged = true, recovering = false;
+    final lifetime = Object(), api = _MediaApi((body) {
+      expect(body['idempotencyKey'], old.idempotencyKey);
+      return _mediaReply(old, bytes, state: recovering ? 'processed' : 'awaiting_upload', current: false);
+    });
+    final controller = WorkspaceProductMediaController(scope: old.scope, gateway: _mediaGateway(api, _MediaPut()), journal: journal, context: () => lifetime);
+    addTearDown(controller.dispose);
+    final running = controller.upload(candidate, current: () => unchanged, readBytes: (_) async => bytes);
+    await entered.future; expect(controller.ready, isFalse); unchanged = false; release.complete();
+    expect(await running, isFalse); expect(controller.ready, isFalse); expect(journal.saved!.original.fingerprint, old.fingerprint);
+    recovering = true;
+    expect(await controller.check(current: () => true), isTrue); expect(controller.original!.fingerprint, old.fingerprint);
+  });
+  test('LF03-UPLOAD grant await and A-B-A lifetime changes fence PUT while keeping original recovery', () async {
+    final bytes = await mediaBytes(), original = _mediaOriginal(bytes), put = _MediaPut(), pending = Completer<Map<String, dynamic>>();
+    final granted = Completer<void>();
+    final api = _MediaApi((body) {
+      if (body['operation'] == 'prepareStoreProductMedia') {granted.complete(); return pending.future;}
+      return _mediaReply(original, bytes);
+    });
+    final journal = _MediaJournal(); Object lifetime = Object(), captured = lifetime;
+    var sourceUnchanged = true;
+    final controller = WorkspaceProductMediaController(scope: original.scope, gateway: _mediaGateway(api, put), journal: journal, context: () => lifetime);
+    addTearDown(controller.dispose);
+    final running = controller.upload(original, current: () => sourceUnchanged, readBytes: (_) async => bytes);
+    await granted.future; sourceUnchanged = false; lifetime = Object(); lifetime = Object();
+    expect(lifetime, isNot(same(captured)));
+    pending.complete(_mediaReply(original, bytes, state: 'awaiting_upload', grant: true));
+    expect(await running, isFalse); expect(put.calls, 0); expect(journal.saved!.original.fingerprint, original.fingerprint);
+    final again = WorkspaceProductMediaController(scope: original.scope, gateway: _mediaGateway(_MediaApi((_) => _mediaReply(original, bytes, state: 'processed', current: false)), put),
+      journal: journal, context: () => lifetime); addTearDown(again.dispose);
+    expect(await again.check(current: () => true), isTrue); expect(again.result!.current, isFalse); expect(put.calls, 0);
+  });
+  for (final failAt in ['original', 'result']) {
+    test('LF03-UPLOAD failed $failAt journal preserves recovery and never claims durable success', () async {
+      final bytes = await mediaBytes(), original = _mediaOriginal(bytes), put = _MediaPut(), journal = _MediaJournal();
+      journal.failOriginal = failAt == 'original'; journal.failResult = failAt == 'result';
+      var uploaded = false; put.afterWrite = () async {uploaded = true;};
+      final api = _MediaApi((body) {
+        final raw = Map<String, Object?>.of(body)..remove('operation')..remove('productMediaVersion');
+        final request = WorkspaceProductMediaIntent.fromJson({'schemaVersion': 1, 'accountId': 'owner-one', 'realm': 'evaluation', ...raw});
+        return _mediaReply(request, bytes, state: body['operation'] == 'prepareStoreProductMedia' ? 'awaiting_upload'
+          : uploaded ? 'processed' : 'not_found', grant: body['operation'] == 'prepareStoreProductMedia');
+      });
+      final context = Object(), gateway = _mediaGateway(api, put), controller = WorkspaceProductMediaController(scope: original.scope,
+        gateway: gateway, journal: journal, context: () => context); addTearDown(controller.dispose);
+      expect(await controller.upload(original, current: () => true, readBytes: (_) async => bytes), isFalse);
+      expect(controller.original!.fingerprint, original.fingerprint); expect(controller.result, isNull);
+      expect(put.calls, failAt == 'original' ? 0 : 1);
+      if (failAt == 'original') {expect(api.bodies, isEmpty);} else {expect(journal.saved!.original.fingerprint, original.fingerprint);}
+      journal.failOriginal = false; journal.failResult = false;
+      expect(await controller.upload(_mediaOriginal(bytes, key: 'new-tap-key'), current: () => true, readBytes: (_) async => bytes), isTrue);
+      expect(controller.original!.idempotencyKey, failAt == 'original' ? 'new-tap-key' : original.idempotencyKey); expect(put.calls, 1);
+    });
+  }
   if (Platform.environment['LF03_FAMILY_SERVER'] == 'true') {
     test('LF03-CONNECTED Store saved variants to real reviewed service restart and public selection', () async {
       final emulator = Platform.environment['FIRESTORE_EMULATOR_HOST'] ?? '';
@@ -1746,10 +2076,76 @@ void main() {
     WorkspaceProductSubmissionRecord.decode(jsonDecode(jsonEncode(submissionAck(original)['record'])), original.scope, at);
   WorkspaceProductSubmissionController productController(_ProductOwner source, _ProductJournal journal, {Object? Function()? context}) =>
     WorkspaceProductSubmissionController(scope: submissionScope, gateway: source, journal: journal, context: context ?? () => 'host-owner');
-  WorkSession productSession(_ProductOwner source, _ProductJournal journal) => WorkSession(contactDraftStore: ListingAccount(),
-    catalogueGateway: source, productSubmissionJournalFactory: (_) => journal)
+  WorkSession productSession(_ProductOwner source, _ProductJournal journal, {WorkspaceProductMediaJournal? mediaJournal, Directory? photoDirectory}) => WorkSession(contactDraftStore: ListingAccount(),
+    catalogueGateway: source, productSubmissionJournalFactory: (_) => journal,
+    productMediaJournalFactory: mediaJournal == null ? null : (_) => mediaJournal,
+    productPhotoSupportDirectory: photoDirectory == null ? null : () async => photoDirectory)
       ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jaipur', verified: true)
       ..workspaceId = 'store-one' ..workspaceCatalogueItems.add(listingItem());
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF03-UPLOAD saved-photo editor uses actual private bytes, explicit actions and readable recovery at $scale', (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale; addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      late Directory directory;
+      await tester.runAsync(() async {directory = await Directory.systemTemp.createTemp('lf03-media-editor-');});
+      final owner = _ProductMediaOwner(), journal = _MediaJournal(), work = productSession(owner, _ProductJournal(), mediaJournal: journal, photoDirectory: directory);
+      late Uint8List bytes;
+      final originalItem = work.workspaceCatalogueItems.single;
+      await tester.runAsync(() async {
+        bytes = await mediaBytes();
+        final photo = await work.privateProductPhotos!.save(product: originalItem,
+          picked: WorkPickedProof(fileName: 'actual-host-photo.png', contentType: 'image/png', bytes: bytes));
+        work.workspaceCatalogueItems[0] = originalItem.copyWith(privatePhoto: photo);
+      });
+      final input = WorkspaceProductSubmissionInput.fromSaved(work.workspaceCatalogueItems.single);
+      owner.head = submissionRecord(WorkspaceProductSubmissionIntent(scope: submissionScope, expectedRevision: 0, idempotencyKey: 'host-media-source', input: input));
+      final put = _MediaPut(); var uploaded = false;
+      put.afterWrite = () async {uploaded = true;};
+      final api = _MediaApi((body) {
+        final raw = Map<String, Object?>.of(body)..remove('operation')..remove('productMediaVersion');
+        final original = WorkspaceProductMediaIntent.fromJson({'schemaVersion': 1, 'accountId': 'owner-one', 'realm': 'evaluation', ...raw});
+        return _mediaReply(original, put.bytes ?? bytes, state: body['operation'] == 'prepareStoreProductMedia' ? 'awaiting_upload'
+          : uploaded ? 'processed' : 'not_found', grant: body['operation'] == 'prepareStoreProductMedia');
+      });
+      owner.media = _mediaGateway(api, put);
+      const captureKey = Key('media-editor-host-root');
+      await openListingEditor(tester, work, captureKey: captureKey, theme: MoolTheme.light());
+      expect(api.bodies, isEmpty); expect(put.calls, 0); // Opening and local journal restore are not uploads.
+      final check = find.byKey(const Key('work-product-review-check'));
+      await tester.ensureVisible(check); await tester.pumpAndSettle(); await tester.tap(check); await tester.pumpAndSettle();
+      expect(api.bodies, isEmpty);
+      final upload = find.byKey(const Key('work-product-photo-upload'));
+      await tester.ensureVisible(upload); await tester.pumpAndSettle();
+      expect(tester.getSize(upload).height, greaterThanOrEqualTo(48));
+      await tester.tap(upload);
+      // Alternate framework microtasks with real file IO, rather than waiting inside the wrong fake-async zone.
+      for (var turn = 0; turn < 100 && journal.saved?.result == null; turn++) {
+        await tester.pump(const Duration(milliseconds: 10));
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
+      }
+      await tester.pumpAndSettle();
+      expect(put.calls, 1, reason: '${work.errorMessage} ${work.workspaceProductMedia('sku-one')?.message}');
+      expect(journal.saved!.result!.processed, isTrue); expect(owner.submitted, isEmpty);
+      expect(work.workspaceCatalogueItems.single.privatePhoto!.sha256, sha256.convert(put.bytes!).toString());
+      expect(work.workspaceOrders, isEmpty); expect(work.workspaceInvoices, isEmpty);
+      final status = find.byKey(const Key('work-product-photo-status'));
+      await tester.ensureVisible(status); await tester.pumpAndSettle();
+      expect(find.textContaining('Photo processed privately'), findsOneWidget); expect(tester.takeException(), isNull);
+      final captureDirectory = Platform.environment['LF03_MEDIA_CAPTURE_DIR'];
+      if (captureDirectory != null) {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(captureKey));
+        await tester.runAsync(() async {
+          final image = await boundary.toImage();
+          try {
+            final data = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+            await Directory(captureDirectory).create(recursive: true);
+            final file = File('$captureDirectory/media-editor-$scale.png');
+            if (await file.exists()) throw StateError('Preserve existing host capture.');
+            await file.writeAsBytes(data.buffer.asUint8List());
+          } finally {image.dispose();}
+        });
+      }
+    });
+  }
   test('LF03-SUBMIT recovery journals before dispatch and never calls a reviewed mirror', () async {
     final owner = _ProductOwner(), journal = _ProductJournal(), controller = productController(owner, journal);
     addTearDown(controller.dispose);
