@@ -207,6 +207,52 @@ void connectPurchaseFixture(Transport wire, bool Function() completed) {
 }
 
 void main() {
+  if (Platform.environment['LF13_STARS_RECOVERY_LOG'] case final path?) {
+    for (final phase in ['before-commit', 'after-commit']) {
+      test('LF13-RECOVERY actual service original survives lost $phase response through strict client', () async {
+        const marker = 'LF13_RECOVERY_PROJECTION=';
+        final rows = File(path).readAsLinesSync().where((line) => line.contains(marker))
+          .map((line) => (jsonDecode(line.substring(line.indexOf(marker) + marker.length)) as Map).cast<String, dynamic>())
+          .where((row) => row['phase'] == phase).toList();
+        expect(rows, hasLength(1));
+        final capture = rows.single, raw = capture['recovered'] as Map<String, dynamic>;
+        final command = (capture['command'] as Map).cast<String, dynamic>();
+        final wire = Transport()..data = raw..status = 500;
+        final gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, account: raw['viewerUserId']));
+        final target = gateway.restoreProductFeedbackTarget(capture['target'], realm: raw['realm']);
+        expect(target, isNotNull);
+        Future<WorkspaceProductStarsResult?> request({required bool reconcile}) => gateway.submitProductStars(
+          target: target!, stars: command['stars'], expectedRevision: command['expectedRevision'],
+          operationId: command['operationId'], reconcile: reconcile);
+        // Isolated failed transport followed by actual captured service readback;
+        // never a fabricated saved result, new operation ID or runtime injection.
+        expect(await request(reconcile: false), isNull);
+        final original = Map<String, Object?>.of(wire.sent!);
+        wire.status = 200;
+        final recovered = await request(reconcile: true);
+        expect(recovered, isNotNull);
+        expect(wire.sent!['operation'], 'reconcileBuyerProductStars');
+        expect(Map<String, Object?>.of(wire.sent!)..remove('operation'), command);
+        expect(capture['receiptCountAfterRecovery'], capture['receiptCountAfterFailure']);
+        if (phase == 'after-commit') {
+          expect(recovered!.rating!.stars, command['stars']);
+          expect(recovered.rating!.revision, command['expectedRevision'] + 1);
+          expect(capture['receiptCountAfterFailure'], capture['receiptCountBefore'] + 1);
+        } else {
+          expect(recovered!.rating, isNull); expect(recovered.supersededByRevision, isNull);
+          expect(capture['receiptCountAfterFailure'], capture['receiptCountBefore']);
+          wire.data = capture['retried'] as Map<String, dynamic>;
+          final retried = await request(reconcile: false);
+          expect(retried!.rating!.stars, command['stars']);
+          expect(wire.sent, original, reason: 'Explicit retry must use the unchanged original request.');
+        }
+        wire.data = raw;
+        final other = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, account: 'other-buyer'));
+        expect(await other.submitProductStars(target: target!, stars: command['stars'],
+          expectedRevision: command['expectedRevision'], operationId: command['operationId'], reconcile: true), isNull);
+      });
+    }
+  }
   if (Platform.environment['LF_EXACT_PRODUCT_TARGET_LOG'] case final path?) {
     test('LF-STARS actual100-line backend target passes exact buyer-bound Dart read', () async {
       final entry = File(path).readAsLinesSync().singleWhere((l) => l.startsWith('LF_EXACT_PRODUCT_TARGET='));

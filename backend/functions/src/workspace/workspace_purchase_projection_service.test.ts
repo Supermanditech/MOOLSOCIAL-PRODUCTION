@@ -716,6 +716,82 @@ test(`LF-LISTING actual persisted originals preserve explicit provenance across 
 });
 }
 
+test('LF13-RECOVERY real original stars survive unknown acknowledgements without automatic retries',
+  {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async (t) => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-stars-recovery-${randomUUID().slice(0, 8)}`}, `recovery-${randomUUID()}`);
+  const db = getFirestore(app), root = db.collection('workspacePurchaseProjections').doc('evaluation');
+  try {
+    const value = publicListingReceipt(); value.receiptId = `receipt-${randomUUID()}`; value.buyerUserId = `buyer-${randomUUID()}`;
+    for (const store of value.stores) await db.collection('workspaceProfiles').doc(store.caseId).set({
+      schemaVersion: 1, caseId: store.caseId, workspaceId: store.storeId, ownerUserId: store.ownerUserId,
+      familyId: 'products-trade', profileId: 'retailer-grocery', status: 'live', shopEnabled: true,
+    });
+    const producer = new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => value});
+    const created = await producer.materialize('stars-recovery-original');
+    const buyer = await producer.readBuyer(value.buyerUserId, {purchaseId: created.purchaseId}), order = buyer.orders[0]!;
+    const scope = {purchaseId: buyer.purchaseId, storeId: order.storeId, orderId: order.orderId};
+    const restart = new WorkspaceOrderOperationsService(db, 'evaluation',
+      {readOperationalOrder: async () => ({...operationalEvidence(), ...scope, originalFingerprint: order.originalFingerprint,
+        sourceRevision: buyer.sourceRevision, initialStage: 'Ready'})}, () => new Date(),
+      {issuer: 'trusted-fulfilment', readCompletion: async () => ({...completionEvidence(), ...scope,
+        receiptId: `completion-${buyer.purchaseId}`, originalFingerprint: order.originalFingerprint,
+        sourceRevision: buyer.sourceRevision, operationalRevision: 1})});
+    await restart.initialize('stars-recovery-operations'); await restart.recordCompletion('stars-recovery-completion');
+    const target = (await restart.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 5, cursor: null})).targets[0]!;
+    assert.ok(target);
+    const ratingPath = root.collection('productStarRatings').doc(target.id);
+    await restart.submitProductStars(value.buyerUserId, {targetId: target.id, expectedRevision: 0,
+      operationId: 'host-existing-rating', stars: 1});
+      for (const phase of ['before-commit', 'after-commit'] as const) {
+        await t.test(`LF13-RECOVERY explicit original reconciliation after ${phase} lost reply`, async () => {
+          const previous = (await restart.readBuyerProductStars(value.buyerUserId, {targetId: target.id}))!;
+          const command = {targetId: target.id, expectedRevision: previous.revision,
+            operationId: `host-lost-${phase}`, stars: phase === 'before-commit' ? 2 : 3};
+          const receipts = root.collection('productStarReceipts');
+          const receiptCountBefore = (await receipts.get()).size;
+          const originalTransaction = db.runTransaction;
+          const lost = Object.assign(new Error('Isolated unknown transaction acknowledgement'),
+            {code: 3, details: 'Transaction is invalid or closed.'});
+          let calls = 0, committed: unknown;
+          // Failure injection is confined to this isolated test DB instance.
+          // Preserve the production method and strict concurrent-save assertion.
+          db.runTransaction = (async (...args: unknown[]) => {
+            calls++;
+            if (phase === 'after-commit') committed = await Reflect.apply(originalTransaction, db, args);
+            throw lost;
+          }) as typeof originalTransaction;
+          try {
+            await assert.rejects(restart.submitProductStars(value.buyerUserId, command), error => error === lost);
+          } finally {db.runTransaction = originalTransaction;}
+          assert.equal(calls, 1, 'An uncertain acknowledgement must not trigger an automatic write retry.');
+          const receiptCountAfterFailure = (await receipts.get()).size;
+          assert.equal(receiptCountAfterFailure, receiptCountBefore + (phase === 'after-commit' ? 1 : 0));
+          const frozenRating = (await ratingPath.get()).data();
+          const resumed = new WorkspaceOrderOperationsService(db, 'evaluation');
+          const recovered = await resumed.submitProductStars(value.buyerUserId, command, true);
+          const receiptCountAfterRecovery = (await receipts.get()).size;
+          assert.equal(receiptCountAfterRecovery, receiptCountAfterFailure, 'Reconciliation must not create a receipt.');
+          assert.deepEqual((await ratingPath.get()).data(), frozenRating, 'Reconciliation must not modify the rating.');
+          let retried: unknown = null;
+          if (phase === 'after-commit') {
+            assert.deepEqual(recovered, committed, 'Recover the original acknowledgement, not the latest rating.');
+            assert.equal(recovered.rating!.revision, previous.revision + 1);
+          } else {
+            assert.equal(recovered.state, 'not_recorded'); assert.equal(recovered.rating, null);
+            assert.equal((await resumed.readBuyerProductStars(value.buyerUserId, {targetId: target.id}))!.revision, previous.revision);
+            // Only a deliberate retry of the unchanged original request writes.
+            retried = await resumed.submitProductStars(value.buyerUserId, command);
+            assert.deepEqual(await resumed.submitProductStars(value.buyerUserId, command, true), retried);
+            assert.equal((await receipts.get()).size, receiptCountBefore + 1);
+          }
+          console.log(`LF13_RECOVERY_PROJECTION=${JSON.stringify({phase, target, command, recovered, retried,
+            receiptCountBefore, receiptCountAfterFailure, receiptCountAfterRecovery})}`);
+        });
+      }
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+
 test("LF-FEEDBACK private stars have submit/reconcile and retailer reader surfaces", () => {
   assert.equal(typeof Reflect.get(WorkspaceOrderOperationsService.prototype, "readBuyerProductFeedbackTarget"), "function");
   assert.equal(typeof Reflect.get(WorkspaceOrderOperationsService.prototype, "submitProductStars"), "function");
