@@ -8622,9 +8622,10 @@ void main() {
   });
 
   Future<void> openStoreHeaderAction(WidgetTester tester, String key) async {
-    // Analytics has no utility band. Use the visible Store Orders header.
+    // Profile is approved on Home only; alerts remain in the Orders header.
     if (find.byKey(Key(key)).evaluate().isEmpty) {
-      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.tap(find.byKey(Key(key == 'work-dashboard-profile'
+          ? 'work-store-home' : 'work-store-orders')));
       await tester.pumpAndSettle();
     }
     await tester.tap(find.byKey(Key(key)));
@@ -26110,16 +26111,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
     Future<void> openPromotionFromOperations(WidgetTester tester) async {
-      await tester.tap(find.byKey(const Key('work-store-orders')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('work-dashboard-profile')));
-      await tester.pumpAndSettle();
-      final operations = find.byKey(
-        const Key('global-profile-quick-operations'),
-      );
-      await reveal(tester, operations);
-      await tester.tap(operations);
-      await tester.pumpAndSettle();
+      await openStoreTools(tester);
       final grow = find.byKey(const Key('work-business-grow'));
       await reveal(tester, grow);
       await tester.tap(grow);
@@ -32981,12 +32973,14 @@ void main() {
     'sellingPrice': '50',
     'stock': '10',
   };
+  const csv23MappedPackFields = ['genericName', 'netQuantity', 'manufacturerName',
+    'packerName', 'importerName', 'countryOfOrigin', 'fssaiLicenseNumber', 'consumerCare'];
 
   test(
     'CSV23 eight pack fields reach shared snapshot and public adapter',
     () async {
       final facts = {
-        for (final key in WorkspaceProductImport.packFieldLabels.keys)
+        for (final key in csv23MappedPackFields)
           key: mappedPack.toJson()[key]! as String,
         'consumerCare': 'Product care,\nMon–Sat',
       };
@@ -33033,7 +33027,7 @@ void main() {
           c.fssaiLicenseNumber,
           c.consumerCare,
         ],
-        WorkspaceProductImport.packFieldLabels.keys
+        csv23MappedPackFields
             .map((k) => facts[k])
             .toList(),
       );
@@ -33074,8 +33068,11 @@ void main() {
       expect(blank.compliance!.manufacturedOrPackedOn, isNull);
       expect(blank.compliance!.bestBeforeOrUseBy, isNull);
       for (final key in WorkspaceProductImport.packFieldLabels.keys) {
-        expect(blank.compliance!.toJson()[key], mappedPack.toJson()[key]);
-        final same = read({...row, key: '  ${mappedPack.toJson()[key]}  '});
+        final expected = mappedPack.toJson()[key];
+        expect(blank.compliance!.toJson()[key], expected);
+        // Added optional fields are absent, not the literal text "null".
+        final same = read({...row, key: expected == null ? '  ' : '  $expected  '});
+        expect(same.compliance!.toJson()[key], expected);
         expect(
           same.catalogueFactsRequireReview,
           master.catalogueFactsRequireReview,
@@ -33477,7 +33474,7 @@ void main() {
   ) async {
     final row = {
       ...csv23Required,
-      for (final key in WorkspaceProductImport.packFieldLabels.keys)
+      for (final key in csv23MappedPackFields)
         key: mappedPack.toJson()[key]! as String,
     };
     final item = WorkspaceProductImport.parse(
@@ -33498,7 +33495,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    for (final key in WorkspaceProductImport.packFieldLabels.keys) {
+    for (final key in csv23MappedPackFields) {
       final field = find.text(row[key]!);
       expect(field, findsOneWidget);
       await tester.ensureVisible(field);
@@ -33716,9 +33713,12 @@ void main() {
     );
     expect(malformed.rows.every((r) => r.issue != null), isTrue);
     final numeric = parse(
-      '$head\nRice,Local,1kg,40,-1,1\nRice,Local,1kg,40,50,-1\nRice,Local,1kg,40.5,50,1',
+      '$head\nRice,Local,1kg,40,-1,1\nRice,Local,1kg,40,50,-1\nRice,Local,1kg,40.005,50,1',
     );
     expect(numeric.rows.every((r) => r.product == null), isTrue);
+    final decimal = parse('$head\nRice,Local,1kg,40.5,50,1').rows.single.product!;
+    expect(decimal.purchasePriceMinor, 4050);
+    expect(decimal.sellingPriceMinor, 5000);
     final duplicate = parse(
       '$head,sku\nRice,Local,1kg,40,50,1,001\nRice,Local,1kg,40,50,1,002\nSugar,Local,1kg,40,50,1,001',
     );
@@ -46609,6 +46609,9 @@ void main() {
     expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-dashboard-profile')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-store-orders')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
     expect(work.currentWorkspaceOrder, same(order));
     expect(work.workspaceOrderActionDeadline, deadline);
@@ -48014,8 +48017,7 @@ void main() {
           if (surface == 'product') {
             // The global saved-record search remains in Customer records;
             // Stock search intentionally searches only Stock products.
-            await tester.tap(find.byKey(const Key('work-dashboard-profile')));
-            await tester.pumpAndSettle();
+            await openStoreProfile(tester);
             final operations = find.byKey(
               const Key('global-profile-quick-operations'),
             );
@@ -55522,6 +55524,7 @@ void main() {
       addTearDown(tester.view.reset);
       const storePath = '/app/work/workspace/dashboard';
       const storeLocation = '$storePath?section=orders';
+      const profileReturnLocation = '$storePath?section=dashboard';
       Uri? securityLocation;
       final router = GoRouter(
         initialLocation: '/app/social',
@@ -55566,15 +55569,18 @@ void main() {
       await tester.ensureVisible(security);
       await tester.tap(security);
       await tester.pumpAndSettle();
-      expect(securityLocation?.queryParameters['return'], storeLocation);
+      expect(securityLocation?.queryParameters['return'], profileReturnLocation);
       // Completing authentication uses go(), replacing the pushed Store stack.
       router.go(securityLocation.toString());
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('global-security-back')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+      expect(find.byKey(const Key('work-dashboard-profile')), findsOneWidget);
       expect(work.activeWorkspace, same(workspace));
       expect(find.text('Open test Store'), findsNothing);
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -70163,16 +70169,7 @@ void main() {
             );
             // Global saved-record search belongs to an operational screen,
             // not the analytics header or Stock's product-only search.
-            await tester.tap(find.byKey(const Key('work-store-orders')));
-            await tester.pumpAndSettle();
-            await tester.tap(find.byKey(const Key('work-dashboard-profile')));
-            await tester.pumpAndSettle();
-            final operations = find.byKey(
-              const Key('global-profile-quick-operations'),
-            );
-            await reveal(tester, operations);
-            await tester.tap(operations);
-            await tester.pumpAndSettle();
+            await openStoreTools(tester);
             await reveal(
               tester,
               find.byKey(const Key('work-business-customers')),
