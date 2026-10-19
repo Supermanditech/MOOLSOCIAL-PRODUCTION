@@ -4197,6 +4197,73 @@ class SecureWorkCatalogueBindingPendingStore implements WorkspaceCatalogueBindin
   });
 }
 
+/// An original Store-reported quantity, never the full inventory or a ledger.
+/// Same account-scoped encrypted/native-tail pattern as product submissions.
+class SecureWorkStoreStockJournal implements WorkspaceStoreStockJournal {
+  SecureWorkStoreStockJournal({FlutterSecureStorage? storage, String? Function()? currentAccount})
+    : _storage = storage ?? const FlutterSecureStorage(),
+      _currentAccount = currentAccount ?? SecureWorkOrderPendingStore._signedInAccount;
+  final FlutterSecureStorage _storage;
+  final String? Function() _currentAccount;
+  static final _tails = <String, Future<void>>{};
+  String _key(WorkspaceStoreStockScope scope) => 'moolsocial.workspace.store-stock.v1.${
+    base64UrlEncode(utf8.encode(jsonEncode([scope.account, scope.store, scope.realm, scope.sku])))}';
+  void _check(WorkspaceStoreStockScope scope) {
+    if (scope.account.isEmpty || scope.store.isEmpty || scope.sku.isEmpty ||
+        !{'production', 'evaluation'}.contains(scope.realm) || _currentAccount() != scope.account) {
+      throw const WorkGatewayException('Sign in again to check the saved Stock update.');
+    }
+  }
+  Future<T> _serial<T>(WorkspaceStoreStockScope scope, Future<T> Function() action) {
+    final key = _key(scope), result = (_tails[key] ?? Future<void>.value()).then((_) => action());
+    final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _tails[key] = tail;
+    unawaited(tail.then((_) { if (identical(_tails[key], tail)) _tails.remove(key); }));
+    return result;
+  }
+  Future<WorkspaceStoreStockIntent?> _read(WorkspaceStoreStockScope scope) async {
+    _check(scope);
+    final raw = await _storage.read(key: _key(scope));
+    _check(scope);
+    if (raw == null) return null;
+    final value = jsonDecode(raw), keys = {'schemaVersion', 'accountId', 'storeId', 'realm', 'skuId', 'original'};
+    if (value is! Map || value.length != keys.length || value.keys.any((key) => !keys.contains(key)) ||
+        value['schemaVersion'] is! int || value['schemaVersion'] != 1 || value['accountId'] != scope.account ||
+        value['storeId'] != scope.store || value['realm'] != scope.realm || value['skuId'] != scope.sku) {
+      throw const FormatException('Keep the saved Stock recovery record.');
+    }
+    if (value['original'] == null) return null;
+    final original = WorkspaceStoreStockIntent.fromJson(value['original']);
+    if (original.scope != scope) throw const FormatException('Keep the original Stock owner.');
+    return original;
+  }
+  Future<void> _write(WorkspaceStoreStockScope scope, WorkspaceStoreStockIntent? original) async {
+    _check(scope);
+    await _storage.write(key: _key(scope), value: jsonEncode({'schemaVersion': 1, 'accountId': scope.account,
+      'storeId': scope.store, 'realm': scope.realm, 'skuId': scope.sku, 'original': original?.toJson()}));
+    _check(scope);
+  }
+  @override
+  Future<WorkspaceStoreStockIntent?> readPending(WorkspaceStoreStockScope scope) => _serial(scope, () => _read(scope));
+  @override
+  Future<void> savePending(WorkspaceStoreStockIntent original) => _serial(original.scope, () async {
+    WorkspaceStoreStockIntent.fromJson(original.toJson());
+    final prior = await _read(original.scope);
+    if (prior != null) {
+      if (prior.serverFingerprint == original.serverFingerprint) return;
+      throw const FormatException('Check the earlier Stock update first.');
+    }
+    await _write(original.scope, original);
+  });
+  @override
+  Future<void> removePending(WorkspaceStoreStockIntent original) => _serial(original.scope, () async {
+    final prior = await _read(original.scope);
+    if (prior == null) return;
+    if (prior.serverFingerprint != original.serverFingerprint) throw const FormatException('Keep the original Stock update.');
+    await _write(original.scope, null);
+  });
+}
+
 /// Same scoped encrypted-journal pattern as listing requests. One immutable
 /// original per saved SKU; native tails finish before any later read/write.
 class SecureWorkProductSubmissionJournal implements WorkspaceProductSubmissionJournal {

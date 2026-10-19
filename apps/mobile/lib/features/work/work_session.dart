@@ -504,6 +504,7 @@ class _StoreOperationalData {
   String? inventoryError;
   Future<bool>? inventoryLoad;
   Future<bool> inventoryWrites = Future<bool>.value(true);
+  Future<bool> storeStockWrites = Future<bool>.value(true);
   bool inventoryReceiptBusy = false;
   bool inventoryReceiptRecoveryPending = false;
 }
@@ -624,6 +625,7 @@ class WorkSession extends ChangeNotifier {
     this.catalogueBindingPendingStoreFactory,
     this.variantFamilyJournalFactory,
     this.productSubmissionJournalFactory,
+    this.storeStockJournalFactory,
     this.productMediaJournalFactory,
     this.supplierPolicyGateway,
     this.supplierPolicyRealm,
@@ -692,6 +694,7 @@ class WorkSession extends ChangeNotifier {
     this.catalogueBindingPendingStoreFactory,
     this.variantFamilyJournalFactory,
     this.productSubmissionJournalFactory,
+    this.storeStockJournalFactory,
     this.productMediaJournalFactory,
     this.supplierPolicyGateway,
     this.supplierPolicyRealm,
@@ -1069,6 +1072,97 @@ class WorkSession extends ChangeNotifier {
   final WorkspaceCatalogueBindingPendingStore Function(WorkspaceCatalogueBindingScope scope)? catalogueBindingPendingStoreFactory;
   final WorkspaceVariantFamilyJournal Function(WorkspaceVariantFamilyScope scope)? variantFamilyJournalFactory;
   final WorkspaceProductSubmissionJournal Function(WorkspaceProductSubmissionScope scope)? productSubmissionJournalFactory;
+  final WorkspaceStoreStockJournal Function(WorkspaceStoreStockScope scope)? storeStockJournalFactory;
+  final _storeStockControllers = <WorkspaceStoreStockScope, WorkspaceStoreStockController>{};
+  Future<void> get workspaceStoreStockReportsSettled async { await _storeData.storeStockWrites; }
+  bool get workspaceStoreStockConnectionConfigured => catalogueGateway is WorkspaceStoreStockOwnerGateway &&
+      (catalogueGateway as WorkspaceStoreStockOwnerGateway).stockSnapshotsSupported &&
+      !(catalogueGateway is AuthenticatedWorkspaceCatalogueGateway && gateway is ReviewWorkGateway);
+  Future<bool> _stockCheckpointMatchesCommittedLedger(_StoreOperationalData data, WorkspaceSavedInventory saved) async {
+    final journal = data.ledgerCheckpointStore ?? SecureWorkLedgerCheckpointStore(accountScope: () => _disposed ? null : _contactAccountScope);
+    final checkpoint = await journal.read(saved.account, saved.store).timeout(const Duration(seconds: 10));
+    if (checkpoint == null) return true;
+    if (!checkpoint.valid || checkpoint.pendingReturn != null || checkpoint.pendingRefund != null) return false;
+    final ledger = checkpoint.inventory;
+    if (ledger == null) return true;
+    final quantities = ledger.quantities;
+    if (quantities == null || ledger.accountScope != saved.account || ledger.workspaceId != saved.store) return false;
+    final movements = {for (final movement in saved.movements) movement.id: movement};
+    final known = {for (final movement in ledger.movements) movement.id};
+    if (ledger.movements.any((movement) => movements[movement.id]?.contentIdentity != movement.contentIdentity)) return false;
+    final tails = saved.movements.where((movement) => !known.contains(movement.id)).toList(growable: false);
+    // Independent manual Stock updates may follow the ledger. An uncommitted
+    // order/return/receipt tail cannot stand in for a committed business result.
+    if (tails.any((movement) => movement.referenceKind != null ||
+        !{WorkspaceStockMovementKind.openingStock, WorkspaceStockMovementKind.adjustment,
+          WorkspaceStockMovementKind.goodsReceived, WorkspaceStockMovementKind.damageOrExpiry}.contains(movement.kind))) { return false; }
+    for (final item in saved.products.where((item) => item.stockMode == WorkspaceStockMode.exactQuantity)) {
+      final quantity = quantities[item.id];
+      if (quantity != null && item.stock != quantity + tails.where((movement) => movement.productId == item.id)
+          .fold<int>(0, (sum, movement) => sum + movement.quantityDelta)) { return false; }
+    }
+    return true;
+  }
+  void _queueCommittedLedgerStock(_StoreOperationalData data, {required bool changed}) {
+    if (changed && workspaceStoreStockConnectionConfigured && localInventoryEnabled && identical(data, _storeData) &&
+        data.inventoryLoaded && !data.inventoryReceiptRecoveryPending && data.ledgerRecovered && data.ledgerRecoveryError == null) {
+      _queueInventorySave();
+    }
+  }
+  void _queueStoreStockReport(_StoreOperationalData data, WorkspaceSavedInventory saved) {
+    final source = catalogueGateway;
+    if (!workspaceStoreStockConnectionConfigured || source is! WorkspaceCatalogueOwnerGateway ||
+        saved.qa != !_productionSession || data.inventoryReceiptRecoveryPending) { return; }
+    final WorkspaceStoreStockOwnerGateway owner = source is AuthenticatedWorkspaceCatalogueGateway
+      ? source.forOwnerAccount(saved.account) : source as WorkspaceStoreStockOwnerGateway;
+    final catalogueOwner = owner is WorkspaceCatalogueOwnerGateway ? owner as WorkspaceCatalogueOwnerGateway : source as WorkspaceCatalogueOwnerGateway;
+    if (owner.realm != (saved.qa ? 'evaluation' : 'production')) return;
+    final lifetime = publicationPreferencesContext;
+    final ledgerRevision = data.ledgerCheckpointRevision, mutation = data.inventoryMutations;
+    bool current() => !_disposed && _isStoreScopeCurrent(data, saved.store, saved.account) &&
+      publicationPreferencesContext == lifetime && data.inventoryRevision == saved.revision && !data.inventoryReceiptRecoveryPending &&
+      data.inventoryMutations == mutation && data.ledgerCheckpointRevision == ledgerRevision;
+    data.storeStockWrites = data.storeStockWrites.then((_) async {
+      if (!current()) return false;
+      var complete = true;
+      for (final link in saved.reviewedCatalogueLinks) {
+        if (!current()) return false;
+        final scope = (account: saved.account, store: saved.store, realm: owner.realm, sku: link.skuId);
+        final previous = _storeStockControllers[scope];
+        if (previous != null && !previous.active) { previous.dispose(); _storeStockControllers.remove(scope); }
+        final controller = _storeStockControllers.putIfAbsent(scope, () => WorkspaceStoreStockController(scope: scope,
+          gateway: owner, journal: storeStockJournalFactory?.call(scope) ?? SecureWorkStoreStockJournal(),
+          context: () => !_disposed && _isStoreScopeCurrent(data, saved.store, saved.account) ? publicationPreferencesContext : null));
+        try {
+          // Reconcile a durable original even when the local checkpoint is old
+          // or the SKU was withdrawn. Never replace an unconfirmed original.
+          if (!await controller.recover() || !current()) { complete = false; continue; }
+          if (data.customerCollectionBusy || data.pendingCustomerReturn != null || data.pendingCustomerRefund != null ||
+              !await _stockCheckpointMatchesCommittedLedger(data, saved) || !current()) { complete = false; continue; }
+          final mirror = await catalogueOwner.readOwnedSku(storeId: saved.store, skuId: link.skuId, current: current)
+            .timeout(const Duration(seconds: 25));
+          if (!current() || mirror == null) { complete = false; continue; }
+          final input = WorkspaceStoreStockInput.fromSaved(saved, mirror, scope: scope, now: DateTime.now().toUtc());
+          if (!await controller.synchronize(input, inputCurrent: () => current() && !data.customerCollectionBusy &&
+              data.pendingCustomerReturn == null && data.pendingCustomerRefund == null)) { complete = false; }
+        } catch (_) { complete = false; }
+      }
+      return current() && complete;
+    }).catchError((Object _) => false);
+  }
+  /// Reads the durable checkpoint; it never uploads the open editor or invents
+  /// a new savedAt to make old Stock appear fresh.
+  Future<bool> refreshWorkspaceStoreStock() async {
+    final data = _storeData, account = _contactAccountScope, store = activeWorkspace?.id;
+    if (!workspaceStoreStockConnectionConfigured || account == null || store == null || !await data.inventoryWrites ||
+        !_isStoreScopeCurrent(data, store, account)) { return false; }
+    try {
+      final saved = await _inventoryStorage.read(account, store, qa: !_productionSession);
+      if (saved == null || !_isStoreScopeCurrent(data, store, account) || saved.revision != data.inventoryRevision) return false;
+      _queueStoreStockReport(data, saved);
+      return await data.storeStockWrites;
+    } catch (_) { return false; }
+  }
   final WorkspaceProductMediaJournal Function(WorkspaceProductSubmissionScope scope)? productMediaJournalFactory;
   final Map<WorkspaceProductSubmissionScope, WorkspaceProductMediaController> _productMedia = {};
   WorkspaceProductMediaController? workspaceProductMedia(String skuId) {
@@ -2329,6 +2423,7 @@ class WorkSession extends ChangeNotifier {
       data.supplierLedgers[(key.$1, supplierId)] = authoritative!.supplierLedgers[supplierId]!;
       data.ledgerRecovered = true;
       projectionComplete = true;
+      _queueStoreStockReport(data, projected!);
       _persistOperationalState('supplier-goods-received');
       return WorkspaceGoodsReceiptSaveResult.saved;
     } on Object {
@@ -2519,6 +2614,7 @@ class WorkSession extends ChangeNotifier {
       data.supplierLedgers[(key.$1, frozen.supplierId)] = authoritative!.supplierLedgers[frozen.supplierId]!;
       data.ledgerRecovered = true;
       complete = true;
+      _queueStoreStockReport(data, projected!);
       _persistOperationalState('supplier-goods-returned');
       return WorkspaceGoodsReceiptSaveResult.saved;
     } on Object {
@@ -3190,6 +3286,7 @@ class WorkSession extends ChangeNotifier {
         data.inventoryLoaded = true;
         data.inventoryError = data.inventoryReceiptRecoveryPending
             ? 'Goods receipt is saved. Reopen it to recover Stock before making further changes.' : null;
+        if (saved != null && !data.inventoryReceiptRecoveryPending) _queueStoreStockReport(data, saved);
         return true;
       } on Object {
         if (_isStoreScopeCurrent(data, store, account)) {
@@ -3287,6 +3384,7 @@ class WorkSession extends ChangeNotifier {
         );
         data.inventoryRevision = snapshot.revision;
         data.inventoryError = null;
+        if (_isStoreScopeCurrent(data, store, account)) _queueStoreStockReport(data, snapshot);
         return _isStoreScopeCurrent(data, store, account);
       } on Object {
         data.inventoryError =
@@ -5512,10 +5610,12 @@ class WorkSession extends ChangeNotifier {
         );
   }
 
-  void _restoreLedgerInventory(
+  bool _restoreLedgerInventory(
     _StoreOperationalData data,
     WorkspaceInventoryLedger inventory,
   ) {
+    final before = <Object>[for (final product in data.workspaceCatalogueItems) (product.id, product.stock, product.available),
+      for (final movement in data.workspaceStockMovements) movement.contentIdentity];
     final quantities = inventory.quantities!;
     for (var i = 0; i < data.workspaceCatalogueItems.length; i++) {
       final product = data.workspaceCatalogueItems[i];
@@ -5540,6 +5640,8 @@ class WorkSession extends ChangeNotifier {
       ..addAll(unrecorded)
       ..addAll(inventory.movements.reversed);
     data.ledgerInventory = inventory;
+    return !listEquals(before, <Object>[for (final product in data.workspaceCatalogueItems) (product.id, product.stock, product.available),
+      for (final movement in data.workspaceStockMovements) movement.contentIdentity]);
   }
 
   Future<bool> recordWorkspaceInvoiceInLedger(
@@ -5674,6 +5776,7 @@ class WorkSession extends ChangeNotifier {
           !applyWorkspaceFinance(reply)) {
         throw StateError('Invoice projection needs recovery.');
       }
+      _queueCommittedLedgerStock(data, changed: true);
       return true;
     } catch (_) {
       if (!_disposed && identical(data, _storeData)) {
@@ -5805,6 +5908,7 @@ class WorkSession extends ChangeNotifier {
   Future<bool> _recoverCustomerLedger(_StoreOperationalData data) async {
     final account = _contactAccountScope;
     final store = activeWorkspace?.id;
+    var stockProjectionChanged = false;
     if (account == null ||
         store == null ||
         data.ledgerCheckpointStore == null) {
@@ -5964,11 +6068,12 @@ class WorkSession extends ChangeNotifier {
         data.collectionMayHaveSubmitted = saved.pending != null;
         data.ledgerCheckpointRevision = saved.revision;
         if (saved.inventory != null) {
-          _restoreLedgerInventory(data, saved.inventory!);
+          stockProjectionChanged = _restoreLedgerInventory(data, saved.inventory!);
         }
       }
       data.ledgerRecovered = true;
       data.ledgerRecoveryError = null;
+      _queueCommittedLedgerStock(data, changed: stockProjectionChanged);
       notifyListeners();
       return true;
     } catch (_) {
@@ -6335,9 +6440,10 @@ class WorkSession extends ChangeNotifier {
       if (!applyWorkspaceFinance(reply)) {
         throw StateError('Saved return needs projection recovery.');
       }
-      _restoreLedgerInventory(data, nextInventory);
+      final stockChanged = _restoreLedgerInventory(data, nextInventory);
       data.pendingCustomerReturn = null;
       data.returnIntentSaved = false;
+      _queueCommittedLedgerStock(data, changed: stockChanged);
       showNotice(
         'Return recorded. Customer dues and sellable stock are updated.',
       );
@@ -8261,11 +8367,12 @@ class WorkSession extends ChangeNotifier {
       if (!current()) {
         return false;
       }
-      _restoreLedgerInventory(data, next);
+      final stockChanged = _restoreLedgerInventory(data, next);
       data.ledgerPurchaseReceipts = checkpoint.purchaseReceipts;
       final confirmedPurchase = receipt.applyTo(purchase);
       data.purchases[purchase.shipmentId] = confirmedPurchase;
       data.purchaseLastRecords[purchase.shipmentId] = confirmedPurchase;
+      _queueCommittedLedgerStock(data, changed: stockChanged);
       return true;
     } catch (_) {
       data.ledgerRecovered = false;
@@ -13234,6 +13341,8 @@ class WorkSession extends ChangeNotifier {
     _variantFamilyPublishers.clear();
     for (final publisher in _productSubmissions.values) { publisher.dispose(); }
     _productSubmissions.clear();
+    for (final report in _storeStockControllers.values) { report.dispose(); }
+    _storeStockControllers.clear();
     for (final media in _productMedia.values) {media.dispose();}
     _productMedia.clear();
     for (final reader in _catalogueReadbacks.values) { reader.dispose(); }

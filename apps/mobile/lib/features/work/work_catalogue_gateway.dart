@@ -11,6 +11,7 @@ import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
 import 'work_publication_data.dart';
 import 'work_models.dart' show WorkspaceVariantFamily, WorkspaceVariantMembership, WorkspaceCatalogueItem,
+  WorkspaceSavedInventory, WorkspaceStockMode,
   WorkspaceAnalyticsRequest, WorkspaceAnalyticsSnapshot, WorkspaceAnalyticsState, WorkspaceAnalyticsCoverage,
   WorkspaceAnalyticsMetric, WorkspaceAnalyticsBasis, WorkspaceAnalyticsUnit, WorkspaceAnalyticsBreakdown,
   WorkspaceAnalyticsDimension, WorkspaceAnalyticsRank;
@@ -30,6 +31,355 @@ abstract interface class WorkspacePublicProductGateway {
 typedef WorkspaceVariantFamilyScope = ({String account, String store, String realm, String family});
 
 typedef WorkspaceProductSubmissionScope = ({String account, String store, String realm, String sku});
+
+typedef WorkspaceStoreStockScope = ({String account, String store, String realm, String sku});
+
+Map<String, dynamic> _stockBinding(Object? raw) {
+  final b = _map(jsonDecode(jsonEncode(raw)));
+  _keys(b, ['skuId', 'skuRevision', 'canonicalProductId', 'verifiedPackId']);
+  _id(b['skuId']); _id(b['canonicalProductId']); _id(b['verifiedPackId']); _int(b['skuRevision'], 1, 1000000000);
+  return b;
+}
+DateTime _stockTime(Object? raw) {
+  final text = _string(raw, 24), value = DateTime.parse(text).toUtc();
+  if (value.toIso8601String() != text || text.length != 24) throw const FormatException('Stock time needs recovery.');
+  return value;
+}
+Map<String, dynamic> _stockCheckpoint(Object? raw) {
+  final s = _map(jsonDecode(jsonEncode(raw)));
+  _keys(s, ['inventoryRevision', 'savedAt', 'mode', 'quantityPacks', 'available']);
+  _int(s['inventoryRevision'], 1, 1000000000); _stockTime(s['savedAt']);
+  if (!{'exact_quantity', 'availability_only'}.contains(s['mode']) || s['available'] is! bool ||
+      s['mode'] == 'availability_only' && s['quantityPacks'] != null) { throw const FormatException(); }
+  if (s['mode'] == 'exact_quantity') { _int(s['quantityPacks'], 0, 1000000000); }
+  return s;
+}
+void _stockScope(WorkspaceStoreStockScope scope) {
+  _id(scope.account); _id(scope.store); _id(scope.sku);
+  if (!{'production', 'evaluation'}.contains(scope.realm)) throw const FormatException();
+}
+
+/// Captures an existing saved selling pack. Never serializes the inventory,
+/// opening quantity, costs, movements, private images or unrelated products.
+class WorkspaceStoreStockInput {
+  WorkspaceStoreStockInput._(this._encoded);
+  final String _encoded;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  Map<String, dynamic> get binding => _map(toJson()['binding']);
+  Map<String, dynamic> get source => _map(toJson()['source']);
+  static WorkspaceStoreStockInput fromJson(Object? raw) {
+    final value = _map(raw); _keys(value, ['binding', 'source']);
+    return WorkspaceStoreStockInput._(jsonEncode(_sorted({'binding': _stockBinding(value['binding']),
+      'source': _stockCheckpoint(value['source'])})));
+  }
+  static WorkspaceStoreStockInput fromSaved(WorkspaceSavedInventory saved, WorkspaceCatalogueOwnedSku mirror,
+      {required WorkspaceStoreStockScope scope, required DateTime now}) {
+    _stockScope(scope); now = now.toUtc();
+    final items = saved.products.where((p) => p.id == scope.sku).toList(growable: false);
+    final links = saved.reviewedCatalogueLinks.where((l) => l.skuId == scope.sku).toList(growable: false);
+    if (saved.account != scope.account || saved.store != scope.store || saved.qa != (scope.realm == 'evaluation') ||
+        saved.revision <= 0 || saved.savedAt.isAfter(now) || !saved.savedAt.add(const Duration(minutes: 5)).isAfter(now) ||
+        items.length != 1 || links.length != 1 || mirror.realm != scope.realm || mirror.storeId != scope.store || mirror.skuId != scope.sku) {
+      throw const FormatException('Recover and save current Store Stock first.');
+    }
+    final item = WorkspaceCatalogueItem.fromInventoryJson(jsonDecode(jsonEncode(items.single.toInventoryJson()))), link = links.single;
+    final origin = item.stockEntry, measure = item.packMeasure;
+    if (!link.valid || link.realm != scope.realm || link.storeId != scope.store || link.mirrorRevision != mirror.revision ||
+        link.canonicalProductId != mirror.canonicalProductId || link.verifiedPackId != mirror.verifiedPackId ||
+        !item.publicListing || mirror.input['publicListing'] != true || origin?.valid != true || origin!.productId != item.id ||
+        origin.pack != item.pack || measure?.valid != true) { throw const FormatException('Check this saved SKU and selling pack.'); }
+    final pack = {'label': item.pack, 'quantityMilli': measure!.quantityMilli,
+      'unit': measure.unitLabel == 'unit' ? 'count' : measure.unitLabel, 'unitsPerCase': measure.unitsPerCase};
+    if (_catalogueHash(pack) != _catalogueHash(mirror.input['pack'])) throw const FormatException('The reviewed selling pack changed.');
+    final content = _map(mirror.input['content']);
+    final identity = {'sku': item.sku, 'title': item.title, 'brand': item.brand, 'variant': item.variant, 'categoryId': item.categoryId};
+    final reviewedIdentity = {'sku': mirror.input['sku'], for (final field in ['title', 'brand', 'variant', 'categoryId']) field: content[field]};
+    if (_catalogueHash(identity) != _catalogueHash(reviewedIdentity) ||
+        _catalogueHash({'entryMethod': origin.method.name, 'sourceRecordId': item.id}) != _catalogueHash(mirror.input['provenance'])) {
+      throw const FormatException('Review the changed product identity before reporting its Stock.');
+    }
+    WorkspaceVariantFamily.validateInventory(saved.variantFamilies, saved.products);
+    // Stock v1 transports UTC milliseconds. The original local checkpoint and
+    // its exact savedAt/revision remain unchanged; only this allowlist is sent.
+    final transportTime = DateTime.fromMillisecondsSinceEpoch(saved.savedAt.toUtc().millisecondsSinceEpoch, isUtc: true);
+    return fromJson({'binding': {'skuId': scope.sku, 'skuRevision': mirror.revision,
+      'canonicalProductId': mirror.canonicalProductId, 'verifiedPackId': mirror.verifiedPackId},
+      'source': {'inventoryRevision': saved.revision, 'savedAt': transportTime.toIso8601String(),
+        'mode': item.stockMode == WorkspaceStockMode.exactQuantity ? 'exact_quantity' : 'availability_only',
+        'quantityPacks': item.stockMode == WorkspaceStockMode.exactQuantity ? item.stock : null, 'available': item.available}});
+  }
+}
+
+/// Frozen original, including expired requests. Restoration is clock-independent.
+class WorkspaceStoreStockIntent {
+  WorkspaceStoreStockIntent({required this.scope, required this.expectedRevision, required this.idempotencyKey,
+      required WorkspaceStoreStockInput input}) : input = WorkspaceStoreStockInput.fromJson(input.toJson()) {
+    _stockScope(scope); _int(expectedRevision, 0, 999999999); _id(idempotencyKey);
+    if (this.input.binding['skuId'] != scope.sku) throw const FormatException();
+  }
+  final WorkspaceStoreStockScope scope;
+  final int expectedRevision;
+  final String idempotencyKey;
+  final WorkspaceStoreStockInput input;
+  Map<String, Object?> get body => {'stockSnapshotVersion': 1, 'storeId': scope.store,
+    ...input.toJson(), 'expectedRevision': expectedRevision, 'idempotencyKey': idempotencyKey};
+  String get serverFingerprint => _catalogueHash({'realm': scope.realm, 'owner': scope.account, 'request': body});
+  Map<String, Object?> toJson() => {'version': 1, 'scope': {'account': scope.account, 'store': scope.store,
+    'realm': scope.realm, 'sku': scope.sku}, 'expectedRevision': expectedRevision, 'idempotencyKey': idempotencyKey, 'input': input.toJson()};
+  static WorkspaceStoreStockIntent fromJson(Object? raw) {
+    final v = _map(raw); _keys(v, ['version', 'scope', 'expectedRevision', 'idempotencyKey', 'input']);
+    final s = _map(v['scope']); _keys(s, ['account', 'store', 'realm', 'sku']);
+    if (v['version'] is! int || v['version'] != 1) throw const FormatException();
+    return WorkspaceStoreStockIntent(scope: (account: _id(s['account']), store: _id(s['store']), realm: _string(s['realm']), sku: _id(s['sku'])),
+      expectedRevision: _int(v['expectedRevision'], 0, 999999999), idempotencyKey: _id(v['idempotencyKey']),
+      input: WorkspaceStoreStockInput.fromJson(v['input']));
+  }
+}
+
+class WorkspaceStoreStockRecord {
+  WorkspaceStoreStockRecord._(this._encoded);
+  final String _encoded;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  int get revision => toJson()['revision'] as int;
+  Map<String, dynamic> get binding => _map(toJson()['binding']);
+  Map<String, dynamic> get source => _map(toJson()['source']);
+  static WorkspaceStoreStockRecord decode(Object? raw, WorkspaceStoreStockScope scope, DateTime now) {
+    _stockScope(scope);
+    final r = _map(raw); _keys(r, ['schemaVersion', 'realm', 'storeId', 'binding', 'ownerBinding', 'revision', 'reportedAt', 'source', 'integrity']);
+    final binding = _stockBinding(r['binding']), source = _stockCheckpoint(r['source']), body = Map<String, dynamic>.of(r)..remove('integrity');
+    final reportedAt = _stockTime(r['reportedAt']);
+    if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['realm'] != scope.realm || r['storeId'] != scope.store ||
+        binding['skuId'] != scope.sku || r['ownerBinding'] != _catalogueHash([scope.realm, scope.store, scope.account]) ||
+        r['integrity'] != _catalogueHash(body) || _stockTime(source['savedAt']).isAfter(reportedAt) || reportedAt.isAfter(now.toUtc())) {
+      throw const FormatException('Stock report needs recovery.');
+    }
+    _int(r['revision'], 1, 1000000000);
+    return WorkspaceStoreStockRecord._(jsonEncode(_sorted(r)));
+  }
+}
+
+class WorkspaceStoreStockHead {
+  const WorkspaceStoreStockHead({required this.state, required this.currentRevision, this.record});
+  final String state;
+  final int currentRevision;
+  final WorkspaceStoreStockRecord? record;
+  static WorkspaceStoreStockHead decode(Object? raw, WorkspaceStoreStockScope scope, Map<String, dynamic> binding,
+      DateTime now, {WorkspaceStoreStockIntent? original, bool reconcile = false}) {
+    _stockScope(scope);
+    if (_stockBinding(binding)['skuId'] != scope.sku || original != null && original.scope != scope) throw const FormatException();
+    final r = _map(raw), state = r['state'];
+    _keys(r, ['schemaVersion', 'stockSnapshotVersion', 'realm', 'storeId', 'binding', 'state', 'record', 'idempotencyKey',
+      'orderingAvailable', 'reservationConfirmed', if (state == 'source_changed') 'currentRevision',
+      if (state == 'expired') ...['expiredAt', 'settledAt', 'originalFingerprint']]);
+    if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['stockSnapshotVersion'] is! int || r['stockSnapshotVersion'] != 1 ||
+        r['realm'] != scope.realm || r['storeId'] != scope.store || _catalogueHash(_stockBinding(r['binding'])) != _catalogueHash(binding) ||
+        r['idempotencyKey'] != original?.idempotencyKey || r['orderingAvailable'] != false || r['reservationConfirmed'] != false ||
+        !(original == null ? {'reported', 'none', 'source_changed'} : {'reported', 'expired', if (reconcile) 'not_found'}).contains(state)) {
+      throw const FormatException();
+    }
+    if (state == 'expired') {
+      final expiredAt = _stockTime(r['expiredAt']), settledAt = _stockTime(r['settledAt']);
+      if (r['record'] != null || r['originalFingerprint'] != original!.serverFingerprint ||
+          expiredAt != _stockTime(original.input.source['savedAt']).add(const Duration(minutes: 5)) || settledAt.isBefore(expiredAt)) {
+        throw const FormatException();
+      }
+      return const WorkspaceStoreStockHead(state: 'expired', currentRevision: 0);
+    }
+    if (state != 'reported') {
+      if (r['record'] != null) throw const FormatException();
+      return WorkspaceStoreStockHead(state: state as String,
+        currentRevision: state == 'source_changed' ? _int(r['currentRevision'], 1, 1000000000) : 0);
+    }
+    final record = WorkspaceStoreStockRecord.decode(r['record'], scope, now);
+    if (_catalogueHash(record.binding) != _catalogueHash(binding) || original != null &&
+        (record.revision != original.expectedRevision + 1 || _catalogueHash(record.source) != _catalogueHash(original.input.source))) {
+      throw const FormatException();
+    }
+    return WorkspaceStoreStockHead(state: 'reported', currentRevision: record.revision, record: record);
+  }
+}
+
+enum WorkspaceStoreStockWriteState { reported, expired, notFound, notSent, unknown }
+class WorkspaceStoreStockWriteResult {
+  const WorkspaceStoreStockWriteResult(this.state, [this.record]);
+  final WorkspaceStoreStockWriteState state;
+  final WorkspaceStoreStockRecord? record;
+}
+abstract interface class WorkspaceStoreStockOwnerGateway {
+  String get realm;
+  bool get stockSnapshotsSupported;
+  Future<WorkspaceStoreStockHead> readStoreStockHead(WorkspaceStoreStockScope scope, Map<String, dynamic> binding, {required bool Function() current});
+  Future<WorkspaceStoreStockWriteResult> writeStoreStock(WorkspaceStoreStockIntent original, {required bool Function() current, bool reconcile = false});
+}
+
+abstract interface class WorkspaceStoreStockJournal {
+  Future<WorkspaceStoreStockIntent?> readPending(WorkspaceStoreStockScope scope);
+  Future<void> savePending(WorkspaceStoreStockIntent original);
+  Future<void> removePending(WorkspaceStoreStockIntent original);
+}
+
+/// One original per saved SKU. A missing receipt is never proof of failure:
+/// recovery sends that same original, including after its source has expired.
+class WorkspaceStoreStockController {
+  WorkspaceStoreStockController({required this.scope, required this.gateway, required this.journal,
+    required this.context, DateTime Function()? now}) : _lifetime = context(), now = now ?? DateTime.now {
+    _stockScope(scope);
+    if (scope.realm != gateway.realm) throw const FormatException();
+  }
+  final WorkspaceStoreStockScope scope;
+  final WorkspaceStoreStockOwnerGateway gateway;
+  final WorkspaceStoreStockJournal journal;
+  final Object? Function() context;
+  final Object? _lifetime;
+  final DateTime Function() now;
+  bool _closed = false, busy = false;
+  int _revision = 0;
+  WorkspaceStoreStockIntent? pending;
+  bool get active => !_closed && _lifetime != null && context() == _lifetime;
+  bool get supported => active && gateway.stockSnapshotsSupported;
+
+  Future<bool> _finish(WorkspaceStoreStockIntent original, WorkspaceStoreStockWriteResult result) async {
+    if (!active || pending?.serverFingerprint != original.serverFingerprint) return false;
+    final record = result.record;
+    if (result.state == WorkspaceStoreStockWriteState.reported) {
+      if (record == null || record.revision != original.expectedRevision + 1 ||
+          _catalogueHash(record.binding) != _catalogueHash(original.input.binding) ||
+          _catalogueHash(record.source) != _catalogueHash(original.input.source)) { return false; }
+      // Revalidate even an injected adapter; no response object grants ownership.
+      WorkspaceStoreStockRecord.decode(record.toJson(), scope, now());
+      if (record.revision > _revision) _revision = record.revision;
+    } else if (result.state != WorkspaceStoreStockWriteState.expired) {
+      return false;
+    }
+    // Native completion, not a caller timeout, controls journal serialization.
+    await journal.removePending(original).timeout(const Duration(seconds: 10));
+    if (!active) return false;
+    pending = null;
+    return true;
+  }
+
+  Future<bool> _recover() async {
+    var original = await journal.readPending(scope).timeout(const Duration(seconds: 10));
+    if (!active) return false;
+    if (original != null && original.scope != scope ||
+        original != null && pending != null && original.serverFingerprint != pending!.serverFingerprint) {
+      throw const FormatException('Keep the original Stock update.');
+    }
+    // A failed/late journal write never licenses a replacement original. Re-save
+    // the same in-memory original after the physical journal tail has settled.
+    if (original == null && pending != null) {
+      original = pending;
+      await journal.savePending(original!).timeout(const Duration(seconds: 10));
+      if (!active) return false;
+    }
+    pending = original;
+    if (original == null) return true;
+    var result = await gateway.writeStoreStock(original, current: () => active, reconcile: true).timeout(const Duration(seconds: 25));
+    if (!active) return false;
+    if (result.state == WorkspaceStoreStockWriteState.notFound) {
+      // The server serializes success/expiry on the original receipt. This is
+      // not a replacement key, fresh savedAt, or a client-declared expiry.
+      result = await gateway.writeStoreStock(original, current: () => active).timeout(const Duration(seconds: 25));
+    }
+    return _finish(original, result);
+  }
+
+  Future<bool> recover() async {
+    if (!supported || busy) return false;
+    busy = true;
+    try { return await _recover(); } catch (_) { return false; } finally { busy = false; }
+  }
+
+  Future<bool> synchronize(WorkspaceStoreStockInput input, {required bool Function() inputCurrent}) async {
+    if (!supported || busy || input.binding['skuId'] != scope.sku || !inputCurrent()) return false;
+    busy = true;
+    try {
+      if (!await _recover() || !active || !inputCurrent()) return false;
+      final head = await gateway.readStoreStockHead(scope, input.binding, current: () => active && inputCurrent()).timeout(const Duration(seconds: 25));
+      if (!active || !inputCurrent() || head.currentRevision < _revision) return false;
+      if (!{'reported', 'none', 'source_changed'}.contains(head.state)) return false;
+      if (head.state == 'reported') {
+        final record = head.record;
+        if (record == null || record.revision != head.currentRevision) return false;
+        WorkspaceStoreStockRecord.decode(record.toJson(), scope, now());
+        if (_catalogueHash(record.binding) != _catalogueHash(input.binding)) return false;
+        if (_catalogueHash(record.source) == _catalogueHash(input.source)) return true;
+      } else if (head.record != null || head.state == 'none' && head.currentRevision != 0) { return false; }
+      _revision = head.currentRevision;
+      final savedAt = _stockTime(input.source['savedAt']), clock = now().toUtc();
+      if (savedAt.isAfter(clock) || !savedAt.add(const Duration(minutes: 5)).isAfter(clock)) return false;
+      final original = WorkspaceStoreStockIntent(scope: scope, expectedRevision: _revision, input: input,
+        idempotencyKey: 'stock-${List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join()}');
+      pending = original;
+      await journal.savePending(original).timeout(const Duration(seconds: 10));
+      if (!active || !inputCurrent()) return false;
+      final result = await gateway.writeStoreStock(original, current: () => active && inputCurrent()).timeout(const Duration(seconds: 25));
+      return await _finish(original, result) && result.state == WorkspaceStoreStockWriteState.reported;
+    } catch (_) { return false; } finally { busy = false; }
+  }
+  void dispose() { _closed = true; }
+}
+
+class WorkspacePublicStockQuery {
+  WorkspacePublicStockQuery({required this.realm, required this.storeId, required Map<String, dynamic> binding,
+      required this.requestedPacks}) : _binding = jsonEncode(_sorted(_stockBinding(binding))) {
+    _id(storeId); _int(requestedPacks, 1, 1000000000);
+    if (!{'production', 'evaluation'}.contains(realm)) throw const FormatException();
+  }
+  final String realm, storeId, _binding;
+  final int requestedPacks;
+  Map<String, dynamic> get binding => _map(jsonDecode(_binding));
+  Map<String, Object?> get body => {'stockSnapshotVersion': 1, 'storeId': storeId, 'binding': binding, 'requestedPacks': requestedPacks};
+  String get identity => jsonEncode(_sorted({'realm': realm, ...body}));
+  factory WorkspacePublicStockQuery.fromEntry(WorkspacePublicCatalogueEntry entry, int requestedPacks) {
+    final listing = entry.product.publicListingIdentity;
+    if (listing == null || !listing.matches(entry.product)) throw const FormatException();
+    return WorkspacePublicStockQuery(realm: listing.realm, storeId: listing.storeId, requestedPacks: requestedPacks,
+      binding: {'skuId': listing.skuId, 'skuRevision': _int(entry.readback.skuRevision, 1, 1000000000),
+        'canonicalProductId': listing.canonicalProductId, 'verifiedPackId': listing.verifiedPackId});
+  }
+}
+/// Read-only Store report for one exact quantity; never a delivery/order grant.
+class WorkspacePublicStockResult {
+  WorkspacePublicStockResult._(this.query, this._encoded);
+  final WorkspacePublicStockQuery query;
+  final String _encoded;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  String get state => toJson()['state'] as String;
+  bool? get available => toJson()['stock']?['available'] as bool?;
+  bool? get quantityAvailable => toJson()['stock']?['quantityAvailable'] as bool?;
+  DateTime? get validUntil => toJson()['stock'] == null ? null : _stockTime(toJson()['stock']['validUntil']);
+  bool freshAt(DateTime now) => state == 'reported' && validUntil!.isAfter(now.toUtc());
+  static WorkspacePublicStockResult decode(Object? raw, WorkspacePublicStockQuery query, DateTime now) {
+    final r = _map(raw); _keys(r, ['schemaVersion', 'stockSnapshotVersion', 'realm', 'storeId', 'binding', 'state',
+      'observedAt', 'requestedPacks', 'stock', 'orderingAvailable', 'reservationConfirmed']);
+    final observedAt = _stockTime(r['observedAt']); now = now.toUtc();
+    if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['stockSnapshotVersion'] is! int || r['stockSnapshotVersion'] != 1 ||
+        r['realm'] != query.realm || r['storeId'] != query.storeId || r['requestedPacks'] is! int || r['requestedPacks'] != query.requestedPacks ||
+        _catalogueHash(_stockBinding(r['binding'])) != _catalogueHash(query.binding) || observedAt.isAfter(now) ||
+        r['orderingAvailable'] != false || r['reservationConfirmed'] != false || !{'unknown', 'reported'}.contains(r['state'])) {
+      throw const FormatException();
+    }
+    if (r['state'] == 'unknown') {
+      if (r['stock'] != null) throw const FormatException();
+    } else {
+      final s = _map(r['stock']); _keys(s, ['source', 'reportedAt', 'savedAt', 'validUntil', 'reportRevision', 'available', 'quantityAvailable']);
+      final reportedAt = _stockTime(s['reportedAt']), savedAt = _stockTime(s['savedAt']), until = _stockTime(s['validUntil']);
+      _int(s['reportRevision'], 1, 1000000000);
+      if (s['source'] != 'selling_store_checkpoint' || savedAt.isAfter(reportedAt) || reportedAt.isAfter(observedAt) ||
+          until != savedAt.add(const Duration(minutes: 5)) || !until.isAfter(now) || s['available'] is! bool ||
+          s['quantityAvailable'] != null && s['quantityAvailable'] is! bool || s['available'] == false && s['quantityAvailable'] != false) {
+        throw const FormatException();
+      }
+    }
+    return WorkspacePublicStockResult._(query, jsonEncode(_sorted(r)));
+  }
+}
+abstract interface class WorkspaceStoreStockPublicGateway {
+  String get realm;
+  bool get stockSnapshotsSupported;
+  Future<WorkspacePublicStockResult> readPublicStoreStock(WorkspacePublicStockQuery query, {required bool Function() current});
+}
 
 /// Owner-authored saved facts, not a reviewed mirror, Stock upload or publication.
 class WorkspaceProductSubmissionInput {
@@ -2800,6 +3150,7 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
     productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
     reviewedFamilyReadbackSupported: true, storeClassificationReadbackSupported: true,
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
+    stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
     promotionDiscoverySupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PROMOTION_DISCOVERY_V1'));
   return WorkspacePublicDiscoverySource(gateway: gateway, current: current);
 }
@@ -2837,7 +3188,7 @@ class UnavailableWorkspaceCatalogueGateway
       WorkspaceCatalogueContentResult(content: _unavailable(product));
 }
 
-WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway() {
+WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentials? credentials}) {
   final endpoint = Uri.tryParse(
     const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL'),
   );
@@ -2846,7 +3197,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway() {
   }
   return AuthenticatedWorkspaceCatalogueGateway(
     endpoint: endpoint,
-    credentials: FirebaseSocialContentCredentials(),
+    credentials: credentials ?? FirebaseSocialContentCredentials(),
     transport: IoSocialContentTransport(),
     policyReadbackRequired: true,
     productFactsReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_FACTS_V1'),
@@ -2856,6 +3207,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway() {
     productMediaSupported: const bool.fromEnvironment('MOOLSOCIAL_PRODUCT_MEDIA_V1'),
     reviewedProductSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_REVIEW_V1'),
     reviewedProductMediaSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_MEDIA_REVIEW_V1'),
+    stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
     storeClassificationReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_STORE_CLASSIFICATION_V1'),
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
   );
@@ -2873,7 +3225,7 @@ bool _validEndpoint(Uri value) =>
 class AuthenticatedWorkspaceCatalogueGateway
     implements WorkspaceCatalogueGateway, WorkspaceCatalogueOwnerGateway, WorkspacePublicProductGateway,
       WorkspacePublicDetailsOwnerGateway, WorkspaceVariantFamilyOwnerGateway, WorkspaceProductSubmissionOwnerGateway,
-      WorkspaceReviewedProductSubmissionGateway, WorkspaceProductMediaGateway {
+      WorkspaceReviewedProductSubmissionGateway, WorkspaceProductMediaGateway, WorkspaceStoreStockOwnerGateway, WorkspaceStoreStockPublicGateway {
   AuthenticatedWorkspaceCatalogueGateway({
     required this.endpoint,
     required this.credentials,
@@ -2893,6 +3245,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.storeClassificationReadbackSupported = false,
     this.minorMoneyReadbackSupported = false,
     this.promotionDiscoverySupported = false,
+    this.stockSnapshotsSupported = false,
     DateTime Function()? now,
   }) : _reviewedVariantsOverride = reviewedVariants, _productMediaTransportOverride = productMediaTransport, now = now ?? DateTime.now {
     if (!_validEndpoint(endpoint) ||
@@ -2928,6 +3281,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool minorMoneyReadbackSupported;
   final bool promotionDiscoverySupported;
   @override
+  final bool stockSnapshotsSupported;
+  @override
   bool get variantFamilySubmissionSupported => reviewedFamilyReadbackSupported;
   final WorkspacePublicVariantSource? _reviewedVariantsOverride;
   late final WorkspacePublicVariantSource? reviewedVariants = _reviewedVariantsOverride ??
@@ -2960,12 +3315,63 @@ class AuthenticatedWorkspaceCatalogueGateway
       storeClassificationReadbackSupported: storeClassificationReadbackSupported,
       minorMoneyReadbackSupported: minorMoneyReadbackSupported,
       promotionDiscoverySupported: promotionDiscoverySupported,
+      stockSnapshotsSupported: stockSnapshotsSupported,
       now: now,
     );
   }
 
   bool _productSubmissionOwner(WorkspaceProductSubmissionScope scope, bool Function() current) => current() &&
     productSubmissionSupported && scope.realm == realm && ownerAccountId == scope.account;
+
+  bool _stockOwner(WorkspaceStoreStockScope scope, bool Function() current) => current() && stockSnapshotsSupported &&
+    scope.realm == realm && ownerAccountId == scope.account;
+  @override
+  Future<WorkspacePublicStockResult> readPublicStoreStock(WorkspacePublicStockQuery query, {required bool Function() current}) async {
+    bool valid() => current() && stockSnapshotsSupported && query.realm == realm;
+    if (!valid()) throw const FormatException('Stock information is unavailable.');
+    final response = await _ownerRequest({'operation': 'readPublicStoreStockSnapshot', ...query.body}, valid, mutation: false);
+    if (!valid() || response?.statusCode != 200) throw const FormatException();
+    final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
+    if (envelope['ok'] != true) throw const FormatException();
+    return WorkspacePublicStockResult.decode(envelope['data'], query, now());
+  }
+  @override
+  Future<WorkspaceStoreStockHead> readStoreStockHead(WorkspaceStoreStockScope scope, Map<String, dynamic> binding,
+      {required bool Function() current}) async {
+    _stockScope(scope); final frozen = _stockBinding(binding);
+    if (!_stockOwner(scope, current) || frozen['skuId'] != scope.sku) throw const FormatException('Stock connection is unavailable.');
+    final response = await _ownerRequest({'operation': 'readStoreStockSnapshot', 'stockSnapshotVersion': 1,
+      'storeId': scope.store, 'binding': frozen}, () => _stockOwner(scope, current), mutation: false);
+    if (!_stockOwner(scope, current) || response?.statusCode != 200) throw const FormatException();
+    final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
+    if (envelope['ok'] != true) throw const FormatException();
+    return WorkspaceStoreStockHead.decode(envelope['data'], scope, frozen, now());
+  }
+  @override
+  Future<WorkspaceStoreStockWriteResult> writeStoreStock(WorkspaceStoreStockIntent original,
+      {required bool Function() current, bool reconcile = false}) async {
+    var dispatched = false;
+    try {
+      original = WorkspaceStoreStockIntent.fromJson(original.toJson());
+      bool valid() => _stockOwner(original.scope, current);
+      if (!valid()) return const WorkspaceStoreStockWriteResult(WorkspaceStoreStockWriteState.notSent);
+      final response = await _ownerRequest({'operation': reconcile ? 'reconcileStoreStockSnapshot' : 'publishStoreStockSnapshot', ...original.body},
+        valid, mutation: !reconcile, onDispatch: () => dispatched = true);
+      if (!valid() || response?.statusCode != 200) throw const FormatException();
+      final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
+      if (envelope['ok'] != true) throw const FormatException();
+      final head = WorkspaceStoreStockHead.decode(envelope['data'], original.scope, original.input.binding, now(),
+        original: original, reconcile: reconcile);
+      return WorkspaceStoreStockWriteResult(switch (head.state) {
+        'reported' => WorkspaceStoreStockWriteState.reported,
+        'expired' => WorkspaceStoreStockWriteState.expired,
+        'not_found' => WorkspaceStoreStockWriteState.notFound,
+        _ => WorkspaceStoreStockWriteState.unknown,
+      }, head.record);
+    } catch (_) {
+      return WorkspaceStoreStockWriteResult(dispatched ? WorkspaceStoreStockWriteState.unknown : WorkspaceStoreStockWriteState.notSent);
+    }
+  }
   Future<WorkspaceProductMediaResult> _mediaRequest(WorkspaceProductMediaIntent original, String operation,
       bool Function() current, {bool grant = false}) async {
     if (!productMediaSupported || !_productSubmissionOwner(original.scope, current)) throw const FormatException();

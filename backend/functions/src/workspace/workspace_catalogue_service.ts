@@ -2260,9 +2260,30 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       const base = {schemaVersion: 1, stockSnapshotVersion: 1, realm: this.realm, storeId, binding};
       const ownerResult = (record: StoreStockRecord | null, state: string) => ({...base, state, record,
         idempotencyKey: request.idempotencyKey ?? null, orderingAvailable: false, reservationConfirmed: false});
+      const expiredResult = (expiredAt: string, settledAt: string) =>
+        ({...ownerResult(null, "expired"), expiredAt, settledAt, originalFingerprint: commandFingerprint});
+      const expiryTime = () => new Date(Date.parse(request.source!.savedAt) + storeStockFreshMillis).toISOString();
+      const settleExpiry = (settledAt: string) => {
+        const proof = {expiredAt: expiryTime(), settledAt};
+        if (Date.parse(settledAt) < Date.parse(proof.expiredAt)) invalid();
+        // Same receipt path as success: a late original must observe this
+        // terminal result, never write a backdated Stock head afterwards.
+        transaction.create(receipt!, {fingerprint: commandFingerprint,
+          expired: {...proof, integrity: cataloguePayloadHash([commandFingerprint, ownerBinding, proof])}});
+        return expiredResult(proof.expiredAt, proof.settledAt);
+      };
       // Current owner authorization still applies. Replay does not assess later
       // publication/expiry as permission to lose or replace an original attempt.
       if (original?.exists) {
+        if (Object.hasOwn(original.data()!, "expired")) {
+          const old = exact(original.data(), ["fingerprint", "expired"]);
+          if (old.fingerprint !== commandFingerprint) throw new WorkspaceProfileError("conflict", "Use the original Stock report request.", 409);
+          const proof = exact(old.expired, ["expiredAt", "settledAt", "integrity"]);
+          const expiredAt = stockTime(proof.expiredAt), settledAt = stockTime(proof.settledAt);
+          if (expiredAt !== expiryTime() || Date.parse(settledAt) < Date.parse(expiredAt) ||
+              proof.integrity !== cataloguePayloadHash([commandFingerprint, ownerBinding, {expiredAt, settledAt}])) invalid("Expired Stock request needs recovery.");
+          return expiredResult(expiredAt, settledAt);
+        }
         const old = exact(original.data(), ["fingerprint", "record"]);
         if (old.fingerprint !== commandFingerprint) throw new WorkspaceProfileError("conflict", "Use the original Stock report request.", 409);
         const record = checkedStockRecord(old.record, this.realm, storeId, binding.skuId);
@@ -2270,8 +2291,14 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
             cataloguePayloadHash(record.source) !== cataloguePayloadHash(request.source) || record.revision !== request.expectedRevision! + 1) invalid();
         return ownerResult(record, "reported");
       }
-      const current = saved.exists ? checkedStockRecord(saved.data(), this.realm, storeId, binding.skuId) : undefined;
       if (action === "reconcile") return ownerResult(null, "not_found");
+      const admissionAt = this.now().toISOString();
+      // Historical expiry settlement needs current owner authorization, not a
+      // still-public listing. A withdrawn/rebound product cannot strand it.
+      if (action === "save" && Date.parse(admissionAt) - Date.parse(request.source!.savedAt) >= storeStockFreshMillis) {
+        return settleExpiry(admissionAt);
+      }
+      const current = saved.exists ? checkedStockRecord(saved.data(), this.realm, storeId, binding.skuId) : undefined;
       if (action === "read") return current && (current.ownerBinding !== ownerBinding ||
           cataloguePayloadHash(current.binding) !== cataloguePayloadHash(binding))
         ? {...ownerResult(null, "source_changed"), currentRevision: current.revision}
@@ -2299,6 +2326,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
             quantityAvailable},
           orderingAvailable: false, reservationConfirmed: false};
       }
+      if (Date.parse(at) - Date.parse(request.source!.savedAt) >= storeStockFreshMillis) return settleExpiry(at);
       if (!freshStockCheckpoint(request.source!, at)) throw new WorkspaceProfileError("stale_snapshot", "Recover and save current Stock before reporting it.", 409);
       if ((current?.revision ?? 0) !== request.expectedRevision) throw new WorkspaceProfileError("conflict", "Stock report changed. Review its current version.", 409);
       const body = {schemaVersion: 1 as const, realm: this.realm, storeId, binding, ownerBinding,

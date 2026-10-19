@@ -80,7 +80,7 @@ test('LF11 actual Store checkpoint publication, original recovery and private-co
     for (const source of [{...original.source, quantityPacks: 1.5}, {...original.source, quantityPacks: -1},
       {...original.source, quantityPacks: '7'}, {...original.source, mode: 'availability_only', quantityPacks: 7},
       {...original.source, inventoryRevision: 0}, {...original.source, savedAt: '2026-10-16T12:00:00Z'},
-      {...original.source, savedAt: '2026-10-16T12:00:01.000Z'}, {...original.source, savedAt: '2026-10-16T11:54:59.999Z'},
+      {...original.source, savedAt: '2026-10-16T12:00:01.000Z'},
       {...original.source, purchaseCostMinor: 100}]) await assert.rejects(save({...original, source} as any));
     await assert.rejects(save({...original, binding: {...binding, verifiedPackId: 'other-pack'}}));
     await assert.rejects(save({...original, paid: true} as any));
@@ -115,7 +115,15 @@ test('LF11 actual Store checkpoint publication, original recovery and private-co
     clock = '2026-10-16T12:05:00.000Z';
     assert.equal((await read()).state, 'unknown'); assert.equal((await read()).stock, null);
     assert.deepEqual(await save(), first);
-    await assert.rejects(save({...original, expectedRevision: 3, idempotencyKey: 'expired-new-stock'}), {code: 'stale_snapshot'});
+    const expiredOriginal = {...original, expectedRevision: 3, idempotencyKey: 'expired-new-stock'};
+    const beforeExpiryHead = (await store.collection('stockSnapshots').doc('sku-one').get()).data();
+    const expired = await save(expiredOriginal);
+    assert.equal(expired.state, 'expired'); assert.equal(expired.record, null);
+    assert.equal(expired.originalFingerprint, cataloguePayloadHash({realm: 'evaluation', owner: 'owner-one', request: expiredOriginal}));
+    assert.equal(expired.expiredAt, clock); assert.equal(expired.settledAt, clock);
+    assert.deepEqual((await store.collection('stockSnapshots').doc('sku-one').get()).data(), beforeExpiryHead);
+    assert.deepEqual(await service().handleStoreStock('owner-one', 'reconcileStoreStockSnapshot', expiredOriginal), expired);
+    await assert.rejects(save({...expiredOriginal, source: {...original.source, quantityPacks: 8}}), {code: 'conflict'});
     clock = at;
     await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: value, expectedRevision: 1, idempotencyKey: 'stock-new-binding'});
     assert.equal((await read()).state, 'unknown');
@@ -127,6 +135,39 @@ test('LF11 actual Store checkpoint publication, original recovery and private-co
       source: {...original.source, inventoryRevision: 2}});
     const newQuery = {...query, binding: newScope.binding};
     assert.equal((await read(newQuery)).stock.quantityAvailable, true);
+    // An invocation delayed before its transaction cannot later publish after
+    // another instance has durably settled that SAME original as expired.
+    const delayedOriginal = {...original, binding: newScope.binding, expectedRevision: 4, idempotencyKey: 'late-stock-original'};
+    let release!: () => void, entered!: () => void;
+    const held = new Promise<void>(resolve => {release = resolve;}), started = new Promise<void>(resolve => {entered = resolve;});
+    const delayedRepository = new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at));
+    const dispatch = delayedRepository.storeStock.bind(delayedRepository);
+    delayedRepository.storeStock = async (...args) => {entered(); await held; return dispatch(...args);};
+    const delayedService = new WorkspaceCatalogueService(delayedRepository, catalogueIdentity, () => new Date(at));
+    const late = delayedService.handleStoreStock('owner-one', 'publishStoreStockSnapshot', delayedOriginal);
+    let settled: any;
+    try {
+      await started; clock = '2026-10-16T12:05:00.000Z';
+      settled = await save(delayedOriginal);
+      assert.equal(settled.state, 'expired');
+    } finally {release();}
+    assert.deepEqual(await late, settled);
+    assert.equal((await store.collection('stockSnapshots').doc('sku-one').get()).get('revision'), 4);
+    assert.deepEqual(await service().handleStoreStock('owner-one', 'reconcileStoreStockSnapshot', delayedOriginal), settled);
+    const racingOriginal = {...delayedOriginal, idempotencyKey: 'racing-stock-original'};
+    const freshService = new WorkspaceCatalogueService(new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at)),
+      catalogueIdentity, () => new Date(at));
+    const outcomes = await Promise.allSettled([
+      freshService.handleStoreStock('owner-one', 'publishStoreStockSnapshot', racingOriginal),
+      service().handleStoreStock('owner-one', 'publishStoreStockSnapshot', racingOriginal),
+    ]);
+    for (const outcome of outcomes) if (outcome.status === 'rejected') throw outcome.reason;
+    const wins = outcomes.map(outcome => {assert.equal(outcome.status, 'fulfilled'); return outcome.value as any;});
+    assert.deepEqual(wins[0], wins[1]); assert.ok(['reported', 'expired'].includes(wins[0].state));
+    console.log('LF11_STOCK_EXPIRY_PROJECTION=' + JSON.stringify({original: expiredOriginal, expired, delayed: settled, concurrent: wins[0]}));
+    const finalStockRevision = wins[0].state === 'reported' ? 5 : 4;
+    assert.equal((await store.collection('stockSnapshots').doc('sku-one').get()).get('revision'), finalStockRevision);
+    clock = at;
     const otherRealm = new WorkspaceCatalogueService(new FirestoreWorkspaceCatalogueRepository(db, 'production', () => new Date(clock)),
       catalogueIdentity, () => new Date(clock));
     assert.equal((await otherRealm.handleStoreStock('buyer-one', 'readPublicStoreStockSnapshot', newQuery) as any).state, 'unknown');
@@ -143,11 +184,13 @@ test('LF11 actual Store checkpoint publication, original recovery and private-co
     await db.collection('workspaceProfiles').doc(profile.caseId).update({shopEnabled: false});
     assert.equal((await read()).state, 'unknown');
     assert.deepEqual(await service().handleStoreStock('owner-one', 'reconcileStoreStockSnapshot', original), first);
+    assert.deepEqual(await save(expiredOriginal), expired);
+    assert.deepEqual(await save(delayedOriginal), settled);
     const skuAfter = (await store.collection('skus').doc('sku-one').get()).data()!;
     const skuBefore = JSON.parse(beforeSku); skuBefore.revision = 2;
     assert.deepEqual(skuAfter, skuBefore); // Reporting never changes quantities/prices in the reviewed SKU mirror.
-    assert.equal((await store.collection('stockSnapshots').doc('sku-one').collection('revisions').get()).size, 4);
-    assert.equal((await store.collection('stockSnapshots').doc('sku-one').collection('receipts').get()).size, 4);
+    assert.equal((await store.collection('stockSnapshots').doc('sku-one').collection('revisions').get()).size, finalStockRevision);
+    assert.equal((await store.collection('stockSnapshots').doc('sku-one').collection('receipts').get()).size, 7);
   } finally {await db.terminate(); await deleteApp(app);}
 });
 test('LF14 rendered-product producer and owner aggregate are implemented in the existing catalogue owner', () => {

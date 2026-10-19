@@ -1101,7 +1101,458 @@ Future<void> openListingEditor(WidgetTester tester, WorkSession work, {Size size
   await tester.ensureVisible(edit); await tester.tap(edit); await tester.pumpAndSettle();
 }
 
+// Isolated controller/journal fixtures; not injected into device inventory.
+class _StockJournal implements WorkspaceStoreStockJournal {
+  WorkspaceStoreStockIntent? saved;
+  bool failSave = false, failRemove = false;
+  @override Future<WorkspaceStoreStockIntent?> readPending(WorkspaceStoreStockScope scope) async => saved;
+  @override Future<void> savePending(WorkspaceStoreStockIntent original) async {
+    if (failSave) throw StateError('host save failure');
+    if (saved != null && saved!.serverFingerprint != original.serverFingerprint) throw const FormatException();
+    saved = WorkspaceStoreStockIntent.fromJson(original.toJson());
+  }
+  @override Future<void> removePending(WorkspaceStoreStockIntent original) async {
+    if (failRemove) throw StateError('host removal failure');
+    if (saved?.serverFingerprint != original.serverFingerprint) throw const FormatException();
+    saved = null;
+  }
+}
+class _StockOwner implements WorkspaceStoreStockOwnerGateway {
+  @override String get realm => 'evaluation';
+  @override bool stockSnapshotsSupported = true;
+  WorkspaceStoreStockHead head = const WorkspaceStoreStockHead(state: 'none', currentRevision: 0);
+  final sent = <({WorkspaceStoreStockIntent original, bool reconcile})>[];
+  Future<WorkspaceStoreStockWriteResult> Function(WorkspaceStoreStockIntent original, bool reconcile)? write;
+  @override Future<WorkspaceStoreStockHead> readStoreStockHead(WorkspaceStoreStockScope scope, Map<String, dynamic> binding,
+    {required bool Function() current}) async => head;
+  @override Future<WorkspaceStoreStockWriteResult> writeStoreStock(WorkspaceStoreStockIntent original,
+    {required bool Function() current, bool reconcile = false}) async {
+    sent.add((original: original, reconcile: reconcile));
+    return write == null ? const WorkspaceStoreStockWriteResult(WorkspaceStoreStockWriteState.unknown) : await write!(original, reconcile);
+  }
+}
+class _StockSessionCatalogue extends SessionCatalogue implements WorkspaceStoreStockOwnerGateway {
+  _StockSessionCatalogue(this.stockOwner);
+  final _StockOwner stockOwner;
+  @override String get realm => stockOwner.realm;
+  @override bool get stockSnapshotsSupported => stockOwner.stockSnapshotsSupported;
+  @override Future<WorkspaceStoreStockHead> readStoreStockHead(WorkspaceStoreStockScope scope, Map<String, dynamic> binding,
+    {required bool Function() current}) => stockOwner.readStoreStockHead(scope, binding, current: current);
+  @override Future<WorkspaceStoreStockWriteResult> writeStoreStock(WorkspaceStoreStockIntent original,
+    {required bool Function() current, bool reconcile = false}) => stockOwner.writeStoreStock(original, current: current, reconcile: reconcile);
+}
+
 void main() {
+  const stockScope = (account: 'owner-one', store: 'store-one', realm: 'evaluation', sku: 'sku-one');
+  WorkspaceCatalogueOwnedSku stockMirror({WorkspaceStockEntryMethod method = WorkspaceStockEntryMethod.manual}) => WorkspaceCatalogueOwnedSku.decode(
+    ownerRow(listed: true)..['provenance'] = {'entryMethod': method.name, 'sourceRecordId': 'sku-one'}, storeId: 'store-one',
+    skuId: 'sku-one', now: at, realm: 'evaluation');
+  WorkspaceSavedInventory stockCheckpoint({WorkspaceStockEntryMethod method = WorkspaceStockEntryMethod.manual,
+      int stock = 7, bool availabilityOnly = false, DateTime? savedAt, bool qa = true, String account = 'owner-one',
+      String store = 'store-one', bool listed = true}) {
+    final mirror = stockMirror(), raw = listingItem().toInventoryJson();
+    raw['stock'] = stock; raw['publicListing'] = listed;
+    raw['stockMode'] = availabilityOnly ? 'availabilityOnly' : 'exactQuantity';
+    raw['stockEntry'] = {...listingItem().stockEntry!.toJson(), 'method': method.name,
+      'stockMode': availabilityOnly ? 'availabilityOnly' : 'exactQuantity', 'quantity': availabilityOnly ? null : 99};
+    final item = WorkspaceCatalogueItem.fromInventoryJson(raw);
+    final link = WorkspaceReviewedCatalogueLink(realm: 'evaluation', storeId: 'store-one', skuId: 'sku-one',
+      canonicalProductId: mirror.canonicalProductId, verifiedPackId: mirror.verifiedPackId, mirrorRevision: mirror.revision,
+      candidateRevision: 1, candidateFingerprint: 'A' * 64, submissionRevision: 1, submissionFingerprint: 'B' * 64, authoredSha256: 'C' * 64);
+    return WorkspaceSavedInventory(account: account, store: store, qa: qa, revision: 12, savedAt: savedAt ?? at,
+      products: [item], movements: const [], reviewedCatalogueLinks: [link]);
+  }
+  WorkspaceStoreStockIntent stockOriginal() => WorkspaceStoreStockIntent(scope: stockScope, expectedRevision: 0, idempotencyKey: 'stock-original',
+    input: WorkspaceStoreStockInput.fromSaved(stockCheckpoint(), stockMirror(), scope: stockScope, now: at));
+  Map<String, dynamic> stockReply(WorkspaceStoreStockIntent original, {String state = 'reported'}) {
+    final body = <String, dynamic>{'schemaVersion': 1, 'realm': original.scope.realm, 'storeId': original.scope.store,
+      'binding': original.input.binding, 'ownerBinding': _mediaHash([original.scope.realm, original.scope.store, original.scope.account]),
+      'revision': original.expectedRevision + 1, 'reportedAt': at.toIso8601String(), 'source': original.input.source};
+    final until = DateTime.parse(original.input.source['savedAt'] as String).add(const Duration(minutes: 5)).toIso8601String();
+    return {'schemaVersion': 1, 'stockSnapshotVersion': 1, 'realm': original.scope.realm, 'storeId': original.scope.store,
+      'binding': original.input.binding, 'state': state, 'record': state == 'reported' ? {...body, 'integrity': _mediaHash(body)} : null,
+      'idempotencyKey': original.idempotencyKey, 'orderingAvailable': false, 'reservationConfirmed': false,
+      if (state == 'expired') ...{'expiredAt': until, 'settledAt': until, 'originalFingerprint': original.serverFingerprint}};
+  }
+  AuthenticatedWorkspaceCatalogueGateway stockGateway(SocialContentTransport transport, {Credentials? credentials, bool enabled = true,
+      String account = 'owner-one', DateTime Function()? clock}) => AuthenticatedWorkspaceCatalogueGateway(
+    endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+    credentials: credentials ?? Credentials(), transport: transport, realm: 'evaluation', ownerAccountId: account,
+    stockSnapshotsSupported: enabled, now: clock ?? () => at);
+  Map<String, dynamic> publicStockReply(WorkspacePublicStockQuery query, {bool unknown = false}) => {
+    'schemaVersion': 1, 'stockSnapshotVersion': 1, 'realm': query.realm, 'storeId': query.storeId, 'binding': query.binding,
+    'state': unknown ? 'unknown' : 'reported', 'observedAt': at.toIso8601String(), 'requestedPacks': query.requestedPacks,
+    'orderingAvailable': false, 'reservationConfirmed': false, 'stock': unknown ? null : <String, dynamic>{
+      'source': 'selling_store_checkpoint', 'reportedAt': at.toIso8601String(), 'savedAt': at.toIso8601String(),
+      'validUntil': at.add(const Duration(minutes: 5)).toIso8601String(), 'reportRevision': 1, 'available': true, 'quantityAvailable': true}};
+  test('LF11 Stock gateway is disabled for legacy connections', () {
+    expect((gateway(Transport(page())) as dynamic).stockSnapshotsSupported, isFalse);
+  });
+  test('LF11 production builder preserves explicit Stock capability flag', () {
+    final source = buildWorkspaceCatalogueGateway(credentials: Credentials());
+    const endpoint = String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL');
+    if (endpoint.isEmpty) { expect(source, isA<UnavailableWorkspaceCatalogueGateway>()); return; }
+    expect(source, isA<AuthenticatedWorkspaceCatalogueGateway>());
+    expect((source as AuthenticatedWorkspaceCatalogueGateway).stockSnapshotsSupported,
+      const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'));
+  });
+  for (final method in WorkspaceStockEntryMethod.values) {
+    test('LF11 Stock capture uses current saved selling packs not opening quantity ${method.name}', () {
+      final saved = stockCheckpoint(method: method, savedAt: at.add(const Duration(microseconds: 123))), before = jsonEncode(saved.toJson());
+      final input = WorkspaceStoreStockInput.fromSaved(saved, stockMirror(method: method), scope: stockScope, now: at.add(const Duration(milliseconds: 1)));
+      expect(input.source['quantityPacks'], 7); expect(input.source['inventoryRevision'], 12);
+      expect(input.source['savedAt'], at.toIso8601String()); expect(jsonEncode(saved.toJson()), before);
+      for (final field in ['purchasePrice', 'purchasePriceMinor', 'movements', 'privatePhoto', 'products', 'account', 'method']) {
+        expect(jsonEncode(input.toJson()).contains(field), isFalse);
+      }
+      final changedCopy = input.toJson(); (changedCopy['source'] as Map)['quantityPacks'] = 999;
+      expect(input.source['quantityPacks'], 7);
+    });
+  }
+  test('LF11 Stock capture distinguishes zero, availability-only and wrong checkpoint scope', () {
+    expect(WorkspaceStoreStockInput.fromSaved(stockCheckpoint(stock: 0), stockMirror(), scope: stockScope, now: at).source['quantityPacks'], 0);
+    final unknown = WorkspaceStoreStockInput.fromSaved(stockCheckpoint(stock: 999, availabilityOnly: true), stockMirror(), scope: stockScope, now: at);
+    expect(unknown.source['quantityPacks'], isNull); expect(unknown.source['mode'], 'availability_only');
+    for (final saved in [stockCheckpoint(qa: false), stockCheckpoint(account: 'other-owner'), stockCheckpoint(store: 'other-store'),
+      stockCheckpoint(listed: false), stockCheckpoint(savedAt: at.add(const Duration(milliseconds: 1))),
+      stockCheckpoint(savedAt: at.subtract(const Duration(minutes: 5)))]) {
+      expect(() => WorkspaceStoreStockInput.fromSaved(saved, stockMirror(), scope: stockScope, now: at), throwsFormatException);
+    }
+    final raw = stockMirror().toJson(); (raw['pack'] as Map)['quantityMilli'] = 2000;
+    final changed = WorkspaceCatalogueOwnedSku.decode(raw, storeId: 'store-one', skuId: 'sku-one', now: at, realm: 'evaluation');
+    expect(() => WorkspaceStoreStockInput.fromSaved(stockCheckpoint(), changed, scope: stockScope, now: at), throwsFormatException);
+  });
+  test('LF11 Stock original restoration remains immutable and clock independent', () {
+    final original = stockOriginal(), raw = original.toJson();
+    expect(WorkspaceStoreStockIntent.fromJson(jsonDecode(jsonEncode(raw))).serverFingerprint, original.serverFingerprint);
+    ((raw['input'] as Map)['source'] as Map)['quantityPacks'] = 10;
+    expect(original.input.source['quantityPacks'], 7); expect(original.body['expectedRevision'], 0);
+    final expired = stockReply(original, state: 'expired');
+    expect(WorkspaceStoreStockHead.decode(expired, stockScope, original.input.binding, at, original: original).state, 'expired');
+    expect(() => WorkspaceStoreStockHead.decode({...expired, 'originalFingerprint': 'D' * 64}, stockScope,
+      original.input.binding, at, original: original), throwsFormatException);
+    expect(() => WorkspaceStoreStockHead.decode({...expired, 'settledAt': at.toIso8601String()}, stockScope,
+      original.input.binding, at, original: original), throwsFormatException);
+  });
+  test('LF11 Stock gateway binds original, preserves result copies and uses mutation versus read AppCheck', () async {
+    final original = stockOriginal(), reply = stockReply(original), transport = Transport(reply), credentials = Credentials();
+    final api = stockGateway(transport, credentials: credentials);
+    expect(api.forOwnerAccount('owner-one').stockSnapshotsSupported, isTrue);
+    final posted = await api.writeStoreStock(original, current: () => true);
+    expect(posted.state, WorkspaceStoreStockWriteState.reported); expect(posted.record!.source['quantityPacks'], 7);
+    expect(transport.sent!['operation'], 'publishStoreStockSnapshot');
+    expect(credentials.modes.last, SocialAppCheckTokenMode.limitedUse);
+    expect(await api.writeStoreStock(original, current: () => true, reconcile: true).then((r) => r.state), WorkspaceStoreStockWriteState.reported);
+    expect(credentials.modes.last, SocialAppCheckTokenMode.standard);
+    ((reply['record'] as Map)['source'] as Map)['quantityPacks'] = 500;
+    expect(posted.record!.source['quantityPacks'], 7);
+    expect((await api.writeStoreStock(original, current: () => true)).state, WorkspaceStoreStockWriteState.unknown);
+    transport.data = stockReply(original, state: 'not_found');
+    expect((await api.writeStoreStock(original, current: () => true, reconcile: true)).state, WorkspaceStoreStockWriteState.notFound);
+    expect((await api.writeStoreStock(original, current: () => true)).state, WorkspaceStoreStockWriteState.unknown);
+    transport.data = stockReply(original, state: 'expired');
+    expect((await api.writeStoreStock(original, current: () => true, reconcile: true)).state, WorkspaceStoreStockWriteState.expired);
+  });
+  test('LF11 Stock gateway never sends disabled, wrong-owner or retired-before-dispatch requests', () async {
+    final original = stockOriginal(), transport = Transport(stockReply(original));
+    for (final api in [stockGateway(transport, enabled: false), stockGateway(transport, account: 'other-owner')]) {
+      expect((await api.writeStoreStock(original, current: () => true)).state, WorkspaceStoreStockWriteState.notSent);
+    }
+    expect(transport.sent, isNull);
+    var live = true;
+    final api = stockGateway(transport, credentials: RetiringOwnerCredentials(() => live = false));
+    expect((await api.writeStoreStock(original, current: () => live)).state, WorkspaceStoreStockWriteState.notSent);
+    expect(transport.sent, isNull);
+  });
+  test('LF11 Stock gateway drops an acknowledgement after account lifetime retirement', () async {
+    final original = stockOriginal(); var live = true;
+    final transport = OwnerTransport((body) async {live = false; return SocialContentResponse(statusCode: 200,
+      body: jsonEncode({'ok': true, 'data': stockReply(original)}));});
+    expect((await stockGateway(transport).writeStoreStock(original, current: () => live)).state, WorkspaceStoreStockWriteState.unknown);
+    expect(transport.calls, 1);
+  });
+  test('LF11 public Stock reader is exact-quantity, independently expiring and never ordering authority', () async {
+    final query = WorkspacePublicStockQuery(realm: 'evaluation', storeId: 'store-one', binding: stockOriginal().input.binding, requestedPacks: 3);
+    final reply = publicStockReply(query), transport = Transport(reply), credentials = Credentials();
+    final result = await stockGateway(transport, credentials: credentials).readPublicStoreStock(query, current: () => true);
+    expect(result.quantityAvailable, isTrue); expect(result.freshAt(at), isTrue);
+    expect(result.freshAt(at.add(const Duration(minutes: 5))), isFalse);
+    expect(credentials.modes.last, SocialAppCheckTokenMode.standard); expect(result.toJson()['orderingAvailable'], false);
+    expect(() => WorkspacePublicStockResult.decode(reply, query, at.add(const Duration(minutes: 5))), throwsFormatException);
+    expect(() => WorkspacePublicStockResult.decode({...reply, 'requestedPacks': 4}, query, at), throwsFormatException);
+    expect(() => WorkspacePublicStockResult.decode({...reply, 'orderingAvailable': true}, query, at), throwsFormatException);
+    final unknown = WorkspacePublicStockResult.decode(publicStockReply(query, unknown: true), query, at);
+    expect(unknown.available, isNull); expect(unknown.quantityAvailable, isNull); expect(unknown.freshAt(at), false);
+    final uncounted = publicStockReply(query); (uncounted['stock'] as Map)['quantityAvailable'] = null;
+    expect(WorkspacePublicStockResult.decode(uncounted, query, at).quantityAvailable, isNull);
+    (uncounted['stock'] as Map)['quantityPacks'] = 7;
+    expect(() => WorkspacePublicStockResult.decode(uncounted, query, at), throwsFormatException);
+  });
+  test('LF11 Stock capture fences identity edits without coupling prices or descriptions', () {
+    WorkspaceSavedInventory edited(WorkspaceCatalogueItem item) {
+      final base = stockCheckpoint();
+      return WorkspaceSavedInventory(account: base.account, store: base.store, qa: base.qa, revision: base.revision,
+        savedAt: base.savedAt, products: [item], movements: [], reviewedCatalogueLinks: base.reviewedCatalogueLinks);
+    }
+    final base = stockCheckpoint().products.single;
+    for (final key in ['sku', 'title', 'brand', 'variant', 'categoryId']) {
+      final raw = base.toInventoryJson()..[key] = key == 'categoryId' ? 'snacks' : 'Different $key';
+      expect(() => WorkspaceStoreStockInput.fromSaved(edited(WorkspaceCatalogueItem.fromInventoryJson(raw)), stockMirror(),
+        scope: stockScope, now: at), throwsFormatException, reason: key);
+    }
+    final changed = base.copyWith(stock: 3, sellingPrice: 270, content: const WorkspaceProductContent(description: 'Private edit'));
+    expect(WorkspaceStoreStockInput.fromSaved(edited(changed), stockMirror(), scope: stockScope, now: at).source['quantityPacks'], 3);
+  });
+  WorkspaceStoreStockRecord stockRecord(WorkspaceStoreStockIntent original) => WorkspaceStoreStockRecord.decode(
+    stockReply(original)['record'], stockScope, at);
+  WorkspaceStoreStockController stockController(_StockOwner api, WorkspaceStoreStockJournal journal, {Object? Function()? context, DateTime Function()? clock}) =>
+    WorkspaceStoreStockController(scope: stockScope, gateway: api, journal: journal, context: context ?? () => 'current', now: clock ?? () => at);
+  test('LF11 Stock controller journals before dispatch and deduplicates confirmed saved source', () async {
+    final api = _StockOwner(), journal = _StockJournal(), controller = stockController(api, journal);
+    addTearDown(controller.dispose);
+    api.write = (original, _) async {
+      expect(journal.saved!.serverFingerprint, original.serverFingerprint);
+      final record = stockRecord(original); api.head = WorkspaceStoreStockHead(state: 'reported', currentRevision: record.revision, record: record);
+      return WorkspaceStoreStockWriteResult(WorkspaceStoreStockWriteState.reported, record);
+    };
+    final input = stockOriginal().input;
+    expect(await controller.synchronize(input, inputCurrent: () => true), true);
+    expect(journal.saved, isNull); expect(api.sent, hasLength(1));
+    expect(await controller.synchronize(input, inputCurrent: () => true), true);
+    expect(api.sent, hasLength(1));
+    api.head = const WorkspaceStoreStockHead(state: 'none', currentRevision: 0);
+    expect(await controller.synchronize(input, inputCurrent: () => true), false);
+    expect(api.sent, hasLength(1));
+  });
+  test('LF11 Stock unknown survives a new controller and not-found retries only the exact expired original', () async {
+    final api = _StockOwner(), journal = _StockJournal(), first = stockController(api, journal);
+    expect(await first.synchronize(stockOriginal().input, inputCurrent: () => true), false);
+    final original = journal.saved!; first.dispose();
+    final next = stockController(api, journal, clock: () => at.add(const Duration(hours: 1))); addTearDown(next.dispose);
+    api.write = (attempt, reconcile) async {
+      expect(attempt.serverFingerprint, original.serverFingerprint);
+      return WorkspaceStoreStockWriteResult(reconcile ? WorkspaceStoreStockWriteState.notFound : WorkspaceStoreStockWriteState.expired);
+    };
+    expect(await next.recover(), true); expect(journal.saved, isNull);
+    expect(api.sent.map((e) => e.reconcile), [false, true, false]);
+    expect(api.sent.map((e) => e.original.serverFingerprint).toSet(), {original.serverFingerprint});
+  });
+  test('LF11 Stock failed journal save and removal never allocate a replacement original', () async {
+    final api = _StockOwner(), journal = _StockJournal()..failSave = true, controller = stockController(api, journal);
+    addTearDown(controller.dispose);
+    expect(await controller.synchronize(stockOriginal().input, inputCurrent: () => true), false);
+    expect(api.sent, isEmpty); final original = controller.pending!;
+    journal.failSave = false; journal.failRemove = true;
+    api.write = (attempt, _) async => WorkspaceStoreStockWriteResult(WorkspaceStoreStockWriteState.reported, stockRecord(attempt));
+    expect(await controller.recover(), false); expect(journal.saved!.serverFingerprint, original.serverFingerprint);
+    journal.failRemove = false;
+    expect(await controller.recover(), true); expect(journal.saved, isNull);
+    expect(api.sent.map((e) => e.original.serverFingerprint).toSet(), {original.serverFingerprint});
+  });
+  test('LF11 Stock account retirement retains owner original and suppresses later sends', () async {
+    Object? lifetime = Object(); final api = _StockOwner(), journal = _StockJournal(), controller = stockController(api, journal, context: () => lifetime);
+    addTearDown(controller.dispose);
+    api.write = (original, _) async { lifetime = Object(); return WorkspaceStoreStockWriteResult(WorkspaceStoreStockWriteState.reported, stockRecord(original)); };
+    expect(await controller.synchronize(stockOriginal().input, inputCurrent: () => true), false);
+    expect(journal.saved, isNotNull); expect(await controller.recover(), false); expect(api.sent, hasLength(1));
+  });
+  test('LF11 encrypted Stock journal survives instances, rejects overwrites and fences scope', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    var account = stockScope.account;
+    SecureWorkStoreStockJournal fresh() => SecureWorkStoreStockJournal(currentAccount: () => account);
+    final original = stockOriginal(); await fresh().savePending(original);
+    expect((await fresh().readPending(stockScope))!.serverFingerprint, original.serverFingerprint);
+    final other = WorkspaceStoreStockIntent(scope: stockScope, expectedRevision: 0, idempotencyKey: 'other-original', input: original.input);
+    await expectLater(fresh().savePending(other), throwsFormatException); await expectLater(fresh().removePending(other), throwsFormatException);
+    expect(await fresh().readPending((account: account, store: 'other-store', realm: 'evaluation', sku: 'sku-one')), isNull);
+    expect(await fresh().readPending((account: account, store: 'store-one', realm: 'production', sku: 'sku-one')), isNull);
+    account = 'other-account'; await expectLater(fresh().readPending(stockScope), throwsA(isA<WorkGatewayException>()));
+    account = stockScope.account; await fresh().removePending(original); expect(await fresh().readPending(stockScope), isNull);
+  });
+  test('LF11 Stock physical journal completion stays serialized after caller timeout', () async {
+    final storage = _DelayedDetailsStorage(), original = stockOriginal();
+    SecureWorkStoreStockJournal fresh() => SecureWorkStoreStockJournal(storage: storage, currentAccount: () => stockScope.account);
+    final save = fresh().savePending(original); await storage.entered.future;
+    await expectLater(save.timeout(const Duration(milliseconds: 1)), throwsA(isA<TimeoutException>()));
+    final remove = fresh().removePending(original); await Future<void>.delayed(Duration.zero); expect(storage.writes, 1);
+    storage.release.complete(); await save; await remove;
+    expect(storage.writes, 2); expect(await fresh().readPending(stockScope), isNull);
+  });
+  test('LF11 WorkSession uploads only successfully saved Stock and never editor quantities or failed saves', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final account = ListingAccount(), api = _StockOwner()..stockSnapshotsSupported = false, journal = _StockJournal();
+    final source = _StockSessionCatalogue(api)..ownerRead = () async => stockMirror();
+    final inventory = _AdoptionInventory(SecureWorkInventoryStore(accountScope: () => account.owner));
+    await inventory.save(WorkspaceSavedInventory.fromJson({...stockCheckpoint().toJson(), 'revision': 1}), expectedRevision: null);
+    final work = WorkSession(contactDraftStore: account, inventoryStore: inventory, catalogueGateway: source,
+      storeStockJournalFactory: (_) => journal)
+      ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery',
+        profileId: 'retailer-grocery', area: 'Jaipur', verified: true) ..workspaceId = 'store-one';
+    addTearDown(work.dispose);
+    expect(await work.loadWorkspaceInventory(), true);
+    api.stockSnapshotsSupported = true;
+    api.write = (original, _) async {
+      final raw = stockReply(original)['record'] as Map<String, dynamic>;
+      raw['reportedAt'] = original.input.source['savedAt'];
+      raw.remove('integrity'); raw['integrity'] = _mediaHash(raw);
+      final record = WorkspaceStoreStockRecord.decode(raw, stockScope, DateTime.now().toUtc());
+      api.head = WorkspaceStoreStockHead(state: 'reported', currentRevision: record.revision, record: record);
+      return WorkspaceStoreStockWriteResult(WorkspaceStoreStockWriteState.reported, record);
+    };
+    expect(await work.retryWorkspaceInventorySave(), true);
+    await work.workspaceStoreStockReportsSettled;
+    expect(api.sent, hasLength(1)); expect(api.sent.single.original.input.source['quantityPacks'], 7);
+    final saved = (await inventory.read(account.owner, 'store-one', qa: true))!;
+    expect(api.sent.single.original.input.source['inventoryRevision'], saved.revision);
+    // An unsaved list/editor change is not the durable checkpoint.
+    work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.single.copyWith(stock: 2);
+    expect(await work.refreshWorkspaceStoreStock(), true);
+    expect(api.sent, hasLength(1));
+    inventory.failReviewed = true;
+    expect(await work.retryWorkspaceInventorySave(), false);
+    await work.workspaceStoreStockReportsSettled; expect(api.sent, hasLength(1));
+    expect(work.workspaceInventoryError, isNotNull);
+    inventory.failReviewed = false;
+    expect(await work.retryWorkspaceInventorySave(), true);
+    await work.workspaceStoreStockReportsSettled;
+    expect(api.sent, hasLength(2)); expect(api.sent.last.original.input.source['quantityPacks'], 2);
+    expect(work.workspaceOrders, isEmpty); expect(work.workspaceInvoices, isEmpty);
+    expect(work.workspaceCatalogueItems, hasLength(1));
+  });
+  test('LF11 WorkSession fences Store changes during mirror read and keeps saved Stock local', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final account = ListingAccount(), api = _StockOwner()..stockSnapshotsSupported = false, journal = _StockJournal();
+    final entered = Completer<void>(), release = Completer<WorkspaceCatalogueOwnedSku?>();
+    final source = _StockSessionCatalogue(api)..ownerRead = () { if (!entered.isCompleted) entered.complete(); return release.future; };
+    final inventory = SecureWorkInventoryStore(accountScope: () => account.owner);
+    await inventory.save(WorkspaceSavedInventory.fromJson({...stockCheckpoint().toJson(), 'revision': 1}), expectedRevision: null);
+    final work = WorkSession(contactDraftStore: account, inventoryStore: inventory, catalogueGateway: source,
+      storeStockJournalFactory: (_) => journal)
+      ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery',
+        profileId: 'retailer-grocery', area: 'Jaipur', verified: true) ..workspaceId = 'store-one';
+    addTearDown(work.dispose); expect(await work.loadWorkspaceInventory(), true);
+    api.stockSnapshotsSupported = true; expect(await work.retryWorkspaceInventorySave(), true);
+    final pending = work.workspaceStoreStockReportsSettled; await entered.future;
+    work.activeWorkspace = const WorkWorkspace(id: 'other-store', name: 'Other', profileLabel: 'Grocery',
+      profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+    release.complete(stockMirror()); await pending;
+    expect(api.sent, isEmpty); expect(journal.saved, isNull);
+    expect((await inventory.read(account.owner, 'store-one', qa: true))!.products.single.stock, 7);
+  });
+  for (final failProjection in [false, true]) {
+    test('LF11 committed Counter sale seven to six projects saved Stock and recovers without reposting failure=$failProjection', () async {
+      TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+      final account = ListingAccount(), api = _StockOwner()..stockSnapshotsSupported = false, journal = _StockJournal();
+      final source = _StockSessionCatalogue(api)..ownerRead = () async => stockMirror();
+      final inventory = _AdoptionInventory(SecureWorkInventoryStore(accountScope: () => account.owner));
+      await inventory.save(WorkspaceSavedInventory.fromJson({...stockCheckpoint().toJson(), 'revision': 1}), expectedRevision: null);
+      final finance = WorkspaceFinanceSnapshot(accountScope: account.owner, workspaceId: 'store-one', revision: 1, asOf: at,
+        salesTodayMinor: 0, duesMinor: 0, availableMinor: 0, heldMinor: 0, requestedMinor: 0, paidOutMinor: 0,
+        feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0, payments: const [], payouts: const [], historyComplete: true);
+      final ledger = SecureWorkLedgerCheckpointStore(accountScope: () => account.owner);
+      WorkSession fresh() => WorkSession(contactDraftStore: account, inventoryStore: inventory, catalogueGateway: source,
+        storeStockJournalFactory: (_) => journal)
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery',
+          profileId: 'retailer-grocery', area: 'Jaipur', verified: true) ..workspaceId = 'store-one';
+      final work = fresh(); addTearDown(work.dispose);
+      expect(await work.loadWorkspaceInventory(), true); expect(work.applyWorkspaceFinance(finance), true);
+      expect(work.bindCustomerCollectionGateway(accountScope: account.owner, storeId: 'store-one',
+        adapter: StoreReviewCustomerCollectionGateway(finance), checkpointStore: ledger), true);
+      expect(await work.recoverCustomerLedger(), true);
+      expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'store-one'), true);
+      expect(work.startNewWorkspaceOrder(), true);
+      work.workspaceOrderCustomer = '9000000013'; work.workspaceOrderQuantities['sku-one'] = 1;
+      expect(work.saveWorkspaceOrderDraft(customer: work.workspaceOrderCustomer, source: 'Counter',
+        fulfilment: 'At the shop', payment: 'Cash', address: ''), true, reason: work.errorMessage);
+      final invoice = work.completeWorkspaceCounterSale(); expect(invoice, isNotNull, reason: work.errorMessage);
+      expect(invoice!.payableMinor, 26000);
+      expect(work.workspaceCatalogueItems.single.stock, 6);
+      api.stockSnapshotsSupported = true; inventory.failReviewed = failProjection;
+      api.write = (original, _) async {
+        final raw = stockReply(original)['record'] as Map<String, dynamic>;
+        raw['reportedAt'] = original.input.source['savedAt']; raw.remove('integrity'); raw['integrity'] = _mediaHash(raw);
+        final record = WorkspaceStoreStockRecord.decode(raw, stockScope, DateTime.now().toUtc());
+        api.head = WorkspaceStoreStockHead(state: 'reported', currentRevision: record.revision, record: record);
+        return WorkspaceStoreStockWriteResult(WorkspaceStoreStockWriteState.reported, record);
+      };
+      expect(await work.recordWorkspaceInvoiceInLedger(invoice), true, reason: work.errorMessage);
+      await work.workspaceInventorySaved; await work.workspaceStoreStockReportsSettled;
+      final committed = (await ledger.read(account.owner, 'store-one'))!;
+      expect(committed.inventory!.quantities!['sku-one'], 6); expect(committed.billedInvoices, hasLength(1));
+      final bytes = jsonEncode(committed.toJson());
+      if (failProjection) {
+        expect(api.sent, isEmpty); expect((await inventory.read(account.owner, 'store-one', qa: true))!.products.single.stock, 7);
+      } else { expect(api.sent.single.original.input.source['quantityPacks'], 6); }
+      inventory.failReviewed = false;
+      final restored = fresh(); addTearDown(restored.dispose);
+      expect(await restored.loadWorkspaceInventory(), true);
+      expect(restored.applyWorkspaceFinance(finance), true);
+      expect(restored.bindCustomerCollectionGateway(accountScope: account.owner, storeId: 'store-one',
+        adapter: StoreReviewCustomerCollectionGateway(finance), checkpointStore: ledger), true);
+      expect(await restored.recoverCustomerLedger(), true, reason: restored.customerLedgerRecoveryError);
+      await restored.workspaceInventorySaved; await restored.workspaceStoreStockReportsSettled;
+      expect(restored.workspaceCatalogueItems.single.stock, 6);
+      expect((await inventory.read(account.owner, 'store-one', qa: true))!.products.single.stock, 6);
+      expect(jsonEncode((await ledger.read(account.owner, 'store-one'))!.toJson()), bytes);
+      expect(api.sent.every((attempt) => attempt.original.input.source['quantityPacks'] == 6), true);
+      expect(api.sent, isNotEmpty); expect(journal.saved, isNull);
+    });
+  }
+  test('LF11 WorkSession binds the ordinary unbound authenticated catalogue before owner reads', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final account = ListingAccount(), journal = _StockJournal(), sent = <String>[];
+    final mirror = stockMirror().toJson();
+    final transport = OwnerTransport((body) async {
+      final operation = body['operation'] as String; sent.add(operation);
+      Map<String, dynamic> result;
+      if (operation == 'listStoreCatalogueSkus') {
+        result = {'schemaVersion': 1, 'realm': 'evaluation', 'storeId': 'store-one', 'items': [mirror], 'nextCursor': null};
+      } else if (operation == 'readStoreStockSnapshot') {
+        result = {'schemaVersion': 1, 'stockSnapshotVersion': 1, 'realm': 'evaluation', 'storeId': 'store-one',
+          'binding': body['binding'], 'state': 'none', 'record': null, 'idempotencyKey': null,
+          'orderingAvailable': false, 'reservationConfirmed': false};
+      } else {
+        expect(operation, 'publishStoreStockSnapshot');
+        final original = WorkspaceStoreStockIntent(scope: stockScope, expectedRevision: body['expectedRevision'] as int,
+          idempotencyKey: body['idempotencyKey'] as String, input: WorkspaceStoreStockInput.fromJson({'binding': body['binding'], 'source': body['source']}));
+        result = stockReply(original);
+        final record = result['record'] as Map<String, dynamic>;
+        record['reportedAt'] = original.input.source['savedAt']; record.remove('integrity'); record['integrity'] = _mediaHash(record);
+      }
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': result}));
+    });
+    final source = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, realm: 'evaluation', stockSnapshotsSupported: true);
+    expect(source.ownerAccountId, isNull);
+    final inventory = SecureWorkInventoryStore(accountScope: () => account.owner);
+    await inventory.save(WorkspaceSavedInventory.fromJson({...stockCheckpoint().toJson(), 'revision': 1}), expectedRevision: null);
+    final work = WorkSession(gateway: const UnavailableWorkGateway(), contactDraftStore: account, inventoryStore: inventory,
+      catalogueGateway: source, storeStockJournalFactory: (_) => journal)
+      ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery',
+        profileId: 'retailer-grocery', area: 'Jaipur', verified: true) ..workspaceId = 'store-one';
+    addTearDown(work.dispose);
+    expect(await work.loadWorkspaceInventory(), true); await work.workspaceStoreStockReportsSettled;
+    sent.clear(); expect(await work.retryWorkspaceInventorySave(), true); await work.workspaceStoreStockReportsSettled;
+    expect(sent, containsAllInOrder(['listStoreCatalogueSkus', 'readStoreStockSnapshot', 'publishStoreStockSnapshot']));
+    expect(journal.saved, isNull);
+  });
+  test('LF11 actual service Stock and terminal-expiry payloads decode through the strict Dart client', () async {
+    final path = Platform.environment['LF11_STOCK_LOG'];
+    if (path == null) fail('Set LF11_STOCK_LOG to the actual local-emulator producer output.');
+    final lines = File(path).readAsLinesSync();
+    final report = jsonDecode(lines.singleWhere((l) => l.startsWith('LF11_STORE_STOCK_PROJECTION=')).split('LF11_STORE_STOCK_PROJECTION=').last) as Map<String, dynamic>;
+    final terminal = jsonDecode(lines.singleWhere((l) => l.startsWith('LF11_STOCK_EXPIRY_PROJECTION=')).split('LF11_STOCK_EXPIRY_PROJECTION=').last) as Map<String, dynamic>;
+    WorkspaceStoreStockIntent originalFor(Map<String, dynamic> body) => WorkspaceStoreStockIntent(scope: stockScope,
+      expectedRevision: body['expectedRevision'] as int, idempotencyKey: body['idempotencyKey'] as String,
+      input: WorkspaceStoreStockInput.fromJson({'binding': body['binding'], 'source': body['source']}));
+    final record = WorkspaceStoreStockRecord.decode(report['owner']['record'], stockScope, at);
+    expect(record.source['quantityPacks'], 7);
+    final query = WorkspacePublicStockQuery(realm: 'evaluation', storeId: 'store-one', binding: record.binding, requestedPacks: 1);
+    expect(WorkspacePublicStockResult.decode(report['publicOne'], query, at).quantityAvailable, true);
+    final original = originalFor(terminal['original'] as Map<String, dynamic>), api = stockGateway(Transport(terminal['expired'] as Map<String, dynamic>));
+    expect((await api.writeStoreStock(original, current: () => true, reconcile: true)).state, WorkspaceStoreStockWriteState.expired);
+    expect(original.serverFingerprint, terminal['expired']['originalFingerprint']);
+  });
   testWidgets('H22-OWNER unknown storage owner hides Store until its first read settles', (tester) async {
     final account = _HeldWorkspaceAccount(), held = Completer<Map<String, Object?>?>();
     account.holds['owner-one'] = held;
