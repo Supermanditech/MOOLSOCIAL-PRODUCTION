@@ -2719,6 +2719,92 @@ void main() {
       expect(transport.calls, 0);
     });
   }
+  final presentationDiscoveryLog = Platform.environment['LF14_DISCOVERY_LOG'];
+  if (presentationDiscoveryLog != null) {
+    // Actual local service output; isolated host evidence, never native runtime data.
+    const marker = 'LF14_DISCOVERY_PROJECTION=';
+    final capture = jsonDecode(File(presentationDiscoveryLog).readAsLinesSync()
+      .singleWhere((line) => line.contains(marker)).split(marker).last) as Map<String, dynamic>;
+    final aggregate = (capture['aggregate'] as Map).cast<String, dynamic>();
+    final observed = DateTime.parse(aggregate['observedAt'] as String);
+    WorkspaceAnalyticsRequest request() => WorkspaceAnalyticsRequest(accountScope: 'owner-one', storeId: 'store-one',
+      start: DateTime.parse(aggregate['start'] as String), end: DateTime.parse(aggregate['end'] as String));
+    WorkspaceProductPresentationGateway reader({bool enabled = true,
+      void Function(Map<String, dynamic>)? edit, List<Map<String, Object?>>? sent,
+      Duration baseDelay = Duration.zero, Future<void>? optionalReply}) =>
+      WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => null, discoverySourcesEnabled: enabled,
+        gateway: AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          realm: 'evaluation', ownerAccountId: 'owner-one', credentials: Credentials(), now: () => observed,
+          transport: OwnerTransport((body) async {
+            sent?.add(body);
+            if (body['discoverySourcesVersion'] == 1) { await optionalReply; }
+            else if (baseDelay > Duration.zero) { await Future<void>.delayed(baseDelay); }
+            final data = (jsonDecode(jsonEncode(aggregate)) as Map).cast<String, dynamic>();
+            for (final key in ['schemaVersion', 'storeId', 'start', 'end', 'skuIds']) { data[key] = body[key]; }
+            if (body['discoverySourcesVersion'] == 1) { edit?.call(data); }
+            else { data.remove('discoverySourcesVersion'); data.remove('discoverySources'); }
+            return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+          })));
+    test('LF14-DISCOVERY actual service sources reach the existing Store breakdown without duplicate metrics', () async {
+      final sent = <Map<String, Object?>>[], snapshot = await reader(sent: sent).readAnalytics(request());
+      expect(sent, hasLength(2)); expect(sent.first.containsKey('discoverySourcesVersion'), false);
+      expect(sent.last['discoverySourcesVersion'], 1);
+      expect(snapshot.metrics.single.value, 3);
+      expect(snapshot.breakdowns.map((b) => b.id), ['most-viewed-products', 'discovery-sources']);
+      final sources = snapshot.breakdowns.last;
+      expect(sources.rows.map((r) => r.id), ['offers', 'quick', 'unknown']);
+      expect(sources.rows.map((r) => r.count), [1, 1, 1]);
+      expect(sources.source, contains('product views')); expect(sources.source, contains('Unknown'));
+      expect(snapshot.usableFor(request(), observed), true);
+    });
+    test('LF14-DISCOVERY disabled capability keeps the single unchanged v1 read', () async {
+      final sent = <Map<String, Object?>>[], snapshot = await reader(enabled: false, sent: sent).readAnalytics(request());
+      expect(sent, hasLength(1)); expect(sent.single.containsKey('discoverySourcesVersion'), false);
+      expect(snapshot.metrics.single.value, 3); expect(snapshot.breakdowns.single.id, 'most-viewed-products');
+    });
+    for (final entry in <String, void Function(Map<String, dynamic>)>{
+      'missing version': (d) { d.remove('discoverySourcesVersion'); },
+      'foreign Store': (d) { d['storeId'] = 'store-other'; },
+      'foreign realm': (d) { d['realm'] = 'production'; },
+      'unknown label': (d) { (d['discoverySources'] as List).first['id'] = 'private-search-text'; },
+      'duplicate source': (d) { d['discoverySources'] = [{'id': 'quick', 'count': 1}, {'id': 'quick', 'count': 2}]; },
+      'wrong sum': (d) { (d['discoverySources'] as List).first['count'] = 2; },
+      'negative count': (d) { (d['discoverySources'] as List).first['count'] = -1; },
+      'extra private field': (d) { (d['discoverySources'] as List).first['userId'] = 'private'; },
+      'future coverage': (d) { d['coveredUntil'] = observed.add(const Duration(days: 1)).toIso8601String(); },
+      'unavailable': (d) { d.addAll({'state': 'unavailable', 'coverage': 'unknown', 'count': null,
+        'products': [], 'discoverySources': [], 'coveredFrom': null, 'coveredUntil': null}); },
+    }.entries) {
+      test('LF14-DISCOVERY ${entry.key} suppresses only optional attribution', () async {
+        final snapshot = await reader(edit: entry.value).readAnalytics(request());
+        expect(snapshot.state, WorkspaceAnalyticsState.verified); expect(snapshot.metrics.single.value, 3);
+        expect(snapshot.breakdowns.single.id, 'most-viewed-products');
+      });
+    }
+    test('LF14-DISCOVERY covered zero is distinct from unavailable and independent snapshots may differ', () async {
+      final zero = await reader(edit: (d) { d.addAll({'count': 0, 'products': [], 'discoverySources': []}); }).readAnalytics(request());
+      expect(zero.breakdowns.last.id, 'discovery-sources'); expect(zero.breakdowns.last.rows, isEmpty);
+      expect(zero.metrics.single.value, 3, reason: 'Do not compare independently sampled base and source totals.');
+    });
+    test('LF14-DISCOVERY stalled optional query preserves valid base data before actual Work deadline', () async {
+      final work = WorkSession(contactDraftStore: ListingAccount())
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileId: 'retailer-grocery',
+          profileLabel: 'Grocery', area: 'Jaipur', verified: true)
+        ..workspaceId = 'store-one';
+      addTearDown(work.dispose);
+      final sent = <Map<String, Object?>>[], stalled = Completer<void>();
+      work.bindProductPresentationReader(reader(sent: sent, baseDelay: const Duration(seconds: 15), optionalReply: stalled.future));
+      final watch = Stopwatch()..start();
+      final snapshot = await work.readWorkspaceAnalytics(request());
+      expect(snapshot.state, WorkspaceAnalyticsState.verified); expect(snapshot.metrics.single.value, 3);
+      expect(snapshot.breakdowns.single.id, 'most-viewed-products'); expect(sent, hasLength(2));
+      expect(watch.elapsed, lessThan(const Duration(seconds: 30)));
+      stalled.complete(); // Late response must not mutate the returned snapshot.
+      await Future<void>.delayed(Duration.zero);
+      expect(snapshot.breakdowns, hasLength(1));
+    }, timeout: const Timeout(Duration(seconds: 45)));
+  }
   final presentationLog = Platform.environment['LF14_PRESENTATION_LOG'];
   if (presentationLog != null) {
     Map<String, dynamic> presentationCapture() {
@@ -2766,6 +2852,32 @@ void main() {
       expect(snapshot.breakdowns.single.id, 'most-viewed-products');
       expect(credentials.modes, [SocialAppCheckTokenMode.limitedUse, SocialAppCheckTokenMode.standard, SocialAppCheckTokenMode.standard]);
     });
+    if (cartAdditionLog != null) {
+      test('LF14-DISCOVERY malformed optional attribution retains product Store and Cart feeds together', () async {
+        const marker = 'LF14_CART_ADDITIONS_PROJECTION=';
+        final cart = jsonDecode(File(cartAdditionLog).readAsLinesSync().singleWhere((l) => l.startsWith(marker))
+          .substring(marker.length)) as Map<String, dynamic>;
+        final gateway = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => null,
+          storePresentationsEnabled: true, cartAdditionsEnabled: true, discoverySourcesEnabled: true,
+          gateway: presentationOwner(OwnerTransport((body) async {
+            final data = switch (body['operation']) {
+              'readStorePublicPresentations' => storeVisitCapture()['aggregate'],
+              'readStoreCartAdditions' => cart['aggregate'],
+              _ => presentationCapture()['aggregate'],
+            };
+            final copy = (jsonDecode(jsonEncode(data)) as Map).cast<String, dynamic>();
+            if (body['discoverySourcesVersion'] == 1) {
+              copy['discoverySourcesVersion'] = 1; copy['discoverySources'] = [{'id': 'quick', 'count': -1}];
+            }
+            return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': copy}));
+          })));
+        final snapshot = await gateway.readAnalytics(presentationRequest());
+        expect(snapshot.metrics.map((m) => m.id), containsAll(['product-views', 'store-views', 'visitors', 'journey-cart']));
+        expect(snapshot.metrics.singleWhere((m) => m.id == 'product-views').value, 1);
+        expect(snapshot.metrics.singleWhere((m) => m.id == 'visitors').value, 2);
+        expect(snapshot.breakdowns.single.id, 'most-viewed-products');
+      });
+    }
     test('LF14-VISITS covered empty interval supplies genuine zero journey stage without conversion', () async {
       final data = (storeVisitCapture()['zero'] as Map).cast<String, dynamic>();
       final gateway = visitGateway(OwnerTransport((_) async => SocialContentResponse(statusCode: 200,
