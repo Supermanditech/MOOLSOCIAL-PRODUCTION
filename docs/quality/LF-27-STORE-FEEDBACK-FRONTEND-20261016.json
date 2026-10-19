@@ -1,5 +1,16 @@
 {
   "storeWideCoupon20261020": {
+    "localProducerCheckpoint": {
+      "state": "implemented_emulator_tested_frontend_publish_and_public_readback_unfinished",
+      "sourceParent": "d64d2a891aa054339ed95f06582c12f5242d280d",
+      "implementation": "Extend existing promotion service/router only: explicitly negotiated Store-wide save/read/list/original-reconcile/public page, separate campaign/revision/receipt collections, exact integer terms, explicit funding acknowledgement, current trusted Store owner, server CAS independent of private draft revision, immutable original receipts and atomic public profile/head snapshot. Existing SKU promotions retained. Feature flag defaults off; ordering/redemption remain false. Configured limits are not remaining uses or reserved budget.",
+      "verification": "TypeScript compile v4 terminal0; entire workspace_promotion_service suite v2:87 passed,0 failed/skipped, including actual loopback Firestore atomic persistence, restart, concurrent CAS and realm/owner isolation. Earlier v1:84 passed before three added boundary tests, not171 unique cases. Host Node24; declared deployment Node22 remains unqualified. No deployment or live commerce.",
+      "logs": ["lf04-store-coupon-service-red-20261020-v1.log", "lf04-store-coupon-service-green-20261020-v1.log", "lf04-store-coupon-service-compile-20261020-v4.log", "lf04-store-coupon-service-tests-20261020-v2.log"],
+      "architect": "Read-only final atomic snapshot review found no concrete must-fix; architect did not execute tests or device acceptance.",
+      "native": "Backend-only delta changes no phone runtime. Current-source d64d UI remains loaded on OPPO; fresh foreground-guarded capture lf04-store-coupon-service-checkpoint-20261020-v1.png/xml visually inspected. Exactly one updated EVAL private campaign remains, correctly not published. No fake public feed, new transaction or native publication claim.",
+      "diagnostics": "One rg read used duplicated backend/functions prefix from backend cwd and failed; corrected bounded src path read before relying on content. Compilation terminal0 independently verified. Two broad quality-record searches produced truncated output; not used as complete source/evidence. This receipt update uses the exact existing leaf, not historical-document requalification. Existing REG4649 context only, no registry/policy change.",
+      "remaining": "Wire typed owner request plus original-intent recovery, explicit publish/withdraw UI and public campaign reader; then genuine eligibility/redemption/quote confirmation and durable order attribution. Do not expose private drafts, infer savings from advertised terms, or mark either LF04 or the full active goal complete from this checkpoint. No APK work."
+    },
     "state": "frontend_authoring_and_consumer_disclosure_verified_founder_review_pending",
     "founderDecision": "Approved named editable Store-wide campaigns and consistent product/Cart/Checkout disclosure; execute now supersedes old audit/baseline restriction only.",
     "boundary": "Private drafts do not establish public activation, usage, funding/redemption or payable savings. Existing SKU promotions and saved data preserved; final totals need authoritative Checkout quote.",

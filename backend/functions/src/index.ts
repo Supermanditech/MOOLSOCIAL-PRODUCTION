@@ -2940,13 +2940,14 @@ export const moolSocialWorkspace = onRequest(
         operation === "setRetailerAvailability" ||
         operation === "saveRetailerProduct" ||
         operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" ||
-        operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStorePublicDetails" ||
+        operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStoreCoupon" || operation === "saveStorePublicDetails" ||
         variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || stockOperation === "save" || catalogueProductionAction !== undefined ||
         operation === "prepareStoreProductMedia" || operation === "confirmStoreProductMedia" || operation === 'recordPublicProductPresentation' || operation === 'recordPublicStorePresentation' || operation === 'recordPublicCartAddition';
       const supplierPolicyOperation = ["readStoreSupplierPolicy", "saveStoreSupplierPolicy",
         "reconcileStoreSupplierPolicy"].includes(operation);
       const promotionOperation = ["readStorePromotion", "saveStorePromotion", "reconcileStorePromotion",
-        "listStorePromotions", "readPublicStorePromotions", "readPublicPromotionDiscovery"].includes(operation);
+        "listStorePromotions", "readPublicStorePromotions", "readPublicPromotionDiscovery",
+        "saveStoreCoupon", "readStoreCoupon", "listStoreCoupons", "reconcileStoreCoupon", "readPublicStoreCoupons"].includes(operation);
       const catalogueOperation = ["saveStoreCatalogueSku", "bindReviewedStoreCatalogueSku",
         "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue", "readPublicCatalogueDiscovery",
         "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined || productMediaOperation || stockOperation !== undefined || catalogueProductionAction !== undefined;
@@ -3180,7 +3181,8 @@ function workspacePromotionService(): WorkspacePromotionService {
     throw new WorkspaceProfileError("service_unavailable", "Store promotions are unavailable right now.", 503, true);
   }
   return new WorkspacePromotionService(new FirestorePromotionRepository(getFirestore(), realm), workspaceCatalogueService(),
-    () => new Date(), {benefitTermsSupported: process.env.MOOLSOCIAL_STORE_PROMOTION_TERMS_V1 === "true"});
+    () => new Date(), {benefitTermsSupported: process.env.MOOLSOCIAL_STORE_PROMOTION_TERMS_V1 === "true",
+      storeCouponTermsSupported: process.env.MOOLSOCIAL_STORE_COUPON_TERMS_V1 === "true"});
 }
 
 function workspaceSupplierPolicyService(): WorkspaceSupplierPolicyService {

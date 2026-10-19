@@ -4,6 +4,7 @@ import {randomUUID} from "node:crypto";
 import {initializeApp, deleteApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 import {FirestorePromotionRepository, WorkspacePromotionService, planPromotionSave,
+  planStoreCouponSave, type StoreCouponCommand, type StoreCouponRecord, type StoreCouponReceipt,
   type PromotionCommand, type PromotionRecord, type PromotionReceipt,
   type PromotionRepository} from "./workspace_promotion_service.js";
 import type {WorkspaceProfileRecord} from "./workspace_profile_service.js";
@@ -105,6 +106,258 @@ function termsService(repository: PromotionRepository, enabled = true) {
   return Reflect.construct(WorkspacePromotionService, [repository, {publicCatalogue: async () => source()},
     () => new Date(at), {benefitTermsSupported: enabled}]) as WorkspacePromotionService;
 }
+test('LF04-STORE-COUPON negotiated Store-wide authoring does not require a SKU', async () => {
+  const repository = new Memory() as Memory & {saveCoupon(command: any): Promise<any>};
+  repository.sku = undefined;
+  repository.saveCoupon = async command => ({...command.coupon, schemaVersion: 1,
+    realm: command.realm, storeId: command.storeId, couponId: command.couponId,
+    revision: command.expectedRevision + 1, observedAt: command.observedAt});
+  const subject = Reflect.construct(WorkspacePromotionService, [repository,
+    {publicCatalogue: async () => {throw Error('No product-specific source required');}},
+    () => new Date(at), {storeCouponTermsSupported: true}]) as WorkspacePromotionService;
+  const result = await subject.handleOperation('owner-one', 'saveStoreCoupon', {
+    storeCouponTermsVersion: 1, storeId: 'store-one', couponId: 'diwali-one',
+    expectedRevision: 0, idempotencyKey: 'coupon-original-one', fundingAcknowledged: true,
+    coupon: {name: 'Host Diwali savings', percentage: false, discount: 1050,
+      minimumSpendMinor: 10000, maximumSavingMinor: 1050, startsAt: at, endsAt: until,
+      totalUses: 20, usesPerCustomer: 1, active: true},
+  }) as Record<string, any>;
+  assert.equal(result.record.name, 'Host Diwali savings');
+  assert.equal(result.record.revision, 1);
+  assert.equal(result.storeCouponTermsVersion, 1);
+  assert.equal(result.redemptionAvailable, false);
+  assert.equal(repository.records.size, 0, 'Existing SKU publications remain separate.');
+});
+
+function storeCouponBody(changes: Record<string, unknown> = {}) {
+  return {storeCouponTermsVersion: 1, storeId: 'store-one', couponId: 'coupon-one',
+    expectedRevision: 0, idempotencyKey: 'store-coupon-original', fundingAcknowledged: true,
+    coupon: {name: 'Host Diwali savings', percentage: false, discount: 1050,
+      minimumSpendMinor: 10000, maximumSavingMinor: 1050, startsAt: at, endsAt: until,
+      totalUses: 20, usesPerCustomer: 1, active: true}, ...changes};
+}
+class CouponMemory extends Memory {
+  couponHeads = new Map<string, StoreCouponRecord>();
+  couponReceipts = new Map<string, StoreCouponReceipt>();
+  couponWrites = 0;
+  beforeSnapshot?: () => void | Promise<void>;
+  private couponKey(c: StoreCouponCommand) {return `${c.realm}/${c.storeId}/${c.ownerUserId}/${c.idempotencyKey}`;}
+  async saveCoupon(command: StoreCouponCommand) {
+    const key = this.couponKey(command), receipt = this.couponReceipts.get(key);
+    const result = planStoreCouponSave(command, this.profile, this.couponHeads.get(command.couponId), receipt, this.now);
+    if (!receipt) {
+      this.couponHeads.set(result.couponId, structuredClone(result));
+      this.couponReceipts.set(key, {fingerprint: command.fingerprint, record: structuredClone(result)});
+      this.couponWrites++;
+    }
+    return structuredClone(result);
+  }
+  async reconcileCoupon(command: StoreCouponCommand) {
+    const receipt = this.couponReceipts.get(this.couponKey(command));
+    return receipt ? planStoreCouponSave(command, this.profile, this.couponHeads.get(command.couponId), receipt, this.now) : undefined;
+  }
+  async readCoupon(storeId: string, couponId: string, userId?: string) {
+    await super.read(storeId, 'unused', userId);
+    return structuredClone(this.couponHeads.get(couponId));
+  }
+  async pageCoupons(storeId: string, after: string | undefined, limit: number, userId?: string) {
+    await super.read(storeId, 'unused', userId);
+    return [...this.couponHeads.values()].filter(c => !after || c.couponId > after)
+      .sort((a, b) => a.couponId.localeCompare(b.couponId)).slice(0, limit).map(c => structuredClone(c));
+  }
+  async publicCouponSnapshot(storeId: string, after: string | undefined, limit: number) {
+    await this.beforeSnapshot?.();
+    // One isolated in-memory snapshot, not per-item asynchronous enrichment.
+    const records = [...this.couponHeads.values()].filter(c => c.storeId === storeId && (!after || c.couponId > after))
+      .sort((a, b) => a.couponId.localeCompare(b.couponId)).slice(0, limit).map(c => structuredClone(c));
+    return {profile: structuredClone(this.profile!), records, observedAt: this.now};
+  }
+}
+function storeCouponService(repository: PromotionRepository, clock = () => at, enabled = true) {
+  return new WorkspacePromotionService(repository,
+    {publicCatalogue: async () => {throw Error('Store-wide terms do not read SKU fixtures');}},
+    () => new Date(clock()), {storeCouponTermsSupported: enabled});
+}
+const publicCoupons = {storeCouponTermsVersion: 1, storeId: 'store-one', limit: 20};
+for (const percentage of [false, true]) {
+  test(`LF04-STORE-COUPON original lifecycle readback and private-public separation ${percentage}`, async () => {
+    const repo = new CouponMemory(), subject = storeCouponService(repo, () => repo.now), original = storeCouponBody();
+    original.coupon.percentage = percentage; original.coupon.discount = percentage ? 750 : 1050;
+    original.coupon.maximumSavingMinor = percentage ? 5000 : 1050;
+    const saved = await subject.handleOperation('owner-one', 'saveStoreCoupon', original) as any;
+    assert.equal(saved.record.revision, 1); assert.equal(saved.publicationConfirmed, false);
+    assert.equal(saved.redemptionAvailable, false); assert.equal(saved.orderingAvailable, false);
+    const restart = storeCouponService(repo, () => repo.now);
+    assert.deepEqual(await restart.handleOperation('owner-one', 'reconcileStoreCoupon', original), saved);
+    assert.deepEqual(await restart.handleOperation('owner-one', 'saveStoreCoupon', original), saved);
+    assert.equal(repo.couponWrites, 1);
+    const edited = {...original, expectedRevision: 1, idempotencyKey: 'coupon-edited',
+      coupon: {...original.coupon, name: 'Host New Year offer'}};
+    await restart.handleOperation('owner-one', 'saveStoreCoupon', edited);
+    const page = await restart.handleOperation('buyer-one', 'readPublicStoreCoupons', publicCoupons) as any;
+    assert.equal(page.state, 'ready'); assert.equal(page.items.length, 1);
+    assert.equal(page.items[0].couponId, 'coupon-one'); assert.equal(page.items[0].revision, 2);
+    assert.equal(page.items[0].scope, 'store_basket'); assert.equal(page.items[0].terms.name, 'Host New Year offer');
+    assert.equal(page.items[0].terms.discount, original.coupon.discount);
+    assert.equal(page.items[0].terms.totalUses, 20, 'Configured limit, never remaining uses.');
+    assert.doesNotMatch(JSON.stringify(page), /owner-one|host-case|fingerprint|idempotencyKey|savingAmountMinor|remainingUses/u);
+    const list = await restart.handleOperation('owner-one', 'listStoreCoupons', publicCoupons) as any;
+    assert.equal(list.items.length, 1); assert.equal(list.items[0].revision, 2);
+    const paused = {...edited, expectedRevision: 2, idempotencyKey: 'coupon-paused', coupon: {...edited.coupon, active: false}};
+    await restart.handleOperation('owner-one', 'saveStoreCoupon', paused);
+    assert.deepEqual((await restart.handleOperation('buyer-one', 'readPublicStoreCoupons', publicCoupons) as any).items, []);
+    repo.now = '2026-10-20T00:00:00.000Z';
+    assert.deepEqual(await restart.handleOperation('owner-one', 'reconcileStoreCoupon', original), saved);
+    assert.deepEqual(await restart.handleOperation('owner-one', 'saveStoreCoupon', original), saved);
+    assert.equal(repo.couponHeads.get('coupon-one')!.active, false); assert.equal(repo.couponWrites, 3);
+    assert.equal((await restart.handleOperation('owner-one', 'reconcileStoreCoupon', {...original, idempotencyKey: 'never-sent'}) as any).record, null);
+    assert.equal(repo.couponWrites, 3);
+    assert.equal(repo.records.size, 0); assert.equal(repo.receipts.size, 0);
+  });
+}
+for (const [label, patch] of Object.entries({
+  'missing funding': {fundingAcknowledged: undefined}, 'funding false': {fundingAcknowledged: false},
+  'local revision confused with server CAS': {expectedRevision: 7}, 'forged owner': {ownerUserId: 'another-owner'},
+  'client publication claim': {publicationConfirmed: true}, 'SKU limitation': {skuId: 'sku-one'},
+})) test(`LF04-STORE-COUPON rejects ${label} without writes`, async () => {
+  const repo = new CouponMemory();
+  await assert.rejects(storeCouponService(repo).handleOperation('owner-one', 'saveStoreCoupon', storeCouponBody(patch)));
+  assert.equal(repo.couponWrites, 0);
+});
+for (const [label, patch] of Object.entries({
+  'empty name': {name: ''}, 'multiline name': {name: 'Diwali\nsavings'},
+  'tabbed name': {name: 'Diwali\tsavings'}, 'coerced percentage': {percentage: 'false'}, 'fractional paise': {discount: 10.5},
+  'missing flat cap': {maximumSavingMinor: null}, 'different flat cap': {maximumSavingMinor: 1000},
+  'unsafe money': {discount: Number.MAX_SAFE_INTEGER}, 'negative minimum': {minimumSpendMinor: -1},
+  'zero total uses': {totalUses: 0}, 'string usage limit': {totalUses: '20'},
+  'fractional per-customer uses': {usesPerCustomer: 1.5}, 'too many per customer': {usesPerCustomer: 21},
+  'reversed dates': {startsAt: until}, 'noncanonical date': {endsAt: '2026-10-18'},
+  'over100percent': {percentage: true, discount: 10001}, 'mixed applied total': {appliedSavingMinor: 1050},
+  'forged platform sponsor': {sponsor: 'moolSocial'},
+})) test(`LF04-STORE-COUPON rejects invalid terms ${label}`, async () => {
+  const repo = new CouponMemory(), original = storeCouponBody();
+  Object.assign(original.coupon, patch);
+  await assert.rejects(storeCouponService(repo).handleOperation('owner-one', 'saveStoreCoupon', original));
+  assert.equal(repo.couponWrites, 0);
+});
+test('LF04-STORE-COUPON negotiation is explicit and original request is frozen before await', async () => {
+  const repo = new CouponMemory(), original = storeCouponBody();
+  for (const version of [undefined, '1', 2]) {
+    await assert.rejects(storeCouponService(repo).handleOperation('owner-one', 'saveStoreCoupon', {...original, storeCouponTermsVersion: version}), {code: 'unavailable'});
+  }
+  await assert.rejects(storeCouponService(repo, () => at, false).handleOperation('owner-one', 'saveStoreCoupon', original), {code: 'unavailable'});
+  await assert.rejects(storeCouponService(new Memory()).handleOperation('owner-one', 'saveStoreCoupon', original), {code: 'unavailable'});
+  const promise = storeCouponService(repo).handleOperation('owner-one', 'saveStoreCoupon', original);
+  original.coupon.name = 'Later private edit';
+  assert.equal((await promise as any).record.name, 'Host Diwali savings');
+  assert.equal(repo.couponWrites, 1);
+  const changed = storeCouponBody(); changed.coupon.name = 'Changed original';
+  await assert.rejects(storeCouponService(repo).handleOperation('owner-one', 'reconcileStoreCoupon', changed), {code: 'conflict'});
+  assert.equal(repo.couponWrites, 1);
+});
+test('LF04-STORE-COUPON owner, Store, CAS and publisher boundaries are enforced', async () => {
+  const repo = new CouponMemory(), subject = storeCouponService(repo);
+  await assert.rejects(subject.handleOperation('other-owner', 'saveStoreCoupon', storeCouponBody()));
+  await assert.rejects(subject.handleOperation('owner-one', 'saveStoreCoupon', storeCouponBody({storeId: 'store-two'})));
+  await subject.handleOperation('owner-one', 'saveStoreCoupon', storeCouponBody());
+  await assert.rejects(subject.handleOperation('owner-one', 'saveStoreCoupon', storeCouponBody({idempotencyKey: 'stale-next'})), {code: 'conflict'});
+  await assert.rejects(subject.handleOperation('other-owner', 'listStoreCoupons', publicCoupons));
+  for (const profileId of ['retailer-grocery', 'wholesaler', 'manufacturer']) {
+    repo.profile!.profileId = profileId;
+    const page = await subject.handleOperation('buyer-one', 'readPublicStoreCoupons', publicCoupons) as any;
+    assert.equal(page.items[0].publisherType, profileId === 'retailer-grocery' ? 'retailer' : profileId);
+    assert.equal(page.items[0].publisherName, 'Host Store'); assert.equal(page.items[0].storeId, 'store-one');
+  }
+  repo.profile!.shopEnabled = false;
+  const hidden = await subject.handleOperation('buyer-one', 'readPublicStoreCoupons', publicCoupons) as any;
+  assert.equal(hidden.state, 'unavailable'); assert.deepEqual(hidden.items, []);
+  repo.profile!.status = 'suspended';
+  await assert.rejects(subject.handleOperation('owner-one', 'readStoreCoupon', {storeCouponTermsVersion: 1, storeId: 'store-one', couponId: 'coupon-one'}));
+  await assert.rejects(subject.handleOperation('owner-one', 'reconcileStoreCoupon', storeCouponBody()));
+});
+test('LF04-STORE-COUPON public source is one coherent profile/head snapshot, not per-item awaits', async () => {
+  const repo = new CouponMemory(), subject = storeCouponService(repo);
+  await subject.handleOperation('owner-one', 'saveStoreCoupon', storeCouponBody());
+  const original = repo.publicCouponSnapshot.bind(repo);
+  repo.store = async () => {throw Error('Public projection must not enrich using separate profile reads');};
+  Object.defineProperty(repo, 'pageCoupons', {value: undefined});
+  repo.readCoupon = async () => {throw Error('Public projection must not mix separate head reads');};
+  repo.publicCouponSnapshot = async (...args) => {
+    const snapshot = await original(...args);
+    snapshot.profile.profileId = 'wholesaler'; snapshot.profile.name = 'Host snapshot Store';
+    snapshot.records[0]!.active = false; snapshot.records[0]!.revision = 2;
+    return snapshot;
+  };
+  const page = await subject.handleOperation('buyer-one', 'readPublicStoreCoupons', publicCoupons) as any;
+  assert.equal(page.state, 'ready'); assert.deepEqual(page.items, []);
+  repo.publicCouponSnapshot = async (...args) => {
+    const snapshot = await original(...args); snapshot.profile.status = 'suspended'; return snapshot;
+  };
+  assert.equal((await subject.handleOperation('buyer-one', 'readPublicStoreCoupons', publicCoupons) as any).state, 'unavailable');
+  repo.publicCouponSnapshot = async () => {throw Error('private backend diagnostics');};
+  const failed = await subject.handleOperation('buyer-one', 'readPublicStoreCoupons', publicCoupons) as any;
+  assert.equal(failed.state, 'unavailable'); assert.doesNotMatch(JSON.stringify(failed), /diagnostics/u);
+});
+
+test('LF04-STORE-COUPON missing save acknowledgement is unavailable, never a successful absent record', async () => {
+  const repo = new CouponMemory();
+  Object.defineProperty(repo, 'saveCoupon', {value: async () => undefined});
+  await assert.rejects(storeCouponService(repo).handleOperation('owner-one', 'saveStoreCoupon', storeCouponBody()), {code: 'unavailable'});
+  assert.equal(repo.couponWrites, 0);
+});
+test('LF04-STORE-COUPON pagination, expiry, scheduled activation and malformed source fail truthfully', async () => {
+  const repo = new CouponMemory(), subject = storeCouponService(repo, () => repo.now);
+  await subject.handleOperation('owner-one', 'saveStoreCoupon', storeCouponBody());
+  await subject.handleOperation('owner-one', 'saveStoreCoupon', storeCouponBody({couponId: 'coupon-two', idempotencyKey: 'coupon-two-original'}));
+  const first = await subject.handleOperation('buyer-one', 'readPublicStoreCoupons', {...publicCoupons, limit: 1}) as any;
+  assert.equal(first.items[0].couponId, 'coupon-one'); assert.equal(first.nextCursor, 'coupon-one');
+  const second = await subject.handleOperation('buyer-one', 'readPublicStoreCoupons', {...publicCoupons, limit: 1, after: first.nextCursor}) as any;
+  assert.equal(second.items[0].couponId, 'coupon-two'); assert.equal(second.nextCursor, 'coupon-two');
+  assert.equal((await subject.handleOperation('buyer-one', 'readPublicStoreCoupons', {...publicCoupons, after: second.nextCursor}) as any).nextCursor, null);
+  repo.now = until;
+  assert.deepEqual((await subject.handleOperation('buyer-one', 'readPublicStoreCoupons', publicCoupons) as any).items, []);
+  repo.now = at; repo.couponHeads.get('coupon-one')!.startsAt = '2026-10-17T01:00:01.000Z';
+  const later = storeCouponService(repo, () => '2026-10-17T01:00:01.000Z');
+  assert.equal((await later.handleOperation('buyer-one', 'readPublicStoreCoupons', publicCoupons) as any).state, 'unavailable');
+  repo.now = '2026-10-17T01:00:01.000Z';
+  assert.equal((await later.handleOperation('buyer-one', 'readPublicStoreCoupons', publicCoupons) as any).items.length, 2);
+  Object.assign(repo.couponHeads.get('coupon-one')!, {storeId: 'foreign-store'});
+  const original = repo.publicCouponSnapshot.bind(repo);
+  repo.publicCouponSnapshot = async (...args) => ({...await original(...args), records: [...repo.couponHeads.values()]});
+  assert.equal((await later.handleOperation('buyer-one', 'readPublicStoreCoupons', publicCoupons) as any).state, 'unavailable');
+});
+test('LF04-STORE-COUPON Firestore atomic persistence, restart, original reconciliation and isolation', async t => {
+  const host = process.env.FIRESTORE_EMULATOR_HOST;
+  if (!host) {t.skip('Explicit loopback emulator required'); return;}
+  assert.match(host, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: 'demo-lf-store-coupons'}, `store-coupon-${randomUUID()}`), db = getFirestore(app);
+  const suffix = randomUUID().replaceAll('-', ''), storeId = `store-${suffix}`, caseId = `case-${suffix}`;
+  const root = db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc(storeId);
+  await db.collection('workspaceProfiles').doc(caseId).create({...profile, workspaceId: storeId, caseId});
+  const original = storeCouponBody({storeId});
+  const open = () => storeCouponService(new FirestorePromotionRepository(db, 'evaluation', () => new Date(at)));
+  try {
+    const first = await open().handleOperation('owner-one', 'saveStoreCoupon', original) as any;
+    assert.deepEqual(await open().handleOperation('owner-one', 'reconcileStoreCoupon', original), first);
+    assert.deepEqual((await open().handleOperation('owner-one', 'readStoreCoupon', {storeCouponTermsVersion: 1, storeId, couponId: 'coupon-one'}) as any).record, first.record);
+    assert.equal((await root.collection('skus').get()).size, 0, 'No duplicated SKU or Stock is required.');
+    assert.equal((await root.collection('promotions').get()).size, 0, 'No per-SKU promotion is created.');
+    const race = await Promise.allSettled(['edit-one', 'edit-two'].map(key => open().handleOperation('owner-one', 'saveStoreCoupon', {
+      ...original, expectedRevision: 1, idempotencyKey: key, coupon: {...original.coupon, name: `Host ${key}`}})));
+    assert.equal(race.filter(r => r.status === 'fulfilled').length, 1);
+    const publicPage = await open().handleOperation('buyer-one', 'readPublicStoreCoupons', {...publicCoupons, storeId}) as any;
+    assert.equal(publicPage.state, 'ready'); assert.equal(publicPage.items[0].revision, 2);
+    assert.equal(publicPage.orderingAvailable, false); assert.equal(publicPage.redemptionAvailable, false);
+    assert.equal((await root.collection('storeCouponReceipts').get()).size, 2);
+    assert.equal((await root.collection('storeCoupons').doc('coupon-one').collection('revisions').get()).size, 2);
+    const foreignRealm = storeCouponService(new FirestorePromotionRepository(db, 'production', () => new Date(at)));
+    assert.equal((await foreignRealm.handleOperation('owner-one', 'readStoreCoupon', {storeCouponTermsVersion: 1, storeId, couponId: 'coupon-one'}) as any).record, null);
+    await db.collection('workspaceProfiles').doc(caseId).update({shopEnabled: false});
+    assert.equal((await open().handleOperation('buyer-one', 'readPublicStoreCoupons', {...publicCoupons, storeId}) as any).state, 'unavailable');
+    await db.collection('workspaceProfiles').doc(caseId).update({ownerUserId: 'new-owner'});
+    await assert.rejects(open().handleOperation('owner-one', 'reconcileStoreCoupon', original));
+  } finally {await deleteApp(app);}
+});
 for (const kind of ["flat", "percentage"] as const) {
   test(`LF04 advertised benefit terms owner save original recovery and public readback ${kind}`, async () => {
     const repository = new Memory(), subject = termsService(repository), benefitTerms = advertisedTerms(kind);
