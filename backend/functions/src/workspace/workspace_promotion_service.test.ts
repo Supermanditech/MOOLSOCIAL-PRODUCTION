@@ -64,6 +64,97 @@ function source() {
 function service(repository: PromotionRepository, read = async (_body: Readonly<Record<string, unknown>>) => source()) {
   return new WorkspacePromotionService(repository, {publicCatalogue: read}, () => new Date(at));
 }
+
+const discoveryQuery = {search: "", categoryId: "all", publisher: null, supplierOnly: false};
+function discoveryFixture() {
+  const repository = new Memory();
+  let clock = at, directoryReads = 0;
+  const row = {...source().items[0]!, listings: [{listingId: `listing-${"a".repeat(64)}`, channel: "retail"}]};
+  const listing = {...source(), items: [row]};
+  const catalogue = {
+    publicCatalogue: async () => source(),
+    publicDiscovery: async (request: Readonly<Record<string, unknown>>) => {
+      directoryReads++;
+      const shop = (request.query as {destination: string}).destination === "shop";
+      return {schemaVersion: 1, discoveryPageVersion: 1, realm: "evaluation", state: "ready",
+        coverage: "verified_public_only", directoryCoverage: "complete_bounded", orderingAvailable: false,
+        observedAt: clock, query: request.query, resultKind: "products", requestedStore: null,
+        items: shop ? [{channel: "retail", listing: structuredClone(listing)}] : [],
+        page: {snapshotId: "b".repeat(64), startIndex: 0, totalCount: shop ? 1 : 0, previousCursor: null, nextCursor: null}};
+    },
+  };
+  const subject = new WorkspacePromotionService(repository, catalogue, () => new Date(clock));
+  const discover = (changes: Record<string, unknown> = {}) => subject.handleOperation("buyer-one",
+    "readPublicPromotionDiscovery", {promotionDiscoveryVersion: 1, query: discoveryQuery, pageSize: 1, ...changes}) as Promise<Record<string, any>>;
+  return {repository, subject, catalogue, listing, discover, setClock: (value: string) => {clock = value;}, reads: () => directoryReads};
+}
+
+test("ordinary promotion discovery uses owner publications and paginates placements, not products", async () => {
+  const f = discoveryFixture();
+  await f.subject.save("owner-one", body());
+  await f.subject.save("owner-one", body({placementId: "promotion-two", idempotencyKey: "original-two"}));
+  const first = await f.discover();
+  assert.equal(first.state, "ready"); assert.equal(first.page.totalCount, 2);
+  assert.deepEqual(first.coverage, {kind: "connected_publishers", publisherTypes: ["retailer"], countBasis: "publications"});
+  assert.equal(first.items[0].publication.publicationId, "promotion-one");
+  assert.deepEqual(first.items[0].listing, f.listing);
+  const next = await f.discover({cursor: first.page.nextCursor});
+  assert.equal(next.items[0].publication.publicationId, "promotion-two");
+  const back = await f.discover({cursor: next.page.previousCursor});
+  assert.equal(back.page.snapshotId, first.page.snapshotId);
+  await assert.rejects(f.discover({cursor: first.page.nextCursor, query: {...discoveryQuery, search: "other"}}));
+  assert.ok(f.reads() >= 6, "directory must be checked after the last promotion await");
+});
+
+test("ordinary promotions keep partial publisher coverage and fail closed on unsupported sources", async () => {
+  const f = discoveryFixture();
+  assert.equal((await f.discover()).page.totalCount, 0);
+  await assert.rejects(f.discover({query: {...discoveryQuery, publisher: "moolSocial"}}));
+  await assert.rejects(f.discover({query: {...discoveryQuery, regionId: "region-one"}}));
+  f.catalogue.publicDiscovery = async () => {throw Error("source unavailable");};
+  await assert.rejects(f.discover());
+});
+
+test("ordinary promotion snapshots retire paused, expired and changed sources, including cursor reuse", async () => {
+  const f = discoveryFixture();
+  await f.subject.save("owner-one", body());
+  await f.subject.save("owner-one", body({placementId: "promotion-two", idempotencyKey: "original-two"}));
+  const first = await f.discover();
+  const pause = body({expectedRevision: 1, idempotencyKey: "pause-one"}); pause.promotion.active = false;
+  await f.subject.save("owner-one", pause);
+  assert.equal((await f.discover()).page.totalCount, 1);
+  await assert.rejects(f.discover({cursor: first.page.nextCursor}));
+  f.setClock("2026-10-17T02:00:00.000Z");
+  assert.equal((await f.discover()).page.totalCount, 0);
+});
+
+test("ordinary promotions detect scheduled activation during final directory await", async () => {
+  const f = discoveryFixture(), scheduled = body(); scheduled.promotion.validFrom = "2026-10-17T01:00:01.000Z";
+  await f.subject.save("owner-one", scheduled);
+  const read = f.catalogue.publicDiscovery;
+  f.catalogue.publicDiscovery = async input => {
+    const response = await read(input);
+    if (f.reads() === 5) f.setClock("2026-10-17T01:00:01.000Z");
+    return response;
+  };
+  await assert.rejects(f.discover(), {code: "stale_snapshot"});
+});
+
+test("ordinary promotion discovery rejects directory mutation after final promotion reads", async () => {
+  const f = discoveryFixture(); await f.subject.save("owner-one", body());
+  const read = f.catalogue.publicDiscovery;
+  f.catalogue.publicDiscovery = async input => {
+    const response = await read(input);
+    if (f.reads() >= 5) response.page.snapshotId = "c".repeat(64);
+    return response;
+  };
+  await assert.rejects(f.discover(), {code: "stale_snapshot"});
+});
+
+test("ordinary promotion discovery does not turn unreadable promotion coverage into zero", async () => {
+  const f = discoveryFixture(); f.repository.page = async () => {throw Error("read failed");};
+  await assert.rejects(f.discover(), {code: "unavailable"});
+});
 test("public promotions require a real persistent producer", () => {
   assert.equal(typeof FirestorePromotionRepository.prototype.save, "function");
   assert.equal(typeof FirestorePromotionRepository.prototype.reconcile, "function");

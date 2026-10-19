@@ -16,7 +16,7 @@ import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingB
   normalizeStoreVariantFamily, storeVariantFamilyOperation, storeVariantFamilySubmission, planStoreVariantFamilySubmission,
   planStoreVariantFamilyReview, type StoreVariantFamilyInput, type StoreVariantFamilyCandidate} from "./workspace_catalogue_service.js";
 import type {WorkspaceProfileRecord} from "./workspace_profile_service.js";
-import {WorkspacePromotionService, planPromotionSave, type PromotionRepository, type PromotionRecord} from "./workspace_promotion_service.js";
+import {WorkspacePromotionService, FirestorePromotionRepository, planPromotionSave, type PromotionRepository, type PromotionRecord} from "./workspace_promotion_service.js";
 import {createCatalogueAggregate, type CatalogueAggregate} from "../commerce/catalogue_contract.js";
 import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
   type SupplyParticipantWorkspace} from "../commerce/supply_participant_contract.js";
@@ -672,6 +672,7 @@ test('LF03-CONNECTED live family bridge', {
   const repository = new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at));
   const service = new WorkspaceCatalogueService(repository, catalogueIdentity, () => new Date(at));
   const controlToken = randomUUID(), operations: string[] = [];
+  const promotions = new WorkspacePromotionService(new FirestorePromotionRepository(db, 'evaluation', () => new Date(at)), service, () => new Date(at));
   let explicitFinish = false;
   let complete!: () => void;
   const finished = new Promise<void>(resolve => {complete = resolve;});
@@ -723,7 +724,8 @@ test('LF03-CONNECTED live family bridge', {
           data = await repository.reviewVariantFamily('reviewer-one', catalogueIdentity, 'store-one', 'family-one', review);
         } else if (body.action === 'finish') {
           assert.equal((await root.collection('stores').doc('store-one').collection('skus').get()).size, 2);
-          for (const operation of ['submitStoreProduct', 'bindReviewedStoreCatalogueSku', 'submitStoreVariantFamily', 'readPublicStoreVariantFamilies']) {
+          for (const operation of ['submitStoreProduct', 'bindReviewedStoreCatalogueSku', 'submitStoreVariantFamily', 'readPublicStoreVariantFamilies',
+            'saveStorePromotion', 'readPublicPromotionDiscovery']) {
             assert.ok(operations.includes(operation), `Missing actual request ${operation}`);
           }
           explicitFinish = true; data = {finished: true}; response.once('finish', complete);
@@ -740,6 +742,9 @@ test('LF03-CONNECTED live family bridge', {
         else if (operation === 'reconcileStoreCatalogueBinding') data = await service.reconcileBinding('owner-one', input);
         else if (operation === 'readPublicStoreCatalogue') data = await service.publicCatalogue(input);
         else if (operation === 'readPublicStoreVariantFamilies') data = await service.publicVariantFamilies(input);
+        else if (operation === 'readPublicCatalogueDiscovery') data = await service.publicDiscovery(input);
+        else if (['readStorePromotion', 'saveStorePromotion', 'reconcileStorePromotion', 'readPublicStorePromotions',
+          'readPublicPromotionDiscovery'].includes(String(operation))) data = await promotions.handleOperation('owner-one', String(operation), input);
         else if (storeVariantFamilyOperation(operation)) data = await service.handleStoreVariantFamily('owner-one', operation as string, input);
         else throw new Error('Unsupported host operation');
       }

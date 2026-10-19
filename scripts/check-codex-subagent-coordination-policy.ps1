@@ -8017,6 +8017,9 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     if (@($facts.owners) -ccontains 'backend/functions/src/workspace/workspace_promotion_service.ts') {
       $factsOwners += 'backend/functions/src/workspace/workspace_promotion_service.ts'
     }
+    if (@($facts.owners) -ccontains 'backend/functions/src/workspace/workspace_promotion_service.test.ts') {
+      $factsOwners += 'backend/functions/src/workspace/workspace_promotion_service.test.ts'
+    }
     if ($null -ne $facts.PSObject.Properties['reviewedFamilyContractVersion']) {
       if ($facts.reviewedFamilyContractVersion -isnot [long] -and $facts.reviewedFamilyContractVersion -isnot [int] -or
           $facts.reviewedFamilyContractVersion -ne 1) { return $false }

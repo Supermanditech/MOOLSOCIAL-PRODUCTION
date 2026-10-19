@@ -914,7 +914,8 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
         requestedCursor != null &&
         requestedCursor != previousCursor) {
       if (result.snapshotId != previous.snapshotId ||
-          result.totalCount != previous.totalCount) {
+          result.totalCount != previous.totalCount ||
+          result.offerCoverage?.key != previous.offerCoverage?.key) {
         throw const FormatException('Catalogue snapshot changed');
       }
       if (requestedCursor == previous.nextCursor &&
@@ -3396,6 +3397,7 @@ class BuyV2RootSessions {
       BuyV2Session(core: core, reviewDataEnabled: false,
         customerStateStore: store, pendingAccountState: pending,
         cataloguePageSource: catalogue, variantFamilySource: catalogue, productContentAdapter: catalogue,
+        publishedCatalogueSource: catalogue?.gateway.promotionDiscoverySupported == true ? catalogue : null,
         purchaseRealm: purchaseRealm,
         purchaseReader: purchaseReaderFactory != null
           ? purchaseReaderFactory!(identity, () => alive && !_disposed && currentIdentity() == identity)
@@ -4502,7 +4504,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     late final BuyV2CataloguePager<BuyV2PublishedCatalogueOffer> pager;
     pager = BuyV2CataloguePager<BuyV2PublishedCatalogueOffer>(
-      identityOf: (offer) => offer.product.id,
+      identityOf: (offer) => offer.identity,
       load: (query, {cursor, required pageSize}) => _withCatalogueRequest(
         () async {
           final source = _publishedCatalogueSource;
@@ -4517,11 +4519,12 @@ class BuyV2Session extends ChangeNotifier {
           final publications = <String>{};
           for (final offer in page.items) {
             if (!offer.isCurrent(now: catalogueNow()) ||
-                !publications.add(offer.publicationId) ||
+                !publications.add(offer.identity) ||
+                page.offerCoverage != null && !page.offerCoverage!.publishers.contains(offer.publisherType) ||
                 !query.acceptsOfferPublisher(offer.publisherType) ||
                 pager.cachedItems.any(
                   (previous) =>
-                      previous.publicationId == offer.publicationId &&
+                      previous.identity == offer.identity &&
                       previous.product.id != offer.product.id,
                 )) {
               throw const FormatException('Published offer facts do not match');
@@ -4623,7 +4626,7 @@ class BuyV2Session extends ChangeNotifier {
     if (_collectionDisposed) return;
     var promotion = _openedStorePromotion;
     if (promotion != null && (!promotion.source.storeOffersActive ||
-        !promotion.offer.isCurrent(now: DateTime.now().toUtc()) ||
+        !promotion.offer.isCurrent(now: catalogueNow()) ||
         _catalogueStoreBrowseAnchors[promotion.product.destination] != promotion.product.id)) {
       _openedStorePromotion = promotion = null;
     }
@@ -4738,7 +4741,7 @@ class BuyV2Session extends ChangeNotifier {
   /// Open-only admission of a resolved public promotion. Loading a promotion
   /// section must not move Store return anchors or replace Cart/order snapshots.
   bool admitStorePromotion(BuyV2StorePublishedOffersSource source, BuyV2PublishedCatalogueOffer offer) {
-    final product = offer.product, now = DateTime.now().toUtc();
+    final product = offer.product, now = catalogueNow();
     if (_collectionDisposed || !identical(source, cataloguePageSource) || !source.storeOffersActive ||
         !offer.isCurrent(now: now) || offer.publisherId != product.storeId ||
         product.publicListingIdentity?.valid != true || !product.publicListingIdentity!.matches(product) ||

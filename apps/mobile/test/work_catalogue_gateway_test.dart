@@ -27,6 +27,7 @@ import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_publication.dart';
+import 'package:moolsocial/features/work/work_product_promotions.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
 import 'package:moolsocial/features/work/widgets/store_publication_settings.dart';
 
@@ -234,10 +235,11 @@ class _HostTipPolicy implements BuyV2TipPolicy {
   bool accepts(BuyV2Destination destination, int amount) => amount == 0 || amount == 10;
 }
 class _HostRetirableStateStore implements BuyV2CustomerStateStore {
+  Future<BuyV2CustomerStateSnapshot?>? heldRead;
   @override
   String? ownerScope = 'host-loading-owner';
   @override
-  Future<BuyV2CustomerStateSnapshot?> read() async => null;
+  Future<BuyV2CustomerStateSnapshot?> read() async => heldRead == null ? null : await heldRead;
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async => true;
 }
@@ -1057,9 +1059,13 @@ void main() {
         'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
         credentials: Credentials(), transport: transport, ownerAccountId: 'owner-one', realm: 'evaluation',
         productSubmissionSupported: true, reviewedProductSubmissionSupported: true,
-        productFactsReadbackSupported: true, reviewedFamilyReadbackSupported: true, minorMoneyReadbackSupported: true, now: () => at);
+        productFactsReadbackSupported: true, reviewedFamilyReadbackSupported: true, minorMoneyReadbackSupported: true,
+        unbrandedProduceReadbackSupported: true, storeClassificationReadbackSupported: true, promotionDiscoverySupported: true, now: () => at);
       final account = ListingAccount();
       WorkSession fresh() => WorkSession(contactDraftStore: account, catalogueGateway: _ConnectedFamilyGateway(connection),
+        productPromotionGateway: AuthenticatedStorePromotionGateway(endpoint: connection.endpoint, credentials: connection.credentials,
+          transport: transport, ownerAccountId: 'owner-one', realm: 'evaluation', now: () => at), productPromotionRealm: 'evaluation',
+        productPromotionPendingStoreFactory: (_) => SecureStorePromotionPendingStore(currentAccount: () => account.owner),
         inventoryStore: SecureWorkInventoryStore(accountScope: () => account.owner),
         productSubmissionJournalFactory: (_) => SecureWorkProductSubmissionJournal(currentAccount: () => account.owner),
         variantFamilyJournalFactory: (_) => SecureWorkVariantFamilyJournal(currentAccount: () => account.owner),
@@ -1154,6 +1160,43 @@ void main() {
       expect(buyer.selectedProduct!.publicListingIdentity!.verifiedPackId, 'resolved-pack-sku-two');
       expect(buyer.selectedProduct!.priceMinor, 1689950);
       buyer.releaseCatalogueProducts('connected-family');
+      // Actual private owner save -> persistent service -> ordinary public Offers.
+      final promotion = StorePromotionInput(skuId: 'sku-one', skuRevision: 1, channel: 'retail',
+        headline: 'Host reviewed family promotion', detail: 'Descriptive text, not an applied discount', validFrom: at,
+        validUntil: DateTime.now().toUtc().add(const Duration(days: 1)), active: true);
+      for (final placement in ['promotion-one', 'promotion-two']) {
+        expect(await restored.workspaceProductPromotions!.refresh(placement), isTrue,
+          reason: restored.workspaceProductPromotions!.message);
+        expect(await restored.readWorkspacePromotionSource('sku-one', channel: 'retail'), isNotNull,
+          reason: 'Actual saved source must match before owner promotion submission');
+        expect((await restored.submitWorkspaceProductPromotion(placement, promotion)).state, StorePromotionResultState.saved,
+          reason: restored.workspaceProductPromotions!.message);
+      }
+      final global = WorkspacePublicDiscoverySource(gateway: connection, current: () => true);
+      addTearDown(global.dispose);
+      final offersQuery = BuyV2CatalogueQuery(destination: BuyV2Destination.shop, regionId: null,
+        areaScope: BuyV2CatalogueAreaScope.allAreas, offersOnly: true);
+      final offersPage = await global.loadOffers(offersQuery, pageSize: 1);
+      expect(offersPage.totalCount, 2); expect(offersPage.offerCoverage!.key, 'retailer');
+      final otherOffer = await global.loadOffers(offersQuery, pageSize: 1, cursor: offersPage.nextCursor);
+      expect(otherOffer.items.single.publicationId, 'promotion-two');
+      expect(otherOffer.items.single.product.id, offersPage.items.single.product.id);
+      expect(otherOffer.items.single.product.variantFamilyId, 'family-one');
+      final offerCore = BuySession();
+      final offerBuyer = BuyV2Session(core: offerCore, reviewDataEnabled: false,
+        catalogueNow: () => at, cataloguePageSource: global, publishedCatalogueSource: global);
+      addTearDown(offerCore.dispose); addTearDown(offerBuyer.dispose);
+      final offerPager = offerBuyer.acquireCatalogueOffers('connected-offers'); await offerPager.open(offersQuery);
+      expect(offerPager.message, isNull); expect(offerPager.page!.items, hasLength(2));
+      expect(offerBuyer.admitStorePromotion(global, offerPager.page!.items.last), isTrue);
+      expect(offerBuyer.openProduct(offersPage.items.single.product.id), isTrue);
+      expect(offerBuyer.selectedProduct!.sourceSkuId, 'sku-one'); expect(offerBuyer.cartLines, isEmpty);
+      final paused = StorePromotionInput(skuId: promotion.skuId, skuRevision: promotion.skuRevision, channel: promotion.channel,
+        headline: promotion.headline, detail: promotion.detail, validFrom: promotion.validFrom, validUntil: promotion.validUntil, active: false);
+      expect(await restored.workspaceProductPromotions!.refresh('promotion-one'), isTrue);
+      expect((await restored.submitWorkspaceProductPromotion('promotion-one', paused)).state, StorePromotionResultState.saved);
+      expect((await global.loadOffers(offersQuery, pageSize: 1)).totalCount, 1);
+      await expectLater(global.loadOffers(offersQuery, pageSize: 1, cursor: offersPage.nextCursor), throwsFormatException);
       final localSibling = restored.workspaceCatalogueItems.firstWhere((p) => p.id == 'sku-two');
       expect(restored.addOrUpdateWorkspaceProduct(localSibling.copyWith(sellingPriceMinor: 1689951)), isTrue);
       expect(await restored.workspaceInventorySaved, isTrue);
@@ -2377,10 +2420,10 @@ void main() {
     row(data)['supplierPolicy'] = policyEnvelope();
     return data;
   }
-  AuthenticatedWorkspaceCatalogueGateway discoveryGateway(SocialContentTransport transport, {String realm = 'production'}) =>
+  AuthenticatedWorkspaceCatalogueGateway discoveryGateway(SocialContentTransport transport, {String realm = 'production', bool promotions = false}) =>
     AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
       credentials: Credentials(), transport: transport, realm: realm, productFactsReadbackSupported: true,
-      unbrandedProduceReadbackSupported: true, storeClassificationReadbackSupported: true, now: () => at);
+      unbrandedProduceReadbackSupported: true, storeClassificationReadbackSupported: true, promotionDiscoverySupported: promotions, now: () => at);
   Map<String, dynamic> discoveryData(Map<String, Object?> body, {bool empty = false}) {
     final listing = publicPage();
     listing.addAll({'productFactsReadbackVersion': 1, 'storeClassificationReadbackVersion': 1, 'storeDetailsReadbackVersion': 1});
@@ -2538,6 +2581,164 @@ void main() {
     'observedAt': at.toIso8601String(), 'state': 'ready',
     'coverage': 'verified_public_promotions_only', 'orderingAvailable': false,
     'items': items, 'nextCursor': next};
+  Map<String, dynamic> globalPromotionPage(Map<String, Object?> body) {
+    final listing = ((discoveryData({'query': {}, 'resultKind': 'products'})['items'] as List).single as Map)['listing'] as Map<String, dynamic>;
+    final sku = jsonDecode(jsonEncode(row(listing))) as Map<String, dynamic>..remove('listings');
+    return {'schemaVersion': 1, 'promotionDiscoveryVersion': 1, 'realm': 'production', 'state': 'ready',
+      'coverage': {'kind': 'connected_publishers', 'publisherTypes': ['retailer'], 'countBasis': 'publications'},
+      'orderingAvailable': false, 'observedAt': at.toIso8601String(), 'query': body['query'],
+      'items': <Object?>[for (final id in ['promotion-one', 'promotion-two']) {'publication': {...promotionRow(id: id), 'product': sku}, 'listing': listing}],
+      'page': {'snapshotId': 'd' * 64, 'startIndex': 0, 'totalCount': 2, 'previousCursor': null, 'nextCursor': null}};
+  }
+  BuyV2CatalogueQuery globalOffersQuery() => BuyV2CatalogueQuery(destination: BuyV2Destination.shop,
+    regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas, offersOnly: true);
+  test('LF04 GLOBAL ordinary promotions retain separate placements and exact paise SKU', () async {
+    final source = WorkspacePublicDiscoverySource(current: () => true, gateway: discoveryGateway(OwnerTransport((body) async {
+      expect(body['operation'], 'readPublicPromotionDiscovery');
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': globalPromotionPage(body)}));
+    }), promotions: true));
+    addTearDown(source.dispose);
+    final page = await source.loadOffers(globalOffersQuery(), pageSize: 40);
+    expect(page.offerCoverage!.key, 'retailer'); expect(page.items.map((o) => o.product.priceMinor).toSet(), {10025});
+    expect(page.items.map((o) => o.identity).toSet(), hasLength(2)); expect(page.items.map((o) => o.product.id).toSet(), hasLength(1));
+    final core = BuySession();
+    final buyer = BuyV2Session(core: core, catalogueNow: () => at,
+      cataloguePageSource: source, publishedCatalogueSource: source, reviewDataEnabled: false);
+    addTearDown(core.dispose); addTearDown(buyer.dispose);
+    final pager = buyer.acquireCatalogueOffers('global-host'); await pager.open(globalOffersQuery());
+    expect(pager.message, isNull); expect(pager.page!.items, hasLength(2)); expect(buyer.cartLines, isEmpty);
+  });
+  test('LF04 GLOBAL delayed older enrichment cannot regress a newer publication head', () async {
+    final release = Completer<void>(), entered = Completer<void>(); var calls = 0, revision = 1;
+    final reader = HostReviewedVariantSource(memberships: (entries, current) async {
+      if (++calls == 1) { entered.complete(); await release.future; }
+      return entries.map((entry) => WorkspaceReviewedVariantMembership(listing: entry.product.publicListingIdentity!,
+        skuRevision: entry.readback.skuRevision!, catalogueVersion: entry.readback.catalogueVersion!, familyId: null,
+        sourceId: 'host-global-associations', revision: 1, observedAt: at, validUntil: at.add(const Duration(minutes: 30)),
+        attributes: const [])).toList();
+    });
+    final source = WorkspacePublicDiscoverySource(current: () => true, gateway: AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'), credentials: Credentials(),
+      productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true, storeClassificationReadbackSupported: true,
+      promotionDiscoverySupported: true, reviewedVariants: reader, now: () => at, transport: OwnerTransport((body) async {
+        final data = globalPromotionPage(body);
+        for (final raw in data['items'] as List) {
+          final p = (raw as Map)['publication'] as Map;
+          p['revision'] = revision; p['sourceId'] = 'store-promotion:production:store-one:${p['publicationId']}:$revision';
+        }
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      })));
+    addTearDown(source.dispose);
+    final old = expectLater(source.loadOffers(globalOffersQuery(), pageSize: 40), throwsFormatException);
+    await entered.future; revision = 2;
+    expect((await source.loadOffers(globalOffersQuery(), pageSize: 40)).items.first.revision, 2);
+    release.complete(); await old; revision = 1;
+    await expectLater(source.loadOffers(globalOffersQuery(), pageSize: 40), throwsFormatException);
+  });
+  test('LF04 GLOBAL two Stores can reuse a placement ID without product or publication collisions', () async {
+    final source = WorkspacePublicDiscoverySource(current: () => true, gateway: discoveryGateway(OwnerTransport((body) async {
+      final data = globalPromotionPage(body), items = data['items'] as List;
+      items[1] = jsonDecode(jsonEncode(items.first).replaceAll('store-one', 'store-two').replaceAll('a' * 64, 'e' * 64));
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    }), promotions: true));
+    addTearDown(source.dispose);
+    final core = BuySession();
+    final buyer = BuyV2Session(core: core, reviewDataEnabled: false,
+      catalogueNow: () => at, cataloguePageSource: source, publishedCatalogueSource: source);
+    addTearDown(core.dispose); addTearDown(buyer.dispose);
+    expect((await source.loadOffers(globalOffersQuery(), pageSize: 40)).items, hasLength(2));
+    final pager = buyer.acquireCatalogueOffers('two-stores'); await pager.open(globalOffersQuery());
+    expect(pager.message, isNull); expect(pager.page!.items.map((p) => p.publicationId).toSet(), {'promotion-one'});
+    expect(pager.page!.items.map((p) => p.identity).toSet(), hasLength(2));
+    expect(pager.page!.items.map((p) => p.product.storeId).toSet(), {'store-one', 'store-two'});
+  });
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF04 GLOBAL Offers coverage and distinct promotions fit at $scale', (tester) async {
+      tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(390, 844); addTearDown(tester.view.reset);
+      final source = WorkspacePublicDiscoverySource(current: () => true, gateway: discoveryGateway(OwnerTransport((body) async =>
+        SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': globalPromotionPage(body)}))), promotions: true));
+      final core = BuySession();
+      final buyer = BuyV2Session(core: core, reviewDataEnabled: false, catalogueNow: () => at,
+        cataloguePageSource: source, publishedCatalogueSource: source)..chooseCatalogueArea(null, BuyV2CatalogueAreaScope.allAreas)
+        ..featuredOffersMoolSocial = false;
+      var closed = false;
+      void close() {if (!closed) {closed = true; buyer.dispose(); core.dispose(); source.dispose();}}
+      addTearDown(close);
+      const capture = Key('global-offers-host');
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+        MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale), disableAnimations: true), child: child!),
+        home: RepaintBoundary(key: capture, child: Scaffold(body: BuyV2OffersView(session: buyer, source: const BuyV2CataloguePublishedOffersSource())))));
+      for (var frame = 0; frame < 10; frame++) { await tester.pump(const Duration(milliseconds: 200)); }
+      expect(find.byKey(const Key('buy-offers-publisher-coverage')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      expect(buyer.commerceLoadState, BuyV2CommerceLoadState.loading, reason: 'Reading publications does not manufacture commerce readiness');
+      final directory = Platform.environment['LF04_OFFERS_CAPTURE_DIR'];
+      if (directory != null) { await tester.runAsync(() async {
+        final image = await tester.renderObject<RenderRepaintBoundary>(find.byKey(capture)).toImage();
+        try {
+          final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+          await Directory(directory).create(recursive: true);
+          final file = File('$directory/ordinary-offers-host-$scale.png');
+          if (await file.exists()) throw StateError('Preserve existing capture');
+          await file.writeAsBytes(bytes.buffer.asUint8List());
+        } finally {image.dispose();}
+      }); }
+      buyer.toggleSaved(publicIdentity().listingId);
+      await tester.tap(find.byKey(const Key('buy-offers-saved'))); await tester.pump();
+      expect(find.bySemanticsLabel('2 saved retailer promotions shown'), findsOneWidget);
+      expect(buyer.cartLines, isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+      close();
+    });
+  }
+  for (final fault in ['coverage', 'publisher', 'source', 'price', 'count', 'duplicate', 'future', 'retired']) {
+    test('LF04 GLOBAL rejects $fault without partial page admission', () async {
+      var current = true;
+      final source = WorkspacePublicDiscoverySource(current: () => current, gateway: discoveryGateway(OwnerTransport((body) async {
+        final data = globalPromotionPage(body), item = ((data['items'] as List).first as Map)['publication'] as Map;
+        if (fault == 'coverage') (data['coverage'] as Map)['publisherTypes'] = ['retailer', 'moolSocial'];
+        if (fault == 'publisher') item['publisherId'] = 'other-store';
+        if (fault == 'source') item['sourceId'] = 'other-source';
+        if (fault == 'price') (((item['product'] as Map)['channels'] as List).single as Map)['priceMinor'] = 10026;
+        if (fault == 'count') (data['page'] as Map)['totalCount'] = 3;
+        if (fault == 'duplicate') (data['items'] as List)[1] = (data['items'] as List).first;
+        if (fault == 'future') data['observedAt'] = at.add(const Duration(seconds: 1)).toIso8601String();
+        if (fault == 'retired') current = false;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      }), promotions: true));
+      addTearDown(source.dispose);
+      await expectLater(source.loadOffers(globalOffersQuery(), pageSize: 40), throwsFormatException);
+      expect(source.observedProductIds, isEmpty);
+    });
+  }
+  for (final mode in ['commerce unavailable', 'recovery pending', 'missing publication source']) {
+    testWidgets('LF04 GLOBAL browse guard $mode retains commercial and account boundaries', (tester) async {
+      var calls = 0;
+      final restored = Completer<BuyV2CustomerStateSnapshot?>();
+      final stateStore = _HostRetirableStateStore()..heldRead = restored.future;
+      final source = WorkspacePublicDiscoverySource(current: () => true, gateway: discoveryGateway(OwnerTransport((body) async {
+        calls++; return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': globalPromotionPage(body)}));
+      }), promotions: true));
+      final core = BuySession();
+      final buyer = BuyV2Session(core: core, reviewDataEnabled: false, catalogueNow: () => at,
+        customerStateStore: mode == 'recovery pending' ? stateStore : null,
+        cataloguePageSource: source, publishedCatalogueSource: mode == 'missing publication source' ? null : source)
+        ..chooseCatalogueArea(null, BuyV2CatalogueAreaScope.allAreas)..featuredOffersMoolSocial = false
+        ..commerceLoadState = BuyV2CommerceLoadState.unavailable;
+      final recovery = mode == 'recovery pending' ? buyer.restoreCustomerState() : null;
+      expect(buyer.customerStateRecoveryPending, mode == 'recovery pending');
+      var closed = false;
+      void close() {if (!closed) {closed = true; buyer.dispose(); core.dispose(); source.dispose();}}
+      addTearDown(close);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: BuyV2OffersView(session: buyer, source: const BuyV2CataloguePublishedOffersSource()))));
+      for (var frame = 0; frame < 10; frame++) {await tester.pump(const Duration(milliseconds: 200));}
+      expect(find.byKey(const Key('buy-offers-publisher-coverage')), mode == 'commerce unavailable' ? findsOneWidget : findsNothing);
+      expect(calls, mode == 'commerce unavailable' ? greaterThan(0) : 0);
+      expect(buyer.catalogueAvailable, isFalse); expect(buyer.availablePaymentMethods, isEmpty); expect(buyer.cartLines, isEmpty);
+      expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
+      restored.complete(null); if (recovery != null) await recovery; close();
+    });
+  }
   test('LF04 STORE reader traverses empty filtered page and resolves genuine listing and copy', () async {
     final requests = <Map<String, Object?>>[];
     final transport = OwnerTransport((body) async {

@@ -291,6 +291,7 @@ class BuyV2CataloguePage<T> {
     this.totalCount,
     this.previousCursor,
     this.nextCursor,
+    this.offerCoverage,
   }) : items = List.unmodifiable(items);
 
   final String queryKey;
@@ -300,6 +301,17 @@ class BuyV2CataloguePage<T> {
   final int? totalCount;
   final String? previousCursor;
   final String? nextCursor;
+  /// Null preserves legacy complete-feed contracts. A scoped feed must name
+  /// its connected publishers; its count is not an all-publisher total.
+  final BuyV2OfferCoverage? offerCoverage;
+}
+
+@immutable
+class BuyV2OfferCoverage {
+  BuyV2OfferCoverage(Iterable<BuyV2OfferPublisherType> publishers)
+      : publishers = Set.unmodifiable(publishers);
+  final Set<BuyV2OfferPublisherType> publishers;
+  String get key => (publishers.map((p) => p.name).toList()..sort()).join('|');
 }
 
 /// One source supplies both provider discovery and provider-specific SKU pages.
@@ -505,6 +517,11 @@ class BuyV2PublishedCatalogueOffer {
   /// Optional legacy-compatible publication copy/version, not benefit authority.
   final String? detail;
   final int? revision;
+
+  /// The publication entity is scoped, but independent of its mutable revision
+  /// and product association so conflicting retargets cannot hide in new keys.
+  String get identity => jsonEncode([product.publicListingIdentity?.realm,
+    publisherType.name, publisherId, publicationId]);
 
   bool isCurrent({required DateTime now}) =>
       (revision == null || revision! >= 1 && revision! <= 1000000000) &&

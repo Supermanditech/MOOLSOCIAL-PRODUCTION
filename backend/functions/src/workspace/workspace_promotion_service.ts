@@ -132,13 +132,14 @@ export function planPromotionSave(command: PromotionCommand, profile: WorkspaceP
 
 export class WorkspacePromotionService {
   constructor(private readonly repository: PromotionRepository,
-    private readonly catalogue: Pick<WorkspaceCatalogueService, "publicCatalogue">,
+    private readonly catalogue: Pick<WorkspaceCatalogueService, "publicCatalogue"> & Partial<Pick<WorkspaceCatalogueService, "publicDiscovery">>,
     private readonly now: () => Date = () => new Date()) {}
   /** Endpoint still performs Firebase/default-tenant/AppCheck verification. */
   async handleOperation(userId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     id(userId); body = structuredClone(body);
     if (Buffer.byteLength(JSON.stringify({operation, ...body}), "utf8") > 60000) fail();
     if (operation === "readPublicStorePromotions") return this.publicPage(body);
+    if (operation === "readPublicPromotionDiscovery") return this.publicDiscovery(body);
     if (operation === "listStorePromotions") {
       const query = exact(body, ["storeId", "limit"], ["after"]), storeId = id(query.storeId);
       const limit = integer(query.limit, 1, 20), after = query.after === undefined ? undefined : id(query.after);
@@ -172,7 +173,158 @@ export class WorkspacePromotionService {
     const result = await this.repository.read(storeId, placementId, userId);
     return result && record(result, this.repository.realm, storeId);
   }
-  async publicPage(body: Readonly<Record<string, unknown>>): Promise<PublicPromotionPage> {
+  /** Descriptive placements only. Coverage/counts do not assert platform or
+   * other publisher feeds, geography, discounts, eligibility or redemption. */
+  async publicDiscovery(body: Readonly<Record<string, unknown>>): Promise<object> {
+    exact(body, ["promotionDiscoveryVersion", "query", "pageSize"], ["cursor"]);
+    if (body.promotionDiscoveryVersion !== 1) fail();
+    const raw = exact(body.query, ["search", "categoryId", "publisher", "supplierOnly"]);
+    if (typeof raw.search !== "string" || raw.search.length > 240 || typeof raw.supplierOnly !== "boolean" ||
+        raw.publisher !== null && !["retailer", "manufacturer", "wholesaler", "moolSocial"].includes(String(raw.publisher))) fail();
+    const query = {search: raw.search.trim().toLowerCase().replace(/\s+/gu, " "), categoryId: id(raw.categoryId),
+      publisher: raw.publisher, supplierOnly: raw.supplierOnly};
+    const unavailable = (): never => fail("unavailable", 503);
+    if (!this.catalogue.publicDiscovery || query.publisher !== null && query.publisher !== "retailer") unavailable();
+    const pageSize = integer(body.pageSize, 1, 50);
+    const coverage = {kind: "connected_publishers", publisherTypes: ["retailer"], countBasis: "publications"};
+    // Remove ONLY generated read observations. Persisted SKU observations,
+    // revisions, content and validity remain part of the cohort fingerprint.
+    const stableListing = (value: Record<string, unknown>) => {
+      const copy = structuredClone(value); delete copy.observedAt;
+      const store = copy.publicStore as Record<string, unknown> | undefined;
+      if (store?.details) delete (store.details as Record<string, unknown>).observedAt;
+      for (const row of copy.items as Record<string, unknown>[]) {
+        if (row.supplierPolicy) delete (row.supplierPolicy as Record<string, unknown>).observedAt;
+      }
+      return copy;
+    };
+    const directory = async () => {
+      const rows: Array<{channel: string; listing: Record<string, unknown>}> = [], snapshots: string[] = [];
+      for (const destination of ["shop", "wholesale"]) {
+        const catalogueQuery = {destination, search: "", categoryId: "all", sort: "relevance", brands: [],
+          maximumPriceMinor: null, tradeType: null, listingIds: []};
+        let cursor: string | undefined, snapshot: string | undefined, count = 0, complete = false;
+        const cursors = new Set<string>();
+        for (let pageIndex = 0; pageIndex < 11; pageIndex++) {
+          const page = object(await this.catalogue.publicDiscovery!({discoveryPageVersion: 1,
+            query: catalogueQuery, pageSize: 50, resultKind: "products", ...(cursor ? {cursor} : {})}));
+          const metadata = object(page.page);
+          if (page.schemaVersion !== 1 || page.discoveryPageVersion !== 1 || page.realm !== this.repository.realm ||
+              page.state !== "ready" || page.coverage !== "verified_public_only" || page.directoryCoverage !== "complete_bounded" ||
+              page.orderingAvailable !== false || page.resultKind !== "products" || page.requestedStore !== null ||
+              time(page.observedAt) > this.now().toISOString() || cataloguePayloadHash(page.query) !== cataloguePayloadHash(catalogueQuery) ||
+              !Array.isArray(page.items) || page.items.length > 50 || metadata.startIndex !== count ||
+              snapshot !== undefined && metadata.snapshotId !== snapshot) unavailable();
+          snapshot = text(metadata.snapshotId, 64);
+          const total = integer(metadata.totalCount, 0, 500);
+          for (const rawRow of page.items as unknown[]) {
+            const row = exact(rawRow, ["channel", "listing"]), listing = object(row.listing);
+            if (destination === "shop" ? row.channel !== "retail" : !["wholesale", "bulk"].includes(String(row.channel))) unavailable();
+            id(listing.storeId);
+            if (!Array.isArray(listing.items) || listing.items.length !== 1) unavailable();
+            rows.push({channel: String(row.channel), listing});
+          }
+          const returned = (page.items as unknown[]).length;
+          count += returned;
+          if (count > total || count < total && returned !== 50 || rows.length > 500) unavailable();
+          if (metadata.nextCursor === null) {if (count !== total) unavailable(); complete = true; break;}
+          cursor = text(metadata.nextCursor, 2048);
+          if (!cursors.add(cursor) || count >= total) unavailable();
+        }
+        if (!complete) unavailable();
+        snapshots.push(snapshot!);
+      }
+      const stores = [...new Set(rows.map(row => id(row.listing.storeId)))].sort();
+      if (stores.length > 20) unavailable();
+      return {rows, stores, fingerprint: cataloguePayloadHash([snapshots, rows.map(row => ({channel: row.channel, listing: stableListing(row.listing)}))])};
+    };
+    type Item = {publication: PublicPromotion; listing: Record<string, unknown>};
+    let nextActivation: string | undefined;
+    const cohort = async (catalogue: Awaited<ReturnType<typeof directory>>) => {
+      const items: Item[] = [], keys = new Set<string>();
+      let scanned = 0, scannedRecords = 0;
+      for (const storeId of catalogue.stores) {
+        let after: string | undefined, complete = false;
+        for (let pageIndex = 0; pageIndex < 26; pageIndex++) {
+          const page = await this.publicPage({storeId, limit: 20, ...(after ? {after} : {})}, promotion => {
+            if (++scannedRecords > 500) unavailable();
+            if (promotion.active && promotion.validFrom > this.now().toISOString() &&
+                (nextActivation === undefined || promotion.validFrom < nextActivation)) nextActivation = promotion.validFrom;
+          });
+          if (page.state !== "ready") unavailable();
+          for (const publication of page.items) {
+            const key = cataloguePayloadHash([storeId, publication.publicationId]);
+            if (!keys.add(key) || ++scanned > 500) unavailable();
+            const matches = catalogue.rows.filter(row => row.listing.storeId === storeId &&
+              row.channel === publication.product.channels[0]?.kind &&
+              object((row.listing.items as unknown[])[0]).skuId === publication.product.skuId);
+            if (matches.length !== 1) unavailable();
+            const listing = matches[0]!.listing, sku = object((listing.items as unknown[])[0]);
+            const expected = structuredClone(Object.fromEntries(["skuId", "canonicalProductId", "verifiedPackId", "sku", "revision", "observedAt", "content", "pack"]
+              .filter(k => Object.hasOwn(sku, k)).map(k => [k, sku[k]])));
+            const actual: Record<string, unknown> = structuredClone(publication.product); delete actual.supplierPolicy; delete actual.channels;
+            // publicPage's legacy static-media contract omits frameCount=1.
+            const media = (actual.content as Record<string, unknown>)?.media;
+            const expectedMedia = (expected.content as Record<string, unknown>)?.media;
+            if (Array.isArray(media) && Array.isArray(expectedMedia)) expectedMedia.forEach((value, index) => {
+              const file = (value as Record<string, any>).file, other = (media[index] as Record<string, any> | undefined)?.file;
+              if (file?.frameCount === 1 && other && !Object.hasOwn(other, "frameCount")) delete file.frameCount;
+            });
+            const channel = (sku.channels as Record<string, unknown>[]).find(c => c.kind === publication.product.channels[0]?.kind);
+            if (cataloguePayloadHash(expected) !== cataloguePayloadHash(actual) ||
+                cataloguePayloadHash(channel) !== cataloguePayloadHash(publication.product.channels[0])) unavailable();
+            items.push({publication, listing});
+          }
+          if (page.nextCursor === null) {complete = true; break;}
+          if (after !== undefined && page.nextCursor <= after) unavailable();
+          after = page.nextCursor;
+        }
+        if (!complete) unavailable();
+      }
+      return items;
+    };
+    const stableItems = (items: Item[]) => items.map(({publication, listing}) => {
+      const copy = structuredClone(publication); delete (copy as Partial<PublicPromotion>).observedAt;
+      if (copy.product.supplierPolicy) delete (copy.product.supplierPolicy as Record<string, unknown>).observedAt;
+      return {publication: copy, listing: stableListing(listing)};
+    });
+    const firstDirectory = await directory(), first = await cohort(firstDirectory);
+    const secondDirectory = await directory(), confirmed = await cohort(secondDirectory);
+    const lastDirectory = await directory();
+    if (firstDirectory.fingerprint !== secondDirectory.fingerprint || secondDirectory.fingerprint !== lastDirectory.fingerprint ||
+        cataloguePayloadHash(stableItems(first)) !== cataloguePayloadHash(stableItems(confirmed))) fail("stale_snapshot", 409);
+    const observedAt = this.now().toISOString();
+    if (nextActivation !== undefined && nextActivation <= observedAt ||
+        confirmed.some(item => item.publication.validUntil <= observedAt)) fail("stale_snapshot", 409);
+    const selected = confirmed.filter(({publication, listing}) => {
+      const sku = object((listing.items as unknown[])[0]), content = object(sku.content), pack = object(sku.pack);
+      return (query.categoryId === "all" || content.categoryId === query.categoryId) &&
+        (!query.search || [publication.headline, publication.detail, content.title, content.brand, content.variant, pack.label]
+          .join(" ").toLowerCase().replace(/\s+/gu, " ").includes(query.search));
+    }).sort((a, b) => a.publication.publisherId.localeCompare(b.publication.publisherId) ||
+      a.publication.publicationId.localeCompare(b.publication.publicationId));
+    const snapshotId = cataloguePayloadHash([this.repository.realm, coverage, firstDirectory.fingerprint, stableItems(confirmed)]).toLowerCase();
+    const queryHash = cataloguePayloadHash([this.repository.realm, query, coverage]).toLowerCase();
+    let index = 0;
+    if (body.cursor !== undefined) {
+      const encoded = text(body.cursor, 2048);
+      let cursor: Record<string, unknown>;
+      try {cursor = exact(JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")), ["v", "q", "s", "n", "i"]);} catch {fail();}
+      if (Buffer.from(JSON.stringify(cursor)).toString("base64url") !== encoded || cursor.v !== 1 || cursor.q !== queryHash ||
+          cursor.s !== snapshotId || cursor.n !== pageSize) fail("stale_cursor", 409);
+      index = integer(cursor.i, 0, 500);
+      if (index % pageSize || index >= selected.length) fail("stale_cursor", 409);
+    }
+    const cursorAt = (i: number) => Buffer.from(JSON.stringify({v: 1, q: queryHash, s: snapshotId, n: pageSize, i})).toString("base64url");
+    const result = {schemaVersion: 1, promotionDiscoveryVersion: 1, realm: this.repository.realm, state: "ready", coverage,
+      orderingAvailable: false, observedAt, query, items: selected.slice(index, index + pageSize),
+      page: {snapshotId, startIndex: index, totalCount: selected.length,
+        previousCursor: index === 0 ? null : cursorAt(index - pageSize),
+        nextCursor: index + pageSize < selected.length ? cursorAt(index + pageSize) : null}};
+    if (Buffer.byteLength(JSON.stringify(result), "utf8") > 480 * 1024) unavailable();
+    return result;
+  }
+  async publicPage(body: Readonly<Record<string, unknown>>, observe?: (record: PromotionRecord) => void): Promise<PublicPromotionPage> {
     const query = exact(structuredClone(body), ["storeId", "limit"], ["after"]), storeId = id(query.storeId);
     const limit = integer(query.limit, 1, 20), after = query.after === undefined ? undefined : id(query.after);
     const base = (): Omit<PublicPromotionPage, "state" | "items" | "nextCursor"> => ({schemaVersion: 1,
@@ -183,6 +335,7 @@ export class WorkspacePromotionService {
       const rows = (await this.repository.page(storeId, after, limit)).map(r => record(r, this.repository.realm, storeId));
       const items: PublicPromotion[] = [];
       for (const promotion of rows) {
+        observe?.(promotion);
         let now = this.now().toISOString();
         if (!promotion.active || promotion.observedAt > now || promotion.validFrom > now || promotion.validUntil <= now) continue;
         const response = object(await this.catalogue.publicCatalogue({storeId, skuId: promotion.skuId,

@@ -392,12 +392,17 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
 
   @override
   Widget build(BuildContext context) {
-    if (!session.catalogueAvailable) {
+    if (session.customerStateRecoveryPending) {
       return _OffersAvailabilityState(session: session);
     }
     if (session.pagedOffersEnabled &&
         widget.source is BuyV2CataloguePublishedOffersSource) {
       return _PagedPublishedOffersView(session: session);
+    }
+    // Explicit read-only publication discovery is independent of quotes,
+    // payment methods and order feeds. Existing commercial guards stay intact.
+    if (!session.catalogueAvailable) {
+      return _OffersAvailabilityState(session: session);
     }
     final liveSource = widget.source is BuyV2LivePublishedOffersSource;
     if (!session.reviewDataEnabled && !liveSource) {
@@ -978,13 +983,13 @@ class _PublishedOfferPromotion extends StatefulWidget {
     required this.session,
     required this.entries,
     required this.moolSocial,
-    this.onOpenProduct,
+    this.onOpenPublication,
     this.canOpen,
   });
   final bool moolSocial;
   final BuyV2Session session;
   final List<({BuyV2PublishedOffer offer, BuyV2Product product})> entries;
-  final ValueChanged<BuyV2Product>? onOpenProduct;
+  final void Function(BuyV2Product, BuyV2PublishedOffer)? onOpenPublication;
   final bool Function()? canOpen;
 
   @override
@@ -1179,8 +1184,9 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                         if (!current()) return;
                         widget.session.featuredOfferPublicationId =
                             entry.offer.identity;
-                        final handler = widget.onOpenProduct;
-                        if (handler != null) { handler(product); } else { widget.session.openProduct(product.id); }
+                        final publicationHandler = widget.onOpenPublication;
+                        if (publicationHandler != null) { publicationHandler(product, entry.offer); }
+                        else { widget.session.openProduct(product.id); }
                       }
                       void details() => showDialog<void>(context: context,
                         builder: (dialogContext) => StatefulBuilder(builder: (context, update) => AlertDialog(
@@ -1206,6 +1212,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                         )));
 
                       return Padding(
+                        key: ValueKey('buy-offer-placement-${entry.offer.identity}'),
                         padding: const EdgeInsets.fromLTRB(8, 0, 4, 0),
                         child: Container(
                           key: ValueKey('buy-offer-theme-card-${product.id}'),
@@ -1901,7 +1908,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
     final unfilteredProducts = !publicationCurrent
         ? const <BuyV2Product>[]
         : widget.publishedOffers
-        ? offers.map((offer) => offer.product).toList(growable: false)
+        ? {for (final offer in offers) offer.product.id: offer.product}.values.toList(growable: false)
         : page?.items.cast<BuyV2Product>().toList(growable: false) ??
               const <BuyV2Product>[];
     final products = widget.savedOnly
@@ -1913,12 +1920,15 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
         widget.query.storeId == null &&
         widget.query.areaScope != BuyV2CatalogueAreaScope.allAreas &&
         widget.query.regionId == null;
+    final partialOffers = widget.publishedOffers && page?.offerCoverage?.key == 'retailer';
+    final resultNoun = partialOffers ? 'retailer promotions' : widget.publishedOffers ? 'offers' : 'products';
+    final resultCount = widget.publishedOffers ? offers.length : unfilteredProducts.length;
     final pageControls = _CataloguePageControls(
       scopeKey: widget.scopeKey,
       compactStore: widget.session.isStoreProcurement,
-      noun: widget.publishedOffers ? 'offers' : 'products',
+      noun: resultNoun,
       start: publicationCurrent ? page?.startIndex : null,
-      count: unfilteredProducts.length,
+      count: resultCount,
       total: publicationCurrent ? page?.totalCount : null,
       loading: loading,
       showRange: !widget.controlsAfterProducts,
@@ -1936,16 +1946,16 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
           : null,
       onRefresh: loading ? null : _pager.refresh,
     );
-    final noun = widget.publishedOffers ? 'offers' : 'products';
+    final noun = resultNoun;
     final range = widget.savedOnly
-        ? '${products.length} saved $noun shown'
+        ? '${widget.publishedOffers ? offers.where((offer) => widget.session.isSaved(offer.product.id)).length : products.length} saved $noun shown'
         : page == null || !publicationCurrent
         ? (loading ? 'Loading $noun' : 'Results')
         : products.isEmpty
         ? '0 $noun'
-        : '${_catalogueCount(page.startIndex + 1)}–${_catalogueCount(page.startIndex + products.length)}'
+        : '${_catalogueCount(page.startIndex + 1)}–${_catalogueCount(page.startIndex + resultCount)}'
               '${page.totalCount == null ? '' : ' of ${_catalogueCount(page.totalCount!)}'}'
-              '${widget.publishedOffers ? ' offers' : ''}';
+              '${widget.publishedOffers ? ' $resultNoun' : ''}';
     final canPrevious =
         !widget.savedOnly &&
         !loading &&
@@ -1987,6 +1997,10 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                   key: ValueKey('buy-catalogue-loading'),
                   minHeight: 2,
                 ),
+              if (partialOffers)
+                Padding(key: const ValueKey('buy-offers-publisher-coverage'), padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                  child: Text('Retailer promotions shown. MoolSocial, manufacturer and wholesaler promotions aren’t available here yet.',
+                    style: context.buyBody)),
               if (publicationCurrent &&
                   offers.isNotEmpty &&
                   widget.publicationFacts != null)
@@ -2027,7 +2041,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                   title: widget.savedOnly
                       ? 'No saved offers to show'
                       : widget.publishedOffers
-                      ? 'No matching offers'
+                      ? partialOffers ? 'No matching retailer promotions' : 'No matching offers'
                       : 'No matching products',
                   detail: widget.savedOnly
                       ? 'Browse all offers to find current deals.'
@@ -2157,7 +2171,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                     vertical: 6,
                   ),
                   child: Text(
-                    'All matching ${widget.publishedOffers ? 'offers' : 'products'} are on this or earlier pages.',
+                    'All matching $resultNoun are on this or earlier pages.',
                     style: context.buyMeta,
                   ),
                 ),
@@ -8141,9 +8155,11 @@ class _BuyV2StorePublishedPromotionsState extends State<BuyV2StorePublishedPromo
             productId: offer.product.id, publisherType: offer.publisherType, publisherId: offer.publisherId,
             publisherName: offer.publisherName, publicationId: offer.publicationId, revision: offer.revision,
             headline: offer.headline, detail: offer.detail))],
-          onOpenProduct: (product) {
+          onOpenPublication: (product, selected) {
             final source = _source;
-            final offer = _offers.where((offer) => offer.product.id == product.id).firstOrNull;
+            final offer = _offers.where((offer) => offer.product.id == product.id &&
+              offer.publicationId == selected.publicationId && offer.revision == selected.revision &&
+              offer.publisherId == selected.publisherId && offer.publisherType == selected.publisherType).firstOrNull;
             if (!_current || source == null || offer == null || !widget.session.admitStorePromotion(source, offer)) return;
             widget.onOpenProduct(product);
           })]);
