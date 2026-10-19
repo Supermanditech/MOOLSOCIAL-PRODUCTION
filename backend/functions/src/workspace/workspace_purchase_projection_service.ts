@@ -143,6 +143,33 @@ export interface OrderCompletionAcknowledgment extends OperationalScope {
   state: "recorded";
   completion: {id: string; revision: string; outcome: "delivered" | "collected"; occurredAt: string; recordedAt: string};
 }
+/** Private eligible purchased context, not a published review or save permission. */
+export interface ProductFeedbackTarget extends PurchaseReference {
+  id: string; kind: "product"; orderLineId: string; productId: string; productLabel: string;
+  purchasedListing: OriginalPublicListing; completedAt: string; completionId: string; completionRevision: string;
+}
+interface StoredProductFeedbackTarget {
+  schemaVersion: 1; realm: Realm; authNamespace: "firebase-default"; buyerUserId: string;
+  target: ProductFeedbackTarget; integrity: string;
+}
+export interface ProductFeedbackTargetPage {
+  schemaVersion: 1; realm: Realm; authNamespace: "firebase-default";
+  viewerRole: "buyer"; viewerUserId: string; coverage: "indexed_recorded_completions";
+  targets: ProductFeedbackTarget[]; nextCursor: string | null;
+}
+/** Private retailer improvement signal. Never a public review/aggregate. */
+export interface ProductStars {
+  target: ProductFeedbackTarget; stars: number; revision: number; updatedAt: string;
+}
+interface StoredProductStars {
+  schemaVersion: 1; realm: Realm; authNamespace: "firebase-default";
+  buyerUserId: string; storeId: string; rating: ProductStars; integrity: string;
+}
+export interface ProductStarsResult {
+  schemaVersion: 1; realm: Realm; authNamespace: "firebase-default";
+  viewerRole: "buyer"; viewerUserId: string; operationId: string;
+  state: "saved" | "not_recorded"; rating: ProductStars | null;
+}
 export function normalizeOrderCompletion(value: unknown, realm: Realm, now: Date): TrustedOrderCompletionEvidence {
   const r = exact(value, ["schemaVersion", "realm", "authNamespace", "issuer", "receiptId", "revision",
     "purchaseId", "storeId", "orderId", "originalFingerprint", "sourceRevision", "operationalSourceRevision",
@@ -272,7 +299,189 @@ export class WorkspaceOrderOperationsService {
       completion: {id: `completion-${digest([p.issuer, p.receiptId])}`, revision: p.revision,
         outcome: p.outcome, occurredAt: p.occurredAt, recordedAt: saved.recordedAt}};
   }
-  /** Internal trusted-source materializer only. There is deliberately no HTTP write operation. */
+  private productFeedbackTargets(a: PurchaseAggregate, o: StoredOrder, saved: StoredOrderCompletion): StoredProductFeedbackTarget[] {
+    if (o.factsVersion !== 6) return [];
+    const completion = this.completionAck(saved).completion;
+    return o.original.lines.flatMap(line => {
+      if (!line.publicListing) return [];
+      const target: ProductFeedbackTarget = {id: `feedback-${digest([1, this.realm, "firebase-default", a.buyerUserId,
+        a.purchaseId, o.storeId, o.orderId, line.lineId, o.originalFingerprint, a.sourceRevision, line.name,
+        line.publicListing.listingId, line.publicListing.skuId, line.publicListing.canonicalProductId,
+        line.publicListing.verifiedPackId, line.publicListing.channel, completion.id, completion.revision, completion.occurredAt])}`,
+      kind: "product", purchaseId: a.purchaseId, storeId: o.storeId, orderId: o.orderId,
+      orderLineId: line.lineId, productId: line.publicListing.listingId, productLabel: line.name,
+      originalFingerprint: o.originalFingerprint, sourceRevision: a.sourceRevision,
+      purchasedListing: line.publicListing, completedAt: completion.occurredAt,
+      completionId: completion.id, completionRevision: completion.revision};
+      const body = {schemaVersion: 1 as const, realm: this.realm, authNamespace: "firebase-default" as const,
+        buyerUserId: a.buyerUserId, target};
+      return [{...body, integrity: integrityHash(body)}];
+    });
+  }
+  private async indexProductFeedback(tx: Transaction, a: PurchaseAggregate, o: StoredOrder, saved: StoredOrderCompletion): Promise<void> {
+    const targets = this.productFeedbackTargets(a, o, saved);
+    if (!targets.length) return;
+    // At most100 lines in one Store order: <=100 target writes plus3 completion
+    // receipts. Read all candidates before writing, including accepted replay repair.
+    const paths = targets.map(t => this.root().collection("productFeedbackTargets").doc(t.target.id));
+    const docs = await tx.getAll(...paths);
+    for (const [i, doc] of docs.entries()) {
+      if (doc.exists && integrityHash(doc.data()) !== integrityHash(targets[i])) fail("invalid_state", 409);
+    }
+    for (const [i, doc] of docs.entries()) if (!doc.exists) tx.create(paths[i]!, targets[i]!);
+  }
+  async listBuyerProductFeedbackTargets(actor: string, body: Readonly<Record<string, unknown>>): Promise<ProductFeedbackTargetPage> {
+    id(actor); exact(body, ["limit", "cursor"]);
+    const limit = integer(body.limit, 5, 1), scope = digest([1, this.realm, "firebase-default", actor, "product-feedback"]);
+    let after: string | undefined;
+    if (body.cursor !== null) {
+      try {
+        const token = text(body.cursor, 512);
+        const parsed = exact(JSON.parse(Buffer.from(token, "base64url").toString("utf8")), ["version", "scope", "after"]);
+        if (parsed.version !== 1 || parsed.scope !== scope || !/^feedback-[a-f0-9]{64}$/u.test(String(parsed.after)) ||
+            typeof parsed.after !== "string" || Buffer.from(JSON.stringify(parsed)).toString("base64url") !== token) fail();
+        after = parsed.after;
+      } catch {fail();}
+    }
+    return this.db.runTransaction(async tx => {
+      let query = this.root().collection("productFeedbackTargets").where("buyerUserId", "==", actor)
+        .orderBy(FieldPath.documentId()).limit(limit);
+      if (after) query = query.startAfter(after);
+      const docs = await tx.get(query), targets: ProductFeedbackTarget[] = [];
+      for (const doc of docs.docs) {
+        const raw = exact(doc.data(), ["schemaVersion", "realm", "authNamespace", "buyerUserId", "target", "integrity"]);
+        if (raw.schemaVersion !== 1 || raw.realm !== this.realm || raw.authNamespace !== "firebase-default" || raw.buyerUserId !== actor) {
+          fail("invalid_state", 409);
+        }
+        const target = obj(raw.target);
+        const {aggregate, order} = await this.original(tx, operationalScope(target));
+        if (aggregate.buyerUserId !== actor) fail("not_found", 404);
+        const terminal = await tx.get(this.completionPath({purchaseId: aggregate.purchaseId, storeId: order.storeId, orderId: order.orderId}));
+        if (!terminal.exists) fail("invalid_state", 409);
+        const saved = this.completionStored(terminal.data()); this.completionBound(saved, aggregate, order);
+        const expected = this.productFeedbackTargets(aggregate, order, saved).find(t => t.target.id === doc.id);
+        if (!expected || integrityHash(raw) !== integrityHash(expected)) fail("invalid_state", 409);
+        targets.push(expected.target);
+      }
+      const last = docs.size === limit ? docs.docs.at(-1)?.id : undefined;
+      return {schemaVersion: 1, realm: this.realm, authNamespace: "firebase-default", viewerRole: "buyer", viewerUserId: actor,
+        coverage: "indexed_recorded_completions", targets,
+        nextCursor: last ? Buffer.from(JSON.stringify({version: 1, scope, after: last})).toString("base64url") : null};
+    });
+  }
+  private async feedbackTarget(tx: Transaction, targetId: string) {
+    if (!/^feedback-[a-f0-9]{64}$/u.test(targetId)) fail();
+    const doc = await tx.get(this.root().collection("productFeedbackTargets").doc(targetId));
+    if (!doc.exists) fail("not_found", 404);
+    const raw = exact(doc.data(), ["schemaVersion", "realm", "authNamespace", "buyerUserId", "target", "integrity"]);
+    const {aggregate, order} = await this.original(tx, operationalScope(obj(raw.target)));
+    const terminal = await tx.get(this.completionPath({purchaseId: aggregate.purchaseId, storeId: order.storeId, orderId: order.orderId}));
+    if (!terminal.exists) fail("invalid_state", 409);
+    const saved = this.completionStored(terminal.data()); this.completionBound(saved, aggregate, order);
+    const expected = this.productFeedbackTargets(aggregate, order, saved).find(t => t.target.id === targetId);
+    if (!expected || integrityHash(raw) !== integrityHash(expected)) fail("invalid_state", 409);
+    return {target: expected.target, aggregate, order};
+  }
+  private starsStored(raw: unknown, target: ProductFeedbackTarget, buyerUserId: string): StoredProductStars {
+    try {
+      const r = exact(raw, ["schemaVersion", "realm", "authNamespace", "buyerUserId", "storeId", "rating", "integrity"]);
+      const rating = exact(r.rating, ["target", "stars", "revision", "updatedAt"]), {integrity, ...body} = r;
+      if (r.schemaVersion !== 1 || r.realm !== this.realm || r.authNamespace !== "firebase-default" ||
+          r.buyerUserId !== buyerUserId || r.storeId !== target.storeId || integrity !== integrityHash(body) ||
+          integrityHash(rating.target) !== integrityHash(target) || timestamp(rating.updatedAt) < target.completedAt ||
+          timestamp(rating.updatedAt) > this.now().toISOString()) fail();
+      integer(rating.stars, 5, 1); integer(rating.revision, Number.MAX_SAFE_INTEGER, 1);
+      return r as unknown as StoredProductStars;
+    } catch {return fail("invalid_state", 409);}
+  }
+  async readBuyerProductStars(actor: string, body: Readonly<Record<string, unknown>>): Promise<ProductStars | null> {
+    id(actor); exact(body, ["targetId"]); const targetId = id(body.targetId);
+    return this.db.runTransaction(async tx => {
+      const {target, aggregate} = await this.feedbackTarget(tx, targetId);
+      if (aggregate.buyerUserId !== actor) fail("not_found", 404);
+      const doc = await tx.get(this.root().collection("productStarRatings").doc(targetId));
+      return doc.exists ? this.starsStored(doc.data(), target, actor).rating : null;
+    });
+  }
+  async submitProductStars(actor: string, body: Readonly<Record<string, unknown>>, reconcile = false): Promise<ProductStarsResult> {
+    id(actor); const r = exact(body, ["targetId", "expectedRevision", "operationId", "stars"]);
+    const targetId = id(r.targetId), operationId = id(r.operationId), stars = integer(r.stars, 5, 1);
+    const expectedRevision = integer(r.expectedRevision, Number.MAX_SAFE_INTEGER - 1);
+    const commandFingerprint = integrityHash({realm: this.realm, actor, targetId, operationId, expectedRevision, stars});
+    const receiptPath = this.root().collection("productStarReceipts").doc(digest([actor, targetId, operationId]));
+    return this.db.runTransaction(async tx => {
+      const {target, aggregate} = await this.feedbackTarget(tx, targetId);
+      if (aggregate.buyerUserId !== actor) fail("not_found", 404);
+      const receipt = await tx.get(receiptPath);
+      if (receipt.exists) {
+        const saved = exact(receipt.data(), ["schemaVersion", "realm", "authNamespace", "buyerUserId", "commandFingerprint", "result", "integrity"]);
+        const {integrity, ...receiptBody} = saved;
+        if (saved.schemaVersion !== 1 || saved.realm !== this.realm || saved.authNamespace !== "firebase-default" ||
+            saved.buyerUserId !== actor || integrity !== integrityHash(receiptBody)) fail("invalid_state", 409);
+        if (saved.commandFingerprint !== commandFingerprint) fail("conflict", 409);
+        const result = exact(saved.result, ["schemaVersion", "realm", "authNamespace", "viewerRole", "viewerUserId", "operationId", "state", "rating"]);
+        const rating = obj(result.rating);
+        if (result.schemaVersion !== 1 || result.realm !== this.realm || result.authNamespace !== "firebase-default" ||
+            result.viewerRole !== "buyer" || result.viewerUserId !== actor || result.operationId !== operationId ||
+            result.state !== "saved" || rating.stars !== stars || rating.revision !== expectedRevision + 1) fail("invalid_state", 409);
+        const ratingBody = {schemaVersion: 1 as const, realm: this.realm, authNamespace: "firebase-default" as const,
+          buyerUserId: actor, storeId: target.storeId, rating};
+        this.starsStored({...ratingBody, integrity: integrityHash(ratingBody)}, target, actor);
+        return result as unknown as ProductStarsResult;
+      }
+      const base = {schemaVersion: 1 as const, realm: this.realm, authNamespace: "firebase-default" as const,
+        viewerRole: "buyer" as const, viewerUserId: actor, operationId};
+      // Reconciliation observes only the original attempt. It never submits it.
+      if (reconcile) return {...base, state: "not_recorded", rating: null};
+      const ratingPath = this.root().collection("productStarRatings").doc(targetId), existing = await tx.get(ratingPath);
+      const previous = existing.exists ? this.starsStored(existing.data(), target, actor).rating : null;
+      if ((previous?.revision ?? 0) !== expectedRevision) fail("conflict", 409);
+      const rating: ProductStars = {target, stars, revision: expectedRevision + 1, updatedAt: this.now().toISOString()};
+      const ratingBody = {schemaVersion: 1 as const, realm: this.realm, authNamespace: "firebase-default" as const,
+        buyerUserId: actor, storeId: target.storeId, rating};
+      this.starsStored({...ratingBody, integrity: integrityHash(ratingBody)}, target, actor);
+      const result: ProductStarsResult = {...base, state: "saved", rating};
+      const receiptBody = {schemaVersion: 1 as const, realm: this.realm, authNamespace: "firebase-default" as const,
+        buyerUserId: actor, commandFingerprint, result};
+      tx.set(ratingPath, {...ratingBody, integrity: integrityHash(ratingBody)});
+      tx.create(receiptPath, {...receiptBody, integrity: integrityHash(receiptBody)});
+      return result;
+    });
+  }
+  async listStoreProductStars(actor: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    id(actor); exact(body, ["storeId", "limit", "cursor"]);
+    const storeId = id(body.storeId), limit = integer(body.limit, 5, 1);
+    const scope = digest([1, this.realm, "firebase-default", actor, storeId, "product-stars"]);
+    let after: string | undefined;
+    if (body.cursor !== null) {
+      try {
+        const token = text(body.cursor, 512), parsed = exact(JSON.parse(Buffer.from(token, "base64url").toString("utf8")), ["version", "scope", "after"]);
+        if (parsed.version !== 1 || parsed.scope !== scope || typeof parsed.after !== "string" ||
+            !/^feedback-[a-f0-9]{64}$/u.test(parsed.after) || Buffer.from(JSON.stringify(parsed)).toString("base64url") !== token) fail();
+        after = parsed.after;
+      } catch {fail();}
+    }
+    return this.db.runTransaction(async tx => {
+      const profiles = await tx.get(this.db.collection("workspaceProfiles").where("workspaceId", "==", storeId).limit(2));
+      if (profiles.size !== 1) fail("not_found", 404);
+      const profile = profiles.docs[0]!;
+      requireStore(profile.data(), {caseId: profile.id, storeId, ownerUserId: actor}, false);
+      let query = this.root().collection("productStarRatings").where("storeId", "==", storeId).orderBy(FieldPath.documentId()).limit(limit);
+      if (after) query = query.startAfter(after);
+      const docs = await tx.get(query), ratings: ProductStars[] = [];
+      for (const doc of docs.docs) {
+        const {target, aggregate, order} = await this.feedbackTarget(tx, doc.id);
+        if (target.storeId !== storeId) fail("invalid_state", 409);
+        await this.seller(tx, order, actor);
+        ratings.push(this.starsStored(doc.data(), target, aggregate.buyerUserId).rating);
+      }
+      const last = docs.size === limit ? docs.docs.at(-1)?.id : undefined;
+      return {schemaVersion: 1, realm: this.realm, authNamespace: "firebase-default", viewerRole: "seller", viewerUserId: actor,
+        storeId, coverage: "recorded_private_product_stars", ratings,
+        nextCursor: last ? Buffer.from(JSON.stringify({version: 1, scope, after: last})).toString("base64url") : null};
+    });
+  }
+  /** Internal trusted-source materializer only. There is deliberately no HTTP completion write operation. */
   async recordCompletion(reference: string): Promise<OrderCompletionAcknowledgment> {
     id(reference);
     const source = this.completionSource;
@@ -286,6 +495,7 @@ export class WorkspaceOrderOperationsService {
       if (saved.referenceDigest !== referenceDigest || saved.proof.issuer !== issuer) fail("invalid_state", 409);
       const {aggregate, order} = await this.original(tx, saved.proof);
       this.completionBound(saved, aggregate, order);
+      await this.indexProductFeedback(tx, aggregate, order, saved);
       return this.completionAck(saved);
     };
     // Reconciliation of the original reference does not call a missing/changed
@@ -310,6 +520,7 @@ export class WorkspaceOrderOperationsService {
       const receiptPath = this.root().collection("completionReceipts").doc(`source-${digest([issuer, proof.receiptId])}`);
       const existingOrder = await tx.get(this.completionPath(proof)), existingReceipt = await tx.get(receiptPath);
       if (existingOrder.exists || existingReceipt.exists) fail("conflict", 409);
+      await this.indexProductFeedback(tx, aggregate, order, saved);
       tx.create(this.completionPath(proof), saved); tx.create(commandPath, saved); tx.create(receiptPath, saved);
       return this.completionAck(saved);
     });

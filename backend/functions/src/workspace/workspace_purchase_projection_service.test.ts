@@ -27,6 +27,10 @@ test("completion has an explicit internal producer and separate authorized reade
   assert.equal(typeof Reflect.get(WorkspaceOrderOperationsService.prototype, "readCompletion"), "function");
 });
 
+test("LF-FEEDBACK exact completed product targets have a private authenticated discovery surface", () => {
+  assert.equal(typeof Reflect.get(WorkspaceOrderOperationsService.prototype, "listBuyerProductFeedbackTargets"), "function");
+});
+
 function completionEvidence(): TrustedOrderCompletionEvidence {
   return {schemaVersion: 1, realm: "evaluation", authNamespace: "firebase-default", issuer: "trusted-fulfilment",
     receiptId: "completion-receipt", revision: "completion-v1", purchaseId: "purchase-one", storeId: "store-one", orderId: "order-one",
@@ -442,10 +446,12 @@ for (const [fault, mutate] of Object.entries<(input: ReturnType<typeof publicLis
 });
 
 for (const allNull of [false, true]) {
-test(`LF-LISTING actual persisted originals preserve explicit provenance across restart allNull=${allNull}`, {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+test(`LF-LISTING actual persisted originals preserve explicit provenance across restart allNull=${allNull}`, {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async (t) => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
-  const app = initializeApp({projectId: allNull ? "demo-lf-listing-null" : "demo-lf-listing"}, `listing-${randomUUID()}`), db = getFirestore(app);
-  const value = publicListingReceipt(); value.receiptId = `receipt-${randomUUID()}`;
+  // Isolated demo project per run: historical fixtures must not populate this
+  // Store's private paginated feed or contend with another test's transactions.
+  const app = initializeApp({projectId: `demo-lf-listing-${randomUUID().slice(0, 8)}`}, `listing-${randomUUID()}`), db = getFirestore(app);
+  const value = publicListingReceipt(); value.receiptId = `receipt-${randomUUID()}`; value.buyerUserId = `buyer-${randomUUID()}`;
   if (allNull) for (const store of value.stores) for (const line of store.lines) line.publicListing = null;
   for (const store of value.stores) await db.collection("workspaceProfiles").doc(store.caseId).set({
     schemaVersion: 1, caseId: store.caseId, workspaceId: store.storeId, ownerUserId: store.ownerUserId,
@@ -491,7 +497,90 @@ test(`LF-LISTING actual persisted originals preserve explicit provenance across 
     await operations.initialize("listing-operation");
     const operational = await operations.read(value.buyerUserId, "buyer", scope);
     assert.equal(operational.originalFactsVersion, 6); assert.deepEqual(operational.original, first.original);
-    assert.equal((await operations.recordCompletion("listing-completion")).state, "recorded");
+    assert.deepEqual((await operations.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 5, cursor: null})).targets, []);
+    const completionReference = `listing-completion-${buyer.purchaseId}`;
+    const completed = await operations.recordCompletion(completionReference);
+    assert.equal(completed.state, "recorded");
+    assert.equal(completed.purchaseId, buyer.purchaseId);
+    assert.equal(completed.orderId, first.orderId);
+    const targets = await operations.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 1, cursor: null});
+    assert.equal(targets.coverage, "indexed_recorded_completions");
+    assert.equal(targets.targets.length, allNull ? 0 : 1);
+    assert.deepEqual((await operations.listBuyerProductFeedbackTargets("unrelated-buyer", {limit: 5, cursor: null})).targets, []);
+    await assert.rejects(operations.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 6, cursor: null}), rejectsCode("invalid_input"));
+    await assert.rejects(operations.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 1, cursor: null, buyerUserId: value.buyerUserId}), rejectsCode("invalid_input"));
+    if (!allNull) {
+      const target = targets.targets[0]!;
+      const purchased = first.original.lines.find(line => line.lineId === target.orderLineId)!;
+      assert.deepEqual(target.purchasedListing, purchased.publicListing);
+      assert.equal(target.completionId, completed.completion.id);
+      assert.equal(target.productLabel, purchased.name);
+      assert.equal(target.originalFingerprint, first.originalFingerprint);
+      assert.equal(Object.hasOwn(target, "buyerUserId"), false);
+      assert.equal(Object.hasOwn(target, "customerLabel"), false);
+      const starCommand = {targetId: target.id, expectedRevision: 0, operationId: "stars-first", stars: 1};
+      t.diagnostic("private stars: target validated; checking read-only reconcile and payload rejection");
+      const root = db.collection("workspacePurchaseProjections").doc("evaluation");
+      const receiptCount = (await root.collection("productStarReceipts").get()).size;
+      assert.equal((await operations.submitProductStars(value.buyerUserId, starCommand, true)).state, "not_recorded");
+      assert.equal((await root.collection("productStarReceipts").get()).size, receiptCount);
+      assert.equal(await operations.readBuyerProductStars(value.buyerUserId, {targetId: target.id}), null);
+      await assert.rejects(operations.submitProductStars("unrelated-buyer", starCommand), rejectsCode("not_found"));
+      for (const stars of [0, 6, 1.5, "5", null]) {
+        await assert.rejects(operations.submitProductStars(value.buyerUserId, {...starCommand, stars}), rejectsCode("invalid_input"));
+      }
+      for (const extra of [{comment: "not collected"}, {storeId: first.storeId}, {public: true}]) {
+        await assert.rejects(operations.submitProductStars(value.buyerUserId, {...starCommand, ...extra}), rejectsCode("invalid_input"));
+      }
+      t.diagnostic("private stars: reconcile and invalid payloads passed; starting concurrent same-key save");
+      const [starOne, replayOne] = await Promise.all([operations.submitProductStars(value.buyerUserId, starCommand),
+        operations.submitProductStars(value.buyerUserId, starCommand)]);
+      t.diagnostic("private stars: concurrent original attempt accepted");
+      assert.deepEqual(starOne, replayOne); assert.equal(starOne.rating!.stars, 1);
+      const restart = new WorkspaceOrderOperationsService(db, "evaluation");
+      assert.deepEqual(await restart.submitProductStars(value.buyerUserId, starCommand, true), starOne);
+      for (let stars = 2; stars <= 5; stars++) {
+        const next = await restart.submitProductStars(value.buyerUserId, {...starCommand,
+          operationId: `stars-edit-${stars}`, expectedRevision: stars - 1, stars});
+        assert.equal(next.rating!.stars, stars); assert.equal(next.rating!.revision, stars);
+      }
+      // Historical original receipt stays1star, even after later five-star edit.
+      assert.deepEqual(await restart.submitProductStars(value.buyerUserId, starCommand), starOne);
+      await assert.rejects(restart.submitProductStars(value.buyerUserId, {...starCommand, stars: 2}), rejectsCode("conflict"));
+      await assert.rejects(restart.submitProductStars(value.buyerUserId, {...starCommand, operationId: "stale-edit"}), rejectsCode("conflict"));
+      assert.equal((await restart.readBuyerProductStars(value.buyerUserId, {targetId: target.id}))!.stars, 5);
+      const downgraded = await restart.submitProductStars(value.buyerUserId, {...starCommand, operationId: "stars-lower", expectedRevision: 5, stars: 1});
+      assert.equal(downgraded.rating!.stars, 1);
+      const sellerStars = await restart.listStoreProductStars(value.stores[0].ownerUserId, {storeId: first.storeId, limit: 5, cursor: null});
+      t.diagnostic("private stars: all1-5 values and Store readback accepted");
+      const sellerPage = sellerStars as {ratings: {stars: number; target: {id: string}}[]};
+      assert.equal(sellerPage.ratings.find(r => r.target.id === target.id)!.stars, 1);
+      assert.equal(JSON.stringify(sellerStars).includes(value.buyerUserId), false);
+      assert.equal(JSON.stringify(sellerStars).includes("comment"), false);
+      await assert.rejects(restart.listStoreProductStars(value.stores[1].ownerUserId,
+        {storeId: first.storeId, limit: 5, cursor: null}), rejectsCode("not_found"));
+      const ratingPath = root.collection("productStarRatings").doc(target.id), frozenStars = (await ratingPath.get()).data()!;
+      await ratingPath.update({"rating.stars": 4});
+      await assert.rejects(restart.readBuyerProductStars(value.buyerUserId, {targetId: target.id}), rejectsCode("invalid_state"));
+      await assert.rejects(restart.listStoreProductStars(value.stores[0].ownerUserId,
+        {storeId: first.storeId, limit: 5, cursor: null}), rejectsCode("invalid_state"));
+      await ratingPath.set(frozenStars);
+      console.log(`LF_PRIVATE_PRODUCT_STARS=${JSON.stringify({target, buyer: downgraded, seller: sellerStars})}`);
+      await assert.rejects(operations.listBuyerProductFeedbackTargets("unrelated-buyer", {limit: 1, cursor: targets.nextCursor}), rejectsCode("invalid_input"));
+      const path = db.collection("workspacePurchaseProjections").doc("evaluation").collection("productFeedbackTargets").doc(target.id);
+      const frozen = (await path.get()).data()!;
+      await path.update({"target.productLabel": "tampered"});
+      await assert.rejects(operations.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 1, cursor: null}), rejectsCode("invalid_state"));
+      await assert.rejects(operations.recordCompletion(completionReference), rejectsCode("invalid_state"));
+      await path.set(frozen);
+      await path.delete();
+      const offline = new WorkspaceOrderOperationsService(db, "evaluation", undefined, () => new Date(),
+        {issuer: "trusted-fulfilment", readCompletion: async () => {throw new Error("accepted reference must not call source");}});
+      assert.deepEqual(await offline.recordCompletion(completionReference), completed);
+      assert.deepEqual((await path.get()).data(), frozen);
+      assert.deepEqual(await offline.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 1, cursor: null}), targets);
+    }
+    console.log(`LF_PRODUCT_TARGET_PROJECTION=${JSON.stringify(targets)}`);
     assert.deepEqual((await operations.read(value.buyerUserId, "buyer", scope)).original, first.original);
     console.log(`LF_LISTING_PROJECTION=${JSON.stringify({buyer, seller, operational})}`);
     await db.collection("workspaceProfiles").doc(value.stores[0].caseId).update({status: "suspended"});
@@ -500,6 +589,51 @@ test(`LF-LISTING actual persisted originals preserve explicit provenance across 
   } finally {await db.terminate(); await deleteApp(app);}
 });
 }
+
+test("LF-FEEDBACK private stars have submit/reconcile and retailer reader surfaces", () => {
+  assert.equal(typeof Reflect.get(WorkspaceOrderOperationsService.prototype, "submitProductStars"), "function");
+  assert.equal(typeof Reflect.get(WorkspaceOrderOperationsService.prototype, "listStoreProductStars"), "function");
+});
+
+test("LF-FEEDBACK collected maximum100-line Store completion creates bounded exact targets atomically", {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+  const app = initializeApp({projectId: "demo-lf-feedback-max"}, `feedback-${randomUUID()}`), db = getFirestore(app);
+  const value = publicListingReceipt(), store = value.stores[0], base = store.lines[0], suffix = randomUUID();
+  value.stores = [store]; value.receiptId = `max-${suffix}`; value.buyerUserId = `buyer-${suffix}`;
+  store.caseId = `case-${suffix}`;
+  store.lines = Array.from({length: 100}, (_, i) => {
+    const skuId = `sku-${i.toString().padStart(3, "0")}`;
+    return {...base, sourceLineId: `source-${skuId}`, skuId, scheduledFulfilment: null,
+      publicListing: {...base.publicListing, skuId,
+        listingId: `listing-${createHash("sha256").update(JSON.stringify([1, "evaluation", store.storeId, skuId, "retail"])).digest("hex")}`}};
+  });
+  const items = store.lines.reduce((sum: number, line: {lineTotalMinor: number}) => sum + line.lineTotalMinor, 0);
+  store.totals = {itemsMinor: items, discountMinor: 0, taxMinor: 0, deliveryMinor: 0, freightMinor: 0, paymentFeeMinor: 0, tipMinor: 0, totalMinor: items};
+  store.benefitAttribution = {schemaVersion: 1, components: []};
+  await db.collection("workspaceProfiles").doc(store.caseId).set({schemaVersion: 1, caseId: store.caseId,
+    workspaceId: store.storeId, ownerUserId: store.ownerUserId, familyId: "products-trade", profileId: "retailer-grocery", status: "live", shopEnabled: true});
+  try {
+    const originals = new WorkspacePurchaseProjectionService(db, "evaluation", {readFinalPlacement: async () => value});
+    const made = await originals.materialize("max-placed"), buyer = await originals.readBuyer(value.buyerUserId, {purchaseId: made.purchaseId});
+    const order = buyer.orders[0]!, scope = {purchaseId: buyer.purchaseId, storeId: order.storeId, orderId: order.orderId};
+    const service = new WorkspaceOrderOperationsService(db, "evaluation", {readOperationalOrder: async () => ({...operationalEvidence(), ...scope,
+      originalFingerprint: order.originalFingerprint, sourceRevision: buyer.sourceRevision, fulfilment: "collection", initialStage: "Ready", allowedActions: []})},
+    () => new Date("2026-10-16T12:00:00.000Z"), {issuer: "trusted-fulfilment", readCompletion: async () => ({...completionEvidence(), ...scope,
+      receiptId: `completion-${suffix}`, originalFingerprint: order.originalFingerprint, sourceRevision: buyer.sourceRevision,
+      outcome: "collected", operationalRevision: 1})});
+    await service.initialize("max-ready");
+    const [one, two] = await Promise.all([service.recordCompletion(`max-complete-${suffix}`), service.recordCompletion(`max-complete-${suffix}`)]);
+    assert.deepEqual(one, two);
+    assert.equal(one.purchaseId, buyer.purchaseId);
+    const root = db.collection("workspacePurchaseProjections").doc("evaluation");
+    assert.equal((await root.collection("productFeedbackTargets").where("buyerUserId", "==", value.buyerUserId).get()).size, 100);
+    const page = await service.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 5, cursor: null});
+    assert.equal(page.targets.length, 5); assert.ok(page.nextCursor);
+    const next = await service.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 5, cursor: page.nextCursor});
+    assert.equal(next.targets.length, 5);
+    assert.equal(new Set([...page.targets, ...next.targets].map(t => t.id)).size, 10);
+    assert.equal((await originals.readBuyer(value.buyerUserId, {purchaseId: made.purchaseId})).orders[0]!.original.totals.totalMinor, items);
+  } finally {await db.terminate(); await deleteApp(app);}
+});
 
 function scheduledReceipt() {
   const value = JSON.parse(JSON.stringify(variantReceipt()));

@@ -613,6 +613,53 @@ class WorkspaceOrderCompletion {
   int get hashCode => Object.hash(id, revision, outcome, occurredAt, recordedAt);
 }
 
+/// Exact private purchased-product context, not a published rating or consent.
+class WorkspaceProductFeedbackTarget {
+  const WorkspaceProductFeedbackTarget._({required this.id, required this.reference,
+    required this.orderLineId, required this.productId, required this.productLabel,
+    required this.purchasedListing, required this.completedAt, required this.completionId, required this.completionRevision});
+  final String id, orderLineId, productId, productLabel, completionId, completionRevision;
+  final WorkspacePurchaseReference reference;
+  final BuyV2PublicListingIdentity purchasedListing;
+  final DateTime completedAt;
+  Map<String, Object?> toJson() => {'id': id, 'kind': 'product', 'purchaseId': reference.purchaseId,
+    'storeId': reference.storeId, 'orderId': reference.orderId, 'orderLineId': orderLineId,
+    'productId': productId, 'productLabel': productLabel, 'originalFingerprint': reference.originalFingerprint,
+    'sourceRevision': reference.sourceRevision, 'purchasedListing': purchasedListing.toJson(),
+    'completedAt': completedAt.toUtc().toIso8601String(), 'completionId': completionId, 'completionRevision': completionRevision};
+}
+
+/// Private stars only; deliberately contains no comment, author or public count.
+class WorkspaceProductStars {
+  const WorkspaceProductStars._({required this.target, required this.stars, required this.revision, required this.updatedAt});
+  final WorkspaceProductFeedbackTarget target;
+  final int stars, revision;
+  final DateTime updatedAt;
+}
+class WorkspaceProductStarsResult {
+  const WorkspaceProductStarsResult._({required this.operationId, required this.rating});
+  final String operationId;
+  // Null is an explicitly observed missing original receipt, not a failed read.
+  final WorkspaceProductStars? rating;
+}
+class WorkspaceStoreProductStarsPage {
+  WorkspaceStoreProductStarsPage._({required this.storeId, required List<WorkspaceProductStars> ratings,
+    required this.nextCursor}) : ratings = List.unmodifiable(ratings);
+  final String storeId;
+  final List<WorkspaceProductStars> ratings;
+  final String? nextCursor;
+}
+
+/// This bounded index covers recorded exact-product completions only. It is not
+/// publication consent, a public rating, nor complete historical purchase coverage.
+class WorkspaceProductFeedbackTargetPage {
+  WorkspaceProductFeedbackTargetPage._({required this.realm, required this.viewerUserId,
+    required List<WorkspaceProductFeedbackTarget> targets, required this.nextCursor}) : targets = List.unmodifiable(targets);
+  final String realm, viewerUserId;
+  final List<WorkspaceProductFeedbackTarget> targets;
+  final String? nextCursor;
+}
+
 /// Explicit operational adapter; the composed identity reader stays read-only.
 /// No automatic retries. The existing Store journal/controller owns command
 /// persistence and uncertain-attempt recovery before this adapter is bound.
@@ -855,6 +902,147 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
       }
       return WorkspaceOrderCompletionSnapshot._(reference: reference, realm: realm, viewerRole: role,
         viewerUserId: identity.accountUserId, completion: completion);
+    } on Object {return null;}
+  }
+
+  Future<WorkspaceProductFeedbackTargetPage?> listProductFeedbackTargets({required String realm, String? cursor}) async {
+    if (!isCurrent || !const ['evaluation', 'production'].contains(realm) ||
+        cursor != null && (cursor.isEmpty || cursor.length > 512)) {
+      return null;
+    }
+    try {
+      final raw = await _call('listBuyerProductFeedbackTargets', {'limit': 5, 'cursor': cursor});
+      if (raw == null || !isCurrent) return null;
+      final data = _exactMap(raw, const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId', 'coverage', 'targets', 'nextCursor']);
+      if (data['schemaVersion'] is! int || data['schemaVersion'] != 1 || data['realm'] != realm ||
+          data['authNamespace'] != 'firebase-default' || data['viewerRole'] != 'buyer' || data['viewerUserId'] != identity.accountUserId ||
+          data['coverage'] != 'indexed_recorded_completions' || data['targets'] is! List || (data['targets'] as List).length > 5 ||
+          data['nextCursor'] != null && (data['nextCursor'] is! String || (data['nextCursor'] as String).isEmpty ||
+            (data['nextCursor'] as String).length > 512 || data['nextCursor'] == cursor || (data['targets'] as List).isEmpty)) {
+        throw const FormatException('Invalid feedback target page.');
+      }
+      final targets = <WorkspaceProductFeedbackTarget>[], ids = <String>{};
+      for (final raw in data['targets'] as List) {
+        final t = _exactMap(raw, const ['id', 'kind', 'purchaseId', 'storeId', 'orderId', 'orderLineId', 'productId',
+          'productLabel', 'originalFingerprint', 'sourceRevision', 'purchasedListing', 'completedAt', 'completionId', 'completionRevision']);
+        if (t['kind'] != 'product' || !['purchaseId', 'storeId', 'orderId', 'orderLineId', 'sourceRevision', 'completionRevision'].every((k) => _id(t[k])) ||
+            t['originalFingerprint'] is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(t['originalFingerprint']) ||
+            t['completionId'] is! String || !RegExp(r'^completion-[a-f0-9]{64}$').hasMatch(t['completionId']) ||
+            t['productLabel'] is! String || (t['productLabel'] as String).trim().isEmpty ||
+            (t['productLabel'] as String).trim() != t['productLabel'] || (t['productLabel'] as String).length > 240) {
+          throw const FormatException('Invalid purchased target.');
+        }
+        final listing = BuyV2PublicListingIdentity.fromJson(t['purchasedListing']), completedAt = _date(t['completedAt']);
+        if (listing == null || listing.realm != realm || listing.storeId != t['storeId'] || listing.listingId != t['productId'] ||
+            listing.listingId != 'listing-${sha256.convert(utf8.encode(jsonEncode([1, realm, listing.storeId, listing.skuId, listing.channel.name])))}' ||
+            completedAt.isAfter(now().toUtc())) {
+          throw const FormatException('Unbound completed target.');
+        }
+        final expected = 'feedback-${sha256.convert(utf8.encode(jsonEncode([1, realm, 'firebase-default', identity.accountUserId,
+          t['purchaseId'], t['storeId'], t['orderId'], t['orderLineId'], t['originalFingerprint'], t['sourceRevision'], t['productLabel'],
+          listing.listingId, listing.skuId, listing.canonicalProductId, listing.verifiedPackId, listing.channel.name,
+          t['completionId'], t['completionRevision'], t['completedAt']])))}';
+        if (t['id'] != expected || !ids.add(expected)) throw const FormatException('Changed feedback target.');
+        targets.add(WorkspaceProductFeedbackTarget._(id: expected,
+          reference: WorkspacePurchaseReference(purchaseId: t['purchaseId'], storeId: t['storeId'], orderId: t['orderId'],
+            sourceRevision: t['sourceRevision'], originalFingerprint: t['originalFingerprint']),
+          orderLineId: t['orderLineId'], productId: t['productId'], productLabel: t['productLabel'], purchasedListing: listing,
+          completedAt: completedAt, completionId: t['completionId'], completionRevision: t['completionRevision']));
+      }
+      return WorkspaceProductFeedbackTargetPage._(realm: realm, viewerUserId: identity.accountUserId,
+        targets: targets, nextCursor: data['nextCursor']);
+    } on Object {return null;}
+  }
+
+  WorkspaceProductFeedbackTarget _privateStarsTarget(Object? raw, String realm) {
+    final t = _exactMap(_map(raw), const ['id', 'kind', 'purchaseId', 'storeId', 'orderId', 'orderLineId', 'productId',
+      'productLabel', 'originalFingerprint', 'sourceRevision', 'purchasedListing', 'completedAt', 'completionId', 'completionRevision']);
+    if (t['kind'] != 'product' || t['id'] is! String || !RegExp(r'^feedback-[a-f0-9]{64}$').hasMatch(t['id']) ||
+        !['purchaseId', 'storeId', 'orderId', 'orderLineId', 'sourceRevision', 'completionRevision'].every((k) => _id(t[k])) ||
+        t['originalFingerprint'] is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(t['originalFingerprint']) ||
+        t['completionId'] is! String || !RegExp(r'^completion-[a-f0-9]{64}$').hasMatch(t['completionId']) ||
+        t['productLabel'] is! String || (t['productLabel'] as String).trim().isEmpty ||
+        t['productLabel'] != (t['productLabel'] as String).trim() || (t['productLabel'] as String).length > 240) {
+      throw const FormatException('Invalid private stars context.');
+    }
+    final listing = BuyV2PublicListingIdentity.fromJson(t['purchasedListing']), completedAt = _date(t['completedAt']);
+    if (listing == null || listing.realm != realm || listing.storeId != t['storeId'] || listing.listingId != t['productId'] ||
+        listing.listingId != 'listing-${sha256.convert(utf8.encode(jsonEncode([1, realm, listing.storeId, listing.skuId, listing.channel.name])))}' ||
+        completedAt.isAfter(now().toUtc())) {
+      throw const FormatException('Unbound private stars context.');
+    }
+    // Seller receives an opaque target ID, never the buyer UID used to derive it.
+    return WorkspaceProductFeedbackTarget._(id: t['id'],
+      reference: WorkspacePurchaseReference(purchaseId: t['purchaseId'], storeId: t['storeId'], orderId: t['orderId'],
+        sourceRevision: t['sourceRevision'], originalFingerprint: t['originalFingerprint']),
+      orderLineId: t['orderLineId'], productId: t['productId'], productLabel: t['productLabel'], purchasedListing: listing,
+      completedAt: completedAt, completionId: t['completionId'], completionRevision: t['completionRevision']);
+  }
+  WorkspaceProductStars _privateStars(Object? value, String realm) {
+    final r = _exactMap(_map(value), const ['target', 'stars', 'revision', 'updatedAt']);
+    if (r['stars'] is! int || r['stars'] < 1 || r['stars'] > 5 || r['revision'] is! int ||
+        r['revision'] < 1 || r['revision'] > 9007199254740991) {
+      throw const FormatException('Invalid stars.');
+    }
+    final target = _privateStarsTarget(r['target'], realm), updatedAt = _date(r['updatedAt']);
+    if (updatedAt.isBefore(target.completedAt) || updatedAt.isAfter(now().toUtc())) {
+      throw const FormatException('Invalid stars date.');
+    }
+    return WorkspaceProductStars._(target: target, stars: r['stars'], revision: r['revision'], updatedAt: updatedAt);
+  }
+  Future<WorkspaceProductStarsResult?> submitProductStars({required WorkspaceProductFeedbackTarget target,
+    required int stars, required int expectedRevision, required String operationId, bool reconcile = false}) async {
+    final realm = target.purchasedListing.realm;
+    if (!_validReference(realm, target.reference) || !_id(operationId) || stars < 1 || stars > 5 ||
+        expectedRevision < 0 || expectedRevision >= 9007199254740991) {
+      return null;
+    }
+    try {
+      final raw = await _call(reconcile ? 'reconcileBuyerProductStars' : 'submitBuyerProductStars', {
+        'targetId': target.id, 'expectedRevision': expectedRevision, 'operationId': operationId, 'stars': stars,
+      }, mutation: !reconcile);
+      if (raw == null || !isCurrent) return null;
+      final r = _exactMap(raw, const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId', 'operationId', 'state', 'rating']);
+      if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['realm'] != realm || r['authNamespace'] != 'firebase-default' ||
+          r['viewerRole'] != 'buyer' || r['viewerUserId'] != identity.accountUserId || r['operationId'] != operationId) {
+        throw const FormatException('Wrong stars receipt owner.');
+      }
+      WorkspaceProductStars? saved;
+      if (r['state'] == 'saved') {
+        saved = _privateStars(r['rating'], realm);
+        if (jsonEncode(saved.target.toJson()) != jsonEncode(target.toJson()) || saved.stars != stars ||
+            saved.revision != expectedRevision + 1) {
+          throw const FormatException('Changed stars receipt.');
+        }
+      } else if (!reconcile || r['state'] != 'not_recorded' || r['rating'] != null) {
+        throw const FormatException('Unknown stars outcome.');
+      }
+      return WorkspaceProductStarsResult._(operationId: operationId, rating: saved);
+    } on Object {return null;}
+  }
+  Future<WorkspaceStoreProductStarsPage?> listStoreProductStars({required String realm, required String storeId, String? cursor}) async {
+    if (!isCurrent || !const ['evaluation', 'production'].contains(realm) || !_id(storeId) ||
+        cursor != null && (cursor.isEmpty || cursor.length > 512)) {
+      return null;
+    }
+    try {
+      final raw = await _call('listStoreProductStars', {'storeId': storeId, 'limit': 5, 'cursor': cursor});
+      if (raw == null || !isCurrent) return null;
+      final r = _exactMap(raw, const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId', 'storeId', 'coverage', 'ratings', 'nextCursor']);
+      if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['realm'] != realm || r['authNamespace'] != 'firebase-default' ||
+          r['viewerRole'] != 'seller' || r['viewerUserId'] != identity.accountUserId || r['storeId'] != storeId ||
+          r['coverage'] != 'recorded_private_product_stars' || r['ratings'] is! List || (r['ratings'] as List).length > 5 ||
+          r['nextCursor'] != null && (r['nextCursor'] is! String || (r['nextCursor'] as String).isEmpty ||
+            (r['nextCursor'] as String).length > 512 || r['nextCursor'] == cursor || (r['ratings'] as List).isEmpty)) {
+        throw const FormatException('Wrong private Store stars page.');
+      }
+      final ratings = <WorkspaceProductStars>[], ids = <String>{};
+      for (final value in r['ratings'] as List) {
+        final rating = _privateStars(value, realm);
+        if (rating.target.reference.storeId != storeId || !ids.add(rating.target.id)) throw const FormatException('Wrong Store.');
+        ratings.add(rating);
+      }
+      return WorkspaceStoreProductStarsPage._(storeId: storeId, ratings: ratings, nextCursor: r['nextCursor']);
     } on Object {return null;}
   }
 

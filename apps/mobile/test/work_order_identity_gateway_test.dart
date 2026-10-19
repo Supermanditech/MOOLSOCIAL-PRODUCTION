@@ -90,6 +90,153 @@ class Transport implements SocialContentTransport {
 }
 
 void main() {
+  Map<String, dynamic> feedbackTargetPage() {
+    final data = publicListingPurchaseResponse(), order = data['orders'][0], line = order['original']['lines'][0];
+    final listing = line['publicListing'];
+    final target = <String, dynamic>{'kind': 'product', 'purchaseId': data['purchaseId'], 'storeId': order['storeId'], 'orderId': order['orderId'],
+      'orderLineId': line['lineId'], 'productId': listing['listingId'], 'productLabel': line['name'], 'originalFingerprint': order['originalFingerprint'],
+      'sourceRevision': data['sourceRevision'], 'purchasedListing': listing, 'completedAt': '2026-10-16T12:00:00.000Z',
+      'completionId': 'completion-${'a' * 64}', 'completionRevision': 'completed-v1'};
+    target['id'] = 'feedback-${sha256.convert(utf8.encode(jsonEncode([1, 'evaluation', 'firebase-default', 'buyer-1',
+      target['purchaseId'], target['storeId'], target['orderId'], target['orderLineId'], target['originalFingerprint'], target['sourceRevision'], target['productLabel'],
+      listing['listingId'], listing['skuId'], listing['canonicalProductId'], listing['verifiedPackId'], listing['channel'],
+      target['completionId'], target['completionRevision'], target['completedAt']])))}';
+    return {'schemaVersion': 1, 'realm': 'evaluation', 'authNamespace': 'firebase-default', 'viewerRole': 'buyer', 'viewerUserId': 'buyer-1',
+      'coverage': 'indexed_recorded_completions', 'targets': [target], 'nextCursor': null};
+  }
+  Map<String, dynamic> starResult() => {'schemaVersion': 1, 'realm': 'evaluation', 'authNamespace': 'firebase-default',
+    'viewerRole': 'buyer', 'viewerUserId': 'buyer-1', 'operationId': 'stars-save', 'state': 'saved',
+    'rating': {'target': feedbackTargetPage()['targets'][0], 'stars': 1, 'revision': 1, 'updatedAt': '2026-10-19T00:00:00.000Z'}};
+  test('LF-STARS private submit uses limited-use token and read-only reconcile never submits', () async {
+    final wire = Transport()..data = feedbackTargetPage();
+    final identity = projectionGateway(wire), credentials = identity.credentials as Credentials;
+    final gateway = AuthenticatedWorkspaceOrderOperationsGateway(identity);
+    final target = (await gateway.listProductFeedbackTargets(realm: 'evaluation'))!.targets.single;
+    wire.data = starResult();
+    final saved = await gateway.submitProductStars(target: target, stars: 1, expectedRevision: 0, operationId: 'stars-save');
+    expect(saved!.rating!.stars, 1);
+    expect(wire.sent, {'operation': 'submitBuyerProductStars', 'targetId': target.id, 'stars': 1, 'expectedRevision': 0, 'operationId': 'stars-save'});
+    expect(credentials.modes.last, SocialAppCheckTokenMode.limitedUse);
+    wire.data = starResult()..['state'] = 'not_recorded'..['rating'] = null;
+    final missing = await gateway.submitProductStars(target: target, stars: 1, expectedRevision: 0, operationId: 'stars-save', reconcile: true);
+    expect(missing, isNotNull); expect(missing!.rating, isNull);
+    expect(wire.sent!['operation'], 'reconcileBuyerProductStars'); expect(credentials.modes.last, SocialAppCheckTokenMode.standard);
+    expect(await gateway.submitProductStars(target: target, stars: 1, expectedRevision: 0, operationId: 'stars-save'), isNull);
+  });
+  for (final fault in <String, void Function(Map<String, dynamic>)>{
+    'public field': (r) => r['public'] = true,
+    'comment': (r) => r['rating']['comment'] = 'not part of MVP',
+    'wrong owner': (r) => r['viewerUserId'] = 'other',
+    'wrong realm': (r) => r['realm'] = 'production',
+    'wrong attempt': (r) => r['operationId'] = 'another-save',
+    'float stars': (r) => r['rating']['stars'] = 1.0,
+    'zero stars': (r) => r['rating']['stars'] = 0,
+    'wrong stars': (r) => r['rating']['stars'] = 5,
+    'wrong revision': (r) => r['rating']['revision'] = 2,
+    'wrong line': (r) => r['rating']['target']['orderLineId'] = 'another-line',
+    'wrong target': (r) => r['rating']['target']['id'] = 'feedback-${'b' * 64}',
+    'future': (r) => r['rating']['updatedAt'] = '2099-01-01T00:00:00.000Z',
+  }.entries) {
+    test('LF-STARS rejects changed ${fault.key} without retry', () async {
+      final wire = Transport()..data = feedbackTargetPage(), gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire));
+      final target = (await gateway.listProductFeedbackTargets(realm: 'evaluation'))!.targets.single;
+      wire.data = starResult(); fault.value(wire.data);
+      expect(await gateway.submitProductStars(target: target, stars: 1, expectedRevision: 0, operationId: 'stars-save'), isNull);
+      expect(wire.calls, 2);
+    });
+  }
+  test('LF-STARS private Store reader includes one-star ratings and no public/reply contract', () async {
+    final wire = Transport()..data = {'schemaVersion': 1, 'realm': 'evaluation', 'authNamespace': 'firebase-default',
+      'viewerRole': 'seller', 'viewerUserId': 'owner-1', 'storeId': 'store-one',
+      'coverage': 'recorded_private_product_stars', 'ratings': [starResult()['rating']], 'nextCursor': null};
+    final gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, account: 'owner-1'));
+    expect((await gateway.listStoreProductStars(realm: 'evaluation', storeId: 'store-one'))!.ratings.single.stars, 1);
+    wire.data['buyerUserId'] = 'private-leak';
+    expect(await gateway.listStoreProductStars(realm: 'evaluation', storeId: 'store-one'), isNull);
+    wire.data.remove('buyerUserId'); wire.data['storeId'] = 'another-store';
+    expect(await gateway.listStoreProductStars(realm: 'evaluation', storeId: 'store-one'), isNull);
+  });
+  if (Platform.environment['LF_PRIVATE_PRODUCT_STARS_LOG'] case final path?) {
+    test('LF-STARS actual saved private backend stars cross buyer and seller strict readers', () async {
+      const marker = 'LF_PRIVATE_PRODUCT_STARS=';
+      final rows = File(path).readAsLinesSync().where((line) => line.contains(marker)).toList(); expect(rows, hasLength(1));
+      final data = (jsonDecode(rows.single.substring(rows.single.indexOf(marker) + marker.length)) as Map).cast<String, dynamic>();
+      final buyer = data['buyer'] as Map<String, dynamic>, targetPage = {'schemaVersion': 1, 'realm': buyer['realm'],
+        'authNamespace': 'firebase-default', 'viewerRole': 'buyer', 'viewerUserId': buyer['viewerUserId'],
+        'coverage': 'indexed_recorded_completions', 'targets': [data['target']], 'nextCursor': null};
+      final wire = Transport()..data = targetPage;
+      final gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, account: buyer['viewerUserId']));
+      final target = (await gateway.listProductFeedbackTargets(realm: buyer['realm']))!.targets.single;
+      wire.data = buyer;
+      final saved = await gateway.submitProductStars(target: target, stars: buyer['rating']['stars'],
+        expectedRevision: buyer['rating']['revision'] - 1, operationId: buyer['operationId'], reconcile: true);
+      expect(saved!.rating!.stars, 1);
+      final seller = (data['seller'] as Map).cast<String, dynamic>(); wire.data = seller;
+      final privatePage = await AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, account: seller['viewerUserId']))
+        .listStoreProductStars(realm: seller['realm'], storeId: seller['storeId']);
+      expect(privatePage, isNotNull); expect(privatePage!.ratings.any((r) => r.target.id == target.id && r.stars == 1), isTrue);
+    });
+  }
+  test('LF-FEEDBACK target page retains full historical identity without granting publication or commerce', () async {
+    final data = feedbackTargetPage(), wire = Transport()..data = data;
+    final page = await AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire)).listProductFeedbackTargets(realm: 'evaluation');
+    expect(page, isNotNull); expect(page!.targets.single.productId, data['targets'][0]['productId']);
+    expect(page.targets.single.purchasedListing.toJson(), data['targets'][0]['purchasedListing']);
+    expect(wire.sent, {'operation': 'listBuyerProductFeedbackTargets', 'limit': 5, 'cursor': null});
+    wire.data = feedbackTargetPage()..['targets'] = <Object>[];
+    expect((await AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire)).listProductFeedbackTargets(realm: 'evaluation'))!.targets, isEmpty);
+  });
+  for (final fault in <String, void Function(Map<String, dynamic>)>{
+    'schema': (d) => d['schemaVersion'] = 1.0,
+    'realm': (d) => d['realm'] = 'production',
+    'namespace': (d) => d['authNamespace'] = 'tenant-other',
+    'viewer': (d) => d['viewerUserId'] = 'other-account',
+    'role': (d) => d['viewerRole'] = 'seller',
+    'coverage': (d) => d['coverage'] = 'all_purchases',
+    'null targets': (d) => d['targets'] = null,
+    'missing listing': (d) => d['targets'][0].remove('purchasedListing'),
+    'changed ID': (d) => d['targets'][0]['id'] = 'feedback-${'b' * 64}',
+    'changed line': (d) => d['targets'][0]['orderLineId'] = 'another-line',
+    'changed Store': (d) => d['targets'][0]['storeId'] = 'another-store',
+    'changed canonical': (d) => d['targets'][0]['purchasedListing']['canonicalProductId'] = 'another-product',
+    'changed pack': (d) => d['targets'][0]['purchasedListing']['verifiedPackId'] = 'another-pack',
+    'changed completion': (d) => d['targets'][0]['completionRevision'] = 'another-completion',
+    'future completion': (d) => d['targets'][0]['completedAt'] = '2099-10-16T12:00:00.000Z',
+    'duplicate target': (d) => (d['targets'] as List).add(d['targets'][0]),
+    'private proof': (d) => d['targets'][0]['proof'] = 'private-proof',
+    'public permission': (d) => d['canPublish'] = true,
+    'empty cursor': (d) => d['nextCursor'] = '',
+    'empty with cursor': (d) {d['targets'] = []; d['nextCursor'] = 'not-a-complete-empty-page';},
+  }.entries) {
+    test('LF-FEEDBACK strict target page rejects ${fault.key}', () async {
+      final data = feedbackTargetPage(); fault.value(data);
+      expect(await AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(Transport()..data = data))
+        .listProductFeedbackTargets(realm: 'evaluation'), isNull);
+    });
+  }
+  test('LF-FEEDBACK retired A B A account cannot admit target results or issue another call', () async {
+    Object? generation = Object(); final wire = Transport()..data = feedbackTargetPage()..pending = Completer<void>();
+    final gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, lifetime: () => generation));
+    final pending = gateway.listProductFeedbackTargets(realm: 'evaluation');
+    for (var i = 0; i < 100 && wire.calls == 0; i++) {await Future<void>.delayed(Duration.zero);}
+    expect(wire.calls, 1); generation = Object(); generation = Object(); wire.pending!.complete();
+    expect(await pending, isNull); expect(await gateway.listProductFeedbackTargets(realm: 'evaluation'), isNull); expect(wire.calls, 1);
+  });
+  if (Platform.environment['LF_PRODUCT_TARGET_PROJECTION_LOG'] case final path?) {
+    test('LF-FEEDBACK actual completion producer target pages cross strict private Dart reader', () async {
+      const marker = 'LF_PRODUCT_TARGET_PROJECTION=';
+      final rows = File(path).readAsLinesSync().where((line) => line.contains(marker)).toList();
+      expect(rows, hasLength(2)); var supplied = 0, absent = 0;
+      for (final row in rows) {
+        final data = (jsonDecode(row.substring(row.indexOf(marker) + marker.length)) as Map).cast<String, dynamic>();
+        final page = await AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(Transport()..data = data, account: data['viewerUserId']))
+          .listProductFeedbackTargets(realm: 'evaluation');
+        expect(page, isNotNull); expect(page!.targets.length, (data['targets'] as List).length);
+        if (page.targets.isEmpty) {absent++;} else {supplied++; expect(page.targets.single.purchasedListing.toJson(), data['targets'][0]['purchasedListing']);}
+      }
+      expect(supplied, 1); expect(absent, 1);
+    });
+  }
   for (final role in WorkspaceOrderIdentityRole.values) {
     for (final allNull in [false, true]) {
       test('LF-LISTING strict originals retain version6 and nullable provenance ${role.name} $allNull', () async {

@@ -2943,6 +2943,8 @@ export const moolSocialWorkspace = onRequest(
         operation === "listBuyerPurchaseReferences" || operation === "listStorePurchaseReferences";
       const operationalRead = operation === "readBuyerOperationalOrder" || operation === "readStoreOperationalOrder";
       const completionRead = operation === "readBuyerOrderCompletion" || operation === "readStoreOrderCompletion";
+      const productFeedbackTargetRead = operation === "listBuyerProductFeedbackTargets";
+      const productStarsOperation = ["readBuyerProductStars", "submitBuyerProductStars", "reconcileBuyerProductStars", "listStoreProductStars"].includes(operation);
       const operationalCommand = operation === "submitStoreOrderCommand";
       const operationalReconcile = operation === "reconcileStoreOrderCommand";
       const ownerUserId = await verifySocialInvocation(
@@ -2955,13 +2957,13 @@ export const moolSocialWorkspace = onRequest(
             ),
           verifyIdToken: async (token) => {
             const verified = await getAuth().verifyIdToken(token);
-            if (purchaseProjectionRead || operationalRead || completionRead || operationalCommand || operationalReconcile || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation) {
+            if (purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation) {
               requireDefaultPurchaseTenant(verified.firebase?.tenant);
             }
             return verified;
           },
         },
-        mutation || orderMutation || operationalCommand,
+        mutation || orderMutation || operationalCommand || operation === "submitBuyerProductStars",
         true,
       );
       if (!ownerUserId) {
@@ -2990,6 +2992,16 @@ export const moolSocialWorkspace = onRequest(
         ? await workspaceCatalogueService().handleStoreVariantFamily(ownerUserId, operation, catalogueBody)
         : supplierPolicyOperation
         ? await workspaceSupplierPolicyService().handleOwnerOperation(ownerUserId, operation, catalogueBody)
+        : operation === "readBuyerProductStars"
+        ? {schemaVersion: 1, realm: process.env.MOOLSOCIAL_PURCHASE_REALM,
+          authNamespace: "firebase-default", viewerRole: "buyer", viewerUserId: ownerUserId, targetId: catalogueBody.targetId,
+          rating: await workspaceOrderOperationsService().readBuyerProductStars(ownerUserId, catalogueBody)}
+        : operation === "submitBuyerProductStars" || operation === "reconcileBuyerProductStars"
+        ? await workspaceOrderOperationsService().submitProductStars(ownerUserId, catalogueBody, operation === "reconcileBuyerProductStars")
+        : operation === "listStoreProductStars"
+        ? await workspaceOrderOperationsService().listStoreProductStars(ownerUserId, catalogueBody)
+        : productFeedbackTargetRead
+        ? await workspaceOrderOperationsService().listBuyerProductFeedbackTargets(ownerUserId, catalogueBody)
         : completionRead
         ? await workspaceOrderOperationsService().readCompletion(ownerUserId,
           operation === "readBuyerOrderCompletion" ? "buyer" : "seller", catalogueBody)
