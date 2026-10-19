@@ -241,12 +241,13 @@ class _HostTipPolicy implements BuyV2TipPolicy {
 }
 class _HostRetirableStateStore implements BuyV2CustomerStateStore {
   Future<BuyV2CustomerStateSnapshot?>? heldRead;
+  bool writesSucceed = true;
   @override
   String? ownerScope = 'host-loading-owner';
   @override
   Future<BuyV2CustomerStateSnapshot?> read() async => heldRead == null ? null : await heldRead;
   @override
-  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async => true;
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async => writesSucceed;
 }
 BuyV2CheckoutQuoteSnapshot _hostExactQuote(List<BuyV2FulfilmentGroup> groups, Map<String, int> tips,
   {int coupon = 0, int fee = 0, String id = 'host-current-quote', DateTime? expires}) {
@@ -2393,6 +2394,82 @@ void main() {
     expect((await gateway.writeProductSubmission(original, current: () => true, reconcile: true)).state, WorkspaceProductSubmissionWriteState.notFound);
     expect((await gateway.writeProductSubmission(original, current: () => true)).state, WorkspaceProductSubmissionWriteState.unknown);
   });
+  final cartAdditionLog = Platform.environment['LF14_CART_LOG'];
+  if (cartAdditionLog != null) {
+    Map<String, dynamic> cartCapture() => jsonDecode(File(cartAdditionLog).readAsLinesSync()
+      .singleWhere((line) => line.startsWith('LF14_CART_ADDITIONS_PROJECTION='))
+      .substring('LF14_CART_ADDITIONS_PROJECTION='.length)) as Map<String, dynamic>;
+    WorkspaceProductPresentationGateway cartReporter(OwnerTransport transport, {bool enabled = true,
+      String account = 'owner-one', bool Function()? current, SocialContentCredentials? credentials}) {
+      final capture = cartCapture(), now = DateTime.parse(capture['aggregate']['observedAt'] as String);
+      final entry = WorkspacePublicCatalogueEntry.fromResponse(capture['page'], storeId: 'store-one', realm: 'evaluation', channel: BuyV2OfferClass.retail, now: now);
+      return WorkspaceProductPresentationGateway(current: current ?? () => true, displayed: (_) => entry.readback,
+        productPresentationsEnabled: false, cartAdditionsEnabled: enabled,
+        gateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: credentials ?? Credentials(), transport: transport, realm: 'evaluation', ownerAccountId: account, now: () => now));
+    }
+    WorkspaceAnalyticsRequest cartAnalyticsRequest({bool zero = false}) {
+      final aggregate = cartCapture()[zero ? 'zero' : 'aggregate'] as Map;
+      return WorkspaceAnalyticsRequest(accountScope: 'owner-one', storeId: 'store-one',
+        start: DateTime.parse(aggregate['start']), end: DateTime.parse(aggregate['end']));
+    }
+    test('LF14 CART actual service acknowledgement and account union reach the existing Store analytics', () async {
+      final capture = cartCapture();
+      final reporter = cartReporter(OwnerTransport((body) async => SocialContentResponse(statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': body['operation'] == 'recordPublicCartAddition' ? capture['accepted'] : capture['aggregate']}))));
+      expect(await reporter.recordCartAddition((capture['event'] as Map).cast<String, Object?>(), ownerCurrent: () => true), true);
+      final work = WorkSession(contactDraftStore: ListingAccount())
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Jaipur', verified: true)
+        ..workspaceId = 'store-one';
+      addTearDown(work.dispose); work.bindProductPresentationReader(reporter);
+      final snapshot = await work.readWorkspaceAnalytics(cartAnalyticsRequest());
+      expect(snapshot.metrics.single.id, 'journey-cart'); expect(snapshot.metrics.single.value, 2);
+      expect(snapshot.coverage, WorkspaceAnalyticsCoverage.partial);
+      expect(snapshot.metrics.single.source, contains('signed-in accounts'));
+      expect(snapshot.metrics.any((m) => {'journey-order', 'cart-dropoff', 'order-conversion'}.contains(m.id)), false);
+    });
+    test('LF14 CART covered zero stays distinct from unavailable collection', () async {
+      final capture = cartCapture(); var absent = false;
+      final reporter = cartReporter(OwnerTransport((body) async {
+        final data = Map<String, dynamic>.from(capture['zero'] as Map);
+        if (absent) { data.addAll({'state': 'unavailable', 'coverage': 'unknown', 'collectionStartedAt': null,
+          'coveredFrom': null, 'coveredUntil': null, 'count': null, 'customers': null}); }
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      }));
+      expect((await reporter.readAnalytics(cartAnalyticsRequest(zero: true))).metrics.single.value, 0);
+      absent = true;
+      final unavailable = await reporter.readAnalytics(cartAnalyticsRequest(zero: true));
+      expect(unavailable.state, WorkspaceAnalyticsState.unavailable); expect(unavailable.metrics, isEmpty);
+    });
+    for (final fault in ['too many customers', 'fraction', 'missing customers', 'private key', 'wrong Store', 'sum mismatch', 'future']) {
+      test('LF14 CART rejects $fault instead of showing fabricated counts', () async {
+        final reporter = cartReporter(OwnerTransport((body) async {
+          final data = Map<String, dynamic>.from(cartCapture()['aggregate'] as Map);
+          switch (fault) {
+            case 'too many customers': data['customers'] = 4;
+            case 'fraction': data['customers'] = 1.5;
+            case 'missing customers': data.remove('customers');
+            case 'private key': data['customerKey'] = 'opaque-but-private';
+            case 'wrong Store': data['storeId'] = 'other-store';
+            case 'sum mismatch': data['count'] = 4;
+            case 'future': data['observedAt'] = '2027-01-01T00:00:00.000Z';
+          }
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+        }));
+        final snapshot = await reporter.readAnalytics(cartAnalyticsRequest());
+        expect(snapshot.state, WorkspaceAnalyticsState.unavailable); expect(snapshot.metrics, isEmpty);
+      });
+    }
+    test('LF14 CART disabled and retired owner reporting never sends', () async {
+      final transport = OwnerTransport((body) async => throw StateError('Must not send'));
+      final original = (cartCapture()['event'] as Map).cast<String, Object?>();
+      expect(await cartReporter(transport, enabled: false).recordCartAddition(original, ownerCurrent: () => true), false);
+      var live = true;
+      final retired = cartReporter(transport, current: () => live, credentials: RetiringOwnerCredentials(() => live = false));
+      expect(await retired.recordCartAddition(original, ownerCurrent: () => true), false);
+      expect(transport.calls, 0);
+    });
+  }
   final presentationLog = Platform.environment['LF14_PRESENTATION_LOG'];
   if (presentationLog != null) {
     Map<String, dynamic> presentationCapture() {
@@ -6113,12 +6190,12 @@ void main() {
     {BuyV2ProductFactsAdapter? facts, BuyV2CheckoutQuoteAdapter? quoteAdapter,
       BuyV2CommercialPaymentTermsAdapter? termsAdapter, BuyV2TipPolicy tipPolicy = const BuyV2DisabledTipPolicy(),
       BuyV2CustomerStateStore? customerStateStore, BuyV2CommerceAdapter? commerceAdapter, bool reviewDataEnabled = true,
-      WorkspacePublicStockReader? stockReader, bool disposeAtTearDown = true}) async {
+      WorkspacePublicStockReader? stockReader, WorkspaceProductPresentationGateway? presentations, bool disposeAtTearDown = true}) async {
     final core = BuySession(), source = _ExactMoneyHostCatalogue()..rows.addAll(values);
     final session = BuyV2Session(core: core, cataloguePageSource: source, reviewDataEnabled: reviewDataEnabled, catalogueNow: () => at,
       productFactsAdapter: facts ?? const BuyV2CatalogueProductFactsAdapter(), cartBenefitsAdapter: adapter,
       checkoutQuoteAdapter: quoteAdapter, commercialPaymentTermsAdapter: termsAdapter, tipPolicy: tipPolicy,
-      customerStateStore: customerStateStore, commerceAdapter: commerceAdapter, storeStockReader: stockReader);
+      customerStateStore: customerStateStore, commerceAdapter: commerceAdapter, storeStockReader: stockReader, productPresentations: presentations);
     addTearDown(core.dispose); if (disposeAtTearDown) addTearDown(session.dispose);
     if (customerStateStore != null) await session.restoreCustomerState(restoreBrowsing: false);
     final pager = session.acquireCatalogueProducts('host-paise-benefits');
@@ -6151,6 +6228,67 @@ void main() {
         channelEnabled: true, storeReady: true, fleetAvailable: true, customerLocationConfirmed: true,
         options: {BuyV2DeliveryOption.quick}));
     expect(session.refreshProductFacts(selected.id), true);
+  }
+  test('LF14 CART actual successful Add reports once; failed Add and Cart editing do not manufacture events', () async {
+    final entry = factoryEntry(publicPage()), sent = <Map<String, Object?>>[], received = Completer<void>();
+    final reporter = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => entry.readback,
+      productPresentationsEnabled: false, cartAdditionsEnabled: true,
+      gateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), now: () => at, transport: OwnerTransport((body) async {
+          sent.add(body); if (!received.isCompleted) received.complete();
+          return const SocialContentResponse(statusCode: 503, body: '{}'); // Telemetry failure never changes the accepted Cart.
+        })));
+    final facts = _HostOperationalFacts((p) => const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false).snapshotFor(p));
+    final buyer = await benefitSession(_HostMinorBenefits(), [entry.product], facts: facts, presentations: reporter, reviewDataEnabled: false);
+    expect(buyer.addProduct(entry.product.id), false); expect(sent, isEmpty);
+    enableHostStockEligibility(buyer, entry.product, facts);
+    expect(buyer.addProduct(entry.product.id), true);
+    await received.future.timeout(const Duration(seconds: 1));
+    expect(sent, hasLength(1)); expect(sent.single['operation'], 'recordPublicCartAddition');
+    expect(sent.single['skuId'], entry.product.sourceSkuId);
+    expect(sent.single['listingId'], entry.product.id);
+    expect(sent.single['presentationId'], matches(RegExp(r'^[a-f0-9]{32}$')));
+    expect(sent.single.keys, isNot(contains('customerKey'))); expect(sent.single.keys, isNot(contains('quantity')));
+    expect(buyer.quantityFor(entry.product.id), 1);
+    buyer.openCart(); expect(buyer.setCartQuantity(entry.product.id, '2'), true);
+    await Future<void>.delayed(Duration.zero);
+    expect(sent, hasLength(1)); expect(buyer.quantityFor(entry.product.id), 2);
+  });
+  for (final saved in [true, false]) {
+    test('LF14 CART Scheduled Add reports only confirmed save $saved and not choice replacement', () async {
+      final entry = factoryEntry(publicPage()), sent = <Map<String, Object?>>[], received = Completer<void>();
+      final store = _HostRetirableStateStore()..writesSucceed = saved;
+      final reporter = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => entry.readback,
+        productPresentationsEnabled: false, cartAdditionsEnabled: true,
+        gateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: Credentials(), now: () => at, transport: OwnerTransport((body) async {
+            sent.add(body); if (!received.isCompleted) received.complete();
+            return const SocialContentResponse(statusCode: 503, body: '{}');
+          })));
+      final facts = _HostOperationalFacts((p) => const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false).snapshotFor(p));
+      final buyer = await benefitSession(_HostMinorBenefits(), [entry.product], facts: facts, presentations: reporter,
+        customerStateStore: store, reviewDataEnabled: false);
+      var slot = 'host-slot-A';
+      facts.reply = (p) => BuyV2ProductFactsSnapshot(productId: p.id, priceMinor: p.priceMinor,
+        deliveryPromise: 'Host Scheduled choice', partner: p.seller, orderabilityLabel: 'Available to add',
+        sourceId: 'host-scheduled-cart-event', observedAt: at, storeOperatingState: BuyV2StoreOperatingState.open,
+        eligibility: BuyV2OfferEligibility(productId: p.id, storeId: p.storeId!, sourceRevision: slot,
+          customerLocationKey: buyer.eligibilityLocationKey, observedAt: at, expiresAt: at.add(const Duration(minutes: 15)),
+          offerClass: p.offerClass!, channelEnabled: true, storeReady: true, fleetAvailable: true,
+          customerLocationConfirmed: true, options: {BuyV2DeliveryOption.scheduled}, scheduledSlotId: slot,
+          scheduledStart: at.add(const Duration(hours: 1)), scheduledEnd: at.add(const Duration(hours: 2))));
+      buyer.refreshProductFacts(entry.product.id);
+      expect(sent, isEmpty);
+      final selected = buyer.scheduledWindowFor(entry.product)!;
+      expect(await buyer.addProductForScheduledWindow(entry.product.id, selected), saved, reason: buyer.notice);
+      if (!saved) { await Future<void>.delayed(Duration.zero); expect(sent, isEmpty); expect(buyer.cartLines, isEmpty); return; }
+      await received.future.timeout(const Duration(seconds: 1)); expect(sent, hasLength(1));
+      final old = buyer.cartLineFor(entry.product.id)!;
+      slot = 'host-slot-B'; buyer.refreshProductFacts(entry.product.id);
+      expect(await buyer.addProductForScheduledWindow(entry.product.id, buyer.scheduledWindowFor(entry.product)!, replaceLine: old), true, reason: buyer.notice);
+      await Future<void>.delayed(Duration.zero);
+      expect(sent, hasLength(1)); expect(buyer.quantityFor(entry.product.id), 1);
+    });
   }
   for (final scale in [1.0, 2.0]) {
     testWidgets('LF04 TERMS product and Cart disclose supplied terms without applying savings at $scale', (tester) async {

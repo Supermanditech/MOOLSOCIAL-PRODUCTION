@@ -2923,6 +2923,10 @@ export const moolSocialWorkspace = onRequest(
       if (productPresentationOperation && process.env.MOOLSOCIAL_PRODUCT_PRESENTATIONS_V1 !== 'true') {
         throw new WorkspaceProfileError('service_unavailable', 'Product view reporting is not connected.', 503);
       }
+      const cartAdditionOperation = ['recordPublicCartAddition', 'readStoreCartAdditions'].includes(operation);
+      if (cartAdditionOperation && process.env.MOOLSOCIAL_CART_ADDITIONS_V1 !== 'true') {
+        throw new WorkspaceProfileError('service_unavailable', 'Cart activity reporting is not connected.', 503);
+      }
       const mutation = operation === "prepareProofUpload" ||
         operation === "confirmProofUpload" ||
         operation === "submitProfile" ||
@@ -2933,7 +2937,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStorePublicDetails" ||
         variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || stockOperation === "save" ||
-        operation === "prepareStoreProductMedia" || operation === "confirmStoreProductMedia" || operation === 'recordPublicProductPresentation' || operation === 'recordPublicStorePresentation';
+        operation === "prepareStoreProductMedia" || operation === "confirmStoreProductMedia" || operation === 'recordPublicProductPresentation' || operation === 'recordPublicStorePresentation' || operation === 'recordPublicCartAddition';
       const supplierPolicyOperation = ["readStoreSupplierPolicy", "saveStoreSupplierPolicy",
         "reconcileStoreSupplierPolicy"].includes(operation);
       const promotionOperation = ["readStorePromotion", "saveStorePromotion", "reconcileStorePromotion",
@@ -2966,7 +2970,7 @@ export const moolSocialWorkspace = onRequest(
             ),
           verifyIdToken: async (token) => {
             const verified = await getAuth().verifyIdToken(token);
-            if (purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation) {
+            if (purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation) {
               requireDefaultPurchaseTenant(verified.firebase?.tenant);
             }
             return verified;
@@ -2987,6 +2991,10 @@ export const moolSocialWorkspace = onRequest(
       const {operation: _operation, ...catalogueBody} = body;
       const result = stockOperation !== undefined
         ? await workspaceCatalogueService().handleStoreStock(ownerUserId, operation, catalogueBody)
+        : operation === 'recordPublicCartAddition'
+        ? await workspaceCatalogueService().recordCartAddition(ownerUserId, catalogueBody)
+        : operation === 'readStoreCartAdditions'
+        ? await workspaceCatalogueService().readCartAdditions(ownerUserId, catalogueBody)
         : operation === 'recordPublicStorePresentation'
         ? await workspaceCatalogueService().recordStorePresentation(ownerUserId, catalogueBody)
         : operation === 'readStorePublicPresentations'

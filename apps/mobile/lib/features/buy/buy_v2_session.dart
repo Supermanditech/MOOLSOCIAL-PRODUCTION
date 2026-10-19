@@ -16466,6 +16466,21 @@ class BuyV2Session extends ChangeNotifier {
       replacement ? 'Delivery choice updated. Quantity unchanged.' : '${item.customerTitle} added',
       destination: item.destination,
     );
+    if (!replacement) _reportAcceptedCartAddition(item);
+  }
+
+  void _reportAcceptedCartAddition(BuyV2Product product) {
+    // Best-effort report of an accepted local Add action, not a durable Cart,
+    // reservation or order. Failure must never change the caller's success.
+    try {
+      final reporter = productPresentations;
+      bool ownerCurrent() => !_collectionDisposed && !isStoreProcurement && procurementScopeCurrent;
+      if (reporter == null || !ownerCurrent()) return;
+      final random = math.Random.secure();
+      final eventId = List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+      final original = reporter.prepare(product, eventId, cartAddition: true);
+      if (original != null) unawaited(reporter.recordCartAddition(original, ownerCurrent: ownerCurrent));
+    } on Object { /* Lossy reporting remains partial; commerce is independent. */ }
   }
 
   bool approveSavedPrescription(String prescriptionId) {

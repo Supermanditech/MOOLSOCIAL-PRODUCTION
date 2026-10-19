@@ -387,6 +387,7 @@ export interface ProductPresentation {
   listingId: string; skuRevision: number; catalogueVersion: number;
 }
 export interface ProductPresentationQuery {storeId: string; start: string; end: string; skuIds: string[]}
+type ProductActivityAdmission = boolean | {validUntil: string};
 export interface StorePresentation {
   schemaVersion: 1; presentationId: string; storeId: string; catalogueVersion: number; observedAt: string;
 }
@@ -438,6 +439,9 @@ export interface WorkspaceCatalogueRepository {
   recordProductPresentation?(actor: string, input: ProductPresentation, identity: CatalogueIdentity,
     admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object>;
   readProductPresentations?(owner: string, query: ProductPresentationQuery): Promise<object>;
+  recordCartAddition?(actor: string, input: ProductPresentation, identity: CatalogueIdentity,
+    admit: (source: PublicCatalogueSource) => Promise<ProductActivityAdmission>): Promise<object>;
+  readCartAdditions?(owner: string, query: ProductPresentationQuery): Promise<object>;
   recordStorePresentation?(actor: string, input: StorePresentation, identity: CatalogueIdentity,
     admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object>;
   readStorePresentations?(owner: string, query: ProductPresentationQuery): Promise<object>;
@@ -934,20 +938,40 @@ export class WorkspaceCatalogueService {
 
   /** Public image bytes only after exact current reviewed listing admission, never an upload URL. */
   async recordProductPresentation(actor: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    return this.recordProductActivity(actor, body, false);
+  }
+  /** Authenticated client-reported successful Add action, never an order or saved-Cart assertion. */
+  async recordCartAddition(actor: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    return this.recordProductActivity(actor, body, true);
+  }
+  private async recordProductActivity(actor: string, body: Readonly<Record<string, unknown>>, cart: boolean): Promise<object> {
     const input = productPresentation(body);
-    if (!this.identity || !this.repository.recordProductPresentation) throw mediaUnavailable();
-    return this.repository.recordProductPresentation(id(actor), input, this.identity, async source => {
+    const record = cart ? this.repository.recordCartAddition : this.repository.recordProductPresentation;
+    if (!this.identity || !record) throw mediaUnavailable();
+    return record.call(this.repository, id(actor), input, this.identity, async source => {
       const response = await this.publicCatalogue({storeId: input.storeId, skuId: input.skuId, listingReadbackVersion: 1,
         mediaReadbackVersion: 1, productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1}, source) as {
-          state: string; catalogueVersion?: number; items: Array<{skuId: string; revision: number; listings: PublicCatalogueListingBinding[]}>};
-      return response.state === 'ready' && response.catalogueVersion === input.catalogueVersion && response.items.some(item =>
-        item.skuId === input.skuId && item.revision === input.skuRevision && item.listings.some(listing => listing.listingId === input.listingId));
+          state: string; catalogueVersion?: number; items: Array<{skuId: string; revision: number;
+            channels: Array<{kind: StoreSkuChannel['kind']; validUntil: string}>; listings: PublicCatalogueListingBinding[]}>};
+      const item = response.state === 'ready' && response.catalogueVersion === input.catalogueVersion
+        ? response.items.find(item => item.skuId === input.skuId && item.revision === input.skuRevision &&
+          item.listings.some(listing => listing.listingId === input.listingId)) : undefined;
+      if (!item) return false;
+      if (!cart) return true;
+      const channel = item.listings.find(listing => listing.listingId === input.listingId)!.channel;
+      const terms = item.channels.find(terms => terms.kind === channel);
+      return terms ? {validUntil: presentationTime(terms.validUntil)} : false;
     });
   }
   async readProductPresentations(owner: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const query = productPresentationQuery(body);
     if (!this.repository.readProductPresentations) throw mediaUnavailable();
     return this.repository.readProductPresentations(id(owner), query);
+  }
+  async readCartAdditions(owner: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    const query = productPresentationQuery(body);
+    if (!this.repository.readCartAdditions) throw mediaUnavailable();
+    return this.repository.readCartAdditions(id(owner), query);
   }
   async recordStorePresentation(actor: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const input = storePresentation(body);
@@ -3035,66 +3059,101 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
   }
   async recordProductPresentation(actor: string, input: ProductPresentation, identity: CatalogueIdentity,
     admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object> {
+    return this.recordProductActivity(actor, input, identity, admit, false);
+  }
+  async recordCartAddition(actor: string, input: ProductPresentation, identity: CatalogueIdentity,
+    admit: (source: PublicCatalogueSource) => Promise<ProductActivityAdmission>): Promise<object> {
+    return this.recordProductActivity(actor, input, identity, admit, true);
+  }
+  private async recordProductActivity(actor: string, input: ProductPresentation, identity: CatalogueIdentity,
+    admit: (source: PublicCatalogueSource) => Promise<ProductActivityAdmission>, cart: boolean): Promise<object> {
     input = productPresentation(structuredClone(input)); actor = id(actor);
     const root = this.root(input.storeId), fingerprint = cataloguePayloadHash(input),
       // Actor-bound opaque key prevents another account from retrieving a receipt. Raw buyer identity is never stored.
-      receipt = root.collection('productPresentations').doc(cataloguePayloadHash([this.realm, actor, input.presentationId]));
+      receipt = root.collection(cart ? 'cartAdditions' : 'productPresentations').doc(cataloguePayloadHash([this.realm, actor, input.presentationId])),
+      customerKey = cataloguePayloadHash([1, 'cart-customer', this.realm, input.storeId, actor]);
     return this.firestore.runTransaction(async transaction => {
       const saved = await transaction.get(receipt);
       const result = (acceptedAt: string) => ({...input, realm: this.realm, acceptedAt, state: 'recorded', orderingAvailable: false});
       if (saved.exists) {
-        const prior = exact(saved.data(), ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'label']);
+        const prior = exact(saved.data(), ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'label', ...(cart ? ['customerKey', 'integrity'] : [])]);
         if (prior.schemaVersion !== 1 || prior.realm !== this.realm || prior.fingerprint !== fingerprint ||
             cataloguePayloadHash(productPresentation(prior.input)) !== fingerprint) throw new WorkspaceProfileError('conflict', 'This presentation was already recorded with different details.', 409);
+        if (cart) {
+          const {integrity, ...record} = prior;
+          if (prior.customerKey !== customerKey || integrity !== cataloguePayloadHash(record)) throw mediaUnavailable();
+        }
         return result(presentationTime(prior.acceptedAt));
       }
       const source = await this.publicCatalogueSource(input.storeId, identity, false, transaction);
       if (!source || source.profile.ownerUserId === actor || !await admit(source)) throw new WorkspaceProfileError('unavailable', 'This public product presentation could not be confirmed.', 503);
-      const acceptedAt = this.now().toISOString(), day = root.collection('productPresentationDays').doc(acceptedAt.slice(0, 10)),
-        coverage = root.collection('productPresentationCoverage').doc('current');
+      let acceptedAt = this.now().toISOString();
+      const admissionDay = acceptedAt.slice(0, 10), day = root.collection(cart ? 'cartAdditionDays' : 'productPresentationDays').doc(admissionDay),
+        coverage = root.collection(cart ? 'cartAdditionCoverage' : 'productPresentationCoverage').doc('current');
       const [daily, collection] = await transaction.getAll(day, coverage);
       if (daily?.exists && daily.get('schemaVersion') !== 1 || collection?.exists && collection.get('schemaVersion') !== 1) invalid();
       const count = daily?.exists ? integer(daily.get('count'), 0, 5000) : 0;
       if (count >= 5000) throw new WorkspaceProfileError('service_unavailable', 'Product view reporting is at capacity.', 503, true);
-      const startedAt = collection?.exists ? presentationTime(collection.get('startedAt')) : acceptedAt;
-      if (startedAt > acceptedAt || !await admit(source)) throw mediaUnavailable(); // Term expiry cannot cross the awaited capacity reads.
+      let startedAt = collection?.exists ? presentationTime(collection.get('startedAt')) : acceptedAt;
+      const finalAdmission = await admit(source);
+      if (startedAt > acceptedAt || !finalAdmission) throw mediaUnavailable(); // Recheck after awaited capacity reads.
+      if (cart) {
+        acceptedAt = this.now().toISOString();
+        if (typeof finalAdmission !== 'object' || acceptedAt >= presentationTime(finalAdmission.validUntil) ||
+            startedAt > acceptedAt || acceptedAt.slice(0, 10) !== admissionDay) throw mediaUnavailable();
+        if (!collection?.exists) startedAt = acceptedAt;
+      }
       const item = source.records.find(row => row.skuId === input.skuId)!;
       const label = `${item.content.title} · ${item.pack.label}`.slice(0, 240);
-      transaction.create(receipt, {schemaVersion: 1, realm: this.realm, fingerprint, input, acceptedAt, label});
+      const record = {schemaVersion: 1, realm: this.realm, fingerprint, input, acceptedAt, label, ...(cart ? {customerKey} : {})};
+      transaction.create(receipt, cart ? {...record, integrity: cataloguePayloadHash(record)} : record);
       transaction.set(day, {schemaVersion: 1, count: count + 1});
       if (!collection?.exists) transaction.create(coverage, {schemaVersion: 1, startedAt});
       return result(acceptedAt);
     });
   }
   async readProductPresentations(owner: string, query: ProductPresentationQuery): Promise<object> {
+    return this.readProductActivity(owner, query, false);
+  }
+  async readCartAdditions(owner: string, query: ProductPresentationQuery): Promise<object> {
+    return this.readProductActivity(owner, query, true);
+  }
+  private async readProductActivity(owner: string, query: ProductPresentationQuery, cart: boolean): Promise<object> {
     query = productPresentationQuery({schemaVersion: 1, ...structuredClone(query)}); owner = id(owner);
     return this.firestore.runTransaction(async transaction => {
       const profiles = await transaction.get(this.firestore.collection('workspaceProfiles').where('workspaceId', '==', query.storeId).limit(2));
       if (profiles.size !== 1 || profiles.docs[0]!.id !== profiles.docs[0]!.get('caseId')) throw mediaUnavailable();
       requireStore(profiles.docs[0]!.data() as WorkspaceProfileRecord, query.storeId, owner);
       const root = this.root(query.storeId), observedAt = this.now().toISOString(),
-        collection = await transaction.get(root.collection('productPresentationCoverage').doc('current'));
-      const base = {schemaVersion: 1, realm: this.realm, ...query, observedAt, source: 'Recorded product views'};
+        collection = await transaction.get(root.collection(cart ? 'cartAdditionCoverage' : 'productPresentationCoverage').doc('current'));
+      const base = {schemaVersion: 1, realm: this.realm, ...query, observedAt,
+        source: cart ? 'Reported signed-in Cart additions' : 'Recorded product views'};
       const unavailable = (collectionStartedAt: string | null = null) => ({...base, state: 'unavailable', coverage: 'unknown', collectionStartedAt,
-        coveredFrom: null, coveredUntil: null, count: null, products: []});
+        coveredFrom: null, coveredUntil: null, count: null, products: [], ...(cart ? {customers: null} : {})});
       if (!collection.exists) return unavailable();
       if (collection.get('schemaVersion') !== 1) invalid();
       const startedAt = presentationTime(collection.get('startedAt')), from = [query.start, startedAt].sort().at(-1)!, until = [query.end, observedAt].sort()[0]!;
       if (from >= until) return unavailable(startedAt);
-      const events = await transaction.get(root.collection('productPresentations').where('acceptedAt', '>=', from).where('acceptedAt', '<', until).orderBy('acceptedAt').limit(5001));
+      const events = await transaction.get(root.collection(cart ? 'cartAdditions' : 'productPresentations').where('acceptedAt', '>=', from).where('acceptedAt', '<', until).orderBy('acceptedAt').limit(5001));
       if (events.size > 5000) return unavailable(startedAt); // Never silently truncate a count/ranking.
       const products = new Map<string, {skuId: string; label: string; count: number}>();
+      const customers = new Set<string>();
       let count = 0;
       for (const doc of events.docs) {
-        const event = exact(doc.data(), ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'label']), input = productPresentation(event.input);
+        const event = exact(doc.data(), ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'label', ...(cart ? ['customerKey', 'integrity'] : [])]), input = productPresentation(event.input);
         if (event.schemaVersion !== 1 || event.realm !== this.realm || input.storeId !== query.storeId || event.fingerprint !== cataloguePayloadHash(input) ||
             presentationTime(event.acceptedAt) < from || presentationTime(event.acceptedAt) >= until) invalid();
+        if (cart) {
+          const {integrity, ...record} = event;
+          if (typeof event.customerKey !== 'string' || !/^[A-F0-9]{64}$/u.test(event.customerKey) || integrity !== cataloguePayloadHash(record)) invalid();
+        }
         if (query.skuIds.length && !query.skuIds.includes(input.skuId)) continue;
+        if (cart) customers.add(event.customerKey as string);
         const label = text(event.label, 240), previous = products.get(input.skuId);
         products.set(input.skuId, {skuId: input.skuId, label, count: (previous?.count ?? 0) + 1}); count++;
       }
       return {...base, state: 'ready', coverage: 'partial', collectionStartedAt: startedAt, coveredFrom: from, coveredUntil: until, count,
-        products: [...products.values()].sort((a, b) => b.count - a.count || a.skuId.localeCompare(b.skuId))};
+        products: [...products.values()].sort((a, b) => b.count - a.count || a.skuId.localeCompare(b.skuId)), ...(cart ? {customers: customers.size} : {})};
     });
   }
   async recordStorePresentation(actor: string, input: StorePresentation, identity: CatalogueIdentity,
