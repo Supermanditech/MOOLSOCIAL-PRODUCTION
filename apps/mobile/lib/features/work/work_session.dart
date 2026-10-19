@@ -948,7 +948,13 @@ class WorkSession extends ChangeNotifier {
   final Map<StorePromotionScope, StorePromotionController> _productPromotions = {};
   final Map<StorePromotionScope, StoreCouponController> _storeCoupons = {};
   StoreCouponController? get workspaceStoreCoupons {
-    final account = _contactAccountScope, store = activeWorkspace?.id, connection = productPromotionGateway;
+    final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
+    StorePromotionGateway? connection = productPromotionGateway;
+    if (connection == null && account != null && source is AuthenticatedWorkspaceCatalogueGateway &&
+        gateway is! ReviewWorkGateway && source.storeCouponTermsSupported) {
+      connection = AuthenticatedStorePromotionGateway(endpoint: source.endpoint, credentials: source.credentials,
+        transport: source.transport, ownerAccountId: account, realm: source.realm, storeCouponTermsSupported: true);
+    }
     final realm = productPromotionRealm ?? (connection is AuthenticatedStorePromotionGateway ? connection.realm : null);
     if (_disposed || account == null || account.isEmpty || store == null || !workspaceStoreAuthoringAvailable ||
         connection is! StoreCouponGateway || !(connection as StoreCouponGateway).storeCouponTermsSupported ||

@@ -2947,7 +2947,7 @@ export const moolSocialWorkspace = onRequest(
         "reconcileStoreSupplierPolicy"].includes(operation);
       const promotionOperation = ["readStorePromotion", "saveStorePromotion", "reconcileStorePromotion",
         "listStorePromotions", "readPublicStorePromotions", "readPublicPromotionDiscovery",
-        "saveStoreCoupon", "readStoreCoupon", "listStoreCoupons", "reconcileStoreCoupon", "readPublicStoreCoupons"].includes(operation);
+        "saveStoreCoupon", "readStoreCoupon", "listStoreCoupons", "reconcileStoreCoupon", "readPublicStoreCoupons", "readPublicStoreCouponSnapshot"].includes(operation);
       const catalogueOperation = ["saveStoreCatalogueSku", "bindReviewedStoreCatalogueSku",
         "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue", "readPublicCatalogueDiscovery",
         "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined || productMediaOperation || stockOperation !== undefined || catalogueProductionAction !== undefined;

@@ -1152,6 +1152,110 @@ class _StockSessionCatalogue extends SessionCatalogue implements WorkspaceStoreS
 }
 
 void main() {
+  Map<String, dynamic> publicCoupon({String id = 'coupon-one', int revision = 1, String name = 'Host Diwali savings'}) => {
+    'couponId': id, 'revision': revision, 'scope': 'store_basket', 'storeId': 'store-one',
+    'publisherType': 'retailer', 'publisherName': 'Host Store',
+    'sourceId': 'store-coupon:evaluation:store-one:$id:$revision', 'terms': {
+      'name': name, 'percentage': false, 'discount': 1050, 'minimumSpendMinor': 10000,
+      'maximumSavingMinor': 1050, 'startsAt': at.toIso8601String(), 'endsAt': at.add(const Duration(days: 1)).toIso8601String(),
+      'totalUses': 20, 'usesPerCustomer': 1, 'active': true}};
+  Map<String, dynamic> publicCouponData(List<Map<String, dynamic>> items) => {
+    'schemaVersion': 1, 'storeCouponTermsVersion': 1, 'storeCouponSnapshotVersion': 1,
+    'realm': 'evaluation', 'storeId': 'store-one', 'orderingAvailable': false, 'redemptionAvailable': false,
+    'state': 'ready', 'complete': true, 'coverage': 'published_store_coupon_terms_only',
+    'observedAt': at.toIso8601String(), 'items': items};
+  SocialContentResponse publicCouponResponse(Map<String, dynamic> data) => SocialContentResponse(
+    statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+  AuthenticatedWorkspaceCatalogueGateway couponConnection(OwnerTransport transport, {bool supported = true, DateTime Function()? clock}) =>
+    AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, realm: 'evaluation', ownerAccountId: 'buyer-one',
+      productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true, storeClassificationReadbackSupported: true,
+      supplierPublishersVersionSupported: true, promotionTermsSupported: true, storeCouponTermsSupported: supported, now: clock ?? () => at);
+  test('LF04 PUBLIC COUPON snapshot negotiation is distinct and advertised terms are not a Cart benefit', () async {
+    final bodies = <Map<String, Object?>>[];
+    final transport = OwnerTransport((body) async {bodies.add(body); return publicCouponResponse(publicCouponData([publicCoupon()]));});
+    final gateway = couponConnection(transport), source = WorkspaceStoreCatalogueSource(gateway: couponConnection(transport), storeId: 'store-one', current: () => true);
+    final rows = await source.loadStoreCoupons(storeId: 'store-one');
+    expect(rows.single.name, 'Host Diwali savings'); expect(rows.single.terms.flatBasis, 'per_order');
+    expect(rows.single.terms.flatAmountMinor, 1050); expect(rows.single.configuredTotalUses, 20);
+    expect(rows.single.isCurrent(at), isTrue); expect(rows.single.isCurrent(at.add(const Duration(minutes: 1))), isFalse);
+    expect(bodies.single.keys.toSet(), {'operation', 'storeId', 'storeCouponTermsVersion', 'storeCouponSnapshotVersion'});
+    expect(bodies.single['operation'], 'readPublicStoreCouponSnapshot');
+    expect(gateway.forOwnerAccount('owner-one').storeCouponTermsSupported, isTrue);
+    expect(() => rows.clear(), throwsUnsupportedError);
+  });
+  for (final fault in ['incomplete', 'unavailable', 'wrong realm', 'wrong Store', 'ordering', 'redemption',
+    'old version', 'paged response', 'future snapshot', 'stale snapshot', 'duplicate', 'foreign campaign',
+    'platform sponsor', 'private term', 'blank name', 'fractional saving', 'paused']) {
+    test('LF04 PUBLIC COUPON rejects $fault without claiming verified empty', () async {
+      final row = publicCoupon(), data = publicCouponData([row]), terms = row['terms'] as Map<String, dynamic>;
+      switch (fault) {
+        case 'incomplete': data['complete'] = false;
+        case 'unavailable': data['state'] = 'unavailable';
+        case 'wrong realm': data['realm'] = 'production';
+        case 'wrong Store': data['storeId'] = 'store-two';
+        case 'ordering': data['orderingAvailable'] = true;
+        case 'redemption': data['redemptionAvailable'] = true;
+        case 'old version': data.remove('storeCouponSnapshotVersion');
+        case 'paged response': data['nextCursor'] = null;
+        case 'future snapshot': data['observedAt'] = at.add(const Duration(seconds: 1)).toIso8601String();
+        case 'stale snapshot': data['observedAt'] = at.subtract(const Duration(minutes: 1)).toIso8601String();
+        case 'duplicate': data['items'] = [row, row];
+        case 'foreign campaign': row['storeId'] = 'store-two';
+        case 'platform sponsor': row['publisherType'] = 'moolSocial';
+        case 'private term': terms['ownerUserId'] = 'owner-one';
+        case 'blank name': terms['name'] = '';
+        case 'fractional saving': terms['discount'] = 10.5;
+        case 'paused': terms['active'] = false;
+      }
+      final source = WorkspaceStoreCatalogueSource(gateway: couponConnection(OwnerTransport((_) async => publicCouponResponse(data))),
+        storeId: 'store-one', current: () => true);
+      await expectLater(source.loadStoreCoupons(storeId: 'store-one'), throwsA(anything));
+    });
+  }
+  test('LF04 PUBLIC COUPON complete absence retires old revision and only a newer publication can return', () async {
+    var data = publicCouponData([publicCoupon()]);
+    final source = WorkspaceStoreCatalogueSource(gateway: couponConnection(OwnerTransport((_) async => publicCouponResponse(data))),
+      storeId: 'store-one', current: () => true);
+    expect((await source.loadStoreCoupons(storeId: 'store-one')).length, 1);
+    data = publicCouponData([]); expect(await source.loadStoreCoupons(storeId: 'store-one'), isEmpty);
+    data = publicCouponData([publicCoupon()]); await expectLater(source.loadStoreCoupons(storeId: 'store-one'), throwsFormatException);
+    data = publicCouponData([publicCoupon(revision: 2)]); expect((await source.loadStoreCoupons(storeId: 'store-one')).single.revision, 2);
+  });
+  test('LF04 PUBLIC COUPON retired or superseded reads cannot install a snapshot', () async {
+    var current = true; final pending = Completer<SocialContentResponse>(); var calls = 0;
+    final source = WorkspaceStoreCatalogueSource(gateway: couponConnection(OwnerTransport((_) {
+      if (++calls == 1) return pending.future;
+      return Future.value(publicCouponResponse(publicCouponData([publicCoupon(revision: 2)])));
+    })), storeId: 'store-one', current: () => current);
+    final first = source.loadStoreCoupons(storeId: 'store-one');
+    final rejected = expectLater(first, throwsA(anything)); await Future<void>.delayed(Duration.zero);
+    expect((await source.loadStoreCoupons(storeId: 'store-one')).single.revision, 2);
+    pending.complete(publicCouponResponse(publicCouponData([publicCoupon()]))); await rejected;
+    current = false; await expectLater(source.loadStoreCoupons(storeId: 'store-one'), throwsA(anything));
+    final disabledTransport = OwnerTransport((_) async => throw StateError('Unsupported source must not send'));
+    final disabled = WorkspaceStoreCatalogueSource(gateway: couponConnection(disabledTransport, supported: false), storeId: 'store-one', current: () => true);
+    await expectLater(disabled.loadStoreCoupons(storeId: 'store-one'), throwsA(anything)); expect(disabledTransport.calls, 0);
+  });
+  test('LF04 PUBLIC COUPON complete snapshot bounds preserve all400 and reject401, not truncate', () async {
+    var data = publicCouponData([for (var n = 0; n < 400; n++) publicCoupon(id: 'coupon-${n.toString().padLeft(3, '0')}')]);
+    final source = WorkspaceStoreCatalogueSource(gateway: couponConnection(OwnerTransport((_) async => publicCouponResponse(data))),
+      storeId: 'store-one', current: () => true);
+    expect((await source.loadStoreCoupons(storeId: 'store-one')).length, 400);
+    data = publicCouponData([for (var n = 0; n < 401; n++) publicCoupon(id: 'coupon-${n.toString().padLeft(3, '0')}')]);
+    await expectLater(source.loadStoreCoupons(storeId: 'store-one'), throwsFormatException);
+  });
+  test('LF04 PUBLIC COUPON contradictory same-revision terms cannot revive their previous copy', () async {
+    var data = publicCouponData([publicCoupon()]);
+    final source = WorkspaceStoreCatalogueSource(gateway: couponConnection(OwnerTransport((_) async => publicCouponResponse(data))),
+      storeId: 'store-one', current: () => true);
+    await source.loadStoreCoupons(storeId: 'store-one');
+    data = publicCouponData([publicCoupon(name: 'Contradictory same revision')]);
+    await expectLater(source.loadStoreCoupons(storeId: 'store-one'), throwsFormatException);
+    data = publicCouponData([publicCoupon()]); await expectLater(source.loadStoreCoupons(storeId: 'store-one'), throwsFormatException);
+    data = publicCouponData([publicCoupon(revision: 2)]);
+    expect((await source.loadStoreCoupons(storeId: 'store-one')).single.revision, 2);
+  });
   const stockScope = (account: 'owner-one', store: 'store-one', realm: 'evaluation', sku: 'sku-one');
   WorkspaceCatalogueOwnedSku stockMirror({WorkspaceStockEntryMethod method = WorkspaceStockEntryMethod.manual}) => WorkspaceCatalogueOwnedSku.decode(
     ownerRow(listed: true)..['provenance'] = {'entryMethod': method.name, 'sourceRecordId': 'sku-one'}, storeId: 'store-one',

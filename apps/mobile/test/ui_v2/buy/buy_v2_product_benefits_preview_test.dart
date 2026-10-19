@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -21,6 +25,97 @@ void main() {
       productId: session.selectedProductId,
     ),
   );
+
+  BuyV2PublishedStoreCoupon publishedCoupon(DateTime observed, {int revision = 1}) => BuyV2PublishedStoreCoupon(
+    realm: 'evaluation', storeId: 'host-store-one', couponId: 'host-diwali', revision: revision,
+    name: 'Diwali savings from Host Store', publisherName: 'Host Store', publisherType: BuyV2OfferPublisherType.retailer,
+    sourceId: 'store-coupon:evaluation:host-store-one:host-diwali:$revision', observedAt: observed,
+    validFrom: observed.subtract(const Duration(hours: 1)), validUntil: observed.add(const Duration(days: 1)),
+    configuredTotalUses: 20, configuredUsesPerCustomer: 1,
+    terms: BuyV2AdvertisedBenefitTerms(kind: 'flat', flatAmountMinor: 1050, flatBasis: 'per_order',
+      maximumSavingMinor: 1050, minimumSpendMinor: 10000));
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF04 PUBLISHED COUPON real-listing Store terms render without Cart authority at $scale', (tester) async {
+      tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset); addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      var clock = DateTime.utc(2026, 10, 20, 1);
+      final source = _PublishedCouponSource()..values = [publishedCoupon(clock)], commerce = _PublishedCouponCommerce();
+      final core = BuySession(), session = BuyV2Session(core: core, reviewDataEnabled: false,
+        commerceAdapter: commerce, cataloguePageSource: source, catalogueNow: () => clock);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      await session.restoreCommerce(); final product = commerce.product;
+      expect(session.openProduct(product.id), isTrue);
+      const hostCapture = Key('host-only-coupon-preview-capture');
+      await tester.pumpWidget(RepaintBoundary(key: hostCapture, child: app(session))); await tester.pumpAndSettle();
+      expect(session.publishedStoreCouponsFor(product), hasLength(1),
+        reason: 'Normal product entry must load published terms while live benefit eligibility remains disabled.');
+      expect(session.liveCartBenefitsEnabled, isFalse);
+      final tile = find.byKey(ValueKey('buy-published-store-coupon-${source.values.single.identity}'));
+      await tester.scrollUntilVisible(tile, 200, scrollable: find.descendant(
+        of: find.byKey(PageStorageKey('buy-product-${product.id}')), matching: find.byType(Scrollable)).first);
+      await tester.pumpAndSettle(); await tester.ensureVisible(find.text(source.values.single.name)); await tester.pumpAndSettle();
+      await tester.tap(find.text(source.values.single.name)); await tester.pumpAndSettle();
+      expect(find.text('Store-wide coupon · View terms'), findsOneWidget);
+      expect(find.text('₹10.50 off'), findsOneWidget);
+      expect(find.textContaining('maximum saving ₹10.50'), findsNothing);
+      expect(find.text('Minimum Store purchase ₹100'), findsOneWidget);
+      expect(find.textContaining('This information does not apply a discount'), findsOneWidget);
+      expect(session.cartLines, isEmpty); expect(session.scopedCouponSaving, 0);
+      expect(session.selectedCartBenefitsFor({BuyV2Destination.shop}), isEmpty);
+      expect(session.productBenefitsFor(product), isEmpty);
+      // Optional labelled host render, never phone/provider acceptance or golden replacement.
+      final captureRoot = Platform.environment['MOOLSOCIAL_HOST_COUPON_CAPTURE_ROOT'];
+      if (captureRoot != null) {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(hostCapture));
+        await tester.runAsync(() async {
+          final file = File('$captureRoot/lf04-public-coupon-host-${scale == 1 ? 'normal' : '2x'}-20261020-v3.png');
+          if (await file.exists()) throw StateError('Preserve the earlier host capture; choose a new evidence filename.');
+          final rendered = await boundary.toImage(pixelRatio: 1);
+          try {
+            final bytes = await rendered.toByteData(format: ui.ImageByteFormat.png);
+            await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
+          } finally {rendered.dispose();}
+        });
+      }
+      clock = clock.add(const Duration(minutes: 1)); await tester.pump(const Duration(minutes: 1)); await tester.pumpAndSettle();
+      expect(find.byKey(ValueKey('buy-published-store-coupon-${source.values.single.identity}')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+  test('LF04 PUBLISHED COUPON refresh failure and retired reads cannot retain old advertised terms', () async {
+    final clock = DateTime.utc(2026, 10, 20, 1), source = _PublishedCouponSource(), commerce = _PublishedCouponCommerce();
+    source.values = [publishedCoupon(clock)];
+    final core = BuySession(), session = BuyV2Session(core: core, reviewDataEnabled: false,
+      commerceAdapter: commerce, cataloguePageSource: source, catalogueNow: () => clock);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    await session.restoreCommerce(); final product = commerce.product;
+    expect(await session.refreshPublishedStoreCoupons(product.id), isTrue);
+    expect(session.publishedStoreCouponsFor(product).length, 1);
+    source.fail = true; expect(await session.refreshPublishedStoreCoupons(product.id), isFalse);
+    expect(session.publishedStoreCouponsFor(product), isEmpty);
+    source.fail = false; source.held = Completer<List<BuyV2PublishedStoreCoupon>>();
+    final pending = session.refreshPublishedStoreCoupons(product.id); await Future<void>.delayed(Duration.zero);
+    source.active = false; source.held!.complete([publishedCoupon(clock)]);
+    expect(await pending, isFalse); expect(session.publishedStoreCouponsFor(product), isEmpty);
+    expect(session.scopedCouponSaving, 0);
+  });
+  test('LF04 PUBLISHED COUPON newer read wins and another real Store listing receives no coupon', () async {
+    final clock = DateTime.utc(2026, 10, 20, 1), source = _PublishedCouponSource(), commerce = _PublishedCouponCommerce();
+    final core = BuySession(), session = BuyV2Session(core: core, reviewDataEnabled: false,
+      commerceAdapter: commerce, cataloguePageSource: source, catalogueNow: () => clock);
+    addTearDown(core.dispose); addTearDown(session.dispose); await session.restoreCommerce();
+    final firstResult = Completer<List<BuyV2PublishedStoreCoupon>>(); source.held = firstResult;
+    final first = session.refreshPublishedStoreCoupons(commerce.product.id); await Future<void>.delayed(Duration.zero);
+    source.held = null; source.values = [publishedCoupon(clock, revision: 2)];
+    expect(await session.refreshPublishedStoreCoupons(commerce.product.id), isTrue);
+    firstResult.complete([publishedCoupon(clock)]); expect(await first, isFalse);
+    expect(session.publishedStoreCouponsFor(commerce.product).single.revision, 2);
+    final other = _PublishedCouponCommerce(store: 'host-store-two').product;
+    expect(other.publicListingIdentity!.matches(other), isTrue);
+    expect(session.publishedStoreCouponsFor(other), isEmpty);
+    expect(session.scopedCouponSaving, 0); expect(session.cartLines, isEmpty);
+  });
 
   testWidgets('Store-wide named coupon disclosure expands without applying per-SKU savings', (tester) async {
     tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
@@ -258,4 +353,31 @@ final class _StoreCouponCommerce implements BuyV2CommerceAdapter {
     products: [for (final product in BuyV2Catalogue.allProducts)
       product.copyWith(storeId: product.id == 's-milk' ? 'host-store-one' : 'host-store-two')]);
   @override dynamic noSuchMethod(Invocation invocation) => throw UnsupportedError('Host read-only fixture');
+}
+
+// Explicitly isolated published-listing/advertisement fixtures; never phone data.
+class _PublishedCouponSource implements BuyV2CataloguePageSource, BuyV2StoreCouponSource {
+  bool active = true, fail = false;
+  List<BuyV2PublishedStoreCoupon> values = [];
+  Completer<List<BuyV2PublishedStoreCoupon>>? held;
+  @override bool get storeCouponsActive => active;
+  @override Future<List<BuyV2PublishedStoreCoupon>> loadStoreCoupons({required String storeId}) async {
+    if (fail) throw StateError('Host unavailable public source');
+    return held?.future ?? values;
+  }
+  @override dynamic noSuchMethod(Invocation invocation) => throw UnsupportedError('No fixture catalogue page');
+}
+class _PublishedCouponCommerce implements BuyV2CommerceAdapter {
+  _PublishedCouponCommerce({this.store = 'host-store-one'});
+  final String store;
+  late final identity = BuyV2PublicListingIdentity(listingId: 'listing-${(store == 'host-store-one' ? 'd' : 'e') * 64}', realm: 'evaluation',
+    storeId: store, skuId: 'host-sku-one', canonicalProductId: 'host-milk-one',
+    verifiedPackId: 'host-pack-one', channel: BuyV2OfferClass.retail);
+  late final product = BuyV2Product(id: identity.listingId, canonicalId: identity.canonicalProductId,
+    publicListingIdentity: identity, storeId: identity.storeId, offerClass: BuyV2OfferClass.retail,
+    destination: BuyV2Destination.shop, categoryId: 'dairy', brand: 'Host', title: 'Host milk', variant: 'Plain',
+    pack: '1 litre', priceMinor: 7050, unitPrice: '₹70.50/litre', badge: '', seller: 'Host Store',
+    sellerType: 'Retailer', deliveryPromise: '', origin: '', confirmedOn: '', visualLabel: '', visualKind: 'milk');
+  @override Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready, products: [product]);
+  @override dynamic noSuchMethod(Invocation invocation) => throw UnsupportedError('Host read-only commerce fixture');
 }

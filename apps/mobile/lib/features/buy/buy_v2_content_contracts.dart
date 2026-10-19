@@ -542,6 +542,50 @@ class BuyV2AdvertisedBenefitTerms {
     'minimumSpendMinor': minimumSpendMinor, 'minimumQuantity': minimumQuantity};
 }
 
+/// Named Store-wide advertisement. It carries configured terms and limits,
+/// never a Cart eligibility result, selected benefit or applied saving.
+@immutable
+class BuyV2PublishedStoreCoupon {
+  const BuyV2PublishedStoreCoupon({required this.realm, required this.storeId, required this.couponId,
+    required this.revision, required this.name, required this.publisherName, required this.publisherType,
+    required this.sourceId, required this.observedAt, required this.validFrom, required this.validUntil,
+    required this.terms, required this.configuredTotalUses, required this.configuredUsesPerCustomer});
+  final String realm, storeId, couponId, name, publisherName, sourceId;
+  final BuyV2OfferPublisherType publisherType;
+  final int revision, configuredTotalUses, configuredUsesPerCustomer;
+  final DateTime observedAt, validFrom, validUntil;
+  final BuyV2AdvertisedBenefitTerms terms;
+  String get identity => jsonEncode([realm, storeId, couponId]);
+  // A local cache lifetime, not an operational-availability or redemption claim.
+  DateTime get freshUntil {
+    final freshness = observedAt.add(const Duration(minutes: 1));
+    return freshness.isBefore(validUntil) ? freshness : validUntil;
+  }
+  bool isCurrent(DateTime now) => {'evaluation', 'production'}.contains(realm) &&
+    RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(storeId) &&
+    RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(couponId) &&
+    revision >= 1 && revision <= 1000000000 && name.isNotEmpty && name == name.trim() && name.length <= 80 &&
+    !RegExp(r'[\x00-\x1f]').hasMatch(name) && publisherName.isNotEmpty && publisherName == publisherName.trim() &&
+    publisherName.length <= 240 && !RegExp(r'[\x00-\x1f]').hasMatch(publisherName) &&
+    {BuyV2OfferPublisherType.retailer, BuyV2OfferPublisherType.wholesaler, BuyV2OfferPublisherType.manufacturer}.contains(publisherType) &&
+    sourceId == 'store-coupon:$realm:$storeId:$couponId:$revision' &&
+    !observedAt.isAfter(now) && !validFrom.isAfter(observedAt) && observedAt.isBefore(validUntil) &&
+    !now.isBefore(validFrom) && now.isBefore(freshUntil) &&
+    configuredTotalUses > 0 && configuredTotalUses <= 1000000000 && configuredUsesPerCustomer > 0 &&
+    configuredUsesPerCustomer <= configuredTotalUses &&
+    (terms.kind == 'flat' ? terms.flatBasis == 'per_order' && terms.flatAmountMinor != null &&
+      terms.maximumSavingMinor == terms.flatAmountMinor : terms.kind == 'percentage' && terms.percentageBasisPoints != null) &&
+    terms.minimumQuantity == null && terms.minimumSpendMinor != null && terms.minimumSpendMinor! <= 9000000000000 &&
+    terms.maximumSavingMinor != null && terms.maximumSavingMinor! <= 9000000000000;
+}
+
+/// Advertised Store basket terms only. No eligible saving, selection or payable
+/// authority. Throw for incomplete/unavailable reads, never return false zeros.
+abstract interface class BuyV2StoreCouponSource {
+  bool get storeCouponsActive;
+  Future<List<BuyV2PublishedStoreCoupon>> loadStoreCoupons({required String storeId});
+}
+
 /// A published placement owns an exact Store listing and current source facts.
 /// Being returned by an offersOnly product filter is not publication evidence.
 @immutable

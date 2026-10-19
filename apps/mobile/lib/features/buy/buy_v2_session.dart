@@ -4752,6 +4752,66 @@ class BuyV2Session extends ChangeNotifier {
       _catalogueOfferPagers[scopeKey]?.pager.query;
 
   final Map<BuyV2Destination, String> _catalogueStoreBrowseAnchors = {};
+  final _publishedStoreCoupons = <String, List<BuyV2PublishedStoreCoupon>>{};
+  final _storeCouponRequests = <String, int>{};
+  int _storeCouponRequest = 0;
+  Timer? _storeCouponExpiry;
+  String? _storeCouponKey(BuyV2Product product) {
+    final identity = product.publicListingIdentity;
+    if (isStoreProcurement || identity?.valid != true || !identity!.matches(product) ||
+        !{BuyV2Destination.shop, BuyV2Destination.wholesale}.contains(product.destination)) { return null; }
+    return jsonEncode([identity.realm, identity.storeId]);
+  }
+  List<BuyV2PublishedStoreCoupon> publishedStoreCouponsFor(BuyV2Product product) {
+    final key = _storeCouponKey(product), source = _sourceForCatalogue(product.destination);
+    if (_collectionDisposed || key == null || source is! BuyV2StoreCouponSource ||
+        !(source as BuyV2StoreCouponSource).storeCouponsActive) { return const []; }
+    return List.unmodifiable((_publishedStoreCoupons[key] ?? const <BuyV2PublishedStoreCoupon>[])
+      .where((coupon) => coupon.realm == product.publicListingIdentity!.realm &&
+        coupon.storeId == product.storeId && coupon.isCurrent(catalogueNow())));
+  }
+  Future<bool> refreshPublishedStoreCoupons(String productId) async {
+    final product = findProduct(productId);
+    if (product == null || _collectionDisposed) return false;
+    final key = _storeCouponKey(product), source = _sourceForCatalogue(product.destination);
+    if (key == null || source is! BuyV2StoreCouponSource || !(source as BuyV2StoreCouponSource).storeCouponsActive) return false;
+    final reader = source as BuyV2StoreCouponSource, sequence = ++_storeCouponRequest;
+    _storeCouponRequests[key] = sequence;
+    _publishedStoreCoupons.remove(key);
+    _scheduleStoreCouponExpiry(); notifyListeners();
+    bool current() => !_collectionDisposed && _storeCouponRequests[key] == sequence && reader.storeCouponsActive &&
+      identical(_sourceForCatalogue(product.destination), source) && findProduct(productId)?.publicListingIdentity == product.publicListingIdentity;
+    try {
+      final results = await reader.loadStoreCoupons(storeId: product.storeId!).timeout(const Duration(seconds: 26));
+      if (!current()) return false;
+      final ids = <String>{};
+      if (results.length > 400 || results.any((coupon) => coupon.realm != product.publicListingIdentity!.realm ||
+          coupon.storeId != product.storeId || !coupon.isCurrent(catalogueNow()) || !ids.add(coupon.couponId))) {
+        throw const FormatException();
+      }
+      _publishedStoreCoupons[key] = List.unmodifiable(results);
+      _scheduleStoreCouponExpiry(); notifyListeners();
+      return true;
+    } on Object {
+      if (current()) {_publishedStoreCoupons.remove(key); _scheduleStoreCouponExpiry(); notifyListeners();}
+      return false;
+    }
+  }
+  void _scheduleStoreCouponExpiry() {
+    _storeCouponExpiry?.cancel();
+    if (_collectionDisposed) return;
+    final deadlines = _publishedStoreCoupons.values.expand((values) => values).map((coupon) => coupon.freshUntil).toList()..sort();
+    if (deadlines.isEmpty) return;
+    var delay = deadlines.first.difference(catalogueNow());
+    if (delay.isNegative) delay = Duration.zero;
+    _storeCouponExpiry = Timer(delay, () {
+      if (_collectionDisposed) return;
+      for (final key in _publishedStoreCoupons.keys.toList()) {
+        _publishedStoreCoupons[key] = _publishedStoreCoupons[key]!.where((coupon) => coupon.isCurrent(catalogueNow())).toList();
+      }
+      _scheduleStoreCouponExpiry(); notifyListeners();
+    });
+  }
   ({BuyV2StorePublishedOffersSource source, BuyV2PublishedCatalogueOffer offer,
     BuyV2Product product, Set<BuyV2Product> superseded})? _openedStorePromotion;
   Timer? _advertisedOfferExpiry;
@@ -4982,6 +5042,7 @@ class BuyV2Session extends ChangeNotifier {
   void dispose() {
     _collectionDisposed = true;
     _advertisedOfferExpiry?.cancel();
+    _storeCouponExpiry?.cancel();
     storeStockReader?.removeListener(_onStoreStockChanged);
     storeStockReader?.dispose();
     _ordersNavigationVisit = null;
@@ -11030,13 +11091,14 @@ class BuyV2Session extends ChangeNotifier {
     );
   }
 
-  Future<bool> refreshProductBenefits(String productId) async {
+  Future<bool> refreshProductBenefits(String productId, {bool refreshCouponTerms = true}) async {
     final product = findProduct(productId);
     if (product == null) {
       notice = 'This product could not be found.';
       notifyListeners();
       return false;
     }
+    if (refreshCouponTerms) unawaited(refreshPublishedStoreCoupons(productId));
     if (_productBenefitAmountMinor(product) == null) {
       _productBenefitStates[product.id] = BuyV2CartBenefitsLoadState.unavailable;
       _productBenefitMessages[product.id] = _unsupportedBenefitsMessage;
@@ -13801,8 +13863,9 @@ class BuyV2Session extends ChangeNotifier {
       previous,
       BuyV2NavigationMotionDirection.forward,
     );
+    unawaited(refreshPublishedStoreCoupons(item.id));
     if (liveCartBenefitsEnabled) {
-      unawaited(refreshProductBenefits(item.id));
+      unawaited(refreshProductBenefits(item.id, refreshCouponTerms: false));
     }
     _requestVariantFamily(item);
     return true;
@@ -13861,8 +13924,9 @@ class BuyV2Session extends ChangeNotifier {
       previous,
       BuyV2NavigationMotionDirection.replace,
     );
+    unawaited(refreshPublishedStoreCoupons(next.id));
     if (liveCartBenefitsEnabled) {
-      unawaited(refreshProductBenefits(next.id));
+      unawaited(refreshProductBenefits(next.id, refreshCouponTerms: false));
     }
     _requestVariantFamily(next);
     return true;

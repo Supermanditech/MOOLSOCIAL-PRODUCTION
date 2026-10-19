@@ -2541,7 +2541,7 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
 
 /// Genuine exact-Store catalogue source. Global/geo discovery and Store address
 /// metadata require their own providers; an unsupported call is not an empty feed.
-class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2VariantFamilySource, BuyV2StorePublishedOffersSource {
+class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2VariantFamilySource, BuyV2StorePublishedOffersSource, BuyV2StoreCouponSource {
   WorkspaceStoreCatalogueSource({required this.gateway, required this.storeId, required this.current, this.contentReadback});
   final AuthenticatedWorkspaceCatalogueGateway gateway;
   final String storeId;
@@ -2553,6 +2553,87 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
   String? _publicStoreName;
   int _promotionGeneration = 0;
   final _promotionHeads = <String, ({int revision, DateTime observed, String copy})>{};
+  int _couponGeneration = 0;
+  final _couponHeads = <String, ({int revision, String? copy})>{};
+  @override bool get storeCouponsActive => current() && gateway.storeCouponTermsSupported;
+  @override Future<List<BuyV2PublishedStoreCoupon>> loadStoreCoupons({required String storeId}) {
+    var reading = true;
+    final generation = ++_couponGeneration;
+    bool active() => reading && storeCouponsActive && generation == _couponGeneration;
+    return _readStoreCoupons(storeId, active).timeout(const Duration(seconds: 25)).whenComplete(() => reading = false);
+  }
+  Future<List<BuyV2PublishedStoreCoupon>> _readStoreCoupons(String requestedStore, bool Function() active) async {
+    if (requestedStore != storeId || !active()) throw const FormatException('Store coupons are not connected.');
+    _id(storeId);
+    final values = <BuyV2PublishedStoreCoupon>[], ids = <String>{};
+      if (!active()) throw const FormatException();
+      final response = await gateway._ownerRequest({'operation': 'readPublicStoreCouponSnapshot',
+        'storeId': storeId, 'storeCouponTermsVersion': 1, 'storeCouponSnapshotVersion': 1}, active, mutation: false);
+      if (!active() || response?.statusCode != 200) throw const FormatException('Store coupons could not be checked.');
+      final envelope = _map(jsonDecode(response!.body));
+      if (envelope['ok'] != true) throw const FormatException();
+      final data = _map(envelope['data']);
+      _keys(data, ['schemaVersion', 'storeCouponTermsVersion', 'realm', 'storeId', 'orderingAvailable',
+        'redemptionAvailable', 'state', 'coverage', 'observedAt', 'items', 'storeCouponSnapshotVersion', 'complete']);
+      _int(data['schemaVersion'], 1, 1); _int(data['storeCouponTermsVersion'], 1, 1);
+      _int(data['storeCouponSnapshotVersion'], 1, 1);
+      final observed = _time(data['observedAt']), now = gateway.now().toUtc();
+      if (data['realm'] != gateway.realm || data['storeId'] != storeId || data['orderingAvailable'] != false ||
+          data['redemptionAvailable'] != false || data['state'] != 'ready' || data['complete'] != true ||
+          data['coverage'] != 'published_store_coupon_terms_only' || observed.isAfter(now) ||
+          !now.isBefore(observed.add(const Duration(minutes: 1)))) { throw const FormatException(); }
+      final items = _list(data['items'], 400);
+      String? previous;
+      for (final raw in items) {
+        final row = _map(raw);
+        _keys(row, ['couponId', 'revision', 'scope', 'storeId', 'publisherType', 'publisherName', 'terms', 'sourceId']);
+        final id = _id(row['couponId']), revision = _int(row['revision'], 1, 1000000000);
+        if (!ids.add(id) || previous != null && id.compareTo(previous) <= 0 ||
+            row['scope'] != 'store_basket' || row['storeId'] != storeId) { throw const FormatException(); }
+        previous = id;
+        final terms = _map(row['terms']);
+        _keys(terms, ['name', 'percentage', 'discount', 'minimumSpendMinor', 'maximumSavingMinor',
+          'startsAt', 'endsAt', 'totalUses', 'usesPerCustomer', 'active']);
+        if (terms['percentage'] is! bool || terms['active'] != true) throw const FormatException();
+        final percentage = terms['percentage'] as bool, discount = _int(terms['discount'], 1, percentage ? 10000 : 9000000000000);
+        final cap = _int(terms['maximumSavingMinor'], 1, 9000000000000);
+        if (!percentage && cap != discount) throw const FormatException();
+        final publisher = BuyV2OfferPublisherType.values.where((p) => p.name == row['publisherType']).single;
+        final value = BuyV2PublishedStoreCoupon(realm: gateway.realm, storeId: storeId, couponId: id,
+          revision: revision, name: _string(terms['name'], 80), publisherType: publisher,
+          publisherName: _string(row['publisherName'], 240), sourceId: _string(row['sourceId'], 512), observedAt: observed,
+          validFrom: _time(terms['startsAt']), validUntil: _time(terms['endsAt']),
+          configuredTotalUses: _int(terms['totalUses'], 1, 1000000000),
+          configuredUsesPerCustomer: _int(terms['usesPerCustomer'], 1, 1000000000),
+          terms: BuyV2AdvertisedBenefitTerms(kind: percentage ? 'percentage' : 'flat',
+            flatAmountMinor: percentage ? null : discount, flatBasis: percentage ? null : 'per_order',
+            percentageBasisPoints: percentage ? discount : null, maximumSavingMinor: cap,
+            minimumSpendMinor: _int(terms['minimumSpendMinor'], 0, 9000000000000)));
+        if (!value.isCurrent(now)) throw const FormatException();
+        values.add(value);
+      }
+    if (!active() || values.any((value) => !value.isCurrent(gateway.now().toUtc()))) {
+      throw const FormatException('Store coupon read is incomplete.');
+    }
+    final copies = <String, ({int revision, String? copy})>{};
+    for (final value in values) {
+      final copy = jsonEncode([value.name, value.terms.toJson(), value.validFrom.toIso8601String(),
+        value.validUntil.toIso8601String(), value.configuredTotalUses, value.configuredUsesPerCustomer]);
+      final old = _couponHeads[value.couponId];
+      if (old != null && (value.revision < old.revision || value.revision == old.revision && old.copy != copy)) {
+        if (value.revision == old.revision) _couponHeads[value.couponId] = (revision: old.revision, copy: null);
+        throw const FormatException('Coupon revision changed. Refresh the Store.');
+      }
+      copies[value.couponId] = (revision: value.revision, copy: copy);
+    }
+    // A complete absence retires the observed revision. Re-enabling a paused
+    // campaign requires a new server revision, not an older cached rich copy.
+    for (final old in _couponHeads.entries.toList()) {
+      if (!copies.containsKey(old.key)) _couponHeads[old.key] = (revision: old.value.revision, copy: null);
+    }
+    _couponHeads.addAll(copies);
+    return List.unmodifiable(values);
+  }
   void Function() _prepareMetadata(Map<String, dynamic> data) {
     final store = _publicStore(data, storeId, gateway.realm, gateway.now().toUtc(),
       supplierPublishersSupported: gateway.supplierPublishersVersionSupported);
@@ -3036,7 +3117,7 @@ class WorkspaceProductPresentationGateway {
 
 class WorkspacePublicDiscoverySource extends ChangeNotifier
     implements BuyV2CataloguePageSource, BuyV2VariantFamilySource,
-      BuyV2ProductContentAdapter, BuyV2StorePublishedOffersSource, BuyV2PublishedCatalogueSource {
+      BuyV2ProductContentAdapter, BuyV2StorePublishedOffersSource, BuyV2PublishedCatalogueSource, BuyV2StoreCouponSource {
   WorkspacePublicDiscoverySource({required this.gateway, required this.current}) {
     if (!gateway.productFactsReadbackSupported || !gateway.unbrandedProduceReadbackSupported ||
         !gateway.storeClassificationReadbackSupported) { throw ArgumentError('Matching discovery contracts are required.'); }
@@ -3294,6 +3375,9 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   }
   @override
   bool get storeOffersActive => active;
+  @override bool get storeCouponsActive => active && gateway.storeCouponTermsSupported;
+  @override Future<List<BuyV2PublishedStoreCoupon>> loadStoreCoupons({required String storeId}) =>
+    _store(storeId).loadStoreCoupons(storeId: storeId);
   @override
   Future<List<BuyV2PublishedCatalogueOffer>> loadStoreOffers({required String storeId, required BuyV2Destination destination}) =>
     _store(storeId).loadStoreOffers(storeId: storeId, destination: destination);
@@ -3332,6 +3416,7 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
+    storeCouponTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V1'),
     promotionDiscoverySupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PROMOTION_DISCOVERY_V1'));
   return WorkspacePublicDiscoverySource(gateway: gateway, current: current);
 }
@@ -3391,6 +3476,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
     reviewedProductMediaSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_MEDIA_REVIEW_V1'),
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
+    storeCouponTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V1'),
     storeClassificationReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_STORE_CLASSIFICATION_V1'),
     supplierPublishersVersionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_PUBLISHERS_V1'),
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
@@ -3431,6 +3517,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.minorMoneyReadbackSupported = false,
     this.promotionDiscoverySupported = false,
     this.promotionTermsSupported = false,
+    this.storeCouponTermsSupported = false,
     this.stockSnapshotsSupported = false,
     DateTime Function()? now,
   }) : _reviewedVariantsOverride = reviewedVariants, _productMediaTransportOverride = productMediaTransport, now = now ?? DateTime.now {
@@ -3468,6 +3555,7 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool minorMoneyReadbackSupported;
   final bool promotionDiscoverySupported;
   final bool promotionTermsSupported;
+  final bool storeCouponTermsSupported;
   @override
   final bool stockSnapshotsSupported;
   @override
@@ -3505,6 +3593,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       minorMoneyReadbackSupported: minorMoneyReadbackSupported,
       promotionDiscoverySupported: promotionDiscoverySupported,
       promotionTermsSupported: promotionTermsSupported,
+      storeCouponTermsSupported: storeCouponTermsSupported,
       stockSnapshotsSupported: stockSnapshotsSupported,
       now: now,
     );

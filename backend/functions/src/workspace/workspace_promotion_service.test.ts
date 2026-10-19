@@ -358,6 +358,57 @@ test('LF04-STORE-COUPON Firestore atomic persistence, restart, original reconcil
     await assert.rejects(open().handleOperation('owner-one', 'reconcileStoreCoupon', original));
   } finally {await deleteApp(app);}
 });
+const couponSnapshotBody = {storeCouponTermsVersion: 1, storeCouponSnapshotVersion: 1, storeId: 'store-one'};
+test('LF04-STORE-COUPON complete public snapshot has one transaction image and explicit bounded completeness', async () => {
+  const repo = new CouponMemory(), subject = storeCouponService(repo);
+  await subject.handleOperation('owner-one', 'saveStoreCoupon', storeCouponBody());
+  const first = repo.couponHeads.get('coupon-one')!;
+  repo.couponHeads.clear();
+  for (let n = 0; n < 400; n++) {
+    const id = `coupon-${`${n}`.padStart(3, '0')}`;
+    repo.couponHeads.set(id, {...first, couponId: id});
+  }
+  const snapshot = await subject.handleOperation('buyer-one', 'readPublicStoreCouponSnapshot', couponSnapshotBody) as any;
+  assert.equal(snapshot.state, 'ready'); assert.equal(snapshot.complete, true);
+  assert.equal(snapshot.items.length, 400); assert.equal(snapshot.storeCouponSnapshotVersion, 1);
+  assert.equal(Object.hasOwn(snapshot, 'nextCursor'), false);
+  repo.couponHeads.set('coupon-400', {...first, couponId: 'coupon-400'});
+  const tooLarge = await subject.handleOperation('buyer-one', 'readPublicStoreCouponSnapshot', couponSnapshotBody) as any;
+  assert.equal(tooLarge.state, 'unavailable'); assert.equal(tooLarge.complete, false); assert.deepEqual(tooLarge.items, []);
+  for (const row of repo.couponHeads.values()) row.active = false;
+  const filteredOverflow = await subject.handleOperation('buyer-one', 'readPublicStoreCouponSnapshot', couponSnapshotBody) as any;
+  assert.equal(filteredOverflow.state, 'unavailable'); assert.equal(filteredOverflow.complete, false);
+  assert.deepEqual(filteredOverflow.items, [], 'Filtered campaigns still count toward complete-snapshot capacity.');
+  repo.couponHeads.delete('coupon-400');
+  const empty = await subject.handleOperation('buyer-one', 'readPublicStoreCouponSnapshot', couponSnapshotBody) as any;
+  assert.equal(empty.state, 'ready'); assert.equal(empty.complete, true); assert.deepEqual(empty.items, []);
+  for (const body of [{...couponSnapshotBody, storeCouponSnapshotVersion: undefined},
+    {...couponSnapshotBody, storeCouponSnapshotVersion: '1'}, {...couponSnapshotBody, after: 'coupon-001'}]) {
+    await assert.rejects(subject.handleOperation('buyer-one', 'readPublicStoreCouponSnapshot', body));
+  }
+});
+test('LF04-STORE-COUPON Firestore complete snapshot crosses old page limit in a single transaction', async t => {
+  const host = process.env.FIRESTORE_EMULATOR_HOST;
+  if (!host) {t.skip('Explicit loopback emulator required'); return;}
+  assert.match(host, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: 'demo-lf-store-coupons'}, `coupon-snapshot-${randomUUID()}`), db = getFirestore(app);
+  const suffix = randomUUID().replaceAll('-', ''), storeId = `store-${suffix}`, caseId = `case-${suffix}`;
+  const originalTransaction = db.runTransaction.bind(db);
+  try {
+    await db.collection('workspaceProfiles').doc(caseId).create({...profile, workspaceId: storeId, caseId});
+    const subject = storeCouponService(new FirestorePromotionRepository(db, 'evaluation', () => new Date(at)));
+    for (let n = 0; n < 25; n++) await subject.handleOperation('owner-one', 'saveStoreCoupon',
+      storeCouponBody({storeId, couponId: `coupon-${`${n}`.padStart(3, '0')}`, idempotencyKey: `snapshot-original-${n}`}));
+    let transactions = 0;
+    db.runTransaction = ((...args: Parameters<typeof db.runTransaction>) => {
+      transactions++; return originalTransaction(...args);
+    }) as typeof db.runTransaction;
+    const snapshot = await subject.handleOperation('buyer-one', 'readPublicStoreCouponSnapshot', {...couponSnapshotBody, storeId}) as any;
+    assert.equal(transactions, 1); assert.equal(snapshot.complete, true); assert.equal(snapshot.items.length, 25);
+    assert.equal(snapshot.items[0].couponId, 'coupon-000'); assert.equal(snapshot.items[24].couponId, 'coupon-024');
+    assert.equal(snapshot.redemptionAvailable, false); assert.equal(snapshot.orderingAvailable, false);
+  } finally {db.runTransaction = originalTransaction; await deleteApp(app);}
+});
 for (const kind of ["flat", "percentage"] as const) {
   test(`LF04 advertised benefit terms owner save original recovery and public readback ${kind}`, async () => {
     const repository = new Memory(), subject = termsService(repository), benefitTerms = advertisedTerms(kind);

@@ -1805,6 +1805,10 @@ class BuyV2ProductView extends StatelessWidget {
                                 ),
                               ],
                             ),
+                          if ((shop || wholesale) && session.publishedStoreCouponsFor(product).isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            BuyV2CartAvoidanceRegion(child: _PublishedStoreCouponPanel(session: session, product: product)),
+                          ],
                           if ((shop || wholesale) &&
                               (productBenefitsState !=
                                       BuyV2CartBenefitsLoadState.ready ||
@@ -7521,6 +7525,54 @@ class _ProductTrustPill extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _PublishedStoreCouponPanel extends StatelessWidget {
+  const _PublishedStoreCouponPanel({required this.session, required this.product});
+  final BuyV2Session session;
+  final BuyV2Product product;
+  @override Widget build(BuildContext context) {
+    final coupons = session.publishedStoreCouponsFor(product);
+    if (coupons.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (final coupon in coupons.take(3)) _PublishedStoreCouponTile(coupon: coupon),
+      if (coupons.length > 3) TextButton(onPressed: () => showModalBottomSheet<void>(context: context,
+        isScrollControlled: true, useSafeArea: true, builder: (context) => AnimatedBuilder(animation: session,
+          builder: (context, _) {
+            final current = session.publishedStoreCouponsFor(product);
+            return SizedBox(height: MediaQuery.sizeOf(context).height * .8, child: Column(children: [
+              ListTile(title: const Text('Store coupon terms'), trailing: IconButton(tooltip: 'Close coupon terms',
+                icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context))),
+              Expanded(child: current.isEmpty ? const Center(child: Text('These terms need checking again.'))
+                : ListView.builder(padding: const EdgeInsets.all(12), itemCount: current.length,
+                  itemBuilder: (context, index) => _PublishedStoreCouponTile(coupon: current[index]))),
+            ]));
+          })), child: Text('View all ${coupons.length} Store coupons')),
+    ]);
+  }
+}
+class _PublishedStoreCouponTile extends StatelessWidget {
+  const _PublishedStoreCouponTile({required this.coupon});
+  final BuyV2PublishedStoreCoupon coupon;
+  @override Widget build(BuildContext context) {
+    final terms = coupon.terms, dates = MaterialLocalizations.of(context);
+    final saving = terms.kind == 'flat' ? '${_comparisonMoney(terms.flatAmountMinor!)} off'
+      : '${(terms.percentageBasisPoints! / 100).toStringAsFixed(terms.percentageBasisPoints! % 100 == 0 ? 0 : 2)}% off';
+    return Padding(padding: const EdgeInsets.only(bottom: 6), child: Material(
+      color: const Color(0xfff2f8f7), borderRadius: BorderRadius.circular(13),
+      child: ExpansionTile(key: ValueKey('buy-published-store-coupon-${coupon.identity}'),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 10), childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        leading: const Icon(Icons.confirmation_number_outlined, color: Color(0xff256b78)),
+        title: Text(coupon.name, style: context.buyBody.copyWith(fontWeight: FontWeight.w600)),
+        subtitle: Text('Store-wide coupon · View terms', style: context.buyMeta),
+        children: [Align(alignment: Alignment.centerLeft, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(terms.kind == 'flat' ? saving : '$saving · up to ${_comparisonMoney(terms.maximumSavingMinor!)}', style: context.buyBody),
+          Text('Minimum Store purchase ${_comparisonMoney(terms.minimumSpendMinor!)}', style: context.buyMeta),
+          Text('Valid ${dates.formatShortDate(coupon.validFrom.toLocal())} – ${dates.formatShortDate(coupon.validUntil.toLocal())}', style: context.buyMeta),
+          Text('${coupon.configuredUsesPerCustomer} ${coupon.configuredUsesPerCustomer == 1 ? 'use' : 'uses'} per customer · Campaign limit: ${coupon.configuredTotalUses} uses. This is not the remaining count.', style: context.buyMeta),
+          Text('${coupon.publisherName} · One saving per eligible Store basket, not per product. This information does not apply a discount; eligibility and the final saving need confirmation at Checkout.', style: context.buyMeta),
+        ]))] )));
   }
 }
 

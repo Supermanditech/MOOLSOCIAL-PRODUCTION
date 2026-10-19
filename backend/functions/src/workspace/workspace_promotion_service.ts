@@ -275,7 +275,7 @@ export class WorkspacePromotionService {
   async handleOperation(userId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     id(userId); body = structuredClone(body);
     if (Buffer.byteLength(JSON.stringify({operation, ...body}), "utf8") > 60000) fail();
-    if (["saveStoreCoupon", "readStoreCoupon", "listStoreCoupons", "reconcileStoreCoupon", "readPublicStoreCoupons"].includes(operation)) {
+    if (["saveStoreCoupon", "readStoreCoupon", "listStoreCoupons", "reconcileStoreCoupon", "readPublicStoreCoupons", "readPublicStoreCouponSnapshot"].includes(operation)) {
       return this.storeCouponOperation(userId, operation, body);
     }
     const negotiated = this.negotiation(body);
@@ -325,8 +325,11 @@ export class WorkspacePromotionService {
       if (value && value.couponId !== couponId) fail();
       return {...envelope(), record: value ?? null, publicationConfirmed: false};
     }
-    const query = exact(body, ["storeId", "limit"], ["after"]);
-    const limit = integer(query.limit, 1, 20), after = query.after === undefined ? undefined : id(query.after);
+    const completeSnapshot = operation === "readPublicStoreCouponSnapshot";
+    const query = completeSnapshot ? exact(body, ["storeId", "storeCouponSnapshotVersion"]) : exact(body, ["storeId", "limit"], ["after"]);
+    if (completeSnapshot && query.storeCouponSnapshotVersion !== 1) fail("unavailable", 503);
+    const limit = completeSnapshot ? 401 : integer(query.limit, 1, 20);
+    const after = completeSnapshot || query.after === undefined ? undefined : id(query.after);
     if (operation === "listStoreCoupons") {
       if (!repo.pageCoupons) fail("unavailable", 503);
       owner(await repo.store(storeId), storeId, userId);
@@ -343,6 +346,7 @@ export class WorkspacePromotionService {
       const observedAt = time(snapshot.observedAt), now = this.now().toISOString();
       if (observedAt > now) fail("stale_snapshot", 409);
       const rows = couponPage(snapshot.records, repo.realm, storeId, after, limit);
+      if (completeSnapshot && rows.length > 400) fail("incomplete_snapshot", 503);
       const items: object[] = [];
       for (const row of rows) {
         if (row.observedAt > observedAt) fail("stale_snapshot", 409);
@@ -355,10 +359,11 @@ export class WorkspacePromotionService {
           sourceId: `store-coupon:${repo.realm}:${storeId}:${row.couponId}:${row.revision}`});
       }
       return {...envelope(), state: "ready", coverage: "published_store_coupon_terms_only",
-        observedAt, items, nextCursor: rows.length === limit ? rows.at(-1)!.couponId : null};
+        observedAt, items, ...(completeSnapshot ? {storeCouponSnapshotVersion: 1, complete: true} :
+          {nextCursor: rows.length === limit ? rows.at(-1)!.couponId : null})};
     } catch {
       return {...envelope(), state: "unavailable", coverage: "published_store_coupon_terms_only",
-        observedAt: this.now().toISOString(), items: [], nextCursor: null};
+        observedAt: this.now().toISOString(), items: [], ...(completeSnapshot ? {storeCouponSnapshotVersion: 1, complete: false} : {nextCursor: null})};
     }
   }
   private async command(userId: string, body: Readonly<Record<string, unknown>>): Promise<PromotionCommand> {
@@ -694,11 +699,13 @@ export class FirestorePromotionRepository implements PromotionRepository {
     });
   }
   private async couponSnapshot(storeId: string, after: string | undefined, limit: number, userId?: string): Promise<StoreCouponSnapshot> {
+    // Only the internal complete public read may request its overflow sentinel.
+    const boundedLimit = limit === 401 && after === undefined && userId === undefined ? 401 : integer(limit, 1, 20);
     return this.firestore.runTransaction(async transaction => {
       const profiles = await transaction.get(this.profiles(storeId));
       const profile = owner(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId") ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined,
         storeId, userId);
-      let query = this.root(storeId).collection("storeCoupons").orderBy(FieldPath.documentId()).limit(integer(limit, 1, 20));
+      let query = this.root(storeId).collection("storeCoupons").orderBy(FieldPath.documentId()).limit(boundedLimit);
       if (after !== undefined) query = query.startAfter(id(after));
       const snapshot = await transaction.get(query);
       const records = snapshot.docs.map(d => {const value = couponRecord(d.data(), this.realm, storeId); if (value.couponId !== d.id) fail(); return value;});
@@ -706,6 +713,7 @@ export class FirestorePromotionRepository implements PromotionRepository {
     });
   }
   async pageCoupons(storeId: string, after: string | undefined, limit: number, userId?: string): Promise<StoreCouponRecord[]> {
+    integer(limit, 1, 20);
     return (await this.couponSnapshot(storeId, after, limit, userId)).records;
   }
   async publicCouponSnapshot(storeId: string, after: string | undefined, limit: number): Promise<StoreCouponSnapshot> {
