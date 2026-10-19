@@ -11607,13 +11607,24 @@ class BuyV2Session extends ChangeNotifier {
 
   // Freeze quote output as well as Cart inputs. A refreshed quote cannot renew
   // an older request's expiry or silently change its fee allocation after save.
-  String? _selectedScheduledQuoteAgreement(BuyV2CheckoutQuote? quote) => quote == null ? null : jsonEncode([
+  String? _checkoutQuoteAgreement(BuyV2CheckoutQuote? quote) => quote == null ? null : jsonEncode([
     quote.id, quote.sourceId, quote.evaluatedAt.toIso8601String(), quote.validUntil.toIso8601String(), quote.totalMinor,
     for (final line in quote.lines) [line.fulfilmentKey, line.itemSubtotalMinor, line.couponSavingMinor,
       line.taxMinor, line.freightMinor, line.deliveryFeeMinor, line.tipMinor, line.paymentChargeMinor, line.totalMinor,
       if (line.scheduledFulfilments case final acknowledgement?)
         for (final entry in acknowledgement.byProductId.entries)
           [entry.key, entry.value.quantity, entry.value.selection.toJson()]],
+    if (quote.paymentGroups case final groups?)
+      for (final group in groups) [group.id, group.fulfilmentKeys.toList()..sort(),
+        group.paymentMethod, group.currency, group.totalMinor, group.amountDueNowMinor],
+  ]);
+
+  String _checkoutTermsAgreement(Iterable<String> fulfilmentKeys) => jsonEncode([
+    commercialPaymentTermsEnabled,
+    if (commercialPaymentTermsEnabled) commercialPaymentTermsLoadState.name,
+    for (final key in fulfilmentKeys.toList()..sort())
+      [key, if (selectedCommercialPaymentTermFor(key) case final term?)
+        _commercialPaymentAgreement(term) else null],
   ]);
 
   void _invalidateCheckoutQuote() {
@@ -17509,8 +17520,10 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    final scheduledQuote = request.lines.any((line) => line.scheduledFulfilment != null) ? _checkoutQuote : null;
-    final scheduledQuoteAgreement = _selectedScheduledQuoteAgreement(scheduledQuote);
+    final originalQuote = _checkoutQuote;
+    final quoteAgreement = _checkoutQuoteAgreement(originalQuote);
+    final termKeys = groups.map((group) => group.key).toList(growable: false);
+    final termsAgreement = _checkoutTermsAgreement(termKeys);
     final discounts = _checkoutGroupCouponSavingsMinor();
     final quoteLines = {
       for (final line
@@ -17567,11 +17580,18 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     final stockChanged = _stockRequestHasShortage(request);
+    // Judge the frozen request's agreement, not a successor global payment
+    // selection. Scheduled delivery still requires its current input grant.
+    final agreementChanged = (checkoutQuoteEnabled &&
+          (checkoutQuoteLoadState != BuyV2CommerceLoadState.ready || originalQuote == null)) ||
+        quoteAgreement != _checkoutQuoteAgreement(_checkoutQuote) ||
+        termsAgreement != _checkoutTermsAgreement(termKeys) ||
+        (originalQuote != null && (request.checkoutQuoteId != originalQuote.id ||
+          !catalogueNow().isBefore(originalQuote.validUntil)));
     if (!retained || stockChanged ||
+        agreementChanged ||
         (request.lines.any((line) => line.scheduledFulfilment != null) &&
-          (!_selectedScheduledInputsCurrent(request) || checkoutQuoteReviewRequired || scheduledQuote == null ||
-            request.checkoutQuoteId != scheduledQuote.id || !catalogueNow().isBefore(scheduledQuote.validUntil) ||
-            scheduledQuoteAgreement != _selectedScheduledQuoteAgreement(_checkoutQuote))) ||
+          (!_selectedScheduledInputsCurrent(request) || checkoutQuoteReviewRequired || originalQuote == null)) ||
         (purchaseOrderRequired &&
             (purchaseOrderReviewRequired ||
                 purchaseOrder?.review?.requestId !=
@@ -18083,6 +18103,8 @@ class BuyV2Session extends ChangeNotifier {
       }
       final sequence = ++_groupOperationSequence;
       final identity = collectionIdentity?.value;
+      final quoteAgreement = _checkoutQuoteAgreement(_checkoutQuote);
+      final termsAgreement = _checkoutTermsAgreement(group.fulfilmentKeys);
       _checkoutIdempotencyKey = request.idempotencyKey;
       _paymentReference = null;
       _paymentActionUri = null;
@@ -18117,11 +18139,15 @@ class BuyV2Session extends ChangeNotifier {
       // This group has not dispatched yet. Recovery of a submitted group uses
       // the separate original-attempt path and must not require a fresh grant.
       final stockChanged = _stockRequestHasShortage(request);
-      if (stockChanged || request.lines.any((line) => line.scheduledFulfilment != null) &&
-          (!catalogueNow().isBefore(attempt.quoteValidUntil) || !_selectedScheduledInputsCurrent(request))) {
+      final agreementChanged = !catalogueNow().isBefore(attempt.quoteValidUntil) ||
+          quoteAgreement != _checkoutQuoteAgreement(_checkoutQuote) ||
+          termsAgreement != _checkoutTermsAgreement(group.fulfilmentKeys);
+      if (stockChanged || agreementChanged ||
+          request.lines.any((line) => line.scheduledFulfilment != null) && !_selectedScheduledInputsCurrent(request)) {
         checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
         _syncCheckoutGroupState(); _checkoutIdempotencyKey = null;
         notice = stockChanged ? 'Stock changed. Review the affected products before payment.'
+          : agreementChanged ? 'Order agreement changed. Review Checkout before payment.'
           : 'Scheduled delivery changed before payment. Review Checkout.';
         _persistCustomerState(); notifyListeners(); return false;
       }

@@ -2828,6 +2828,9 @@ void main() {
   legacyRecoveryFixture({
     bool manualDispose = false,
     ValueNotifier<BuyV2CollectionIdentity?>? identity,
+    DateTime Function()? clock,
+    TestPaymentQuote? quote,
+    bool withQuote = true,
   }) async {
     final core = BuySession();
     final commerce = TestLegacyRecoveryCommerce()
@@ -2845,7 +2848,8 @@ void main() {
         delegate: _T01CDeliveryFactsAdapter(),
       ),
       reviewDataEnabled: false,
-      checkoutQuoteAdapter: TestPaymentQuote(),
+      checkoutQuoteAdapter: withQuote ? quote ?? TestPaymentQuote() : null,
+      catalogueNow: clock ?? DateTime.now,
     );
     if (!manualDispose) {
       addTearDown(session.dispose);
@@ -2906,6 +2910,36 @@ void main() {
     expect(await session.submitOrder(), isFalse);
     expect(commerce.requests, hasLength(1));
   });
+
+  for (final change in ['expired', 'replacement', 'unchanged', 'no-quote']) {
+    test('LF08 ordinary legacy dispatch rechecks saved agreement $change', () async {
+      var now = DateTime.now();
+      final quote = TestPaymentQuote();
+      final (session, commerce, store) = await legacyRecoveryFixture(clock: () => now, quote: quote,
+        withQuote: change != 'no-quote');
+      await session.retainedAccountState();
+      final writes = store.writeCalls, hold = Completer<void>();
+      store.pendingWrite = hold;
+      final placing = session.submitOrder();
+      for (var i = 0; i < 100 && store.writeCalls == writes; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(store.writeCalls, greaterThan(writes));
+      expect(session.legacyCheckoutAttempt, isNotNull);
+      expect(commerce.requests, isEmpty);
+      if (change == 'expired') now = now.add(const Duration(hours: 2));
+      if (change == 'replacement') {
+        quote.charge = 1;
+        expect(await session.refreshCheckoutQuote(), isTrue);
+      }
+      hold.complete();
+      await placing;
+      final expectedDispatch = change == 'unchanged' || change == 'no-quote';
+      expect(commerce.requests, hasLength(expectedDispatch ? 1 : 0));
+      expect(session.quantityFor('s-tomato'), 1);
+      if (!expectedDispatch) expect(session.legacyCheckoutAttempt, isNull);
+    });
+  }
 
   test('T07 freezes complete request before delayed durable write', () async {
     final (session, commerce, store) = await legacyRecoveryFixture();
@@ -3541,6 +3575,86 @@ void main() {
     }
     expect(session.checkoutPaymentGroups, hasLength(2));
     return (session, commerce, store, quote);
+  }
+
+  for (final grouped in [false, true]) {
+    for (final changed in [false, true]) {
+      test('LF08 ordinary same-ID terms across saved agreement grouped=$grouped changed=$changed', () async {
+        final core = BuySession();
+        final TestPaymentCommerce commerce = grouped ? TestGroupedPaymentCommerce() : TestLegacyRecoveryCommerce();
+        commerce.snapshot = testPaymentSnapshot(null, addresses: const [_instructionAddress]);
+        final store = _MemoryCustomerStateStore('host-lf08-held-terms');
+        final terms = TestGroupedPaymentTerms(), quote = TestPaymentQuote();
+        if (grouped) {
+          quote.groupsFor = (lines, method) => [for (var i = 0; i < lines.length; i++)
+            BuyV2CheckoutPaymentGroup.minor(id: 'host-group-$i', fulfilmentKeys: {lines[i].fulfilmentKey},
+              paymentMethod: method, totalMinor: lines[i].totalMinor, amountDueNowMinor: lines[i].totalMinor)];
+        }
+        final session = BuyV2Session(core: core, commerceAdapter: commerce, customerStateStore: store,
+          productFactsAdapter: BuyTestEligibilityFacts(delegate: _T01CDeliveryFactsAdapter()),
+          reviewDataEnabled: false, checkoutQuoteAdapter: quote, commercialPaymentTermsAdapter: terms);
+        addTearDown(session.dispose); addTearDown(core.dispose);
+        await session.restoreCommerce();
+        expect(session.addProduct('w-notebook'), isTrue, reason: session.notice);
+        session.openCart(); expect(session.openCheckout(), isTrue, reason: session.notice);
+        expect(await session.refreshCheckoutQuote(), isTrue);
+        await session.refreshCommercialPaymentTerms();
+        final key = session.checkoutFulfilmentGroups.single.key;
+        expect(session.chooseCommercialPaymentTerm(session.commercialPaymentTermsFor(key).single), isTrue);
+        await session.retainedAccountState();
+        final originalQuantity = session.quantityFor('w-notebook');
+        final writes = store.writeCalls, hold = Completer<void>();
+        store.pendingWrite = hold;
+        final placing = session.submitOrder();
+        for (var i = 0; i < 100 && store.writeCalls == writes; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 1));
+        }
+        expect(store.writeCalls, greaterThan(writes));
+        final frozen = grouped ? session.currentCheckoutPaymentGroup!.request : session.legacyCheckoutAttempt!.payment.request;
+        expect(commerce.requests, isEmpty);
+        if (changed) {
+          terms.credit = true;
+          await session.refreshCommercialPaymentTerms();
+          final replacement = session.commercialPaymentTermsFor(key).single;
+          expect(replacement.id, frozen.commercialPaymentTermIds[key]);
+          expect(replacement.kind, BuyV2CommercialPaymentTermKind.supplierCredit);
+          expect(session.selectedCommercialPaymentTermFor(key), isNull);
+        }
+        hold.complete(); await placing;
+        expect(commerce.requests, hasLength(changed ? 0 : 1));
+        expect(session.quantityFor('w-notebook'), originalQuantity);
+      });
+    }
+  }
+
+  for (final change in ['expired', 'replacement', 'unchanged']) {
+    test('LF08 ordinary grouped dispatch rechecks saved agreement $change', () async {
+      var now = DateTime.now();
+      final (session, commerce, store, quote) = await groupedFixture(clock: () => now);
+      await session.retainedAccountState();
+      final writes = store.writeCalls, hold = Completer<void>();
+      store.pendingWrite = hold;
+      final placing = session.submitOrder();
+      for (var i = 0; i < 100 && store.writeCalls == writes; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(store.writeCalls, greaterThan(writes));
+      expect(session.currentCheckoutPaymentGroup!.state, BuyV2CheckoutSubmissionState.submitting);
+      expect(commerce.requests, isEmpty);
+      if (change == 'expired') now = now.add(const Duration(hours: 2));
+      if (change == 'replacement') {
+        quote.charge = 1;
+        expect(await session.refreshCheckoutQuote(), isTrue);
+      }
+      hold.complete();
+      await placing;
+      expect(commerce.requests, hasLength(change == 'unchanged' ? 1 : 0));
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.quantityFor('s-rice'), 1);
+      if (change != 'unchanged') {
+        expect(session.currentCheckoutPaymentGroup!.state, BuyV2CheckoutSubmissionState.idle);
+      }
+    });
   }
 
   test(
