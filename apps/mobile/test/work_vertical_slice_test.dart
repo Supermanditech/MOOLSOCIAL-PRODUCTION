@@ -17,6 +17,8 @@ import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/features/work/work_product_promotions.dart';
+import 'package:moolsocial/features/work/widgets/store_product_promotions.dart';
 import 'package:moolsocial/features/work/widgets/store_settings_widgets.dart';
 import 'package:moolsocial/features/work/screens/work_onboarding_screens.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
@@ -65,7 +67,7 @@ class _Lf04DelayedOfferDraft implements WorkPendingProofStore {
   Map<String, Object?>? saved;
   Completer<Map<String, Object?>?>? readGate;
   Completer<void>? saveGate;
-  bool failRead = false, failSave = false;
+  bool failRead = false, failSave = false, failAfterSave = false;
   @override
   Future<Map<String, Object?>?> read(String scope) async {
     if (failRead) throw StateError('Host unavailable storage');
@@ -77,6 +79,7 @@ class _Lf04DelayedOfferDraft implements WorkPendingProofStore {
     if (saveGate != null) await saveGate!.future;
     if (failSave) throw StateError('Host failed write');
     saved = captured;
+    if (failAfterSave) throw StateError('Host lost save acknowledgement after write');
   }
   @override
   Future<void> clear(String scope) async => saved = null;
@@ -108,6 +111,183 @@ WorkSession _testWorkSession({
 }
 
 void main() {
+  StoreCouponCampaign coupon(String store, {String id = 'diwali-one', int revision = 1,
+      String name = 'Diwali savings', int discount = 1050, bool percentage = false,
+      int? maximum, int perCustomer = 1}) => StoreCouponCampaign(
+    id: id, storeId: store, revision: revision, name: name, percentage: percentage,
+    discount: discount, minimumSpendMinor: 20025, maximumSavingMinor: maximum ?? discount,
+    startsAt: DateTime.utc(2026, 10, 20), endsAt: DateTime.utc(2026, 11, 20),
+    totalUses: 100, usesPerCustomer: perCustomer);
+
+  test('LF04 COUPON named campaigns roundtrip exactly and reject invalid scopes or limits', () {
+    final original = coupon('host-store');
+    final decoded = decodeStoreCouponCampaigns(encodeStoreCouponCampaigns([original]), 'host-store').single;
+    expect(decoded.toJson(), original.toJson());
+    expect(decoded.discount, 1050);
+    expect(() => decodeStoreCouponCampaigns(encodeStoreCouponCampaigns([original]), 'other'), throwsFormatException);
+    expect(() => decodeStoreCouponCampaigns('{"schemaVersion":2,"campaigns":[]}', 'host-store'), throwsFormatException);
+    expect(() => decodeStoreCouponCampaigns(encodeStoreCouponCampaigns([original, original]), 'host-store'), throwsFormatException);
+    expect(() => coupon('host-store', percentage: true, discount: 10001), throwsFormatException);
+    expect(() => coupon('host-store', perCustomer: 101), throwsFormatException);
+    expect(() => coupon('host-store', name: ''), throwsFormatException);
+    expect(() => coupon('host-store', maximum: 1), throwsFormatException);
+  });
+  test('LF04 COUPON campaigns preserve legacy drafts, edit identity and restore after restart', () async {
+    final storage = _Lf04DelayedOfferDraft();
+    WorkSession open() => _testWorkSession(offerDraftStoreFactory: (_) => storage)..seedVerifiedWorkspace();
+    final owner = open(); addTearDown(owner.dispose);
+    final store = owner.activeWorkspace!.id;
+    expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: store), isTrue);
+    owner.workspaceOfferDraft.addAll({'title': 'Existing SKU draft', 'productId': 'original-sku'});
+    expect(await owner.saveWorkspaceStoreCouponCampaign(coupon(store), expectedStoreId: store), isTrue);
+    expect(await owner.saveWorkspaceStoreCouponCampaign(coupon(store, id: 'new-year', name: 'New Year offer'), expectedStoreId: store), isTrue);
+    expect(await owner.saveWorkspaceStoreCouponCampaign(coupon(store, revision: 2, name: 'Diwali special'), expectedStoreId: store), isTrue);
+    expect(await owner.saveWorkspaceStoreCouponCampaign(coupon(store), expectedStoreId: store), isFalse);
+    final restored = open(); addTearDown(restored.dispose);
+    expect(await restored.loadWorkspaceOfferDraft(expectedStoreId: store), isTrue);
+    expect(restored.workspaceStoreCouponCampaigns.map((c) => c.name), ['Diwali special', 'New Year offer']);
+    expect(restored.workspaceStoreCouponCampaigns.first.id, 'diwali-one');
+    expect(restored.workspaceStoreCouponCampaigns.first.revision, 2);
+    expect(restored.workspaceOfferDraft['title'], 'Existing SKU draft');
+    expect(restored.workspaceOfferDraft['productId'], 'original-sku');
+    expect(restored.workspaceOffers, isEmpty);
+    expect(restored.workspaceOrders, isEmpty);
+  });
+  test('LF04 COUPON failed save retains previous saved version and excludes other Stores', () async {
+    final storage = _Lf04DelayedOfferDraft();
+    final owner = _testWorkSession(offerDraftStoreFactory: (_) => storage)..seedVerifiedWorkspace();
+    addTearDown(owner.dispose); final store = owner.activeWorkspace!.id;
+    expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: store), isTrue);
+    expect(await owner.saveWorkspaceStoreCouponCampaign(coupon(store), expectedStoreId: store), isTrue);
+    final before = jsonEncode(storage.saved);
+    storage.failSave = true;
+    expect(await owner.saveWorkspaceStoreCouponCampaign(coupon(store, revision: 2, name: 'Unconfirmed change'), expectedStoreId: store), isFalse);
+    expect(owner.workspaceStoreCouponCampaigns.single.name, 'Diwali savings');
+    expect(jsonEncode(storage.saved), before);
+    expect(await owner.saveWorkspaceStoreCouponCampaign(coupon('other-store'), expectedStoreId: store), isFalse);
+    expect(jsonEncode(storage.saved), before);
+  });
+  test('LF04 COUPON unreadable newer campaign bytes cannot be overwritten', () async {
+    final storage = _Lf04DelayedOfferDraft();
+    final owner = _testWorkSession(offerDraftStoreFactory: (_) => storage)..seedVerifiedWorkspace();
+    addTearDown(owner.dispose); final store = owner.activeWorkspace!.id;
+    storage.saved = {'schemaVersion': 1, 'storeId': store, 'fields': {
+      'title': 'Original', 'storeCouponCampaignsV1': '{"schemaVersion":2,"campaigns":[]}'}};
+    final original = jsonEncode(storage.saved);
+    expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: store), isFalse);
+    expect(await owner.saveWorkspaceStoreCouponCampaign(coupon(store), expectedStoreId: store), isFalse);
+    expect(jsonEncode(storage.saved), original);
+  });
+  test('LF04 COUPON saved campaign is read back after Store session changes during write', () async {
+    final storage = _Lf04DelayedOfferDraft();
+    final owner = _testWorkSession(offerDraftStoreFactory: (_) => storage)..seedVerifiedWorkspace();
+    addTearDown(owner.dispose); final original = owner.activeWorkspace!;
+    await owner.loadWorkspaceOfferDraft(expectedStoreId: original.id);
+    await owner.saveWorkspaceStoreCouponCampaign(coupon(original.id), expectedStoreId: original.id);
+    storage.saveGate = Completer();
+    final saving = owner.saveWorkspaceStoreCouponCampaign(
+      coupon(original.id, revision: 2, name: 'Saved before return'), expectedStoreId: original.id);
+    owner.activeWorkspace = null; owner.activeWorkspace = original;
+    storage.saveGate!.complete(); expect(await saving, isFalse);
+    expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: original.id), isTrue);
+    expect(owner.workspaceStoreCouponCampaigns.single.name, 'Saved before return');
+    expect(owner.workspaceStoreCouponCampaigns.single.revision, 2);
+  });
+  test('LF04 COUPON unknown committed write blocks stale replay until explicit readback', () async {
+    final storage = _Lf04DelayedOfferDraft();
+    final owner = _testWorkSession(offerDraftStoreFactory: (_) => storage)..seedVerifiedWorkspace();
+    addTearDown(owner.dispose); final store = owner.activeWorkspace!.id;
+    await owner.loadWorkspaceOfferDraft(expectedStoreId: store);
+    await owner.saveWorkspaceStoreCouponCampaign(coupon(store), expectedStoreId: store);
+    storage.failAfterSave = true;
+    expect(await owner.saveWorkspaceStoreCouponCampaign(coupon(store, revision: 2, name: 'Actually saved'), expectedStoreId: store), isFalse);
+    expect(owner.workspaceStoreCouponRecoveryRequired, isTrue);
+    final committed = jsonEncode(storage.saved);
+    expect(await owner.saveWorkspaceOfferDraft(expectedStoreId: store), isFalse);
+    expect(await owner.saveWorkspaceStoreCouponCampaign(coupon(store, revision: 2, name: 'Must not overwrite'), expectedStoreId: store), isFalse);
+    expect(jsonEncode(storage.saved), committed);
+    expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: store), isTrue);
+    expect(owner.workspaceStoreCouponRecoveryRequired, isFalse);
+    expect(owner.workspaceStoreCouponCampaigns.single.name, 'Actually saved');
+    expect(jsonEncode(storage.saved), committed);
+  });
+  testWidgets('LF04 COUPON unknown save keeps original intent and checks without resubmission', (tester) async {
+    final storage = _Lf04DelayedOfferDraft();
+    final owner = _testWorkSession(offerDraftStoreFactory: (_) => storage)..seedVerifiedWorkspace();
+    addTearDown(owner.dispose); final store = owner.activeWorkspace!.id;
+    await owner.loadWorkspaceOfferDraft(expectedStoreId: store);
+    await owner.saveWorkspaceStoreCouponCampaign(coupon(store), expectedStoreId: store);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: ListView(children: [StoreCouponCampaignPanel(session: owner)]))));
+    await tester.pumpAndSettle(); await tester.ensureVisible(find.byTooltip('Edit Diwali savings'));
+    await tester.pumpAndSettle(); await tester.tap(find.byTooltip('Edit Diwali savings')); await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-coupon-name')), 'Diwali updated');
+    storage.failAfterSave = true;
+    await tester.scrollUntilVisible(find.byKey(const Key('work-coupon-save')), 200,
+      scrollable: find.descendant(of: find.byKey(const Key('work-coupon-editor')), matching: find.byType(Scrollable)).first);
+    await tester.pumpAndSettle(); await tester.tap(find.byKey(const Key('work-coupon-save'))); await tester.pumpAndSettle();
+    expect(owner.workspaceStoreCouponRecoveryRequired, isTrue,
+      reason: tester.widgetList<Text>(find.byType(Text)).map((t) => t.data).whereType<String>().join(' | '));
+    await tester.scrollUntilVisible(find.byKey(const Key('work-coupon-save')), 100,
+      scrollable: find.descendant(of: find.byKey(const Key('work-coupon-editor')), matching: find.byType(Scrollable)).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Check saved coupon'), findsOneWidget);
+    final committed = jsonEncode(storage.saved);
+    await tester.tap(find.byKey(const Key('work-coupon-save'))); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-coupon-editor')), findsNothing);
+    expect(owner.workspaceStoreCouponCampaigns.single.name, 'Diwali updated');
+    expect(jsonEncode(storage.saved), committed);
+    expect(tester.takeException(), isNull);
+  });
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF04 COUPON compact list and safe editor at text scale $scale', (tester) async {
+      tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset); addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final storage = _Lf04DelayedOfferDraft();
+      final owner = _testWorkSession(offerDraftStoreFactory: (_) => storage)..seedVerifiedWorkspace();
+      addTearDown(owner.dispose); final store = owner.activeWorkspace!.id;
+      await owner.loadWorkspaceOfferDraft(expectedStoreId: store);
+      await owner.saveWorkspaceStoreCouponCampaign(coupon(store), expectedStoreId: store);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: ListView(children: [StoreCouponCampaignPanel(session: owner)]))));
+      await tester.pumpAndSettle();
+      expect(find.text('Diwali savings'), findsOneWidget);
+      expect(find.textContaining('Saved draft · not published'), findsOneWidget);
+      await tester.ensureVisible(find.byTooltip('Edit Diwali savings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Edit Diwali savings')); await tester.pumpAndSettle();
+      expect(find.text('Edit Store coupon'), findsOneWidget);
+      expect(find.byKey(const Key('work-coupon-name')), findsOneWidget);
+      expect(find.text('Diwali savings'), findsWidgets);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byTooltip('Close coupon editor')); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-coupon-editor')), findsNothing);
+      expect(owner.workspaceStoreCouponCampaigns.single.revision, 1);
+    });
+  }
+  testWidgets('LF04 COUPON date picker does not restore the amount keyboard', (tester) async {
+    final storage = _Lf04DelayedOfferDraft();
+    final owner = _testWorkSession(offerDraftStoreFactory: (_) => storage)..seedVerifiedWorkspace();
+    addTearDown(owner.dispose); final store = owner.activeWorkspace!.id;
+    await owner.loadWorkspaceOfferDraft(expectedStoreId: store);
+    await owner.saveWorkspaceStoreCouponCampaign(coupon(store), expectedStoreId: store);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: ListView(children: [StoreCouponCampaignPanel(session: owner)]))));
+    await tester.pumpAndSettle(); await tester.ensureVisible(find.byTooltip('Edit Diwali savings'));
+    await tester.pumpAndSettle(); await tester.tap(find.byTooltip('Edit Diwali savings')); await tester.pumpAndSettle();
+    final name = find.byKey(const Key('work-coupon-name'));
+    await tester.tap(name); await tester.pumpAndSettle();
+    final focus = tester.widget<EditableText>(find.descendant(of: name, matching: find.byType(EditableText))).focusNode;
+    expect(focus.hasFocus, isTrue);
+    final date = find.byKey(const Key('work-coupon-start'));
+    await tester.scrollUntilVisible(date, 150, scrollable: find.descendant(
+      of: find.byKey(const Key('work-coupon-editor')), matching: find.byType(Scrollable)).first);
+    await tester.pumpAndSettle(); await tester.tap(date); await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    expect(focus.hasFocus, isFalse);
+    await tester.tap(find.text('Cancel')); await tester.pumpAndSettle();
+    expect(focus.hasFocus, isFalse);
+    expect(owner.workspaceStoreCouponCampaigns.single.revision, 1);
+    expect(tester.takeException(), isNull);
+  });
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
     FlutterSecureStorage.setMockInitialValues({});
@@ -765,6 +945,9 @@ void main() {
       }
       expect(find.byKey(const Key('work-offer-prerequisites')), findsNothing);
       expect(find.byKey(const Key('work-offer-private-product')), findsNothing);
+      await tester.scrollUntilVisible(find.byKey(const Key('work-offer-publication-unavailable')),
+        100, scrollable: find.descendant(of: find.byKey(const Key('work-store-offers-screen')),
+          matching: find.byType(Scrollable)).first);
       expect(find.byKey(const Key('work-offer-publication-unavailable')), findsOneWidget);
       final publish = find.byKey(const Key('work-offer-publish'));
       await tester.scrollUntilVisible(publish, 120, scrollable: find.descendant(
@@ -798,6 +981,9 @@ void main() {
           'work-business-grow', 'work-growth-offers']) {
           await tapVisible(tester, Key(key));
         }
+        await tester.scrollUntilVisible(find.byKey(const Key('work-offer-publication-unavailable')),
+          100, scrollable: find.descendant(of: find.byKey(const Key('work-store-offers-screen')),
+            matching: find.byType(Scrollable)).first);
         expect(find.byKey(const Key('work-offer-publication-unavailable')), findsOneWidget);
       }
       Future<void> revealOffer(Finder input) async {

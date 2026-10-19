@@ -37872,6 +37872,7 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
       key: const Key('work-store-offers-screen'),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
       children: [
+        StoreCouponCampaignPanel(session: widget.session),
         StoreProductPromotionPanel(session: widget.session),
         if (!hasPublicProducts || eligibleCustomers == 0)
           const Text(

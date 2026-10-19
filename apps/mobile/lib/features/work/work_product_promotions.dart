@@ -7,6 +7,81 @@ import '../buy/buy_v2_content_contracts.dart' show BuyV2AdvertisedBenefitTerms;
 
 typedef StorePromotionScope = ({String account, String store, String realm});
 
+/// Owner-entered, private Store-wide campaign configuration. Not a published
+/// benefit, redemption, usage count or authority to reduce Checkout totals.
+@immutable
+class StoreCouponCampaign {
+  StoreCouponCampaign({required this.id, required this.storeId,
+    required this.revision, required this.name, required this.percentage,
+    required this.discount, required this.minimumSpendMinor,
+    required this.maximumSavingMinor, required this.startsAt,
+    required this.endsAt, required this.totalUses, required this.usesPerCustomer}) {
+    if (id.trim().isEmpty || id.length > 128 || storeId.trim().isEmpty ||
+        revision < 1 || name != name.trim() || name.isEmpty || name.length > 80 ||
+        RegExp(r'[\x00-\x1f]').hasMatch(name) ||
+        discount <= 0 || discount > (percentage ? 10000 : 9000000000000) ||
+        minimumSpendMinor < 0 || minimumSpendMinor > 9000000000000 ||
+        maximumSavingMinor <= 0 || maximumSavingMinor > 9000000000000 ||
+        (!percentage && maximumSavingMinor != discount) ||
+        !endsAt.isAfter(startsAt) || totalUses <= 0 || totalUses > 1000000000 ||
+        usesPerCustomer <= 0 || usesPerCustomer > totalUses) {
+      throw const FormatException('Check the coupon name, saving, dates and limits.');
+    }
+  }
+  final String id, storeId, name;
+  final int revision;
+  final bool percentage;
+  /// Flat saving in paise, or percentage in basis points (100 = 1%).
+  final int discount, minimumSpendMinor, maximumSavingMinor;
+  final DateTime startsAt, endsAt;
+  final int totalUses, usesPerCustomer;
+  Map<String, Object> toJson() => {
+    'id': id, 'storeId': storeId, 'revision': revision, 'name': name,
+    'percentage': percentage, 'discount': discount,
+    'minimumSpendMinor': minimumSpendMinor, 'maximumSavingMinor': maximumSavingMinor,
+    'startsAt': startsAt.toUtc().toIso8601String(),
+    'endsAt': endsAt.toUtc().toIso8601String(),
+    'totalUses': totalUses, 'usesPerCustomer': usesPerCustomer,
+  };
+  factory StoreCouponCampaign.fromJson(Object? raw, String storeId) {
+    if (raw is! Map || raw.length != 12 || raw['storeId'] != storeId ||
+        raw['id'] is! String || raw['name'] is! String || raw['revision'] is! int ||
+        raw['percentage'] is! bool || raw['discount'] is! int ||
+        raw['minimumSpendMinor'] is! int || raw['maximumSavingMinor'] is! int ||
+        raw['startsAt'] is! String || raw['endsAt'] is! String ||
+        raw['totalUses'] is! int || raw['usesPerCustomer'] is! int) {
+      throw const FormatException('Saved coupons could not be opened.');
+    }
+    return StoreCouponCampaign(id: raw['id'] as String, storeId: storeId,
+      revision: raw['revision'] as int, name: raw['name'] as String,
+      percentage: raw['percentage'] as bool, discount: raw['discount'] as int,
+      minimumSpendMinor: raw['minimumSpendMinor'] as int,
+      maximumSavingMinor: raw['maximumSavingMinor'] as int,
+      startsAt: DateTime.parse(raw['startsAt'] as String),
+      endsAt: DateTime.parse(raw['endsAt'] as String),
+      totalUses: raw['totalUses'] as int, usesPerCustomer: raw['usesPerCustomer'] as int);
+  }
+}
+
+List<StoreCouponCampaign> decodeStoreCouponCampaigns(String? encoded, String storeId) {
+  if (encoded == null) return const [];
+  final raw = jsonDecode(encoded);
+  if (raw is! Map || raw.length != 2 || raw['schemaVersion'] != 1 ||
+      raw['campaigns'] is! List || (raw['campaigns'] as List).length > 50) {
+    throw const FormatException('Saved coupons need a compatible app version.');
+  }
+  final records = (raw['campaigns'] as List)
+      .map((row) => StoreCouponCampaign.fromJson(row, storeId)).toList();
+  if (records.map((row) => row.id).toSet().length != records.length) {
+    throw const FormatException('Saved coupon identities could not be checked.');
+  }
+  return List.unmodifiable(records);
+}
+
+String encodeStoreCouponCampaigns(List<StoreCouponCampaign> campaigns) => jsonEncode({
+  'schemaVersion': 1, 'campaigns': campaigns.map((row) => row.toJson()).toList(),
+});
+
 Map<String, dynamic> _map(Object? raw, List<String> keys) {
   if (raw is! Map<String, dynamic> ||
       raw.length != keys.length ||

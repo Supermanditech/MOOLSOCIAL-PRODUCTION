@@ -292,7 +292,9 @@ if ($RequireLfPublicationProbes) {
     $cases+=3
   }
   if ($null -ne $continuation.PSObject.Properties['batch02Promotions']) {
-    $moneyFixture='apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart'
+    foreach ($moneyFixture in @('apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart',
+        'apps/mobile/test/work_vertical_slice_test.dart')) {
     $claimed=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     if (@($claimed.batch02Promotions.owners) -cnotcontains $moneyFixture) {
       $claimed.batch02Promotions.owners+= $moneyFixture
@@ -313,6 +315,7 @@ if ($RequireLfPublicationProbes) {
     $widened.batch02Promotions.owners+= "$moneyFixture.unclaimed"
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $widened @())) 'Promotion owner declaration accepted Cart fixture suffix.'
     $cases+=8
+    }
     foreach ($owner in $continuation.batch02Promotions.owners) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact promotion owner rejected.'
       $cases++

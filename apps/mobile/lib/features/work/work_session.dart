@@ -561,6 +561,7 @@ class _StockHistoryState {
 class _OfferDraftRecovery {
   final Map<String, String> values = {};
   bool loaded = false, saving = false;
+  bool couponReadbackRequired = false;
   String? error;
 }
 
@@ -9789,6 +9790,7 @@ class WorkSession extends ChangeNotifier {
   Map<String, String> get workspaceOfferDraft => _offerDraftRecovery.values;
   String? get workspaceOfferDraftError => _offerDraftRecovery.error;
   bool get workspaceOfferDraftSaving => _offerDraftRecovery.saving;
+  bool get workspaceStoreCouponRecoveryRequired => _offerDraftRecovery.couponReadbackRequired;
 
   // No accepted publisher is connected. Valid draft fields are not capability.
   bool get workspaceOfferPublishingAvailable => false;
@@ -12643,7 +12645,55 @@ class WorkSession extends ChangeNotifier {
         : null;
   }
 
-  static const _offerDraftFields = {'title', 'detail', 'productId', 'validUntil', 'orderCap'};
+  static const _couponCampaignField = 'storeCouponCampaignsV1';
+  static const _offerDraftFields = {'title', 'detail', 'productId', 'validUntil', 'orderCap', _couponCampaignField};
+
+  bool _validOfferDraftFields(Map fields, String storeId) {
+    if (fields.entries.any((e) => !_offerDraftFields.contains(e.key) ||
+        e.value is! String || (e.value as String).length >
+          (e.key == _couponCampaignField ? 65536 : 4000))) { return false; }
+    try {
+      decodeStoreCouponCampaigns(fields[_couponCampaignField] as String?, storeId);
+      return true;
+    } on FormatException { return false; }
+  }
+
+  List<StoreCouponCampaign> get workspaceStoreCouponCampaigns =>
+      decodeStoreCouponCampaigns(workspaceOfferDraft[_couponCampaignField], activeWorkspace?.id ?? '');
+
+  /// A private device save only. No campaign activation or monetary application.
+  Future<bool> saveWorkspaceStoreCouponCampaign(StoreCouponCampaign campaign,
+      {required String expectedStoreId}) async {
+    final recovery = _offerDraftRecovery;
+    final fields = workspaceOfferDraft;
+    if (activeWorkspace?.id != expectedStoreId || campaign.storeId != expectedStoreId ||
+        !recovery.loaded || recovery.saving || recovery.couponReadbackRequired) { return false; }
+    final campaigns = workspaceStoreCouponCampaigns.toList();
+    final index = campaigns.indexWhere((c) => c.id == campaign.id);
+    if (campaign.revision != (index < 0 ? 1 : campaigns[index].revision + 1) ||
+        (index < 0 && campaigns.length >= 50)) {
+      showError('Reopen this coupon before saving your changes.');
+      return false;
+    }
+    if (index < 0) { campaigns.add(campaign); } else { campaigns[index] = campaign; }
+    final previous = fields[_couponCampaignField];
+    final encoded = encodeStoreCouponCampaigns(campaigns);
+    fields[_couponCampaignField] = encoded;
+    final saved = await saveWorkspaceOfferDraft(expectedStoreId: expectedStoreId);
+    if (!saved) {
+      // False can mean a committed write followed by a scope change or a
+      // timeout whose underlying write still completes. Never replay stale
+      // cached campaigns before an actual read (which awaits queued writes).
+      recovery.couponReadbackRequired = true;
+      recovery.loaded = false;
+      if (fields[_couponCampaignField] == encoded) {
+        if (previous == null) { fields.remove(_couponCampaignField); }
+        else { fields[_couponCampaignField] = previous; }
+      }
+      if (identical(recovery, _offerDraftRecovery)) { notifyListeners(); }
+    }
+    return saved;
+  }
 
   Future<bool> loadWorkspaceOfferDraft({required String expectedStoreId}) async {
     final data = _storeData;
@@ -12662,13 +12712,22 @@ class WorkSession extends ChangeNotifier {
       if (!current()) return false;
       final fields = saved?['fields'];
       if (saved != null && (saved['schemaVersion'] != 1 || saved['storeId'] != expectedStoreId ||
-          fields is! Map || fields.entries.any((e) => !_offerDraftFields.contains(e.key) ||
-            e.value is! String || (e.value as String).length > 4000))) {
+          fields is! Map || !_validOfferDraftFields(fields, expectedStoreId))) {
         throw const FormatException('Invalid offer draft');
       }
       // Navigation may retain newer unsaved input; never replace it on reopening.
+      if (draft.couponReadbackRequired) {
+        if (fields is Map && fields.containsKey(_couponCampaignField)) {
+          draft.values[_couponCampaignField] = fields[_couponCampaignField] as String;
+        } else { draft.values.remove(_couponCampaignField); }
+        draft.couponReadbackRequired = false;
+      }
       if (draft.values.isEmpty && fields is Map) {
         draft.values.addAll(Map<String, String>.from(fields));
+      } else if (fields is Map && fields.containsKey(_couponCampaignField) &&
+          !draft.values.containsKey(_couponCampaignField)) {
+        // Retained typing in the old product draft must not hide saved campaigns.
+        draft.values[_couponCampaignField] = fields[_couponCampaignField] as String;
       }
       draft.loaded = true;
       draft.error = null;
@@ -12691,10 +12750,10 @@ class WorkSession extends ChangeNotifier {
     bool current() => !_disposed && identical(data, _storeData) &&
         activeWorkspace?.id == expectedStoreId && _contactAccountScope == scope &&
         navigationScopeRevision == revision;
-    if (!current() || scope == null || !draft.loaded || draft.saving) return false;
+    if (!current() || scope == null || !draft.loaded || draft.saving || draft.couponReadbackRequired) return false;
     final fields = Map<String, String>.of(draft.values);
-    if (fields.entries.any((e) => !_offerDraftFields.contains(e.key) || e.value.length > 4000)) {
-      draft.error = 'Keep each offer field within 4,000 characters.';
+    if (!_validOfferDraftFields(fields, expectedStoreId)) {
+      draft.error = 'Check the saved coupon details and keep offer text within 4,000 characters.';
       notifyListeners();
       return false;
     }

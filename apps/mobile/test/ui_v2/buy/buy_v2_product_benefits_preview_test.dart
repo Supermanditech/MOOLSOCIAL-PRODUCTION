@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
@@ -20,6 +21,44 @@ void main() {
       productId: session.selectedProductId,
     ),
   );
+
+  testWidgets('Store-wide named coupon disclosure expands without applying per-SKU savings', (tester) async {
+    tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final core = BuySession();
+    final adapter = _ProductBenefitsAdapter(BuyV2CartBenefitsSnapshot(
+      state: BuyV2CartBenefitsLoadState.ready, evaluatedAt: DateTime.utc(2026, 8, 31, 12)));
+    final session = BuyV2Session(core: core, cartBenefitsAdapter: adapter,
+      commerceAdapter: _StoreCouponCommerce(), reviewDataEnabled: false,
+      productFactsAdapter: const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: true));
+    addTearDown(session.dispose); addTearDown(core.dispose);
+    await session.restoreCommerce();
+    final product = session.findProduct('s-milk')!;
+    adapter.snapshot = BuyV2CartBenefitsSnapshot(state: BuyV2CartBenefitsLoadState.ready,
+      evaluatedAt: DateTime.utc(2026, 8, 31, 12), benefits: [BuyV2CartBenefit(
+        id: 'host-diwali', kind: BuyV2CartBenefitKind.coupon, destination: product.destination,
+        title: 'Diwali savings', detail: 'Host provider terms: save on the eligible Store basket.',
+        sourceId: 'host-campaign-revision', sponsor: BuyV2CartBenefitSponsor.retailer,
+        sponsorName: product.seller, scope: BuyV2CartBenefitScope.store, storeId: product.storeId,
+        revision: 2, savingAmountMinor: 1050, minimumSpendMinor: 3025)]);
+    expect(session.openProduct('s-milk'), isTrue);
+    await tester.pumpWidget(app(session)); await tester.pumpAndSettle();
+    expect(session.productBenefitsFor(product).map((b) => b.id), contains('host-diwali'));
+    final tile = find.byKey(const ValueKey('buy-product-store-coupon-host-diwali'));
+    await tester.scrollUntilVisible(tile, 240, scrollable: find.descendant(
+      of: find.byKey(const PageStorageKey('buy-product-s-milk')), matching: find.byType(Scrollable)).first);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Diwali savings')); await tester.pumpAndSettle();
+    expect(find.text('Diwali savings'), findsOneWidget);
+    expect(find.text('Store-wide coupon · View terms'), findsOneWidget);
+    await tester.tap(find.text('Diwali savings')); await tester.pumpAndSettle();
+    expect(find.text('Minimum Store purchase ₹30.25'), findsOneWidget);
+    expect(find.textContaining('Applies once to this Store’s eligible basket.'), findsOneWidget);
+    expect(session.cartLines, isEmpty);
+    expect(session.selectedCartBenefitsFor({BuyV2Destination.shop}), isEmpty);
+    expect(session.scopedCouponSaving, 0);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('product offers show live eligibility without applying a saving', (
     tester,
@@ -210,4 +249,13 @@ final class _ProductBenefitsAdapter implements BuyV2LiveCartBenefitsAdapter {
     requests.add(request);
     return snapshot;
   }
+}
+
+// Isolated host catalogue only: actual Store IDs must precede Store-wide scope.
+final class _StoreCouponCommerce implements BuyV2CommerceAdapter {
+  @override Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    products: [for (final product in BuyV2Catalogue.allProducts)
+      product.copyWith(storeId: product.id == 's-milk' ? 'host-store-one' : 'host-store-two')]);
+  @override dynamic noSuchMethod(Invocation invocation) => throw UnsupportedError('Host read-only fixture');
 }

@@ -7675,6 +7675,37 @@ class _ProductBenefitPreviewTile extends StatelessWidget {
       BuyV2CartBenefitSponsor.financialPartner => 'Payment partner',
       BuyV2CartBenefitSponsor.moolSocial => 'MoolSocial',
     };
+    if (benefit.kind == BuyV2CartBenefitKind.coupon &&
+        benefit.scope == BuyV2CartBenefitScope.store) {
+      return Container(
+        key: ValueKey('buy-product-benefit-${benefit.id}'),
+        decoration: BoxDecoration(color: const Color(0xfff2f8f7),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: const Color(0xffd6e7e3))),
+        child: Material(color: Colors.transparent, child: ExpansionTile(
+          key: ValueKey('buy-product-store-coupon-${benefit.id}'),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 10),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          leading: const Icon(Icons.confirmation_number_outlined, color: Color(0xff256b78)),
+          title: Text(benefit.title, style: context.buyBody),
+          subtitle: Text('Store-wide coupon · View terms', style: context.buyMeta),
+          children: [Align(alignment: Alignment.centerLeft, child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(benefit.detail, style: context.buyMeta),
+              if (benefit.savingAmountMinor > 0)
+                Text('Eligible basket saving ${_comparisonMoney(benefit.savingAmountMinor)} · confirmed at Checkout', style: context.buyMeta),
+              if (paymentMethods.isNotEmpty)
+                Text('With ${paymentMethods.join(' or ')}', style: context.buyMeta),
+              if (benefit.freeDelivery) Text('Free delivery offer', style: context.buyMeta),
+              if (benefit.minimumSpendMinor case final minimum?)
+                Text('Minimum Store purchase ${_comparisonMoney(minimum)}', style: context.buyMeta),
+              if (validUntil != null)
+                Text('Until ${MaterialLocalizations.of(context).formatShortDate(validUntil)}', style: context.buyMeta),
+              Text('$sponsor · ${benefit.sponsorName} · Applies once to this Store’s eligible basket. Select in Cart; the final saving is confirmed at Checkout.',
+                style: context.buyMeta),
+            ]))],
+        )));
+    }
     return Container(
       key: ValueKey('buy-product-benefit-${benefit.id}'),
       padding: const EdgeInsets.all(9),
@@ -12412,7 +12443,9 @@ class _CheckoutOrderDetails extends StatelessWidget {
                   Text(
                     benefit.kind == BuyV2CartBenefitKind.paymentOffer
                         ? _paymentOfferStatus(session, benefit)
-                        : 'Coupon saving −${_comparisonMoney(session.couponSavingMinorForDestination(benefit.destination))} included in this total.',
+                        : session.checkoutQuoteRequired && session.checkoutQuoteReviewRequired
+                            ? 'Selected coupon. Its saving is not confirmed yet.'
+                            : 'Coupon saving −${_comparisonMoney(session.couponSavingMinorForDestination(benefit.destination))} included in this total.',
                     style: context.buyMeta,
                   ),
                 ],
