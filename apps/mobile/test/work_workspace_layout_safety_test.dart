@@ -17635,6 +17635,22 @@ void main() {
         isA<UnderlineInputBorder>(),
       );
       expect(find.text('Enter a complete qty'), findsOneWidget);
+      final lot = find.byKey(const Key('work-receive-lot-0'));
+      await Scrollable.ensureVisible(tester.element(lot), alignment: .4);
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(of: lot, matching: find.text('Batch & pack details · optional')));
+      await tester.pumpAndSettle();
+      for (final (field, value) in [
+        ('batch', 'HOST-RECOVERY-LOT'), ('manufactured', '09/2026'),
+        ('expiry', 'Best before 6 months'), ('mrp', '125.50'),
+      ]) {
+        final input = find.byKey(Key('work-receive-$field-0'));
+        await Scrollable.ensureVisible(tester.element(input), alignment: .4);
+        await tester.pumpAndSettle();
+        await tester.enterText(input, value);
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+      }
       final before = (await work.readLedgerForm(draftKey))!.fields;
       expect(before['arrivalId'], isNotEmpty);
       expect(before['groupId'], isNotEmpty);
@@ -17675,6 +17691,12 @@ void main() {
         'Delivery before bill',
       );
       expect(tester.widget<TextField>(expected).controller!.text, '2.');
+      for (final (field, value) in [
+        ('batch', 'HOST-RECOVERY-LOT'), ('manufactured', '09/2026'),
+        ('expiry', 'Best before 6 months'), ('mrp', '125.50'),
+      ]) {
+        expect(tester.widget<TextField>(find.byKey(Key('work-receive-$field-0'))).controller!.text, value);
+      }
       expect(
         tester.widget<TextField>(expected).decoration!.errorText,
         'Enter a complete qty',
@@ -18005,6 +18027,8 @@ void main() {
             for (final (index, product) in products.indexed)
               WorkspaceSupplierGoodsReceiptLine(
                 sourceLineId: 'partial-line-$index',
+                lotDetails: const WorkspaceReceivingLotDetails(batch: 'HOST-PREVIOUS-LOT',
+                  manufacturedLabel: '09/2026', expiryLabel: 'Use by 03/2027', mrpMinor: 12550),
                 productId: product.id,
                 productLabel: product.title,
                 purchaseUnit: product.pack,
@@ -18136,6 +18160,8 @@ void main() {
         final next = entry.value!.goodsReceiptDrafts.last.receipt;
         expect(next.expectedDeliveryId, first.expectedDeliveryId);
         expect(next.lines.single.sourceLineId, 'partial-line-1');
+        expect(first.lines.last.lotDetails!.batch, 'HOST-PREVIOUS-LOT');
+        expect(next.lines.single.lotDetails, isNull, reason: 'A new physical arrival must not inherit the previous lot.');
         expect(
           next.lines.single.mappingIdentity,
           first.lines.last.mappingIdentity,
@@ -18313,6 +18339,45 @@ void main() {
           reason:
               'Starting a new delivery must not change Stock or supplier books.',
         );
+        if (variant == 'portrait' || variant == 'large-landscape') {
+          await tester.tap(find.byKey(const Key('work-store-stock')));
+          await tester.pumpAndSettle();
+          await openStoreStockStatement(tester);
+          await tester.pumpAndSettle();
+          final position = find.byKey(Key('work-stock-position-${products.first.id}'));
+          final positionScroll = find.descendant(of: find.byKey(const Key('work-stock-statement-screen')),
+            matching: find.byType(Scrollable)).first;
+          await tester.scrollUntilVisible(position, 100, scrollable: positionScroll);
+          await tester.pumpAndSettle();
+          await Scrollable.ensureVisible(tester.element(position), alignment: .4);
+          await tester.pumpAndSettle();
+          await tester.tap(position);
+          await tester.pumpAndSettle();
+          final movement = first.movementFor(first.lines.first)!;
+          final reference = find.byKey(ValueKey('work-stock-reference-${movement.id}'));
+          final historyScroll = find.descendant(of: find.byKey(const Key('work-stock-statement-screen')),
+            matching: find.byType(Scrollable)).first;
+          await tester.scrollUntilVisible(reference, 100, scrollable: historyScroll);
+          await tester.pumpAndSettle();
+          await Scrollable.ensureVisible(tester.element(reference), alignment: .4);
+          await tester.pumpAndSettle();
+          await tester.tap(reference);
+          await tester.pumpAndSettle();
+          expect(find.text('Receiving details'), findsOneWidget);
+          final detailScroll = find.descendant(of: find.byType(Dialog), matching: find.byType(Scrollable)).first;
+          for (final label in ['Batch: HOST-PREVIOUS-LOT', 'Manufactured: 09/2026',
+            'Expiry / best before: Use by 03/2027', 'Pack MRP ₹125.50']) {
+            final detail = find.text(label);
+            await tester.scrollUntilVisible(detail, 80, scrollable: detailScroll);
+            await tester.pumpAndSettle();
+            await Scrollable.ensureVisible(tester.element(detail), alignment: .4);
+            await tester.pumpAndSettle();
+            expect(detail.hitTestable(), findsOneWidget);
+          }
+          expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stockAfter);
+          await tester.tap(find.byTooltip('Close receiving details'));
+          await tester.pumpAndSettle();
+        }
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       },

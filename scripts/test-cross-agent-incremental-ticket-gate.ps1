@@ -423,6 +423,13 @@ if ($RequireLfPublicationProbes) {
     $cases++
   }
   if ($null -ne $continuation.PSObject.Properties['batch02OwnerVariants']) {
+    $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $probe.batch02OwnerVariants.owners=@($probe.batch02OwnerVariants.owners | Where-Object { $_ -cne 'apps/mobile/test/work_store_atomic_operations_test.dart' })
+    Assert-Fixture (Test-Lf27Batch01Continuation $probe @()) 'Historical Store-family record rejected without optional receiving test.'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @('apps/mobile/test/work_store_atomic_operations_test.dart'))) 'Undeclared receiving test owner admitted.'
+    $probe.batch02OwnerVariants.owners+= 'apps/mobile/test/work_store_atomic_operations_test.dart.bak'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Receiving test owner widened to neighboring path.'
+    $cases+=3
     foreach($owner in $continuation.batch02OwnerVariants.owners) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact Store-family owner rejected.'
       $cases++

@@ -3265,18 +3265,55 @@ class WorkspaceSupplierBillAcceptance {
 
 /// One immutable delivery line. Quantities use thousandths of the supplier's
 /// unit, converted exactly into the existing Stock unit; never rounded.
+/// Private observations from this physical arrival, not catalogue facts,
+/// allocation, a public shelf-life promise or a change to Stock valuation.
+/// Printed date labels retain their precision and meaning without inference.
+class WorkspaceReceivingLotDetails {
+  const WorkspaceReceivingLotDetails({this.batch = '', this.manufacturedLabel = '',
+    this.expiryLabel = '', this.mrpMinor});
+  final String batch, manufacturedLabel, expiryLabel;
+  final int? mrpMinor;
+  bool get isEmpty => batch.isEmpty && manufacturedLabel.isEmpty && expiryLabel.isEmpty && mrpMinor == null;
+  bool get valid => !isEmpty && [batch, manufacturedLabel, expiryLabel].every(
+    (v) => v == v.trim() && v.length <= 240 && !RegExp(r'[\x00-\x1f\x7f]').hasMatch(v)) &&
+    (mrpMinor == null || (mrpMinor! >= 0 && mrpMinor! <= 9007199254740991));
+  List<String> get labels => [
+    if (batch.isNotEmpty) 'Batch: $batch',
+    if (manufacturedLabel.isNotEmpty) 'Manufactured: $manufacturedLabel',
+    if (expiryLabel.isNotEmpty) 'Expiry / best before: $expiryLabel',
+    if (mrpMinor != null) 'Pack MRP ₹${workspacePriceInputFromMinor(mrpMinor!)}',
+  ];
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'batch': batch,
+    'manufacturedLabel': manufacturedLabel, 'expiryLabel': expiryLabel, 'mrpMinor': mrpMinor};
+  static WorkspaceReceivingLotDetails fromJson(Object? raw) {
+    const keys = {'schemaVersion', 'batch', 'manufacturedLabel', 'expiryLabel', 'mrpMinor'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) ||
+        raw['schemaVersion'] != 1 || raw['schemaVersion'] is! int ||
+        raw['batch'] is! String || raw['manufacturedLabel'] is! String || raw['expiryLabel'] is! String ||
+        (raw['mrpMinor'] != null && raw['mrpMinor'] is! int)) {
+      throw const FormatException('Invalid receiving lot details');
+    }
+    final result = WorkspaceReceivingLotDetails(batch: raw['batch'] as String,
+      manufacturedLabel: raw['manufacturedLabel'] as String, expiryLabel: raw['expiryLabel'] as String,
+      mrpMinor: raw['mrpMinor'] as int?);
+    if (!result.valid) throw const FormatException('Invalid receiving lot details');
+    return result;
+  }
+}
+
 class WorkspaceSupplierGoodsReceiptLine {
   WorkspaceSupplierGoodsReceiptLine({required this.sourceLineId,
     required this.productId, required this.productLabel,
     required this.purchaseUnit, required this.stockUnit, required this.unitsPerPack,
     required this.deliveredMilli, required this.acceptedMilli,
     required this.damagedMilli, required this.shortMilli,
-    this.expectedMilli, Map<String, int> priorStockUnits = const {},
+    this.expectedMilli, this.lotDetails, Map<String, int> priorStockUnits = const {},
   }) : priorStockUnits = Map.unmodifiable(priorStockUnits);
   final String sourceLineId, productId, productLabel, purchaseUnit, stockUnit;
   final int unitsPerPack, deliveredMilli, acceptedMilli, damagedMilli, shortMilli;
   final int? expectedMilli;
   final Map<String, int> priorStockUnits;
+  final WorkspaceReceivingLotDetails? lotDetails;
   int get acceptedStockUnits => acceptedMilli * unitsPerPack ~/ 1000;
   int get linkedStockUnits => priorStockUnits.values.fold(0, (a, b) => a + b);
   int get newStockUnits => acceptedStockUnits - linkedStockUnits;
@@ -3293,7 +3330,7 @@ class WorkspaceSupplierGoodsReceiptLine {
       acceptedStockUnits <= 2147483647 && priorStockUnits.length <= 200 &&
       priorStockUnits.entries.every((e) => e.key.trim().isNotEmpty &&
         e.key.length <= 512 && e.value > 0 && e.value <= 2147483647) &&
-      linkedStockUnits <= acceptedStockUnits;
+      linkedStockUnits <= acceptedStockUnits && (lotDetails == null || lotDetails!.valid);
   Object get mappingIdentity =>
       (productId, productLabel, purchaseUnit, stockUnit, unitsPerPack, expectedMilli);
   Map<String, Object?> toJson() => {
@@ -3302,12 +3339,15 @@ class WorkspaceSupplierGoodsReceiptLine {
     'deliveredMilli': deliveredMilli, 'acceptedMilli': acceptedMilli,
     'damagedMilli': damagedMilli, 'shortMilli': shortMilli,
     'expectedMilli': expectedMilli, 'priorStockUnits': priorStockUnits,
+    if (lotDetails != null) 'lotDetails': lotDetails!.toJson(),
   };
   static WorkspaceSupplierGoodsReceiptLine fromJson(Object? raw) {
     const keys = {'sourceLineId', 'productId', 'productLabel', 'purchaseUnit',
       'stockUnit', 'unitsPerPack', 'deliveredMilli', 'acceptedMilli', 'damagedMilli',
       'shortMilli', 'expectedMilli', 'priorStockUnits'};
-    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains)) {
+    if (raw is! Map || !keys.every(raw.containsKey) ||
+        raw.length != keys.length + (raw.containsKey('lotDetails') ? 1 : 0) ||
+        !raw.keys.every((key) => keys.contains(key) || key == 'lotDetails')) {
       throw const FormatException('Invalid received item');
     }
     final result = WorkspaceSupplierGoodsReceiptLine(
@@ -3317,6 +3357,7 @@ class WorkspaceSupplierGoodsReceiptLine {
       deliveredMilli: raw['deliveredMilli'] as int, acceptedMilli: raw['acceptedMilli'] as int,
       damagedMilli: raw['damagedMilli'] as int, shortMilli: raw['shortMilli'] as int,
       expectedMilli: raw['expectedMilli'] as int?,
+      lotDetails: raw.containsKey('lotDetails') ? WorkspaceReceivingLotDetails.fromJson(raw['lotDetails']) : null,
       priorStockUnits: Map<String, int>.from(raw['priorStockUnits'] as Map));
     if (!result.valid) {
       throw const FormatException('Invalid received item');
@@ -7398,7 +7439,9 @@ class WorkspaceLedgerFormDraft {
       }
       final ids = <String>{};
       for (final line in value.skip(2)) {
-        if (line is! List || line.length != 10 || line[2] is! bool) return false;
+        if (line is! List || !const [10, 11].contains(line.length) || line[2] is! bool) return false;
+        if (line.length == 11 && (line[10] is! List || (line[10] as List).length != 4 ||
+            (line[10] as List).any((v) => v is! String || v.length > 512))) { return false; }
         for (final index in const [0, 1, 3, 4, 5, 6, 7, 8]) {
           if (line[index] is! String || (line[index] as String).length > 512) return false;
         }

@@ -17440,13 +17440,18 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
 }
 
 class _ReceivingLineInput {
-  _ReceivingLineInput(this.id, {WorkspaceSupplierGoodsReceiptLine? saved})
+  _ReceivingLineInput(this.id, {WorkspaceSupplierGoodsReceiptLine? saved, bool restoreLot = false})
     : original = saved, productId = saved?.productId ?? '', unit = TextEditingController(text: saved?.purchaseUnit ?? ''),
       factor = TextEditingController(text: '${saved?.unitsPerPack ?? 1}'),
       expected = TextEditingController(text: saved?.expectedMilli == null ? '' : _quantity(saved!.expectedMilli!)),
       delivered = TextEditingController(text: saved == null ? '' : _quantity(saved.deliveredMilli)),
       damaged = TextEditingController(text: saved == null ? '0' : _quantity(saved.damagedMilli)),
       short = TextEditingController(text: saved == null ? '0' : _quantity(saved.shortMilli)),
+      batch = TextEditingController(text: restoreLot ? saved?.lotDetails?.batch ?? '' : ''),
+      manufactured = TextEditingController(text: restoreLot ? saved?.lotDetails?.manufacturedLabel ?? '' : ''),
+      expiry = TextEditingController(text: restoreLot ? saved?.lotDetails?.expiryLabel ?? '' : ''),
+      mrp = TextEditingController(text: restoreLot && saved?.lotDetails?.mrpMinor != null
+        ? workspacePriceInputFromMinor(saved!.lotDetails!.mrpMinor!) : ''),
       prior = {for (final e in saved?.priorStockUnits.entries ?? const <MapEntry<String, int>>[])
         e.key: TextEditingController(text: '${e.value}')};
   final String id;
@@ -17454,6 +17459,8 @@ class _ReceivingLineInput {
   String productId;
   bool arrives = true;
   final TextEditingController unit, factor, expected, delivered, damaged, short;
+  final TextEditingController batch, manufactured, expiry, mrp;
+  List<TextEditingController> get lotControllers => [batch, manufactured, expiry, mrp];
   final Map<String, TextEditingController> prior;
   static String _quantity(int value) => (value / 1000).toStringAsFixed(3).replaceFirst(RegExp(r'\.?0+$'), '');
   static int? milli(String text) {
@@ -17463,7 +17470,7 @@ class _ReceivingLineInput {
     if (whole == null || whole > 2147483) return null;
     return whole * 1000 + int.parse(parts.length == 1 ? '0' : parts.last.padRight(3, '0'));
   }
-  void dispose() { for (final c in [unit, factor, expected, delivered, damaged, short, ...prior.values]) { c.dispose(); } }
+  void dispose() { for (final c in [unit, factor, expected, delivered, damaged, short, ...lotControllers, ...prior.values]) { c.dispose(); } }
 }
 
 /// Receiving is independent of entering a supplier bill. Persist the reviewed
@@ -17519,7 +17526,8 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   String get _input => jsonEncode([_reference.text, _day.text, for (final line in _lines)
     [line.id, line.productId, line.arrives, line.unit.text, line.factor.text, line.expected.text,
       line.delivered.text, line.damaged.text, line.short.text,
-      {for (final e in line.prior.entries) if (e.value.text.isNotEmpty) e.key: e.value.text}]]);
+      {for (final e in line.prior.entries) if (e.value.text.isNotEmpty) e.key: e.value.text},
+      if (line.lotControllers.any((c) => c.text.isNotEmpty)) [for (final c in line.lotControllers) c.text]]]);
   @override
   void initState() { super.initState(); unawaited(_recover()); }
   @override
@@ -17583,6 +17591,11 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         line.prior.clear();
         for (final entry in (value[9] as Map).entries) {
           line.prior[entry.key as String] = TextEditingController(text: entry.value as String);
+        }
+        if (value.length == 11) {
+          for (final (index, controller) in line.lotControllers.indexed) {
+            controller.text = (value[10] as List)[index] as String;
+          }
         }
         restored.add(line);
       }
@@ -17664,7 +17677,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   }
   void _restore(WorkspaceSupplierGoodsReceipt receipt) {
     for (final line in _lines) { line.dispose(); }
-    _lines..clear()..addAll(receipt.lines.map((line) => _ReceivingLineInput(line.sourceLineId, saved: line)));
+    _lines..clear()..addAll(receipt.lines.map((line) => _ReceivingLineInput(line.sourceLineId, saved: line, restoreLot: true)));
     _arrivalId = receipt.id; _groupId = receipt.expectedDeliveryId;
     _reference.text = receipt.reference; _day.text = receipt.deliveredOn;
     _frozen = receipt; _reviewVerified = true; _cancelAttempt = null; _postResult = null;
@@ -17741,11 +17754,18 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         if (amount == null || amount < 0) { return null; }
         prior[e.key] = amount;
       }
+      final mrp = input.mrp.text.trim().isEmpty ? null : workspacePriceMinorFromInput(input.mrp.text,
+        maximumMinor: 9007199254740991);
+      if (input.mrp.text.trim().isNotEmpty && mrp == null) return null;
+      final lot = WorkspaceReceivingLotDetails(batch: input.batch.text.trim(),
+        manufacturedLabel: input.manufactured.text.trim(), expiryLabel: input.expiry.text.trim(), mrpMinor: mrp);
+      if (!lot.isEmpty && !lot.valid) return null;
       values.add(WorkspaceSupplierGoodsReceiptLine(sourceLineId: input.id, productId: product.id,
         productLabel: input.original?.productId == product.id ? input.original!.productLabel : product.title,
         purchaseUnit: input.unit.text.trim(), stockUnit: product.pack,
         unitsPerPack: factor, deliveredMilli: delivered, acceptedMilli: delivered - damage,
-        damagedMilli: damage, shortMilli: short, expectedMilli: expected, priorStockUnits: prior));
+        damagedMilli: damage, shortMilli: short, expectedMilli: expected, priorStockUnits: prior,
+        lotDetails: lot.isEmpty ? null : lot));
     }
     final receipt = WorkspaceSupplierGoodsReceipt(id: _arrivalId, expectedDeliveryId: _groupId,
       reference: _reference.text.trim(), deliveredOn: _day.text.trim(), recordedAt: DateTime.now().toUtc(), lines: values);
@@ -17761,7 +17781,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     }
     final receipt = _frozen ?? _snapshot();
     if (!_current || _supplierId == null || receipt == null || _bookRevision == null) {
-      setState(() { _error = 'Choose saved Stock items, enter a delivery reference/date and check quantities. Up to 3 decimal places; accepted goods must convert to whole Stock units.'; });
+      setState(() { _error = 'Choose saved Stock items, enter a delivery reference/date and check quantities. Up to 3 decimal places; accepted goods must convert to whole Stock units. Optional lot labels must be at most 240 characters each; pack MRP needs a valid amount with up to 2 decimal places.'; });
       return;
     }
     setState(() { _frozen = receipt; _busy = true; _error = null; });
@@ -18051,6 +18071,11 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           if (saved.shortMilli > 0) figure('Short in this arrival', qty(saved.shortMilli)),
           if (saved.linkedStockUnits > 0) figure('Already in Stock · linked', '${saved.linkedStockUnits}'),
           figure('${session.workspaceGoodsReceiptRecoveryPending ? 'Awaiting Stock recovery' : 'Added to Stock'} · ${saved.stockUnit}', '${saved.newStockUnits}'),
+          if (saved.lotDetails != null) ...[
+            const SizedBox(height: 6),
+            const Text('Recorded from this arrival · private', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            for (final label in saved.lotDetails!.labels) Text(label, style: const TextStyle(fontSize: 12)),
+          ],
           const SizedBox(height: 6),
           Text(expected == null ? 'Total delivered ${qty(earlier)} · expected quantity not entered'
             : 'Total delivered ${qty(earlier)} of ${qty(expected)} · pending ${qty(expected - earlier)}',
@@ -18083,6 +18108,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           line.productId = value ?? ''; for (final c in line.prior.values) { c.dispose(); } line.prior.clear();
           line.unit.text = session.workspaceCatalogueItems.where((p) => p.id == value).firstOrNull?.pack ?? '';
           line.factor.text = '1';
+          for (final controller in line.lotControllers) { controller.clear(); }
           _saveInput();
         }) : null),
       Wrap(spacing: 12, runSpacing: 12, children: [
@@ -18095,6 +18121,20 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         _field('Short this arrival', line.short, 'work-receive-short-$index'),
       ]),
       Text('Accepted: ${accepted == null || accepted < 0 ? 'Check quantities' : _ReceivingLineInput._quantity(accepted)}${product == null ? '' : ' · Stock unit: ${product.pack}'}', style: const TextStyle(fontSize: 12)),
+      ExpansionTile(key: ValueKey('work-receive-lot-$index'), tilePadding: EdgeInsets.zero,
+        dense: true, initiallyExpanded: line.lotControllers.any((c) => c.text.isNotEmpty),
+        title: const Text('Batch & pack details · optional', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        subtitle: const Text('Only for this delivery · not published', style: TextStyle(fontSize: 12)),
+        children: [
+          const Text('Copy the pack label as printed, including month/year or best-before wording. Leave unknown details blank. For multiple batches, use a separate item line for each batch. These details do not change Stock cost.', style: TextStyle(fontSize: 12)),
+          _field('Batch / lot number', line.batch, 'work-receive-batch-$index', number: false),
+          _field('Manufactured · as printed', line.manufactured, 'work-receive-manufactured-$index', number: false),
+          _field('Expiry / best before / use by · as printed', line.expiry, 'work-receive-expiry-$index', number: false),
+          Text('Pack MRP is for one saved Stock unit: ${product?.pack ?? 'choose a product'}', style: const TextStyle(fontSize: 12)),
+          _field('Pack MRP ₹', line.mrp, 'work-receive-mrp-$index',
+            errorText: line.mrp.text.trim().isNotEmpty && workspacePriceMinorFromInput(line.mrp.text, maximumMinor: 9007199254740991) == null ? 'Enter an amount with up to 2 decimal places' : null),
+          const SizedBox(height: 8),
+        ]),
       if (prior.isNotEmpty) const Text('Already entered in Stock? Link only the matching original entry below.', style: TextStyle(fontSize: 12)),
       for (final entry in prior.entries) Row(children: [Expanded(child: Text('${entry.key.reason}\n${_registerDate(entry.key.occurredAt)} · original ${entry.key.quantityDelta} · unlinked ${entry.value}', style: const TextStyle(fontSize: 12))),
         _field('Link Stock units', line.prior[entry.key.id]!, 'work-receive-prior-$index-${entry.key.id}')]),
@@ -18475,7 +18515,8 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
             for (final line in receipt.lines) ListTile(title: Text(line.productLabel), subtitle: Text(
               'Received ${_ReceivingLineInput._quantity(line.deliveredMilli)} ${line.purchaseUnit} · Accepted ${_ReceivingLineInput._quantity(line.acceptedMilli)}\n'
               'Damaged ${_ReceivingLineInput._quantity(line.damagedMilli)} · Short ${_ReceivingLineInput._quantity(line.shortMilli)}\n'
-              'Earlier Stock linked ${line.linkedStockUnits} · ${_actionReceiptStock(line, receipt, recovered && verified)}')),
+              'Earlier Stock linked ${line.linkedStockUnits} · ${_actionReceiptStock(line, receipt, recovered && verified)}'
+              '${line.lotDetails == null ? '' : '\nRecorded from this arrival · private\n${line.lotDetails!.labels.join('\n')}'}')),
             for (final returned in ledger?.goodsReturns.values ?? <WorkspaceSupplierGoodsReturn>[])
               if (returned.receiptId == receipt.id) ListTile(title: Text('Return ${returned.reference}'),
                 subtitle: Text('${returned.returnedOn} · ${returned.reason}\n${returned.lines.map((l) => '${l.productLabel}: ${l.stockUnits}').join(', ')}')),
@@ -21451,6 +21492,31 @@ class _WorkspaceOperationSurface extends StatelessWidget {
                 queryParameters: {'order': movement.referenceId!},
               ).toString(),
             );
+          } else if (movement.referenceKind == WorkspaceStockReferenceKind.manualSupplierReceipt) {
+            final scope = session.workspaceSupplierScope, epoch = session.navigationScopeRevision;
+            if (session.workspaceReceivingForStockMovement(movement) == null) {
+              session.showNotice('Saved receiving details are unavailable. Recover Purchases before opening this receipt.');
+              return;
+            }
+            showDialog<void>(context: context, builder: (dialogContext) => Dialog.fullscreen(child: SafeArea(
+              child: AnimatedBuilder(animation: session, builder: (context, _) {
+                final record = session.workspaceSupplierScope == scope && session.navigationScopeRevision == epoch
+                  ? session.workspaceReceivingForStockMovement(movement) : null;
+                return Column(children: [ListTile(title: const Text('Receiving details'),
+                  trailing: IconButton(tooltip: 'Close receiving details', onPressed: () => Navigator.pop(dialogContext), icon: const Icon(Icons.close))),
+                  Expanded(child: ListView(padding: const EdgeInsets.all(16), children: record == null
+                    ? [const Text('This receiving record is no longer available in the current Store. Close and reopen it.')]
+                    : [Text(record.$1.reference, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      Text('${record.$3} · ${record.$1.deliveredOn}'),
+                      const SizedBox(height: 12), Text(record.$2.productLabel),
+                      Text('Accepted ${_ReceivingLineInput._quantity(record.$2.acceptedMilli)} ${record.$2.purchaseUnit}'),
+                      Text('Added to Stock ${record.$2.newStockUnits} ${record.$2.stockUnit}'),
+                      if (record.$2.lotDetails == null) const Text('Batch and pack details were not recorded.')
+                      else ...[const SizedBox(height: 12), const Text('Recorded from this arrival · private'),
+                        for (final label in record.$2.lotDetails!.labels) Text(label)],
+                    ])),
+                ]);
+              }))));
           } else {
             final purchase = session.workspacePurchaseForStockMovement(
               movement,

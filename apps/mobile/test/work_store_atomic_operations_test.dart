@@ -6174,6 +6174,92 @@ void main() {
         damagedMilli: 0, shortMilli: 0, expectedMilli: 12000, priorStockUnits: prior)]);
   }
 
+  test('PF08 receiving preserves optional printed lot facts and legacy bytes', () {
+    final legacy = WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'line', productId: 'sku',
+      productLabel: 'Host-only food pack', purchaseUnit: 'pack', stockUnit: 'pack',
+      unitsPerPack: 1, deliveredMilli: 2000, acceptedMilli: 2000, damagedMilli: 0, shortMilli: 0);
+    final raw = {...legacy.toJson(), 'lotDetails': {
+      'schemaVersion': 1, 'batch': 'HOST-BATCH', 'manufacturedLabel': '09/2026',
+      'expiryLabel': 'Best before 6 months from manufacture', 'mrpMinor': 12550,
+    }};
+    final restored = WorkspaceSupplierGoodsReceiptLine.fromJson(raw);
+    expect(restored.toJson(), raw);
+    expect(restored.mappingIdentity, legacy.mappingIdentity);
+    expect(restored.newStockUnits, legacy.newStockUnits);
+    expect(WorkspaceSupplierGoodsReceiptLine.fromJson(legacy.toJson()).toJson(), legacy.toJson());
+    final receipt = WorkspaceSupplierGoodsReceipt(id: 'receipt', expectedDeliveryId: 'delivery',
+      reference: 'HOST-LOT', deliveredOn: '2026-10-01', recordedAt: DateTime.utc(2026, 10, 2), lines: [restored]);
+    final oldReceipt = WorkspaceSupplierGoodsReceipt(id: receipt.id, expectedDeliveryId: receipt.expectedDeliveryId,
+      reference: receipt.reference, deliveredOn: receipt.deliveredOn, recordedAt: receipt.recordedAt, lines: [legacy]);
+    final movement = receipt.movementFor(restored)!, oldMovement = oldReceipt.movementFor(legacy)!;
+    expect((movement.id, movement.productId, movement.quantityDelta, movement.referenceId),
+      (oldMovement.id, oldMovement.productId, oldMovement.quantityDelta, oldMovement.referenceId));
+    for (final bad in [
+      {...raw, 'lotDetails': {...raw['lotDetails'] as Map, 'schemaVersion': 2}},
+      {...raw, 'lotDetails': {...raw['lotDetails'] as Map, 'mrpMinor': -1}},
+      {...raw, 'lotDetails': {...raw['lotDetails'] as Map, 'mrpMinor': 12.5}},
+      {...raw, 'lotDetails': {...raw['lotDetails'] as Map, 'batch': 'x' * 241}},
+      {...raw, 'lotDetails': {...raw['lotDetails'] as Map, 'serial': 'must-not-leak'}},
+    ]) {
+      expect(() => WorkspaceSupplierGoodsReceiptLine.fromJson(bad), throwsA(anything));
+    }
+  });
+
+  test('PF08 receiving frozen review and Stock reference survive encrypted restart', () async {
+    final storage = _OrderJournalStorage(), opening = openingFixture(amount: 0);
+    final owner = await openingPostingSession(storage, initialRecord: opening, inventory: true);
+    expect(await owner.confirmWorkspaceSupplierOpeningRecord(opening, scope: owner.workspaceSupplierScope!,
+      expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+    final original = sessionReceipt(owner);
+    final receipt = WorkspaceSupplierGoodsReceipt.fromJson({...original.toJson(), 'lines': [
+      {...original.lines.single.toJson(), 'lotDetails': {'schemaVersion': 1, 'batch': 'HOST-LOT-A',
+        'manufacturedLabel': '09/2026', 'expiryLabel': 'Use by 03/2027', 'mrpMinor': 12550}},
+    ]});
+    final stockBefore = owner.workspaceCatalogueItems.single.stock;
+    expect(await owner.saveWorkspaceGoodsReceiptDraft(receipt, supplierId: opening.supplierId,
+      scope: owner.workspaceSupplierScope!, expectedRevision: 3), isTrue);
+    final changed = WorkspaceSupplierGoodsReceipt.fromJson({...receipt.toJson(), 'lines': [
+      {...receipt.lines.single.toJson(), 'lotDetails': {...receipt.lines.single.lotDetails!.toJson(), 'batch': 'HOST-LOT-B'}},
+    ]});
+    expect(await owner.saveWorkspaceGoodsReceiptDraft(changed, supplierId: opening.supplierId,
+      scope: owner.workspaceSupplierScope!, expectedRevision: 4), isFalse);
+    expect(owner.workspaceCatalogueItems.single.stock, stockBefore);
+    expect(await owner.confirmWorkspaceSupplierGoodsReceipt(receipt, supplierId: opening.supplierId,
+      scope: owner.workspaceSupplierScope!, expectedPurchaseRevision: 4,
+      expectedSupplierRevision: 1, requireSavedReview: true), WorkspaceGoodsReceiptSaveResult.saved);
+    final reopened = await openingPostingSession(storage, inventory: true);
+    expect(await reopened.recoverCustomerLedger(), isTrue);
+    final saved = reopened.workspaceSupplierLedger(opening.supplierId)!.goodsReceipts[receipt.id]!;
+    expect(saved.toJson(), receipt.toJson());
+    expect(reopened.workspaceCatalogueItems.single.stock, stockBefore + 6);
+    final movement = reopened.workspaceStockMovements.singleWhere((m) => m.id == receipt.movementFor(receipt.lines.single)!.id);
+    expect(reopened.workspaceReceivingForStockMovement(movement)?.$2.lotDetails?.toJson(), receipt.lines.single.lotDetails!.toJson());
+    final foreign = WorkspaceStockMovement(id: movement.id, productId: 'other-sku', productLabel: movement.productLabel,
+      kind: movement.kind, quantityDelta: movement.quantityDelta, reason: movement.reason, occurredAt: movement.occurredAt,
+      referenceKind: movement.referenceKind, referenceId: movement.referenceId);
+    expect(reopened.workspaceReceivingForStockMovement(foreign), isNull);
+    reopened.activeWorkspace = null;
+    expect(reopened.workspaceReceivingForStockMovement(movement), isNull);
+  });
+
+  test('PF08 RECEIVINGINPUT keeps incomplete optional details through encrypted restart', () async {
+    const key = (account: 'account-A', store: 'store-A', customer: 'supplier-A', invoice: 'receiving-input',
+      order: 'receiving-input:qa', kind: 'supplierReceivingInput', ledgerRevision: 1);
+    final storage = _OrderJournalStorage();
+    final input = ['line-A', 'sku-A', true, 'pack', '1', '', '2.', '0', '0', <String, String>{},
+      ['HOST-LOT', '09/2026', 'Best before 6 months', '125.']];
+    final draft = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {
+      'arrivalId': 'arrival-A', 'groupId': 'group-A', 'input': jsonEncode(['HOST reference', '2026-10-03', input])});
+    expect(draft.valid, isTrue);
+    SecureWorkLedgerFormDraftStore store() => SecureWorkLedgerFormDraftStore(accountScope: () => 'account-A', storage: storage);
+    await store().save(draft, expectedRevision: null);
+    expect((await store().read(key))!.fields, draft.fields);
+    for (final bad in [<Object?>['short'], ['a', 'b', 'c', 100], ['a', 'b', 'c', 'd', 'extra']]) {
+      expect(WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {...draft.fields,
+        'input': jsonEncode(['ref', 'day', [...input.take(10), bad]])}).valid, isFalse);
+    }
+  });
+
   test('RECEIVINGINPUT bounded incomplete input is not posting authority', () {
     const key = (account: 'account-A', store: 'store-A', customer: 'supplier-A',
       invoice: 'receiving-input', order: 'receiving-input:qa', kind: 'supplierReceivingInput', ledgerRevision: 1);

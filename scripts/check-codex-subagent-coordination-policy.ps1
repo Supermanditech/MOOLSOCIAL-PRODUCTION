@@ -8078,6 +8078,13 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
       'apps/mobile/lib/features/work/screens/store_add_product_sheet.dart',
       'apps/mobile/test/work_product_content_test.dart',
       'apps/mobile/test/work_workspace_layout_safety_test.dart')
+    # Existing cumulative Store owner; optional only for the PF08 receiving
+    # persistence/replay regression in this same product-facts continuation.
+    if ($null -ne $ownerVariants -and $ownerVariants -is [pscustomobject] -and
+        $null -ne $ownerVariants.PSObject.Properties['owners'] -and
+        @($ownerVariants.owners) -ccontains 'apps/mobile/test/work_store_atomic_operations_test.dart') {
+      $storeVariantOwners += 'apps/mobile/test/work_store_atomic_operations_test.dart'
+    }
     if ($null -eq $ownerVariants -or $ownerVariants -isnot [pscustomobject]) { return $false }
     foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
       if($null -eq $ownerVariants.PSObject.Properties[$key]) { return $false }

@@ -8128,6 +8128,33 @@ class WorkSession extends ChangeNotifier {
     return true;
   }
 
+  /// Resolve only the current Store's exact posted arrival and movement. Never
+  /// use a supplier name, another draft or a caller-supplied reference alone.
+  (WorkspaceSupplierGoodsReceipt, WorkspaceSupplierGoodsReceiptLine, String)? workspaceReceivingForStockMovement(
+    WorkspaceStockMovement movement,
+  ) {
+    if (_disposed || workspaceSupplierScope == null || !workspaceSuppliersLoaded ||
+        workspaceSupplierRecoveryRequired || workspaceGoodsReceiptRecoveryPending ||
+        movement.referenceKind != WorkspaceStockReferenceKind.manualSupplierReceipt ||
+        !workspaceStockMovements.any((saved) => saved.contentIdentity == movement.contentIdentity)) {
+      return null;
+    }
+    try {
+      final link = jsonDecode(movement.referenceId ?? '');
+      if (link is! List || link.length != 2 || link.any((v) => v is! String)) return null;
+      final matches = <(WorkspaceSupplierGoodsReceipt, WorkspaceSupplierGoodsReceiptLine, String)>[];
+      for (final supplier in workspaceSuppliers) {
+        final receipt = workspaceSupplierLedger(supplier.id)?.goodsReceipts[link[0]];
+        if (receipt == null) continue;
+        final line = receipt.lines.where((l) => l.sourceLineId == link[1]).singleOrNull;
+        if (line != null && receipt.movementFor(line)?.contentIdentity == movement.contentIdentity) {
+          matches.add((receipt, line, supplier.name));
+        }
+      }
+      return matches.length == 1 ? matches.single : null;
+    } on Object { return null; }
+  }
+
   WorkspacePurchaseRecord? workspacePurchaseForStockMovement(
     WorkspaceStockMovement movement,
   ) {
