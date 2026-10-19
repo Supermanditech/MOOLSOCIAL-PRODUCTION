@@ -2342,7 +2342,11 @@ void main() {
   testWidgets('mixed Cart uses real media and context-specific benefit pages', (
     tester,
   ) async {
-    final session = BuyV2Session(core: BuySession());
+    // This layout case requires a genuine ready-empty response, not a disabled provider.
+    final provider = _WidgetLiveBenefitsAdapter();
+    final session = BuyV2Session(core: BuySession(), cartBenefitsAdapter: provider);
+    provider.complete(BuyV2CartBenefitsSnapshot(state: BuyV2CartBenefitsLoadState.ready, evaluatedAt: session.catalogueNow()));
+    addTearDown(session.core.dispose); addTearDown(session.dispose);
     final products = [
       productFor(BuyV2Destination.shop),
       productFor(BuyV2Destination.wholesale),
@@ -3392,7 +3396,11 @@ void main() {
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(320, 700));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final session = BuyV2Session(core: BuySession());
+      // Keep verified empty and unconfigured eligibility as different cases.
+      final provider = _WidgetLiveBenefitsAdapter();
+      final session = BuyV2Session(core: BuySession(), cartBenefitsAdapter: provider);
+      provider.complete(BuyV2CartBenefitsSnapshot(state: BuyV2CartBenefitsLoadState.ready, evaluatedAt: session.catalogueNow()));
+      addTearDown(session.core.dispose); addTearDown(session.dispose);
       for (final destination in const [
         BuyV2Destination.shop,
         BuyV2Destination.wholesale,

@@ -6927,10 +6927,13 @@ class BuyV2Session extends ChangeNotifier {
   bool get _unsupportedCartBenefitAmount => !_supportsBenefitAmount(scopedCartTotalMinor) ||
       cartLines.map((line) => line.product.destination).toSet().any((d) => !_supportsBenefitAmount(totalMinorForDestination(d)));
   static const _unsupportedBenefitsMessage = 'Coupons and offers could not be checked. Your Cart is kept unchanged.';
-  BuyV2CartBenefitsLoadState get cartBenefitsLoadState => _unsupportedCartBenefitAmount
+  bool get cartBenefitsConfigured => cartBenefitsAdapter is! BuyV2DisabledCartBenefitsAdapter;
+  BuyV2CartBenefitsLoadState get cartBenefitsLoadState => !cartBenefitsConfigured || _unsupportedCartBenefitAmount
       ? BuyV2CartBenefitsLoadState.unavailable : _cartBenefitsLoadState;
   set cartBenefitsLoadState(BuyV2CartBenefitsLoadState value) { _cartBenefitsLoadState = value; }
-  String? get cartBenefitsMessage => _unsupportedCartBenefitAmount ? _unsupportedBenefitsMessage : _cartBenefitsMessage;
+  String? get cartBenefitsMessage => !cartBenefitsConfigured
+    ? 'Coupon and payment-offer checks aren’t connected yet. Your Cart is unchanged.'
+    : _unsupportedCartBenefitAmount ? _unsupportedBenefitsMessage : _cartBenefitsMessage;
   set cartBenefitsMessage(String? value) { _cartBenefitsMessage = value; }
   List<BuyV2CommercialPaymentTerm> _commercialPaymentTerms = [];
   final Map<String, ({String id, String agreement})>
@@ -11221,6 +11224,7 @@ class BuyV2Session extends ChangeNotifier {
 
   Future<bool> refreshCartBenefits() async {
     final adapter = cartBenefitsAdapter;
+    if (!cartBenefitsConfigured) return false;
     if (adapter is! BuyV2LiveCartBenefitsAdapter) return !_unsupportedCartBenefitAmount;
     if (_cart.isEmpty) {
       _liveCartBenefits = [];

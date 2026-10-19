@@ -6649,6 +6649,62 @@ void main() {
       home: Scaffold(body: AnimatedBuilder(animation: session, builder: (context, _) => BuyV2ProductView(session: session)))));
     await tester.pumpAndSettle();
   }
+  test('LF08 DISABLED coupon source is unavailable not a verified empty eligibility result', () async {
+    final selected = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+    final session = await benefitSession(const BuyV2DisabledCartBenefitsAdapter(), [selected]);
+    expect(session.cartBenefitsLoadState, BuyV2CartBenefitsLoadState.unavailable);
+    expect(session.addProduct(selected.id), isTrue, reason: session.notice);
+    final before = session.cartLines.map((line) => [line.product.id, line.quantity]).toList();
+    final total = session.scopedCartTotalMinor;
+    expect(session.cartBenefitsLoadState, BuyV2CartBenefitsLoadState.unavailable);
+    expect(await session.refreshCartBenefits(), isFalse);
+    expect(session.cartLines.map((line) => [line.product.id, line.quantity]).toList(), before);
+    expect(session.scopedCartTotalMinor, total); expect(session.scopedCouponSavingMinor, 0);
+  });
+  test('LF08 DISABLED does not replace a genuine configured ready-empty result with unavailability', () async {
+    final source = _HostLiveBenefits(), selected = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+    final session = await benefitSession(source, [selected]);
+    expect(session.addProduct(selected.id), isTrue, reason: session.notice);
+    expect(await session.refreshCartBenefits(), isTrue);
+    expect(session.cartBenefitsConfigured, isTrue); expect(session.cartBenefitsLoadState, BuyV2CartBenefitsLoadState.ready);
+    expect(session.cartBenefitsMessage, isNull); expect(source.requests, isNotEmpty);
+    expect(session.cartBenefits(kind: BuyV2CartBenefitKind.coupon), isEmpty);
+  });
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF08 DISABLED compact Cart explains missing checks without false zero or retry at $scale', (tester) async {
+      tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final selected = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+      final session = await benefitSession(const BuyV2DisabledCartBenefitsAdapter(), [selected]);
+      expect(session.addProduct(selected.id), isTrue, reason: session.notice); session.openCart();
+      expect(session.cartBenefitsLoadState, BuyV2CartBenefitsLoadState.unavailable);
+      const captureKey = Key('lf08-disabled-coupon-host-capture');
+      await tester.pumpWidget(RepaintBoundary(key: captureKey, child: MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+        MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+        home: Scaffold(body: BuyV2CartView(session: session, onBrowseMore: () {})))));
+      await tester.pumpAndSettle();
+      final message = find.text('Coupon and payment-offer checks aren’t connected yet. Your Cart is unchanged.');
+      await tester.scrollUntilVisible(message, 200, scrollable: find.byWidgetPredicate(
+        (widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down).first);
+      await tester.pumpAndSettle();
+      expect(message, findsOneWidget); expect(find.text('No Shop coupons right now'), findsNothing);
+      expect(find.byKey(const ValueKey('buy-cart-benefits-retry')), findsNothing);
+      expect(session.scopedCouponSavingMinor, 0); expect(tester.takeException(), isNull);
+      final directory = Platform.environment['LF08_DISABLED_CAPTURE_DIR'];
+      if (directory != null) {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(captureKey));
+        await tester.runAsync(() async {
+          final file = File('$directory/lf08-disabled-coupon-host-$scale-20261020-v1.png');
+          if (await file.exists()) throw StateError('Preserve existing host capture.');
+          final image = await boundary.toImage();
+          try {
+            final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+            await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
+          } finally {image.dispose();}
+        });
+      }
+    });
+  }
   Future<void> revealOptionalDetails(WidgetTester tester, BuyV2Product selected, Finder control) async {
     await tester.scrollUntilVisible(control, 220, scrollable: find.descendant(
       of: find.byKey(PageStorageKey('buy-product-${selected.id}')), matching: find.byType(Scrollable)).first);

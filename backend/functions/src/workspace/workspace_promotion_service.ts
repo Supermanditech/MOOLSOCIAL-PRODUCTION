@@ -673,12 +673,24 @@ export class FirestorePromotionRepository implements PromotionRepository {
     if (command.realm !== this.realm) fail();
     const root = this.root(command.storeId), head = root.collection("storeCoupons").doc(id(command.couponId));
     const receiptRef = root.collection("storeCouponReceipts").doc(cataloguePayloadHash([command.ownerUserId, command.idempotencyKey]));
+    const usageRef = root.collection("storeCouponUsage").doc(command.couponId);
     return this.firestore.runTransaction(async transaction => {
-      const [profiles, current, receipt] = await Promise.all([transaction.get(this.profiles(command.storeId)), transaction.get(head), transaction.get(receiptRef)]);
+      const [profiles, current, receipt, usage] = await Promise.all([transaction.get(this.profiles(command.storeId)),
+        transaction.get(head), transaction.get(receiptRef), transaction.get(usageRef)]);
       const profile = profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId") ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined;
       const result = planStoreCouponSave(command, profile, current.exists ? current.data() as StoreCouponRecord : undefined,
         receipt.exists ? receipt.data() as StoreCouponReceipt : undefined, this.now().toISOString());
       if (!receipt.exists) {
+        if (!current.exists) {
+          // Initialization provenance only, not remaining capacity or funding.
+          // A missing historical origin is never silently backfilled on edit.
+          if (usage.exists) fail("invalid_state", 409);
+          transaction.create(usageRef, {schemaVersion: 1, realm: this.realm,
+            storeId: command.storeId, couponId: command.couponId, usageRevision: 0,
+            heldUses: 0, redeemedUses: 0, origin: {couponRevision: 1,
+              ownerUserId: command.ownerUserId, receiptId: receiptRef.id,
+              requestFingerprint: command.fingerprint, observedAt: command.observedAt}});
+        }
         transaction.set(head, result);
         transaction.create(head.collection("revisions").doc(String(result.revision)), result);
         transaction.create(receiptRef, {fingerprint: command.fingerprint, record: result});

@@ -8,6 +8,7 @@ import {FirestorePromotionRepository, WorkspacePromotionService, planPromotionSa
   type PromotionCommand, type PromotionRecord, type PromotionReceipt,
   type PromotionRepository} from "./workspace_promotion_service.js";
 import type {WorkspaceProfileRecord} from "./workspace_profile_service.js";
+import {cataloguePayloadHash} from "./workspace_catalogue_service.js";
 
 // Isolated host/emulator records, never evaluation data injected into a phone.
 const at = "2026-10-17T01:00:00.000Z", until = "2026-10-18T01:00:00.000Z";
@@ -408,6 +409,70 @@ test('LF04-STORE-COUPON Firestore complete snapshot crosses old page limit in a 
     assert.equal(snapshot.items[0].couponId, 'coupon-000'); assert.equal(snapshot.items[24].couponId, 'coupon-024');
     assert.equal(snapshot.redemptionAvailable, false); assert.equal(snapshot.orderingAvailable, false);
   } finally {db.runTransaction = originalTransaction; await deleteApp(app);}
+});
+test('LF08-COUPON-USAGE Firestore creates one private known-zero origin and never resets or backfills history', async t => {
+  const host = process.env.FIRESTORE_EMULATOR_HOST;
+  if (!host) {t.skip('Explicit loopback emulator required'); return;}
+  assert.match(host, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: 'demo-lf-store-coupons'}, `coupon-origin-${randomUUID()}`), db = getFirestore(app);
+  const suffix = randomUUID().replaceAll('-', ''), storeId = `store-${suffix}`, caseId = `case-${suffix}`;
+  const root = db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc(storeId);
+  const open = () => storeCouponService(new FirestorePromotionRepository(db, 'evaluation', () => new Date(at)));
+  try {
+    await db.collection('workspaceProfiles').doc(caseId).create({...profile, workspaceId: storeId, caseId});
+    const original = storeCouponBody({storeId});
+    const first = await open().handleOperation('owner-one', 'saveStoreCoupon', original) as any;
+    const path = root.collection('storeCouponUsage').doc('coupon-one'), initial = (await path.get()).data()!;
+    assert.ok(initial, 'A genuinely new campaign must have an atomic usage origin.');
+    assert.deepEqual({schemaVersion: initial.schemaVersion, realm: initial.realm, storeId: initial.storeId,
+      couponId: initial.couponId, usageRevision: initial.usageRevision, heldUses: initial.heldUses, redeemedUses: initial.redeemedUses},
+      {schemaVersion: 1, realm: 'evaluation', storeId, couponId: 'coupon-one', usageRevision: 0, heldUses: 0, redeemedUses: 0});
+    assert.equal(initial.origin.couponRevision, 1); assert.equal(initial.origin.ownerUserId, 'owner-one');
+    assert.equal(initial.origin.observedAt, at, 'Request observation is preserved, not renamed commit time.');
+    assert.equal(initial.origin.receiptId, cataloguePayloadHash(['owner-one', original.idempotencyKey]));
+    const receipt = (await root.collection('storeCouponReceipts').doc(initial.origin.receiptId).get()).data()!;
+    assert.equal(initial.origin.requestFingerprint, receipt.fingerprint); assert.deepEqual(receipt.record, first.record);
+    assert.deepEqual(await open().handleOperation('owner-one', 'saveStoreCoupon', original), first);
+    assert.deepEqual((await path.get()).data(), initial);
+    // Historical use is a labelled emulator fixture only, not a redemption API claim.
+    await path.update({usageRevision: 5, heldUses: 2, redeemedUses: 3});
+    const retained = (await path.get()).data();
+    const edited = {...original, expectedRevision: 1, idempotencyKey: 'coupon-edit', coupon: {...original.coupon, name: 'Host revised campaign'}};
+    await open().handleOperation('owner-one', 'saveStoreCoupon', edited);
+    await open().handleOperation('owner-one', 'saveStoreCoupon', {...edited, expectedRevision: 2,
+      idempotencyKey: 'coupon-pause', coupon: {...edited.coupon, active: false}});
+    await open().handleOperation('owner-one', 'saveStoreCoupon', {...edited, expectedRevision: 3, idempotencyKey: 'coupon-resume'});
+    await open().handleOperation('owner-one', 'reconcileStoreCoupon', original);
+    assert.deepEqual((await path.get()).data(), retained, 'No edit, pause, republish or replay resets usage.');
+    const publicPage = await open().handleOperation('buyer-one', 'readPublicStoreCouponSnapshot', {...couponSnapshotBody, storeId});
+    assert.doesNotMatch(JSON.stringify(publicPage), /requestFingerprint|usageRevision|heldUses|redeemedUses|ownerUserId/u);
+    const legacyId = 'legacy-coupon';
+    await root.collection('storeCoupons').doc(legacyId).create({...first.record, couponId: legacyId});
+    const legacy = storeCouponBody({storeId, couponId: legacyId, expectedRevision: 1, idempotencyKey: 'legacy-edit'});
+    await open().handleOperation('owner-one', 'saveStoreCoupon', legacy);
+    await open().handleOperation('owner-one', 'saveStoreCoupon', legacy);
+    assert.equal((await root.collection('storeCouponUsage').doc(legacyId).get()).exists, false,
+      'Historical unknown usage must not become a new zero baseline.');
+    const orphan = {...initial, couponId: 'orphan-coupon'};
+    await root.collection('storeCouponUsage').doc('orphan-coupon').create(orphan);
+    await assert.rejects(open().handleOperation('owner-one', 'saveStoreCoupon', storeCouponBody({storeId,
+      couponId: 'orphan-coupon', idempotencyKey: 'orphan-attempt'})));
+    assert.equal((await root.collection('storeCoupons').doc('orphan-coupon').get()).exists, false);
+    assert.deepEqual((await root.collection('storeCouponUsage').doc('orphan-coupon').get()).data(), orphan);
+    const race = await Promise.allSettled(['race-first', 'race-second'].map(key => open().handleOperation('owner-one', 'saveStoreCoupon',
+      storeCouponBody({storeId, couponId: 'race-coupon', idempotencyKey: key}))));
+    assert.equal(race.filter(r => r.status === 'fulfilled').length, 1);
+    const raceOrigin = (await root.collection('storeCouponUsage').doc('race-coupon').get()).data()!;
+    assert.equal(raceOrigin.heldUses, 0); assert.equal(raceOrigin.redeemedUses, 0);
+    const raceReceipt = (await root.collection('storeCouponReceipts').doc(raceOrigin.origin.receiptId).get()).data()!;
+    assert.equal(raceReceipt.record.couponId, 'race-coupon'); assert.equal(raceReceipt.fingerprint, raceOrigin.origin.requestFingerprint);
+    assert.equal((await root.collection('storeCoupons').doc('race-coupon').collection('revisions').get()).size, 1);
+    assert.equal((await db.collection('workspaceCatalogues').doc('production').collection('stores').doc(storeId)
+      .collection('storeCouponUsage').doc('coupon-one').get()).exists, false);
+    await assert.rejects(open().handleOperation('other-owner', 'saveStoreCoupon', storeCouponBody({storeId,
+      couponId: 'foreign-attempt', idempotencyKey: 'foreign-attempt'})));
+    assert.equal((await root.collection('storeCouponUsage').doc('foreign-attempt').get()).exists, false);
+  } finally {await deleteApp(app);}
 });
 for (const kind of ["flat", "percentage"] as const) {
   test(`LF04 advertised benefit terms owner save original recovery and public readback ${kind}`, async () => {

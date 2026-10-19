@@ -22480,6 +22480,15 @@ class _CartBenefitEligibilityState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!session.cartBenefitsConfigured) {
+      return Padding(key: const ValueKey('buy-cart-benefits-unavailable'),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(Icons.info_outline, size: 18, color: BuyV2Colors.muted),
+          const SizedBox(width: 8),
+          Expanded(child: Text(session.cartBenefitsMessage!, style: context.buyMeta)),
+        ]));
+    }
     final loading =
         session.cartBenefitsLoadState == BuyV2CartBenefitsLoadState.idle ||
         session.cartBenefitsLoadState == BuyV2CartBenefitsLoadState.loading;
