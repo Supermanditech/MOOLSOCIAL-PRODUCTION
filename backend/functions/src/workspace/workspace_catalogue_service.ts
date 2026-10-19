@@ -1,4 +1,6 @@
 import {createHash} from "node:crypto";
+import sharp from "sharp";
+import type {Bucket, File} from "@google-cloud/storage";
 import {FieldPath, type Firestore, type Transaction} from "firebase-admin/firestore";
 import {applyCatalogueCommand, createCatalogueAggregate, referencedOfferTermAt, reviewedCanonicalProduct,
   type CatalogueAggregate, type CatalogueCommand} from "../commerce/catalogue_contract.js";
@@ -6,6 +8,237 @@ import {isSupplyCapabilityActive, type SupplyActor,
   type SupplyCapabilityQuery, type SupplyParticipantWorkspace} from "../commerce/supply_participant_contract.js";
 import {WorkspaceProfileError, type WorkspaceProfileRecord} from "./workspace_profile_service.js";
 import {publicSupplierPolicySnapshot, type WorkspaceSupplierPolicyService} from "./workspace_supplier_policy_service.js";
+
+export interface NormalizedStoreProductImage {
+  bytes: Buffer;
+  source: {sha256: string; byteLength: number; width: number; height: number; mimeType: string};
+  file: {sha256: string; byteLength: number; width: number; height: number;
+    mimeType: "image/png"; normalized: true; frameCount: 1};
+  /** Descriptive source measurement only; never review, approval or publication. */
+  meetsPublicSourceFloor: boolean;
+}
+const productImageByteLimit = 8 * 1024 * 1024;
+let productImageDecodes = 0;
+function invalidProductImage(): WorkspaceProfileError {
+  return new WorkspaceProfileError("invalid_image", "Use one complete PNG, JPEG or WebP image within the image limits. Your saved photo is unchanged.", 400);
+}
+/** Structural animation/truncation checks supplement, never replace, full pixel decoding. */
+function productImageContainer(bytes: Buffer): "png" | "jpeg" | "webp" {
+  if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+    let position = 8, chunks = 0, hasPixels = false;
+    while (position + 12 <= bytes.length) {
+      const length = bytes.readUInt32BE(position), kind = bytes.toString("ascii", position + 4, position + 8);
+      if (length > bytes.length - position - 12 || ++chunks > 10000 ||
+          (chunks === 1 && (kind !== "IHDR" || length !== 13)) ||
+          ["acTL", "fcTL", "fdAT"].includes(kind)) throw invalidProductImage();
+      if (kind === "IDAT") hasPixels = true;
+      position += 12 + length;
+      if (kind === "IEND") {
+        if (length !== 0 || position !== bytes.length || !hasPixels) throw invalidProductImage();
+        return "png";
+      }
+    }
+    throw invalidProductImage();
+  }
+  if (bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") {
+    if (bytes.readUInt32LE(4) !== bytes.length - 8) throw invalidProductImage();
+    let position = 12;
+    while (position + 8 <= bytes.length) {
+      const kind = bytes.toString("ascii", position, position + 4), length = bytes.readUInt32LE(position + 4);
+      if (length > bytes.length - position - 8 || kind === "ANIM" || kind === "ANMF" ||
+          (kind === "VP8X" && length >= 1 && (bytes[position + 8]! & 2) !== 0)) throw invalidProductImage();
+      position += 8 + length + (length % 2);
+    }
+    if (position !== bytes.length) throw invalidProductImage();
+    return "webp";
+  }
+  if (bytes.length >= 4 && bytes[0] === 255 && bytes[1] === 216 &&
+      bytes[bytes.length - 2] === 255 && bytes[bytes.length - 1] === 217) return "jpeg";
+  throw invalidProductImage();
+}
+/** Private derivative only. Caller must bind actual bytes to immutable owner/submission/upload identity. */
+export async function normalizeStoreProductImage(input: Buffer): Promise<NormalizedStoreProductImage> {
+  if (!Buffer.isBuffer(input) || input.length === 0 || input.length > productImageByteLimit) throw invalidProductImage();
+  if (productImageDecodes >= 2) {
+    throw new WorkspaceProfileError("service_unavailable", "Image processing is busy. Retry this original upload shortly.", 503, true);
+  }
+  // Capture before the first await: caller mutation cannot substitute bytes after a hash/metadata check.
+  const bytes = Buffer.from(input);
+  productImageDecodes++;
+  try {
+    const format = productImageContainer(bytes);
+    const image = sharp(bytes, {failOn: "warning", limitInputPixels: 16 * 1024 * 1024, sequentialRead: true});
+    const metadata = await image.metadata();
+    if (metadata.format !== format || !metadata.width || !metadata.height ||
+        metadata.width > 16384 || metadata.height > 16384 ||
+        metadata.width * metadata.height > 16 * 1024 * 1024 ||
+        (metadata.pages ?? 1) !== 1 || (metadata.delay?.length ?? 0) > 1) throw invalidProductImage();
+    // Default re-encoding strips EXIF/ICC/XMP/IPTC. Never retain metadata or upscale a small saved image.
+    const output = await image.rotate().resize({width: 1024, height: 1024, fit: "inside", withoutEnlargement: true})
+      .png({compressionLevel: 6}).timeout({seconds: 5}).toBuffer({resolveWithObject: true});
+    if (output.info.format !== "png" || !output.info.width || !output.info.height ||
+        output.info.width > 1024 || output.info.height > 1024 || output.data.length > productImageByteLimit) throw invalidProductImage();
+    const hash = (value: Buffer) => createHash("sha256").update(value).digest("hex").toUpperCase();
+    return {bytes: Buffer.from(output.data),
+      source: {sha256: hash(bytes), byteLength: bytes.length, width: metadata.width, height: metadata.height,
+        mimeType: `image/${format}`},
+      file: {sha256: hash(output.data), byteLength: output.data.length, width: output.info.width,
+        height: output.info.height, mimeType: "image/png", normalized: true, frameCount: 1},
+      meetsPublicSourceFloor: metadata.width >= 512 && metadata.height >= 512};
+  } catch (error) {
+    if (error instanceof WorkspaceProfileError) throw error;
+    // Decoder diagnostics can contain internal paths/metadata; return only the actionable public error.
+    throw invalidProductImage();
+  } finally {
+    productImageDecodes--;
+  }
+}
+
+/** Private processing protocol. None of these records constitutes a public media reference. */
+export interface StoreProductMediaRequest {
+  storeId: string; skuId: string; submissionRevision: number; submissionFingerprint: string;
+  sourceSha256: string; sourceByteLength: number; sourceMimeType: "image/png" | "image/jpeg" | "image/webp";
+  idempotencyKey: string;
+}
+export interface StoreProductMediaUpload extends StoreProductMediaRequest {
+  schemaVersion: 1; realm: "evaluation" | "production"; ownerUserId: string;
+  uploadId: string; fingerprint: string; preparedAt: string; expiresAt: string;
+  processed: null | {assetId: string; originalGeneration: string; derivativeGeneration: string;
+    processedAt: string; source: NormalizedStoreProductImage["source"]; file: NormalizedStoreProductImage["file"];
+    meetsPublicSourceFloor: boolean};
+}
+export interface StoreProductMediaObjects {
+  prepare(upload: StoreProductMediaUpload): Promise<{uploadUrl: string; requiredHeaders: Record<string, string>}>;
+  read(upload: StoreProductMediaUpload): Promise<{bytes: Buffer; generation: string}>;
+  save(upload: StoreProductMediaUpload, generation: string, image: NormalizedStoreProductImage): Promise<{assetId: string; generation: string}>;
+}
+function mediaUnavailable(): WorkspaceProfileError {
+  return new WorkspaceProfileError("service_unavailable", "Product-image storage is unavailable. Keep your saved photo and retry the original request.", 503, true);
+}
+function mediaRequest(body: Readonly<Record<string, unknown>>): StoreProductMediaRequest {
+  exact(body, ["productMediaVersion", "storeId", "skuId", "submissionRevision", "submissionFingerprint",
+    "sourceSha256", "sourceByteLength", "sourceMimeType", "idempotencyKey"]);
+  if (body.productMediaVersion !== 1 || typeof body.sourceMimeType !== "string" || !["image/png", "image/jpeg", "image/webp"].includes(body.sourceMimeType) ||
+      typeof body.sourceSha256 !== "string" || !/^(?:[A-F0-9]{64}|[a-f0-9]{64})$/u.test(body.sourceSha256) ||
+      typeof body.submissionFingerprint !== "string" || !/^[A-F0-9]{64}$/u.test(body.submissionFingerprint)) invalid();
+  return {storeId: id(body.storeId), skuId: id(body.skuId), submissionRevision: integer(body.submissionRevision),
+    submissionFingerprint: body.submissionFingerprint, sourceSha256: body.sourceSha256,
+    sourceByteLength: integer(body.sourceByteLength, 1, productImageByteLimit),
+    sourceMimeType: body.sourceMimeType as StoreProductMediaRequest["sourceMimeType"], idempotencyKey: id(body.idempotencyKey)};
+}
+function mediaObjectPath(upload: StoreProductMediaUpload): string {
+  return `private/product-media/v1/${upload.realm}/${upload.uploadId}/original`;
+}
+function checkedMediaUpload(raw: unknown, asOf: string): StoreProductMediaUpload {
+  const value = exact(raw, ["schemaVersion", "realm", "ownerUserId", "uploadId", "fingerprint", "preparedAt", "expiresAt", "processed",
+    "storeId", "skuId", "submissionRevision", "submissionFingerprint", "sourceSha256", "sourceByteLength", "sourceMimeType", "idempotencyKey"]);
+  const {schemaVersion, realm, ownerUserId, uploadId, fingerprint, preparedAt, expiresAt, processed, ...request} = value;
+  const input = mediaRequest({productMediaVersion: 1, ...request}), owner = id(ownerUserId);
+  const iso = (v: unknown): string => {
+    if (typeof v !== "string" || !Number.isFinite(Date.parse(v)) || new Date(v).toISOString() !== v) invalid();
+    return v;
+  };
+  const prepared = iso(preparedAt), expires = iso(expiresAt);
+  if (schemaVersion !== 1 || typeof realm !== "string" || !["evaluation", "production"].includes(realm) ||
+      uploadId !== cataloguePayloadHash([realm, input.storeId, input.skuId, owner, input.idempotencyKey]) ||
+      fingerprint !== cataloguePayloadHash({realm, ownerUserId: owner, ...input}) || prepared > asOf || Date.parse(expires) - Date.parse(prepared) !== 300000) invalid();
+  if (processed !== null) {
+    const p = exact(processed, ["assetId", "originalGeneration", "derivativeGeneration", "processedAt", "source", "file", "meetsPublicSourceFloor"]);
+    for (const g of [p.originalGeneration, p.derivativeGeneration]) if (typeof g !== "string" || !/^[1-9][0-9]*$/u.test(g)) invalid();
+    const source = exact(p.source, ["sha256", "byteLength", "width", "height", "mimeType"]);
+    const file = exact(p.file, ["sha256", "byteLength", "width", "height", "mimeType", "normalized", "frameCount"]);
+    const width = integer(source.width, 1, 16384), height = integer(source.height, 1, 16384);
+    if (width * height > 16 * 1024 * 1024 || source.sha256 !== input.sourceSha256.toUpperCase() ||
+        source.byteLength !== input.sourceByteLength || source.mimeType !== input.sourceMimeType ||
+        typeof file.sha256 !== "string" || !/^[A-F0-9]{64}$/u.test(file.sha256) ||
+        file.mimeType !== "image/png" || file.normalized !== true || file.frameCount !== 1 ||
+        integer(file.width, 1, 1024) * integer(file.height, 1, 1024) > width * height ||
+        integer(file.byteLength, 1, productImageByteLimit) < 1 ||
+        p.meetsPublicSourceFloor !== (width >= 512 && height >= 512) || Date.parse(iso(p.processedAt)) < Date.parse(prepared) || iso(p.processedAt) > asOf ||
+        p.assetId !== cataloguePayloadHash({uploadId, generation: p.originalGeneration, sha256: file.sha256})) invalid();
+  }
+  return structuredClone(value) as unknown as StoreProductMediaUpload;
+}
+/** Actual GCS adapter, enabled only with explicit configuration and enforced private-bucket policy. */
+export class GoogleCloudStoreProductMediaObjects implements StoreProductMediaObjects {
+  constructor(private readonly bucket: Bucket) {}
+  private async assertPrivate(): Promise<void> {
+    const [metadata] = await this.bucket.getMetadata();
+    if (metadata.iamConfiguration?.publicAccessPrevention !== "enforced" ||
+        metadata.iamConfiguration?.uniformBucketLevelAccess?.enabled !== true) throw mediaUnavailable();
+  }
+  private tags(upload: StoreProductMediaUpload): Record<string, string> {
+    return {"moolsocial-schema": "private-product-media-v1", "moolsocial-binding": upload.fingerprint,
+      "moolsocial-owner": cataloguePayloadHash(upload.ownerUserId), "moolsocial-source": upload.sourceSha256};
+  }
+  async prepare(upload: StoreProductMediaUpload) {
+    try {
+      await this.assertPrivate();
+      const requiredHeaders = {"content-type": upload.sourceMimeType, "content-length": String(upload.sourceByteLength),
+        "x-goog-if-generation-match": "0", ...Object.fromEntries(Object.entries(this.tags(upload)).map(([k, v]) => [`x-goog-meta-${k}`, v]))};
+      const [uploadUrl] = await this.bucket.file(mediaObjectPath(upload)).getSignedUrl({version: "v4", action: "write",
+        expires: new Date(upload.expiresAt), contentType: upload.sourceMimeType,
+        extensionHeaders: Object.fromEntries(Object.entries(requiredHeaders).filter(([k]) => k !== "content-type"))});
+      return {uploadUrl, requiredHeaders};
+    } catch {throw mediaUnavailable();}
+  }
+  private async boundedBytes(file: File): Promise<Buffer> {
+    const stream = file.createReadStream({validation: "crc32c"});
+    const timer = setTimeout(() => stream.destroy(mediaUnavailable()), 10000);
+    timer.unref();
+    const chunks: Buffer[] = []; let size = 0;
+    try {
+      for await (const raw of stream) {
+        const chunk = Buffer.from(raw); size += chunk.length;
+        if (size > productImageByteLimit) {stream.destroy(); throw invalidProductImage();}
+        chunks.push(chunk);
+      }
+      return Buffer.concat(chunks, size);
+    } finally {clearTimeout(timer); stream.destroy();}
+  }
+  async read(upload: StoreProductMediaUpload) {
+    try {
+      await this.assertPrivate();
+      const path = mediaObjectPath(upload), [head] = await this.bucket.file(path).getMetadata();
+      const generation = String(head.generation ?? "");
+      if (!/^[1-9][0-9]*$/u.test(generation)) throw invalidProductImage();
+      const pinned = this.bucket.file(path, {generation}), [metadata] = await pinned.getMetadata();
+      const created = Date.parse(metadata.timeCreated ?? ""), custom = metadata.metadata ?? {};
+      if (String(metadata.generation) !== generation || metadata.contentType !== upload.sourceMimeType ||
+          Number(metadata.size) !== upload.sourceByteLength || !Number.isFinite(created) ||
+          created < Date.parse(upload.preparedAt) || created > Date.parse(upload.expiresAt) ||
+          Object.entries(this.tags(upload)).some(([k, v]) => custom[k] !== v) ||
+          Object.hasOwn(custom, "firebaseStorageDownloadTokens")) throw invalidProductImage();
+      const bytes = await this.boundedBytes(pinned);
+      if (bytes.length !== upload.sourceByteLength) throw invalidProductImage();
+      return {bytes, generation};
+    } catch (error) {
+      if (error instanceof WorkspaceProfileError) throw error;
+      throw mediaUnavailable();
+    }
+  }
+  async save(upload: StoreProductMediaUpload, generation: string, image: NormalizedStoreProductImage) {
+    try {
+      await this.assertPrivate();
+      const assetId = cataloguePayloadHash({uploadId: upload.uploadId, generation, sha256: image.file.sha256});
+      const path = `private/product-media/v1/${upload.realm}/${upload.uploadId}/derivatives/${assetId}.png`;
+      const metadata = {...this.tags(upload), "moolsocial-original-generation": generation, "moolsocial-sha256": image.file.sha256};
+      try {
+        await this.bucket.file(path).save(image.bytes, {resumable: false, preconditionOpts: {ifGenerationMatch: 0},
+          metadata: {contentType: "image/png", cacheControl: "private, no-store", metadata}});
+      } catch (error) {if ((error as {code?: number}).code !== 412) throw error;}
+      // Original-attempt recovery after an object write/receipt gap verifies the existing immutable derivative.
+      const [head] = await this.bucket.file(path).getMetadata(), derivativeGeneration = String(head.generation ?? "");
+      if (!/^[1-9][0-9]*$/u.test(derivativeGeneration)) throw invalidProductImage();
+      const pinned = this.bucket.file(path, {generation: derivativeGeneration}), [stored] = await pinned.getMetadata();
+      if (String(stored.generation) !== derivativeGeneration || stored.contentType !== "image/png" || Number(stored.size) !== image.bytes.length ||
+          Object.entries(metadata).some(([k, v]) => stored.metadata?.[k] !== v) ||
+          Object.hasOwn(stored.metadata ?? {}, "firebaseStorageDownloadTokens") ||
+          createHash("sha256").update(await this.boundedBytes(pinned)).digest("hex").toUpperCase() !== image.file.sha256) throw invalidProductImage();
+      return {assetId, generation: derivativeGeneration};
+    } catch (error) {if (error instanceof WorkspaceProfileError) throw error; throw mediaUnavailable();}
+  }
+}
 
 /** Publication mirror only. Never an inventory, order, payment or approval ledger. */
 export interface StoreSkuContent {
@@ -115,6 +348,7 @@ export interface WorkspaceCatalogueRepository {
   submitProduct?(command: StoreProductSubmissionCommand): Promise<StoreProductSubmissionRecord>;
   reconcileProduct?(command: StoreProductSubmissionCommand): Promise<StoreProductSubmissionRecord | undefined>;
   readProductSubmission?(storeId: string, skuId: string, ownerUserId: string): Promise<StoreProductSubmissionRecord | undefined>;
+  productMedia?(ownerUserId: string, action: "prepare" | "confirm" | "read", request: StoreProductMediaRequest): Promise<object>;
   readReviewedProductSubmission?(storeId: string, skuId: string, ownerUserId: string,
     identity: CatalogueIdentity): Promise<StoreProductReviewReadback>;
   /** Complete bounded directory, never public product facts or approval. */
@@ -433,6 +667,15 @@ export class WorkspaceCatalogueService {
     private readonly identity?: CatalogueIdentity,
     private readonly now: () => Date = () => new Date(),
     private readonly policyReader?: Pick<WorkspaceSupplierPolicyService, "forPublicSku">) {}
+
+  async handleProductMedia(ownerUserId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    const action = operation === "prepareStoreProductMedia" ? "prepare" : operation === "confirmStoreProductMedia" ? "confirm"
+      : operation === "readStoreProductMedia" ? "read" : undefined;
+    if (!action) invalid();
+    const request = mediaRequest(structuredClone(body));
+    if (!this.repository.productMedia) throw mediaUnavailable();
+    return this.repository.productMedia(id(ownerUserId), action, request);
+  }
 
   async handleProductSubmission(ownerUserId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const action = storeProductSubmissionOperation(operation);
@@ -1709,7 +1952,88 @@ export function planReviewedCatalogueSave(command: CatalogueSave, identity: Cata
 
 export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogueRepository {
   constructor(private readonly firestore: Firestore, readonly realm: "evaluation" | "production",
-    private readonly now: () => Date = () => new Date()) {}
+    private readonly now: () => Date = () => new Date(), private readonly mediaObjects?: StoreProductMediaObjects) {}
+
+  async productMedia(ownerUserId: string, action: "prepare" | "confirm" | "read", original: StoreProductMediaRequest): Promise<object> {
+    const request = mediaRequest({productMediaVersion: 1, ...structuredClone(original)}), owner = id(ownerUserId);
+    if (!["prepare", "confirm", "read"].includes(action)) invalid();
+    const uploadId = cataloguePayloadHash([this.realm, request.storeId, request.skuId, owner, request.idempotencyKey]);
+    const fingerprint = cataloguePayloadHash({realm: this.realm, ownerUserId: owner, ...request});
+    const ref = this.root(request.storeId).collection("productMediaUploads").doc(uploadId);
+    const head = this.productSubmissionHead(request.storeId, request.skuId);
+    const immutableSource = head.collection("revisions").doc(String(request.submissionRevision));
+    const matchesSource = (record: StoreProductSubmissionRecord | undefined) => !!record && record.submittedBy === owner &&
+      record.revision === request.submissionRevision && record.fingerprint === request.submissionFingerprint &&
+      record.product.mediaIntent.pendingUpload && record.product.mediaIntent.pendingSelectionSha256 ===
+        cataloguePayloadHash({privateSha256: request.sourceSha256, skuId: request.skuId});
+    const result = (record: StoreProductMediaUpload | null, current: boolean, grant?: {uploadUrl: string; requiredHeaders: Record<string, string>}) =>
+      ({schemaVersion: 1, productMediaVersion: 1, realm: this.realm, storeId: request.storeId, skuId: request.skuId,
+        idempotencyKey: request.idempotencyKey, uploadId, current,
+        state: record?.processed ? "processed" : record ? "awaiting_upload" : "not_found",
+        preparedAt: record?.preparedAt ?? null, expiresAt: record?.expiresAt ?? null,
+        source: {revision: request.submissionRevision, fingerprint: request.submissionFingerprint},
+        processed: record?.processed ?? null, approved: false, publicationConfirmed: false, ...(grant ?? {})});
+    const loaded = await this.firestore.runTransaction(async transaction => {
+      await this.productSubmissionOwner(transaction, request.storeId, owner);
+      const [doc, sourceDoc, historicalDoc] = await transaction.getAll(ref, head, immutableSource);
+      const source = sourceDoc?.exists ? checkedProductSubmission(sourceDoc.data(), this.realm, request.storeId, request.skuId) : undefined;
+      const current = matchesSource(source);
+      const historical = historicalDoc?.exists ? checkedProductSubmission(historicalDoc.data(), this.realm, request.storeId, request.skuId) : undefined;
+      let record = doc?.exists ? checkedMediaUpload(doc.data(), this.now().toISOString()) : null;
+      if (record && (record.fingerprint !== fingerprint || record.uploadId !== uploadId || record.ownerUserId !== owner ||
+          record.realm !== this.realm || record.storeId !== request.storeId || record.skuId !== request.skuId)) {
+        throw new WorkspaceProfileError("conflict", "This image request changed. Recover its original result.", 409);
+      }
+      if (record && !matchesSource(historical)) throw new WorkspaceProfileError("stale_snapshot", "The original saved image source cannot be verified.", 409);
+      if (!record && action === "prepare") {
+        if (!current) throw new WorkspaceProfileError("stale_snapshot", "The saved product or selected photo changed. Refresh before uploading.", 409);
+        const preparedAt = this.now().toISOString(), expiresAt = new Date(Date.parse(preparedAt) + 300000).toISOString();
+        record = {...request, schemaVersion: 1, realm: this.realm, ownerUserId: owner, uploadId, fingerprint, preparedAt, expiresAt, processed: null};
+        transaction.create(ref, record);
+      }
+      return {record, current};
+    });
+    if (!loaded.record || action === "read" || loaded.record.processed) return result(loaded.record, loaded.current);
+    if (action === "prepare" && !loaded.current) throw new WorkspaceProfileError("stale_snapshot", "The saved product or selected photo changed. Its earlier upload cannot replace it.", 409);
+    if (!this.mediaObjects) throw mediaUnavailable();
+    const upload = loaded.record;
+    if (action === "prepare") {
+      if (upload.expiresAt <= this.now().toISOString()) throw new WorkspaceProfileError("upload_expired", "This upload grant expired. Keep the photo and start a new upload request.", 409);
+      return result(upload, true, await this.mediaObjects.prepare(upload));
+    }
+    // Byte IO and decoding are outside retryable transaction callbacks.
+    const originalBytes = await this.mediaObjects.read(upload);
+    if (!/^[1-9][0-9]*$/u.test(originalBytes.generation) || !Buffer.isBuffer(originalBytes.bytes) ||
+        originalBytes.bytes.length !== request.sourceByteLength ||
+        createHash("sha256").update(originalBytes.bytes).digest("hex").toUpperCase() !== request.sourceSha256.toUpperCase()) throw invalidProductImage();
+    const image = await normalizeStoreProductImage(originalBytes.bytes);
+    if (image.source.mimeType !== request.sourceMimeType) throw invalidProductImage();
+    const derivative = await this.mediaObjects.save(upload, originalBytes.generation, image);
+    const assetId = cataloguePayloadHash({uploadId, generation: originalBytes.generation, sha256: image.file.sha256});
+    if (derivative.assetId !== assetId || !/^[1-9][0-9]*$/u.test(derivative.generation)) throw mediaUnavailable();
+    const completed = await this.firestore.runTransaction(async transaction => {
+      await this.productSubmissionOwner(transaction, request.storeId, owner);
+      const [doc, sourceDoc, historicalDoc] = await transaction.getAll(ref, head, immutableSource);
+      const record = doc?.exists ? checkedMediaUpload(doc.data(), this.now().toISOString()) : undefined;
+      if (!record || record.fingerprint !== fingerprint) throw new WorkspaceProfileError("conflict", "Recover the original image request.", 409);
+      if (!matchesSource(historicalDoc?.exists ? checkedProductSubmission(historicalDoc.data(), this.realm, request.storeId, request.skuId) : undefined)) {
+        throw new WorkspaceProfileError("stale_snapshot", "The original saved image source cannot be verified.", 409);
+      }
+      const current = matchesSource(sourceDoc?.exists ? checkedProductSubmission(sourceDoc.data(), this.realm, request.storeId, request.skuId) : undefined);
+      // Concurrent confirms must agree with the same immutable source generation and output.
+      if (record.processed) {
+        if (record.processed.assetId !== assetId || record.processed.originalGeneration !== originalBytes.generation ||
+            record.processed.derivativeGeneration !== derivative.generation) throw invalidProductImage();
+        return {record, current};
+      }
+      // Preserve the historical result even after a source edit; never write it into the newer submission/head.
+      record.processed = {assetId, originalGeneration: originalBytes.generation, derivativeGeneration: derivative.generation,
+        processedAt: this.now().toISOString(), source: image.source, file: image.file, meetsPublicSourceFloor: image.meetsPublicSourceFloor};
+      transaction.set(ref, checkedMediaUpload(record, this.now().toISOString()));
+      return {record, current};
+    });
+    return result(completed.record, completed.current);
+  }
 
   /** Internal only: resolves private authority inside the committing transaction.
    * No HTTP operation, automatic grants, approval shortcut or runtime seeds.

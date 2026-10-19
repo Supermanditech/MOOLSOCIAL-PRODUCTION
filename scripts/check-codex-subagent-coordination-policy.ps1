@@ -8020,6 +8020,10 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     if (@($facts.owners) -ccontains 'backend/functions/src/workspace/workspace_promotion_service.test.ts') {
       $factsOwners += 'backend/functions/src/workspace/workspace_promotion_service.test.ts'
     }
+    # Founder-approved decoder dependency only; no directory/wildcard ownership.
+    foreach ($decoderOwner in @('backend/functions/package.json', 'backend/functions/package-lock.json')) {
+      if (@($facts.owners) -ccontains $decoderOwner) { $factsOwners += $decoderOwner }
+    }
     if ($null -ne $facts.PSObject.Properties['reviewedFamilyContractVersion']) {
       if ($facts.reviewedFamilyContractVersion -isnot [long] -and $facts.reviewedFamilyContractVersion -isnot [int] -or
           $facts.reviewedFamilyContractVersion -ne 1) { return $false }
@@ -8386,6 +8390,10 @@ function Invoke-Lf01Admission {
     'apps/mobile/test/work_catalogue_gateway_test.dart')
   if ($ProductionTicketId -ceq 'LF-27') {
     $extensionRecord = Get-Content -Raw -LiteralPath (Join-Path $root $recordOwner) | ConvertFrom-Json
+    # Exact decoder prerequisite approved19Oct; preserve historical claim lists.
+    foreach ($decoderOwner in @('backend/functions/package.json', 'backend/functions/package-lock.json')) {
+      if (@($extensionRecord.frontendContinuation.batch02Facts.owners) -ccontains $decoderOwner) { $owners += $decoderOwner }
+    }
     if ($null -ne $extensionRecord.PSObject.Properties['sharedCatalogueExtension']) {
       $extension = $extensionRecord.sharedCatalogueExtension
       Assert-Coordination ($extension.authorized -eq $true -and

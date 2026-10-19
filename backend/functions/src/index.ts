@@ -133,6 +133,7 @@ import {
   WorkspaceCatalogueService,
   storeVariantFamilyOperation,
   storeProductSubmissionOperation,
+  GoogleCloudStoreProductMediaObjects,
 } from "./workspace/workspace_catalogue_service.js";
 import {WorkspaceSupplierPolicyService, FirestoreSupplierPolicyRepository} from "./workspace/workspace_supplier_policy_service.js";
 import {WorkspacePromotionService, FirestorePromotionRepository} from "./workspace/workspace_promotion_service.js";
@@ -2892,6 +2893,7 @@ export const moolSocialWorkspace = onRequest(
         : "";
       const variantFamilyOperation = storeVariantFamilyOperation(operation);
       const productSubmissionOperation = storeProductSubmissionOperation(operation);
+      const productMediaOperation = ["prepareStoreProductMedia", "confirmStoreProductMedia", "readStoreProductMedia"].includes(operation);
       const mutation = operation === "prepareProofUpload" ||
         operation === "confirmProofUpload" ||
         operation === "submitProfile" ||
@@ -2901,14 +2903,15 @@ export const moolSocialWorkspace = onRequest(
         operation === "saveRetailerProduct" ||
         operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStorePublicDetails" ||
-        variantFamilyOperation === "submit" || productSubmissionOperation === "submit";
+        variantFamilyOperation === "submit" || productSubmissionOperation === "submit" ||
+        operation === "prepareStoreProductMedia" || operation === "confirmStoreProductMedia";
       const supplierPolicyOperation = ["readStoreSupplierPolicy", "saveStoreSupplierPolicy",
         "reconcileStoreSupplierPolicy"].includes(operation);
       const promotionOperation = ["readStorePromotion", "saveStorePromotion", "reconcileStorePromotion",
         "listStorePromotions", "readPublicStorePromotions", "readPublicPromotionDiscovery"].includes(operation);
       const catalogueOperation = ["saveStoreCatalogueSku", "bindReviewedStoreCatalogueSku",
         "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue", "readPublicCatalogueDiscovery",
-        "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined;
+        "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined || productMediaOperation;
       const orderMutation = operation === "acceptRetailerOrder" ||
         operation === "packRetailerOrder" ||
         operation === "requestRetailerDelivery" ||
@@ -2952,6 +2955,8 @@ export const moolSocialWorkspace = onRequest(
       const {operation: _operation, ...catalogueBody} = body;
       const result = promotionOperation
         ? await workspacePromotionService().handleOperation(ownerUserId, operation, catalogueBody)
+        : productMediaOperation
+        ? await workspaceCatalogueService().handleProductMedia(ownerUserId, operation, catalogueBody)
         : productSubmissionOperation !== undefined
         ? await workspaceCatalogueService().handleProductSubmission(ownerUserId, operation, catalogueBody)
         : variantFamilyOperation === "public_read"
@@ -3110,7 +3115,8 @@ function workspaceCatalogueService(): WorkspaceCatalogueService {
   const catalogueId = process.env.MOOLSOCIAL_CATALOGUE_ID;
   const tenantId = process.env.MOOLSOCIAL_CATALOGUE_TENANT_ID;
   return new WorkspaceCatalogueService(
-    new FirestoreWorkspaceCatalogueRepository(getFirestore(), realm),
+    new FirestoreWorkspaceCatalogueRepository(getFirestore(), realm, undefined,
+      process.env.MOOLSOCIAL_PRODUCT_MEDIA_V1 === "true" ? new GoogleCloudStoreProductMediaObjects(getStorage().bucket()) : undefined),
     catalogueId && tenantId ? {catalogueId, tenantId} : undefined,
     undefined,
     new WorkspaceSupplierPolicyService(new FirestoreSupplierPolicyRepository(getFirestore(), realm)),

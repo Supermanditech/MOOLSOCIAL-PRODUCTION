@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {randomUUID} from "node:crypto";
+import {createHash, randomUUID} from "node:crypto";
 import {createServer} from "node:http";
+import {Readable} from "node:stream";
+import sharp from "sharp";
+import * as catalogueModule from "./workspace_catalogue_service.js";
+import {GoogleCloudStoreProductMediaObjects, type StoreProductMediaObjects, type StoreProductMediaUpload,
+  type StoreProductMediaRequest, type NormalizedStoreProductImage} from "./workspace_catalogue_service.js";
 import {initializeApp, deleteApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingBindings, channelTerms, planCatalogueSave, normalizeSku,
@@ -23,6 +28,365 @@ import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
 
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
 const at = "2026-10-16T12:00:00.000Z";
+// Actual byte fixtures, isolated from device data and production media.
+type DecodedProductImage = {bytes: Buffer; source: {sha256: string; byteLength: number;
+  width: number; height: number; mimeType: string}; file: {sha256: string; byteLength: number;
+  width: number; height: number; mimeType: string; normalized: boolean; frameCount: number};
+  meetsPublicSourceFloor: boolean};
+const decodeProductImage = (bytes: Buffer): Promise<DecodedProductImage> => {
+  const decode = (catalogueModule as unknown as Record<string, unknown>).normalizeStoreProductImage;
+  assert.equal(typeof decode, "function", "A full image decoder is required, not metadata claims");
+  return (decode as (bytes: Buffer) => Promise<DecodedProductImage>)(bytes);
+};
+for (const format of ["png", "jpeg", "webp"] as const) {
+  test(`LF03-MEDIA actual ${format} pixels decode to measured private PNG`, async () => {
+    const bytes = await sharp({create: {width: 640, height: 520, channels: 3,
+      background: "#247a62"}})[format]().toBuffer();
+    const result = await decodeProductImage(bytes);
+    assert.equal(result.source.byteLength, bytes.length);
+    assert.equal(result.source.mimeType, `image/${format}`);
+    assert.equal(result.source.sha256, cataloguePayloadHashBytes(bytes));
+    assert.equal(result.file.sha256, cataloguePayloadHashBytes(result.bytes));
+    assert.equal(result.file.byteLength, result.bytes.length);
+    assert.deepEqual([result.file.width, result.file.height, result.file.frameCount], [640, 520, 1]);
+    assert.equal(result.file.mimeType, "image/png");
+    assert.equal(result.file.normalized, true);
+    assert.equal(result.meetsPublicSourceFloor, true);
+    const output = await sharp(result.bytes).metadata();
+    assert.equal(output.format, "png");
+    assert.equal(output.exif, undefined);
+    assert.equal(output.icc, undefined);
+    assert.equal(output.xmp, undefined);
+  });
+}
+function cataloguePayloadHashBytes(bytes: Buffer): string {
+  return createHash("sha256").update(bytes).digest("hex").toUpperCase();
+}
+test("LF03-MEDIA strips metadata and applies actual EXIF orientation", async () => {
+  const bytes = await sharp({create: {width: 600, height: 520, channels: 3, background: "#3178aa"}})
+    .withMetadata({orientation: 6}).withXmp('<x:xmpmeta xmlns:x="adobe:ns:meta/">private-camera-location</x:xmpmeta>')
+    .jpeg().toBuffer();
+  assert.ok((await sharp(bytes).metadata()).exif);
+  const result = await decodeProductImage(bytes), metadata = await sharp(result.bytes).metadata();
+  assert.deepEqual([result.file.width, result.file.height], [520, 600]);
+  assert.equal(metadata.exif, undefined);
+  assert.equal(metadata.xmp, undefined);
+  assert.equal(metadata.icc, undefined);
+  assert.equal(metadata.orientation, undefined);
+  assert.equal(result.bytes.includes(Buffer.from("private-camera-location")), false);
+});
+test("LF03-MEDIA never fabricates the public floor by upscaling private saved photos", async () => {
+  const small = await sharp({create: {width: 128, height: 256, channels: 4, background: "#206070"}}).png().toBuffer();
+  const decoded = await decodeProductImage(small);
+  assert.deepEqual([decoded.file.width, decoded.file.height], [128, 256]);
+  assert.equal(decoded.meetsPublicSourceFloor, false);
+  const large = await sharp({create: {width: 2048, height: 1024, channels: 3, background: "#a07050"}}).png().toBuffer();
+  const bounded = await decodeProductImage(large);
+  assert.deepEqual([bounded.file.width, bounded.file.height], [1024, 512]);
+  assert.deepEqual([bounded.source.width, bounded.source.height], [2048, 1024]);
+});
+test("LF03-MEDIA reports the exact 512-pixel source floor without approval or enlargement", async () => {
+  for (const side of [511, 512]) {
+    const bytes = await sharp({create: {width: side, height: 512, channels: 3, background: "#204030"}}).png().toBuffer();
+    const decoded = await decodeProductImage(bytes);
+    assert.deepEqual([decoded.file.width, decoded.file.height], [side, 512]);
+    assert.equal(decoded.meetsPublicSourceFloor, side === 512);
+    assert.equal(Object.hasOwn(decoded, "approved"), false);
+  }
+});
+test("LF03-MEDIA captures input before awaits and returns independent bytes", async () => {
+  const original = await sharp({create: {width: 520, height: 520, channels: 3, background: "#283450"}}).png().toBuffer();
+  const untouched = Buffer.from(original), pending = decodeProductImage(original);
+  original.fill(0);
+  const decoded = await pending;
+  assert.equal(decoded.source.sha256, cataloguePayloadHashBytes(untouched));
+  const again = await decodeProductImage(untouched);
+  assert.deepEqual(decoded.bytes, again.bytes);
+  decoded.bytes.fill(0);
+  assert.notDeepEqual(decoded.bytes, again.bytes);
+});
+test("LF03-MEDIA rejects corrupt, header-only, truncated and unsupported input", async () => {
+  const valid = await sharp({create: {width: 520, height: 520, channels: 3, background: "#316249"}}).png().toBuffer();
+  for (const bytes of [Buffer.alloc(0), Buffer.from("not-image"), valid.subarray(0, 24),
+    valid.subarray(0, valid.length - 20), Buffer.from('<svg width="600" height="600"></svg>'),
+    await sharp({create: {width: 520, height: 520, channels: 3, background: "red"}}).gif().toBuffer(),
+    Buffer.alloc(8 * 1024 * 1024 + 1)]) {
+    await assert.rejects(decodeProductImage(bytes), (error: unknown) =>
+      (error as {code?: string}).code === "invalid_image");
+  }
+});
+test("LF03-MEDIA rejects excessive decoded pixels and animation rather than taking frame one", async () => {
+  const bomb = await sharp({create: {width: 5000, height: 4000, channels: 3, background: "white"}}).png().toBuffer();
+  await assert.rejects(decodeProductImage(bomb), (e: unknown) => (e as {code?: string}).code === "invalid_image");
+  const frames = Buffer.alloc(128 * 256 * 4);
+  for (let p = 0; p < frames.length; p += 4) {
+    frames[p] = p < 128 * 128 * 4 ? 255 : 0;
+    frames[p + 2] = p < 128 * 128 * 4 ? 0 : 255;
+    frames[p + 3] = 255;
+  }
+  const animated = await sharp(frames, {raw: {width: 128, height: 256, pageHeight: 128,
+    channels: 4}}).webp({loop: 0, delay: [50, 50]}).toBuffer();
+  assert.equal((await sharp(animated).metadata()).pages, 2);
+  await assert.rejects(decodeProductImage(animated), (e: unknown) => (e as {code?: string}).code === "invalid_image");
+});
+test("LF03-MEDIA rejects real APNG frame controls, including loaders exposing only a default frame", async () => {
+  const pngChunk = (kind: string, data: Buffer) => {
+    const payload = Buffer.concat([Buffer.from(kind), data]), result = Buffer.alloc(data.length + 12);
+    result.writeUInt32BE(data.length, 0); payload.copy(result, 4);
+    let crc = 0xffffffff;
+    for (const byte of payload) {crc ^= byte; for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);}
+    result.writeUInt32BE((crc ^ 0xffffffff) >>> 0, result.length - 4); return result;
+  };
+  const frames = await Promise.all(["red", "blue"].map(background => sharp({create: {width: 520, height: 520,
+    channels: 4, background}}).png().toBuffer()));
+  const chunks = (bytes: Buffer) => {
+    const parts: Array<{kind: string; data: Buffer}> = [];
+    for (let p = 8; p < bytes.length;) {
+      const length = bytes.readUInt32BE(p); parts.push({kind: bytes.toString("ascii", p + 4, p + 8), data: bytes.subarray(p + 8, p + 8 + length)}); p += length + 12;
+    }
+    return parts;
+  };
+  const first = chunks(frames[0]!), second = chunks(frames[1]!);
+  const control = Buffer.alloc(8); control.writeUInt32BE(2, 0);
+  const frameControl = (sequence: number) => {
+    const value = Buffer.alloc(26); value.writeUInt32BE(sequence, 0); value.writeUInt32BE(520, 4); value.writeUInt32BE(520, 8);
+    value.writeUInt16BE(5, 20); value.writeUInt16BE(100, 22); return pngChunk("fcTL", value);
+  };
+  const pixels1 = Buffer.concat(first.filter(p => p.kind === "IDAT").map(p => p.data));
+  const pixels2 = Buffer.concat(second.filter(p => p.kind === "IDAT").map(p => p.data));
+  const sequence = Buffer.alloc(4); sequence.writeUInt32BE(2);
+  const apng = Buffer.concat([frames[0]!.subarray(0, 8), pngChunk("IHDR", first[0]!.data), pngChunk("acTL", control),
+    frameControl(0), pngChunk("IDAT", pixels1), frameControl(1), pngChunk("fdAT", Buffer.concat([sequence, pixels2])), pngChunk("IEND", Buffer.alloc(0))]);
+  // libvips may decode only the PNG default frame; our container fence must still reject the animation.
+  assert.equal((await sharp(apng).metadata()).width, 520);
+  await assert.rejects(decodeProductImage(apng), {code: "invalid_image"});
+});
+test("LF03-MEDIA bounded work rejects excess requests and releases capacity after failure", async () => {
+  const bytes = await sharp({create: {width: 1024, height: 1024, channels: 3, background: "white"}}).png().toBuffer();
+  const requests = Array.from({length: 5}, () => decodeProductImage(bytes));
+  const results = await Promise.allSettled(requests);
+  assert.equal(results.filter(x => x.status === "fulfilled").length, 2);
+  for (const result of results.filter(x => x.status === "rejected")) {
+    assert.equal(result.reason.code, "service_unavailable");
+    assert.equal(result.reason.retryable, true);
+  }
+  await assert.rejects(decodeProductImage(Buffer.from("invalid")));
+  assert.equal((await decodeProductImage(bytes)).file.width, 1024);
+});
+test("LF03-MEDIA emulator persists source-bound processing, original recovery and private isolation", {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-media-${randomUUID().slice(0, 8)}`}, `media-${randomUUID()}`);
+  const db = getFirestore(app), bytes = await sharp({create: {width: 640, height: 520, channels: 3, background: "#307554"}}).png().toBuffer();
+  const originals = new Map<string, Buffer>(), derivatives = new Map<string, Buffer>();
+  let failAfterWrite = false, duringSave: (() => Promise<void>) | undefined, reads = 0, grants = 0;
+  // Labelled host object-storage double. Firestore is real local emulator; GCS is tested separately below.
+  const objects: StoreProductMediaObjects = {
+    async prepare(upload) {grants++; return {uploadUrl: `https://host-storage.invalid/${upload.uploadId}`, requiredHeaders: {"x-goog-if-generation-match": "0"}};},
+    async read(upload) {reads++; const original = originals.get(upload.uploadId); if (!original) throw Error("host upload missing");
+      return {bytes: Buffer.from(original), generation: "17"};},
+    async save(upload, generation, image) {
+      const assetId = cataloguePayloadHash({uploadId: upload.uploadId, generation, sha256: image.file.sha256});
+      const previous = derivatives.get(assetId); if (previous) assert.deepEqual(previous, image.bytes);
+      else derivatives.set(assetId, Buffer.from(image.bytes));
+      if (duringSave) {const action = duringSave; duringSave = undefined; await action();}
+      if (failAfterWrite) {failAfterWrite = false; throw Error("host crash after durable derivative");}
+      return {assetId, generation: "23"};
+    },
+  };
+  let clock = at;
+  const repository = () => new FirestoreWorkspaceCatalogueRepository(db, "evaluation", () => new Date(clock), objects);
+  const service = () => new WorkspaceCatalogueService(repository(), undefined, () => new Date(clock));
+  type MediaResult = {state: string; uploadId: string; uploadUrl?: string; current: boolean; approved: boolean;
+    publicationConfirmed: boolean; processed: StoreProductMediaUpload["processed"]};
+  const call = async (operation: string, body: StoreProductMediaRequest, owner = "owner-one") =>
+    await service().handleProductMedia(owner, operation, {productMediaVersion: 1, ...body}) as MediaResult;
+  const prepare = (body: StoreProductMediaRequest) => call("prepareStoreProductMedia", body);
+  const confirm = (body: StoreProductMediaRequest) => call("confirmStoreProductMedia", body);
+  const read = (body: StoreProductMediaRequest) => call("readStoreProductMedia", body);
+  try {
+    await db.collection("workspaceProfiles").doc(profile.caseId).set(profile);
+    const product = submittedProduct();
+    // Same lowercase digest text used by actual saved private photos; do not rewrite the old submission hash.
+    product.mediaIntent = {pendingUpload: true, pendingSelectionSha256: cataloguePayloadHash({privateSha256: cataloguePayloadHashBytes(bytes).toLowerCase(), skuId: product.skuId}), publishedReferences: []};
+    const submission = await repository().submitProduct(storeProductSubmission("owner-one", "evaluation",
+      {storeId: "store-one", expectedRevision: 0, idempotencyKey: "host-media-product", product}, at));
+    const request: StoreProductMediaRequest = {storeId: "store-one", skuId: "sku-one", submissionRevision: submission.revision,
+      submissionFingerprint: submission.fingerprint, sourceSha256: cataloguePayloadHashBytes(bytes).toLowerCase(), sourceByteLength: bytes.length,
+      sourceMimeType: "image/png", idempotencyKey: "host-upload-one"};
+    assert.equal((await read(request)).state, "not_found");
+    for (const sourceMimeType of [["image/png"], {toString: "image/png"}, null]) {
+      await assert.rejects(service().handleProductMedia("owner-one", "prepareStoreProductMedia",
+        {productMediaVersion: 1, ...request, sourceMimeType}), {code: "invalid_input"});
+    }
+    assert.equal((await db.collection("workspaceCatalogues").doc("evaluation").collection("stores").doc("store-one")
+      .collection("productMediaUploads").get()).size, 0);
+    await assert.rejects(prepare({...request, sourceSha256: "A".repeat(64)}), {code: "stale_snapshot"});
+    const first = await prepare(request);
+    assert.equal(first.state, "awaiting_upload"); assert.equal(first.current, true);
+    assert.deepEqual(await prepare(request), first); // Repository reconstructed for every call.
+    originals.set(first.uploadId, bytes);
+    await assert.rejects(prepare({...request, sourceByteLength: bytes.length + 1}), {code: "conflict"});
+    await assert.rejects(call("readStoreProductMedia", request, "different-owner"), {code: "not_found"});
+    await assert.rejects(confirm({...request, sourceMimeType: "image/jpeg"}), {code: "conflict"});
+    originals.set(first.uploadId, Buffer.from(bytes).fill(0));
+    await assert.rejects(confirm(request), {code: "invalid_image"});
+    assert.equal((await read(request)).processed, null);
+    originals.set(first.uploadId, bytes); failAfterWrite = true;
+    await assert.rejects(confirm(request), /host crash after durable derivative/u);
+    assert.equal(derivatives.size, 1); assert.equal((await read(request)).processed, null);
+    const done = await confirm(request);
+    assert.equal(done.state, "processed"); assert.equal(done.current, true);
+    assert.equal(done.approved, false); assert.equal(done.publicationConfirmed, false);
+    assert.equal(done.processed?.originalGeneration, "17"); assert.equal(done.processed?.derivativeGeneration, "23");
+    assert.equal(done.processed?.file.width, 640); assert.equal(done.processed?.meetsPublicSourceFloor, true);
+    assert.equal(done.processed?.source.sha256, request.sourceSha256.toUpperCase());
+    assert.equal(done.uploadUrl, undefined);
+    assert.equal(derivatives.size, 1);
+    const originalReads = reads, originalGrants = grants;
+    assert.deepEqual(await confirm(request), done); assert.deepEqual(await read(request), done);
+    assert.deepEqual(await prepare(request), done);
+    assert.equal(reads, originalReads); assert.equal(grants, originalGrants);
+    const root = db.collection("workspaceCatalogues").doc("evaluation").collection("stores").doc("store-one");
+    const uploadRef = root.collection("productMediaUploads").doc(first.uploadId);
+    const stored = (await uploadRef.get()).data() as StoreProductMediaUpload;
+    for (const corrupt of [
+      {...stored, schemaVersion: 2}, {...stored, preparedAt: "bad-date"}, {...stored, expiresAt: at},
+      {...stored, sourceByteLength: stored.sourceByteLength + 1},
+      {...stored, processed: {...stored.processed!, assetId: "unbound-asset"}},
+      {...stored, processed: {...stored.processed!, originalGeneration: ""}},
+      {...stored, processed: {...stored.processed!, processedAt: "2040-01-01T00:00:00.000Z"}},
+      {...stored, processed: {...stored.processed!, file: {...stored.processed!.file, width: 99999}}},
+      {...stored, processed: {...stored.processed!, source: {...stored.processed!.source, sha256: "A".repeat(64)}}},
+      {...stored, processed: {...stored.processed!, meetsPublicSourceFloor: false}},
+      {...stored, processed: {...stored.processed!, approved: true}},
+    ]) {
+      await uploadRef.set(corrupt);
+      await assert.rejects(read(request));
+      await uploadRef.set(stored);
+    }
+    assert.equal((await root.collection("skus").get()).size, 0);
+    assert.equal((await root.collection("productReviews").get()).size, 0);
+    assert.equal((await db.collection("workspaceCatalogues").doc("evaluation").collection("publicListingBindings").get()).size, 0);
+    assert.deepEqual(await repository().readProductSubmission("store-one", "sku-one", "owner-one"), submission);
+    const another = {...request, idempotencyKey: "host-upload-race"}, pending = await prepare(another);
+    originals.set(pending.uploadId, bytes);
+    duringSave = async () => {
+      const changed = {...product, content: {...product.content, title: "Newer product source"}};
+      await repository().submitProduct(storeProductSubmission("owner-one", "evaluation",
+        {storeId: "store-one", expectedRevision: 1, idempotencyKey: "host-source-edit", product: changed}, at));
+    };
+    failAfterWrite = true;
+    await assert.rejects(confirm(another), /host crash after durable derivative/u);
+    assert.equal((await read(another)).processed, null); assert.equal((await read(another)).current, false);
+    const historical = await confirm(another);
+    assert.equal(historical.state, "processed"); assert.equal(historical.current, false);
+    assert.equal(historical.approved, false); assert.equal(historical.publicationConfirmed, false);
+    assert.deepEqual((await read(another)).processed, historical.processed);
+    const recovered = await confirm(request);
+    assert.equal(recovered.current, false); assert.deepEqual(recovered.processed, done.processed);
+    assert.equal((await root.collection("productSubmissions").doc("sku-one").get()).get("revision"), 2);
+    await db.collection("workspaceProfiles").doc(profile.caseId).update({ownerUserId: "replacement-owner"});
+    await assert.rejects(read(request), {code: "not_found"});
+    await db.collection("workspaceProfiles").doc(profile.caseId).update({ownerUserId: "owner-one"});
+    const current = (await repository().readProductSubmission("store-one", "sku-one", "owner-one"))!;
+    const expiring = {...request, idempotencyKey: "host-expiry", submissionRevision: current.revision, submissionFingerprint: current.fingerprint};
+    await prepare(expiring); clock = "2026-10-16T12:06:00.000Z";
+    await assert.rejects(prepare(expiring), {code: "upload_expired"});
+    // Disabled actual storage stays unavailable and cannot produce an accepted result.
+    const disabled = new WorkspaceCatalogueService(new FirestoreWorkspaceCatalogueRepository(db, "evaluation"));
+    await assert.rejects(disabled.handleProductMedia("owner-one", "confirmStoreProductMedia", {productMediaVersion: 1, ...expiring}), {code: "service_unavailable"});
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+function hostMediaBucket() {
+  // Explicit host SDK double: exercises actual adapter choices, not a deployed bucket acceptance.
+  const values = new Map<string, {bytes: Buffer; metadata: Record<string, unknown>}>();
+  const calls: Array<{action: string; path: string; generation?: string}> = [];
+  let privateBucket = true, signed: Record<string, unknown> | undefined, writes = 0;
+  const bucket = {
+    async getMetadata() {return [{iamConfiguration: {publicAccessPrevention: privateBucket ? "enforced" : "inherited",
+      uniformBucketLevelAccess: {enabled: privateBucket}}}];},
+    file(path: string, options?: {generation?: string}) {
+      const generation = options?.generation, log = (action: string) => calls.push({action, path, ...(generation ? {generation} : {})});
+      return {
+        async getSignedUrl(options: Record<string, unknown>) {signed = options; log("sign"); return ["https://private-host.invalid/upload-only"];},
+        async getMetadata() {
+          log("metadata"); const value = values.get(path); if (!value) throw Object.assign(Error("missing"), {code: 404});
+          if (generation && generation !== value.metadata.generation) throw Error("wrong generation");
+          return [structuredClone(value.metadata)];
+        },
+        createReadStream() {log("read"); return Readable.from([Buffer.from(values.get(path)!.bytes)]);},
+        async save(bytes: Buffer, options: {preconditionOpts?: {ifGenerationMatch: number}; metadata: Record<string, unknown>}) {
+          log("write"); assert.equal(options.preconditionOpts?.ifGenerationMatch, 0);
+          if (values.has(path)) throw Object.assign(Error("already exists"), {code: 412});
+          writes++; values.set(path, {bytes: Buffer.from(bytes), metadata: {...options.metadata, generation: "31", size: String(bytes.length)}});
+        },
+      };
+    },
+  };
+  return {values, calls, get writes() {return writes;}, get signed() {return signed;},
+    setPrivate(value: boolean) {privateBucket = value;},
+    adapter: new GoogleCloudStoreProductMediaObjects(bucket as unknown as ConstructorParameters<typeof GoogleCloudStoreProductMediaObjects>[0])};
+}
+async function hostUpload() {
+  const bytes = await sharp({create: {width: 520, height: 640, channels: 4, background: {r: 40, g: 90, b: 70, alpha: 0.5}}}).png().toBuffer();
+  const request: StoreProductMediaRequest = {storeId: "store-one", skuId: "sku-one", submissionRevision: 1,
+    submissionFingerprint: "A".repeat(64), sourceSha256: cataloguePayloadHashBytes(bytes), sourceByteLength: bytes.length,
+    sourceMimeType: "image/png", idempotencyKey: "host-upload-one"};
+  const upload: StoreProductMediaUpload = {...request, schemaVersion: 1, realm: "evaluation", ownerUserId: "owner-one",
+    uploadId: "B".repeat(64), fingerprint: "C".repeat(64), preparedAt: at, expiresAt: "2026-10-16T12:05:00.000Z", processed: null};
+  return {upload, bytes};
+}
+test("LF03-MEDIA GCS adapter requires private storage, signs write-once bound uploads and pins generation", async () => {
+  const host = hostMediaBucket(), {upload, bytes} = await hostUpload();
+  host.setPrivate(false);
+  await assert.rejects(host.adapter.prepare(upload), {code: "service_unavailable"});
+  host.setPrivate(true);
+  const grant = await host.adapter.prepare(upload);
+  assert.equal(grant.requiredHeaders["x-goog-if-generation-match"], "0");
+  assert.equal(grant.requiredHeaders["content-length"], String(bytes.length));
+  assert.equal(host.signed?.action, "write");
+  assert.equal((host.signed?.expires as Date).toISOString(), upload.expiresAt);
+  const path = host.calls.find(call => call.action === "sign")!.path;
+  assert.match(path, /^private\/product-media\/v1\/evaluation\//u);
+  const metadata = Object.fromEntries(Object.entries(grant.requiredHeaders).filter(([k]) => k.startsWith("x-goog-meta-"))
+    .map(([k, v]) => [k.slice("x-goog-meta-".length), v]));
+  const object = {bytes, metadata: {metadata, contentType: "image/png", size: String(bytes.length),
+    generation: "17", timeCreated: "2026-10-16T12:00:01.000Z"}};
+  host.values.set(path, object);
+  assert.deepEqual(await host.adapter.read(upload), {bytes, generation: "17"});
+  assert.ok(host.calls.some(call => call.action === "metadata" && call.generation === "17"));
+  assert.deepEqual(host.calls.filter(call => call.action === "read").map(call => call.generation), ["17"]);
+  for (const changed of [
+    {...object.metadata, contentType: "image/jpeg"}, {...object.metadata, size: "1"},
+    {...object.metadata, timeCreated: "2026-10-16T12:06:00.000Z"},
+    {...object.metadata, metadata: {...metadata, "moolsocial-binding": "other"}},
+    {...object.metadata, metadata: {...metadata, firebaseStorageDownloadTokens: "forbidden"}},
+  ]) {
+    host.values.set(path, {bytes, metadata: changed});
+    await assert.rejects(host.adapter.read(upload), {code: "invalid_image"});
+  }
+  host.values.set(path, {...object, bytes: Buffer.alloc(8 * 1024 * 1024 + 1)});
+  await assert.rejects(host.adapter.read(upload), {code: "invalid_image"});
+});
+test("LF03-MEDIA GCS derivative recovery is immutable, verified, private and metadata-free", async () => {
+  const host = hostMediaBucket(), {upload, bytes} = await hostUpload(), image = await decodeProductImage(bytes);
+  const saved = await host.adapter.save(upload, "17", image as NormalizedStoreProductImage);
+  assert.deepEqual(await host.adapter.save(upload, "17", image as NormalizedStoreProductImage), saved);
+  assert.equal(host.writes, 1);
+  assert.equal(saved.generation, "31");
+  const path = host.calls.find(call => call.action === "write")!.path, stored = host.values.get(path)!;
+  assert.match(path, /^private\/product-media\/v1\/evaluation\/.+\/derivatives\/[^/]+\.png$/u);
+  assert.equal(stored.metadata.cacheControl, "private, no-store");
+  assert.equal(stored.metadata.contentType, "image/png");
+  assert.ok(host.calls.filter(call => call.action === "read").every(call => call.generation === "31"));
+  assert.equal((await sharp(stored.bytes).metadata()).hasAlpha, true);
+  stored.bytes = Buffer.from(stored.bytes).fill(0);
+  await assert.rejects(host.adapter.save(upload, "17", image as NormalizedStoreProductImage), {code: "invalid_image"});
+  host.setPrivate(false);
+  await assert.rejects(host.adapter.save(upload, "17", image as NormalizedStoreProductImage), {code: "service_unavailable"});
+});
 test('LF03-SUBMIT new saved SKU has a private submission producer without a reviewed mirror prerequisite', () => {
   assert.equal(typeof (WorkspaceCatalogueService.prototype as unknown as Record<string, unknown>).handleProductSubmission, 'function');
   assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>).submitProduct, 'function');

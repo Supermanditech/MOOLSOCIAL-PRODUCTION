@@ -303,6 +303,8 @@ if ($RequireLfPublicationProbes) {
         'backend/functions/src/commerce/catalogue_contract.test.ts',
         'apps/mobile/lib/features/work/work_services.dart',
         'backend/functions/src/workspace/workspace_promotion_service.test.ts',
+        'backend/functions/package.json',
+        'backend/functions/package-lock.json',
         'backend/functions/src/workspace/workspace_promotion_service.ts')) {
       $legacyFacts=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
       $legacyFacts.batch02Facts.owners=@($legacyFacts.batch02Facts.owners | Where-Object { $_ -cne $optionalOwner })
