@@ -1587,11 +1587,12 @@ function producerAuthority(owner = true, storeId = "store-one"): CatalogueProduc
       scopes: [owner ? "supply.workspace.admin" : "supply.catalogue.review"]},
     validFrom: "2026-10-16T00:00:00.000Z", expiresAt: "2026-10-17T00:00:00.000Z"};
 }
-function producerParticipant(storeId = "store-one", categoryId = "grocery"): SupplyParticipantWorkspace {
+function producerParticipant(storeId = "store-one", categoryId = "grocery",
+  participantType: "retailer" | "wholesaler" | "manufacturer" = "retailer"): SupplyParticipantWorkspace {
   const actor = producerAuthority(true, storeId).actor;
   let result = registerSupplyParticipantWorkspace({commandId: "fixture-register", occurredAt: at,
     workspaceId: storeId, tenantId: "tenant-one", legalEntityReference: "fixture-legal",
-    participantType: "retailer", actor});
+    participantType, actor});
   for (const capability of ["product_master_stewardship", "retail_fulfilment", "wholesale_supply"] as const) {
     result = applySupplyParticipantCommand(result, {type: "request_capability", actor,
       commandId: `request-${capability}`, workspaceId: storeId, expectedVersion: result.version,
@@ -1760,15 +1761,18 @@ test('LF03-REVIEW emulator private reviewed candidate to negotiated readback and
     }
   } finally {await db.terminate(); await deleteApp(app);}
 });
-function produceAll(value = input(), canonicalBrandId: string | null = "brand-host", canonicalCategoryId = value.content.categoryId) {
+function produceAll(value = input(), canonicalBrandId: string | null = "brand-host", canonicalCategoryId = value.content.categoryId,
+  liveProfile = profile) {
   let aggregate: CatalogueAggregate | undefined;
-  const participant = producerParticipant("store-one", canonicalCategoryId), receipts: CatalogueProductionReceipt[] = [];
+  const participant = producerParticipant("store-one", canonicalCategoryId,
+    liveProfile.profileId === "wholesaler" || liveProfile.profileId === "manufacturer" ? liveProfile.profileId : "retailer"),
+    receipts: CatalogueProductionReceipt[] = [];
   for (const command of productionCommands(value)) {
     if (command.type === "propose_product") {command.brandId = canonicalBrandId; command.categoryId = canonicalCategoryId;}
     const owner = ["propose_product", "propose_pack", "create_offer"].includes(String(command.type));
     const authority = producerAuthority(owner);
     const result = planCatalogueProduction({operatorUserId: authority.userId, identity: catalogueIdentity,
-      input: command, observedAt: at}, authority, aggregate, participant, profile);
+      input: command, observedAt: at}, authority, aggregate, participant, liveProfile);
     aggregate = result.aggregate;
     receipts.push({fingerprint: result.fingerprint, result: result.aggregate});
   }
@@ -2370,6 +2374,40 @@ test("fresh authorization time rejects expiry even when the original command tim
     input: productionCommands()[1]!, observedAt: at}, producerAuthority(), aggregate, participant,
     profile, receipts[1], "2026-10-17T00:00:00.000Z"), {code: "forbidden"});
 });
+
+for (const profileId of ["wholesaler", "manufacturer"]) {
+  test(`LF04-SUPPLIER reviewed publication and legacy-write boundary ${profileId}`, () => {
+    const liveProfile = {...profile, profileId}, value = input();
+    const {aggregate, participant} = produceAll(value, "brand-host", value.content.categoryId, liveProfile);
+    assert.equal(participant.participantType, profileId);
+    const command: CatalogueSave = {ownerUserId: "owner-one", profile: liveProfile, input: value,
+      expectedRevision: 0, idempotencyKey: "supplier-reviewed-bind", observedAt: at,
+      fingerprint: cataloguePayloadHash({storeId: "store-one", input: value, expectedRevision: 0})};
+    assert.throws(() => planCatalogueSave(command), {code: "forbidden"},
+      "Do not admit a supplier through the legacy unreviewed public-write route.");
+    const saved = planReviewedCatalogueSave(command, catalogueIdentity, aggregate, producerAuthority(), participant);
+    assert.equal(saved.publicListing, true);
+    assert.equal(saved.skuId, value.skuId);
+    const receipt = {fingerprint: command.fingerprint, record: saved};
+    assert.deepEqual(planCatalogueSave(command, saved, receipt), saved,
+      "Historical owned receipts replay; this is not renewed publishing authority.");
+    for (const capability of [undefined, {...participant, capabilities: participant.capabilities.map(c =>
+      c.kind === "retail_fulfilment" ? {...c, state: "revoked" as const} : c)}]) {
+      assert.throws(() => planReviewedCatalogueSave(command, catalogueIdentity, aggregate, producerAuthority(), capability));
+    }
+    assert.throws(() => planReviewedCatalogueSave(command, catalogueIdentity, aggregate, undefined, participant));
+    assert.throws(() => planReviewedCatalogueSave({...command, ownerUserId: "other-owner"},
+      catalogueIdentity, aggregate, producerAuthority(), participant));
+    for (const status of ["pending", "approved", "suspended"] as const) {
+      assert.throws(() => planReviewedCatalogueSave({...command, profile: {...liveProfile, status}},
+        catalogueIdentity, aggregate, producerAuthority(), participant));
+    }
+    const hidden = {...value, publicListing: false};
+    const withdrawal = {...command, input: hidden, expectedRevision: 1,
+      fingerprint: cataloguePayloadHash({storeId: "store-one", input: hidden, expectedRevision: 1})};
+    assert.equal(planReviewedCatalogueSave(withdrawal, catalogueIdentity, undefined, undefined, undefined, saved).publicListing, false);
+  });
+}
 
 test("reviewed binding rejects different content pack price Store and revoked selling capability", () => {
   const {aggregate, participant} = produceAll();

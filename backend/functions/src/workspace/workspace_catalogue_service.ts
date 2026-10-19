@@ -769,7 +769,7 @@ export function planCatalogueProduction(command: CatalogueProduction,
     if (!participant || participant.schemaVersion !== 1 || participant.status !== "registered" ||
         participant.tenantId !== identity.tenantId || actor.workspaceId !== participant.workspaceId ||
         !actor.scopes.includes("supply.workspace.admin")) throw deny();
-    requireStore(profile, participant.workspaceId, operator);
+    requireStore(profile, participant.workspaceId, operator, true);
     const productId = input.type === "create_offer"
       ? current?.packs.find(p => p.packId === input.packId)?.productId : input.productId;
     const categoryId = input.type === "propose_product" ? input.categoryId as string :
@@ -1806,12 +1806,18 @@ function boolean(value: unknown): boolean {if (typeof value !== "boolean") inval
 function list(value: unknown, max: number): unknown[] {
   if (!Array.isArray(value) || value.length > max) invalid(); return value;
 }
-function requireStore(profile: WorkspaceProfileRecord | undefined, storeId: string, owner?: string): WorkspaceProfileRecord {
+function requireStore(profile: WorkspaceProfileRecord | undefined, storeId: string, owner?: string,
+  reviewedSupplier = false): WorkspaceProfileRecord {
   if (!profile || profile.workspaceId !== storeId ||
       (owner !== undefined && profile.ownerUserId !== id(owner))) {
     throw new WorkspaceProfileError("not_found", "That Store is unavailable.", 404);
   }
-  if (profile.familyId !== "products-trade" || !profile.profileId.startsWith("retailer-") || profile.status !== "live") {
+  // Public/legacy callers retain retailer-only coverage until their negotiated
+  // supplier readers are connected. Write planners opt in explicitly; the
+  // legacy save core separately forbids new unreviewed supplier publication.
+  const supported = profile.profileId.startsWith("retailer-") ||
+    reviewedSupplier && ["wholesaler", "manufacturer"].includes(profile.profileId);
+  if (profile.familyId !== "products-trade" || !supported || profile.status !== "live") {
     throw new WorkspaceProfileError("invalid_state", "This Store is not active.", 409);
   }
   return profile;
@@ -2292,8 +2298,13 @@ export function planStoreVariantFamilyReview(operatorUserId: string, identity: C
 /** Shared by the transaction adapter and isolated tests; no network side effects. */
 export function planCatalogueSave(command: CatalogueSave, current?: StoreSkuRecord,
   receipt?: CatalogueSaveReceipt): StoreSkuRecord {
+  return planSkuSave(command, current, receipt, false);
+}
+/** Internal proof comes only from the reviewed planner, never request input. */
+function planSkuSave(command: CatalogueSave, current: StoreSkuRecord | undefined,
+  receipt: CatalogueSaveReceipt | undefined, reviewed: boolean): StoreSkuRecord {
   const storeId = id(command.profile.workspaceId);
-  requireStore(command.profile, storeId, command.ownerUserId);
+  requireStore(command.profile, storeId, command.ownerUserId, true);
   const input = normalizeSku(command.input, storeId);
   const reviewCandidate = command.reviewCandidate === undefined ? undefined : reviewedCandidateReference(command.reviewCandidate);
   const fingerprint = cataloguePayloadHash({storeId, input, expectedRevision: command.expectedRevision,
@@ -2305,6 +2316,9 @@ export function planCatalogueSave(command: CatalogueSave, current?: StoreSkuReco
     const prior = normalizeRecord(receipt.record, storeId);
     if (receipt.fingerprint !== fingerprint || prior.skuId !== input.skuId) throw conflict();
     return prior;
+  }
+  if (input.publicListing && !reviewed && !command.profile.profileId.startsWith("retailer-")) {
+    throw new WorkspaceProfileError("forbidden", "Use the reviewed product publication flow.", 403);
   }
   const prior = current && normalizeRecord(current, storeId);
   if (command.expectedRevision !== (prior?.revision ?? 0) || (prior &&
@@ -2322,7 +2336,7 @@ export function planReviewedCatalogueSave(command: CatalogueSave, identity: Cata
   receipt?: CatalogueSaveReceipt, authorizationAt = command.observedAt): StoreSkuRecord {
   const storeId = id(command.profile.workspaceId), at = command.observedAt;
   if (!Number.isFinite(Date.parse(at)) || new Date(at).toISOString() !== at) invalid();
-  requireStore(command.profile, storeId, command.ownerUserId);
+  requireStore(command.profile, storeId, command.ownerUserId, true);
   const input = normalizeSku(command.input, storeId);
   // Owners may withdraw their exact existing mirror even after review/selling
   // authority expires. This grants no new content, price or publication rights.
@@ -2364,7 +2378,7 @@ export function planReviewedCatalogueSave(command: CatalogueSave, identity: Cata
       invalid("Selling terms do not match an active reviewed offer.");
     }
   }
-  return planCatalogueSave(command, current, receipt);
+  return planSkuSave(command, current, receipt, true);
 }
 
 export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogueRepository {
