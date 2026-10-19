@@ -417,6 +417,8 @@ function productPresentationQuery(raw: unknown): ProductPresentationQuery {
 
 export interface WorkspaceCatalogueRepository {
   readonly realm: "evaluation" | "production";
+  storeStock?(owner: string | undefined, action: StoreStockAction, request: StoreStockRequest,
+    identity: CatalogueIdentity, admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object>;
   store(storeId: string): Promise<WorkspaceProfileRecord | undefined>;
   save(command: CatalogueSave): Promise<StoreSkuRecord>;
   bindReviewed?(command: CatalogueSave, identity: CatalogueIdentity): Promise<StoreSkuRecord>;
@@ -808,11 +810,86 @@ export function storeProductSubmissionOperation(operation: unknown): "submit" | 
   return undefined;
 }
 
+type StoreStockAction = "save" | "read" | "reconcile" | "public";
+interface StoreStockBinding {skuId: string; skuRevision: number; canonicalProductId: string; verifiedPackId: string}
+interface StoreStockCheckpoint {
+  inventoryRevision: number; savedAt: string; mode: "exact_quantity" | "availability_only";
+  quantityPacks: number | null; available: boolean;
+}
+interface StoreStockRequest {
+  stockSnapshotVersion: 1; storeId: string; binding: StoreStockBinding;
+  expectedRevision?: number; idempotencyKey?: string; source?: StoreStockCheckpoint; requestedPacks?: number;
+}
+interface StoreStockRecord {
+  schemaVersion: 1; realm: "evaluation" | "production"; storeId: string; binding: StoreStockBinding;
+  ownerBinding: string; revision: number; reportedAt: string; source: StoreStockCheckpoint; integrity: string;
+}
+export function storeStockOperation(operation: unknown): StoreStockAction | undefined {
+  return operation === "publishStoreStockSnapshot" ? "save" : operation === "readStoreStockSnapshot" ? "read"
+    : operation === "reconcileStoreStockSnapshot" ? "reconcile" : operation === "readPublicStoreStockSnapshot" ? "public" : undefined;
+}
+function stockTime(raw: unknown): string {
+  if (typeof raw !== "string" || !Number.isFinite(Date.parse(raw)) || new Date(raw).toISOString() !== raw) invalid();
+  return raw;
+}
+function stockCheckpoint(raw: unknown): StoreStockCheckpoint {
+  const s = exact(raw, ["inventoryRevision", "savedAt", "mode", "quantityPacks", "available"]);
+  if (s.mode !== "exact_quantity" && s.mode !== "availability_only" || typeof s.available !== "boolean" ||
+      s.mode === "availability_only" && s.quantityPacks !== null) invalid();
+  return {inventoryRevision: integer(s.inventoryRevision, 1, 1000000000), savedAt: stockTime(s.savedAt),
+    mode: s.mode as StoreStockCheckpoint["mode"], available: s.available,
+    quantityPacks: s.mode === "availability_only" ? null : integer(s.quantityPacks, 0, 1000000000)};
+}
+function stockRequest(raw: unknown, action: StoreStockAction): StoreStockRequest {
+  const r = exact(raw, ["stockSnapshotVersion", "storeId", "binding", ...(action === "save" || action === "reconcile"
+    ? ["expectedRevision", "idempotencyKey", "source"] : action === "public" ? ["requestedPacks"] : [])]);
+  const b = exact(r.binding, ["skuId", "skuRevision", "canonicalProductId", "verifiedPackId"]);
+  if (r.stockSnapshotVersion !== 1) invalid();
+  return {stockSnapshotVersion: 1, storeId: id(r.storeId), binding: {skuId: id(b.skuId),
+    skuRevision: integer(b.skuRevision, 1, 1000000000), canonicalProductId: id(b.canonicalProductId), verifiedPackId: id(b.verifiedPackId)},
+    ...(action === "save" || action === "reconcile" ? {expectedRevision: integer(r.expectedRevision, 0, 999999999),
+      idempotencyKey: id(r.idempotencyKey), source: stockCheckpoint(r.source)} : {}),
+    ...(action === "public" ? {requestedPacks: integer(r.requestedPacks, 1, 1000000000)} : {})};
+}
+function checkedStockRecord(raw: unknown, realm: StoreStockRecord["realm"], storeId: string, skuId: string): StoreStockRecord {
+  const r = exact(raw, ["schemaVersion", "realm", "storeId", "binding", "ownerBinding", "revision", "reportedAt", "source", "integrity"]);
+  const binding = stockRequest({stockSnapshotVersion: 1, storeId, binding: r.binding}, "read").binding;
+  const source = stockCheckpoint(r.source), reportedAt = stockTime(r.reportedAt), {integrity, ...body} = r;
+  if (r.schemaVersion !== 1 || r.realm !== realm || r.storeId !== storeId || binding.skuId !== skuId ||
+      typeof r.ownerBinding !== "string" || !/^[A-F0-9]{64}$/u.test(r.ownerBinding) ||
+      integrity !== cataloguePayloadHash(body) || source.savedAt > reportedAt) invalid("Saved Stock report is inconsistent.");
+  integer(r.revision, 1, 1000000000);
+  return structuredClone(r) as unknown as StoreStockRecord;
+}
+const storeStockFreshMillis = 5 * 60 * 1000;
+function freshStockCheckpoint(source: StoreStockCheckpoint, at: string): boolean {
+  const age = Date.parse(at) - Date.parse(source.savedAt);
+  return age >= 0 && age < storeStockFreshMillis;
+}
+
 export class WorkspaceCatalogueService {
   constructor(private readonly repository: WorkspaceCatalogueRepository,
     private readonly identity?: CatalogueIdentity,
     private readonly now: () => Date = () => new Date(),
     private readonly policyReader?: Pick<WorkspaceSupplierPolicyService, "forPublicSku">) {}
+
+  /** Store-reported checkpoint only: never allocation, reservation or delivery authority. */
+  async handleStoreStock(actor: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    const action = storeStockOperation(operation);
+    if (!action) invalid();
+    const request = stockRequest(structuredClone(body), action);
+    if (!this.identity || !this.repository.storeStock) throw mediaUnavailable();
+    id(actor);
+    return this.repository.storeStock(action === "public" ? undefined : actor, action, request, {...this.identity}, async source => {
+      const page = await this.publicCatalogue({storeId: request.storeId, skuId: request.binding.skuId,
+        listingReadbackVersion: 1, mediaReadbackVersion: 1, productFactsReadbackVersion: 1,
+        unbrandedProduceReadbackVersion: 1}, source) as {state: string;
+          items: Array<Pick<StoreSkuRecord, "skuId" | "revision" | "canonicalProductId" | "verifiedPackId">>};
+      return page.state === "ready" && page.items.some(item => item.skuId === request.binding.skuId &&
+        item.revision === request.binding.skuRevision && item.canonicalProductId === request.binding.canonicalProductId &&
+        item.verifiedPackId === request.binding.verifiedPackId);
+    });
+  }
 
   async handleProductMedia(ownerUserId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const action = operation === "prepareStoreProductMedia" ? "prepare" : operation === "confirmStoreProductMedia" ? "confirm"
@@ -2163,6 +2240,76 @@ export function planReviewedCatalogueSave(command: CatalogueSave, identity: Cata
 export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogueRepository {
   constructor(private readonly firestore: Firestore, readonly realm: "evaluation" | "production",
     private readonly now: () => Date = () => new Date(), private readonly mediaObjects?: StoreProductMediaObjects) {}
+
+  async storeStock(owner: string | undefined, action: StoreStockAction, raw: StoreStockRequest,
+    identity: CatalogueIdentity, admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object> {
+    const request = stockRequest(structuredClone(raw), action), {storeId, binding} = request;
+    if (action !== "public") id(owner);
+    const head = this.root(storeId).collection("stockSnapshots").doc(binding.skuId);
+    const commandFingerprint = cataloguePayloadHash({realm: this.realm, owner: owner ?? null, request});
+    const receipt = action === "save" || action === "reconcile"
+      ? head.collection("receipts").doc(cataloguePayloadHash([owner, request.idempotencyKey])) : undefined;
+    return this.firestore.runTransaction(async transaction => {
+      const [profiles, saved, original] = await Promise.all([
+        transaction.get(this.firestore.collection("workspaceProfiles").where("workspaceId", "==", storeId).limit(2)),
+        transaction.get(head), receipt ? transaction.get(receipt) : undefined]);
+      const profile = profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId")
+        ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined;
+      if (action !== "public") requireStore(profile, storeId, owner);
+      const ownerBinding = cataloguePayloadHash([this.realm, storeId, profile?.ownerUserId ?? null]);
+      const base = {schemaVersion: 1, stockSnapshotVersion: 1, realm: this.realm, storeId, binding};
+      const ownerResult = (record: StoreStockRecord | null, state: string) => ({...base, state, record,
+        idempotencyKey: request.idempotencyKey ?? null, orderingAvailable: false, reservationConfirmed: false});
+      // Current owner authorization still applies. Replay does not assess later
+      // publication/expiry as permission to lose or replace an original attempt.
+      if (original?.exists) {
+        const old = exact(original.data(), ["fingerprint", "record"]);
+        if (old.fingerprint !== commandFingerprint) throw new WorkspaceProfileError("conflict", "Use the original Stock report request.", 409);
+        const record = checkedStockRecord(old.record, this.realm, storeId, binding.skuId);
+        if (record.ownerBinding !== ownerBinding || cataloguePayloadHash(record.binding) !== cataloguePayloadHash(binding) ||
+            cataloguePayloadHash(record.source) !== cataloguePayloadHash(request.source) || record.revision !== request.expectedRevision! + 1) invalid();
+        return ownerResult(record, "reported");
+      }
+      const current = saved.exists ? checkedStockRecord(saved.data(), this.realm, storeId, binding.skuId) : undefined;
+      if (action === "reconcile") return ownerResult(null, "not_found");
+      if (action === "read") return current && (current.ownerBinding !== ownerBinding ||
+          cataloguePayloadHash(current.binding) !== cataloguePayloadHash(binding))
+        ? {...ownerResult(null, "source_changed"), currentRevision: current.revision}
+        : ownerResult(current ?? null, current ? "reported" : "none");
+      const unknown = () => ({...base, state: "unknown", observedAt: this.now().toISOString(),
+        requestedPacks: request.requestedPacks, stock: null, orderingAvailable: false, reservationConfirmed: false});
+      const source = await this.publicCatalogueSource(storeId, identity, false, transaction);
+      if (!source || !await admit(source)) {
+        if (action === "public") return unknown();
+        throw new WorkspaceProfileError("not_found", "The matching reviewed public product is unavailable.", 404);
+      }
+      const at = this.now().toISOString();
+      if (action === "public") {
+        if (!current || current.ownerBinding !== ownerBinding || cataloguePayloadHash(current.binding) !== cataloguePayloadHash(binding) ||
+            current.reportedAt > at || !freshStockCheckpoint(current.source, at)) return unknown();
+        const quantityAvailable = !current.source.available ? false : current.source.mode === "availability_only"
+          ? null : current.source.quantityPacks! >= request.requestedPacks!;
+        // Omit raw counts, local revisions, costs and receipt bodies. Repeated
+        // quantity queries can still infer a limit; this is not count secrecy.
+        return {...base, state: "reported", observedAt: at, requestedPacks: request.requestedPacks,
+          stock: {source: "selling_store_checkpoint", reportedAt: current.reportedAt, savedAt: current.source.savedAt,
+            validUntil: new Date(Date.parse(current.source.savedAt) + storeStockFreshMillis).toISOString(),
+            reportRevision: current.revision,
+            available: current.source.available && (current.source.mode === "availability_only" || current.source.quantityPacks! > 0),
+            quantityAvailable},
+          orderingAvailable: false, reservationConfirmed: false};
+      }
+      if (!freshStockCheckpoint(request.source!, at)) throw new WorkspaceProfileError("stale_snapshot", "Recover and save current Stock before reporting it.", 409);
+      if ((current?.revision ?? 0) !== request.expectedRevision) throw new WorkspaceProfileError("conflict", "Stock report changed. Review its current version.", 409);
+      const body = {schemaVersion: 1 as const, realm: this.realm, storeId, binding, ownerBinding,
+        revision: request.expectedRevision! + 1, reportedAt: at, source: request.source!};
+      const record: StoreStockRecord = {...body, integrity: cataloguePayloadHash(body)};
+      transaction.set(head, record);
+      transaction.create(head.collection("revisions").doc(String(record.revision)), record);
+      transaction.create(receipt!, {fingerprint: commandFingerprint, record});
+      return ownerResult(record, "reported");
+    });
+  }
 
   private async submissionMedia(transaction: Transaction, source: CatalogueSubmissionReference,
     submission: StoreProductSubmissionRecord): Promise<StoreProductMediaUpload> {

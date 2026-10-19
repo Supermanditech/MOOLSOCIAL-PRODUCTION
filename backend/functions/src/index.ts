@@ -133,6 +133,7 @@ import {
   WorkspaceCatalogueService,
   storeVariantFamilyOperation,
   storeProductSubmissionOperation,
+  storeStockOperation,
   GoogleCloudStoreProductMediaObjects,
   parsePublicProductMediaPath,
   deliverPublicProductMediaResponse,
@@ -2909,6 +2910,10 @@ export const moolSocialWorkspace = onRequest(
         : "";
       const variantFamilyOperation = storeVariantFamilyOperation(operation);
       const productSubmissionOperation = storeProductSubmissionOperation(operation);
+      const stockOperation = storeStockOperation(operation);
+      if (stockOperation !== undefined && process.env.MOOLSOCIAL_STORE_STOCK_V1 !== 'true') {
+        throw new WorkspaceProfileError('service_unavailable', 'Store Stock reporting is unavailable.', 503);
+      }
       const productMediaOperation = ["prepareStoreProductMedia", "confirmStoreProductMedia", "readStoreProductMedia"].includes(operation);
       const storePresentationOperation = ['recordPublicStorePresentation', 'readStorePublicPresentations'].includes(operation);
       if (storePresentationOperation && process.env.MOOLSOCIAL_STORE_PRESENTATIONS_V1 !== 'true') {
@@ -2927,7 +2932,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "saveRetailerProduct" ||
         operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStorePublicDetails" ||
-        variantFamilyOperation === "submit" || productSubmissionOperation === "submit" ||
+        variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || stockOperation === "save" ||
         operation === "prepareStoreProductMedia" || operation === "confirmStoreProductMedia" || operation === 'recordPublicProductPresentation' || operation === 'recordPublicStorePresentation';
       const supplierPolicyOperation = ["readStoreSupplierPolicy", "saveStoreSupplierPolicy",
         "reconcileStoreSupplierPolicy"].includes(operation);
@@ -2935,7 +2940,7 @@ export const moolSocialWorkspace = onRequest(
         "listStorePromotions", "readPublicStorePromotions", "readPublicPromotionDiscovery"].includes(operation);
       const catalogueOperation = ["saveStoreCatalogueSku", "bindReviewedStoreCatalogueSku",
         "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue", "readPublicCatalogueDiscovery",
-        "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined || productMediaOperation;
+        "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined || productMediaOperation || stockOperation !== undefined;
       const orderMutation = operation === "acceptRetailerOrder" ||
         operation === "packRetailerOrder" ||
         operation === "requestRetailerDelivery" ||
@@ -2980,7 +2985,9 @@ export const moolSocialWorkspace = onRequest(
       const service = workspaceProfileService();
       const orders = retailerOrderService();
       const {operation: _operation, ...catalogueBody} = body;
-      const result = operation === 'recordPublicStorePresentation'
+      const result = stockOperation !== undefined
+        ? await workspaceCatalogueService().handleStoreStock(ownerUserId, operation, catalogueBody)
+        : operation === 'recordPublicStorePresentation'
         ? await workspaceCatalogueService().recordStorePresentation(ownerUserId, catalogueBody)
         : operation === 'readStorePublicPresentations'
         ? await workspaceCatalogueService().readStorePresentations(ownerUserId, catalogueBody)

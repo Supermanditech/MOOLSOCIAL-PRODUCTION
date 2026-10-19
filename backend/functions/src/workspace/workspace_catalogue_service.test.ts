@@ -32,6 +32,124 @@ import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
 
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
 const at = "2026-10-16T12:00:00.000Z";
+test('LF11 saved selling-Store stock has a producer and exact public quantity-query reader', () => {
+  assert.equal(typeof Reflect.get(WorkspaceCatalogueService.prototype, 'handleStoreStock'), 'function');
+  assert.equal(typeof Reflect.get(FirestoreWorkspaceCatalogueRepository.prototype, 'storeStock'), 'function');
+});
+test('LF11 Stock HTTP source admission is explicit, disabled by default and separate from payment/delivery', () => {
+  const operations = {publishStoreStockSnapshot: 'save', readStoreStockSnapshot: 'read',
+    reconcileStoreStockSnapshot: 'reconcile', readPublicStoreStockSnapshot: 'public'};
+  for (const [operation, action] of Object.entries(operations)) assert.equal(catalogueModule.storeStockOperation(operation), action);
+  for (const operation of ['assignDelivery', 'confirmPayment', 'reserveStock', 'approveStoreStock', null, {}]) {
+    assert.equal(catalogueModule.storeStockOperation(operation), undefined);
+  }
+  const index = readFileSync(`${__dirname}/../../src/index.ts`, 'utf8');
+  assert.match(index, /stockOperation !== undefined && process\.env\.MOOLSOCIAL_STORE_STOCK_V1 !== 'true'/u);
+  assert.match(index, /stockOperation === "save"/u);
+  assert.match(index, /catalogueOperation[\s\S]*?requireDefaultPurchaseTenant\(verified\.firebase\?\.tenant\)/u);
+  assert.match(index, /stockOperation !== undefined\s*\? await workspaceCatalogueService\(\)\.handleStoreStock\(ownerUserId, operation, catalogueBody\)/u);
+});
+test('LF11 actual Store checkpoint publication, original recovery and private-count public quantity checks', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-stock-${randomUUID().slice(0, 8)}`}, `stock-${randomUUID()}`), db = getFirestore(app);
+  const root = db.collection('workspaceCatalogues').doc('evaluation'), store = root.collection('stores').doc('store-one');
+  let clock = at;
+  const repository = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(clock));
+  const service = () => new WorkspaceCatalogueService(repository(), catalogueIdentity, () => new Date(clock));
+  const binding = {skuId: 'sku-one', skuRevision: 1, canonicalProductId: input().canonicalProductId, verifiedPackId: input().verifiedPackId};
+  const scope = {stockSnapshotVersion: 1, storeId: 'store-one', binding};
+  const original = {...scope, expectedRevision: 0, idempotencyKey: 'stock-original',
+    source: {inventoryRevision: 12, savedAt: at, mode: 'exact_quantity', quantityPacks: 7, available: true}};
+  const query = {...scope, requestedPacks: 1};
+  const read = (body = query) => service().handleStoreStock('buyer-one', 'readPublicStoreStockSnapshot', body) as Promise<any>;
+  const save = (body = original, actor = 'owner-one') => service().handleStoreStock(actor, 'publishStoreStockSnapshot', body) as Promise<any>;
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    await root.collection('participants').doc('store-one').set(producerParticipant());
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    const value = input(), commands = productionCommands(value);
+    for (let index = 0; index < commands.length; index++) await repository().produceCatalogue([0, 2, 4].includes(index)
+      ? 'reviewer-one' : 'owner-one', catalogueIdentity, commands[index]!);
+    await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: value, expectedRevision: 0, idempotencyKey: 'stock-published-binding'});
+    const beforeSku = JSON.stringify((await store.collection('skus').doc('sku-one').get()).data());
+    assert.equal((await read()).state, 'unknown'); assert.equal((await read()).stock, null);
+    await assert.rejects(save(original, 'other-owner'));
+    for (const source of [{...original.source, quantityPacks: 1.5}, {...original.source, quantityPacks: -1},
+      {...original.source, quantityPacks: '7'}, {...original.source, mode: 'availability_only', quantityPacks: 7},
+      {...original.source, inventoryRevision: 0}, {...original.source, savedAt: '2026-10-16T12:00:00Z'},
+      {...original.source, savedAt: '2026-10-16T12:00:01.000Z'}, {...original.source, savedAt: '2026-10-16T11:54:59.999Z'},
+      {...original.source, purchaseCostMinor: 100}]) await assert.rejects(save({...original, source} as any));
+    await assert.rejects(save({...original, binding: {...binding, verifiedPackId: 'other-pack'}}));
+    await assert.rejects(save({...original, paid: true} as any));
+    assert.equal((await store.collection('stockSnapshots').get()).size, 0);
+    const first = await save();
+    assert.equal(first.state, 'reported'); assert.equal(first.record.source.quantityPacks, 7);
+    assert.equal(first.record.revision, 1); assert.equal(first.orderingAvailable, false); assert.equal(first.reservationConfirmed, false);
+    assert.deepEqual(await save(), first);
+    assert.deepEqual(await service().handleStoreStock('owner-one', 'reconcileStoreStockSnapshot', original), first);
+    await assert.rejects(save({...original, source: {...original.source, quantityPacks: 8}}), {code: 'conflict'});
+    await assert.rejects(save({...original, idempotencyKey: 'stock-stale-cas'}), {code: 'conflict'});
+    const publicOne = await read(), publicShort = await read({...query, requestedPacks: 8});
+    assert.equal(publicOne.stock.validUntil, '2026-10-16T12:05:00.000Z');
+    assert.equal(publicOne.stock.quantityAvailable, true); assert.equal(publicShort.stock.quantityAvailable, false);
+    assert.equal(publicOne.stock.available, true); assert.equal(publicOne.orderingAvailable, false);
+    for (const privateField of ['quantityPacks', 'inventoryRevision', 'ownerUserId', 'integrity', 'fingerprint', 'purchaseCost', 'movements']) {
+      assert.equal(JSON.stringify(publicOne).includes(privateField), false);
+    }
+    console.log('LF11_STORE_STOCK_PROJECTION=' + JSON.stringify({owner: first, publicOne, publicShort}));
+    const absent = {...original, expectedRevision: 1, idempotencyKey: 'stock-not-dispatched'};
+    const receiptCount = (await store.collection('stockSnapshots').doc('sku-one').collection('receipts').get()).size;
+    assert.equal((await service().handleStoreStock('owner-one', 'reconcileStoreStockSnapshot', absent) as any).state, 'not_found');
+    assert.equal((await store.collection('stockSnapshots').doc('sku-one').collection('receipts').get()).size, receiptCount);
+    const zero = await save({...original, expectedRevision: 1, idempotencyKey: 'stock-zero',
+      source: {...original.source, inventoryRevision: 13, quantityPacks: 0}});
+    assert.equal(zero.record.revision, 2); assert.equal((await read()).stock.quantityAvailable, false);
+    assert.equal((await read()).stock.available, false);
+    await save({...original, expectedRevision: 2, idempotencyKey: 'stock-availability-only',
+      source: {...original.source, inventoryRevision: 1, mode: 'availability_only', quantityPacks: null}} as any);
+    assert.equal((await read()).stock.quantityAvailable, null); assert.equal((await read()).stock.available, true);
+    assert.deepEqual(await service().handleStoreStock('owner-one', 'reconcileStoreStockSnapshot', original), first);
+    clock = '2026-10-16T12:05:00.000Z';
+    assert.equal((await read()).state, 'unknown'); assert.equal((await read()).stock, null);
+    assert.deepEqual(await save(), first);
+    await assert.rejects(save({...original, expectedRevision: 3, idempotencyKey: 'expired-new-stock'}), {code: 'stale_snapshot'});
+    clock = at;
+    await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: value, expectedRevision: 1, idempotencyKey: 'stock-new-binding'});
+    assert.equal((await read()).state, 'unknown');
+    assert.equal((await read({...query, binding: {...binding, skuRevision: 2}})).state, 'unknown');
+    const newScope = {...scope, binding: {...binding, skuRevision: 2}};
+    const changed = await service().handleStoreStock('owner-one', 'readStoreStockSnapshot', newScope) as any;
+    assert.equal(changed.state, 'source_changed'); assert.equal(changed.record, null); assert.equal(changed.currentRevision, 3);
+    await save({...original, binding: newScope.binding, expectedRevision: 3, idempotencyKey: 'stock-new-source',
+      source: {...original.source, inventoryRevision: 2}});
+    const newQuery = {...query, binding: newScope.binding};
+    assert.equal((await read(newQuery)).stock.quantityAvailable, true);
+    const otherRealm = new WorkspaceCatalogueService(new FirestoreWorkspaceCatalogueRepository(db, 'production', () => new Date(clock)),
+      catalogueIdentity, () => new Date(clock));
+    assert.equal((await otherRealm.handleStoreStock('buyer-one', 'readPublicStoreStockSnapshot', newQuery) as any).state, 'unknown');
+    const stockHead = store.collection('stockSnapshots').doc('sku-one'), validHead = (await stockHead.get()).data()!;
+    await stockHead.update({'source.quantityPacks': 3});
+    await assert.rejects(read(newQuery));
+    await stockHead.set(validHead);
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({ownerUserId: 'replacement-owner'});
+    assert.equal((await read(newQuery)).state, 'unknown');
+    const replacementRead = await service().handleStoreStock('replacement-owner', 'readStoreStockSnapshot', newScope) as any;
+    assert.equal(replacementRead.state, 'source_changed'); assert.equal(replacementRead.record, null);
+    await assert.rejects(service().handleStoreStock('owner-one', 'reconcileStoreStockSnapshot', original));
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({ownerUserId: 'owner-one'});
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({shopEnabled: false});
+    assert.equal((await read()).state, 'unknown');
+    assert.deepEqual(await service().handleStoreStock('owner-one', 'reconcileStoreStockSnapshot', original), first);
+    const skuAfter = (await store.collection('skus').doc('sku-one').get()).data()!;
+    const skuBefore = JSON.parse(beforeSku); skuBefore.revision = 2;
+    assert.deepEqual(skuAfter, skuBefore); // Reporting never changes quantities/prices in the reviewed SKU mirror.
+    assert.equal((await store.collection('stockSnapshots').doc('sku-one').collection('revisions').get()).size, 4);
+    assert.equal((await store.collection('stockSnapshots').doc('sku-one').collection('receipts').get()).size, 4);
+  } finally {await db.terminate(); await deleteApp(app);}
+});
 test('LF14 rendered-product producer and owner aggregate are implemented in the existing catalogue owner', () => {
   for (const method of ['recordProductPresentation', 'readProductPresentations', 'recordStorePresentation', 'readStorePresentations']) {
     assert.equal(typeof (WorkspaceCatalogueService.prototype as unknown as Record<string, unknown>)[method], 'function');
