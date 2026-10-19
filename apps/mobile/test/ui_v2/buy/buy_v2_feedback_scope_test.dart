@@ -146,10 +146,14 @@ void main() {
   });
 
   for (final action in ['review', 'report']) {
-    testWidgets('LF13 open $action sheet rejects same-owner new login', (
+    testWidgets('LF13 public SKU has no post-purchase $action entry and keeps old drafts', (
       tester,
     ) async {
       final (session, adapter, _, identity) = await fixture();
+      if (action == 'review') {
+        session.retainProductReviewDraft(productId: 's-milk', rating: 3, comment: 'Private host draft',
+          ownerScope: 'owner-a', targetId: 'host-target');
+      }
       await tester.pumpWidget(
         MaterialApp(
           theme: MoolTheme.light(),
@@ -157,29 +161,15 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final button = find.byKey(ValueKey('buy-$action-product-s-milk'));
-      final scrollable = find
-          .descendant(
-            of: find.byKey(const PageStorageKey('buy-product-s-milk')),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(button, 200, scrollable: scrollable);
-      await tester.pumpAndSettle();
-      await tester.tap(button);
-      await tester.pumpAndSettle();
-      if (action == 'review') {
-        await tester.enterText(
-          find.byKey(const ValueKey('buy-review-comment-s-milk')),
-          'Private host draft',
-        );
-      }
+      expect(find.byKey(ValueKey('buy-$action-product-s-milk')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-product-reviews-s-milk')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-review-comment-s-milk')), findsNothing);
       identity.value = const BuyV2CollectionIdentity(
         accountId: 'a',
         sessionId: 'login-b',
       );
       await tester.pumpAndSettle();
-      expect(find.textContaining('Your account changed.'), findsOneWidget);
+      expect(find.byKey(ValueKey('buy-$action-product-s-milk')), findsNothing);
       expect(adapter.calls, 0);
       expect(
         session.productReviewDraft('s-milk', targetId: 'host-target')?.comment,

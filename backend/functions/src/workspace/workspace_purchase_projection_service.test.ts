@@ -495,6 +495,9 @@ test(`LF-LISTING actual persisted originals preserve explicit provenance across 
         receiptId: `listing-completion-${buyer.purchaseId}`, originalFingerprint: first.originalFingerprint,
         sourceRevision: buyer.sourceRevision, operationalRevision: 1})});
     await operations.initialize("listing-operation");
+    const exactTargetScope = {...scope, originalFingerprint: first.originalFingerprint, sourceRevision: buyer.sourceRevision,
+      orderLineId: first.original.lines[0]!.lineId};
+    await assert.rejects(operations.readBuyerProductFeedbackTarget(value.buyerUserId, exactTargetScope), rejectsCode("not_found"));
     const operational = await operations.read(value.buyerUserId, "buyer", scope);
     assert.equal(operational.originalFactsVersion, 6); assert.deepEqual(operational.original, first.original);
     assert.deepEqual((await operations.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 5, cursor: null})).targets, []);
@@ -511,6 +514,13 @@ test(`LF-LISTING actual persisted originals preserve explicit provenance across 
     await assert.rejects(operations.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 1, cursor: null, buyerUserId: value.buyerUserId}), rejectsCode("invalid_input"));
     if (!allNull) {
       const target = targets.targets[0]!;
+      const exactScope = {...exactTargetScope, orderLineId: target.orderLineId};
+      assert.deepEqual((await operations.readBuyerProductFeedbackTarget(value.buyerUserId, exactScope)).target, target);
+      await assert.rejects(operations.readBuyerProductFeedbackTarget("unrelated-buyer", exactScope), rejectsCode("not_found"));
+      for (const changed of [{orderLineId: "missing-line"}, {sourceRevision: "other-revision"}, {originalFingerprint: "b".repeat(64)}]) {
+        await assert.rejects(operations.readBuyerProductFeedbackTarget(value.buyerUserId, {...exactScope, ...changed}), rejectsCode("not_found"));
+      }
+      await assert.rejects(operations.readBuyerProductFeedbackTarget(value.buyerUserId, {...exactScope, buyerUserId: value.buyerUserId}), rejectsCode("invalid_input"));
       const purchased = first.original.lines.find(line => line.lineId === target.orderLineId)!;
       assert.deepEqual(target.purchasedListing, purchased.publicListing);
       assert.equal(target.completionId, completed.completion.id);
@@ -533,8 +543,17 @@ test(`LF-LISTING actual persisted originals preserve explicit provenance across 
         await assert.rejects(operations.submitProductStars(value.buyerUserId, {...starCommand, ...extra}), rejectsCode("invalid_input"));
       }
       t.diagnostic("private stars: reconcile and invalid payloads passed; starting concurrent same-key save");
-      const [starOne, replayOne] = await Promise.all([operations.submitProductStars(value.buyerUserId, starCommand),
+      const outcomes = await Promise.allSettled([operations.submitProductStars(value.buyerUserId, starCommand),
         operations.submitProductStars(value.buyerUserId, starCommand)]);
+      t.diagnostic(`private stars concurrent outcomes: ${outcomes.map(r => r.status === "fulfilled" ? "saved" : String(r.reason)).join(" | ")}`);
+      // Await both before any fixture teardown; neither failure is hidden by
+      // cancellation/termination of its still-running sibling transaction.
+      for (const outcome of outcomes) if (outcome.status === "rejected") throw outcome.reason;
+      const [starOne, replayOne] = outcomes.map(outcome => {
+        assert.equal(outcome.status, "fulfilled");
+        return outcome.value;
+      });
+      assert.ok(starOne); assert.ok(replayOne);
       t.diagnostic("private stars: concurrent original attempt accepted");
       assert.deepEqual(starOne, replayOne); assert.equal(starOne.rating!.stars, 1);
       const restart = new WorkspaceOrderOperationsService(db, "evaluation");
@@ -548,6 +567,12 @@ test(`LF-LISTING actual persisted originals preserve explicit provenance across 
       assert.deepEqual(await restart.submitProductStars(value.buyerUserId, starCommand), starOne);
       await assert.rejects(restart.submitProductStars(value.buyerUserId, {...starCommand, stars: 2}), rejectsCode("conflict"));
       await assert.rejects(restart.submitProductStars(value.buyerUserId, {...starCommand, operationId: "stale-edit"}), rejectsCode("conflict"));
+      const stale = await restart.submitProductStars(value.buyerUserId, {...starCommand, operationId: "stale-edit"}, true);
+      assert.deepEqual(stale, {...starOne, operationId: "stale-edit", state: "superseded", rating: null,
+        targetId: target.id, observedRevision: 5});
+      assert.deepEqual(await restart.submitProductStars(value.buyerUserId, starCommand, true), starOne);
+      assert.equal((await restart.submitProductStars(value.buyerUserId,
+        {...starCommand, operationId: "not-sent-next", expectedRevision: 5}, true)).state, "not_recorded");
       assert.equal((await restart.readBuyerProductStars(value.buyerUserId, {targetId: target.id}))!.stars, 5);
       const downgraded = await restart.submitProductStars(value.buyerUserId, {...starCommand, operationId: "stars-lower", expectedRevision: 5, stars: 1});
       assert.equal(downgraded.rating!.stars, 1);
@@ -561,6 +586,8 @@ test(`LF-LISTING actual persisted originals preserve explicit provenance across 
         {storeId: first.storeId, limit: 5, cursor: null}), rejectsCode("not_found"));
       const ratingPath = root.collection("productStarRatings").doc(target.id), frozenStars = (await ratingPath.get()).data()!;
       await ratingPath.update({"rating.stars": 4});
+      await assert.rejects(restart.submitProductStars(value.buyerUserId,
+        {...starCommand, operationId: "stale-edit"}, true), rejectsCode("invalid_state"));
       await assert.rejects(restart.readBuyerProductStars(value.buyerUserId, {targetId: target.id}), rejectsCode("invalid_state"));
       await assert.rejects(restart.listStoreProductStars(value.stores[0].ownerUserId,
         {storeId: first.storeId, limit: 5, cursor: null}), rejectsCode("invalid_state"));
@@ -570,10 +597,13 @@ test(`LF-LISTING actual persisted originals preserve explicit provenance across 
       const path = db.collection("workspacePurchaseProjections").doc("evaluation").collection("productFeedbackTargets").doc(target.id);
       const frozen = (await path.get()).data()!;
       await path.update({"target.productLabel": "tampered"});
+      await assert.rejects(operations.readBuyerProductFeedbackTarget(value.buyerUserId, exactScope), rejectsCode("invalid_state"));
       await assert.rejects(operations.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 1, cursor: null}), rejectsCode("invalid_state"));
       await assert.rejects(operations.recordCompletion(completionReference), rejectsCode("invalid_state"));
       await path.set(frozen);
       await path.delete();
+      await assert.rejects(operations.readBuyerProductFeedbackTarget(value.buyerUserId, exactScope), rejectsCode("service_unavailable"));
+      assert.equal((await path.get()).exists, false);
       const offline = new WorkspaceOrderOperationsService(db, "evaluation", undefined, () => new Date(),
         {issuer: "trusted-fulfilment", readCompletion: async () => {throw new Error("accepted reference must not call source");}});
       assert.deepEqual(await offline.recordCompletion(completionReference), completed);
@@ -591,6 +621,7 @@ test(`LF-LISTING actual persisted originals preserve explicit provenance across 
 }
 
 test("LF-FEEDBACK private stars have submit/reconcile and retailer reader surfaces", () => {
+  assert.equal(typeof Reflect.get(WorkspaceOrderOperationsService.prototype, "readBuyerProductFeedbackTarget"), "function");
   assert.equal(typeof Reflect.get(WorkspaceOrderOperationsService.prototype, "submitProductStars"), "function");
   assert.equal(typeof Reflect.get(WorkspaceOrderOperationsService.prototype, "listStoreProductStars"), "function");
 });
@@ -631,6 +662,32 @@ test("LF-FEEDBACK collected maximum100-line Store completion creates bounded exa
     const next = await service.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 5, cursor: page.nextCursor});
     assert.equal(next.targets.length, 5);
     assert.equal(new Set([...page.targets, ...next.targets].map(t => t.id)).size, 10);
+    const outsideFirstPage = order.original.lines.find(l => !page.targets.some(t => t.orderLineId === l.lineId))!;
+    const exact = await service.readBuyerProductFeedbackTarget(value.buyerUserId, {...scope,
+      originalFingerprint: order.originalFingerprint, sourceRevision: buyer.sourceRevision, orderLineId: outsideFirstPage.lineId});
+    assert.equal(exact.target.orderLineId, outsideFirstPage.lineId);
+    assert.deepEqual(exact.target.purchasedListing, outsideFirstPage.publicListing);
+    const exactScope = {...scope, originalFingerprint: order.originalFingerprint, sourceRevision: buyer.sourceRevision,
+      orderLineId: outsideFirstPage.lineId};
+    const path = root.collection("productFeedbackTargets").doc(exact.target.id), frozen = (await path.get()).data()!;
+    const completionBefore = JSON.stringify(await service.readCompletion(value.buyerUserId, "buyer", scope));
+    const ratingCount = (await root.collection("productStarRatings").get()).size;
+    const receiptCount = (await root.collection("productStarReceipts").get()).size;
+    await assert.rejects(service.readBuyerProductFeedbackTarget("another-buyer", exactScope), rejectsCode("not_found"));
+    for (const changed of [{orderLineId: "missing"}, {sourceRevision: "changed"}, {originalFingerprint: "b".repeat(64)}]) {
+      await assert.rejects(service.readBuyerProductFeedbackTarget(value.buyerUserId, {...exactScope, ...changed}), rejectsCode("not_found"));
+    }
+    await path.update({"target.productLabel": "tampered"});
+    await assert.rejects(service.readBuyerProductFeedbackTarget(value.buyerUserId, exactScope), rejectsCode("invalid_state"));
+    await path.delete();
+    await assert.rejects(service.readBuyerProductFeedbackTarget(value.buyerUserId, exactScope), rejectsCode("service_unavailable"));
+    assert.equal((await path.get()).exists, false);
+    await path.set(frozen);
+    assert.deepEqual((await path.get()).data(), frozen);
+    assert.equal((await root.collection("productStarRatings").get()).size, ratingCount);
+    assert.equal((await root.collection("productStarReceipts").get()).size, receiptCount);
+    assert.equal(JSON.stringify(await service.readCompletion(value.buyerUserId, "buyer", scope)), completionBefore);
+    console.log(`LF_EXACT_PRODUCT_TARGET=${JSON.stringify(exact)}`);
     assert.equal((await originals.readBuyer(value.buyerUserId, {purchaseId: made.purchaseId})).orders[0]!.original.totals.totalMinor, items);
   } finally {await db.terminate(); await deleteApp(app);}
 });

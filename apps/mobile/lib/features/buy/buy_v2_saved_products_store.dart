@@ -130,6 +130,47 @@ class BuyV2ProductReviewDraft {
       rating >= 0 && rating <= 5 && comment.characters.length <= 8000;
 }
 
+/// Original private stars command, not eligibility or a successful save. The
+/// authenticated customer storage namespace owns it; the service revalidates it.
+@immutable
+class BuyV2ProductStarsAttempt {
+  const BuyV2ProductStarsAttempt._(this.targetJson, this.targetId, this.operationId, this.expectedRevision, this.stars);
+  final String targetJson, targetId, operationId;
+  final int expectedRevision, stars;
+  Map<String, Object?> get target => (jsonDecode(targetJson) as Map).cast<String, Object?>();
+  Map<String, Object?> toJson() => {'version': 1, 'target': target, 'operationId': operationId,
+    'expectedRevision': expectedRevision, 'stars': stars};
+  factory BuyV2ProductStarsAttempt.fromJson(Object? raw) {
+    bool exact(Map r, Set<String> keys) => r.length == keys.length && keys.every(r.containsKey);
+    bool id(Object? v) => v is String && RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(v);
+    bool hash(Object? v, String prefix) => v is String && RegExp('^$prefix[a-f0-9]{64}\$').hasMatch(v);
+    if (raw is! Map || !exact(raw, const {'version', 'target', 'operationId', 'expectedRevision', 'stars'}) ||
+        raw['version'] is! int || raw['version'] != 1 || !id(raw['operationId']) ||
+        raw['expectedRevision'] is! int || raw['expectedRevision'] < 0 || raw['expectedRevision'] >= 9007199254740991 ||
+        raw['stars'] is! int || raw['stars'] < 1 || raw['stars'] > 5 || raw['target'] is! Map) {
+      throw const FormatException('Saved star request needs checking.');
+    }
+    final t = raw['target'] as Map;
+    if (!exact(t, const {'id', 'kind', 'purchaseId', 'storeId', 'orderId', 'orderLineId', 'productId', 'productLabel',
+        'originalFingerprint', 'sourceRevision', 'purchasedListing', 'completedAt', 'completionId', 'completionRevision'}) ||
+        t['kind'] != 'product' || !hash(t['id'], 'feedback-') || !hash(t['originalFingerprint'], '') ||
+        !hash(t['completionId'], 'completion-') ||
+        !['purchaseId', 'storeId', 'orderId', 'orderLineId', 'sourceRevision', 'completionRevision'].every((key) => id(t[key])) ||
+        t['productLabel'] is! String || (t['productLabel'] as String).trim().isEmpty ||
+        t['productLabel'] != (t['productLabel'] as String).trim() || (t['productLabel'] as String).length > 240 ||
+        RegExp(r'[\x00-\x1f]').hasMatch(t['productLabel']) || t['completedAt'] is! String ||
+        DateTime.parse(t['completedAt']).toUtc().toIso8601String() != t['completedAt']) {
+      throw const FormatException('Saved star target needs checking.');
+    }
+    final listing = BuyV2PublicListingIdentity.fromJson(t['purchasedListing']);
+    if (listing == null || listing.storeId != t['storeId'] || listing.listingId != t['productId'] ||
+        listing.listingId != 'listing-${sha256.convert(utf8.encode(jsonEncode([1, listing.realm, listing.storeId, listing.skuId, listing.channel.name])))}') {
+      throw const FormatException('Saved star listing needs checking.');
+    }
+    return BuyV2ProductStarsAttempt._(jsonEncode(t), t['id'], raw['operationId'], raw['expectedRevision'], raw['stars']);
+  }
+}
+
 /// Private duplicate-prevention metadata, never proof of payment or authority
 /// to replay a request. Restored records always require provider reconciliation.
 @immutable
@@ -289,6 +330,7 @@ class BuyV2CustomerStateSnapshot {
     this.productIdentityKeys = const {},
     this.reviewDrafts = const {},
     this.productReportStates = const {},
+    this.productStarAttempts = const {},
     this.supplierPolicyAcceptances = const {},
     this.supplierPolicyRequiredProductKeys = const {},
     this.supplierPolicyUnresolvedProductKeys = const {},
@@ -339,6 +381,9 @@ class BuyV2CustomerStateSnapshot {
   final Map<String, BuyV2ProductReviewDraft> reviewDrafts;
   /// Local original-owner retry protection, not moderation/publication state.
   final Map<String, String> productReportStates;
+  final Map<String, BuyV2ProductStarsAttempt> productStarAttempts;
+  bool get hasValidProductStarAttempts => productStarAttempts.length <= 100 &&
+    productStarAttempts.entries.every((entry) => entry.key == entry.value.targetId);
   bool get hasValidProductReportStates => productReportStates.entries.every((entry) {
     if (!const {'pending', 'submitted'}.contains(entry.value)) return false;
     try {
@@ -485,7 +530,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
       final hasSupplyRecovery = decoded.containsKey('orderSupplyCheckpoints') ||
           decoded['orders'] is List && (decoded['orders'] as List).any(
             (order) => order is Map && order.containsKey('supplyProgress'));
-      if (invalidDraft && (decoded.containsKey('productReportStates') || hasSupplyRecovery)) {
+      if (invalidDraft && (decoded.containsKey('productReportStates') || decoded.containsKey('productStarAttempts') || hasSupplyRecovery)) {
         // An unreadable draft cannot discard supplied order/report recovery.
         throw const FormatException('Saved purchase and order recovery need checking.');
       }
@@ -509,7 +554,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
     if (!_ownerCurrent) return false;
-    if (!snapshot.hasValidProductReportStates) return false;
+    if (!snapshot.hasValidProductReportStates || !snapshot.hasValidProductStarAttempts) return false;
     if (!_validSupplyCache(snapshot)) return false;
     try {
       for (final order in snapshot.orders.where(_hasInvoiceContext)) {
@@ -581,6 +626,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'productIdentityKeys': snapshot.productIdentityKeys,
     if (snapshot.productReportStates.isNotEmpty)
       'productReportStates': {'version': 1, 'records': snapshot.productReportStates},
+    if (snapshot.productStarAttempts.isNotEmpty)
+      'productStarAttempts': {'version': 1, 'records': {
+        for (final entry in snapshot.productStarAttempts.entries) entry.key: entry.value.toJson(),
+      }},
     'supplierPolicyAcceptances': snapshot.supplierPolicyAcceptances,
     'supplierPolicyUnresolvedProductKeys': snapshot.supplierPolicyUnresolvedProductKeys.toList(),
     'supplierPolicyRequiredProductKeys': snapshot
@@ -722,6 +771,8 @@ final class BuyV2SharedPreferencesCustomerStateStore
     productIdentityKeys: _stringMap(source['productIdentityKeys']),
     productReportStates: source.containsKey('productReportStates')
         ? _decodeProductReportStates(source['productReportStates']) : const {},
+    productStarAttempts: source.containsKey('productStarAttempts')
+        ? _decodeProductStarAttempts(source['productStarAttempts']) : const {},
     supplierPolicyAcceptances: _stringMap(source['supplierPolicyAcceptances']),
     supplierPolicyUnresolvedProductKeys: _unresolvedPolicyKeys(source['supplierPolicyUnresolvedProductKeys']),
     supplierPolicyRequiredProductKeys: _stringList(
@@ -2007,6 +2058,20 @@ final class BuyV2SharedPreferencesCustomerStateStore
       throw const FormatException('Saved product report target needs checking.');
     }
     return Map.unmodifiable(records);
+  }
+
+  static Map<String, BuyV2ProductStarsAttempt> _decodeProductStarAttempts(Object? raw) {
+    if (raw is! Map || raw.length != 2 || raw['version'] is! int || raw['version'] != 1 ||
+        raw['records'] is! Map || (raw['records'] as Map).length > 100) {
+      throw const FormatException('Saved star request recovery needs checking.');
+    }
+    final result = <String, BuyV2ProductStarsAttempt>{};
+    for (final entry in (raw['records'] as Map).entries) {
+      final attempt = BuyV2ProductStarsAttempt.fromJson(entry.value);
+      if (entry.key != attempt.targetId) throw const FormatException('Changed saved star target.');
+      result[attempt.targetId] = attempt;
+    }
+    return Map.unmodifiable(result);
   }
 
   static String? _string(Object? value) =>

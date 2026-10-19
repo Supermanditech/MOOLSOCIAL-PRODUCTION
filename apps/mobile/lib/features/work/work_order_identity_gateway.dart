@@ -673,9 +673,16 @@ class WorkspaceProductStars {
   final DateTime updatedAt;
 }
 class WorkspaceProductStarsResult {
-  const WorkspaceProductStarsResult._({required this.operationId, required this.rating});
+  const WorkspaceProductStarsResult._({required this.operationId, required this.rating, this.supersededByRevision});
   final String operationId;
-  // Null is an explicitly observed missing original receipt, not a failed read.
+  // Null without supersession is a missing original receipt, not a failed read.
+  final WorkspaceProductStars? rating;
+  final int? supersededByRevision;
+}
+class WorkspaceBuyerProductStarsSnapshot {
+  const WorkspaceBuyerProductStarsSnapshot._({required this.target, required this.rating});
+  final WorkspaceProductFeedbackTarget target;
+  // A successful authenticated read may report no saved rating yet.
   final WorkspaceProductStars? rating;
 }
 class WorkspaceStoreProductStarsPage {
@@ -1026,6 +1033,61 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
     }
     return WorkspaceProductStars._(target: target, stars: r['stars'], revision: r['revision'], updatedAt: updatedAt);
   }
+  /// Restores an original command's exact target without depending on current
+  /// catalogue availability. Scope/hash validation is not server save authority.
+  WorkspaceProductFeedbackTarget? restoreProductFeedbackTarget(Object? value, {required String realm}) {
+    if (!isCurrent || !const ['evaluation', 'production'].contains(realm)) return null;
+    try {
+      final target = _privateStarsTarget(value, realm), t = target.toJson(), listing = target.purchasedListing;
+      final expected = 'feedback-${sha256.convert(utf8.encode(jsonEncode([1, realm, 'firebase-default', identity.accountUserId,
+        t['purchaseId'], t['storeId'], t['orderId'], t['orderLineId'], t['originalFingerprint'], t['sourceRevision'], t['productLabel'],
+        listing.listingId, listing.skuId, listing.canonicalProductId, listing.verifiedPackId, listing.channel.name,
+        t['completionId'], t['completionRevision'], t['completedAt']])))}';
+      return target.id == expected ? target : null;
+    } on Object {return null;}
+  }
+  Future<WorkspaceProductFeedbackTarget?> readProductFeedbackTarget({required String realm,
+    required WorkspacePurchaseReference reference, required WorkspacePurchasedSkuLine line}) async {
+    if (!_validReference(realm, reference) || !_id(line.lineId) || line.publicListing == null) return null;
+    try {
+      final raw = await _call('readBuyerProductFeedbackTarget', {'purchaseId': reference.purchaseId,
+        'storeId': reference.storeId, 'orderId': reference.orderId, 'originalFingerprint': reference.originalFingerprint,
+        'sourceRevision': reference.sourceRevision, 'orderLineId': line.lineId});
+      if (raw == null || !isCurrent) return null;
+      final data = _exactMap(raw, const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId', 'target']);
+      if (data['schemaVersion'] is! int || data['schemaVersion'] != 1 || data['realm'] != realm ||
+          data['authNamespace'] != 'firebase-default' || data['viewerRole'] != 'buyer' || data['viewerUserId'] != identity.accountUserId) {
+        return null;
+      }
+      final target = restoreProductFeedbackTarget(data['target'], realm: realm), t = target?.reference;
+      if (target == null || t!.purchaseId != reference.purchaseId || t.storeId != reference.storeId ||
+          t.orderId != reference.orderId || t.originalFingerprint != reference.originalFingerprint ||
+          t.sourceRevision != reference.sourceRevision || target.orderLineId != line.lineId ||
+          target.productLabel != line.name || target.purchasedListing != line.publicListing) {
+        return null;
+      }
+      return target;
+    } on Object {return null;}
+  }
+  Future<WorkspaceBuyerProductStarsSnapshot?> readProductStars(WorkspaceProductFeedbackTarget target) async {
+    final realm = target.purchasedListing.realm;
+    if (restoreProductFeedbackTarget(target.toJson(), realm: realm) == null) return null;
+    try {
+      final raw = await _call('readBuyerProductStars', {'targetId': target.id});
+      if (raw == null || !isCurrent) return null;
+      final r = _exactMap(raw, const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId', 'targetId', 'rating']);
+      if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['realm'] != realm ||
+          r['authNamespace'] != 'firebase-default' || r['viewerRole'] != 'buyer' ||
+          r['viewerUserId'] != identity.accountUserId || r['targetId'] != target.id) {
+        throw const FormatException('Wrong saved-stars owner.');
+      }
+      final rating = r['rating'] == null ? null : _privateStars(r['rating'], realm);
+      if (rating != null && jsonEncode(rating.target.toJson()) != jsonEncode(target.toJson())) {
+        throw const FormatException('Changed saved-stars target.');
+      }
+      return WorkspaceBuyerProductStarsSnapshot._(target: target, rating: rating);
+    } on Object {return null;}
+  }
   Future<WorkspaceProductStarsResult?> submitProductStars({required WorkspaceProductFeedbackTarget target,
     required int stars, required int expectedRevision, required String operationId, bool reconcile = false}) async {
     final realm = target.purchasedListing.realm;
@@ -1038,7 +1100,9 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
         'targetId': target.id, 'expectedRevision': expectedRevision, 'operationId': operationId, 'stars': stars,
       }, mutation: !reconcile);
       if (raw == null || !isCurrent) return null;
-      final r = _exactMap(raw, const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId', 'operationId', 'state', 'rating']);
+      final superseded = raw['state'] == 'superseded';
+      final r = _exactMap(raw, ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId', 'operationId', 'state', 'rating',
+        if (superseded) ...['targetId', 'observedRevision']]);
       if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['realm'] != realm || r['authNamespace'] != 'firebase-default' ||
           r['viewerRole'] != 'buyer' || r['viewerUserId'] != identity.accountUserId || r['operationId'] != operationId) {
         throw const FormatException('Wrong stars receipt owner.');
@@ -1050,10 +1114,16 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
             saved.revision != expectedRevision + 1) {
           throw const FormatException('Changed stars receipt.');
         }
+      } else if (superseded) {
+        if (!reconcile || r['rating'] != null || r['targetId'] != target.id || r['observedRevision'] is! int ||
+            (r['observedRevision'] as int) <= expectedRevision || (r['observedRevision'] as int) > 9007199254740991) {
+          throw const FormatException('Unproven superseded stars attempt.');
+        }
       } else if (!reconcile || r['state'] != 'not_recorded' || r['rating'] != null) {
         throw const FormatException('Unknown stars outcome.');
       }
-      return WorkspaceProductStarsResult._(operationId: operationId, rating: saved);
+      return WorkspaceProductStarsResult._(operationId: operationId, rating: saved,
+        supersededByRevision: superseded ? r['observedRevision'] as int : null);
     } on Object {return null;}
   }
   Future<WorkspaceStoreProductStarsPage?> listStoreProductStars({required String realm, required String storeId, String? cursor}) async {

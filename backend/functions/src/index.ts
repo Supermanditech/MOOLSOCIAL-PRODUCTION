@@ -2943,7 +2943,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "listBuyerPurchaseReferences" || operation === "listStorePurchaseReferences";
       const operationalRead = operation === "readBuyerOperationalOrder" || operation === "readStoreOperationalOrder";
       const completionRead = operation === "readBuyerOrderCompletion" || operation === "readStoreOrderCompletion";
-      const productFeedbackTargetRead = operation === "listBuyerProductFeedbackTargets";
+      const productFeedbackTargetRead = ["listBuyerProductFeedbackTargets", "readBuyerProductFeedbackTarget"].includes(operation);
       const productStarsOperation = ["readBuyerProductStars", "submitBuyerProductStars", "reconcileBuyerProductStars", "listStoreProductStars"].includes(operation);
       const operationalCommand = operation === "submitStoreOrderCommand";
       const operationalReconcile = operation === "reconcileStoreOrderCommand";
@@ -3000,6 +3000,8 @@ export const moolSocialWorkspace = onRequest(
         ? await workspaceOrderOperationsService().submitProductStars(ownerUserId, catalogueBody, operation === "reconcileBuyerProductStars")
         : operation === "listStoreProductStars"
         ? await workspaceOrderOperationsService().listStoreProductStars(ownerUserId, catalogueBody)
+        : operation === "readBuyerProductFeedbackTarget"
+        ? await workspaceOrderOperationsService().readBuyerProductFeedbackTarget(ownerUserId, catalogueBody)
         : productFeedbackTargetRead
         ? await workspaceOrderOperationsService().listBuyerProductFeedbackTargets(ownerUserId, catalogueBody)
         : completionRead

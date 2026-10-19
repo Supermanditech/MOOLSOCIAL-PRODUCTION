@@ -6,6 +6,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/work/work_order_identity_gateway.dart';
 import 'package:moolsocial/features/work/work_customer_feedback.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:flutter/material.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
+import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/features/work/widgets/workspace_purchase_originals.dart';
 
 // Isolated contract fixtures; no native storage, real order or provider calls.
 Map<String, dynamic> response({String role = 'buyer'}) {
@@ -90,24 +100,432 @@ class Transport implements SocialContentTransport {
   }
 }
 
-void main() {
-  Map<String, dynamic> feedbackTargetPage() {
-    final data = publicListingPurchaseResponse(), order = data['orders'][0], line = order['original']['lines'][0];
-    final listing = line['publicListing'];
-    final target = <String, dynamic>{'kind': 'product', 'purchaseId': data['purchaseId'], 'storeId': order['storeId'], 'orderId': order['orderId'],
-      'orderLineId': line['lineId'], 'productId': listing['listingId'], 'productLabel': line['name'], 'originalFingerprint': order['originalFingerprint'],
-      'sourceRevision': data['sourceRevision'], 'purchasedListing': listing, 'completedAt': '2026-10-16T12:00:00.000Z',
-      'completionId': 'completion-${'a' * 64}', 'completionRevision': 'completed-v1'};
-    target['id'] = 'feedback-${sha256.convert(utf8.encode(jsonEncode([1, 'evaluation', 'firebase-default', 'buyer-1',
-      target['purchaseId'], target['storeId'], target['orderId'], target['orderLineId'], target['originalFingerprint'], target['sourceRevision'], target['productLabel'],
-      listing['listingId'], listing['skuId'], listing['canonicalProductId'], listing['verifiedPackId'], listing['channel'],
-      target['completionId'], target['completionRevision'], target['completedAt']])))}';
-    return {'schemaVersion': 1, 'realm': 'evaluation', 'authNamespace': 'firebase-default', 'viewerRole': 'buyer', 'viewerUserId': 'buyer-1',
-      'coverage': 'indexed_recorded_completions', 'targets': [target], 'nextCursor': null};
+// Isolated serialized-storage fixture, never native account/Cart injection.
+final class StarsPreferences implements SharedPreferencesAsync {
+  final values = <String, String>{};
+  @override
+  Future<String?> getString(String key) async => values[key];
+  @override
+  Future<void> setString(String key, String value) async {values[key] = value;}
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw StateError('Unexpected preferences operation');
+}
+
+class StarsStateStore implements BuyV2CustomerStateStore {
+  @override
+  String get ownerScope => 'host-stars-account';
+  BuyV2CustomerStateSnapshot? saved;
+  int writes = 0;
+  final refusedWrites = <int>{};
+  Future<void> Function(int)? beforeWrite;
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => saved;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
+    final sequence = ++writes;
+    await beforeWrite?.call(sequence);
+    if (refusedWrites.contains(sequence)) return false;
+    saved = snapshot; return true;
   }
-  Map<String, dynamic> starResult() => {'schemaVersion': 1, 'realm': 'evaluation', 'authNamespace': 'firebase-default',
-    'viewerRole': 'buyer', 'viewerUserId': 'buyer-1', 'operationId': 'stars-save', 'state': 'saved',
-    'rating': {'target': feedbackTargetPage()['targets'][0], 'stars': 1, 'revision': 1, 'updatedAt': '2026-10-19T00:00:00.000Z'}};
+}
+
+class StarsCatalogue implements BuyV2CommerceAdapter {
+  StarsCatalogue(this.product);
+  final BuyV2Product product;
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready, products: [product], productReportsAvailable: true);
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw StateError('Unexpected host commerce operation');
+}
+
+Map<String, dynamic> completionResponse({String role = 'buyer', bool supplied = true}) {
+  final original = operationalResponse(role: role);
+  return {for (final key in const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId',
+    'purchaseId', 'storeId', 'orderId', 'sourceRevision', 'originalFingerprint']) key: original[key],
+    'state': supplied ? 'recorded' : 'not_supplied',
+    'completion': supplied ? {'id': 'completion-${'a' * 64}', 'revision': 'completion-v1', 'outcome': 'delivered',
+      'occurredAt': '2026-10-16T12:01:00.000Z', 'recordedAt': '2026-10-16T12:01:01.000Z'} : null};
+}
+Map<String, dynamic> feedbackTargetPage({String? orderLineId}) {
+  final data = publicListingPurchaseResponse(), order = data['orders'][0], line = order['original']['lines'][0];
+  final listing = line['publicListing'];
+  final target = <String, dynamic>{'kind': 'product', 'purchaseId': data['purchaseId'], 'storeId': order['storeId'], 'orderId': order['orderId'],
+    'orderLineId': orderLineId ?? line['lineId'], 'productId': listing['listingId'], 'productLabel': line['name'], 'originalFingerprint': order['originalFingerprint'],
+    'sourceRevision': data['sourceRevision'], 'purchasedListing': listing, 'completedAt': '2026-10-16T12:00:00.000Z',
+    'completionId': 'completion-${'a' * 64}', 'completionRevision': 'completed-v1'};
+  target['id'] = 'feedback-${sha256.convert(utf8.encode(jsonEncode([1, 'evaluation', 'firebase-default', 'buyer-1',
+    target['purchaseId'], target['storeId'], target['orderId'], target['orderLineId'], target['originalFingerprint'], target['sourceRevision'], target['productLabel'],
+    listing['listingId'], listing['skuId'], listing['canonicalProductId'], listing['verifiedPackId'], listing['channel'],
+    target['completionId'], target['completionRevision'], target['completedAt']])))}';
+  return {'schemaVersion': 1, 'realm': 'evaluation', 'authNamespace': 'firebase-default', 'viewerRole': 'buyer', 'viewerUserId': 'buyer-1',
+    'coverage': 'indexed_recorded_completions', 'targets': [target], 'nextCursor': null};
+}
+Map<String, dynamic> starResult() => {'schemaVersion': 1, 'realm': 'evaluation', 'authNamespace': 'firebase-default',
+  'viewerRole': 'buyer', 'viewerUserId': 'buyer-1', 'operationId': 'stars-save', 'state': 'saved',
+  'rating': {'target': feedbackTargetPage()['targets'][0], 'stars': 1, 'revision': 1, 'updatedAt': '2026-10-19T00:00:00.000Z'}};
+Map<String, dynamic> exactTargetResponse() => Map<String, dynamic>.from(feedbackTargetPage())
+  ..remove('coverage')..remove('targets')..remove('nextCursor')..['target'] = feedbackTargetPage()['targets'][0];
+Map<String, dynamic> starAttempt() => {'version': 1, 'target': feedbackTargetPage()['targets'][0],
+  'operationId': 'original-stars-save', 'expectedRevision': 0, 'stars': 1};
+Future<(BuyV2Session, Transport, StarsStateStore)> starsSession({StarsStateStore? storage,
+  Object? Function()? lifetime, BuyV2CommerceAdapter? catalogue}) async {
+  final wire = Transport(), store = storage ?? StarsStateStore(), core = BuySession();
+  wire.respond = (body) => switch (body['operation']) {
+    'listBuyerProductFeedbackTargets' => feedbackTargetPage(),
+    'readBuyerProductFeedbackTarget' => exactTargetResponse(),
+    'readBuyerProductStars' => {'schemaVersion': 1, 'realm': 'evaluation', 'authNamespace': 'firebase-default',
+      'viewerRole': 'buyer', 'viewerUserId': 'buyer-1', 'targetId': feedbackTargetPage()['targets'][0]['id'], 'rating': null},
+    'submitBuyerProductStars' => starResult()..['operationId'] = body['operationId']..['rating']['stars'] = body['stars'],
+    'reconcileBuyerProductStars' => starResult()..['operationId'] = body['operationId']..['state'] = 'not_recorded'..['rating'] = null,
+    _ => throw StateError('Unexpected isolated stars operation'),
+  };
+  final session = BuyV2Session(core: core, customerStateStore: store, reviewDataEnabled: false,
+    purchaseReader: projectionGateway(wire, lifetime: lifetime), purchaseRealm: 'evaluation', commerceAdapter: catalogue);
+  addTearDown(session.dispose); addTearDown(core.dispose);
+  await session.restoreCustomerState();
+  return (session, wire, store);
+}
+void connectPurchaseFixture(Transport wire, bool Function() completed) {
+  final respond = wire.respond!, details = publicListingPurchaseResponse(), target = feedbackTargetPage()['targets'][0];
+  final refs = referenceResponse(); refs['references'][0]['originalFingerprint'] = target['originalFingerprint'];
+  wire.respond = (body) {
+    switch (body['operation']) {
+      case 'listBuyerPurchaseReferences': return refs;
+      case 'readBuyerPurchaseProjection': return details;
+      case 'readBuyerOperationalOrder': throw StateError('No operational status fixture');
+      case 'readBuyerOrderCompletion':
+        final reply = completionResponse(supplied: completed())..['originalFingerprint'] = target['originalFingerprint'];
+        if (completed()) {
+          reply['completion']['id'] = target['completionId']; reply['completion']['revision'] = target['completionRevision'];
+          reply['completion']['occurredAt'] = target['completedAt'];
+        }
+        return reply;
+      default: return respond(body);
+    }
+  };
+}
+
+void main() {
+  if (Platform.environment['LF_EXACT_PRODUCT_TARGET_LOG'] case final path?) {
+    test('LF-STARS actual100-line backend target passes exact buyer-bound Dart read', () async {
+      final entry = File(path).readAsLinesSync().singleWhere((l) => l.startsWith('LF_EXACT_PRODUCT_TARGET='));
+      final data = (jsonDecode(entry.substring('LF_EXACT_PRODUCT_TARGET='.length)) as Map).cast<String, dynamic>();
+      final raw = data['target'] as Map, listing = BuyV2PublicListingIdentity.fromJson(raw['purchasedListing'])!;
+      final ref = WorkspacePurchaseReference(purchaseId: raw['purchaseId'], storeId: raw['storeId'], orderId: raw['orderId'],
+        sourceRevision: raw['sourceRevision'], originalFingerprint: raw['originalFingerprint']);
+      // Other money/quantity values are isolated client fixture facts, not backend acceptance.
+      final line = WorkspacePurchasedSkuLine(lineId: raw['orderLineId'], skuId: listing.skuId,
+        canonicalProductId: listing.canonicalProductId, verifiedPackId: listing.verifiedPackId, offerId: 'fixture-offer',
+        offerRevision: 'fixture-revision', name: raw['productLabel'], packLabel: 'fixture-pack', quantityMilli: 1000,
+        quantityUnit: 'pack', unitPriceMinor: 100, lineTotalMinor: 100, hasPublicListingSnapshot: true, publicListing: listing);
+      final wire = Transport()..data = data;
+      final gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, account: data['viewerUserId']));
+      final target = await gateway.readProductFeedbackTarget(realm: data['realm'], reference: ref, line: line);
+      expect(target, isNotNull); expect(target!.toJson(), raw);
+      expect(wire.sent!['operation'], 'readBuyerProductFeedbackTarget');
+      expect(wire.sent!['orderLineId'], raw['orderLineId']);
+    });
+  }
+  test('LF-STARS one hundred retained originals cannot poison storage with attempt101', () async {
+    final attempts = <String, BuyV2ProductStarsAttempt>{};
+    for (var i = 0; i < 100; i++) {
+      final target = feedbackTargetPage(orderLineId: 'held-line-$i')['targets'][0];
+      attempts[target['id']] = BuyV2ProductStarsAttempt.fromJson({...starAttempt(), 'target': target, 'operationId': 'held-$i'});
+    }
+    final storage = StarsStateStore()..saved = BuyV2CustomerStateSnapshot(productStarAttempts: attempts);
+    final (session, wire, store) = await starsSession(storage: storage);
+    expect(await session.loadPrivateStars(), isTrue);
+    final target = feedbackTargetPage()['targets'][0];
+    expect(session.canSavePrivateStars(target['id']), isFalse);
+    expect(await session.savePrivateStars(target['id'], 5), isFalse);
+    expect(wire.requests.where((r) => r['operation'] == 'submitBuyerProductStars'), isEmpty);
+    expect(store.saved!.productStarAttempts, hasLength(100));
+    expect(session.privateStarAttempt(attempts.keys.first), isNotNull);
+    final writes = store.writes;
+    expect(session.submitSearch('retained rice'), isTrue);
+    await session.retainedAccountState();
+    expect(store.writes, greaterThan(writes));
+    expect(store.saved!.recentSearches.values.expand((v) => v), contains('retained rice'));
+    expect(store.saved!.productStarAttempts, hasLength(100));
+  });
+  test('LF-STARS selected purchased line loads directly without searching global pages and retains an uncertain original on read failure', () async {
+    final (session, wire, store) = await starsSession();
+    final reader = projectionGateway(Transport()..data = publicListingPurchaseResponse());
+    final purchase = (await reader.readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+      realm: 'evaluation', purchaseId: 'purchase-v2'))!;
+    final line = purchase.orders.single.lines.first;
+    final target = AuthenticatedWorkspaceOrderOperationsGateway(reader).restoreProductFeedbackTarget(feedbackTargetPage()['targets'][0], realm: 'evaluation')!;
+    final respond = wire.respond!;
+    wire.respond = (body) {
+      if (body['operation'] == 'listBuyerProductFeedbackTargets') throw StateError('Must not page unrelated purchases');
+      return respond(body);
+    };
+    expect(await session.loadPrivateStarsFor(target.reference, line), isTrue);
+    expect(wire.requests.first['operation'], 'readBuyerProductFeedbackTarget');
+    expect(wire.requests.first['orderLineId'], line.lineId);
+    wire.fail = true;
+    expect(await session.savePrivateStars(target.id, 2), isFalse);
+    expect(await session.loadPrivateStarsFor(target.reference, line), isFalse);
+    expect(session.privateStarAttempt(target.id)!.stars, 2);
+    expect(store.saved!.productStarAttempts[target.id]!.stars, 2);
+    expect(session.canSavePrivateStars(target.id), isFalse);
+  });
+  for (final fault in <String, void Function(Map<String, dynamic>)>{
+    'realm': (d) => d['realm'] = 'production',
+    'owner': (d) => d['viewerUserId'] = 'buyer-2',
+    'role': (d) => d['viewerRole'] = 'seller',
+    'extra': (d) => d['publicRating'] = 5,
+    'line': (d) => d['target']['orderLineId'] = 'other-line',
+    'name': (d) => d['target']['productLabel'] = 'Changed name',
+    'fingerprint': (d) => d['target']['originalFingerprint'] = 'b' * 64,
+  }.entries) {
+    test('LF-STARS exact purchased-line reader rejects changed ${fault.key}', () async {
+      final reader = projectionGateway(Transport()..data = publicListingPurchaseResponse());
+      final purchase = (await reader.readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: 'purchase-v2'))!;
+      final target = AuthenticatedWorkspaceOrderOperationsGateway(reader).restoreProductFeedbackTarget(feedbackTargetPage()['targets'][0], realm: 'evaluation')!;
+      final changed = exactTargetResponse(); fault.value(changed);
+      final gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(Transport()..data = changed));
+      expect(await gateway.readProductFeedbackTarget(realm: 'evaluation', reference: target.reference, line: purchase.orders.single.lines.first), isNull);
+    });
+  }
+  test('LF-STARS real session loads independently of commerce and durably saves private stars', () async {
+    final (session, wire, store) = await starsSession();
+    expect(await session.loadPrivateStars(), isTrue);
+    final target = session.privateStarTargets().single;
+    expect(session.canSavePrivateStars(target.id), isTrue);
+    expect(await session.savePrivateStars(target.id, 1), isTrue);
+    expect(session.privateStarRating(target.id)!.stars, 1);
+    expect(session.privateStarAttempt(target.id), isNull);
+    expect(store.saved!.productStarAttempts, isEmpty);
+    expect(wire.requests.where((r) => r['operation'] == 'submitBuyerProductStars'), hasLength(1));
+  });
+  test('LF-STARS session storage failure cannot dispatch and preserves original beside legacy draft', () async {
+    final storage = StarsStateStore()..saved = const BuyV2CustomerStateSnapshot(reviewDrafts: {
+      'legacy': BuyV2ProductReviewDraft(rating: 3, comment: 'Do not submit or remove')});
+    final (session, wire, store) = await starsSession(storage: storage);
+    expect(await session.loadPrivateStars(), isTrue);
+    final target = session.privateStarTargets().single;
+    store.refusedWrites.add(store.writes + 1);
+    expect(await session.savePrivateStars(target.id, 2), isFalse);
+    expect(wire.requests.where((r) => r['operation'] == 'submitBuyerProductStars'), isEmpty);
+    expect(session.privateStarAttempt(target.id)!.stars, 2);
+    expect(session.canSavePrivateStars(target.id), isFalse);
+  });
+  test('LF-STARS uncertain save survives session restart and retries only its original body', () async {
+    final (session, wire, store) = await starsSession();
+    expect(await session.loadPrivateStars(), isTrue); final target = session.privateStarTargets().single;
+    final respond = wire.respond!;
+    wire.respond = (body) => body['operation'] == 'submitBuyerProductStars' ? throw StateError('lost reply') : respond(body);
+    expect(await session.savePrivateStars(target.id, 1), isFalse);
+    final original = wire.requests.last;
+    final (resumed, next, _) = await starsSession(storage: store);
+    expect(resumed.privateStarAttempt(target.id)!.stars, 1);
+    expect(await resumed.checkPrivateStars(target.id), isFalse);
+    expect(next.requests.last['operation'], 'reconcileBuyerProductStars');
+    expect(await resumed.checkPrivateStars(target.id, retryOriginal: true), isTrue);
+    expect(next.requests.last, original);
+    expect(store.saved!.productStarAttempts, isEmpty);
+  });
+  test('LF-STARS superseded attempt closes only after saved cleanup and requires fresh read', () async {
+    final (session, wire, store) = await starsSession();
+    expect(await session.loadPrivateStars(), isTrue); final target = session.privateStarTargets().single;
+    final respond = wire.respond!;
+    wire.respond = (body) => body['operation'] == 'submitBuyerProductStars' ? throw StateError('conflict') : respond(body);
+    expect(await session.savePrivateStars(target.id, 1), isFalse);
+    wire.respond = (body) => body['operation'] == 'reconcileBuyerProductStars'
+      ? (starResult()..['operationId'] = body['operationId']..['state'] = 'superseded'..['rating'] = null
+        ..['targetId'] = target.id..['observedRevision'] = 2) : respond(body);
+    store.refusedWrites.add(store.writes + 1);
+    expect(await session.checkPrivateStars(target.id), isFalse);
+    expect(session.privateStarAttempt(target.id), isNotNull);
+    expect(await session.checkPrivateStars(target.id), isTrue);
+    expect(session.privateStarAttempt(target.id), isNull);
+    expect(session.canSavePrivateStars(target.id), isFalse);
+    expect(session.privateStarsMessage, contains('not accepted'));
+    expect(store.saved!.productStarAttempts, isEmpty);
+  });
+  test('LF-STARS account retirement during cleanup hands back the original, not a cleared snapshot', () async {
+    Object? life = 'active';
+    final (session, _, store) = await starsSession(lifetime: () => life);
+    await session.loadPrivateStars(); final target = session.privateStarTargets().single;
+    final cleanupStarted = Completer<void>(), cleanup = Completer<void>();
+    final cleanupSequence = store.writes + 2;
+    store.beforeWrite = (n) async {if (n == cleanupSequence) {cleanupStarted.complete(); await cleanup.future;}};
+    final save = session.savePrivateStars(target.id, 1);
+    await cleanupStarted.future;
+    life = 'retired';
+    final retained = session.retainedAccountState();
+    cleanup.complete();
+    expect(await save, isFalse);
+    final recovery = await retained;
+    expect(recovery!.productStarAttempts[target.id]!.stars, 1);
+    expect(session.privateStarTargets(), isEmpty);
+  });
+  for (final changed in ['pack', 'canonical']) {
+    test('LF-STARS product entry rejects changed $changed while original purchase retains rating target', () async {
+      final target = feedbackTargetPage()['targets'][0];
+      final rawListing = Map<String, dynamic>.from(target['purchasedListing'] as Map);
+      rawListing[changed == 'pack' ? 'verifiedPackId' : 'canonicalProductId'] = 'changed-current-facts';
+      final listing = BuyV2PublicListingIdentity.fromJson(rawListing)!;
+      final product = BuyV2Catalogue.allProducts.first.copyWith(id: listing.listingId, storeId: listing.storeId,
+        canonicalId: listing.canonicalProductId, offerClass: listing.channel, publicListingIdentity: listing);
+      final (session, _, _) = await starsSession(catalogue: StarsCatalogue(product));
+      await session.restoreCommerce(); expect(await session.loadPrivateStars(), isTrue);
+      expect(session.privateStarTargets(productId: product.id), isEmpty);
+      expect(session.privateStarTargets(purchaseId: target['purchaseId']).single.id, target['id']);
+    });
+  }
+  for (final scale in [1.0, 1.6]) {
+    testWidgets('LF-STARS completed purchased item alone opens stars sheet at text scale $scale', (tester) async {
+      final target = feedbackTargetPage()['targets'][0];
+      final listing = BuyV2PublicListingIdentity.fromJson(target['purchasedListing'])!;
+      final product = BuyV2Catalogue.allProducts.firstWhere((p) => p.id == 's-milk').copyWith(
+        id: listing.listingId, storeId: listing.storeId, canonicalId: listing.canonicalProductId,
+        publicListingIdentity: listing, offerClass: listing.channel);
+      final storage = StarsStateStore()..saved = const BuyV2CustomerStateSnapshot(reviewDrafts: {
+        'legacy': BuyV2ProductReviewDraft(rating: 2, comment: 'Must remain private and untouched')});
+      final (session, wire, store) = await starsSession(storage: storage, catalogue: StarsCatalogue(product));
+      await session.restoreCommerce();
+      var completed = false;
+      connectPurchaseFixture(wire, () => completed);
+      tester.view.physicalSize = const Size(360, 780); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+        builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+        home: BuyV2Screen(session: session, productId: product.id)));
+      await tester.pumpAndSettle();
+      expect(find.byKey(ValueKey('buy-review-product-${product.id}')), findsNothing);
+      expect(find.byKey(ValueKey('buy-report-product-${product.id}')), findsNothing);
+      expect(find.text('Rate purchase'), findsNothing);
+      session.openDestination(BuyV2Destination.orders); await tester.pumpAndSettle();
+      await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey('original-order-${target['orderId']}'))); await tester.pumpAndSettle();
+      final button = find.byKey(ValueKey('purchase-rate-item-${target['orderId']}-${target['orderLineId']}'));
+      expect(button, findsNothing);
+      final update = find.text('Check order update');
+      await tester.ensureVisible(update); await tester.tap(update); await tester.pumpAndSettle();
+      expect(button, findsNothing, reason: 'No rating for an order without trusted completion');
+      completed = true;
+      await tester.ensureVisible(update); await tester.tap(update); await tester.pumpAndSettle();
+      expect(button, findsOneWidget);
+      final stale = tester.widget<TextButton>(button).onPressed!;
+      completed = false;
+      await tester.ensureVisible(update); await tester.tap(update); await tester.pumpAndSettle();
+      stale(); await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-product-review-sheet')), findsNothing);
+      completed = true;
+      await tester.ensureVisible(update); await tester.tap(update); await tester.pumpAndSettle();
+      await tester.ensureVisible(button); await tester.pumpAndSettle();
+      await tester.tap(button); await tester.pumpAndSettle();
+      expect(find.text('Rate your purchase'), findsOneWidget);
+      expect(find.text('Choose 1–5 stars. Only this Store can see your rating.'), findsOneWidget);
+      expect(find.text('Private product rating'), findsNothing);
+      expect(find.byType(TextFormField), findsNothing);
+      expect(find.textContaining('Must remain private'), findsNothing);
+      final star = find.byKey(ValueKey('buy-private-star-${target['id']}-1'));
+      final sheetScroll = find.descendant(of: find.byKey(const ValueKey('buy-product-review-fields-scroll')), matching: find.byType(Scrollable)).first;
+      await tester.scrollUntilVisible(star, 120, scrollable: sheetScroll); await tester.tap(star); await tester.pumpAndSettle();
+      final submit = find.byKey(const ValueKey('buy-submit-private-stars'));
+      await tester.scrollUntilVisible(submit, 120, scrollable: sheetScroll); await tester.tap(submit); await tester.pumpAndSettle();
+      expect(wire.requests.where((r) => r['operation'] == 'submitBuyerProductStars').single['stars'], 1);
+      expect(store.saved!.reviewDrafts['legacy']!.comment, 'Must remain private and untouched');
+      expect(store.saved!.productStarAttempts, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+  testWidgets('LF-STARS retained purchased-line callback cannot enter a replacement buyer widget', (tester) async {
+    final (_, wire, _) = await starsSession(); connectPurchaseFixture(wire, () => true);
+    final target = feedbackTargetPage()['targets'][0], gatewayA = projectionGateway(wire), gatewayB = projectionGateway(wire, account: 'buyer-2');
+    var calls = 0;
+    Widget host(AuthenticatedWorkspaceOrderIdentityGateway gateway) => MaterialApp(home: Scaffold(body: SingleChildScrollView(
+      child: WorkspacePurchaseOriginals(key: const ValueKey('same-originals-state'), gateway: gateway,
+        role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', onRatePurchasedItem: (_, _, _) => calls++))));
+    await tester.pumpWidget(host(gatewayA)); await tester.pumpAndSettle();
+    await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('original-order-${target['orderId']}'))); await tester.pumpAndSettle();
+    final update = find.text('Check order update'); await tester.ensureVisible(update); await tester.tap(update); await tester.pumpAndSettle();
+    final action = find.byKey(ValueKey('purchase-rate-item-${target['orderId']}-${target['orderLineId']}'));
+    final stale = tester.widget<TextButton>(action).onPressed!;
+    await tester.pumpWidget(host(gatewayB)); await tester.pumpAndSettle();
+    stale(); await tester.pumpAndSettle(); expect(calls, 0);
+    expect(tester.takeException(), isNull);
+  });
+  for (final fault in <String, void Function(Map<String, dynamic>)>{
+    'same revision': (r) => r['observedRevision'] = 0,
+    'fractional revision': (r) => r['observedRevision'] = 2.5,
+    'wrong target': (r) => r['targetId'] = 'other',
+    'wrong account': (r) => r['viewerUserId'] = 'other',
+    'wrong attempt': (r) => r['operationId'] = 'other',
+    'non-null rating': (r) => r['rating'] = starResult()['rating'],
+  }.entries) {
+    test('LF-STARS rejects unproven supersession ${fault.key}', () async {
+      final wire = Transport(), gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire));
+      final target = gateway.restoreProductFeedbackTarget(starAttempt()['target'], realm: 'evaluation')!;
+      wire.data = starResult()..['state'] = 'superseded'..['rating'] = null..['targetId'] = target.id..['observedRevision'] = 2;
+      fault.value(wire.data);
+      expect(await gateway.submitProductStars(target: target, stars: 1, expectedRevision: 0, operationId: 'stars-save', reconcile: true), isNull);
+    });
+  }
+  test('LF-STARS serialized original survives storage restart beside Cart and written drafts', () async {
+    final prefs = StarsPreferences(), original = BuyV2ProductStarsAttempt.fromJson(starAttempt());
+    BuyV2SharedPreferencesCustomerStateStore store() => BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-stars-account');
+    expect(await store().write(BuyV2CustomerStateSnapshot(cartQuantities: const {'saved-item': 2},
+      reviewDrafts: const {'legacy-target': BuyV2ProductReviewDraft(rating: 3, comment: 'Retain this private draft')},
+      productStarAttempts: {original.targetId: original})), isTrue);
+    final restored = (await store().read())!;
+    expect(restored.productStarAttempts[original.targetId]!.toJson(), original.toJson());
+    expect(restored.reviewDrafts['legacy-target']!.comment, 'Retain this private draft'); expect(restored.cartQuantities, {'saved-item': 2});
+    final exposed = original.target; exposed['productLabel'] = 'changed outside DTO';
+    expect(original.target['productLabel'], feedbackTargetPage()['targets'][0]['productLabel']);
+    final before = Map<String, String>.of(prefs.values);
+    expect(await store().write(BuyV2CustomerStateSnapshot(productStarAttempts: {'wrong-target': original})), isFalse);
+    expect(prefs.values, before);
+    final key = prefs.values.keys.single, raw = (jsonDecode(prefs.values[key]!) as Map).cast<String, dynamic>();
+    raw['productStarAttempts']['version'] = 2; prefs.values[key] = jsonEncode(raw); final malformed = prefs.values[key];
+    await expectLater(store().read(), throwsFormatException); expect(prefs.values[key], malformed);
+  });
+  test('LF-STARS legacy snapshots omit star journal and invalid procurement cannot erase a supplied original', () async {
+    final prefs = StarsPreferences(), store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-stars-account');
+    expect(await store.write(const BuyV2CustomerStateSnapshot()), isTrue);
+    final key = prefs.values.keys.single, raw = (jsonDecode(prefs.values[key]!) as Map).cast<String, dynamic>();
+    expect(raw.containsKey('productStarAttempts'), isFalse); expect((await store.read())!.productStarAttempts, isEmpty);
+    final original = BuyV2ProductStarsAttempt.fromJson(starAttempt());
+    raw['procurementDraft'] = {'invalid': true};
+    raw['productStarAttempts'] = {'version': 1, 'records': {original.targetId: original.toJson()}};
+    prefs.values[key] = jsonEncode(raw); final before = prefs.values[key];
+    await expectLater(store.read(), throwsFormatException); expect(prefs.values[key], before);
+  });
+  for (final change in <String, void Function(Map<String, dynamic>)>{
+    'schema float': (r) => r['version'] = 1.0,
+    'comment': (r) => r['comment'] = 'not collected',
+    'zero stars': (r) => r['stars'] = 0,
+    'float stars': (r) => r['stars'] = 1.5,
+    'negative revision': (r) => r['expectedRevision'] = -1,
+    'wrong listing': (r) => r['target']['purchasedListing']['storeId'] = 'another-store',
+    'missing completion': (r) => r['target'].remove('completedAt'),
+    'private buyer': (r) => r['target']['buyerUserId'] = 'private',
+  }.entries) {
+    test('LF-STARS original command rejects ${change.key}', () {
+      final raw = starAttempt(); change.value(raw); expect(() => BuyV2ProductStarsAttempt.fromJson(raw), throwsFormatException);
+    });
+  }
+  test('LF-STARS saved stars read is independent from original receipts and restored target is buyer-bound', () async {
+    final wire = Transport(), gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire));
+    final target = gateway.restoreProductFeedbackTarget(starAttempt()['target'], realm: 'evaluation')!;
+    expect(gateway.restoreProductFeedbackTarget(starAttempt()['target'], realm: 'production'), isNull);
+    expect(AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, account: 'another-buyer'))
+      .restoreProductFeedbackTarget(starAttempt()['target'], realm: 'evaluation'), isNull);
+    wire.data = {'schemaVersion': 1, 'realm': 'evaluation', 'authNamespace': 'firebase-default', 'viewerRole': 'buyer',
+      'viewerUserId': 'buyer-1', 'targetId': target.id, 'rating': null};
+    final empty = await gateway.readProductStars(target); expect(empty, isNotNull); expect(empty!.rating, isNull);
+    wire.data['rating'] = starResult()['rating'];
+    expect((await gateway.readProductStars(target))!.rating!.revision, 1);
+    wire.data['viewerUserId'] = 'another-buyer'; expect(await gateway.readProductStars(target), isNull);
+    wire.data['viewerUserId'] = 'buyer-1'; wire.data['targetId'] = 'another-target'; expect(await gateway.readProductStars(target), isNull);
+  });
   test('LF-STARS private submit uses limited-use token and read-only reconcile never submits', () async {
     final wire = Transport()..data = feedbackTargetPage();
     final identity = projectionGateway(wire), credentials = identity.credentials as Credentials;
@@ -291,14 +709,6 @@ void main() {
       expect(await projectionGateway(Transport()..data = data).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
         realm: 'evaluation', purchaseId: data['purchaseId']), isNull);
     });
-  }
-  Map<String, dynamic> completionResponse({String role = 'buyer', bool supplied = true}) {
-    final original = operationalResponse(role: role);
-    return {for (final key in const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId',
-      'purchaseId', 'storeId', 'orderId', 'sourceRevision', 'originalFingerprint']) key: original[key],
-      'state': supplied ? 'recorded' : 'not_supplied',
-      'completion': supplied ? {'id': 'completion-${'a' * 64}', 'revision': 'completion-v1', 'outcome': 'delivered',
-        'occurredAt': '2026-10-16T12:01:00.000Z', 'recordedAt': '2026-10-16T12:01:01.000Z'} : null};
   }
   for (final role in WorkspaceOrderIdentityRole.values) {
     for (final supplied in [false, true]) {

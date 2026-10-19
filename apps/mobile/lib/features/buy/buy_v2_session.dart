@@ -5339,6 +5339,7 @@ class BuyV2Session extends ChangeNotifier {
   /// Disposal is not proof that an already-dispatched business attempt stopped.
   Future<BuyV2CustomerStateSnapshot?> retainedAccountState() async {
     final inherited = _pendingAccountStateImported ? null : await pendingAccountState;
+    await _privateStarsSettlement?.future;
     await _scheduledCartSettlement?.future;
     await _consumerStateWrites;
     return _consumerPendingSnapshot ??
@@ -6434,6 +6435,213 @@ class BuyV2Session extends ChangeNotifier {
   final Set<String> _reviewableProductIds = {};
   final Map<String, Object> _productFeedbackOperations = {};
   final Map<String, String> _productReportStates = {};
+  final Map<String, BuyV2ProductStarsAttempt> _productStarAttempts = {};
+  final Map<String, WorkspaceProductFeedbackTarget> _privateStarsTargets = {};
+  final Map<String, WorkspaceProductStars?> _privateStarsSaved = {};
+  final Set<String> _privateStarsCursors = {};
+  Object? _privateStarsScope, _privateStarsLoad, _privateStarsOperation;
+  Completer<void>? _privateStarsSettlement;
+  String? privateStarsMessage, _privateStarsCursor;
+  bool get privateStarsAvailable => !_collectionDisposed && !isStoreProcurement &&
+    purchaseReader?.isCurrent == true && customerStateStore?.ownerScope != null &&
+    const ['evaluation', 'production'].contains(purchaseRealm);
+  bool get privateStarsLoading => _privateStarsLoad != null;
+  bool get privateStarsBusy => _privateStarsOperation != null;
+  bool get privateStarsHasMore => _privateStarsCursor != null;
+  bool get privateStarsRecoveryFull => _productStarAttempts.length >= 100;
+  Object? _preparePrivateStars() {
+    final valid = _prepareProductFeedbackScope() && privateStarsAvailable;
+    final scope = valid ? (purchaseReader, purchaseRealm, _productFeedbackScope, customerStateStore?.ownerScope) : null;
+    if (_privateStarsScope != scope) {
+      _privateStarsScope = scope; _privateStarsLoad = null; _privateStarsCursor = null;
+      _privateStarsTargets.clear(); _privateStarsSaved.clear(); _privateStarsCursors.clear(); privateStarsMessage = null;
+    }
+    if (scope != null) {
+      final gateway = AuthenticatedWorkspaceOrderOperationsGateway(purchaseReader!);
+      for (final attempt in _productStarAttempts.values) {
+        final target = gateway.restoreProductFeedbackTarget(attempt.target, realm: purchaseRealm);
+        if (target != null) _privateStarsTargets.putIfAbsent(target.id, () => target);
+      }
+    }
+    return scope;
+  }
+  List<WorkspaceProductFeedbackTarget> privateStarTargets({String? productId, String? orderId, String? purchaseId,
+    WorkspacePurchaseReference? reference, String? orderLineId}) {
+    if (_preparePrivateStars() == null) return const [];
+    final product = productId == null ? null : findProduct(productId);
+    return List.unmodifiable(_privateStarsTargets.values.where((t) =>
+      (productId == null || product != null && t.productId == productId &&
+        t.purchasedListing.matches(product) && t.purchasedListing == product.publicListingIdentity) &&
+      (orderId == null || t.reference.orderId == orderId) &&
+      (purchaseId == null || t.reference.purchaseId == purchaseId) &&
+      (orderLineId == null || t.orderLineId == orderLineId) &&
+      (reference == null || t.reference.purchaseId == reference.purchaseId && t.reference.storeId == reference.storeId &&
+        t.reference.orderId == reference.orderId && t.reference.originalFingerprint == reference.originalFingerprint &&
+        t.reference.sourceRevision == reference.sourceRevision)));
+  }
+  WorkspaceProductStars? privateStarRating(String targetId) => _preparePrivateStars() == null ? null : _privateStarsSaved[targetId];
+  BuyV2ProductStarsAttempt? privateStarAttempt(String targetId) =>
+    _preparePrivateStars() == null ? null : _productStarAttempts[targetId];
+  bool canSavePrivateStars(String targetId) => _preparePrivateStars() != null &&
+    !privateStarsBusy && !privateStarsLoading && !privateStarsRecoveryFull && !customerStateRecoveryPending &&
+    _productReportJournalLoadedOwner == customerStateStore?.ownerScope &&
+    _privateStarsSaved.containsKey(targetId) && !_productStarAttempts.containsKey(targetId);
+
+  Future<bool> loadPrivateStarsFor(WorkspacePurchaseReference reference, WorkspacePurchasedSkuLine line) async {
+    final scope = _preparePrivateStars();
+    if (scope == null || privateStarsLoading || privateStarsBusy) return false;
+    final reader = purchaseReader!, realm = purchaseRealm, token = Object(); _privateStarsLoad = token;
+    bool current() => !_collectionDisposed && identical(_privateStarsLoad, token) && _preparePrivateStars() == scope;
+    for (final target in privateStarTargets(reference: reference, orderLineId: line.lineId)) {
+      _privateStarsSaved.remove(target.id);
+    }
+    privateStarsMessage = null; notifyListeners();
+    try {
+      if (!current()) return false;
+      final gateway = AuthenticatedWorkspaceOrderOperationsGateway(reader);
+      final target = await gateway.readProductFeedbackTarget(realm: realm, reference: reference, line: line);
+      if (!current()) return false;
+      if (target == null) {
+        privateStarsMessage = 'This purchased item could not be checked. Any original rating save is kept.'; return false;
+      }
+      _privateStarsTargets[target.id] = target;
+      final saved = await gateway.readProductStars(target);
+      if (!current()) return false;
+      if (saved == null) {
+        _privateStarsSaved.remove(target.id);
+        privateStarsMessage = 'Your saved rating could not be checked. Refresh before changing it.'; return false;
+      }
+      _privateStarsSaved[target.id] = saved.rating;
+      return true;
+    } on Object {
+      if (current()) privateStarsMessage = 'This purchased item could not be checked. Your original rating save is kept.';
+      return false;
+    } finally {
+      if (identical(_privateStarsLoad, token)) {_privateStarsLoad = null; if (!_collectionDisposed) notifyListeners();}
+    }
+  }
+
+  Future<bool> loadPrivateStars({bool more = false}) async {
+    final scope = _preparePrivateStars();
+    if (scope == null || privateStarsLoading || privateStarsBusy || more && _privateStarsCursor == null) return false;
+    final reader = purchaseReader!, realm = purchaseRealm, token = Object(); _privateStarsLoad = token;
+    bool current() => !_collectionDisposed && identical(_privateStarsLoad, token) && _preparePrivateStars() == scope;
+    final cursor = more ? _privateStarsCursor : null;
+    privateStarsMessage = null; notifyListeners();
+    try {
+      if (!current()) return false;
+      final gateway = AuthenticatedWorkspaceOrderOperationsGateway(reader);
+      final page = await gateway.listProductFeedbackTargets(realm: realm, cursor: cursor);
+      if (!current()) return false;
+      if (page == null || page.nextCursor != null && (page.nextCursor == cursor || more && _privateStarsCursors.contains(page.nextCursor))) {
+        privateStarsMessage = 'Completed purchases could not be checked. Previously loaded ratings are kept.'; return false;
+      }
+      if (!more) {_privateStarsCursors.clear(); _privateStarsCursor = null;}
+      var complete = true;
+      for (final target in page.targets) {
+        _privateStarsTargets[target.id] = target;
+        final saved = await gateway.readProductStars(target);
+        if (!current()) return false;
+        if (saved == null) {_privateStarsSaved.remove(target.id); complete = false;}
+        else {_privateStarsSaved[target.id] = saved.rating;}
+      }
+      if (cursor != null) _privateStarsCursors.add(cursor);
+      _privateStarsCursor = page.nextCursor;
+      privateStarsMessage = complete ? null : 'Some saved ratings could not be checked. Refresh before changing them.';
+      return complete;
+    } on Object {
+      if (current()) privateStarsMessage = 'Ratings could not be checked. Your saved attempts are kept.';
+      return false;
+    } finally {
+      if (identical(_privateStarsLoad, token)) {_privateStarsLoad = null; if (!_collectionDisposed) notifyListeners();}
+    }
+  }
+
+  Future<bool> savePrivateStars(String targetId, int stars) async {
+    if (_preparePrivateStars() != null && privateStarsRecoveryFull) {
+      privateStarsMessage = 'Check an earlier rating save before sending another. Your saved attempts are kept.';
+      notifyListeners(); return false;
+    }
+    if (!canSavePrivateStars(targetId) || stars < 1 || stars > 5) return false;
+    final target = _privateStarsTargets[targetId]; if (target == null) return false;
+    final revision = _privateStarsSaved[targetId]?.revision ?? 0;
+    final operationId = sha256.convert(utf8.encode(jsonEncode([customerStateStore!.ownerScope, target.id, revision, stars]))).toString();
+    final attempt = BuyV2ProductStarsAttempt.fromJson({'version': 1, 'target': target.toJson(),
+      'operationId': operationId, 'expectedRevision': revision, 'stars': stars});
+    _productStarAttempts[targetId] = attempt;
+    return _runPrivateStars(attempt);
+  }
+  Future<bool> checkPrivateStars(String targetId, {bool retryOriginal = false}) async {
+    if (_preparePrivateStars() == null || privateStarsBusy || privateStarsLoading || customerStateRecoveryPending) return false;
+    final attempt = _productStarAttempts[targetId]; if (attempt == null) return false;
+    return _runPrivateStars(attempt, reconcile: !retryOriginal);
+  }
+  Future<bool> _runPrivateStars(BuyV2ProductStarsAttempt attempt, {bool reconcile = false}) async {
+    final scope = _preparePrivateStars(), store = customerStateStore, reader = purchaseReader;
+    if (scope == null || store == null || reader == null || privateStarsBusy ||
+        _productReportJournalLoadedOwner != store.ownerScope) {
+      return false;
+    }
+    final realm = purchaseRealm, owner = store.ownerScope, token = Object(), settlement = Completer<void>();
+    final gateway = AuthenticatedWorkspaceOrderOperationsGateway(reader);
+    final target = gateway.restoreProductFeedbackTarget(attempt.target, realm: realm);
+    if (target == null) {privateStarsMessage = 'This saved rating needs its original account and purchase.'; notifyListeners(); return false;}
+    _privateStarsOperation = token; _privateStarsSettlement = settlement; privateStarsMessage = null;
+    bool current() => !_collectionDisposed && identical(_privateStarsOperation, token) && _preparePrivateStars() == scope &&
+      identical(customerStateStore, store) && store.ownerScope == owner && identical(_productStarAttempts[attempt.targetId], attempt);
+    void retainOriginal() {
+      if (identical(customerStateStore, store) && store.ownerScope == owner) {
+        _persistCustomerState(retainStarsRollback: (store: store, operation: token));
+      }
+    }
+    try {
+      notifyListeners(); if (!current()) {retainOriginal(); return false;}
+      if (!reconcile) {
+        var actualWrite = false;
+        final retained = await (_persistCustomerState(written: (saved) => actualWrite = saved) ?? Future.value(false))
+          .timeout(const Duration(seconds: 15), onTimeout: () => false);
+        if (!retained || !actualWrite || !current()) {
+          retainOriginal(); if (current()) privateStarsMessage = 'Your rating was kept for recovery but was not sent. Check the original attempt.';
+          return false;
+        }
+      }
+      final result = await gateway.submitProductStars(target: target, stars: attempt.stars,
+        expectedRevision: attempt.expectedRevision, operationId: attempt.operationId, reconcile: reconcile);
+      if (!current()) {retainOriginal(); return false;}
+      if (result == null || result.rating == null && result.supersededByRevision == null) {
+        privateStarsMessage = result == null ? 'Your rating is not confirmed. Check the original attempt before making changes.'
+          : 'The original rating is not recorded yet. Keep this attempt; retry only the original save.';
+        return false;
+      }
+      final rating = result.rating, previous = _privateStarsSaved[target.id];
+      if (rating != null && (previous == null || previous.revision <= rating.revision)) _privateStarsSaved[target.id] = rating;
+      if (result.supersededByRevision != null) _privateStarsSaved.remove(target.id);
+      // Do not remove the master intent until its exact cleanup is actually saved.
+      final remaining = Map<String, BuyV2ProductStarsAttempt>.of(_productStarAttempts)..remove(target.id);
+      var cleanupWritten = false;
+      final cleared = await (_persistCustomerState(productStarAttempts: Map.unmodifiable(remaining),
+        written: (saved) => cleanupWritten = saved) ?? Future.value(false))
+        .timeout(const Duration(seconds: 15), onTimeout: () => false);
+      if (!cleared || !cleanupWritten || !current()) {
+        retainOriginal(); if (current()) privateStarsMessage = 'The original result was checked. Saved recovery still needs checking.';
+        return false;
+      }
+      _productStarAttempts.remove(target.id);
+      privateStarsMessage = result.supersededByRevision != null
+        ? 'A newer rating is already saved. Refresh before changing it; this older attempt was not accepted.'
+        : 'Your rating was shared privately with this Store.';
+      // Written legacy drafts are intentionally not submitted or discarded.
+      return true;
+    } on Object {
+      retainOriginal(); if (current()) privateStarsMessage = 'Your original rating is kept. Check its result before trying again.';
+      return false;
+    } finally {
+      if (identical(_privateStarsOperation, token)) _privateStarsOperation = null;
+      if (!settlement.isCompleted) settlement.complete();
+      if (identical(_privateStarsSettlement, settlement)) _privateStarsSettlement = null;
+      if (!_collectionDisposed) notifyListeners();
+    }
+  }
   String? _productReportJournalOwner, _productReportJournalLoadedOwner;
   void _ensureProductReportOwner() {
     final owner = customerStateStore?.ownerScope;
@@ -6441,6 +6649,7 @@ class BuyV2Session extends ChangeNotifier {
     _productReportJournalOwner = owner;
     _productReportJournalLoadedOwner = null;
     _productReportStates.clear();
+    _productStarAttempts.clear();
   }
   (String?, String?, String?, int, int)? _productFeedbackScope;
 
@@ -9169,7 +9378,7 @@ class BuyV2Session extends ChangeNotifier {
   }) {
     final owner = customerStateStore?.ownerScope;
     // Validate every resolved binding before replacing any live Cart state.
-    if (!snapshot.hasValidProductReportStates) {
+    if (!snapshot.hasValidProductReportStates || !snapshot.hasValidProductStarAttempts) {
       throw const FormatException('Saved product report recovery needs checking.');
     }
     for (final entry in snapshot.cartScheduledFulfilments.entries) {
@@ -9203,6 +9412,7 @@ class BuyV2Session extends ChangeNotifier {
     _balanceHoldsLoadedOwner = owner;
     _ensureProductReportOwner();
     _productReportStates..clear()..addAll(snapshot.productReportStates);
+    _productStarAttempts..clear()..addAll(snapshot.productStarAttempts);
     _productReportJournalLoadedOwner = owner;
     _ensureSupplierPolicyOwner();
     _supplierPolicyAcceptances
@@ -9588,12 +9798,17 @@ class BuyV2Session extends ChangeNotifier {
 
   Future<bool>? _persistCustomerState({
     Map<String, String>? supplierPolicyAcceptances,
+    Map<String, BuyV2ProductStarsAttempt>? productStarAttempts,
     void Function(bool)? written,
     ({BuyV2CustomerStateStore store, Object operation})? retainScheduledRollback,
+    ({BuyV2CustomerStateStore store, Object operation})? retainStarsRollback,
   }) {
     final retainOnly = retainScheduledRollback != null && !isStoreProcurement &&
         identical(retainScheduledRollback.store, customerStateStore) &&
-        identical(retainScheduledRollback.operation, _scheduledCartSave);
+        identical(retainScheduledRollback.operation, _scheduledCartSave) ||
+      retainStarsRollback != null && !isStoreProcurement &&
+        identical(retainStarsRollback.store, customerStateStore) &&
+        identical(retainStarsRollback.operation, _privateStarsOperation);
     if (!retainOnly && (_collectionDisposed || !procurementScopeCurrent ||
         (customerStateRecoveryPending &&
             (!_customerStateSnapshotLoaded ||
@@ -9616,6 +9831,7 @@ class BuyV2Session extends ChangeNotifier {
     final snapshot = BuyV2CustomerStateSnapshot(
       reviewDrafts: Map.unmodifiable(_reviewDrafts),
       productReportStates: Map.unmodifiable(_productReportStates),
+      productStarAttempts: Map.unmodifiable(productStarAttempts ?? _productStarAttempts),
       supplierPolicyAcceptances: Map.unmodifiable(
         supplierPolicyAcceptances ??
             _supplierPolicyAcceptancesInFlight ??

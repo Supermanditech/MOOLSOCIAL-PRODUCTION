@@ -5324,99 +5324,30 @@ void main() {
   }
 
   for (final viewport in [const Size(320, 711), const Size(711, 320)]) {
-    testWidgets('R665 D04 enlarged report actions fit safe viewport $viewport', (
-      tester,
-    ) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = viewport;
+    testWidgets('R665 D04 enlarged SKU excludes post-purchase actions at $viewport', (tester) async {
+      tester.view.devicePixelRatio = 1; tester.view.physicalSize = viewport;
       addTearDown(tester.view.reset);
-      final core = BuySession();
-      final session = BuyV2Session(core: core);
-      addTearDown(core.dispose);
-      addTearDown(session.dispose);
-      await tester.pumpWidget(
-        app(
-          session,
-          textScale: 2,
-          safePadding: const EdgeInsets.only(top: 24, bottom: 24),
-        ),
-      );
+      final core = BuySession(), session = BuyV2Session(core: core);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      await tester.pumpWidget(app(session, textScale: 2,
+        safePadding: const EdgeInsets.only(top: 24, bottom: 24)));
       await tester.pumpAndSettle();
+      final before = session.itemCount;
       const productId = 's-tomato';
-      session.openProduct(productId);
-      await tester.pumpAndSettle();
-      final report = find.byKey(const ValueKey('buy-report-product-s-tomato'));
-      await tester.scrollUntilVisible(
-        report,
-        250,
-        scrollable: scrollableWithin(
-          const PageStorageKey('buy-product-s-tomato'),
-        ),
-        maxScrolls: 50,
-      );
-      await tester.ensureVisible(report);
-      await tester.pumpAndSettle();
-      await tester.tap(report);
-      await tester.pumpAndSettle();
-      final cancel = find.byKey(const ValueKey('buy-cancel-product-report'));
-      final send = find.byKey(const ValueKey('buy-submit-report-s-tomato'));
-      for (final keyboard in [0.0, 100.0, 0.0]) {
-        tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-        expect(cancel.hitTestable(), findsOneWidget);
-        expect(tester.widget<FilledButton>(send).onPressed, isNull);
-        for (final action in [cancel, send]) {
-          final rect = tester.getRect(action);
-          expect(rect.top, greaterThanOrEqualTo(24));
-          expect(
-            rect.bottom,
-            lessThanOrEqualTo(viewport.height - keyboard - 24),
-          );
-          for (final paragraph in tester.renderObjectList<RenderParagraph>(
-            find.descendant(of: action, matching: find.byType(RichText)),
-          )) {
-            final text = TextPainter(
-              text: paragraph.text,
-              textDirection: paragraph.textDirection,
-              textScaler: paragraph.textScaler,
-            )..layout(maxWidth: paragraph.size.width);
-            expect(
-              paragraph.size.height,
-              greaterThanOrEqualTo(text.height - .1),
-            );
-            if (identical(action, cancel)) {
-              expect(
-                text.computeLineMetrics(),
-                hasLength(1),
-                reason:
-                    'Cancel must remain an intact word at the chosen text size.',
-              );
-              expect(tester.getSize(cancel).height, greaterThanOrEqualTo(48));
-            }
-            text.dispose();
-          }
-        }
-      }
-      final reason = find.byKey(const ValueKey('buy-report-reason-0'));
-      await tester.ensureVisible(reason);
-      await tester.pumpAndSettle();
-      await tester.tap(reason);
-      await tester.pumpAndSettle();
-      expect(tester.widget<FilledButton>(send).onPressed, isNotNull);
-      await captureR66Visual(tester, 'r669-report-cancel-${viewport.width}');
-      await tester.tap(cancel);
-      await tester.pumpAndSettle();
+      session.openProduct(productId); await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-product-reviews-s-tomato')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-report-product-s-tomato')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-review-product-s-tomato')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-product-review-sheet')), findsNothing);
       expect(session.hasReportedProduct(productId), isFalse);
-      expect(session.selectedProduct?.id, productId);
-      expect(session.view, BuyV2View.product);
-      expect(report.hitTestable(), findsOneWidget);
+      expect(session.selectedProduct?.id, productId); expect(session.view, BuyV2View.product);
+      expect(session.itemCount, before);
       expect(tester.takeException(), isNull);
     });
   }
 
   testWidgets(
-    'product detail uses automatic fulfilment reviews and reporting',
+    'product detail uses automatic fulfilment without post-purchase actions',
     (tester) async {
       final session = BuyV2Session(core: BuySession());
       final product = BuyV2Catalogue.products.firstWhere(
@@ -5442,52 +5373,11 @@ void main() {
       expect(find.textContaining(product.seller), findsWidgets);
       expect(find.textContaining('Verified'), findsNothing);
 
-      final reviews = find.byKey(ValueKey('buy-product-reviews-${product.id}'));
-      await tester.scrollUntilVisible(
-        reviews,
-        240,
-        scrollable: productScrollable,
-      );
-      await tester.drag(productScrollable, const Offset(0, -140));
-      await tester.pumpAndSettle();
-      final reviewProduct = find.byKey(
-        ValueKey('buy-review-product-${product.id}'),
-      );
-      await tester.ensureVisible(reviewProduct);
-      await tester.pumpAndSettle();
-      expect(reviewProduct.hitTestable(), findsOneWidget);
-      await tester.tap(reviewProduct);
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(ValueKey('buy-review-rating-${product.id}-4')),
-      );
-      await tester.enterText(
-        find.byKey(ValueKey('buy-review-comment-${product.id}')),
-        'Fresh pack and the delivery promise was clear.',
-      );
-      await tester.pump();
-      await tester.tap(find.byKey(ValueKey('buy-submit-review-${product.id}')));
-      await tester.pumpAndSettle();
-      expect(
-        find.text('Fresh pack and the delivery promise was clear.'),
-        findsOneWidget,
-      );
-      expect(session.customerReviewFor(product.id)?.rating, 4);
-
-      await tester.tap(
-        find.byKey(ValueKey('buy-report-product-${product.id}')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('buy-report-reason-0')));
-      final submitReport = find.byKey(
-        ValueKey('buy-submit-report-${product.id}'),
-      );
-      await tester.ensureVisible(submitReport);
-      await tester.pumpAndSettle();
-      await tester.tap(submitReport);
-      await tester.pumpAndSettle();
-      expect(find.text('Reported'), findsOneWidget);
-      expect(session.hasReportedProduct(product.id), isTrue);
+      expect(find.byKey(ValueKey('buy-product-reviews-${product.id}')), findsNothing);
+      expect(find.byKey(ValueKey('buy-review-product-${product.id}')), findsNothing);
+      expect(find.byKey(ValueKey('buy-report-product-${product.id}')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-product-review-sheet')), findsNothing);
+      expect(session.hasReportedProduct(product.id), isFalse);
       expect(tester.takeException(), isNull);
     },
   );
@@ -6054,11 +5944,9 @@ void main() {
             reason: '$destination at $viewport',
           );
           expect(find.textContaining('Verified'), findsNothing);
-          await tester.scrollUntilVisible(
-            find.byKey(ValueKey('buy-product-reviews-${product.id}')),
-            180,
-            scrollable: productScrollable,
-          );
+          expect(find.byKey(ValueKey('buy-product-reviews-${product.id}')), findsNothing);
+          expect(find.byKey(ValueKey('buy-review-product-${product.id}')), findsNothing);
+          expect(find.byKey(ValueKey('buy-report-product-${product.id}')), findsNothing);
           expect(
             tester.takeException(),
             isNull,

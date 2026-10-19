@@ -11,11 +11,14 @@ class WorkspacePurchaseOriginals extends StatefulWidget {
     required this.role,
     required this.realm,
     this.storeId,
+    this.onRatePurchasedItem,
   });
   final AuthenticatedWorkspaceOrderIdentityGateway gateway;
   final WorkspaceOrderIdentityRole role;
   final String realm;
   final String? storeId;
+  /// Buyer-only entry after authoritative completion, scoped to one frozen line.
+  final void Function(WorkspacePurchaseReference, WorkspacePurchaseOrder, WorkspacePurchasedSkuLine)? onRatePurchasedItem;
   @override
   State<WorkspacePurchaseOriginals> createState() =>
       _WorkspacePurchaseOriginalsState();
@@ -229,6 +232,24 @@ class _WorkspacePurchaseOriginalsState
     );
   }
 
+  Widget _ratingAction(WorkspacePurchaseReference reference, WorkspacePurchaseOrder original, WorkspacePurchasedSkuLine line) {
+    final generation = _generation, gateway = widget.gateway, callback = widget.onRatePurchasedItem;
+    final completion = _completions[reference.orderId];
+    return Align(alignment: AlignmentDirectional.centerStart,
+      child: TextButton.icon(key: ValueKey('purchase-rate-item-${reference.orderId}-${line.lineId}'),
+        onPressed: () {
+          if (!_current(generation) || !identical(widget.gateway, gateway) ||
+              widget.role != WorkspaceOrderIdentityRole.buyer || callback == null ||
+              !identical(widget.onRatePurchasedItem, callback) || completion == null ||
+              _completions[reference.orderId] != completion || _completionFailed.contains(reference.orderId) ||
+              !identical(_details[reference.orderId], original)) {
+            return;
+          }
+          callback(reference, original, line);
+        },
+        icon: const Icon(Icons.star_outline_rounded, size: 18), label: const Text('Rate purchase')));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!widget.gateway.isCurrent) return const SizedBox.shrink();
@@ -342,6 +363,11 @@ class _WorkspacePurchaseOriginalsState
                                 WorkspaceOriginalScheduledForLine(line: line),
                                 _amount(line.lineTotalMinor),
                                 WorkspaceOriginalBenefitsForLine(original: details, lineId: line.lineId),
+                                if (widget.role == WorkspaceOrderIdentityRole.buyer &&
+                                    _completions.containsKey(reference.orderId) &&
+                                    !_completionFailed.contains(reference.orderId) &&
+                                    line.publicListing != null && widget.onRatePurchasedItem != null)
+                                  _ratingAction(reference, details, line),
                               ],
                             ),
                           ),

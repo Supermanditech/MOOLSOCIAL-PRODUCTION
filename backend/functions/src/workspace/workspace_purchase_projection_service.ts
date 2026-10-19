@@ -168,7 +168,8 @@ interface StoredProductStars {
 export interface ProductStarsResult {
   schemaVersion: 1; realm: Realm; authNamespace: "firebase-default";
   viewerRole: "buyer"; viewerUserId: string; operationId: string;
-  state: "saved" | "not_recorded"; rating: ProductStars | null;
+  state: "saved" | "not_recorded" | "superseded"; rating: ProductStars | null;
+  targetId?: string; observedRevision?: number;
 }
 export function normalizeOrderCompletion(value: unknown, realm: Realm, now: Date): TrustedOrderCompletionEvidence {
   const r = exact(value, ["schemaVersion", "realm", "authNamespace", "issuer", "receiptId", "revision",
@@ -369,6 +370,28 @@ export class WorkspaceOrderOperationsService {
         nextCursor: last ? Buffer.from(JSON.stringify({version: 1, scope, after: last})).toString("base64url") : null};
     });
   }
+  async readBuyerProductFeedbackTarget(actor: string, body: Readonly<Record<string, unknown>>) {
+    id(actor); exact(body, ["purchaseId", "storeId", "orderId", "originalFingerprint", "sourceRevision", "orderLineId"]);
+    const scope = operationalScope(body), lineId = id(body.orderLineId);
+    const fingerprint = text(body.originalFingerprint, 64), revision = id(body.sourceRevision);
+    if (!/^[a-f0-9]{64}$/u.test(fingerprint)) fail();
+    return this.db.runTransaction(async tx => {
+      const {aggregate, order} = await this.original(tx, scope);
+      if (aggregate.buyerUserId !== actor) fail("not_found", 404);
+      if (aggregate.sourceRevision !== revision || order.originalFingerprint !== fingerprint) fail("not_found", 404);
+      const terminal = await tx.get(this.completionPath(scope));
+      if (!terminal.exists) fail("not_found", 404);
+      const saved = this.completionStored(terminal.data()); this.completionBound(saved, aggregate, order);
+      const expected = this.productFeedbackTargets(aggregate, order, saved).find(t => t.target.orderLineId === lineId);
+      if (!expected) fail("not_found", 404);
+      const indexed = await tx.get(this.root().collection("productFeedbackTargets").doc(expected.target.id));
+      // A read never repairs a missing index or manufactures completion eligibility.
+      if (!indexed.exists) fail("service_unavailable", 503);
+      if (integrityHash(indexed.data()) !== integrityHash(expected)) fail("invalid_state", 409);
+      return {schemaVersion: 1, realm: this.realm, authNamespace: "firebase-default", viewerRole: "buyer",
+        viewerUserId: actor, target: expected.target};
+    });
+  }
   private async feedbackTarget(tx: Transaction, targetId: string) {
     if (!/^feedback-[a-f0-9]{64}$/u.test(targetId)) fail();
     const doc = await tx.get(this.root().collection("productFeedbackTargets").doc(targetId));
@@ -431,10 +454,13 @@ export class WorkspaceOrderOperationsService {
       }
       const base = {schemaVersion: 1 as const, realm: this.realm, authNamespace: "firebase-default" as const,
         viewerRole: "buyer" as const, viewerUserId: actor, operationId};
-      // Reconciliation observes only the original attempt. It never submits it.
-      if (reconcile) return {...base, state: "not_recorded", rating: null};
       const ratingPath = this.root().collection("productStarRatings").doc(targetId), existing = await tx.get(ratingPath);
       const previous = existing.exists ? this.starsStored(existing.data(), target, actor).rating : null;
+      // Same transaction as the absent original receipt. Monotonic revisions
+      // prove this stale CAS can never commit; no replacement attempt is sent.
+      if (reconcile) return previous && previous.revision > expectedRevision
+        ? {...base, state: "superseded", rating: null, targetId, observedRevision: previous.revision}
+        : {...base, state: "not_recorded", rating: null};
       if ((previous?.revision ?? 0) !== expectedRevision) fail("conflict", 409);
       const rating: ProductStars = {target, stars, revision: expectedRevision + 1, updatedAt: this.now().toISOString()};
       const ratingBody = {schemaVersion: 1 as const, realm: this.realm, authNamespace: "firebase-default" as const,
