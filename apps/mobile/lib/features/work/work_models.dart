@@ -10195,25 +10195,26 @@ class WorkspaceReviewedCatalogueLink {
   const WorkspaceReviewedCatalogueLink({required this.realm, required this.storeId, required this.skuId,
     required this.canonicalProductId, required this.verifiedPackId, required this.mirrorRevision,
     required this.candidateRevision, required this.candidateFingerprint, required this.submissionRevision,
-    required this.submissionFingerprint, required this.authoredSha256});
+    required this.submissionFingerprint, required this.authoredSha256, this.mediaProof});
   final String realm, storeId, skuId, canonicalProductId, verifiedPackId;
   final String candidateFingerprint, submissionFingerprint, authoredSha256;
   final int mirrorRevision, candidateRevision, submissionRevision;
+  final WorkspaceReviewedProductMediaProof? mediaProof;
   bool get valid => {'evaluation', 'production'}.contains(realm) &&
     [storeId, skuId, canonicalProductId, verifiedPackId].every((v) => RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(v)) &&
     [candidateFingerprint, submissionFingerprint, authoredSha256].every((v) => RegExp(r'^[A-F0-9]{64}$').hasMatch(v)) &&
     [mirrorRevision, candidateRevision, submissionRevision].every((v) => v > 0 && v <= 1000000001);
   Map<String, Object?> toJson() {
     if (!valid) throw const FormatException('Reviewed product identity needs recovery.');
-    return {'version': 1, 'realm': realm, 'storeId': storeId, 'skuId': skuId, 'canonicalProductId': canonicalProductId,
+    return {'version': mediaProof == null ? 1 : 2, 'realm': realm, 'storeId': storeId, 'skuId': skuId, 'canonicalProductId': canonicalProductId,
       'verifiedPackId': verifiedPackId, 'mirrorRevision': mirrorRevision, 'candidateRevision': candidateRevision,
       'candidateFingerprint': candidateFingerprint, 'submissionRevision': submissionRevision,
-      'submissionFingerprint': submissionFingerprint, 'authoredSha256': authoredSha256};
+      'submissionFingerprint': submissionFingerprint, 'authoredSha256': authoredSha256, if (mediaProof != null) 'media': mediaProof!.toJson()};
   }
   static WorkspaceReviewedCatalogueLink fromJson(Object? raw) {
-    const fields = {'version', 'realm', 'storeId', 'skuId', 'canonicalProductId', 'verifiedPackId', 'mirrorRevision',
-      'candidateRevision', 'candidateFingerprint', 'submissionRevision', 'submissionFingerprint', 'authoredSha256'};
-    if (raw is! Map || raw.length != fields.length || !fields.every(raw.containsKey) || raw['version'] is! int || raw['version'] != 1 ||
+    final fields = {'version', 'realm', 'storeId', 'skuId', 'canonicalProductId', 'verifiedPackId', 'mirrorRevision',
+      'candidateRevision', 'candidateFingerprint', 'submissionRevision', 'submissionFingerprint', 'authoredSha256', if (raw is Map && raw['version'] == 2) 'media'};
+    if (raw is! Map || raw.length != fields.length || !fields.every(raw.containsKey) || raw['version'] is! int || !{1, 2}.contains(raw['version']) ||
         ['realm', 'storeId', 'skuId', 'canonicalProductId', 'verifiedPackId', 'candidateFingerprint', 'submissionFingerprint', 'authoredSha256']
           .any((key) => raw[key] is! String) || ['mirrorRevision', 'candidateRevision', 'submissionRevision'].any((key) => raw[key] is! int)) {
       throw const FormatException('Reviewed product identity needs recovery.');
@@ -10221,7 +10222,8 @@ class WorkspaceReviewedCatalogueLink {
     final link = WorkspaceReviewedCatalogueLink(realm: raw['realm'] as String, storeId: raw['storeId'] as String, skuId: raw['skuId'] as String,
       canonicalProductId: raw['canonicalProductId'] as String, verifiedPackId: raw['verifiedPackId'] as String, mirrorRevision: raw['mirrorRevision'] as int,
       candidateRevision: raw['candidateRevision'] as int, candidateFingerprint: raw['candidateFingerprint'] as String,
-      submissionRevision: raw['submissionRevision'] as int, submissionFingerprint: raw['submissionFingerprint'] as String, authoredSha256: raw['authoredSha256'] as String);
+      submissionRevision: raw['submissionRevision'] as int, submissionFingerprint: raw['submissionFingerprint'] as String, authoredSha256: raw['authoredSha256'] as String,
+      mediaProof: raw['version'] == 2 ? WorkspaceReviewedProductMediaProof.fromJson(raw['media']) : null);
     if (!link.valid) throw const FormatException('Reviewed product identity needs recovery.');
     return link;
   }

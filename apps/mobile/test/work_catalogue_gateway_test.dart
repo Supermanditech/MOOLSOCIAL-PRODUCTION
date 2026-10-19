@@ -1756,6 +1756,154 @@ void main() {
     expect((await gateway.writeProductSubmission(original, current: () => true, reconcile: true)).state, WorkspaceProductSubmissionWriteState.notFound);
     expect((await gateway.writeProductSubmission(original, current: () => true)).state, WorkspaceProductSubmissionWriteState.unknown);
   });
+  final publishedMediaLog = Platform.environment['LF03_PUBLISHED_MEDIA_LOG'];
+  if (publishedMediaLog != null) {
+    Map<String, dynamic> mediaCapture() {
+      const marker = 'LF03_PUBLISHED_MEDIA_PROJECTION=';
+      final line = File(publishedMediaLog).readAsLinesSync().singleWhere((line) => line.contains(marker));
+      return jsonDecode(line.split(marker).last) as Map<String, dynamic>;
+    }
+    AuthenticatedWorkspaceCatalogueGateway publishedMediaGateway(OwnerTransport transport, {bool media = true}) =>
+      AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), transport: transport, realm: 'evaluation', ownerAccountId: 'owner-one',
+        productSubmissionSupported: true, reviewedProductSubmissionSupported: true, productMediaSupported: media, reviewedProductMediaSupported: media, now: () => at);
+    test('LF03-PUBLISHED-CLIENT actual backend candidate negotiates media without rewriting its private source', () async {
+      final capture = mediaCapture(), bodies = <Map<String, Object?>>[];
+      final source = publishedMediaGateway(OwnerTransport((body) async {
+        bodies.add(body); return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': capture['ready']}));
+      }));
+      final reply = await source.readReviewedProductSubmission(submissionScope, current: () => true), candidate = reply.candidate!;
+      expect(reply.state, 'ready'); expect(candidate.toJson()['schemaVersion'], 2); expect(candidate.source.input.mediaPending, isTrue);
+      expect(candidate.mediaProof!.assetId, capture['ready']['review']['candidate']['source']['media']['assetId']);
+      expect(bodies.single['productMediaReviewVersion'], 1);
+      final original = candidate.publicationIntent(accountId: 'owner-one', idempotencyKey: 'publish-image-original');
+      expect(original.toJson()['schemaVersion'], 3);
+      expect(WorkspaceCatalogueBindingIntent.fromJson(original.toJson()).toJson(), original.toJson());
+      expect(original.body.containsKey('reviewedMedia'), isFalse); // Private proof stays in recovery, not a new caller-supplied approval field.
+      await expectLater(publishedMediaGateway(OwnerTransport((_) async => SocialContentResponse(statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': capture['ready']}))), media: false)
+        .readReviewedProductSubmission(submissionScope, current: () => true), throwsFormatException);
+    });
+    test('LF03-PUBLISHED-CLIENT existing upload support never opts an older service into reviewed media', () async {
+      final ready = mediaCapture()['ready'] as Map<String, dynamic>;
+      ready.remove('productMediaReviewVersion'); ready['review'] = {'version': 1, 'state': 'awaiting_media', 'candidate': null};
+      final gateway = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), realm: 'evaluation', ownerAccountId: 'owner-one', productSubmissionSupported: true,
+        reviewedProductSubmissionSupported: true, productMediaSupported: true, now: () => at,
+        transport: OwnerTransport((body) async {
+          expect(body.containsKey('productMediaReviewVersion'), isFalse);
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': ready}));
+        }));
+      expect(gateway.forOwnerAccount('owner-one').reviewedProductMediaSupported, isFalse);
+      expect((await gateway.readReviewedProductSubmission(submissionScope, current: () => true)).state, 'awaiting_media');
+    });
+    for (final fault in ['scope', 'asset', 'input hash', 'generation', 'width', 'mime', 'normalized', 'descriptor URL', 'descriptor file', 'version']) {
+      test('LF03-PUBLISHED-CLIENT rejects rehashed but mismatched $fault media evidence', () async {
+        final capture = mediaCapture(), ready = capture['ready'] as Map<String, dynamic>, candidate = ready['review']['candidate'] as Map<String, dynamic>,
+          proof = candidate['source']['media'] as Map<String, dynamic>;
+        switch (fault) {
+          case 'scope': candidate['source']['storeId'] = 'other-store';
+          case 'asset': proof['assetId'] = 'A' * 64;
+          case 'input hash': proof['selectedSha256'] = 'b' * 64;
+          case 'generation': proof['originalGeneration'] = '99';
+          case 'width': proof['source']['width'] = 128;
+          case 'mime': proof['file']['mimeType'] = 'image/jpeg';
+          case 'normalized': proof['file']['normalized'] = false;
+          case 'descriptor URL': candidate['sku']['content']['media'][0]['url'] = 'https://evil.invalid/private-original.png';
+          case 'descriptor file': candidate['sku']['content']['media'][0]['file']['byteLength'] = 1;
+          case 'version': candidate['schemaVersion'] = 1;
+        }
+        candidate['fingerprint'] = _mediaHash(Map<String, dynamic>.of(candidate)..remove('fingerprint'));
+        final gateway = publishedMediaGateway(OwnerTransport((_) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': ready}))));
+        await expectLater(gateway.readReviewedProductSubmission(submissionScope, current: () => true), throwsFormatException);
+      });
+    }
+    test('LF03-PUBLISHED-CLIENT existing public reader/gallery binding uses the actual delivered derivative', () async {
+      final capture = mediaCapture(), entry = WorkspacePublicCatalogueEntry.fromResponse(capture['publicPage'] as Map<String, dynamic>,
+        storeId: 'store-one', realm: 'evaluation', channel: BuyV2OfferClass.retail, now: at);
+      final asset = entry.readback.content.media.single, bytes = base64Decode(capture['bytesBase64'] as String),
+        proof = WorkspaceReviewedProductMediaProof.fromJson(capture['ready']['review']['candidate']['source']['media']);
+      expect(asset.id, proof.assetId); expect(asset.source, proof.descriptor(realm: 'evaluation', storeId: 'store-one', skuId: 'sku-one', canonicalId: 'canonical-one')['url']);
+      expect(BuyV2SupplierMediaPolicy.publicationMessage(entry.product, asset), isNull);
+      expect(sha256.convert(bytes).toString().toUpperCase(), proof.toJson()['file']['sha256']);
+      final codec = await ui.instantiateImageCodec(bytes);
+      try {final frame = await codec.getNextFrame(); expect(frame.image.width, proof.toJson()['file']['width']); frame.image.dispose();} finally {codec.dispose();}
+    });
+    test('LF03-PUBLISHED-CLIENT frozen media adoption journal retains exact evidence through restart', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final capture = mediaCapture(), source = WorkspaceProductSubmissionRecord.decode(capture['source'], submissionScope, at);
+      final candidate = WorkspaceReviewedProductCandidate.decode(capture['ready']['review']['candidate'], source, submissionScope, at, allowMedia: true);
+      final original = candidate.publicationIntent(accountId: 'owner-one', idempotencyKey: 'recover-media-adoption');
+      SecureWorkCatalogueBindingPendingStore journal() => SecureWorkCatalogueBindingPendingStore(currentAccount: () => 'owner-one');
+      await journal().savePending(original);
+      const scope = (account: 'owner-one', store: 'store-one', realm: 'evaluation');
+      final restarted = (await journal().readPending(scope))!;
+      expect(restarted.toJson(), original.toJson()); expect(restarted.reviewedMedia!.fingerprint, candidate.mediaProof!.fingerprint);
+      final corrupt = original.toJson(); (corrupt['reviewedMedia'] as Map)['derivativeGeneration'] = 'changed';
+      expect(() => WorkspaceCatalogueBindingIntent.fromJson(corrupt), throwsFormatException);
+      final downgrade = original.toJson()..['schemaVersion'] = 2..remove('reviewedMedia');
+      expect(() => WorkspaceCatalogueBindingIntent.fromJson(downgrade), throwsFormatException);
+      await journal().removePending(restarted); expect(await journal().readPending(scope), isNull);
+    });
+    test('LF03-PUBLISHED-CLIENT WorkSession adoption preserves private photo, Stock and durable media sidecar', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final capture = mediaCapture(), account = ListingAccount(), inventory = _AdoptionInventory(SecureWorkInventoryStore(accountScope: () => account.owner));
+      var readback = capture['ready'], bindingResponse = capture['response'];
+      final source = _AdoptionGateway(publishedMediaGateway(OwnerTransport((body) async {
+        final operation = body['operation'];
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true,
+          'data': operation == 'readStoreProductSubmission' ? readback : bindingResponse}));
+      })));
+      final work = WorkSession(contactDraftStore: account, catalogueGateway: source, inventoryStore: inventory,
+        productSubmissionJournalFactory: (_) => SecureWorkProductSubmissionJournal(currentAccount: () => account.owner),
+        purchaseEntryStore: SecureWorkPurchaseEntryStore(accountScope: () => account.owner),
+        catalogueBindingPendingStoreFactory: (_) => SecureWorkCatalogueBindingPendingStore(currentAccount: () => account.owner))
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jaipur', verified: true)
+        ..workspaceId = 'store-one';
+      addTearDown(work.dispose);
+      final product = capture['source']['product'] as Map<String, dynamic>, content = product['content'] as Map<String, dynamic>,
+        proof = WorkspaceReviewedProductMediaProof.fromJson(capture['ready']['review']['candidate']['source']['media']);
+      var item = listingItem().copyWith(canonicalId: 'local-canonical-nomination', title: content['title'] as String,
+        brand: content['brand'] as String, variant: content['variant'] as String, categoryId: content['categoryId'] as String,
+        sku: product['sku'] as String, barcode: product['barcode'] as String, sellingPriceMinor: product['channels'][0]['priceMinor'] as int,
+        mrpMinor: product['channels'][0]['mrpMinor'] as int, content: WorkspaceProductContent(description: content['description'] as String,
+          highlights: (content['highlights'] as List).cast<String>(), specifications: {for (final spec in content['specifications'] as List) spec['label'] as String: spec['value'] as String}));
+      item = item.copyWith(privatePhoto: WorkspacePrivateProductPhoto(owner: work.privateProductPhotos!.owner,
+        identity: WorkspacePrivateProductPhoto.identityOf(item), sha256: proof.selectedSha256,
+        byteLength: proof.toJson()['source']['byteLength'] as int, width: proof.toJson()['source']['width'] as int, height: proof.toJson()['source']['height'] as int));
+      work.workspaceCatalogueItems.add(item);
+      expect(await work.loadWorkspaceInventory(), isTrue); expect(await work.retryWorkspaceInventorySave(), isTrue);
+      final before = work.workspaceCatalogueItems.single.toInventoryJson();
+      expect(await work.checkWorkspaceProductSubmission(item.id), isTrue);
+      expect(work.canPublishReviewedWorkspaceProduct(item.id), isTrue);
+      expect(await work.publishReviewedWorkspaceProduct(item.id, inputCurrent: () => true), isTrue, reason: work.errorMessage);
+      expect(work.workspaceCatalogueItems.single.toInventoryJson(), {...before, 'publicListing': true});
+      expect(work.workspaceStockMovements, isEmpty); expect(work.workspaceInvoices, isEmpty);
+      final link = work.workspaceReviewedCatalogueLink(item.id)!;
+      expect(link.toJson()['version'], 2); expect(link.mediaProof!.fingerprint, proof.fingerprint);
+      final restored = WorkspaceSavedInventory.fromJson(jsonDecode(jsonEncode((await inventory.read('owner-one', 'store-one', qa: true))!.toJson())));
+      expect(restored.reviewedCatalogueLinks.single.mediaProof!.fingerprint, proof.fingerprint);
+      expect(restored.products.single.privatePhoto!.toJson(), item.privatePhoto!.toJson());
+      expect(work.workspaceCatalogueListingPending, isFalse);
+      const marker = 'LF03_REMOVED_MEDIA_PROJECTION=';
+      final removed = jsonDecode(File(publishedMediaLog).readAsLinesSync().singleWhere((line) => line.contains(marker)).split(marker).last) as Map<String, dynamic>;
+      readback = removed['ready']; bindingResponse = removed['response'];
+      work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.single.copyWith(clearPrivatePhoto: true);
+      expect(await work.retryWorkspaceInventorySave(), isTrue);
+      expect(await work.checkWorkspaceProductSubmission(item.id), isTrue);
+      expect(work.canPublishReviewedWorkspaceProduct(item.id), isTrue);
+      expect(await work.publishReviewedWorkspaceProduct(item.id, inputCurrent: () => true), isTrue, reason: work.errorMessage);
+      expect(work.workspaceReviewedCatalogueLink(item.id)!.mediaProof, isNull);
+      expect(work.workspaceCatalogueItems.single.privatePhoto, isNull);
+      final removedInventory = WorkspaceSavedInventory.fromJson(jsonDecode(jsonEncode((await inventory.read('owner-one', 'store-one', qa: true))!.toJson())));
+      expect(removedInventory.reviewedCatalogueLinks.single.toJson()['version'], 1);
+      expect(removedInventory.reviewedCatalogueLinks.single.mediaProof, isNull);
+      expect(removedInventory.products.single.privatePhoto, isNull);
+      expect(work.workspaceCatalogueItems.single.stock, item.stock);
+      expect(work.workspaceStockMovements, isEmpty); expect(work.workspaceInvoices, isEmpty);
+      expect(work.workspaceCatalogueListingPending, isFalse);
+    });
+  }
   final reviewLog = Platform.environment['LF03_REVIEW_LOG'];
   if (reviewLog != null) {
     Map<String, dynamic> reviewCapture(String marker) {

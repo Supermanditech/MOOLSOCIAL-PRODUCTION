@@ -217,31 +217,39 @@ class WorkspaceReviewedProductCandidate {
   Map<String, dynamic> get sku => _map(toJson()['sku']);
   int get revision => toJson()['revision'] as int;
   String get fingerprint => toJson()['fingerprint'] as String;
+  WorkspaceReviewedProductMediaProof? get mediaProof => (toJson()['source'] as Map).containsKey('media')
+    ? WorkspaceReviewedProductMediaProof.fromJson(toJson()['source']['media']) : null;
   DateTime get expiresAt => _time(toJson()['expiresAt']);
   static WorkspaceReviewedProductCandidate decode(Object? raw, WorkspaceProductSubmissionRecord source,
-      WorkspaceProductSubmissionScope scope, DateTime observed, {bool requireCurrent = true}) {
+      WorkspaceProductSubmissionScope scope, DateTime observed, {bool requireCurrent = true, bool allowMedia = false}) {
     final value = _map(raw);
     _keys(value, ['schemaVersion', 'realm', 'storeId', 'skuId', 'revision', 'fingerprint', 'source', 'identity',
       'sku', 'expectedMirrorRevision', 'reviewedBy', 'reviewedAt', 'expiresAt', 'terms']);
     final reference = _map(value['source']);
-    _keys(reference, ['realm', 'storeId', 'skuId', 'revision', 'fingerprint']);
+    final hasMedia = reference.containsKey('media');
+    _keys(reference, ['realm', 'storeId', 'skuId', 'revision', 'fingerprint', if (hasMedia) 'media']);
+    final media = hasMedia ? WorkspaceReviewedProductMediaProof.fromJson(reference['media']) : null;
+    if (hasMedia && !allowMedia) throw const FormatException('Update MoolSocial before adopting these reviewed photos.');
     _int(reference['revision'], 1, 1000000000);
     final identity = _map(value['identity']); _keys(identity, ['catalogueId', 'tenantId']);
     _id(identity['catalogueId']); _id(identity['tenantId']);
     _int(value['revision'], 1, 1000000000); _int(value['expectedMirrorRevision'], 0, 1000000000);
     final reviewedAt = _time(value['reviewedAt']), expires = _time(value['expiresAt']);
     final body = source.input.toJson(), sku = _map(value['sku']); _ownerSkuInput(sku, scope.store);
-    final content = Map<String, dynamic>.of(_map(body['content']))..['media'] = <Object>[];
+    final content = Map<String, dynamic>.of(_map(body['content']))..['media'] = [if (media != null)
+      media.descriptor(realm: scope.realm, storeId: scope.store, skuId: scope.sku, canonicalId: _id(sku['canonicalProductId']))];
     final channels = (sku['channels'] as List).map((raw) => Map<String, dynamic>.of(_map(raw))..remove('offerId')).toList();
-    final noImages = body['mediaIntent']['pendingUpload'] == false && (body['mediaIntent']['publishedReferences'] as List).isEmpty;
+    final validMedia = (body['mediaIntent']['publishedReferences'] as List).isEmpty && (media == null
+      ? body['mediaIntent']['pendingUpload'] == false
+      : body['mediaIntent']['pendingUpload'] == true && media.matchesSelection(scope.sku, body['mediaIntent']['pendingSelectionSha256'] as String?));
     final hashed = Map<String, dynamic>.of(value)..remove('fingerprint');
-    if (_int(value['schemaVersion'], 1, 1) != 1 || value['realm'] != scope.realm || value['storeId'] != scope.store || value['skuId'] != scope.sku ||
+    if (_int(value['schemaVersion'], 1, 2) != (hasMedia ? 2 : 1) || value['realm'] != scope.realm || value['storeId'] != scope.store || value['skuId'] != scope.sku ||
         reference['realm'] != scope.realm || reference['storeId'] != scope.store || reference['skuId'] != scope.sku ||
         reference['revision'] != source.revision || reference['fingerprint'] != source.fingerprint ||
         value['fingerprint'] != _catalogueHash(hashed) || _id(value['reviewedBy']) == source.toJson()['submittedBy'] ||
         reviewedAt.toIso8601String() != value['reviewedAt'] || expires.toIso8601String() != value['expiresAt'] ||
         reviewedAt.isAfter(observed) || reviewedAt.isBefore(_time(source.toJson()['submittedAt'])) || !expires.isAfter(reviewedAt) ||
-        requireCurrent && !expires.isAfter(observed) || !noImages || sku['publicListing'] != true ||
+        requireCurrent && !expires.isAfter(observed) || !validMedia || sku['publicListing'] != true ||
         sku['skuId'] != scope.sku || sku['sku'] != body['sku'] ||
         jsonEncode(_sorted(sku['content'])) != jsonEncode(_sorted(content)) ||
         jsonEncode(_sorted(sku['pack'])) != jsonEncode(_sorted(body['pack'])) ||
@@ -266,7 +274,7 @@ class WorkspaceReviewedProductCandidate {
   WorkspaceCatalogueBindingIntent publicationIntent({required String accountId, required String idempotencyKey}) =>
     WorkspaceCatalogueBindingIntent(accountId: accountId, realm: toJson()['realm'] as String,
       storeId: toJson()['storeId'] as String, expectedRevision: toJson()['expectedMirrorRevision'] as int,
-      idempotencyKey: idempotencyKey, sku: sku, reviewCandidate: {'revision': revision, 'fingerprint': fingerprint}, reviewedSource: source);
+      idempotencyKey: idempotencyKey, sku: sku, reviewCandidate: {'revision': revision, 'fingerprint': fingerprint}, reviewedSource: source, reviewedMedia: mediaProof);
 }
 String _catalogueHash(Object value) => crypto.sha256.convert(utf8.encode(jsonEncode(_sorted(value)))).toString().toUpperCase();
 class WorkspaceProductReviewReadback {
@@ -275,14 +283,14 @@ class WorkspaceProductReviewReadback {
   final String state;
   final WorkspaceReviewedProductCandidate? candidate;
   static WorkspaceProductReviewReadback decodeReview(Object? raw, WorkspaceProductSubmissionRecord? record,
-      WorkspaceProductSubmissionScope scope, DateTime observed) {
+      WorkspaceProductSubmissionScope scope, DateTime observed, {bool allowMedia = false}) {
     final review = _map(raw); _keys(review, ['version', 'state', 'candidate']);
     final state = _string(review['state']);
     if (_int(review['version'], 1, 1) != 1 || !{'pending', 'awaiting_media', 'ready', 'bound', 'outdated', 'unavailable'}.contains(state) ||
         ({'ready', 'bound'}.contains(state) ? record == null || review['candidate'] == null : review['candidate'] != null) ||
         state == 'awaiting_media' && record == null) { throw const FormatException(); }
     final candidate = review['candidate'] == null ? null : WorkspaceReviewedProductCandidate.decode(review['candidate'], record!, scope,
-      observed, requireCurrent: state != 'bound');
+      observed, requireCurrent: state != 'bound', allowMedia: allowMedia);
     return WorkspaceProductReviewReadback(record: record, state: state, candidate: candidate);
   }
 }
@@ -1384,6 +1392,7 @@ class WorkspaceCatalogueBindingIntent {
     required Map<String, dynamic> sku,
     Map<String, dynamic>? reviewCandidate,
     this.reviewedSource,
+    this.reviewedMedia,
   }) : _encodedSku = jsonEncode(sku), _encodedReviewCandidate = reviewCandidate == null ? null : jsonEncode(reviewCandidate) {
     _id(accountId);
     if (!{'production', 'evaluation'}.contains(realm)) {
@@ -1396,6 +1405,14 @@ class WorkspaceCatalogueBindingIntent {
     if ((_encodedReviewCandidate == null) != (reviewedSource == null)) throw const FormatException();
     if (reviewedSource != null && (reviewedSource!.input.skuId != skuId || reviewedSource!.toJson()['submittedBy'] != accountId ||
         reviewedSource!.toJson()['realm'] != realm || reviewedSource!.toJson()['storeId'] != storeId)) { throw const FormatException(); }
+    if (reviewedSource?.input.mediaPending == true && reviewedMedia == null) throw const FormatException('Keep the reviewed photo evidence with this original listing request.');
+    if (reviewedMedia != null) {
+      if (reviewedSource == null || !reviewedSource!.input.mediaPending ||
+        !reviewedMedia!.matchesSelection(skuId, reviewedSource!.input.toJson()['mediaIntent']['pendingSelectionSha256'] as String?)) {throw const FormatException();}
+      final expected = {..._map(reviewedSource!.input.toJson()['content']), 'media': [reviewedMedia!.descriptor(realm: realm, storeId: storeId,
+        skuId: skuId, canonicalId: _id(this.sku['canonicalProductId']))]};
+      if (_catalogueHash(expected) != _catalogueHash(this.sku['content'] as Object)) throw const FormatException();
+    }
     if (_encodedReviewCandidate != null) {
       final ref = _map(jsonDecode(_encodedReviewCandidate)); _keys(ref, ['revision', 'fingerprint']);
       _int(ref['revision'], 1, 1000000000);
@@ -1405,6 +1422,7 @@ class WorkspaceCatalogueBindingIntent {
   final String accountId, realm, storeId, idempotencyKey, _encodedSku;
   final String? _encodedReviewCandidate;
   final WorkspaceProductSubmissionRecord? reviewedSource;
+  final WorkspaceReviewedProductMediaProof? reviewedMedia;
   final int expectedRevision;
   Map<String, dynamic> get sku => _map(jsonDecode(_encodedSku));
   String get skuId => sku['skuId'] as String;
@@ -1416,11 +1434,12 @@ class WorkspaceCatalogueBindingIntent {
     if (_encodedReviewCandidate != null) 'reviewCandidate': jsonDecode(_encodedReviewCandidate),
   };
   Map<String, Object?> toJson() => {
-    'schemaVersion': _encodedReviewCandidate == null ? 1 : 2,
+    'schemaVersion': _encodedReviewCandidate == null ? 1 : reviewedMedia == null ? 2 : 3,
     'accountId': accountId,
     'realm': realm,
     ...body,
     if (reviewedSource != null) 'reviewedSource': reviewedSource!.toJson(),
+    if (reviewedMedia != null) 'reviewedMedia': reviewedMedia!.toJson(),
   };
   static WorkspaceCatalogueBindingIntent fromJson(Object? value) {
     final raw = _map(value);
@@ -1432,10 +1451,11 @@ class WorkspaceCatalogueBindingIntent {
       'sku',
       'expectedRevision',
       'idempotencyKey',
-      if (raw['schemaVersion'] == 2) 'reviewCandidate',
-      if (raw['schemaVersion'] == 2) 'reviewedSource',
+      if (raw['schemaVersion'] == 2 || raw['schemaVersion'] == 3) 'reviewCandidate',
+      if (raw['schemaVersion'] == 2 || raw['schemaVersion'] == 3) 'reviewedSource',
+      if (raw['schemaVersion'] == 3) 'reviewedMedia',
     ]);
-    if (raw['schemaVersion'] is! int || !{1, 2}.contains(raw['schemaVersion'])) throw const FormatException();
+    if (raw['schemaVersion'] is! int || !{1, 2, 3}.contains(raw['schemaVersion'])) throw const FormatException();
     return WorkspaceCatalogueBindingIntent(
       accountId: _id(raw['accountId']),
       realm: _string(raw['realm']),
@@ -1443,10 +1463,11 @@ class WorkspaceCatalogueBindingIntent {
       expectedRevision: _int(raw['expectedRevision'], 0, 1000000000),
       idempotencyKey: _id(raw['idempotencyKey']),
       sku: _map(raw['sku']),
-      reviewCandidate: raw['schemaVersion'] == 2 ? _map(raw['reviewCandidate']) : null,
-      reviewedSource: raw['schemaVersion'] == 2 ? WorkspaceProductSubmissionRecord.decode(raw['reviewedSource'],
+      reviewCandidate: raw['schemaVersion'] == 2 || raw['schemaVersion'] == 3 ? _map(raw['reviewCandidate']) : null,
+      reviewedSource: raw['schemaVersion'] == 2 || raw['schemaVersion'] == 3 ? WorkspaceProductSubmissionRecord.decode(raw['reviewedSource'],
         (account: _id(raw['accountId']), store: _id(raw['storeId']), realm: _string(raw['realm']), sku: _id(_map(raw['sku'])['skuId'])),
         _time(_map(raw['reviewedSource'])['submittedAt'])) : null,
+      reviewedMedia: raw['schemaVersion'] == 3 ? WorkspaceReviewedProductMediaProof.fromJson(raw['reviewedMedia']) : null,
     );
   }
 }
@@ -2641,6 +2662,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway() {
     productSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_SUBMISSIONS_V1'),
     productMediaSupported: const bool.fromEnvironment('MOOLSOCIAL_PRODUCT_MEDIA_V1'),
     reviewedProductSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_REVIEW_V1'),
+    reviewedProductMediaSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_MEDIA_REVIEW_V1'),
     storeClassificationReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_STORE_CLASSIFICATION_V1'),
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
   );
@@ -2674,6 +2696,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.productMediaSupported = false,
     WorkspaceProductMediaUploadTransport? productMediaTransport,
     this.reviewedProductSubmissionSupported = false,
+    this.reviewedProductMediaSupported = false,
     this.storeClassificationReadbackSupported = false,
     this.minorMoneyReadbackSupported = false,
     this.promotionDiscoverySupported = false,
@@ -2704,6 +2727,7 @@ class AuthenticatedWorkspaceCatalogueGateway
   late final WorkspaceProductMediaUploadTransport _productMediaTransport = _productMediaTransportOverride ?? IoWorkspaceProductMediaUploadTransport();
   @override
   final bool reviewedProductSubmissionSupported;
+  final bool reviewedProductMediaSupported;
   @override
   DateTime get productReviewNow => now().toUtc();
   final bool storeClassificationReadbackSupported;
@@ -2739,6 +2763,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       productMediaSupported: productMediaSupported,
       productMediaTransport: _productMediaTransportOverride,
       reviewedProductSubmissionSupported: reviewedProductSubmissionSupported,
+      reviewedProductMediaSupported: reviewedProductMediaSupported,
       storeClassificationReadbackSupported: storeClassificationReadbackSupported,
       minorMoneyReadbackSupported: minorMoneyReadbackSupported,
       promotionDiscoverySupported: promotionDiscoverySupported,
@@ -2824,15 +2849,16 @@ class AuthenticatedWorkspaceCatalogueGateway
       {required bool Function() current}) async {
     if (!reviewedProductSubmissionSupported || !_productSubmissionOwner(scope, current)) throw const FormatException('Product review is not connected.');
     final response = await _ownerRequest({'operation': 'readStoreProductSubmission', 'productSubmissionVersion': 1,
-      'productReviewVersion': 1, 'storeId': scope.store, 'skuId': scope.sku}, current, mutation: false);
+      'productReviewVersion': 1, if (reviewedProductMediaSupported) 'productMediaReviewVersion': 1, 'storeId': scope.store, 'skuId': scope.sku}, current, mutation: false);
     if (!_productSubmissionOwner(scope, current) || response?.statusCode != 200) throw const FormatException();
     final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
     if (envelope['ok'] != true) throw const FormatException();
     final value = _map(envelope['data']);
     if (_int(value['productReviewVersion'], 1, 1) != 1) throw const FormatException();
-    final legacy = Map<String, dynamic>.of(value)..remove('productReviewVersion')..remove('review');
+    if (reviewedProductMediaSupported && _int(value['productMediaReviewVersion'], 1, 1) != 1 || !reviewedProductMediaSupported && value.containsKey('productMediaReviewVersion')) throw const FormatException();
+    final legacy = Map<String, dynamic>.of(value)..remove('productReviewVersion')..remove('review')..remove('productMediaReviewVersion');
     final record = _productSubmissionResponse(legacy, scope, key: null, reconcile: false);
-    final readback = WorkspaceProductReviewReadback.decodeReview(value['review'], record, scope, _time(value['observedAt']));
+    final readback = WorkspaceProductReviewReadback.decodeReview(value['review'], record, scope, _time(value['observedAt']), allowMedia: reviewedProductMediaSupported);
     if (readback.state == 'ready' && !readback.candidate!.expiresAt.isAfter(now().toUtc())) throw const FormatException();
     return readback;
   }

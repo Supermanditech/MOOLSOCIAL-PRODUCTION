@@ -1364,12 +1364,12 @@ class WorkSession extends ChangeNotifier {
     if (!current() || !identical(data, _storeData) || !_stockEditAvailable() ||
         _savedProductSubmission(original.skuId)?.authoredSha256 != source.input.authoredSha256) { return false; }
     final index = data.workspaceCatalogueItems.indexWhere((item) => item.id == original.skuId);
-    if (index < 0 || !_listingMirrorMatches(saved, data.workspaceCatalogueItems[index], reviewedFamily: true, adopting: true)) return false;
+    if (index < 0 || !_listingMirrorMatches(saved, data.workspaceCatalogueItems[index], reviewedFamily: true, adopting: true, reviewedMedia: original.reviewedMedia)) return false;
     final reference = original.body['reviewCandidate'] as Map;
     final link = WorkspaceReviewedCatalogueLink(realm: original.realm, storeId: original.storeId, skuId: original.skuId,
       canonicalProductId: saved.canonicalProductId, verifiedPackId: saved.verifiedPackId, mirrorRevision: saved.revision,
       candidateRevision: reference['revision'] as int, candidateFingerprint: reference['fingerprint'] as String,
-      submissionRevision: source.revision, submissionFingerprint: source.fingerprint, authoredSha256: source.input.authoredSha256);
+      submissionRevision: source.revision, submissionFingerprint: source.fingerprint, authoredSha256: source.input.authoredSha256, mediaProof: original.reviewedMedia);
     final previous = data.reviewedCatalogueLinks.where((old) => old.skuId == original.skuId).firstOrNull;
     if (previous != null && !link.preserves(previous)) return false;
     data.reviewedCatalogueLinks.removeWhere((old) => old.skuId == original.skuId); data.reviewedCatalogueLinks.add(link);
@@ -1445,7 +1445,8 @@ class WorkSession extends ChangeNotifier {
       origin != null && origin.valid && origin.productId == item.id &&
       _ownerInputValuesEqual(owned.input['provenance'], {'entryMethod': origin.method.name, 'sourceRecordId': origin.productId});
   }
-  bool _listingMirrorMatches(WorkspaceCatalogueOwnedSku owned, WorkspaceCatalogueItem item, {bool reviewedFamily = false, bool adopting = false}) {
+  bool _listingMirrorMatches(WorkspaceCatalogueOwnedSku owned, WorkspaceCatalogueItem item,
+    {bool reviewedFamily = false, bool adopting = false, WorkspaceReviewedProductMediaProof? reviewedMedia}) {
     // The legacy reviewed reader has no family contract. Never strip options
     // and publish a different legacy SKU while that connection is pending.
     if (item.variantMembership != null && !reviewedFamily) return false;
@@ -1468,6 +1469,13 @@ class WorkSession extends ChangeNotifier {
         'publisherWorkspaceId': binding.supplierWorkspaceId, 'file': {'mimeType': file.mimeType,
           'byteLength': file.byteLength, 'width': file.width, 'height': file.height, 'normalized': file.normalized,
           if (file.frameCount != null) 'frameCount': file.frameCount}});
+    }
+    final imageProof = adopting ? reviewedMedia : reviewedMedia ?? workspaceReviewedCatalogueLink(item.id)?.mediaProof;
+    if (imageProof != null) {
+      if (item.privatePhoto?.sha256 != imageProof.selectedSha256 || item.privatePhoto?.matches(item) != true) return false;
+      final descriptor = imageProof.descriptor(realm: owned.realm, storeId: owned.storeId, skuId: item.id, canonicalId: owned.canonicalProductId);
+      if (media.isNotEmpty && !_ownerInputValuesEqual(media, [descriptor])) return false;
+      media.clear(); media.add(descriptor);
     }
     final facts = WorkspaceCatalogueProductFacts(compliance: item.compliance?.toBuyPublicCompliance(),
       composition: item.composition, regulatoryNote: item.regulatoryNote,

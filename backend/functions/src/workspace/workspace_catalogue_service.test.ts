@@ -3,11 +3,14 @@ import test from "node:test";
 import {createHash, generateKeyPairSync, randomUUID} from "node:crypto";
 import {createServer} from "node:http";
 import {Readable} from "node:stream";
+import {readFileSync} from "node:fs";
+import {EventEmitter} from "node:events";
 import {Storage} from "@google-cloud/storage";
 import sharp from "sharp";
 import * as catalogueModule from "./workspace_catalogue_service.js";
 import {GoogleCloudStoreProductMediaObjects, type StoreProductMediaObjects, type StoreProductMediaUpload,
-  type StoreProductMediaRequest, type NormalizedStoreProductImage} from "./workspace_catalogue_service.js";
+  type StoreProductMediaRequest, type NormalizedStoreProductImage, storeProductMediaProof, publicProductMediaPath,
+  parsePublicProductMediaPath, deliverPublicProductMediaResponse} from "./workspace_catalogue_service.js";
 import {initializeApp, deleteApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingBindings, channelTerms, planCatalogueSave, normalizeSku,
@@ -29,6 +32,203 @@ import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
 
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
 const at = "2026-10-16T12:00:00.000Z";
+test('LF03-PUBLISHED processed assets have authorized byte review and guarded public delivery entries', () => {
+  assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>).readProductMediaForReview, 'function');
+  assert.equal(typeof (WorkspaceCatalogueService.prototype as unknown as Record<string, unknown>).publicProductMedia, 'function');
+});
+test('LF03-PUBLISHED stable image paths are scoped, canonical and attached only to Workspace HTTP owner', () => {
+  const assetId = 'A'.repeat(64), path = publicProductMediaPath('evaluation', 'store-one', 'sku-one', assetId);
+  assert.deepEqual(parsePublicProductMediaPath(path), {realm: 'evaluation', storeId: 'store-one', skuId: 'sku-one', assetId});
+  for (const bad of [path + '?token=private', path + '/extra', path.replace('store-one', '..'), path.replace(assetId, assetId.toLowerCase()),
+    path.replace('store-one', '%73tore-one'), '/private/product-media/original', ['/public-product-media']]) {
+    assert.equal(parsePublicProductMediaPath(bad), undefined);
+  }
+  // Static placement regression supplements the actual byte-service tests below.
+  const index = readFileSync(`${__dirname}/../../src/index.ts`, 'utf8'), start = index.indexOf('export const moolSocialWorkspace = onRequest(');
+  assert.ok(start > 0);
+  const positions = [...index.matchAll(/parsePublicProductMediaPath\(request\.path\)/gu)].map(match => match.index);
+  assert.equal(positions.length, 1); assert.ok(positions[0]! > start);
+  const route = index.slice(start, index.indexOf('function workspaceProfileService', start));
+  assert.ok(route.includes('response.status(200).send(bytes)'));
+  assert.ok(route.includes('"cache-control", "no-store"'));
+});
+test('LF03-PUBLISHED response slots bound work across instances, slow consumers, failure and disconnect', async () => {
+  class HostResponse extends EventEmitter {
+    destroyed = false; writableFinished = false;
+    finish() {this.writableFinished = true; this.emit('finish');}
+    disconnect() {this.destroyed = true; this.emit('close');}
+  }
+  const response = () => new HostResponse(), run = (r: HostResponse, work: () => Promise<Buffer>, send: (b: Buffer) => void = () => r.finish()) =>
+    deliverPublicProductMediaResponse(r as unknown as Parameters<typeof deliverPublicProductMediaResponse>[0], work, send);
+  let resolveFirst!: (b: Buffer) => void, resolveSecond!: (b: Buffer) => void, resolveThird!: (b: Buffer) => void, byteReads = 0, sends = 0;
+  const first = response(), second = response(), third = response();
+  const one = run(first, () => {byteReads++; return new Promise(resolve => {resolveFirst = resolve;});}, () => {sends++;});
+  const two = run(second, () => {byteReads++; return new Promise(resolve => {resolveSecond = resolve;});}, () => {sends++;});
+  await assert.rejects(run(response(), async () => {byteReads++; return Buffer.from('blocked');}), {code: 'service_unavailable'});
+  assert.equal(byteReads, 2);
+  resolveFirst(Buffer.from('private-approved-one')); await one;
+  await assert.rejects(run(response(), async () => Buffer.alloc(1)), {code: 'service_unavailable'}); // Slow consumer still owns the first buffer.
+  first.finish();
+  await assert.rejects(run(response(), async () => {throw Error('object failure');}), /object failure/u);
+  const three = run(third, () => new Promise(resolve => {resolveThird = resolve;}));
+  second.disconnect();
+  await assert.rejects(run(response(), async () => Buffer.alloc(1)), {code: 'service_unavailable'}); // Work is still outstanding after disconnect.
+  resolveSecond(Buffer.from('not-sent-to-disconnected-client')); await two; assert.equal(sends, 1);
+  await run(response(), async () => Buffer.from('freed-slot'));
+  resolveThird(Buffer.from('approved-three')); await three;
+  await run(response(), async () => Buffer.from('all-slots-released'));
+  assert.equal(first.listenerCount('finish'), 0); assert.equal(second.listenerCount('close'), 0);
+});
+test('LF03-PUBLISHED emulator actual processed image to independent content review, explicit adoption and guarded bytes', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-media-public-${randomUUID().slice(0, 8)}`}, `media-public-${randomUUID()}`);
+  const db = getFirestore(app), root = db.collection('workspaceCatalogues').doc('evaluation'), store = root.collection('stores').doc('store-one');
+  const originals = new Map<string, Buffer>(), derivatives = new Map<string, Buffer>();
+  let duringRead: (() => Promise<void>) | undefined, clock = at;
+  const objects: StoreProductMediaObjects = {
+    async prepare() {return {uploadUrl: 'https://host-private.invalid/write-only', requiredHeaders: {}};},
+    async read(upload) {return {bytes: Buffer.from(originals.get(upload.uploadId)!), generation: '17'};},
+    async save(upload, generation, image) {
+      const assetId = cataloguePayloadHash({uploadId: upload.uploadId, generation, sha256: image.file.sha256});
+      derivatives.set(assetId, Buffer.from(image.bytes)); return {assetId, generation: '23'};
+    },
+    async readDerivative(upload) {
+      const bytes = Buffer.from(derivatives.get(upload.processed!.assetId)!);
+      if (duringRead) {const action = duringRead; duringRead = undefined; await action();}
+      return bytes;
+    },
+  };
+  const repository = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(clock), objects);
+  const service = () => new WorkspaceCatalogueService(repository(), catalogueIdentity, () => new Date(clock));
+  const publicBytes = (assetId: string) => service().publicProductMedia({realm: 'evaluation', storeId: 'store-one', skuId: 'sku-one', assetId});
+  async function upload(product: StoreProductSubmissionInput, bytes: Buffer, expectedRevision: number) {
+    product.mediaIntent = {pendingUpload: true, pendingSelectionSha256: cataloguePayloadHash({privateSha256: cataloguePayloadHashBytes(bytes).toLowerCase(), skuId: product.skuId}), publishedReferences: []};
+    const record = await repository().submitProduct(productCommand({product, expectedRevision, idempotencyKey: `image-product-${expectedRevision}`}));
+    const request: StoreProductMediaRequest = {storeId: 'store-one', skuId: product.skuId, submissionRevision: record.revision,
+      submissionFingerprint: record.fingerprint, sourceSha256: cataloguePayloadHashBytes(bytes).toLowerCase(), sourceByteLength: bytes.length,
+      sourceMimeType: 'image/png', idempotencyKey: `image-upload-${expectedRevision}`};
+    const prepared = await repository().productMedia('owner-one', 'prepare', request) as {uploadId: string};
+    originals.set(prepared.uploadId, bytes);
+    await repository().productMedia('owner-one', 'confirm', request);
+    const stored = (await store.collection('productMediaUploads').doc(prepared.uploadId).get()).data() as StoreProductMediaUpload;
+    const source: CatalogueSubmissionReference = {realm: 'evaluation', storeId: 'store-one', skuId: product.skuId,
+      revision: record.revision, fingerprint: record.fingerprint, media: storeProductMediaProof(stored, at)};
+    const {sha256: _, ...file} = source.media!.file;
+    const value: StoreSkuInput = {...input(), content: {...product.content, media: [{id: source.media!.assetId, revision: `m1-${source.media!.assetId}`,
+      url: 'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace' + publicProductMediaPath('evaluation', source.storeId, source.skuId, source.media!.assetId),
+      storeId: source.storeId, skuId: source.skuId, canonicalProductId: 'canonical-one', publisherWorkspaceId: source.storeId, file} ]}, provenance: product.provenance};
+    return {record, source, value, processed: derivatives.get(source.media!.assetId)!};
+  }
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    await root.collection('participants').doc('store-one').set(producerParticipant());
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    const pixels = await sharp({create: {width: 640, height: 520, channels: 3, background: '#277250'}}).png().toBuffer();
+    const first = await upload(submittedProduct(), pixels, 0), asset = first.source.media!.assetId;
+    await assert.rejects(publicBytes(asset));
+    assert.equal((await store.collection('skus').get()).size, 0);
+    const preview = await repository().readProductMediaForReview('reviewer-one', catalogueIdentity, first.source);
+    assert.deepEqual(preview.bytes, first.processed); assert.deepEqual(preview.proof, first.source.media);
+    await assert.rejects(repository().readProductMediaForReview('owner-one', catalogueIdentity, first.source), {code: 'forbidden'});
+    await assert.rejects(repository().readProductMediaForReview('reviewer-one', {...catalogueIdentity, tenantId: 'other-tenant'}, first.source), {code: 'forbidden'});
+    for (const corrupt of [ {...first.source, realm: 'production' as const}, {...first.source, storeId: 'other-store'},
+      {...first.source, media: {...first.source.media!, derivativeGeneration: '99'}},
+      {...first.source, media: {...first.source.media!, source: {...first.source.media!.source, width: 128}}}]) {
+      await assert.rejects(repository().readProductMediaForReview('reviewer-one', catalogueIdentity, corrupt));
+    }
+    duringRead = async () => {await root.collection('producerAuthorities').doc('reviewer-one').update({enabled: false});};
+    await assert.rejects(repository().readProductMediaForReview('reviewer-one', catalogueIdentity, first.source), {code: 'forbidden'});
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    derivatives.set(asset, Buffer.from(first.processed).fill(0));
+    await assert.rejects(repository().readProductMediaForReview('reviewer-one', catalogueIdentity, first.source), {code: 'invalid_image'});
+    derivatives.set(asset, first.processed);
+    const commands = productionCommands(first.value), {contentSha256: _, categoryId: __, ...proposal} = commands[1]!,
+      {descriptorSha256: ___, ...packProposal} = commands[3]!;
+    await repository().produceCatalogue('reviewer-one', catalogueIdentity, commands[0]!);
+    await assert.rejects(repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, {...first.source, media: undefined} as unknown as CatalogueSubmissionReference, proposal));
+    await repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, first.source, proposal);
+    await assert.rejects(publicBytes(asset));
+    const resolution = {source: first.source, expectedReviewRevision: 0, idempotencyKey: 'resolve-image', canonicalProductId: 'canonical-one',
+      verifiedPackId: 'pack-one', offers: [{kind: 'retail', offerId: 'offer-one'}]};
+    await assert.rejects(repository().resolveProductReview('reviewer-one', catalogueIdentity, resolution));
+    await repository().produceCatalogue('reviewer-one', catalogueIdentity, commands[2]!);
+    await repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, first.source, packProposal);
+    await repository().produceCatalogue('reviewer-one', catalogueIdentity, commands[4]!);
+    await repository().produceCatalogue('owner-one', catalogueIdentity, commands[5]!);
+    await assert.rejects(repository().resolveProductReview('owner-one', catalogueIdentity, resolution), {code: 'forbidden'});
+    const candidate = await repository().resolveProductReview('reviewer-one', catalogueIdentity, resolution);
+    assert.equal(candidate.schemaVersion, 2); assert.deepEqual(candidate.sku, first.value);
+    const read = {productSubmissionVersion: 1, productReviewVersion: 1, storeId: 'store-one', skuId: 'sku-one'};
+    assert.equal(((await service().handleProductSubmission('owner-one', 'readStoreProductSubmission', read)) as any).review.state, 'awaiting_media');
+    const ready = await service().handleProductSubmission('owner-one', 'readStoreProductSubmission', {...read, productMediaReviewVersion: 1}) as any;
+    assert.equal(ready.review.state, 'ready'); assert.deepEqual(ready.review.candidate, candidate);
+    await assert.rejects(publicBytes(asset));
+    const binding = {storeId: 'store-one', sku: candidate.sku, expectedRevision: 0, idempotencyKey: 'adopt-image',
+      reviewCandidate: {revision: candidate.revision, fingerprint: candidate.fingerprint}};
+    const adopted = await service().bindReviewedSku('owner-one', binding) as any;
+    assert.equal(adopted.saved.revision, 1); assert.equal(adopted.publicationConfirmed, false);
+    assert.deepEqual(await publicBytes(asset), first.processed);
+    assert.equal((await sharp(await publicBytes(asset)).metadata()).width, 640);
+    assert.deepEqual(await service().reconcileBinding('owner-one', binding), adopted);
+    if (process.env.LF03_PUBLISHED_MEDIA_CAPTURE === 'true') {
+      console.log(`LF03_PUBLISHED_MEDIA_PROJECTION=${JSON.stringify({ready, source: first.record, request: binding, response: adopted,
+        publicPage: await service().publicCatalogue({storeId: 'store-one', skuId: 'sku-one', listingReadbackVersion: 1, productFactsReadbackVersion: 1,
+          mediaReadbackVersion: 1, policyReadbackVersion: 1, storeDetailsReadbackVersion: 1}), bytesBase64: first.processed.toString('base64')})}`);
+    }
+    const replacementBytes = await sharp({create: {width: 640, height: 520, channels: 3, background: '#793440'}}).png().toBuffer();
+    const next = await upload(submittedProduct(), replacementBytes, 1), nextAsset = next.source.media!.assetId;
+    assert.notEqual(nextAsset, asset); assert.deepEqual(await publicBytes(asset), first.processed); await assert.rejects(publicBytes(nextAsset));
+    const previousHash = cataloguePayloadHash(first.value.content), nextHash = cataloguePayloadHash(next.value.content);
+    await repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, next.source,
+      {type: 'propose_product_revision', commandId: 'replace-image-propose', expectedVersion: 6, productId: 'canonical-one', previousContentSha256: previousHash});
+    await repository().produceCatalogue('reviewer-one', catalogueIdentity,
+      {type: 'review_product_revision', commandId: 'replace-image-reject', expectedVersion: 7, productId: 'canonical-one', revision: 2,
+        previousContentSha256: previousHash, contentSha256: nextHash, decision: 'reject', reasonCode: 'wrong-image'});
+    await assert.rejects(repository().resolveProductReview('reviewer-one', catalogueIdentity, {...resolution, source: next.source, expectedReviewRevision: 1, idempotencyKey: 'reject-image'}));
+    assert.deepEqual(await publicBytes(asset), first.processed); await assert.rejects(publicBytes(nextAsset));
+    await repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, next.source,
+      {type: 'propose_product_revision', commandId: 'replace-image-repropose', expectedVersion: 8, productId: 'canonical-one', previousContentSha256: previousHash});
+    await repository().readProductMediaForReview('reviewer-one', catalogueIdentity, next.source);
+    await repository().produceCatalogue('reviewer-one', catalogueIdentity,
+      {type: 'review_product_revision', commandId: 'replace-image-approve', expectedVersion: 9, productId: 'canonical-one', revision: 3,
+        previousContentSha256: previousHash, contentSha256: nextHash, decision: 'verify', reasonCode: 'checked-exact-source'});
+    const candidate2 = await repository().resolveProductReview('reviewer-one', catalogueIdentity, {...resolution, source: next.source, expectedReviewRevision: 1, idempotencyKey: 'resolve-replacement'});
+    await service().bindReviewedSku('owner-one', {...binding, sku: candidate2.sku, expectedRevision: 1, idempotencyKey: 'adopt-replacement',
+      reviewCandidate: {revision: candidate2.revision, fingerprint: candidate2.fingerprint}});
+    assert.deepEqual(await publicBytes(nextAsset), next.processed); await assert.rejects(publicBytes(asset));
+    derivatives.set(nextAsset, Buffer.alloc(next.processed.length)); await assert.rejects(publicBytes(nextAsset), {code: 'invalid_image'});
+    derivatives.set(nextAsset, next.processed);
+    duringRead = async () => {await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: {...candidate2.sku, publicListing: false}, expectedRevision: 2, idempotencyKey: 'withdraw-image'});};
+    await assert.rejects(publicBytes(nextAsset));
+    assert.equal((await store.collection('skus').doc('sku-one').get()).get('revision'), 3);
+    assert.deepEqual(await service().reconcileBinding('owner-one', binding), adopted); // Original acknowledgement is not renewed publication.
+    await assert.rejects(publicBytes(nextAsset));
+    assert.equal((await store.collection('skus').get()).size, 1); assert.equal((await store.collection('productMediaAssets').get()).size, 2);
+    // Removing a photo is another source-bound review/adoption, never reuse of its old proof.
+    const removedProduct = submittedProduct();
+    const removedRecord = await repository().submitProduct(productCommand({product: removedProduct, expectedRevision: 2, idempotencyKey: 'remove-image-product'}));
+    const removedSource = {realm: 'evaluation' as const, storeId: 'store-one', skuId: 'sku-one', revision: removedRecord.revision, fingerprint: removedRecord.fingerprint};
+    await repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, removedSource,
+      {type: 'propose_product_revision', commandId: 'remove-image-propose', expectedVersion: 10, productId: 'canonical-one', previousContentSha256: nextHash});
+    await repository().produceCatalogue('reviewer-one', catalogueIdentity,
+      {type: 'review_product_revision', commandId: 'remove-image-approve', expectedVersion: 11, productId: 'canonical-one', revision: 4,
+        previousContentSha256: nextHash, contentSha256: cataloguePayloadHash({...removedProduct.content, media: []}), decision: 'verify', reasonCode: 'checked-photo-removal'});
+    const removedCandidate = await repository().resolveProductReview('reviewer-one', catalogueIdentity,
+      {...resolution, source: removedSource, expectedReviewRevision: 2, idempotencyKey: 'resolve-image-removal'});
+    assert.equal(removedCandidate.schemaVersion, 1); assert.equal(removedCandidate.source.media, undefined);
+    const removedReady = await service().handleProductSubmission('owner-one', 'readStoreProductSubmission', {...read, productMediaReviewVersion: 1});
+    const removedBinding = {...binding, sku: removedCandidate.sku, expectedRevision: 3, idempotencyKey: 'adopt-image-removal',
+      reviewCandidate: {revision: removedCandidate.revision, fingerprint: removedCandidate.fingerprint}};
+    const removedResponse = await service().bindReviewedSku('owner-one', removedBinding);
+    assert.deepEqual((await store.collection('skus').doc('sku-one').get()).get('content.media'), []);
+    await assert.rejects(publicBytes(asset)); await assert.rejects(publicBytes(nextAsset));
+    if (process.env.LF03_PUBLISHED_MEDIA_CAPTURE === 'true') console.log(`LF03_REMOVED_MEDIA_PROJECTION=${JSON.stringify({ready: removedReady, source: removedRecord, response: removedResponse})}`);
+    clock = '2026-10-16T13:00:00.000Z'; await assert.rejects(publicBytes(nextAsset));
+  } finally {await db.terminate(); await deleteApp(app);}
+});
 // Actual byte fixtures, isolated from device data and production media.
 type DecodedProductImage = {bytes: Buffer; source: {sha256: string; byteLength: number;
   width: number; height: number; mimeType: string}; file: {sha256: string; byteLength: number;
@@ -392,9 +592,19 @@ test("LF03-MEDIA GCS derivative recovery is immutable, verified, private and met
   assert.equal(stored.metadata.contentType, "image/png");
   assert.ok(host.calls.filter(call => call.action === "read").every(call => call.generation === "31"));
   assert.equal((await sharp(stored.bytes).metadata()).hasAlpha, true);
+  const processed: StoreProductMediaUpload = {...upload, processed: {originalGeneration: '17', derivativeGeneration: saved.generation,
+    assetId: saved.assetId, processedAt: at, source: image.source, file: (image as NormalizedStoreProductImage).file, meetsPublicSourceFloor: image.meetsPublicSourceFloor}};
+  assert.deepEqual(await host.adapter.readDerivative(processed), image.bytes);
+  await assert.rejects(host.adapter.readDerivative({...processed, processed: {...processed.processed!, derivativeGeneration: '99'}}));
+  const priorMetadata = structuredClone(stored.metadata);
+  stored.metadata = {...priorMetadata, metadata: {...priorMetadata.metadata as Record<string, unknown>, firebaseStorageDownloadTokens: 'forbidden'}};
+  await assert.rejects(host.adapter.readDerivative(processed), {code: 'invalid_image'});
+  stored.metadata = priorMetadata;
   stored.bytes = Buffer.from(stored.bytes).fill(0);
+  await assert.rejects(host.adapter.readDerivative(processed), {code: 'invalid_image'});
   await assert.rejects(host.adapter.save(upload, "17", image as NormalizedStoreProductImage), {code: "invalid_image"});
   host.setPrivate(false);
+  await assert.rejects(host.adapter.readDerivative(processed), {code: 'service_unavailable'});
   await assert.rejects(host.adapter.save(upload, "17", image as NormalizedStoreProductImage), {code: "service_unavailable"});
 });
 test("LF03-MEDIA actual offline GCS signer agrees with the strict client grant contract", async () => {

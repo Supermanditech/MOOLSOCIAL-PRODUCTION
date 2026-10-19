@@ -1,7 +1,8 @@
 import {createHash} from "node:crypto";
+import type {ServerResponse} from "node:http";
 import sharp from "sharp";
 import type {Bucket, File} from "@google-cloud/storage";
-import {FieldPath, type Firestore, type Transaction} from "firebase-admin/firestore";
+import {FieldPath, type DocumentReference, type Firestore, type Transaction} from "firebase-admin/firestore";
 import {applyCatalogueCommand, createCatalogueAggregate, referencedOfferTermAt, reviewedCanonicalProduct,
   type CatalogueAggregate, type CatalogueCommand} from "../commerce/catalogue_contract.js";
 import {isSupplyCapabilityActive, type SupplyActor,
@@ -21,6 +22,32 @@ const productImageByteLimit = 8 * 1024 * 1024;
 let productImageDecodes = 0;
 function invalidProductImage(): WorkspaceProfileError {
   return new WorkspaceProfileError("invalid_image", "Use one complete PNG, JPEG or WebP image within the image limits. Your saved photo is unchanged.", 400);
+}
+let activePublicProductMediaDeliveries = 0;
+/** Route-local memory bound shared across per-request service instances. Slow/closed responses retain their slot until work settles. */
+export async function deliverPublicProductMediaResponse(response: Pick<ServerResponse, "once" | "removeListener" | "destroyed" | "writableFinished">,
+  work: () => Promise<Buffer>, send: (bytes: Buffer) => void): Promise<void> {
+  if (activePublicProductMediaDeliveries >= 2) throw new WorkspaceProfileError("service_unavailable", "Product images are busy. Retry shortly.", 503, true);
+  activePublicProductMediaDeliveries++;
+  let workDone = false, responseDone = response.destroyed || response.writableFinished, released = false;
+  const release = () => {
+    if (!released && workDone && responseDone) {
+      released = true; activePublicProductMediaDeliveries--;
+      response.removeListener("finish", finished); response.removeListener("close", finished);
+    }
+  };
+  const finished = () => {responseDone = true; release();};
+  response.once("finish", finished); response.once("close", finished);
+  try {
+    if (responseDone) {workDone = true; release(); return;}
+    const bytes = await work(); workDone = true;
+    if (response.destroyed || responseDone) {responseDone = true; release(); return;}
+    send(bytes);
+    responseDone ||= response.writableFinished;
+    release();
+  } catch (error) {
+    workDone = true; responseDone = true; release(); throw error;
+  }
 }
 /** Structural animation/truncation checks supplement, never replace, full pixel decoding. */
 function productImageContainer(bytes: Buffer): "png" | "jpeg" | "webp" {
@@ -112,6 +139,7 @@ export interface StoreProductMediaObjects {
   prepare(upload: StoreProductMediaUpload): Promise<{uploadUrl: string; requiredHeaders: Record<string, string>}>;
   read(upload: StoreProductMediaUpload): Promise<{bytes: Buffer; generation: string}>;
   save(upload: StoreProductMediaUpload, generation: string, image: NormalizedStoreProductImage): Promise<{assetId: string; generation: string}>;
+  readDerivative?(upload: StoreProductMediaUpload): Promise<Buffer>;
 }
 function mediaUnavailable(): WorkspaceProfileError {
   return new WorkspaceProfileError("service_unavailable", "Product-image storage is unavailable. Keep your saved photo and retry the original request.", 503, true);
@@ -240,6 +268,22 @@ export class GoogleCloudStoreProductMediaObjects implements StoreProductMediaObj
       return {assetId, generation: derivativeGeneration};
     } catch (error) {if (error instanceof WorkspaceProfileError) throw error; throw mediaUnavailable();}
   }
+  async readDerivative(upload: StoreProductMediaUpload): Promise<Buffer> {
+    try {
+      await this.assertPrivate();
+      const processed = upload.processed;
+      if (!processed) throw invalidProductImage();
+      const path = `private/product-media/v1/${upload.realm}/${upload.uploadId}/derivatives/${processed.assetId}.png`;
+      const file = this.bucket.file(path, {generation: processed.derivativeGeneration}), [metadata] = await file.getMetadata();
+      const expected = {...this.tags(upload), "moolsocial-original-generation": processed.originalGeneration, "moolsocial-sha256": processed.file.sha256};
+      if (String(metadata.generation) !== processed.derivativeGeneration || metadata.contentType !== "image/png" ||
+          Number(metadata.size) !== processed.file.byteLength || Object.entries(expected).some(([k, v]) => metadata.metadata?.[k] !== v) ||
+          Object.hasOwn(metadata.metadata ?? {}, "firebaseStorageDownloadTokens")) throw invalidProductImage();
+      const bytes = await this.boundedBytes(file);
+      if (bytes.length !== processed.file.byteLength || createHash("sha256").update(bytes).digest("hex").toUpperCase() !== processed.file.sha256) throw invalidProductImage();
+      return bytes;
+    } catch (error) {if (error instanceof WorkspaceProfileError) throw error; throw mediaUnavailable();}
+  }
 }
 
 /** Publication mirror only. Never an inventory, order, payment or approval ledger. */
@@ -310,7 +354,7 @@ export interface CatalogueSave {
   reviewCandidate?: {revision: number; fingerprint: string};
 }
 export interface StoreReviewedProductCandidate {
-  schemaVersion: 1; realm: "evaluation" | "production"; storeId: string; skuId: string;
+  schemaVersion: 1 | 2; realm: "evaluation" | "production"; storeId: string; skuId: string;
   revision: number; fingerprint: string; source: CatalogueSubmissionReference;
   identity: CatalogueIdentity; sku: StoreSkuInput; expectedMirrorRevision: number;
   reviewedBy: string; reviewedAt: string; expiresAt: string;
@@ -352,7 +396,10 @@ export interface WorkspaceCatalogueRepository {
   readProductSubmission?(storeId: string, skuId: string, ownerUserId: string): Promise<StoreProductSubmissionRecord | undefined>;
   productMedia?(ownerUserId: string, action: "prepare" | "confirm" | "read", request: StoreProductMediaRequest): Promise<object>;
   readReviewedProductSubmission?(storeId: string, skuId: string, ownerUserId: string,
-    identity: CatalogueIdentity): Promise<StoreProductReviewReadback>;
+    identity: CatalogueIdentity, includeMedia?: boolean): Promise<StoreProductReviewReadback>;
+  publicMediaAsset?(storeId: string, skuId: string, assetId: string, identity: CatalogueIdentity): Promise<{
+    source: PublicCatalogueSource; upload: StoreProductMediaUpload} | undefined>;
+  readMediaDerivative?(upload: StoreProductMediaUpload): Promise<Buffer>;
   /** Complete bounded directory, never public product facts or approval. */
   publicDiscoveryBindings?(): Promise<PublicCatalogueListingBinding[]>;
   publicListingBindings?(record: StoreSkuRecord): Promise<PublicCatalogueListingBinding[] | undefined>;
@@ -480,6 +527,66 @@ export interface CatalogueProducerAuthority {
 export interface CatalogueSubmissionReference {
   realm: "evaluation" | "production"; storeId: string; skuId: string;
   revision: number; fingerprint: string;
+  media?: CatalogueSubmissionMediaProof;
+}
+/** Private immutable processing proof. Public media still uses the existing descriptor shape. */
+export interface CatalogueSubmissionMediaProof {
+  version: 1; uploadId: string; uploadFingerprint: string; selectedSha256: string;
+  assetId: string; originalGeneration: string; derivativeGeneration: string;
+  source: NormalizedStoreProductImage["source"]; file: NormalizedStoreProductImage["file"];
+}
+const productMediaDeliveryBase = "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace";
+export function publicProductMediaPath(realm: "evaluation" | "production", storeId: string, skuId: string, assetId: string): string {
+  if (!/^[A-F0-9]{64}$/u.test(assetId) || !["evaluation", "production"].includes(realm)) invalid();
+  return `/public-product-media/v1/${realm}/${encodeURIComponent(id(storeId))}/${encodeURIComponent(id(skuId))}/${assetId}.png`;
+}
+export function parsePublicProductMediaPath(raw: unknown): {realm: "evaluation" | "production"; storeId: string; skuId: string; assetId: string} | undefined {
+  if (typeof raw !== "string") return undefined;
+  const parts = raw.match(/^\/public-product-media\/v1\/(evaluation|production)\/([^/]+)\/([^/]+)\/([A-F0-9]{64})\.png$/u);
+  if (!parts) return undefined;
+  try {
+    const value = {realm: parts[1] as "evaluation" | "production", storeId: id(decodeURIComponent(parts[2]!)), skuId: id(decodeURIComponent(parts[3]!)), assetId: parts[4]!};
+    return publicProductMediaPath(value.realm, value.storeId, value.skuId, value.assetId) === raw ? value : undefined;
+  } catch {return undefined;}
+}
+function checkedSubmissionMedia(raw: unknown): CatalogueSubmissionMediaProof {
+  const value = exact(raw, ["version", "uploadId", "uploadFingerprint", "selectedSha256", "assetId", "originalGeneration", "derivativeGeneration", "source", "file"]);
+  const source = exact(value.source, ["sha256", "byteLength", "width", "height", "mimeType"]);
+  const file = exact(value.file, ["sha256", "byteLength", "width", "height", "mimeType", "normalized", "frameCount"]);
+  for (const hash of [value.uploadId, value.uploadFingerprint, value.assetId, source.sha256, file.sha256]) {
+    if (typeof hash !== "string" || !/^[A-F0-9]{64}$/u.test(hash)) invalid();
+  }
+  for (const generation of [value.originalGeneration, value.derivativeGeneration]) {
+    if (typeof generation !== "string" || !/^[1-9][0-9]*$/u.test(generation)) invalid();
+  }
+  if (value.version !== 1 || typeof value.selectedSha256 !== "string" || !/^(?:[A-F0-9]{64}|[a-f0-9]{64})$/u.test(value.selectedSha256) ||
+      value.selectedSha256.toUpperCase() !== source.sha256 || typeof source.mimeType !== "string" || !["image/png", "image/jpeg", "image/webp"].includes(source.mimeType) ||
+      integer(source.width, 512, 8192) * integer(source.height, 512, 8192) > 16 * 1024 * 1024 ||
+      integer(source.byteLength, 1, productImageByteLimit) < 1 || integer(file.byteLength, 1, productImageByteLimit) < 1 ||
+      integer(file.width, 128, 1024) * integer(file.height, 128, 1024) > (source.width as number) * (source.height as number) ||
+      file.mimeType !== "image/png" || file.normalized !== true || file.frameCount !== 1 ||
+      value.assetId !== cataloguePayloadHash({uploadId: value.uploadId, generation: value.originalGeneration, sha256: file.sha256})) invalid();
+  return structuredClone(value) as unknown as CatalogueSubmissionMediaProof;
+}
+export function storeProductMediaProof(upload: StoreProductMediaUpload, asOf = new Date().toISOString()): CatalogueSubmissionMediaProof {
+  upload = checkedMediaUpload(upload, asOf);
+  if (!upload.processed || !upload.processed.meetsPublicSourceFloor) throw new WorkspaceProfileError("invalid_image", "Use a sufficiently large product image before public review. Your private photo is kept.", 400);
+  return checkedSubmissionMedia({version: 1, uploadId: upload.uploadId, uploadFingerprint: upload.fingerprint, selectedSha256: upload.sourceSha256,
+    assetId: upload.processed.assetId, originalGeneration: upload.processed.originalGeneration, derivativeGeneration: upload.processed.derivativeGeneration,
+    source: upload.processed.source, file: upload.processed.file});
+}
+function submittedContent(source: StoreProductSubmissionRecord, productId: string, proof?: CatalogueSubmissionMediaProof): StoreSkuContent {
+  if (!proof) {
+    if (source.product.mediaIntent.pendingUpload || source.product.mediaIntent.publishedReferences.length !== 0) throw new WorkspaceProfileError("unavailable", "Product images must finish their review first.", 503);
+    return {...source.product.content, media: []};
+  }
+  proof = checkedSubmissionMedia(proof);
+  if (!source.product.mediaIntent.pendingUpload || source.product.mediaIntent.publishedReferences.length !== 0 ||
+      source.product.mediaIntent.pendingSelectionSha256 !== cataloguePayloadHash({privateSha256: proof.selectedSha256, skuId: source.skuId})) invalid("The processed photo is not this saved selection.");
+  const {sha256: _, ...file} = proof.file;
+  return {...source.product.content, media: [{id: proof.assetId, revision: `m1-${proof.assetId}`,
+    url: productMediaDeliveryBase + publicProductMediaPath(source.realm, source.storeId, source.skuId, proof.assetId),
+    storeId: source.storeId, skuId: source.skuId, canonicalProductId: id(productId), publisherWorkspaceId: source.storeId, file}]};
 }
 export interface CatalogueProductionReceipt {
   fingerprint: string; result: CatalogueAggregate; submission?: CatalogueSubmissionReference;
@@ -491,24 +598,22 @@ export interface CatalogueProduction {
 }
 
 function submissionReference(raw: unknown): CatalogueSubmissionReference {
-  const value = exact(raw, ["realm", "storeId", "skuId", "revision", "fingerprint"]);
-  if (!["evaluation", "production"].includes(String(value.realm)) ||
+  const value = exact(raw, ["realm", "storeId", "skuId", "revision", "fingerprint"], ["media"]);
+  if (typeof value.realm !== "string" || !["evaluation", "production"].includes(value.realm) ||
       typeof value.fingerprint !== "string" || !/^[A-F0-9]{64}$/u.test(value.fingerprint)) invalid();
   return {realm: value.realm as CatalogueSubmissionReference["realm"], storeId: id(value.storeId),
-    skuId: id(value.skuId), revision: integer(value.revision, 1, 1000000000), fingerprint: value.fingerprint};
+    skuId: id(value.skuId), revision: integer(value.revision, 1, 1000000000), fingerprint: value.fingerprint,
+    ...(Object.hasOwn(value, "media") ? {media: checkedSubmissionMedia(value.media)} : {})};
 }
 
 /** Derive facts from a saved source, never accept owner-supplied approval or hashes.
  * Media nominations need the separate verified asset producer; do not drop them.
  */
 export function submittedCatalogueInput(source: StoreProductSubmissionRecord,
-  raw: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  raw: Readonly<Record<string, unknown>>, media?: CatalogueSubmissionMediaProof): Record<string, unknown> {
   const saved = checkedProductSubmission(source, source.realm, source.storeId, source.skuId);
-  if (saved.product.mediaIntent.pendingUpload || saved.product.mediaIntent.publishedReferences.length !== 0) {
-    throw new WorkspaceProfileError("unavailable", "Product images must finish their review first.", 503);
-  }
   const type = text(raw.type, 32), common = ["type", "commandId", "expectedVersion", "productId"];
-  const contentSha256 = cataloguePayloadHash({...saved.product.content, media: []});
+  const contentSha256 = cataloguePayloadHash(submittedContent(saved, media ? id(raw.productId) : "", media));
   if (type === "propose_product") {
     exact(raw, [...common, "brandId", "codes"]);
     return productionInput({...raw, categoryId: saved.product.content.categoryId, contentSha256});
@@ -682,8 +787,9 @@ export class WorkspaceCatalogueService {
   async handleProductSubmission(ownerUserId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const action = storeProductSubmissionOperation(operation);
     if (!action || body.productSubmissionVersion !== 1) invalid();
-    const {productSubmissionVersion: _, productReviewVersion, ...request} = structuredClone(body);
+    const {productSubmissionVersion: _, productReviewVersion, productMediaReviewVersion, ...request} = structuredClone(body);
     if (productReviewVersion !== undefined && (productReviewVersion !== 1 || action !== "read")) invalid();
+    if (productMediaReviewVersion !== undefined && (productMediaReviewVersion !== 1 || productReviewVersion !== 1 || action !== "read")) invalid();
     let review: StoreProductReviewReadback["review"] | undefined;
     let storeId: string, skuId: string, key: string | null = null, record: StoreProductSubmissionRecord | undefined;
     if (action === "read") {
@@ -694,7 +800,7 @@ export class WorkspaceCatalogueService {
         if (!this.identity || !this.repository.readReviewedProductSubmission) {
           throw new WorkspaceProfileError("unavailable", "Product review readback is not connected.", 503);
         }
-        const result = await this.repository.readReviewedProductSubmission(storeId, skuId, id(ownerUserId), {...this.identity});
+        const result = await this.repository.readReviewedProductSubmission(storeId, skuId, id(ownerUserId), {...this.identity}, productMediaReviewVersion === 1);
         record = result.record ?? undefined; review = result.review;
       } else record = await this.repository.readProductSubmission(storeId, skuId, id(ownerUserId));
     } else {
@@ -707,7 +813,39 @@ export class WorkspaceCatalogueService {
       observedAt: this.now().toISOString(), idempotencyKey: key,
       state: record ? record.product.mediaIntent.pendingUpload ? "awaiting_media" : "submitted" : action === "reconcile" ? "not_found" : "none",
       approved: false, publicationConfirmed: false, orderingAvailable: false, record: record ?? null,
-      ...(review ? {productReviewVersion: 1, review} : {})};
+      ...(review ? {productReviewVersion: 1, review} : {}), ...(productMediaReviewVersion === 1 ? {productMediaReviewVersion: 1} : {})};
+  }
+
+  /** Public image bytes only after exact current reviewed listing admission, never an upload URL. */
+  async publicProductMedia(body: Readonly<Record<string, unknown>>): Promise<Buffer> {
+    exact(body, ["realm", "storeId", "skuId", "assetId"]);
+    const storeId = id(body.storeId), skuId = id(body.skuId), assetId = text(body.assetId, 64);
+    if (body.realm !== this.repository.realm || !/^[A-F0-9]{64}$/u.test(assetId)) invalid();
+    const missing = () => new WorkspaceProfileError("not_found", "This public product image is unavailable.", 404);
+    if (!this.identity || !this.repository.publicMediaAsset || !this.repository.readMediaDerivative) throw missing();
+    const admit = async () => {
+      const resolved = await this.repository.publicMediaAsset!(storeId, skuId, assetId, this.identity!);
+      if (!resolved) throw missing();
+      const {source, upload} = resolved, record = source.records[0];
+      if (!record || source.records.length !== 1 || record.skuId !== skuId) throw missing();
+      const proof = storeProductMediaProof(upload, this.now().toISOString());
+      const descriptor = {id: proof.assetId, revision: `m1-${proof.assetId}`, url: productMediaDeliveryBase + publicProductMediaPath(this.repository.realm, storeId, skuId, assetId),
+        storeId, skuId, canonicalProductId: record.canonicalProductId, publisherWorkspaceId: storeId,
+        file: (({sha256: _, ...file}) => file)(proof.file)};
+      if (!record.content.media.some(media => cataloguePayloadHash(media) === cataloguePayloadHash(descriptor))) throw missing();
+      independentProductReview(source.catalogue, record, upload.ownerUserId);
+      const page = await this.publicCatalogue({storeId, skuId, listingReadbackVersion: 1, productFactsReadbackVersion: 1,
+        unbrandedProduceReadbackVersion: 1, mediaReadbackVersion: 1}, source) as {state?: string; items?: Array<{skuId: string}>};
+      if (page.state !== "ready" || !page.items?.some(item => item.skuId === skuId)) throw missing();
+      return {upload, fingerprint: cataloguePayloadHash({source, proof})};
+    };
+    const first = await admit(), bytes = await this.repository.readMediaDerivative(first.upload);
+    if (bytes.length !== first.upload.processed!.file.byteLength ||
+        createHash("sha256").update(bytes).digest("hex").toUpperCase() !== first.upload.processed!.file.sha256) throw missing();
+    // Withdrawal/canonical changes/expiry during object IO cannot release bytes from an older snapshot.
+    const last = await admit();
+    if (first.fingerprint !== last.fingerprint) throw missing();
+    return bytes;
   }
 
   /** Complete bounded discovery, not serviceability, Stock or ordering authority.
@@ -1563,10 +1701,10 @@ function reviewedCandidateReference(raw: unknown): {revision: number; fingerprin
   return {revision: integer(value.revision, 1, 1000000000), fingerprint: value.fingerprint};
 }
 function candidateSku(source: StoreProductSubmissionRecord, productId: string, packId: string,
-  rawOffers: unknown): StoreSkuInput {
+  rawOffers: unknown, media?: CatalogueSubmissionMediaProof): StoreSkuInput {
   // Reuse the media-wait check, without inventing an approved asset from a nomination.
   submittedCatalogueInput(source, {type: "propose_pack", commandId: "candidate-validation",
-    expectedVersion: 1, productId, packId, codes: []});
+    expectedVersion: 1, productId, packId, codes: []}, media);
   const offers = list(rawOffers, 2).map(raw => {
     const row = exact(raw, ["kind", "offerId"]);
     if (typeof row.kind !== "string" || !["retail", "wholesale", "bulk"].includes(row.kind)) invalid();
@@ -1574,7 +1712,7 @@ function candidateSku(source: StoreProductSubmissionRecord, productId: string, p
   });
   if (offers.length !== source.product.channels.length || new Set(offers.map(o => o.kind)).size !== offers.length) invalid();
   return normalizeSku({skuId: source.skuId, sku: source.product.sku, canonicalProductId: id(productId),
-    verifiedPackId: id(packId), publicListing: true, content: {...source.product.content, media: []}, pack: source.product.pack,
+    verifiedPackId: id(packId), publicListing: true, content: submittedContent(source, productId, media), pack: source.product.pack,
     provenance: source.product.provenance, channels: source.product.channels.map(channel => {
       const offer = offers.find(o => o.kind === channel.kind); if (!offer) invalid();
       return {...channel, offerId: offer.offerId};
@@ -1614,7 +1752,7 @@ function checkedReviewedCandidate(raw: unknown): StoreReviewedProductCandidate {
   const reference = reviewedCandidateReference({revision: value.revision, fingerprint: value.fingerprint});
   const source = submissionReference(value.source), identity = exact(value.identity, ["catalogueId", "tenantId"]);
   const reviewedAt = text(value.reviewedAt, 32), expiresAt = text(value.expiresAt, 32);
-  if (value.schemaVersion !== 1 || value.realm !== source.realm || value.storeId !== source.storeId || value.skuId !== source.skuId ||
+  if (value.schemaVersion !== (source.media ? 2 : 1) || value.realm !== source.realm || value.storeId !== source.storeId || value.skuId !== source.skuId ||
       !Number.isFinite(Date.parse(reviewedAt)) || new Date(reviewedAt).toISOString() !== reviewedAt ||
       !Number.isFinite(Date.parse(expiresAt)) || new Date(expiresAt).toISOString() !== expiresAt || expiresAt <= reviewedAt) invalid();
   const sku = normalizeSku(value.sku, source.storeId);
@@ -1630,7 +1768,7 @@ function checkedReviewedCandidate(raw: unknown): StoreReviewedProductCandidate {
       termSnapshotSha256: term.termSnapshotSha256 as string, effectiveFrom, expiresAt: until};
   });
   if (terms.length !== sku.channels.length || new Set(terms.map(t => t.kind)).size !== terms.length) invalid();
-  const candidate = {schemaVersion: 1 as const, realm: source.realm, storeId: source.storeId, skuId: source.skuId,
+  const candidate = {schemaVersion: source.media ? 2 as const : 1 as const, realm: source.realm, storeId: source.storeId, skuId: source.skuId,
     revision: reference.revision, source, identity: {catalogueId: id(identity.catalogueId), tenantId: id(identity.tenantId)},
     sku, expectedMirrorRevision: integer(value.expectedMirrorRevision, 0, 1000000000),
     reviewedBy: id(value.reviewedBy), reviewedAt, expiresAt, terms};
@@ -1644,7 +1782,7 @@ function validateReviewedCandidate(candidate: StoreReviewedProductCandidate, sou
       candidate.storeId !== source.storeId || candidate.skuId !== source.skuId || candidate.realm !== source.realm ||
       candidate.reviewedBy === source.submittedBy || at < candidate.reviewedAt || at >= candidate.expiresAt ||
       cataloguePayloadHash(candidate.sku) !== cataloguePayloadHash(candidateSku(source, candidate.sku.canonicalProductId,
-        candidate.sku.verifiedPackId, candidate.sku.channels.map(c => ({kind: c.kind, offerId: c.offerId}))))) {
+        candidate.sku.verifiedPackId, candidate.sku.channels.map(c => ({kind: c.kind, offerId: c.offerId})), candidate.source.media))) {
     invalid("Reviewed product source or terms changed.");
   }
   independentProductReview(catalogue, candidate.sku, source.submittedBy);
@@ -1956,6 +2094,76 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
   constructor(private readonly firestore: Firestore, readonly realm: "evaluation" | "production",
     private readonly now: () => Date = () => new Date(), private readonly mediaObjects?: StoreProductMediaObjects) {}
 
+  private async submissionMedia(transaction: Transaction, source: CatalogueSubmissionReference,
+    submission: StoreProductSubmissionRecord): Promise<StoreProductMediaUpload> {
+    if (!source.media || source.realm !== this.realm || source.revision !== submission.revision || source.fingerprint !== submission.fingerprint ||
+        source.storeId !== submission.storeId || source.skuId !== submission.skuId) invalid("Processed media source is unavailable.");
+    const doc = await transaction.get(this.root(source.storeId).collection("productMediaUploads").doc(source.media.uploadId));
+    if (!doc.exists) throw mediaUnavailable();
+    const upload = checkedMediaUpload(doc.data(), this.now().toISOString());
+    if (upload.realm !== this.realm || upload.ownerUserId !== submission.submittedBy || upload.storeId !== source.storeId ||
+        upload.skuId !== source.skuId || upload.submissionRevision !== source.revision || upload.submissionFingerprint !== source.fingerprint ||
+        cataloguePayloadHash(storeProductMediaProof(upload, this.now().toISOString())) !== cataloguePayloadHash(source.media)) invalid("Processed media proof changed.");
+    submittedContent(submission, "proof-validation-product", source.media);
+    return upload;
+  }
+  async readMediaDerivative(upload: StoreProductMediaUpload): Promise<Buffer> {
+    upload = checkedMediaUpload(structuredClone(upload), this.now().toISOString());
+    if (!this.mediaObjects?.readDerivative) throw mediaUnavailable();
+    const bytes = await this.mediaObjects.readDerivative(upload);
+    if (!upload.processed || bytes.length !== upload.processed.file.byteLength ||
+        createHash("sha256").update(bytes).digest("hex").toUpperCase() !== upload.processed.file.sha256) throw invalidProductImage();
+    return Buffer.from(bytes);
+  }
+  /** Internal trusted reviewer access to the actual derivative, not an owner/public approval API. */
+  async readProductMediaForReview(operatorUserId: string, identity: CatalogueIdentity,
+    original: CatalogueSubmissionReference): Promise<{bytes: Buffer; proof: CatalogueSubmissionMediaProof}> {
+    const operator = id(operatorUserId), source = submissionReference(structuredClone(original));
+    identity = {catalogueId: id(identity.catalogueId), tenantId: id(identity.tenantId)};
+    const load = () => this.firestore.runTransaction(async transaction => {
+      const [authority, snapshot, current] = await transaction.getAll(
+        this.firestore.collection("workspaceCatalogues").doc(this.realm).collection("producerAuthorities").doc(operator),
+        this.productSubmissionHead(source.storeId, source.skuId).collection("revisions").doc(String(source.revision)),
+        this.productSubmissionHead(source.storeId, source.skuId));
+      const actor = producerActor(operator, identity, this.now().toISOString(), authority?.data() as CatalogueProducerAuthority | undefined);
+      if (!actor.scopes.includes("supply.catalogue.review")) throw new WorkspaceProfileError("forbidden", "Independent product review authority is required.", 403);
+      if (!snapshot?.exists || !current?.exists) throw mediaUnavailable();
+      const record = checkedProductSubmission(snapshot.data(), this.realm, source.storeId, source.skuId);
+      if (operator === record.submittedBy) throw new WorkspaceProfileError("forbidden", "Independent product review is required.", 403);
+      await this.productSubmissionOwner(transaction, source.storeId, record.submittedBy);
+      if (cataloguePayloadHash(checkedProductSubmission(current.data(), this.realm, source.storeId, source.skuId)) !== cataloguePayloadHash(record)) {
+        throw new WorkspaceProfileError("stale_snapshot", "Product details changed before image review.", 409);
+      }
+      return this.submissionMedia(transaction, source, record);
+    });
+    const first = await load(), bytes = await this.readMediaDerivative(first), last = await load();
+    if (cataloguePayloadHash(first) !== cataloguePayloadHash(last)) throw mediaUnavailable();
+    return {bytes, proof: storeProductMediaProof(last, this.now().toISOString())};
+  }
+  async publicMediaAsset(storeId: string, skuId: string, assetId: string, identity: CatalogueIdentity): Promise<{
+    source: PublicCatalogueSource; upload: StoreProductMediaUpload} | undefined> {
+    storeId = id(storeId); skuId = id(skuId);
+    if (!/^[A-F0-9]{64}$/u.test(assetId)) invalid();
+    return this.firestore.runTransaction(async transaction => {
+      const root = this.root(storeId), [index, sku, catalogue, profiles] = await Promise.all([
+        transaction.get(root.collection("productMediaAssets").doc(assetId)), transaction.get(root.collection("skus").doc(skuId)),
+        transaction.get(this.firestore.collection("workspaceCatalogues").doc(this.realm).collection("canonicalCatalogues").doc(id(identity.catalogueId))),
+        transaction.get(this.firestore.collection("workspaceProfiles").where("workspaceId", "==", storeId).limit(2))]);
+      if (!index.exists || !sku.exists || !catalogue.exists || profiles.size !== 1 || profiles.docs[0]!.id !== profiles.docs[0]!.get("caseId")) return undefined;
+      const profile = requireStore(profiles.docs[0]!.data() as WorkspaceProfileRecord, storeId), row = normalizeRecord(sku.data(), storeId);
+      if (!profile.shopEnabled || !row.publicListing || row.skuId !== skuId) return undefined;
+      const pointer = exact(index.data(), ["schemaVersion", "source"]), reference = submissionReference(pointer.source);
+      if (pointer.schemaVersion !== 1 || reference.realm !== this.realm || reference.storeId !== storeId || reference.skuId !== skuId || reference.media?.assetId !== assetId) return undefined;
+      const sourceDoc = await transaction.get(this.productSubmissionHead(storeId, skuId).collection("revisions").doc(String(reference.revision)));
+      if (!sourceDoc.exists) return undefined;
+      const upload = await this.submissionMedia(transaction, reference, checkedProductSubmission(sourceDoc.data(), this.realm, storeId, skuId));
+      const expected = cataloguePublicListingBindings(this.realm, row), docs = await transaction.getAll(...expected.map(binding => this.listingRoot().doc(binding.listingId)));
+      if (docs.some(doc => !doc.exists)) return undefined;
+      const bindings = expected.map((binding, i) => checkedListingBinding(docs[i]!.data(), binding));
+      return {source: {profile, records: [row], catalogue: catalogue.data() as CatalogueAggregate, bindings, policy: null}, upload};
+    });
+  }
+
   async productMedia(ownerUserId: string, action: "prepare" | "confirm" | "read", original: StoreProductMediaRequest): Promise<object> {
     const request = mediaRequest({productMediaVersion: 1, ...structuredClone(original)}), owner = id(ownerUserId);
     if (!["prepare", "confirm", "read"].includes(action)) invalid();
@@ -2069,7 +2277,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
     const authorityRef = root.collection("producerAuthorities").doc(operator);
     return this.firestore.runTransaction(async transaction => {
       const [authorityDoc, aggregateDoc, receiptDoc] = await transaction.getAll(authorityRef, aggregateRef, receiptRef);
-      let normalized: Record<string, unknown>;
+      let normalized: Record<string, unknown>, mediaIndex: {ref: DocumentReference; exists: boolean} | undefined;
       if (pinned) {
         const saved = await transaction.get(this.productSubmissionHead(pinned.storeId, pinned.skuId)
           .collection("revisions").doc(String(pinned.revision)));
@@ -2079,10 +2287,16 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
           throw new WorkspaceProfileError("conflict", "Saved product source changed.", 409);
         }
         if (record.submittedBy !== operator) throw new WorkspaceProfileError("forbidden", "Use the original Store owner submission.", 403);
-        normalized = submittedCatalogueInput(record, original);
+        if (pinned.media) {
+          await this.submissionMedia(transaction, pinned, record);
+          const ref = this.root(pinned.storeId).collection("productMediaAssets").doc(pinned.media.assetId), existing = await transaction.get(ref);
+          if (existing.exists && cataloguePayloadHash(existing.data()) !== cataloguePayloadHash({schemaVersion: 1, source: pinned})) invalid("Image source index changed.");
+          mediaIndex = {ref, exists: existing.exists};
+        }
+        normalized = submittedCatalogueInput(record, original, pinned.media);
         const aggregate = aggregateDoc?.data() as CatalogueAggregate | undefined;
         if (!receiptDoc?.exists && normalized.type === "propose_pack" && (!aggregate || !reviewedCanonicalProduct(aggregate, String(normalized.productId),
-          cataloguePayloadHash({...record.product.content, media: []})))) {
+          cataloguePayloadHash(submittedContent(record, String(normalized.productId), pinned.media))))) {
           invalid("Pack proposal requires this exact reviewed product content.");
         }
       } else normalized = productionInput(original);
@@ -2110,6 +2324,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
         transaction.create(aggregateRef.collection("revisions").doc(String(result.aggregate.version)), result.aggregate);
         transaction.create(receiptRef, {fingerprint: result.fingerprint, result: result.aggregate,
           ...(pinned ? {submission: pinned} : {})});
+        if (mediaIndex && !mediaIndex.exists) transaction.create(mediaIndex.ref, {schemaVersion: 1, source: pinned});
       }
       return result.aggregate;
     });
@@ -2217,7 +2432,8 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       requireStore(profile, source.storeId, submission.submittedBy);
       if (operator === submission.submittedBy) throw new WorkspaceProfileError("forbidden", "Independent product review is required.", 403);
       const ownerAuthority = await transaction.get(catalogueRoot.collection("producerAuthorities").doc(submission.submittedBy));
-      const sku = candidateSku(submission, id(body.canonicalProductId), id(body.verifiedPackId), body.offers);
+      if (source.media) await this.submissionMedia(transaction, source, submission);
+      const sku = candidateSku(submission, id(body.canonicalProductId), id(body.verifiedPackId), body.offers, source.media);
       const catalogue = catalogueDoc.data() as CatalogueAggregate | undefined;
       if (!catalogue) invalid("Reviewed catalogue is unavailable.");
       const terms = sku.channels.map(channel => {
@@ -2225,7 +2441,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
         if (!term) invalid("Reviewed selling terms are unavailable.");
         return {kind: channel.kind, offerId: channel.offerId, ...term};
       });
-      const candidateData = {schemaVersion: 1 as const, realm: this.realm, storeId: source.storeId, skuId: source.skuId,
+      const candidateData = {schemaVersion: source.media ? 2 as const : 1 as const, realm: this.realm, storeId: source.storeId, skuId: source.skuId,
         revision: expectedRevision + 1, source, identity, sku, expectedMirrorRevision: currentSku.exists ? normalizeRecord(currentSku.data(), source.storeId).revision : 0,
         reviewedBy: operator, reviewedAt: at, expiresAt: terms.map(t => t.expiresAt).sort()[0]!, terms};
       const candidate = checkedReviewedCandidate({...candidateData, fingerprint: cataloguePayloadHash(candidateData)});
@@ -2238,7 +2454,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
     });
   }
   async readReviewedProductSubmission(storeId: string, skuId: string, ownerUserId: string,
-    identity: CatalogueIdentity): Promise<StoreProductReviewReadback> {
+    identity: CatalogueIdentity, includeMedia = false): Promise<StoreProductReviewReadback> {
     storeId = id(storeId); skuId = id(skuId); ownerUserId = id(ownerUserId);
     identity = {catalogueId: id(identity.catalogueId), tenantId: id(identity.tenantId)};
     const root = this.root(storeId), catalogueRoot = this.firestore.collection("workspaceCatalogues").doc(this.realm);
@@ -2252,12 +2468,17 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       const result = (state: StoreProductReviewReadback["review"]["state"], candidate: StoreReviewedProductCandidate | null = null): StoreProductReviewReadback =>
         ({record, review: {version: 1, state, candidate}});
       if (!record) return result("pending");
-      if (record.product.mediaIntent.pendingUpload || record.product.mediaIntent.publishedReferences.length !== 0) return result("awaiting_media");
-      if (!resolved?.exists) return result("pending");
+      const needsMedia = record.product.mediaIntent.pendingUpload || record.product.mediaIntent.publishedReferences.length !== 0;
+      if (needsMedia && !includeMedia) return result("awaiting_media");
+      if (!resolved?.exists) return result(needsMedia ? "awaiting_media" : "pending");
       const candidate = checkedReviewedCandidate(resolved.data());
       if (candidate.storeId !== storeId || candidate.skuId !== skuId || candidate.realm !== this.realm ||
           cataloguePayloadHash(candidate.identity) !== cataloguePayloadHash(identity)) invalid("Product review scope changed.");
       if (candidate.source.fingerprint !== record.fingerprint || candidate.source.revision !== record.revision) return result("outdated");
+      if (candidate.source.media) {
+        if (!includeMedia) return result("awaiting_media");
+        try {await this.submissionMedia(transaction, candidate.source, record);} catch {return result("unavailable");}
+      }
       const mirror = current?.exists ? normalizeRecord(current.data(), storeId) : undefined;
       if (mirror && mirror.revision === candidate.expectedMirrorRevision + 1) {
         const {schemaVersion: _v, storeId: _s, revision: _r, observedAt: _a, ...input} = mirror;
@@ -2515,6 +2736,8 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
               cataloguePayloadHash(candidate.identity) !== cataloguePayloadHash(reviewedIdentity) ||
               cataloguePayloadHash(candidate.sku) !== cataloguePayloadHash(command.input) ||
               candidate.expectedMirrorRevision !== command.expectedRevision) invalid("Reviewed product candidate changed.");
+          if (candidate.source.media) await this.submissionMedia(transaction, candidate.source,
+            checkedProductSubmission(submission.data(), this.realm, fresh.workspaceId!, command.input.skuId));
           validateReviewedCandidate(candidate, checkedProductSubmission(submission.data(), this.realm, fresh.workspaceId!, command.input.skuId),
             fresh, catalogue?.data() as CatalogueAggregate | undefined, authority?.data() as CatalogueProducerAuthority | undefined,
             participant?.data() as SupplyParticipantWorkspace | undefined, prior, this.now().toISOString());

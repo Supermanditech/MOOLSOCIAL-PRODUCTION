@@ -134,6 +134,8 @@ import {
   storeVariantFamilyOperation,
   storeProductSubmissionOperation,
   GoogleCloudStoreProductMediaObjects,
+  parsePublicProductMediaPath,
+  deliverPublicProductMediaResponse,
 } from "./workspace/workspace_catalogue_service.js";
 import {WorkspaceSupplierPolicyService, FirestoreSupplierPolicyRepository} from "./workspace/workspace_supplier_policy_service.js";
 import {WorkspacePromotionService, FirestorePromotionRepository} from "./workspace/workspace_promotion_service.js";
@@ -2862,6 +2864,20 @@ export const moolSocialWorkspace = onRequest(
     response.setHeader("x-content-type-options", "nosniff");
     response.setHeader("x-request-id", id);
     try {
+      if (request.method === "GET") {
+        const media = parsePublicProductMediaPath(request.path);
+        if (!media || Object.keys(request.query).length !== 0 || (request.rawBody?.byteLength ?? 0) !== 0) {
+          throw new WorkspaceProfileError("not_found", "This public product image is unavailable.", 404);
+        }
+        await deliverPublicProductMediaResponse(response, () => workspaceCatalogueService().publicProductMedia(media), bytes => {
+          response.setHeader("content-type", "image/png");
+          response.setHeader("content-length", String(bytes.length));
+          response.setHeader("cross-origin-resource-policy", "cross-origin");
+          response.setHeader("access-control-allow-origin", "*");
+          response.status(200).send(bytes);
+        });
+        return;
+      }
       if (request.method !== "POST") {
         throw new WorkspaceProfileError(
           "bad_request",

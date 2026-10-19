@@ -25642,18 +25642,19 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         final pending = controller.pending != null;
         final photoProcessed = media?.fresh == true && media?.result?.processed == true && media?.result?.current == true &&
           media?.original?.submissionFingerprint == controller.head?.fingerprint;
+        final reviewedPhoto = controller.review?.candidate?.mediaProof != null;
         return Padding(padding: const EdgeInsets.only(top: 8), child: Column(
           key: const Key('work-product-review-submission'), crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(photoProcessed
+            Text(photoProcessed && !reviewedPhoto
               ? media!.message!
               : controller.message ?? 'Save keeps this product private. Submit saved details for review separately.',
-              key: photoProcessed ? const Key('work-product-photo-status') : null, style: Theme.of(context).textTheme.bodySmall),
-            if (media?.message != null && !photoProcessed) Text(media!.message!, key: const Key('work-product-photo-status'), style: Theme.of(context).textTheme.bodySmall),
+              key: photoProcessed && !reviewedPhoto ? const Key('work-product-photo-status') : null, style: Theme.of(context).textTheme.bodySmall),
+            if (media?.message != null && !photoProcessed && !reviewedPhoto) Text(media!.message!, key: const Key('work-product-photo-status'), style: Theme.of(context).textTheme.bodySmall),
             if (_hasUnsavedEdits && !pending) Text('Save product changes before submitting.', style: Theme.of(context).textTheme.bodySmall),
             if (controller.review?.state == 'ready' && !widget.session.localInventoryEnabled)
               Text('Reviewed details need connected saved-product storage before publishing.', style: Theme.of(context).textTheme.bodySmall),
             Wrap(spacing: 8, runSpacing: 2, children: [
-              if (media != null && _privatePhoto != null && controller.head?.input.mediaPending == true && !photoProcessed)
+              if (media != null && _privatePhoto != null && controller.head?.input.mediaPending == true && !photoProcessed && !reviewedPhoto)
                 TextButton.icon(key: const Key('work-product-photo-upload'), style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                   onPressed: busy || _choosingPhoto || _hasUnsavedEdits || pending || !controller.headLoaded ? null : () async {
                     if (!_mediaEditorCurrent) return;

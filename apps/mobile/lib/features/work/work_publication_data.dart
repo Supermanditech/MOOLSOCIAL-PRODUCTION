@@ -1,5 +1,63 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart' as crypto;
+
 import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
+
+/// Private processing evidence retained through independent review/adoption.
+/// Its descriptor remains the existing public image shape; this value never approves an upload.
+class WorkspaceReviewedProductMediaProof {
+  WorkspaceReviewedProductMediaProof._(this._encoded);
+  final String _encoded;
+  Map<String, dynamic> toJson() => Map<String, dynamic>.from(jsonDecode(_encoded) as Map);
+  String get fingerprint => _encoded;
+  String get assetId => toJson()['assetId'] as String;
+  String get selectedSha256 => toJson()['selectedSha256'] as String;
+  static WorkspaceReviewedProductMediaProof fromJson(Object? raw) {
+    Map<String, dynamic> map(Object? raw, List<String> keys) {
+      if (raw is! Map || raw.length != keys.length || raw.keys.any((key) => !keys.contains(key))) throw const FormatException('Reviewed photo evidence needs recovery.');
+      return Map<String, dynamic>.from(raw);
+    }
+    int number(Object? value, int min, int max) {
+      if (value is! int || value < min || value > max) throw const FormatException();
+      return value;
+    }
+    final value = map(raw, ['version', 'uploadId', 'uploadFingerprint', 'selectedSha256', 'assetId', 'originalGeneration', 'derivativeGeneration', 'source', 'file']);
+    final source = map(value['source'], ['sha256', 'byteLength', 'width', 'height', 'mimeType']);
+    final file = map(value['file'], ['sha256', 'byteLength', 'width', 'height', 'mimeType', 'normalized', 'frameCount']);
+    for (final hash in [value['uploadId'], value['uploadFingerprint'], value['assetId'], source['sha256'], file['sha256']]) {
+      if (hash is! String || !RegExp(r'^[A-F0-9]{64}$').hasMatch(hash)) throw const FormatException();
+    }
+    for (final generation in [value['originalGeneration'], value['derivativeGeneration']]) {
+      if (generation is! String || !RegExp(r'^[1-9][0-9]*$').hasMatch(generation)) throw const FormatException();
+    }
+    final hash = crypto.sha256.convert(utf8.encode(jsonEncode({'generation': value['originalGeneration'], 'sha256': file['sha256'], 'uploadId': value['uploadId']}))).toString().toUpperCase();
+    final area = number(source['width'], 512, 8192) * number(source['height'], 512, 8192);
+    if (number(value['version'], 1, 1) != 1 || value['selectedSha256'] is! String ||
+      !RegExp(r'^(?:[A-F0-9]{64}|[a-f0-9]{64})$').hasMatch(value['selectedSha256'] as String) ||
+      (value['selectedSha256'] as String).toUpperCase() != source['sha256'] ||
+      !{'image/png', 'image/jpeg', 'image/webp'}.contains(source['mimeType']) || area > 16 * 1024 * 1024 ||
+      number(source['byteLength'], 1, 8 * 1024 * 1024) < 1 || number(file['byteLength'], 1, 8 * 1024 * 1024) < 1 ||
+      number(file['width'], 128, 1024) * number(file['height'], 128, 1024) > area ||
+      file['mimeType'] != 'image/png' || file['normalized'] != true || number(file['frameCount'], 1, 1) != 1 || value['assetId'] != hash) {
+      throw const FormatException('Reviewed photo evidence changed.');
+    }
+    Object? sorted(Object? item) => item is Map ? {for (final key in item.keys.cast<String>().toList()..sort()) key: sorted(item[key])}
+      : item is List ? item.map(sorted).toList() : item;
+    return WorkspaceReviewedProductMediaProof._(jsonEncode(sorted(value)));
+  }
+  bool matchesSelection(String skuId, String? selectionHash) => selectionHash == crypto.sha256.convert(utf8.encode(
+    jsonEncode({'privateSha256': selectedSha256, 'skuId': skuId}))).toString().toUpperCase();
+  Map<String, dynamic> descriptor({required String realm, required String storeId, required String skuId, required String canonicalId}) {
+    if (!{'evaluation', 'production'}.contains(realm) || [storeId, skuId, canonicalId].any((v) => !RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(v))) {
+      throw const FormatException();
+    }
+    final file = Map<String, dynamic>.from(toJson()['file'] as Map)..remove('sha256');
+    return {'id': assetId, 'revision': 'm1-$assetId', 'url': 'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'
+      '/public-product-media/v1/$realm/${Uri.encodeComponent(storeId)}/${Uri.encodeComponent(skuId)}/$assetId.png',
+      'storeId': storeId, 'skuId': skuId, 'canonicalProductId': canonicalId, 'publisherWorkspaceId': storeId, 'file': file};
+  }
+}
 
 /// Plain rupee text, parsed without floating-point money. Callers retain their
 /// original price ceiling; quantity limits are separate.
