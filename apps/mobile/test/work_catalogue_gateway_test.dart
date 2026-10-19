@@ -2006,12 +2006,16 @@ void main() {
         onTimeout: () => throw StateError('Host family bridge not ready: ${diagnostics.join('\n')}'));
       final port = configuration['port'] as int;
       expect(port, inInclusiveRange(1, 65535));
+      Map<String, dynamic>? lastPublicRead;
       Future<SocialContentResponse> post(String path, Map<String, Object?> body, Map<String, String> headers) async {
         final request = await client.postUrl(Uri.parse('http://127.0.0.1:$port/$path'));
         headers.forEach(request.headers.set); request.headers.contentType = ContentType.json;
         request.write(jsonEncode(body));
         final response = await request.close().timeout(const Duration(seconds: 15));
         final text = await response.transform(utf8.decoder).join();
+        if (response.statusCode == 200 && body['operation'] == 'readPublicStoreCatalogue') {
+          lastPublicRead = (jsonDecode(text) as Map<String, dynamic>)['data'] as Map<String, dynamic>;
+        }
         if (response.statusCode != 200) {
           // Actual isolated service failure; do not rewrite it into a fixture.
           debugPrint('LF03_CONNECTED_ERROR=${jsonEncode({'operation': body['operation'], 'status': response.statusCode, 'response': text})}');
@@ -2175,6 +2179,64 @@ void main() {
       expect(await restored.requestWorkspaceProductListing('sku-two', listed: true), isFalse);
       expect(await restored.requestWorkspaceProductListing('sku-two', listed: false), isTrue, reason: restored.errorMessage);
       await expectLater(source.loadVariantFamily(entry.product, query), throwsFormatException);
+      // Existing optional editor fields, not a new typed nutrition/schema engine.
+      // Actual private save -> source proposal -> independent review -> adoption
+      // -> strict public readback. These isolated records never enter OPPO.
+      const categoryDetails = {
+        'food': ('cooking-oil', {'Contains allergens': 'Milk', 'May contain allergens': 'Peanuts',
+          'Food declaration': 'Pack states vegetarian', 'Nutrition basis': 'Per 100 ml',
+          'Serving size': '15 ml', 'Nutrition details': 'Energy 90 kcal per serving',
+          'Storage': 'Store in a cool dry place', 'Preparation': ''}),
+        'care': ('surface-cleaners', {'Intended use': 'Floor cleaning', 'Dilution': '20 ml in 1 L water',
+          'Usage': 'Use as directed on pack', 'Storage': 'Keep away from children',
+          'Form or material': 'Liquid', 'Intended surface': 'Sealed tile', 'Model code': ''}),
+        'electronics': ('electronics', {'Model code': 'HOST-PHONE-128', 'RAM': '8 GB',
+          'Storage capacity': '128 GB', 'Compatibility': 'USB-C', 'In the box': 'Phone and cable',
+          'Operating system': 'Manufacturer supplied OS', 'Power rating': ''}),
+        'appliance': ('other', {'Model code': 'HOST-WASHER-7', 'Capacity': '7 kg',
+          'Electrical supply': '230 V 50 Hz', 'Dimensions': '600 x 550 x 850 mm',
+          'Installation requirements': 'Level floor and supplied connections',
+          'In the box': 'Appliance and supplied hose', 'Energy label': '', 'Certification reference': ''}),
+      };
+      for (final scenario in categoryDetails.entries) {
+        final skuId = 'sku-${scenario.key}', category = scenario.value.$1, details = scenario.value.$2;
+        final base = listingItem();
+        final authored = const WorkspaceProductContent().withGuidedDetails(details);
+        final item = WorkspaceCatalogueItem.fromInventoryJson({...base.toInventoryJson(), 'id': skuId,
+          'canonicalId': 'local-$skuId', 'sku': 'HOST-$skuId', 'pack': '1 unit',
+          'stockEntry': {...base.stockEntry!.toJson(), 'productId': skuId, 'sku': 'HOST-$skuId', 'pack': '1 unit'}})
+          .copyWith(title: 'Host ${scenario.key} source', categoryId: category, content: authored,
+            sellingPriceMinor: 10025, packMeasure: const WorkspacePackMeasure(unit: BuyV2ComparisonUnit.count, quantityMilli: 1000));
+        expect(restored.addOrUpdateWorkspaceProduct(item, stockEntryMethod: WorkspaceStockEntryMethod.manual), isTrue,
+          reason: restored.errorMessage);
+        expect(await restored.workspaceInventorySaved, isTrue);
+        final savedItem = WorkspaceCatalogueItem.fromInventoryJson(
+          restored.workspaceCatalogueItems.firstWhere((p) => p.id == skuId).toInventoryJson());
+        expect(savedItem.content.specifications, authored.specifications);
+        expect(await restored.submitWorkspaceProduct(skuId, inputCurrent: () => true), isTrue,
+          reason: restored.workspaceProductSubmission(skuId)?.message);
+        expect(await connection.readPublicEntry(storeId: 'store-one', skuId: skuId,
+          channel: BuyV2OfferClass.retail, current: () => true), isNull, reason: 'Private submission is not publication');
+        await control({'action': 'review-product', 'skuId': skuId});
+        expect(await restored.checkWorkspaceProductSubmission(skuId), isTrue);
+        expect(await restored.publishReviewedWorkspaceProduct(skuId, inputCurrent: () => true), isTrue,
+          reason: restored.errorMessage);
+        final published = await connection.readPublicEntry(storeId: 'store-one', skuId: skuId,
+          channel: BuyV2OfferClass.retail, current: () => true);
+        expect(published, isNotNull);
+        expect(published!.product.sourceSkuId, skuId); expect(published.product.categoryId, category);
+        expect(published.product.priceMinor, 10025);
+        expect({for (final field in published.readback.content.specifications) field.label: field.value}, authored.specifications);
+        final reply = lastPublicRead!;
+        expect(restored.addOrUpdateWorkspaceProduct(savedItem.copyWith(content:
+          authored.withGuidedDetails({details.keys.first: 'Host unpublished replacement'}))), isTrue);
+        expect(await restored.workspaceInventorySaved, isTrue);
+        final unchanged = await connection.readPublicEntry(storeId: 'store-one', skuId: skuId,
+          channel: BuyV2OfferClass.retail, current: () => true);
+        expect({for (final field in unchanged!.readback.content.specifications) field.label: field.value}, authored.specifications);
+        debugPrint('LF03_GUIDED_PROJECTION=${jsonEncode({'kind': scenario.key, 'details': details, 'reply': reply})}');
+      }
+      expect(restored.workspaceInvoices, isEmpty); expect(restored.workspaceOrders, isEmpty);
       await control({'action': 'finish'});
       expect(await child.exitCode.timeout(const Duration(seconds: 15)), 0, reason: diagnostics.join('\n'));
     }, timeout: const Timeout(Duration(minutes: 4)));
@@ -4194,6 +4256,7 @@ void main() {
     session.releaseCatalogueProducts('host-discovery-contract');
   }); }
   final revisionLog = Platform.environment['LF03_REVISION_PUBLIC_LOG'];
+  final guidedLog = Platform.environment['LF03_GUIDED_PUBLIC_LOG'];
   if (revisionLog != null) {
     test('LF03-REVISION actual approved update and other Store original reach the existing public content cache', () async {
       const marker = 'LF_REVISION_PROJECTION=';
@@ -6851,6 +6914,37 @@ void main() {
     facts['regulatoryNote'] = supplied ? 'Host reviewed safety directions' : null;
     (row(data)['content'] as Map)['productFacts'] = facts;
     return factoryEntry(data, channel: trade ? BuyV2OfferClass.wholesale : BuyV2OfferClass.retail).product;
+  }
+  if (guidedLog != null) {
+    for (final kind in ['food', 'care', 'electronics', 'appliance']) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets('LF03-GUIDED actual reviewed service details render $kind at $scale', (tester) async {
+          const marker = 'LF03_GUIDED_PROJECTION=';
+          final captures = File(guidedLog).readAsLinesSync().where((line) => line.contains(marker))
+            .map((line) => jsonDecode(line.split(marker).last) as Map<String, dynamic>)
+            .where((capture) => capture['kind'] == kind).toList();
+          expect(captures, hasLength(1));
+          final capture = captures.single;
+          final entry = WorkspacePublicCatalogueEntry.fromResponse(capture['reply'] as Map<String, dynamic>,
+            storeId: 'store-one', realm: 'evaluation', channel: BuyV2OfferClass.retail, now: at);
+          final content = _HostOptionalProductContent()..specifications = entry.readback.content.specifications;
+          final session = await optionalDetailsSession(entry.product, content);
+          await mountOptionalDetails(tester, session, scale);
+          final details = find.byKey(ValueKey('buy-product-content-ready-${entry.product.id}'));
+          await revealOptionalDetails(tester, entry.product, details);
+          for (final field in (capture['details'] as Map).entries) {
+            expect(find.descendant(of: details, matching: find.text(field.key as String)),
+              (field.value as String).isEmpty ? findsNothing : findsOneWidget);
+            if ((field.value as String).isNotEmpty) {
+              expect(find.descendant(of: details, matching: find.text(field.value as String)), findsOneWidget);
+            }
+          }
+          expect(find.text('Host unpublished replacement'), findsNothing);
+          expect(session.cartLines, isEmpty); expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        });
+      }
+    }
   }
   for (final trade in [false, true]) {
     for (final scale in [1.0, 2.0]) {

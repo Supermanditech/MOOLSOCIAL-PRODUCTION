@@ -1990,9 +1990,12 @@ test('LF03-CONNECTED live family bridge', {
       if (request.url === '/control') {
         if (request.headers['x-lf-control'] !== controlToken) {response.writeHead(403).end(); return;}
         if (body.action === 'review-product') {
-          assert.match(String(body.skuId), /^sku-(one|two)$/u);
+          assert.match(String(body.skuId), /^sku-(one|two|food|care|electronics|appliance)$/u);
           const skuId = String(body.skuId), saved = await repository.readProductSubmission('store-one', skuId, 'owner-one');
           assert.ok(saved);
+          // Isolated fixture provisioning only, never an owner-selected grant.
+          // Each reviewed source still passes the real category/actor guards.
+          await root.collection('participants').doc('store-one').set(producerParticipant('store-one', saved.product.content.categoryId));
           const source: CatalogueSubmissionReference = {realm: 'evaluation', storeId: 'store-one', skuId,
             revision: saved.revision, fingerprint: saved.fingerprint};
           const value: StoreSkuInput = {skuId, sku: saved.product.sku, canonicalProductId: `resolved-${skuId}`,
@@ -2023,7 +2026,7 @@ test('LF03-CONNECTED live family bridge', {
           await assert.rejects(repository.reviewVariantFamily('owner-one', catalogueIdentity, 'store-one', 'family-one', review), {code: 'forbidden'});
           data = await repository.reviewVariantFamily('reviewer-one', catalogueIdentity, 'store-one', 'family-one', review);
         } else if (body.action === 'finish') {
-          assert.equal((await root.collection('stores').doc('store-one').collection('skus').get()).size, 2);
+          assert.equal((await root.collection('stores').doc('store-one').collection('skus').get()).size, 6);
           for (const operation of ['submitStoreProduct', 'bindReviewedStoreCatalogueSku', 'submitStoreVariantFamily', 'readPublicStoreVariantFamilies',
             'saveStorePromotion', 'readPublicPromotionDiscovery']) {
             assert.ok(operations.includes(operation), `Missing actual request ${operation}`);
