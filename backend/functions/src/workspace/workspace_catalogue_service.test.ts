@@ -102,6 +102,84 @@ test('LF03-EXEC exact caller envelopes cannot nominate actor, authority or confi
   await assert.rejects(service.handleCatalogueProduction('reviewer-one', 'approveMyProduct', body));
 });
 
+test('LF03-REVIEW runtime media inspection returns only exact normalized bytes to the verified reviewer', async () => {
+  assert.equal(catalogueModule.catalogueProductionOperation('readCatalogueSourceMedia'), 'review_media');
+  const bytes = await sharp({create: {width: 128, height: 128, channels: 3, background: '#277250'}}).png().toBuffer();
+  const hash = createHash('sha256').update(bytes).digest('hex').toUpperCase();
+  const uploadId = 'A'.repeat(64), generation = '1';
+  const proof = {version: 1 as const, uploadId, uploadFingerprint: 'B'.repeat(64), selectedSha256: 'C'.repeat(64),
+    assetId: cataloguePayloadHash({uploadId, generation, sha256: hash}), originalGeneration: generation, derivativeGeneration: '2',
+    source: {sha256: 'C'.repeat(64), byteLength: 1000, width: 512, height: 512, mimeType: 'image/png'},
+    file: {sha256: hash, byteLength: bytes.length, width: 128, height: 128, mimeType: 'image/png', normalized: true as const, frameCount: 1}};
+  const source = {realm: 'evaluation' as const, storeId: 'store-one', skuId: 'sku-one', revision: 1, fingerprint: 'D'.repeat(64), media: proof};
+  const calls: unknown[] = [];
+  let returned = bytes;
+  const repository = {realm: 'evaluation', readProductMediaForReview: async (...args: unknown[]) => {
+    calls.push(args);
+    if (args[0] !== 'reviewer-one') throw Object.assign(Error('Independent review required'), {code: 'forbidden'});
+    return {bytes: returned, proof};
+  }} as unknown as WorkspaceCatalogueRepository;
+  const service = new WorkspaceCatalogueService(repository, catalogueIdentity, () => new Date(at));
+  assert.deepEqual(await service.handleCatalogueProduction('reviewer-one', 'readCatalogueSourceMedia', {source}), {
+    schemaVersion: 1, realm: 'evaluation', operation: 'readCatalogueSourceMedia', state: 'private_review_media',
+    source, file: {mimeType: 'image/png', sha256: hash, byteLength: bytes.length, base64: bytes.toString('base64')},
+  });
+  assert.deepEqual(calls[0], ['reviewer-one', catalogueIdentity, source]);
+  await assert.rejects(service.handleCatalogueProduction('owner-one', 'readCatalogueSourceMedia', {source}), {code: 'forbidden'});
+  for (const body of [{source, actor: 'reviewer-one'}, {source: {...source, realm: 'production'}}, {source: {...source, media: undefined}}]) {
+    await assert.rejects(service.handleCatalogueProduction('reviewer-one', 'readCatalogueSourceMedia', body));
+  }
+  returned = Buffer.from(bytes).fill(0);
+  await assert.rejects(service.handleCatalogueProduction('reviewer-one', 'readCatalogueSourceMedia', {source}));
+  returned = Buffer.alloc(8 * 1024 * 1024 + 1);
+  await assert.rejects(service.handleCatalogueProduction('reviewer-one', 'readCatalogueSourceMedia', {source}));
+  await assert.rejects(new WorkspaceCatalogueService({realm: 'evaluation'} as WorkspaceCatalogueRepository, catalogueIdentity)
+    .handleCatalogueProduction('reviewer-one', 'readCatalogueSourceMedia', {source}), {code: 'service_unavailable'});
+});
+
+test('LF03-REVIEW runtime variant review preserves exact request and returns a minimal decision acknowledgement', async () => {
+  assert.equal(catalogueModule.catalogueProductionOperation('reviewCatalogueVariantFamily'), 'review_family');
+  const fixture = familyFixture(), calls: unknown[] = [];
+  let result = planStoreVariantFamilyReview('reviewer-one', catalogueIdentity, fixture.review,
+    producerAuthority(false), fixture.candidate, fixture.records, fixture.aggregate, at);
+  const repository = {realm: 'evaluation', reviewVariantFamily: async (...args: unknown[]) => {
+    calls.push(args);
+    if (args[0] !== 'reviewer-one') throw Object.assign(Error('Independent review required'), {code: 'forbidden'});
+    return structuredClone(result);
+  }} as unknown as WorkspaceCatalogueRepository;
+  const service = new WorkspaceCatalogueService(repository, catalogueIdentity, () => new Date(at));
+  const body = {storeId: 'store-one', familyId: fixture.family.familyId, review: fixture.review};
+  const response = await service.handleCatalogueProduction('reviewer-one', 'reviewCatalogueVariantFamily', body);
+  assert.deepEqual(response, {schemaVersion: 1, realm: 'evaluation', operation: 'reviewCatalogueVariantFamily', state: 'reviewed_family',
+    storeId: 'store-one', familyId: fixture.family.familyId, candidateRevision: fixture.candidate.revision,
+    candidateFingerprint: fixture.candidate.fingerprint, reviewRevision: 1, decision: 'verify'});
+  assert.deepEqual(calls[0], ['reviewer-one', catalogueIdentity, 'store-one', fixture.family.familyId, fixture.review]);
+  assert.doesNotMatch(JSON.stringify(response), /reviewerUserId|submittedBy|members|producerAuthorities/);
+  await assert.rejects(service.handleCatalogueProduction('owner-one', 'reviewCatalogueVariantFamily', body), {code: 'forbidden'});
+  for (const field of ['actor', 'operatorUserId', 'authority', 'identity', 'realm', 'catalogueId', 'tenantId']) {
+    await assert.rejects(service.handleCatalogueProduction('reviewer-one', 'reviewCatalogueVariantFamily', {...body, [field]: 'forged'}));
+  }
+  result = {...result, candidate: {...result.candidate, storeId: 'another-store'}};
+  await assert.rejects(service.handleCatalogueProduction('reviewer-one', 'reviewCatalogueVariantFamily', body));
+  await assert.rejects(new WorkspaceCatalogueService({realm: 'evaluation'} as WorkspaceCatalogueRepository, catalogueIdentity)
+    .handleCatalogueProduction('reviewer-one', 'reviewCatalogueVariantFamily', body), {code: 'service_unavailable'});
+});
+
+test('LF03-REVIEW private byte responses use the existing bounded delivery lifecycle after authentication', () => {
+  const index = readFileSync(`${__dirname}/../../src/index.ts`, 'utf8');
+  const start = index.indexOf('export const moolSocialWorkspace = onRequest(');
+  const route = index.slice(start, index.indexOf('function workspaceOrderOperationsService', start));
+  const branch = route.indexOf('if (catalogueProductionAction === "review_media")');
+  assert.ok(branch > route.indexOf('const ownerUserId = await verifySocialInvocation('));
+  const guarded = route.slice(branch, route.indexOf('const result = catalogueProductionAction', branch));
+  assert.ok(guarded.includes('await deliverPublicProductMediaResponse(response, async () =>'));
+  assert.ok(guarded.indexOf('deliverPublicProductMediaResponse') < guarded.indexOf('handleCatalogueProduction'));
+  assert.ok(guarded.includes('Buffer.from(JSON.stringify({ok: true, data:'));
+  assert.ok(guarded.includes('"content-type", "application/json; charset=utf-8"'));
+  assert.ok(guarded.includes('response.status(200).send(bytes)'));
+  assert.match(guarded, /return;\s*\}\s*$/u);
+});
+
 test('LF03-EXEC existing HTTP dispatch pins privileged actions to verified mutation identity and default-off activation', () => {
   const index = readFileSync(`${__dirname}/../../src/index.ts`, 'utf8');
   const start = index.indexOf('export const moolSocialWorkspace = onRequest('), end = index.indexOf('function workspaceOrderOperationsService', start);
@@ -678,6 +756,14 @@ test('LF03-PUBLISHED emulator actual processed image to independent content revi
     assert.equal((await store.collection('skus').get()).size, 0);
     const preview = await repository().readProductMediaForReview('reviewer-one', catalogueIdentity, first.source);
     assert.deepEqual(preview.bytes, first.processed); assert.deepEqual(preview.proof, first.source.media);
+    const inspection = () => service().handleCatalogueProduction('reviewer-one', 'readCatalogueSourceMedia', {source: first.source}) as
+      Promise<{state: string; source: CatalogueSubmissionReference; file: {base64: string; sha256: string; byteLength: number}}>;
+    const inspected = await inspection();
+    assert.equal(inspected.state, 'private_review_media'); assert.deepEqual(inspected.source, first.source);
+    assert.deepEqual(Buffer.from(inspected.file.base64, 'base64'), first.processed);
+    assert.equal(inspected.file.sha256, first.source.media!.file.sha256);
+    assert.equal(inspected.file.byteLength, first.processed.length);
+    await assert.rejects(service().handleCatalogueProduction('owner-one', 'readCatalogueSourceMedia', {source: first.source}), {code: 'forbidden'});
     await assert.rejects(repository().readProductMediaForReview('owner-one', catalogueIdentity, first.source), {code: 'forbidden'});
     await assert.rejects(repository().readProductMediaForReview('reviewer-one', {...catalogueIdentity, tenantId: 'other-tenant'}, first.source), {code: 'forbidden'});
     for (const corrupt of [ {...first.source, realm: 'production' as const}, {...first.source, storeId: 'other-store'},
@@ -686,10 +772,10 @@ test('LF03-PUBLISHED emulator actual processed image to independent content revi
       await assert.rejects(repository().readProductMediaForReview('reviewer-one', catalogueIdentity, corrupt));
     }
     duringRead = async () => {await root.collection('producerAuthorities').doc('reviewer-one').update({enabled: false});};
-    await assert.rejects(repository().readProductMediaForReview('reviewer-one', catalogueIdentity, first.source), {code: 'forbidden'});
+    await assert.rejects(inspection(), {code: 'forbidden'});
     await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
     derivatives.set(asset, Buffer.from(first.processed).fill(0));
-    await assert.rejects(repository().readProductMediaForReview('reviewer-one', catalogueIdentity, first.source), {code: 'invalid_image'});
+    await assert.rejects(inspection(), {code: 'invalid_image'});
     derivatives.set(asset, first.processed);
     const commands = productionCommands(first.value), {contentSha256: _, categoryId: __, ...proposal} = commands[1]!,
       {descriptorSha256: ___, ...packProposal} = commands[3]!;
@@ -2083,7 +2169,27 @@ test("family emulator private submit, trusted approval, public exact siblings, r
     assert.equal((await service().publicVariantFamilies({...query, familyId: family.familyId}) as Result).state, "unavailable");
     const review = {expectedCandidateRevision: 1, expectedCandidateFingerprint: candidate.fingerprint,
       expectedReviewRevision: 0, decision: "verify", reasonCode: "checked-source", idempotencyKey: "family-review-one"};
-    await assert.rejects(repository().reviewVariantFamily("owner-one", identity, storeId, family.familyId, review));
+    const reviewBody = {storeId, familyId: family.familyId, review};
+    await assert.rejects(service().handleCatalogueProduction('owner-one', 'reviewCatalogueVariantFamily', reviewBody), {code: 'forbidden'});
+    for (const changedOwner of ['reviewer-one', 'another-owner']) {
+      await db.collection('workspaceProfiles').doc(caseId).update({ownerUserId: changedOwner});
+      await assert.rejects(service().handleCatalogueProduction('reviewer-one', 'reviewCatalogueVariantFamily', reviewBody), {code: 'not_found'});
+      assert.equal((await root.collection('stores').doc(storeId).collection('variantFamilyReviews').doc(family.familyId).get()).exists, false,
+        'A pending family from a former owner cannot be newly approved after transfer.');
+    }
+    await db.collection('workspaceProfiles').doc(caseId).update({ownerUserId: 'owner-one'});
+    const acknowledgement = await service().handleCatalogueProduction('reviewer-one', 'reviewCatalogueVariantFamily', reviewBody);
+    assert.deepEqual(acknowledgement, {schemaVersion: 1, realm: 'evaluation', operation: 'reviewCatalogueVariantFamily', state: 'reviewed_family',
+      storeId, familyId: family.familyId, candidateRevision: candidate.revision, candidateFingerprint: candidate.fingerprint,
+      reviewRevision: 1, decision: 'verify'});
+    assert.deepEqual(await service().handleCatalogueProduction('reviewer-one', 'reviewCatalogueVariantFamily', reviewBody), acknowledgement);
+    await db.collection('workspaceProfiles').doc(caseId).update({ownerUserId: 'reviewer-one'});
+    assert.deepEqual(await service().handleCatalogueProduction('reviewer-one', 'reviewCatalogueVariantFamily', reviewBody), acknowledgement,
+      'Recover an already-recorded original result without creating a new decision.');
+    await assert.rejects(service().handleCatalogueProduction('reviewer-one', 'reviewCatalogueVariantFamily', {...reviewBody,
+      review: {...review, expectedReviewRevision: 1, decision: 'reject', idempotencyKey: 'new-after-transfer'}}), {code: 'not_found'});
+    assert.equal((await root.collection('stores').doc(storeId).collection('variantFamilyReviews').doc(family.familyId).get()).get('revision'), 1);
+    await db.collection('workspaceProfiles').doc(caseId).update({ownerUserId: 'owner-one'});
     const approved = await repository().reviewVariantFamily("reviewer-one", identity, storeId, family.familyId, review);
     assert.deepEqual(await repository().reviewVariantFamily("reviewer-one", identity, storeId, family.familyId, review), approved);
     const after = await service().publicVariantFamilies({...query, familyId: family.familyId}) as Result;
@@ -2102,8 +2208,8 @@ test("family emulator private submit, trusted approval, public exact siblings, r
       assert.equal(row.membership.listing.skuId, row.product.skuId); assert.equal(row.product.channels[0]!.priceMinor, 26000);
       assert.equal(Object.hasOwn(row.product, "provenance"), false);
     }
-    await assert.rejects(repository().reviewVariantFamily("reviewer-one", identity, storeId, family.familyId,
-      {...review, reasonCode: "changed-original"}), {code: "conflict"});
+    await assert.rejects(service().handleCatalogueProduction('reviewer-one', 'reviewCatalogueVariantFamily',
+      {...reviewBody, review: {...review, reasonCode: 'changed-original'}}), {code: 'conflict'});
     const competing = {...family, familyId: "another-family"};
     const another = await repository().submitVariantFamily(storeVariantFamilySubmission("owner-one", "evaluation",
       {...original, idempotencyKey: "other-family", family: competing}, at));

@@ -2994,6 +2994,18 @@ export const moolSocialWorkspace = onRequest(
       const service = workspaceProfileService();
       const orders = retailerOrderService();
       const {operation: _operation, ...catalogueBody} = body;
+      if (catalogueProductionAction === "review_media") {
+        // Reuse the bounded response lifecycle for private normalized bytes too.
+        // Acquire only after authentication, before retrieval/base64/JSON work;
+        // slow or disconnected clients retain their slot until work settles.
+        await deliverPublicProductMediaResponse(response, async () =>
+          Buffer.from(JSON.stringify({ok: true, data:
+            await workspaceCatalogueService().handleCatalogueProduction(ownerUserId, operation, catalogueBody)})), bytes => {
+          response.setHeader("content-type", "application/json; charset=utf-8");
+          response.status(200).send(bytes);
+        });
+        return;
+      }
       const result = catalogueProductionAction !== undefined
         ? await workspaceCatalogueService().handleCatalogueProduction(ownerUserId, operation, catalogueBody)
         : stockOperation !== undefined

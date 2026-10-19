@@ -424,6 +424,10 @@ export interface WorkspaceCatalogueRepository {
     source: CatalogueSubmissionReference, input: Readonly<Record<string, unknown>>): Promise<CatalogueAggregate>;
   resolveProductReview?(operatorUserId: string, identity: CatalogueIdentity,
     input: Readonly<Record<string, unknown>>): Promise<StoreReviewedProductCandidate>;
+  readProductMediaForReview?(operatorUserId: string, identity: CatalogueIdentity,
+    source: CatalogueSubmissionReference): Promise<{bytes: Buffer; proof: CatalogueSubmissionMediaProof}>;
+  reviewVariantFamily?(operatorUserId: string, identity: CatalogueIdentity, storeId: string,
+    familyId: string, input: Readonly<Record<string, unknown>>): Promise<StoreVariantFamilyReview>;
   storeStock?(owner: string | undefined, action: StoreStockAction, request: StoreStockRequest,
     identity: CatalogueIdentity, admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object>;
   store(storeId: string): Promise<WorkspaceProfileRecord | undefined>;
@@ -833,10 +837,12 @@ export function storeVariantFamilyOperation(operation: unknown): "submit" | "own
   if (operation === "readPublicStoreVariantFamilies") return "public_read";
   return undefined;
 }
-export function catalogueProductionOperation(operation: unknown): "proposal" | "command" | "resolve" | undefined {
+export function catalogueProductionOperation(operation: unknown): "proposal" | "command" | "resolve" | "review_media" | "review_family" | undefined {
   return operation === "submitCatalogueSourceProposal" ? "proposal"
     : operation === "executeCatalogueProduction" ? "command"
-    : operation === "resolveStoreProductReview" ? "resolve" : undefined;
+    : operation === "resolveStoreProductReview" ? "resolve"
+    : operation === "readCatalogueSourceMedia" ? "review_media"
+    : operation === "reviewCatalogueVariantFamily" ? "review_family" : undefined;
 }
 
 export function storeProductSubmissionOperation(operation: unknown): "submit" | "read" | "reconcile" | undefined {
@@ -920,6 +926,36 @@ export class WorkspaceCatalogueService {
     const unavailable = () => new WorkspaceProfileError("service_unavailable", "Catalogue operations are not connected.", 503);
     if (!this.identity) throw unavailable();
     const identity = {catalogueId: id(this.identity.catalogueId), tenantId: id(this.identity.tenantId)};
+    if (action === "review_media") {
+      exact(body, ["source"]);
+      const source = submissionReference(body.source);
+      if (source.realm !== this.repository.realm || !source.media) invalid();
+      if (!this.repository.readProductMediaForReview) throw unavailable();
+      // The repository checks current independent authority both before and after
+      // private byte retrieval. No owner/public URL or private aggregate escapes.
+      const result = await this.repository.readProductMediaForReview(actor, identity, source);
+      const proof = checkedSubmissionMedia(result.proof), bytes = result.bytes;
+      if (cataloguePayloadHash(proof) !== cataloguePayloadHash(source.media) || !Buffer.isBuffer(bytes) ||
+          bytes.length !== proof.file.byteLength || bytes.length > productImageByteLimit ||
+          createHash("sha256").update(bytes).digest("hex").toUpperCase() !== proof.file.sha256) throw invalidProductImage();
+      return {schemaVersion: 1, realm: this.repository.realm, operation, state: "private_review_media", source,
+        file: {mimeType: proof.file.mimeType, sha256: proof.file.sha256, byteLength: bytes.length, base64: bytes.toString("base64")}};
+    }
+    if (action === "review_family") {
+      exact(body, ["storeId", "familyId", "review"]);
+      const storeId = id(body.storeId), familyId = id(body.familyId), review = object(body.review);
+      exact(review, ["expectedCandidateRevision", "expectedCandidateFingerprint", "expectedReviewRevision", "decision", "reasonCode", "idempotencyKey"]);
+      if (!this.repository.reviewVariantFamily) throw unavailable();
+      const result = checkedFamilyReview(await this.repository.reviewVariantFamily(actor, identity, storeId, familyId, review));
+      if (result.reviewerUserId !== actor || result.catalogueId !== identity.catalogueId || result.tenantId !== identity.tenantId ||
+          result.candidate.realm !== this.repository.realm || result.candidate.storeId !== storeId || result.candidate.family.familyId !== familyId ||
+          result.candidate.revision !== review.expectedCandidateRevision || result.candidate.fingerprint !== review.expectedCandidateFingerprint ||
+          result.revision !== integer(review.expectedReviewRevision, 0, 999999999) + 1 ||
+          result.decision !== review.decision || result.reasonCode !== review.reasonCode) invalid();
+      return {schemaVersion: 1, realm: this.repository.realm, operation, state: "reviewed_family", storeId, familyId,
+        candidateRevision: result.candidate.revision, candidateFingerprint: result.candidate.fingerprint,
+        reviewRevision: result.revision, decision: result.decision};
+    }
     if (action === "resolve") {
       exact(body, ["source", "expectedReviewRevision", "idempotencyKey", "canonicalProductId", "verifiedPackId", "offers"]);
       if (!this.repository.resolveProductReview) throw unavailable();
@@ -2929,7 +2965,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
         transaction.get(reviewHead), transaction.get(receipt),
         transaction.get(root.collection("variantFamilyReviews").limit(201)),
         transaction.get(root.collection("variantPublication").doc("current"))]);
-      requireStore(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId")
+      const profile = requireStore(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId")
         ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined, store);
       const authority = authorityDoc.data() as CatalogueProducerAuthority | undefined;
       const at = this.now().toISOString(), actor = producerActor(operator, identity, at, authority);
@@ -2946,6 +2982,10 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       if (!candidateDoc.exists || familyDocs.size > 200) invalid("Family review source is incomplete.");
       const candidate = checkedFamilyCandidate(candidateDoc.data() as StoreVariantFamilyCandidate);
       if (candidate.realm !== this.realm || candidate.storeId !== store || candidate.family.familyId !== family) invalid();
+      // A former owner's pending submission cannot acquire approval after a
+      // Store transfer, including a transfer to the privileged reviewer.
+      // Original receipts above remain reads of their already-recorded result.
+      requireStore(profile, store, candidate.submittedBy);
       const skuDocs = await transaction.getAll(...candidate.family.members.map(member => root.collection("skus").doc(member.skuId)));
       const records = skuDocs.filter(doc => doc.exists).map(doc => {
         const row = normalizeRecord(doc.data(), store); if (row.skuId !== doc.id) invalid(); return row;
