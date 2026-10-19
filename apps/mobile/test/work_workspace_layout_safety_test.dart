@@ -8582,6 +8582,39 @@ void main() {
     });
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF14-VISITS journey explains distinct signed-in accounts without inventing conversion scale=$scale', (tester) async {
+      // Isolated presentation fixture, never injected into native/provider data.
+      var signedInSource = true;
+      final work = liveStore(analyticsReader: (request) async => WorkspaceAnalyticsSnapshot(
+        request: request, state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.partial,
+        source: 'Automated journey presentation fixture', updatedAt: DateTime.now(),
+        coveredFrom: request.start, coveredUntil: request.end,
+        metrics: [WorkspaceAnalyticsMetric(id: 'journey-store', state: WorkspaceAnalyticsState.verified,
+          coverage: WorkspaceAnalyticsCoverage.partial, basis: WorkspaceAnalyticsBasis.periodActivity,
+          unit: WorkspaceAnalyticsUnit.count, source: signedInSource
+            ? 'Signed-in Store visits only · tracked 16/10/2026 12:00 to 16/10/2026 12:01'
+            : 'Another provider with its own visitor population', value: 2, asOf: request.end)]));
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 720), textScale: scale, openHomeActions: false);
+      await _toggleHomeCategory(tester, 'journey');
+      String value(String id) => tester.widget<Text>(find.byKey(Key('store-analytics-value-$id'))).data!;
+      expect(value('journey-store'), '2');
+      expect(find.text('Signed-in accounts · each counted once. Only recorded visits are included.'), findsOneWidget);
+      expect(value('order-conversion'), '—'); expect(value('cart-dropoff'), '—');
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(tester.takeException(), isNull);
+      signedInSource = false;
+      await tester.ensureVisible(find.byTooltip('Refresh analytics'));
+      await tester.tap(find.byTooltip('Refresh analytics')); await tester.pumpAndSettle();
+      expect(value('journey-store'), '2');
+      expect(find.text('Start of the customer journey'), findsOneWidget);
+      expect(find.text('Signed-in accounts · each counted once. Only recorded visits are included.'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('ANALYTICS percentages require matching cohort basis and unit', (
     tester,
   ) async {

@@ -5371,7 +5371,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
             ? 'Selected period activity' : 'Current position' : 'Basis unverified',
           source: known ? '${metric!.source}; as of ${metric.asOf!.toUtc().toIso8601String()}' : 'Report source not connected or eligible',
           coverage: known ? '${metric!.coverage.name}; provider records ${provider!.coveredFrom!.toUtc().toIso8601String()} to ${provider.coveredUntil!.toUtc().toIso8601String()}' : 'Unknown; not zero',
-          meaning: definition.guide));
+          meaning: _StoreAnalyticsProviderReportState.metricGuide(definition.id, definition.guide, metric)));
       }
     }
     for (final group in const [
@@ -6531,6 +6531,12 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
   bool _definitions = false;
   WorkspaceAnalyticsRequest? get _request => widget.request;
   Future<WorkspaceAnalyticsSnapshot>? get _result => widget.result;
+  static String metricGuide(String id, String fallback, WorkspaceAnalyticsMetric? metric) =>
+      id == 'journey-store' && storeAnalyticsMetricEligible(id, metric) &&
+        metric!.coverage == WorkspaceAnalyticsCoverage.partial &&
+        metric.source.startsWith('Signed-in Store visits only · tracked ')
+          ? 'Signed-in accounts · each counted once. Only recorded visits are included.'
+          : fallback;
   static List<({String id, String label, String guide})> definitions(String report) => switch (report) {
       'public' => const [
         (
@@ -6846,6 +6852,7 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                       final metric = values[row.id];
                       final percentage = const {'order-conversion', 'cart-dropoff'}.contains(row.id);
                       final known = storeAnalyticsMetricEligible(row.id, metric);
+                      final guide = metricGuide(row.id, row.guide, metric);
                       final stageIcon = switch (row.id) {
                         'journey-store' => Icons.storefront_outlined,
                         'journey-product' => Icons.inventory_2_outlined,
@@ -6882,7 +6889,7 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                                       size: 18, color: _AnalyticsChartPalette.reportAccent(widget.report))),
                                     const SizedBox(width: 6),
                                   ],
-                                  Expanded(child: Tooltip(message: row.guide, triggerMode: TooltipTriggerMode.tap, child: Text(
+                                  Expanded(child: Tooltip(message: guide, triggerMode: TooltipTriggerMode.tap, child: Text(
                                   row.label,
                                   style: const TextStyle(
                                     fontSize: 14,
@@ -6895,7 +6902,7 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                                   padding: EdgeInsets.only(left: stageIcon == null ? 0 : 15, top: 4, bottom: 4),
                                   decoration: BoxDecoration(border: row.id.startsWith('journey-') && stageIcon != null && row.id != 'journey-completed'
                                     ? Border(left: BorderSide(width: 2, color: _AnalyticsChartPalette.border)) : null),
-                                  child: known || _definitions ? Text(row.guide,
+                                  child: known || _definitions ? Text(guide,
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: _OperatingPalette.secondary,

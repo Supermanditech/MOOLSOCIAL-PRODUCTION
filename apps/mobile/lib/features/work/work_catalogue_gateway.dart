@@ -2952,7 +2952,7 @@ class WorkspaceProductPresentationGateway {
     return WorkspaceAnalyticsSnapshot(request: request, state: WorkspaceAnalyticsState.verified,
       coverage: WorkspaceAnalyticsCoverage.partial, source: 'Recorded signed-in Store visits', updatedAt: observed,
       coveredFrom: from, coveredUntil: until, metrics: [
-        for (final entry in {'store-views': count, 'visits': count, 'visitors': visitors}.entries)
+        for (final entry in {'store-views': count, 'visits': count, 'visitors': visitors, 'journey-store': visitors}.entries)
           WorkspaceAnalyticsMetric(id: entry.key, state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.partial,
             basis: WorkspaceAnalyticsBasis.periodActivity, unit: WorkspaceAnalyticsUnit.count, source: source, value: entry.value, asOf: until),
       ]);

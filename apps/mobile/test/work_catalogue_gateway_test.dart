@@ -2512,10 +2512,29 @@ void main() {
       addTearDown(work.dispose); work.bindProductPresentationReader(gateway);
       final snapshot = await work.readWorkspaceAnalytics(presentationRequest());
       expect(snapshot.state, WorkspaceAnalyticsState.verified); expect(snapshot.coverage, WorkspaceAnalyticsCoverage.partial);
-      expect({for (final metric in snapshot.metrics) metric.id: metric.value}, {'product-views': 1, 'store-views': 3, 'visits': 3, 'visitors': 2});
+      expect({for (final metric in snapshot.metrics) metric.id: metric.value}, {'product-views': 1, 'store-views': 3, 'visits': 3, 'visitors': 2, 'journey-store': 2});
       expect(snapshot.metrics.every((m) => m.coverage == WorkspaceAnalyticsCoverage.partial && m.cohortId == null), isTrue);
       expect(snapshot.breakdowns.single.id, 'most-viewed-products');
       expect(credentials.modes, [SocialAppCheckTokenMode.limitedUse, SocialAppCheckTokenMode.standard, SocialAppCheckTokenMode.standard]);
+    });
+    test('LF14-VISITS covered empty interval supplies genuine zero journey stage without conversion', () async {
+      final data = (storeVisitCapture()['zero'] as Map).cast<String, dynamic>();
+      final gateway = visitGateway(OwnerTransport((_) async => SocialContentResponse(statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': data}))), product: false);
+      final snapshot = await gateway.readAnalytics(WorkspaceAnalyticsRequest(accountScope: 'owner-one', storeId: 'store-one',
+        start: DateTime.parse(data['start']), end: DateTime.parse(data['end'])));
+      expect(snapshot.state, WorkspaceAnalyticsState.verified);
+      expect(snapshot.metrics.singleWhere((metric) => metric.id == 'journey-store').value, 0);
+      expect(snapshot.metrics.every((metric) => metric.cohortId == null && metric.coverage == WorkspaceAnalyticsCoverage.partial), isTrue);
+      expect(snapshot.metrics.where((metric) => ['order-conversion', 'cart-dropoff', 'journey-left'].contains(metric.id)), isEmpty);
+    });
+    test('LF14-VISITS retired account cannot expose a returned journey stage', () async {
+      var live = true;
+      final gateway = visitGateway(OwnerTransport((_) async {
+        live = false;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': storeVisitCapture()['aggregate']}));
+      }), product: false, current: () => live);
+      await expectLater(gateway.readAnalytics(presentationRequest()), throwsFormatException);
     });
     for (final fault in ['realm', 'Store', 'extra', 'coverage', 'visitors exceed visits', 'zero visitors with visits', 'future', 'collection', 'range']) {
       test('LF14-VISITS corrupt $fault source stays unavailable, never zero', () async {
