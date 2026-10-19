@@ -10077,6 +10077,7 @@ class WorkSession extends ChangeNotifier {
         ...WorkspacePublicationContract.inspect(
         store: activeWorkspace,
         products: workspaceCatalogueItems,
+        variantFamilies: workspaceVariantFamilies,
         details: workspacePublicationDetails,
         ).issues,
       ]);

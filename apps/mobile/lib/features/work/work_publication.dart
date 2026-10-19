@@ -376,6 +376,25 @@ abstract final class WorkspacePublicationContract {
 
   /// Extend the audit without silently changing the retained v1 export schema.
   /// Unsupported provider values cannot be inferred from legacy text/quantity.
+  static List<BuyV2VariantAttribute> _ownedVariantAttributes(WorkspaceCatalogueItem item, WorkspaceVariantFamily? family) {
+    final member = item.variantMembership;
+    if (member == null) {
+      if (family != null) throw const FormatException('Product options do not match.');
+      return const [];
+    }
+    if (family == null || family.title != item.title || family.brand != item.brand || family.categoryId != item.categoryId) {
+      throw const FormatException('Review the saved product options before sharing.');
+    }
+    return family.attributesFor(member);
+  }
+
+  static String _variantAuditKey(Object? value) {
+    final rows = (value as List<BuyV2VariantAttribute>).map((a) => <Object?>[
+      a.dimensionId, a.dimensionLabel, a.optionId, a.optionLabel, a.kind.name, a.swatchArgb,
+    ]).toList()..sort((a, b) => (a.first as String).compareTo(b.first as String));
+    return jsonEncode(rows);
+  }
+
   static Map<String, Object?> sourceProductAuditValues(
     WorkspaceCatalogueItem p, {
     required String storeId,
@@ -383,6 +402,7 @@ abstract final class WorkspacePublicationContract {
     BuyV2Destination channel = BuyV2Destination.shop,
     WorkspaceStorePublicationDetails? storeDetails,
     BuyV2PackTerms? publicPackTerms,
+    WorkspaceVariantFamily? variantFamily,
   }) => {
     ..._sourceProductValues(
       p,
@@ -392,7 +412,8 @@ abstract final class WorkspacePublicationContract {
       storeDetails: storeDetails,
       exactAudit: true,
     ),
-    'variantAttributes': const <BuyV2VariantAttribute>[],
+    'variantFamilyId': p.variantMembership?.familyId,
+    'variantAttributes': _ownedVariantAttributes(p, variantFamily),
     'packTerms': publicPackTerms,
     if (publicPackTerms != null) 'unitPrice': publicPackTerms.unitPriceLabel ?? '',
     if (channel == BuyV2Destination.wholesale && p.wholesaleOffer?.valid == true) ...{
@@ -414,6 +435,7 @@ abstract final class WorkspacePublicationContract {
 
   static Map<String, Object?> publicProductAuditValues(BuyV2Product p) => {
     ..._publicProductValues(p, exactAudit: true),
+    'variantFamilyId': p.variantFamilyId,
     // Empty allocations are equivalent; nonempty unowned values must reject.
     'variantAttributes': p.variantAttributes.isEmpty
         ? const <BuyV2VariantAttribute>[]
@@ -436,6 +458,7 @@ abstract final class WorkspacePublicationContract {
     BuyV2Product? projected,
     WorkspaceStorePublicationDetails? storeDetails,
     BuyV2PackTerms? publicPackTerms,
+    WorkspaceVariantFamily? variantFamily,
     DateTime? now,
   }) {
     final issues = <WorkspacePublicationIssue>[];
@@ -446,6 +469,13 @@ abstract final class WorkspacePublicationContract {
         '${item.title}: $message',
       ),
     );
+    final List<BuyV2VariantAttribute> variantAttributes;
+    try {
+      variantAttributes = _ownedVariantAttributes(item, variantFamily);
+    } on FormatException {
+      missing('variantFamilyId', 'review the saved product options before sharing.');
+      return issues;
+    }
     for (final field in {
       'title': item.title,
       'brand': item.brand,
@@ -531,6 +561,11 @@ abstract final class WorkspacePublicationContract {
           storeDetails: storeDetails,
           publicPackTerms: publicPackTerms,
           now: now,
+        ).copyWith(
+          // Local comparison only. These owner inputs never create reviewed
+          // public family membership or bypass the provider holds below.
+          variantFamilyId: item.variantMembership?.familyId,
+          variantAttributes: variantAttributes,
         );
     if (item.cataloguePhoto?.status != WorkspaceCataloguePhotoStatus.approved ||
         target.mediaAssets.isEmpty ||
@@ -566,12 +601,13 @@ abstract final class WorkspacePublicationContract {
       channel: channel,
       storeDetails: storeDetails,
       publicPackTerms: publicPackTerms,
+      variantFamily: variantFamily,
     );
     final to = publicProductAuditValues(target);
     for (final key in {...from.keys, ...to.keys}) {
       if (!from.containsKey(key) ||
           !to.containsKey(key) ||
-          from[key] != to[key]) {
+          (key == 'variantAttributes' ? _variantAuditKey(from[key]) != _variantAuditKey(to[key]) : from[key] != to[key])) {
         missing(
           key,
           'customer information does not match the saved product. Review its details.',
@@ -584,6 +620,7 @@ abstract final class WorkspacePublicationContract {
   static WorkspacePublicationReport inspect({
     required WorkWorkspace? store,
     required Iterable<WorkspaceCatalogueItem> products,
+    Iterable<WorkspaceVariantFamily> variantFamilies = const [],
     WorkspaceStorePublicationDetails details =
         const WorkspaceStorePublicationDetails(),
   }) {
@@ -612,6 +649,9 @@ abstract final class WorkspacePublicationContract {
       );
     }
     for (final item in selected) {
+      final matching = item.variantMembership == null ? const <WorkspaceVariantFamily>[]
+        : variantFamilies.where((f) => f.id == item.variantMembership!.familyId).toList();
+      final family = matching.length == 1 ? matching.single : null;
       if (item.retailEnabled) {
         issues.addAll(
           productIssues(
@@ -619,6 +659,7 @@ abstract final class WorkspacePublicationContract {
             storeId: store?.id ?? '',
             storeName: store?.name ?? '',
             storeDetails: details,
+            variantFamily: family,
           ),
         );
       }
@@ -630,6 +671,7 @@ abstract final class WorkspacePublicationContract {
             storeName: store?.name ?? '',
             channel: BuyV2Destination.wholesale,
             storeDetails: details,
+            variantFamily: family,
           ),
         );
       }

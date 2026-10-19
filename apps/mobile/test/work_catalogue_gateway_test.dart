@@ -30,6 +30,7 @@ import 'package:moolsocial/features/work/work_publication.dart';
 import 'package:moolsocial/features/work/work_product_promotions.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
 import 'package:moolsocial/features/work/widgets/store_publication_settings.dart';
+import 'work_publication_test.dart' as publication_fixture show fixture;
 
 // Host fixtures only. No upload, device storage or real commerce.
 final at = DateTime.utc(2026, 10, 16, 12);
@@ -2230,6 +2231,88 @@ void main() {
     final restored = (await SecureWorkInventoryStore(accountScope: () => 'owner-one').read('owner-one', 'store-one', qa: true))!;
     expect(restored.reviewedCatalogueLinks.single.toJson(), link.toJson());
     expect(restored.products.single.toInventoryJson(), item.toInventoryJson()); expect(restored.variantFamilies.single.toJson(), family.toJson());
+  });
+  test('LF03 VARIANT-AUDIT a saved membership without its family cannot disappear from readiness', () {
+    final item = publication_fixture.fixture().copyWith(variantMembership:
+      WorkspaceVariantMembership(familyId: 'family-one', selections: {'colour': 'blue'}));
+    final issues = WorkspacePublicationContract.productIssues(item, storeId: 'store-one', storeName: 'Host Store');
+    expect(issues.any((i) => i.field.endsWith(':variantFamilyId')), isTrue);
+  });
+  WorkspaceVariantFamily auditFamily() {
+    final item = publication_fixture.fixture();
+    return WorkspaceVariantFamily(id: 'family-one', revision: 1, title: item.title, brand: item.brand,
+      categoryId: item.categoryId, options: const [
+        BuyV2VariantAttribute(dimensionId: 'colour', dimensionLabel: 'Colour', optionId: 'blue', optionLabel: 'Blue',
+          kind: BuyV2VariantDimensionKind.colour, swatchArgb: 0xff0000ff),
+        BuyV2VariantAttribute(dimensionId: 'colour', dimensionLabel: 'Colour', optionId: 'black', optionLabel: 'Black',
+          kind: BuyV2VariantDimensionKind.colour, swatchArgb: 0xff000000),
+        BuyV2VariantAttribute(dimensionId: 'size', dimensionLabel: 'Size', optionId: 'small', optionLabel: 'Small'),
+      ]);
+  }
+  WorkspaceCatalogueItem auditMember() => publication_fixture.fixture().copyWith(variantMembership:
+    WorkspaceVariantMembership(familyId: 'family-one', selections: {'colour': 'blue', 'size': 'small'}));
+  List<BuyV2VariantAttribute> auditCopy(List<BuyV2VariantAttribute> source, {String? fault}) => source.reversed.map((a) =>
+    BuyV2VariantAttribute(dimensionId: fault == 'dimensionId' ? '${a.dimensionId}-changed' : a.dimensionId,
+      dimensionLabel: fault == 'dimensionLabel' ? '${a.dimensionLabel} changed' : a.dimensionLabel,
+      optionId: fault == 'optionId' ? '${a.optionId}-changed' : a.optionId,
+      optionLabel: fault == 'optionLabel' ? '${a.optionLabel} changed' : a.optionLabel,
+      kind: fault == 'kind' ? BuyV2VariantDimensionKind.size : a.kind,
+      swatchArgb: fault == 'swatch' ? 0xffabcdef : a.swatchArgb)).toList();
+  test('LF03 VARIANT-AUDIT matches exact selected values without object or ordering identity', () {
+    final item = auditMember(), family = auditFamily(), before = jsonEncode(auditMember().toInventoryJson());
+    final attributes = family.attributesFor(item.variantMembership!);
+    final source = WorkspacePublicationContract.sourceProductAuditValues(item, storeId: 'store-one', storeName: 'Host Store', variantFamily: family);
+    expect(source['variantFamilyId'], family.id);
+    expect((source['variantAttributes'] as List<BuyV2VariantAttribute>).map((a) => a.optionId).toSet(), {'blue', 'small'});
+    final target = item.toBuyPublicProduct(storeId: 'store-one', storeName: 'Host Store')
+      .copyWith(variantFamilyId: family.id, variantAttributes: auditCopy(attributes));
+    final issues = WorkspacePublicationContract.productIssues(item, storeId: 'store-one', storeName: 'Host Store',
+      variantFamily: family, projected: target);
+    expect(issues.where((i) => i.field.contains('variant')), isEmpty);
+    expect(jsonEncode(item.toInventoryJson()), before);
+    // Local audit inputs do not silently expand the genuine/default converter.
+    expect(item.toBuyPublicProduct(storeId: 'store-one', storeName: 'Host Store').variantAttributes, isEmpty);
+  });
+  for (final fault in ['dimensionId', 'dimensionLabel', 'optionId', 'optionLabel', 'kind', 'swatch', 'duplicate', 'familyId']) {
+    test('LF03 VARIANT-AUDIT rejects changed public $fault without overwriting the projection', () {
+      final item = auditMember(), family = auditFamily(), attributes = family.attributesFor(auditMember().variantMembership!);
+      final changed = auditCopy(attributes, fault: fault);
+      final target = item.toBuyPublicProduct(storeId: 'store-one', storeName: 'Host Store').copyWith(
+        variantFamilyId: fault == 'familyId' ? 'another-family' : family.id,
+        variantAttributes: fault == 'duplicate' ? [...changed, changed.first] : changed);
+      final issues = WorkspacePublicationContract.productIssues(item, storeId: 'store-one', storeName: 'Host Store',
+        variantFamily: family, projected: target);
+      expect(issues.any((i) => i.field.endsWith(fault == 'familyId' ? ':variantFamilyId' : ':variantAttributes')), isTrue);
+    });
+  }
+  for (final fault in ['missing choice', 'unknown choice', 'different family', 'duplicate family']) {
+    test('LF03 VARIANT-AUDIT invalid saved $fault remains a report issue', () {
+      final family = auditFamily(); var item = auditMember();
+      if (fault != 'duplicate family') {
+        item = item.copyWith(variantMembership: WorkspaceVariantMembership(
+          familyId: fault == 'different family' ? 'another-family' : family.id,
+          selections: {'colour': fault == 'unknown choice' ? 'red' : 'blue', if (fault != 'missing choice') 'size': 'small'}));
+      }
+      final report = WorkspacePublicationContract.inspect(store: const WorkWorkspace(id: 'store-one', name: 'Host Store',
+        profileLabel: 'Grocery', area: 'Jaipur', verified: true), products: [item],
+        variantFamilies: [family, if (fault == 'duplicate family') family]);
+      expect(report.issues.any((i) => i.field.endsWith(':variantFamilyId')), isTrue);
+    });
+  }
+  test('LF03 VARIANT-AUDIT current Store wires its families but retains public confirmation hold', () {
+    final work = WorkSession(contactDraftStore: ListingAccount())..activeWorkspace = const WorkWorkspace(
+      id: 'store-one', name: 'Host Store', profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+    addTearDown(work.dispose);
+    expect(work.addOrUpdateWorkspaceProduct(auditMember(), variantFamily: auditFamily(),
+      stockEntryMethod: WorkspaceStockEntryMethod.manual), isTrue);
+    expect(work.workspaceCatalogueItems.single.publicListing, isFalse);
+    // Host-only selected-intent fixture, not independent review or publication.
+    work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.single.copyWith(publicListing: true);
+    expect(work.workspacePublicationReport.issues.where((i) => i.field.contains('variant')), isEmpty);
+    expect(work.workspacePublicationReport.issues.any((i) => i.field == 'publication.confirmation'), isTrue);
+    work.activeWorkspace = const WorkWorkspace(id: 'store-two', name: 'Other Store', profileLabel: 'Grocery',
+      profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+    expect(work.workspaceVariantFamilies, isEmpty); expect(work.workspaceCatalogueItems, isEmpty);
   });
   group('LF03-MEDIA private codec display bounds', () {
     late Directory directory;
