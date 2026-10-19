@@ -44,6 +44,76 @@ class _OrderPending implements WorkOrderPendingStore {
 }
 
 void main() {
+  for (final kind in ['legacy', 'unknown', 'no supplied details']) {
+    testWidgets('LF-CONTEXT absent original details and unrelated instructions add no blank section $kind', (tester) async {
+      final data = kind == 'legacy' ? fixtures.publicListingPurchaseResponse()
+        : fixtures.fulfilmentPurchaseResponse(unknown: kind == 'unknown');
+      if (kind == 'no supplied details') {
+        data['orders'][0]['original']['fulfilmentContext'] = {'schemaVersion': 1, 'method': 'delivery',
+          'recipient': null, 'address': null, 'instructions': <Object>[]};
+        fixtures.rehashPurchaseOrder(data['orders'][0]);
+      }
+      final original = (await fixtures.projectionGateway(fixtures.Transport()..data = data).readPurchaseProjection(
+        role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: data['purchaseId']))!.orders.single;
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: Align(alignment: Alignment.topLeft,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [WorkspaceOriginalFulfilmentForOrder(original: original),
+          WorkspaceOriginalInstructionsForLine(original: original, lineId: 'not-this-order')])))));
+      expect(find.byType(Text), findsNothing); expect(tester.takeException(), isNull);
+    });
+  }
+  testWidgets('LF-CONTEXT collection shows only supplied recipient without a delivery address or empty phone', (tester) async {
+    final data = fixtures.fulfilmentPurchaseResponse(), order = data['orders'][0];
+    order['original']['lines'][0]['scheduledFulfilment'] = null;
+    order['original']['fulfilmentContext']['method'] = 'collection'; order['original']['fulfilmentContext']['address'] = null;
+    order['original']['fulfilmentContext']['recipient']['phone'] = ''; fixtures.rehashPurchaseOrder(order);
+    final original = (await fixtures.projectionGateway(fixtures.Transport()..data = data).readPurchaseProjection(
+      role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: data['purchaseId']))!.orders.single;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: WorkspaceOriginalFulfilmentForOrder(original: original))));
+    expect(find.text('Order collection details'), findsOneWidget); expect(find.text('Evaluation recipient'), findsOneWidget);
+    expect(find.text('Order delivery details'), findsNothing); expect(find.textContaining('Evaluation house'), findsNothing);
+    expect(tester.widgetList<Text>(find.byType(Text)).any((text) => text.data?.isEmpty == true), isFalse);
+    expect(tester.takeException(), isNull);
+  });
+  for (final role in ['buyer', 'seller']) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF-CONTEXT original recipient and line instructions are compact readable customer details $role scale=$scale', (tester) async {
+        await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
+        tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1; addTearDown(tester.view.reset);
+        final details = fixtures.fulfilmentPurchaseResponse(role: role), order = details['orders'][0] as Map<String, dynamic>;
+        order['original']['lines'][0]['name'] = 'Evaluation product'; // English host layout, not native Unicode acceptance.
+        final note = List.filled(4, 'Leave the exact ordered pack at reception.').join(' ');
+        order['original']['fulfilmentContext']['instructions'][0]['text'] = note;
+        fixtures.rehashPurchaseOrder(order);
+        final refs = fixtures.referenceResponse(role: role); refs['references'][0]['originalFingerprint'] = order['originalFingerprint'];
+        final wire = fixtures.Transport()..respond = (body) => body['operation'].toString().startsWith('list') ? refs : details;
+        final capture = GlobalKey();
+        await tester.pumpWidget(RepaintBoundary(key: capture, child: MaterialApp(theme: ThemeData(fontFamily: 'Inter'), home: Scaffold(body: MediaQuery(data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+          child: SingleChildScrollView(child: WorkspacePurchaseOriginals(gateway: fixtures.projectionGateway(wire,
+            account: role == 'buyer' ? 'buyer-1' : 'owner-1'), role: role == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller,
+            realm: 'evaluation', storeId: role == 'seller' ? 'store-one' : null)))))));
+        await tester.pumpAndSettle(); await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('original-order-order-v2'))); await tester.pumpAndSettle();
+        expect(find.text('Order delivery details'), findsOneWidget);
+        expect(find.text('Evaluation recipient'), findsOneWidget); expect(find.text('9876501234'), findsOneWidget);
+        expect(find.textContaining('Evaluation house 12'), findsOneWidget);
+        final instructions = find.text('Instructions · $note'); expect(instructions, findsOneWidget);
+        await tester.ensureVisible(instructions); await tester.pumpAndSettle();
+        final text = tester.widget<Text>(instructions); expect(text.maxLines, isNull); expect(text.overflow, isNot(TextOverflow.ellipsis));
+        expect(find.textContaining('address-book'), findsNothing); expect(find.text('Landmark'), findsNothing);
+        expect(tester.takeException(), isNull);
+        const captureRoot = String.fromEnvironment('LF_CONTEXT_CAPTURE_ROOT');
+        if (captureRoot.isNotEmpty) {
+          final boundary = capture.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+          await tester.runAsync(() async {
+            final directory = Directory(captureRoot); await directory.create(recursive: true);
+            final file = File('$captureRoot/original-context-$role-$scale.png'); expect(await file.exists(), isFalse);
+            final image = await boundary.toImage(); final bytes = await image.toByteData(format: ui.ImageByteFormat.png); image.dispose();
+            await file.writeAsBytes(bytes!.buffer.asUint8List());
+          });
+        }
+      });
+    }
+  }
   for (final role in ['buyer', 'seller']) {
     for (final scale in [1.0, 2.0]) {
       testWidgets('LF-SCHEDULE original requested window is readable and not a booking $role $scale', (tester) async {
@@ -291,7 +361,8 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
   }
-  for (final scenario in [(1.0, 'delivery'), (2.0, 'delivery'), (1.0, 'collection'), (1.0, 'attribution'), (2.0, 'attribution'), (1.0, 'variant'), (2.0, 'variant'), (1.0, 'scheduled'), (2.0, 'scheduled')]) {
+  for (final scenario in [(1.0, 'delivery'), (2.0, 'delivery'), (1.0, 'collection'), (1.0, 'attribution'), (2.0, 'attribution'), (1.0, 'variant'), (2.0, 'variant'), (1.0, 'scheduled'), (2.0, 'scheduled'),
+    (1.0, 'context'), (2.0, 'context'), (1.0, 'context-partial'), (2.0, 'context-partial')]) {
   testWidgets('configured Store feed supports exact facts ${scenario.$2} scale ${scenario.$1}', (tester) async {
     await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
     tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
@@ -300,6 +371,14 @@ void main() {
       : scenario.$2 == 'variant' ? fixtures.variantOperationalResponse(role: 'seller')
       : scenario.$2 == 'attribution' ? fixtures.attributedOperationalResponse(role: 'seller')
       : fixtures.operationalResponse(role: 'seller');
+    if (scenario.$2.startsWith('context')) {
+      final facts = fixtures.fulfilmentPurchaseResponse(role: 'seller'), original = facts['orders'][0];
+      if (scenario.$2 == 'context-partial') {
+        original['original']['fulfilmentContext']['address'] = {'line': '', 'area': '', 'pinCode': '', 'landmark': 'Gate B'};
+        fixtures.rehashPurchaseOrder(original);
+      }
+      raw['original'] = original['original']; raw['originalFingerprint'] = original['originalFingerprint']; raw['originalFactsVersion'] = 7;
+    }
     if (scenario.$2 == 'collection') {
       raw['fulfilment'] = 'collection'; raw['stage'] = 'Preparing'; raw['permittedActions'] = <String>[];
     }
@@ -367,6 +446,13 @@ void main() {
       expect(find.byKey(Key('work-operational-total-$key')), findsOneWidget);
     }
     expect(find.text('1 pack × ₹100.51'), findsOneWidget);
+    if (scenario.$2.startsWith('context')) {
+      expect(find.text('Order delivery details'), findsOneWidget);
+      expect(find.text('Evaluation recipient'), findsOneWidget);
+      expect(find.text('Instructions · दरवाज़े पर दें'), findsOneWidget);
+      expect(work.workspaceOrders.single.operational!.original.factsVersion, 7);
+      expect(find.text('Delivery · ${raw['address']}'), scenario.$2 == 'context-partial' ? findsOneWidget : findsNothing);
+    }
     if (scenario.$2 == 'scheduled') {
       expect(find.textContaining('Requested Scheduled window'), findsOneWidget);
       expect(find.textContaining('opaque-destination'), findsNothing);

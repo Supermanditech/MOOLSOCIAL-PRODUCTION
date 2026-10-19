@@ -362,7 +362,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         'state',
         'orders',
       ]);
-      if (data['schemaVersion'] is! int || !const [2, 3, 4, 5, 6].contains(data['schemaVersion']) ||
+      if (data['schemaVersion'] is! int || !const [2, 3, 4, 5, 6, 7].contains(data['schemaVersion']) ||
           data['realm'] != realm ||
           data['authNamespace'] != 'firebase-default' ||
           data['viewerRole'] != role.name ||
@@ -783,7 +783,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
   ) {
     final source = _map(value);
     final enriched = source.containsKey('originalFactsVersion');
-    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4, 5, 6].contains(source['originalFactsVersion']))) {
+    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4, 5, 6, 7].contains(source['originalFactsVersion']))) {
       throw const FormatException('Unsupported original facts.');
     }
     final data = _exactMap(source, [
@@ -889,6 +889,9 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
       'originalFingerprint': ref.originalFingerprint,
       'original': data['original'],
     }, realm);
+    if (original.fulfilmentContext != null && original.fulfilmentContext!.method != data['fulfilment']) {
+      throw const FormatException('Original and operational fulfilment disagree.');
+    }
     return WorkspaceOperationalOrderSnapshot._(
       realm: realm,
       viewerRole: role,
@@ -1344,15 +1347,34 @@ class WorkspacePurchaseOrder {
     required List<WorkspacePurchasedSkuLine> lines,
     required Map<String, int> totals,
     this.benefitAttribution,
+    this.hasFulfilmentContextSnapshot = false,
+    this.fulfilmentContext,
   }) : lines = List.unmodifiable(lines),
        totals = Map.unmodifiable(totals);
   final String storeId, orderId, originalFingerprint;
   final List<WorkspacePurchasedSkuLine> lines;
   final Map<String, int> totals;
   final WorkspaceOriginalBenefitAttribution? benefitAttribution;
-  int get factsVersion => lines.any((line) => line.hasPublicListingSnapshot) ? 6 :
+  final bool hasFulfilmentContextSnapshot;
+  final WorkspaceOriginalFulfilmentContext? fulfilmentContext;
+  int get factsVersion => hasFulfilmentContextSnapshot ? 7 : lines.any((line) => line.hasPublicListingSnapshot) ? 6 :
     lines.any((line) => line.hasScheduledFulfilmentSnapshot) ? 5 :
     lines.any((line) => line.variant != null) ? 4 : benefitAttribution == null ? 2 : 3;
+}
+
+/// Private frozen customer input, not verified address, eligibility or assignment.
+class WorkspaceOriginalFulfilmentContext {
+  WorkspaceOriginalFulfilmentContext._({required this.method, required this.recipient, required this.address,
+    required Map<String, String> instructions}) : instructions = Map.unmodifiable(instructions);
+  final String method;
+  final ({String name, String phone})? recipient;
+  final ({String line, String area, String pinCode, String landmark})? address;
+  final Map<String, String> instructions;
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'method': method,
+    'recipient': recipient == null ? null : {'name': recipient!.name, 'phone': recipient!.phone},
+    'address': address == null ? null : {'line': address!.line, 'area': address!.area,
+      'pinCode': address!.pinCode, 'landmark': address!.landmark},
+    'instructions': instructions.entries.map((i) => {'lineId': i.key, 'text': i.value}).toList()};
 }
 
 /// Frozen final-placement facts, not current coupons or cashback entitlement.
@@ -1544,7 +1566,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     'originalFingerprint',
   ]);
   final version = data['factsVersion'];
-  if (version is! int || !const [2, 3, 4, 5, 6].contains(version) ||
+  if (version is! int || !const [2, 3, 4, 5, 6, 7].contains(version) ||
       !_id(data['storeId']) ||
       !_id(data['orderId'])) {
     throw const FormatException('Unsupported order reference.');
@@ -1554,6 +1576,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     'lines',
     'totals',
     if (version >= 3) 'benefitAttribution',
+    if (version >= 7) 'fulfilmentContext',
   ]);
   final rawLines = original['lines'];
   if (original['currency'] != 'INR' ||
@@ -1565,7 +1588,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
   final lines = <WorkspacePurchasedSkuLine>[];
   for (final raw in rawLines) {
     final l = _exactMap(raw, [..._purchaseLineKeys, if (version >= 4) 'variant', if (version >= 5) 'scheduledFulfilment',
-      if (version == 6) 'publicListing']);
+      if (version >= 6) 'publicListing']);
     if (version >= 4 && (l['variant'] is! String ||
         (l['variant'] as String).trim() != l['variant'] ||
         (l['variant'] as String).length > 240 ||
@@ -1580,7 +1603,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
       throw const FormatException('Original Scheduled selection conflicts with its purchased line.');
     }
     BuyV2PublicListingIdentity? listing;
-    if (version == 6 && l['publicListing'] != null) {
+    if (version >= 6 && l['publicListing'] != null) {
       listing = BuyV2PublicListingIdentity.fromJson(l['publicListing']);
       if (listing == null || listing.realm != realm || listing.storeId != data['storeId'] ||
           listing.skuId != l['skuId'] || listing.canonicalProductId != l['canonicalProductId'] || listing.verifiedPackId != l['verifiedPackId'] ||
@@ -1632,7 +1655,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
         variant: version >= 4 ? l['variant'] as String : null,
         hasScheduledFulfilmentSnapshot: version >= 5,
         scheduledFulfilment: scheduled,
-        hasPublicListingSnapshot: version == 6,
+        hasPublicListingSnapshot: version >= 6,
         publicListing: listing,
       ),
     );
@@ -1660,6 +1683,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     throw const FormatException('Contradictory order total.');
   }
   final attribution = version >= 3 ? _decodeBenefits(original['benefitAttribution'], lines, totals['discountMinor']!) : null;
+  final fulfilment = version >= 7 ? _decodeFulfilmentContext(original['fulfilmentContext'], lines) : null;
   final hash = sha256
       .convert(
         utf8.encode(
@@ -1672,6 +1696,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
               'lines': lines.map((l) => l.toJson()).toList(),
               'totals': totals,
               if (attribution != null) 'benefitAttribution': attribution.toJson(),
+              if (version >= 7) 'fulfilmentContext': fulfilment?.toJson(),
             },
           }),
         ),
@@ -1687,5 +1712,56 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     lines: lines,
     totals: totals,
     benefitAttribution: attribution,
+    hasFulfilmentContextSnapshot: version >= 7,
+    fulfilmentContext: fulfilment,
   );
+}
+
+WorkspaceOriginalFulfilmentContext? _decodeFulfilmentContext(Object? value, List<WorkspacePurchasedSkuLine> lines) {
+  if (value == null) return null;
+  final r = _exactMap(value, const ['schemaVersion', 'method', 'recipient', 'address', 'instructions']);
+  if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || !const ['delivery', 'collection'].contains(r['method']) ||
+      r['method'] == 'collection' && (r['address'] != null || lines.any((l) => l.scheduledFulfilment != null))) {
+    throw const FormatException('Invalid original fulfilment.');
+  }
+  String part(Object? v, int max, {bool multiline = true}) {
+    if (v is! String || v != v.trim() || v.length > max ||
+        (multiline ? RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f]') : RegExp(r'[\x00-\x1f]')).hasMatch(v)) {
+      throw const FormatException('Invalid original customer detail.');
+    }
+    return v;
+  }
+  ({String name, String phone})? recipient;
+  if (r['recipient'] != null) {
+    final p = _exactMap(r['recipient'], const ['name', 'phone']);
+    final name = part(p['name'], 240, multiline: false), phone = part(p['phone'], 30, multiline: false);
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (name.isEmpty && phone.isEmpty || phone.isNotEmpty &&
+        (!RegExp(r'^\+?[0-9][0-9 ()-]*$').hasMatch(phone) || digits.length < 7 || digits.length > 15)) {
+      throw const FormatException('Invalid original recipient.');
+    }
+    recipient = (name: name, phone: phone);
+  }
+  ({String line, String area, String pinCode, String landmark})? address;
+  if (r['address'] != null) {
+    final a = _exactMap(r['address'], const ['line', 'area', 'pinCode', 'landmark']);
+    address = (line: part(a['line'], 1000), area: part(a['area'], 240), pinCode: part(a['pinCode'], 6), landmark: part(a['landmark'], 240));
+    if ([address.line, address.area, address.pinCode, address.landmark].every((v) => v.isEmpty) ||
+        address.pinCode.isNotEmpty && !RegExp(r'^[1-9][0-9]{5}$').hasMatch(address.pinCode)) {
+      throw const FormatException('Invalid original address.');
+    }
+  }
+  final rawNotes = r['instructions'];
+  if (rawNotes is! List || rawNotes.length > lines.length) throw const FormatException('Invalid original instructions.');
+  final instructions = <String, String>{};
+  for (final raw in rawNotes) {
+    final i = _exactMap(raw, const ['lineId', 'text']), note = part(i['text'], 1000), lineId = i['lineId'];
+    if (!_id(lineId) || note.isEmpty || instructions.containsKey(lineId) || !lines.any((l) => l.lineId == lineId)) {
+      throw const FormatException('Instructions do not match this order.');
+    }
+    instructions[lineId as String] = note;
+  }
+  final keys = instructions.keys.toList()..sort();
+  return WorkspaceOriginalFulfilmentContext._(method: r['method'] as String, recipient: recipient, address: address,
+    instructions: {for (final key in keys) key: instructions[key]!});
 }

@@ -3,7 +3,7 @@ import {FieldPath, type Firestore, type Transaction} from "firebase-admin/firest
 import {WorkspaceProfileError} from "./workspace_profile_service.js";
 
 type Realm = "evaluation" | "production";
-export type PurchaseFactsVersion = 2 | 3 | 4 | 5 | 6;
+export type PurchaseFactsVersion = 2 | 3 | 4 | 5 | 6 | 7;
 export interface PlacementLine {
   sourceLineId: string; skuId: string; canonicalProductId: string;
   verifiedPackId: string; offerId: string; offerRevision: string;
@@ -32,6 +32,16 @@ interface PlacementStore {
   storeId: string; caseId: string; ownerUserId: string;
   lines: PlacementLine[]; totals: PurchaseTotals;
   benefitAttribution?: OriginalBenefitAttribution;
+  fulfilmentContext?: OriginalFulfilmentContext | null;
+}
+/** Frozen customer details, not address verification, serviceability or delivery
+ * assignment. Instruction lineId references sourceLineId before materializing.
+ * Never project this private context into catalogue, feedback or analytics. */
+export interface OriginalFulfilmentContext {
+  schemaVersion: 1; method: "delivery" | "collection";
+  recipient: {name: string; phone: string} | null;
+  address: {line: string; area: string; pinCode: string; landmark: string} | null;
+  instructions: {lineId: string; text: string}[];
 }
 /** Immutable source facts only, not eligibility, redemption or cashback payment.
  * On a placement receipt, allocation lineId references sourceLineId. The atomic
@@ -49,7 +59,7 @@ export interface OriginalBenefitAttribution {schemaVersion: 1; components: Origi
 /** Server-owned FINAL PLACEMENT, not a quote, client command, payment or stock proof.
  * No real upstream implementation is configured in this local slice. */
 export interface TrustedPlacementReceipt {
-  schemaVersion: 1 | 2 | 3 | 4 | 5; realm: Realm; authNamespace: "firebase-default";
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6; realm: Realm; authNamespace: "firebase-default";
   finalPlacement: true; issuer: string; receiptId: string; revision: string;
   buyerUserId: string; stores: PlacementStore[];
 }
@@ -60,6 +70,7 @@ export interface PurchasedLine extends Omit<PlacementLine, "sourceLineId"> {line
 export interface PurchaseOriginal {
   currency: "INR"; lines: PurchasedLine[]; totals: PurchaseTotals;
   benefitAttribution?: OriginalBenefitAttribution;
+  fulfilmentContext?: OriginalFulfilmentContext | null;
 }
 export interface PurchaseStoreProjection {
   factsVersion: PurchaseFactsVersion; storeId: string; orderId: string; original: PurchaseOriginal;
@@ -236,7 +247,7 @@ export interface OperationalOrderSnapshot {
   viewerRole: "buyer" | "seller"; viewerUserId: string;
   purchaseId: string; storeId: string; orderId: string;
   sourceRevision: string; originalFingerprint: string; original: PurchaseOriginal;
-  originalFactsVersion?: 3 | 4 | 5 | 6;
+  originalFactsVersion?: 3 | 4 | 5 | 6 | 7;
   operationalSourceRevision: string; revision: number; stage: OperationalOrderStage;
   fulfilment: "delivery" | "collection"; placedAt: string;
   acceptanceDeadline: string | null; fulfilmentDeadline: string | null;
@@ -301,7 +312,7 @@ export class WorkspaceOrderOperationsService {
         outcome: p.outcome, occurredAt: p.occurredAt, recordedAt: saved.recordedAt}};
   }
   private productFeedbackTargets(a: PurchaseAggregate, o: StoredOrder, saved: StoredOrderCompletion): StoredProductFeedbackTarget[] {
-    if (o.factsVersion !== 6) return [];
+    if (o.factsVersion < 6) return [];
     const completion = this.completionAck(saved).completion;
     return o.original.lines.flatMap(line => {
       if (!line.publicListing) return [];
@@ -597,6 +608,7 @@ export class WorkspaceOrderOperationsService {
       exact(r, ["schemaVersion", "proof", "proofFingerprint", "revision", "stage", "integrity",
         ...(Object.hasOwn(r, "rejectionReason") ? ["rejectionReason"] : [])]);
       const proof = normalizeOperationalOrder(r.proof, this.realm, this.now());
+      if (o.original.fulfilmentContext != null && proof.fulfilment !== o.original.fulfilmentContext.method) fail();
       if (r.schemaVersion !== 1 || typeof r.stage !== "string" || !operationStages.includes(r.stage) ||
           proof.purchaseId !== a.purchaseId || proof.storeId !== o.storeId || proof.orderId !== o.orderId ||
           proof.sourceRevision !== a.sourceRevision || proof.originalFingerprint !== o.originalFingerprint ||
@@ -644,7 +656,8 @@ export class WorkspaceOrderOperationsService {
     return this.db.runTransaction(async tx => {
       const {aggregate, order} = await this.original(tx, scope);
       await this.seller(tx, order, order.ownerUserId);
-      if (proof.sourceRevision !== aggregate.sourceRevision || proof.originalFingerprint !== order.originalFingerprint) {
+      if (proof.sourceRevision !== aggregate.sourceRevision || proof.originalFingerprint !== order.originalFingerprint ||
+          order.original.fulfilmentContext != null && proof.fulfilment !== order.original.fulfilmentContext.method) {
         fail("conflict", 409);
       }
       const existing = await tx.get(this.path(scope));
@@ -905,21 +918,55 @@ function line(v: unknown, withVariant = false, scheduledScope?: {realm: Realm; s
       BigInt(result.lineTotalMinor)) fail();
   return result;
 }
+function fulfilmentContext(value: unknown, lines: readonly {lineId: string}[], hasScheduled = false): OriginalFulfilmentContext | null {
+  if (value === null) return null;
+  const r = exact(value, ["schemaVersion", "method", "recipient", "address", "instructions"]);
+  if (r.schemaVersion !== 1 || r.method !== "delivery" && r.method !== "collection" ||
+      r.method === "collection" && (r.address !== null || hasScheduled)) fail();
+  const part = (v: unknown, max: number): string => {
+    if (typeof v !== "string" || v !== v.trim() || v.length > max || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(v)) fail();
+    return v;
+  };
+  let recipient: OriginalFulfilmentContext["recipient"] = null;
+  if (r.recipient !== null) {
+    const p = exact(r.recipient, ["name", "phone"]);
+    const name = p.name === "" ? "" : text(p.name, 240), phone = p.phone === "" ? "" : text(p.phone, 30);
+    if (!name && !phone || phone && (!/^\+?[0-9][0-9 ()-]*$/u.test(phone) ||
+        phone.replace(/[^0-9]/gu, "").length < 7 || phone.replace(/[^0-9]/gu, "").length > 15)) fail();
+    recipient = {name, phone};
+  }
+  let address: OriginalFulfilmentContext["address"] = null;
+  if (r.address !== null) {
+    const a = exact(r.address, ["line", "area", "pinCode", "landmark"]);
+    address = {line: part(a.line, 1000), area: part(a.area, 240), pinCode: part(a.pinCode, 6), landmark: part(a.landmark, 240)};
+    if (!Object.values(address).some(v => v.length) || address.pinCode !== "" && !/^[1-9][0-9]{5}$/u.test(address.pinCode)) fail();
+  }
+  if (!Array.isArray(r.instructions) || r.instructions.length > lines.length) fail();
+  const instructions = r.instructions.map(value => {
+    const i = exact(value, ["lineId", "text"]), lineId = id(i.lineId), note = part(i.text, 1000);
+    if (!note || !lines.some(l => l.lineId === lineId)) fail();
+    return {lineId, text: note};
+  }).sort((a,b) => compare(a.lineId, b.lineId));
+  unique(instructions.map(i => i.lineId));
+  return {schemaVersion: 1, method: r.method, recipient, address, instructions};
+}
 export function normalizePlacement(value: unknown, realm: Realm): TrustedPlacementReceipt {
   const r = exact(value, ["schemaVersion", "realm", "authNamespace", "finalPlacement", "issuer",
     "receiptId", "revision", "buyerUserId", "stores"]);
-  if ((r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
+  if ((r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5 && r.schemaVersion !== 6) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
       r.finalPlacement !== true || !["evaluation", "production"].includes(realm)) fail();
   const stores = array(r.stores, 10).map(raw => {
     const s = exact(raw, ["storeId", "caseId", "ownerUserId", "lines", "totals",
-      ...(r.schemaVersion !== 1 ? ["benefitAttribution"] : [])]);
+      ...(r.schemaVersion !== 1 ? ["benefitAttribution"] : []), ...(r.schemaVersion === 6 ? ["fulfilmentContext"] : [])]);
     const lines = array(s.lines, 100).map(value => line(value, (r.schemaVersion as number) >= 3,
-      (r.schemaVersion as number) >= 4 ? {realm, storeId: id(s.storeId)} : undefined, r.schemaVersion === 5)).sort((a,b) => compare(a.sourceLineId, b.sourceLineId));
+      (r.schemaVersion as number) >= 4 ? {realm, storeId: id(s.storeId)} : undefined, (r.schemaVersion as number) >= 5)).sort((a,b) => compare(a.sourceLineId, b.sourceLineId));
     unique(lines.map(l => l.sourceLineId));
     const amounts = totals(s.totals, lines.reduce((sum, l) => sum + l.lineTotalMinor, 0));
     return {storeId: id(s.storeId), caseId: id(s.caseId), ownerUserId: id(s.ownerUserId), lines, totals: amounts,
       ...(r.schemaVersion !== 1 ? {benefitAttribution: benefits(s.benefitAttribution,
-        lines.map(l => ({lineId: l.sourceLineId, lineTotalMinor: l.lineTotalMinor})), amounts.discountMinor)} : {})};
+        lines.map(l => ({lineId: l.sourceLineId, lineTotalMinor: l.lineTotalMinor})), amounts.discountMinor)} : {}),
+      ...(r.schemaVersion === 6 ? {fulfilmentContext: fulfilmentContext(s.fulfilmentContext,
+        lines.map(l => ({lineId: l.sourceLineId})), lines.some(l => l.scheduledFulfilment != null))} : {})};
   }).sort((a,b) => compare(a.storeId, b.storeId));
   unique(stores.map(s => s.storeId)); unique(stores.map(s => s.caseId));
   if (stores.reduce((sum, s) => sum + s.lines.length, 0) > 200) fail();
@@ -940,14 +987,14 @@ function requireStore(value: unknown, expected: {caseId: string; storeId: string
       p.status !== "live" || (requireNewSales && p.shopEnabled !== true)) fail("not_found", 404);
 }
 export function purchaseOriginalFingerprint(storeId: string, orderId: string, original: PurchaseOriginal): string {
-  return digest({factsVersion: original.lines.some(l => l.publicListing !== undefined) ? 6 : original.lines.some(l => l.scheduledFulfilment !== undefined) ? 5 : original.lines.some(l => l.variant !== undefined) ? 4 :
+  return digest({factsVersion: Object.hasOwn(original, "fulfilmentContext") ? 7 : original.lines.some(l => l.publicListing !== undefined) ? 6 : original.lines.some(l => l.scheduledFulfilment !== undefined) ? 5 : original.lines.some(l => l.variant !== undefined) ? 4 :
     original.benefitAttribution === undefined ? 2 : 3, storeId, orderId, original});
 }
 function validateAggregate(value: unknown, purchaseId: string, realm: Realm): PurchaseAggregate {
   try {
     const r = exact(value, ["schemaVersion", "realm", "authNamespace", "purchaseId", "buyerUserId",
       "buyerId", "sourceRevision", "sourceFingerprint", "createdAt", "orders", "integrity"]);
-    if ((r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5 && r.schemaVersion !== 6) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
+    if ((r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5 && r.schemaVersion !== 6 && r.schemaVersion !== 7) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
         r.purchaseId !== purchaseId || !/^[a-f0-9]{64}$/u.test(String(r.sourceFingerprint))) fail();
     id(r.buyerUserId); id(r.buyerId); id(r.sourceRevision);
     if (typeof r.createdAt !== "string" || new Date(r.createdAt).toISOString() !== r.createdAt) fail();
@@ -955,21 +1002,23 @@ function validateAggregate(value: unknown, purchaseId: string, realm: Realm): Pu
       const o = exact(raw, ["factsVersion", "storeId", "orderId", "original", "originalFingerprint", "caseId", "ownerUserId"]);
       if (o.factsVersion !== r.schemaVersion) fail();
       const original = exact(o.original, ["currency", "lines", "totals",
-        ...(o.factsVersion !== 2 ? ["benefitAttribution"] : [])]);
+        ...(o.factsVersion !== 2 ? ["benefitAttribution"] : []), ...(o.factsVersion === 7 ? ["fulfilmentContext"] : [])]);
       if (original.currency !== "INR") fail();
       const lines = array(original.lines, 100).map(rawLine => {
         const l = exact(rawLine, [...lineKeys.filter(k => k !== "sourceLineId"), "lineId",
           ...((o.factsVersion as number) >= 4 ? ["variant"] : []), ...((o.factsVersion as number) >= 5 ? ["scheduledFulfilment"] : []),
-          ...(o.factsVersion === 6 ? ["publicListing"] : [])]);
+          ...((o.factsVersion as number) >= 6 ? ["publicListing"] : [])]);
         const {lineId, ...rest} = l;
         const {sourceLineId, ...normalized} = line({...rest, sourceLineId: lineId}, (o.factsVersion as number) >= 4,
-          (o.factsVersion as number) >= 5 ? {realm, storeId: id(o.storeId)} : undefined, o.factsVersion === 6);
+          (o.factsVersion as number) >= 5 ? {realm, storeId: id(o.storeId)} : undefined, (o.factsVersion as number) >= 6);
         return {lineId: sourceLineId, ...normalized};
       }).sort((a,b) => compare(a.lineId, b.lineId));
       unique(lines.map(l => l.lineId));
       const canonical: PurchaseOriginal = {currency: "INR", lines,
         totals: totals(original.totals, lines.reduce((sum,l) => sum + l.lineTotalMinor, 0))};
       if (o.factsVersion !== 2) canonical.benefitAttribution = benefits(original.benefitAttribution, lines, canonical.totals.discountMinor);
+      if (o.factsVersion === 7) canonical.fulfilmentContext = fulfilmentContext(original.fulfilmentContext, lines,
+        lines.some(l => l.scheduledFulfilment != null));
       const result: StoredOrder = {factsVersion: o.factsVersion as PurchaseFactsVersion, storeId: id(o.storeId), orderId: id(o.orderId),
         original: canonical, originalFingerprint: String(o.originalFingerprint),
         caseId: id(o.caseId), ownerUserId: id(o.ownerUserId)};
@@ -1039,6 +1088,11 @@ export class WorkspacePurchaseProjectionService {
           original.benefitAttribution = {...s.benefitAttribution, components: s.benefitAttribution.components.map(c => ({
             ...c, allocations: c.allocations.map(a => ({...a, lineId: savedIds.get(a.lineId)!})),
           }))};
+        }
+        if (Object.hasOwn(s, "fulfilmentContext")) {
+          const savedIds = new Map(s.lines.map(l => [l.sourceLineId, l.lineId]));
+          original.fulfilmentContext = s.fulfilmentContext == null ? null : {...s.fulfilmentContext,
+            instructions: s.fulfilmentContext.instructions.map(i => ({...i, lineId: savedIds.get(i.lineId)!})).sort((a,b) => compare(a.lineId, b.lineId))};
         }
         return {factsVersion: (input.schemaVersion + 1) as PurchaseFactsVersion, storeId: s.storeId, orderId: s.orderId, original,
           originalFingerprint: purchaseOriginalFingerprint(s.storeId, s.orderId, original),

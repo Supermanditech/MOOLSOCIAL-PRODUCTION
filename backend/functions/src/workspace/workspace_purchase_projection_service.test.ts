@@ -403,6 +403,102 @@ function publicListingReceipt() {
   });
   return value;
 }
+function fulfilmentContextReceipt() {
+  const value = publicListingReceipt(); value.schemaVersion = 6;
+  for (const [index, store] of value.stores.entries()) store.fulfilmentContext = {
+    schemaVersion: 1, method: index === 0 ? 'delivery' : 'collection',
+    recipient: {name: index === 0 ? 'Evaluation recipient A' : 'Evaluation recipient B', phone: index === 0 ? '9876501234' : ''},
+    address: index === 0 ? {line: 'Evaluation house 12', area: 'Evaluation area', pinCode: '342003', landmark: ''} : null,
+    instructions: [{lineId: store.lines[0].sourceLineId, text: index === 0 ? 'दरवाज़े पर दें' : 'Keep the exact ordered pack'}],
+  };
+  return value;
+}
+test('LF-CONTEXT trusted placement preserves per-Store recipient and line instructions without current-profile inference', () => {
+  const value = fulfilmentContextReceipt();
+  assert.deepEqual(normalizePlacement(value, 'evaluation'), value);
+  const unknown = fulfilmentContextReceipt(); unknown.stores.forEach((store: Record<string, unknown>) => {store.fulfilmentContext = null;});
+  assert.deepEqual(normalizePlacement(unknown, 'evaluation'), unknown);
+  for (const legacy of [receipt(), attributedReceipt(), scheduledReceipt(), publicListingReceipt()]) {
+    assert.deepEqual(normalizePlacement(legacy, 'evaluation'), legacy);
+    assert.equal(Object.hasOwn(legacy.stores[0]!, 'fulfilmentContext'), false);
+  }
+});
+for (const [name, mutate] of Object.entries({
+  'missing context': (v: any) => {delete v.stores[0].fulfilmentContext;},
+  'old version enrichment': (v: any) => {v.schemaVersion = 5;},
+  'address book identity': (v: any) => {v.stores[0].fulfilmentContext.address.id = 'private-address-id';},
+  'recipient account identity': (v: any) => {v.stores[0].fulfilmentContext.recipient.accountId = 'private-account';},
+  'cross Store instruction': (v: any) => {v.stores[0].fulfilmentContext.instructions[0].lineId = v.stores[1].lines[0].sourceLineId;},
+  'duplicate instruction': (v: any) => {v.stores[0].fulfilmentContext.instructions.push(v.stores[0].fulfilmentContext.instructions[0]);},
+  'blank note': (v: any) => {v.stores[0].fulfilmentContext.instructions[0].text = '';},
+  'oversized note': (v: any) => {v.stores[0].fulfilmentContext.instructions[0].text = 'द'.repeat(1001);},
+  'control character': (v: any) => {v.stores[0].fulfilmentContext.instructions[0].text = 'note\u0000';},
+  'collection residence': (v: any) => {v.stores[1].fulfilmentContext.address = v.stores[0].fulfilmentContext.address;},
+  'invalid phone': (v: any) => {v.stores[0].fulfilmentContext.recipient.phone = 'not-a-phone';},
+})) test(`LF-CONTEXT rejects ${name}`, () => {
+  const value = fulfilmentContextReceipt(); mutate(value);
+  assert.throws(() => normalizePlacement(value, 'evaluation'), rejectsCode('invalid_input'));
+});
+
+test('LF-CONTEXT emulator freezes two Store contexts, remaps notes, preserves feedback and rejects contradictory operations', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-context-${randomUUID().slice(0,8)}`}, `context-${randomUUID()}`), db = getFirestore(app);
+  const value = fulfilmentContextReceipt(), originalSource = structuredClone(value), now = new Date('2026-10-16T12:00:00.000Z');
+  const service = new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => value});
+  const reader = new WorkspacePurchaseProjectionService(db, 'evaluation');
+  try {
+    for (const store of value.stores) await db.collection('workspaceProfiles').doc(store.caseId).set({schemaVersion: 1,
+      caseId: store.caseId, workspaceId: store.storeId, ownerUserId: store.ownerUserId, familyId: 'products-trade',
+      profileId: 'retailer-grocery', status: 'live', shopEnabled: true});
+    const made = await service.materialize('original-context-source'), buyer = await reader.readBuyer(value.buyerUserId, {purchaseId: made.purchaseId});
+    assert.equal(buyer.schemaVersion, 7);
+    assert.deepEqual(await service.materialize('original-context-source'), made);
+    const seller: unknown[] = [], operations: unknown[] = [];
+    for (const [index, order] of buyer.orders.entries()) {
+      const supplied = value.stores[index], context = order.original.fulfilmentContext!;
+      assert.equal(order.factsVersion, 7); assert.equal(context.recipient!.name, supplied.fulfilmentContext.recipient.name);
+      const sourceLine = supplied.lines[0], purchasedLine = order.original.lines.find(line => line.skuId === sourceLine.skuId &&
+        line.verifiedPackId === sourceLine.verifiedPackId && line.offerId === sourceLine.offerId && line.variant === sourceLine.variant)!;
+      assert.ok(purchasedLine);
+      assert.equal(context.instructions[0]!.lineId, purchasedLine.lineId);
+      assert.notEqual(context.instructions[0]!.lineId, supplied.lines[0].sourceLineId);
+      assert.equal(context.instructions[0]!.text, supplied.fulfilmentContext.instructions[0].text);
+      const scope = {purchaseId: made.purchaseId, storeId: order.storeId, orderId: order.orderId};
+      const view = await reader.readStore(supplied.ownerUserId, scope); seller.push(view);
+      assert.equal(view.orders.length, 1); assert.deepEqual(view.orders[0], order);
+      assert.doesNotMatch(JSON.stringify(view), new RegExp(value.stores[1-index].fulfilmentContext.recipient.name));
+      await assert.rejects(reader.readStore(value.stores[1-index].ownerUserId, scope), rejectsCode('not_found'));
+      const proof: TrustedOperationalOrderEvidence = {...operationalEvidence(), ...scope,
+        originalFingerprint: order.originalFingerprint, sourceRevision: buyer.sourceRevision, fulfilment: context.method,
+        initialStage: context.method === 'collection' ? 'Ready' : 'Confirmed', allowedActions: context.method === 'collection' ? [] : ['accept', 'ready', 'reject']};
+      if (index === 0) {
+        const contradiction = new WorkspaceOrderOperationsService(db, 'evaluation', {readOperationalOrder: async () => ({...proof,
+          fulfilment: 'collection', initialStage: 'Ready', allowedActions: []})}, () => now);
+        await assert.rejects(contradiction.initialize('contradictory-original-mode'), rejectsCode('conflict'));
+      }
+      const operational = new WorkspaceOrderOperationsService(db, 'evaluation', {readOperationalOrder: async () => proof}, () => now,
+        {issuer: 'trusted-fulfilment', readCompletion: async () => ({...completionEvidence(), ...scope,
+          originalFingerprint: order.originalFingerprint, sourceRevision: buyer.sourceRevision, operationalRevision: 1, outcome: 'collected'})});
+      await operational.initialize(`context-operations-${index}`);
+      const snapshot = await operational.read(supplied.ownerUserId, 'seller', scope); operations.push(snapshot);
+      assert.equal(snapshot.originalFactsVersion, 7); assert.deepEqual(snapshot.original, order.original);
+      if (context.method === 'collection') {
+        await operational.recordCompletion('context-collection-complete');
+        const targets = await operational.listBuyerProductFeedbackTargets(value.buyerUserId, {limit: 5, cursor: null});
+        assert.equal(targets.targets.length, 1);
+        assert.doesNotMatch(JSON.stringify(targets), /Evaluation recipient|9876501234|Evaluation house|Keep the exact ordered pack/);
+      }
+    }
+    value.stores[0].fulfilmentContext.instructions[0].text = 'Changed after the original placement';
+    await assert.rejects(service.materialize('original-context-source'), rejectsCode('conflict'));
+    value.stores = originalSource.stores;
+    assert.deepEqual(await reader.readBuyer(value.buyerUserId, {purchaseId: made.purchaseId}), buyer);
+    console.log(`LF10_CONTEXT_PROJECTION=${JSON.stringify({buyer, seller, operations})}`); // Isolated emulator fixtures only.
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+
 test("LF-LISTING frozen ordinary purchased context survives independently of desired Scheduled intent", () => {
   const input = publicListingReceipt();
   assert.deepEqual(normalizePlacement(input, "evaluation"), input);

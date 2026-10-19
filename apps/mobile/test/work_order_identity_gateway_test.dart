@@ -679,6 +679,70 @@ void main() {
     });
   }
   for (final role in WorkspaceOrderIdentityRole.values) {
+    for (final unknown in [false, true]) {
+      test('LF-CONTEXT strict original reader retains version7 including null ${role.name} unknown=$unknown', () async {
+        final data = fulfilmentPurchaseResponse(role: role.name, unknown: unknown), wire = Transport()..data = data;
+        final result = await projectionGateway(wire, account: role == WorkspaceOrderIdentityRole.buyer ? 'buyer-1' : 'owner-1')
+          .readPurchaseProjection(role: role, realm: 'evaluation', purchaseId: data['purchaseId'],
+            storeId: role == WorkspaceOrderIdentityRole.seller ? 'store-one' : null,
+            orderId: role == WorkspaceOrderIdentityRole.seller ? data['orders'][0]['orderId'] : null);
+        expect(result, isNotNull);
+        expect(result!.orders.single.factsVersion, 7);
+        final saved = result.orders.single;
+        expect(saved.hasFulfilmentContextSnapshot, isTrue);
+        expect(saved.fulfilmentContext?.toJson(), data['orders'][0]['original']['fulfilmentContext']);
+        if (!unknown) expect(() => saved.fulfilmentContext!.instructions['another-line'] = 'Changed', throwsUnsupportedError);
+      });
+    }
+  }
+  for (final fault in <String, void Function(Map<String, dynamic>)>{
+    'missing context': (d) => (d['orders'][0]['original'] as Map).remove('fulfilmentContext'),
+    'old version': (d) {d['schemaVersion'] = 6; d['orders'][0]['factsVersion'] = 6;},
+    'foreign line': (d) => d['orders'][0]['original']['fulfilmentContext']['instructions'][0]['lineId'] = 'another-Store-line',
+    'duplicate note': (d) {final notes = d['orders'][0]['original']['fulfilmentContext']['instructions'] as List; notes.add(notes[0]);},
+    'empty note': (d) => d['orders'][0]['original']['fulfilmentContext']['instructions'][0]['text'] = '',
+    'account identifier': (d) => d['orders'][0]['original']['fulfilmentContext']['recipient']['userId'] = 'private-id',
+    'address book identifier': (d) => d['orders'][0]['original']['fulfilmentContext']['address']['id'] = 'address-id',
+    'invalid phone': (d) => d['orders'][0]['original']['fulfilmentContext']['recipient']['phone'] = 'not-a-phone',
+    'control character': (d) => d['orders'][0]['original']['fulfilmentContext']['instructions'][0]['text'] = 'note\u0000',
+    'collection address': (d) => d['orders'][0]['original']['fulfilmentContext']['method'] = 'collection',
+  }.entries) {
+    test('LF-CONTEXT strict reader rejects rehashed ${fault.key}', () async {
+      final data = fulfilmentPurchaseResponse(); fault.value(data); rehashPurchaseOrder(data['orders'][0]);
+      expect(await projectionGateway(Transport()..data = data).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: data['purchaseId']), isNull);
+    });
+  }
+  if (Platform.environment['LF10_CONTEXT_LOG'] case final path?) {
+    test('LF-CONTEXT actual saved two-Store and operational projections retain exact private details', () async {
+      const marker = 'LF10_CONTEXT_PROJECTION=';
+      final row = File(path).readAsLinesSync().singleWhere((line) => line.startsWith(marker));
+      final captured = (jsonDecode(row.substring(marker.length)) as Map).cast<String, dynamic>();
+      for (final data in [captured['buyer'], ...captured['seller'] as List]) {
+        final wire = Transport()..data = data, role = data['viewerRole'] == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller;
+        final order = data['orders'][0];
+        final result = await projectionGateway(wire, account: data['viewerUserId']).readPurchaseProjection(role: role,
+          realm: 'evaluation', purchaseId: data['purchaseId'], storeId: role == WorkspaceOrderIdentityRole.seller ? order['storeId'] : null,
+          orderId: role == WorkspaceOrderIdentityRole.seller ? order['orderId'] : null);
+        expect(result, isNotNull);
+        for (final saved in result!.orders) {
+          final raw = (data['orders'] as List).singleWhere((v) => v['orderId'] == saved.orderId);
+          expect(saved.factsVersion, 7); expect(saved.fulfilmentContext!.toJson(), raw['original']['fulfilmentContext']);
+          expect(saved.lines.any((line) => saved.fulfilmentContext!.instructions.containsKey(line.lineId)), isTrue);
+        }
+      }
+      for (final data in captured['operations'] as List) {
+        final reference = WorkspacePurchaseReference(purchaseId: data['purchaseId'], storeId: data['storeId'], orderId: data['orderId'],
+          originalFingerprint: data['originalFingerprint'], sourceRevision: data['sourceRevision']);
+        final gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(Transport()..data = data, account: data['viewerUserId']),
+          now: () => DateTime.utc(2026, 10, 16, 12));
+        final saved = await gateway.read(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference);
+        expect(saved, isNotNull); expect(saved!.original.factsVersion, 7);
+        expect(saved.original.fulfilmentContext!.toJson(), data['original']['fulfilmentContext']);
+      }
+    });
+  }
+  for (final role in WorkspaceOrderIdentityRole.values) {
     for (final allNull in [false, true]) {
       test('LF-LISTING strict originals retain version6 and nullable provenance ${role.name} $allNull', () async {
         final data = publicListingPurchaseResponse(role: role.name, allNull: allNull), wire = Transport()..data = data;
@@ -1903,6 +1967,18 @@ Map<String, dynamic> purchaseResponse({String role = 'buyer'}) {
       },
     ],
   };
+}
+
+Map<String, dynamic> fulfilmentPurchaseResponse({String role = 'buyer', bool unknown = false}) {
+  final data = publicListingPurchaseResponse(role: role)..['schemaVersion'] = 7;
+  final order = data['orders'][0] as Map<String, dynamic>; order['factsVersion'] = 7;
+  order['original']['fulfilmentContext'] = unknown ? null : {
+    'schemaVersion': 1, 'method': 'delivery', 'recipient': {'name': 'Evaluation recipient', 'phone': '9876501234'},
+    'address': {'line': 'Evaluation house 12', 'area': 'Evaluation area', 'pinCode': '342003', 'landmark': ''},
+    'instructions': [{'lineId': order['original']['lines'][0]['lineId'], 'text': 'दरवाज़े पर दें'}],
+  };
+  rehashPurchaseOrder(order);
+  return (jsonDecode(jsonEncode(data)) as Map).cast<String, dynamic>();
 }
 
 Map<String, dynamic> publicListingPurchaseResponse({String role = 'buyer', bool allNull = false}) {

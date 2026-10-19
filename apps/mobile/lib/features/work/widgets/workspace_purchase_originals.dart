@@ -344,6 +344,7 @@ class _WorkspacePurchaseOriginalsState
                         ),
                       if (_details[reference.orderId] case final details?) ...[
                         _orderUpdate(reference),
+                        WorkspaceOriginalFulfilmentForOrder(original: details),
                         for (final line in details.lines)
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 6),
@@ -361,6 +362,7 @@ class _WorkspacePurchaseOriginalsState
                                 ),
                                 WorkspaceOriginalVariantForLine(line: line),
                                 WorkspaceOriginalScheduledForLine(line: line),
+                                WorkspaceOriginalInstructionsForLine(original: details, lineId: line.lineId),
                                 _amount(line.lineTotalMinor),
                                 WorkspaceOriginalBenefitsForLine(original: details, lineId: line.lineId),
                                 if (widget.role == WorkspaceOrderIdentityRole.buyer &&
@@ -446,6 +448,41 @@ class _WorkspacePurchaseOriginalsState
       );
     },
   );
+}
+
+/// Compact private order details, never an address/eligibility verification.
+class WorkspaceOriginalFulfilmentForOrder extends StatelessWidget {
+  const WorkspaceOriginalFulfilmentForOrder({super.key, required this.original});
+  final WorkspacePurchaseOrder original;
+  @override
+  Widget build(BuildContext context) {
+    final supplied = original.fulfilmentContext;
+    if (supplied == null || supplied.recipient == null && supplied.address == null) return const SizedBox.shrink();
+    final recipient = supplied.recipient, address = supplied.address;
+    final addressLines = address == null ? <String>[] : [address.line, address.area, address.pinCode,
+      if (address.landmark.isNotEmpty) 'Landmark: ${address.landmark}'].where((v) => v.isNotEmpty).toList();
+    final style = Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.4);
+    return Padding(key: ValueKey('original-fulfilment-${original.orderId}'), padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(supplied.method == 'collection' ? 'Order collection details' : 'Order delivery details',
+          style: style?.copyWith(fontWeight: FontWeight.w600)),
+        if (recipient != null && recipient.name.isNotEmpty) Text(recipient.name, style: style),
+        if (recipient != null && recipient.phone.isNotEmpty) Text(recipient.phone, style: style),
+        if (addressLines.isNotEmpty) Text(addressLines.join('\n'), style: style),
+      ]));
+  }
+}
+
+class WorkspaceOriginalInstructionsForLine extends StatelessWidget {
+  const WorkspaceOriginalInstructionsForLine({super.key, required this.original, required this.lineId});
+  final WorkspacePurchaseOrder original;
+  final String lineId;
+  @override
+  Widget build(BuildContext context) {
+    final note = original.fulfilmentContext?.instructions[lineId];
+    return note == null ? const SizedBox.shrink() : Text('Instructions · $note',
+      key: ValueKey('original-instructions-$lineId'), style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.4));
+  }
 }
 
 /// Only supplied original text; never supplement it from today's catalogue.

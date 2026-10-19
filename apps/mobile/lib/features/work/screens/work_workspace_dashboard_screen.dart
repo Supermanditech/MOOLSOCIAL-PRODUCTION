@@ -29864,6 +29864,7 @@ class _ExactOrderInformation extends StatelessWidget {
 
   Widget _operationalInformation(BuildContext context) {
     final exact = order.operational!;
+    final originalAddress = exact.original.fulfilmentContext?.address;
     final localizations = MaterialLocalizations.of(context);
     String date(DateTime value) {
       final local = value.toLocal();
@@ -29878,8 +29879,10 @@ class _ExactOrderInformation extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (showFacts) ...[
         Text('Placed ${date(exact.placedAt)}', style: const TextStyle(color: MoolColors.muted, fontSize: 12)),
-        Text(exact.fulfilment == 'collection' ? 'Collect at store · ${exact.address}' : 'Delivery · ${exact.address}',
-          style: const TextStyle(fontSize: 12)),
+        if (originalAddress == null || originalAddress.line.isEmpty || originalAddress.area.isEmpty || originalAddress.pinCode.isEmpty)
+          Text(exact.fulfilment == 'collection' ? 'Collect at store · ${exact.address}' : 'Delivery · ${exact.address}',
+            style: const TextStyle(fontSize: 12)),
+        WorkspaceOriginalFulfilmentForOrder(original: exact.original),
         if (exact.stage == 'Confirmed' && exact.acceptanceDeadline != null)
           Text('Accept by ${date(exact.acceptanceDeadline!)}', style: const TextStyle(fontSize: 12)),
         if (exact.fulfilmentDeadline case final deadline?)
@@ -29895,6 +29898,7 @@ class _ExactOrderInformation extends StatelessWidget {
               Text('${line.name} · ${line.packLabel}', style: const TextStyle(fontWeight: FontWeight.w600)),
               WorkspaceOriginalVariantForLine(line: line),
               WorkspaceOriginalScheduledForLine(line: line),
+              WorkspaceOriginalInstructionsForLine(original: exact.original, lineId: line.lineId),
               _StoreMoneyLine(leading: Text('${line.quantityLabel} × ${_price(line.unitPriceMinor)}'),
                 value: _price(line.lineTotalMinor), style: const TextStyle(fontWeight: FontWeight.w600)),
               WorkspaceOriginalBenefitsForLine(original: exact.original, lineId: line.lineId),
