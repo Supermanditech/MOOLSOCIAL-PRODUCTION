@@ -3891,10 +3891,11 @@ void main() {
     row(data)['supplierPolicy'] = policyEnvelope();
     return data;
   }
-  AuthenticatedWorkspaceCatalogueGateway discoveryGateway(SocialContentTransport transport, {String realm = 'production', bool promotions = false}) =>
+  AuthenticatedWorkspaceCatalogueGateway discoveryGateway(SocialContentTransport transport, {String realm = 'production', bool promotions = false, bool advertisedTerms = false}) =>
     AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
       credentials: Credentials(), transport: transport, realm: realm, productFactsReadbackSupported: true,
-      unbrandedProduceReadbackSupported: true, storeClassificationReadbackSupported: true, promotionDiscoverySupported: promotions, now: () => at);
+      unbrandedProduceReadbackSupported: true, storeClassificationReadbackSupported: true, promotionDiscoverySupported: promotions,
+      promotionTermsSupported: advertisedTerms, now: () => at);
   Map<String, dynamic> discoveryData(Map<String, Object?> body, {bool empty = false}) {
     final listing = publicPage();
     listing.addAll({'productFactsReadbackVersion': 1, 'storeClassificationReadbackVersion': 1, 'storeDetailsReadbackVersion': 1});
@@ -4063,6 +4064,139 @@ void main() {
   }
   BuyV2CatalogueQuery globalOffersQuery() => BuyV2CatalogueQuery(destination: BuyV2Destination.shop,
     regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas, offersOnly: true);
+  Map<String, dynamic> advertisedTerms({bool percentage = false}) => BuyV2AdvertisedBenefitTerms(kind: percentage ? 'percentage' : 'flat',
+    flatAmountMinor: percentage ? null : 1025, flatBasis: percentage ? null : 'per_pack', percentageBasisPoints: percentage ? 750 : null,
+    maximumSavingMinor: 5000, minimumSpendMinor: 0, minimumQuantity: 2).toJson();
+  Map<String, dynamic> globalAdvertisedPage(Map<String, Object?> body, {bool clear = false, int revision = 1}) {
+    final data = globalPromotionPage(body)..['promotionTermsVersion'] = 1;
+    final items = (data['items'] as List).cast<Map>();
+    for (var i = 0; i < items.length; i++) {
+      final publication = items[i]['publication'] as Map<String, dynamic>;
+      publication['revision'] = revision;
+      publication['sourceId'] = 'store-promotion:production:store-one:${publication['publicationId']}:$revision';
+      if (!clear) publication['benefitTerms'] = advertisedTerms(percentage: i == 1);
+    }
+    return data;
+  }
+  test('LF04 TERMS real Store and global readers retain exact terms without a Cart benefit', () async {
+    final requests = <Map<String, Object?>>[];
+    final connection = discoveryGateway(OwnerTransport((body) async {
+      requests.add(body);
+      final listing = ((discoveryData({'query': {}, 'resultKind': 'products'})['items'] as List).single as Map)['listing'] as Map<String, dynamic>;
+      final placement = promotionRow()..['benefitTerms'] = advertisedTerms()
+        ..['product'] = (jsonDecode(jsonEncode(row(listing))) as Map<String, dynamic>..remove('listings'));
+      final data = body['operation'] == 'readPublicPromotionDiscovery' ? globalAdvertisedPage(body)
+        : body['operation'] == 'readPublicStorePromotions'
+          ? (promotionPage([placement])..['promotionTermsVersion'] = 1) : listing;
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    }), promotions: true, advertisedTerms: true);
+    expect(connection.forOwnerAccount('owner-one').promotionTermsSupported, true);
+    final global = WorkspacePublicDiscoverySource(gateway: connection, current: () => true);
+    final store = WorkspaceStoreCatalogueSource(gateway: connection, storeId: 'store-one', current: () => true);
+    addTearDown(global.dispose);
+    final found = await global.loadOffers(globalOffersQuery(), pageSize: 40);
+    expect(found.items.map((o) => o.benefitTerms!.toJson()), [advertisedTerms(), advertisedTerms(percentage: true)]);
+    final scoped = await store.loadStoreOffers(storeId: 'store-one', destination: BuyV2Destination.shop);
+    expect(scoped.single.benefitTerms!.toJson(), advertisedTerms());
+    expect(requests.where((b) => b['operation'] == 'readPublicStorePromotions' || b['operation'] == 'readPublicPromotionDiscovery')
+      .every((b) => b['promotionTermsVersion'] == 1), true);
+    expect(found.items.first.product.priceMinor, 10025);
+  });
+  for (final fault in ['no opt-in', 'missing marker', 'wrong version', 'null terms', 'ambiguous kind']) {
+    test('LF04 TERMS public reader rejects $fault instead of dropping conditions', () async {
+      final source = WorkspacePublicDiscoverySource(current: () => true, gateway: discoveryGateway(OwnerTransport((body) async {
+        final data = globalAdvertisedPage(body);
+        if (fault == 'missing marker') data.remove('promotionTermsVersion');
+        if (fault == 'wrong version') data['promotionTermsVersion'] = 1.0;
+        final publication = ((data['items'] as List).first as Map)['publication'] as Map;
+        if (fault == 'null terms') publication['benefitTerms'] = null;
+        if (fault == 'ambiguous kind') (publication['benefitTerms'] as Map)['percentageBasisPoints'] = 500;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      }), promotions: true, advertisedTerms: fault != 'no opt-in'));
+      addTearDown(source.dispose); await expectLater(source.loadOffers(globalOffersQuery(), pageSize: 40), throwsFormatException);
+    });
+  }
+  test('LF04 TERMS same-revision condition changes cannot overwrite admitted public facts', () async {
+    var changed = false;
+    final source = WorkspacePublicDiscoverySource(current: () => true, gateway: discoveryGateway(OwnerTransport((body) async {
+      final data = globalAdvertisedPage(body);
+      if (changed) ((((data['items'] as List).first as Map)['publication'] as Map)['benefitTerms'] as Map)['minimumQuantity'] = 3;
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    }), promotions: true, advertisedTerms: true));
+    addTearDown(source.dispose); await source.loadOffers(globalOffersQuery(), pageSize: 40); changed = true;
+    await expectLater(source.loadOffers(globalOffersQuery(), pageSize: 40), throwsFormatException);
+  });
+  test('LF04 TERMS cleared head survives page removal and cannot resurrect opened terms', () async {
+    var revision = 1, empty = false;
+    final source = WorkspacePublicDiscoverySource(current: () => true, gateway: discoveryGateway(OwnerTransport((body) async {
+      final data = globalAdvertisedPage(body, clear: revision == 2, revision: revision);
+      if (empty) { data['items'] = <Object?>[]; (data['page'] as Map)['totalCount'] = 0; }
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    }), promotions: true, advertisedTerms: true));
+    final core = BuySession();
+    final buyer = BuyV2Session(core: core, reviewDataEnabled: false,
+      catalogueNow: () => at, cataloguePageSource: source, publishedCatalogueSource: source);
+    addTearDown(core.dispose); addTearDown(buyer.dispose); addTearDown(source.dispose);
+    final pager = buyer.acquireCatalogueOffers('terms-head'); await pager.open(globalOffersQuery());
+    final old = pager.page!.items.first;
+    expect(buyer.admitStorePromotion(source, old), true);
+    expect(buyer.advertisedOffersFor(old.product), hasLength(2));
+    revision = 2; await pager.refresh(); expect(pager.message, isNull);
+    expect(buyer.advertisedOffersFor(old.product), isEmpty);
+    empty = true; await pager.refresh(); expect(pager.message, isNull);
+    expect(buyer.advertisedOffersFor(old.product), isEmpty);
+    expect(buyer.admitStorePromotion(source, old), false);
+  });
+  test('LF04 TERMS conflicting equal revision is suppressed until a newer head', () async {
+    final source = WorkspacePublicDiscoverySource(current: () => true, gateway: discoveryGateway(OwnerTransport((body) async =>
+      SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': globalAdvertisedPage(body)}))),
+      promotions: true, advertisedTerms: true));
+    final core = BuySession();
+    final buyer = BuyV2Session(core: core, reviewDataEnabled: false,
+      catalogueNow: () => at, cataloguePageSource: source, publishedCatalogueSource: source);
+    addTearDown(core.dispose); addTearDown(buyer.dispose); addTearDown(source.dispose);
+    final pager = buyer.acquireCatalogueOffers('terms-conflict'); await pager.open(globalOffersQuery());
+    final old = pager.page!.items.first;
+    BuyV2PublishedCatalogueOffer changed(int revision) => BuyV2PublishedCatalogueOffer(
+      publicationId: old.publicationId, product: old.product, publisherType: old.publisherType,
+      publisherId: old.publisherId, publisherName: old.publisherName, headline: old.headline,
+      sourceId: old.sourceId, observedAt: old.observedAt, validUntil: old.validUntil,
+      detail: old.detail, revision: revision, benefitTerms: BuyV2AdvertisedBenefitTerms(kind: 'percentage', percentageBasisPoints: 500));
+    expect(buyer.admitStorePromotion(source, old), true);
+    expect(buyer.admitStorePromotion(source, changed(1)), false);
+    expect(buyer.advertisedOffersFor(old.product).where((o) => o.identity == old.identity), isEmpty);
+    expect(buyer.admitStorePromotion(source, old), false);
+    expect(buyer.admitStorePromotion(source, changed(2)), true);
+    expect(buyer.advertisedOffersFor(old.product).firstWhere((o) => o.identity == old.identity).revision, 2);
+  });
+  test('LF04 TERMS Store refresh retires opened terms without navigation; rename is not a terms conflict', () async {
+    final source = WorkspacePublicDiscoverySource(current: () => true, gateway: discoveryGateway(OwnerTransport((body) async =>
+      SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': globalAdvertisedPage(body)}))),
+      promotions: true, advertisedTerms: true));
+    final core = BuySession();
+    final buyer = BuyV2Session(core: core, reviewDataEnabled: false,
+      catalogueNow: () => at, cataloguePageSource: source, publishedCatalogueSource: source);
+    addTearDown(core.dispose); addTearDown(buyer.dispose); addTearDown(source.dispose);
+    final old = (await source.loadOffers(globalOffersQuery(), pageSize: 40)).items.first;
+    BuyV2PublishedCatalogueOffer replacement(int revision, {bool clear = false, String? name}) => BuyV2PublishedCatalogueOffer(
+      publicationId: old.publicationId, product: old.product, publisherType: old.publisherType,
+      publisherId: old.publisherId, publisherName: name ?? old.publisherName, headline: old.headline,
+      sourceId: old.sourceId, observedAt: old.observedAt, validUntil: old.validUntil,
+      detail: old.detail, revision: revision, benefitTerms: clear ? null : old.benefitTerms);
+    expect(buyer.admitStorePromotion(source, old), true);
+    expect(buyer.observeStorePromotions(source, [replacement(1, name: 'Renamed Store')]), true);
+    expect(buyer.advertisedOffersFor(old.product), hasLength(1));
+    expect(buyer.observeStorePromotions(source, [replacement(2, clear: true)]), true);
+    expect(buyer.advertisedOffersFor(old.product), isEmpty);
+    expect(buyer.cartLines, isEmpty);
+    expect(buyer.admitStorePromotion(source, old), false);
+  });
+  testWidgets('LF04 TERMS percentage disclosure does not invent its calculation basis', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: BuyV2AdvertisedBenefitRows(
+      terms: BuyV2AdvertisedBenefitTerms(kind: 'percentage', percentageBasisPoints: 750)))));
+    expect(find.text('Store-advertised amount: 7.5%'), findsOneWidget);
+    expect(find.textContaining('subtotal'), findsNothing);
+  });
   test('LF04 GLOBAL ordinary promotions retain separate placements and exact paise SKU', () async {
     final source = WorkspacePublicDiscoverySource(current: () => true, gateway: discoveryGateway(OwnerTransport((body) async {
       expect(body['operation'], 'readPublicPromotionDiscovery');
@@ -6017,6 +6151,51 @@ void main() {
         channelEnabled: true, storeReady: true, fleetAvailable: true, customerLocationConfirmed: true,
         options: {BuyV2DeliveryOption.quick}));
     expect(session.refreshProductFacts(selected.id), true);
+  }
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF04 TERMS product and Cart disclose supplied terms without applying savings at $scale', (tester) async {
+      var current = true;
+      final source = WorkspacePublicDiscoverySource(current: () => current, gateway: discoveryGateway(OwnerTransport((body) async =>
+        SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': globalAdvertisedPage(body)}))),
+        promotions: true, advertisedTerms: true));
+      final core = BuySession();
+      final facts = _HostOperationalFacts((p) => const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false).snapshotFor(p));
+      final buyer = BuyV2Session(core: core, reviewDataEnabled: false, catalogueNow: () => at,
+        cataloguePageSource: source, publishedCatalogueSource: source, productFactsAdapter: facts);
+      var closed = false;
+      void close() { if (!closed) { closed = true; buyer.dispose(); core.dispose(); source.dispose(); } }
+      addTearDown(close);
+      final pager = buyer.acquireCatalogueOffers('terms-ui'); await pager.open(globalOffersQuery());
+      final selected = pager.page!.items.first.product;
+      expect(buyer.openProduct(selected.id), true);
+      enableHostStockEligibility(buyer, selected, facts);
+      await mountOptionalDetails(tester, buyer, scale);
+      final link = find.byKey(ValueKey('buy-advertised-offer-terms-${selected.id}'));
+      await revealOptionalDetails(tester, selected, link); await tester.tap(link); await tester.pumpAndSettle();
+      expect(find.text('Store-advertised amount: ₹10.25 per selling pack'), findsOneWidget);
+      expect(find.text('Store-advertised amount: 7.5%'), findsOneWidget);
+      expect(find.text('No minimum product spend'), findsNWidgets(2));
+      expect(buyer.cartLines, isEmpty);
+      await tester.tap(find.text('Close')); await tester.pumpAndSettle();
+      expect(buyer.addProduct(selected.id), true); buyer.openCart();
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+        MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+        home: Scaffold(body: AnimatedBuilder(animation: buyer, builder: (context, _) => BuyV2CartView(session: buyer, onBrowseMore: () {})))));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(link, 200, scrollable: find.byType(Scrollable).first);
+      await Scrollable.ensureVisible(tester.element(link), alignment: .15); await tester.pumpAndSettle();
+      final before = buyer.cartLines.single.totalMinor;
+      await tester.tap(link); await tester.pumpAndSettle();
+      expect(find.text('Current Store offer terms'), findsOneWidget);
+      expect(buyer.cartLines.single.totalMinor, before); expect(before, 10025);
+      expect(find.textContaining('No discount is applied here'), findsOneWidget);
+      current = false; buyer.refreshProductFacts(selected.id); await tester.pumpAndSettle();
+      expect(find.textContaining('promotion changed or ended'), findsOneWidget);
+      expect(find.textContaining('Store-advertised amount:'), findsNothing);
+      expect(buyer.cartLines.single.totalMinor, before);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink()); close();
+    });
   }
   test('LF11 Stock session positive is not eligibility and fresh negative preserves Cart without a replacement payment', () async {
     final entry = factoryEntry(publicPage()); var short = false, revision = 1;

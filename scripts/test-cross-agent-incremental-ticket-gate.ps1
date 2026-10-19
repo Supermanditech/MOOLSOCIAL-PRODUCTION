@@ -311,6 +311,22 @@ if ($RequireLfPublicationProbes) {
     $cases++
   }
   if ($null -ne $continuation.PSObject.Properties['batch02Facts']) {
+    # These two owners already belong to sharedCatalogueExtension/the cumulative
+    # claim. The older continuation must preserve exact optional ownership too.
+    foreach ($existingOwner in @('apps/mobile/lib/features/work/work_product_promotions.dart',
+        'apps/mobile/lib/features/work/widgets/store_product_promotions.dart')) {
+      $claimed=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      if (@($claimed.batch02Facts.owners) -cnotcontains $existingOwner) {
+        $claimed.batch02Facts.owners+= $existingOwner
+      }
+      Assert-Fixture (Test-Lf27Batch01Continuation $claimed @($existingOwner)) 'Already-authorized exact promotion owner rejected.'
+      $historical=$claimed | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $historical.batch02Facts.owners=@($historical.batch02Facts.owners | Where-Object { $_ -cne $existingOwner })
+      Assert-Fixture (Test-Lf27Batch01Continuation $historical @()) 'Historical promotion owner absence rejected.'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $historical @($existingOwner))) 'Unclaimed promotion owner admitted.'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $claimed @("$existingOwner.unclaimed"))) 'Promotion path prefix granted ownership.'
+      $cases+=4
+    }
     foreach($owner in $continuation.batch02Facts.owners) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact Batch02 facts owner rejected.'
       $cases++

@@ -146,6 +146,7 @@ class BuyV2PublishedOffer {
     this.publisherId,
     this.revision,
     this.detail,
+    this.benefitTerms,
   });
 
   final String productId;
@@ -155,6 +156,7 @@ class BuyV2PublishedOffer {
   final String? publicationId;
   final String? publisherId, detail;
   final int? revision;
+  final BuyV2AdvertisedBenefitTerms? benefitTerms;
 
   bool get hasValidPublicationMetadata => revision == null && publisherId == null ||
       revision != null && revision! >= 1 && revision! <= 1000000000 &&
@@ -174,6 +176,59 @@ class BuyV2PublishedOffer {
 /// checkout and order creation.
 abstract interface class BuyV2PublishedOffersSource {
   List<BuyV2PublishedOffer> get publishedOffers;
+}
+
+/// Optional supplied facts only. These rows never compute/apply a Cart saving.
+class BuyV2AdvertisedBenefitRows extends StatelessWidget {
+  const BuyV2AdvertisedBenefitRows({super.key, required this.terms});
+  final BuyV2AdvertisedBenefitTerms terms;
+  @override Widget build(BuildContext context) {
+    final p = terms.percentageBasisPoints;
+    final fraction = p == null ? '' : (p % 100).toString().padLeft(2, '0').replaceFirst(RegExp(r'0+$'), '');
+    final amount = terms.kind == 'flat'
+      ? '${buyV2MoneyMinor(terms.flatAmountMinor!)} ${terms.flatBasis == 'per_pack' ? 'per selling pack' : 'once per order for this product'}'
+      : '${p! ~/ 100}${fraction.isEmpty ? '' : '.$fraction'}%';
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text('Store-advertised amount: $amount'),
+      if (terms.maximumSavingMinor case final cap?) Text('Maximum per order: ${buyV2MoneyMinor(cap)}'),
+      if (terms.minimumSpendMinor case final spend?) Text(spend == 0 ? 'No minimum product spend' : 'Minimum product spend: ${buyV2MoneyMinor(spend)}'),
+      if (terms.minimumQuantity case final packs?) Text('Minimum: $packs selling ${packs == 1 ? 'pack' : 'packs'}'),
+    ]);
+  }
+}
+
+/// Compact product/Cart disclosure from already admitted exact publications.
+/// No fetch, selection, coupon or quote mutation is performed by opening it.
+class BuyV2AdvertisedOfferLink extends StatelessWidget {
+  const BuyV2AdvertisedOfferLink({super.key, required this.session, required this.product});
+  final BuyV2Session session;
+  final BuyV2Product product;
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: session, builder: (context, _) {
+    if (session.advertisedOffersFor(product).isEmpty) return const SizedBox.shrink();
+    return Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+      key: ValueKey('buy-advertised-offer-terms-${product.id}'),
+      style: TextButton.styleFrom(minimumSize: const Size(48, 48)), icon: const Icon(Icons.local_offer_outlined, size: 16),
+      label: const Text('Store offer terms'), onPressed: () {
+        if (session.advertisedOffersFor(product).isEmpty) return;
+        unawaited(showDialog<void>(context: context, builder: (dialog) => AnimatedBuilder(animation: session,
+          builder: (context, _) {
+            final offers = session.advertisedOffersFor(product);
+            return AlertDialog(scrollable: true, title: const Text('Current Store offer terms'),
+              content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (offers.isEmpty) const Text('This promotion changed or ended. Close and refresh.')
+                else ...[
+                  for (final offer in offers) Padding(padding: const EdgeInsets.only(bottom: 12), child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Text(offer.headline, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      BuyV2AdvertisedBenefitRows(terms: offer.benefitTerms!),
+                      Text('Ends ${MaterialLocalizations.of(context).formatMediumDate(offer.validUntil.toLocal())}'),
+                    ])),
+                  const Text('Advertised terms only. No discount is applied here; eligibility and final savings require Checkout confirmation.'),
+                ],
+              ]), actions: [TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Close'))]);
+          })));
+      }));
+  });
 }
 
 enum BuyV2PublishedOffersLoadState { loading, ready, offline, unavailable }
@@ -657,6 +712,7 @@ class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
                 publisherId: value.revision == null ? null : value.publisherId,
                 revision: value.revision,
                 detail: value.detail,
+                benefitTerms: value.benefitTerms,
               ),
               product: value.product,
             ),
@@ -1180,7 +1236,8 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                         e.offer.publisherType == entry.offer.publisherType &&
                         e.product.customerSeller(e.offer.publisherName ?? (_mool ? 'MoolSocial' : e.product.seller)) ==
                           product.customerSeller(publisher) &&
-                        e.offer.headline == entry.offer.headline && e.offer.detail == entry.offer.detail);
+                        e.offer.headline == entry.offer.headline && e.offer.detail == entry.offer.detail &&
+                        jsonEncode(e.offer.benefitTerms?.toJson()) == jsonEncode(entry.offer.benefitTerms?.toJson()));
                       void open() {
                         if (!current()) return;
                         widget.session.featuredOfferPublicationId =
@@ -1190,13 +1247,14 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                         else { widget.session.openProduct(product.id); }
                       }
                       void details() => showDialog<void>(context: context,
-                        builder: (dialogContext) => StatefulBuilder(builder: (context, update) => AlertDialog(
+                        builder: (dialogContext) => StatefulBuilder(builder: (context, update) => AnimatedBuilder(animation: owner, builder: (context, _) => AlertDialog(
                           scrollable: true,
                           title: Text(entry.offer.headline, style: context.buyBody.copyWith(
                             fontSize: 14, height: 1.25, fontWeight: FontWeight.w700)),
                           content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [Text('From ${product.customerSeller(publisher)}'), const SizedBox(height: 8),
-                              Text(entry.offer.detail!.trim(), key: ValueKey('buy-offer-detail-copy-${entry.offer.identity}')),
+                              if (entry.offer.detail?.trim().isNotEmpty == true) Text(entry.offer.detail!.trim(), key: ValueKey('buy-offer-detail-copy-${entry.offer.identity}')),
+                              if (entry.offer.benefitTerms case final terms? when current()) BuyV2AdvertisedBenefitRows(terms: terms),
                               const SizedBox(height: 12), const Text('Viewing this promotion does not apply a discount.'),
                               if (!current()) ...[const SizedBox(height: 8),
                                 const Text('This offer changed. Close and refresh the offers.')]]),
@@ -1210,7 +1268,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                               if (!current()) { update(() {}); return; }
                               Navigator.pop(dialogContext); open();
                             }, child: const Text('View product'))],
-                        )));
+                        ))));
 
                       return Padding(
                         key: ValueKey('buy-offer-placement-${entry.offer.identity}'),
@@ -1313,7 +1371,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
-                                        if (entry.offer.detail?.trim().isNotEmpty == true)
+                                        if (entry.offer.detail?.trim().isNotEmpty == true || entry.offer.benefitTerms != null)
                                           TextButton(key: ValueKey('buy-offer-details-${entry.offer.identity}'),
                                             onPressed: details,
                                             style: TextButton.styleFrom(minimumSize: const Size(48, 48),
@@ -8164,6 +8222,7 @@ class _BuyV2StorePublishedPromotionsState extends State<BuyV2StorePublishedPromo
       if (!source.storeOffersActive || offers.any((offer) => !offer.isCurrent(now: now) ||
           offer.product.storeId != store || offer.publisherId != store || offer.product.destination != destination ||
           !identities.add('${offer.publisherId}:${offer.publicationId}'))) { throw const FormatException(); }
+      if (!session.observeStorePromotions(source, offers)) throw const FormatException();
       setState(() { _offers = List.unmodifiable(offers); _loading = false; });
       if (offers.isNotEmpty) {
         final until = offers.map((offer) => offer.validUntil).reduce((a, b) => a.isBefore(b) ? a : b);
@@ -8194,7 +8253,7 @@ class _BuyV2StorePublishedPromotionsState extends State<BuyV2StorePublishedPromo
           entries: [for (final offer in _offers) (product: offer.product, offer: BuyV2PublishedOffer(
             productId: offer.product.id, publisherType: offer.publisherType, publisherId: offer.publisherId,
             publisherName: offer.publisherName, publicationId: offer.publicationId, revision: offer.revision,
-            headline: offer.headline, detail: offer.detail))],
+            headline: offer.headline, detail: offer.detail, benefitTerms: offer.benefitTerms))],
           onOpenPublication: (product, selected) {
             final source = _source;
             final offer = _offers.where((offer) => offer.product.id == product.id &&

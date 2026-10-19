@@ -3152,7 +3152,8 @@ function workspacePromotionService(): WorkspacePromotionService {
   if (realm !== "evaluation" && realm !== "production") {
     throw new WorkspaceProfileError("service_unavailable", "Store promotions are unavailable right now.", 503, true);
   }
-  return new WorkspacePromotionService(new FirestorePromotionRepository(getFirestore(), realm), workspaceCatalogueService());
+  return new WorkspacePromotionService(new FirestorePromotionRepository(getFirestore(), realm), workspaceCatalogueService(),
+    () => new Date(), {benefitTermsSupported: process.env.MOOLSOCIAL_STORE_PROMOTION_TERMS_V1 === "true"});
 }
 
 function workspaceSupplierPolicyService(): WorkspaceSupplierPolicyService {

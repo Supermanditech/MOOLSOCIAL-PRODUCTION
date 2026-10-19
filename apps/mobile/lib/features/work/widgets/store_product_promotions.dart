@@ -5,6 +5,7 @@ import '../work_catalogue_gateway.dart';
 import '../work_models.dart';
 import '../work_product_promotions.dart';
 import '../work_session.dart';
+import '../../buy/buy_v2_content_contracts.dart' show BuyV2AdvertisedBenefitTerms;
 
 /// Explicit public promotion, never a conversion of the private targeted draft.
 class StoreProductPromotionPanel extends StatelessWidget {
@@ -47,6 +48,9 @@ class _PromotionEditor extends StatefulWidget {
 
 class _PromotionEditorState extends State<_PromotionEditor> {
   final _headline = TextEditingController(), _detail = TextEditingController();
+  final _benefitAmount = TextEditingController(), _benefitCap = TextEditingController(),
+    _benefitSpend = TextEditingController(), _benefitQuantity = TextEditingController();
+  String? _benefitKind, _flatBasis;
   final _headlineScroll = ScrollController(keepScrollOffset: false),
       _detailScroll = ScrollController(keepScrollOffset: false);
   final _records = <StorePromotionRecord>[];
@@ -188,6 +192,12 @@ class _PromotionEditorState extends State<_PromotionEditor> {
       _channel = existing?.channel;
       _headline.text = existing?.headline ?? '';
       _detail.text = existing?.detail ?? '';
+      final terms = existing?.benefitTerms;
+      _benefitKind = terms?.kind; _flatBasis = terms?.flatBasis;
+      _benefitAmount.text = terms == null ? '' : workspacePriceInputFromMinor(terms.flatAmountMinor ?? terms.percentageBasisPoints!);
+      _benefitCap.text = terms?.maximumSavingMinor == null ? '' : workspacePriceInputFromMinor(terms!.maximumSavingMinor!);
+      _benefitSpend.text = terms?.minimumSpendMinor == null ? '' : workspacePriceInputFromMinor(terms!.minimumSpendMinor!);
+      _benefitQuantity.text = terms?.minimumQuantity?.toString() ?? '';
       _from = existing?.validFrom ?? widget.now().toUtc();
       _until = existing?.validUntil;
       _source = null;
@@ -305,6 +315,59 @@ class _PromotionEditorState extends State<_PromotionEditor> {
     });
   }
 
+  BuyV2AdvertisedBenefitTerms? get _advertisedTerms {
+    final kind = _benefitKind;
+    if (kind == null) return null;
+    const maxMoney = 4503599627370495;
+    int? optionalMoney(TextEditingController controller) {
+      if (controller.text.trim().isEmpty) return null;
+      return workspacePriceMinorFromInput(controller.text, maximumMinor: maxMoney) ?? (throw const FormatException());
+    }
+    final amount = workspacePriceMinorFromInput(_benefitAmount.text, maximumMinor: kind == 'flat' ? maxMoney : 10000);
+    if (amount == null) throw const FormatException();
+    final quantityText = _benefitQuantity.text.trim();
+    if (quantityText.isNotEmpty && !RegExp(r'^\d+$').hasMatch(quantityText)) throw const FormatException();
+    final quantity = quantityText.isEmpty ? null : int.tryParse(quantityText);
+    if (quantityText.isNotEmpty && quantity == null) throw const FormatException();
+    return BuyV2AdvertisedBenefitTerms(kind: kind, flatAmountMinor: kind == 'flat' ? amount : null,
+      flatBasis: kind == 'flat' ? _flatBasis : null, percentageBasisPoints: kind == 'percentage' ? amount : null,
+      maximumSavingMinor: optionalMoney(_benefitCap), minimumSpendMinor: optionalMoney(_benefitSpend), minimumQuantity: quantity);
+  }
+
+  Widget _benefitInput(String key, String label, TextEditingController controller, {bool whole = false}) => TextField(
+    key: Key(key), controller: controller, enabled: !_locked,
+    keyboardType: TextInputType.numberWithOptions(decimal: !whole),
+    decoration: InputDecoration(labelText: label, helperText: whole ? 'Whole selling packs' : 'Up to two decimal places'),
+    onChanged: (_) => setState(() => _dirty = true));
+
+  Widget _benefitEditor() {
+    String? error;
+    try { _advertisedTerms; } on FormatException { error = 'Check the amount, basis and optional limits. Use positive values; minimum spend can be zero.'; }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      DropdownButtonFormField<String>(key: const Key('work-promotion-benefit-kind'), initialValue: _benefitKind ?? 'none', isExpanded: true,
+        decoration: const InputDecoration(labelText: 'Offer amount · optional'),
+        items: const [DropdownMenuItem(value: 'none', child: Text('No structured offer amount')),
+          DropdownMenuItem(value: 'flat', child: Text('Flat amount (₹)')),
+          DropdownMenuItem(value: 'percentage', child: Text('Percentage (%)'))],
+        onChanged: _locked ? null : (value) => setState(() {
+          _benefitKind = value == 'none' ? null : value; _flatBasis = null; _benefitAmount.clear(); _dirty = true;
+        })),
+      if (_benefitKind != null) ...[
+        _benefitInput('work-promotion-benefit-amount', _benefitKind == 'flat' ? 'Advertised amount (₹)' : 'Advertised percentage (%)', _benefitAmount),
+        if (_benefitKind == 'flat') DropdownButtonFormField<String>(key: const Key('work-promotion-flat-basis'), initialValue: _flatBasis, isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Flat amount applies'),
+          items: const [DropdownMenuItem(value: 'per_pack', child: Text('Per selling pack')),
+            DropdownMenuItem(value: 'per_order', child: Text('Once per order for this product'))],
+          onChanged: _locked ? null : (value) => setState(() { _flatBasis = value; _dirty = true; })),
+        _benefitInput('work-promotion-benefit-cap', 'Maximum saving per order (₹) · optional', _benefitCap),
+        _benefitInput('work-promotion-benefit-spend', 'Minimum spend on this product (₹) · optional', _benefitSpend),
+        _benefitInput('work-promotion-benefit-quantity', 'Minimum selling packs · optional', _benefitQuantity, whole: true),
+        const Padding(padding: EdgeInsets.only(top: 6), child: Text('These are your advertised terms, not an applied discount. Checkout confirmation is separate.')),
+        if (error != null) Text(error, key: const Key('work-promotion-benefit-error'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
+      ],
+    ]);
+  }
+
   StorePromotionInput? get _input {
     final source = _source, from = _from, until = _until, channel = _channel;
     if (source == null ||
@@ -325,6 +388,7 @@ class _PromotionEditorState extends State<_PromotionEditor> {
         validFrom: from,
         validUntil: until,
         active: true,
+        benefitTerms: _advertisedTerms,
       );
     } on Object {
       return null;
@@ -520,6 +584,7 @@ class _PromotionEditorState extends State<_PromotionEditor> {
                 ),
                 onChanged: (_) => setState(() => _dirty = true),
               ),
+              if (_owner.benefitTermsSupported) _benefitEditor(),
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
@@ -594,6 +659,7 @@ class _PromotionEditorState extends State<_PromotionEditor> {
     _session.removeListener(_changed);
     _headline.dispose();
     _detail.dispose();
+    _benefitAmount.dispose(); _benefitCap.dispose(); _benefitSpend.dispose(); _benefitQuantity.dispose();
     _headlineScroll.dispose();
     _detailScroll.dispose();
     super.dispose();

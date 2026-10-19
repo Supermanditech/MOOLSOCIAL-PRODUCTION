@@ -502,6 +502,46 @@ class BuyV2VariantFamilySnapshot {
   }
 }
 
+/// Literal Store-authored offer terms. This is deliberately not a CartBenefit,
+/// eligibility result, calculated saving or permission to change a payable.
+@immutable
+class BuyV2AdvertisedBenefitTerms {
+  const BuyV2AdvertisedBenefitTerms._({required this.kind, required this.flatAmountMinor,
+    required this.flatBasis, required this.percentageBasisPoints, required this.maximumSavingMinor,
+    required this.minimumSpendMinor, required this.minimumQuantity});
+  factory BuyV2AdvertisedBenefitTerms({required String kind, int? flatAmountMinor, String? flatBasis,
+    int? percentageBasisPoints, int? maximumSavingMinor, int? minimumSpendMinor, int? minimumQuantity}) =>
+      BuyV2AdvertisedBenefitTerms.fromJson({'schemaVersion': 1, 'kind': kind, 'currency': 'INR',
+        'flatAmountMinor': flatAmountMinor, 'flatBasis': flatBasis, 'percentageBasisPoints': percentageBasisPoints,
+        'maximumSavingMinor': maximumSavingMinor, 'minimumSpendMinor': minimumSpendMinor, 'minimumQuantity': minimumQuantity});
+  factory BuyV2AdvertisedBenefitTerms.fromJson(Object? raw) {
+    const keys = ['schemaVersion', 'kind', 'currency', 'flatAmountMinor', 'flatBasis', 'percentageBasisPoints',
+      'maximumSavingMinor', 'minimumSpendMinor', 'minimumQuantity'];
+    if (raw is! Map || raw.length != keys.length || keys.any((key) => !raw.containsKey(key)) ||
+        raw['schemaVersion'] is! int || raw['schemaVersion'] != 1 || raw['currency'] != 'INR' ||
+        raw['kind'] is! String || !{'flat', 'percentage'}.contains(raw['kind'])) { throw const FormatException(); }
+    int? number(String key, int min, int max) {
+      final value = raw[key];
+      if (value == null) return null;
+      if (value is! int || value < min || value > max) throw const FormatException();
+      return value;
+    }
+    final flat = number('flatAmountMinor', 1, 4503599627370495), cap = number('maximumSavingMinor', 1, 4503599627370495),
+      spend = number('minimumSpendMinor', 0, 4503599627370495), quantity = number('minimumQuantity', 1, 1000000000),
+      percentage = number('percentageBasisPoints', 1, 10000), basis = raw['flatBasis'];
+    if (raw['kind'] == 'flat' ? flat == null || percentage != null || basis is! String || !{'per_pack', 'per_order'}.contains(basis)
+        : flat != null || basis != null || percentage == null) { throw const FormatException(); }
+    return BuyV2AdvertisedBenefitTerms._(kind: raw['kind'] as String, flatAmountMinor: flat, flatBasis: basis as String?,
+      percentageBasisPoints: percentage, maximumSavingMinor: cap, minimumSpendMinor: spend, minimumQuantity: quantity);
+  }
+  final String kind;
+  final String? flatBasis;
+  final int? flatAmountMinor, percentageBasisPoints, maximumSavingMinor, minimumSpendMinor, minimumQuantity;
+  Map<String, dynamic> toJson() => {'schemaVersion': 1, 'kind': kind, 'currency': 'INR', 'flatAmountMinor': flatAmountMinor,
+    'flatBasis': flatBasis, 'percentageBasisPoints': percentageBasisPoints, 'maximumSavingMinor': maximumSavingMinor,
+    'minimumSpendMinor': minimumSpendMinor, 'minimumQuantity': minimumQuantity};
+}
+
 /// A published placement owns an exact Store listing and current source facts.
 /// Being returned by an offersOnly product filter is not publication evidence.
 @immutable
@@ -518,6 +558,7 @@ class BuyV2PublishedCatalogueOffer {
     required this.validUntil,
     this.detail,
     this.revision,
+    this.benefitTerms,
   });
 
   final String publicationId;
@@ -532,6 +573,7 @@ class BuyV2PublishedCatalogueOffer {
   /// Optional legacy-compatible publication copy/version, not benefit authority.
   final String? detail;
   final int? revision;
+  final BuyV2AdvertisedBenefitTerms? benefitTerms;
 
   /// The publication entity is scoped, but independent of its mutable revision
   /// and product association so conflicting retargets cannot hide in new keys.

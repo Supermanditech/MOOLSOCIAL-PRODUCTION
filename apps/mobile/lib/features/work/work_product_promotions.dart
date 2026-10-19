@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../shared/social_content_gateway.dart';
+import '../buy/buy_v2_content_contracts.dart' show BuyV2AdvertisedBenefitTerms;
 
 typedef StorePromotionScope = ({String account, String store, String realm});
 
@@ -84,6 +85,7 @@ class StorePromotionInput {
     required DateTime validFrom,
     required DateTime validUntil,
     required bool active,
+    BuyV2AdvertisedBenefitTerms? benefitTerms,
   }) : _encoded = jsonEncode({
          'skuId': _id(skuId),
          'skuRevision': _revision(skuRevision, 1),
@@ -93,6 +95,7 @@ class StorePromotionInput {
          'validFrom': _iso(validFrom),
          'validUntil': _iso(validUntil),
          'active': active,
+         if (benefitTerms != null) 'benefitTerms': benefitTerms.toJson(),
        }) {
     if (!{'retail', 'wholesale', 'bulk'}.contains(channel) ||
         !this.validUntil.isAfter(this.validFrom)) {
@@ -110,6 +113,8 @@ class StorePromotionInput {
   DateTime get validFrom => _time(toJson()['validFrom']);
   DateTime get validUntil => _time(toJson()['validUntil']);
   bool get active => toJson()['active'] as bool;
+  BuyV2AdvertisedBenefitTerms? get benefitTerms => toJson().containsKey('benefitTerms')
+    ? BuyV2AdvertisedBenefitTerms.fromJson(toJson()['benefitTerms']) : null;
   StorePromotionInput paused() =>
       StorePromotionInput.fromJson(toJson()..['active'] = false);
   void validateForSave(DateTime now) {
@@ -119,7 +124,7 @@ class StorePromotionInput {
   }
 
   factory StorePromotionInput.fromJson(Object? raw) {
-    final row = _map(raw, _inputKeys);
+    final row = _map(raw, [..._inputKeys, if (raw is Map && raw.containsKey('benefitTerms')) 'benefitTerms']);
     if (row['active'] is! bool) {
       throw const FormatException('Check the promotion status.');
     }
@@ -132,6 +137,7 @@ class StorePromotionInput {
       validFrom: _time(row['validFrom']),
       validUntil: _time(row['validUntil']),
       active: row['active'] as bool,
+      benefitTerms: row.containsKey('benefitTerms') ? BuyV2AdvertisedBenefitTerms.fromJson(row['benefitTerms']) : null,
     );
   }
 }
@@ -221,6 +227,7 @@ class StorePromotionRecord {
     _scope(scope);
     final row = _map(raw, [
       ..._inputKeys,
+      if (raw is Map && raw.containsKey('benefitTerms')) 'benefitTerms',
       'schemaVersion',
       'realm',
       'storeId',
@@ -242,6 +249,7 @@ class StorePromotionRecord {
       observed,
       StorePromotionInput.fromJson({
         for (final key in _inputKeys) key: row[key],
+        if (row.containsKey('benefitTerms')) 'benefitTerms': row['benefitTerms'],
       }),
     );
   }
@@ -293,13 +301,18 @@ abstract interface class StorePromotionGateway {
 
 class _NotSent implements Exception {}
 
-class AuthenticatedStorePromotionGateway implements StorePromotionGateway {
+abstract interface class StorePromotionTermsCapability {
+  bool get benefitTermsSupported;
+}
+
+class AuthenticatedStorePromotionGateway implements StorePromotionGateway, StorePromotionTermsCapability {
   AuthenticatedStorePromotionGateway({
     required this.endpoint,
     required this.credentials,
     required this.transport,
     required this.ownerAccountId,
     required this.realm,
+    this.benefitTermsSupported = false,
     DateTime Function()? now,
   }) : now = now ?? DateTime.now {
     if (endpoint.scheme != 'https' ||
@@ -319,6 +332,7 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway {
   final SocialContentCredentials credentials;
   final SocialContentTransport transport;
   final String ownerAccountId, realm;
+  @override final bool benefitTermsSupported;
   final DateTime Function() now;
   void _check(StorePromotionScope scope, bool Function() current) {
     _scope(scope);
@@ -336,6 +350,9 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway {
     void Function()? beforeSend,
   }) async {
     _check(scope, current);
+    if (!benefitTermsSupported && body['promotion'] is Map && (body['promotion'] as Map).containsKey('benefitTerms')) {
+      throw _NotSent();
+    }
     final token = await credentials.firebaseIdToken();
     _check(scope, current);
     final check = await credentials.appCheckToken(
@@ -356,7 +373,7 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway {
             'x-firebase-appcheck': check,
             'x-request-id': _key(),
           },
-          body: body,
+          body: {...body, if (benefitTermsSupported) 'promotionTermsVersion': 1},
         )
         .timeout(const Duration(seconds: 20));
   }
@@ -378,9 +395,11 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway {
       'realm',
       'storeId',
       'publicationConfirmed',
+      if (benefitTermsSupported) 'promotionTermsVersion',
       ...fields,
     ]);
-    if (row['schemaVersion'] != 1 ||
+    if (row['schemaVersion'] is! int || row['schemaVersion'] != 1 ||
+        benefitTermsSupported && (row['promotionTermsVersion'] is! int || row['promotionTermsVersion'] != 1) ||
         row['realm'] != scope.realm ||
         row['storeId'] != scope.store ||
         row['publicationConfirmed'] != false) {
@@ -397,6 +416,7 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway {
     final row = _envelope(response, scope, ['record']);
     if (row['record'] == null) return null;
     final result = StorePromotionRecord.decode(row['record'], scope, now());
+    if (result.input.benefitTerms != null && !benefitTermsSupported) throw const FormatException();
     if (result.placementId != placementId) {
       throw const FormatException('Wrong promotion returned.');
     }
@@ -458,6 +478,7 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway {
     var previous = after;
     for (final item in items) {
       final value = StorePromotionRecord.decode(item, scope, now());
+      if (value.input.benefitTerms != null && !benefitTermsSupported) throw const FormatException();
       if (previous != null && value.placementId.compareTo(previous) <= 0) {
         throw const FormatException('Promotion page order changed.');
       }
@@ -564,6 +585,8 @@ class StorePromotionController extends ChangeNotifier {
   }
   final StorePromotionScope scope;
   final StorePromotionGateway gateway;
+  bool get benefitTermsSupported => gateway is StorePromotionTermsCapability &&
+    (gateway as StorePromotionTermsCapability).benefitTermsSupported;
   final StorePromotionPendingStore pendingStore;
   final Object? Function() context;
   final Future<bool> Function(

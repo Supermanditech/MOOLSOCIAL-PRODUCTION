@@ -985,7 +985,7 @@ class WorkSession extends ChangeNotifier {
     if (source is AuthenticatedWorkspaceCatalogueGateway && gateway is! ReviewWorkGateway) {
       realm ??= source.realm;
       connection ??= AuthenticatedStorePromotionGateway(endpoint: source.endpoint, credentials: source.credentials,
-        transport: source.transport, ownerAccountId: account, realm: source.realm);
+        transport: source.transport, ownerAccountId: account, realm: source.realm, benefitTermsSupported: source.promotionTermsSupported);
     }
     if (connection == null || !{'evaluation', 'production'}.contains(realm)) return null;
     final scope = (account: account, store: store, realm: realm!);

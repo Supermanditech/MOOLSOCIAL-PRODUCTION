@@ -66,7 +66,7 @@ function service(repository: PromotionRepository, read = async (_body: Readonly<
 }
 
 const discoveryQuery = {search: "", categoryId: "all", publisher: null, supplierOnly: false};
-function discoveryFixture() {
+function discoveryFixture(options: {benefitTermsSupported?: boolean} = {}) {
   const repository = new Memory();
   let clock = at, directoryReads = 0;
   const row = {...source().items[0]!, listings: [{listingId: `listing-${"a".repeat(64)}`, channel: "retail"}]};
@@ -83,11 +83,115 @@ function discoveryFixture() {
         page: {snapshotId: "b".repeat(64), startIndex: 0, totalCount: shop ? 1 : 0, previousCursor: null, nextCursor: null}};
     },
   };
-  const subject = new WorkspacePromotionService(repository, catalogue, () => new Date(clock));
+  const subject = new WorkspacePromotionService(repository, catalogue, () => new Date(clock), options);
   const discover = (changes: Record<string, unknown> = {}) => subject.handleOperation("buyer-one",
     "readPublicPromotionDiscovery", {promotionDiscoveryVersion: 1, query: discoveryQuery, pageSize: 1, ...changes}) as Promise<Record<string, any>>;
   return {repository, subject, catalogue, listing, discover, setClock: (value: string) => {clock = value;}, reads: () => directoryReads};
 }
+
+function advertisedTerms(kind: "flat" | "percentage" = "flat") {
+  return {schemaVersion: 1, kind, currency: "INR", flatAmountMinor: kind === "flat" ? 1025 : null,
+    flatBasis: kind === "flat" ? "per_pack" : null, percentageBasisPoints: kind === "percentage" ? 750 : null,
+    maximumSavingMinor: 5000, minimumSpendMinor: 0, minimumQuantity: 2};
+}
+function termsService(repository: PromotionRepository, enabled = true) {
+  // Reflect keeps the initial missing-capability regression executable before
+  // the matching optional constructor capability exists. No runtime fixture.
+  return Reflect.construct(WorkspacePromotionService, [repository, {publicCatalogue: async () => source()},
+    () => new Date(at), {benefitTermsSupported: enabled}]) as WorkspacePromotionService;
+}
+for (const kind of ["flat", "percentage"] as const) {
+  test(`LF04 advertised benefit terms owner save original recovery and public readback ${kind}`, async () => {
+    const repository = new Memory(), subject = termsService(repository), benefitTerms = advertisedTerms(kind);
+    const original = {...body(), promotionTermsVersion: 1};
+    Object.assign(original.promotion, {benefitTerms});
+    const saved = await subject.handleOperation("owner-one", "saveStorePromotion", original) as Record<string, any>;
+    assert.deepEqual(saved.record.benefitTerms, benefitTerms); assert.equal(saved.promotionTermsVersion, 1);
+    const restart = termsService(repository);
+    assert.deepEqual(await restart.handleOperation("owner-one", "reconcileStorePromotion", original), saved);
+    const page = await restart.handleOperation("buyer-one", "readPublicStorePromotions",
+      {storeId: "store-one", limit: 20, promotionTermsVersion: 1}) as Record<string, any>;
+    assert.equal(page.state, "ready"); assert.equal(page.promotionTermsVersion, 1);
+    assert.deepEqual(page.items[0].benefitTerms, benefitTerms);
+    assert.equal(page.items[0].product.skuId, "sku-one"); assert.equal(page.orderingAvailable, false);
+    assert.doesNotMatch(JSON.stringify(page), /"applied"|"redemption"|"savingAmountMinor"|owner-one|fingerprint/u);
+    const incompatible = await restart.handleOperation("buyer-one", "readPublicStorePromotions",
+      {storeId: "store-one", limit: 20}) as Record<string, any>;
+    assert.equal(incompatible.state, "unavailable", "Never erase the conditions for an old public reader.");
+    const paused = {...original, expectedRevision: 1, idempotencyKey: "pause-terms",
+      promotion: {...original.promotion, active: false}};
+    await restart.handleOperation("owner-one", "saveStorePromotion", paused);
+    const hidden = await restart.handleOperation("buyer-one", "readPublicStorePromotions",
+      {storeId: "store-one", limit: 20, promotionTermsVersion: 1}) as Record<string, any>;
+    assert.deepEqual(hidden.items, []); assert.equal(hidden.state, "ready");
+    assert.deepEqual(await restart.handleOperation("owner-one", "reconcileStorePromotion", original), saved,
+      "Historical success stays original, not a new activation.");
+  });
+}
+
+for (const [name, change] of Object.entries<Record<string, unknown>>({
+  "unknown version": {schemaVersion: 2}, "coerced version": {schemaVersion: "1"}, "wrong currency": {currency: "USD"},
+  "coerced kind": {kind: ["flat"]}, "coerced basis": {flatBasis: ["per_pack"]}, "missing flat": {flatAmountMinor: null},
+  "ambiguous amount": {percentageBasisPoints: 100}, "fractional paise": {flatAmountMinor: 10.5},
+  "zero advertised amount": {flatAmountMinor: 0}, "unsafe amount": {flatAmountMinor: Number.MAX_SAFE_INTEGER},
+  "zero cap": {maximumSavingMinor: 0}, "negative threshold": {minimumSpendMinor: -1},
+  "fractional packs": {minimumQuantity: 1.5}, "zero packs": {minimumQuantity: 0},
+  "invented applied status": {applied: true}, "missing percent": {kind: "percentage", flatAmountMinor: null, flatBasis: null},
+  "zero percent": {kind: "percentage", flatAmountMinor: null, flatBasis: null, percentageBasisPoints: 0},
+  "over100percent": {kind: "percentage", flatAmountMinor: null, flatBasis: null, percentageBasisPoints: 10001},
+  "fractional basispoints": {kind: "percentage", flatAmountMinor: null, flatBasis: null, percentageBasisPoints: 7.5},
+})) test(`LF04 advertised benefit terms rejects ${name} without writing`, async () => {
+  const repository = new Memory(), subject = termsService(repository), original = {...body(), promotionTermsVersion: 1};
+  Object.assign(original.promotion, {benefitTerms: {...advertisedTerms(), ...change}});
+  await assert.rejects(subject.handleOperation("owner-one", "saveStorePromotion", original),
+    (error: any) => error.code === "invalid_input");
+  assert.equal(repository.writes, 0);
+});
+
+test("LF04 advertised terms capability is explicit and old originals retain their fingerprint", async () => {
+  const a = new Memory(), b = new Memory(), original = body();
+  assert.deepEqual(await termsService(a).handleOperation("owner-one", "saveStorePromotion", original),
+    await termsService(b, false).handleOperation("owner-one", "saveStorePromotion", original));
+  assert.deepEqual([...a.receipts.values()], [...b.receipts.values()]);
+  const rich = {...body(), promotionTermsVersion: 1}; Object.assign(rich.promotion, {benefitTerms: advertisedTerms()});
+  await assert.rejects(termsService(new Memory(), false).handleOperation("owner-one", "saveStorePromotion", rich),
+    (error: any) => error.code === "unavailable");
+  const {promotionTermsVersion, ...missing} = rich; assert.equal(promotionTermsVersion, 1);
+  await assert.rejects(termsService(new Memory()).handleOperation("owner-one", "saveStorePromotion", missing),
+    (error: any) => error.code === "unavailable");
+});
+
+test("LF04 advertised terms cannot be erased by a legacy owner; negotiated explicit clear is preserved", async () => {
+  const repository = new Memory(), subject = termsService(repository), original = {...body(), promotionTermsVersion: 1};
+  Object.assign(original.promotion, {benefitTerms: advertisedTerms()});
+  await subject.handleOperation("owner-one", "saveStorePromotion", original);
+  await assert.rejects(subject.handleOperation("owner-one", "readStorePromotion", {storeId: "store-one", placementId: "promotion-one"}),
+    (error: any) => error.code === "unavailable");
+  await assert.rejects(subject.handleOperation("owner-one", "listStorePromotions", {storeId: "store-one", limit: 20}),
+    (error: any) => error.code === "unavailable");
+  const plain = {...body(), expectedRevision: 1, idempotencyKey: "explicit-clear"};
+  await assert.rejects(subject.handleOperation("owner-one", "saveStorePromotion", plain), (error: any) => error.code === "unavailable");
+  assert.equal(repository.writes, 1);
+  const cleared = await subject.handleOperation("owner-one", "saveStorePromotion", {...plain, promotionTermsVersion: 1}) as Record<string, any>;
+  assert.equal(Object.hasOwn(cleared.record, "benefitTerms"), false); assert.equal(repository.writes, 2);
+  const legacyRead = await subject.handleOperation("buyer-one", "readPublicStorePromotions", {storeId: "store-one", limit: 20}) as Record<string, any>;
+  assert.equal(legacyRead.state, "ready"); assert.equal(Object.hasOwn(legacyRead, "promotionTermsVersion"), false);
+});
+
+test("LF04 advertised terms global discovery preserves conditions and retires changed-condition cursors", async () => {
+  const fixture = discoveryFixture({benefitTermsSupported: true}), first = {...body(), promotionTermsVersion: 1};
+  Object.assign(first.promotion, {benefitTerms: advertisedTerms()});
+  await fixture.subject.handleOperation("owner-one", "saveStorePromotion", first);
+  await fixture.subject.handleOperation("owner-one", "saveStorePromotion", {...first, placementId: "promotion-two", idempotencyKey: "second-placement"});
+  const page = await fixture.discover({promotionTermsVersion: 1});
+  assert.equal(page.promotionTermsVersion, 1); assert.deepEqual(page.items[0].publication.benefitTerms, advertisedTerms());
+  assert.equal(page.orderingAvailable, false); assert.equal(page.page.totalCount, 2);
+  await assert.rejects(fixture.discover(), (error: any) => error.code === "unavailable");
+  await fixture.subject.handleOperation("owner-one", "saveStorePromotion", {...first, expectedRevision: 1, idempotencyKey: "changed-conditions",
+    promotion: {...first.promotion, benefitTerms: {...advertisedTerms(), minimumQuantity: 3}}});
+  await assert.rejects(fixture.discover({promotionTermsVersion: 1, cursor: page.page.nextCursor}),
+    (error: any) => error.code === "stale_cursor");
+});
 
 test("ordinary promotion discovery uses owner publications and paginates placements, not products", async () => {
   const f = discoveryFixture();
@@ -294,6 +398,23 @@ test("Firestore emulator: restart, atomic CAS, original lookup and realm isolati
     assert.deepEqual(await restarted.reconcile("owner-one", input), first);
     assert.equal(await restarted.reconcile("owner-one", {...input, idempotencyKey: "missing-original"}), undefined);
     assert.equal(await service(new FirestorePromotionRepository(db, "production")).readOwned("owner-one", {storeId, placementId: "promotion-one"}), undefined);
+    const richInput = {...body({storeId, placementId: "rich-promotion", idempotencyKey: "rich-original"}), promotionTermsVersion: 1};
+    Object.assign(richInput.promotion, {benefitTerms: advertisedTerms("percentage")});
+    const richService = () => new WorkspacePromotionService(new FirestorePromotionRepository(db, "evaluation", () => new Date(at)),
+      {publicCatalogue: async () => ({...source(), storeId})}, () => new Date(at), {benefitTermsSupported: true});
+    const savedRich = await richService().handleOperation("owner-one", "saveStorePromotion", richInput) as Record<string, any>;
+    assert.deepEqual(savedRich.record.benefitTerms, advertisedTerms("percentage"));
+    const richRestart = richService();
+    assert.deepEqual(await richRestart.handleOperation("owner-one", "reconcileStorePromotion", richInput), savedRich);
+    const richPage = await richRestart.handleOperation("buyer-one", "readPublicStorePromotions",
+      {storeId, limit: 20, promotionTermsVersion: 1}) as Record<string, any>;
+    assert.deepEqual(richPage.items.find((item: any) => item.publicationId === "rich-promotion").benefitTerms, advertisedTerms("percentage"));
+    await richRestart.handleOperation("owner-one", "saveStorePromotion", {...richInput, expectedRevision: 1,
+      idempotencyKey: "rich-pause", promotion: {...richInput.promotion, active: false}});
+    const pausedRich = await richService().handleOperation("buyer-one", "readPublicStorePromotions",
+      {storeId, limit: 20, promotionTermsVersion: 1}) as Record<string, any>;
+    assert.equal(pausedRich.items.some((item: any) => item.publicationId === "rich-promotion"), false);
+    assert.deepEqual(await richService().handleOperation("owner-one", "reconcileStorePromotion", richInput), savedRich);
     const withdrawalRace = service(repository, async () => {
       const response = source(); response.storeId = storeId;
       await root.collection("skus").doc("sku-one").update({publicListing: false});

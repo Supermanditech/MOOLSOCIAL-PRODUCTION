@@ -11,6 +11,7 @@ import 'package:moolsocial/features/work/widgets/store_product_promotions.dart';
 import 'work_catalogue_gateway_test.dart' as catalogue;
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/work/work_product_promotions.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 
 // Isolated host records/transport only; never native Store or published offers.
 class _FamilyCatalogue extends catalogue.SessionCatalogue implements WorkspaceVariantFamilyOwnerGateway {
@@ -50,7 +51,7 @@ Map<String, dynamic> recordJson(StorePromotionIntent original) => {
   'revision': original.expectedRevision + 1,
   'observedAt': at.toIso8601String(),
 };
-SocialContentResponse response(Object? record, {int status = 200}) =>
+SocialContentResponse response(Object? record, {int status = 200, bool terms = false}) =>
     SocialContentResponse(
       statusCode: status,
       body: jsonEncode({
@@ -61,6 +62,7 @@ SocialContentResponse response(Object? record, {int status = 200}) =>
           'storeId': scope.store,
           'record': record,
           'publicationConfirmed': false,
+          if (terms) 'promotionTermsVersion': 1,
         },
       }),
     );
@@ -99,6 +101,7 @@ class Transport implements SocialContentTransport {
 AuthenticatedStorePromotionGateway gateway(
   Credentials credentials,
   Transport transport,
+  {bool terms = false}
 ) => AuthenticatedStorePromotionGateway(
   endpoint: Uri.parse(
     'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace',
@@ -108,6 +111,7 @@ AuthenticatedStorePromotionGateway gateway(
   ownerAccountId: scope.account,
   realm: scope.realm,
   now: () => at,
+  benefitTermsSupported: terms,
 );
 StorePromotionResult saved(StorePromotionIntent original) =>
     StorePromotionResult(
@@ -151,7 +155,9 @@ class Pending implements StorePromotionPendingStore {
   }
 }
 
-class Provider implements StorePromotionGateway {
+class Provider implements StorePromotionGateway, StorePromotionTermsCapability {
+  @override bool benefitTermsSupported = false;
+  StorePromotionIntent? lastSaved;
   int reads = 0, writes = 0, checks = 0;
   StorePromotionRecord? currentRecord;
   Future<StorePromotionResult> Function(StorePromotionIntent)? onSave, onCheck;
@@ -178,6 +184,7 @@ class Provider implements StorePromotionGateway {
     bool Function() current,
   ) async {
     writes++;
+    lastSaved = original;
     return onSave == null ? saved(original) : onSave!(original);
   }
 
@@ -208,6 +215,56 @@ StorePromotionController controller(
   now: now ?? () => at,
 );
 void main() {
+  Map<String, dynamic> benefitTerms({bool percentage = false}) => {'schemaVersion': 1,
+    'kind': percentage ? 'percentage' : 'flat', 'currency': 'INR',
+    'flatAmountMinor': percentage ? null : 1025, 'flatBasis': percentage ? null : 'per_pack',
+    'percentageBasisPoints': percentage ? 750 : null, 'maximumSavingMinor': 5000,
+    'minimumSpendMinor': 0, 'minimumQuantity': 2};
+  for (final percentage in [false, true]) {
+    test('LF04 advertised terms exact immutable source survives record and original journal percentage=$percentage', () {
+      final raw = benefitTerms(percentage: percentage), terms = BuyV2AdvertisedBenefitTerms.fromJson(raw);
+      raw['minimumQuantity'] = 99;
+      expect(terms.minimumQuantity, 2); expect(terms.minimumSpendMinor, 0);
+      final value = StorePromotionInput.fromJson({...input().toJson(), 'benefitTerms': terms.toJson()}), original = intent(value: value);
+      expect(StorePromotionIntent.fromJson(original.toJson()).input.fingerprint, value.fingerprint);
+      final decoded = StorePromotionRecord.decode(recordJson(original), scope, at);
+      expect(decoded.acknowledges(original), true);
+      expect(decoded.input.paused().benefitTerms!.toJson(), terms.toJson());
+      expect(value.toJson()..remove('benefitTerms'), input().toJson());
+      final clear = StorePromotionInput.fromJson(input().toJson()); expect(clear.toJson().containsKey('benefitTerms'), false);
+    });
+  }
+  for (final change in <Map<String, dynamic>>[
+    {'schemaVersion': 1.0}, {'kind': ['flat']}, {'flatBasis': ['per_pack']}, {'flatAmountMinor': 10.5},
+    {'flatAmountMinor': '1025'}, {'flatAmountMinor': null}, {'percentageBasisPoints': 500}, {'maximumSavingMinor': 0},
+    {'minimumSpendMinor': -1}, {'minimumQuantity': 0}, {'applied': true}, {'currency': 'USD'},
+    {'kind': 'percentage', 'flatAmountMinor': null, 'flatBasis': null, 'percentageBasisPoints': 10001},
+    {'kind': 'percentage', 'flatAmountMinor': null, 'flatBasis': null, 'percentageBasisPoints': 0},
+  ]) {
+    test('LF04 advertised terms strict source rejects ${jsonEncode(change)}', () {
+      expect(() => BuyV2AdvertisedBenefitTerms.fromJson({...benefitTerms(), ...change}), throwsFormatException);
+    });
+  }
+  test('LF04 advertised terms negotiated owner gateway never upgrades legacy calls or sends disabled rich writes', () async {
+    final credentials = Credentials(), transport = Transport();
+    final original = intent(value: StorePromotionInput.fromJson({...input().toJson(), 'benefitTerms': benefitTerms()}));
+    expect((await gateway(credentials, transport).save(original, () => true)).state, StorePromotionResultState.notSent);
+    expect(transport.bodies, isEmpty); expect(credentials.modes, isEmpty);
+    transport.reply = (_) async => response(recordJson(original), terms: true);
+    final enabled = gateway(credentials, transport, terms: true);
+    expect((await enabled.save(original, () => true)).state, StorePromotionResultState.saved);
+    expect(transport.bodies.single['promotionTermsVersion'], 1);
+    expect(transport.bodies.single['promotion'], original.input.toJson());
+    expect(credentials.modes, [SocialAppCheckTokenMode.limitedUse]);
+    expect((await enabled.reconcile(original, () => true)).state, StorePromotionResultState.saved);
+    expect(transport.bodies.last['idempotencyKey'], original.idempotencyKey);
+    expect(credentials.modes.last, SocialAppCheckTokenMode.standard);
+    transport.reply = (_) async => response(recordJson(original));
+    expect((await enabled.save(original, () => true)).state, StorePromotionResultState.unknown,
+      reason: 'A missing matching response capability cannot acknowledge a rich write.');
+    expect((await gateway(credentials, transport).save(intent(), () => true)).state, StorePromotionResultState.unknown,
+      reason: 'An unsolicited rich record must not be consumed by a legacy caller.');
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
     'concurrent host journal instances cannot replace an unresolved original',
@@ -429,9 +486,10 @@ void main() {
     delayed.complete(await source().ownerRead());
     expect(await pending, isNull);
   });
+  for (final kind in <String?>[null, 'flat', 'percentage']) {
   for (final scale in [1.0, 2.0]) {
     testWidgets(
-      'explicit promotion editor uses saved source without Stock or targeted draft mutation text$scale',
+      'explicit promotion editor uses saved source without Stock or targeted draft mutation text$scale terms=$kind',
       (tester) async {
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = const Size(320, 700);
@@ -439,7 +497,7 @@ void main() {
         addTearDown(tester.view.reset);
         addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
         final journal = Pending(),
-            provider = Provider(),
+            provider = Provider()..benefitTermsSupported = kind != null,
             owner = work(journal, provider, source());
         addTearDown(owner.dispose);
         owner.workspaceOfferDraft['title'] = 'Untouched targeted host draft';
@@ -488,6 +546,28 @@ void main() {
         );
         FocusManager.instance.primaryFocus?.unfocus();
         await tester.pumpAndSettle();
+        final termsKind = find.byKey(const Key('work-promotion-benefit-kind'));
+        if (kind == null) {
+          expect(termsKind, findsNothing);
+        } else {
+          await tester.ensureVisible(termsKind); await tester.tap(termsKind); await tester.pumpAndSettle();
+          await tester.tap(find.text(kind == 'flat' ? 'Flat amount (₹)' : 'Percentage (%)').last); await tester.pumpAndSettle();
+          final amount = find.byKey(const Key('work-promotion-benefit-amount'));
+          await tester.ensureVisible(amount); await tester.enterText(amount, '10.255'); await tester.pump();
+          expect(find.byKey(const Key('work-promotion-benefit-error')), findsOneWidget);
+          await tester.enterText(amount, '10.25');
+          FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+          if (kind == 'flat') {
+            final basis = find.byKey(const Key('work-promotion-flat-basis'));
+            await tester.ensureVisible(basis); await tester.tap(basis); await tester.pumpAndSettle();
+            await tester.tap(find.text('Per selling pack').last); await tester.pumpAndSettle();
+          }
+          for (final field in {'work-promotion-benefit-cap': '50', 'work-promotion-benefit-spend': '0', 'work-promotion-benefit-quantity': '2'}.entries) {
+            final input = find.byKey(Key(field.key)); await tester.ensureVisible(input); await tester.enterText(input, field.value);
+          }
+          FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-promotion-benefit-error')), findsNothing);
+        }
         final expiry = find.byKey(const Key('work-promotion-expiry'));
         await tester.ensureVisible(expiry);
         await tester.pumpAndSettle();
@@ -502,6 +582,13 @@ void main() {
         await tester.tap(save);
         await tester.pumpAndSettle();
         expect(provider.writes, 1);
+        final terms = provider.lastSaved!.input.benefitTerms;
+        if (kind == null) {
+          expect(terms, isNull);
+        } else {
+          expect(terms!.kind, kind); expect(terms.flatAmountMinor ?? terms.percentageBasisPoints, 1025);
+          expect(terms.maximumSavingMinor, 5000); expect(terms.minimumSpendMinor, 0); expect(terms.minimumQuantity, 2);
+        }
         expect(journal.original, null);
         expect(
           owner.workspaceOfferDraft['title'],
@@ -518,6 +605,7 @@ void main() {
         expect(tester.takeException(), null);
       },
     );
+  }
   }
   testWidgets('unconfigured connection adds no dead-end promotional form', (
     tester,

@@ -8014,6 +8014,12 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     if (@($facts.owners) -ccontains 'apps/mobile/test/work_product_promotions_test.dart') {
       $factsOwners += 'apps/mobile/test/work_product_promotions_test.dart'
     }
+    # Already admitted by sharedCatalogueExtension/the cumulative owner claim;
+    # retain exact optional continuation ownership, never a directory/prefix.
+    foreach ($promotionOwner in @('apps/mobile/lib/features/work/work_product_promotions.dart',
+        'apps/mobile/lib/features/work/widgets/store_product_promotions.dart')) {
+      if (@($facts.owners) -ccontains $promotionOwner) { $factsOwners += $promotionOwner }
+    }
     foreach ($canonicalOwner in @('backend/functions/src/commerce/catalogue_contract.ts',
         'backend/functions/src/commerce/catalogue_contract.test.ts')) {
       if (@($facts.owners) -ccontains $canonicalOwner) { $factsOwners += $canonicalOwner }

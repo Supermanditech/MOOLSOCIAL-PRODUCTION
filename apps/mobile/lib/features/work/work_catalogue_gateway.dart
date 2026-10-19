@@ -2595,13 +2595,15 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
     for (var page = 0; page < 20; page++) {
       if (!active()) throw const FormatException();
       final response = await gateway._ownerRequest({'operation': 'readPublicStorePromotions',
-        'storeId': storeId, 'limit': 20, 'after': ?after}, active, mutation: false);
+        'storeId': storeId, 'limit': 20, 'after': ?after,
+        if (gateway.promotionTermsSupported) 'promotionTermsVersion': 1}, active, mutation: false);
       if (!active() || response?.statusCode != 200) throw const FormatException();
       final envelope = _map(jsonDecode(response!.body));
       if (envelope['ok'] != true) throw const FormatException();
       final data = _map(envelope['data']);
       _keys(data, ['schemaVersion', 'realm', 'storeId', 'observedAt', 'state', 'coverage',
-        'orderingAvailable', 'items', 'nextCursor']);
+        'orderingAvailable', 'items', 'nextCursor', if (gateway.promotionTermsSupported) 'promotionTermsVersion']);
+      if (gateway.promotionTermsSupported) _int(data['promotionTermsVersion'], 1, 1);
       final observed = _time(data['observedAt']), now = gateway.now().toUtc();
       if (data['schemaVersion'] is! int || data['schemaVersion'] != 1 || data['realm'] != gateway.realm ||
           data['storeId'] != storeId || data['state'] != 'ready' ||
@@ -2611,7 +2613,9 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
       for (final raw in _list(data['items'], 20)) {
         final row = _map(raw);
         _keys(row, ['publicationId', 'revision', 'publisherType', 'publisherId', 'publisherName',
-          'headline', 'detail', 'sourceId', 'observedAt', 'validUntil', 'product']);
+          'headline', 'detail', 'sourceId', 'observedAt', 'validUntil', 'product',
+          if (gateway.promotionTermsSupported && row.containsKey('benefitTerms')) 'benefitTerms']);
+        final benefitTerms = row.containsKey('benefitTerms') ? BuyV2AdvertisedBenefitTerms.fromJson(row['benefitTerms']) : null;
         final id = _id(row['publicationId']), revision = _int(row['revision'], 1, 1000000000);
         final source = _string(row['sourceId'], 512), itemObserved = _time(row['observedAt']);
         if (!publications.add(id) || previous != null && id.compareTo(previous) <= 0 ||
@@ -2638,7 +2642,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
         // content/price fact, and separately pin the governed term window. Never
         // manufacture the missing listings/envelope from a promotion payload.
         final actual = _checkedPromotionProduct(sku, entry, expiry);
-        final copy = jsonEncode([source, headline, detail, _sorted(actual)]);
+        final copy = jsonEncode([source, headline, detail, _sorted(actual), if (benefitTerms != null) benefitTerms.toJson()]);
         final head = (revision: revision, observed: itemObserved, copy: copy), old = _promotionHeads[id];
         if (old != null && (revision < old.revision || itemObserved.isBefore(old.observed) ||
             revision == old.revision && copy != old.copy)) { throw const FormatException(); }
@@ -2647,7 +2651,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
         results.add(BuyV2PublishedCatalogueOffer(publicationId: id, revision: revision,
           product: entry.product, publisherType: BuyV2OfferPublisherType.retailer, publisherId: storeId,
           publisherName: _string(row['publisherName'], 240), headline: headline, detail: detail,
-          sourceId: source, observedAt: itemObserved, validUntil: expiry));
+          sourceId: source, observedAt: itemObserved, validUntil: expiry, benefitTerms: benefitTerms));
       }
       final next = data['nextCursor'] == null ? null : _id(data['nextCursor']);
       if (next == null) { complete = true; break; }
@@ -3135,13 +3139,15 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
       final requested = {'search': query.query.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '),
         'categoryId': query.categoryId, 'publisher': query.offerPublisher?.name, 'supplierOnly': query.supplierOffersOnly};
       final response = await gateway._ownerRequest({'operation': 'readPublicPromotionDiscovery',
-        'promotionDiscoveryVersion': 1, 'query': requested, 'pageSize': pageSize, 'cursor': ?cursor}, valid, mutation: false);
+        'promotionDiscoveryVersion': 1, 'query': requested, 'pageSize': pageSize, 'cursor': ?cursor,
+        if (gateway.promotionTermsSupported) 'promotionTermsVersion': 1}, valid, mutation: false);
       if (!valid() || response?.statusCode != 200 || utf8.encode(response!.body).length > 512 * 1024) throw const FormatException();
       final envelope = _map(jsonDecode(response.body)); _keys(envelope, ['ok', 'data']);
       if (envelope['ok'] != true) throw const FormatException();
       final data = _map(envelope['data']);
       _keys(data, ['schemaVersion', 'promotionDiscoveryVersion', 'realm', 'state', 'coverage', 'orderingAvailable',
-        'observedAt', 'query', 'items', 'page']);
+        'observedAt', 'query', 'items', 'page', if (gateway.promotionTermsSupported) 'promotionTermsVersion']);
+      if (gateway.promotionTermsSupported) _int(data['promotionTermsVersion'], 1, 1);
       final observed = _time(data['observedAt']), now = gateway.now().toUtc(), coverage = _map(data['coverage']);
       _keys(coverage, ['kind', 'publisherTypes', 'countBasis']);
       if (_int(data['schemaVersion'], 1, 1) != 1 || _int(data['promotionDiscoveryVersion'], 1, 1) != 1 ||
@@ -3164,7 +3170,9 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
         final row = _map(raw); _keys(row, ['publication', 'listing']);
         final publication = _map(row['publication']), listing = _map(row['listing']);
         _keys(publication, ['publicationId', 'revision', 'publisherType', 'publisherId', 'publisherName',
-          'headline', 'detail', 'sourceId', 'observedAt', 'validUntil', 'product']);
+          'headline', 'detail', 'sourceId', 'observedAt', 'validUntil', 'product',
+          if (gateway.promotionTermsSupported && publication.containsKey('benefitTerms')) 'benefitTerms']);
+        final benefitTerms = publication.containsKey('benefitTerms') ? BuyV2AdvertisedBenefitTerms.fromJson(publication['benefitTerms']) : null;
         final storeId = _id(publication['publisherId']), id = _id(publication['publicationId']), revision = _int(publication['revision'], 1);
         final itemObserved = _time(publication['observedAt']), expiry = _time(publication['validUntil']), source = _string(publication['sourceId'], 512);
         final sku = _map(publication['product']), channelRow = _map(_list(sku['channels'], 1).single),
@@ -3178,7 +3186,8 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
         final actual = _checkedPromotionProduct(sku, entry, expiry);
         final headline = _string(publication['headline'], 160), detail = _string(publication['detail'], 2000, true);
         _string(publication['publisherName'], 240);
-        final identity = jsonEncode([gateway.realm, 'retailer', storeId, id]), copy = jsonEncode([source, headline, detail, _sorted(actual)]), old = _offerHeads[identity];
+        final identity = jsonEncode([gateway.realm, 'retailer', storeId, id]),
+          copy = jsonEncode([source, headline, detail, _sorted(actual), if (benefitTerms != null) benefitTerms.toJson()]), old = _offerHeads[identity];
         if (heads.containsKey(identity) || old != null && (revision < old.revision || itemObserved.isBefore(old.observed) || revision == old.revision && copy != old.copy)) throw const FormatException();
         heads[identity] = (revision: revision, observed: itemObserved, copy: copy);
         final key = '$snapshot:${entry.product.id}', productCopy = entry.readback.fingerprint!;
@@ -3194,7 +3203,8 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
         final p = publications[index];
         return BuyV2PublishedCatalogueOffer(publicationId: p['publicationId'], revision: p['revision'], product: enriched[index].product,
           publisherType: BuyV2OfferPublisherType.retailer, publisherId: p['publisherId'], publisherName: p['publisherName'],
-          headline: p['headline'], detail: p['detail'], sourceId: p['sourceId'], observedAt: _time(p['observedAt']), validUntil: _time(p['validUntil']));
+          headline: p['headline'], detail: p['detail'], sourceId: p['sourceId'], observedAt: _time(p['observedAt']), validUntil: _time(p['validUntil']),
+          benefitTerms: p.containsKey('benefitTerms') ? BuyV2AdvertisedBenefitTerms.fromJson(p['benefitTerms']) : null);
       });
       if (!valid() || offers.any((offer) => !offer.isCurrent(now: gateway.now().toUtc()))) throw const FormatException();
       // Another page/refresh may finish while reviewed-family enrichment awaits.
@@ -3279,6 +3289,7 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
     reviewedFamilyReadbackSupported: true, storeClassificationReadbackSupported: true,
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
+    promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     promotionDiscoverySupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PROMOTION_DISCOVERY_V1'));
   return WorkspacePublicDiscoverySource(gateway: gateway, current: current);
 }
@@ -3336,6 +3347,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
     reviewedProductSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_REVIEW_V1'),
     reviewedProductMediaSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_MEDIA_REVIEW_V1'),
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
+    promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     storeClassificationReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_STORE_CLASSIFICATION_V1'),
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
   );
@@ -3373,6 +3385,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.storeClassificationReadbackSupported = false,
     this.minorMoneyReadbackSupported = false,
     this.promotionDiscoverySupported = false,
+    this.promotionTermsSupported = false,
     this.stockSnapshotsSupported = false,
     DateTime Function()? now,
   }) : _reviewedVariantsOverride = reviewedVariants, _productMediaTransportOverride = productMediaTransport, now = now ?? DateTime.now {
@@ -3408,6 +3421,7 @@ class AuthenticatedWorkspaceCatalogueGateway
   // Opt-in only for the matching integer-paise paged contract; legacy stays v1.
   final bool minorMoneyReadbackSupported;
   final bool promotionDiscoverySupported;
+  final bool promotionTermsSupported;
   @override
   final bool stockSnapshotsSupported;
   @override
@@ -3443,6 +3457,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       storeClassificationReadbackSupported: storeClassificationReadbackSupported,
       minorMoneyReadbackSupported: minorMoneyReadbackSupported,
       promotionDiscoverySupported: promotionDiscoverySupported,
+      promotionTermsSupported: promotionTermsSupported,
       stockSnapshotsSupported: stockSnapshotsSupported,
       now: now,
     );

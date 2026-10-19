@@ -4664,6 +4664,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     for (final lease in _catalogueOfferPagers.values) {
       for (final offer in lease.pager.cachedItems) {
+        _rememberAdvertisedOffer(offer);
         remember(offer.product);
       }
     }
@@ -4738,6 +4739,7 @@ class BuyV2Session extends ChangeNotifier {
     _productBenefitRequestSequences.removeWhere(
       (id, _) => !retained.contains(id),
     );
+    _scheduleAdvertisedOfferExpiry();
     if (notify) notifyListeners();
   }
 
@@ -4752,6 +4754,83 @@ class BuyV2Session extends ChangeNotifier {
   final Map<BuyV2Destination, String> _catalogueStoreBrowseAnchors = {};
   ({BuyV2StorePublishedOffersSource source, BuyV2PublishedCatalogueOffer offer,
     BuyV2Product product, Set<BuyV2Product> superseded})? _openedStorePromotion;
+  Timer? _advertisedOfferExpiry;
+  DateTime? _advertisedOfferUntil;
+  // Session-scoped tombstones survive page refresh/LRU removal. Never revive an
+  // older rich publication after observing a clear, retarget or contradiction.
+  final _advertisedOfferWatermarks = <String, ({int revision, String? copy})>{};
+  String _advertisedOfferCopy(BuyV2PublishedCatalogueOffer offer) => jsonEncode([
+    offer.sourceId, offer.headline, offer.detail,
+    offer.product.publicListingIdentity?.toJson(), offer.product.id,
+    offer.product.packTerms?.revision, offer.product.priceMinor,
+    offer.benefitTerms?.toJson(),
+  ]);
+  bool _rememberAdvertisedOffer(BuyV2PublishedCatalogueOffer offer) {
+    final revision = offer.revision ?? 0, copy = _advertisedOfferCopy(offer);
+    final old = _advertisedOfferWatermarks[offer.identity];
+    if (old == null || revision > old.revision) {
+      _advertisedOfferWatermarks[offer.identity] = (revision: revision, copy: copy);
+      return true;
+    }
+    if (revision < old.revision) return false;
+    if (old.copy != copy) {
+      _advertisedOfferWatermarks[offer.identity] = (revision: revision, copy: null);
+      return false;
+    }
+    return true;
+  }
+  /// Record validated Store refresh heads without opening a product or changing
+  /// any Cart/order snapshot. Clearing terms must retire a previously opened copy.
+  bool observeStorePromotions(BuyV2StorePublishedOffersSource source,
+      List<BuyV2PublishedCatalogueOffer> offers) {
+    if (_collectionDisposed || !identical(source, cataloguePageSource) || !source.storeOffersActive) return false;
+    final identities = <String>{};
+    if (offers.any((offer) => !offer.isCurrent(now: catalogueNow()) ||
+        offer.publisherId != offer.product.storeId ||
+        offer.product.publicListingIdentity?.matches(offer.product) != true ||
+        !identities.add(offer.identity))) { return false; }
+    var accepted = true;
+    for (final offer in offers) { if (!_rememberAdvertisedOffer(offer)) accepted = false; }
+    _scheduleAdvertisedOfferExpiry();
+    notifyListeners();
+    return accepted;
+  }
+  Iterable<BuyV2PublishedCatalogueOffer> get _advertisedOfferHeads sync* {
+    if (_collectionDisposed || isStoreProcurement) return;
+    final candidates = <BuyV2PublishedCatalogueOffer>[
+      if (_openedStorePromotion case final opened? when opened.source.storeOffersActive) opened.offer,
+      if (cataloguePageSource case final WorkspacePublicDiscoverySource source when source.active)
+        for (final lease in _catalogueOfferPagers.values) ...lease.pager.cachedItems,
+    ];
+    final heads = <String, BuyV2PublishedCatalogueOffer>{};
+    for (final candidate in candidates) {
+      final old = heads[candidate.identity];
+      if (old == null || (candidate.revision ?? 0) > (old.revision ?? 0)) heads[candidate.identity] = candidate;
+    }
+    // Select the latest head BEFORE optional terms/product filtering: an explicit
+    // clear/retarget must never fall back to an older rich publication.
+    yield* heads.values.where((offer) {
+      final head = _advertisedOfferWatermarks[offer.identity];
+      return head != null && head.revision == (offer.revision ?? 0) &&
+        head.copy == _advertisedOfferCopy(offer) && offer.isCurrent(now: catalogueNow());
+    });
+  }
+  List<BuyV2PublishedCatalogueOffer> advertisedOffersFor(BuyV2Product product) =>
+    List.unmodifiable(_advertisedOfferHeads.where((offer) => offer.benefitTerms != null &&
+      product.publicListingIdentity?.valid == true && offer.publisherId == product.storeId &&
+      offer.product.id == product.id && offer.product.publicListingIdentity == product.publicListingIdentity &&
+      product.packTerms != null && offer.product.packTerms?.revision == product.packTerms!.revision));
+  void _scheduleAdvertisedOfferExpiry() {
+    final expiry = _advertisedOfferHeads.where((offer) => offer.benefitTerms != null).map((offer) => offer.validUntil).toList()..sort();
+    final until = expiry.firstOrNull;
+    if (until == _advertisedOfferUntil && _advertisedOfferExpiry?.isActive == true) return;
+    _advertisedOfferExpiry?.cancel(); _advertisedOfferUntil = until;
+    if (until == null) return;
+    _advertisedOfferExpiry = Timer(until.difference(catalogueNow()), () {
+      _advertisedOfferUntil = null;
+      if (!_collectionDisposed) { _scheduleAdvertisedOfferExpiry(); notifyListeners(); }
+    });
+  }
 
   /// Open-only admission of a resolved public promotion. Loading a promotion
   /// section must not move Store return anchors or replace Cart/order snapshots.
@@ -4764,6 +4843,11 @@ class BuyV2Session extends ChangeNotifier {
     final previous = findProduct(product.id);
     if (previous != null && (previous.storeId != product.storeId || previous.canonicalId != product.canonicalId ||
         previous.publicListingIdentity != product.publicListingIdentity)) { return false; }
+    if (!_rememberAdvertisedOffer(offer)) {
+      _scheduleAdvertisedOfferExpiry();
+      notifyListeners();
+      return false;
+    }
     try {
       final superseded = Set<BuyV2Product>.identity()..addAll([
         ?previous,
@@ -4782,6 +4866,7 @@ class BuyV2Session extends ChangeNotifier {
       _productFacts.remove(product.id);
       _productContent.remove(product.id);
       _productContentMediaInputs.remove(product.id);
+      _scheduleAdvertisedOfferExpiry();
       return true;
     } on Object { return false; }
   }
@@ -4896,6 +4981,7 @@ class BuyV2Session extends ChangeNotifier {
   @override
   void dispose() {
     _collectionDisposed = true;
+    _advertisedOfferExpiry?.cancel();
     storeStockReader?.removeListener(_onStoreStockChanged);
     storeStockReader?.dispose();
     _ordersNavigationVisit = null;

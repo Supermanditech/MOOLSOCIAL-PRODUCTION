@@ -24,6 +24,7 @@ import 'buy_v2_catalogue.dart'
         BuyV2ProductCard,
         BuyV2AddFace,
         BuyV2ProductEdgeControls,
+        BuyV2AdvertisedOfferLink,
         showBuyV2RecentlyViewed,
         showBuyV2ShoppingHelp;
 import 'buy_v2_design.dart';
@@ -2456,6 +2457,7 @@ class _PublicProductOrderInformationState
               const Divider(height: 1, thickness: .5, color: BuyV2Colors.line),
             rows[i],
           ],
+          BuyV2AdvertisedOfferLink(session: session, product: product),
           if (retained != null) ...[
             const SizedBox(height: 6),
             Text('Selected window · ${_scheduledWindowLabel(context, retained)}',
@@ -24977,6 +24979,7 @@ class _CartLine extends StatelessWidget {
                         ],
                       ),
                     if (compactTitle && !stackMedia) purchaseControls,
+                    BuyV2AdvertisedOfferLink(session: session, product: product),
                     if (line.scheduledFulfilment case final selected?) ...[
                       const SizedBox(height: 5),
                       Text('Requested delivery · ${_scheduledWindowLabel(context, selected)}',
