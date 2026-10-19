@@ -8095,6 +8095,9 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
       if ($null -eq $promotion.PSObject.Properties[$key]) { return $false }
     }
+    if (@($promotion.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart') {
+      $promotionOwners += 'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart'
+    }
     if ($promotion.ticket -cne 'LF-04-C01' -or $promotion.batch -ne 2 -or
         $promotion.sourceCheckpoint -cne '8615a63c66940e4414f5701bc88d55e0fc3c1694' -or
         $promotion.state -cne 'founder_authorized_frontend_promotion_consumer' -or
@@ -8475,6 +8478,10 @@ function Invoke-Lf01Admission {
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Facts'] -and
         @($record.frontendContinuation.batch02Facts.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart') {
       $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart'
+    }
+    if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Promotions'] -and
+        @($record.frontendContinuation.batch02Promotions.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart') {
+      $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart'
     }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch03PolicyRecovery']) {
       $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart'

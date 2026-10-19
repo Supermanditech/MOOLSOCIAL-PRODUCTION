@@ -292,6 +292,27 @@ if ($RequireLfPublicationProbes) {
     $cases+=3
   }
   if ($null -ne $continuation.PSObject.Properties['batch02Promotions']) {
+    $moneyFixture='apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart'
+    $claimed=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    if (@($claimed.batch02Promotions.owners) -cnotcontains $moneyFixture) {
+      $claimed.batch02Promotions.owners+= $moneyFixture
+    }
+    Assert-Fixture (Test-Lf27Batch01Continuation $claimed @($moneyFixture)) 'Exact affected Cart money fixture rejected.'
+    $historical=$claimed | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $historical.batch02Promotions.owners=@($historical.batch02Promotions.owners | Where-Object { $_ -cne $moneyFixture })
+    Assert-Fixture (Test-Lf27Batch01Continuation $historical @()) 'Historical promotion without Cart fixture rejected.'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $historical @($moneyFixture))) 'Unclaimed Cart fixture admitted.'
+    $withoutChild=$claimed | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $withoutChild.PSObject.Properties.Remove('batch02Promotions')
+    Assert-Fixture (Test-Lf27Batch01Continuation $withoutChild @()) 'Historical missing promotion child rejected.'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $withoutChild @($moneyFixture))) 'Missing promotion child granted Cart fixture.'
+    foreach ($unclaimed in @("$moneyFixture.unclaimed", 'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_sibling_test.dart')) {
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $claimed @($unclaimed))) 'Cart fixture path granted sibling/prefix access.'
+    }
+    $widened=$claimed | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $widened.batch02Promotions.owners+= "$moneyFixture.unclaimed"
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $widened @())) 'Promotion owner declaration accepted Cart fixture suffix.'
+    $cases+=8
     foreach ($owner in $continuation.batch02Promotions.owners) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact promotion owner rejected.'
       $cases++

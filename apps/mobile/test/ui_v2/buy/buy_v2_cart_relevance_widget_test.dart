@@ -4016,7 +4016,13 @@ class _R66PayableDisplayFixture extends BuyV2Session {
   int get scopedPayableTotal => displayTotal;
 
   @override
+  int get scopedPayableTotalMinor => displayTotal * 100;
+
+  @override
   int get cartTotal => displayTotal;
+
+  @override
+  int get cartTotalMinor => displayTotal * 100;
 }
 
 class _WidgetLiveBenefitsAdapter implements BuyV2LiveCartBenefitsAdapter {
