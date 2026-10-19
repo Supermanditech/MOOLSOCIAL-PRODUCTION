@@ -2023,6 +2023,7 @@ GoRouter createJourneyRouter(
           useStoreProcurement: true,
           accountIdentity: session.accountIdentity,
           accountAuthenticated: session.isAuthenticated,
+          accountRecoveryReady: session.isAuthenticated || uiReviewOnly,
         ),
       ),
       GoRoute(

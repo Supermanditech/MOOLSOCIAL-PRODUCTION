@@ -619,6 +619,7 @@ class WorkWorkspaceDashboardScreen extends StatefulWidget {
     this.procurementControllerFactory,
     this.accountIdentity,
     this.accountAuthenticated = false,
+    this.accountRecoveryReady,
     this.initialSection,
     super.key,
   });
@@ -629,6 +630,9 @@ class WorkWorkspaceDashboardScreen extends StatefulWidget {
   final WorkProcurementController Function()? procurementControllerFactory;
   final AuthenticatedAccountIdentity? accountIdentity;
   final bool accountAuthenticated;
+  /// Isolated UI review may restore its own records without authenticating.
+  /// Never use this readiness value for commerce or protected actions.
+  final bool? accountRecoveryReady;
   final String? initialSection;
 
   @override
@@ -644,6 +648,7 @@ typedef _SavedStoreSearchVisit = ({
 class _WorkWorkspaceDashboardScreenState
     extends State<WorkWorkspaceDashboardScreen> {
   WorkSession get session => widget.session;
+  bool get _accountRecoveryReady => widget.accountRecoveryReady ?? widget.accountAuthenticated;
   WorkProcurementController? _storeProcurement;
   bool _leavingProcurement = false;
   BuyV2Session? _observedProcurement;
@@ -669,7 +674,7 @@ class _WorkWorkspaceDashboardScreenState
       widget.accountAuthenticated == visit.authenticated;
 
   void _searchScopeChanged() {
-    if (!session.workspaceAccountCurrent(accountReady: widget.accountAuthenticated)) {
+    if (!session.workspaceAccountCurrent(accountReady: _accountRecoveryReady)) {
       // Storage identity drift is not permission to keep showing the former
       // Store. Detach through its existing recovery owner, not a second reset.
       _retainedSavedSearch = null;
@@ -697,12 +702,12 @@ class _WorkWorkspaceDashboardScreenState
     if (_view == _WorkspaceControlView.search) _view = _WorkspaceControlView.dashboard;
   }
   void _recoverDashboardAccount({bool retry = false}) {
-    final source = session, authenticated = widget.accountAuthenticated;
-    final pending = source.recoverWorkspaceAccount(accountReady: authenticated, retry: retry);
+    final source = session, authenticated = widget.accountAuthenticated, ready = _accountRecoveryReady;
+    final pending = source.recoverWorkspaceAccount(accountReady: ready, retry: retry);
     final owner = source.workspaceAccountRecoveryContext;
     if (retry && mounted) setState(() {});
     unawaited(pending.then((restored) {
-      if (!restored || !mounted || !identical(session, source) || widget.accountAuthenticated != authenticated ||
+      if (!restored || !mounted || !identical(session, source) || widget.accountAuthenticated != authenticated || _accountRecoveryReady != ready ||
           source.workspaceAccountRecoveryContext != owner) {
         return;
       }
@@ -900,9 +905,9 @@ class _WorkWorkspaceDashboardScreenState
     return AnimatedBuilder(
       animation: session,
       builder: (context, _) {
-        final pending = !session.workspaceAccountCurrent(accountReady: widget.accountAuthenticated) || session.workspaceAccountRecoveryPending;
+        final pending = !session.workspaceAccountCurrent(accountReady: _accountRecoveryReady) || session.workspaceAccountRecoveryPending;
         if (pending || session.workspaceAccountRecoveryFailed) {
-          final owner = session.workspaceAccountRecoveryContext, authenticated = widget.accountAuthenticated;
+          final owner = session.workspaceAccountRecoveryContext, authenticated = widget.accountAuthenticated, ready = _accountRecoveryReady;
           return WorkPageScaffold(session: session, title: 'Your Workspace', subtitle: 'Account access',
             fallbackBackRoute: '/app/work/earn', activeLocalAction: 'workspace', showHeaderChat: false, showTrailingAction: false,
             showBottomNavigation: false, showMessageBanner: false,
@@ -913,7 +918,7 @@ class _WorkWorkspaceDashboardScreenState
               ])))) : WorkEmptyState(keyName: 'work-account-recovery-error', title: 'Workspace access unavailable',
               detail: 'Saved details could not be restored. Your saved Store data is kept.', actionLabel: 'Try again',
               onAction: () {
-                if (mounted && session.workspaceAccountRecoveryContext == owner && widget.accountAuthenticated == authenticated) {
+                if (mounted && session.workspaceAccountRecoveryContext == owner && widget.accountAuthenticated == authenticated && _accountRecoveryReady == ready) {
                   _recoverDashboardAccount(retry: true);
                 }
               }));

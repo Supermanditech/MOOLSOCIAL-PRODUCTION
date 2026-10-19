@@ -223,6 +223,14 @@ if ($RequireLfPublicationProbes) {
     $cases+=3
   }
   if ($null -ne $continuation.PSObject.Properties['batch03OriginalAttribution']) {
+    $routerOwner='apps/mobile/lib/features/journey01/journey_router.dart'
+    if (@($continuation.batch03OriginalAttribution.owners) -ccontains $routerOwner) {
+      $legacy=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $legacy.batch03OriginalAttribution.owners=@($legacy.batch03OriginalAttribution.owners | Where-Object { $_ -cne $routerOwner })
+      Assert-Fixture (Test-Lf27Batch01Continuation $legacy @()) 'Historical original-attribution list rejected.'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacy @($routerOwner))) 'Unclaimed Workspace router admitted.'
+      $cases+=2
+    }
     foreach($owner in $continuation.batch03OriginalAttribution.owners) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact original-attribution owner rejected.'
       $cases++

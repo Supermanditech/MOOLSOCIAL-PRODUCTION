@@ -5937,8 +5937,7 @@ class BuyV2Session extends ChangeNotifier {
         (target) =>
             target.valid &&
             target.ownerScope == reviewDraftOwnerScope &&
-            target.productId == productId &&
-            target.storeId == product.storeId &&
+            target.matchesProduct(product) &&
             target.kind == kind &&
             (orderId == null || target.orderId == orderId),
       ),
@@ -15114,6 +15113,7 @@ class BuyV2Session extends ChangeNotifier {
           saved.orderLineId == target.orderLineId &&
           saved.productId == target.productId &&
           saved.storeId == target.storeId &&
+          saved.purchasedListing == target.purchasedListing &&
           saved.kind == target.kind &&
           saved.purchaseId == target.purchaseId &&
           mapEquals(saved.orderStoreIds, target.orderStoreIds) &&

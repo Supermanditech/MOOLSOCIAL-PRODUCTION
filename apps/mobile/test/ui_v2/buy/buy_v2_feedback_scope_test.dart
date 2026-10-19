@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
@@ -20,9 +22,9 @@ void main() {
       ValueNotifier<BuyV2CollectionIdentity?>,
     )
   >
-  fixture({bool manualDispose = false}) async {
+  fixture({bool manualDispose = false, _FeedbackAdapter? suppliedAdapter, bool verifyReviewable = true}) async {
     final core = BuySession();
-    final adapter = _FeedbackAdapter();
+    final adapter = suppliedAdapter ?? _FeedbackAdapter();
     final owner = _Owner();
     final identity = ValueNotifier<BuyV2CollectionIdentity?>(
       const BuyV2CollectionIdentity(accountId: 'a', sessionId: 'login-a'),
@@ -39,7 +41,7 @@ void main() {
     if (!manualDispose) addTearDown(session.dispose);
     await session.restoreCommerce();
     await session.restoreCustomerState();
-    expect(session.canReviewProduct('s-milk'), isTrue);
+    if (verifyReviewable) expect(session.canReviewProduct(adapter.publishedProduct?.id ?? 's-milk'), isTrue);
     return (session, adapter, owner, identity);
   }
 
@@ -58,6 +60,41 @@ void main() {
     }
     expect(adapter.calls, count);
   }
+
+  BuyV2PublicListingIdentity listing({String canonical = 'canonical-milk', String pack = 'pack-one'}) => BuyV2PublicListingIdentity(
+    listingId: 'listing-${sha256.convert(utf8.encode(jsonEncode([1, 'evaluation', 'host-store', 'sku-milk', 'retail'])))}',
+    realm: 'evaluation', storeId: 'host-store', skuId: 'sku-milk', canonicalProductId: canonical,
+    verifiedPackId: pack, channel: BuyV2OfferClass.retail);
+  _FeedbackAdapter publishedAdapter() {
+    final identity = listing();
+    return _FeedbackAdapter()..purchasedListing = identity
+      ..publishedProduct = BuyV2Catalogue.allProducts.firstWhere((p) => p.id == 's-milk').copyWith(id: identity.listingId,
+        canonicalId: identity.canonicalProductId, storeId: identity.storeId, offerClass: identity.channel, publicListingIdentity: identity);
+  }
+  for (final fault in ['canonical', 'pack']) {
+    test('LF-LISTING same stable public ID cannot rate a different purchased $fault', () async {
+      final adapter = publishedAdapter()..purchasedListing = listing(canonical: fault == 'canonical' ? 'old-product' : 'canonical-milk', pack: fault == 'pack' ? 'old-pack' : 'pack-one');
+      final (session, _, _, _) = await fixture(suppliedAdapter: adapter, verifyReviewable: false);
+      expect(session.ratingTargetsFor(adapter.publishedProduct!.id), isEmpty);
+      expect(await session.submitProductReviewOnline(productId: adapter.publishedProduct!.id, rating: 4, comment: 'Host text'), isFalse);
+      expect(adapter.calls, 0);
+    });
+  }
+  for (final fault in ['omitted', 'changed']) {
+    test('LF-LISTING rating acknowledgment cannot $fault the original purchased listing', () async {
+      final adapter = publishedAdapter()..omitSavedListing = fault == 'omitted'
+        ..savedListingOverride = fault == 'changed' ? listing(pack: 'other-pack') : null;
+      final (session, _, _, _) = await fixture(suppliedAdapter: adapter);
+      expect(await session.submitProductReviewOnline(productId: adapter.publishedProduct!.id, rating: 4, comment: 'Host text'), isFalse);
+      expect(session.customerReviewFor(adapter.publishedProduct!.id), isNull);
+    });
+  }
+  test('LF-LISTING exact purchased listing rating keeps acknowledged provenance', () async {
+    final adapter = publishedAdapter();
+    final (session, _, _, _) = await fixture(suppliedAdapter: adapter);
+    expect(await session.submitProductReviewOnline(productId: adapter.publishedProduct!.id, rating: 4, comment: 'Host text'), isTrue);
+    expect(session.ratingTargetsFor(adapter.publishedProduct!.id).single.purchasedListing, adapter.purchasedListing);
+  });
 
   test('LF13 same-account new login keeps the saved review draft', () async {
     final (session, _, _, identity) = await fixture();
@@ -306,6 +343,9 @@ class _FeedbackAdapter
     implements BuyV2CommerceAdapter, BuyV2VerifiedRatingAdapter {
   String owner = 'owner-a';
   String store = 'host-store';
+  BuyV2Product? publishedProduct;
+  BuyV2PublicListingIdentity? purchasedListing, savedListingOverride;
+  bool omitSavedListing = false;
   Completer<void>? pending;
   bool fail = false;
   int calls = 0;
@@ -320,18 +360,19 @@ class _FeedbackAdapter
     orderId: 'host-order',
     orderLineId: 'host-line',
     storeId: 'host-store',
-    productId: 's-milk',
+    productId: publishedProduct?.id ?? 's-milk',
     purchaseLabel: 'Host purchased pack',
     version: version,
     reviewId: rating == null ? null : 'host-review',
     rating: rating,
     comment: comment,
+    purchasedListing: purchasedListing,
   );
   @override
   Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
     state: BuyV2CommerceLoadState.ready,
     products: [
-      BuyV2Catalogue.allProducts
+      publishedProduct ?? BuyV2Catalogue.allProducts
           .firstWhere((p) => p.id == 's-milk')
           .copyWith(storeId: store),
     ],
@@ -359,6 +400,7 @@ class _FeedbackAdapter
         reviewId: 'host-review',
         rating: request.stars,
         comment: request.comment ?? '',
+        purchasedListing: omitSavedListing ? null : savedListingOverride ?? request.target.purchasedListing,
       ),
     );
   }

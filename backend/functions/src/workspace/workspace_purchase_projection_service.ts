@@ -3,6 +3,7 @@ import {FieldPath, type Firestore, type Transaction} from "firebase-admin/firest
 import {WorkspaceProfileError} from "./workspace_profile_service.js";
 
 type Realm = "evaluation" | "production";
+export type PurchaseFactsVersion = 2 | 3 | 4 | 5 | 6;
 export interface PlacementLine {
   sourceLineId: string; skuId: string; canonicalProductId: string;
   verifiedPackId: string; offerId: string; offerRevision: string;
@@ -13,6 +14,8 @@ export interface PlacementLine {
   variant?: string;
   /** Existing Buy desired-window DTO, not a reservation or quote acknowledgement. */
   scheduledFulfilment?: OriginalScheduledFulfilment | null;
+  /** Presence is versioned; null means no verified purchased public context. */
+  publicListing?: OriginalPublicListing | null;
 }
 export interface OriginalScheduledFulfilment {
   schemaVersion: 1; method: "scheduled";
@@ -20,6 +23,7 @@ export interface OriginalScheduledFulfilment {
     canonicalProductId: string; verifiedPackId: string; channel: "retail" | "wholesale" | "bulk"};
   sourceRevision: string; locationKey: string; slotId: string; startsAt: string; endsAt: string;
 }
+export type OriginalPublicListing = OriginalScheduledFulfilment["listing"];
 export interface PurchaseTotals {
   itemsMinor: number; discountMinor: number; taxMinor: number; deliveryMinor: number;
   freightMinor: number; paymentFeeMinor: number; tipMinor: number; totalMinor: number;
@@ -45,7 +49,7 @@ export interface OriginalBenefitAttribution {schemaVersion: 1; components: Origi
 /** Server-owned FINAL PLACEMENT, not a quote, client command, payment or stock proof.
  * No real upstream implementation is configured in this local slice. */
 export interface TrustedPlacementReceipt {
-  schemaVersion: 1 | 2 | 3 | 4; realm: Realm; authNamespace: "firebase-default";
+  schemaVersion: 1 | 2 | 3 | 4 | 5; realm: Realm; authNamespace: "firebase-default";
   finalPlacement: true; issuer: string; receiptId: string; revision: string;
   buyerUserId: string; stores: PlacementStore[];
 }
@@ -58,17 +62,17 @@ export interface PurchaseOriginal {
   benefitAttribution?: OriginalBenefitAttribution;
 }
 export interface PurchaseStoreProjection {
-  factsVersion: 2 | 3 | 4 | 5; storeId: string; orderId: string; original: PurchaseOriginal;
+  factsVersion: PurchaseFactsVersion; storeId: string; orderId: string; original: PurchaseOriginal;
   originalFingerprint: string;
 }
 interface StoredOrder extends PurchaseStoreProjection {caseId: string; ownerUserId: string}
 interface PurchaseAggregate {
-  schemaVersion: 2 | 3 | 4 | 5; realm: Realm; authNamespace: "firebase-default";
+  schemaVersion: PurchaseFactsVersion; realm: Realm; authNamespace: "firebase-default";
   purchaseId: string; buyerUserId: string; buyerId: string; sourceRevision: string;
   sourceFingerprint: string; createdAt: string; orders: StoredOrder[]; integrity: string;
 }
 export interface PurchaseProjection {
-  schemaVersion: 2 | 3 | 4 | 5; realm: Realm; authNamespace: "firebase-default";
+  schemaVersion: PurchaseFactsVersion; realm: Realm; authNamespace: "firebase-default";
   viewerRole: "buyer" | "seller"; viewerUserId: string;
   purchaseId: string; buyerId: string; sourceRevision: string;
   // Not a mutable payment/fulfilment/eligibility status.
@@ -204,7 +208,7 @@ export interface OperationalOrderSnapshot {
   viewerRole: "buyer" | "seller"; viewerUserId: string;
   purchaseId: string; storeId: string; orderId: string;
   sourceRevision: string; originalFingerprint: string; original: PurchaseOriginal;
-  originalFactsVersion?: 3 | 4 | 5;
+  originalFactsVersion?: 3 | 4 | 5 | 6;
   operationalSourceRevision: string; revision: number; stage: OperationalOrderStage;
   fulfilment: "delivery" | "collection"; placedAt: string;
   acceptanceDeadline: string | null; fulfilmentDeadline: string | null;
@@ -627,8 +631,19 @@ function scheduledOriginal(value: unknown, realm: Realm, storeId: string, line: 
     sourceRevision: s.sourceRevision as string, locationKey: s.locationKey as string, slotId: s.slotId as string,
     startsAt: s.startsAt as string, endsAt: s.endsAt as string};
 }
-function line(v: unknown, withVariant = false, scheduledScope?: {realm: Realm; storeId: string}): PlacementLine {
-  const r = exact(v, [...lineKeys, ...(withVariant ? ["variant"] : []), ...(scheduledScope ? ["scheduledFulfilment"] : [])]);
+function originalPublicListing(value: unknown, realm: Realm, storeId: string, line: PlacementLine): OriginalPublicListing | null {
+  if (value === null) return null;
+  const l = exact(value, ["schemaVersion", "realm", "listingId", "storeId", "skuId", "canonicalProductId", "verifiedPackId", "channel"]);
+  if (l.schemaVersion !== 1 || l.realm !== realm || l.storeId !== storeId || l.skuId !== line.skuId ||
+      l.canonicalProductId !== line.canonicalProductId || l.verifiedPackId !== line.verifiedPackId ||
+      typeof l.channel !== "string" || !["retail", "wholesale", "bulk"].includes(l.channel) ||
+      l.listingId !== `listing-${digest([1, realm, storeId, line.skuId, l.channel])}`) fail();
+  return {schemaVersion: 1, realm, listingId: l.listingId as string, storeId, skuId: line.skuId,
+    canonicalProductId: line.canonicalProductId, verifiedPackId: line.verifiedPackId, channel: l.channel as OriginalPublicListing["channel"]};
+}
+function line(v: unknown, withVariant = false, scheduledScope?: {realm: Realm; storeId: string}, withPublicListing = false): PlacementLine {
+  const r = exact(v, [...lineKeys, ...(withVariant ? ["variant"] : []), ...(scheduledScope ? ["scheduledFulfilment"] : []),
+    ...(withPublicListing ? ["publicListing"] : [])]);
   // Match reviewed catalogue variant text, including its permitted line breaks.
   if (withVariant && (typeof r.variant !== "string" || r.variant !== r.variant.trim() ||
       r.variant.length > 240 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(r.variant))) fail();
@@ -640,6 +655,12 @@ function line(v: unknown, withVariant = false, scheduledScope?: {realm: Realm; s
     unitPriceMinor: integer(r.unitPriceMinor), lineTotalMinor: integer(r.lineTotalMinor),
     ...(withVariant ? {variant: r.variant as string} : {})};
   if (scheduledScope) result.scheduledFulfilment = scheduledOriginal(r.scheduledFulfilment, scheduledScope.realm, scheduledScope.storeId, result);
+  if (withPublicListing) {
+    if (!scheduledScope) fail();
+    result.publicListing = originalPublicListing(r.publicListing, scheduledScope.realm, scheduledScope.storeId, result);
+    if (result.publicListing !== null && result.scheduledFulfilment != null &&
+        integrityHash(result.publicListing) !== integrityHash(result.scheduledFulfilment.listing)) fail();
+  }
   // Contract: gross unit price per quantityUnit; quantity in thousandths;
   // gross line rounded half-up to paise. Discounts are explicit order totals.
   // This validates supplied facts, never derives a price/discount/eligibility.
@@ -650,13 +671,13 @@ function line(v: unknown, withVariant = false, scheduledScope?: {realm: Realm; s
 export function normalizePlacement(value: unknown, realm: Realm): TrustedPlacementReceipt {
   const r = exact(value, ["schemaVersion", "realm", "authNamespace", "finalPlacement", "issuer",
     "receiptId", "revision", "buyerUserId", "stores"]);
-  if ((r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
+  if ((r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
       r.finalPlacement !== true || !["evaluation", "production"].includes(realm)) fail();
   const stores = array(r.stores, 10).map(raw => {
     const s = exact(raw, ["storeId", "caseId", "ownerUserId", "lines", "totals",
       ...(r.schemaVersion !== 1 ? ["benefitAttribution"] : [])]);
     const lines = array(s.lines, 100).map(value => line(value, (r.schemaVersion as number) >= 3,
-      r.schemaVersion === 4 ? {realm, storeId: id(s.storeId)} : undefined)).sort((a,b) => compare(a.sourceLineId, b.sourceLineId));
+      (r.schemaVersion as number) >= 4 ? {realm, storeId: id(s.storeId)} : undefined, r.schemaVersion === 5)).sort((a,b) => compare(a.sourceLineId, b.sourceLineId));
     unique(lines.map(l => l.sourceLineId));
     const amounts = totals(s.totals, lines.reduce((sum, l) => sum + l.lineTotalMinor, 0));
     return {storeId: id(s.storeId), caseId: id(s.caseId), ownerUserId: id(s.ownerUserId), lines, totals: amounts,
@@ -673,23 +694,23 @@ export function normalizePlacement(value: unknown, realm: Realm): TrustedPlaceme
   return result;
 }
 function compare(a: string, b: string): number {return a < b ? -1 : a > b ? 1 : 0;}
-function requireStore(value: unknown, expected: {caseId: string; storeId: string; ownerUserId: string}): void {
+function requireStore(value: unknown, expected: {caseId: string; storeId: string; ownerUserId: string}, requireNewSales = true): void {
   if (!value) fail("not_found", 404);
   const p = obj(value);
   if (p.schemaVersion !== 1 || p.caseId !== expected.caseId || p.workspaceId !== expected.storeId ||
       p.ownerUserId !== expected.ownerUserId || p.familyId !== "products-trade" ||
       !["retailer-grocery", "retailer-speciality", "wholesaler", "manufacturer"].includes(String(p.profileId)) ||
-      p.status !== "live" || p.shopEnabled !== true) fail("not_found", 404);
+      p.status !== "live" || (requireNewSales && p.shopEnabled !== true)) fail("not_found", 404);
 }
 export function purchaseOriginalFingerprint(storeId: string, orderId: string, original: PurchaseOriginal): string {
-  return digest({factsVersion: original.lines.some(l => l.scheduledFulfilment !== undefined) ? 5 : original.lines.some(l => l.variant !== undefined) ? 4 :
+  return digest({factsVersion: original.lines.some(l => l.publicListing !== undefined) ? 6 : original.lines.some(l => l.scheduledFulfilment !== undefined) ? 5 : original.lines.some(l => l.variant !== undefined) ? 4 :
     original.benefitAttribution === undefined ? 2 : 3, storeId, orderId, original});
 }
 function validateAggregate(value: unknown, purchaseId: string, realm: Realm): PurchaseAggregate {
   try {
     const r = exact(value, ["schemaVersion", "realm", "authNamespace", "purchaseId", "buyerUserId",
       "buyerId", "sourceRevision", "sourceFingerprint", "createdAt", "orders", "integrity"]);
-    if ((r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
+    if ((r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5 && r.schemaVersion !== 6) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
         r.purchaseId !== purchaseId || !/^[a-f0-9]{64}$/u.test(String(r.sourceFingerprint))) fail();
     id(r.buyerUserId); id(r.buyerId); id(r.sourceRevision);
     if (typeof r.createdAt !== "string" || new Date(r.createdAt).toISOString() !== r.createdAt) fail();
@@ -701,17 +722,18 @@ function validateAggregate(value: unknown, purchaseId: string, realm: Realm): Pu
       if (original.currency !== "INR") fail();
       const lines = array(original.lines, 100).map(rawLine => {
         const l = exact(rawLine, [...lineKeys.filter(k => k !== "sourceLineId"), "lineId",
-          ...((o.factsVersion as number) >= 4 ? ["variant"] : []), ...(o.factsVersion === 5 ? ["scheduledFulfilment"] : [])]);
+          ...((o.factsVersion as number) >= 4 ? ["variant"] : []), ...((o.factsVersion as number) >= 5 ? ["scheduledFulfilment"] : []),
+          ...(o.factsVersion === 6 ? ["publicListing"] : [])]);
         const {lineId, ...rest} = l;
         const {sourceLineId, ...normalized} = line({...rest, sourceLineId: lineId}, (o.factsVersion as number) >= 4,
-          o.factsVersion === 5 ? {realm, storeId: id(o.storeId)} : undefined);
+          (o.factsVersion as number) >= 5 ? {realm, storeId: id(o.storeId)} : undefined, o.factsVersion === 6);
         return {lineId: sourceLineId, ...normalized};
       }).sort((a,b) => compare(a.lineId, b.lineId));
       unique(lines.map(l => l.lineId));
       const canonical: PurchaseOriginal = {currency: "INR", lines,
         totals: totals(original.totals, lines.reduce((sum,l) => sum + l.lineTotalMinor, 0))};
       if (o.factsVersion !== 2) canonical.benefitAttribution = benefits(original.benefitAttribution, lines, canonical.totals.discountMinor);
-      const result: StoredOrder = {factsVersion: o.factsVersion as 2 | 3 | 4 | 5, storeId: id(o.storeId), orderId: id(o.orderId),
+      const result: StoredOrder = {factsVersion: o.factsVersion as PurchaseFactsVersion, storeId: id(o.storeId), orderId: id(o.orderId),
         original: canonical, originalFingerprint: String(o.originalFingerprint),
         caseId: id(o.caseId), ownerUserId: id(o.ownerUserId)};
       if (result.originalFingerprint !== purchaseOriginalFingerprint(result.storeId, result.orderId, canonical)) fail();
@@ -781,11 +803,11 @@ export class WorkspacePurchaseProjectionService {
             ...c, allocations: c.allocations.map(a => ({...a, lineId: savedIds.get(a.lineId)!})),
           }))};
         }
-        return {factsVersion: (input.schemaVersion + 1) as 2 | 3 | 4 | 5, storeId: s.storeId, orderId: s.orderId, original,
+        return {factsVersion: (input.schemaVersion + 1) as PurchaseFactsVersion, storeId: s.storeId, orderId: s.orderId, original,
           originalFingerprint: purchaseOriginalFingerprint(s.storeId, s.orderId, original),
           caseId: s.caseId, ownerUserId: s.ownerUserId};
       });
-      const body = {schemaVersion: (input.schemaVersion + 1) as 2 | 3 | 4 | 5, realm: this.realm, authNamespace: "firebase-default" as const,
+      const body = {schemaVersion: (input.schemaVersion + 1) as PurchaseFactsVersion, realm: this.realm, authNamespace: "firebase-default" as const,
         purchaseId, buyerUserId: input.buyerUserId, buyerId, sourceRevision: input.revision,
         sourceFingerprint, createdAt, orders};
       // Saved UUID line IDs expand each allocation. Bound the actual buyer
@@ -881,7 +903,9 @@ export class WorkspacePurchaseProjectionService {
       const profiles = await tx.get(this.db.collection("workspaceProfiles").where("workspaceId", "==", storeId).limit(2));
       if (profiles.size !== 1) fail("not_found", 404);
       const profileDoc = profiles.docs[0]!;
-      requireStore(profileDoc.data(), {caseId: profileDoc.id, storeId, ownerUserId: actor});
+      // Historical references remain private to the current approved owner,
+      // independently of whether this Store is accepting new sales.
+      requireStore(profileDoc.data(), {caseId: profileDoc.id, storeId, ownerUserId: actor}, false);
       let query = this.root().collection("stores").doc(storeId).collection("orderReferences")
         .orderBy(FieldPath.documentId()).limit(p.limit);
       if (p.after) query = query.startAfter(p.after);
@@ -925,7 +949,7 @@ export class WorkspacePurchaseProjectionService {
       const order = aggregate.orders.find(o => o.storeId === storeId && o.orderId === orderId && o.ownerUserId === actor);
       if (!order) fail("not_found", 404);
       const profile = await tx.get(this.db.collection("workspaceProfiles").doc(order.caseId));
-      requireStore(profile.data(), {caseId: order.caseId, storeId, ownerUserId: actor});
+      requireStore(profile.data(), {caseId: order.caseId, storeId, ownerUserId: actor}, false);
       return this.projection(aggregate, actor, "seller", [order]);
     });
   }

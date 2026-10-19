@@ -8118,6 +8118,11 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
       'apps/mobile/lib/features/work/widgets/workspace_purchase_originals.dart',
       'apps/mobile/test/workspace_purchase_originals_test.dart',
       'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart')
+    # Already-owned router: exact founder-resumed Workspace recovery repair.
+    if ($null -ne $original -and $null -ne $original.PSObject.Properties['owners'] -and
+        @($original.owners) -ccontains 'apps/mobile/lib/features/journey01/journey_router.dart') {
+      $originalOwners += 'apps/mobile/lib/features/journey01/journey_router.dart'
+    }
     if ($null -eq $original -or $original -isnot [pscustomobject]) { return $false }
     foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
       if ($null -eq $original.PSObject.Properties[$key]) { return $false }

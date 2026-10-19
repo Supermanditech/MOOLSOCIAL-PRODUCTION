@@ -6,7 +6,7 @@ import {getFirestore} from "firebase-admin/firestore";
 import {WorkspaceProfileError} from "./workspace_profile_service.js";
 import {WorkspacePurchaseProjectionService, normalizePlacement, requireDefaultPurchaseTenant,
   WorkspaceOrderOperationsService, normalizeOperationalOrder,
-  normalizeOrderCompletion, type TrustedOrderCompletionEvidence,
+  normalizeOrderCompletion, purchaseOriginalFingerprint, type TrustedOrderCompletionEvidence,
   type TrustedOperationalOrderEvidence, type TrustedPlacementReceipt} from "./workspace_purchase_projection_service.js";
 
 function operationalEvidence(): TrustedOperationalOrderEvidence {
@@ -384,6 +384,121 @@ function attributedReceipt() {
         allocations: [{lineId: s.lines[0]!.sourceLineId, amountMinor: 25}]},
     ]},
   }))};
+}
+
+function publicListingReceipt() {
+  const value = JSON.parse(JSON.stringify(scheduledReceipt()));
+  value.schemaVersion = 5;
+  value.stores.forEach((store: {storeId: string; lines: Array<Record<string, unknown>>}, index: number) => {
+    for (const line of store.lines) {
+      const channel = index === 0 ? "retail" : "wholesale";
+      line.publicListing = {schemaVersion: 1, realm: "evaluation",
+        listingId: `listing-${createHash("sha256").update(JSON.stringify([1, "evaluation", store.storeId, line.skuId, channel])).digest("hex")}`,
+        storeId: store.storeId, skuId: line.skuId, canonicalProductId: line.canonicalProductId, verifiedPackId: line.verifiedPackId, channel};
+    }
+  });
+  return value;
+}
+test("LF-LISTING frozen ordinary purchased context survives independently of desired Scheduled intent", () => {
+  const input = publicListingReceipt();
+  assert.deepEqual(normalizePlacement(input, "evaluation"), input);
+  assert.equal(input.stores[1].lines[0].publicListing.channel, "wholesale");
+  assert.equal(input.stores[1].lines[0].scheduledFulfilment, null);
+  const bulk = publicListingReceipt(), line = bulk.stores[1].lines[0], storeId = bulk.stores[1].storeId;
+  line.publicListing.channel = "bulk";
+  line.publicListing.listingId = `listing-${createHash("sha256").update(JSON.stringify([1, "evaluation", storeId, line.skuId, "bulk"])).digest("hex")}`;
+  assert.deepEqual(normalizePlacement(bulk, "evaluation"), bulk);
+});
+test("LF-LISTING explicit null stays unknown even when desired Scheduled contains a listing", () => {
+  const input = publicListingReceipt();
+  for (const store of input.stores) for (const line of store.lines) line.publicListing = null;
+  const result = normalizePlacement(input, "evaluation");
+  assert.equal(result.schemaVersion, 5);
+  assert.equal(Reflect.get(result.stores[0]!.lines[0]!, "publicListing"), null);
+  assert.notEqual(result.stores[0]!.lines[0]!.scheduledFulfilment, null);
+});
+for (const [fault, mutate] of Object.entries<(input: ReturnType<typeof publicListingReceipt>) => void>({
+  "missing listing": v => delete v.stores[0].lines[0].publicListing,
+  "old receipt with new field": v => v.schemaVersion = 4,
+  "missing inherited Scheduled": v => delete v.stores[0].lines[0].scheduledFulfilment,
+  "missing inherited variant": v => delete v.stores[0].lines[0].variant,
+  "missing inherited benefits": v => delete v.stores[0].benefitAttribution,
+  "wrong realm": v => v.stores[0].lines[0].publicListing.realm = "production",
+  "wrong Store": v => v.stores[0].lines[0].publicListing.storeId = "other-store",
+  "wrong SKU": v => v.stores[0].lines[0].publicListing.skuId = "other-sku",
+  "wrong canonical": v => v.stores[0].lines[0].publicListing.canonicalProductId = "other-product",
+  "wrong pack": v => v.stores[0].lines[0].publicListing.verifiedPackId = "other-pack",
+  "forged stable ID": v => v.stores[0].lines[0].publicListing.listingId = `listing-${"a".repeat(64)}`,
+  "unknown channel": v => v.stores[0].lines[0].publicListing.channel = "standard",
+  "private extra field": v => v.stores[0].lines[0].publicListing.purchaseCost = 99,
+  "array instead of identity": v => v.stores[0].lines[0].publicListing = [v.stores[0].lines[0].publicListing],
+  "contradictory desired channel": v => {
+    const l = v.stores[0].lines[0], s = l.scheduledFulfilment.listing;
+    s.channel = "wholesale"; s.listingId = `listing-${createHash("sha256").update(JSON.stringify([1, "evaluation", s.storeId, s.skuId, s.channel])).digest("hex")}`;
+  },
+})) test(`LF-LISTING rejects ${fault} without guessing purchased identity`, () => {
+  const input = publicListingReceipt(); mutate(input);
+  assert.throws(() => normalizePlacement(input, "evaluation"), rejectsCode("invalid_input"));
+});
+
+for (const allNull of [false, true]) {
+test(`LF-LISTING actual persisted originals preserve explicit provenance across restart allNull=${allNull}`, {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: allNull ? "demo-lf-listing-null" : "demo-lf-listing"}, `listing-${randomUUID()}`), db = getFirestore(app);
+  const value = publicListingReceipt(); value.receiptId = `receipt-${randomUUID()}`;
+  if (allNull) for (const store of value.stores) for (const line of store.lines) line.publicListing = null;
+  for (const store of value.stores) await db.collection("workspaceProfiles").doc(store.caseId).set({
+    schemaVersion: 1, caseId: store.caseId, workspaceId: store.storeId, ownerUserId: store.ownerUserId,
+    familyId: "products-trade", profileId: "retailer-grocery", status: "live", shopEnabled: true,
+  });
+  try {
+    const producer = new WorkspacePurchaseProjectionService(db, "evaluation", {readFinalPlacement: async () => value});
+    const created = await producer.materialize("listing-original");
+    assert.deepEqual(await producer.materialize("listing-original"), created);
+    const reader = new WorkspacePurchaseProjectionService(db, "evaluation");
+    const buyer = await reader.readBuyer(value.buyerUserId, {purchaseId: created.purchaseId});
+    assert.equal(buyer.schemaVersion, 6);
+    for (const order of buyer.orders) {
+      assert.equal(order.factsVersion, 6);
+      const source = value.stores.find((s: {storeId: string}) => s.storeId === order.storeId);
+      for (const line of order.original.lines) {
+        assert.equal(Object.hasOwn(line, "publicListing"), true);
+        assert.deepEqual(line.publicListing, source.lines.find((l: {skuId: string}) => l.skuId === line.skuId).publicListing);
+        assert.equal(line.unitPriceMinor, source.lines[0].unitPriceMinor);
+      }
+      const legacy = {...order.original, lines: order.original.lines.map(({publicListing: _unknown, ...line}) => line)};
+      assert.notEqual(purchaseOriginalFingerprint(order.storeId, order.orderId, legacy), order.originalFingerprint);
+    }
+    const first = buyer.orders[0]!, scope = {purchaseId: buyer.purchaseId, storeId: first.storeId, orderId: first.orderId};
+    const savedBefore = JSON.stringify((await db.collection("workspacePurchaseProjections").doc("evaluation").collection("purchases").doc(created.purchaseId).get()).data());
+    await db.collection("workspaceProfiles").doc(value.stores[0].caseId).update({shopEnabled: false});
+    const seller = await reader.readStore(value.stores[0].ownerUserId, scope);
+    assert.deepEqual(seller.orders, [first]);
+    const pageBody = {storeId: first.storeId, limit: 5, cursor: null};
+    assert.equal((await reader.listStore(value.stores[0].ownerUserId, pageBody)).viewerRole, "seller");
+    await assert.rejects(reader.readStore(value.stores[1].ownerUserId, scope), rejectsCode("not_found"));
+    await assert.rejects(reader.listStore(value.stores[1].ownerUserId, pageBody), rejectsCode("not_found"));
+    assert.deepEqual(await producer.materialize("listing-original"), created);
+    const oldReceipt = value.receiptId; value.receiptId = `new-paused-${randomUUID()}`;
+    await assert.rejects(producer.materialize("new-sales-while-paused"), rejectsCode("not_found"));
+    value.receiptId = oldReceipt;
+    assert.equal(JSON.stringify((await db.collection("workspacePurchaseProjections").doc("evaluation").collection("purchases").doc(created.purchaseId).get()).data()), savedBefore);
+    const operations = new WorkspaceOrderOperationsService(db, "evaluation", {readOperationalOrder: async () => ({...operationalEvidence(), ...scope,
+      originalFingerprint: first.originalFingerprint, sourceRevision: buyer.sourceRevision, initialStage: "Ready"})}, () => new Date(),
+      {issuer: "trusted-fulfilment", readCompletion: async () => ({...completionEvidence(), ...scope,
+        receiptId: `listing-completion-${buyer.purchaseId}`, originalFingerprint: first.originalFingerprint,
+        sourceRevision: buyer.sourceRevision, operationalRevision: 1})});
+    await operations.initialize("listing-operation");
+    const operational = await operations.read(value.buyerUserId, "buyer", scope);
+    assert.equal(operational.originalFactsVersion, 6); assert.deepEqual(operational.original, first.original);
+    assert.equal((await operations.recordCompletion("listing-completion")).state, "recorded");
+    assert.deepEqual((await operations.read(value.buyerUserId, "buyer", scope)).original, first.original);
+    console.log(`LF_LISTING_PROJECTION=${JSON.stringify({buyer, seller, operational})}`);
+    await db.collection("workspaceProfiles").doc(value.stores[0].caseId).update({status: "suspended"});
+    await assert.rejects(reader.readStore(value.stores[0].ownerUserId, scope), rejectsCode("not_found"));
+    await assert.rejects(reader.listStore(value.stores[0].ownerUserId, pageBody), rejectsCode("not_found"));
+  } finally {await db.terminate(); await deleteApp(app);}
+});
 }
 
 function scheduledReceipt() {

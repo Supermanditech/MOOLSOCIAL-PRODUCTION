@@ -4814,6 +4814,46 @@ void main() {
     return work;
   }
 
+  for (final (authenticated, reviewOnly) in [(false, true), (true, false)]) {
+    testWidgets('LF-LAUNCH actual router settles Workspace recovery auth=$authenticated review=$reviewOnly', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(412, 915);
+      addTearDown(tester.view.reset);
+      final account = _ContactDraftFixtureStore();
+      final work = storeViewFixture(null, account);
+      final storeId = work.activeWorkspace!.id;
+      final journey = JourneySession(
+        store: MemoryJourneyStore(snapshot: const JourneySnapshot(
+          languageCode: 'en', areaMode: 'skipped', setupComplete: true)),
+        otpGateway: ReviewOtpGateway(signedIn: authenticated),
+        allowGuestReady: reviewOnly,
+      );
+      addTearDown(journey.dispose);
+      addTearDown(work.dispose);
+      await journey.start();
+      await work.recoverPendingProof(accountReady: authenticated || reviewOnly);
+      final owner = work.workspaceAccountRecoveryContext;
+      expect(journey.isAuthenticated, authenticated);
+      await tester.pumpWidget(MoolSocialApp(session: journey, workSession: work,
+        uiReviewOnly: reviewOnly, initialLocation: '/app/work/workspace/dashboard'));
+      // Bound frames instead of pumpAndSettle: a restore loop must fail assertions,
+      // not spend minutes waiting for the intentional loading indicator.
+      for (var frame = 0; frame < 12; frame++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('work-account-recovery')), findsNothing);
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      expect(work.workspaceAccountCurrent(accountReady: authenticated || reviewOnly), isTrue);
+      expect(work.workspaceAccountRecoveryPending, isFalse);
+      expect(work.workspaceAccountRecoveryContext, owner);
+      expect(work.activeWorkspace?.id, storeId);
+      expect(journey.isAuthenticated, authenticated);
+      expect(tester.widget<WorkWorkspaceDashboardScreen>(find.byType(WorkWorkspaceDashboardScreen)).accountAuthenticated, authenticated);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   Future<WorkSession> analyticsSavedStockFixture({
     WorkPendingProofStore? contactStore,
     bool empty = false,

@@ -90,6 +90,38 @@ class Transport implements SocialContentTransport {
 }
 
 void main() {
+  for (final role in WorkspaceOrderIdentityRole.values) {
+    for (final allNull in [false, true]) {
+      test('LF-LISTING strict originals retain version6 and nullable provenance ${role.name} $allNull', () async {
+        final data = publicListingPurchaseResponse(role: role.name, allNull: allNull), wire = Transport()..data = data;
+        final result = await projectionGateway(wire, account: role == WorkspaceOrderIdentityRole.buyer ? 'buyer-1' : 'owner-1').readPurchaseProjection(
+          role: role, realm: 'evaluation', purchaseId: data['purchaseId'], storeId: role == WorkspaceOrderIdentityRole.seller ? 'store-one' : null,
+          orderId: role == WorkspaceOrderIdentityRole.seller ? data['orders'][0]['orderId'] : null);
+        expect(result, isNotNull); final order = result!.orders.single;
+        expect(order.factsVersion, 6);
+        expect(order.lines.single.toJson(), data['orders'][0]['original']['lines'][0]);
+        expect(order.lines.single.toJson().containsKey('publicListing'), isTrue);
+      });
+    }
+  }
+  for (final fault in <String, void Function(Map<String, dynamic>)>{
+    'missing': (d) => d['orders'][0]['original']['lines'][0].remove('publicListing'),
+    'realm': (d) => d['orders'][0]['original']['lines'][0]['publicListing']['realm'] = 'production',
+    'Store': (d) => d['orders'][0]['original']['lines'][0]['publicListing']['storeId'] = 'other-store',
+    'SKU': (d) => d['orders'][0]['original']['lines'][0]['publicListing']['skuId'] = 'other-sku',
+    'canonical': (d) => d['orders'][0]['original']['lines'][0]['publicListing']['canonicalProductId'] = 'other-product',
+    'pack': (d) => d['orders'][0]['original']['lines'][0]['publicListing']['verifiedPackId'] = 'other-pack',
+    'stable ID': (d) => d['orders'][0]['original']['lines'][0]['publicListing']['listingId'] = 'listing-${'a' * 64}',
+    'extra field': (d) => d['orders'][0]['original']['lines'][0]['publicListing']['purchaseCost'] = 50,
+    'inherited Schedule': (d) => d['orders'][0]['original']['lines'][0].remove('scheduledFulfilment'),
+    'old marker': (d) {d['schemaVersion'] = 5; d['orders'][0]['factsVersion'] = 5;},
+  }.entries) {
+    test('LF-LISTING rejects rehashed ${fault.key} rather than substituting current catalogue identity', () async {
+      final data = publicListingPurchaseResponse(); fault.value(data); rehashPurchaseOrder(data['orders'][0]);
+      expect(await projectionGateway(Transport()..data = data).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: data['purchaseId']), isNull);
+    });
+  }
   Map<String, dynamic> completionResponse({String role = 'buyer', bool supplied = true}) {
     final original = operationalResponse(role: role);
     return {for (final key in const ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'viewerUserId',
@@ -153,6 +185,38 @@ void main() {
     expect(await gateway.readCompletion(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: operationalReference()), isNull);
     expect(wire.calls, 1);
   });
+  if (Platform.environment['LF_LISTING_PROJECTION_LOG'] case final path?) {
+    test('LF-LISTING actual local producer crosses both original readers and operational decoder', () async {
+      const marker = 'LF_LISTING_PROJECTION=';
+      final rows = File(path).readAsLinesSync().where((line) => line.contains(marker)).toList();
+      expect(rows, hasLength(2));
+      for (final row in rows) {
+        final payload = (jsonDecode(row.substring(row.indexOf(marker) + marker.length)) as Map).cast<String, dynamic>();
+        for (final role in WorkspaceOrderIdentityRole.values) {
+          final data = (payload[role.name] as Map).cast<String, dynamic>();
+          final firstOrder = data['orders'][0];
+          final result = await projectionGateway(Transport()..data = data, account: data['viewerUserId']).readPurchaseProjection(
+            role: role, realm: 'evaluation', purchaseId: data['purchaseId'],
+            storeId: role == WorkspaceOrderIdentityRole.seller ? firstOrder['storeId'] : null,
+            orderId: role == WorkspaceOrderIdentityRole.seller ? firstOrder['orderId'] : null);
+          expect(result, isNotNull);
+          for (final order in result!.orders) {
+            final raw = (data['orders'] as List).singleWhere((r) => r['orderId'] == order.orderId);
+            expect(order.factsVersion, 6);
+            expect(order.lines.map((line) => line.toJson()).toList(), raw['original']['lines']);
+          }
+        }
+        final data = (payload['operational'] as Map).cast<String, dynamic>();
+        final ref = WorkspacePurchaseReference(purchaseId: data['purchaseId'], storeId: data['storeId'],
+          orderId: data['orderId'], sourceRevision: data['sourceRevision'], originalFingerprint: data['originalFingerprint']);
+        final result = await AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(Transport()..data = data,
+          account: data['viewerUserId'])).read(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: ref);
+        expect(result, isNotNull);
+        expect(result!.original.factsVersion, 6);
+        expect(result.original.lines.map((line) => line.toJson()).toList(), data['original']['lines']);
+      }
+    });
+  }
   if (Platform.environment['LF_COMPLETION_PROJECTION_LOG'] case final path?) {
     test('LF-COMPLETE actual local completion producer crosses strict Dart readback for both roles and fulfilments', () async {
       const marker = 'LF_COMPLETION_PROJECTION=';
@@ -1259,6 +1323,17 @@ Map<String, dynamic> purchaseResponse({String role = 'buyer'}) {
       },
     ],
   };
+}
+
+Map<String, dynamic> publicListingPurchaseResponse({String role = 'buyer', bool allNull = false}) {
+  final data = scheduledPurchaseResponse(role: role)..['schemaVersion'] = 6;
+  final order = data['orders'][0] as Map<String, dynamic>;
+  order['factsVersion'] = 6;
+  for (final line in order['original']['lines']) {
+    line['publicListing'] = allNull ? null : jsonDecode(jsonEncode(line['scheduledFulfilment']['listing']));
+  }
+  rehashPurchaseOrder(order);
+  return data;
 }
 
 Map<String, dynamic> scheduledPurchaseResponse({String role = 'buyer', bool selected = true}) {

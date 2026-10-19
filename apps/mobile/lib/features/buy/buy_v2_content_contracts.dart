@@ -2118,6 +2118,7 @@ class BuyV2RatingTarget {
     this.version = 0,
     this.rating,
     this.comment = '',
+    this.purchasedListing,
   });
   final String id, ownerScope, orderId, orderLineId, storeId, productId;
   final String purchaseLabel;
@@ -2130,6 +2131,11 @@ class BuyV2RatingTarget {
   final int version;
   final int? rating;
   final String comment;
+  /// Optional on legacy providers. New purchased targets retain the complete
+  /// frozen listing; a stable public ID alone does not identify its pack/version.
+  final BuyV2PublicListingIdentity? purchasedListing;
+  bool matchesProduct(BuyV2Product product) => productId == product.id && storeId == product.storeId &&
+    (purchasedListing == null || purchasedListing == product.publicListingIdentity && purchasedListing!.matches(product));
 
   bool get valid =>
       [
@@ -2161,6 +2167,8 @@ class BuyV2RatingTarget {
                     e.value == e.value.trim(),
               ))) &&
       version >= 0 &&
+      (purchasedListing == null || kind != BuyV2RatingKind.purchase && purchasedListing!.valid &&
+        purchasedListing!.listingId == productId && purchasedListing!.storeId == storeId) &&
       comment.characters.length <= 8000 &&
       (rating == null || (rating! >= 1 && rating! <= 5)) &&
       ((reviewId == null && rating == null && version == 0) ||

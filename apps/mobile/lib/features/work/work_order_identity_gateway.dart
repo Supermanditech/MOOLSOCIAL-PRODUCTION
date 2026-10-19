@@ -326,7 +326,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         'state',
         'orders',
       ]);
-      if (data['schemaVersion'] is! int || !const [2, 3, 4, 5].contains(data['schemaVersion']) ||
+      if (data['schemaVersion'] is! int || !const [2, 3, 4, 5, 6].contains(data['schemaVersion']) ||
           data['realm'] != realm ||
           data['authNamespace'] != 'firebase-default' ||
           data['viewerRole'] != role.name ||
@@ -693,7 +693,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
   ) {
     final source = _map(value);
     final enriched = source.containsKey('originalFactsVersion');
-    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4, 5].contains(source['originalFactsVersion']))) {
+    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4, 5, 6].contains(source['originalFactsVersion']))) {
       throw const FormatException('Unsupported original facts.');
     }
     final data = _exactMap(source, [
@@ -1056,7 +1056,8 @@ class WorkspacePurchaseOrder {
   final List<WorkspacePurchasedSkuLine> lines;
   final Map<String, int> totals;
   final WorkspaceOriginalBenefitAttribution? benefitAttribution;
-  int get factsVersion => lines.any((line) => line.hasScheduledFulfilmentSnapshot) ? 5 :
+  int get factsVersion => lines.any((line) => line.hasPublicListingSnapshot) ? 6 :
+    lines.any((line) => line.hasScheduledFulfilmentSnapshot) ? 5 :
     lines.any((line) => line.variant != null) ? 4 : benefitAttribution == null ? 2 : 3;
 }
 
@@ -1104,6 +1105,8 @@ class WorkspacePurchasedSkuLine {
     this.variant,
     this.hasScheduledFulfilmentSnapshot = false,
     this.scheduledFulfilment,
+    this.hasPublicListingSnapshot = false,
+    this.publicListing,
   });
   final String lineId,
       skuId,
@@ -1117,6 +1120,10 @@ class WorkspacePurchasedSkuLine {
   /// Presence is retained even for an explicit null; legacy omission is unknown.
   final bool hasScheduledFulfilmentSnapshot;
   final BuyV2ScheduledFulfilment? scheduledFulfilment;
+  /// Explicit null is retained in facts6. Never infer from desired scheduling
+  /// or today’s catalogue; this is historical identity, not permission to buy.
+  final bool hasPublicListingSnapshot;
+  final BuyV2PublicListingIdentity? publicListing;
   final int quantityMilli, unitPriceMinor, lineTotalMinor;
   String get quantityLabel {
     final fraction = quantityMilli % 1000;
@@ -1138,6 +1145,7 @@ class WorkspacePurchasedSkuLine {
     'lineTotalMinor': lineTotalMinor,
     'variant': ?variant,
     if (hasScheduledFulfilmentSnapshot) 'scheduledFulfilment': scheduledFulfilment?.toJson(),
+    if (hasPublicListingSnapshot) 'publicListing': publicListing?.toJson(),
   };
 }
 
@@ -1242,7 +1250,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     'originalFingerprint',
   ]);
   final version = data['factsVersion'];
-  if (version is! int || !const [2, 3, 4, 5].contains(version) ||
+  if (version is! int || !const [2, 3, 4, 5, 6].contains(version) ||
       !_id(data['storeId']) ||
       !_id(data['orderId'])) {
     throw const FormatException('Unsupported order reference.');
@@ -1262,19 +1270,30 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
   }
   final lines = <WorkspacePurchasedSkuLine>[];
   for (final raw in rawLines) {
-    final l = _exactMap(raw, [..._purchaseLineKeys, if (version >= 4) 'variant', if (version == 5) 'scheduledFulfilment']);
+    final l = _exactMap(raw, [..._purchaseLineKeys, if (version >= 4) 'variant', if (version >= 5) 'scheduledFulfilment',
+      if (version == 6) 'publicListing']);
     if (version >= 4 && (l['variant'] is! String ||
         (l['variant'] as String).trim() != l['variant'] ||
         (l['variant'] as String).length > 240 ||
         RegExp(r'[\u0000-\u0008\u000b\u000c\u000e-\u001f]').hasMatch(l['variant'] as String))) {
       throw const FormatException('Invalid original variant.');
     }
-    final scheduled = version == 5 && l['scheduledFulfilment'] != null
+    final scheduled = version >= 5 && l['scheduledFulfilment'] != null
       ? BuyV2ScheduledFulfilment.fromJson(l['scheduledFulfilment']) : null;
     if (scheduled != null && (scheduled.listing.realm != realm || scheduled.listing.storeId != data['storeId'] ||
         scheduled.listing.skuId != l['skuId'] || scheduled.listing.canonicalProductId != l['canonicalProductId'] ||
         scheduled.listing.verifiedPackId != l['verifiedPackId'])) {
       throw const FormatException('Original Scheduled selection conflicts with its purchased line.');
+    }
+    BuyV2PublicListingIdentity? listing;
+    if (version == 6 && l['publicListing'] != null) {
+      listing = BuyV2PublicListingIdentity.fromJson(l['publicListing']);
+      if (listing == null || listing.realm != realm || listing.storeId != data['storeId'] ||
+          listing.skuId != l['skuId'] || listing.canonicalProductId != l['canonicalProductId'] || listing.verifiedPackId != l['verifiedPackId'] ||
+          listing.listingId != 'listing-${sha256.convert(utf8.encode(jsonEncode([1, realm, data['storeId'], l['skuId'], listing.channel.name])))}' ||
+          scheduled != null && listing != scheduled.listing) {
+        throw const FormatException('Original public listing conflicts with its purchased line.');
+      }
     }
     if ([
           'lineId',
@@ -1317,8 +1336,10 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
         unitPriceMinor: l['unitPriceMinor'] as int,
         lineTotalMinor: l['lineTotalMinor'] as int,
         variant: version >= 4 ? l['variant'] as String : null,
-        hasScheduledFulfilmentSnapshot: version == 5,
+        hasScheduledFulfilmentSnapshot: version >= 5,
         scheduledFulfilment: scheduled,
+        hasPublicListingSnapshot: version == 6,
+        publicListing: listing,
       ),
     );
   }
