@@ -349,7 +349,8 @@ class WorkspacePublicStockResult {
   bool? get available => toJson()['stock']?['available'] as bool?;
   bool? get quantityAvailable => toJson()['stock']?['quantityAvailable'] as bool?;
   DateTime? get validUntil => toJson()['stock'] == null ? null : _stockTime(toJson()['stock']['validUntil']);
-  bool freshAt(DateTime now) => state == 'reported' && validUntil!.isAfter(now.toUtc());
+  bool freshAt(DateTime now) => state == 'reported' && validUntil!.isAfter(now.toUtc()) &&
+    !_stockTime(toJson()['observedAt']).isAfter(now.toUtc());
   static WorkspacePublicStockResult decode(Object? raw, WorkspacePublicStockQuery query, DateTime now) {
     final r = _map(raw); _keys(r, ['schemaVersion', 'stockSnapshotVersion', 'realm', 'storeId', 'binding', 'state',
       'observedAt', 'requestedPacks', 'stock', 'orderingAvailable', 'reservationConfirmed']);
@@ -379,6 +380,133 @@ abstract interface class WorkspaceStoreStockPublicGateway {
   String get realm;
   bool get stockSnapshotsSupported;
   Future<WorkspacePublicStockResult> readPublicStoreStock(WorkspacePublicStockQuery query, {required bool Function() current});
+}
+
+/// Session-owned, explicit quantity reads. Synchronous getters never dispatch;
+/// source expiry and Stock expiry are independent of delivery/quote authority.
+class WorkspacePublicStockReader extends ChangeNotifier {
+  WorkspacePublicStockReader({required this.gateway, required this.displayed, required this.current, DateTime Function()? now})
+    : now = now ?? DateTime.now;
+  final WorkspaceStoreStockPublicGateway gateway;
+  final WorkspaceCatalogueContentResult? Function(BuyV2Product product) displayed;
+  final bool Function() current;
+  final DateTime Function() now;
+  final _results = <String, WorkspacePublicStockResult>{};
+  final _tokens = <String, Object>{};
+  final _loads = <String, ({String key, Object token, bool Function() current, Future<bool> result})>{};
+  final _expiry = <String, Timer>{};
+  final _highWater = <String, ({int revision, String source})>{};
+  final _bindingEpoch = <String, int>{};
+  final _waiting = <Completer<void>>[];
+  int _runningReads = 0;
+  void _drain() {
+    while (_runningReads < 3 && _waiting.isNotEmpty) {
+      _runningReads++; _waiting.removeAt(0).complete();
+    }
+  }
+  Future<void> _acquire() { final turn = Completer<void>(); _waiting.add(turn); _drain(); return turn.future; }
+  Future<WorkspacePublicStockResult> _read(WorkspacePublicStockQuery query, bool Function() valid) async {
+    await _acquire();
+    try {
+      if (!valid()) throw const FormatException();
+      return await gateway.readPublicStoreStock(query, current: valid);
+    } finally { _runningReads--; _drain(); }
+  }
+  bool _closed = false;
+  bool get active => !_closed && gateway.stockSnapshotsSupported && current();
+  WorkspacePublicStockQuery? _query(BuyV2Product product, int packs) {
+    try {
+      if (!active) return null;
+      final content = displayed(product), clock = now().toUtc(), identity = product.publicListingIdentity;
+      if (content == null || content.content.state != BuyV2ProductContentState.ready ||
+          content.content.productId != product.id || content.content.observedAt == null ||
+          content.content.observedAt!.isAfter(clock) || content.validUntil?.isAfter(clock) != true ||
+          identity == null || identity.realm != gateway.realm || !identity.matches(product)) { return null; }
+      return WorkspacePublicStockQuery.fromEntry(WorkspacePublicCatalogueEntry(product: product, readback: content), packs);
+    } catch (_) { return null; }
+  }
+  String? requestIdentity(BuyV2Product product, int packs) => _query(product, packs)?.identity;
+  WorkspacePublicStockResult? snapshotFor(BuyV2Product product, int packs) {
+    final query = _query(product, packs), value = _results[product.id];
+    return query != null && value?.query.identity == query.identity && value!.freshAt(now()) ? value : null;
+  }
+  String _bindingKey(WorkspacePublicStockQuery query) => _catalogueHash([query.realm, query.storeId, query.binding]);
+  void _dropBinding(WorkspacePublicStockQuery query, {bool retirePending = false}) {
+    final binding = _bindingKey(query);
+    if (retirePending) { _bindingEpoch[binding] = (_bindingEpoch[binding] ?? 0) + 1; }
+    for (final id in _results.keys.where((id) => _bindingKey(_results[id]!.query) == binding).toList()) {
+      _results.remove(id); _expiry.remove(id)?.cancel();
+    }
+  }
+  Future<bool> refresh(BuyV2Product product, int packs, {bool force = false, bool Function()? requestCurrent}) {
+    final query = _query(product, packs);
+    if (query == null || requestCurrent?.call() == false) return Future.value(false);
+    final previous = _loads[product.id];
+    if (previous?.key == query.identity && previous!.current()) return previous.result;
+    if (!force && snapshotFor(product, packs) != null) return Future.value(true);
+    final token = Object(); _tokens[product.id] = token; var reading = true;
+    final binding = _bindingKey(query), epoch = _bindingEpoch[_bindingKey(query)] ?? 0;
+    bool valid() => reading && active && identical(_tokens[product.id], token) && (requestCurrent?.call() ?? true) &&
+      (_bindingEpoch[binding] ?? 0) == epoch &&
+      _query(product, packs)?.identity == query.identity;
+    // Refresh must not temporarily restore eligibility beneath a fresh shortage.
+    final retained = snapshotFor(product, packs);
+    if (retained?.available != false && retained?.quantityAvailable != false) {
+      _results.remove(product.id); _expiry.remove(product.id)?.cancel();
+    }
+    final operation = () async {
+      // Install the original flight before any callback can observe completion.
+      await Future<void>.value();
+      try {
+        if (!valid()) return false;
+        // A caller deadline does not release a still-running physical read.
+        final value = await _read(query, valid).timeout(const Duration(seconds: 25));
+        if (!valid()) return false;
+        final verified = WorkspacePublicStockResult.decode(value.toJson(), query, now());
+        if (verified.state != 'reported') { _dropBinding(query, retirePending: true); return false; }
+        final body = verified.toJson()['stock'] as Map<String, dynamic>;
+        final revision = body['reportRevision'] as int, source = _catalogueHash(Map<String, dynamic>.of(body)..remove('quantityAvailable'));
+        final key = _bindingKey(query), previousHead = _highWater[key];
+        if (previousHead != null && (revision < previousHead.revision || revision == previousHead.revision && source != previousHead.source)) {
+          _dropBinding(query, retirePending: true); return false;
+        }
+        if (previousHead == null || revision > previousHead.revision) _dropBinding(query);
+        _highWater[key] = (revision: revision, source: source);
+        final contentExpiry = displayed(product)!.validUntil!;
+        final until = verified.validUntil!.isBefore(contentExpiry) ? verified.validUntil! : contentExpiry;
+        final remaining = until.difference(now().toUtc());
+        if (remaining <= Duration.zero) return false;
+        _results[product.id] = verified;
+        _expiry[product.id] = Timer(remaining, () {
+          if (_closed || !identical(_results[product.id], verified)) return;
+          _results.remove(product.id); _expiry.remove(product.id);
+          if (active) notifyListeners();
+        });
+        return true;
+      } catch (_) {
+        if (valid()) _dropBinding(query, retirePending: true);
+        return false;
+      } finally {
+        reading = false;
+        if (identical(_loads[product.id]?.token, token)) {
+          _loads.remove(product.id);
+          if (active) notifyListeners();
+        }
+      }
+    }();
+    _loads[product.id] = (key: query.identity, token: token, current: valid, result: operation);
+    // Requests are invoked by explicit actions/postframe observers, not build.
+    if (active) notifyListeners();
+    return operation;
+  }
+  @override void dispose() {
+    _closed = true;
+    for (final turn in _waiting) { turn.completeError(const FormatException()); }
+    _waiting.clear();
+    for (final timer in _expiry.values) { timer.cancel(); }
+    _expiry.clear(); _tokens.clear(); _loads.clear(); _results.clear(); _highWater.clear(); _bindingEpoch.clear();
+    super.dispose();
+  }
 }
 
 /// Owner-authored saved facts, not a reviewed mirror, Stock upload or publication.

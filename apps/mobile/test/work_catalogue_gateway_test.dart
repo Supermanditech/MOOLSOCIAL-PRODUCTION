@@ -123,6 +123,11 @@ class _HostMinorPlacement extends _HostPlacement implements BuyV2MinorOrderPlace
   }
 }
 class _HostMinorGroupedPlacement extends _HostMinorPlacement implements BuyV2MinorGroupedOrderPlacementAdapter {
+  final reconciled = <({String key, String reference})>[];
+  @override
+  Future<BuyV2OrderPlacementResult> reconcileOrder({required String idempotencyKey, required String paymentReference}) async {
+    reconciliationCalls++; reconciled.add((key: idempotencyKey, reference: paymentReference)); return reconciliation;
+  }
   @override
   Future<BuyV2OrderPlacementResult> placePaymentGroupMinor(BuyV2OrderPlacementRequest request) async {
     minorGroups.add(request); return record(request);
@@ -318,14 +323,16 @@ class _ExactMoneyHostCatalogue implements BuyV2CataloguePageSource {
   Future<List<BuyV2Product>> resolveProducts(Set<String> ids) async => rows.where((p) => ids.contains(p.id)).toList();
 }
 final class _ExactMoneyHostPreferences implements SharedPreferencesAsync {
-  _ExactMoneyHostPreferences({this.beforeSet});
+  _ExactMoneyHostPreferences({this.beforeSet, this.beforeWrite});
   final values = <String, String>{};
   final void Function(String key, String value)? beforeSet;
+  final Future<void> Function(String key, String value)? beforeWrite;
   @override
   Future<String?> getString(String key) async => values[key];
   @override
   Future<void> setString(String key, String value) async {
     beforeSet?.call(key, value);
+    await beforeWrite?.call(key, value);
     values[key] = value;
   }
   @override
@@ -1276,6 +1283,8 @@ void main() {
     final reply = publicStockReply(query), transport = Transport(reply), credentials = Credentials();
     final result = await stockGateway(transport, credentials: credentials).readPublicStoreStock(query, current: () => true);
     expect(result.quantityAvailable, isTrue); expect(result.freshAt(at), isTrue);
+    expect(result.freshAt(at.subtract(const Duration(milliseconds: 1))), isFalse,
+      reason: 'A cached observation cannot remain current after the clock moves before it.');
     expect(result.freshAt(at.add(const Duration(minutes: 5))), isFalse);
     expect(credentials.modes.last, SocialAppCheckTokenMode.standard); expect(result.toJson()['orderingAvailable'], false);
     expect(() => WorkspacePublicStockResult.decode(reply, query, at.add(const Duration(minutes: 5))), throwsFormatException);
@@ -4540,6 +4549,158 @@ void main() {
     {BuyV2OfferClass channel = BuyV2OfferClass.retail}) =>
       WorkspacePublicCatalogueEntry.fromResponse(data, storeId: 'store-one',
         realm: 'production', channel: channel, now: at);
+  WorkspacePublicStockQuery stockPublicQuery(Map<String, Object?> body) => WorkspacePublicStockQuery(realm: 'production',
+    storeId: body['storeId'] as String, binding: Map<String, dynamic>.from(body['binding'] as Map), requestedPacks: body['requestedPacks'] as int);
+  AuthenticatedWorkspaceCatalogueGateway publicStockApi(OwnerTransport transport, {DateTime Function()? clock, bool enabled = true, bool discovery = false}) =>
+    AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, realm: 'production', stockSnapshotsSupported: enabled, now: clock ?? () => at,
+      productFactsReadbackSupported: discovery, unbrandedProduceReadbackSupported: discovery, storeClassificationReadbackSupported: discovery);
+  SocialContentResponse stockPublicResponse(WorkspacePublicStockQuery query, {int revision = 1, bool unknown = false,
+    bool available = true, bool? quantityAvailable = true}) {
+    final data = publicStockReply(query, unknown: unknown);
+    if (!unknown) { (data['stock'] as Map<String, dynamic>).addAll({'reportRevision': revision, 'available': available, 'quantityAvailable': quantityAvailable}); }
+    return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+  }
+  test('LF11 public Stock cache getters never read and identical explicit queries coalesce', () async {
+    final entry = factoryEntry(publicPage()), response = Completer<SocialContentResponse>();
+    final transport = OwnerTransport((_) => response.future);
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(transport), displayed: (_) => entry.readback, current: () => true, now: () => at);
+    addTearDown(reader.dispose);
+    for (var i = 0; i < 40; i++) {
+      expect(reader.requestIdentity(entry.product, 1), isNotNull); expect(reader.snapshotFor(entry.product, 1), isNull);
+    }
+    expect(transport.calls, 0);
+    final first = reader.refresh(entry.product, 1), same = reader.refresh(entry.product, 1);
+    expect(identical(first, same), true); await Future<void>.delayed(Duration.zero); expect(transport.calls, 1);
+    response.complete(stockPublicResponse(WorkspacePublicStockQuery.fromEntry(entry, 1)));
+    expect(await first, true); expect(reader.snapshotFor(entry.product, 1)!.quantityAvailable, true);
+    expect(await reader.refresh(entry.product, 1), true); expect(transport.calls, 1);
+  });
+  test('LF11 public Stock cache drops late quantity and revision replies', () async {
+    final entry = factoryEntry(publicPage()), held = Completer<SocialContentResponse>();
+    final transport = OwnerTransport((body) async {
+      final query = stockPublicQuery(body);
+      return query.requestedPacks == 1 ? held.future : stockPublicResponse(query, quantityAvailable: false);
+    });
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(transport), displayed: (_) => entry.readback, current: () => true, now: () => at);
+    addTearDown(reader.dispose);
+    final old = reader.refresh(entry.product, 1); await Future<void>.delayed(Duration.zero);
+    expect(await reader.refresh(entry.product, 8), true);
+    held.complete(stockPublicResponse(WorkspacePublicStockQuery.fromEntry(entry, 1)));
+    expect(await old, false); expect(reader.snapshotFor(entry.product, 1), isNull);
+    expect(reader.snapshotFor(entry.product, 8)!.quantityAvailable, false);
+  });
+  test('LF11 public Stock cache fences changed binding, unavailable readback and retired lifetime', () async {
+    final entry = factoryEntry(publicPage()), held = Completer<SocialContentResponse>(); var displayed = entry.readback;
+    final transport = OwnerTransport((_) => held.future);
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(transport), displayed: (_) => displayed, current: () => true, now: () => at);
+    final original = reader.refresh(entry.product, 1); await Future<void>.delayed(Duration.zero);
+    displayed = WorkspaceCatalogueContentResult(content: entry.readback.content, skuRevision: entry.readback.skuRevision! + 1,
+      validUntil: entry.readback.validUntil);
+    held.complete(stockPublicResponse(WorkspacePublicStockQuery.fromEntry(entry, 1)));
+    expect(await original, false); expect(reader.snapshotFor(entry.product, 1), isNull); reader.dispose();
+    final blocked = WorkspacePublicStockReader(gateway: publicStockApi(transport), displayed: (_) => null, current: () => true, now: () => at);
+    expect(await blocked.refresh(entry.product, 1), false); blocked.dispose();
+    final pending = Completer<SocialContentResponse>(), retiredTransport = OwnerTransport((_) => pending.future);
+    final retired = WorkspacePublicStockReader(gateway: publicStockApi(retiredTransport), displayed: (_) => entry.readback, current: () => true, now: () => at);
+    final late = retired.refresh(entry.product, 1); await Future<void>.delayed(Duration.zero); retired.dispose();
+    pending.complete(stockPublicResponse(WorkspacePublicStockQuery.fromEntry(entry, 1)));
+    expect(await late, false); expect(retired.snapshotFor(entry.product, 1), isNull);
+  });
+  test('LF11 public Stock cache fresh-zero and availability-only remain distinct; unknown/failure clears positives', () async {
+    final entry = factoryEntry(publicPage()); var mode = 'positive';
+    final transport = OwnerTransport((body) async {
+      if (mode == 'failure') throw StateError('isolated unavailable source');
+      return stockPublicResponse(stockPublicQuery(body), unknown: mode == 'unknown', available: mode != 'zero',
+        quantityAvailable: mode == 'zero' ? false : mode == 'uncounted' ? null : true);
+    });
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(transport), displayed: (_) => entry.readback, current: () => true, now: () => at);
+    addTearDown(reader.dispose);
+    expect(await reader.refresh(entry.product, 1), true);
+    mode = 'failure'; expect(await reader.refresh(entry.product, 1, force: true), false); expect(reader.snapshotFor(entry.product, 1), isNull);
+    mode = 'zero'; expect(await reader.refresh(entry.product, 1), false, reason: 'Same revision cannot change immutable source facts.');
+    final zero = WorkspacePublicStockReader(gateway: publicStockApi(transport), displayed: (_) => entry.readback, current: () => true, now: () => at);
+    addTearDown(zero.dispose); expect(await zero.refresh(entry.product, 1), true); expect(zero.snapshotFor(entry.product, 1)!.available, false);
+    mode = 'uncounted'; final uncounted = WorkspacePublicStockReader(gateway: publicStockApi(transport), displayed: (_) => entry.readback, current: () => true, now: () => at);
+    addTearDown(uncounted.dispose); expect(await uncounted.refresh(entry.product, 1), true); expect(uncounted.snapshotFor(entry.product, 1)!.quantityAvailable, isNull);
+    mode = 'unknown'; expect(await uncounted.refresh(entry.product, 1, force: true), false); expect(uncounted.snapshotFor(entry.product, 1), isNull);
+  });
+  test('LF11 public Stock cache high-water spans quantities and expiry notifies without interaction', () async {
+    final entry = factoryEntry(publicPage()); var revision = 2, clock = at.add(const Duration(minutes: 4, seconds: 59));
+    final transport = OwnerTransport((body) async => stockPublicResponse(stockPublicQuery(body), revision: revision));
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(transport, clock: () => clock), displayed: (_) => entry.readback, current: () => true, now: () => clock);
+    addTearDown(reader.dispose); var changes = 0; reader.addListener(() => changes++);
+    expect(await reader.refresh(entry.product, 1), true); revision = 1;
+    expect(await reader.refresh(entry.product, 2), false); expect(reader.snapshotFor(entry.product, 1), isNull);
+    revision = 3; expect(await reader.refresh(entry.product, 1), true); final before = changes;
+    clock = at.add(const Duration(minutes: 5)); await Future<void>.delayed(const Duration(milliseconds: 1050));
+    expect(changes, greaterThan(before)); expect(reader.snapshotFor(entry.product, 1), isNull);
+    expect(reader.requestIdentity(entry.product.copyWith(storeId: 'other-store'), 1), isNull);
+  });
+  test('LF11 public Stock refresh retains fresh shortage while the original response is pending', () async {
+    final entry = factoryEntry(publicPage()), pending = Completer<SocialContentResponse>(); var hold = false;
+    final transport = OwnerTransport((body) async => hold ? pending.future : stockPublicResponse(stockPublicQuery(body), quantityAvailable: false));
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(transport), displayed: (_) => entry.readback, current: () => true, now: () => at);
+    addTearDown(reader.dispose);
+    expect(await reader.refresh(entry.product, 1), true); hold = true;
+    final refreshing = reader.refresh(entry.product, 1, force: true); await Future<void>.delayed(Duration.zero);
+    expect(reader.snapshotFor(entry.product, 1)!.quantityAvailable, false);
+    pending.complete(stockPublicResponse(WorkspacePublicStockQuery.fromEntry(entry, 1), revision: 2));
+    expect(await refreshing, true); expect(reader.snapshotFor(entry.product, 1)!.quantityAvailable, true);
+  });
+  test('LF11 public Stock unknown retires an older sibling listing response for the same SKU', () async {
+    final page = publicPage(trade: true), retail = factoryEntry(page), trade = factoryEntry(page, channel: BuyV2OfferClass.wholesale);
+    final old = Completer<SocialContentResponse>();
+    final transport = OwnerTransport((body) async => (body['requestedPacks'] as int) == 1 ? old.future : stockPublicResponse(stockPublicQuery(body), unknown: true));
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(transport),
+      displayed: (p) => p.id == retail.product.id ? retail.readback : trade.readback, current: () => true, now: () => at);
+    addTearDown(reader.dispose);
+    final pending = reader.refresh(retail.product, 1); await Future<void>.delayed(Duration.zero);
+    expect(await reader.refresh(trade.product, trade.product.minimumOrder), false);
+    old.complete(stockPublicResponse(WorkspacePublicStockQuery.fromEntry(retail, 1)));
+    expect(await pending, false); expect(reader.snapshotFor(retail.product, 1), isNull);
+    expect(await reader.refresh(retail.product, 2), false);
+  });
+  test('LF11 public Stock physical read pool is bounded and never dispatches retired queued quantities', () async {
+    final entry = factoryEntry(publicPage()), held = <int, Completer<SocialContentResponse>>{};
+    var running = 0, peak = 0;
+    final transport = OwnerTransport((body) async {
+      final packs = body['requestedPacks'] as int; running++; if (running > peak) peak = running;
+      final response = Completer<SocialContentResponse>(); held[packs] = response;
+      try { return await response.future; } finally { running--; }
+    });
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(transport), displayed: (_) => entry.readback, current: () => true, now: () => at);
+    final requests = <Future<bool>>[];
+    for (var packs = 1; packs <= 8; packs++) { requests.add(reader.refresh(entry.product, packs)); await Future<void>.delayed(Duration.zero); }
+    expect(held.keys, [1, 2, 3]); expect(peak, 3);
+    held[1]!.complete(stockPublicResponse(WorkspacePublicStockQuery.fromEntry(entry, 1))); await Future<void>.delayed(Duration.zero);
+    expect(held.keys, [1, 2, 3, 8]); expect(peak, 3);
+    for (final packs in [2, 3, 8]) { held[packs]!.complete(stockPublicResponse(WorkspacePublicStockQuery.fromEntry(entry, packs))); }
+    expect((await Future.wait(requests)).where((v) => v), [true]); reader.dispose();
+    final blocked = Completer<SocialContentResponse>(), disposedApi = OwnerTransport((_) => blocked.future);
+    final disposed = WorkspacePublicStockReader(gateway: publicStockApi(disposedApi), displayed: (_) => entry.readback, current: () => true, now: () => at);
+    final closing = <Future<bool>>[];
+    for (var packs = 1; packs <= 5; packs++) { closing.add(disposed.refresh(entry.product, packs)); await Future<void>.delayed(Duration.zero); }
+    disposed.dispose(); blocked.complete(stockPublicResponse(WorkspacePublicStockQuery.fromEntry(entry, 1)));
+    expect(await Future.wait(closing), everyElement(false)); expect(disposedApi.calls, 3);
+  });
+  for (final contradiction in [false, true]) {
+    test('LF11 public Stock rejected head retires sibling flight contradiction=$contradiction', () async {
+      final data = publicPage(trade: true), retail = factoryEntry(data), trade = factoryEntry(data, channel: BuyV2OfferClass.wholesale);
+      final held = Completer<SocialContentResponse>(); var first = true;
+      final reader = WorkspacePublicStockReader(gateway: publicStockApi(OwnerTransport((body) async {
+        final query = stockPublicQuery(body);
+        if (first) { first = false; return stockPublicResponse(query, revision: 2); }
+        if (query.requestedPacks == 1) return held.future;
+        return stockPublicResponse(query, revision: contradiction ? 2 : 1, available: !contradiction, quantityAvailable: !contradiction);
+      })), displayed: (p) => p.id == retail.product.id ? retail.readback : trade.readback, current: () => true, now: () => at);
+      addTearDown(reader.dispose); expect(await reader.refresh(retail.product, 1), true);
+      final pending = reader.refresh(retail.product, 1, force: true); await Future<void>.delayed(Duration.zero);
+      expect(await reader.refresh(trade.product, trade.product.minimumOrder), false);
+      held.complete(stockPublicResponse(WorkspacePublicStockQuery.fromEntry(retail, 1), revision: 2));
+      expect(await pending, false); expect(reader.snapshotFor(retail.product, 1), isNull);
+    });
+  }
   test('LF-FACTORY exact source facts and empty tiers retain real fixed-price freshness', () {
     final entry = factoryEntry(publicPage()), value = entry.product, pack = value.packTerms!;
     expect(value.id, publicIdentity().listingId); expect(value.sourceSkuId, 'sku-one');
@@ -5817,13 +5978,14 @@ void main() {
   Future<BuyV2Session> benefitSession(BuyV2CartBenefitsAdapter adapter, List<BuyV2Product> values,
     {BuyV2ProductFactsAdapter? facts, BuyV2CheckoutQuoteAdapter? quoteAdapter,
       BuyV2CommercialPaymentTermsAdapter? termsAdapter, BuyV2TipPolicy tipPolicy = const BuyV2DisabledTipPolicy(),
-      BuyV2CustomerStateStore? customerStateStore, BuyV2CommerceAdapter? commerceAdapter, bool reviewDataEnabled = true}) async {
+      BuyV2CustomerStateStore? customerStateStore, BuyV2CommerceAdapter? commerceAdapter, bool reviewDataEnabled = true,
+      WorkspacePublicStockReader? stockReader, bool disposeAtTearDown = true}) async {
     final core = BuySession(), source = _ExactMoneyHostCatalogue()..rows.addAll(values);
     final session = BuyV2Session(core: core, cataloguePageSource: source, reviewDataEnabled: reviewDataEnabled, catalogueNow: () => at,
       productFactsAdapter: facts ?? const BuyV2CatalogueProductFactsAdapter(), cartBenefitsAdapter: adapter,
       checkoutQuoteAdapter: quoteAdapter, commercialPaymentTermsAdapter: termsAdapter, tipPolicy: tipPolicy,
-      customerStateStore: customerStateStore, commerceAdapter: commerceAdapter);
-    addTearDown(core.dispose); addTearDown(session.dispose);
+      customerStateStore: customerStateStore, commerceAdapter: commerceAdapter, storeStockReader: stockReader);
+    addTearDown(core.dispose); if (disposeAtTearDown) addTearDown(session.dispose);
     if (customerStateStore != null) await session.restoreCustomerState(restoreBrowsing: false);
     final pager = session.acquireCatalogueProducts('host-paise-benefits');
     addTearDown(() => session.releaseCatalogueProducts('host-paise-benefits'));
@@ -5832,6 +5994,145 @@ void main() {
     expect(pager.page?.items.length, values.length, reason: pager.message);
     return session;
   }
+  Future<void> mountOptionalDetails(WidgetTester tester, BuyV2Session session, double scale) async {
+    tester.view.physicalSize = const Size(320, 800); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+      MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+      home: Scaffold(body: AnimatedBuilder(animation: session, builder: (context, _) => BuyV2ProductView(session: session)))));
+    await tester.pumpAndSettle();
+  }
+  Future<void> revealOptionalDetails(WidgetTester tester, BuyV2Product selected, Finder control) async {
+    await tester.scrollUntilVisible(control, 220, scrollable: find.descendant(
+      of: find.byKey(PageStorageKey('buy-product-${selected.id}')), matching: find.byType(Scrollable)).first);
+    await tester.ensureVisible(control); await tester.pumpAndSettle();
+  }
+  void enableHostStockEligibility(BuyV2Session session, BuyV2Product selected, _HostOperationalFacts adapter) {
+    adapter.reply = (p) => BuyV2ProductFactsSnapshot(productId: p.id, priceMinor: p.priceMinor,
+      deliveryPromise: 'Host confirmed delivery', partner: p.seller, orderabilityLabel: 'Available to add',
+      sourceId: 'host-stock-consumer-facts', observedAt: at, storeOperatingState: BuyV2StoreOperatingState.open,
+      eligibility: BuyV2OfferEligibility(productId: selected.id, storeId: selected.storeId!,
+        sourceRevision: 'host-stock-eligibility', customerLocationKey: session.eligibilityLocationKey,
+        observedAt: at, expiresAt: at.add(const Duration(minutes: 15)), offerClass: selected.offerClass!,
+        channelEnabled: true, storeReady: true, fleetAvailable: true, customerLocationConfirmed: true,
+        options: {BuyV2DeliveryOption.quick}));
+    expect(session.refreshProductFacts(selected.id), true);
+  }
+  test('LF11 Stock session positive is not eligibility and fresh negative preserves Cart without a replacement payment', () async {
+    final entry = factoryEntry(publicPage()); var short = false, revision = 1;
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(OwnerTransport((body) async =>
+      stockPublicResponse(stockPublicQuery(body), revision: revision, quantityAvailable: !short))),
+      displayed: (_) => entry.readback, current: () => true, now: () => at);
+    final facts = _HostOperationalFacts((p) => const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false).snapshotFor(p));
+    final session = await benefitSession(_HostMinorBenefits(), [entry.product], facts: facts, stockReader: reader, reviewDataEnabled: false);
+    expect(await session.refreshStoreStock(entry.product), true);
+    expect(session.productFactsFor(entry.product).eligibility, isNull);
+    expect(session.addProduct(entry.product.id), false);
+    enableHostStockEligibility(session, entry.product, facts);
+    expect(session.addProduct(entry.product.id), true); expect(session.setCartQuantity(entry.product.id, '8'), true);
+    short = true; revision = 2; expect(await session.refreshStoreStock(entry.product), true);
+    expect(session.storeStockFor(entry.product)!.query.requestedPacks, 8);
+    expect(session.productFactsFor(entry.product).eligibility, isNull);
+    expect(session.cartLines.single.quantity, 8); expect(session.cartLines.single.product.id, entry.product.id);
+    expect(session.storeStockLabelFor(entry.product), contains('this quantity'));
+    session.decrease(entry.product.id); expect(session.quantityFor(entry.product.id), 7);
+    expect(session.storeStockFor(entry.product), isNull, reason: 'A check for eight packs cannot label seven.');
+  });
+  for (final layout in [(scale: 1.0, landscape: false), (scale: 2.0, landscape: false), (scale: 1.0, landscape: true)]) {
+    final scale = layout.scale;
+    testWidgets('LF11 Stock visible product and Cart request exact added typed and decreased quantities at $layout', (tester) async {
+      final entry = factoryEntry(publicPage()), requests = <int>[];
+      final reader = WorkspacePublicStockReader(gateway: publicStockApi(OwnerTransport((body) async {
+        requests.add(body['requestedPacks'] as int); return stockPublicResponse(stockPublicQuery(body));
+      })), displayed: (_) => entry.readback, current: () => true, now: () => at);
+      final facts = _HostOperationalFacts((p) => const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false).snapshotFor(p));
+      final session = await benefitSession(_HostMinorBenefits(), [entry.product], facts: facts, stockReader: reader, reviewDataEnabled: false, disposeAtTearDown: false);
+      enableHostStockEligibility(session, entry.product, facts);
+      expect(requests, isEmpty); expect(session.openProduct(entry.product.id), true);
+      await mountOptionalDetails(tester, session, scale);
+      expect(requests, [1]); expect(session.storeStockLabelFor(entry.product), contains('1 pack'));
+      await revealOptionalDetails(tester, entry.product, find.byKey(ValueKey('buy-automatic-fulfilment-${entry.product.id}')));
+      expect(find.text('Stock'), findsOneWidget); expect(find.text('Store reports stock for 1 pack'), findsOneWidget);
+      expect(session.addProduct(entry.product.id), true); session.openCart();
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+        MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+        home: Scaffold(body: AnimatedBuilder(animation: session, builder: (context, _) => BuyV2CartView(session: session, onBrowseMore: () {})))));
+      await tester.pumpAndSettle(); expect(requests, [1], reason: 'Identical fresh product/Cart query is reused.');
+      if (layout.landscape) {
+        tester.view.physicalSize = const Size(800, 360); await tester.pumpAndSettle();
+        final list = find.byKey(PageStorageKey('buy-cart-${session.cartScope.name}'));
+        await tester.drag(list, const Offset(0, -1100)); await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('buy-cart-back')).hitTestable(), findsNothing);
+      }
+      expect(session.setCartQuantity(entry.product.id, '8'), true); await tester.pumpAndSettle();
+      expect(requests, [1, 8]);
+      if (!layout.landscape) {
+        expect(find.byKey(ValueKey('buy-cart-stock-${entry.product.id}')), findsOneWidget);
+        expect(find.text('Store reports stock for 8 packs'), findsOneWidget);
+      }
+      session.decrease(entry.product.id); await tester.pumpAndSettle(); expect(requests, [1, 8, 7]);
+      if (!layout.landscape) expect(find.text('Store reports stock for 7 packs'), findsOneWidget);
+      expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); session.dispose();
+    });
+  }
+  testWidgets('LF11 Stock covered product cannot admit a late reply and return reads the current source', (tester) async {
+    final entry = factoryEntry(publicPage()), first = Completer<SocialContentResponse>(); var calls = 0;
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(OwnerTransport((body) async {
+      calls++; return calls == 1 ? first.future : stockPublicResponse(stockPublicQuery(body), revision: 2);
+    })), displayed: (_) => entry.readback, current: () => true, now: () => at);
+    final session = await benefitSession(_HostMinorBenefits(), [entry.product], stockReader: reader, reviewDataEnabled: false, disposeAtTearDown: false);
+    expect(session.openProduct(entry.product.id), true); await mountOptionalDetails(tester, session, 1);
+    expect(calls, 1);
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator).first);
+    unawaited(navigator.push(MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Text('Host covering route')))));
+    await tester.pumpAndSettle(); first.complete(stockPublicResponse(WorkspacePublicStockQuery.fromEntry(entry, 1)));
+    await tester.pumpAndSettle(); expect(session.storeStockFor(entry.product), isNull); expect(calls, 1);
+    navigator.pop(); await tester.pumpAndSettle(); expect(calls, 2); expect(session.storeStockFor(entry.product), isNotNull);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); session.dispose();
+  });
+  testWidgets('LF11 Stock restored saved Cart checks its retained exact quantity without re-adding', (tester) async {
+    final entry = factoryEntry(publicPage()), preferences = _ExactMoneyHostPreferences(), quantities = <int>[];
+    final firstFacts = _HostOperationalFacts((p) => const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false).snapshotFor(p));
+    final first = await benefitSession(_HostMinorBenefits(), [entry.product], facts: firstFacts, reviewDataEnabled: false,
+      customerStateStore: BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-restored-stock'));
+    enableHostStockEligibility(first, entry.product, firstFacts); expect(first.addProduct(entry.product.id), true);
+    expect(first.setCartQuantity(entry.product.id, '8'), true); await first.retainedAccountState();
+    final saved = Map.of(preferences.values);
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(OwnerTransport((body) async {
+      quantities.add(body['requestedPacks'] as int); return stockPublicResponse(stockPublicQuery(body));
+    })), displayed: (_) => entry.readback, current: () => true, now: () => at);
+    final session = await benefitSession(_HostMinorBenefits(), [entry.product], stockReader: reader, reviewDataEnabled: false, disposeAtTearDown: false,
+      customerStateStore: BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-restored-stock'));
+    expect(session.quantityFor(entry.product.id), 8); expect(quantities, isEmpty); expect(preferences.values, saved);
+    session.openCart();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Scaffold(body: AnimatedBuilder(animation: session,
+      builder: (context, _) => BuyV2CartView(session: session, onBrowseMore: () {})))));
+    await tester.pumpAndSettle(); expect(quantities, [8]); expect(session.cartLines.single.product.id, entry.product.id);
+    expect(session.quantityFor(entry.product.id), 8); expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink()); session.dispose();
+  });
+  test('LF11 Stock actual root owns reader and retires original A B A response', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    const accountA = (environment: 'host-service', projectId: 'host-project', tenantId: null as String?, userId: 'host-a');
+    const accountB = (environment: 'host-service', projectId: 'host-project', tenantId: null as String?, userId: 'host-b');
+    BuyV2AccountPersistenceIdentity live = accountA;
+    final core = BuySession(), held = Completer<SocialContentResponse>(), started = Completer<Map<String, Object?>>();
+    final root = BuyV2RootSessions(core: core, currentIdentity: () => live, accountStoreFactory: (_, _) => _HostRetirableStateStore(),
+      catalogueSourceFactory: (_, current) => WorkspacePublicDiscoverySource(current: current, gateway: publicStockApi(discovery: true, OwnerTransport((body) async {
+        if (body['operation'] == 'readPublicStoreStockSnapshot') { started.complete(body); return held.future; }
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': discoveryData(body)}));
+      }))));
+    addTearDown(core.dispose); addTearDown(root.dispose); root.synchronize(accountRequired: true);
+    final original = root.current, source = original.cataloguePageSource as WorkspacePublicDiscoverySource;
+    final selected = (await source.loadProducts(discoveryQuery(), pageSize: 40)).items.single;
+    final originalRead = original.refreshStoreStock(selected), body = await started.future;
+    expect(original.storeStockReader, isNotNull);
+    live = accountB; root.synchronize(accountRequired: true); live = accountA; root.synchronize(accountRequired: true);
+    expect(identical(root.current.storeStockReader, original.storeStockReader), false);
+    held.complete(stockPublicResponse(stockPublicQuery(body)));
+    expect(await originalRead, false); expect(original.storeStockFor(selected), isNull);
+    expect(root.current.storeStockFor(selected), isNull);
+  });
   Future<BuyV2Session> optionalDetailsSession(BuyV2Product selected, _HostOptionalProductContent content) async {
     final core = BuySession(), catalogue = _ExactMoneyHostCatalogue()..rows.add(selected);
     final session = BuyV2Session(core: core, cataloguePageSource: catalogue, productContentAdapter: content,
@@ -5852,19 +6153,6 @@ void main() {
     facts['regulatoryNote'] = supplied ? 'Host reviewed safety directions' : null;
     (row(data)['content'] as Map)['productFacts'] = facts;
     return factoryEntry(data, channel: trade ? BuyV2OfferClass.wholesale : BuyV2OfferClass.retail).product;
-  }
-  Future<void> mountOptionalDetails(WidgetTester tester, BuyV2Session session, double scale) async {
-    tester.view.physicalSize = const Size(320, 800); tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
-      MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
-      home: Scaffold(body: AnimatedBuilder(animation: session, builder: (context, _) => BuyV2ProductView(session: session)))));
-    await tester.pumpAndSettle();
-  }
-  Future<void> revealOptionalDetails(WidgetTester tester, BuyV2Product selected, Finder control) async {
-    await tester.scrollUntilVisible(control, 220, scrollable: find.descendant(
-      of: find.byKey(PageStorageKey('buy-product-${selected.id}')), matching: find.byType(Scrollable)).first);
-    await tester.ensureVisible(control); await tester.pumpAndSettle();
   }
   for (final trade in [false, true]) {
     for (final scale in [1.0, 2.0]) {
@@ -6091,7 +6379,9 @@ void main() {
   });
   Future<({BuyV2Session session, _ExactMoneyHostPreferences preferences})> placementFixture(
     _HostPlacement adapter, {bool grouped = false, int price = 1025, int quantity = 1, int fee = 0,
-    int? mrp, bool withTerms = false, void Function(String key, String value)? beforeSet}) async {
+    int? mrp, bool withTerms = false, void Function(String key, String value)? beforeSet,
+    Future<void> Function(String key, String value)? beforeWrite,
+    WorkspacePublicCatalogueEntry? stockEntry, WorkspacePublicStockReader? stockReader}) async {
     final quote = _HostMinorQuote()..reply = ((groups, tips) async {
       final value = _hostExactQuote(groups, tips, fee: fee).quote!;
       return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready, quote: BuyV2CheckoutQuote.minor(
@@ -6101,16 +6391,58 @@ void main() {
           fulfilmentKeys: groups.map((group) => group.key).toSet(), paymentMethod: 'UPI',
           totalMinor: value.totalMinor, amountDueNowMinor: value.totalMinor)]));
     });
-    final preferences = _ExactMoneyHostPreferences(beforeSet: beforeSet);
+    final preferences = _ExactMoneyHostPreferences(beforeSet: beforeSet, beforeWrite: beforeWrite);
     final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-placement');
-    final value = product.copyWith(priceMinor: price, mrpMinor: mrp ?? 28000, deliveryPromise: 'Host-only fulfilment');
+    final value = (stockEntry?.product ?? product).copyWith(priceMinor: price, mrpMinor: mrp ?? 28000, deliveryPromise: 'Host-only fulfilment');
+    final facts = stockEntry == null ? null : _HostOperationalFacts((p) => const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false).snapshotFor(p));
     final session = await benefitSession(_HostMinorBenefits(), [value], quoteAdapter: quote,
-      customerStateStore: store, commerceAdapter: adapter, termsAdapter: !withTerms ? null :
+      customerStateStore: store, commerceAdapter: adapter, stockReader: stockReader, facts: facts, termsAdapter: !withTerms ? null :
         (_HostMinorTerms()..reply = ((groups, totals) async => _hostExactRetailTerms(groups, totals))));
+    if (facts != null) { enableHostStockEligibility(session, value, facts); }
     expect(session.addProduct(value.id), isTrue); expect(session.setCartQuantity(value.id, '$quantity'), isTrue);
     session.addAddress(frozenAddress); session.openCart(); expect(session.openCheckout(), isTrue);
     expect(await session.refreshCheckoutQuote(), isTrue);
     return (session: session, preferences: preferences);
+  }
+  for (final grouped in [false, true]) {
+    test('LF11 Stock fresh shortage during frozen save prevents new dispatch grouped=$grouped', () async {
+      final entry = factoryEntry(publicPage()), adapter = _HostMinorGroupedPlacement(); var shortage = false, intercepted = false;
+      late BuyV2Session session;
+      final reader = WorkspacePublicStockReader(gateway: publicStockApi(OwnerTransport((body) async =>
+        stockPublicResponse(stockPublicQuery(body), quantityAvailable: !shortage))), displayed: (_) => entry.readback, current: () => true, now: () => at);
+      final fixture = await placementFixture(adapter, grouped: grouped, price: entry.product.priceMinor,
+        stockEntry: entry, stockReader: reader, beforeWrite: (_, value) async {
+          final state = jsonDecode(value) as Map;
+          if (!intercepted && (state['legacyCheckoutAttempt'] != null || state['checkoutPaymentAttempt'] != null)) {
+            intercepted = true; shortage = true; expect(await session.refreshStoreStock(entry.product), true);
+          }
+        });
+      session = fixture.session;
+      expect(await session.submitOrder(), false); expect(intercepted, true);
+      expect(adapter.minorSingle, isEmpty); expect(adapter.minorGroups, isEmpty);
+      expect(session.notice, contains('Stock changed')); expect(session.cartLines.single.quantity, 1);
+      expect(session.storeStockFor(entry.product)!.quantityAvailable, false);
+    });
+    test('LF11 Stock reports never replace or forget a submitted original payment grouped=$grouped', () async {
+      final entry = factoryEntry(publicPage()), adapter = _HostMinorGroupedPlacement(); var shortage = false;
+      final reader = WorkspacePublicStockReader(gateway: publicStockApi(OwnerTransport((body) async =>
+        stockPublicResponse(stockPublicQuery(body), quantityAvailable: !shortage))), displayed: (_) => entry.readback, current: () => true, now: () => at);
+      final fixture = await placementFixture(adapter, grouped: grouped, price: entry.product.priceMinor, stockEntry: entry, stockReader: reader), session = fixture.session;
+      expect(await session.submitOrder(), false); final originals = grouped ? adapter.minorGroups : adapter.minorSingle;
+      expect(originals, hasLength(1)); final bytes = Map.of(fixture.preferences.values), before = session.cartLines.single;
+      shortage = true; expect(await session.refreshStoreStock(entry.product), true);
+      expect(session.cartChangesBlocked, true); expect(originals, hasLength(1));
+      final after = session.cartLines.single;
+      expect(after.product, same(before.product)); expect(after.quantity, before.quantity);
+      expect(after.product.priceMinor, before.product.priceMinor); expect(fixture.preferences.values, bytes);
+      final original = originals.single;
+      adapter.reconciliation = BuyV2OrderPlacementResult(outcome: BuyV2OrderPlacementOutcome.paymentUnknown,
+        customerMessage: 'Host original remains unconfirmed', paymentReference: 'host-placement-reference',
+        checkoutAttemptId: original.checkoutAttemptId, paymentGroupId: original.paymentGroupId, idempotencyKey: original.idempotencyKey);
+      expect(await session.reconcilePayment(), false);
+      expect(adapter.reconciled, [(key: original.idempotencyKey, reference: 'host-placement-reference')]);
+      expect(originals, hasLength(1)); expect(session.cartChangesBlocked, true);
+    });
   }
   for (final grouped in [false, true]) {
     test('LF-PAISE new exact placement grouped=$grouped saves original paise before explicit dispatch', () async {

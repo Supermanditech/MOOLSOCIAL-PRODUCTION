@@ -218,6 +218,7 @@ final class _WorkspacePublicBuySession extends BuyV2Session {
     required super.core,
     required BuyV2CommerceAdapter commerceAdapter,
     super.productContentAdapter,
+    super.storeStockReader,
     super.cataloguePageSource,
   }) : super(commerceAdapter: commerceAdapter, reviewDataEnabled: false);
 
@@ -375,6 +376,8 @@ GoRouter createJourneyRouter(
       workSession.navigationScopeRevision == navigation;
     next = _WorkspacePublicBuySession(
       core: buySession,
+      storeStockReader: publicSource?.stockSnapshotsSupported == true && contentReadback != null ? WorkspacePublicStockReader(
+        gateway: publicSource!, displayed: contentReadback.displayedProduct, current: current, now: publicSource.now) : null,
       commerceAdapter: publicSource == null
           ? _WorkspacePublicBuyCommerceAdapter(publicProduct)
           : _WorkspacePublicBuyCommerceAdapter(null, loadProduct: () async {

@@ -133,6 +133,15 @@ class _InvoiceRecoverySession extends BuyV2Session {
       missingConfirmation ? 1 : super.confirmedProductCount;
 
   @override
+  bool get confirmedOrderReferencesMatch {
+    if (!missingConfirmation) return super.confirmedOrderReferencesMatch;
+    final reference = confirmedPurchaseId, saved = confirmedOrders;
+    return reference != null && reference.trim().isNotEmpty && saved.isNotEmpty &&
+      saved.map((order) => order.id).toSet().length == saved.length &&
+      saved.every((order) => order.id.trim().isNotEmpty && order.purchaseId == reference);
+  }
+
+  @override
   List<BuyV2Order> get confirmedOrders {
     if (!missingConfirmation) return super.confirmedOrders;
     final order = orders.first;
@@ -6433,6 +6442,8 @@ void main() {
           await tester.binding.setSurfaceSize(const Size(360, 800));
           addTearDown(() => tester.binding.setSurfaceSize(null));
           final session = _R66CartDisplayFixture(total);
+          expect(session.cartTotalMinor, total * 100);
+          expect(session.totalMinorForDestination(BuyV2Destination.wholesale), total * 100);
           addTearDown(session.dispose);
           session.addProduct('w-notebook');
           session.clearCartAcknowledgement();
@@ -7847,6 +7858,7 @@ void main() {
           tester.view.physicalSize = layout.size;
           addTearDown(tester.view.reset);
           final session = _R668CartPayableFixture(amount);
+          expect(session.scopedPayableTotalMinor, amount * 100);
           addTearDown(session.dispose);
           await tester.pumpWidget(app(session, textScale: layout.scale));
           await tester.pumpAndSettle();
@@ -9432,11 +9444,16 @@ void main() {
         await tester.tap(add);
         await tester.pumpAndSettle();
         final quantity = session.quantityFor(id);
-        expect(quantity, greaterThan(0));
-        final card = find.byKey(ValueKey('buy-product-$id'));
-        await tester.ensureVisible(card);
-        await tester.tap(card);
-        await tester.pumpAndSettle();
+        if (mode == 'quick') {
+          expect(quantity, greaterThan(0));
+          final card = find.byKey(ValueKey('buy-product-$id'));
+          await tester.ensureVisible(card);
+          await tester.tap(card);
+          await tester.pumpAndSettle();
+        } else {
+          expect(quantity, 0, reason: 'Scheduled review must not invent a selected slot or add a Cart line.');
+          expect(session.view, BuyV2View.product);
+        }
         expect(session.selectedProductId, id);
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
@@ -14267,12 +14284,16 @@ void main() {
           .label,
       contains('MoolSocial Fulfilment Store. Safe Protein Store.'),
     );
+    expect(session.productFactsFor(storeProduct).storeOperatingState, BuyV2StoreOperatingState.unknown);
     expect(find.text('Open'), findsNothing);
-    await tester.tap(
-      find.byKey(const ValueKey('buy-public-store-fulfilment-toggle')),
-    );
+    expect(find.text('Store hours unavailable right now'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('buy-public-store-fulfilment-toggle')));
     await tester.pumpAndSettle();
-    expect(find.text('Open'), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-public-store-fulfilment-details')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('buy-public-store-fulfilment-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Store hours unavailable right now'), findsOneWidget);
+    expect(find.text('Open'), findsNothing);
     expect(
       find.byKey(const ValueKey('buy-public-store-no-products')),
       findsOneWidget,
@@ -14791,7 +14812,13 @@ class _R66CartDisplayFixture extends BuyV2Session {
   int totalForDestination(BuyV2Destination value) => displayTotal;
 
   @override
+  int totalMinorForDestination(BuyV2Destination value) => displayTotal * 100;
+
+  @override
   int get cartTotal => displayTotal;
+
+  @override
+  int get cartTotalMinor => displayTotal * 100;
 }
 
 // Layout-only totals; arithmetic and real quantities use the session suites.
@@ -14800,6 +14827,9 @@ class _R668CartPayableFixture extends _R66CartDisplayFixture {
 
   @override
   int get scopedPayableTotal => displayTotal;
+
+  @override
+  int get scopedPayableTotalMinor => displayTotal * 100;
 }
 
 void _expectCustomerFacingBuyCopy(

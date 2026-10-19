@@ -834,6 +834,73 @@ class _ProductPresentationObserverState extends State<_ProductPresentationObserv
   }
 }
 
+/// Explicit visible-surface reads, separate from presentation telemetry. A
+/// rebuild/getter is not permission to scan every catalogue product.
+class _StoreStockObserver extends StatefulWidget {
+  const _StoreStockObserver({required this.session, required this.products, this.cart = false});
+  final BuyV2Session session;
+  final List<BuyV2Product> products;
+  final bool cart;
+  @override State<_StoreStockObserver> createState() => _StoreStockObserverState();
+}
+class _StoreStockObserverState extends State<_StoreStockObserver> with WidgetsBindingObserver {
+  final _attempted = <String, String>{};
+  BuyV2Session? _owner;
+  bool _scheduled = false;
+  bool _wasVisible = false;
+  int _visibilityEpoch = 0;
+  @override void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); }
+  @override void dispose() { WidgetsBinding.instance.removeObserver(this); super.dispose(); }
+  @override void didChangeAppLifecycleState(AppLifecycleState state) {
+    _visibilityEpoch++; _wasVisible = false; _attempted.clear();
+    if (state == AppLifecycleState.resumed && mounted) { setState(_attempted.clear); }
+  }
+  bool _visible(BuyV2Session session) {
+    if (!mounted || !identical(widget.session, session) || ModalRoute.of(context)?.isCurrent != true ||
+        !TickerMode.valuesOf(context).enabled ||
+        WidgetsBinding.instance.lifecycleState != null && WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
+        (widget.cart ? session.view != BuyV2View.cart : session.view != BuyV2View.product)) { return false; }
+    var hidden = false;
+    context.visitAncestorElements((element) { if (element.widget case Offstage(offstage: true)) hidden = true; return !hidden; });
+    return !hidden;
+  }
+  bool _includes(BuyV2Session session, BuyV2Product product, String key) => _visible(session) &&
+    widget.products.any((item) => item.id == product.id) &&
+    (widget.cart ? session.quantityFor(product.id) > 0 : session.selectedProduct?.id == product.id) &&
+    session.storeStockRequestIdentity(product) == key;
+  @override Widget build(BuildContext context) {
+    final session = widget.session;
+    if (!identical(_owner, session)) { _owner = session; _visibilityEpoch++; _attempted.clear(); }
+    final visible = _visible(session);
+    if (visible != _wasVisible) { _wasVisible = visible; _visibilityEpoch++; }
+    if (!visible) { _attempted.clear(); }
+    final ids = widget.products.map((p) => p.id).toSet();
+    _attempted.removeWhere((id, _) => !ids.contains(id));
+    if (visible && !_scheduled) {
+      final pending = <({BuyV2Product product, String key})>[];
+      for (final product in widget.products) {
+        final key = session.storeStockRequestIdentity(product);
+        if (key != null && _attempted[product.id] != key) { pending.add((product: product, key: key)); }
+      }
+      if (pending.isNotEmpty) {
+        final epoch = _visibilityEpoch;
+        _scheduled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scheduled = false;
+          if (!mounted) return;
+          for (final request in pending) {
+            if (_visibilityEpoch != epoch || !_includes(session, request.product, request.key)) continue;
+            _attempted[request.product.id] = request.key;
+            unawaited(session.refreshStoreStock(request.product,
+              current: () => _visibilityEpoch == epoch && _includes(session, request.product, request.key)));
+          }
+        });
+      }
+    }
+    return const SizedBox.shrink();
+  }
+}
+
 class BuyV2ProductView extends StatelessWidget {
   const BuyV2ProductView({
     super.key,
@@ -1024,6 +1091,7 @@ class BuyV2ProductView extends StatelessWidget {
     return Column(
       children: [
         _ProductPresentationObserver(session: session, product: product),
+        _StoreStockObserver(session: session, products: [product]),
         Expanded(
           child: ListView(
             key: PageStorageKey('buy-product-${product.id}'),
@@ -2309,6 +2377,7 @@ class _PublicProductOrderInformationState
       hasDelivery ? buyerPromise : 'Check delivery availability',
       color: hasDelivery ? BuyV2Colors.green : BuyV2Colors.muted,
     );
+    add('Stock', session.storeStockLabelFor(product));
     if (hasDelivery) {
       final mode = session.fulfilmentModeFor(product);
       final method = session.supportsFulfilment(product, mode)
@@ -8215,6 +8284,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
           (destination) =>
               lines.any((line) => line.product.destination == destination),
         );
+    final stockObserver = _StoreStockObserver(session: session, products: [for (final line in lines) line.product], cart: true);
     final header = <Widget>[
       Padding(
         padding: const EdgeInsets.fromLTRB(10, 3, 10, 2),
@@ -8808,6 +8878,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
               key: const ValueKey('buy-cart-landscape-scroll-owner'),
               child: list,
             ),
+            stockObserver,
           ],
         ),
       );
@@ -8834,6 +8905,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                     ),
             ),
             if (!keyboardVisible) footer,
+            stockObserver,
           ],
         );
       },
@@ -24526,7 +24598,8 @@ class _CartLine extends StatelessWidget {
                 10)
             .clamp(76.0, double.infinity)
             .toDouble();
-    final productDetailsLabel = 'View ${product.customerTitle} product details';
+    final stockLabel = session.storeStockLabelFor(product);
+    final productDetailsLabel = 'View ${product.customerTitle} product details${stockLabel == null ? '' : '. $stockLabel'}';
     void openProductDetails() {
       HapticFeedback.selectionClick();
       session.openProduct(product.id);
@@ -24599,6 +24672,9 @@ class _CartLine extends StatelessWidget {
                           buyerPromise,
                           style: context.buyMeta.copyWith(fontSize: 11),
                         ),
+                        if (stockLabel != null) Text(stockLabel,
+                          key: ValueKey('buy-cart-stock-${product.id}'),
+                          style: context.buyMeta.copyWith(fontSize: 11)),
                       ],
                     ),
                   ),

@@ -3402,6 +3402,8 @@ class BuyV2RootSessions {
     final next = accountSessionFactory?.call(store, pending) ??
       BuyV2Session(core: core, reviewDataEnabled: false,
         productPresentations: presentations,
+        storeStockReader: catalogue?.gateway.stockSnapshotsSupported == true ? WorkspacePublicStockReader(
+          gateway: catalogue!.gateway, displayed: catalogue.displayedProduct, current: catalogueCurrent, now: catalogue.gateway.now) : null,
         customerStateStore: store, pendingAccountState: pending,
         cataloguePageSource: catalogue, variantFamilySource: catalogue, productContentAdapter: catalogue,
         publishedCatalogueSource: catalogue?.gateway.promotionDiscoverySupported == true ? catalogue : null,
@@ -3443,11 +3445,14 @@ class BuyV2RootSessions {
 
 class BuyV2Session extends ChangeNotifier {
   final WorkspaceProductPresentationGateway? productPresentations;
+  /// Owned by this session; never shared across authenticated lifetimes.
+  final WorkspacePublicStockReader? storeStockReader;
   final AuthenticatedWorkspaceOrderIdentityGateway? purchaseReader;
   final String purchaseRealm;
   BuyV2Session({
     required this.core,
     this.productPresentations,
+    this.storeStockReader,
     this.purchaseReader,
     this.purchaseRealm = const String.fromEnvironment('MOOLSOCIAL_PURCHASE_REALM'),
     BuyV2ProductFactsAdapter? productFactsAdapter,
@@ -3559,6 +3564,7 @@ class BuyV2Session extends ChangeNotifier {
                ? const BuyV2UiReviewShoppingAlertsAdapter()
                : const BuyV2UnavailableShoppingAlertsAdapter()) {
     procurementIdentity?.addListener(_onProcurementIdentityChanged);
+    storeStockReader?.addListener(_onStoreStockChanged);
     collectionIdentity?.addListener(_onCollectionIdentityChanged);
     final buyerIdentity = collectionIdentity;
     if (this.purchaseOrderAdapter is _BuyV2DeviceReviewPurchaseOrderAdapter) {
@@ -4890,6 +4896,8 @@ class BuyV2Session extends ChangeNotifier {
   @override
   void dispose() {
     _collectionDisposed = true;
+    storeStockReader?.removeListener(_onStoreStockChanged);
+    storeStockReader?.dispose();
     _ordersNavigationVisit = null;
     _cartOrderReturnOrigin = null;
     for (final controller in _productAcceptance.values) {
@@ -13056,6 +13064,44 @@ class BuyV2Session extends ChangeNotifier {
     throw ArgumentError.value(id, 'id', 'Unknown Buy product');
   }
 
+  int _storeStockPacks(BuyV2Product product) => math.max(product.minimumOrder, quantityFor(product.id));
+  String? storeStockRequestIdentity(BuyV2Product product) => _collectionDisposed || isStoreProcurement
+    ? null : storeStockReader?.requestIdentity(product, _storeStockPacks(product));
+  WorkspacePublicStockResult? storeStockFor(BuyV2Product product) => _collectionDisposed || isStoreProcurement
+    ? null : storeStockReader?.snapshotFor(product, _storeStockPacks(product));
+  String? storeStockLabelFor(BuyV2Product product) {
+    final value = storeStockFor(product);
+    if (value == null) return null;
+    if (value.available == false) return 'Store reports out of stock';
+    if (value.quantityAvailable == false) return 'Store cannot confirm stock for this quantity';
+    if (value.quantityAvailable == null) return 'Store reports stock · quantity unconfirmed';
+    final packs = value.query.requestedPacks;
+    return 'Store reports stock for $packs ${packs == 1 ? 'pack' : 'packs'}';
+  }
+  Future<bool> refreshStoreStock(BuyV2Product product, {bool force = false, bool Function()? current}) {
+    final source = storeStockReader, key = storeStockRequestIdentity(product), packs = _storeStockPacks(product);
+    if (source == null || key == null || current?.call() == false) return Future.value(false);
+    return source.refresh(product, packs, force: force, requestCurrent: () => !_collectionDisposed &&
+      (current?.call() ?? true) && storeStockRequestIdentity(product) == key);
+  }
+  bool _storeReportedShortage(BuyV2Product product) {
+    final value = storeStockFor(product);
+    return value?.available == false || value?.quantityAvailable == false;
+  }
+  bool _stockRequestHasShortage(BuyV2OrderPlacementRequest request) => !isStoreProcurement &&
+    request.lines.any((line) {
+      final value = storeStockReader?.snapshotFor(line.product, line.quantity);
+      return value?.available == false || value?.quantityAvailable == false;
+    });
+  void _onStoreStockChanged() {
+    if (_collectionDisposed) return;
+    // Never rewrite or retire an existing payment attempt on a background read.
+    if (!cartChangesBlocked && checkoutLines.any((line) => _storeReportedShortage(line.product))) _invalidateCheckoutQuote();
+    notifyListeners();
+  }
+  BuyV2ProductFactsSnapshot _withStoreStockRestriction(BuyV2Product product, BuyV2ProductFactsSnapshot facts) =>
+    _storeReportedShortage(product) ? facts.copyWith(orderabilityLabel: 'Stock unavailable for this quantity', clearEligibility: true) : facts;
+
   BuyV2ProductFactsSnapshot productFactsFor(BuyV2Product product) {
     var cached = _productFacts.putIfAbsent(product.id, () {
       final next = productFactsAdapter.snapshotFor(product);
@@ -13070,6 +13116,7 @@ class BuyV2Session extends ChangeNotifier {
               clearStoreCollection: store.collection == null,
             );
     });
+    cached = _withStoreStockRestriction(product, cached);
     if (variantWithdrawn(product) ||
         !product.hasValidVariantFamilyIdentity ||
         !product.hasValidMoney || !cached.hasValidMoney ||
@@ -16913,7 +16960,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     for (final product in lines.map((line) => line.product).toSet()) {
-      final next = productFactsAdapter.snapshotFor(product);
+      final next = _withStoreStockRestriction(product, productFactsAdapter.snapshotFor(product));
       if (!_validProductFacts(product, next) || next.stale) {
         notice = 'Delivery times could not be confirmed. Try again.';
         notifyListeners();
@@ -17079,7 +17126,7 @@ class BuyV2Session extends ChangeNotifier {
   bool _refreshCheckoutFactsForProduction(List<BuyV2CartLine> lines) {
     final priceChanges = <BuyV2PriceChange>[];
     for (final product in lines.map((line) => line.product).toSet()) {
-      final next = productFactsAdapter.snapshotFor(product);
+      final next = _withStoreStockRestriction(product, productFactsAdapter.snapshotFor(product));
       if (!_validProductFacts(product, next) || next.stale) {
         checkoutSubmissionState = BuyV2CheckoutSubmissionState.failed;
         notice =
@@ -17397,7 +17444,8 @@ class BuyV2Session extends ChangeNotifier {
     )) {
       return false;
     }
-    if (!retained ||
+    final stockChanged = _stockRequestHasShortage(request);
+    if (!retained || stockChanged ||
         (request.lines.any((line) => line.scheduledFulfilment != null) &&
           (!_selectedScheduledInputsCurrent(request) || checkoutQuoteReviewRequired || scheduledQuote == null ||
             request.checkoutQuoteId != scheduledQuote.id || !catalogueNow().isBefore(scheduledQuote.validUntil) ||
@@ -17413,7 +17461,8 @@ class BuyV2Session extends ChangeNotifier {
       _checkoutIdempotencyKey = null;
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.failed;
       notice = retained
-          ? request.lines.any((line) => line.scheduledFulfilment != null)
+          ? stockChanged ? 'Stock changed. Review the affected products before payment.'
+            : request.lines.any((line) => line.scheduledFulfilment != null)
               ? 'Scheduled delivery changed. Review Checkout before payment.'
               : 'Order agreement changed. Check them before payment.'
           : 'Order recovery could not be saved. No payment was started.';
@@ -17945,11 +17994,13 @@ class BuyV2Session extends ChangeNotifier {
       }
       // This group has not dispatched yet. Recovery of a submitted group uses
       // the separate original-attempt path and must not require a fresh grant.
-      if (request.lines.any((line) => line.scheduledFulfilment != null) &&
+      final stockChanged = _stockRequestHasShortage(request);
+      if (stockChanged || request.lines.any((line) => line.scheduledFulfilment != null) &&
           (!catalogueNow().isBefore(attempt.quoteValidUntil) || !_selectedScheduledInputsCurrent(request))) {
         checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
         _syncCheckoutGroupState(); _checkoutIdempotencyKey = null;
-        notice = 'Scheduled delivery changed before payment. Review Checkout.';
+        notice = stockChanged ? 'Stock changed. Review the affected products before payment.'
+          : 'Scheduled delivery changed before payment. Review Checkout.';
         _persistCustomerState(); notifyListeners(); return false;
       }
       BuyV2OrderPlacementResult result;
