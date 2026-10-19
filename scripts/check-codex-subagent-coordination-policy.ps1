@@ -8030,6 +8030,11 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     if (@($facts.owners) -ccontains 'backend/functions/src/workspace/workspace_promotion_service.test.ts') {
       $factsOwners += 'backend/functions/src/workspace/workspace_promotion_service.test.ts'
     }
+    # Exact founder-approved supplier-policy continuation; no directory grant.
+    foreach ($supplierPolicyOwner in @('backend/functions/src/workspace/workspace_supplier_policy_service.ts',
+        'backend/functions/src/workspace/workspace_supplier_policy_service.test.ts')) {
+      if (@($facts.owners) -ccontains $supplierPolicyOwner) { $factsOwners += $supplierPolicyOwner }
+    }
     # Founder-approved decoder dependency only; no directory/wildcard ownership.
     foreach ($decoderOwner in @('backend/functions/package.json', 'backend/functions/package-lock.json')) {
       if (@($facts.owners) -ccontains $decoderOwner) { $factsOwners += $decoderOwner }

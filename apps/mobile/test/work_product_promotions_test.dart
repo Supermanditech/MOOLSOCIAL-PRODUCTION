@@ -11,6 +11,9 @@ import 'package:moolsocial/features/work/widgets/store_product_promotions.dart';
 import 'work_catalogue_gateway_test.dart' as catalogue;
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/work/work_product_promotions.dart';
+import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
+import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 
 // Isolated host records/transport only; never native Store or published offers.
@@ -215,6 +218,63 @@ StorePromotionController controller(
   now: now ?? () => at,
 );
 void main() {
+  WorkSession supplierOwner(String profile, {bool supported = true, bool review = false}) => WorkSession(
+    gateway: review ? ReviewWorkGateway() : const UnavailableWorkGateway(), contactDraftStore: catalogue.ListingAccount(),
+    catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: catalogue.Credentials(), transport: catalogue.OwnerTransport((_) async => throw StateError('No host publication')),
+      ownerAccountId: 'owner-one', supplierPublishersVersionSupported: supported),
+    productPromotionGateway: Provider(), productPromotionRealm: 'production', productPromotionPendingStoreFactory: (_) => Pending())
+    ..activeWorkspace = WorkWorkspace(id: 'store-one', name: 'Host supplier', profileLabel: profile,
+      profileId: profile, area: 'Jaipur', verified: true);
+  for (final fault in ['legacy', 'review', 'unknown profile']) {
+    test('LF04 PUBLISHERS supplier authoring remains closed for $fault', () {
+      TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+      final owner = supplierOwner(fault == 'unknown profile' ? 'wholesaler-pretend' : 'wholesaler',
+        supported: fault != 'legacy', review: fault == 'review'); addTearDown(owner.dispose);
+      expect(owner.workspaceStoreAuthoringAvailable, isFalse);
+      expect(owner.workspaceProductPromotions, isNull); expect(owner.workspacePublicDetailsPublisher, isNull);
+    });
+  }
+  for (final profile in ['wholesaler', 'manufacturer']) {
+    testWidgets('LF04 PUBLISHERS $profile uses existing Store and Stock navigation', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      tester.view.physicalSize = const Size(430, 932); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      final owner = supplierOwner(profile), core = BuySession();
+      final buyer = BuyV2Session(core: core);
+      addTearDown(owner.dispose); addTearDown(core.dispose); addTearDown(buyer.dispose);
+      expect(await owner.recoverWorkspaceAccount(accountReady: true), isTrue);
+      await tester.pumpWidget(MaterialApp(home: WorkWorkspaceDashboardScreen(session: owner,
+        procurementSession: buyer, accountRecoveryReady: true)));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-home')), findsOneWidget);
+      final stock = find.byKey(const Key('work-store-stock')); expect(stock, findsOneWidget);
+      await tester.tap(stock); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-home')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const Key('work-store-home'))); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-full-name')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+  for (final profile in ['wholesaler', 'manufacturer']) {
+    test('LF04 PUBLISHERS supplier owner reaches existing authoring controllers $profile', () {
+      TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+      final connection = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: catalogue.Credentials(), transport: catalogue.OwnerTransport((_) async => throw StateError('No host publication')),
+        ownerAccountId: 'owner-one', supplierPublishersVersionSupported: true);
+      final owner = WorkSession(gateway: const UnavailableWorkGateway(), contactDraftStore: catalogue.ListingAccount(),
+        catalogueGateway: connection, productPromotionGateway: Provider(), productPromotionRealm: 'production',
+        productPromotionPendingStoreFactory: (_) => Pending())
+        ..activeWorkspace = WorkWorkspace(id: 'store-one', name: 'Host supplier', profileLabel: profile,
+          profileId: profile, area: 'Jaipur', verified: true);
+      addTearDown(owner.dispose);
+      expect(owner.workspaceProductPromotions, isNotNull);
+      expect(owner.workspacePublicDetailsPublisher, isNotNull);
+    });
+  }
   Map<String, dynamic> benefitTerms({bool percentage = false}) => {'schemaVersion': 1,
     'kind': percentage ? 'percentage' : 'flat', 'currency': 'INR',
     'flatAmountMinor': percentage ? null : 1025, 'flatBasis': percentage ? null : 'per_pack',

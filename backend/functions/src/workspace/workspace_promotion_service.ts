@@ -36,7 +36,7 @@ export interface PromotionRepository {
 }
 interface PublicSku extends Record<string, unknown> {skuId: string; channels: Record<string, unknown>[]}
 export interface PublicPromotion {
-  publicationId: string; revision: number; publisherType: "retailer"; publisherId: string;
+  publicationId: string; revision: number; publisherType: "retailer" | "wholesaler" | "manufacturer"; publisherId: string;
   publisherName: string; headline: string; detail: string; sourceId: string;
   observedAt: string; validUntil: string; product: PublicSku;
   benefitTerms?: PromotionBenefitTerms;
@@ -46,6 +46,7 @@ interface PublicPromotionPage {
   state: "ready" | "unavailable"; coverage: "verified_public_promotions_only";
   orderingAvailable: false; items: PublicPromotion[]; nextCursor: string | null;
   promotionTermsVersion?: 1;
+  supplierPublishersVersion?: 1;
 }
 function fail(code = "invalid_input", status = 400): never {
   throw new WorkspaceProfileError(code, "Product promotion could not be confirmed.", status);
@@ -111,10 +112,14 @@ function record(value: unknown, realm: PromotionRecord["realm"], storeId: string
   return {...inputFromRecord(row), schemaVersion: 1, realm, storeId,
     placementId: id(row.placementId), revision: integer(row.revision, 1), observedAt: time(row.observedAt)};
 }
+function profilePublisher(profileId: string): PublicPromotion["publisherType"] | undefined {
+  return profileId.startsWith("retailer-") ? "retailer" :
+    profileId === "wholesaler" || profileId === "manufacturer" ? profileId : undefined;
+}
 function owner(profile: WorkspaceProfileRecord | undefined, storeId: string, userId?: string): WorkspaceProfileRecord {
   if (!profile || profile.schemaVersion !== 1 || profile.workspaceId !== storeId ||
       userId !== undefined && profile.ownerUserId !== userId) fail("not_found", 404);
-  if (profile.familyId !== "products-trade" || !profile.profileId.startsWith("retailer-") || profile.status !== "live") fail("invalid_state", 409);
+  if (profile.familyId !== "products-trade" || !profilePublisher(profile.profileId) || profile.status !== "live") fail("invalid_state", 409);
   if (userId === undefined && profile.shopEnabled !== true) fail("not_found", 404);
   return profile;
 }
@@ -168,10 +173,11 @@ export class WorkspacePromotionService {
     private readonly now: () => Date = () => new Date(),
     private readonly options: {benefitTermsSupported?: boolean} = {}) {}
   private negotiation(body: Readonly<Record<string, unknown>>) {
-    const {promotionTermsVersion, ...plain} = body;
+    const {promotionTermsVersion, supplierPublishersVersion, ...plain} = body;
     if (Object.hasOwn(body, "promotionTermsVersion") && promotionTermsVersion !== 1) fail();
+    if (Object.hasOwn(body, "supplierPublishersVersion") && supplierPublishersVersion !== 1) fail();
     if (promotionTermsVersion === 1 && !this.options.benefitTermsSupported) fail("unavailable", 503);
-    return {body: plain, terms: promotionTermsVersion === 1};
+    return {body: plain, terms: promotionTermsVersion === 1, suppliers: supplierPublishersVersion === 1};
   }
   /** Endpoint still performs Firebase/default-tenant/AppCheck verification. */
   async handleOperation(userId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
@@ -180,6 +186,7 @@ export class WorkspacePromotionService {
     const negotiated = this.negotiation(body);
     if (operation === "readPublicStorePromotions") return this.publicPage(body);
     if (operation === "readPublicPromotionDiscovery") return this.publicDiscovery(body);
+    if (negotiated.suppliers) fail(); // Read negotiation never grants owner authority.
     if (operation === "listStorePromotions") {
       const query = exact(negotiated.body, ["storeId", "limit"], ["after"]), storeId = id(query.storeId);
       const limit = integer(query.limit, 1, 20), after = query.after === undefined ? undefined : id(query.after);
@@ -199,7 +206,9 @@ export class WorkspacePromotionService {
       record: result ?? null, publicationConfirmed: false, ...(negotiated.terms ? {promotionTermsVersion: 1} : {})};
   }
   private async command(userId: string, body: Readonly<Record<string, unknown>>): Promise<PromotionCommand> {
-    const n = this.negotiation(body), command = request(userId, this.repository.realm, n.body, this.now().toISOString(), n.terms);
+    const n = this.negotiation(body);
+    if (n.suppliers) fail();
+    const command = request(userId, this.repository.realm, n.body, this.now().toISOString(), n.terms);
     owner(await this.repository.store(command.storeId), command.storeId, userId);
     return command;
   }
@@ -211,6 +220,7 @@ export class WorkspacePromotionService {
   }
   async readOwned(userId: string, body: Readonly<Record<string, unknown>>): Promise<PromotionRecord | undefined> {
     const n = this.negotiation(body), query = exact(n.body, ["storeId", "placementId"]), storeId = id(query.storeId), placementId = id(query.placementId);
+    if (n.suppliers) fail();
     id(userId); owner(await this.repository.store(storeId), storeId, userId);
     const result = await this.repository.read(storeId, placementId, userId);
     if (result?.benefitTerms && !n.terms) fail("unavailable", 503);
@@ -224,13 +234,14 @@ export class WorkspacePromotionService {
     if (body.promotionDiscoveryVersion !== 1) fail();
     const raw = exact(body.query, ["search", "categoryId", "publisher", "supplierOnly"]);
     if (typeof raw.search !== "string" || raw.search.length > 240 || typeof raw.supplierOnly !== "boolean" ||
-        raw.publisher !== null && !["retailer", "manufacturer", "wholesaler", "moolSocial"].includes(String(raw.publisher))) fail();
+        raw.publisher !== null && (typeof raw.publisher !== "string" || !["retailer", "manufacturer", "wholesaler", "moolSocial"].includes(raw.publisher))) fail();
     const query = {search: raw.search.trim().toLowerCase().replace(/\s+/gu, " "), categoryId: id(raw.categoryId),
       publisher: raw.publisher, supplierOnly: raw.supplierOnly};
     const unavailable = (): never => fail("unavailable", 503);
-    if (!this.catalogue.publicDiscovery || query.publisher !== null && query.publisher !== "retailer") unavailable();
+    const publisherTypes = negotiated.suppliers ? ["retailer", "wholesaler", "manufacturer"] : ["retailer"];
+    if (!this.catalogue.publicDiscovery || query.publisher !== null && !publisherTypes.includes(String(query.publisher))) unavailable();
     const pageSize = integer(body.pageSize, 1, 50);
-    const coverage = {kind: "connected_publishers", publisherTypes: ["retailer"], countBasis: "publications"};
+    const coverage = {kind: "connected_publishers", publisherTypes, countBasis: "publications"};
     // Remove ONLY generated read observations. Persisted SKU observations,
     // revisions, content and validity remain part of the cohort fingerprint.
     const stableListing = (value: Record<string, unknown>) => {
@@ -251,9 +262,11 @@ export class WorkspacePromotionService {
         const cursors = new Set<string>();
         for (let pageIndex = 0; pageIndex < 11; pageIndex++) {
           const page = object(await this.catalogue.publicDiscovery!({discoveryPageVersion: 1,
+            ...(negotiated.suppliers ? {supplierPublishersVersion: 1} : {}),
             query: catalogueQuery, pageSize: 50, resultKind: "products", ...(cursor ? {cursor} : {})}));
           const metadata = object(page.page);
-          if (page.schemaVersion !== 1 || page.discoveryPageVersion !== 1 || page.realm !== this.repository.realm ||
+          if ((negotiated.suppliers ? page.supplierPublishersVersion !== 1 : Object.hasOwn(page, "supplierPublishersVersion")) ||
+              page.schemaVersion !== 1 || page.discoveryPageVersion !== 1 || page.realm !== this.repository.realm ||
               page.state !== "ready" || page.coverage !== "verified_public_only" || page.directoryCoverage !== "complete_bounded" ||
               page.orderingAvailable !== false || page.resultKind !== "products" || page.requestedStore !== null ||
               time(page.observedAt) > this.now().toISOString() || cataloguePayloadHash(page.query) !== cataloguePayloadHash(catalogueQuery) ||
@@ -263,6 +276,7 @@ export class WorkspacePromotionService {
           const total = integer(metadata.totalCount, 0, 500);
           for (const rawRow of page.items as unknown[]) {
             const row = exact(rawRow, ["channel", "listing"]), listing = object(row.listing);
+            if (negotiated.suppliers ? listing.supplierPublishersVersion !== 1 : Object.hasOwn(listing, "supplierPublishersVersion")) unavailable();
             if (destination === "shop" ? row.channel !== "retail" : !["wholesale", "bulk"].includes(String(row.channel))) unavailable();
             id(listing.storeId);
             if (!Array.isArray(listing.items) || listing.items.length !== 1) unavailable();
@@ -291,6 +305,7 @@ export class WorkspacePromotionService {
         let after: string | undefined, complete = false;
         for (let pageIndex = 0; pageIndex < 26; pageIndex++) {
           const page = await this.publicPage({storeId, limit: 20, ...(after ? {after} : {}),
+            ...(negotiated.suppliers ? {supplierPublishersVersion: 1} : {}),
             ...(negotiated.terms ? {promotionTermsVersion: 1} : {})}, promotion => {
             if (++scannedRecords > 500) unavailable();
             if (promotion.active && promotion.validFrom > this.now().toISOString() &&
@@ -343,13 +358,15 @@ export class WorkspacePromotionService {
         confirmed.some(item => item.publication.validUntil <= observedAt)) fail("stale_snapshot", 409);
     const selected = confirmed.filter(({publication, listing}) => {
       const sku = object((listing.items as unknown[])[0]), content = object(sku.content), pack = object(sku.pack);
-      return (query.categoryId === "all" || content.categoryId === query.categoryId) &&
+      return (query.publisher === null || publication.publisherType === query.publisher) &&
+        (query.categoryId === "all" || content.categoryId === query.categoryId) &&
         (!query.search || [publication.headline, publication.detail, content.title, content.brand, content.variant, pack.label]
           .join(" ").toLowerCase().replace(/\s+/gu, " ").includes(query.search));
     }).sort((a, b) => a.publication.publisherId.localeCompare(b.publication.publisherId) ||
       a.publication.publicationId.localeCompare(b.publication.publicationId));
     const snapshotId = cataloguePayloadHash([this.repository.realm, coverage, firstDirectory.fingerprint, stableItems(confirmed)]).toLowerCase();
-    const queryHash = cataloguePayloadHash([this.repository.realm, query, coverage, ...(negotiated.terms ? [1] : [])]).toLowerCase();
+    const queryHash = cataloguePayloadHash([this.repository.realm, query, coverage, ...(negotiated.terms ? [1] : []),
+      ...(negotiated.suppliers ? ["supplier-publishers-v1"] : [])]).toLowerCase();
     let index = 0;
     if (body.cursor !== undefined) {
       const encoded = text(body.cursor, 2048);
@@ -362,6 +379,7 @@ export class WorkspacePromotionService {
     }
     const cursorAt = (i: number) => Buffer.from(JSON.stringify({v: 1, q: queryHash, s: snapshotId, n: pageSize, i})).toString("base64url");
     const result = {schemaVersion: 1, promotionDiscoveryVersion: 1, realm: this.repository.realm, state: "ready", coverage,
+      ...(negotiated.suppliers ? {supplierPublishersVersion: 1} : {}),
       ...(negotiated.terms ? {promotionTermsVersion: 1} : {}),
       orderingAvailable: false, observedAt, query, items: selected.slice(index, index + pageSize),
       page: {snapshotId, startIndex: index, totalCount: selected.length,
@@ -376,9 +394,11 @@ export class WorkspacePromotionService {
     const limit = integer(query.limit, 1, 20), after = query.after === undefined ? undefined : id(query.after);
     const base = (): Omit<PublicPromotionPage, "state" | "items" | "nextCursor"> => ({schemaVersion: 1,
       realm: this.repository.realm, storeId, observedAt: this.now().toISOString(), orderingAvailable: false,
-      coverage: "verified_public_promotions_only", ...(negotiated.terms ? {promotionTermsVersion: 1} : {})});
+      coverage: "verified_public_promotions_only", ...(negotiated.terms ? {promotionTermsVersion: 1} : {}),
+      ...(negotiated.suppliers ? {supplierPublishersVersion: 1} : {})});
     try {
-      owner(await this.repository.store(storeId), storeId);
+      const initialStore = owner(await this.repository.store(storeId), storeId);
+      if (!negotiated.suppliers && profilePublisher(initialStore.profileId) !== "retailer") fail("unavailable", 503);
       const rows = (await this.repository.page(storeId, after, limit)).map(r => record(r, this.repository.realm, storeId));
       const items: PublicPromotion[] = [];
       for (const promotion of rows) {
@@ -387,8 +407,10 @@ export class WorkspacePromotionService {
         if (!promotion.active || promotion.observedAt > now || promotion.validFrom > now || promotion.validUntil <= now) continue;
         if (promotion.benefitTerms && !negotiated.terms) fail("unavailable", 503);
         const response = object(await this.catalogue.publicCatalogue({storeId, skuId: promotion.skuId,
+          ...(negotiated.suppliers ? {supplierPublishersVersion: 1} : {}),
           policyReadbackVersion: 1, productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1}));
-        if (response.schemaVersion !== 1 || response.realm !== this.repository.realm || response.storeId !== storeId ||
+        if ((negotiated.suppliers ? response.supplierPublishersVersion !== 1 : Object.hasOwn(response, "supplierPublishersVersion")) ||
+            response.schemaVersion !== 1 || response.realm !== this.repository.realm || response.storeId !== storeId ||
             response.state !== "ready" || response.orderingAvailable !== false || response.coverage !== "verified_public_only" ||
             time(response.observedAt) > this.now().toISOString() || !Array.isArray(response.items) || response.items.length > 1) fail();
         if (!response.items.length) continue;
@@ -402,12 +424,14 @@ export class WorkspacePromotionService {
         const fresh = await this.repository.read(storeId, promotion.placementId);
         if (!fresh || cataloguePayloadHash(record(fresh, this.repository.realm, storeId)) !== cataloguePayloadHash(promotion)) continue;
         const freshStore = owner(await this.repository.store(storeId), storeId);
+        const publisherType = profilePublisher(freshStore.profileId)!;
+        if (!negotiated.suppliers && publisherType !== "retailer") fail("unavailable", 503);
         now = this.now().toISOString();
         if (validUntil <= now) continue;
         const product = Object.fromEntries(["skuId", "canonicalProductId", "verifiedPackId", "sku", "revision", "observedAt",
           "content", "pack", "supplierPolicy"].filter(k => Object.hasOwn(source, k)).map(k => [k, structuredClone(source[k])])) as PublicSku;
         product.channels = structuredClone(channels);
-        items.push({publicationId: promotion.placementId, revision: promotion.revision, publisherType: "retailer",
+        items.push({publicationId: promotion.placementId, revision: promotion.revision, publisherType,
           publisherId: storeId, publisherName: text(freshStore.name, 240), headline: promotion.headline, detail: promotion.detail,
           sourceId: `store-promotion:${this.repository.realm}:${storeId}:${promotion.placementId}:${promotion.revision}`,
           observedAt: now, validUntil, product, ...(promotion.benefitTerms ? {benefitTerms: structuredClone(promotion.benefitTerms)} : {})});

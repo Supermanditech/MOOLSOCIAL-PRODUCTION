@@ -862,10 +862,17 @@ class WorkSession extends ChangeNotifier {
   final String? publicDetailsRealm;
   final WorkspacePublicDetailsJournal Function(WorkspacePublicDetailsScope scope)? publicDetailsJournalFactory;
   final Map<WorkspacePublicDetailsScope, WorkspacePublicDetailsController> _publicDetailsPublishers = {};
+  bool _storeAuthoringProfile(String? profileId) => profileId?.startsWith('retailer-') == true ||
+    ({'wholesaler', 'manufacturer'}.contains(profileId) && gateway is! ReviewWorkGateway &&
+      catalogueGateway is AuthenticatedWorkspaceCatalogueGateway &&
+      (catalogueGateway as AuthenticatedWorkspaceCatalogueGateway).supplierPublishersVersionSupported);
+  /// Presentation access only. The server still verifies live profile, owner,
+  /// producer capabilities and reviewed SKU bindings before publication.
+  bool get workspaceStoreAuthoringAvailable => _storeAuthoringProfile(activeWorkspace?.profileId);
   WorkspacePublicDetailsController? get workspacePublicDetailsPublisher {
     final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
     if (_disposed || account == null || account.isEmpty || store == null ||
-        activeWorkspace?.profileId?.startsWith('retailer-') != true) {
+        !workspaceStoreAuthoringAvailable) {
       return null;
     }
     WorkspacePublicDetailsOwnerGateway? connection = publicDetailsGateway;
@@ -976,7 +983,7 @@ class WorkSession extends ChangeNotifier {
   StorePromotionController? get workspaceProductPromotions {
     final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
     if (_disposed || account == null || account.isEmpty || store == null ||
-        activeWorkspace?.profileId?.startsWith('retailer-') != true) {
+        !workspaceStoreAuthoringAvailable) {
       return null;
     }
     StorePromotionGateway? connection = productPromotionGateway;
@@ -4853,7 +4860,7 @@ class WorkSession extends ChangeNotifier {
     }
     _activeWorkspace = value;
     if (value != null && previousId != value.id &&
-        value.profileId?.startsWith('retailer-') == true && tradingPreferencesPersistenceAvailable) {
+        _storeAuthoringProfile(value.profileId) && tradingPreferencesPersistenceAvailable) {
       scheduleMicrotask(() {
         if (!_disposed && activeWorkspace?.id == value.id) {
           unawaited(loadWorkspaceTradingPreferences(expectedStoreId: value.id));
@@ -4861,7 +4868,7 @@ class WorkSession extends ChangeNotifier {
       });
     }
     if (value != null && previousId != value.id &&
-        value.profileId?.startsWith('retailer-') == true && publicationPreferencesPersistenceAvailable) {
+        _storeAuthoringProfile(value.profileId) && publicationPreferencesPersistenceAvailable) {
       scheduleMicrotask(() {
         if (!_disposed && activeWorkspace?.id == value.id) {
           unawaited(loadWorkspacePublicationPreferences(expectedStoreId: value.id));

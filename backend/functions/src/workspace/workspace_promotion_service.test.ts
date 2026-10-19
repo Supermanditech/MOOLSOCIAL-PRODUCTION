@@ -72,15 +72,20 @@ function discoveryFixture(options: {benefitTermsSupported?: boolean} = {}) {
   const row = {...source().items[0]!, listings: [{listingId: `listing-${"a".repeat(64)}`, channel: "retail"}]};
   const listing = {...source(), items: [row]};
   const catalogue = {
-    publicCatalogue: async () => source(),
+    publicCatalogue: async (request: Readonly<Record<string, unknown>>) => ({...source(),
+      ...(request.supplierPublishersVersion === 1 ? {supplierPublishersVersion: 1} : {})}),
     publicDiscovery: async (request: Readonly<Record<string, unknown>>) => {
       directoryReads++;
       const shop = (request.query as {destination: string}).destination === "shop";
+      const suppliers = request.supplierPublishersVersion === 1;
+      const visible = shop && (repository.profile!.profileId.startsWith('retailer-') || suppliers);
       return {schemaVersion: 1, discoveryPageVersion: 1, realm: "evaluation", state: "ready",
+        ...(suppliers ? {supplierPublishersVersion: 1} : {}),
         coverage: "verified_public_only", directoryCoverage: "complete_bounded", orderingAvailable: false,
         observedAt: clock, query: request.query, resultKind: "products", requestedStore: null,
-        items: shop ? [{channel: "retail", listing: structuredClone(listing)}] : [],
-        page: {snapshotId: "b".repeat(64), startIndex: 0, totalCount: shop ? 1 : 0, previousCursor: null, nextCursor: null}};
+        items: visible ? [{channel: "retail", listing: {...structuredClone(listing),
+          ...(suppliers ? {supplierPublishersVersion: 1} : {})}}] : [],
+        page: {snapshotId: "b".repeat(64), startIndex: 0, totalCount: visible ? 1 : 0, previousCursor: null, nextCursor: null}};
     },
   };
   const subject = new WorkspacePromotionService(repository, catalogue, () => new Date(clock), options);
@@ -192,6 +197,38 @@ test("LF04 advertised terms global discovery preserves conditions and retires ch
   await assert.rejects(fixture.discover({promotionTermsVersion: 1, cursor: page.page.nextCursor}),
     (error: any) => error.code === "stale_cursor");
 });
+
+for (const profileId of ['wholesaler', 'manufacturer']) {
+  test(`LF04-PUBLISHERS supplier promotions derive trusted identity ${profileId}`, async () => {
+    const f = discoveryFixture(); f.repository.profile!.profileId = profileId;
+    const saved = await f.subject.save('owner-one', body());
+    assert.equal(saved.storeId, 'store-one');
+    const legacy = await f.subject.publicPage({storeId: 'store-one', limit: 20});
+    assert.equal(legacy.state, 'unavailable');
+    assert.deepEqual(legacy.items, []);
+    assert.equal(Object.hasOwn(legacy, 'supplierPublishersVersion'), false);
+    const page = await f.subject.publicPage({storeId: 'store-one', limit: 20, supplierPublishersVersion: 1}) as any;
+    assert.equal(page.supplierPublishersVersion, 1);
+    assert.equal(page.state, 'ready');
+    assert.equal(page.items[0].publisherType, profileId);
+    assert.equal(page.items[0].publisherId, 'store-one');
+    const opted = await f.discover({supplierPublishersVersion: 1,
+      query: {...discoveryQuery, publisher: profileId}});
+    assert.equal(opted.page.totalCount, 1);
+    assert.deepEqual(opted.coverage.publisherTypes, ['retailer', 'wholesaler', 'manufacturer']);
+    assert.equal(opted.items[0].publication.publisherType, profileId);
+    assert.equal((await f.discover()).page.totalCount, 0);
+    assert.equal((await f.discover({supplierPublishersVersion: 1,
+      query: {...discoveryQuery, publisher: 'retailer'}})).page.totalCount, 0);
+    await assert.rejects(f.discover({supplierPublishersVersion: 1,
+      query: {...discoveryQuery, publisher: 'moolSocial'}}));
+    const real = f.catalogue.publicDiscovery;
+    f.catalogue.publicDiscovery = async request => {
+      const value = await real(request); delete (value as Record<string, unknown>).supplierPublishersVersion; return value;
+    };
+    await assert.rejects(f.discover({supplierPublishersVersion: 1}), 'Missing acknowledgement cannot silently downgrade.');
+  });
+}
 
 test("ordinary promotion discovery uses owner publications and paginates placements, not products", async () => {
   const f = discoveryFixture();

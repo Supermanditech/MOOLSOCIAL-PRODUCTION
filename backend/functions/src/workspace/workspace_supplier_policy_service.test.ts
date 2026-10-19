@@ -48,6 +48,22 @@ function service(repository: SupplierPolicyRepository, now = () => new Date(at))
   return new WorkspaceSupplierPolicyService(repository, now);
 }
 
+for (const profileId of ['wholesaler', 'manufacturer']) {
+  test(`LF04-PUBLISHERS supplier policy remains exact-Store and SKU scoped ${profileId}`, async () => {
+    const repository = new Memory(); repository.profile!.profileId = profileId;
+    const subject = service(repository);
+    const original = await subject.save('owner-one', input());
+    assert.deepEqual(await service(repository).reconcile('owner-one', input()), original);
+    const publicPolicy = await service(repository).forPublicSku('store-one', 'sku-one');
+    assert.equal(publicPolicy.state, 'ready');
+    assert.equal(publicPolicy.storeId, 'store-one');
+    assert.deepEqual(publicPolicy.policy!.productIds, ['sku-one']);
+    await assert.rejects(subject.save('other-owner', input()), {code: 'not_found'});
+    repository.profile!.status = 'pending';
+    await assert.rejects(subject.save('owner-one', input()));
+  });
+}
+
 test("supplier policy has a persistent local producer rather than native fixtures", () => {
   assert.equal(typeof FirestoreSupplierPolicyRepository.prototype.save, "function");
   assert.equal(typeof FirestoreSupplierPolicyRepository.prototype.reconcile, "function");

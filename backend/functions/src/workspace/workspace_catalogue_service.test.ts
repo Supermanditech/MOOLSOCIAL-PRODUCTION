@@ -26,6 +26,7 @@ import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingB
   planStoreVariantFamilyReview, type StoreVariantFamilyInput, type StoreVariantFamilyCandidate} from "./workspace_catalogue_service.js";
 import type {WorkspaceProfileRecord} from "./workspace_profile_service.js";
 import {WorkspacePromotionService, FirestorePromotionRepository, planPromotionSave, type PromotionRepository, type PromotionRecord} from "./workspace_promotion_service.js";
+import {WorkspaceSupplierPolicyService, FirestoreSupplierPolicyRepository} from "./workspace_supplier_policy_service.js";
 import {createCatalogueAggregate, type CatalogueAggregate} from "../commerce/catalogue_contract.js";
 import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
   type SupplyParticipantWorkspace} from "../commerce/supply_participant_contract.js";
@@ -2877,6 +2878,147 @@ async function discoveryFixture() {
   await subject(repository).saveSku('owner-one', save(unreviewed));
   return repository;
 }
+for (const profileId of ['wholesaler', 'manufacturer']) {
+  test(`LF04-PUBLISHERS explicit catalogue and discovery readback ${profileId}`, async () => {
+    const repository = await discoveryFixture(), service = subject(repository);
+    repository.stores.set('store-two', {...repository.stores.get('store-two')!, profileId});
+    const legacy = await service.publicDiscovery(discoveryRequest()) as DiscoveryResult;
+    assert.equal(legacy.page.totalCount, 1, 'A validated supplier cannot break or enter the legacy retailer cohort.');
+    assert.equal(legacy.items[0]!.listing.storeId, 'store-one');
+    assert.equal(Object.hasOwn(legacy, 'supplierPublishersVersion'), false);
+    const opted = await service.publicDiscovery(discoveryRequest({supplierPublishersVersion: 1})) as
+      DiscoveryResult & {supplierPublishersVersion: number};
+    assert.equal(opted.supplierPublishersVersion, 1);
+    assert.equal(opted.page.totalCount, 2);
+    assert.equal(opted.items[0]!.listing.storeId, 'store-two');
+    assert.equal((opted.items[0]!.listing as any).supplierPublishersVersion, 1);
+    assert.equal((opted.items[0]!.listing as any).publicStore.profileId, profileId);
+    const direct = await service.publicCatalogue({storeId: 'store-two', listingReadbackVersion: 1}) as any;
+    assert.equal(direct.state, 'unavailable');
+    const checked = await service.publicCatalogue({storeId: 'store-two', listingReadbackVersion: 1,
+      supplierPublishersVersion: 1}) as any;
+    assert.equal(checked.state, 'ready');
+    assert.equal(checked.supplierPublishersVersion, 1);
+    assert.equal(checked.publicStore.profileId, profileId);
+    assert.equal(checked.items[0].skuId, 'sku-two');
+    await assert.rejects(service.publicDiscovery(discoveryRequest({cursor: opted.page.nextCursor})));
+    for (const version of [0, 2, '1', null, true]) {
+      await assert.rejects(service.publicCatalogue({storeId: 'store-two', supplierPublishersVersion: version}));
+      await assert.rejects(service.publicDiscovery(discoveryRequest({supplierPublishersVersion: version})));
+    }
+    repository.stores.set('store-two', {...repository.stores.get('store-two')!, profileId: `${profileId}-unrecognised`});
+    await assert.rejects(service.publicDiscovery(discoveryRequest()), 'Corrupt profiles are not truthful empty coverage.');
+  });
+}
+
+for (const requested of [false, true]) {
+  test(`LF04-PUBLISHERS fresh profile change respects legacy non-listing mode ${requested}`, async () => {
+    const repository = await discoveryFixture(), service = subject(repository);
+    const page = repository.page.bind(repository);
+    repository.page = async (...args) => {
+      const rows = await page(...args);
+      repository.stores.set('store-one', {...repository.stores.get('store-one')!, profileId: 'wholesaler'});
+      return rows;
+    };
+    const result = await service.publicCatalogue({storeId: 'store-one',
+      ...(requested ? {supplierPublishersVersion: 1} : {})}) as any;
+    assert.equal(result.state, requested ? 'ready' : 'unavailable');
+    if (!requested) assert.deepEqual(result.items, []);
+  });
+}
+
+for (const profileId of ['wholesaler', 'manufacturer']) {
+  test(`LF04-PUBLISHERS actual reviewed supplier persistence and readback ${profileId}`, {
+    skip: process.env.FIRESTORE_EMULATOR_HOST === undefined,
+  }, async () => {
+    assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+    const app = initializeApp({projectId: `demo-lf-publisher-${randomUUID().slice(0, 8)}`}, `publisher-${randomUUID()}`);
+    const db = getFirestore(app), root = db.collection('workspaceCatalogues').doc('evaluation');
+    const repository = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at));
+    const policies = () => new WorkspaceSupplierPolicyService(
+      new FirestoreSupplierPolicyRepository(db, 'evaluation', () => new Date(at)), () => new Date(at));
+    const service = () => new WorkspaceCatalogueService(repository(), catalogueIdentity, () => new Date(at), policies());
+    const promotions = () => new WorkspacePromotionService(
+      new FirestorePromotionRepository(db, 'evaluation', () => new Date(at)), service(), () => new Date(at));
+    try {
+      // Isolated approved-profile/grant fixtures, not native identities or approval actions.
+      const liveProfile = {...profile, profileId}, value = input();
+      const {aggregate, participant} = produceAll(value, 'brand-host', value.content.categoryId, liveProfile);
+      await db.collection('workspaceProfiles').doc(liveProfile.caseId).set(liveProfile);
+      await root.collection('canonicalCatalogues').doc(catalogueIdentity.catalogueId).set(aggregate);
+      await root.collection('participants').doc('store-one').set(participant);
+      await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+      const original = save(value);
+      await assert.rejects(service().saveSku('owner-one', original), {code: 'forbidden'});
+      assert.equal((await root.collection('stores').doc('store-one').collection('skus').get()).size, 0);
+      const bound = await service().bindReviewedSku('owner-one', original) as any;
+      assert.equal(bound.saved.publicListing, true);
+      assert.equal((await repository().publicDiscoveryBindings()).length, 1);
+      const read = await service().publicCatalogue({storeId: 'store-one', listingReadbackVersion: 1,
+        supplierPublishersVersion: 1}) as any;
+      assert.equal(read.state, 'ready');
+      assert.equal(read.publicStore.profileId, profileId);
+      assert.equal(read.items[0].skuId, value.skuId);
+      assert.equal((await service().publicDiscovery(discoveryRequest()) as any).page.totalCount, 0);
+      const discovered = await service().publicDiscovery(discoveryRequest({supplierPublishersVersion: 1})) as any;
+      assert.equal(discovered.page.totalCount, 1);
+      assert.equal(discovered.items[0].listing.publicStore.profileId, profileId);
+      assert.doesNotMatch(JSON.stringify(discovered), /ownerUserId|sourceRecordId|provenance|producerAuthorities/u);
+      const until = new Date(Date.parse(at) + 3600000).toISOString();
+      await policies().save('owner-one', {storeId: 'store-one', expectedRevision: 0, idempotencyKey: 'supplier-policy',
+        policy: {title: 'Host supplier policy', body: 'Isolated descriptive terms, not payment authority.',
+          productIds: [value.skuId], requiresAcceptance: true, validUntil: until}});
+      const offerRequest = {storeId: 'store-one', placementId: 'supplier-promotion', expectedRevision: 0,
+        idempotencyKey: 'supplier-promotion-original', promotion: {skuId: value.skuId, skuRevision: bound.saved.revision,
+          channel: 'retail', headline: 'Host supplier product', detail: 'Descriptive promotion, not applied savings.',
+          validFrom: at, validUntil: until, active: true}};
+      const promotion = await promotions().save('owner-one', offerRequest);
+      assert.deepEqual(await promotions().reconcile('owner-one', offerRequest), promotion);
+      const storeOffers = await promotions().publicPage({storeId: 'store-one', limit: 20, supplierPublishersVersion: 1});
+      assert.equal(storeOffers.state, 'ready'); assert.equal(storeOffers.items[0]!.publisherType, profileId);
+      assert.equal((storeOffers.items[0]!.product.supplierPolicy as any).requiresAcceptance, true);
+      const offerQuery = {search: '', categoryId: 'all', publisher: profileId, supplierOnly: true};
+      const globalOffers = await promotions().publicDiscovery({promotionDiscoveryVersion: 1, supplierPublishersVersion: 1,
+        query: offerQuery, pageSize: 20}) as any;
+      assert.equal(globalOffers.page.totalCount, 1);
+      assert.equal(globalOffers.items[0].publication.publisherType, profileId);
+      const policyRead = await service().publicCatalogue({storeId: 'store-one', listingReadbackVersion: 1,
+        policyReadbackVersion: 1, supplierPublishersVersion: 1}) as any;
+      assert.equal(policyRead.items[0].supplierPolicy.requiresAcceptance, true);
+      console.info(`LF04_SUPPLIER_PROJECTION=${JSON.stringify({profileId, catalogue: policyRead,
+        discovery: discovered, storeOffers, globalOffers})}`);
+      await root.collection('producerAuthorities').doc('owner-one').delete();
+      assert.deepEqual(await service().reconcileBinding('owner-one', original), bound,
+        'Original owned receipt recovery must not create renewed publication authority.');
+      const changed = {...value, channels: value.channels.map(c => ({...c, priceMinor: 25000}))};
+      await assert.rejects(service().bindReviewedSku('owner-one', save(changed,
+        {expectedRevision: 1, idempotencyKey: 'supplier-no-authority'})));
+      const hidden = {...value, publicListing: false};
+      await service().bindReviewedSku('owner-one', save(hidden,
+        {expectedRevision: 1, idempotencyKey: 'supplier-withdraw'}));
+      assert.equal((await service().publicDiscovery(discoveryRequest({supplierPublishersVersion: 1})) as any).page.totalCount, 0);
+      assert.equal((await promotions().publicDiscovery({promotionDiscoveryVersion: 1, supplierPublishersVersion: 1,
+        query: offerQuery, pageSize: 20}) as any).page.totalCount, 0);
+    } finally {
+      await db.terminate();
+      await deleteApp(app);
+    }
+  });
+}
+
+test('LF04-PUBLISHERS legacy retailer page cursors cannot cross negotiated modes', async () => {
+  const repository = await viewRepository(), service = subject(repository);
+  const legacy = await service.publicCatalogue(viewRequest()) as ViewResult;
+  assert.ok(legacy.page.nextCursor);
+  const opted = await service.publicCatalogue(viewRequest({supplierPublishersVersion: 1})) as
+    ViewResult & {supplierPublishersVersion: number};
+  assert.equal(opted.supplierPublishersVersion, 1);
+  assert.equal(opted.page.totalCount, legacy.page.totalCount);
+  await assert.rejects(service.publicCatalogue(viewRequest({supplierPublishersVersion: 1,
+    cursor: legacy.page.nextCursor})), {code: 'stale_cursor'});
+  await assert.rejects(service.publicCatalogue(viewRequest({cursor: opted.page.nextCursor})), {code: 'stale_cursor'});
+});
+
 test('LF-DISCOVERY two Stores exact paise filters deterministic pages and isolated public envelopes', async () => {
   const repository = await discoveryFixture(), service = subject(repository);
   const first = await service.publicDiscovery(discoveryRequest()) as DiscoveryResult;

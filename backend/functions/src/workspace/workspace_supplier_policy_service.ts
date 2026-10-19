@@ -111,7 +111,9 @@ function record(value: unknown, realm: string, storeId: string): SupplierPolicyR
 function owner(profile: WorkspaceProfileRecord | undefined, storeId: string, userId?: string): WorkspaceProfileRecord {
   if (!profile || profile.schemaVersion !== 1 || profile.workspaceId !== storeId ||
       (userId !== undefined && profile.ownerUserId !== userId)) fail("not_found", "That Store is unavailable.", 404);
-  if (profile.familyId !== "products-trade" || !profile.profileId.startsWith("retailer-") || profile.status !== "live") {
+  if (profile.familyId !== "products-trade" ||
+      !(profile.profileId.startsWith("retailer-") || profile.profileId === "wholesaler" || profile.profileId === "manufacturer") ||
+      profile.status !== "live") {
     fail("invalid_state", "This Store is not active.", 409);
   }
   return profile;

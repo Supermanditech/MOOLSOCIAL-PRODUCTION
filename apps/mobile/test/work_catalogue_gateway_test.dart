@@ -3987,11 +3987,11 @@ void main() {
     row(data)['supplierPolicy'] = policyEnvelope();
     return data;
   }
-  AuthenticatedWorkspaceCatalogueGateway discoveryGateway(SocialContentTransport transport, {String realm = 'production', bool promotions = false, bool advertisedTerms = false}) =>
+  AuthenticatedWorkspaceCatalogueGateway discoveryGateway(SocialContentTransport transport, {String realm = 'production', bool promotions = false, bool advertisedTerms = false, bool supplierPublishers = false}) =>
     AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
       credentials: Credentials(), transport: transport, realm: realm, productFactsReadbackSupported: true,
       unbrandedProduceReadbackSupported: true, storeClassificationReadbackSupported: true, promotionDiscoverySupported: promotions,
-      promotionTermsSupported: advertisedTerms, now: () => at);
+      promotionTermsSupported: advertisedTerms, supplierPublishersVersionSupported: supplierPublishers, now: () => at);
   Map<String, dynamic> discoveryData(Map<String, Object?> body, {bool empty = false}) {
     final listing = publicPage();
     listing.addAll({'productFactsReadbackVersion': 1, 'storeClassificationReadbackVersion': 1, 'storeDetailsReadbackVersion': 1});
@@ -4160,6 +4160,118 @@ void main() {
   }
   BuyV2CatalogueQuery globalOffersQuery() => BuyV2CatalogueQuery(destination: BuyV2Destination.shop,
     regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas, offersOnly: true);
+  test('LF04 PUBLISHERS default exact reader rejects unsolicited publisher acknowledgement', () {
+    final data = publicPage()..['supplierPublishersVersion'] = 1;
+    expect(() => WorkspacePublicCatalogueEntry.fromResponse(data, storeId: 'store-one',
+      realm: 'production', channel: BuyV2OfferClass.retail, now: at), throwsFormatException);
+  });
+  Map<String, dynamic> publisherDiscovery(Map<String, Object?> body, String profile) {
+    final data = discoveryData(body)..['supplierPublishersVersion'] = 1;
+    final listing = ((data['items'] as List).single as Map)['listing'] as Map<String, dynamic>;
+    listing['supplierPublishersVersion'] = 1;
+    (listing['publicStore'] as Map)['profileId'] = profile;
+    return data;
+  }
+  Map<String, dynamic> publisherOffers(Map<String, Object?> body, String profile) {
+    final data = globalPromotionPage(body)..['supplierPublishersVersion'] = 1;
+    (data['coverage'] as Map)['publisherTypes'] = ['retailer', 'wholesaler', 'manufacturer'];
+    for (final row in (data['items'] as List).cast<Map>()) {
+      (row['publication'] as Map)['publisherType'] = profile.startsWith('retailer-') ? 'retailer' : profile;
+      final listing = row['listing'] as Map;
+      listing['supplierPublishersVersion'] = 1; (listing['publicStore'] as Map)['profileId'] = profile;
+    }
+    return data;
+  }
+  for (final profile in ['retailer-grocery', 'wholesaler', 'manufacturer']) {
+    test('LF04 PUBLISHERS opted discovery and Offers keep trusted $profile identity', () async {
+      final requests = <Map<String, Object?>>[];
+      final connection = discoveryGateway(OwnerTransport((body) async {
+        requests.add(body);
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data':
+          body['operation'] == 'readPublicPromotionDiscovery' ? publisherOffers(body, profile) : publisherDiscovery(body, profile)}));
+      }), promotions: true, supplierPublishers: true);
+      expect(connection.forOwnerAccount('owner-one').supplierPublishersVersionSupported, isTrue);
+      final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => true); addTearDown(source.dispose);
+      final products = await source.loadProducts(discoveryQuery(), pageSize: 40);
+      expect(products.items.single.sourceSkuId, 'sku-one'); expect(products.items.single.priceMinor, 10025);
+      final offers = await source.loadOffers(globalOffersQuery(), pageSize: 40);
+      expect(offers.items.map((o) => o.publisherType.name).toSet(), {profile.startsWith('retailer-') ? 'retailer' : profile});
+      expect(offers.offerCoverage!.key, 'manufacturer|retailer|wholesaler');
+      expect(requests.every((r) => r['supplierPublishersVersion'] == 1), isTrue);
+      expect(source.snapshotFor(products.items.single).state, BuyV2ProductContentState.ready);
+    });
+  }
+  for (final fault in ['missing', 'coerced', 'nested missing', 'unknown profile', 'unsolicited']) {
+    test('LF04 PUBLISHERS discovery rejects $fault negotiation', () async {
+      final source = WorkspacePublicDiscoverySource(current: () => true, gateway: discoveryGateway(OwnerTransport((body) async {
+        final data = publisherDiscovery(body, 'wholesaler');
+        final listing = ((data['items'] as List).single as Map)['listing'] as Map;
+        if (fault == 'missing') data.remove('supplierPublishersVersion');
+        if (fault == 'coerced') data['supplierPublishersVersion'] = '1';
+        if (fault == 'nested missing') listing.remove('supplierPublishersVersion');
+        if (fault == 'unknown profile') (listing['publicStore'] as Map)['profileId'] = 'wholesaler-pretend';
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      }), supplierPublishers: fault != 'unsolicited'));
+      addTearDown(source.dispose); await expectLater(source.loadProducts(discoveryQuery(), pageSize: 40), throwsFormatException);
+    });
+  }
+  for (final fault in ['publisher mismatch', 'platform publisher', 'coverage downgrade', 'missing ack', 'nested ack']) {
+    test('LF04 PUBLISHERS Offers rejects $fault', () async {
+      final source = WorkspacePublicDiscoverySource(current: () => true, gateway: discoveryGateway(OwnerTransport((body) async {
+        final data = publisherOffers(body, 'manufacturer'); final first = (data['items'] as List).first as Map;
+        if (fault == 'publisher mismatch') (first['publication'] as Map)['publisherType'] = 'wholesaler';
+        if (fault == 'platform publisher') (first['publication'] as Map)['publisherType'] = 'moolSocial';
+        if (fault == 'coverage downgrade') (data['coverage'] as Map)['publisherTypes'] = ['retailer'];
+        if (fault == 'missing ack') data.remove('supplierPublishersVersion');
+        if (fault == 'nested ack') (first['listing'] as Map).remove('supplierPublishersVersion');
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      }), promotions: true, supplierPublishers: true));
+      addTearDown(source.dispose); await expectLater(source.loadOffers(globalOffersQuery(), pageSize: 40), throwsFormatException);
+    });
+  }
+  if (Platform.environment['LF04_SUPPLIER_LOG'] case final String logPath) {
+    test('LF04 PUBLISHERS actual backend projections cross strict public and Store offer readers', () async {
+      final lines = File(logPath).readAsLinesSync().where((l) => l.contains('LF04_SUPPLIER_PROJECTION=')).toList();
+      expect(lines, hasLength(2));
+      for (final line in lines) {
+        final saved = jsonDecode(line.split('LF04_SUPPLIER_PROJECTION=').last) as Map<String, dynamic>;
+        final catalogue = saved['catalogue'] as Map<String, dynamic>, storeId = catalogue['storeId'] as String;
+        final listing = (((saved['discovery'] as Map)['items'] as List).single as Map)['listing'] as Map<String, dynamic>;
+        final original = WorkspacePublicCatalogueEntry.fromResponse(catalogue, storeId: storeId,
+          realm: 'evaluation', channel: BuyV2OfferClass.retail, now: at, supplierPublishersVersionSupported: true);
+        final requests = <Map<String, Object?>>[];
+        final connection = discoveryGateway(OwnerTransport((body) async {
+          requests.add(body);
+          final data = switch (body['operation']) {
+            'readPublicCatalogueDiscovery' => saved['discovery'],
+            'readPublicPromotionDiscovery' => saved['globalOffers'],
+            'readPublicStorePromotions' => saved['storeOffers'],
+            // This is the actual service's metadata-enriched catalogue response,
+            // returned inside discovery; do not invent missing acknowledgement.
+            'readPublicStoreCatalogue' => listing,
+            _ => throw StateError('Unexpected projection request'),
+          };
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+        }), realm: 'evaluation', promotions: true, supplierPublishers: true);
+        final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => true); addTearDown(source.dispose);
+        final products = await source.loadProducts(BuyV2CatalogueQuery(destination: BuyV2Destination.shop,
+          regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas, sort: BuyV2ProductSort.priceLowToHigh), pageSize: 40);
+        final offers = await source.loadOffers(BuyV2CatalogueQuery(destination: BuyV2Destination.shop,
+          regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas, offersOnly: true, supplierOffersOnly: true,
+          offerPublisher: BuyV2OfferPublisherType.values.singleWhere((p) => p.name == saved['profileId'])), pageSize: 40);
+        final store = WorkspaceStoreCatalogueSource(gateway: connection, storeId: storeId, current: () => true);
+        final scoped = await store.loadStoreOffers(storeId: storeId, destination: BuyV2Destination.shop);
+        expect(products.items.single.publicListingIdentity!.realm, 'evaluation');
+        expect(products.items.single.id, original.product.id);
+        expect(offers.items.single.product.id, products.items.single.id);
+        expect(scoped.single.product.id, products.items.single.id);
+        expect(scoped.single.publisherType.name, saved['profileId']);
+        expect(offers.items.single.publisherType.name, saved['profileId']);
+        expect(scoped.single.product.priceMinor, products.items.single.priceMinor);
+        expect(requests.every((r) => r['supplierPublishersVersion'] == 1), isTrue);
+      }
+    });
+  }
   Map<String, dynamic> advertisedTerms({bool percentage = false}) => BuyV2AdvertisedBenefitTerms(kind: percentage ? 'percentage' : 'flat',
     flatAmountMinor: percentage ? null : 1025, flatBasis: percentage ? null : 'per_pack', percentageBasisPoints: percentage ? 750 : null,
     maximumSavingMinor: 5000, minimumSpendMinor: 0, minimumQuantity: 2).toJson();
@@ -5483,6 +5595,38 @@ void main() {
       AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
         'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
         credentials: Credentials(), transport: transport, now: () => at, reviewedFamilyReadbackSupported: enabled);
+  for (final profile in ['wholesaler', 'manufacturer']) {
+    for (final acknowledged in [true, false]) {
+      test('LF04 PUBLISHERS $profile HTTP family and Store page require acknowledgement=$acknowledged', () async {
+        final fallback = familyTransport(), requests = <Map<String, Object?>>[];
+        final transport = OwnerTransport((body) async {
+          requests.add(body); expect(body['supplierPublishersVersion'], 1);
+          final family = body['operation'] == 'readPublicStoreVariantFamilies';
+          final data = family ? httpReviewedFamily(body)
+            : (jsonDecode((await fallback.postJson(Uri.parse('https://example.com'), headers: {}, body: body)).body) as Map)['data'] as Map<String, dynamic>;
+          if (!family || acknowledged) data['supplierPublishersVersion'] = 1;
+          (data['publicStore'] as Map)['profileId'] = profile;
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+        });
+        final gateway = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+          'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: Credentials(), transport: transport, now: () => at,
+          reviewedFamilyReadbackSupported: true, supplierPublishersVersionSupported: true);
+        final entry = await gateway.readPublicEntry(storeId: 'store-one', skuId: 'sku-one',
+          channel: BuyV2OfferClass.retail, current: () => true);
+        if (!acknowledged) {expect(entry, isNull); return;}
+        expect(entry!.publisherType!.name, profile);
+        final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true, gateway: gateway);
+        final query = BuyV2CatalogueQuery(destination: BuyV2Destination.shop, regionId: null,
+          areaScope: BuyV2CatalogueAreaScope.allAreas, storeId: 'store-one');
+        final page = await source.loadProducts(query, pageSize: 40);
+        expect(page.items.single.sourceSkuId, 'sku-one');
+        final snapshot = await source.loadVariantFamily(entry.product, query);
+        expect(snapshot.candidates.map((p) => p.sourceSkuId).toSet(), {'sku-one', 'sku-two'});
+        expect(requests.where((r) => r['operation'] == 'readPublicStoreVariantFamilies'), isNotEmpty);
+      });
+    }
+  }
   test('LF03 HTTP-FAMILY reads actual endpoint association and exact off-page sibling without generated SKUs', () async {
     final fallback = familyTransport(), operations = <Object?>[];
     final transport = OwnerTransport((body) async {

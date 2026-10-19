@@ -951,7 +951,7 @@ class _WorkWorkspaceDashboardScreenState
           'retailer-grocery',
           'retailer-speciality',
         }.contains(profile.id);
-        if (retailer) {
+        if (retailer || session.workspaceStoreAuthoringAvailable) {
           return _buildRetailerControls(
             context,
             workspace: workspace,

@@ -2275,9 +2275,11 @@ String _catalogueBrand(Map<String, dynamic> content, {Map<String, dynamic>? read
 }
 
 class WorkspacePublicCatalogueEntry {
-  const WorkspacePublicCatalogueEntry({required this.product, required this.readback});
+  const WorkspacePublicCatalogueEntry({required this.product, required this.readback, this.publisherType});
   final BuyV2Product product;
   final WorkspaceCatalogueContentResult readback;
+  // From the checked live public profile, never descriptive businessType text.
+  final BuyV2OfferPublisherType? publisherType;
 
   /// Throws on unavailable, incomplete, changed or unrepresentable source facts.
   /// The existing strict content decoder verifies the complete source tuple,
@@ -2288,7 +2290,9 @@ class WorkspacePublicCatalogueEntry {
     required String realm,
     required BuyV2OfferClass channel,
     required DateTime now,
+    bool supplierPublishersVersionSupported = false,
   }) {
+    _checkSupplierPublishersReadback(data, supported: supplierPublishersVersionSupported);
     _checkProductFactsReadbackVersion(data);
     _checkProduceReadback(data);
     if (!{'production', 'evaluation'}.contains(realm) ||
@@ -2303,7 +2307,7 @@ class WorkspacePublicCatalogueEntry {
     final facts = content.containsKey('productFacts')
         ? WorkspaceCatalogueProductFacts.fromJson(content['productFacts']) : null;
     if (facts != null && data['productFactsReadbackVersion'] != 1) throw const FormatException();
-    final store = _publicStore(data, storeId, realm, now);
+    final store = _publicStore(data, storeId, realm, now, supplierPublishersSupported: supplierPublishersVersionSupported);
     final bindings = _list(row['listings'], 2).map(BuyV2PublicListingIdentity.fromJson)
       .whereType<BuyV2PublicListingIdentity>().where((value) => value.channel == channel).toList();
     final channels = _list(row['channels'], 2).map(_map)
@@ -2344,13 +2348,14 @@ class WorkspacePublicCatalogueEntry {
       sellerType: _publicSellerType(data, storeId, realm, now),
       deliveryPromise: '', origin: '', confirmedOn: '', visualLabel: '', visualKind: '',
       minimumOrder: _int(terms['minimumOrder']), offerClass: channel);
-    final readback = _decode(data, product, realm, now.toUtc(), policyRequired: true);
+    final readback = _decode(data, product, realm, now.toUtc(), policyRequired: true,
+      supplierPublishersSupported: supplierPublishersVersionSupported);
     if (readback.content.state != BuyV2ProductContentState.ready || !product.hasValidPackTerms) {
       throw const FormatException();
     }
     return WorkspacePublicCatalogueEntry(product: product.copyWith(mediaAssets: List.unmodifiable(
       readback.content.media.where((asset) => BuyV2SupplierMediaPolicy.publicationMessage(product, asset) == null))),
-      readback: readback);
+      readback: readback, publisherType: _profilePublisher(store['profileId']));
   }
 }
 
@@ -2404,6 +2409,7 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
     if (!current() || listings.isEmpty || listings.length > 50 ||
         listings.any((i) => !i.valid || i.storeId != storeId || i.realm != gateway.realm)) { throw const FormatException(); }
     final response = await gateway._ownerRequest({'operation': 'readPublicStoreVariantFamilies', 'storeId': storeId,
+      if (gateway.supplierPublishersVersionSupported) 'supplierPublishersVersion': 1,
       if (gateway.storeClassificationReadbackSupported) 'storeClassificationReadbackVersion': 1,
       'listings': [for (final i in listings) {'listingId': i.listingId, 'skuId': i.skuId, 'channel': i.channel.name}],
       'familyId': ?familyId}, current, mutation: false);
@@ -2414,7 +2420,8 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
     if (data['state'] != 'ready') throw const FormatException('Published options are unavailable.');
     _checkStoreClassificationReadback(data, supported: gateway.storeClassificationReadbackSupported);
     if (gateway.storeClassificationReadbackSupported && data['storeClassificationReadbackVersion'] != 1) throw const FormatException();
-    _keys(Map<String, dynamic>.of(data)..remove('storeClassificationReadbackVersion')..remove('storeDetailsReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'observedAt', 'orderingAvailable', 'state',
+    _checkSupplierPublishersReadback(data, supported: gateway.supplierPublishersVersionSupported);
+    _keys(Map<String, dynamic>.of(data)..remove('supplierPublishersVersion')..remove('storeClassificationReadbackVersion')..remove('storeDetailsReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'observedAt', 'orderingAvailable', 'state',
       'catalogueVersion', 'publicStore', 'sourceId', 'revision', 'validUntil', 'memberships', 'family']);
     final now = gateway.now().toUtc(), observed = _time(data['observedAt']), expires = _time(data['validUntil']);
     if (data['schemaVersion'] is! int || data['schemaVersion'] != 1 || data['realm'] != gateway.realm ||
@@ -2422,7 +2429,7 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
         !now.isBefore(expires) || !observed.isBefore(expires) || expires.difference(observed) > const Duration(minutes: 5) ||
         data['sourceId'] != 'store-reviewed-variants:${gateway.realm}:$storeId') { throw const FormatException(); }
     _int(data['revision'], 1, 1000000000); _int(data['catalogueVersion'], 1, 1000000001);
-    _publicStore(data, storeId, gateway.realm, now);
+    _publicStore(data, storeId, gateway.realm, now, supplierPublishersSupported: gateway.supplierPublishersVersionSupported);
     return data;
   }
 
@@ -2510,10 +2517,12 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
         'storeId': identity.storeId, 'observedAt': data['observedAt'], 'state': 'ready', 'orderingAvailable': false,
         'coverage': 'verified_public_only', 'listingCoverage': 'complete', 'listingReadbackVersion': 1,
         'productFactsReadbackVersion': 1, 'mediaReadbackVersion': 1, 'unbrandedProduceReadbackVersion': 1,
+        if (data.containsKey('supplierPublishersVersion')) 'supplierPublishersVersion': data['supplierPublishersVersion'],
         if (data.containsKey('storeClassificationReadbackVersion')) 'storeClassificationReadbackVersion': data['storeClassificationReadbackVersion'],
         if (data.containsKey('storeDetailsReadbackVersion')) 'storeDetailsReadbackVersion': data['storeDetailsReadbackVersion'],
         'catalogueVersion': data['catalogueVersion'], 'publicStore': data['publicStore'], 'items': [row['product']], 'nextCursor': null},
-        storeId: identity.storeId, realm: gateway.realm, channel: identity.channel, now: gateway.now().toUtc());
+        storeId: identity.storeId, realm: gateway.realm, channel: identity.channel, now: gateway.now().toUtc(),
+        supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported);
       if (!member.validFor(entry, gateway.realm, gateway.now().toUtc()) || member.familyId != previous.familyId ||
           products.any((p) => p.id == entry.product.id)) { throw const FormatException(); }
       products.add(entry.product.copyWith(variantFamilyId: member.familyId, variantAttributes: member.attributes));
@@ -2545,7 +2554,8 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
   int _promotionGeneration = 0;
   final _promotionHeads = <String, ({int revision, DateTime observed, String copy})>{};
   void Function() _prepareMetadata(Map<String, dynamic> data) {
-    final store = _publicStore(data, storeId, gateway.realm, gateway.now().toUtc());
+    final store = _publicStore(data, storeId, gateway.realm, gateway.now().toUtc(),
+      supplierPublishersSupported: gateway.supplierPublishersVersionSupported);
     final metadata = data['storeDetailsReadbackVersion'] == 1
       ? WorkspacePublicStoreMetadata.decode(store['details'], gateway.realm, storeId, gateway.now().toUtc()) : null;
     final fingerprint = jsonEncode(_sorted(metadata?.details?.toJson())), revision = metadata?.revision;
@@ -2596,13 +2606,16 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
       if (!active()) throw const FormatException();
       final response = await gateway._ownerRequest({'operation': 'readPublicStorePromotions',
         'storeId': storeId, 'limit': 20, 'after': ?after,
+        if (gateway.supplierPublishersVersionSupported) 'supplierPublishersVersion': 1,
         if (gateway.promotionTermsSupported) 'promotionTermsVersion': 1}, active, mutation: false);
       if (!active() || response?.statusCode != 200) throw const FormatException();
       final envelope = _map(jsonDecode(response!.body));
       if (envelope['ok'] != true) throw const FormatException();
       final data = _map(envelope['data']);
       _keys(data, ['schemaVersion', 'realm', 'storeId', 'observedAt', 'state', 'coverage',
-        'orderingAvailable', 'items', 'nextCursor', if (gateway.promotionTermsSupported) 'promotionTermsVersion']);
+        'orderingAvailable', 'items', 'nextCursor', if (gateway.promotionTermsSupported) 'promotionTermsVersion',
+        if (gateway.supplierPublishersVersionSupported) 'supplierPublishersVersion']);
+      _checkSupplierPublishersReadback(data, supported: gateway.supplierPublishersVersionSupported);
       if (gateway.promotionTermsSupported) _int(data['promotionTermsVersion'], 1, 1);
       final observed = _time(data['observedAt']), now = gateway.now().toUtc();
       if (data['schemaVersion'] is! int || data['schemaVersion'] != 1 || data['realm'] != gateway.realm ||
@@ -2619,7 +2632,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
         final id = _id(row['publicationId']), revision = _int(row['revision'], 1, 1000000000);
         final source = _string(row['sourceId'], 512), itemObserved = _time(row['observedAt']);
         if (!publications.add(id) || previous != null && id.compareTo(previous) <= 0 ||
-            row['publisherType'] != 'retailer' || row['publisherId'] != storeId ||
+            row['publisherId'] != storeId ||
             source != 'store-promotion:${gateway.realm}:$storeId:$id:$revision' || itemObserved.isAfter(observed)) {
           throw const FormatException();
         }
@@ -2636,7 +2649,8 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
         final entry = resolved[resolutionKey] ?? await gateway.readPublicEntry(storeId: storeId, skuId: skuId,
           channel: channel, current: active);
         if (!active() || entry == null || entry.product.storeId != storeId ||
-            entry.product.publicListingIdentity?.realm != gateway.realm) { throw const FormatException(); }
+            entry.product.publicListingIdentity?.realm != gateway.realm || entry.publisherType == null ||
+            row['publisherType'] != entry.publisherType!.name) { throw const FormatException(); }
         resolved[resolutionKey] = entry;
         // Resolve the real listing first. Compare every immutable SKU/pack/media/
         // content/price fact, and separately pin the governed term window. Never
@@ -2649,7 +2663,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
         heads[id] = head;
         entries.add(entry);
         results.add(BuyV2PublishedCatalogueOffer(publicationId: id, revision: revision,
-          product: entry.product, publisherType: BuyV2OfferPublisherType.retailer, publisherId: storeId,
+          product: entry.product, publisherType: entry.publisherType!, publisherId: storeId,
           publisherName: _string(row['publisherName'], 240), headline: headline, detail: detail,
           sourceId: source, observedAt: itemObserved, validUntil: expiry, benefitTerms: benefitTerms));
       }
@@ -2696,6 +2710,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
     if (pageSize < 1 || pageSize > 50 || !active()) throw const FormatException();
     final response = await gateway._ownerRequest({'operation': 'readPublicStoreCatalogue',
       'storeId': storeId, 'cataloguePageVersion': gateway.minorMoneyReadbackSupported ? 2 : 1, 'query': request, 'pageSize': pageSize,
+      if (gateway.supplierPublishersVersionSupported) 'supplierPublishersVersion': 1,
       if (gateway.productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
       'storeDetailsReadbackVersion': 1,
       if (gateway.storeClassificationReadbackSupported) 'storeClassificationReadbackVersion': 1,
@@ -2739,7 +2754,8 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
         // Page semantics were verified above. Project this single returned row
         // through the same exact-SKU binding/content decoder, not owner storage.
         'items': [_map(item['row'])], 'nextCursor': null},
-        storeId: storeId, realm: gateway.realm, channel: channel, now: gateway.now().toUtc());
+        storeId: storeId, realm: gateway.realm, channel: channel, now: gateway.now().toUtc(),
+        supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported);
       if (entry.product.destination != query.destination ||
           (query.wholesaleSaleType != null && channel.name != query.wholesaleSaleType!.name) ||
           (listingIds.isNotEmpty && !listingIds.contains(entry.product.id))) {
@@ -3065,6 +3081,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
     final requested = _query(query, ids);
     final response = await gateway._ownerRequest({'operation': 'readPublicCatalogueDiscovery',
       'discoveryPageVersion': 1, 'query': requested, 'pageSize': pageSize, 'resultKind': kind,
+      if (gateway.supplierPublishersVersionSupported) 'supplierPublishersVersion': 1,
       if (query.storeId != null) 'storeId': query.storeId, 'cursor': ?cursor}, valid, mutation: false);
     if (!valid() || response?.statusCode != 200 || utf8.encode(response!.body).length > 512 * 1024) throw const FormatException();
     final envelope = _map(jsonDecode(response.body));
@@ -3072,7 +3089,9 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
     if (envelope['ok'] != true) throw const FormatException();
     final data = _map(envelope['data']);
     _keys(data, ['schemaVersion', 'discoveryPageVersion', 'realm', 'state', 'coverage', 'directoryCoverage',
-      'orderingAvailable', 'observedAt', 'query', 'resultKind', 'requestedStore', 'items', 'page']);
+      'orderingAvailable', 'observedAt', 'query', 'resultKind', 'requestedStore', 'items', 'page',
+      if (gateway.supplierPublishersVersionSupported) 'supplierPublishersVersion']);
+    _checkSupplierPublishersReadback(data, supported: gateway.supplierPublishersVersionSupported);
     if (_int(data['schemaVersion'], 1, 1) != 1 || _int(data['discoveryPageVersion'], 1, 1) != 1 ||
         data['realm'] != gateway.realm || data['state'] != 'ready' || data['coverage'] != 'verified_public_only' ||
         data['directoryCoverage'] != 'complete_bounded' || data['orderingAvailable'] != false ||
@@ -3100,7 +3119,8 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
           listing['storeDetailsReadbackVersion'] != 1 ||
           _time(listing['observedAt']).isAfter(_time(data['observedAt']))) { throw const FormatException(); }
       final entry = WorkspacePublicCatalogueEntry.fromResponse(listing, storeId: storeId,
-        realm: gateway.realm, channel: channels.single, now: gateway.now().toUtc());
+        realm: gateway.realm, channel: channels.single, now: gateway.now().toUtc(),
+        supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported);
       if (entry.product.destination != query.destination || ids.isNotEmpty && !ids.contains(entry.product.id) ||
           query.wholesaleSaleType != null && entry.product.offerClass?.name != query.wholesaleSaleType!.name) { throw const FormatException(); }
       final storeCopy = jsonEncode(_sorted(listing['publicStore']));
@@ -3152,13 +3172,18 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
         'categoryId': query.categoryId, 'publisher': query.offerPublisher?.name, 'supplierOnly': query.supplierOffersOnly};
       final response = await gateway._ownerRequest({'operation': 'readPublicPromotionDiscovery',
         'promotionDiscoveryVersion': 1, 'query': requested, 'pageSize': pageSize, 'cursor': ?cursor,
+        if (gateway.supplierPublishersVersionSupported) 'supplierPublishersVersion': 1,
         if (gateway.promotionTermsSupported) 'promotionTermsVersion': 1}, valid, mutation: false);
       if (!valid() || response?.statusCode != 200 || utf8.encode(response!.body).length > 512 * 1024) throw const FormatException();
       final envelope = _map(jsonDecode(response.body)); _keys(envelope, ['ok', 'data']);
       if (envelope['ok'] != true) throw const FormatException();
       final data = _map(envelope['data']);
       _keys(data, ['schemaVersion', 'promotionDiscoveryVersion', 'realm', 'state', 'coverage', 'orderingAvailable',
-        'observedAt', 'query', 'items', 'page', if (gateway.promotionTermsSupported) 'promotionTermsVersion']);
+        'observedAt', 'query', 'items', 'page', if (gateway.promotionTermsSupported) 'promotionTermsVersion',
+        if (gateway.supplierPublishersVersionSupported) 'supplierPublishersVersion']);
+      _checkSupplierPublishersReadback(data, supported: gateway.supplierPublishersVersionSupported);
+      final publisherCoverage = [BuyV2OfferPublisherType.retailer,
+        if (gateway.supplierPublishersVersionSupported) ...[BuyV2OfferPublisherType.wholesaler, BuyV2OfferPublisherType.manufacturer]];
       if (gateway.promotionTermsSupported) _int(data['promotionTermsVersion'], 1, 1);
       final observed = _time(data['observedAt']), now = gateway.now().toUtc(), coverage = _map(data['coverage']);
       _keys(coverage, ['kind', 'publisherTypes', 'countBasis']);
@@ -3166,7 +3191,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
           data['realm'] != gateway.realm || data['state'] != 'ready' || data['orderingAvailable'] != false || observed.isAfter(now) ||
           jsonEncode(_sorted(data['query'])) != jsonEncode(_sorted(requested)) ||
           coverage['kind'] != 'connected_publishers' || coverage['countBasis'] != 'publications' ||
-          jsonEncode(coverage['publisherTypes']) != '["retailer"]') { throw const FormatException(); }
+          jsonEncode(coverage['publisherTypes']) != jsonEncode(publisherCoverage.map((p) => p.name).toList())) { throw const FormatException(); }
       final metadata = _map(data['page']);
       _keys(metadata, ['snapshotId', 'startIndex', 'totalCount', 'previousCursor', 'nextCursor']);
       final snapshot = _string(metadata['snapshotId'], 64), start = _int(metadata['startIndex'], 0, 500), total = _int(metadata['totalCount'], 0, 500);
@@ -3189,16 +3214,20 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
         final itemObserved = _time(publication['observedAt']), expiry = _time(publication['validUntil']), source = _string(publication['sourceId'], 512);
         final sku = _map(publication['product']), channelRow = _map(_list(sku['channels'], 1).single),
           channel = BuyV2OfferClass.values.where((c) => c.name == channelRow['kind']).single;
-        if (publication['publisherType'] != 'retailer' || !query.acceptsOfferPublisher(BuyV2OfferPublisherType.retailer) ||
-            listing['storeId'] != storeId || listing['productFactsReadbackVersion'] != 1 || listing['storeClassificationReadbackVersion'] != 1 ||
+        if (listing['storeId'] != storeId || listing['productFactsReadbackVersion'] != 1 || listing['storeClassificationReadbackVersion'] != 1 ||
             listing['storeDetailsReadbackVersion'] != 1 || _time(listing['observedAt']).isAfter(observed) ||
             source != 'store-promotion:${gateway.realm}:$storeId:$id:$revision' || itemObserved.isAfter(observed) ||
             !itemObserved.isBefore(expiry) || !now.isBefore(expiry)) { throw const FormatException(); }
-        final entry = WorkspacePublicCatalogueEntry.fromResponse(listing, storeId: storeId, realm: gateway.realm, channel: channel, now: now);
+        final entry = WorkspacePublicCatalogueEntry.fromResponse(listing, storeId: storeId, realm: gateway.realm, channel: channel, now: now,
+          supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported);
+        if (entry.publisherType == null || publication['publisherType'] != entry.publisherType!.name ||
+            !publisherCoverage.contains(entry.publisherType) || !query.acceptsOfferPublisher(entry.publisherType!)) {
+          throw const FormatException();
+        }
         final actual = _checkedPromotionProduct(sku, entry, expiry);
         final headline = _string(publication['headline'], 160), detail = _string(publication['detail'], 2000, true);
         _string(publication['publisherName'], 240);
-        final identity = jsonEncode([gateway.realm, 'retailer', storeId, id]),
+        final identity = jsonEncode([gateway.realm, entry.publisherType!.name, storeId, id]),
           copy = jsonEncode([source, headline, detail, _sorted(actual), if (benefitTerms != null) benefitTerms.toJson()]), old = _offerHeads[identity];
         if (heads.containsKey(identity) || old != null && (revision < old.revision || itemObserved.isBefore(old.observed) || revision == old.revision && copy != old.copy)) throw const FormatException();
         heads[identity] = (revision: revision, observed: itemObserved, copy: copy);
@@ -3214,7 +3243,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
       final offers = List.generate(enriched.length, (index) {
         final p = publications[index];
         return BuyV2PublishedCatalogueOffer(publicationId: p['publicationId'], revision: p['revision'], product: enriched[index].product,
-          publisherType: BuyV2OfferPublisherType.retailer, publisherId: p['publisherId'], publisherName: p['publisherName'],
+          publisherType: enriched[index].publisherType!, publisherId: p['publisherId'], publisherName: p['publisherName'],
           headline: p['headline'], detail: p['detail'], sourceId: p['sourceId'], observedAt: _time(p['observedAt']), validUntil: _time(p['validUntil']),
           benefitTerms: p.containsKey('benefitTerms') ? BuyV2AdvertisedBenefitTerms.fromJson(p['benefitTerms']) : null);
       });
@@ -3235,7 +3264,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
       while (_offerCopies.length > 500) { _offerCopies.remove(_offerCopies.keys.first); }
       while (_offerHeads.length > 500) { _offerHeads.remove(_offerHeads.keys.first); }
       return BuyV2CataloguePage(queryKey: query.key, snapshotId: snapshot, items: offers, startIndex: start, totalCount: total,
-        previousCursor: previous, nextCursor: next, offerCoverage: BuyV2OfferCoverage([BuyV2OfferPublisherType.retailer]));
+        previousCursor: previous, nextCursor: next, offerCoverage: BuyV2OfferCoverage(publisherCoverage));
     } finally {reading = false;}
   }
   @override
@@ -3299,6 +3328,7 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
     ownerAccountId: _id(accountUserId), policyReadbackRequired: true,
     productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
     reviewedFamilyReadbackSupported: true, storeClassificationReadbackSupported: true,
+    supplierPublishersVersionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_PUBLISHERS_V1'),
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
@@ -3362,6 +3392,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     storeClassificationReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_STORE_CLASSIFICATION_V1'),
+    supplierPublishersVersionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_PUBLISHERS_V1'),
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
   );
 }
@@ -3396,6 +3427,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.reviewedProductSubmissionSupported = false,
     this.reviewedProductMediaSupported = false,
     this.storeClassificationReadbackSupported = false,
+    this.supplierPublishersVersionSupported = false,
     this.minorMoneyReadbackSupported = false,
     this.promotionDiscoverySupported = false,
     this.promotionTermsSupported = false,
@@ -3431,6 +3463,7 @@ class AuthenticatedWorkspaceCatalogueGateway
   @override
   DateTime get productReviewNow => now().toUtc();
   final bool storeClassificationReadbackSupported;
+  final bool supplierPublishersVersionSupported;
   // Opt-in only for the matching integer-paise paged contract; legacy stays v1.
   final bool minorMoneyReadbackSupported;
   final bool promotionDiscoverySupported;
@@ -3468,6 +3501,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       reviewedProductSubmissionSupported: reviewedProductSubmissionSupported,
       reviewedProductMediaSupported: reviewedProductMediaSupported,
       storeClassificationReadbackSupported: storeClassificationReadbackSupported,
+      supplierPublishersVersionSupported: supplierPublishersVersionSupported,
       minorMoneyReadbackSupported: minorMoneyReadbackSupported,
       promotionDiscoverySupported: promotionDiscoverySupported,
       promotionTermsSupported: promotionTermsSupported,
@@ -3718,7 +3752,8 @@ class AuthenticatedWorkspaceCatalogueGateway
         throw const FormatException('Product options could not be confirmed.');
       }
       enriched.add(WorkspacePublicCatalogueEntry(product: entry.product.copyWith(
-        variantFamilyId: record.familyId, variantAttributes: record.attributes), readback: entry.readback));
+        variantFamilyId: record.familyId, variantAttributes: record.attributes), readback: entry.readback,
+        publisherType: entry.publisherType));
     }
     if (!current()) throw const FormatException();
     // Validate the entire batch before admitting any association/high-water mark.
@@ -4070,6 +4105,7 @@ class AuthenticatedWorkspaceCatalogueGateway
             body: {
               'operation': 'readPublicStoreCatalogue',
               'mediaReadbackVersion': 1,
+              if (supplierPublishersVersionSupported) 'supplierPublishersVersion': 1,
               if (productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
               if (unbrandedProduceReadbackSupported) 'unbrandedProduceReadbackVersion': 1,
               if (policyRequired) 'policyReadbackVersion': 1,
@@ -4094,7 +4130,8 @@ class AuthenticatedWorkspaceCatalogueGateway
       if (items is List && items.any((item) => item is Map && item.containsKey('supplierPolicy'))) {
         _policyObserved = true;
       }
-      return _decode(data, product, realm, now().toUtc(), policyRequired: policyRequired || policyResolutionRequired);
+      return _decode(data, product, realm, now().toUtc(), policyRequired: policyRequired || policyResolutionRequired,
+        supplierPublishersSupported: supplierPublishersVersionSupported);
     } catch (_) {
       // Never expose provider diagnostics, retain a stale result, or fake success.
       return WorkspaceCatalogueContentResult(content: _unavailable(product,
@@ -4112,6 +4149,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       final response = await _ownerRequest({
         'operation': 'readPublicStoreCatalogue', 'storeId': storeId, 'skuId': skuId,
         'listingReadbackVersion': 1, 'mediaReadbackVersion': 1, 'policyReadbackVersion': 1,
+        if (supplierPublishersVersionSupported) 'supplierPublishersVersion': 1,
         if (productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
         'storeDetailsReadbackVersion': 1,
         if (storeClassificationReadbackSupported) 'storeClassificationReadbackVersion': 1,
@@ -4123,7 +4161,8 @@ class AuthenticatedWorkspaceCatalogueGateway
       _checkStoreClassificationReadback(_map(envelope['data']), supported: storeClassificationReadbackSupported);
       if (storeClassificationReadbackSupported && _map(envelope['data'])['storeClassificationReadbackVersion'] != 1) throw const FormatException();
       final entry = WorkspacePublicCatalogueEntry.fromResponse(_map(envelope['data']),
-        storeId: storeId, realm: realm, channel: channel, now: now().toUtc());
+        storeId: storeId, realm: realm, channel: channel, now: now().toUtc(),
+        supplierPublishersVersionSupported: supplierPublishersVersionSupported);
       // The response is scoped to the requested raw SKU, not merely a same-Store
       // listing. Account/session retirement never admits a delayed product.
       if (!current() || entry.product.sourceSkuId != skuId) return null;
@@ -4622,7 +4661,9 @@ WorkspaceCatalogueContentResult _decode(
   String realm,
   DateTime now, {
   bool policyRequired = false,
+  bool supplierPublishersSupported = false,
 }) {
+  _checkSupplierPublishersReadback(data, supported: supplierPublishersSupported);
   _checkProductFactsReadbackVersion(data);
   _checkProduceReadback(data);
   if (data['schemaVersion'] != 1 ||
@@ -4647,7 +4688,7 @@ WorkspaceCatalogueContentResult _decode(
   if (identity != null) {
     if (!identity.matches(product) || identity.realm != realm || data['listingReadbackVersion'] != 1 ||
         data['listingCoverage'] != 'complete') { throw const FormatException(); }
-    _publicStore(data, product.storeId!, realm, now);
+    _publicStore(data, product.storeId!, realm, now, supplierPublishersSupported: supplierPublishersSupported);
     if (data['storeClassificationReadbackVersion'] == 1 &&
         _publicSellerType(data, product.storeId!, realm, now) != product.sellerType) { throw const FormatException(); }
     final bindings = _list(row['listings'], 2).map(BuyV2PublicListingIdentity.fromJson).toList();
@@ -4976,11 +5017,33 @@ WorkspaceCatalogueContentResult _decode(
     fingerprint: jsonEncode(_sorted(value)), observed: observed);
 }
 
-Map<String, dynamic> _publicStore(Map<String, dynamic> data, String storeId, String realm, DateTime now) {
+void _checkSupplierPublishersReadback(Map<String, dynamic> data, {required bool supported}) {
+  if (supported ? data['supplierPublishersVersion'] is! int || data['supplierPublishersVersion'] != 1
+      : data.containsKey('supplierPublishersVersion')) {
+    throw const FormatException();
+  }
+}
+
+BuyV2OfferPublisherType _profilePublisher(Object? profile) {
+  if (profile is String && profile.startsWith('retailer-')) return BuyV2OfferPublisherType.retailer;
+  return switch (profile) {
+    'wholesaler' => BuyV2OfferPublisherType.wholesaler,
+    'manufacturer' => BuyV2OfferPublisherType.manufacturer,
+    _ => throw const FormatException(),
+  };
+}
+
+Map<String, dynamic> _publicStore(Map<String, dynamic> data, String storeId, String realm, DateTime now,
+    {bool supplierPublishersSupported = false}) {
+  _checkSupplierPublishersReadback(data, supported: supplierPublishersSupported);
   _checkStoreClassificationReadback(data);
   final store = _map(data['publicStore']);
   _keys(Map<String, dynamic>.of(store)..remove('details'), ['id', 'name', 'profileId']);
-  if (store['id'] != storeId || !_string(store['profileId']).startsWith('retailer-')) throw const FormatException();
+  if (store['id'] != storeId || !supplierPublishersSupported &&
+      _profilePublisher(store['profileId']) != BuyV2OfferPublisherType.retailer) {
+    throw const FormatException();
+  }
+  _profilePublisher(store['profileId']);
   _string(store['name'], 240);
   if (store.containsKey('details') || data['storeDetailsReadbackVersion'] == 1) {
     if (data['storeDetailsReadbackVersion'] != 1) throw const FormatException();
