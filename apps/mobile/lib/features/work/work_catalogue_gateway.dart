@@ -10,7 +10,10 @@ import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
 import 'work_publication_data.dart';
-import 'work_models.dart' show WorkspaceVariantFamily, WorkspaceVariantMembership, WorkspaceCatalogueItem;
+import 'work_models.dart' show WorkspaceVariantFamily, WorkspaceVariantMembership, WorkspaceCatalogueItem,
+  WorkspaceAnalyticsRequest, WorkspaceAnalyticsSnapshot, WorkspaceAnalyticsState, WorkspaceAnalyticsCoverage,
+  WorkspaceAnalyticsMetric, WorkspaceAnalyticsBasis, WorkspaceAnalyticsUnit, WorkspaceAnalyticsBreakdown,
+  WorkspaceAnalyticsDimension, WorkspaceAnalyticsRank;
 
 /// Read-only public catalogue content, never an order/price/Stock authority.
 abstract interface class WorkspaceCatalogueGateway {
@@ -2351,6 +2354,92 @@ Map<String, dynamic> _checkedPromotionProduct(Map<String, dynamic> sku,
 
 /// One authenticated account-generation's public discovery/content owner.
 /// Unsupported geography/fulfilment filters require their actual producer.
+/// Lossy, explicitly partial presentation reporting; never a visitor/payment/Stock ledger.
+class WorkspaceProductPresentationGateway {
+  WorkspaceProductPresentationGateway({required this.gateway, required this.current, required this.displayed});
+  final AuthenticatedWorkspaceCatalogueGateway gateway;
+  final bool Function() current;
+  final WorkspaceCatalogueContentResult? Function(BuyV2Product) displayed;
+  Map<String, Object?>? prepare(BuyV2Product product, String presentationId) {
+    final identity = product.publicListingIdentity, result = displayed(product);
+    if (!current() || identity == null || !identity.matches(product) || identity.realm != gateway.realm ||
+        result?.content.state != BuyV2ProductContentState.ready || result?.validUntil?.isAfter(gateway.now().toUtc()) != true ||
+        result?.skuRevision == null || result?.catalogueVersion == null || !RegExp(r'^[a-f0-9]{32}$').hasMatch(presentationId)) {return null;}
+    return {'schemaVersion': 1, 'presentationId': presentationId, 'storeId': identity.storeId, 'skuId': identity.skuId,
+      'listingId': identity.listingId, 'skuRevision': result!.skuRevision, 'catalogueVersion': result.catalogueVersion};
+  }
+  Future<bool> record(Map<String, Object?> original, {required bool Function() visible}) async {
+    final frozen = Map<String, Object?>.unmodifiable(original);
+    bool valid() => current() && visible();
+    try {
+      if (!valid()) return false;
+      final response = await gateway._ownerRequest({'operation': 'recordPublicProductPresentation', ...frozen}, valid, mutation: true);
+      if (!valid() || response?.statusCode != 200) return false;
+      final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
+      final data = _map(envelope['data']);
+      _keys(data, [...frozen.keys, 'realm', 'acceptedAt', 'state', 'orderingAvailable']);
+      return envelope['ok'] == true && data['realm'] == gateway.realm && data['state'] == 'recorded' && data['orderingAvailable'] == false &&
+        !_time(data['acceptedAt']).isAfter(gateway.now().toUtc()) && frozen.entries.every((e) => data[e.key] == e.value);
+    } on Object {return false;}
+  }
+  Future<WorkspaceAnalyticsSnapshot> readAnalytics(WorkspaceAnalyticsRequest request) async {
+    if (!current() || !request.valid || request.accountScope != gateway.ownerAccountId) throw const FormatException();
+    DateTime millisecondFloor(DateTime value) {
+      final utc = value.toUtc();
+      return DateTime.utc(utc.year, utc.month, utc.day, utc.hour, utc.minute, utc.second, utc.millisecond);
+    }
+    final floor = millisecondFloor(request.start);
+    // The provider records milliseconds. Narrow the covered interval; never
+    // round start outward and count an event before the user's selected range.
+    final wireStart = floor.isBefore(request.start) ? floor.add(const Duration(milliseconds: 1)) : floor,
+      wireEnd = millisecondFloor(request.end);
+    if (!wireStart.isBefore(wireEnd)) {
+      return WorkspaceAnalyticsSnapshot(request: request, state: WorkspaceAnalyticsState.unavailable,
+        coverage: WorkspaceAnalyticsCoverage.unknown, source: 'Recorded product views', metrics: const []);
+    }
+    final skus = request.skuIds.toList()..sort();
+    final query = {'schemaVersion': 1, 'storeId': request.storeId, 'start': wireStart.toIso8601String(),
+      'end': wireEnd.toIso8601String(), 'skuIds': skus};
+    final response = await gateway._ownerRequest({'operation': 'readStoreProductPresentations', ...query}, current, mutation: false);
+    if (!current() || response?.statusCode != 200 || utf8.encode(response!.body).length > 512 * 1024) throw const FormatException();
+    final envelope = _map(jsonDecode(response.body)); _keys(envelope, ['ok', 'data']);
+    if (envelope['ok'] != true) throw const FormatException();
+    final data = _map(envelope['data']);
+    _keys(data, [...query.keys, 'realm', 'observedAt', 'source', 'state', 'coverage', 'collectionStartedAt', 'coveredFrom', 'coveredUntil', 'count', 'products']);
+    if (data['realm'] != gateway.realm || query.entries.any((e) => jsonEncode(data[e.key]) != jsonEncode(e.value)) || data['source'] != 'Recorded product views') throw const FormatException();
+    final observed = _time(data['observedAt']);
+    if (observed.isAfter(gateway.now().toUtc())) throw const FormatException();
+    if (data['state'] == 'unavailable') {
+      if (data['coverage'] != 'unknown' || data['count'] != null || data['coveredFrom'] != null || data['coveredUntil'] != null || _list(data['products'], 0).isNotEmpty) throw const FormatException();
+      if (data['collectionStartedAt'] != null && _time(data['collectionStartedAt']).isAfter(observed)) throw const FormatException();
+      return WorkspaceAnalyticsSnapshot(request: request, state: WorkspaceAnalyticsState.unavailable,
+        coverage: WorkspaceAnalyticsCoverage.unknown, source: 'Recorded product views', metrics: const []);
+    }
+    final from = _time(data['coveredFrom']), until = _time(data['coveredUntil']), start = _time(data['collectionStartedAt']);
+    if (data['state'] != 'ready' || data['coverage'] != 'partial' || start.isAfter(from) || from.isBefore(wireStart) ||
+        until.isAfter(wireEnd) || until.isAfter(observed) || !from.isBefore(until)) {throw const FormatException();}
+    final count = _int(data['count'], 0, 5000), ids = <String>{};
+    var total = 0;
+    final rows = _list(data['products'], 5000).map((raw) {
+      final row = _map(raw); _keys(row, ['skuId', 'label', 'count']);
+      final id = _id(row['skuId']), amount = _int(row['count'], 1, 5000);
+      if (!ids.add(id) || skus.isNotEmpty && !skus.contains(id)) throw const FormatException();
+      total += amount;
+      return WorkspaceAnalyticsRank(id: id, label: _string(row['label']), count: amount);
+    }).toList(growable: false);
+    if (total != count) throw const FormatException();
+    final snapshot = WorkspaceAnalyticsSnapshot(request: request, state: WorkspaceAnalyticsState.verified,
+      coverage: WorkspaceAnalyticsCoverage.partial, source: 'Recorded product views', updatedAt: observed, coveredFrom: from, coveredUntil: until,
+      metrics: [WorkspaceAnalyticsMetric(id: 'product-views', state: WorkspaceAnalyticsState.verified,
+        coverage: WorkspaceAnalyticsCoverage.partial, basis: WorkspaceAnalyticsBasis.periodActivity, unit: WorkspaceAnalyticsUnit.count,
+        source: 'Recorded product views', value: count, asOf: until)],
+      breakdowns: [WorkspaceAnalyticsBreakdown(id: 'most-viewed-products', dimension: WorkspaceAnalyticsDimension.product,
+        coverage: WorkspaceAnalyticsCoverage.partial, asOf: until, source: 'Recorded product views', rows: rows)]);
+    if (!snapshot.usableFor(request, gateway.now().toUtc())) throw const FormatException();
+    return snapshot;
+  }
+}
+
 class WorkspacePublicDiscoverySource extends ChangeNotifier
     implements BuyV2CataloguePageSource, BuyV2VariantFamilySource,
       BuyV2ProductContentAdapter, BuyV2StorePublishedOffersSource, BuyV2PublishedCatalogueSource {
@@ -2369,6 +2458,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   bool _closed = false;
   bool get active => !_closed && current();
   Iterable<String> get observedProductIds => _readback.observedProductIds;
+  WorkspaceCatalogueContentResult? displayedProduct(BuyV2Product product) => active ? _readback.displayedProduct(product) : null;
   void _changed() { if (active) notifyListeners(); }
   WorkspaceStoreCatalogueSource _store(String storeId) => _stores.putIfAbsent(_id(storeId), () =>
     WorkspaceStoreCatalogueSource(gateway: gateway, storeId: storeId, current: () => active, contentReadback: _readback));
@@ -2623,6 +2713,18 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
     promotionDiscoverySupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PROMOTION_DISCOVERY_V1'));
   return WorkspacePublicDiscoverySource(gateway: gateway, current: current);
+}
+
+WorkspaceProductPresentationGateway? configuredWorkspaceProductPresentations({required String environment,
+  required String projectId, required String? tenantId, required String accountUserId, required String realm,
+  required bool Function() current, required WorkspaceCatalogueContentResult? Function(BuyV2Product) displayed}) {
+  if (!const bool.fromEnvironment('MOOLSOCIAL_PRODUCT_PRESENTATIONS_V1') || environment != 'firebase-service' ||
+      projectId != 'moolsocial-dev-503018' || tenantId != null || !{'evaluation', 'production'}.contains(realm)) {return null;}
+  final endpoint = Uri.tryParse(const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL'));
+  if (endpoint == null || !_validEndpoint(endpoint)) return null;
+  return WorkspaceProductPresentationGateway(gateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: endpoint,
+    credentials: FirebaseSocialContentCredentials(), transport: IoSocialContentTransport(), realm: realm, ownerAccountId: _id(accountUserId)),
+    current: current, displayed: displayed);
 }
 
 BuyV2ProductContentSnapshot _unavailable(BuyV2Product product, {bool policyResolutionPending = false}) =>
@@ -3664,6 +3766,9 @@ class WorkspaceCatalogueReadback extends ChangeNotifier
     }
     return result.content;
   }
+
+  WorkspaceCatalogueContentResult? displayedProduct(BuyV2Product product) =>
+    snapshotFor(product).state == BuyV2ProductContentState.ready ? _results[_key(product)] : null;
 
   @override
   void dispose() {

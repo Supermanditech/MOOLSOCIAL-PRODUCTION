@@ -1616,6 +1616,13 @@ class WorkSession extends ChangeNotifier {
   final WorkPendingProofStore Function(String storeId)? tradingPreferencesStoreFactory;
   /// Read-only integration seam. No tracking, posting or local analytics seed.
   final WorkspaceAnalyticsReader? analyticsReader;
+  WorkspaceProductPresentationGateway? _productPresentationReader;
+  bool get hasAnalyticsReader => analyticsReader != null || _productPresentationReader != null;
+  void bindProductPresentationReader(WorkspaceProductPresentationGateway? reader) {
+    // A supplied integration retains ownership. Auth-root replacements must
+    // never leave the previous account's fallback reader installed.
+    _productPresentationReader = reader;
+  }
 
   WorkspaceAnalyticsRequest? analyticsRequest({
     required DateTime start,
@@ -1653,7 +1660,8 @@ class WorkSession extends ChangeNotifier {
           skuIds: request.skuIds,
         )?.sameScope(request) ==
         true;
-    if (!current() || analyticsReader == null) {
+    final reader = analyticsReader ?? _productPresentationReader?.readAnalytics;
+    if (!current() || reader == null) {
       return absent(WorkspaceAnalyticsState.unavailable);
     }
     var scopeChanged = false;
@@ -1662,7 +1670,7 @@ class WorkSession extends ChangeNotifier {
     try {
       // Release the scope watcher even if an integration provider never settles.
       // A late result after this deadline cannot publish through this operation.
-      final response = await analyticsReader!(request).timeout(const Duration(seconds: 30));
+      final response = await reader(request).timeout(const Duration(seconds: 30));
       if (scopeChanged || !current()) return absent(WorkspaceAnalyticsState.unavailable);
       return response.usableFor(request, DateTime.now())
           ? response

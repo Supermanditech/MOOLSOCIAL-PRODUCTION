@@ -795,6 +795,45 @@ Future<void> _addWithScheduledWindow(BuildContext context, BuyV2Session session,
   }
 }
 
+class _ProductPresentationObserver extends StatefulWidget {
+  const _ProductPresentationObserver({required this.session, required this.product});
+  final BuyV2Session session;
+  final BuyV2Product product;
+  @override State<_ProductPresentationObserver> createState() => _ProductPresentationObserverState();
+}
+class _ProductPresentationObserverState extends State<_ProductPresentationObserver> {
+  BuyV2Session? _reportedSession;
+  String? _reportedProduct;
+  bool _scheduled = false;
+  bool _visible(BuyV2Session session, String productId) {
+    if (!mounted || !identical(widget.session, session) || widget.product.id != productId || session.selectedProduct?.id != productId ||
+        ModalRoute.of(context)?.isCurrent != true || !TickerMode.valuesOf(context).enabled ||
+        WidgetsBinding.instance.lifecycleState != null && WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {return false;}
+    var hidden = false;
+    context.visitAncestorElements((element) {if (element.widget case Offstage(offstage: true)) hidden = true; return !hidden;});
+    return !hidden;
+  }
+  @override Widget build(BuildContext context) {
+    if (!_scheduled && (!identical(_reportedSession, widget.session) || _reportedProduct != widget.product.id)) {
+      _scheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scheduled = false;
+        if (!mounted) return;
+        final session = widget.session, product = widget.product, gateway = session.productPresentations;
+        if (gateway == null || !_visible(session, product.id)) return;
+        final id = List.generate(16, (_) => math.Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+        final original = gateway.prepare(product, id);
+        if (original == null) return;
+        // A rebuild is not a second presentation. Failed telemetry stays partial;
+        // do not silently generate replacement commands/IDs or block commerce.
+        _reportedSession = session; _reportedProduct = product.id;
+        unawaited(gateway.record(original, visible: () => _visible(session, product.id)));
+      });
+    }
+    return const SizedBox.shrink();
+  }
+}
+
 class BuyV2ProductView extends StatelessWidget {
   const BuyV2ProductView({
     super.key,
@@ -992,6 +1031,7 @@ class BuyV2ProductView extends StatelessWidget {
 
     return Column(
       children: [
+        _ProductPresentationObserver(session: session, product: product),
         Expanded(
           child: ListView(
             key: PageStorageKey('buy-product-${product.id}'),

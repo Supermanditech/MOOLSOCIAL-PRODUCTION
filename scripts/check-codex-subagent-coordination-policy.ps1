@@ -7995,6 +7995,10 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     if (@($facts.owners) -ccontains 'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart') {
       $factsOwners += 'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart'
     }
+    # Already-owned app root: bind only the account-fenced Store/public reader.
+    if (@($facts.owners) -ccontains 'apps/mobile/lib/app/moolsocial_app.dart') {
+      $factsOwners += 'apps/mobile/lib/app/moolsocial_app.dart'
+    }
     if (@($facts.owners) -ccontains 'apps/mobile/lib/features/work/work_publication_data.dart') {
       $factsOwners += 'apps/mobile/lib/features/work/work_publication_data.dart'
     }

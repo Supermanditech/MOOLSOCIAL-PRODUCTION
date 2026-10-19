@@ -32,6 +32,69 @@ import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
 
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
 const at = "2026-10-16T12:00:00.000Z";
+test('LF14 rendered-product producer and owner aggregate are implemented in the existing catalogue owner', () => {
+  for (const method of ['recordProductPresentation', 'readProductPresentations']) {
+    assert.equal(typeof (WorkspaceCatalogueService.prototype as unknown as Record<string, unknown>)[method], 'function');
+    assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>)[method], 'function');
+  }
+});
+test('LF14 emulator reviewed public product to immutable presentation and restarted owner-only partial aggregate', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  const app = initializeApp({projectId: `demo-lf-views-${randomUUID().slice(0, 8)}`}, `views-${randomUUID()}`), db = getFirestore(app);
+  const root = db.collection('workspaceCatalogues').doc('evaluation'), store = root.collection('stores').doc('store-one');
+  let clock = at;
+  const repository = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(clock));
+  const service = () => new WorkspaceCatalogueService(repository(), catalogueIdentity, () => new Date(clock));
+  const range = {schemaVersion: 1, storeId: 'store-one', start: '2026-10-16T00:00:00.000Z', end: '2026-10-17T00:00:00.000Z', skuIds: []};
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    await root.collection('participants').doc('store-one').set(producerParticipant());
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    const value = input(), commands = productionCommands(value);
+    for (let index = 0; index < commands.length; index++) await repository().produceCatalogue([0, 2, 4].includes(index) ? 'reviewer-one' : 'owner-one', catalogueIdentity, commands[index]!);
+    await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: value, expectedRevision: 0, idempotencyKey: 'publish-viewed-product'});
+    await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: input('sku-two'), expectedRevision: 0, idempotencyKey: 'publish-alternate-viewed-product'});
+    const page = await service().publicCatalogue({storeId: 'store-one', skuId: 'sku-one', listingReadbackVersion: 1,
+      mediaReadbackVersion: 1, productFactsReadbackVersion: 1, policyReadbackVersion: 1, storeDetailsReadbackVersion: 1}) as any;
+    const event = {schemaVersion: 1, presentationId: 'a'.repeat(32), storeId: 'store-one', skuId: 'sku-one',
+      listingId: page.items[0].listings[0].listingId, skuRevision: 1, catalogueVersion: 6};
+    assert.equal((await service().readProductPresentations('owner-one', range) as any).state, 'unavailable');
+    for (const changed of [{skuRevision: 2}, {catalogueVersion: 7}, {listingId: 'listing-' + 'b'.repeat(64)}, {skuId: 'another-sku'}, {acceptedAt: at}]) {
+      await assert.rejects(service().recordProductPresentation('buyer-one', {...event, ...changed}));
+    }
+    await assert.rejects(service().recordProductPresentation('owner-one', event));
+    assert.equal((await store.collection('productPresentations').get()).size, 0);
+    const accepted = await service().recordProductPresentation('buyer-one', event);
+    assert.equal((accepted as any).acceptedAt, at);
+    assert.deepEqual(await service().recordProductPresentation('buyer-one', event), accepted);
+    await assert.rejects(service().recordProductPresentation('buyer-one', {...event, skuRevision: 2}), {code: 'conflict'});
+    clock = '2026-10-16T12:00:02.000Z';
+    const aggregate = await service().readProductPresentations('owner-one', range) as any;
+    assert.equal(aggregate.count, 1); assert.equal(aggregate.coverage, 'partial'); assert.equal(aggregate.coveredFrom, at);
+    assert.deepEqual(aggregate.products, [{skuId: 'sku-one', label: 'Host fixture oil · 1 L', count: 1}]);
+    await assert.rejects(service().readProductPresentations('buyer-one', range), {code: 'not_found'});
+    assert.equal((await service().readProductPresentations('owner-one', {...range, skuIds: ['another-sku']}) as any).count, 0);
+    assert.equal((await service().readProductPresentations('owner-one', {...range, start: '2026-10-15T00:00:00.000Z', end: '2026-10-16T00:00:00.000Z'}) as any).count, null);
+    await assert.rejects(service().readProductPresentations('owner-one', {...range, start: '2026-01-01T00:00:00.000Z'}));
+    const stored = (await store.collection('productPresentations').get()).docs;
+    assert.equal(stored.length, 1); assert.equal(JSON.stringify(stored.map(d => d.data())).includes('buyer-one'), false);
+    assert.equal(JSON.stringify(aggregate).includes('buyer-one'), false);
+    if (process.env.LF14_PRESENTATION_CAPTURE === 'true') console.log(`LF14_PRESENTATION_PROJECTION=${JSON.stringify({event, accepted, aggregate, page,
+      precisionAggregate: await service().readProductPresentations('owner-one', {...range, start: '2026-10-16T00:00:00.001Z'}),
+      alternatePage: await service().publicCatalogue({storeId: 'store-one', skuId: 'sku-two', listingReadbackVersion: 1,
+        mediaReadbackVersion: 1, productFactsReadbackVersion: 1, policyReadbackVersion: 1, storeDetailsReadbackVersion: 1})})}`);
+    await store.collection('productPresentationDays').doc('2026-10-16').set({schemaVersion: 1, count: 5000}); // Explicit isolated host capacity fixture.
+    assert.deepEqual(await service().recordProductPresentation('buyer-one', event), accepted);
+    await assert.rejects(service().recordProductPresentation('buyer-one', {...event, presentationId: 'b'.repeat(32)}), {code: 'service_unavailable'});
+    await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: {...value, publicListing: false}, expectedRevision: 1, idempotencyKey: 'withdraw-viewed-product'});
+    assert.deepEqual(await service().recordProductPresentation('buyer-one', event), accepted);
+    await assert.rejects(service().recordProductPresentation('other-buyer', event));
+    assert.equal((await store.collection('productPresentations').get()).size, 1);
+    assert.equal((await service().readProductPresentations('owner-one', range) as any).count, 1);
+  } finally {await db.terminate(); await deleteApp(app);}
+});
 test('LF03-PUBLISHED processed assets have authorized byte review and guarded public delivery entries', () => {
   assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>).readProductMediaForReview, 'function');
   assert.equal(typeof (WorkspaceCatalogueService.prototype as unknown as Record<string, unknown>).publicProductMedia, 'function');

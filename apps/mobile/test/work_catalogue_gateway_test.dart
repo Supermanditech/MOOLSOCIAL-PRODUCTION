@@ -1756,6 +1756,149 @@ void main() {
     expect((await gateway.writeProductSubmission(original, current: () => true, reconcile: true)).state, WorkspaceProductSubmissionWriteState.notFound);
     expect((await gateway.writeProductSubmission(original, current: () => true)).state, WorkspaceProductSubmissionWriteState.unknown);
   });
+  final presentationLog = Platform.environment['LF14_PRESENTATION_LOG'];
+  if (presentationLog != null) {
+    Map<String, dynamic> presentationCapture() {
+      const marker = 'LF14_PRESENTATION_PROJECTION=';
+      return jsonDecode(File(presentationLog).readAsLinesSync().singleWhere((line) => line.contains(marker)).split(marker).last) as Map<String, dynamic>;
+    }
+    WorkspacePublicCatalogueEntry presentationEntry(Map<String, dynamic> capture, {bool alternate = false}) =>
+      WorkspacePublicCatalogueEntry.fromResponse(capture[alternate ? 'alternatePage' : 'page'] as Map<String, dynamic>,
+        storeId: 'store-one', realm: 'evaluation', channel: BuyV2OfferClass.retail, now: DateTime.parse(capture['aggregate']['observedAt'] as String));
+    AuthenticatedWorkspaceCatalogueGateway presentationOwner(OwnerTransport transport, {String account = 'owner-one', SocialContentCredentials? credentials}) =>
+      AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: credentials ?? Credentials(), transport: transport, realm: 'evaluation', ownerAccountId: account,
+        now: () => DateTime.parse(presentationCapture()['aggregate']['observedAt'] as String));
+    WorkspaceAnalyticsRequest presentationRequest() => WorkspaceAnalyticsRequest(accountScope: 'owner-one', storeId: 'store-one',
+      start: DateTime.parse(presentationCapture()['aggregate']['start'] as String), end: DateTime.parse(presentationCapture()['aggregate']['end'] as String));
+    test('LF14-CLIENT actual service projection feeds only product presentations and the existing Work analytics boundary', () async {
+      final capture = presentationCapture(), entry = presentationEntry(capture), credentials = Credentials(), sent = <Map<String, Object?>>[];
+      final gateway = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => entry.readback,
+        gateway: presentationOwner(OwnerTransport((body) async {
+          sent.add(body);
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true,
+            'data': body['operation'] == 'recordPublicProductPresentation' ? capture['accepted'] : capture['aggregate']}));
+        }), credentials: credentials));
+      final prepared = gateway.prepare(entry.product, 'a' * 32)!;
+      expect(prepared, capture['event']);
+      expect(await gateway.record(prepared, visible: () => true), isTrue);
+      final work = WorkSession(contactDraftStore: ListingAccount())
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Jaipur', verified: true)
+        ..workspaceId = 'store-one';
+      addTearDown(work.dispose); work.bindProductPresentationReader(gateway);
+      expect(work.hasAnalyticsReader, isTrue);
+      final snapshot = await work.readWorkspaceAnalytics(presentationRequest());
+      expect(snapshot.state, WorkspaceAnalyticsState.verified); expect(snapshot.coverage, WorkspaceAnalyticsCoverage.partial);
+      expect(snapshot.metrics.single.id, 'product-views'); expect(snapshot.metrics.single.value, 1);
+      expect(snapshot.metrics.single.cohortId, isNull);
+      expect(snapshot.breakdowns.single.id, 'most-viewed-products'); expect(snapshot.breakdowns.single.rows.single.id, 'sku-one');
+      expect(credentials.modes, [SocialAppCheckTokenMode.limitedUse, SocialAppCheckTokenMode.standard]);
+      work.bindProductPresentationReader(null); expect(work.hasAnalyticsReader, isFalse);
+      expect((await work.readWorkspaceAnalytics(presentationRequest())).state, WorkspaceAnalyticsState.unavailable);
+      expect(sent, hasLength(2));
+    });
+    for (final corrupt in ['scope', 'coverage', 'count', 'rank count', 'duplicate', 'future', 'before collection', 'extra metric']) {
+      test('LF14-CLIENT malformed $corrupt aggregate cannot supply an analytics value', () async {
+        final data = presentationCapture()['aggregate'] as Map<String, dynamic>;
+        switch (corrupt) {
+          case 'scope': data['storeId'] = 'other-store';
+          case 'coverage': data['coverage'] = 'complete';
+          case 'count': data['count'] = 2;
+          case 'rank count': data['products'][0]['count'] = 0;
+          case 'duplicate': (data['products'] as List).add(data['products'][0]);
+          case 'future': data['observedAt'] = '2027-01-01T00:00:00.000Z';
+          case 'before collection': data['coveredFrom'] = data['start'];
+          case 'extra metric': data['visitors'] = 100;
+        }
+        final gateway = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => null,
+          gateway: presentationOwner(OwnerTransport((_) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data})))));
+        await expectLater(gateway.readAnalytics(presentationRequest()), throwsFormatException);
+      });
+    }
+    test('LF14-CLIENT dashboard microsecond cutoff uses explicit millisecond coverage through Work reader', () async {
+      final capture = presentationCapture(), range = presentationRequest();
+      final request = WorkspaceAnalyticsRequest(accountScope: range.accountScope, storeId: range.storeId,
+        start: range.start.add(const Duration(microseconds: 456)), end: range.end.add(const Duration(microseconds: 456)));
+      final adapter = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => null,
+        gateway: presentationOwner(OwnerTransport((body) async {
+          expect(body['start'], '2026-10-16T00:00:00.001Z'); expect(body['end'], '2026-10-17T00:00:00.000Z');
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': capture['precisionAggregate']}));
+        })));
+      final work = WorkSession(contactDraftStore: ListingAccount())
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Jaipur', verified: true)
+        ..workspaceId = 'store-one';
+      addTearDown(work.dispose); work.bindProductPresentationReader(adapter);
+      final snapshot = await work.readWorkspaceAnalytics(request);
+      expect(snapshot.state, WorkspaceAnalyticsState.verified); expect(snapshot.request.sameScope(request), isTrue);
+      expect(snapshot.metrics.single.value, 1); expect(snapshot.coveredFrom!.isBefore(request.start), isFalse);
+      expect(snapshot.coveredUntil!.isAfter(request.end), isFalse);
+    });
+    test('LF14-CLIENT lost reporting reply never retries or dispatches after visibility or lifetime retires', () async {
+      final capture = presentationCapture(), entry = presentationEntry(capture);
+      final transport = OwnerTransport((_) async => throw StateError('Host lost acknowledgement'));
+      final adapter = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => entry.readback, gateway: presentationOwner(transport));
+      final original = adapter.prepare(entry.product, 'a' * 32)!;
+      expect(await adapter.record(original, visible: () => true), isFalse); expect(transport.calls, 1);
+      expect(await adapter.record(original, visible: () => false), isFalse); expect(transport.calls, 1);
+      var current = true;
+      final retiring = WorkspaceProductPresentationGateway(current: () => current, displayed: (_) => entry.readback,
+        gateway: presentationOwner(transport, credentials: RetiringOwnerCredentials(() => current = false)));
+      expect(await retiring.record(original, visible: () => true), isFalse); expect(transport.calls, 1);
+    });
+    test('LF14-CLIENT retired A B A owner lifetime cannot send or admit the old event', () async {
+      const accountA = (environment: 'host-service', projectId: 'host-project', tenantId: null as String?, userId: 'owner-one');
+      const accountB = (environment: 'host-service', projectId: 'host-project', tenantId: null as String?, userId: 'owner-two');
+      BuyV2AccountPersistenceIdentity live = accountA;
+      final capture = presentationCapture(), entry = presentationEntry(capture), core = BuySession();
+      final providers = <WorkspaceProductPresentationGateway>[], outgoing = <Map<String, Object?>>[];
+      final root = BuyV2RootSessions(core: core, currentIdentity: () => live, accountStoreFactory: (_, _) => _HostRetirableStateStore(),
+        productPresentationFactory: (identity, current, _) {
+          final gateway = WorkspaceProductPresentationGateway(current: current, displayed: (_) => entry.readback,
+            gateway: presentationOwner(OwnerTransport((body) async {outgoing.add(body); return SocialContentResponse(statusCode: 503, body: '{}');}), account: identity.userId));
+          providers.add(gateway); return gateway;
+        });
+      addTearDown(root.dispose); addTearDown(core.dispose);
+      root.synchronize(accountRequired: true); final original = providers.single.prepare(entry.product, 'a' * 32)!;
+      expect(root.current.productPresentations, same(providers.single));
+      live = accountB; root.synchronize(accountRequired: true); live = accountA; root.synchronize(accountRequired: true);
+      expect(providers, hasLength(3)); expect(providers.first.prepare(entry.product, 'b' * 32), isNull);
+      expect(await providers.first.record(original, visible: () => true), isFalse); expect(outgoing, isEmpty);
+      expect(root.current.productPresentations, same(providers.last));
+      expect(configuredWorkspaceProductPresentations(environment: 'firebase-service', projectId: 'moolsocial-dev-503018',
+        tenantId: null, accountUserId: 'owner-one', realm: 'evaluation', current: () => true, displayed: (_) => entry.readback), isNull);
+    });
+    testWidgets('LF14-CLIENT mounted current product frames count once, not loading navigation rebuilds or covered routes', (tester) async {
+      final capture = presentationCapture(), entry = presentationEntry(capture), alternate = presentationEntry(capture, alternate: true);
+      final sent = <Map<String, Object?>>[], core = BuySession(), catalogue = _ExactMoneyHostCatalogue()..rows.addAll([entry.product, alternate.product]);
+      var live = true;
+      final observer = WorkspaceProductPresentationGateway(current: () => live, displayed: (product) => product.id == entry.product.id ? entry.readback : alternate.readback,
+        gateway: presentationOwner(OwnerTransport((body) async {
+          sent.add(body);
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {...capture['accepted'] as Map,
+            ...Map<String, Object?>.of(body)..remove('operation')}}));
+        }), account: 'buyer-one'));
+      final session = BuyV2Session(core: core, cataloguePageSource: catalogue, reviewDataEnabled: false,
+        productPresentations: observer, catalogueNow: () => DateTime.parse(capture['aggregate']['observedAt'] as String));
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      final pager = session.acquireCatalogueProducts('host-presentations');
+      addTearDown(() => session.releaseCatalogueProducts('host-presentations'));
+      await pager.open(BuyV2CatalogueQuery(destination: BuyV2Destination.shop, regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas));
+      expect(session.openProduct(entry.product.id), isTrue); expect(sent, isEmpty);
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(MaterialApp(navigatorKey: navigator, theme: MoolTheme.light(), home: Scaffold(body:
+        AnimatedBuilder(animation: session, builder: (context, _) => BuyV2ProductView(session: session)))));
+      await tester.pumpAndSettle(); expect(sent, hasLength(1));
+      session.refreshProductContent(entry.product.id); await tester.pumpAndSettle(); expect(sent, hasLength(1));
+      unawaited(navigator.currentState!.push(MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Text('Host covered route')))));
+      await tester.pumpAndSettle();
+      expect(session.openProduct(alternate.product.id), isTrue); await tester.pumpAndSettle(); expect(sent, hasLength(1));
+      navigator.currentState!.pop(); await tester.pumpAndSettle(); expect(sent, hasLength(2));
+      expect(sent[0]['skuId'], 'sku-one'); expect(sent[1]['skuId'], 'sku-two'); expect(sent[0]['presentationId'], isNot(sent[1]['presentationId']));
+      expect(session.openProduct(entry.product.id), isTrue); await tester.pumpAndSettle(); expect(sent, hasLength(3));
+      live = false; expect(session.openProduct(alternate.product.id), isTrue); await tester.pumpAndSettle(); expect(sent, hasLength(3));
+      await tester.pumpWidget(const SizedBox.shrink()); expect(tester.takeException(), isNull);
+    });
+  }
   final publishedMediaLog = Platform.environment['LF03_PUBLISHED_MEDIA_LOG'];
   if (publishedMediaLog != null) {
     Map<String, dynamic> mediaCapture() {

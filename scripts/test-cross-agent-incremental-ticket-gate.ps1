@@ -294,6 +294,7 @@ if ($RequireLfPublicationProbes) {
       $cases++
     }
     foreach ($optionalOwner in @('apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+        'apps/mobile/lib/app/moolsocial_app.dart',
         'apps/mobile/lib/features/work/work_publication_data.dart',
         'apps/mobile/lib/features/work/widgets/store_publication_settings.dart',
         'apps/mobile/lib/features/work/work_publication.dart',

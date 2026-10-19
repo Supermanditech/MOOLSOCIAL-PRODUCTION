@@ -3340,7 +3340,7 @@ typedef BuyV2AccountPersistenceIdentity = ({String environment, String projectId
 class BuyV2RootSessions {
   BuyV2RootSessions({required this.core, required this.currentIdentity,
     this.preserveReview = false, this.accountStoreFactory, this.accountSessionFactory,
-    this.purchaseReaderFactory, this.catalogueSourceFactory,
+    this.purchaseReaderFactory, this.catalogueSourceFactory, this.productPresentationFactory,
     this.purchaseRealm = const String.fromEnvironment('MOOLSOCIAL_PURCHASE_REALM'),
   }) : guest = BuyV2Session(core: core, reviewDataEnabled: preserveReview ? null : false),
        unavailable = BuyV2Session(core: core, reviewDataEnabled: false) {
@@ -3351,6 +3351,7 @@ class BuyV2RootSessions {
   final String purchaseRealm;
   final AuthenticatedWorkspaceOrderIdentityGateway? Function(BuyV2AccountPersistenceIdentity, bool Function())? purchaseReaderFactory;
   final WorkspacePublicDiscoverySource? Function(BuyV2AccountPersistenceIdentity, bool Function())? catalogueSourceFactory;
+  final WorkspaceProductPresentationGateway? Function(BuyV2AccountPersistenceIdentity, bool Function(), WorkspacePublicDiscoverySource?)? productPresentationFactory;
   final BuyV2AccountPersistenceIdentity? Function() currentIdentity;
   final bool preserveReview;
   final BuyV2CustomerStateStore Function(BuyV2AccountPersistenceIdentity,
@@ -3393,8 +3394,14 @@ class BuyV2RootSessions {
       ? catalogueSourceFactory!(identity, catalogueCurrent)
       : configuredWorkspacePublicDiscovery(environment: identity.environment, projectId: identity.projectId,
           tenantId: identity.tenantId, accountUserId: identity.userId, realm: purchaseRealm, current: catalogueCurrent);
+    final presentations = accountSessionFactory != null ? null : productPresentationFactory != null
+      ? productPresentationFactory!(identity, catalogueCurrent, catalogue)
+      : configuredWorkspaceProductPresentations(environment: identity.environment, projectId: identity.projectId,
+          tenantId: identity.tenantId, accountUserId: identity.userId, realm: purchaseRealm,
+          current: catalogueCurrent, displayed: (product) => catalogue?.displayedProduct(product));
     final next = accountSessionFactory?.call(store, pending) ??
       BuyV2Session(core: core, reviewDataEnabled: false,
+        productPresentations: presentations,
         customerStateStore: store, pendingAccountState: pending,
         cataloguePageSource: catalogue, variantFamilySource: catalogue, productContentAdapter: catalogue,
         publishedCatalogueSource: catalogue?.gateway.promotionDiscoverySupported == true ? catalogue : null,
@@ -3435,10 +3442,12 @@ class BuyV2RootSessions {
 }
 
 class BuyV2Session extends ChangeNotifier {
+  final WorkspaceProductPresentationGateway? productPresentations;
   final AuthenticatedWorkspaceOrderIdentityGateway? purchaseReader;
   final String purchaseRealm;
   BuyV2Session({
     required this.core,
+    this.productPresentations,
     this.purchaseReader,
     this.purchaseRealm = const String.fromEnvironment('MOOLSOCIAL_PURCHASE_REALM'),
     BuyV2ProductFactsAdapter? productFactsAdapter,

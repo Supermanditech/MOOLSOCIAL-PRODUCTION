@@ -5538,7 +5538,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
           ? 'Report update pending' : 'Loading analytics…' : failed
           ? 'Could not load analytics' : verified
           ? '${snapshot.coverage == WorkspaceAnalyticsCoverage.complete ? 'Complete' : 'Partial'} provider coverage · ${snapshot.source}'
-          : widget.session.analyticsReader == null ? 'Public and supply data not connected' : 'Provider data unavailable';
+          : !widget.session.hasAnalyticsReader ? 'Public and supply data not connected' : 'Provider data unavailable';
         String remote(String id, {bool position = false}) {
           final metric = verified ? snapshot.metrics.where((m) => m.id == id).firstOrNull : null;
           return metric?.state == WorkspaceAnalyticsState.verified &&
@@ -5781,7 +5781,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                                 child: _AnalyticsExplorePreview(id: id, figures: figures[id]!,
                                   graphic: widget.compactVisuals[id],
                                   unavailable: failed ? 'Could not load data' : loading ? 'Updating data…' :
-                                    widget.session.analyticsReader == null
+                                    !widget.session.hasAnalyticsReader
                                       ? (id == 'public' || id == 'journey' ? 'Tracking not connected' : 'Supply data not connected')
                                       : 'Data unavailable',
                                   balanceDate: id == 'money' && local('customer-dues') != '—'
@@ -6496,7 +6496,7 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
         (
           id: 'product-views',
           label: 'Product views',
-          guide: 'Views of your Store’s products',
+          guide: 'Recorded product presentations, including repeat views. Not unique customers; coverage may be partial.',
         ),
         (
           id: 'visible-skus',

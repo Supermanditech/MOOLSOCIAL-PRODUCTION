@@ -148,6 +148,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
 
   GoRouter _createRouter(String initialLocation) {
     _workSession.bindOriginalPurchaseReader(_buyRoot.current.purchaseReader, _buyRoot.current.purchaseRealm);
+    _workSession.bindProductPresentationReader(_buyRoot.current.productPresentations);
     return createJourneyRouter(
     _session,
     _bookSession,

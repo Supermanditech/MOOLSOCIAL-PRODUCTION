@@ -382,6 +382,30 @@ export interface StorePublicDetailsCommand {
   publishedAt: string; details: StorePublicDetailsInput;
 }
 export interface StorePublicDetailsReceipt {fingerprint: string; record: StorePublicDetailsRecord}
+export interface ProductPresentation {
+  schemaVersion: 1; presentationId: string; storeId: string; skuId: string;
+  listingId: string; skuRevision: number; catalogueVersion: number;
+}
+export interface ProductPresentationQuery {storeId: string; start: string; end: string; skuIds: string[]}
+function presentationTime(value: unknown): string {
+  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) invalid();
+  return value;
+}
+function productPresentation(raw: unknown): ProductPresentation {
+  const value = exact(raw, ['schemaVersion', 'presentationId', 'storeId', 'skuId', 'listingId', 'skuRevision', 'catalogueVersion']);
+  if (value.schemaVersion !== 1 || typeof value.presentationId !== 'string' || !/^[a-f0-9]{32}$/u.test(value.presentationId) ||
+      typeof value.listingId !== 'string' || !/^listing-[a-f0-9]{64}$/u.test(value.listingId)) invalid();
+  return {schemaVersion: 1, presentationId: value.presentationId, storeId: id(value.storeId), skuId: id(value.skuId),
+    listingId: value.listingId, skuRevision: integer(value.skuRevision, 1, 1000000000), catalogueVersion: integer(value.catalogueVersion, 1, 1000000001)};
+}
+function productPresentationQuery(raw: unknown): ProductPresentationQuery {
+  const value = exact(raw, ['schemaVersion', 'storeId', 'start', 'end', 'skuIds']);
+  if (value.schemaVersion !== 1 || !Array.isArray(value.skuIds) || value.skuIds.length > 50) invalid();
+  const start = presentationTime(value.start), end = presentationTime(value.end), skuIds = value.skuIds.map(id).sort();
+  if (start >= end || Date.parse(end) - Date.parse(start) > 31 * 86400000 || new Set(skuIds).size !== skuIds.length) invalid();
+  return {storeId: id(value.storeId), start, end, skuIds};
+}
+
 export interface WorkspaceCatalogueRepository {
   readonly realm: "evaluation" | "production";
   store(storeId: string): Promise<WorkspaceProfileRecord | undefined>;
@@ -400,6 +424,9 @@ export interface WorkspaceCatalogueRepository {
   publicMediaAsset?(storeId: string, skuId: string, assetId: string, identity: CatalogueIdentity): Promise<{
     source: PublicCatalogueSource; upload: StoreProductMediaUpload} | undefined>;
   readMediaDerivative?(upload: StoreProductMediaUpload): Promise<Buffer>;
+  recordProductPresentation?(actor: string, input: ProductPresentation, identity: CatalogueIdentity,
+    admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object>;
+  readProductPresentations?(owner: string, query: ProductPresentationQuery): Promise<object>;
   /** Complete bounded directory, never public product facts or approval. */
   publicDiscoveryBindings?(): Promise<PublicCatalogueListingBinding[]>;
   publicListingBindings?(record: StoreSkuRecord): Promise<PublicCatalogueListingBinding[] | undefined>;
@@ -817,6 +844,22 @@ export class WorkspaceCatalogueService {
   }
 
   /** Public image bytes only after exact current reviewed listing admission, never an upload URL. */
+  async recordProductPresentation(actor: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    const input = productPresentation(body);
+    if (!this.identity || !this.repository.recordProductPresentation) throw mediaUnavailable();
+    return this.repository.recordProductPresentation(id(actor), input, this.identity, async source => {
+      const response = await this.publicCatalogue({storeId: input.storeId, skuId: input.skuId, listingReadbackVersion: 1,
+        mediaReadbackVersion: 1, productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1}, source) as {
+          state: string; catalogueVersion?: number; items: Array<{skuId: string; revision: number; listings: PublicCatalogueListingBinding[]}>};
+      return response.state === 'ready' && response.catalogueVersion === input.catalogueVersion && response.items.some(item =>
+        item.skuId === input.skuId && item.revision === input.skuRevision && item.listings.some(listing => listing.listingId === input.listingId));
+    });
+  }
+  async readProductPresentations(owner: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    const query = productPresentationQuery(body);
+    if (!this.repository.readProductPresentations) throw mediaUnavailable();
+    return this.repository.readProductPresentations(id(owner), query);
+  }
   async publicProductMedia(body: Readonly<Record<string, unknown>>): Promise<Buffer> {
     exact(body, ["realm", "storeId", "skuId", "assetId"]);
     const storeId = id(body.storeId), skuId = id(body.skuId), assetId = text(body.assetId, 64);
@@ -2788,9 +2831,73 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
     // This adapter never invents/reviews a canonical catalogue or seeds offer terms.
     return doc.exists ? doc.data() as CatalogueAggregate : undefined;
   }
-  async publicCatalogueSource(storeId: string, identity: CatalogueIdentity, includeFamilies = false): Promise<PublicCatalogueSource | undefined> {
-    storeId = id(storeId);
+  async recordProductPresentation(actor: string, input: ProductPresentation, identity: CatalogueIdentity,
+    admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object> {
+    input = productPresentation(structuredClone(input)); actor = id(actor);
+    const root = this.root(input.storeId), fingerprint = cataloguePayloadHash(input),
+      // Actor-bound opaque key prevents another account from retrieving a receipt. Raw buyer identity is never stored.
+      receipt = root.collection('productPresentations').doc(cataloguePayloadHash([this.realm, actor, input.presentationId]));
     return this.firestore.runTransaction(async transaction => {
+      const saved = await transaction.get(receipt);
+      const result = (acceptedAt: string) => ({...input, realm: this.realm, acceptedAt, state: 'recorded', orderingAvailable: false});
+      if (saved.exists) {
+        const prior = exact(saved.data(), ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'label']);
+        if (prior.schemaVersion !== 1 || prior.realm !== this.realm || prior.fingerprint !== fingerprint ||
+            cataloguePayloadHash(productPresentation(prior.input)) !== fingerprint) throw new WorkspaceProfileError('conflict', 'This presentation was already recorded with different details.', 409);
+        return result(presentationTime(prior.acceptedAt));
+      }
+      const source = await this.publicCatalogueSource(input.storeId, identity, false, transaction);
+      if (!source || source.profile.ownerUserId === actor || !await admit(source)) throw new WorkspaceProfileError('unavailable', 'This public product presentation could not be confirmed.', 503);
+      const acceptedAt = this.now().toISOString(), day = root.collection('productPresentationDays').doc(acceptedAt.slice(0, 10)),
+        coverage = root.collection('productPresentationCoverage').doc('current');
+      const [daily, collection] = await transaction.getAll(day, coverage);
+      if (daily?.exists && daily.get('schemaVersion') !== 1 || collection?.exists && collection.get('schemaVersion') !== 1) invalid();
+      const count = daily?.exists ? integer(daily.get('count'), 0, 5000) : 0;
+      if (count >= 5000) throw new WorkspaceProfileError('service_unavailable', 'Product view reporting is at capacity.', 503, true);
+      const startedAt = collection?.exists ? presentationTime(collection.get('startedAt')) : acceptedAt;
+      if (startedAt > acceptedAt || !await admit(source)) throw mediaUnavailable(); // Term expiry cannot cross the awaited capacity reads.
+      const item = source.records.find(row => row.skuId === input.skuId)!;
+      const label = `${item.content.title} · ${item.pack.label}`.slice(0, 240);
+      transaction.create(receipt, {schemaVersion: 1, realm: this.realm, fingerprint, input, acceptedAt, label});
+      transaction.set(day, {schemaVersion: 1, count: count + 1});
+      if (!collection?.exists) transaction.create(coverage, {schemaVersion: 1, startedAt});
+      return result(acceptedAt);
+    });
+  }
+  async readProductPresentations(owner: string, query: ProductPresentationQuery): Promise<object> {
+    query = productPresentationQuery({schemaVersion: 1, ...structuredClone(query)}); owner = id(owner);
+    return this.firestore.runTransaction(async transaction => {
+      const profiles = await transaction.get(this.firestore.collection('workspaceProfiles').where('workspaceId', '==', query.storeId).limit(2));
+      if (profiles.size !== 1 || profiles.docs[0]!.id !== profiles.docs[0]!.get('caseId')) throw mediaUnavailable();
+      requireStore(profiles.docs[0]!.data() as WorkspaceProfileRecord, query.storeId, owner);
+      const root = this.root(query.storeId), observedAt = this.now().toISOString(),
+        collection = await transaction.get(root.collection('productPresentationCoverage').doc('current'));
+      const base = {schemaVersion: 1, realm: this.realm, ...query, observedAt, source: 'Recorded product views'};
+      const unavailable = (collectionStartedAt: string | null = null) => ({...base, state: 'unavailable', coverage: 'unknown', collectionStartedAt,
+        coveredFrom: null, coveredUntil: null, count: null, products: []});
+      if (!collection.exists) return unavailable();
+      if (collection.get('schemaVersion') !== 1) invalid();
+      const startedAt = presentationTime(collection.get('startedAt')), from = [query.start, startedAt].sort().at(-1)!, until = [query.end, observedAt].sort()[0]!;
+      if (from >= until) return unavailable(startedAt);
+      const events = await transaction.get(root.collection('productPresentations').where('acceptedAt', '>=', from).where('acceptedAt', '<', until).orderBy('acceptedAt').limit(5001));
+      if (events.size > 5000) return unavailable(startedAt); // Never silently truncate a count/ranking.
+      const products = new Map<string, {skuId: string; label: string; count: number}>();
+      let count = 0;
+      for (const doc of events.docs) {
+        const event = exact(doc.data(), ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'label']), input = productPresentation(event.input);
+        if (event.schemaVersion !== 1 || event.realm !== this.realm || input.storeId !== query.storeId || event.fingerprint !== cataloguePayloadHash(input) ||
+            presentationTime(event.acceptedAt) < from || presentationTime(event.acceptedAt) >= until) invalid();
+        if (query.skuIds.length && !query.skuIds.includes(input.skuId)) continue;
+        const label = text(event.label, 240), previous = products.get(input.skuId);
+        products.set(input.skuId, {skuId: input.skuId, label, count: (previous?.count ?? 0) + 1}); count++;
+      }
+      return {...base, state: 'ready', coverage: 'partial', collectionStartedAt: startedAt, coveredFrom: from, coveredUntil: until, count,
+        products: [...products.values()].sort((a, b) => b.count - a.count || a.skuId.localeCompare(b.skuId))};
+    });
+  }
+  async publicCatalogueSource(storeId: string, identity: CatalogueIdentity, includeFamilies = false, existingTransaction?: Transaction): Promise<PublicCatalogueSource | undefined> {
+    storeId = id(storeId);
+    const load = async (transaction: Transaction): Promise<PublicCatalogueSource | undefined> => {
       const [profiles, catalogueDoc, skuDocs, policyDoc, detailsDoc] = await Promise.all([
         transaction.get(this.firestore.collection("workspaceProfiles").where("workspaceId", "==", storeId).limit(2)),
         transaction.get(this.firestore.collection("workspaceCatalogues").doc(this.realm).collection("canonicalCatalogues").doc(id(identity.catalogueId))),
@@ -2829,7 +2936,8 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       }
       return {profile, catalogue, records, bindings, policy: policyDoc.exists ? policyDoc.data()! : null,
         publicDetails: detailsDoc.exists ? detailsDoc.data()! : null, ...(variantFamilies ? {variantFamilies} : {})};
-    });
+    };
+    return existingTransaction ? load(existingTransaction) : this.firestore.runTransaction(load);
   }
   async publicListingBindings(record: StoreSkuRecord): Promise<PublicCatalogueListingBinding[] | undefined> {
     record = structuredClone(record);
