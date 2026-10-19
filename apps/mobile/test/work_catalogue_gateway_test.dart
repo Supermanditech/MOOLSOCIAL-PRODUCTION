@@ -6229,6 +6229,118 @@ void main() {
         options: {BuyV2DeliveryOption.quick}));
     expect(session.refreshProductFacts(selected.id), true);
   }
+  BuyV2CartBenefit identityCoupon({String id = 'shared-coupon', String store = 'store-one', String source = 'host-benefits',
+    int revision = 1, int saving = 25}) => BuyV2CartBenefit(id: id, kind: BuyV2CartBenefitKind.coupon,
+      destination: BuyV2Destination.shop, title: '$store $source r$revision', detail: 'Isolated host scoped coupon',
+      sourceId: source, revision: revision, scope: BuyV2CartBenefitScope.store, storeId: store,
+      savingAmountMinor: saving, validUntil: at.add(const Duration(hours: 1)));
+  for (final live in [false, true]) {
+    for (final difference in ['Store', 'source', 'revision']) {
+      test('LF08 ID ${live ? 'live' : 'local'} retains same-ID $difference candidates without stacking', () async {
+        final adapter = live ? _HostLiveBenefits() : _HostMinorBenefits();
+        final a = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+        final b = a.copyWith(id: 'host-other-store-sku', storeId: 'store-two');
+        final first = identityCoupon(), second = identityCoupon(store: difference == 'Store' ? 'store-two' : 'store-one',
+          source: difference == 'source' ? 'host-other-source' : 'host-benefits', revision: difference == 'revision' ? 2 : 1, saving: 35);
+        final buyer = await benefitSession(adapter, [a, b]);
+        expect(buyer.addProduct(a.id), true); expect(buyer.addProduct(b.id), true);
+        adapter.offers.addAll([first, first, second]);
+        if (live) expect(await buyer.refreshCartBenefits(), true);
+        expect(buyer.cartBenefits(kind: BuyV2CartBenefitKind.coupon), [first, second]);
+        expect(buyer.chooseCartBenefit(first), true); expect(buyer.chooseCartBenefit(second), true);
+        expect(buyer.selectedCartBenefitsFor({BuyV2Destination.shop}), [second]);
+        expect(buyer.scopedCouponSavingMinor, 35); expect(buyer.cartTotalMinor, 4000);
+      });
+    }
+    test('LF08 ID ${live ? 'live' : 'local'} product preview retains different source namespaces', () async {
+      final adapter = live ? _HostLiveBenefits() : _HostMinorBenefits();
+      final value = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+      final first = identityCoupon(), second = identityCoupon(source: 'host-other-source');
+      adapter.offers.addAll([first, first, second]);
+      final buyer = await benefitSession(adapter, [value]);
+      expect(await buyer.refreshProductBenefits(value.id), true);
+      expect(buyer.productBenefitsFor(value), [first, second]);
+    });
+  }
+  testWidgets('LF08 ID captured old Remove cannot clear a newer selected coupon', (tester) async {
+    final adapter = _HostMinorBenefits(), value = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+    final first = identityCoupon(id: 'old-selection'), second = identityCoupon(id: 'new-selection', saving: 35);
+    adapter.offers.addAll([first, second]);
+    final buyer = await benefitSession(adapter, [value]);
+    expect(buyer.addProduct(value.id), true); expect(buyer.chooseCartBenefit(first), true); buyer.openCart();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Scaffold(body: BuyV2CartView(session: buyer, onBrowseMore: () {}))));
+    await tester.pumpAndSettle();
+    final oldRemove = tester.widget<Semantics>(find.byKey(const ValueKey('buy-cart-benefit-remove-old-selection'))).properties.onTap!;
+    expect(buyer.chooseCartBenefit(second), true);
+    oldRemove();
+    expect(buyer.selectedCartBenefit(kind: BuyV2CartBenefitKind.coupon, destination: BuyV2Destination.shop), same(second));
+    expect(buyer.scopedCouponSavingMinor, 35);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  testWidgets('LF08 ID old-owner Remove is retired and Cart listener follows the replacement session', (tester) async {
+    final value = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+    final coupon = identityCoupon(id: 'shared-owner-coupon'), replacement = identityCoupon(id: 'new-owner-choice', saving: 35);
+    final a = _HostMinorBenefits()..offers.addAll([coupon, replacement]), b = _HostMinorBenefits()..offers.addAll([coupon, replacement]);
+    final first = await benefitSession(a, [value]), second = await benefitSession(b, [value]);
+    expect(first.addProduct(value.id), true); expect(first.chooseCartBenefit(coupon), true); first.openCart();
+    expect(second.addProduct(value.id), true); expect(second.chooseCartBenefit(coupon), true); second.openCart();
+    Widget page(BuyV2Session buyer) => MaterialApp(theme: MoolTheme.light(), home: Scaffold(body: BuyV2CartView(session: buyer, onBrowseMore: () {})));
+    await tester.pumpWidget(page(first)); await tester.pumpAndSettle();
+    final oldRemove = tester.widget<Semantics>(find.byKey(const ValueKey('buy-cart-benefit-remove-shared-owner-coupon'))).properties.onTap!;
+    final oldSelect = tester.widget<Semantics>(find.byKey(const ValueKey('buy-cart-benefit-select-new-owner-choice'))).properties.onTap!;
+    await tester.pumpWidget(page(second)); await tester.pumpAndSettle();
+    final before = (saving: second.scopedCouponSavingMinor, total: second.cartTotalMinor,
+      quote: second.checkoutQuote, quoteState: second.checkoutQuoteLoadState);
+    oldSelect();
+    expect(second.isCartBenefitSelected(coupon), true);
+    oldRemove();
+    expect(second.isCartBenefitSelected(coupon), true);
+    expect((saving: second.scopedCouponSavingMinor, total: second.cartTotalMinor,
+      quote: second.checkoutQuote, quoteState: second.checkoutQuoteLoadState), before);
+    final retained = tester.element(find.descendant(of: find.byKey(const ValueKey('buy-cart-inline-benefits-owner')),
+      matching: find.byWidgetPredicate((w) => w.runtimeType.toString() == '_CartBenefitsInline')));
+    expect(second.chooseCartBenefit(replacement), true);
+    expect(retained.dirty, true, reason: 'Current owner must schedule its actual listener component.');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-cart-benefit-remove-new-owner-choice')), findsOneWidget);
+    expect(retained.dirty, false);
+    expect(first.chooseCartBenefit(replacement), true);
+    expect(retained.dirty, false, reason: 'Retired listener must not schedule the replacement owner UI.');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF08 ID same-ID Store cards have separate action ownership at $scale', (tester) async {
+      tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(320, 800); addTearDown(tester.view.reset);
+      final adapter = _HostMinorBenefits(), a = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+      final b = a.copyWith(id: 'host-second-store', storeId: 'store-two');
+      final first = identityCoupon(), second = identityCoupon(store: 'store-two', saving: 35);
+      adapter.offers.addAll([first, second]);
+      final buyer = await benefitSession(adapter, [a, b]);
+      buyer.addProduct(a.id); buyer.addProduct(b.id); buyer.chooseCartBenefit(second); buyer.openCart();
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+        MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+        home: Scaffold(body: BuyV2CartView(session: buyer, onBrowseMore: () {}))));
+      await tester.pumpAndSettle();
+      final firstCard = find.byKey(ValueKey('buy-cart-benefit-owner-${BuyV2Session.benefitIdentity(first)}'));
+      final secondCard = find.byKey(ValueKey('buy-cart-benefit-owner-${BuyV2Session.benefitIdentity(second)}'));
+      final cartScroll = find.descendant(
+        of: find.byKey(const PageStorageKey('buy-cart-all')),
+        matching: find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down),
+      );
+      expect(cartScroll, findsOneWidget);
+      await tester.scrollUntilVisible(find.byKey(const ValueKey('buy-cart-inline-benefits-owner')), 220, scrollable: cartScroll);
+      await tester.pumpAndSettle();
+      expect(firstCard, findsOneWidget); expect(secondCard, findsOneWidget);
+      expect(find.descendant(of: firstCard, matching: find.byKey(const ValueKey('buy-cart-benefit-select-shared-coupon'))), findsOneWidget);
+      final remove = find.descendant(of: secondCard, matching: find.byKey(const ValueKey('buy-cart-benefit-remove-shared-coupon')));
+      expect(remove, findsOneWidget);
+      await Scrollable.ensureVisible(tester.element(remove), alignment: .2); await tester.pumpAndSettle();
+      expect(remove.hitTestable(), findsOneWidget); await tester.tap(remove); await tester.pumpAndSettle();
+      expect(buyer.selectedCartBenefitsFor({BuyV2Destination.shop}), isEmpty);
+      expect(buyer.scopedCouponSavingMinor, 0); expect(buyer.cartTotalMinor, 4000);
+      expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
   test('LF14 CART actual successful Add reports once; failed Add and Cart editing do not manufacture events', () async {
     final entry = factoryEntry(publicPage()), sent = <Map<String, Object?>>[], received = Completer<void>();
     final reporter = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => entry.readback,

@@ -11144,7 +11144,7 @@ class BuyV2Session extends ChangeNotifier {
               destinationTotalMinor: total,
               destinationQuantity: product.minimumOrder,
             ) &&
-            ids.add('${benefit.kind.name}|${benefit.id}'))
+            ids.add(benefitIdentity(benefit)))
           benefit,
     ]);
   }
@@ -11249,9 +11249,7 @@ class BuyV2Session extends ChangeNotifier {
               destinationQuantity: _benefitQuantity(benefit, cartLines),
               allowUnmetSpend: benefit.kind == BuyV2CartBenefitKind.coupon,
             ) &&
-            ids.add(
-              '${benefit.destination.name}|${benefit.kind.name}|${benefit.id}',
-            ))
+            ids.add(benefitIdentity(benefit)))
           benefit,
     ]);
   }
@@ -12035,6 +12033,18 @@ class BuyV2Session extends ChangeNotifier {
     (benefit.productIds.toList()..sort()),
   ]);
 
+  /// Provider-scoped version identity, not permission to combine/apply benefits.
+  /// Display names never replace the source, Store or exact listing identity.
+  static String benefitIdentity(BuyV2CartBenefit benefit) => jsonEncode([
+    benefit.destination.name, benefit.kind.name, benefit.id, benefit.sourceId,
+    benefit.revision, benefit.scope.name, benefit.storeId,
+    (benefit.productIds.toList()..sort()),
+  ]);
+
+  bool _benefitSelectionMatches(_BuyV2CartBenefitSelectionRef selected, BuyV2CartBenefit benefit) =>
+    selected.benefitId == benefit.id && selected.sourceId == benefit.sourceId &&
+    selected.revision == benefit.revision && selected.scopeKey == _benefitScopeKey(benefit);
+
   int _benefitTotalMinor(BuyV2CartBenefit benefit, Iterable<BuyV2CartLine> lines) =>
       buyV2SumMinor(lines
           .where((line) => benefit.appliesTo(line.product))
@@ -12106,7 +12116,7 @@ class BuyV2Session extends ChangeNotifier {
               (benefit.minimumQuantity! <= 0 ||
                   _benefitQuantity(benefit, cartLines) <
                       benefit.minimumQuantity!)) ||
-          !ids.add('${benefit.destination.name}|${benefit.id}')) {
+          !ids.add(benefitIdentity(benefit))) {
         continue;
       }
       valid.add(benefit);
@@ -12209,7 +12219,14 @@ class BuyV2Session extends ChangeNotifier {
     return List.unmodifiable(selected);
   }
 
+  bool isCartBenefitSelected(BuyV2CartBenefit benefit) {
+    if (_collectionDisposed || !procurementScopeCurrent) return false;
+    final current = selectedCartBenefit(kind: benefit.kind, destination: benefit.destination);
+    return current != null && benefitIdentity(current) == benefitIdentity(benefit);
+  }
+
   bool chooseCartBenefit(BuyV2CartBenefit benefit) {
+    if (_collectionDisposed || !procurementScopeCurrent) return false;
     if (_holdCartForPaymentResolution()) return false;
     if (liveCartBenefitsEnabled &&
         cartBenefitsLoadState != BuyV2CartBenefitsLoadState.ready) {
@@ -12224,10 +12241,7 @@ class BuyV2Session extends ChangeNotifier {
     final current = available
         .where(
           (candidate) =>
-              candidate.id == benefit.id &&
-              candidate.sourceId == benefit.sourceId &&
-              candidate.revision == benefit.revision &&
-              _benefitScopeKey(candidate) == _benefitScopeKey(benefit),
+              benefitIdentity(candidate) == benefitIdentity(benefit),
         )
         .firstOrNull;
     if (current == null) {
@@ -12256,8 +12270,15 @@ class BuyV2Session extends ChangeNotifier {
   void removeCartBenefit({
     required BuyV2CartBenefitKind kind,
     required BuyV2Destination destination,
+    BuyV2CartBenefit? expectedBenefit,
   }) {
+    if (_collectionDisposed || !procurementScopeCurrent) return;
     if (_holdCartForPaymentResolution()) return;
+    if (expectedBenefit != null) {
+      final current = _selectedCartBenefitRefs[_cartBenefitSelectionKey(destination, kind)];
+      if (expectedBenefit.destination != destination || expectedBenefit.kind != kind || current == null ||
+          !_benefitSelectionMatches(current, expectedBenefit)) { return; }
+    }
     final removed = _selectedCartBenefitRefs.remove(
       _cartBenefitSelectionKey(destination, kind),
     );
@@ -19458,8 +19479,7 @@ class BuyV2Session extends ChangeNotifier {
           (benefit) =>
               key ==
                   _cartBenefitSelectionKey(benefit.destination, benefit.kind) &&
-              selection.benefitId == benefit.id &&
-              selection.sourceId == benefit.sourceId,
+              _benefitSelectionMatches(selection, benefit),
         ),
       );
     }

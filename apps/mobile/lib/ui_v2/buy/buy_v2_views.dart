@@ -7648,7 +7648,7 @@ class _ProductBenefitsPreview extends StatelessWidget {
             )
           else
             for (final (index, benefit) in visibleBenefits.indexed) ...[
-              _ProductBenefitPreviewTile(benefit: benefit),
+              _ProductBenefitPreviewTile(key: ValueKey('buy-product-benefit-owner-${BuyV2Session.benefitIdentity(benefit)}'), benefit: benefit),
               if (index != visibleBenefits.length - 1)
                 const SizedBox(height: 7),
             ],
@@ -7659,7 +7659,7 @@ class _ProductBenefitsPreview extends StatelessWidget {
 }
 
 class _ProductBenefitPreviewTile extends StatelessWidget {
-  const _ProductBenefitPreviewTile({required this.benefit});
+  const _ProductBenefitPreviewTile({super.key, required this.benefit});
 
   final BuyV2CartBenefit benefit;
 
@@ -21951,11 +21951,15 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
     super.initState();
     _followCartFilter();
     widget.session.addListener(_sessionChanged);
-    if (widget.session.liveCartBenefitsEnabled &&
-        widget.session.cartBenefitsLoadState !=
+    _scheduleBenefitsRead(widget.session);
+  }
+
+  void _scheduleBenefitsRead(BuyV2Session ownerSession) {
+    if (ownerSession.liveCartBenefitsEnabled &&
+        ownerSession.cartBenefitsLoadState !=
             BuyV2CartBenefitsLoadState.ready) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) unawaited(widget.session.refreshCartBenefits());
+        if (mounted && identical(widget.session, ownerSession)) unawaited(ownerSession.refreshCartBenefits());
       });
     }
   }
@@ -21976,6 +21980,11 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
   @override
   void didUpdateWidget(covariant _CartBenefitsInline oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.session, widget.session)) {
+      oldWidget.session.removeListener(_sessionChanged);
+      widget.session.addListener(_sessionChanged);
+      _scheduleBenefitsRead(widget.session);
+    }
     if (_filter != widget.session.cartDisplayFilter) {
       _filter = widget.session.cartDisplayFilter;
       _followCartFilter();
@@ -21993,6 +22002,7 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
 
   @override
   Widget build(BuildContext context) {
+    final ownerSession = widget.session;
     final combined =
         !widget.session.isStoreProcurement &&
         !widget.destinations.contains(BuyV2Destination.medicine);
@@ -22031,6 +22041,7 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
           ?widget.session.cartOfferOpportunity(destination: destination),
     ];
     Widget cardFor(BuyV2CartBenefit benefit) => _CartBenefitCard(
+      key: ValueKey('buy-cart-benefit-owner-${BuyV2Session.benefitIdentity(benefit)}'),
       benefit: benefit,
       enabled: !widget.session.cartChangesBlocked,
       scopeLabel: benefit.scope == BuyV2CartBenefitScope.platform
@@ -22044,30 +22055,19 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
       paymentStatus: benefit.kind == BuyV2CartBenefitKind.paymentOffer
           ? _paymentOfferStatus(widget.session, benefit)
           : null,
-      selected:
-          widget.session
-                  .selectedCartBenefit(
-                    kind: benefit.kind,
-                    destination: benefit.destination,
-                  )
-                  ?.id ==
-              benefit.id &&
-          widget.session
-                  .selectedCartBenefit(
-                    kind: benefit.kind,
-                    destination: benefit.destination,
-                  )
-                  ?.sourceId ==
-              benefit.sourceId,
+      selected: widget.session.isCartBenefitSelected(benefit),
       onSelect: () {
+        if (!mounted || !identical(widget.session, ownerSession)) return;
         HapticFeedback.selectionClick();
-        widget.session.chooseCartBenefit(benefit);
+        ownerSession.chooseCartBenefit(benefit);
       },
       onRemove: () {
+        if (!mounted || !identical(widget.session, ownerSession)) return;
         HapticFeedback.selectionClick();
-        widget.session.removeCartBenefit(
+        ownerSession.removeCartBenefit(
           kind: benefit.kind,
           destination: benefit.destination,
+          expectedBenefit: benefit,
         );
       },
     );
@@ -22483,6 +22483,7 @@ class _CartBenefitEmptyState extends StatelessWidget {
 
 class _CartBenefitCard extends StatelessWidget {
   const _CartBenefitCard({
+    super.key,
     required this.benefit,
     required this.colourIndex,
     required this.selected,
