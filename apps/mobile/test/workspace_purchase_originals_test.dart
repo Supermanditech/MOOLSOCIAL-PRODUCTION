@@ -362,7 +362,8 @@ void main() {
   });
   }
   for (final scenario in [(1.0, 'delivery'), (2.0, 'delivery'), (1.0, 'collection'), (1.0, 'attribution'), (2.0, 'attribution'), (1.0, 'variant'), (2.0, 'variant'), (1.0, 'scheduled'), (2.0, 'scheduled'),
-    (1.0, 'context'), (2.0, 'context'), (1.0, 'context-partial'), (2.0, 'context-partial')]) {
+    (1.0, 'context'), (2.0, 'context'), (1.0, 'context-partial'), (2.0, 'context-partial'),
+    (1.0, 'gst'), (2.0, 'gst'), (1.0, 'gst-unknown'), (2.0, 'gst-unknown')]) {
   testWidgets('configured Store feed supports exact facts ${scenario.$2} scale ${scenario.$1}', (tester) async {
     await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
     tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
@@ -378,6 +379,11 @@ void main() {
         fixtures.rehashPurchaseOrder(original);
       }
       raw['original'] = original['original']; raw['originalFingerprint'] = original['originalFingerprint']; raw['originalFactsVersion'] = 7;
+    }
+    if (scenario.$2.startsWith('gst')) {
+      final facts = scenario.$2 == 'gst-unknown' ? fixtures.supplierTaxPurchaseResponse(role: 'seller', declaration: null)
+        : fixtures.supplierTaxPurchaseResponse(role: 'seller'), original = facts['orders'][0];
+      raw['original'] = original['original']; raw['originalFingerprint'] = original['originalFingerprint']; raw['originalFactsVersion'] = 9;
     }
     if (scenario.$2 == 'collection') {
       raw['fulfilment'] = 'collection'; raw['stage'] = 'Preparing'; raw['permittedActions'] = <String>[];
@@ -446,6 +452,12 @@ void main() {
       expect(find.byKey(Key('work-operational-total-$key')), findsOneWidget);
     }
     expect(find.text('1 pack × ₹100.51'), findsOneWidget);
+    if (scenario.$2.startsWith('gst')) {
+      expect(find.text(scenario.$2 == 'gst-unknown' ? 'Supplier GST not recorded for this purchase'
+        : 'Supplier-declared GST 5% · Included in the ordered price'), findsOneWidget);
+      expect(work.workspaceOrders.single.operational!.original.factsVersion, 9);
+      expect(work.workspaceOrders.single.operational!.original.totals['totalMinor'], 10015);
+    }
     if (scenario.$2.startsWith('context')) {
       expect(find.text('Order delivery details'), findsOneWidget);
       expect(find.text('Evaluation recipient'), findsOneWidget);
@@ -474,11 +486,18 @@ void main() {
         await tester.runAsync(() async {
           final image = await boundary.toImage();
           final bytes = await image.toByteData(format: ui.ImageByteFormat.png); image.dispose();
-          final directory = Directory('build/lf-operational-ui-20261017'); await directory.create(recursive: true);
+          final directory = Directory(const String.fromEnvironment('LF_OPERATIONAL_CAPTURE_ROOT',
+            defaultValue: 'build/lf-operational-ui-20261017')); await directory.create(recursive: true);
           await File('${directory.path}/host-${scenario.$2}-${scenario.$1}-$suffix.png').writeAsBytes(bytes!.buffer.asUint8List());
         });
       }
       await captureView('details-top');
+      if (scenario.$2.startsWith('gst')) {
+        final declaration = find.byKey(const ValueKey('original-supplier-gst-line-one'));
+        await tester.ensureVisible(declaration); await tester.pumpAndSettle();
+        expect(declaration.hitTestable(), findsOneWidget);
+        await captureView('supplier-gst');
+      }
       await tester.ensureVisible(find.byKey(const Key('work-operational-total-totalMinor'))); await tester.pumpAndSettle();
       await captureView('details-total');
     }

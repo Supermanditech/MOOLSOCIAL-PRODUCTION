@@ -725,6 +725,111 @@ void main() {
     });
   }
   for (final role in WorkspaceOrderIdentityRole.values) {
+    for (final declaration in [null, {'version': 2, 'rateBasisPoints': 0, 'basis': 'additional'},
+      {'version': 2, 'rateBasisPoints': 500, 'basis': 'included'}, {'version': 1, 'amountMinor': 7, 'basis': 'additional'}]) {
+      test('LF-GST-ORIGINAL strict frozen source ${role.name} declaration=$declaration', () async {
+        final data = supplierTaxPurchaseResponse(role: role.name, declaration: declaration), order = data['orders'][0];
+        final saved = await projectionGateway(Transport()..data = data, account: data['viewerUserId'])
+          .readPurchaseProjection(role: role, realm: 'evaluation', purchaseId: data['purchaseId'],
+            storeId: role == WorkspaceOrderIdentityRole.seller ? order['storeId'] : null,
+            orderId: role == WorkspaceOrderIdentityRole.seller ? order['orderId'] : null);
+        expect(saved, isNotNull); expect(saved!.orders.single.factsVersion, 9);
+        expect(saved.orders.single.lines.single.toJson()['supplierTaxSnapshot'], order['original']['lines'][0]['supplierTaxSnapshot']);
+        expect(saved.orders.single.totals, order['original']['totals']);
+      });
+    }
+  }
+  for (final entry in <String, void Function(Map<String, dynamic>)>{
+    'missing': (l) => l.remove('supplierTaxSnapshot'),
+    'boolean': (l) => l['supplierTaxSnapshot'] = false,
+    'revision': (l) => l['supplierTaxSnapshot']['termsRevision'] = '',
+    'time': (l) => l['supplierTaxSnapshot']['observedAt'] = 'invalid',
+    'reversed expiry': (l) => l['supplierTaxSnapshot']['expiresAt'] = '2026-10-01T11:00:00.000Z',
+    'null declaration': (l) => l['supplierTaxSnapshot']['declaration'] = null,
+    'fractional rate': (l) => l['supplierTaxSnapshot']['declaration']['rateBasisPoints'] = 5.5,
+    'overflow': (l) => l['supplierTaxSnapshot']['declaration']['rateBasisPoints'] = 10001,
+    'amount overflow': (l) => l['supplierTaxSnapshot']['declaration'] = {'version': 1, 'amountMinor': 1000000000001, 'basis': 'additional'},
+    'unbound amount unit': (l) {
+      l['quantityUnit'] = 'kg';
+      l['supplierTaxSnapshot']['declaration'] = {'version': 1, 'amountMinor': 7, 'basis': 'additional'};
+    },
+    'extra amount': (l) => l['supplierTaxSnapshot']['declaration']['amountMinor'] = 7,
+    'claim': (l) => l['supplierTaxSnapshot']['verifiedRegistration'] = true,
+  }.entries) {
+    test('LF-GST-ORIGINAL strict read rejects ${entry.key} despite rehashed original', () async {
+      final data = supplierTaxPurchaseResponse(), order = data['orders'][0];
+      entry.value(order['original']['lines'][0] as Map<String, dynamic>); rehashPurchaseOrder(order);
+      expect(await projectionGateway(Transport()..data = data).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: data['purchaseId']), isNull);
+    });
+  }
+  for (final unit in ['kg', 'L', 'count']) {
+    test('LF-GST-ORIGINAL percentage retains the ordered $unit basis', () async {
+      final data = supplierTaxPurchaseResponse(), order = data['orders'][0];
+      order['original']['lines'][0]['quantityUnit'] = unit; rehashPurchaseOrder(order);
+      final result = await projectionGateway(Transport()..data = data).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: data['purchaseId']);
+      expect(result, isNotNull); expect(result!.orders.single.lines.single.quantityUnit, unit);
+    });
+  }
+  if (Platform.environment['LF_GST_ORIGINAL_LOG'] case final path?) {
+    test('LF-GST-ORIGINAL consumes actual persisted materializer buyer and Store readbacks', () async {
+      const marker = 'LF_GST_ORIGINAL_PROJECTION=';
+      final row = File(path).readAsLinesSync().singleWhere((line) => line.startsWith(marker));
+      final packet = (jsonDecode(row.substring(marker.length)) as Map).cast<String, dynamic>();
+      var unknown = 0, zero = 0, known = 0, legacy = 0;
+      for (final data in [packet['buyer'], ...(packet['sellers'] as List)]) {
+        final role = data['viewerRole'] == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller,
+          order = data['orders'][0];
+        final saved = await projectionGateway(Transport()..data = data, account: data['viewerUserId'])
+          .readPurchaseProjection(role: role, realm: 'evaluation', purchaseId: data['purchaseId'],
+            storeId: role == WorkspaceOrderIdentityRole.seller ? order['storeId'] : null,
+            orderId: role == WorkspaceOrderIdentityRole.seller ? order['orderId'] : null);
+        expect(saved, isNotNull);
+        for (final original in saved!.orders) {
+          expect(original.factsVersion, 9);
+          final raw = (data['orders'] as List).singleWhere((o) => o['orderId'] == original.orderId);
+          expect(original.totals, raw['original']['totals']);
+          for (final line in original.lines) {
+            final before = (raw['original']['lines'] as List).singleWhere((l) => l['lineId'] == line.lineId);
+            expect(line.toJson(), before);
+            final snapshot = line.supplierTaxSnapshot;
+            if (snapshot == null) {unknown++;} else if (snapshot.legacyAmount != null) {legacy++;}
+            else if (snapshot.gst!.rateBasisPoints == 0) {zero++;} else {known++;}
+          }
+        }
+      }
+      expect([unknown, zero, known, legacy], [2, 2, 4, 2]);
+    });
+  }
+  for (final role in WorkspaceOrderIdentityRole.values) {
+    for (final scale in [1.0, 2.0]) {
+      for (final unknown in [false, true]) {
+        testWidgets('LF-GST-ORIGINAL buyer and Store disclose frozen terms ${role.name} scale=$scale unknown=$unknown', (tester) async {
+          await tester.binding.setSurfaceSize(scale == 1 ? const Size(320, 844) : const Size(640, 360));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final data = unknown ? supplierTaxPurchaseResponse(role: role.name, declaration: null) : supplierTaxPurchaseResponse(role: role.name),
+            order = data['orders'][0], refs = referenceResponse(role: role.name);
+          refs['references'][0]['originalFingerprint'] = order['originalFingerprint'];
+          final wire = Transport()..respond = (body) => (body['operation'] as String).startsWith('list') ? refs : data;
+          await tester.pumpWidget(MaterialApp(home: Scaffold(body: MediaQuery(data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+            child: SingleChildScrollView(child: WorkspacePurchaseOriginals(
+              gateway: projectionGateway(wire, account: data['viewerUserId']), role: role, realm: 'evaluation',
+              storeId: role == WorkspaceOrderIdentityRole.seller ? order['storeId'] : null))))));
+          await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+          await tester.tap(find.byKey(ValueKey('original-order-${order['orderId']}'))); await tester.pumpAndSettle();
+          final declaration = find.byKey(const ValueKey('original-supplier-gst-line-one'));
+          await tester.ensureVisible(declaration); await tester.pumpAndSettle();
+          expect(tester.widget<Text>(declaration).data, unknown ? 'Supplier GST not recorded for this purchase'
+            : 'Supplier-declared GST 5% · Included in the ordered price');
+          expect(tester.widget<Text>(declaration).maxLines, isNull);
+          expect(wire.requests.every((r) => (r['operation'] as String).startsWith('read') || (r['operation'] as String).startsWith('list')), isTrue);
+          expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
+        });
+      }
+    }
+  }
+  for (final role in WorkspaceOrderIdentityRole.values) {
     for (final unknown in [false, true]) {
       test('LF-BULK ORIGINAL strict purchased agreement version8 ${role.name} unknown=$unknown', () async {
         final data = supplierQuotePurchaseResponse(role: role.name, unknown: unknown), order = data['orders'][0];
@@ -2095,6 +2200,21 @@ Map<String, dynamic> purchaseResponse({String role = 'buyer'}) {
       },
     ],
   };
+}
+
+Map<String, dynamic> supplierTaxPurchaseResponse({String role = 'buyer', Map<String, Object>? declaration = const {
+  'version': 2, 'rateBasisPoints': 500, 'basis': 'included'}}) {
+  final data = supplierQuotePurchaseResponse(role: role, unknown: true)..['schemaVersion'] = 9;
+  final order = data['orders'][0] as Map<String, dynamic>; order['factsVersion'] = 9;
+  for (final line in order['original']['lines']) {
+    line['supplierTaxSnapshot'] = declaration == null ? null : {
+      'schemaVersion': 1, 'termsRevision': 'purchased-terms-v1',
+      'observedAt': '2026-10-01T12:00:00.000Z', 'expiresAt': '2026-10-02T12:00:00.000Z',
+      'declaration': declaration,
+    };
+  }
+  rehashPurchaseOrder(order);
+  return (jsonDecode(jsonEncode(data)) as Map).cast<String, dynamic>();
 }
 
 Map<String, dynamic> supplierQuotePurchaseResponse({String role = 'buyer', bool unknown = false}) {

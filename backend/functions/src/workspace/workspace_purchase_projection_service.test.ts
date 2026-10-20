@@ -836,6 +836,113 @@ function fulfilmentContextReceipt() {
   };
   return value;
 }
+function supplierTaxReceipt() {
+  const value = fulfilmentContextReceipt(); value.schemaVersion = 8;
+  for (const [index, store] of value.stores.entries()) {
+    store.supplierQuote = null;
+    for (const line of store.lines) line.supplierTaxSnapshot = index === 0 ? {
+      schemaVersion: 1, termsRevision: 'purchased-terms-v1',
+      observedAt: '2026-10-01T12:00:00.000Z', expiresAt: '2026-10-02T12:00:00.000Z',
+      declaration: {version: 2, rateBasisPoints: 500, basis: 'included'},
+    } : null;
+  }
+  return value;
+}
+
+test('LF-GST-ORIGINAL trusted receipt retains the historical supplier declaration without changing money', () => {
+  for (const declaration of [null, {version: 2, rateBasisPoints: 0, basis: 'additional'},
+    {version: 2, rateBasisPoints: 500, basis: 'included'}, {version: 1, amountMinor: 7, basis: 'additional'}]) {
+    const input = supplierTaxReceipt();
+    input.stores[0].lines[0].supplierTaxSnapshot = declaration === null ? null : {
+      ...input.stores[0].lines[0].supplierTaxSnapshot, declaration};
+    assert.deepEqual(normalizePlacement(input, 'evaluation'), input);
+    assert.deepEqual(input.stores.map((s: any) => s.totals), fulfilmentContextReceipt().stores.map((s: any) => s.totals));
+  }
+  for (const legacy of [receipt(), attributedReceipt(), variantReceipt(), scheduledReceipt(), publicListingReceipt(), fulfilmentContextReceipt()]) {
+    assert.deepEqual(normalizePlacement(legacy, 'evaluation'), legacy);
+    assert.equal(Object.hasOwn(legacy.stores[0].lines[0], 'supplierTaxSnapshot'), false);
+  }
+});
+
+test('LF-GST-ORIGINAL legacy amounts require a bound pack while rates retain supported units', () => {
+  for (const unit of ['kg', 'L', 'count']) {
+    const input = supplierTaxReceipt(), line = input.stores[0].lines[0]; line.quantityUnit = unit;
+    assert.deepEqual(normalizePlacement(input, 'evaluation'), input);
+    line.supplierTaxSnapshot.declaration = {version: 1, amountMinor: 7, basis: 'additional'};
+    assert.throws(() => normalizePlacement(input, 'evaluation'), rejectsCode('invalid_input'));
+  }
+});
+
+test('LF-GST-ORIGINAL persisted historical declarations survive restart and both role readbacks', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: 'demo-lf-gst-original'}, `gst-original-${randomUUID()}`), db = getFirestore(app);
+  const input = supplierTaxReceipt(), suffix = randomUUID();
+  input.receiptId = `gst-${suffix}`; input.buyerUserId = `buyer-${suffix}`;
+  for (const [index, store] of input.stores.entries()) {
+    const previous = store.storeId;
+    store.storeId = `store-${suffix}-${index}`; store.caseId = `case-${suffix}-${index}`; store.ownerUserId = `owner-${suffix}-${index}`;
+    for (const l of store.lines) {
+      for (const listing of [l.publicListing, l.scheduledFulfilment?.listing]) if (listing) {
+        listing.storeId = store.storeId;
+        listing.listingId = `listing-${createHash('sha256').update(JSON.stringify([1, 'evaluation', store.storeId, l.skuId, listing.channel])).digest('hex')}`;
+      }
+    }
+    assert.notEqual(previous, store.storeId);
+    await db.collection('workspaceProfiles').doc(store.caseId).set({schemaVersion: 1, caseId: store.caseId,
+      workspaceId: store.storeId, ownerUserId: store.ownerUserId, familyId: 'products-trade', profileId: 'retailer-grocery', status: 'live', shopEnabled: true});
+  }
+  const first = input.stores[0], originalLine = first.lines[0];
+  first.lines.push({...structuredClone(originalLine), sourceLineId: 'source-zero', supplierTaxSnapshot: {
+    ...originalLine.supplierTaxSnapshot, declaration: {version: 2, rateBasisPoints: 0, basis: 'additional'}}},
+  {...structuredClone(originalLine), sourceLineId: 'source-unknown', supplierTaxSnapshot: null});
+  first.totals.itemsMinor += 20102; first.totals.totalMinor += 20102;
+  input.stores[1].lines[0].supplierTaxSnapshot = {...originalLine.supplierTaxSnapshot,
+    declaration: {version: 1, amountMinor: 7, basis: 'additional'}};
+  try {
+    const writer = new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => input});
+    const created = await writer.materialize('gst-original-source');
+    assert.deepEqual(await writer.materialize('gst-original-source'), created);
+    const reader = new WorkspacePurchaseProjectionService(db, 'evaluation');
+    const buyer = await reader.readBuyer(input.buyerUserId, {purchaseId: created.purchaseId});
+    assert.equal(buyer.schemaVersion, 9);
+    const sellers = [];
+    for (const order of buyer.orders) {
+      const source = input.stores.find((s: any) => s.storeId === order.storeId)!;
+      assert.deepEqual(order.original.totals, source.totals);
+      assert.deepEqual(order.original.lines.map(l => l.supplierTaxSnapshot).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
+        source.lines.map((l: any) => l.supplierTaxSnapshot).sort((a: any,b: any) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+      const seller = await reader.readStore(source.ownerUserId, {purchaseId: created.purchaseId, storeId: order.storeId, orderId: order.orderId});
+      assert.deepEqual(seller.orders[0], order); sellers.push(seller);
+      await assert.rejects(reader.readStore('foreign-owner', {purchaseId: created.purchaseId, storeId: order.storeId, orderId: order.orderId}), rejectsCode('not_found'));
+    }
+    originalLine.supplierTaxSnapshot.declaration.rateBasisPoints = 1800;
+    await assert.rejects(writer.materialize('gst-original-source'), rejectsCode('conflict'));
+    assert.deepEqual(await reader.readBuyer(input.buyerUserId, {purchaseId: created.purchaseId}), buyer);
+    if (process.env.LF_GST_ORIGINAL_CAPTURE === 'true') console.log(`LF_GST_ORIGINAL_PROJECTION=${JSON.stringify({buyer, sellers})}`);
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+
+for (const [name, mutate] of Object.entries({
+  missing: (s: any) => {delete s.supplierTaxSnapshot;},
+  boolean: (s: any) => {s.supplierTaxSnapshot = false;},
+  version: (s: any) => {s.supplierTaxSnapshot.schemaVersion = 2;},
+  revision: (s: any) => {s.supplierTaxSnapshot.termsRevision = '';},
+  observed: (s: any) => {s.supplierTaxSnapshot.observedAt = 'not-a-date';},
+  expiry: (s: any) => {s.supplierTaxSnapshot.expiresAt = '2026-10-01T11:59:59.000Z';},
+  absentDeclaration: (s: any) => {delete s.supplierTaxSnapshot.declaration;},
+  nullDeclaration: (s: any) => {s.supplierTaxSnapshot.declaration = null;},
+  fractional: (s: any) => {s.supplierTaxSnapshot.declaration.rateBasisPoints = 5.5;},
+  overflow: (s: any) => {s.supplierTaxSnapshot.declaration.rateBasisPoints = 10001;},
+  amountOverflow: (s: any) => {s.supplierTaxSnapshot.declaration = {version: 1, amountMinor: 1000000000001, basis: 'additional'};},
+  contradictory: (s: any) => {s.supplierTaxSnapshot.declaration.amountMinor = 7;},
+  authorityClaim: (s: any) => {s.supplierTaxSnapshot.verifiedRegistration = true;},
+})) test(`LF-GST-ORIGINAL rejects malformed frozen declaration ${name}`, () => {
+  const input = supplierTaxReceipt(); mutate(input.stores[0].lines[0]);
+  assert.throws(() => normalizePlacement(input, 'evaluation'), rejectsCode('invalid_input'));
+});
+
 test('LF-CONTEXT trusted placement preserves per-Store recipient and line instructions without current-profile inference', () => {
   const value = fulfilmentContextReceipt();
   assert.deepEqual(normalizePlacement(value, 'evaluation'), value);

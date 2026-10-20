@@ -725,6 +725,7 @@ class _WorkspacePurchaseOriginalsState
                                   '${_quantity(line.quantityMilli)} ${line.quantityUnit} · ${line.packLabel}',
                                 ),
                                 WorkspaceOriginalVariantForLine(line: line),
+                                WorkspaceOriginalSupplierTaxForLine(line: line),
                                 WorkspaceOriginalScheduledForLine(line: line),
                                 WorkspaceOriginalInstructionsForLine(original: details, lineId: line.lineId),
                                 _amount(line.lineTotalMinor),
@@ -858,6 +859,24 @@ class WorkspaceOriginalVariantForLine extends StatelessWidget {
     ? const SizedBox.shrink()
     : Text(line.variant!, key: ValueKey('original-variant-${line.lineId}'),
         style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.4));
+}
+
+/// Historical supplier statement only. Original charged totals stay separate.
+class WorkspaceOriginalSupplierTaxForLine extends StatelessWidget {
+  const WorkspaceOriginalSupplierTaxForLine({super.key, required this.line});
+  final WorkspacePurchasedSkuLine line;
+  @override
+  Widget build(BuildContext context) {
+    if (!line.hasSupplierTaxSnapshot) return const SizedBox.shrink();
+    final snapshot = line.supplierTaxSnapshot;
+    final gst = snapshot?.gst, amount = snapshot?.legacyAmount;
+    final included = (gst?.basis ?? amount?.basis)?.name == 'included';
+    final label = snapshot == null ? 'Supplier GST not recorded for this purchase'
+      : '${gst != null ? 'Supplier-declared GST ${gst.percentageText}%' : 'Supplier-declared tax ${_money(amount!.amountMinor)} per selling pack'}'
+        ' · ${included ? 'Included in' : 'Additional to'} the ordered price';
+    return Text(label, key: ValueKey('original-supplier-gst-${line.lineId}'),
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.4));
+  }
 }
 
 /// Historical desired selection only. No current availability or booking claim.

@@ -362,7 +362,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         'state',
         'orders',
       ]);
-      if (data['schemaVersion'] is! int || !const [2, 3, 4, 5, 6, 7, 8].contains(data['schemaVersion']) ||
+      if (data['schemaVersion'] is! int || !const [2, 3, 4, 5, 6, 7, 8, 9].contains(data['schemaVersion']) ||
           data['realm'] != realm ||
           data['authNamespace'] != 'firebase-default' ||
           data['viewerRole'] != role.name ||
@@ -783,7 +783,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
   ) {
     final source = _map(value);
     final enriched = source.containsKey('originalFactsVersion');
-    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4, 5, 6, 7, 8].contains(source['originalFactsVersion']))) {
+    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4, 5, 6, 7, 8, 9].contains(source['originalFactsVersion']))) {
       throw const FormatException('Unsupported original facts.');
     }
     final data = _exactMap(source, [
@@ -1361,7 +1361,7 @@ class WorkspacePurchaseOrder {
   final WorkspaceOriginalFulfilmentContext? fulfilmentContext;
   final bool hasSupplierQuoteSnapshot;
   final WorkspaceOriginalSupplierQuote? supplierQuote;
-  int get factsVersion => hasSupplierQuoteSnapshot ? 8 : hasFulfilmentContextSnapshot ? 7 : lines.any((line) => line.hasPublicListingSnapshot) ? 6 :
+  int get factsVersion => lines.any((line) => line.hasSupplierTaxSnapshot) ? 9 : hasSupplierQuoteSnapshot ? 8 : hasFulfilmentContextSnapshot ? 7 : lines.any((line) => line.hasPublicListingSnapshot) ? 6 :
     lines.any((line) => line.hasScheduledFulfilmentSnapshot) ? 5 :
     lines.any((line) => line.variant != null) ? 4 : benefitAttribution == null ? 2 : 3;
 }
@@ -1423,6 +1423,43 @@ class WorkspaceOriginalBenefitComponent {
     'allocations': allocations.entries.map((a) => {'lineId': a.key, 'amountMinor': a.value}).toList()};
 }
 
+/// Supplier-declared terms frozen with the purchase, not a charged tax amount
+/// or verified registration. Historical readback never consults today's SKU.
+class WorkspaceOriginalSupplierTaxSnapshot {
+  const WorkspaceOriginalSupplierTaxSnapshot._({required this.termsRevision,
+    required this.observedAt, required this.expiresAt, this.gst, this.legacyAmount});
+  final String termsRevision, observedAt;
+  final String? expiresAt;
+  final BuyV2SupplierGstRate? gst;
+  final BuyV2SupplierTaxAmount? legacyAmount;
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'termsRevision': termsRevision,
+    'observedAt': observedAt, 'expiresAt': expiresAt,
+    'declaration': gst?.toChannelJson() ?? legacyAmount!.toJson()};
+  static WorkspaceOriginalSupplierTaxSnapshot fromJson(Object? value) {
+    final s = _exactMap(value, const ['schemaVersion', 'termsRevision', 'observedAt', 'expiresAt', 'declaration']);
+    if (s['schemaVersion'] is! int || s['schemaVersion'] != 1 || !_id(s['termsRevision'])) {
+      throw const FormatException('Invalid original supplier declaration.');
+    }
+    DateTime time(Object? raw) {
+      if (raw is! String || raw.length != 24) throw const FormatException('Invalid original supplier time.');
+      final parsed = DateTime.parse(raw).toUtc();
+      if (parsed.toIso8601String() != raw) throw const FormatException('Invalid original supplier time.');
+      return parsed;
+    }
+    final observed = time(s['observedAt']), expires = s['expiresAt'] == null ? null : time(s['expiresAt']);
+    if (expires != null && !expires.isAfter(observed)) throw const FormatException('Invalid original supplier expiry.');
+    final d = _map(s['declaration']);
+    final gst = d['version'] == 2 ? BuyV2SupplierGstRate.fromChannelJson(d) : null;
+    final amount = gst == null ? BuyV2SupplierTaxAmount.fromJson(d) : null;
+    if (gst == null && amount == null) throw const FormatException('Missing original supplier declaration.');
+    if (amount != null && amount.amountMinor > 1000000000000) {
+      throw const FormatException('Original supplier amount exceeds the purchase limit.');
+    }
+    return WorkspaceOriginalSupplierTaxSnapshot._(termsRevision: s['termsRevision'] as String,
+      observedAt: s['observedAt'] as String, expiresAt: s['expiresAt'] as String?, gst: gst, legacyAmount: amount);
+  }
+}
+
 class WorkspacePurchasedSkuLine {
   const WorkspacePurchasedSkuLine({
     required this.lineId,
@@ -1442,6 +1479,8 @@ class WorkspacePurchasedSkuLine {
     this.scheduledFulfilment,
     this.hasPublicListingSnapshot = false,
     this.publicListing,
+    this.hasSupplierTaxSnapshot = false,
+    this.supplierTaxSnapshot,
   });
   final String lineId,
       skuId,
@@ -1459,6 +1498,8 @@ class WorkspacePurchasedSkuLine {
   /// or today’s catalogue; this is historical identity, not permission to buy.
   final bool hasPublicListingSnapshot;
   final BuyV2PublicListingIdentity? publicListing;
+  final bool hasSupplierTaxSnapshot;
+  final WorkspaceOriginalSupplierTaxSnapshot? supplierTaxSnapshot;
   final int quantityMilli, unitPriceMinor, lineTotalMinor;
   String get quantityLabel {
     final fraction = quantityMilli % 1000;
@@ -1481,6 +1522,7 @@ class WorkspacePurchasedSkuLine {
     'variant': ?variant,
     if (hasScheduledFulfilmentSnapshot) 'scheduledFulfilment': scheduledFulfilment?.toJson(),
     if (hasPublicListingSnapshot) 'publicListing': publicListing?.toJson(),
+    if (hasSupplierTaxSnapshot) 'supplierTaxSnapshot': supplierTaxSnapshot?.toJson(),
   };
 }
 
@@ -1585,7 +1627,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     'originalFingerprint',
   ]);
   final version = data['factsVersion'];
-  if (version is! int || !const [2, 3, 4, 5, 6, 7, 8].contains(version) ||
+  if (version is! int || !const [2, 3, 4, 5, 6, 7, 8, 9].contains(version) ||
       !_id(data['storeId']) ||
       !_id(data['orderId'])) {
     throw const FormatException('Unsupported order reference.');
@@ -1608,7 +1650,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
   final lines = <WorkspacePurchasedSkuLine>[];
   for (final raw in rawLines) {
     final l = _exactMap(raw, [..._purchaseLineKeys, if (version >= 4) 'variant', if (version >= 5) 'scheduledFulfilment',
-      if (version >= 6) 'publicListing']);
+      if (version >= 6) 'publicListing', if (version >= 9) 'supplierTaxSnapshot']);
     if (version >= 4 && (l['variant'] is! String ||
         (l['variant'] as String).trim() != l['variant'] ||
         (l['variant'] as String).length > 240 ||
@@ -1658,6 +1700,11 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     if (expected != BigInt.from(l['lineTotalMinor'] as int)) {
       throw const FormatException('Contradictory line amount.');
     }
+    final supplierTax = version >= 9 && l['supplierTaxSnapshot'] != null
+      ? WorkspaceOriginalSupplierTaxSnapshot.fromJson(l['supplierTaxSnapshot']) : null;
+    if (supplierTax?.legacyAmount != null && l['quantityUnit'] != 'pack') {
+      throw const FormatException('Original supplier amount needs its selling pack.');
+    }
     lines.add(
       WorkspacePurchasedSkuLine(
         lineId: l['lineId'] as String,
@@ -1677,6 +1724,8 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
         scheduledFulfilment: scheduled,
         hasPublicListingSnapshot: version >= 6,
         publicListing: listing,
+        hasSupplierTaxSnapshot: version >= 9,
+        supplierTaxSnapshot: supplierTax,
       ),
     );
   }
