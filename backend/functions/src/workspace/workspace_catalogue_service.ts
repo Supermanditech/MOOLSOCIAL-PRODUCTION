@@ -946,6 +946,14 @@ export class WorkspaceCatalogueService {
   /** Internal coupon price projection from the caller's read transaction.
    * Selected SKU reads do not scan/truncate a larger Store catalogue. */
   async couponPriceSnapshot(storeId: string, skuIds: readonly string[], tx: Transaction): Promise<object[]> {
+    return this.reviewedPriceSnapshots(storeId, skuIds, tx, false);
+  }
+  /** Bulk negotiation also freezes genuine descriptive supplier-policy provenance.
+   * Keep the existing coupon projection byte/field shape unchanged. */
+  async bulkQuotationSnapshot(storeId: string, skuIds: readonly string[], tx: Transaction): Promise<object[]> {
+    return this.reviewedPriceSnapshots(storeId, skuIds, tx, true);
+  }
+  private async reviewedPriceSnapshots(storeId: string, skuIds: readonly string[], tx: Transaction, policies: boolean): Promise<object[]> {
     storeId = id(storeId);
     const selected = skuIds.map(id);
     if (!selected.length || selected.length > 100 || new Set(selected).size !== selected.length) invalid();
@@ -954,7 +962,7 @@ export class WorkspaceCatalogueService {
     if (!source) invalid("Coupon price source is unavailable.");
     return Promise.all(selected.map(skuId => this.publicCatalogue({storeId, skuId,
       listingReadbackVersion: 1, mediaReadbackVersion: 1, productFactsReadbackVersion: 1,
-      unbrandedProduceReadbackVersion: 1, supplierPublishersVersion: 1},
+      unbrandedProduceReadbackVersion: 1, supplierPublishersVersion: 1, ...(policies ? {policyReadbackVersion: 1} : {})},
       {...source, records: source.records.filter(record => record.skuId === skuId)})));
   }
 

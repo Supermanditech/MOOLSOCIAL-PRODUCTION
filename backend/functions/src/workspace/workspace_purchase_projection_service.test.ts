@@ -4,10 +4,12 @@ import test from "node:test";
 import {initializeApp, deleteApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 import {WorkspaceProfileError} from "./workspace_profile_service.js";
+import * as purchaseModule from "./workspace_purchase_projection_service.js";
 import {WorkspacePurchaseProjectionService, normalizePlacement, requireDefaultPurchaseTenant,
   WorkspaceOrderOperationsService, normalizeOperationalOrder,
   normalizeOrderCompletion, purchaseOriginalFingerprint, type TrustedOrderCompletionEvidence,
   type TrustedOperationalOrderEvidence, type TrustedPlacementReceipt} from "./workspace_purchase_projection_service.js";
+import {WorkspaceBulkQuoteService} from "./workspace_purchase_projection_service.js";
 
 function operationalEvidence(): TrustedOperationalOrderEvidence {
   const now = new Date("2026-10-16T12:00:00.000Z");
@@ -21,6 +23,150 @@ function operationalEvidence(): TrustedOperationalOrderEvidence {
     fulfilmentDeadline: new Date(now.getTime() + 3600000).toISOString(),
     initialStage: "Confirmed", allowedActions: ["accept", "ready", "reject"]};
 }
+
+test('LF-BULK supplier negotiation has a distinct private lifecycle, not a Checkout quote or issued PO', () => {
+  const Service = Reflect.get(purchaseModule, 'WorkspaceBulkQuoteService');
+  assert.equal(typeof Service, 'function');
+  for (const method of ['request', 'offer', 'accept', 'withdraw', 'read']) {
+    assert.equal(typeof Reflect.get(Service.prototype, method), 'function');
+  }
+});
+
+test('LF-BULK local persisted request offer acceptance and original recovery keep exact merchandise facts private', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  // Isolated catalogue-source fixture and actual loopback Firestore only.
+  // Not a phone record, real quotation, payment or live catalogue acceptance.
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-bulk-${randomUUID().slice(0, 8)}`}, `bulk-${randomUUID()}`), db = getFirestore(app);
+  let clock = '2026-10-20T12:00:00.000Z', channel = 'bulk', revision = 1, policyRevision = 1;
+  const listingId = `listing-${'a'.repeat(64)}`;
+  let expireDuringRead = false;
+  const sourceFixture = {bulkQuotationSnapshot: async () => [{state: 'ready', realm: 'evaluation', storeId: 'store-one', items: [{
+    skuId: 'sku-one', revision, canonicalProductId: 'canonical-one', verifiedPackId: 'pack-one',
+    content: {title: 'Isolated Bulk rice'}, pack: {label: '25 kg bag'},
+    channels: [{kind: channel, minimumOrder: 10, quantityStep: 5, validUntil: '2026-10-21T12:00:00.000Z'}],
+    listings: [{schemaVersion: 1, realm: 'evaluation', listingId, storeId: 'store-one', skuId: 'sku-one', channel,
+      canonicalProductId: 'canonical-one', verifiedPackId: 'pack-one'}],
+    supplierPolicy: {schemaVersion: 1, realm: 'evaluation', storeId: 'store-one', skuId: 'sku-one', observedAt: clock,
+      state: 'ready', revision: policyRevision, requiresAcceptance: true, policy: {id: 'policy-one', storeId: 'store-one',
+        revision: `policy-v${policyRevision}`, productIds: ['sku-one'], requiresAcceptance: true, validUntil: null,
+        title: 'Isolated supplier terms', body: 'Discuss bank or delivery terms with supplier'}},
+  }]}]};
+  const source = {bulkQuotationSnapshot: async () => {
+    const pages = await sourceFixture.bulkQuotationSnapshot();
+    if (expireDuringRead) clock = '2026-10-20T12:05:00.000Z';
+    return pages;
+  }};
+  const service = () => new WorkspaceBulkQuoteService(db, 'evaluation', source, () => new Date(clock));
+  const request = {schemaVersion: 1, requestId: 'request-one', storeId: 'store-one',
+    lines: [{lineId: 'line-one', skuId: 'sku-one', listingId, skuRevision: 1, quantity: 10}]};
+  const profile = {schemaVersion: 1, caseId: 'case-one', workspaceId: 'store-one', ownerUserId: 'supplier-one',
+    familyId: 'products-trade', profileId: 'wholesaler', status: 'live', shopEnabled: true};
+  try {
+    await db.collection('workspaceProfiles').doc('case-one').set(profile);
+    for (const value of ['retail', 'wholesale']) {
+      channel = value; await assert.rejects(service().request('buyer-one', request));
+    }
+    channel = 'bulk';
+    for (const change of [{buyerUserId: 'other-buyer'}, {lines: [{...request.lines[0], quantity: 11}]},
+      {lines: [{...request.lines[0], quantity: 5}]}, {lines: [{...request.lines[0], unitPriceMinor: 1}]}]) {
+      await assert.rejects(service().request('buyer-one', {...request, ...change}));
+    }
+    const created = await service().request('buyer-one', request) as any;
+    assert.equal(created.state, 'requested'); assert.equal(created.orderingAvailable, false);
+    assert.equal(created.kind, 'supplier_merchandise_agreement');
+    const scope = {quoteId: created.quoteId};
+    assert.deepEqual(await service().request('buyer-one', request), created);
+    await assert.rejects(service().request('buyer-one', {...request, lines: [{...request.lines[0], quantity: 15}]}));
+    await assert.rejects(service().read('other-buyer', scope));
+    const offer = {schemaVersion: 1, ...scope, operationId: 'offer-one', expectedRevision: 1,
+      validUntil: '2026-10-20T12:05:00.000Z', prices: [{lineId: 'line-one', unitPriceMinor: 10025}]};
+    await assert.rejects(service().offer('buyer-one', offer));
+    await assert.rejects(service().offer('other-supplier', offer));
+    await assert.rejects(service().offer('supplier-one', {...offer, prices: [{lineId: 'line-one', unitPriceMinor: 1.5}]}));
+    const offered = await service().offer('supplier-one', offer) as any;
+    assert.equal(offered.offer.merchandiseMinor, 100250);
+    assert.equal(offered.finalChargesDetermined, false); assert.equal(offered.creditApproved, false);
+    assert.equal(offered.lines[0].quantity, 10); assert.equal(offered.lines[0].supplierPolicy.revision, 1);
+    assert.deepEqual(await service().offer('supplier-one', offer), offered);
+    const path = db.collection('workspacePurchaseProjections').doc('evaluation').collection('bulkQuoteRequests').doc(created.quoteId);
+    const originalStored = (await path.get()).data()!;
+    const canonical = (v: any): any => Array.isArray(v) ? v.map(canonical) : v && typeof v === 'object'
+      ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
+    const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(canonical(v))).digest('hex');
+    for (const corrupt of [
+      (body: any) => { body.state = ['offered']; },
+      (body: any) => { delete body.offer.prices[0].merchandiseMinor; },
+      (body: any) => { body.revision = 9; },
+      (body: any) => { body.offer.offeredAt = '2026-10-20T12:02:00.000Z'; },
+      (body: any) => { body.lines[0].supplierPolicy.privateAccount = 'not-public'; },
+    ]) {
+      const body = structuredClone(originalStored.body); corrupt(body);
+      await path.set({body, integrity: hash(body)});
+      await assert.rejects(service().read('buyer-one', scope));
+      await assert.rejects(service().read('other-buyer', scope), {code: 'not_found', httpStatus: 404});
+      await assert.rejects(service().offer('other-supplier', offer), {code: 'not_found', httpStatus: 404});
+    }
+    await path.set(originalStored);
+    // Reordered Firestore maps retain the same canonical agreement.
+    await path.set(canonical(originalStored));
+    assert.deepEqual(await service().read('supplier-one', scope), offered);
+    const accept = {schemaVersion: 1, ...scope, operationId: 'accept-one', expectedRevision: 2};
+    await assert.rejects(service().accept('supplier-one', accept));
+    expireDuringRead = true;
+    await assert.rejects(service().accept('buyer-one', accept));
+    expireDuringRead = false; clock = '2026-10-20T12:00:00.000Z';
+    assert.equal((await service().read('buyer-one', scope) as any).revision, 2);
+    policyRevision = 2; await assert.rejects(service().accept('buyer-one', accept)); policyRevision = 1;
+    clock = offer.validUntil; await assert.rejects(service().accept('buyer-one', accept));
+    clock = '2026-10-20T12:01:00.000Z';
+    const accepted = await service().accept('buyer-one', accept) as any;
+    assert.equal(accepted.state, 'accepted'); assert.equal(accepted.acceptance.offerRevision, 2);
+    assert.equal(accepted.orderingAvailable, false); assert.equal(accepted.offer.merchandiseMinor, 100250);
+    assert.deepEqual(await service().read('buyer-one', scope), accepted);
+    const seller = await service().read('supplier-one', scope) as any;
+    assert.equal(seller.viewerRole, 'supplier'); assert.deepEqual(seller.acceptance, accepted.acceptance);
+    assert.equal(JSON.stringify(seller).includes('buyer-one'), false); assert.equal(JSON.stringify(accepted).includes('supplier-one'), false);
+    await assert.rejects(service().withdraw('supplier-one', {...accept, operationId: 'withdraw-one', expectedRevision: 3}));
+    await assert.rejects(service().offer('supplier-one', {...offer, operationId: 'offer-two', expectedRevision: 3}));
+    const race = await service().request('buyer-one', {...request, requestId: 'race-request'}) as any;
+    const raceOffer = {...offer, quoteId: race.quoteId, operationId: 'race-offer'};
+    await service().offer('supplier-one', raceOffer);
+    const raceAccept = {...accept, quoteId: race.quoteId, operationId: 'race-accept'};
+    const raceWithdraw = {...raceAccept, operationId: 'race-withdraw'};
+    const racing = await Promise.allSettled([service().accept('buyer-one', raceAccept), service().withdraw('supplier-one', raceWithdraw)]);
+    assert.equal(racing.filter(r => r.status === 'fulfilled').length, 1);
+    const winner = await service().read('buyer-one', {quoteId: race.quoteId}) as any;
+    assert.equal(winner.revision, 3); assert.ok(['accepted', 'withdrawn'].includes(winner.state));
+    if (winner.state === 'accepted') assert.deepEqual(await service().accept('buyer-one', raceAccept), winner);
+    else assert.equal((await service().withdraw('supplier-one', raceWithdraw) as any).state, 'withdrawn');
+    revision = 2; clock = '2026-10-22T12:00:00.000Z';
+    assert.deepEqual(await service().accept('buyer-one', accept), accepted); // Original, not a new acceptance after expiry.
+    assert.deepEqual(await service().offer('supplier-one', offer), offered);
+    const heavyLines = Array.from({length: 80}, (_, i) => ({lineId: `line-${i}`, skuId: `sku-${i}`,
+      listingId: `listing-${hash(['heavy-listing', i])}`, skuRevision: 1, quantity: 10}));
+    const heavySource = {bulkQuotationSnapshot: async () => {
+      const base = (await sourceFixture.bulkQuotationSnapshot())[0]!.items[0]!;
+      return heavyLines.map(line => ({state: 'ready', realm: 'evaluation', storeId: 'store-one', items: [{...base,
+        skuId: line.skuId, revision: 1, channels: [{kind: 'bulk', minimumOrder: 10, quantityStep: 5, validUntil: '2030-01-01T00:00:00.000Z'}],
+        listings: [{...base.listings[0], skuId: line.skuId, listingId: line.listingId}],
+        supplierPolicy: {...base.supplierPolicy, skuId: line.skuId, policy: {...base.supplierPolicy.policy,
+          productIds: [line.skuId], body: 'x'.repeat(12000)}},
+      }]}));
+    }};
+    await assert.rejects(new WorkspaceBulkQuoteService(db, 'evaluation', heavySource, () => new Date(clock)).request('buyer-one',
+      {...request, requestId: 'heavy-request', lines: heavyLines}), {code: 'invalid_input', httpStatus: 400});
+    await db.collection('workspaceProfiles').doc('case-one').update({ownerUserId: 'new-supplier'});
+    await assert.rejects(service().read('supplier-one', scope)); await assert.rejects(service().offer('supplier-one', offer));
+    await assert.rejects(service().read('new-supplier', scope));
+    assert.deepEqual(await service().read('buyer-one', scope), accepted);
+    const root = db.collection('workspacePurchaseProjections').doc('evaluation');
+    assert.equal((await root.collection('bulkQuoteRequests').get()).size, 2);
+    assert.equal((await root.collection('bulkQuoteCommands').get()).size, 6);
+    for (const collection of ['purchases', 'operationalOrders', 'orderCompletions']) assert.equal((await root.collection(collection).get()).size, 0);
+  } finally { await deleteApp(app); }
+});
 
 test("completion has an explicit internal producer and separate authorized reader, never inferred from Ready", () => {
   assert.equal(typeof Reflect.get(WorkspaceOrderOperationsService.prototype, "recordCompletion"), "function");

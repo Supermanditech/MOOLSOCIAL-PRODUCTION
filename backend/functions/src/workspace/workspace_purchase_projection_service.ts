@@ -1,6 +1,7 @@
 import {createHash, randomUUID} from "node:crypto";
 import {FieldPath, type Firestore, type Transaction} from "firebase-admin/firestore";
 import {WorkspaceProfileError} from "./workspace_profile_service.js";
+import type {WorkspaceCatalogueService} from "./workspace_catalogue_service.js";
 
 type Realm = "evaluation" | "production";
 export type PurchaseFactsVersion = 2 | 3 | 4 | 5 | 6 | 7;
@@ -276,6 +277,273 @@ export interface OperationalCommandResult {
 interface OperationalScope {purchaseId: string; storeId: string; orderId: string}
 function operationalScope(raw: Readonly<Record<string, unknown>>): OperationalScope {
   return {purchaseId: id(raw.purchaseId), storeId: id(raw.storeId), orderId: id(raw.orderId)};
+}
+
+interface BulkRequestLine {lineId: string; skuId: string; listingId: string; skuRevision: number; quantity: number}
+interface BulkQuotedLine extends BulkRequestLine {
+  canonicalProductId: string; verifiedPackId: string; name: string; packLabel: string;
+  supplierPolicy: Record<string, unknown> | null;
+}
+interface BulkPrice {lineId: string; unitPriceMinor: number; merchandiseMinor: number}
+interface BulkOffer {revision: number; offeredAt: string; validUntil: string; prices: BulkPrice[];
+  merchandiseMinor: number; policyFingerprint: string}
+interface BulkAgreementRecord {
+  schemaVersion: 1; realm: Realm; quoteId: string; storeId: string; storeCaseId: string;
+  buyerUserId: string; supplierUserId: string; revision: number;
+  state: 'requested' | 'offered' | 'accepted' | 'withdrawn';
+  requestedAt: string; updatedAt: string; lines: BulkQuotedLine[]; offer: BulkOffer | null;
+  acceptance: {offerRevision: number; acceptedAt: string; agreementFingerprint: string} | null;
+}
+/** Private merchandise negotiation, NOT a final Checkout quote, purchase, PO,
+ * credit entitlement, reservation, payment or delivery instruction. The real
+ * reviewed catalogue is read in the same transaction as the agreement write. */
+export class WorkspaceBulkQuoteService {
+  constructor(private readonly db: Firestore, private readonly realm: Realm,
+    private readonly catalogue: Pick<WorkspaceCatalogueService, 'bulkQuotationSnapshot'>,
+    private readonly now: () => Date = () => new Date()) {
+    if (!['evaluation', 'production'].includes(realm)) fail('service_unavailable', 503);
+  }
+  private root() {return this.db.collection('workspacePurchaseProjections').doc(this.realm);}
+  private path(quoteId: string) {return this.root().collection('bulkQuoteRequests').doc(quoteId);}
+  private policy(raw: unknown, storeId: string, skuId: string): Record<string, unknown> {
+    const p = exact(raw, ['schemaVersion', 'realm', 'storeId', 'skuId', 'state', 'revision', 'requiresAcceptance', 'policy']);
+    if (p.schemaVersion !== 1 || p.realm !== this.realm || p.storeId !== storeId || p.skuId !== skuId ||
+      typeof p.state !== 'string' || !['ready', 'none'].includes(p.state) || typeof p.requiresAcceptance !== 'boolean') fail('service_unavailable', 503);
+    integer(p.revision, 999999999);
+    if (p.state === 'none' && (p.policy !== null || p.requiresAcceptance !== false) || p.state === 'ready' && p.policy === null) fail('service_unavailable', 503);
+    if (p.policy !== null) {
+      const policy = exact(p.policy, ['id', 'storeId', 'revision', 'title', 'body', 'productIds', 'requiresAcceptance', 'validUntil']);
+      if (policy.storeId !== storeId || !Array.isArray(policy.productIds) || policy.productIds.length !== 1 ||
+        policy.productIds[0] !== skuId || policy.revision !== `policy-v${p.revision}` ||
+        policy.requiresAcceptance !== p.requiresAcceptance) fail('service_unavailable', 503);
+      id(policy.id); text(policy.title);
+      if (typeof policy.body !== 'string' || !policy.body.trim() || policy.body.length > 12000) fail('service_unavailable', 503);
+      if (policy.validUntil !== null) timestamp(policy.validUntil);
+    }
+    return structuredClone(p);
+  }
+  private requestLines(raw: unknown): BulkRequestLine[] {
+    const lines = array(raw, 100).map(value => {
+      const r = exact(value, ['lineId', 'skuId', 'listingId', 'skuRevision', 'quantity']);
+      const listingId = text(r.listingId, 72);
+      if (!/^listing-[a-f0-9]{64}$/u.test(listingId)) fail();
+      return {lineId: id(r.lineId), skuId: id(r.skuId), listingId,
+        skuRevision: integer(r.skuRevision, 999999999, 1), quantity: integer(r.quantity, 1000000, 1)};
+    }).sort((a, b) => compare(a.lineId, b.lineId));
+    unique(lines.map(l => l.lineId)); unique(lines.map(l => l.listingId)); return lines;
+  }
+  private stored(raw: unknown): BulkAgreementRecord {
+    const r = exact(raw, ['body', 'integrity']), body = obj(r.body);
+    if (Buffer.byteLength(JSON.stringify(body), 'utf8') > 400000) {
+      throw new WorkspaceProfileError('invalid_input', 'This Bulk request is too large. Request fewer products together.', 400);
+    }
+    exact(body, ['schemaVersion', 'realm', 'quoteId', 'storeId', 'storeCaseId', 'buyerUserId', 'supplierUserId',
+      'revision', 'state', 'requestedAt', 'updatedAt', 'lines', 'offer', 'acceptance']);
+    if (r.integrity !== integrityHash(body) || body.schemaVersion !== 1 || body.realm !== this.realm ||
+      typeof body.state !== 'string' || !['requested', 'offered', 'accepted', 'withdrawn'].includes(body.state)) fail('invalid_state', 409);
+    for (const key of ['quoteId', 'storeId', 'storeCaseId', 'buyerUserId', 'supplierUserId']) id(body[key]);
+    integer(body.revision, 999999999, 1); timestamp(body.requestedAt); timestamp(body.updatedAt);
+    if (String(body.updatedAt) < String(body.requestedAt) || String(body.updatedAt) > this.now().toISOString()) fail('invalid_state', 409);
+    const lines = array(body.lines, 100).map(value => {
+      const line = exact(value, ['lineId', 'skuId', 'listingId', 'skuRevision', 'quantity',
+        'canonicalProductId', 'verifiedPackId', 'name', 'packLabel', 'supplierPolicy']);
+      const request = this.requestLines([Object.fromEntries(['lineId', 'skuId', 'listingId', 'skuRevision', 'quantity'].map(k => [k, line[k]]))])[0]!;
+      id(line.canonicalProductId); id(line.verifiedPackId); text(line.name); text(line.packLabel);
+      this.policy(line.supplierPolicy, String(body.storeId), request.skuId);
+      return {...request, canonicalProductId: String(line.canonicalProductId), verifiedPackId: String(line.verifiedPackId),
+        name: String(line.name), packLabel: String(line.packLabel), supplierPolicy: line.supplierPolicy as Record<string, unknown> | null};
+    });
+    unique(lines.map(l => l.lineId)); unique(lines.map(l => l.listingId));
+    if (body.offer !== null) {
+      const offer = exact(body.offer, ['revision', 'offeredAt', 'validUntil', 'prices', 'merchandiseMinor', 'policyFingerprint']);
+      integer(offer.revision, Number(body.revision), 2); timestamp(offer.offeredAt); timestamp(offer.validUntil);
+      const prices = this.prices(offer.prices, lines, true);
+      if (offer.merchandiseMinor !== prices.reduce((sum, p) => sum + p.merchandiseMinor, 0) ||
+          offer.policyFingerprint !== integrityHash(lines.map(l => [l.lineId, l.supplierPolicy])) ||
+          String(offer.offeredAt) < String(body.requestedAt) || String(offer.offeredAt) > String(body.updatedAt) ||
+          String(offer.validUntil) <= String(offer.offeredAt)) fail('invalid_state', 409);
+    }
+    if (body.acceptance !== null) {
+      const a = exact(body.acceptance, ['offerRevision', 'acceptedAt', 'agreementFingerprint']);
+      const offer = obj(body.offer);
+      if (body.state !== 'accepted' || a.offerRevision !== offer.revision || timestamp(a.acceptedAt) >= timestamp(offer.validUntil) ||
+        a.agreementFingerprint !== integrityHash({lines, offer}) || a.acceptedAt !== body.updatedAt ||
+        Number(offer.revision) + 1 !== body.revision || String(a.acceptedAt) < String(offer.offeredAt)) fail('invalid_state', 409);
+    } else if (body.state === 'accepted') fail('invalid_state', 409);
+    if (body.state === 'requested' && body.offer !== null || body.state === 'offered' && body.offer === null) fail('invalid_state', 409);
+    if (body.state === 'requested' && (body.revision !== 1 || body.updatedAt !== body.requestedAt) ||
+        body.state === 'offered' && (obj(body.offer).revision !== body.revision || obj(body.offer).offeredAt !== body.updatedAt) ||
+        body.state === 'withdrawn' && (Number(body.revision) < 2 || body.acceptance !== null ||
+          body.offer !== null && Number(obj(body.offer).revision) >= Number(body.revision))) fail('invalid_state', 409);
+    return body as unknown as BulkAgreementRecord;
+  }
+  private prices(raw: unknown, lines: BulkQuotedLine[], persisted = false): BulkPrice[] {
+    const prices = array(raw, 100).map(value => {
+      // Persisted prices include the independently checked multiplication.
+      const r = obj(value), keys = persisted
+        ? ['lineId', 'unitPriceMinor', 'merchandiseMinor'] : ['lineId', 'unitPriceMinor'];
+      exact(r, keys);
+      const lineId = id(r.lineId), line = lines.find(l => l.lineId === lineId);
+      if (!line) fail();
+      const unitPriceMinor = integer(r.unitPriceMinor, 1000000000000, 1), amount = unitPriceMinor * line.quantity;
+      if (!Number.isSafeInteger(amount) || amount > 1000000000000 ||
+        persisted && r.merchandiseMinor !== amount) fail();
+      return {lineId, unitPriceMinor, merchandiseMinor: amount};
+    }).sort((a, b) => compare(a.lineId, b.lineId));
+    unique(prices.map(p => p.lineId));
+    if (prices.length !== lines.length || prices.reduce((sum, p) => sum + p.merchandiseMinor, 0) > 1000000000000) fail();
+    return prices;
+  }
+  private async profile(tx: Transaction, storeId: string, actor?: string, caseId?: string, newSales = true) {
+    const profiles = await tx.get(this.db.collection('workspaceProfiles').where('workspaceId', '==', storeId).limit(2));
+    if (profiles.size !== 1) fail('not_found', 404);
+    const doc = profiles.docs[0]!, p = obj(doc.data());
+    requireStore(p, {caseId: caseId ?? doc.id, storeId, ownerUserId: actor ?? id(p.ownerUserId)}, newSales);
+    return {caseId: doc.id, ownerUserId: id(p.ownerUserId)};
+  }
+  private async authorized(tx: Transaction, raw: unknown, actor: string, quoteId: string): Promise<BulkAgreementRecord> {
+    let header: Record<string, unknown>;
+    try { header = obj(obj(raw).body); } catch { return fail('not_found', 404); }
+    if (header.quoteId !== quoteId || typeof header.buyerUserId !== 'string' || typeof header.supplierUserId !== 'string' ||
+      actor !== header.buyerUserId && actor !== header.supplierUserId) fail('not_found', 404);
+    if (actor === header.supplierUserId && actor !== header.buyerUserId) {
+      let storeId: string, caseId: string;
+      try { storeId = id(header.storeId); caseId = id(header.storeCaseId); } catch { return fail('not_found', 404); }
+      await this.profile(tx, storeId, actor, caseId, false);
+    }
+    return this.stored(raw);
+  }
+  private async source(tx: Transaction, storeId: string, lines: BulkRequestLine[]) {
+    const pages = await this.catalogue.bulkQuotationSnapshot(storeId, [...new Set(lines.map(l => l.skuId))], tx);
+    const facts: BulkQuotedLine[] = [], deadlines: string[] = [];
+    for (const line of lines) {
+      let matched: Record<string, unknown> | undefined;
+      for (const value of pages) {
+        const page = obj(value);
+        if (page.state !== 'ready' || page.realm !== this.realm || page.storeId !== storeId) fail('service_unavailable', 503);
+        for (const item of array(page.items, 100)) {
+          const row = obj(item);
+          if (row.skuId === line.skuId) {
+            if (matched) fail('service_unavailable', 503);
+            matched = row;
+          }
+        }
+      }
+      if (!matched || matched.revision !== line.skuRevision) fail('conflict', 409);
+      const listings = array(matched.listings, 3).map(obj), listing = listings.find(l => l.listingId === line.listingId);
+      const term = array(matched.channels, 3).map(obj).find(c => c.kind === 'bulk');
+      if (!listing || listing.channel !== 'bulk' || listing.realm !== this.realm || listing.storeId !== storeId ||
+        listing.skuId !== line.skuId || listing.canonicalProductId !== matched.canonicalProductId ||
+        listing.verifiedPackId !== matched.verifiedPackId || !term ||
+        line.quantity < integer(term.minimumOrder, 1000000, 1) ||
+        (line.quantity - integer(term.minimumOrder, 1000000, 1)) % integer(term.quantityStep, 1000000, 1) !== 0) fail('conflict', 409);
+      deadlines.push(timestamp(term.validUntil));
+      const content = obj(matched.content), pack = obj(matched.pack);
+      const p = obj(matched.supplierPolicy), {observedAt, ...stablePolicy} = p;
+      if (timestamp(observedAt) > this.now().toISOString()) fail('service_unavailable', 503);
+      const supplierPolicy = this.policy(stablePolicy, storeId, line.skuId);
+      if (supplierPolicy.policy !== null) {
+        const policy = obj(supplierPolicy.policy);
+        if (policy.validUntil !== null) deadlines.push(timestamp(policy.validUntil));
+      }
+      facts.push({...line, canonicalProductId: id(matched.canonicalProductId), verifiedPackId: id(matched.verifiedPackId),
+        name: text(content.title), packLabel: text(pack.label), supplierPolicy});
+    }
+    return {lines: facts, validUntil: deadlines.sort()[0]!};
+  }
+  private view(record: BulkAgreementRecord, actor: string) {
+    const {buyerUserId, supplierUserId: _supplier, storeCaseId: _case, ...body} = structuredClone(record);
+    return {...body, viewerRole: actor === buyerUserId ? 'buyer' : 'supplier',
+      customerReference: `customer-${integrityHash([this.realm, record.storeId, buyerUserId]).slice(0, 32)}`,
+      kind: 'supplier_merchandise_agreement', currency: 'INR', orderingAvailable: false, finalChargesDetermined: false, creditApproved: false};
+  }
+  async request(actor: string, raw: Readonly<Record<string, unknown>>): Promise<object> {
+    actor = id(actor); const r = exact(structuredClone(raw), ['schemaVersion', 'requestId', 'storeId', 'lines']);
+    if (r.schemaVersion !== 1) fail();
+    const requestId = id(r.requestId), storeId = id(r.storeId), lines = this.requestLines(r.lines);
+    const quoteId = `bulk-${integrityHash([this.realm, actor, requestId])}`;
+    return this.command(actor, quoteId, requestId, r, async (tx, saved) => {
+      if (saved) fail('conflict', 409);
+      const profile = await this.profile(tx, storeId), source = await this.source(tx, storeId, lines), at = this.now().toISOString();
+      if (at >= source.validUntil) fail('service_unavailable', 503);
+      return {schemaVersion: 1, realm: this.realm, quoteId, storeId, storeCaseId: profile.caseId,
+        buyerUserId: actor, supplierUserId: profile.ownerUserId, revision: 1, state: 'requested', requestedAt: at,
+        updatedAt: at, lines: source.lines, offer: null, acceptance: null};
+    }, true);
+  }
+  private async command(actor: string, quoteId: string, operationId: string, input: object,
+    change: (tx: Transaction, saved: BulkAgreementRecord | null) => Promise<BulkAgreementRecord>, create = false) {
+    const fingerprint = integrityHash(input), receipt = this.root().collection('bulkQuoteCommands').doc(integrityHash([actor, operationId]));
+    return this.db.runTransaction(async tx => {
+      const [doc, prior] = await tx.getAll(this.path(quoteId), receipt);
+      const saved = doc!.exists ? await this.authorized(tx, doc!.data(), actor, quoteId) : null;
+      if (!saved && !create) fail('not_found', 404);
+      if (prior!.exists) {
+        const p = exact(prior!.data(), ['actor', 'quoteId', 'fingerprint', 'record', 'integrity']);
+        const {integrity, ...body} = p;
+        if (p.actor !== actor || p.quoteId !== quoteId || p.fingerprint !== fingerprint || integrity !== integrityHash(body)) fail('conflict', 409);
+        const original = this.stored(p.record);
+        if (!saved || original.quoteId !== quoteId || original.buyerUserId !== saved.buyerUserId ||
+          original.supplierUserId !== saved.supplierUserId) fail('invalid_state', 409);
+        return this.view(original, actor);
+      }
+      const result = await change(tx, saved), stored = {body: result, integrity: integrityHash(result)};
+      this.stored(stored); // Same strict contract on write/read/replay.
+      const acknowledgement = {actor, quoteId, fingerprint, record: stored};
+      if (Buffer.byteLength(JSON.stringify(stored), 'utf8') > 420000 ||
+          Buffer.byteLength(JSON.stringify(acknowledgement), 'utf8') > 440000) fail('invalid_input', 400);
+      tx.set(this.path(quoteId), stored);
+      tx.create(receipt, {...acknowledgement, integrity: integrityHash(acknowledgement)});
+      return this.view(result, actor);
+    });
+  }
+  private transition(actor: string, raw: Readonly<Record<string, unknown>>, action: 'offer' | 'accept' | 'withdraw') {
+    actor = id(actor); const r = exact(structuredClone(raw), ['schemaVersion', 'quoteId', 'operationId', 'expectedRevision',
+      ...(action === 'offer' ? ['validUntil', 'prices'] : [])]);
+    if (r.schemaVersion !== 1) fail();
+    const quoteId = id(r.quoteId), operationId = id(r.operationId), expected = integer(r.expectedRevision, 999999998, 1);
+    return this.command(actor, quoteId, operationId, {action, ...r}, async (tx, record) => {
+      if (!record || record.revision !== expected || record.state === 'accepted' || record.state === 'withdrawn') fail('conflict', 409);
+      if (action === 'offer' && actor !== record.supplierUserId || action === 'accept' && actor !== record.buyerUserId) fail('not_found', 404);
+      const at = this.now().toISOString();
+      if (at < record.updatedAt) fail('invalid_state', 409);
+      const next: BulkAgreementRecord = {...structuredClone(record), revision: expected + 1, updatedAt: at};
+      if (action === 'withdraw') { next.state = 'withdrawn'; return next; }
+      await this.profile(tx, record.storeId, record.supplierUserId, record.storeCaseId);
+      const source = await this.source(tx, record.storeId, this.requestLines(record.lines.map(l => ({lineId: l.lineId,
+        skuId: l.skuId, listingId: l.listingId, skuRevision: l.skuRevision, quantity: l.quantity}))));
+      if (source.lines.some((line, index) => line.canonicalProductId !== record.lines[index]?.canonicalProductId ||
+        line.verifiedPackId !== record.lines[index]?.verifiedPackId)) fail('conflict', 409);
+      const finalAt = this.now().toISOString();
+      if (finalAt < at || finalAt >= source.validUntil) fail('service_unavailable', 503);
+      next.updatedAt = finalAt;
+      if (action === 'offer') {
+        const validUntil = timestamp(r.validUntil); if (validUntil <= finalAt) fail('conflict', 409);
+        const prices = this.prices(r.prices, record.lines);
+        next.lines = source.lines; next.state = 'offered';
+        next.offer = {revision: next.revision, offeredAt: finalAt, validUntil, prices,
+          merchandiseMinor: prices.reduce((sum, p) => sum + p.merchandiseMinor, 0),
+          policyFingerprint: integrityHash(next.lines.map(l => [l.lineId, l.supplierPolicy]))};
+      } else {
+        if (record.state !== 'offered' || !record.offer || record.offer.revision !== expected ||
+          finalAt >= record.offer.validUntil || record.offer.policyFingerprint !== integrityHash(source.lines.map(l => [l.lineId, l.supplierPolicy]))) fail('conflict', 409);
+        next.state = 'accepted'; next.acceptance = {offerRevision: record.offer.revision, acceptedAt: finalAt,
+          agreementFingerprint: integrityHash({lines: record.lines, offer: record.offer})};
+      }
+      return next;
+    });
+  }
+  offer(actor: string, body: Readonly<Record<string, unknown>>) {return this.transition(actor, body, 'offer');}
+  accept(actor: string, body: Readonly<Record<string, unknown>>) {return this.transition(actor, body, 'accept');}
+  withdraw(actor: string, body: Readonly<Record<string, unknown>>) {return this.transition(actor, body, 'withdraw');}
+  async read(actor: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    actor = id(actor); const r = exact(body, ['quoteId']), quoteId = id(r.quoteId);
+    return this.db.runTransaction(async tx => {
+      const doc = await tx.get(this.path(quoteId)); if (!doc.exists) fail('not_found', 404);
+      const record = await this.authorized(tx, doc.data(), actor, quoteId);
+      return this.view(record, actor);
+    });
+  }
 }
 
 /** Local implementation of the operational authority, separate from originals.

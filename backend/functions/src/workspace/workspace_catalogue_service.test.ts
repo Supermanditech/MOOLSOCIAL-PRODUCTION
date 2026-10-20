@@ -26,7 +26,7 @@ import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingB
   normalizeStoreVariantFamily, storeVariantFamilyOperation, storeVariantFamilySubmission, planStoreVariantFamilySubmission,
   planStoreVariantFamilyReview, type StoreVariantFamilyInput, type StoreVariantFamilyCandidate} from "./workspace_catalogue_service.js";
 import type {WorkspaceProfileRecord} from "./workspace_profile_service.js";
-import {requireDefaultPurchaseTenant} from "./workspace_purchase_projection_service.js";
+import {requireDefaultPurchaseTenant, WorkspaceBulkQuoteService} from "./workspace_purchase_projection_service.js";
 import {WorkspacePromotionService, FirestorePromotionRepository, planPromotionSave, type PromotionRepository, type PromotionRecord} from "./workspace_promotion_service.js";
 import {WorkspaceSupplierPolicyService, FirestoreSupplierPolicyRepository} from "./workspace_supplier_policy_service.js";
 import {createCatalogueAggregate, type CatalogueAggregate} from "../commerce/catalogue_contract.js";
@@ -35,6 +35,61 @@ import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
 
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
 const at = "2026-10-16T12:00:00.000Z";
+
+test('LF-BULK actual reviewed catalogue and transactional supplier policy reach the private agreement', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-bulk-source-${randomUUID().slice(0, 8)}`}, `bulk-source-${randomUUID()}`), db = getFirestore(app);
+  const value = input(); value.channels = [{...value.channels[0]!, kind: 'bulk', minimumOrder: 5, quantityStep: 2}];
+  value.content.media = staticMedia(value);
+  const root = db.collection('workspaceCatalogues').doc('evaluation');
+  const repo = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at));
+  const catalogue = () => new WorkspaceCatalogueService(repo(), catalogueIdentity, () => new Date(at));
+  const quotes = () => new WorkspaceBulkQuoteService(db, 'evaluation', catalogue(), () => new Date(at));
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    await root.collection('participants').doc('store-one').set(producerParticipant());
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    for (const original of productionCommands(value)) {
+      const command = original.type === 'create_offer' ? {...original, buyingContext: 'wholesale'} : original;
+      await repo().produceCatalogue(['propose_product', 'propose_pack', 'create_offer'].includes(String(command.type))
+        ? 'owner-one' : 'reviewer-one', catalogueIdentity, command);
+    }
+    const bound = await repo().bindReviewed({ownerUserId: 'owner-one', profile, input: value,
+      expectedRevision: 0, idempotencyKey: 'bulk-source-binding',
+      fingerprint: cataloguePayloadHash({storeId: 'store-one', input: value, expectedRevision: 0}), observedAt: at}, catalogueIdentity);
+    const listing = cataloguePublicListingBindings('evaluation', bound).find(l => l.channel === 'bulk')!;
+    const request = {schemaVersion: 1, requestId: 'bulk-source-request', storeId: 'store-one',
+      lines: [{lineId: 'line-one', skuId: value.skuId, listingId: listing.listingId, skuRevision: bound.revision, quantity: 5}]};
+    await assert.rejects(quotes().request('buyer-one', {...request, lines: [{...request.lines[0], quantity: 6}]}));
+    const first = await quotes().request('buyer-one', request) as any;
+    assert.equal(first.lines[0].supplierPolicy.state, 'none');
+    const policies = new WorkspaceSupplierPolicyService(new FirestoreSupplierPolicyRepository(db, 'evaluation', () => new Date(at)), () => new Date(at));
+    const policy = {title: 'Bulk supplier payment discussion', body: 'Bank or delivery terms require supplier confirmation.',
+      productIds: [value.skuId], requiresAcceptance: true, validUntil: '2026-10-16T13:00:00.000Z'};
+    await policies.save('owner-one', {storeId: 'store-one', expectedRevision: 0, idempotencyKey: 'bulk-policy-one', policy});
+    const offer = {schemaVersion: 1, quoteId: first.quoteId, operationId: 'offer-one', expectedRevision: 1,
+      validUntil: '2026-10-16T12:30:00.000Z', prices: [{lineId: 'line-one', unitPriceMinor: 25001}]};
+    const offered = await quotes().offer('owner-one', offer) as any;
+    assert.equal(offered.offer.merchandiseMinor, 125005);
+    assert.equal(offered.lines[0].supplierPolicy.policy.body, policy.body);
+    // Coupon callers retain their original projection without policy fields.
+    const couponPages = await db.runTransaction(tx => catalogue().couponPriceSnapshot('store-one', [value.skuId], tx)) as any[];
+    assert.equal(Object.hasOwn(couponPages[0].items[0], 'supplierPolicy'), false);
+    const accept = {schemaVersion: 1, quoteId: first.quoteId, operationId: 'accept-one', expectedRevision: 2};
+    await policies.save('owner-one', {storeId: 'store-one', expectedRevision: 1, idempotencyKey: 'bulk-policy-two',
+      policy: {...policy, body: 'Changed supplier policy requires another offer.'}});
+    await assert.rejects(quotes().accept('buyer-one', accept));
+    const revised = await quotes().offer('owner-one', {...offer, operationId: 'offer-two', expectedRevision: 2}) as any;
+    assert.equal(revised.lines[0].supplierPolicy.revision, 2);
+    const accepted = await quotes().accept('buyer-one', {...accept, expectedRevision: 3}) as any;
+    assert.equal(accepted.state, 'accepted'); assert.equal(accepted.creditApproved, false);
+    assert.equal(accepted.finalChargesDetermined, false); assert.equal(accepted.currency, 'INR');
+    assert.deepEqual(await quotes().read('buyer-one', {quoteId: first.quoteId}), accepted);
+  } finally { await deleteApp(app); }
+});
 
 test('LF04-ELIGIBILITY actual reviewed prices, cross-channel tiers and read-only customer capacity', {
   skip: process.env.FIRESTORE_EMULATOR_HOST === undefined,
