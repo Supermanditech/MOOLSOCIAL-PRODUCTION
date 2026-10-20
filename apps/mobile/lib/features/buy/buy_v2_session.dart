@@ -6244,7 +6244,7 @@ class BuyV2Session extends ChangeNotifier {
           : null;
     }
     return checkoutQuoteEnabled && !checkoutQuoteReviewRequired
-        ? checkoutQuotedPaymentCharge * 100
+        ? checkoutQuotedPaymentChargeMinor
         : null;
   }
 

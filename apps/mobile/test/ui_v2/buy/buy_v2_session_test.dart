@@ -301,8 +301,11 @@ class _T04LiveBenefits extends _T04CartBenefits
   ) => gate?.future ?? Future.value(snapshot);
 }
 
-BuyV2CommerceAdapter prepaidCommerceFixture() {
-  final reference = 'TEST-PREPAID-${DateTime.now().microsecondsSinceEpoch}';
+// Isolated fixtures share a monotonic discriminator, not runtime payment IDs.
+// Clock resolution (or a frozen widget clock) cannot identify a new purchase.
+int _prepaidFixtureSequence = 0;
+BuyV2CommerceAdapter prepaidCommerceFixture({DateTime Function()? now}) {
+  final reference = 'TEST-PREPAID-${(now ?? DateTime.now)().microsecondsSinceEpoch}-${++_prepaidFixtureSequence}';
   return _ShopCommerceAdapter(
       snapshot: BuyV2CommerceSnapshot(
         state: BuyV2CommerceLoadState.ready,
@@ -2235,6 +2238,20 @@ void r669SharedProductTests() {
 }
 
 void main() {
+  test('LF fixture independent prepaid purchases stay distinct under an identical clock', () {
+    DateTime fixed() => DateTime.utc(2026, 10, 20, 12);
+    final first = prepaidCommerceFixture(now: fixed) as _ShopCommerceAdapter;
+    final second = prepaidCommerceFixture(now: fixed) as _ShopCommerceAdapter;
+    expect(first.placement.paymentReference, first.reconciliation!.purchaseReference);
+    expect(second.placement.paymentReference, second.reconciliation!.purchaseReference);
+    expect(first.placement.paymentReference, isNot(second.placement.paymentReference));
+    final references = {first.placement.paymentReference, second.placement.paymentReference};
+    for (var i = 0; i < 100; i++) {
+      final fixture = prepaidCommerceFixture(now: fixed) as _ShopCommerceAdapter;
+      expect(fixture.placement.paymentReference, fixture.reconciliation!.purchaseReference);
+      expect(references.add(fixture.placement.paymentReference), isTrue);
+    }
+  });
   // Isolated host identities and private codec fixtures, never runtime commerce.
   const accountA = (environment: 'host-service', projectId: 'host-project',
     tenantId: null as String?, userId: 'host-user-a');

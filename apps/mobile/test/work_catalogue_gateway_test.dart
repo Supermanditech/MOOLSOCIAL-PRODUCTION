@@ -255,6 +255,7 @@ class _HostStoreCouponLegacyBenefits implements BuyV2LiveCartBenefitsAdapter {
 // Explicit nonzero host charges, not runtime tariffs or live provider evidence.
 class _HostSupplierQuoteCheckout extends _HostStoreCouponQuote implements BuyV2SupplierQuoteCheckoutAdapter {
   int supplierCalls = 0;
+  int paymentChargeMinor = 7;
   List<BuyV2SupplierQuoteSelection> received = const [];
   List<BuyV2StoreCouponEligibility> coupons = const [];
   Completer<void>? pending;
@@ -272,8 +273,8 @@ class _HostSupplierQuoteCheckout extends _HostStoreCouponQuote implements BuyV2S
         tips = tipAmountsMinorByFulfilmentKey[group.key] ?? 0,
         saving = selectedStoreCoupons.isEmpty ? 0 : selectedStoreCoupons.single.savingMinor!;
       return BuyV2CheckoutQuoteLine.minor(fulfilmentKey: group.key, itemSubtotalMinor: items, couponSavingMinor: saving,
-        taxMinor: 123, deliveryFeeMinor: 45, freightMinor: 89, paymentChargeMinor: 7, tipMinor: tips,
-        totalMinor: items - saving + 264 + tips);
+        taxMinor: 123, deliveryFeeMinor: 45, freightMinor: 89, paymentChargeMinor: paymentChargeMinor, tipMinor: tips,
+        totalMinor: items - saving + 257 + paymentChargeMinor + tips);
     }()];
     return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready, quote: BuyV2CheckoutQuote.minor(
       id: 'host-final-supplier-quote', sourceId: 'isolated-final-charges', evaluatedAt: quote.acceptedAt,
@@ -5903,6 +5904,30 @@ void main() {
       release.complete(); expect(await selecting, isFalse); expect(s.selectedStoreCoupons, isEmpty);
       expect(s.quantityFor(host.product.id), 10); expect(host.product.priceMinor, 10025);
     });
+  }
+  for (final charge in [0, 7, 100]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF-PAISE supplied payment charge $charge renders exactly at text $scale', (tester) async {
+        final adapter = _HostSupplierQuoteCheckout()..paymentChargeMinor = charge;
+        final host = await supplierSelectionHost(quote: adapter), s = host.session;
+        final gst = BuyV2GstInvoiceController();
+        try {
+          expect(await s.chooseSupplierQuote(host.accepted), isTrue);
+          expect(await s.refreshCheckoutQuote(), isTrue);
+          expect(s.currentPaymentChargeMinor, charge);
+          s.checkoutStep = BuyV2CheckoutStep.payment;
+          await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+            MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+            home: Scaffold(body: BuyV2CheckoutView(session: s, gstInvoiceController: gst))));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          if (charge == 7) expect(find.textContaining('₹0.07'), findsWidgets);
+          expect(host.product.priceMinor, 10025); expect(s.quantityFor(host.product.id), 10);
+        } finally {
+          await tester.pumpWidget(const SizedBox.shrink()); host.dispose(); gst.dispose();
+        }
+      });
+    }
   }
   test('LF-BULK SELECT exact Cart selection preserves product price and negotiates final charges explicitly', () async {
     final adapter = _HostSupplierQuoteCheckout(), host = await supplierSelectionHost(quote: adapter), s = host.session;
