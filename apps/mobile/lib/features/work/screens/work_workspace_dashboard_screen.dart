@@ -38,6 +38,7 @@ import '../work_stock_export.dart';
 import 'work_invoice_pdf_screen.dart';
 import 'store_add_product_sheet.dart';
 import '../work_services.dart';
+import '../work_catalogue_gateway.dart';
 import '../work_session.dart';
 
 // Historical receiving exceptions are not proof of another required delivery,
@@ -804,6 +805,8 @@ class _WorkWorkspaceDashboardScreenState
             currentStoreId: () => session.activeWorkspace?.id,
             storeApproved: () => session.activeWorkspace?.verified == true,
             reviewCatalogueAllowed: () => session.canLoadStoreReviewSeed,
+            catalogueGateway: session.catalogueGateway is AuthenticatedWorkspaceCatalogueGateway
+                ? session.catalogueGateway as AuthenticatedWorkspaceCatalogueGateway : null,
           );
       session.addListener(_procurementIdentityChanged);
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1190,7 +1193,7 @@ class _WorkWorkspaceDashboardScreenState
       _WorkspaceControlView.search => 'Search your store',
       _WorkspaceControlView.status => 'Store settings',
       _WorkspaceControlView.alerts => 'Needs your attention',
-      _WorkspaceControlView.procurement => workspace.name,
+      _WorkspaceControlView.procurement => 'Buying for ${workspace.name}',
       _WorkspaceControlView.operation =>
         _operation == _WorkspaceOperation.counterOrder &&
                 session.workspaceOrderNeedsDelivery
@@ -1394,7 +1397,7 @@ class _WorkWorkspaceDashboardScreenState
     final namePainter =
         TextPainter(
           text: TextSpan(
-            text: workspace.name,
+            text: procurementOpen ? title : workspace.name,
             style: Theme.of(context).textTheme.titleLarge!.copyWith(
               fontSize: analyticsSurface ? 16 : 13,
               fontWeight: FontWeight.w800,
@@ -1585,6 +1588,7 @@ class _WorkWorkspaceDashboardScreenState
                   _view == _WorkspaceControlView.search ||
                   (procurementOpen && _procurementSearchOpen),
               keepSearchUtilities: procurementOpen,
+              nameLabel: procurementOpen ? title : null,
               showProductScanner: !ordersContext,
               nameTextStyle: procurementOpen
                   ? Theme.of(context).textTheme.titleLarge!.copyWith(
@@ -3760,6 +3764,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
     this.searchSemanticsLabel,
     this.nameTextScaler,
     this.nameTextStyle,
+    this.nameLabel,
     this.backKey = const Key('work-operation-back'),
     this.backSize = 44,
     this.keepSearchUtilities = false,
@@ -3788,6 +3793,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
   final String? searchSemanticsLabel;
   final TextScaler? nameTextScaler;
   final TextStyle? nameTextStyle;
+  final String? nameLabel;
   final Key backKey;
   final double backSize;
   final bool keepSearchUtilities;
@@ -3845,7 +3851,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                     container: true,
                     button: true,
                     label:
-                        '${workspace.name}, ${profile.label}, ${workspace.area}. Change Workspace',
+                        '${nameLabel ?? workspace.name}, ${profile.label}, ${workspace.area}. Change Workspace',
                     child: InkWell(
                       key: const Key('work-dashboard-workspace-switcher'),
                       borderRadius: BorderRadius.circular(8),
@@ -3869,7 +3875,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                                       fontWeight: FontWeight.w800,
                                     ),
                                 child: Text(
-                                  workspace.name,
+                                  nameLabel ?? workspace.name,
                                   key: const Key('work-store-full-name'),
                                   textScaler: nameTextScaler,
                                   style: nameTextStyle,

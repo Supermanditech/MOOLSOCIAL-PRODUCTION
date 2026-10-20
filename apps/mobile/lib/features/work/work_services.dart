@@ -44,6 +44,7 @@ class WorkProcurementController extends ChangeNotifier {
     required this.storeApproved,
     this.bookmarks = const SecureWorkProcurementBookmarkStore(),
     this.reviewCatalogueAllowed,
+    this.catalogueGateway,
     WorkProcurementSessionFactory? sessionFactory,
     BuyV2CustomerStateStore Function(String scope)? stateStoreFactory,
   }) : _sessionFactory = sessionFactory,
@@ -54,6 +55,9 @@ class WorkProcurementController extends ChangeNotifier {
   final bool Function() storeApproved;
   final WorkProcurementBookmarkStore bookmarks;
   final bool Function()? reviewCatalogueAllowed;
+  final AuthenticatedWorkspaceCatalogueGateway? catalogueGateway;
+  WorkspacePublicDiscoverySource? _ownedCatalogueSource;
+  int _catalogueLifetime = 0;
   final WorkProcurementSessionFactory? _sessionFactory;
   final bool _ownsCore;
   final BuyV2CustomerStateStore Function(String) _stateStoreFactory;
@@ -78,8 +82,22 @@ class WorkProcurementController extends ChangeNotifier {
     BuyV2CustomerStateStore stateStore,
   ) {
     final context = identity.value;
+    final configured = catalogueGateway?.procurementReadbackSupported == true;
+    AuthenticatedWorkspaceCatalogueGateway? bound;
+    if (configured && context != null) {
+      final lifetime = _catalogueLifetime;
+      bool current() => lifetime == _catalogueLifetime && scopeCurrent &&
+          identity.value?.customerStateOwnerScope == context.customerStateOwnerScope;
+      try {
+        bound = catalogueGateway!.forStoreProcurement(context, current: current);
+        _ownedCatalogueSource = WorkspacePublicDiscoverySource(gateway: bound, current: current);
+      } on Object {
+        // A configured source never falls back to evaluation catalogue grants.
+        bound = null;
+      }
+    }
     final review =
-        context != null &&
+        !configured && context != null &&
             context.purpose == BuyV2ProcurementPurpose.restock &&
             kDebugMode &&
             const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
@@ -108,9 +126,12 @@ class WorkProcurementController extends ChangeNotifier {
       procurementIdentity: identity,
       customerStateStore: stateStore,
       reviewDataEnabled: false,
-      commerceAdapter: review,
+      commerceAdapter: bound == null ? review : _StoreProcurementCommerceAdapter(bound),
       commercialPaymentTermsAdapter: review,
-      cataloguePageSource: review,
+      cataloguePageSource: _ownedCatalogueSource ?? review,
+      variantFamilySource: _ownedCatalogueSource,
+      productContentAdapter: _ownedCatalogueSource,
+      catalogueNow: bound?.now ?? DateTime.now,
       initialCatalogueRegionId: review == null ? null : 'jodhpur',
     );
   }
@@ -138,9 +159,13 @@ class WorkProcurementController extends ChangeNotifier {
   }
 
   void _disposeSession() {
+    _catalogueLifetime++;
+    final source = _ownedCatalogueSource;
+    _ownedCatalogueSource = null;
     final previous = session;
     session = null;
     previous?.dispose();
+    source?.dispose();
     if (_ownsCore) previous?.core.dispose();
   }
 
@@ -286,6 +311,15 @@ class WorkProcurementController extends ChangeNotifier {
     _identity.dispose();
     super.dispose();
   }
+}
+
+/// Reuses the shared unavailable operations until real ordering is connected.
+/// Catalogue permission grants no availability, credit or payment authority.
+final class _StoreProcurementCommerceAdapter extends BuyV2UnavailableCommerceAdapter {
+  const _StoreProcurementCommerceAdapter(this.gateway);
+  final AuthenticatedWorkspaceCatalogueGateway gateway;
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() => gateway.readProcurementAccess();
 }
 
 /// Explicit review-build responses for the existing synthetic Store only.

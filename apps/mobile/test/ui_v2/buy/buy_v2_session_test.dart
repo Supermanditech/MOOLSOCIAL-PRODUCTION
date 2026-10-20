@@ -124,6 +124,8 @@ final class _R669ProcurementCatalogue implements BuyV2CataloguePageSource {
   final List<BuyV2Product> products;
   Completer<void>? gate;
   Completer<void>? resolutionGate;
+  Object? resolutionError;
+  int resolutions = 0;
   BuyV2CatalogueQuery? lastQuery;
 
   @override
@@ -145,10 +147,11 @@ final class _R669ProcurementCatalogue implements BuyV2CataloguePageSource {
 
   @override
   Future<List<BuyV2Product>> resolveProducts(Set<String> productIds) async {
+    resolutions++;
+    final response = products.where((product) => productIds.contains(product.id)).toList();
     await resolutionGate?.future;
-    return products
-        .where((product) => productIds.contains(product.id))
-        .toList();
+    if (resolutionError case final error?) throw error;
+    return response;
   }
 
   @override
@@ -8236,6 +8239,140 @@ void main() {
       expect(notifications, loadingNotifications);
     });
 
+    for (final kind in ['static', 'tier', 'commodity']) {
+    test('LF05-RESTOCK supplier renewal refreshes expired $kind grants without repricing Cart', () async {
+      var clock = now;
+      final terms = kind == 'static' ? product.packTerms : BuyV2PackTerms(
+          skuId: product.id, revision: 'revision-2', sellUnit: 'pack', pricingStoreId: product.storeId,
+          priceObservedAt: now, priceValidUntil: now.add(const Duration(minutes: 20)),
+          commodityPriceRevision: kind == 'commodity' ? 1 : null,
+          priceChangesFrequently: kind == 'commodity' ? true : null,
+          priceTiers: [BuyV2PackPriceTier(minimumPacks: kind == 'tier' ? 2 : product.minimumOrder,
+            priceMinor: kind == 'tier' ? product.priceMinor - 100 : product.priceMinor)]);
+      final original = product.copyWith(procurementSupplierGrant: supplier(),
+        minimumOrder: kind == 'tier' ? 2 : product.minimumOrder,
+        pack: terms?.label ?? product.pack, unitPrice: terms?.unitPriceLabel ?? '', packTerms: terms);
+      expect(original.hasValidPackTerms, isTrue);
+      final source = _R669ProcurementCatalogue([original]);
+      final fixture = await scopedSession(snapshot: commerceSnapshot(products: [original]), catalogueSource: source, clock: () => clock);
+      final session = fixture.session;
+      await session.restoreCustomerState();
+      expect(session.addProduct(product.id), isTrue);
+      final retained = session.cartLines.single, quantity = retained.quantity;
+      if (kind == 'tier') expect(retained.product.priceMinor, original.priceMinor - 100);
+      clock = expiry;
+      final renewed = original.copyWith(procurementSupplierGrant: supplier(until: clock.add(const Duration(minutes: 5))));
+      source.products..clear()..add(renewed);
+      fixture.adapter.snapshot = BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+        procurementAccessOnly: true, procurementBuyerGrant: buyer(until: clock.add(const Duration(minutes: 5))));
+      await session.retryCommerce();
+      expect(source.resolutions, greaterThan(0));
+      expect(session.findProduct(product.id), same(renewed));
+      expect(session.cartLines.single.product.procurementSupplierGrant, same(renewed.procurementSupplierGrant));
+      expect(session.cartLines.single.totalMinor, retained.totalMinor);
+      expect(session.quantityFor(product.id), quantity);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isTrue, reason: session.notice);
+    });
+    }
+
+    for (final change in ['account', 'store', 'origin', 'clearCart']) {
+      test('LF05-RESTOCK supplier renewal respects $change during resolution', () async {
+        final offered = product.copyWith(procurementSupplierGrant: supplier());
+        final source = _R669ProcurementCatalogue([offered]);
+        final fixture = await scopedSession(catalogueSource: source);
+        final session = fixture.session;
+        await session.restoreCustomerState();
+        expect(session.addProduct(product.id), isTrue);
+        fixture.adapter.snapshot = BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+          procurementAccessOnly: true, procurementBuyerGrant: buyer());
+        final gate = source.resolutionGate = Completer<void>();
+        final refresh = session.retryCommerce();
+        await Future<void>.delayed(Duration.zero);
+        if (change == 'clearCart') { session.clearCart(); }
+        else { fixture.identity.value = scope(account: change == 'account' ? 'other-account' : 'buyer-account',
+          store: change == 'store' ? 'other-store' : 'purchasing-store', origin: change == 'origin' ? 'other-origin' : 'restock-operation'); }
+        gate.complete();
+        await refresh;
+        if (change == 'clearCart') { expect(session.cartLines, isEmpty); }
+        else { expect(session.procurementScopeCurrent, isFalse); expect(session.addProduct(product.id), isFalse); }
+      });
+    }
+
+    test('LF05-RESTOCK supplier renewal withdrawal cannot return from cached pages', () async {
+      final offered = product.copyWith(procurementSupplierGrant: supplier());
+      final source = _R669ProcurementCatalogue([offered]);
+      final fixture = await scopedSession(catalogueSource: source);
+      final session = fixture.session;
+      await session.restoreCustomerState();
+      final pager = session.acquireCatalogueProducts('host-renewal');
+      await pager.open(session.catalogueQuery());
+      expect(pager.page!.items.single.id, product.id);
+      expect(session.addProduct(product.id), isTrue);
+      final retained = session.cartLines.single;
+      source.products.clear();
+      fixture.adapter.snapshot = BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+        procurementAccessOnly: true, procurementBuyerGrant: buyer());
+      await session.retryCommerce();
+      await pager.open(session.catalogueQuery());
+      expect(pager.page!.items, isEmpty);
+      expect(session.addProduct(product.id), isFalse);
+      expect(session.cartLines.single.totalMinor, retained.totalMinor);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isFalse);
+      session.releaseCatalogueProducts('host-renewal');
+    });
+
+    for (final change in ['revision', 'price', 'withdrawn', 'unknown', 'denied']) {
+      test('LF05-RESTOCK supplier renewal retains agreement and blocks $change', () async {
+        final offered = product.copyWith(procurementSupplierGrant: supplier());
+        final source = _R669ProcurementCatalogue([offered]);
+        final fixture = await scopedSession(catalogueSource: source);
+        final session = fixture.session;
+        await session.restoreCustomerState();
+        expect(session.addProduct(product.id), isTrue);
+        final retained = session.cartLines.single;
+        source.products..clear()..add(offered.copyWith(
+          priceMinor: change == 'price' ? offered.priceMinor + 100 : offered.priceMinor,
+          procurementSupplierGrant: supplier(revision: change == 'revision' ? 'new-revision' : 'revision-2', approved: change != 'denied')));
+        if (change == 'withdrawn') source.products.clear();
+        if (change == 'unknown') source.resolutionError = StateError('host read unavailable');
+        fixture.adapter.snapshot = BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+          procurementAccessOnly: true, procurementBuyerGrant: buyer());
+        await session.retryCommerce();
+        expect(source.resolutions, greaterThan(0));
+        expect(session.cartLines.single, same(retained));
+        expect(session.addProduct(product.id), isFalse);
+        session.openCart(scope: BuyV2CartScope.wholesale);
+        expect(session.openCheckout(), isFalse);
+      });
+    }
+
+    test('LF05-RESTOCK supplier renewal retires overlapping results and keeps busy access closed', () async {
+      final offered = product.copyWith(procurementSupplierGrant: supplier());
+      final source = _R669ProcurementCatalogue([offered]);
+      final fixture = await scopedSession(catalogueSource: source);
+      final session = fixture.session;
+      await session.restoreCustomerState();
+      expect(session.addProduct(product.id), isTrue);
+      fixture.adapter.snapshot = BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+        procurementAccessOnly: true, procurementBuyerGrant: buyer());
+      final oldGate = source.resolutionGate = Completer<void>();
+      final first = session.retryCommerce();
+      await Future<void>.delayed(Duration.zero);
+      expect(session.procurementUnavailableMessage, isNotNull);
+      expect(session.addProduct(product.id), isFalse);
+      source.resolutionGate = null;
+      source.products.clear();
+      await session.retryCommerce();
+      oldGate.complete();
+      await first;
+      expect(session.addProduct(product.id), isFalse);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isFalse);
+      expect(session.procurementUnavailableMessage, isNull);
+    });
+
     test('LF05-RESTOCK access refresh cannot renew a supplier grant', () async {
       var clock = now;
       final fixture = await scopedSession(clock: () => clock);
@@ -9409,17 +9546,22 @@ void main() {
 
     for (final ready in [false, true]) {
       test('LF05-RESTOCK access refresh preserves original pending payment ready=$ready', () async {
-        final fixture = await scopedSession(withPaymentTerms: true);
+        final source = _R669ProcurementCatalogue([product.copyWith(procurementSupplierGrant: supplier())]);
+        final fixture = await scopedSession(withPaymentTerms: true, catalogueSource: source);
         final session = fixture.session;
         await prepareProcurementPayment(session);
         expect(await session.submitOrder(), isFalse);
         expect(session.checkoutSubmissionState, BuyV2CheckoutSubmissionState.paymentPending);
         final original = session.legacyCheckoutAttempt!, request = fixture.adapter.placements.single;
         final quantity = session.quantityFor(product.id);
+        final resolutions = source.resolutions;
+        source.products.clear();
+        source.resolutionError = StateError('Supplier withdrawn after original payment');
         fixture.adapter.snapshot = BuyV2CommerceSnapshot(
           state: ready ? BuyV2CommerceLoadState.ready : BuyV2CommerceLoadState.unavailable,
           procurementAccessOnly: true, procurementBuyerGrant: ready ? buyer() : null);
         await session.restoreCommerce();
+        expect(source.resolutions, resolutions, reason: 'Original payment recovery must not renew supplier offers');
         expect(session.legacyCheckoutAttempt, same(original));
         expect(session.legacyCheckoutAttempt!.payment.request, same(request));
         expect(session.checkoutSubmissionState, BuyV2CheckoutSubmissionState.paymentPending);

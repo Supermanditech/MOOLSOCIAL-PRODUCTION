@@ -333,6 +333,15 @@ class _HostRetirableStateStore implements BuyV2CustomerStateStore {
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async => writesSucceed;
 }
+class _HostProcurementBookmarks implements WorkProcurementBookmarkStore {
+  WorkProcurementBookmark? value;
+  @override
+  Future<WorkProcurementBookmark?> read(String accountId, String storeId) async => value;
+  @override
+  Future<bool> save(WorkProcurementBookmark bookmark) async { value = bookmark; return true; }
+  @override
+  Future<bool> clear(String accountId, String storeId) async { value = null; return true; }
+}
 BuyV2CheckoutQuoteSnapshot _hostExactQuote(List<BuyV2FulfilmentGroup> groups, Map<String, int> tips,
   {int coupon = 0, int fee = 0, String id = 'host-current-quote', DateTime? expires}) {
   final now = DateTime.now();
@@ -1297,6 +1306,73 @@ void main() {
   BuyV2CatalogueQuery restockQuery({BuyV2ProcurementContext? context = restockContext,
     BuyV2Destination destination = BuyV2Destination.wholesale}) => BuyV2CatalogueQuery(
       destination: destination, regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas, procurementContext: context);
+  test('LF05-RESTOCK Store controller configured failure cannot use review authority', () async {
+    const account = 'host-configured-review-store';
+    final seed = StoreReviewSeed(accountScope: account, orderCount: 1000, now: at);
+    var calls = 0;
+    final base = AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: OwnerTransport((_) async { calls++; throw StateError('No read allowed'); }),
+      realm: 'evaluation', procurementReadbackSupported: true);
+    final controller = WorkProcurementController(currentAccountId: () => account, currentStoreId: () => seed.storeId,
+      storeApproved: () => true, reviewCatalogueAllowed: () => true, catalogueGateway: base,
+      bookmarks: _HostProcurementBookmarks(), stateStoreFactory: (scope) => _HostRetirableStateStore()..ownerScope = scope);
+    addTearDown(controller.dispose);
+    expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'stockStatement'), isTrue);
+    expect(controller.usesReviewCatalogue, isFalse);
+    expect(controller.session!.cataloguePageSource, isNull);
+    expect(controller.session!.procurementUnavailableMessage, isNotNull);
+    expect(controller.session!.availablePaymentMethods, isEmpty);
+    expect(calls, 0);
+  });
+  for (final retire in ['none', 'account', 'store', 'approval', 'dispose']) {
+    test('LF05-RESTOCK Store controller owns actual bound supplier source retire=$retire', () async {
+      final packets = restockClientPackets();
+      var account = restockContext.accountId, store = restockContext.storeId, approved = true;
+      var calls = 0;
+      final api = OwnerTransport((body) async {
+        calls++;
+        expect(body['operation'], 'readStoreProcurementCatalogue');
+        final request = Map<String, Object?>.of(body)..remove('operation');
+        final packet = packets.values.cast<Map<String, dynamic>>().where((entry) =>
+          _mediaHash(entry['request']) == _mediaHash(request)).single;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': packet['response']}));
+      });
+      final base = boundRestockGateway(api);
+      final controller = WorkProcurementController(currentAccountId: () => account, currentStoreId: () => store,
+        storeApproved: () => approved, catalogueGateway: base, bookmarks: _HostProcurementBookmarks(),
+        stateStoreFactory: (scope) => _HostRetirableStateStore()..ownerScope = scope);
+      var disposed = false;
+      addTearDown(() { if (!disposed) controller.dispose(); });
+      expect(await controller.open(purpose: restockContext.purpose, returnTo: 'stockStatement', exactContext: restockContext), isTrue,
+        reason: controller.openFailureMessage);
+      final session = controller.session!;
+      expect(session.procurementUnavailableMessage, isNull);
+      expect(session.commerceLoadState, BuyV2CommerceLoadState.ready);
+      expect(session.cataloguePageSource, isA<WorkspacePublicDiscoverySource>());
+      final source = session.cataloguePageSource! as WorkspacePublicDiscoverySource;
+      expect(source.gateway.procurementContext!.customerStateOwnerScope, restockContext.customerStateOwnerScope);
+      expect(identical(source.gateway, base), isFalse);
+      expect(session.availablePaymentMethods, isEmpty);
+      expect(session.businessVerified, isFalse);
+      expect(controller.usesReviewCatalogue, isFalse);
+      if (retire == 'none') {
+        final page = await source.loadProducts(restockQuery(), pageSize: 24);
+        expect(page.items.single.procurementSupplierGrant, isNotNull);
+        expect(session.addProduct(page.items.single.id), isFalse, reason: 'Catalogue access is not operational availability');
+      } else {
+        if (retire == 'account') account = 'other-account';
+        if (retire == 'store') store = 'other-store';
+        if (retire == 'approval') approved = false;
+        if (retire == 'dispose') { controller.dispose(); disposed = true; }
+        else { controller.invalidateIfChanged(); }
+        final before = calls;
+        expect(source.active, isFalse);
+        await expectLater(source.loadProducts(restockQuery(), pageSize: 24), throwsA(isA<Exception>()));
+        expect(calls, before);
+      }
+    }, skip: Platform.environment['LF_RESTOCK_CLIENT_LOG'] == null);
+  }
   for (final path in ['access', 'discovery', 'stores', 'exact', 'page', 'resolve', 'content']) {
     test('LF05-RESTOCK bound shared client reads actual persisted supplier $path', () async {
       final packets = restockClientPackets(), credentials = Credentials();

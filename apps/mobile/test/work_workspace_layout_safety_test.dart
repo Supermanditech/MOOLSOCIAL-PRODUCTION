@@ -38,6 +38,7 @@ import 'package:moolsocial/shared/commerce/commerce_downloads.dart';
 import 'package:moolsocial/shared/commerce/commerce_downloads_screen.dart';
 import 'commerce_downloads_test.dart' as download_test show Source;
 import 'work_catalogue_gateway_test.dart' as catalogue_fixture;
+import 'ui_v2/buy/buy_v2_discovery_refinement_test.dart' show BuyTestEligibilityFacts;
 import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart' show SocialContentResponse;
 import 'package:moolsocial/features/work/work_services.dart';
@@ -1427,6 +1428,15 @@ class _StorePurchaseState implements BuyV2CustomerStateStore {
     value = snapshot;
     return true;
   }
+}
+
+// Explicit operational host facts for interaction/layout tests only.
+class _StorePurchaseOrderReadyFacts implements BuyV2ProductFactsAdapter {
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
+      const BuyV2CatalogueProductFactsAdapter().snapshotFor(product).copyWith(
+        promisedByLabel: 'Tomorrow, 2–4 PM', sourceId: 'host-store-purchase-facts',
+        eligibility: const BuyTestEligibilityFacts().snapshotFor(product).eligibility);
 }
 
 class _StorePurchaseCommerce implements BuyV2CommerceAdapter {
@@ -4272,7 +4282,8 @@ void main() {
         session.procurementEligibilityFor(product),
         BuyV2ProcurementEligibility.eligible,
       );
-      expect(session.addProduct(product.id), isTrue);
+      expect(session.addProduct(product.id), isFalse,
+        reason: 'Review catalogue permission does not establish operational availability');
       final probe = _StorePaymentTermsProbe();
       final probeIdentity = ValueNotifier(session.procurementContext);
       final probeCore = BuySession();
@@ -4284,6 +4295,7 @@ void main() {
         ),
         commerceAdapter: session.commerceAdapter,
         commercialPaymentTermsAdapter: probe,
+        productFactsAdapter: _StorePurchaseOrderReadyFacts(),
         reviewDataEnabled: false,
       );
       addTearDown(probeIdentity.dispose);
@@ -4334,7 +4346,9 @@ void main() {
       expect(await acceptedTerms(), 1);
       expect(probeSession.choosePayment('PhonePe'), isFalse);
       probe.methods = {'RTGS'};
-      expect(probeSession.choosePayment('RTGS'), isTrue);
+      expect(probeSession.choosePayment('RTGS'), isFalse);
+      expect(probeSession.selectedPayment, 'Cheque');
+      expect(probeSession.notice, contains('RTGS requires'));
       expect(await acceptedTerms(), 0, reason: 'Advance is below RTGS minimum');
       expect(
         (await session.commerceAdapter.createAddressRequest()).available,
@@ -55793,13 +55807,34 @@ void main() {
           now: DateTime.now(),
         );
         final work = liveStore()..activeWorkspace = seed.workspace;
-        final controller = WorkProcurementController(
+        final bookmarks = _StorePurchaseBookmarks();
+        final reviewOwner = WorkProcurementController(
           currentAccountId: () => account,
           currentStoreId: () => work.activeWorkspace?.id,
           storeApproved: () => work.activeWorkspace?.verified == true,
           reviewCatalogueAllowed: () => true,
-          bookmarks: _StorePurchaseBookmarks(),
+          bookmarks: bookmarks,
           stateStoreFactory: _StorePurchaseState.new,
+        );
+        addTearDown(reviewOwner.dispose);
+        await reviewOwner.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard');
+        final reviewSession = reviewOwner.session!;
+        final controller = WorkProcurementController(
+          currentAccountId: () => account,
+          currentStoreId: () => work.activeWorkspace?.id,
+          storeApproved: () => work.activeWorkspace?.verified == true,
+          bookmarks: bookmarks,
+          stateStoreFactory: _StorePurchaseState.new,
+          sessionFactory: (identity, state) {
+            final core = BuySession();
+            addTearDown(core.dispose);
+            return BuyV2Session(core: core, procurementIdentity: identity, customerStateStore: state,
+              reviewDataEnabled: false, commerceAdapter: reviewSession.commerceAdapter,
+              commercialPaymentTermsAdapter: reviewSession.commercialPaymentTermsAdapter,
+              cataloguePageSource: reviewSession.cataloguePageSource,
+              productFactsAdapter: _StorePurchaseOrderReadyFacts(),
+              initialCatalogueRegionId: reviewOwner.usesReviewCatalogue ? 'jodhpur' : null);
+          },
         );
         await mount(
           tester,
@@ -55825,6 +55860,7 @@ void main() {
           findsOneWidget,
         );
         expect(find.byKey(const Key('work-dashboard-scan')), findsOneWidget);
+        expect(find.text('Buying for ${seed.workspace.name}'), findsOneWidget);
         expect(controller.usesReviewCatalogue, enabled);
         expect(
           controller.session!.procurementUnavailableMessage,
@@ -55996,7 +56032,7 @@ void main() {
           final termTile = find.byKey(
             ValueKey('store-payment-selector-${group.key}-${advance.id}'),
           );
-          await tester.ensureVisible(
+          await reveal(tester,
             find.byKey(const ValueKey('buy-checkout-payment-terms')),
           );
           await tester.pumpAndSettle();
@@ -56004,7 +56040,7 @@ void main() {
             tester,
             'restock-terms-${compact ? 'compact' : 'normal'}',
           );
-          await tester.ensureVisible(termTile);
+          await reveal(tester, termTile);
           await tester.tap(termTile);
           await tester.pumpAndSettle();
           await captureStoreView(

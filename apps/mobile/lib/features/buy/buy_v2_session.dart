@@ -185,8 +185,8 @@ typedef _BuyV2RecoveryOrigin = ({
   BuyV2ProductVisitContext productVisit,
 });
 
-final class _BuyV2UnavailableCommerceAdapter implements BuyV2CommerceAdapter {
-  const _BuyV2UnavailableCommerceAdapter();
+base class BuyV2UnavailableCommerceAdapter implements BuyV2CommerceAdapter {
+  const BuyV2UnavailableCommerceAdapter();
 
   static const _unavailable =
       'Shop is unavailable right now. Try again shortly.';
@@ -816,6 +816,13 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
   Future<void> refresh() {
     final currentQuery = _query;
     if (currentQuery == null || _disposed) return Future.value();
+    _invalidate();
+    return open(currentQuery);
+  }
+
+  // Retire authority-bearing pages without disposing mounted leases or queries.
+  void _invalidate() {
+    if (_disposed) return;
     _previewEpoch++;
     _previews.clear();
     _cache.clear();
@@ -824,9 +831,9 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
     _cursor = null;
     _requestedCursor = null;
     _generation += 1;
+    _pending = null;
     _loading = false;
     _message = null;
-    return open(currentQuery);
   }
 
   Future<void> _drain() async {
@@ -3769,7 +3776,7 @@ class BuyV2Session extends ChangeNotifier {
            ((reviewDataEnabled ??
                    (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
                ? const _BuyV2DeviceReviewCommerceAdapter()
-               : const _BuyV2UnavailableCommerceAdapter()),
+               : const BuyV2UnavailableCommerceAdapter()),
        orderResolutionAdapter =
            orderResolutionAdapter ??
            ((reviewDataEnabled ??
@@ -3902,6 +3909,9 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2ProcurementContext? procurementContext;
   BuyV2ProcurementBuyerGrant? _procurementBuyerGrant;
   int _procurementEpoch = 0;
+  int? _procurementOfferRefreshSequence;
+  bool get _procurementOffersRefreshing =>
+      _procurementOfferRefreshSequence == _commerceRefreshSequence;
 
   bool get isStoreProcurement => procurementIdentity != null;
 
@@ -3921,6 +3931,9 @@ class BuyV2Session extends ChangeNotifier {
     if (!isStoreProcurement) return null;
     if (!procurementScopeCurrent) {
       return 'Return to your Store and reopen this purchase. Your Cart is retained.';
+    }
+    if (_procurementOffersRefreshing) {
+      return 'Checking current supplier offers. Your Cart is retained.';
     }
     final context = procurementContext!;
     final grant = _procurementBuyerGrant;
@@ -3960,6 +3973,8 @@ class BuyV2Session extends ChangeNotifier {
     }
     final active = procurementIdentity!.value!;
     final retained = retainedProduct?.procurementSupplierGrant;
+    final quantityPrice = retainedProduct == null ? product :
+        _productAtPackQuantity(product, _cart[retainedProduct.id]?.quantity ?? 1);
     if (retainedProduct != null &&
         (retained == null ||
             retained.offerId.isEmpty ||
@@ -3972,7 +3987,7 @@ class BuyV2Session extends ChangeNotifier {
             retained.workspaceId !=
                 product.procurementSupplierGrant?.workspaceId ||
             !retainedProduct.hasValidMoney || !product.hasValidMoney ||
-            retainedProduct.priceMinor != product.priceMinor)) {
+            retainedProduct.priceMinor != quantityPrice.priceMinor)) {
       return BuyV2ProcurementEligibility.offerChanged;
     }
     return buyV2ProcurementEligibility(
@@ -4857,7 +4872,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void _retainCataloguePages({bool notify = true}) {
-    if (_collectionDisposed) return;
+    if (_collectionDisposed || _procurementOffersRefreshing) return;
     var promotion = _openedStorePromotion;
     if (promotion != null && (!promotion.source.storeOffersActive ||
         !promotion.offer.isCurrent(now: catalogueNow()) ||
@@ -9087,6 +9102,60 @@ class BuyV2Session extends ChangeNotifier {
                 : grant == null);
         if (valid) {
           _procurementBuyerGrant = grant;
+          if (snapshot.state == BuyV2CommerceLoadState.ready &&
+              cataloguePageSource != null && !checkoutRequiresResolution) {
+            final ids = <String>{..._knownCatalogueProducts.map((p) => p.id), ..._cart.keys};
+            if (ids.isNotEmpty) {
+              _procurementOfferRefreshSequence = refreshSequence;
+              // Invalidate every holder before notifying: listeners must never
+              // reimport a withdrawn offer from another page or variant family.
+              for (final lease in _catalogueProductPagers.values) { lease.pager._invalidate(); }
+              for (final lease in _catalogueStorePagers.values) { lease.pager._invalidate(); }
+              for (final lease in _catalogueOfferPagers.values) { lease.pager._invalidate(); }
+              _variantFamilyEpoch++;
+              _variantFamily = null;
+              _variantFamilyRequestProduct = null;
+              _variantFamilyRequestProductId = null;
+              _variantFamilyContextKey = null;
+              _variantFamilyLoading = false;
+              _variantFamilyMessage = null;
+              _openedStorePromotion = null;
+              _pagedStores.clear();
+              notifyListeners();
+              final products = await _resolvePersistedCatalogueProducts(ids, refreshKnown: true)
+                  .timeout(const Duration(seconds: 15));
+              if (refreshSequence != _commerceRefreshSequence || _collectionDisposed ||
+                  procurementEpoch != _procurementEpoch || feedbackScope != _currentCustomerOrderScope ||
+                  !procurementScopeCurrent) { return; }
+              // Validate the complete result before installing any authority.
+              for (final next in products.values) {
+                if (procurementEligibilityFor(next) != BuyV2ProcurementEligibility.eligible) {
+                  throw const FormatException('Supplier offer approval could not be confirmed');
+                }
+              }
+              _catalogueProducts.removeWhere((p) => ids.contains(p.id));
+              _pagedProducts.removeWhere((id, _) => ids.contains(id));
+              _pagedProducts.addAll(products);
+              for (final id in ids) {
+                _productFacts.remove(id);
+                _productContent.remove(id);
+                _productContentMediaInputs.remove(id);
+                final line = _cart[id], next = products[id];
+                if (line != null && next != null &&
+                    procurementEligibilityFor(next, retainedProduct: line.product) == BuyV2ProcurementEligibility.eligible) {
+                  // Renew permission only. Quantity, price, delivery selection
+                  // and historical payment/original-order terms stay intact.
+                  _cart[id] = line.copyWith(product: line.product.copyWith(
+                    procurementSupplierGrant: next.procurementSupplierGrant));
+                }
+              }
+              _procurementOfferRefreshSequence = null;
+              _persistCustomerState();
+              for (final lease in _catalogueProductPagers.values) { unawaited(lease.pager.refresh()); }
+              for (final lease in _catalogueStorePagers.values) { unawaited(lease.pager.refresh()); }
+              for (final lease in _catalogueOfferPagers.values) { unawaited(lease.pager.refresh()); }
+            }
+          }
           commerceLoadState = snapshot.state;
           commerceMessage = snapshot.customerMessage;
         } else {
@@ -9219,8 +9288,13 @@ class BuyV2Session extends ChangeNotifier {
         return;
       }
       commerceLoadState = BuyV2CommerceLoadState.offline;
+      if (isStoreProcurement) _procurementBuyerGrant = null;
       commerceMessage =
           'Shop could not refresh. Check your connection and try again.';
+    } finally {
+      if (_procurementOfferRefreshSequence == refreshSequence) {
+        _procurementOfferRefreshSequence = null;
+      }
     }
     notifyListeners();
   }
