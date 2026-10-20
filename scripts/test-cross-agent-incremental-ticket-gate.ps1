@@ -123,6 +123,19 @@ if ($RequireLfPublicationProbes) {
   Assert-Fixture (-not $record.execution.runtimeWriteAuthorized) 'Historical published execution authority was overwritten.'
   Assert-Fixture (Test-Lf27Batch01Continuation $continuation @()) 'Exact Batch01 activation rejected.'
   $cases+=2
+  foreach ($visitOwner in @('apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart')) {
+    Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($visitOwner)) 'Recorded visit owner rejected.'
+    $legacyVisit=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $legacyVisit.batch02Variants.owners=@($legacyVisit.batch02Variants.owners | Where-Object { $_ -cne $visitOwner })
+    Assert-Fixture (Test-Lf27Batch01Continuation $legacyVisit @()) 'Historical visit-absent record rejected.'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacyVisit @($visitOwner))) 'Unrecorded visit owner admitted.'
+    $cases+=3
+  }
+  $widenedVisit=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+  $widenedVisit.batch02Variants.owners+='apps/mobile/lib/ui_v2/buy/unclaimed_visit.dart'
+  Assert-Fixture (-not (Test-Lf27Batch01Continuation $widenedVisit @())) 'Visit correction admitted a wildcard/unclaimed owner.'
+  $cases++
   foreach($owner in $continuation.owners) {
     Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact Batch01 owner rejected.'
     $cases++

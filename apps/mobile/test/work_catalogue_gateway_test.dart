@@ -2746,6 +2746,67 @@ void main() {
             else { data.remove('discoverySourcesVersion'); data.remove('discoverySources'); }
             return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
           })));
+    test('LF14-ENTRY negotiated producer uses exact surface enums, keeps Cart v1 and never downgrades a failed v2 occurrence', () async {
+      final entry = WorkspacePublicCatalogueEntry.fromResponse(capture['page'] as Map<String, dynamic>,
+        storeId: 'store-one', realm: 'evaluation', channel: BuyV2OfferClass.retail, now: observed);
+      final sent = <Map<String, Object?>>[];
+      WorkspaceProductPresentationGateway reporter(bool enabled) => WorkspaceProductPresentationGateway(
+        current: () => true, displayed: (_) => entry.readback, discoverySourcesEnabled: enabled, cartAdditionsEnabled: true,
+        gateway: AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          realm: 'evaluation', ownerAccountId: 'buyer-one', credentials: Credentials(), now: () => observed,
+          transport: OwnerTransport((body) async { sent.add(body); throw StateError('Lost original reply'); })));
+      final writer = reporter(true);
+      final serviceEvent = (capture['quick'] as Map).cast<String, Object?>();
+      final original = writer.prepare(entry.product, serviceEvent['presentationId']! as String,
+        entrySurface: BuyV2ProductEntrySurface.quick)!;
+      expect(original, serviceEvent, reason: 'The real client must reproduce the exact local-service accepted event.');
+      final accepted = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => entry.readback,
+        discoverySourcesEnabled: true, gateway: AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          realm: 'evaluation', ownerAccountId: 'buyer-one', credentials: Credentials(), now: () => observed,
+          transport: OwnerTransport((body) async => SocialContentResponse(statusCode: 200,
+            body: jsonEncode({'ok': true, 'data': capture['quickReceipt']})))));
+      expect(await accepted.record(original, visible: () => true), true);
+      for (final surface in BuyV2ProductEntrySurface.values) {
+        final event = writer.prepare(entry.product, 'a' * 32, entrySurface: surface)!;
+        expect(event['schemaVersion'], 2); expect(event['discoverySurface'], surface.wireValue);
+      }
+      expect(writer.prepare(entry.product, 'a' * 32, cartAddition: true)!.containsKey('discoverySurface'), false);
+      expect(reporter(false).prepare(entry.product, 'a' * 32)!.containsKey('discoverySurface'), false);
+      final event = writer.prepare(entry.product, 'a' * 32, entrySurface: BuyV2ProductEntrySurface.quick)!;
+      expect(await writer.record(event, visible: () => true), false); expect(sent, hasLength(1));
+      expect(sent.single['schemaVersion'], 2); expect(sent.single['presentationId'], 'a' * 32);
+    });
+    testWidgets('LF14-ENTRY visible observer freezes Quick, same-SKU link becomes Unknown and Back/remount cannot replace occurrence', (tester) async {
+      final entry = WorkspacePublicCatalogueEntry.fromResponse(capture['page'] as Map<String, dynamic>,
+        storeId: 'store-one', realm: 'evaluation', channel: BuyV2OfferClass.retail, now: observed);
+      final sent = <Map<String, Object?>>[], core = BuySession();
+      final catalogue = _ExactMoneyHostCatalogue()..rows.add(entry.product);
+      final reporter = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => entry.readback,
+        discoverySourcesEnabled: true, gateway: AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          realm: 'evaluation', ownerAccountId: 'buyer-one', credentials: Credentials(), now: () => observed,
+          transport: OwnerTransport((body) async { sent.add(body); throw StateError('Host lost acknowledgement'); })));
+      final session = BuyV2Session(core: core, cataloguePageSource: catalogue, reviewDataEnabled: false,
+        productPresentations: reporter, catalogueNow: () => observed);
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      final pager = session.acquireCatalogueProducts('host-discovery-visit');
+      addTearDown(() => session.releaseCatalogueProducts('host-discovery-visit'));
+      await pager.open(BuyV2CatalogueQuery(destination: BuyV2Destination.shop, regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas));
+      session.openProduct(entry.product.id, entrySurface: BuyV2ProductEntrySurface.quick);
+      Widget app() => MaterialApp(theme: MoolTheme.light(), home: Scaffold(body: AnimatedBuilder(animation: session,
+        builder: (context, _) => BuyV2ProductView(session: session))));
+      await tester.pumpWidget(app()); await tester.pumpAndSettle(); expect(sent.single['discoverySurface'], 'quick');
+      final restore = session.beginStoreNavigationVisit();
+      await session.openLinkedProduct(entry.product.id); await tester.pumpAndSettle();
+      expect(sent, hasLength(2)); expect(sent.last['discoverySurface'], 'unknown');
+      restore(); await tester.pumpAndSettle(); expect(sent, hasLength(2));
+      await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpWidget(app()); await tester.pumpAndSettle();
+      expect(sent, hasLength(2), reason: 'A failed report is not retried on Back or route remount.');
+      expect(sent[0]['presentationId'], isNot(sent[1]['presentationId']));
+      await tester.pumpWidget(const SizedBox.shrink()); expect(tester.takeException(), isNull);
+    });
     test('LF14-DISCOVERY actual service sources reach the existing Store breakdown without duplicate metrics', () async {
       final sent = <Map<String, Object?>>[], snapshot = await reader(sent: sent).readAnalytics(request());
       expect(sent, hasLength(2)); expect(sent.first.containsKey('discoverySourcesVersion'), false);

@@ -219,6 +219,53 @@ Future<BuyV2Session> r669ComparisonContinuitySession(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('LF14-ENTRY repeated SKU comparison stack restores exact visits rather than latest SKU source', () {
+    final core = BuySession(), session = BuyV2Session(core: core);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    session.openProduct('s-milk', entrySurface: BuyV2ProductEntrySurface.quick);
+    final first = session.productVisit;
+    session.openProduct('s-bread', preserveComparisonOrigin: true);
+    final middle = session.productVisit;
+    session.openProduct('s-milk', preserveComparisonOrigin: true, entrySurface: BuyV2ProductEntrySurface.offers);
+    expect(session.productVisit, isNot(same(first)));
+    session.closeProduct(); expect(session.productVisit, same(middle));
+    session.closeProduct(); expect(session.productVisit, same(first));
+    expect(session.productVisit.surface, BuyV2ProductEntrySurface.quick);
+  });
+  test('LF14-ENTRY Account Wholesale child restores active visit and the original comparison stack', () {
+    final core = BuySession(), session = BuyV2Session(core: core);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    session.openProduct('s-milk', entrySurface: BuyV2ProductEntrySurface.quick);
+    final first = session.productVisit;
+    session.openProduct('s-bread', preserveComparisonOrigin: true, entrySurface: BuyV2ProductEntrySurface.offers);
+    final second = session.productVisit;
+    session.openAccount(); session.openWholesaleFromAccount(); session.openProduct('w-oil');
+    session.goBack(); session.goBack(); session.goBack();
+    expect(session.selectedProductId, 's-bread'); expect(session.productVisit, same(second));
+    session.goBack(); expect(session.selectedProductId, 's-milk'); expect(session.productVisit, same(first));
+    session.goBack(); expect(session.view, BuyV2View.catalogue); expect(session.destination, BuyV2Destination.shop);
+  });
+  test('LF14-ENTRY variants and Store Cart account recovery bookmarks retain context; same-SKU link resets Unknown', () async {
+    final core = BuySession(), session = BuyV2Session(core: core);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    session.addProduct('s-milk');
+    session.openProduct('s-milk', entrySurface: BuyV2ProductEntrySurface.quick);
+    final origin = session.productVisit;
+    session.selectProductVariant('s-milk-500ml'); expect(session.productVisit, same(origin));
+    final restore = session.beginStoreNavigationVisit();
+    session.openProduct('s-bread', entrySurface: BuyV2ProductEntrySurface.visitStore);
+    session.openCart(); session.openProduct('s-milk'); session.goBack(); session.goBack();
+    expect(session.productVisit.surface, BuyV2ProductEntrySurface.visitStore);
+    restore(); expect(session.productVisit, same(origin));
+    session.openAccount(); session.closeAccount(); expect(session.productVisit, same(origin));
+    session.openRecovery(BuyV2RecoveryKind.stockUnavailable); session.retryRecovery(); expect(session.productVisit, same(origin));
+    final id = session.selectedProductId!;
+    await session.openLinkedProduct(id);
+    expect(session.productVisit, isNot(same(origin))); expect(session.productVisit.surface, BuyV2ProductEntrySurface.unknown);
+    final link = session.productVisit;
+    expect(session.openProduct('missing'), false); expect(session.productVisit, same(link));
+  });
+
   Widget app(
     BuyV2Session session, {
     bool disableAnimations = false,
@@ -308,6 +355,8 @@ void main() {
         await tester.tap(sourceTitle);
         await tester.pumpAndSettle();
         expect(session.selectedProductId, sourceId);
+        expect(session.productVisit.surface, offers ? BuyV2ProductEntrySurface.offers : BuyV2ProductEntrySurface.unknown,
+          reason: 'The Search sheet is not an explicitly attributed Quick catalogue entry.');
         final product = session.product(sourceId);
         final packFacts = find.text('${product.pack} · ${product.unitPrice}');
         final heroPrice = find.byKey(
@@ -449,22 +498,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(session.selectedProductId, sourceId);
         final report = find.byKey(ValueKey('buy-report-product-$sourceId'));
-        await tester.scrollUntilVisible(
-          report,
-          160,
-          scrollable: find
-              .descendant(
-                of: find.byKey(PageStorageKey('buy-product-$sourceId')),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
-        await tester.ensureVisible(report);
-        await tester.pumpAndSettle();
+        expect(report, findsNothing, reason: 'Feedback is purchase-linked, not an arbitrary SKU action.');
         final cart = find.byKey(const ValueKey('buy-cart-navigation-button'));
         expect(cart, findsOneWidget);
-        expect(tester.getRect(cart).overlaps(tester.getRect(report)), isFalse);
-        expect(report.hitTestable(), findsOneWidget);
         final protectedContent = [
           find.byKey(ValueKey('buy-marketplace-trust-ready-$sourceId')),
           find.byKey(ValueKey('buy-product-continuations-$sourceId')),
@@ -504,10 +540,13 @@ void main() {
         await tester.drag(cart, continuation.center - tester.getCenter(cart));
         await tester.pumpAndSettle();
         expectDecisionContentClear();
-        await tester.ensureVisible(report);
+        await tester.ensureVisible(protectedContent.last);
         await tester.pumpAndSettle();
-        expect(report.hitTestable(), findsOneWidget);
-        await captureR66Visual(tester, 'r664-compare-report-$offers-$scale');
+        final afterDrag = visiblePart(protectedContent.last);
+        expect(afterDrag.isEmpty, isFalse);
+        expect(tester.getRect(cart).overlaps(afterDrag), isFalse);
+        expect(report, findsNothing);
+        await captureR66Visual(tester, 'r664-compare-continuation-$offers-$scale');
         final returnAction = find.descendant(
           of: find.byKey(PageStorageKey('buy-product-$sourceId')),
           matching: find.widgetWithText(InkWell, offers ? 'Offers' : 'Shop'),
@@ -705,6 +744,49 @@ void main() {
     });
   }
 
+  for (final surface in [BuyV2ProductEntrySurface.quick, BuyV2ProductEntrySurface.scheduled,
+    BuyV2ProductEntrySurface.wholesale, BuyV2ProductEntrySurface.bulk]) {
+    testWidgets('LF14-ENTRY actual rendered $surface catalogue tap carries source', (tester) async {
+      final core = BuySession(), session = BuyV2Session(core: core);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      await tester.pumpWidget(app(session)); await tester.pumpAndSettle();
+      final trade = surface == BuyV2ProductEntrySurface.wholesale || surface == BuyV2ProductEntrySurface.bulk;
+      session.openDestination(trade ? BuyV2Destination.wholesale : BuyV2Destination.shop);
+      if (trade) { session.chooseWholesaleSaleType(surface == BuyV2ProductEntrySurface.bulk
+        ? BuyV2WholesaleSaleType.bulk : BuyV2WholesaleSaleType.wholesale); }
+      else { session.chooseShopSaleType(surface == BuyV2ProductEntrySurface.scheduled
+        ? BuyV2ShopSaleType.courier : BuyV2ShopSaleType.quickDelivery); }
+      await tester.pumpAndSettle();
+      final card = find.byWidgetPredicate((widget) => widget is InkWell && widget.key is ValueKey<String> &&
+        (widget.key! as ValueKey<String>).value.startsWith('buy-product-')).first;
+      await tester.ensureVisible(card); await tester.tap(card); await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.product); expect(session.productVisit.surface, surface);
+      await tester.pumpWidget(const SizedBox.shrink()); expect(tester.takeException(), isNull);
+    });
+  }
+  testWidgets('LF14-ENTRY actual paged Offers Saved filter retains Offers attribution', (tester) async {
+    final core = BuySession(), now = DateTime.utc(2026, 10, 16, 12);
+    final source = BuyV2DevelopmentPublishedCatalogueSource(providerCount: 4, skusPerStore: 20, now: () => now);
+    final session = BuyV2Session(core: core, publishedCatalogueSource: source,
+      initialCatalogueRegionId: 'jodhpur', catalogueNow: () => now);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    await tester.pumpWidget(app(session)); await tester.pumpAndSettle();
+    // Store zero in this tiny development fixture is platform-published;
+    // supplier-only Offers needs the other fixture Stores, in All areas.
+    session.chooseCatalogueArea(null, BuyV2CatalogueAreaScope.allAreas); await tester.pumpAndSettle();
+    final offers = find.byKey(const ValueKey('buy-local-tab-offers'));
+    await tester.ensureVisible(offers); await tester.tap(offers); await tester.pumpAndSettle();
+    final pager = session.acquireCatalogueOffers('published-offers');
+    addTearDown(() => session.releaseCatalogueOffers('published-offers'));
+    expect(pager.page?.items, isNotEmpty);
+    final product = pager.page!.items.first.product;
+    session.toggleSaved(product.id); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-offers-saved'))); await tester.pumpAndSettle();
+    final target = find.byKey(ValueKey('buy-product-${product.id}'));
+    await tester.ensureVisible(target); await tester.tap(target); await tester.pumpAndSettle();
+    expect(session.productVisit.surface, BuyV2ProductEntrySurface.offers);
+    await tester.pumpWidget(const SizedBox.shrink()); expect(tester.takeException(), isNull);
+  });
   test('R66 comparison return survives a nested Cart product', () {
     final core = BuySession();
     final session = BuyV2Session(core: core);
@@ -751,9 +833,10 @@ void main() {
       session.openProduct('s-milk', preserveComparisonOrigin: true);
       expect(session.canReturnToComparedProduct, isTrue);
       final origin = session.takeProductComparisonOrigin();
-      expect(origin, ['s-milk-500ml']);
+      expect(origin.map((entry) => entry.productId), ['s-milk-500ml']);
       expect(session.canReturnToComparedProduct, isFalse);
-      session.restoreProductComparisonOrigin([...origin, 'missing']);
+      session.restoreProductComparisonOrigin([...origin,
+        (productId: 'missing', visit: BuyV2ProductVisitContext(BuyV2ProductEntrySurface.unknown))]);
       expect(session.productReturnLabel, session.product('s-milk-500ml').title);
       session.closeProduct();
       expect(session.selectedProductId, 's-milk-500ml');

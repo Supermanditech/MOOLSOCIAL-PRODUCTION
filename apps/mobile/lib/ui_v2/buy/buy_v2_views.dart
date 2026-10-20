@@ -805,9 +805,11 @@ class _ProductPresentationObserver extends StatefulWidget {
 class _ProductPresentationObserverState extends State<_ProductPresentationObserver> {
   BuyV2Session? _reportedSession;
   String? _reportedProduct;
+  BuyV2ProductVisitContext? _reportedVisit;
   bool _scheduled = false;
-  bool _visible(BuyV2Session session, String productId) {
+  bool _visible(BuyV2Session session, String productId, BuyV2ProductVisitContext visit) {
     if (!mounted || !identical(widget.session, session) || widget.product.id != productId || session.selectedProduct?.id != productId ||
+        session.view != BuyV2View.product || !identical(session.productVisit, visit) ||
         ModalRoute.of(context)?.isCurrent != true || !TickerMode.valuesOf(context).enabled ||
         WidgetsBinding.instance.lifecycleState != null && WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {return false;}
     var hidden = false;
@@ -815,20 +817,29 @@ class _ProductPresentationObserverState extends State<_ProductPresentationObserv
     return !hidden;
   }
   @override Widget build(BuildContext context) {
-    if (!_scheduled && (!identical(_reportedSession, widget.session) || _reportedProduct != widget.product.id)) {
+    if (!_scheduled && (!identical(_reportedSession, widget.session) || _reportedProduct != widget.product.id ||
+        !identical(_reportedVisit, widget.session.productVisit))) {
+      final visit = widget.session.productVisit;
       _scheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scheduled = false;
         if (!mounted) return;
         final session = widget.session, product = widget.product, gateway = session.productPresentations;
-        if (gateway == null || !_visible(session, product.id)) return;
+        if (!identical(session.productVisit, visit)) {
+          // The old frame lost ownership. Give the newly rendered visit its
+          // own frame rather than sending the old event or dropping the new one.
+          setState(() {});
+          return;
+        }
+        if (gateway == null || !_visible(session, product.id, visit)) return;
         final id = List.generate(16, (_) => math.Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join();
-        final original = gateway.prepare(product, id);
+        final original = gateway.prepare(product, id, entrySurface: visit.surface);
         if (original == null) return;
         // A rebuild is not a second presentation. Failed telemetry stays partial;
         // do not silently generate replacement commands/IDs or block commerce.
-        _reportedSession = session; _reportedProduct = product.id;
-        unawaited(gateway.record(original, visible: () => _visible(session, product.id)));
+        _reportedSession = session; _reportedProduct = product.id; _reportedVisit = visit;
+        if (!session.claimProductPresentation(visit, product.id)) return;
+        unawaited(gateway.record(original, visible: () => _visible(session, product.id, visit)));
       });
     }
     return const SizedBox.shrink();

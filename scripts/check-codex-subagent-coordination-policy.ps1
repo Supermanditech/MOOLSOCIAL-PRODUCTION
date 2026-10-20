@@ -8060,6 +8060,13 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
       'apps/mobile/lib/features/buy/buy_v2_session.dart',
       'apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart')
+    # Already in the cumulative LF01 claim; exact optional visit/bookmark
+    # callers only. Historical variant records remain unchanged and valid.
+    foreach ($visitOwner in @('apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart')) {
+      if ($null -ne $variants -and $null -ne $variants.PSObject.Properties['owners'] -and
+          @($variants.owners) -ccontains $visitOwner) { $variantOwners += $visitOwner }
+    }
     if ($null -eq $variants -or $variants -isnot [pscustomobject]) { return $false }
     foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
       if($null -eq $variants.PSObject.Properties[$key]) { return $false }
@@ -8496,6 +8503,10 @@ function Invoke-Lf01Admission {
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Facts'] -and
         @($record.frontendContinuation.batch02Facts.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart') {
       $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart'
+    }
+    if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Variants'] -and
+        @($record.frontendContinuation.batch02Variants.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart') {
+      $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart'
     }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Promotions'] -and
         @($record.frontendContinuation.batch02Promotions.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart') {

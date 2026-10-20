@@ -132,6 +132,7 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(session.selectedProductId, id);
+          expect(session.productVisit.surface, BuyV2ProductEntrySurface.visitStore);
           expect(session.view, BuyV2View.product);
           final page = find.byKey(PageStorageKey('buy-product-$id')).last;
           final details = find.descendant(

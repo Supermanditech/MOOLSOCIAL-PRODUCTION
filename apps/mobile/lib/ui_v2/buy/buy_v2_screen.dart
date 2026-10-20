@@ -2526,7 +2526,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         brandOnly: brandOnly,
         onAskStore: _openStoreQuestion,
         onStoreChanged: _rememberStoreBrowse,
-        onOpenProduct: _openStoreProduct,
+        onOpenProduct: (product) => _openStoreProduct(product, entrySurface: BuyV2ProductEntrySurface.visitStore),
         onOpenStoreCart: (store) {
           unawaited(_openStoreProduct(store, cartEntry: true));
         },
@@ -2573,6 +2573,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     BuyV2Product product, {
     bool cartEntry = false,
     String? returnLabel,
+    BuyV2ProductEntrySurface entrySurface = BuyV2ProductEntrySurface.unknown,
   }) async {
     final session = widget.session;
     if (returnLabel == null &&
@@ -2580,7 +2581,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       _rememberStoreBrowse(product);
     }
     final restoreOrigin = session.beginStoreNavigationVisit();
-    if (!mounted || (!cartEntry && !session.openProduct(product.id))) {
+    if (!mounted || (!cartEntry && !session.openProduct(product.id, entrySurface: entrySurface))) {
       restoreOrigin();
       return false;
     }

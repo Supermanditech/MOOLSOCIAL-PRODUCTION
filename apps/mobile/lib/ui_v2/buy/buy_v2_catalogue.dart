@@ -27,6 +27,25 @@ import 'buy_v2_store_address.dart';
 export '../../features/buy/buy_v2_content_contracts.dart'
     show BuyV2OfferPublisherType;
 
+BuyV2ProductEntrySurface _catalogueProductEntrySurface(BuyV2Session session) {
+  if (session.showingSavedProducts || session.showingMonthlyBasketProducts) return BuyV2ProductEntrySurface.unknown;
+  return _queryProductEntrySurface(session.catalogueQuery());
+}
+
+BuyV2ProductEntrySurface _queryProductEntrySurface(BuyV2CatalogueQuery query) => switch (query.destination) {
+  BuyV2Destination.shop => switch (query.shopSaleType) {
+    BuyV2ShopSaleType.quickDelivery => BuyV2ProductEntrySurface.quick,
+    BuyV2ShopSaleType.courier => BuyV2ProductEntrySurface.scheduled,
+    null => BuyV2ProductEntrySurface.unknown,
+  },
+  BuyV2Destination.wholesale => switch (query.wholesaleSaleType) {
+    BuyV2WholesaleSaleType.wholesale => BuyV2ProductEntrySurface.wholesale,
+    BuyV2WholesaleSaleType.bulk => BuyV2ProductEntrySurface.bulk,
+    null => BuyV2ProductEntrySurface.unknown,
+  },
+  _ => BuyV2ProductEntrySurface.unknown,
+};
+
 // Recurring treatment for the approved public Store name.
 class _StorefrontTextSheen extends StatefulWidget {
   const _StorefrontTextSheen({required this.stateKey, required this.child});
@@ -602,6 +621,7 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
                 productCardBuilder: (product) => BuyV2ProductCard(
                   session: session,
                   product: product,
+                  entrySurface: BuyV2ProductEntrySurface.offers,
                   compact: true,
                   alignMediaAtTop: true,
                 ),
@@ -1244,7 +1264,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                             entry.offer.identity;
                         final publicationHandler = widget.onOpenPublication;
                         if (publicationHandler != null) { publicationHandler(product, entry.offer); }
-                        else { widget.session.openProduct(product.id); }
+                        else { widget.session.openProduct(product.id, entrySurface: BuyV2ProductEntrySurface.offers); }
                       }
                       void details() => showDialog<void>(context: context,
                         builder: (dialogContext) => StatefulBuilder(builder: (context, update) => AnimatedBuilder(animation: owner, builder: (context, _) => AlertDialog(
@@ -2202,6 +2222,10 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                                   key: ValueKey('buy-paged-card-${product.id}'),
                                   session: widget.session,
                                   product: product,
+                                  entrySurface: widget.storeContext ? BuyV2ProductEntrySurface.visitStore
+                                    : widget.publishedOffers ? BuyV2ProductEntrySurface.offers
+                                    : widget.savedOnly ? BuyV2ProductEntrySurface.unknown
+                                    : _queryProductEntrySurface(widget.query),
                                   compact: true,
                                   alignMediaAtTop: true,
                                   storeContext: widget.storeContext,
@@ -7419,7 +7443,7 @@ Future<void> showBuyV2PartnerCatalogue(
         final product = session.product(selectedProductId);
         final handler = onOpenProduct;
         if (handler == null) {
-          session.openProduct(product.id);
+          session.openProduct(product.id, entrySurface: BuyV2ProductEntrySurface.visitStore);
         } else if (await handler(product) && context.mounted) {
           session.openCart();
         }
@@ -10761,6 +10785,7 @@ class _ProductGrid extends StatelessWidget {
                 child: BuyV2ProgressiveProductGrid(
                   session: session,
                   products: gridProducts,
+                  entrySurface: _catalogueProductEntrySurface(session),
                   storageKey: session.showingMonthlyBasketProducts
                       ? 'buy-monthly-${session.saleTypeSignature}'
                       : 'buy-products-${session.destination.name}-'
@@ -11269,6 +11294,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
     this.beforeCartChange,
     this.initialAddQuantity,
     this.beforeSave,
+    this.entrySurface = BuyV2ProductEntrySurface.unknown,
   });
 
   final BuyV2Session session;
@@ -11292,6 +11318,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
   final Future<bool> Function(BuyV2Product, int)? beforeCartChange;
   final int? initialAddQuantity;
   final bool Function(BuyV2Product)? beforeSave;
+  final BuyV2ProductEntrySurface entrySurface;
 
   @override
   Widget build(BuildContext context) {
@@ -11360,6 +11387,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
                                   alignMediaAtTop: alignMediaAtTop,
                                   savedContext: savedContext,
                                   storeContext: storeContext,
+                                  entrySurface: entrySurface,
                                   onOpenProduct: onOpenProduct,
                                   initialAddQuantity: initialAddQuantity,
                                   beforeSave: beforeSave == null
@@ -11405,6 +11433,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
           semanticLabel: semanticLabel,
           onOpenProduct: onOpenProduct,
           storeContext: storeContext,
+          entrySurface: entrySurface,
         );
       },
     );
@@ -11830,6 +11859,7 @@ class _HorizontalProductGrid extends StatefulWidget {
     this.verticalCatalogueColumns,
     this.onOpenProduct,
     this.storeContext = false,
+    this.entrySurface = BuyV2ProductEntrySurface.unknown,
   });
 
   final BuyV2Session session;
@@ -11844,6 +11874,7 @@ class _HorizontalProductGrid extends StatefulWidget {
   final int? verticalCatalogueColumns;
   final ValueChanged<BuyV2Product>? onOpenProduct;
   final bool storeContext;
+  final BuyV2ProductEntrySurface entrySurface;
 
   @override
   State<_HorizontalProductGrid> createState() => _HorizontalProductGridState();
@@ -12077,6 +12108,7 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
                                 savedContext: widget.savedContext,
                                 onOpenProduct: widget.onOpenProduct,
                                 storeContext: widget.storeContext,
+                                entrySurface: widget.entrySurface,
                               ),
                             ),
                           );
@@ -12642,6 +12674,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
   Widget _buildCard(BuildContext context, BoxConstraints constraints) {
     final session = widget.session;
     final product = widget.product;
+    final entrySurface = _catalogueProductEntrySurface(session);
     final facts = session.productFactsFor(product);
     final fulfilmentMode = session.fulfilmentModeFor(product);
     final automaticFulfilment =
@@ -12723,7 +12756,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
               },
               onTap: () {
                 HapticFeedback.selectionClick();
-                session.openProduct(product.id);
+                session.openProduct(product.id, entrySurface: entrySurface);
               },
               borderRadius: BorderRadius.circular(16),
               child: Container(
@@ -12762,6 +12795,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                               child: _FeaturedProductAction(
                                 session: session,
                                 product: product,
+                                entrySurface: entrySurface,
                                 quantity: quantity,
                                 rxBlocked: rxBlocked,
                                 offerDecision: offerDecision,
@@ -12885,6 +12919,7 @@ class _FeaturedProductAction extends StatelessWidget {
     required this.quantity,
     required this.rxBlocked,
     required this.offerDecision,
+    required this.entrySurface,
   });
 
   final BuyV2Session session;
@@ -12892,6 +12927,7 @@ class _FeaturedProductAction extends StatelessWidget {
   final int quantity;
   final bool rxBlocked;
   final BuyV2ProductOfferDecision? offerDecision;
+  final BuyV2ProductEntrySurface entrySurface;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -12983,7 +13019,7 @@ class _FeaturedProductAction extends StatelessWidget {
                                             session.view == BuyV2View.catalogue &&
                                             session.shopSaleType == BuyV2ShopSaleType.courier;
                                         if (requiresOfferReview || scheduled) {
-                                          session.openProduct(product.id, reviewScheduledWindow: scheduled);
+                                          session.openProduct(product.id, reviewScheduledWindow: scheduled, entrySurface: entrySurface);
                                           return;
                                         }
                                         final added = session.addProduct(
@@ -13262,6 +13298,7 @@ class BuyV2ProductCard extends StatelessWidget {
     this.beforeSave,
     this.comparisonSummary,
     this.comparisonTotal,
+    this.entrySurface = BuyV2ProductEntrySurface.unknown,
   });
 
   final BuyV2Session session;
@@ -13276,6 +13313,7 @@ class BuyV2ProductCard extends StatelessWidget {
   final bool Function()? beforeSave;
   final Widget? comparisonSummary;
   final String? comparisonTotal;
+  final BuyV2ProductEntrySurface entrySurface;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: _buildCard);
@@ -13292,7 +13330,7 @@ class BuyV2ProductCard extends StatelessWidget {
       if (callback != null) {
         callback(product);
       } else {
-        session.openProduct(product.id);
+        session.openProduct(product.id, entrySurface: storeContext ? BuyV2ProductEntrySurface.visitStore : entrySurface);
       }
     }
 
@@ -13397,7 +13435,8 @@ class BuyV2ProductCard extends StatelessWidget {
                                       session.shopSaleType == BuyV2ShopSaleType.courier;
                                   if (requiresOfferReview || scheduled) {
                                     if (scheduled) {
-                                      session.openProduct(product.id, reviewScheduledWindow: true);
+                                      session.openProduct(product.id, reviewScheduledWindow: true,
+                                        entrySurface: storeContext ? BuyV2ProductEntrySurface.visitStore : entrySurface);
                                     } else {
                                       openProduct();
                                     }

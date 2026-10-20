@@ -39,6 +39,21 @@ int buyV2SumMinor(Iterable<int> amounts) {
 
 enum BuyV2Destination { shop, wholesale, medicine, orders }
 
+/// Immediate rendered entry surface, never inferred from delivery promises,
+/// search text or product metadata. Not persisted with the customer's Cart.
+enum BuyV2ProductEntrySurface {
+  quick, scheduled, wholesale, bulk, offers, visitStore, unknown;
+  String get wireValue => this == visitStore ? 'visit_store' : name;
+}
+
+/// Identity is this immutable instance: two opens of the same SKU are distinct.
+final class BuyV2ProductVisitContext {
+  BuyV2ProductVisitContext(this.surface);
+  final BuyV2ProductEntrySurface surface;
+}
+
+typedef BuyV2ProductOrigin = ({String productId, BuyV2ProductVisitContext visit});
+
 enum BuyV2ShoppingIntent {
   monthlyBasket,
   businessBuying,

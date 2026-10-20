@@ -182,6 +182,7 @@ typedef _BuyV2RecoveryOrigin = ({
   String? filter,
   String? productId,
   String? orderId,
+  BuyV2ProductVisitContext productVisit,
 });
 
 final class _BuyV2UnavailableCommerceAdapter implements BuyV2CommerceAdapter {
@@ -4703,8 +4704,9 @@ class BuyV2Session extends ChangeNotifier {
       ...?_variantFamily?.candidates.map((product) => product.id),
       ..._cart.keys,
       ..._recentlyViewedProductIds,
-      ..._comparedProductOrigins,
-      ...?_cartProductReturnOrigin?.comparisons,
+      ..._comparedProductOrigins.map((origin) => origin.productId),
+      ..._accountReturnComparisons.map((origin) => origin.productId),
+      ...?_cartProductReturnOrigin?.comparisons.map((origin) => origin.productId),
       ?selectedProductId,
       ?_cartProductReturnId,
       ?_accountReturnProductId,
@@ -6294,6 +6296,16 @@ class BuyV2Session extends ChangeNotifier {
   bool get showingSavedProducts => _savedCatalogueDestination == destination;
   String query = '';
   String? selectedProductId;
+  BuyV2ProductVisitContext _productVisit = BuyV2ProductVisitContext(BuyV2ProductEntrySurface.unknown);
+  BuyV2ProductVisitContext get productVisit => _productVisit;
+  final _productPresentationAttempts = Expando<Set<String>>();
+  /// One lossy reporting attempt per visible SKU in this transient visit.
+  /// Back/rebuild/route remount cannot create replacement event identities.
+  bool claimProductPresentation(BuyV2ProductVisitContext visit, String productId) {
+    if (_collectionDisposed || !identical(visit, _productVisit) || selectedProductId != productId || view != BuyV2View.product) return false;
+    final attempted = _productPresentationAttempts[visit] ??= <String>{};
+    return attempted.add(productId);
+  }
   String? _pendingStoreReturnAnchorId;
   String? pendingPrescriptionProductId;
   BuyV2RecoveryKind? recoveryKind;
@@ -6471,6 +6483,10 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2Destination _accountReturnDestination = BuyV2Destination.shop;
   BuyV2View _accountReturnView = BuyV2View.catalogue;
   String? _accountReturnProductId;
+  BuyV2ProductVisitContext _accountReturnProductVisit = BuyV2ProductVisitContext(BuyV2ProductEntrySurface.unknown);
+  List<BuyV2ProductOrigin> _accountReturnComparisons = const [];
+  BuyV2Destination _accountReturnProductDestination = BuyV2Destination.shop;
+  BuyV2View _accountReturnProductView = BuyV2View.catalogue;
   String? _accountReturnOrderId;
   String _accountReturnQuery = '';
   String? _accountReturnFilter;
@@ -6479,7 +6495,7 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2View _assistReturnView = BuyV2View.catalogue;
   BuyV2Destination _productReturnDestination = BuyV2Destination.shop;
   BuyV2View _productReturnView = BuyV2View.catalogue;
-  final List<String> _comparedProductOrigins = [];
+  final List<BuyV2ProductOrigin> _comparedProductOrigins = [];
   bool _cartProductReturnActive = false;
   ({
     BuyV2Destination destination,
@@ -6491,7 +6507,7 @@ class BuyV2Session extends ChangeNotifier {
   _cartOrderReturnOrigin;
   BuyV2Destination _cartProductReturnDestination = BuyV2Destination.shop;
   String? _cartProductReturnId;
-  ({BuyV2Destination destination, BuyV2View view, List<String> comparisons})?
+  ({BuyV2Destination destination, BuyV2View view, List<BuyV2ProductOrigin> comparisons, BuyV2ProductVisitContext visit})?
   _cartProductReturnOrigin;
 
   final List<BuyV2Product> _catalogueProducts = [];
@@ -9875,7 +9891,7 @@ class BuyV2Session extends ChangeNotifier {
         checkoutScope: checkoutScope,
         productReturnDestination: _productReturnDestination,
         productReturnView: _productReturnView,
-        comparisonOrigins: List.unmodifiable(_comparedProductOrigins),
+        comparisonOrigins: List.unmodifiable(_comparedProductOrigins.map((origin) => origin.productId)),
         cartReturnProductId: _cartProductReturnActive
             ? _cartProductReturnId
             : null,
@@ -9883,7 +9899,7 @@ class BuyV2Session extends ChangeNotifier {
         cartReturnOriginDestination: _cartProductReturnOrigin?.destination,
         cartReturnOriginView: _cartProductReturnOrigin?.view,
         cartReturnComparisonOrigins: List.unmodifiable(
-          _cartProductReturnOrigin?.comparisons ?? const <String>[],
+          _cartProductReturnOrigin?.comparisons.map((origin) => origin.productId) ?? const <String>[],
         ),
         showingSavedProducts: showingSavedProducts,
         cartScrollOffset: cartScrollOffsetFor(cartScope),
@@ -9898,6 +9914,7 @@ class BuyV2Session extends ChangeNotifier {
     query = saved.query;
     selectedFilter = saved.filter;
     selectedProductId = saved.productId;
+    _productVisit = BuyV2ProductVisitContext(BuyV2ProductEntrySurface.unknown);
     _selectedOrderId = saved.orderId;
     switch (destination) {
       case BuyV2Destination.shop:
@@ -9915,7 +9932,8 @@ class BuyV2Session extends ChangeNotifier {
     _productReturnView = saved.productReturnView;
     _comparedProductOrigins
       ..clear()
-      ..addAll(saved.comparisonOrigins);
+      ..addAll(saved.comparisonOrigins.map((id) => (productId: id,
+        visit: BuyV2ProductVisitContext(BuyV2ProductEntrySurface.unknown))));
     _cartProductReturnActive = saved.cartReturnProductId != null;
     _cartProductReturnId = saved.cartReturnProductId;
     _cartProductReturnDestination = saved.cartReturnDestination;
@@ -9925,7 +9943,9 @@ class BuyV2Session extends ChangeNotifier {
         ? (
             destination: originDestination,
             view: originView,
-            comparisons: List<String>.of(saved.cartReturnComparisonOrigins),
+            comparisons: saved.cartReturnComparisonOrigins.map((id) => (productId: id,
+              visit: BuyV2ProductVisitContext(BuyV2ProductEntrySurface.unknown))).toList(),
+            visit: BuyV2ProductVisitContext(BuyV2ProductEntrySurface.unknown),
           )
         : null;
     _savedCatalogueDestination = saved.showingSavedProducts
@@ -13774,6 +13794,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     selectedProductId = id;
     view = BuyV2View.product;
+    _productVisit = BuyV2ProductVisitContext(BuyV2ProductEntrySurface.unknown);
     _linkedProductId = id;
     _linkedProductLoading = true;
     _linkedProductMessage = null;
@@ -13828,7 +13849,8 @@ class BuyV2Session extends ChangeNotifier {
   String? _scheduledReviewProductId;
   bool get productScheduledReview => _scheduledReviewProductId == selectedProductId && selectedProductId != null;
 
-  bool openProduct(String id, {bool preserveComparisonOrigin = false, bool reviewScheduledWindow = false}) {
+  bool openProduct(String id, {bool preserveComparisonOrigin = false, bool reviewScheduledWindow = false,
+    BuyV2ProductEntrySurface entrySurface = BuyV2ProductEntrySurface.unknown}) {
     final item = findProduct(id);
     if (item == null || !_matchesRetainedProductIdentity(item)) {
       notice = 'This product could not be found.';
@@ -13850,7 +13872,7 @@ class BuyV2Session extends ChangeNotifier {
     } else if (preserveComparisonOrigin &&
         selectedProductId != null &&
         selectedProductId != id) {
-      _comparedProductOrigins.add(selectedProductId!);
+      _comparedProductOrigins.add((productId: selectedProductId!, visit: _productVisit));
     }
     final activeSearch = query.trim().replaceAll(RegExp(r'\s+'), ' ');
     if (view == BuyV2View.catalogue && activeSearch.length >= 2) {
@@ -13859,6 +13881,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     destination = item.destination;
     selectedProductId = item.id;
+    _productVisit = BuyV2ProductVisitContext(entrySurface);
     _scheduledReviewProductId = reviewScheduledWindow ? item.id : null;
     view = BuyV2View.product;
     notice = null;
@@ -13950,7 +13973,8 @@ class BuyV2Session extends ChangeNotifier {
       cartScope: cartScope,
       productReturnDestination: _productReturnDestination,
       productReturnView: _productReturnView,
-      comparisons: List<String>.of(_comparedProductOrigins),
+      comparisons: List<BuyV2ProductOrigin>.of(_comparedProductOrigins),
+      productVisit: _productVisit,
       cartProductReturnActive: _cartProductReturnActive,
       cartProductReturnDestination: _cartProductReturnDestination,
       cartProductReturnId: _cartProductReturnId,
@@ -13965,12 +13989,13 @@ class BuyV2Session extends ChangeNotifier {
       destination = origin.destination;
       view = origin.view;
       selectedProductId = origin.productId;
+      _productVisit = origin.productVisit;
       cartScope = origin.cartScope;
       _productReturnDestination = origin.productReturnDestination;
       _productReturnView = origin.productReturnView;
       _comparedProductOrigins
         ..clear()
-        ..addAll(origin.comparisons.where((id) => findProduct(id) != null));
+        ..addAll(origin.comparisons.where((origin) => findProduct(origin.productId) != null));
       _cartProductReturnActive = origin.cartProductReturnActive;
       _cartProductReturnDestination = origin.cartProductReturnDestination;
       _cartProductReturnId = origin.cartProductReturnId;
@@ -13987,16 +14012,16 @@ class BuyV2Session extends ChangeNotifier {
     };
   }
 
-  List<String> takeProductComparisonOrigin() {
-    final origin = List<String>.unmodifiable(_comparedProductOrigins);
+  List<BuyV2ProductOrigin> takeProductComparisonOrigin() {
+    final origin = List<BuyV2ProductOrigin>.unmodifiable(_comparedProductOrigins);
     _comparedProductOrigins.clear();
     return origin;
   }
 
-  void restoreProductComparisonOrigin(List<String> origin) {
+  void restoreProductComparisonOrigin(List<BuyV2ProductOrigin> origin) {
     _comparedProductOrigins
       ..clear()
-      ..addAll(origin.where((id) => findProduct(id) != null));
+      ..addAll(origin.where((entry) => findProduct(entry.productId) != null));
     notifyListeners();
   }
 
@@ -14007,7 +14032,7 @@ class BuyV2Session extends ChangeNotifier {
       view == BuyV2View.product && _productReturnView == BuyV2View.catalogue;
 
   String? get productReturnLabel => canReturnToComparedProduct
-      ? findProduct(_comparedProductOrigins.last)?.customerTitle ??
+      ? findProduct(_comparedProductOrigins.last.productId)?.customerTitle ??
             'Previous product'
       : canReturnToShoppingAlerts
       ? 'Shopping alerts'
@@ -14023,10 +14048,12 @@ class BuyV2Session extends ChangeNotifier {
     if (_returnToShoppingAlerts()) return;
     final previous = _navigationSurfaceIdentity;
     while (_comparedProductOrigins.isNotEmpty) {
-      final product = findProduct(_comparedProductOrigins.removeLast());
+      final origin = _comparedProductOrigins.removeLast();
+      final product = findProduct(origin.productId);
       if (product == null) continue;
       destination = product.destination;
       selectedProductId = product.id;
+      _productVisit = origin.visit;
       view = BuyV2View.product;
       notice = null;
       _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
@@ -14063,7 +14090,8 @@ class BuyV2Session extends ChangeNotifier {
       _cartProductReturnOrigin = (
         destination: _productReturnDestination,
         view: _productReturnView,
-        comparisons: List<String>.of(_comparedProductOrigins),
+        comparisons: List<BuyV2ProductOrigin>.of(_comparedProductOrigins),
+        visit: _productVisit,
       );
     } else if (view != BuyV2View.checkout && view != BuyV2View.cart) {
       _cartProductReturnActive = false;
@@ -14974,7 +15002,8 @@ class BuyV2Session extends ChangeNotifier {
     );
     final productReturnDestination = _productReturnDestination;
     final productReturnView = _productReturnView;
-    final comparisons = List<String>.of(_comparedProductOrigins);
+    final comparisons = List<BuyV2ProductOrigin>.of(_comparedProductOrigins);
+    final productVisit = _productVisit;
     _comparedProductOrigins.clear();
     _shoppingAlertReturnRequested = false;
     _shoppingAlertVisit = (
@@ -14994,6 +15023,7 @@ class BuyV2Session extends ChangeNotifier {
         query = origin.query;
         selectedFilter = origin.filter;
         selectedProductId = origin.productId;
+        _productVisit = productVisit;
         _selectedOrderId = origin.orderId;
         _productReturnDestination = productReturnDestination;
         _productReturnView = productReturnView;
@@ -15210,6 +15240,10 @@ class BuyV2Session extends ChangeNotifier {
       _accountReturnDestination = destination;
       _accountReturnView = view;
       _accountReturnProductId = selectedProductId;
+      _accountReturnProductVisit = _productVisit;
+      _accountReturnComparisons = List<BuyV2ProductOrigin>.unmodifiable(_comparedProductOrigins);
+      _accountReturnProductDestination = _productReturnDestination;
+      _accountReturnProductView = _productReturnView;
       _accountReturnOrderId = _selectedOrderId;
       _accountReturnQuery = query;
       _accountReturnFilter = selectedFilter;
@@ -15228,6 +15262,12 @@ class BuyV2Session extends ChangeNotifier {
     destination = _accountReturnDestination;
     view = _accountReturnView;
     selectedProductId = _accountReturnProductId;
+    _productVisit = _accountReturnProductVisit;
+    _comparedProductOrigins
+      ..clear()
+      ..addAll(_accountReturnComparisons.where((entry) => findProduct(entry.productId) != null));
+    _productReturnDestination = _accountReturnProductDestination;
+    _productReturnView = _accountReturnProductView;
     _selectedOrderId = _accountReturnOrderId;
     if ((_accountReturnView == BuyV2View.tracking ||
             _accountReturnView == BuyV2View.orderItems) &&
@@ -15404,6 +15444,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     destination = product.destination;
     selectedProductId = product.id;
+    _productVisit = origin?.visit ?? BuyV2ProductVisitContext(BuyV2ProductEntrySurface.unknown);
     view = BuyV2View.product;
     notice = null;
     _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
@@ -19772,6 +19813,7 @@ class BuyV2Session extends ChangeNotifier {
         filter: selectedFilter,
         productId: selectedProductId,
         orderId: _selectedOrderId,
+        productVisit: _productVisit,
       );
     }
     recoveryKind = kind;
@@ -19941,6 +19983,7 @@ class BuyV2Session extends ChangeNotifier {
     query = origin.query;
     selectedFilter = origin.filter;
     selectedProductId = origin.productId;
+    _productVisit = origin.productVisit;
     _selectedOrderId = origin.orderId;
     notice = null;
     var exact = true;

@@ -2944,13 +2944,16 @@ class WorkspaceProductPresentationGateway {
   final bool Function() current;
   final WorkspaceCatalogueContentResult? Function(BuyV2Product) displayed;
   final bool productPresentationsEnabled, storePresentationsEnabled, cartAdditionsEnabled, discoverySourcesEnabled;
-  Map<String, Object?>? prepare(BuyV2Product product, String presentationId, {bool cartAddition = false}) {
+  Map<String, Object?>? prepare(BuyV2Product product, String presentationId, {bool cartAddition = false,
+    BuyV2ProductEntrySurface entrySurface = BuyV2ProductEntrySurface.unknown}) {
     final identity = product.publicListingIdentity, result = displayed(product);
     if (!(cartAddition ? cartAdditionsEnabled : productPresentationsEnabled) || !current() || identity == null || !identity.matches(product) || identity.realm != gateway.realm ||
         result?.content.state != BuyV2ProductContentState.ready || result?.validUntil?.isAfter(gateway.now().toUtc()) != true ||
         result?.skuRevision == null || result?.catalogueVersion == null || !RegExp(r'^[a-f0-9]{32}$').hasMatch(presentationId)) {return null;}
-    return {'schemaVersion': 1, 'presentationId': presentationId, 'storeId': identity.storeId, 'skuId': identity.skuId,
-      'listingId': identity.listingId, 'skuRevision': result!.skuRevision, 'catalogueVersion': result.catalogueVersion};
+    final discovery = !cartAddition && discoverySourcesEnabled;
+    return {'schemaVersion': discovery ? 2 : 1, 'presentationId': presentationId, 'storeId': identity.storeId, 'skuId': identity.skuId,
+      'listingId': identity.listingId, 'skuRevision': result!.skuRevision, 'catalogueVersion': result.catalogueVersion,
+      if (discovery) 'discoverySurface': entrySurface.wireValue};
   }
   Map<String, Object?>? prepareStore(BuyV2PublicStoreObservation observation, String presentationId) {
     if (!storePresentationsEnabled || !current() || observation.realm != gateway.realm ||
