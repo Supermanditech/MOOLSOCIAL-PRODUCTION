@@ -4199,6 +4199,90 @@ class SecureWorkCatalogueBindingPendingStore implements WorkspaceCatalogueBindin
 
 /// An original Store-reported quantity, never the full inventory or a ledger.
 /// Same account-scoped encrypted/native-tail pattern as product submissions.
+/// Dedicated Bulk originals; reuses the existing encrypted serialized-storage
+/// pattern without mixing agreements with orders, payment attempts or Stock.
+class SecureWorkBulkQuoteJournal implements WorkspaceBulkQuoteJournal {
+  SecureWorkBulkQuoteJournal({FlutterSecureStorage? storage, String? Function()? currentAccount, DateTime Function()? now})
+    : _storage = storage ?? const FlutterSecureStorage(),
+      _currentAccount = currentAccount ?? SecureWorkOrderPendingStore._signedInAccount, _now = now ?? DateTime.now;
+  final FlutterSecureStorage _storage;
+  final String? Function() _currentAccount;
+  final DateTime Function() _now;
+  static final _tails = <String, Future<void>>{};
+  String _key(WorkspaceBulkQuoteScope scope) => 'moolsocial.workspace.bulk-quote.v1.${
+    base64UrlEncode(utf8.encode(jsonEncode([scope.account, scope.realm, scope.store, scope.role])))}';
+  void _check(WorkspaceBulkQuoteScope scope) {
+    validateWorkspaceBulkQuoteScope(scope);
+    if (_currentAccount() != scope.account) throw const WorkGatewayException('Sign in again to check saved requests.');
+  }
+  void _original(WorkspaceBulkQuoteScope scope, WorkspaceBulkQuoteIntent value) {
+    if (value.account != scope.account || value.realm != scope.realm || value.storeId != scope.store ||
+      !(scope.role == 'buyer' ? {'request', 'accept', 'withdraw'} : {'offer', 'withdraw'}).contains(value.kind)) {
+      throw const FormatException('Keep the original request owner.');
+    }
+  }
+  Future<T> _serial<T>(WorkspaceBulkQuoteScope scope, Future<T> Function() action) {
+    final key = _key(scope), result = (_tails[key] ?? Future<void>.value()).then((_) => action());
+    final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _tails[key] = tail;
+    unawaited(tail.then((_) { if (identical(_tails[key], tail)) _tails.remove(key); }));
+    return result;
+  }
+  Future<List<WorkspaceBulkQuoteIntent>> _read(WorkspaceBulkQuoteScope scope) async {
+    _check(scope); final raw = await _storage.read(key: _key(scope)); _check(scope);
+    if (raw == null) return [];
+    if (utf8.encode(raw).length > 1024 * 1024) throw const FormatException('Keep saved request recovery.');
+    final r = jsonDecode(raw), keys = {'schemaVersion', 'account', 'realm', 'store', 'role', 'originals'};
+    if (r is! Map || r.length != keys.length || r.keys.any((k) => !keys.contains(k)) || r['schemaVersion'] != 1 ||
+      r['account'] != scope.account || r['realm'] != scope.realm || r['store'] != scope.store || r['role'] != scope.role ||
+      r['originals'] is! List || (r['originals'] as List).length > 2) {
+      throw const FormatException('Keep saved request recovery.');
+    }
+    final values = <WorkspaceBulkQuoteIntent>[], seen = <String>{};
+    for (final row in r['originals'] as List) {
+      final value = WorkspaceBulkQuoteIntent.decode(row, account: scope.account, realm: scope.realm, now: _now());
+      _original(scope, value);
+      if (!seen.add('${value.kind}:${value.operationId}')) throw const FormatException('Keep distinct originals.');
+      values.add(value);
+    }
+    return values;
+  }
+  Future<void> _write(WorkspaceBulkQuoteScope scope, List<WorkspaceBulkQuoteIntent> values) async {
+    _check(scope);
+    final encoded = jsonEncode({'schemaVersion': 1, 'account': scope.account, 'realm': scope.realm,
+      'store': scope.store, 'role': scope.role, 'originals': [for (final value in values) value.toJson()]});
+    if (utf8.encode(encoded).length > 1024 * 1024) throw const FormatException('Keep saved request recovery.');
+    await _storage.write(key: _key(scope), value: encoded); _check(scope);
+    final saved = await _storage.read(key: _key(scope)); _check(scope);
+    if (saved != encoded) throw const FormatException('Saved requests could not be verified.');
+  }
+  @override Future<List<WorkspaceBulkQuoteIntent>> read(WorkspaceBulkQuoteScope scope) => _serial(scope, () => _read(scope));
+  @override Future<void> save(WorkspaceBulkQuoteScope scope, WorkspaceBulkQuoteIntent original) => _serial(scope, () async {
+    _original(scope, original);
+    final restored = WorkspaceBulkQuoteIntent.decode(original.toJson(), account: scope.account, realm: scope.realm, now: _now());
+    final prior = await _read(scope);
+    final same = prior.where((p) => p.kind == original.kind && p.operationId == original.operationId).firstOrNull;
+    if (same != null) {
+      if (jsonEncode(same.toJson()) != jsonEncode(restored.toJson())) throw const FormatException('Keep the exact original request.');
+      return;
+    }
+    // One original plus its explicit withdrawal. Reserve recovery capacity;
+    // never evict an unresolved command to make room for a new quotation.
+    if (prior.isNotEmpty && !(prior.length == 1 && original.kind == 'withdraw' &&
+      {'offer', 'accept'}.contains(prior.single.kind) && prior.single.quoteId == original.quoteId)) {
+      throw const FormatException('Check the earlier request first.');
+    }
+    await _write(scope, [...prior, restored]);
+  });
+  @override Future<void> remove(WorkspaceBulkQuoteScope scope, WorkspaceBulkQuoteIntent original) => _serial(scope, () async {
+    _original(scope, original); final prior = await _read(scope);
+    final same = prior.where((p) => p.kind == original.kind && p.operationId == original.operationId).firstOrNull;
+    if (same == null) return;
+    if (jsonEncode(same.toJson()) != jsonEncode(original.toJson())) throw const FormatException('Keep the exact original request.');
+    await _write(scope, prior.where((p) => !identical(p, same)).toList());
+  });
+}
+
 class SecureWorkStoreStockJournal implements WorkspaceStoreStockJournal {
   SecureWorkStoreStockJournal({FlutterSecureStorage? storage, String? Function()? currentAccount})
     : _storage = storage ?? const FlutterSecureStorage(),

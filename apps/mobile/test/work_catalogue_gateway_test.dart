@@ -434,6 +434,17 @@ class PublicDetailsHostGateway implements WorkspacePublicDetailsOwnerGateway {
   }
 }
 // Host storage-completion boundary; this is not Android encryption acceptance.
+class _BulkLateCleanup implements WorkspaceBulkQuoteJournal {
+  _BulkLateCleanup(this.source);
+  final WorkspaceBulkQuoteJournal source;
+  bool failAfterPhysicalRemoval = true;
+  @override Future<List<WorkspaceBulkQuoteIntent>> read(WorkspaceBulkQuoteScope scope) => source.read(scope);
+  @override Future<void> save(WorkspaceBulkQuoteScope scope, WorkspaceBulkQuoteIntent original) => source.save(scope, original);
+  @override Future<void> remove(WorkspaceBulkQuoteScope scope, WorkspaceBulkQuoteIntent original) async {
+    await source.remove(scope, original);
+    if (failAfterPhysicalRemoval) { failAfterPhysicalRemoval = false; throw TimeoutException('Host late completion'); }
+  }
+}
 class _DelayedDetailsStorage extends FlutterSecureStorage {
   final rows = <String, String>{};
   final entered = Completer<void>(), release = Completer<void>();
@@ -1199,7 +1210,351 @@ class _StockSessionCatalogue extends SessionCatalogue implements WorkspaceStoreS
     {required bool Function() current, bool reconcile = false}) => stockOwner.writeStoreStock(original, current: current, reconcile: reconcile);
 }
 
+// Actual loopback Firestore capture, 2026-10-20. Evaluation identities only;
+// never injected into native storage or claimed as live-service acceptance.
+const _bulkServiceCapture20261020 = r'''{"capturedAt":"2026-10-20T12:01:00.000Z","request":{"schemaVersion":1,"requestId":"request-one","storeId":"store-one","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10}]},"offer":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"offer-one","expectedRevision":1,"validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025}]},"accept":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"accept-one","expectedRevision":2},"created":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"supplierRequested":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"offered":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"accepted":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"recovered":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"request","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"request-one","requestFingerprint":"e61bc6284c6b771f90677f3376ecbb035236e77c2ba49d131f164ee30c75e974","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"recorded","agreement":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"proof":null},"unobserved":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"accept","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"never-accept","requestFingerprint":"9a47224ccf5ad2833db6eaff3e27e70983d53fb33c04c396a6016edc2da9557a","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"not_found","agreement":null,"proof":null},"buyerPage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"buyer","storeId":null,"currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null},"storePage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"supplier","storeId":"store-one","currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null}}''';
+
 void main() {
+  // Captured from the actual isolated Firestore/service journey, not phone data.
+  Map<String, dynamic> bulkCapture() {
+    const path = String.fromEnvironment('LF_BULK_CLIENT_CAPTURE');
+    if (path.isEmpty) return jsonDecode(_bulkServiceCapture20261020) as Map<String, dynamic>;
+    final row = File(path).readAsLinesSync().singleWhere((l) => l.startsWith('LF_BULK_SERVICE_API='));
+    return jsonDecode(row.substring('LF_BULK_SERVICE_API='.length)) as Map<String, dynamic>;
+  }
+  WorkspaceBulkQuoteIntent bulkIntent(Map<String, dynamic> c, String kind, {String? operationId}) {
+    final baseRaw = kind == 'offer' ? c['supplierRequested'] : kind == 'request' ? c['created'] : c['unobserved']['currentHead'];
+    final base = WorkspaceBulkQuote.decode(baseRaw, realm: 'evaluation', now: DateTime.parse(c['capturedAt'] as String));
+    final body = Map<String, dynamic>.from(c[kind] as Map);
+    if (operationId != null) body['operationId'] = operationId;
+    return WorkspaceBulkQuoteIntent.decode({'schemaVersion': 1, 'account': kind == 'offer' ? 'supplier-one' : 'buyer-one',
+      'realm': 'evaluation', 'kind': kind, 'body': body, 'base': kind == 'request' ? null : base.toJson(),
+      'expected': [for (final line in base.lines) line.identity]},
+      account: kind == 'offer' ? 'supplier-one' : 'buyer-one', realm: 'evaluation', now: DateTime.parse(c['capturedAt'] as String));
+  }
+  test('LF-BULK actual service request offer accept and immutable recovery decode end to end', () {
+    final c = bulkCapture(), now = DateTime.parse(c['capturedAt'] as String);
+    final created = WorkspaceBulkQuote.decode(c['created'], realm: 'evaluation', now: now);
+    final offered = WorkspaceBulkQuote.decode(c['offered'], realm: 'evaluation', now: now);
+    final accepted = WorkspaceBulkQuote.decode(c['accepted'], realm: 'evaluation', now: now);
+    expect(created.state, 'requested'); expect(offered.merchandiseMinor, 100250);
+    expect(accepted.accepted, isTrue); expect(accepted.lines.single.variant, 'Aged\ngrain');
+    expect(accepted.toJson()['orderingAvailable'], isFalse);
+    for (final kind in ['request', 'offer', 'accept']) {
+      final original = bulkIntent(c, kind);
+      original.verifyAcknowledgement({'request': created, 'offer': offered, 'accept': accepted}[kind]!);
+      final restored = WorkspaceBulkQuoteIntent.decode(original.toJson(), account: original.account, realm: 'evaluation', now: now);
+      expect(restored.fingerprint, original.fingerprint);
+      final mutable = restored.body; mutable['schemaVersion'] = 999;
+      expect(restored.body['schemaVersion'], 1);
+    }
+    final recovery = WorkspaceBulkQuoteRecovery.decode(c['recovered'], bulkIntent(c, 'request'), now);
+    expect(recovery.state, 'recorded'); expect(recovery.agreement!.revision, 1);
+    expect(recovery.currentHead!.revision, 3);
+    final unknown = WorkspaceBulkQuoteRecovery.decode(c['unobserved'], bulkIntent(c, 'accept', operationId: 'never-accept'), now);
+    expect(unknown.state, 'not_found'); expect(unknown.agreement, isNull);
+    expect(unknown.currentHead!.state, 'offered');
+    final copy = accepted.toJson(); (copy['lines'] as List).clear();
+    expect(accepted.lines, hasLength(1)); expect(accepted.toJson()['lines'], hasLength(1));
+  });
+  test('LF-BULK strict source scope paise policy and acceptance reject corrupted replies', () {
+    final c = bulkCapture(), now = DateTime.parse(c['capturedAt'] as String);
+    final mutations = <void Function(Map<String, dynamic>)>[
+      (r) => r['realm'] = 'production', (r) => r['orderingAvailable'] = true,
+      (r) => r['creditApproved'] = true, (r) => r['finalChargesDetermined'] = true,
+      (r) => r['buyerUserId'] = 'leaked', (r) => r['quoteId'] = 'invalid',
+      (r) => r['revision'] = 2.5, (r) => r['updatedAt'] = '2030-01-01T00:00:00.000Z',
+      (r) => (r['lines'][0] as Map)['quantity'] = 0,
+      (r) => (r['lines'][0] as Map)['variant'] = '',
+      (r) => (r['lines'][0]['supplierPolicy'] as Map)['skuId'] = 'other-sku',
+      (r) => (r['offer'] as Map)['merchandiseMinor'] = 100250.1,
+      (r) => (r['offer']['prices'][0] as Map)['unitPriceMinor'] = -1,
+      (r) => (r['offer']['prices'][0] as Map)['merchandiseMinor'] = 100251,
+      (r) => (r['offer'] as Map)['policyFingerprint'] = 'wrong',
+      (r) => (r['acceptance'] as Map)['agreementFingerprint'] = 'wrong',
+    ];
+    for (var i = 0; i < mutations.length; i++) {
+      final r = jsonDecode(jsonEncode(c['accepted'])) as Map<String, dynamic>; mutations[i](r);
+      expect(() => WorkspaceBulkQuote.decode(r, realm: 'evaluation', now: now), throwsFormatException, reason: 'mutation $i');
+    }
+    expect(() => WorkspaceBulkQuote.decode(c['created'], realm: 'evaluation', now: now, storeId: 'wrong'), throwsFormatException);
+    final legacy = jsonDecode(jsonEncode(c['created'])) as Map<String, dynamic>;
+    (legacy['lines'][0] as Map).remove('variant');
+    expect(WorkspaceBulkQuote.decode(legacy, realm: 'evaluation', now: now).lines.single.variant, isNull);
+  });
+  test('LF-BULK original owner and semantic recovery evidence cannot be substituted', () {
+    final c = bulkCapture(), now = DateTime.parse(c['capturedAt'] as String), original = bulkIntent(c, 'request');
+    expect(() => WorkspaceBulkQuoteIntent.decode(original.toJson(), account: 'another', realm: 'evaluation', now: now), throwsFormatException);
+    final changes = <void Function(Map<String, dynamic>)>[
+      (r) => r['requestFingerprint'] = 'wrong', (r) => r['authNamespace'] = 'other',
+      (r) => r['operationId'] = 'other', (r) => r['originalOperation'] = 'offer',
+      (r) => r['currentHead'] = null,
+      (r) => (r['currentHead'] as Map)['customerReference'] = 'customer-${'0' * 32}',
+    ];
+    for (final change in changes) {
+      final r = jsonDecode(jsonEncode(c['recovered'])) as Map<String, dynamic>; change(r);
+      expect(() => WorkspaceBulkQuoteRecovery.decode(r, original, now), throwsFormatException);
+    }
+    final late = now.add(const Duration(days: 1));
+    final accepted = WorkspaceBulkQuote.decode(c['accepted'], realm: 'evaluation', now: late);
+    expect(accepted.accepted, isTrue); expect(accepted.offerCurrent(late), isFalse);
+    final saved = bulkIntent(c, 'accept').toJson();
+    expect(WorkspaceBulkQuoteIntent.decode(saved, account: 'buyer-one', realm: 'evaluation', now: late).operationId, 'accept-one');
+    expect(WorkspaceBulkQuoteIntent.decode(saved, account: 'buyer-one', realm: 'evaluation',
+      now: now.subtract(const Duration(days: 1))).operationId, 'accept-one');
+    final flipped = jsonDecode(jsonEncode(c['offered'])) as Map<String, dynamic>;
+    flipped['viewerRole'] = 'supplier';
+    expect(() => bulkIntent(c, 'accept').verifyHead(WorkspaceBulkQuote.decode(flipped, realm: 'evaluation', now: now)), throwsFormatException);
+  });
+  WorkspaceBulkQuoteGateway bulkClient(Map<String, dynamic> capture, OwnerTransport transport,
+      {Credentials? credentials, String account = 'buyer-one', bool enabled = true}) => WorkspaceBulkQuoteGateway(
+    AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: credentials ?? Credentials(), transport: transport, ownerAccountId: account, realm: 'evaluation',
+      now: () => DateTime.parse(capture['capturedAt'] as String)), enabled: enabled);
+  test('LF-BULK authenticated gateway sends exact originals with consumed mutation tokens and observational recovery', () async {
+    final c = bulkCapture(), credentials = Credentials(), request = bulkIntent(c, 'request');
+    final transport = OwnerTransport((body) async {
+      final op = body['operation'];
+      if (op == request.operation) {
+        expect(body, {'operation': request.operation, ...request.body});
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': c['created']}));
+      }
+      if (op == 'reconcileBulkSupplierQuote') {
+        expect(body, {'operation': op, 'schemaVersion': 1, 'originalOperation': 'request', 'original': request.body});
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': c['recovered']}));
+      }
+      if (op == 'readBulkSupplierQuote') {
+        expect(body, {'operation': op, 'quoteId': request.quoteId});
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': c['accepted']}));
+      }
+      expect(body, {'operation': 'listBuyerBulkSupplierQuotes', 'limit': 5, 'cursor': null});
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': c['buyerPage']}));
+    });
+    final gateway = bulkClient(c, transport, credentials: credentials); var dispatched = 0;
+    expect((await gateway.execute(request, current: () => true, onDispatch: () => dispatched++)).state, 'requested');
+    expect((await gateway.reconcile(request, current: () => true)).currentHead!.state, 'accepted');
+    expect((await gateway.read(account: request.account, storeId: request.storeId, quoteId: request.quoteId, current: () => true)).accepted, isTrue);
+    final page = await gateway.list(account: request.account, current: () => true);
+    expect(page.summaries.single['quoteId'], request.quoteId); expect(page.nextCursor, isNull);
+    expect(dispatched, 1); expect(transport.calls, 4);
+    expect(credentials.modes, [SocialAppCheckTokenMode.limitedUse, SocialAppCheckTokenMode.standard,
+      SocialAppCheckTokenMode.standard, SocialAppCheckTokenMode.standard]);
+  });
+  test('LF-BULK lifetime fences reject retirement before credentials and after dispatch without retry', () async {
+    final c = bulkCapture(), request = bulkIntent(c, 'request');
+    var current = true;
+    final transport = OwnerTransport((_) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': c['created']})));
+    final credentials = RetiringOwnerCredentials(() => current = false);
+    final gateway = bulkClient(c, transport, credentials: credentials);
+    await expectLater(gateway.execute(request, current: () => current, onDispatch: () => fail('retired')), throwsA(
+      isA<WorkspaceBulkQuoteConnectionException>().having((e) => e.recoveryRequired, 'not dispatched', false)));
+    await Future<void>.delayed(Duration.zero); expect(transport.calls, 0);
+    final entered = Completer<void>(), reply = Completer<SocialContentResponse>(); current = true;
+    final delayed = OwnerTransport((_) { entered.complete(); return reply.future; });
+    final pending = bulkClient(c, delayed).execute(request, current: () => current, onDispatch: () {});
+    final assertion = expectLater(pending, throwsA(isA<WorkspaceBulkQuoteConnectionException>().having((e) => e.recoveryRequired, 'retain original', true)));
+    await entered.future; current = false;
+    reply.complete(SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': c['created']})));
+    await assertion; expect(delayed.calls, 1);
+    current = true;
+    await expectLater(bulkClient(c, transport).execute(request, current: () => current, onDispatch: () => current = false),
+      throwsA(isA<WorkspaceBulkQuoteConnectionException>()));
+    expect(transport.calls, 0);
+  });
+  test('LF-BULK uncertain HTTP malformed and oversized replies preserve original and never retry', () async {
+    final c = bulkCapture(), request = bulkIntent(c, 'request');
+    for (final reply in [SocialContentResponse(statusCode: 409, body: '{}'),
+      SocialContentResponse(statusCode: 200, body: '{'),
+      SocialContentResponse(statusCode: 200, body: ' ' * (1024 * 1024 + 1)),
+      SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': c['offered']}))]) {
+      final transport = OwnerTransport((_) async => reply);
+      await expectLater(bulkClient(c, transport).execute(request, current: () => true, onDispatch: () {}),
+        throwsA(isA<WorkspaceBulkQuoteConnectionException>().having((e) => e.recoveryRequired, 'retain original', true)));
+      expect(transport.calls, 1); expect(request.operationId, 'request-one');
+    }
+  });
+  test('LF-BULK scoped inbox cursor and Store summaries cannot cross owner or Store', () async {
+    final c = bulkCapture(), now = DateTime.parse(c['capturedAt'] as String);
+    final page = WorkspaceBulkQuotePage.decode(c['storePage'], realm: 'evaluation', account: 'supplier-one', storeId: 'store-one', limit: 5, now: now);
+    expect(page.summaries, hasLength(1));
+    expect(() => WorkspaceBulkQuotePage.decode(c['storePage'], realm: 'evaluation', account: 'supplier-one', storeId: 'other-store', limit: 5, now: now), throwsFormatException);
+    expect(() => WorkspaceBulkQuotePage.decode(c['buyerPage'], realm: 'evaluation', account: 'other-buyer', storeId: null, limit: 5, now: now), throwsFormatException);
+    final after = (c['buyerPage']['summaries'] as List).single['quoteId'];
+    final cursor = base64Url.encode(utf8.encode(jsonEncode({'version': 1,
+      'scope': _mediaHash(['evaluation', 'firebase-default', 'bulk-quotation-inbox', 'buyer-one', 'buyer', null, 5]).toLowerCase(),
+      'after': after}))).replaceAll('=', '');
+    WorkspaceBulkQuotePage.verifyCursor(cursor, realm: 'evaluation', account: 'buyer-one', storeId: null, limit: 5);
+    expect(() => WorkspaceBulkQuotePage.decode(c['buyerPage'], realm: 'evaluation', account: 'buyer-one', storeId: null,
+      limit: 5, now: now, requestedCursor: cursor), throwsFormatException);
+    final transport = OwnerTransport((_) async => throw StateError('must not dispatch'));
+    final gateway = bulkClient(c, transport);
+    await expectLater(gateway.list(account: 'buyer-one', cursor: 'wrong-scope', current: () => true), throwsA(isA<FormatException>()));
+    await expectLater(bulkClient(c, transport, enabled: false).list(account: 'buyer-one', current: () => true), throwsA(isA<WorkspaceBulkQuoteConnectionException>()));
+    await expectLater(gateway.list(account: 'other-buyer', current: () => true), throwsA(isA<WorkspaceBulkQuoteConnectionException>()));
+    expect(transport.calls, 0);
+  });
+  const bulkBuyerScope = (account: 'buyer-one', realm: 'evaluation', store: 'store-one', role: 'buyer');
+  test('LF-BULK encrypted originals survive new instances rollback and reject replacement or cross-owner access', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final c = bulkCapture(), original = bulkIntent(c, 'accept'); var account = 'buyer-one';
+    SecureWorkBulkQuoteJournal fresh() => SecureWorkBulkQuoteJournal(currentAccount: () => account,
+      now: () => DateTime.parse(c['capturedAt'] as String).subtract(const Duration(days: 1)));
+    await fresh().save(bulkBuyerScope, original);
+    expect((await fresh().read(bulkBuyerScope)).single.toJson(), original.toJson());
+    final changed = original.toJson(); (changed['body'] as Map)['operationId'] = 'other-original';
+    final other = WorkspaceBulkQuoteIntent.decode(changed, account: account, realm: 'evaluation', now: DateTime.parse(c['capturedAt'] as String));
+    await expectLater(fresh().save(bulkBuyerScope, other), throwsFormatException);
+    await fresh().remove(bulkBuyerScope, other); // Does not remove a different operation.
+    expect(await fresh().read(bulkBuyerScope), hasLength(1));
+    expect(await fresh().read((account: account, realm: 'evaluation', store: 'other-store', role: 'buyer')), isEmpty);
+    account = 'another'; await expectLater(fresh().read(bulkBuyerScope), throwsA(isA<WorkGatewayException>()));
+    account = 'buyer-one'; await fresh().remove(bulkBuyerScope, original); expect(await fresh().read(bulkBuyerScope), isEmpty);
+  });
+  test('LF-BULK physical secure writes stay serialized after caller timeout', () async {
+    final c = bulkCapture(), original = bulkIntent(c, 'request'), storage = _DelayedDetailsStorage();
+    SecureWorkBulkQuoteJournal fresh() => SecureWorkBulkQuoteJournal(storage: storage, currentAccount: () => 'buyer-one',
+      now: () => DateTime.parse(c['capturedAt'] as String));
+    final save = fresh().save(bulkBuyerScope, original); await storage.entered.future;
+    await expectLater(save.timeout(const Duration(milliseconds: 1)), throwsA(isA<TimeoutException>()));
+    final remove = fresh().remove(bulkBuyerScope, original);
+    await Future<void>.delayed(Duration.zero); expect(storage.writes, 1);
+    storage.release.complete(); await save; await remove;
+    expect(storage.writes, 2); expect(await fresh().read(bulkBuyerScope), isEmpty);
+  });
+  test('LF-BULK controller saves and reads original before dispatch and keeps acknowledgement separate from head', () async {
+    final c = bulkCapture(), request = bulkIntent(c, 'request'), storage = _DelayedDetailsStorage(), lifetime = Object();
+    final journal = SecureWorkBulkQuoteJournal(storage: storage, currentAccount: () => 'buyer-one',
+      now: () => DateTime.parse(c['capturedAt'] as String));
+    final transport = OwnerTransport((body) async {
+      expect((await journal.read(bulkBuyerScope)).single.fingerprint, request.fingerprint);
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': c['created']}));
+    });
+    final controller = WorkspaceBulkQuoteController(scope: bulkBuyerScope, gateway: bulkClient(c, transport),
+      journal: journal, context: () => lifetime); addTearDown(controller.dispose);
+    final result = controller.submit(request, inputCurrent: () => true);
+    await storage.entered.future; expect(transport.calls, 0); expect(controller.pending, hasLength(1));
+    storage.release.complete(); expect(await result, isTrue);
+    expect(controller.pending, isEmpty); expect(controller.acknowledgement(request)!.state, 'requested');
+    expect(await journal.read(bulkBuyerScope), isEmpty); expect(transport.calls, 1);
+  });
+  test('LF-BULK controller process recovery retains unknown original and resolves only exact server receipt', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final c = bulkCapture(), request = bulkIntent(c, 'request'), lifetime = Object();
+    SecureWorkBulkQuoteJournal fresh() => SecureWorkBulkQuoteJournal(currentAccount: () => 'buyer-one',
+      now: () => DateTime.parse(c['capturedAt'] as String));
+    final uncertain = OwnerTransport((_) async => SocialContentResponse(statusCode: 503, body: '{}'));
+    final first = WorkspaceBulkQuoteController(scope: bulkBuyerScope, gateway: bulkClient(c, uncertain), journal: fresh(), context: () => lifetime);
+    expect(await first.submit(request, inputCurrent: () => true), isFalse); first.dispose();
+    expect((await fresh().read(bulkBuyerScope)).single.fingerprint, request.fingerprint);
+    final recovered = OwnerTransport((body) async {
+      expect(body['operation'], 'reconcileBulkSupplierQuote'); expect(body['original'], request.body);
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': c['recovered']}));
+    });
+    final second = WorkspaceBulkQuoteController(scope: bulkBuyerScope, gateway: bulkClient(c, recovered), journal: fresh(), context: () => lifetime);
+    addTearDown(second.dispose); expect(await second.recover(), isTrue);
+    expect(second.head(request.quoteId)!.revision, 3); expect(second.acknowledgement(request)!.revision, 1);
+    expect(second.pending, isEmpty); expect(await fresh().read(bulkBuyerScope), isEmpty); expect(recovered.calls, 1);
+  });
+  test('LF-BULK retirement during physical save never dispatches or removes original', () async {
+    final c = bulkCapture(), request = bulkIntent(c, 'request'), storage = _DelayedDetailsStorage();
+    Object? lifetime = Object();
+    final journal = SecureWorkBulkQuoteJournal(storage: storage, currentAccount: () => 'buyer-one',
+      now: () => DateTime.parse(c['capturedAt'] as String));
+    final transport = OwnerTransport((_) async => throw StateError('retired'));
+    final controller = WorkspaceBulkQuoteController(scope: bulkBuyerScope, gateway: bulkClient(c, transport), journal: journal, context: () => lifetime);
+    addTearDown(controller.dispose); final result = controller.submit(request, inputCurrent: () => true);
+    await storage.entered.future; lifetime = Object(); storage.release.complete();
+    expect(await result, isFalse); expect(transport.calls, 0);
+    expect((await journal.read(bulkBuyerScope)).single.fingerprint, request.fingerprint);
+    expect(await controller.recover(), isFalse);
+  });
+  test('LF-BULK explicit same-original retry restores never-dispatched request without a replacement key', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final c = bulkCapture(), request = bulkIntent(c, 'request'), lifetime = Object();
+    final journal = SecureWorkBulkQuoteJournal(currentAccount: () => 'buyer-one', now: () => DateTime.parse(c['capturedAt'] as String));
+    await journal.save(bulkBuyerScope, request);
+    final transport = OwnerTransport((body) async {
+      expect(body, {'operation': request.operation, ...request.body});
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': c['created']}));
+    });
+    final controller = WorkspaceBulkQuoteController(scope: bulkBuyerScope, gateway: bulkClient(c, transport), journal: journal, context: () => lifetime);
+    addTearDown(controller.dispose); expect(await controller.restore(), isTrue); expect(transport.calls, 0);
+    expect(await controller.submit(request, inputCurrent: () => true), isFalse); expect(transport.calls, 0);
+    expect(await controller.retryOriginal(request, inputCurrent: () => true), isTrue);
+    expect(transport.calls, 1); expect(await journal.read(bulkBuyerScope), isEmpty);
+  });
+  test('LF-BULK expired acceptance retains withdrawal and late proven cleanup never resurrects an original', () async {
+    // Controlled protocol/lifecycle fixture derived from the real capture.
+    // Not evidence that an actual customer withdrew or a server order changed.
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final c = bulkCapture(), unknown = bulkIntent(c, 'accept', operationId: 'never-accept'), lifetime = Object();
+    final now = DateTime.parse(c['capturedAt'] as String).add(const Duration(days: 1));
+    final withdrawal = WorkspaceBulkQuoteIntent.decode({'schemaVersion': 1, 'account': 'buyer-one', 'realm': 'evaluation',
+      'kind': 'withdraw', 'body': {'schemaVersion': 1, 'quoteId': unknown.quoteId, 'operationId': 'withdraw-one', 'expectedRevision': 2},
+      'base': unknown.base!.toJson(), 'expected': [for (final l in unknown.base!.lines) l.identity]}, account: 'buyer-one', realm: 'evaluation', now: now);
+    final source = SecureWorkBulkQuoteJournal(currentAccount: () => 'buyer-one', now: () => now), journal = _BulkLateCleanup(source);
+    await source.save(bulkBuyerScope, unknown);
+    var withdrawn = false;
+    final finalHead = unknown.base!.toJson()..['state'] = 'withdrawn'..['revision'] = 3..['updatedAt'] = c['accepted']['updatedAt'];
+    final transport = OwnerTransport((body) async {
+      if (!withdrawn) return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': c['unobserved']}));
+      final original = body['originalOperation'] == 'accept' ? unknown : withdrawal;
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+        'schemaVersion': 1, 'realm': 'evaluation', 'authNamespace': 'firebase-default', 'originalOperation': original.kind,
+        'quoteId': original.quoteId, 'operationId': original.operationId, 'requestFingerprint': original.fingerprint,
+        'currentHead': finalHead, 'state': original.kind == 'accept' ? 'superseded' : 'recorded',
+        'agreement': original.kind == 'accept' ? null : finalHead,
+        'proof': original.kind == 'accept' ? {'expectedRevision': 2, 'currentRevision': 3, 'currentState': 'withdrawn'} : null}}));
+    });
+    final api = WorkspaceBulkQuoteGateway(AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'), credentials: Credentials(),
+      transport: transport, realm: 'evaluation', ownerAccountId: 'buyer-one', now: () => now), enabled: true);
+    final controller = WorkspaceBulkQuoteController(scope: bulkBuyerScope, gateway: api, journal: journal, context: () => lifetime);
+    addTearDown(controller.dispose); expect(await controller.recover(), isFalse);
+    expect(controller.pending, hasLength(1));
+    // Simulate a lost withdrawal reply: both exact originals remain durable.
+    expect(await controller.submit(withdrawal, inputCurrent: () => true), isFalse); withdrawn = true;
+    expect(await source.read(bulkBuyerScope), hasLength(2));
+    expect(await controller.recover(), isFalse); // Physical removal finished, caller observed a timeout.
+    expect((await source.read(bulkBuyerScope)).single.operationId, withdrawal.operationId);
+    expect(await controller.recover(), isTrue);
+    expect(controller.pending, isEmpty); expect(controller.head(unknown.quoteId)!.state, 'withdrawn');
+    expect(await source.read(bulkBuyerScope), isEmpty);
+  });
+  test('LF-BULK retained withdrawal can be deliberately retried while expired original remains unknown', () async {
+    // Controlled host recovery states; no runtime or live order mutation.
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final c = bulkCapture(), original = bulkIntent(c, 'accept', operationId: 'never-accept'), lifetime = Object();
+    final now = DateTime.parse(c['capturedAt'] as String).add(const Duration(days: 1));
+    final withdrawal = WorkspaceBulkQuoteIntent.decode({'schemaVersion': 1, 'account': 'buyer-one', 'realm': 'evaluation',
+      'kind': 'withdraw', 'body': {'schemaVersion': 1, 'quoteId': original.quoteId, 'operationId': 'withdraw-one', 'expectedRevision': 2},
+      'base': original.base!.toJson(), 'expected': [for (final l in original.base!.lines) l.identity]}, account: 'buyer-one', realm: 'evaluation', now: now);
+    final journal = SecureWorkBulkQuoteJournal(currentAccount: () => 'buyer-one', now: () => now);
+    await journal.save(bulkBuyerScope, original); await journal.save(bulkBuyerScope, withdrawal);
+    var retried = false;
+    final finalHead = original.base!.toJson()..['state'] = 'withdrawn'..['revision'] = 3..['updatedAt'] = c['accepted']['updatedAt'];
+    final transport = OwnerTransport((body) async {
+      if (body['operation'] == withdrawal.operation) {
+        expect(body, {'operation': withdrawal.operation, ...withdrawal.body}); retried = true;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': finalHead}));
+      }
+      final command = body['originalOperation'] == 'accept' ? original : withdrawal;
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+        'schemaVersion': 1, 'realm': 'evaluation', 'authNamespace': 'firebase-default', 'originalOperation': command.kind,
+        'quoteId': command.quoteId, 'operationId': command.operationId, 'requestFingerprint': command.fingerprint,
+        'currentHead': retried ? finalHead : original.base!.toJson(), 'state': retried ? 'superseded' : 'not_found',
+        'agreement': null, 'proof': retried ? {'expectedRevision': 2, 'currentRevision': 3, 'currentState': 'withdrawn'} : null}}));
+    });
+    final api = WorkspaceBulkQuoteGateway(AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'), credentials: Credentials(),
+      transport: transport, realm: 'evaluation', ownerAccountId: 'buyer-one', now: () => now), enabled: true);
+    final controller = WorkspaceBulkQuoteController(scope: bulkBuyerScope, gateway: api, journal: journal, context: () => lifetime);
+    addTearDown(controller.dispose); expect(await controller.recover(), isFalse); expect(controller.pending, hasLength(2));
+    expect(await controller.retryOriginal(original, inputCurrent: () => true), isFalse);
+    expect(await controller.retryOriginal(withdrawal, inputCurrent: () => true), isTrue);
+    expect(controller.pending.single.operationId, original.operationId);
+    expect(await controller.recover(), isTrue); expect(controller.pending, isEmpty); expect(await journal.read(bulkBuyerScope), isEmpty);
+  });
   setUpAll(() async {
     if (Platform.environment['LF04_COUPON_CART_CAPTURE_ROOT'] == null) return;
     final font = FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'));

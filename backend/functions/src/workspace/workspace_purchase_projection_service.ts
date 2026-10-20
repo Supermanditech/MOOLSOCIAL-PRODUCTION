@@ -280,8 +280,16 @@ function operationalScope(raw: Readonly<Record<string, unknown>>): OperationalSc
 }
 
 interface BulkRequestLine {lineId: string; skuId: string; listingId: string; skuRevision: number; quantity: number}
+// Match reviewed catalogue text; do not narrow legitimate stored SKU variants
+// merely because the purchase-identity text validator has different rules.
+function bulkVariant(value: unknown): string {
+  if (typeof value !== 'string' || value !== value.trim() || !value.length || value.length > 240 ||
+    /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(value)) fail();
+  return value as string;
+}
 interface BulkQuotedLine extends BulkRequestLine {
   canonicalProductId: string; verifiedPackId: string; name: string; packLabel: string;
+  variant?: string;
   supplierPolicy: Record<string, unknown> | null;
 }
 interface BulkPrice {lineId: string; unitPriceMinor: number; merchandiseMinor: number}
@@ -360,12 +368,14 @@ export class WorkspaceBulkQuoteService {
     if (String(body.updatedAt) < String(body.requestedAt) || String(body.updatedAt) > this.now().toISOString()) fail('invalid_state', 409);
     const lines = array(body.lines, 100).map(value => {
       const line = exact(value, ['lineId', 'skuId', 'listingId', 'skuRevision', 'quantity',
-        'canonicalProductId', 'verifiedPackId', 'name', 'packLabel', 'supplierPolicy']);
+        'canonicalProductId', 'verifiedPackId', 'name', 'packLabel', 'supplierPolicy',
+        ...(Object.hasOwn(obj(value), 'variant') ? ['variant'] : [])]);
       const request = this.requestLines([Object.fromEntries(['lineId', 'skuId', 'listingId', 'skuRevision', 'quantity'].map(k => [k, line[k]]))])[0]!;
       id(line.canonicalProductId); id(line.verifiedPackId); text(line.name); text(line.packLabel);
       this.policy(line.supplierPolicy, String(body.storeId), request.skuId);
       return {...request, canonicalProductId: String(line.canonicalProductId), verifiedPackId: String(line.verifiedPackId),
-        name: String(line.name), packLabel: String(line.packLabel), supplierPolicy: line.supplierPolicy as Record<string, unknown> | null};
+        name: String(line.name), packLabel: String(line.packLabel), supplierPolicy: line.supplierPolicy as Record<string, unknown> | null,
+        ...(Object.hasOwn(line, 'variant') ? {variant: bulkVariant(line.variant)} : {})};
     });
     unique(lines.map(l => l.lineId)); unique(lines.map(l => l.listingId));
     if (body.offer !== null) {
@@ -453,6 +463,7 @@ export class WorkspaceBulkQuoteService {
         (line.quantity - integer(term.minimumOrder, 1000000, 1)) % integer(term.quantityStep, 1000000, 1) !== 0) fail('conflict', 409);
       deadlines.push(timestamp(term.validUntil));
       const content = obj(matched.content), pack = obj(matched.pack);
+      const variant = content.variant === undefined || content.variant === '' ? undefined : bulkVariant(content.variant);
       const p = obj(matched.supplierPolicy), {observedAt, ...stablePolicy} = p;
       if (timestamp(observedAt) > this.now().toISOString()) fail('service_unavailable', 503);
       const supplierPolicy = this.policy(stablePolicy, storeId, line.skuId);
@@ -461,7 +472,7 @@ export class WorkspaceBulkQuoteService {
         if (policy.validUntil !== null) deadlines.push(timestamp(policy.validUntil));
       }
       facts.push({...line, canonicalProductId: id(matched.canonicalProductId), verifiedPackId: id(matched.verifiedPackId),
-        name: text(content.title), packLabel: text(pack.label), supplierPolicy});
+        name: text(content.title), packLabel: text(pack.label), supplierPolicy, ...(variant === undefined ? {} : {variant})});
     }
     return {lines: facts, validUntil: deadlines.sort()[0]!};
   }

@@ -42,6 +42,7 @@ test('LF-BULK actual reviewed catalogue and transactional supplier policy reach 
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
   const app = initializeApp({projectId: `demo-lf-bulk-source-${randomUUID().slice(0, 8)}`}, `bulk-source-${randomUUID()}`), db = getFirestore(app);
   const value = input(); value.channels = [{...value.channels[0]!, kind: 'bulk', minimumOrder: 5, quantityStep: 2}];
+  value.content.variant = 'Aged\ngrain';
   value.content.media = staticMedia(value);
   const root = db.collection('workspaceCatalogues').doc('evaluation');
   const repo = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at));
@@ -65,6 +66,7 @@ test('LF-BULK actual reviewed catalogue and transactional supplier policy reach 
       lines: [{lineId: 'line-one', skuId: value.skuId, listingId: listing.listingId, skuRevision: bound.revision, quantity: 5}]};
     await assert.rejects(quotes().request('buyer-one', {...request, lines: [{...request.lines[0], quantity: 6}]}));
     const first = await quotes().request('buyer-one', request) as any;
+    assert.equal(first.lines[0].variant, value.content.variant);
     assert.equal(first.lines[0].supplierPolicy.state, 'none');
     const policies = new WorkspaceSupplierPolicyService(new FirestoreSupplierPolicyRepository(db, 'evaluation', () => new Date(at)), () => new Date(at));
     const policy = {title: 'Bulk supplier payment discussion', body: 'Bank or delivery terms require supplier confirmation.',

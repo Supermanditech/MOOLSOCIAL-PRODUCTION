@@ -16,6 +16,573 @@ import 'work_models.dart' show WorkspaceVariantFamily, WorkspaceVariantMembershi
   WorkspaceAnalyticsMetric, WorkspaceAnalyticsBasis, WorkspaceAnalyticsUnit, WorkspaceAnalyticsBreakdown,
   WorkspaceAnalyticsDimension, WorkspaceAnalyticsRank;
 
+String _bulkHash(Object? value) => crypto.sha256.convert(utf8.encode(jsonEncode(_sorted(value)))).toString();
+DateTime _bulkTime(Object? value) {
+  final text = _string(value, 24), parsed = DateTime.parse(text).toUtc();
+  if (text.length != 24 || parsed.toIso8601String() != text) throw const FormatException();
+  return parsed;
+}
+void _bulk(bool valid) { if (!valid) throw const FormatException('Supplier quotation could not be verified.'); }
+String _bulkId(Object? value) {
+  final result = _string(value, 69);
+  _bulk(RegExp(r'^bulk-[a-f0-9]{64}$').hasMatch(result)); return result;
+}
+
+/// Private pre-order merchandise agreement. None of its states grant payment,
+/// credit, Stock reservation, delivery or final Checkout pricing authority.
+@immutable
+class WorkspaceBulkQuote {
+  const WorkspaceBulkQuote._(this._encoded, this.quoteId, this.storeId, this.revision, this.state,
+    this.requestedAt, this.updatedAt, this.lines, this.merchandiseMinor, this.validUntil);
+  final String _encoded, quoteId, storeId, state;
+  final int revision;
+  final DateTime requestedAt, updatedAt;
+  final List<WorkspaceBulkQuoteLine> lines;
+  final int? merchandiseMinor;
+  final DateTime? validUntil;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  String get customerReference => toJson()['customerReference'] as String;
+  bool get accepted => state == 'accepted';
+  bool offerCurrent(DateTime now) => state == 'offered' && validUntil != null && now.toUtc().isBefore(validUntil!);
+  factory WorkspaceBulkQuote.decode(Object? raw, {required String realm, required DateTime now,
+    String? quoteId, String? storeId}) {
+    final r = _map(raw);
+    _keys(r, ['schemaVersion', 'realm', 'quoteId', 'storeId', 'revision', 'state', 'requestedAt', 'updatedAt',
+      'lines', 'offer', 'acceptance', 'viewerRole', 'customerReference', 'kind', 'currency',
+      'orderingAvailable', 'finalChargesDetermined', 'creditApproved']);
+    _bulk(utf8.encode(jsonEncode(r)).length <= 420000 && r['schemaVersion'] == 1 &&
+      {'evaluation', 'production'}.contains(realm) && r['realm'] == realm &&
+      r['kind'] == 'supplier_merchandise_agreement' && r['currency'] == 'INR' &&
+      r['orderingAvailable'] == false && r['finalChargesDetermined'] == false && r['creditApproved'] == false &&
+      {'buyer', 'supplier'}.contains(r['viewerRole']));
+    final id = _bulkId(r['quoteId']), store = _id(r['storeId']), revision = _int(r['revision'], 1, 999999999);
+    final state = _string(r['state'], 12), requested = _bulkTime(r['requestedAt']), updated = _bulkTime(r['updatedAt']);
+    _bulk((quoteId == null || quoteId == id) && (storeId == null || storeId == store) &&
+      {'requested', 'offered', 'accepted', 'withdrawn'}.contains(state) &&
+      !updated.isBefore(requested) && !updated.isAfter(now.toUtc()) &&
+      RegExp(r'^customer-[a-f0-9]{32}$').hasMatch(_string(r['customerReference'], 41)));
+    final rawLines = _list(r['lines'], 100), lines = <WorkspaceBulkQuoteLine>[];
+    _bulk(rawLines.isNotEmpty);
+    final ids = <String>{}, listings = <String>{};
+    for (final value in rawLines) {
+      final l = _map(value);
+      _keys(l, ['lineId', 'skuId', 'listingId', 'skuRevision', 'quantity', 'canonicalProductId', 'verifiedPackId', 'name', 'packLabel', 'supplierPolicy',
+        if (l.containsKey('variant')) 'variant']);
+      final lineId = _id(l['lineId']), skuId = _id(l['skuId']), listing = _string(l['listingId'], 72);
+      _bulk(ids.add(lineId) && listings.add(listing) && RegExp(r'^listing-[a-f0-9]{64}$').hasMatch(listing) &&
+        (lines.isEmpty || lines.last.lineId.compareTo(lineId) < 0));
+      final policy = _map(l['supplierPolicy']);
+      _keys(policy, ['schemaVersion', 'realm', 'storeId', 'skuId', 'state', 'revision', 'requiresAcceptance', 'policy']);
+      _bulk(policy['schemaVersion'] == 1 && policy['realm'] == realm && policy['storeId'] == store && policy['skuId'] == skuId &&
+        {'none', 'ready'}.contains(policy['state']) && policy['requiresAcceptance'] is bool);
+      final policyRevision = _int(policy['revision'], 0, 999999999);
+      if (policy['state'] == 'none') {
+        _bulk(policy['policy'] == null && policy['requiresAcceptance'] == false);
+      } else {
+        final p = _map(policy['policy']);
+        _keys(p, ['id', 'storeId', 'revision', 'title', 'body', 'productIds', 'requiresAcceptance', 'validUntil']);
+        _id(p['id']); _string(p['title']); _bulk(policyRevision >= 1);
+        final body = p['body'];
+        _bulk(p['storeId'] == store && p['revision'] == 'policy-v$policyRevision' &&
+          p['requiresAcceptance'] == policy['requiresAcceptance'] && jsonEncode(p['productIds']) == jsonEncode([skuId]) &&
+          body is String && body.trim().isNotEmpty && body.length <= 12000);
+        if (p['validUntil'] != null) _bulkTime(p['validUntil']);
+      }
+      lines.add(WorkspaceBulkQuoteLine._(lineId, skuId, listing, _int(l['skuRevision'], 1, 999999999),
+        _int(l['quantity'], 1, 1000000), _id(l['canonicalProductId']), _id(l['verifiedPackId']),
+        _string(l['name']), _string(l['packLabel']), jsonEncode(policy), l.containsKey('variant') ? _string(l['variant']) : null));
+    }
+    int? merchandise;
+    DateTime? expiry, offeredAt;
+    int? offerRevision;
+    if (r['offer'] != null) {
+      final offer = _map(r['offer']);
+      _keys(offer, ['revision', 'offeredAt', 'validUntil', 'prices', 'merchandiseMinor', 'policyFingerprint']);
+      offerRevision = _int(offer['revision'], 2, revision);
+      offeredAt = _bulkTime(offer['offeredAt']); expiry = _bulkTime(offer['validUntil']);
+      _bulk(!offeredAt.isBefore(requested) && !offeredAt.isAfter(updated) && expiry.isAfter(offeredAt));
+      final prices = _list(offer['prices'], 100), seen = <String>{};
+      _bulk(prices.length == lines.length);
+      var sum = 0;
+      for (var i = 0; i < prices.length; i++) {
+        final p = _map(prices[i]); _keys(p, ['lineId', 'unitPriceMinor', 'merchandiseMinor']);
+        final lineId = _id(p['lineId']), line = lines[i], unit = _int(p['unitPriceMinor'], 1, 1000000000000);
+        final amount = _int(p['merchandiseMinor'], 1, 1000000000000);
+        _bulk(seen.add(lineId) && line.lineId == lineId && amount == unit * line.quantity);
+        sum += amount;
+      }
+      merchandise = _int(offer['merchandiseMinor'], 1, 1000000000000);
+      _bulk(sum == merchandise && offer['policyFingerprint'] == _bulkHash([
+        for (final line in lines) [line.lineId, line.supplierPolicy],
+      ]));
+    }
+    if (r['acceptance'] != null) {
+      final acceptance = _map(r['acceptance']); _keys(acceptance, ['offerRevision', 'acceptedAt', 'agreementFingerprint']);
+      final at = _bulkTime(acceptance['acceptedAt']);
+      _bulk(state == 'accepted' && offerRevision != null && acceptance['offerRevision'] == offerRevision &&
+        revision == offerRevision + 1 && at == updated && !at.isBefore(offeredAt!) && at.isBefore(expiry!) &&
+        acceptance['agreementFingerprint'] == _bulkHash({'lines': r['lines'], 'offer': r['offer']}));
+    } else { _bulk(state != 'accepted'); }
+    _bulk(state != 'requested' || revision == 1 && r['offer'] == null && updated == requested);
+    _bulk(state != 'offered' || offerRevision == revision && offeredAt == updated);
+    _bulk(state != 'withdrawn' || revision >= 2 && r['acceptance'] == null && (offerRevision == null || offerRevision < revision));
+    return WorkspaceBulkQuote._(jsonEncode(r), id, store, revision, state, requested, updated,
+      List.unmodifiable(lines), merchandise, expiry);
+  }
+}
+
+@immutable
+class WorkspaceBulkQuoteLine {
+  const WorkspaceBulkQuoteLine._(this.lineId, this.skuId, this.listingId, this.skuRevision, this.quantity,
+    this.canonicalProductId, this.verifiedPackId, this.name, this.packLabel, this._policy, this.variant);
+  final String lineId, skuId, listingId, canonicalProductId, verifiedPackId, name, packLabel, _policy;
+  final int skuRevision, quantity;
+  final String? variant;
+  Map<String, dynamic> get supplierPolicy => _map(jsonDecode(_policy));
+  Map<String, dynamic> get identity => {'lineId': lineId, 'skuId': skuId, 'listingId': listingId,
+    'skuRevision': skuRevision, 'quantity': quantity, 'canonicalProductId': canonicalProductId, 'verifiedPackId': verifiedPackId};
+}
+
+/// Frozen private original, suitable for an account-owned journal before I/O.
+/// Serializing this object is not proof that storage succeeded or a request sent.
+@immutable
+class WorkspaceBulkQuoteIntent {
+  const WorkspaceBulkQuoteIntent._(this.account, this.realm, this.kind, this._body, this.base, this._expected);
+  final String account, realm, kind, _body, _expected;
+  final WorkspaceBulkQuote? base;
+  Map<String, dynamic> get body => _map(jsonDecode(_body));
+  String get operationId => body[kind == 'request' ? 'requestId' : 'operationId'] as String;
+  String get quoteId => kind == 'request' ? 'bulk-${_bulkHash([realm, account, operationId])}' : base!.quoteId;
+  String get storeId => kind == 'request' ? body['storeId'] as String : base!.storeId;
+  String get fingerprint => _bulkHash(kind == 'request' ? body : {'action': kind, ...body});
+  String get operation => {'request': 'requestBulkSupplierQuote', 'offer': 'offerBulkSupplierQuote',
+    'accept': 'acceptBulkSupplierQuote', 'withdraw': 'withdrawBulkSupplierQuote'}[kind]!;
+  Map<String, dynamic> toJson() => {'schemaVersion': 1, 'account': account, 'realm': realm, 'kind': kind,
+    'body': body, 'base': base?.toJson(), 'expected': jsonDecode(_expected)};
+  factory WorkspaceBulkQuoteIntent.decode(Object? value, {required String account, required String realm, required DateTime now}) {
+    final r = _map(value); _keys(r, ['schemaVersion', 'account', 'realm', 'kind', 'body', 'base', 'expected']);
+    _bulk(r['schemaVersion'] == 1 && r['account'] == _id(account) && r['realm'] == realm &&
+      {'evaluation', 'production'}.contains(realm) && {'request', 'offer', 'accept', 'withdraw'}.contains(r['kind']));
+    final kind = r['kind'] as String, body = _map(r['body']);
+    _keys(body, kind == 'request' ? ['schemaVersion', 'requestId', 'storeId', 'lines'] :
+      ['schemaVersion', 'quoteId', 'operationId', 'expectedRevision', if (kind == 'offer') ...['validUntil', 'prices']]);
+    _bulk(body['schemaVersion'] == 1);
+    final expected = _list(r['expected'], 100), ids = <String>{}, listingIds = <String>{};
+    _bulk(expected.isNotEmpty);
+    for (final v in expected) {
+      final e = _map(v); _keys(e, ['lineId', 'skuId', 'listingId', 'skuRevision', 'quantity', 'canonicalProductId', 'verifiedPackId']);
+      _bulk(ids.add(_id(e['lineId'])) && listingIds.add(_string(e['listingId'], 72)) &&
+        RegExp(r'^listing-[a-f0-9]{64}$').hasMatch(e['listingId'] as String));
+      _id(e['skuId']); _id(e['canonicalProductId']); _id(e['verifiedPackId']);
+      _int(e['skuRevision'], 1, 999999999); _int(e['quantity'], 1, 1000000);
+    }
+    WorkspaceBulkQuote? base;
+    if (kind == 'request') {
+      _id(body['requestId']); _id(body['storeId']); _bulk(r['base'] == null);
+      final lines = _list(body['lines'], 100); _bulk(lines.length == expected.length);
+      for (var i = 0; i < lines.length; i++) {
+        final line = _map(lines[i]); _keys(line, ['lineId', 'skuId', 'listingId', 'skuRevision', 'quantity']);
+        _bulk(line.entries.every((e) => expected[i][e.key] == e.value));
+      }
+    } else {
+      _id(body['operationId']); _bulkId(body['quoteId']);
+      // A frozen journal original is historical evidence, not a fresh provider
+      // reply. A rolled-back device clock must not destroy recovery access.
+      final historicalAt = _bulkTime(_map(r['base'])['updatedAt']);
+      base = WorkspaceBulkQuote.decode(r['base'], realm: realm,
+        now: historicalAt.isAfter(now.toUtc()) ? historicalAt : now, quoteId: body['quoteId'] as String);
+      _bulk(kind == 'accept' ? base.state == 'offered' : {'requested', 'offered'}.contains(base.state));
+      _bulk(_int(body['expectedRevision'], 1, 999999998) == base.revision &&
+        _bulkHash(expected) == _bulkHash([for (final line in base.lines) line.identity]));
+      if (kind == 'offer') {
+        _bulkTime(body['validUntil']);
+        final prices = _list(body['prices'], 100), seen = <String>{}; _bulk(prices.length == expected.length);
+        var sum = 0;
+        for (final value in prices) {
+          final p = _map(value); _keys(p, ['lineId', 'unitPriceMinor']);
+          final line = base.lines.where((l) => l.lineId == p['lineId']).firstOrNull;
+          _bulk(line != null && seen.add(_id(p['lineId'])));
+          final amount = _int(p['unitPriceMinor'], 1, 1000000000000) * line!.quantity;
+          _bulk(amount <= 1000000000000); sum += amount;
+        }
+        _bulk(sum <= 1000000000000);
+      }
+    }
+    return WorkspaceBulkQuoteIntent._(account, realm, kind, jsonEncode(body), base, jsonEncode(expected));
+  }
+  void verifyHead(WorkspaceBulkQuote quote) {
+    final expected = (_list(jsonDecode(_expected), 100).cast<Map<String, dynamic>>().toList()
+      ..sort((a, b) => (a['lineId'] as String).compareTo(b['lineId'] as String)));
+    _bulk(quote.quoteId == quoteId && quote.storeId == storeId && quote.revision >= (base?.revision ?? 1) &&
+      _bulkHash(expected) == _bulkHash([for (final line in quote.lines) line.identity]));
+    if (kind == 'request') {
+      _bulk(quote.toJson()['viewerRole'] == 'buyer' &&
+        quote.customerReference == 'customer-${_bulkHash([realm, storeId, account]).substring(0, 32)}');
+    }
+    if (base != null) _bulk(quote.customerReference == base!.customerReference && quote.toJson()['viewerRole'] == base!.toJson()['viewerRole']);
+  }
+  void verifyAcknowledgement(WorkspaceBulkQuote quote) {
+    verifyHead(quote);
+    _bulk(quote.revision == (base?.revision ?? 0) + 1 &&
+      quote.state == {'request': 'requested', 'offer': 'offered', 'accept': 'accepted', 'withdraw': 'withdrawn'}[kind]);
+    if (kind == 'offer') {
+      final offer = _map(quote.toJson()['offer']);
+      final prices = _list(body['prices'], 100).cast<Map<String, dynamic>>().toList()
+        ..sort((a, b) => (a['lineId'] as String).compareTo(b['lineId'] as String));
+      _bulk(offer['validUntil'] == body['validUntil'] && _bulkHash(prices) == _bulkHash([
+        for (final p in _list(offer['prices'], 100)) {'lineId': p['lineId'], 'unitPriceMinor': p['unitPriceMinor']},
+      ]));
+    }
+    if (kind == 'accept' || kind == 'withdraw') {
+      _bulk(_bulkHash(quote.toJson()['offer']) == _bulkHash(base!.toJson()['offer']) &&
+        _bulkHash(quote.toJson()['lines']) == _bulkHash(base!.toJson()['lines']));
+    }
+  }
+}
+
+@immutable
+class WorkspaceBulkQuoteRecovery {
+  const WorkspaceBulkQuoteRecovery(this.state, this.agreement, this.currentHead);
+  final String state;
+  final WorkspaceBulkQuote? agreement, currentHead;
+  factory WorkspaceBulkQuoteRecovery.decode(Object? raw, WorkspaceBulkQuoteIntent original, DateTime now) {
+    final r = _map(raw);
+    _keys(r, ['schemaVersion', 'realm', 'authNamespace', 'originalOperation', 'quoteId', 'operationId',
+      'requestFingerprint', 'currentHead', 'state', 'agreement', 'proof']);
+    _bulk(r['schemaVersion'] == 1 && r['realm'] == original.realm && r['authNamespace'] == 'firebase-default' &&
+      r['originalOperation'] == original.kind && r['quoteId'] == original.quoteId && r['operationId'] == original.operationId &&
+      r['requestFingerprint'] == original.fingerprint && {'recorded', 'not_found', 'superseded'}.contains(r['state']));
+    WorkspaceBulkQuote? head, acknowledgement;
+    if (r['currentHead'] != null) {
+      head = WorkspaceBulkQuote.decode(r['currentHead'], realm: original.realm, now: now,
+        quoteId: original.quoteId, storeId: original.storeId); original.verifyHead(head);
+    }
+    if (r['state'] == 'recorded') {
+      acknowledgement = WorkspaceBulkQuote.decode(r['agreement'], realm: original.realm, now: now,
+        quoteId: original.quoteId, storeId: original.storeId); original.verifyAcknowledgement(acknowledgement);
+      _bulk(head != null && head.revision >= acknowledgement.revision && r['proof'] == null);
+      if (head!.revision == acknowledgement.revision) _bulk(_bulkHash(head.toJson()) == _bulkHash(acknowledgement.toJson()));
+    } else {
+      _bulk(r['agreement'] == null);
+      if (r['state'] == 'not_found') { _bulk(r['proof'] == null); }
+      else {
+        final proof = _map(r['proof']); _keys(proof, ['expectedRevision', 'currentRevision', 'currentState']);
+        _bulk(original.kind != 'request' && head != null && proof['expectedRevision'] == original.body['expectedRevision'] &&
+          proof['currentRevision'] == head.revision && proof['currentState'] == head.state &&
+          (head.revision > (original.body['expectedRevision'] as int) || {'accepted', 'withdrawn'}.contains(head.state)));
+      }
+    }
+    return WorkspaceBulkQuoteRecovery(r['state'] as String, acknowledgement, head);
+  }
+}
+
+@immutable
+class WorkspaceBulkQuotePage {
+  const WorkspaceBulkQuotePage._(this._summaries, this.nextCursor);
+  final String _summaries;
+  final String? nextCursor;
+  List<Map<String, dynamic>> get summaries => _list(jsonDecode(_summaries), 5).cast<Map<String, dynamic>>();
+  static String? verifyCursor(String? cursor, {required String realm, required String account,
+      required String? storeId, required int limit}) {
+    if (cursor == null) return null;
+    _bulk(cursor.length <= 512);
+    final value = _map(jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(cursor)))));
+    _keys(value, ['version', 'scope', 'after']); _bulkId(value['after']);
+    _bulk(value['version'] == 1 && value['scope'] == _bulkHash([realm, 'firebase-default', 'bulk-quotation-inbox',
+      account, storeId == null ? 'buyer' : 'supplier', storeId, limit]) &&
+      base64Url.encode(utf8.encode(jsonEncode(value))).replaceAll('=', '') == cursor);
+    return value['after'] as String;
+  }
+  factory WorkspaceBulkQuotePage.decode(Object? raw, {required String realm, required String account,
+      required String? storeId, required int limit, required DateTime now, String? requestedCursor}) {
+    final r = _map(raw); _keys(r, ['schemaVersion', 'realm', 'authNamespace', 'viewerRole', 'storeId',
+      'currency', 'paging', 'coverage', 'summaries', 'nextCursor']);
+    _bulk(r['schemaVersion'] == 1 && r['realm'] == realm && r['authNamespace'] == 'firebase-default' &&
+      r['viewerRole'] == (storeId == null ? 'buyer' : 'supplier') && r['storeId'] == storeId && r['currency'] == 'INR' &&
+      r['paging'] == 'refreshable_not_snapshot' && r['coverage'] == 'saved_private_requests');
+    final rows = _list(r['summaries'], limit);
+    String? previous = verifyCursor(requestedCursor, realm: realm, account: account, storeId: storeId, limit: limit);
+    for (final value in rows) {
+      final row = _map(value); _keys(row, ['quoteId', 'storeId', 'revision', 'state', 'requestedAt', 'updatedAt',
+        'productCount', 'offerMerchandiseMinor', 'offerValidUntil', 'customerReference']);
+      final id = _bulkId(row['quoteId']), store = _id(row['storeId']), revision = _int(row['revision'], 1, 999999999);
+      final requested = _bulkTime(row['requestedAt']), updated = _bulkTime(row['updatedAt']);
+      _int(row['productCount'], 1, 100);
+      _bulk((previous == null || previous.compareTo(id) < 0) && (storeId == null || store == storeId) &&
+        {'requested', 'offered', 'accepted', 'withdrawn'}.contains(row['state']) &&
+        !updated.isBefore(requested) && !updated.isAfter(now.toUtc()) &&
+        RegExp(r'^customer-[a-f0-9]{32}$').hasMatch(_string(row['customerReference'], 41)));
+      if (storeId == null) _bulk(row['customerReference'] == 'customer-${_bulkHash([realm, store, account]).substring(0, 32)}');
+      if (row['offerMerchandiseMinor'] == null) {
+        _bulk(row['offerValidUntil'] == null && {'requested', 'withdrawn'}.contains(row['state']));
+      } else {
+        _int(row['offerMerchandiseMinor'], 1, 1000000000000); _bulkTime(row['offerValidUntil']);
+        _bulk(row['state'] != 'requested');
+      }
+      _bulk(row['state'] != 'requested' || revision == 1 && requested == updated);
+      previous = id;
+    }
+    final cursor = r['nextCursor'] as String?;
+    verifyCursor(cursor, realm: realm, account: account, storeId: storeId, limit: limit);
+    if (cursor != null) {
+      final c = _map(jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(cursor)))));
+      _bulk(rows.length == limit && c['after'] == previous);
+    }
+    return WorkspaceBulkQuotePage._(jsonEncode(rows), cursor);
+  }
+}
+
+class WorkspaceBulkQuoteConnectionException implements Exception {
+  const WorkspaceBulkQuoteConnectionException({required this.recoveryRequired});
+  // True means an original command may have reached the server. It must remain
+  // journalled; neither an HTTP error nor malformed reply authorizes a new try.
+  final bool recoveryRequired;
+}
+
+/// Thin adapter to the existing authenticated service. No local success,
+/// automatic retry, final charge calculation or activation of a live endpoint.
+class WorkspaceBulkQuoteGateway {
+  WorkspaceBulkQuoteGateway(this.gateway, {this.enabled = false});
+  final AuthenticatedWorkspaceCatalogueGateway gateway;
+  final bool enabled;
+  bool _active(String account, bool Function() current) => enabled &&
+    gateway.ownerAccountId == account && current();
+  Future<Object?> _exchange(Map<String, Object?> body, String account, bool Function() current,
+      {bool mutation = false, void Function()? onDispatch}) async {
+    var dispatched = false;
+    bool active() => _active(account, current);
+    try {
+      _id(account); _bulk(active());
+      final frozen = _map(jsonDecode(jsonEncode(body)));
+      final reply = await gateway._ownerRequest(frozen, active, mutation: mutation, onDispatch: () {
+        dispatched = mutation; onDispatch?.call(); _bulk(active());
+      });
+      _bulk(active() && reply?.statusCode == 200 && utf8.encode(reply!.body).length <= 1024 * 1024);
+      final envelope = _map(jsonDecode(reply!.body)); _keys(envelope, ['ok', 'data']);
+      _bulk(envelope['ok'] == true); return envelope['data'];
+    } catch (_) { throw WorkspaceBulkQuoteConnectionException(recoveryRequired: dispatched); }
+  }
+  Future<WorkspaceBulkQuote> execute(WorkspaceBulkQuoteIntent original, {required bool Function() current,
+      required void Function() onDispatch}) async {
+    final frozen = WorkspaceBulkQuoteIntent.decode(original.toJson(), account: original.account,
+      realm: gateway.realm, now: gateway.now());
+    final data = await _exchange({'operation': frozen.operation, ...frozen.body}, frozen.account,
+      current, mutation: true, onDispatch: onDispatch);
+    try {
+      _bulk(_active(frozen.account, current));
+      final result = WorkspaceBulkQuote.decode(data, realm: gateway.realm, now: gateway.now(),
+        quoteId: frozen.quoteId, storeId: frozen.storeId);
+      frozen.verifyAcknowledgement(result); return result;
+    } catch (_) { throw const WorkspaceBulkQuoteConnectionException(recoveryRequired: true); }
+  }
+  Future<WorkspaceBulkQuoteRecovery> reconcile(WorkspaceBulkQuoteIntent original, {required bool Function() current}) async {
+    final frozen = WorkspaceBulkQuoteIntent.decode(original.toJson(), account: original.account,
+      realm: gateway.realm, now: gateway.now());
+    final data = await _exchange({'operation': 'reconcileBulkSupplierQuote', 'schemaVersion': 1,
+      'originalOperation': frozen.kind, 'original': frozen.body}, frozen.account, current);
+    _bulk(_active(frozen.account, current));
+    return WorkspaceBulkQuoteRecovery.decode(data, frozen, gateway.now());
+  }
+  Future<WorkspaceBulkQuote> read({required String account, required String storeId, required String quoteId,
+      required bool Function() current}) async {
+    _id(storeId); _bulkId(quoteId);
+    final data = await _exchange({'operation': 'readBulkSupplierQuote', 'quoteId': quoteId}, account, current);
+    _bulk(_active(account, current));
+    final result = WorkspaceBulkQuote.decode(data, realm: gateway.realm, now: gateway.now(), quoteId: quoteId, storeId: storeId);
+    if (result.toJson()['viewerRole'] == 'buyer') _bulk(result.customerReference == 'customer-${_bulkHash([gateway.realm, storeId, account]).substring(0, 32)}');
+    return result;
+  }
+  Future<WorkspaceBulkQuotePage> list({required String account, String? storeId, String? cursor,
+      int limit = 5, required bool Function() current}) async {
+    _int(limit, 1, 5); if (storeId != null) _id(storeId);
+    WorkspaceBulkQuotePage.verifyCursor(cursor, realm: gateway.realm, account: account, storeId: storeId, limit: limit);
+    final data = await _exchange({'operation': storeId == null ? 'listBuyerBulkSupplierQuotes' : 'listStoreBulkSupplierQuotes',
+      'storeId': ?storeId, 'limit': limit, 'cursor': cursor}, account, current);
+    _bulk(_active(account, current));
+    return WorkspaceBulkQuotePage.decode(data, realm: gateway.realm, account: account, storeId: storeId,
+      limit: limit, now: gateway.now(), requestedCursor: cursor);
+  }
+}
+
+typedef WorkspaceBulkQuoteScope = ({String account, String realm, String store, String role});
+void validateWorkspaceBulkQuoteScope(WorkspaceBulkQuoteScope scope) {
+  _id(scope.account); _id(scope.store);
+  _bulk({'evaluation', 'production'}.contains(scope.realm) && {'buyer', 'supplier'}.contains(scope.role));
+}
+abstract interface class WorkspaceBulkQuoteJournal {
+  Future<List<WorkspaceBulkQuoteIntent>> read(WorkspaceBulkQuoteScope scope);
+  Future<void> save(WorkspaceBulkQuoteScope scope, WorkspaceBulkQuoteIntent original);
+  Future<void> remove(WorkspaceBulkQuoteScope scope, WorkspaceBulkQuoteIntent original);
+}
+
+/// Scoped presentation/recovery owner only. A caller supplies a stable lifetime
+/// token, replaced on account/Store transitions; labels are not lifetime tokens.
+class WorkspaceBulkQuoteController extends ChangeNotifier {
+  WorkspaceBulkQuoteController({required this.scope, required this.gateway, required this.journal,
+      required this.context}) : _lifetime = context() {
+    validateWorkspaceBulkQuoteScope(scope);
+    _bulk(gateway.gateway.realm == scope.realm && gateway.gateway.ownerAccountId == scope.account);
+  }
+  final WorkspaceBulkQuoteScope scope;
+  final WorkspaceBulkQuoteGateway gateway;
+  final WorkspaceBulkQuoteJournal journal;
+  final Object? Function() context;
+  final Object? _lifetime;
+  final _pending = <String, WorkspaceBulkQuoteIntent>{};
+  final _heads = <String, WorkspaceBulkQuote>{};
+  final _acknowledgements = <String, WorkspaceBulkQuote>{};
+  final _resolvedCleanup = <String>{};
+  bool _closed = false, _busy = false, _initialized = false;
+  String? message;
+  bool get active => !_closed && _lifetime != null && identical(context(), _lifetime);
+  bool get supported => active && gateway.enabled;
+  bool get busy => _busy;
+  bool get initialized => _initialized;
+  List<WorkspaceBulkQuoteIntent> get pending => List.unmodifiable(_pending.values);
+  List<WorkspaceBulkQuote> get heads => List.unmodifiable(_heads.values);
+  WorkspaceBulkQuote? acknowledgement(WorkspaceBulkQuoteIntent original) => _acknowledgements[_key(original)];
+  WorkspaceBulkQuote? head(String quoteId) => _heads[quoteId];
+  String _key(WorkspaceBulkQuoteIntent original) => '${original.kind}:${original.operationId}';
+  void _checkOriginal(WorkspaceBulkQuoteIntent original) {
+    _bulk(original.account == scope.account && original.realm == scope.realm && original.storeId == scope.store &&
+      (scope.role == 'buyer' ? {'request', 'accept', 'withdraw'}.contains(original.kind) : {'offer', 'withdraw'}.contains(original.kind)));
+  }
+  void _notify() { if (active) notifyListeners(); }
+  void _remember(WorkspaceBulkQuote value) {
+    _bulk(value.storeId == scope.store);
+    if (scope.role == 'buyer') _bulk(value.customerReference == 'customer-${_bulkHash([scope.realm, scope.store, scope.account]).substring(0, 32)}');
+    final prior = _heads[value.quoteId];
+    if (prior != null && prior.revision > value.revision) return;
+    if (prior?.revision == value.revision) _bulk(_bulkHash(prior!.toJson()) == _bulkHash(value.toJson()));
+    _heads[value.quoteId] = value;
+  }
+  Future<void> _restore() async {
+    final saved = await journal.read(scope).timeout(const Duration(seconds: 10));
+    if (!active) return;
+    for (final original in saved) {
+      _checkOriginal(original);
+      final key = _key(original), retained = _pending[key];
+      _bulk(retained == null || retained.fingerprint == original.fingerprint);
+      _pending[key] = original;
+    }
+    // A timed-out save is not permission to replace its original. Physical
+    // storage tails remain serialized even after this caller's deadline.
+    for (final original in _pending.values.toList()) {
+      if (!saved.any((s) => _key(s) == _key(original))) {
+        if (_resolvedCleanup.remove(_key(original))) {
+          _pending.remove(_key(original)); continue;
+        }
+        await journal.save(scope, original).timeout(const Duration(seconds: 10));
+        if (!active) return;
+      }
+    }
+    _initialized = true;
+  }
+  Future<bool> restore() async {
+    if (!supported || _busy) return false;
+    _busy = true; _notify();
+    try { await _restore(); return active && _initialized; }
+    catch (_) { if (active) message = 'Saved requests could not be checked. Please try again.'; return false; }
+    finally { _busy = false; _notify(); }
+  }
+  Future<void> _resolve(WorkspaceBulkQuoteIntent original, WorkspaceBulkQuote? acknowledgement) async {
+    if (!active) return;
+    if (acknowledgement != null) {
+      original.verifyAcknowledgement(acknowledgement);
+      _acknowledgements[_key(original)] = acknowledgement;
+    }
+    _resolvedCleanup.add(_key(original));
+    await journal.remove(scope, original).timeout(const Duration(seconds: 10));
+    if (!active) return;
+    _pending.remove(_key(original));
+    _resolvedCleanup.remove(_key(original));
+  }
+  Future<bool> recover() async {
+    if (!supported || _busy) return false;
+    _busy = true; message = null; _notify();
+    try {
+      await _restore(); if (!active || !_initialized) return false;
+      for (final original in _pending.values.toList()) {
+        final result = await gateway.reconcile(original, current: () => active).timeout(const Duration(seconds: 25));
+        if (!active) return false;
+        if (result.currentHead != null) _remember(result.currentHead!);
+        if (result.state == 'recorded' || result.state == 'superseded') {
+          await _resolve(original, result.agreement);
+          if (!active) return false;
+        }
+      }
+      if (_pending.isNotEmpty) message = 'Confirmation is still pending. Check again before making changes.';
+      return active && _pending.isEmpty;
+    } catch (_) { if (active) message = 'Your saved request is retained. Check its status again.'; return false; }
+    finally { _busy = false; _notify(); }
+  }
+  bool _withdrawsExpiredOriginal(WorkspaceBulkQuoteIntent next) {
+    if (next.kind != 'withdraw' || _pending.length > 2) return false;
+    final unresolved = _pending.values.where((p) => _key(p) != _key(next)).toList();
+    if (unresolved.length != 1) return false;
+    final prior = unresolved.single, current = _heads[next.quoteId];
+    final expiry = prior.kind == 'offer' ? _bulkTime(prior.body['validUntil']) : prior.base?.validUntil;
+    return {'offer', 'accept'}.contains(prior.kind) && prior.quoteId == next.quoteId && expiry != null &&
+      !expiry.isAfter(gateway.gateway.now().toUtc()) &&
+      current != null && current.revision == prior.body['expectedRevision'] &&
+      next.base?.revision == current.revision && _bulkHash(next.base!.toJson()) == _bulkHash(current.toJson());
+  }
+  Future<bool> retryOriginal(WorkspaceBulkQuoteIntent original, {required bool Function() inputCurrent}) async {
+    if (!supported || _busy || !inputCurrent()) return false;
+    _busy = true; message = null; _notify();
+    try {
+      _checkOriginal(original); await _restore();
+      final retained = _pending[_key(original)];
+      if (!active || !inputCurrent() || retained == null ||
+        _pending.length != 1 && !_withdrawsExpiredOriginal(retained) ||
+        _bulkHash(retained.toJson()) != _bulkHash(original.toJson()) || _resolvedCleanup.contains(_key(original))) {
+        return false;
+      }
+      // Deliberate same-key retry only. Expired negotiations use withdrawal and
+      // read-only reconciliation instead of an automatic replacement attempt.
+      if (original.kind == 'offer' && !_bulkTime(original.body['validUntil']).isAfter(gateway.gateway.now().toUtc()) ||
+        original.kind == 'accept' && !original.base!.offerCurrent(gateway.gateway.now())) {
+        return false;
+      }
+      await journal.save(scope, retained).timeout(const Duration(seconds: 10));
+      if (!active || !inputCurrent()) return false;
+      final result = await gateway.execute(retained, current: () => active && inputCurrent(), onDispatch: () {})
+        .timeout(const Duration(seconds: 25));
+      if (!active) return false;
+      _remember(result); await _resolve(retained, result); return active && !_pending.containsKey(_key(retained));
+    } catch (_) { if (active) message = 'The original request is not confirmed. Check its status again.'; return false; }
+    finally { _busy = false; _notify(); }
+  }
+  Future<bool> submit(WorkspaceBulkQuoteIntent original, {required bool Function() inputCurrent}) async {
+    if (!supported || _busy || !inputCurrent()) return false;
+    _busy = true; message = null; _notify();
+    try {
+      _checkOriginal(original); await _restore();
+      if (!active || !inputCurrent() || !_initialized || _pending.isNotEmpty && !_withdrawsExpiredOriginal(original)) return false;
+      _pending[_key(original)] = original;
+      // No network dispatch until serialized native save and readback complete.
+      await journal.save(scope, original).timeout(const Duration(seconds: 10));
+      if (!active || !inputCurrent()) return false;
+      final result = await gateway.execute(original, current: () => active && inputCurrent(), onDispatch: () {})
+        .timeout(const Duration(seconds: 25));
+      if (!active) return false;
+      _remember(result); await _resolve(original, result);
+      return active && !_pending.containsKey(_key(original));
+    } catch (_) { if (active) message = 'Your request has not been confirmed. Check its status before trying again.'; return false; }
+    finally { _busy = false; _notify(); }
+  }
+  Future<bool> refresh(String quoteId) async {
+    if (!supported || _busy) return false;
+    _busy = true; _notify();
+    try {
+      final result = await gateway.read(account: scope.account, storeId: scope.store, quoteId: quoteId, current: () => active);
+      if (!active) return false; _remember(result); return true;
+    } catch (_) { if (active) message = 'This quote could not be refreshed. Please try again.'; return false; }
+    finally { _busy = false; _notify(); }
+  }
+  @override void dispose() { _closed = true; super.dispose(); }
+}
+
 /// Read-only public catalogue content, never an order/price/Stock authority.
 abstract interface class WorkspaceCatalogueGateway {
   Future<WorkspaceCatalogueContentResult> read(BuyV2Product product);

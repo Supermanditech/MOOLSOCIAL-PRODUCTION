@@ -58,7 +58,7 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
   let expireDuringRead = false, sourceReads = 0;
   const sourceFixture = {bulkQuotationSnapshot: async () => [{state: 'ready', realm: 'evaluation', storeId: 'store-one', items: [{
     skuId: 'sku-one', revision, canonicalProductId: 'canonical-one', verifiedPackId: 'pack-one',
-    content: {title: 'Isolated Bulk rice'}, pack: {label: '25 kg bag'},
+    content: {title: 'Isolated Bulk rice', variant: 'Aged\ngrain'}, pack: {label: '25 kg bag'},
     channels: [{kind: channel, minimumOrder: 10, quantityStep: 5, validUntil: '2026-10-21T12:00:00.000Z'}],
     listings: [{schemaVersion: 1, realm: 'evaluation', listingId, storeId: 'store-one', skuId: 'sku-one', channel,
       canonicalProductId: 'canonical-one', verifiedPackId: 'pack-one'}],
@@ -95,6 +95,7 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
     assert.equal(created.state, 'requested'); assert.equal(created.orderingAvailable, false);
     assert.equal(created.kind, 'supplier_merchandise_agreement');
     const scope = {quoteId: created.quoteId};
+    const supplierRequested = await service().read('supplier-one', scope) as any;
     const page = {limit: 1, cursor: null};
     const buyerPage = await service().listBuyer('buyer-one', page) as any;
     assert.equal(buyerPage.summaries.length, 1); assert.equal(buyerPage.nextCursor, null);
@@ -143,6 +144,13 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
       await assert.rejects(service().offer('other-supplier', offer), {code: 'not_found', httpStatus: 404});
     }
     await path.set(originalStored);
+    const legacy = structuredClone(originalStored.body);
+    for (const line of legacy.lines) delete line.variant;
+    await path.set({body: legacy, integrity: hash(legacy)});
+    const legacyRead = await service().read('buyer-one', scope) as any;
+    assert.equal(Object.hasOwn(legacyRead.lines[0], 'variant'), false);
+    assert.deepEqual((await path.get()).data()!.body, legacy);
+    await path.set(originalStored);
     // Reordered Firestore maps retain the same canonical agreement.
     await path.set(canonical(originalStored));
     assert.deepEqual(await service().read('supplier-one', scope), offered);
@@ -168,7 +176,7 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
     assert.equal(recovered.state, 'recorded'); assert.deepEqual(recovered.agreement, created);
     assert.deepEqual(recovered.currentHead, accepted);
     if (process.env.LF_BULK_API_CAPTURE === 'true') console.log(`LF_BULK_SERVICE_API=${JSON.stringify({
-      capturedAt: clock, request, offer, accept, created, offered, accepted, recovered, unobserved, buyerPage, storePage})}`);
+      capturedAt: clock, request, offer, accept, created, supplierRequested, offered, accepted, recovered, unobserved, buyerPage, storePage})}`);
     const superseded = await service().reconcile('supplier-one', {schemaVersion: 1, originalOperation: 'offer',
       original: {...offer, operationId: 'never-offer'}}) as any;
     assert.equal(superseded.state, 'superseded'); assert.equal(superseded.agreement, null);
