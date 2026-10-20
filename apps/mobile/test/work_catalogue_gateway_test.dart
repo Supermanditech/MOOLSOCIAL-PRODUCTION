@@ -583,6 +583,16 @@ class Credentials implements SocialContentCredentials {
     return 'isolated-host-appcheck';
   }
 }
+class AnalyticsHeldCredentials extends Credentials {
+  AnalyticsHeldCredentials(this.release, {this.after = 1});
+  final Future<void> release;
+  final int after;
+  int reads = 0;
+  @override Future<String> firebaseIdToken() async {
+    if (++reads > after) await release;
+    return super.firebaseIdToken();
+  }
+}
 // Private-media host fixtures. No native provider injection or publication/commerce acceptance.
 String _mediaHash(Object? value) {
   Object? sorted(Object? item) => item is Map ? {for (final key in (item.keys.cast<String>().toList()..sort())) key: sorted(item[key])}
@@ -4156,6 +4166,94 @@ void main() {
       gateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
         credentials: credentials ?? Credentials(), transport: transport, realm: 'evaluation', ownerAccountId: 'owner-one',
         now: () => DateTime.parse(storeVisitCapture()['aggregate']['observedAt'] as String)));
+    testWidgets('LF14-DEADLINE known product activity survives Store timeout and stalled Cart before Work deadline', (tester) async {
+      final stalled = Completer<SocialContentResponse>(), operations = <Object?>[];
+      final transport = OwnerTransport((body) async {
+        operations.add(body['operation']);
+        return body['operation'] == 'readStoreProductPresentations'
+          ? SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': presentationCapture()['aggregate']}))
+          : stalled.future;
+      });
+      final reporting = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => null,
+        storePresentationsEnabled: true, cartAdditionsEnabled: true, discoverySourcesEnabled: true, checkoutEntriesEnabled: true,
+        gateway: presentationOwner(transport));
+      final work = WorkSession(contactDraftStore: ListingAccount())
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileId: 'retailer-grocery',
+          profileLabel: 'Grocery', area: 'Jaipur', verified: true)..workspaceId = 'store-one';
+      work.bindProductPresentationReader(reporting);
+      WorkspaceAnalyticsSnapshot? snapshot;
+      final pending = work.readWorkspaceAnalytics(presentationRequest()).then((value) => snapshot = value);
+      try {
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 20));
+        expect(operations, ['readStoreProductPresentations', 'readStorePublicPresentations', 'readStoreCartAdditions']);
+        await tester.pump(const Duration(seconds: 9));
+        expect(snapshot, isNotNull, reason: 'Return known data before the outer 30-second deadline.');
+        expect(snapshot!.state, WorkspaceAnalyticsState.verified);
+        expect(snapshot!.metrics.single.id, 'product-views'); expect(snapshot!.metrics.single.value, 1);
+        expect(snapshot!.breakdowns.single.id, 'most-viewed-products');
+        expect(operations, hasLength(3), reason: 'Expired reads must not start discovery or Checkout requests.');
+      } finally {
+        stalled.complete(const SocialContentResponse(statusCode: 503, body: '{}'));
+        await tester.pump(const Duration(seconds: 40)); await pending; work.dispose();
+      }
+    });
+    testWidgets('LF14-DEADLINE single product source closes held credentials before outer timeout', (tester) async {
+      final release = Completer<void>();
+      final credentials = AnalyticsHeldCredentials(release.future, after: 0);
+      final transport = OwnerTransport((_) async => const SocialContentResponse(statusCode: 503, body: '{}'));
+      final reporting = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => null,
+        gateway: presentationOwner(transport, credentials: credentials));
+      final work = WorkSession(contactDraftStore: ListingAccount())
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileId: 'retailer-grocery',
+          profileLabel: 'Grocery', area: 'Jaipur', verified: true)..workspaceId = 'store-one';
+      work.bindProductPresentationReader(reporting);
+      WorkspaceAnalyticsSnapshot? snapshot;
+      final pending = work.readWorkspaceAnalytics(presentationRequest()).then((value) => snapshot = value);
+      try {
+        await tester.pump(); await tester.pump(const Duration(seconds: 29));
+        expect(snapshot, isNotNull); expect(snapshot!.state, WorkspaceAnalyticsState.error);
+        expect(snapshot!.metrics, isEmpty); expect(snapshot!.coverage, WorkspaceAnalyticsCoverage.unknown);
+        release.complete(); await tester.pump(); expect(transport.calls, 0);
+      } finally {
+        if (!release.isCompleted) release.complete();
+        await tester.pump(const Duration(seconds: 40)); await pending; work.dispose();
+      }
+    });
+    for (final retire in [false, true]) {
+      testWidgets('LF14-DEADLINE held Store credentials cannot erase known data or dispatch late retire=$retire', (tester) async {
+        final release = Completer<void>();
+        final held = AnalyticsHeldCredentials(release.future), operations = <Object?>[];
+        var live = true;
+        final gateway = visitGateway(OwnerTransport((body) async {
+          operations.add(body['operation']);
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': presentationCapture()['aggregate']}));
+        }), credentials: held, current: () => live);
+        final work = WorkSession(contactDraftStore: ListingAccount())
+          ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileId: 'retailer-grocery',
+            profileLabel: 'Grocery', area: 'Jaipur', verified: true)..workspaceId = 'store-one';
+        work.bindProductPresentationReader(gateway);
+        WorkspaceAnalyticsSnapshot? snapshot;
+        final pending = work.readWorkspaceAnalytics(presentationRequest()).then((value) => snapshot = value);
+        try {
+          await tester.pump(); expect(held.reads, 2); expect(operations, ['readStoreProductPresentations']);
+          if (retire) {
+            live = false;
+            work.activeWorkspace = const WorkWorkspace(id: 'store-two', name: 'Other Host Store', profileId: 'retailer-grocery',
+              profileLabel: 'Grocery', area: 'Jaipur', verified: true); work.workspaceId = 'store-two';
+          }
+          await tester.pump(const Duration(seconds: 29));
+          expect(snapshot, isNotNull);
+          expect(snapshot!.state, retire ? WorkspaceAnalyticsState.unavailable : WorkspaceAnalyticsState.verified);
+          expect(snapshot!.metrics.map((m) => m.id), retire ? isEmpty : ['product-views']);
+          release.complete(); await tester.pump();
+          expect(operations, ['readStoreProductPresentations'], reason: 'No request after credential deadline or retirement.');
+        } finally {
+          if (!release.isCompleted) release.complete();
+          await tester.pump(const Duration(seconds: 40)); await pending; work.dispose();
+        }
+      });
+    }
     test('LF14-VISITS actual service events and unique signed-in visitors preserve existing product metrics in Work', () async {
       final capture = storeVisitCapture(), event = capture['event'] as Map, credentials = Credentials();
       final gateway = visitGateway(OwnerTransport((body) async => SocialContentResponse(statusCode: 200,

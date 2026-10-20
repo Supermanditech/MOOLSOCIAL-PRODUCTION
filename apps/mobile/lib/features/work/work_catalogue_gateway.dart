@@ -3769,54 +3769,67 @@ class WorkspaceProductPresentationGateway {
     } on Object {return false;}
   }
   Future<WorkspaceAnalyticsSnapshot> readAnalytics(WorkspaceAnalyticsRequest request) async {
-    final elapsed = Stopwatch()..start();
     if (!current() || !request.valid || request.accountScope != gateway.ownerAccountId) throw const FormatException();
-    if (!storePresentationsEnabled && !cartAdditionsEnabled && !discoverySourcesEnabled && !checkoutEntriesEnabled && productPresentationsEnabled) return _readProductAnalytics(request);
-    final results = <WorkspaceAnalyticsSnapshot>[];
-    if (productPresentationsEnabled) {
-      try {results.add(await _readProductAnalytics(request));} on Object {/* Independent coverage remains unknown, never zero. */}
+    // One deadline covers credentials and every source, leaving time to return
+    // verified activity before Work's outer 30-second deadline. A stalled later
+    // source must not erase facts already read or dispatch after this read ends.
+    var expired = false;
+    final deadline = Completer<void>();
+    final timer = Timer(const Duration(seconds: 28), () { expired = true; deadline.complete(); });
+    Future<WorkspaceAnalyticsSnapshot> bounded(
+      Future<WorkspaceAnalyticsSnapshot> Function(bool Function()) source) async {
+      var reading = true;
+      bool permitted() => reading && !expired && current();
+      if (!permitted()) throw const FormatException();
+      try {
+        final value = await Future.any([
+          source(permitted),
+          deadline.future.then<WorkspaceAnalyticsSnapshot>((_) => throw TimeoutException('Analytics read deadline.')),
+        ]);
+        if (!permitted()) throw const FormatException();
+        return value;
+      } finally { reading = false; }
     }
-    if (storePresentationsEnabled && current()) {
-      try {results.add(await _readStoreAnalytics(request));} on Object {/* Keep verified product metrics if this source is unavailable. */}
-    }
-    if (cartAdditionsEnabled && current()) {
-      try {results.add(await _readProductAnalytics(request, cart: true));} on Object {/* Independent Cart coverage remains unknown. */}
-    }
-    if (productPresentationsEnabled && discoverySourcesEnabled && current()) {
-      // Work's outer deadline is 30 seconds. Optional attribution must leave
-      // time to return verified base data, including time spent on credentials.
-      final budget = const Duration(seconds: 28) - elapsed.elapsed;
-      var permitted = true;
-      if (budget > Duration.zero) {
-        try {
-          results.add(await _readProductAnalytics(request, discovery: true, permitted: () => permitted).timeout(budget));
-        } on Object {/* Optional attribution cannot erase other verified activity. */}
-        finally { permitted = false; }
+    try {
+      if (!storePresentationsEnabled && !cartAdditionsEnabled && !discoverySourcesEnabled && !checkoutEntriesEnabled && productPresentationsEnabled) {
+        return await bounded((permitted) => _readProductAnalytics(request, permitted: permitted));
       }
-    }
-    if (checkoutEntriesEnabled && current()) {
-      final budget = const Duration(seconds: 28) - elapsed.elapsed;
-      var permitted = true;
-      if (budget > Duration.zero) {
-        try { results.add(await _readStoreAnalytics(request, checkout: true, permitted: () => permitted).timeout(budget)); }
-        on Object { /* Independent Checkout coverage cannot erase known base metrics. */ }
-        finally { permitted = false; }
+      final results = <WorkspaceAnalyticsSnapshot>[];
+      Future<void> collect(Future<WorkspaceAnalyticsSnapshot> Function(bool Function()) source) async {
+        if (expired || !current()) return;
+        try { results.add(await bounded(source)); }
+        on Object { /* Each unavailable source stays unknown; retain other verified activity. */ }
       }
-    }
-    if (!current()) throw const FormatException();
-    final verified = results.where((r) => r.state == WorkspaceAnalyticsState.verified && r.usableFor(request, gateway.now().toUtc())).toList();
-    if (verified.isEmpty) {
-      return WorkspaceAnalyticsSnapshot(request: request, state: WorkspaceAnalyticsState.unavailable,
-        coverage: WorkspaceAnalyticsCoverage.unknown, source: 'Recorded public activity', metrics: const []);
-    }
-    if (verified.length == 1) return verified.single;
-    final refreshed = verified.map((r) => r.updatedAt!).reduce((a, b) => a.isAfter(b) ? a : b);
-    final from = verified.map((r) => r.coveredFrom!).reduce((a, b) => a.isBefore(b) ? a : b);
-    final until = verified.map((r) => r.coveredUntil!).reduce((a, b) => a.isAfter(b) ? a : b);
-    return WorkspaceAnalyticsSnapshot(request: request, state: WorkspaceAnalyticsState.verified,
-      coverage: WorkspaceAnalyticsCoverage.partial, source: 'Reported public activity · partial coverage',
-      updatedAt: refreshed, coveredFrom: from, coveredUntil: until,
-      metrics: verified.expand((r) => r.metrics), breakdowns: verified.expand((r) => r.breakdowns));
+      if (productPresentationsEnabled) {
+        await collect((permitted) => _readProductAnalytics(request, permitted: permitted));
+      }
+      if (storePresentationsEnabled && current()) {
+        await collect((permitted) => _readStoreAnalytics(request, permitted: permitted));
+      }
+      if (cartAdditionsEnabled && current()) {
+        await collect((permitted) => _readProductAnalytics(request, cart: true, permitted: permitted));
+      }
+      if (productPresentationsEnabled && discoverySourcesEnabled && current()) {
+        await collect((permitted) => _readProductAnalytics(request, discovery: true, permitted: permitted));
+      }
+      if (checkoutEntriesEnabled && current()) {
+        await collect((permitted) => _readStoreAnalytics(request, checkout: true, permitted: permitted));
+      }
+      if (!current()) throw const FormatException();
+      final verified = results.where((r) => r.state == WorkspaceAnalyticsState.verified && r.usableFor(request, gateway.now().toUtc())).toList();
+      if (verified.isEmpty) {
+        return WorkspaceAnalyticsSnapshot(request: request, state: WorkspaceAnalyticsState.unavailable,
+          coverage: WorkspaceAnalyticsCoverage.unknown, source: 'Recorded public activity', metrics: const []);
+      }
+      if (verified.length == 1) return verified.single;
+      final refreshed = verified.map((r) => r.updatedAt!).reduce((a, b) => a.isAfter(b) ? a : b);
+      final from = verified.map((r) => r.coveredFrom!).reduce((a, b) => a.isBefore(b) ? a : b);
+      final until = verified.map((r) => r.coveredUntil!).reduce((a, b) => a.isAfter(b) ? a : b);
+      return WorkspaceAnalyticsSnapshot(request: request, state: WorkspaceAnalyticsState.verified,
+        coverage: WorkspaceAnalyticsCoverage.partial, source: 'Reported public activity · partial coverage',
+        updatedAt: refreshed, coveredFrom: from, coveredUntil: until,
+        metrics: verified.expand((r) => r.metrics), breakdowns: verified.expand((r) => r.breakdowns));
+    } finally { timer.cancel(); }
   }
   Future<WorkspaceAnalyticsSnapshot> _readStoreAnalytics(WorkspaceAnalyticsRequest request,
     {bool checkout = false, bool Function()? permitted}) async {
