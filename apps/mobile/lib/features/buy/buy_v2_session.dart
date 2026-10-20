@@ -4758,6 +4758,163 @@ class BuyV2Session extends ChangeNotifier {
   final _storeCouponRequests = <String, int>{};
   int _storeCouponRequest = 0;
   Timer? _storeCouponExpiry;
+  final _selectedStoreCouponRefs = <String, ({BuyV2StoreCouponEligibility value,
+    Object owner, int epoch, BuyV2StoreCouponEligibilitySource source, BuyV2Destination destination})>{};
+  final _storeCouponBasketInputs = <String, String>{};
+  final _storeCouponBasketEpochs = <String, int>{};
+  final _storeCouponApplyRequests = <String, int>{};
+  final _storeCouponMessages = <String, String>{};
+  int _storeCouponApplySequence = 0;
+  String _couponStoreKey(BuyV2PublishedStoreCoupon coupon) => jsonEncode([coupon.realm, coupon.storeId]);
+  List<BuyV2CartLine> _couponStoreLines(BuyV2PublishedStoreCoupon coupon) => List.unmodifiable(checkoutLines.where(
+    (line) => line.product.storeId == coupon.storeId && line.product.publicListingIdentity?.realm == coupon.realm));
+  void _syncStoreCouponBasketInputs() {
+    for (final key in {..._storeCouponApplyRequests.keys, ..._selectedStoreCouponRefs.keys}) {
+      final scope = jsonDecode(key) as List;
+      final lines = checkoutLines.where((line) => line.product.storeId == scope[1] &&
+        line.product.publicListingIdentity?.realm == scope[0]).toList();
+      final input = jsonEncode([checkoutScope.name, collectionCheckoutSelected, buyV2StoreCouponCartInput(lines)]);
+      if (_storeCouponBasketInputs[key] != input) {
+        _storeCouponBasketInputs[key] = input;
+        _storeCouponBasketEpochs[key] = (_storeCouponBasketEpochs[key] ?? 0) + 1;
+      }
+    }
+  }
+  bool _selectedStoreCouponCurrent(String key) {
+    final selected = _selectedStoreCouponRefs[key];
+    return selected != null && selected.owner == _currentCustomerOrderScope &&
+      selected.epoch == _storeCouponBasketEpochs[key] && selected.source.storeCouponEligibilityActive &&
+      identical(_sourceForCatalogue(selected.destination), selected.source) &&
+      selected.value.eligible && selected.value.matches(_couponStoreLines(selected.value.coupon), catalogueNow());
+  }
+  BuyV2StoreCouponEligibility? selectedStoreCouponFor(BuyV2PublishedStoreCoupon coupon) {
+    final selected = _selectedStoreCouponRefs[_couponStoreKey(coupon)];
+    return selected?.owner == _currentCustomerOrderScope && selected!.value.coupon.identity == coupon.identity
+      ? selected.value : null;
+  }
+  bool storeCouponNeedsReview(BuyV2PublishedStoreCoupon coupon) =>
+    selectedStoreCouponFor(coupon) != null && !_selectedStoreCouponCurrent(_couponStoreKey(coupon));
+  bool storeCouponChecking(BuyV2PublishedStoreCoupon coupon) => _storeCouponApplyRequests.containsKey(_couponStoreKey(coupon));
+  String? storeCouponMessage(BuyV2PublishedStoreCoupon coupon) => _storeCouponMessages[_couponStoreKey(coupon)];
+  List<BuyV2PublishedStoreCoupon> get cartStoreCoupons {
+    final values = <String, BuyV2PublishedStoreCoupon>{};
+    for (final line in cartLines) {
+      for (final coupon in publishedStoreCouponsFor(line.product)) { values[coupon.identity] = coupon; }
+    }
+    for (final selected in _selectedStoreCouponRefs.values) {
+      if (selected.owner == _currentCustomerOrderScope && cartLines.any((line) =>
+        line.product.storeId == selected.value.coupon.storeId &&
+        line.product.publicListingIdentity?.realm == selected.value.coupon.realm)) {
+        values.putIfAbsent(selected.value.coupon.identity, () => selected.value.coupon);
+      }
+    }
+    return List.unmodifiable(values.values);
+  }
+  List<BuyV2StoreCouponEligibility> get _checkoutStoreCouponSelections => List.unmodifiable([
+    for (final selected in _selectedStoreCouponRefs.values)
+      if (selected.owner == _currentCustomerOrderScope && _couponStoreLines(selected.value.coupon).isNotEmpty) selected.value,
+  ]);
+  List<BuyV2StoreCouponEligibility> get selectedStoreCoupons => _checkoutStoreCouponSelections;
+  bool _unresolvedLegacyCouponFor(List<BuyV2CartLine> lines) => lines.map((line) => line.product.destination).toSet().any((destination) {
+    final reference = _selectedCartBenefitRefs[_cartBenefitSelectionKey(destination, BuyV2CartBenefitKind.coupon)];
+    if (reference == null || selectedCartBenefit(kind: BuyV2CartBenefitKind.coupon, destination: destination) != null) return false;
+    try {
+      final scope = jsonDecode(reference.scopeKey);
+      if (scope is! List || scope.length != 3) return true;
+      if (scope[0] == 'store') return lines.any((line) => line.product.destination == destination && line.product.storeId == scope[1]);
+      if (scope[0] == 'products' && scope[2] is List) {
+        return lines.any((line) => line.product.destination == destination && line.product.storeId == scope[1] && (scope[2] as List).contains(line.product.id));
+      }
+      return true;
+    } on Object { return true; }
+  });
+  bool get _storeCouponSelectionNeedsReview => _checkoutStoreCouponSelections.any((value) {
+    final lines = _couponStoreLines(value.coupon);
+    return !_selectedStoreCouponCurrent(_couponStoreKey(value.coupon)) || _unresolvedLegacyCouponFor(lines) ||
+      selectedCartBenefitsFor(cartDestinations).any((benefit) => benefit.kind == BuyV2CartBenefitKind.coupon &&
+        lines.any((line) => benefit.appliesTo(line.product)));
+  });
+  Future<bool> chooseStoreCoupon(BuyV2PublishedStoreCoupon coupon) async {
+    if (_collectionDisposed || !procurementScopeCurrent || isStoreProcurement || _holdCartForPaymentResolution()) return false;
+    final key = _couponStoreKey(coupon), lines = _couponStoreLines(coupon);
+    if (lines.isEmpty) return false;
+    if (_unresolvedLegacyCouponFor(lines)) {
+      _storeCouponMessages[key] = 'Refresh or remove the current coupon before choosing a Store coupon.';
+      notifyListeners(); return false;
+    }
+    final destination = lines.first.product.destination, source = _sourceForCatalogue(lines.first.product.destination);
+    if (source is! BuyV2StoreCouponEligibilitySource || !(source as BuyV2StoreCouponEligibilitySource).storeCouponEligibilityActive) {
+      _storeCouponMessages[key] = 'Coupon eligibility is not connected yet. No saving has been applied.';
+      notifyListeners(); return false;
+    }
+    if (!publishedStoreCouponsFor(lines.first.product).any((row) => identical(row, coupon))) {
+      _storeCouponMessages[key] = 'Refresh this Store’s coupons before applying.'; notifyListeners(); return false;
+    }
+    final reader = source as BuyV2StoreCouponEligibilitySource, owner = _currentCustomerOrderScope;
+    final sequence = ++_storeCouponApplySequence;
+    _storeCouponApplyRequests[key] = sequence;
+    _syncStoreCouponBasketInputs();
+    final epoch = _storeCouponBasketEpochs[key];
+    _storeCouponMessages.remove(key); notifyListeners();
+    bool current() => !_collectionDisposed && procurementScopeCurrent && !cartChangesBlocked &&
+      owner == _currentCustomerOrderScope && _storeCouponApplyRequests[key] == sequence &&
+      epoch == _storeCouponBasketEpochs[key] && reader.storeCouponEligibilityActive &&
+      identical(_sourceForCatalogue(destination), source) &&
+      publishedStoreCouponsFor(lines.first.product).any((row) => identical(row, coupon)) &&
+      buyV2StoreCouponCartInput(lines) == buyV2StoreCouponCartInput(_couponStoreLines(coupon));
+    try {
+      if (!current()) return false;
+      final result = await reader.evaluateStoreCoupon(coupon: coupon, lines: lines, current: current).timeout(const Duration(seconds: 26));
+      if (!current() || !result.matches(lines, catalogueNow()) || result.coupon.identity != coupon.identity ||
+          result.coupon.revision != coupon.revision || result.coupon.name != coupon.name ||
+          (owner.$2 != null && result.accountId != owner.$2)) { return false; }
+      if (!result.eligible) {
+        _storeCouponMessages[key] = switch (result.reason) {
+          'minimum_spend' => 'This Store’s selected items do not meet the minimum purchase.',
+          'usage_limit' => 'This coupon’s available uses are already taken.',
+          'zero_saving' => 'This coupon gives no saving on the selected items.',
+          _ => 'This coupon is not active. Refresh the Store’s coupons.',
+        };
+        return false;
+      }
+      if (_unresolvedLegacyCouponFor(lines)) {
+        _storeCouponMessages[key] = 'Refresh or remove the current coupon before choosing a Store coupon.';
+        return false;
+      }
+      final overlaps = <BuyV2CartBenefit>[];
+      for (final benefit in selectedCartBenefitsFor(cartDestinations)) {
+        if (benefit.kind != BuyV2CartBenefitKind.coupon || !lines.any((line) => benefit.appliesTo(line.product))) continue;
+        if (_cart.values.any((line) => benefit.appliesTo(line.product) && !lines.any((own) => own.product.id == line.product.id))) {
+          _storeCouponMessages[key] = 'Remove ${benefit.title} first. It also covers items outside this Store coupon.';
+          return false;
+        }
+        overlaps.add(benefit);
+      }
+      if (!current()) return false;
+      for (final benefit in overlaps) {
+        _selectedCartBenefitRefs.remove(_cartBenefitSelectionKey(benefit.destination, benefit.kind));
+      }
+      _selectedStoreCouponRefs[key] = (value: result, owner: owner, epoch: epoch!, source: reader, destination: destination);
+      _invalidateAndRefreshCheckoutPricingContracts();
+      _scheduleStoreCouponExpiry();
+      notice = '${coupon.name} selected once for ${coupon.publisherName}. Checkout must confirm the saving.';
+      return true;
+    } on Object {
+      if (current()) _storeCouponMessages[key] = 'This coupon could not be checked. Your existing choices are unchanged.';
+      return false;
+    } finally {
+      if (!_collectionDisposed && _storeCouponApplyRequests[key] == sequence) {
+        _storeCouponApplyRequests.remove(key); notifyListeners();
+      }
+    }
+  }
+  void removeStoreCoupon(BuyV2PublishedStoreCoupon coupon, {required BuyV2StoreCouponEligibility expectedSelection}) {
+    if (_collectionDisposed || !procurementScopeCurrent || _holdCartForPaymentResolution() ||
+        !identical(selectedStoreCouponFor(coupon), expectedSelection)) { return; }
+    final key = _couponStoreKey(coupon);
+    _storeCouponApplyRequests.remove(key); _selectedStoreCouponRefs.remove(key); _storeCouponMessages.remove(key);
+    _invalidateAndRefreshCheckoutPricingContracts(); _scheduleStoreCouponExpiry(); notifyListeners();
+  }
   String? _storeCouponKey(BuyV2Product product) {
     final identity = product.publicListingIdentity;
     if (isStoreProcurement || identity?.valid != true || !identity!.matches(product) ||
@@ -4791,18 +4948,40 @@ class BuyV2Session extends ChangeNotifier {
           coupon.storeId != product.storeId || !coupon.isCurrent(catalogueNow()) || !ids.add(coupon.couponId))) {
         throw const FormatException();
       }
+      final selected = _selectedStoreCouponRefs[key];
+      if (selected != null && selected.owner == _currentCustomerOrderScope) {
+        final fresh = results.where((value) => value.identity == selected.value.coupon.identity).firstOrNull;
+        String copy(BuyV2PublishedStoreCoupon value) => jsonEncode([value.revision, value.name,
+          value.publisherName, value.publisherType.name, value.validFrom.toIso8601String(),
+          value.validUntil.toIso8601String(), value.terms.toJson()]);
+        if (fresh == null || copy(fresh) != copy(selected.value.coupon)) {
+          _storeCouponBasketEpochs[key] = (_storeCouponBasketEpochs[key] ?? 0) + 1;
+          if (!cartChangesBlocked) { _invalidateCheckoutQuote(); _invalidateCommercialPaymentTerms(); }
+        }
+      }
       _publishedStoreCoupons[key] = List.unmodifiable(results);
       _scheduleStoreCouponExpiry(); notifyListeners();
       return true;
     } on Object {
-      if (current()) {_publishedStoreCoupons.remove(key); _scheduleStoreCouponExpiry(); notifyListeners();}
+      if (current()) {
+        _publishedStoreCoupons.remove(key);
+        if (_selectedStoreCouponRefs[key]?.owner == _currentCustomerOrderScope) {
+          _storeCouponBasketEpochs[key] = (_storeCouponBasketEpochs[key] ?? 0) + 1;
+          if (!cartChangesBlocked) { _invalidateCheckoutQuote(); _invalidateCommercialPaymentTerms(); }
+        }
+        _scheduleStoreCouponExpiry(); notifyListeners();
+      }
       return false;
     }
   }
   void _scheduleStoreCouponExpiry() {
     _storeCouponExpiry?.cancel();
     if (_collectionDisposed) return;
-    final deadlines = _publishedStoreCoupons.values.expand((values) => values).map((coupon) => coupon.freshUntil).toList()..sort();
+    final deadlines = [
+      ..._publishedStoreCoupons.values.expand((values) => values).map((coupon) => coupon.freshUntil),
+      for (final selected in _selectedStoreCouponRefs.values)
+        if (selected.value.validUntil.isAfter(catalogueNow())) selected.value.validUntil,
+    ]..sort();
     if (deadlines.isEmpty) return;
     var delay = deadlines.first.difference(catalogueNow());
     if (delay.isNegative) delay = Duration.zero;
@@ -4810,6 +4989,9 @@ class BuyV2Session extends ChangeNotifier {
       if (_collectionDisposed) return;
       for (final key in _publishedStoreCoupons.keys.toList()) {
         _publishedStoreCoupons[key] = _publishedStoreCoupons[key]!.where((coupon) => coupon.isCurrent(catalogueNow())).toList();
+      }
+      if (!cartChangesBlocked && _storeCouponSelectionNeedsReview) {
+        _invalidateCheckoutQuote(); _invalidateCommercialPaymentTerms();
       }
       _scheduleStoreCouponExpiry(); notifyListeners();
     });
@@ -10792,8 +10974,11 @@ class BuyV2Session extends ChangeNotifier {
       kind: BuyV2CartBenefitKind.coupon,
       destination: destination,
     );
-    if (coupon == null) return 0;
-    return coupon.savingAmountMinor.clamp(0, _benefitTotalMinor(coupon, cartLines));
+    final legacy = coupon == null ? 0 : coupon.savingAmountMinor.clamp(0, _benefitTotalMinor(coupon, cartLines));
+    if (!_storeCouponsQuoteConfirmed) return legacy;
+    return buyV2SumMinor([legacy, for (final selection in _checkoutStoreCouponSelections)
+      for (final line in checkoutLines.where((line) => line.product.destination == destination))
+        selection.allocations[line.product.id] ?? 0]);
   }
   int couponSavingForDestination(BuyV2Destination destination) => buyV2WholeRupees(couponSavingMinorForDestination(destination));
 
@@ -10812,10 +10997,13 @@ class BuyV2Session extends ChangeNotifier {
   );
   int get checkoutCouponSaving => buyV2WholeRupees(checkoutCouponSavingMinor);
 
-  Map<String, int> _checkoutGroupCouponSavingsMinor() {
+  Map<String, int> _checkoutGroupCouponSavingsMinor({bool includeUnconfirmedStoreCoupons = false}) {
     final remainingDiscount = {
       for (final destination in checkoutDestinations)
-        destination: couponSavingMinorForDestination(destination),
+        destination: () {
+          final benefit = selectedCartBenefit(kind: BuyV2CartBenefitKind.coupon, destination: destination);
+          return benefit == null ? 0 : benefit.savingAmountMinor.clamp(0, _benefitTotalMinor(benefit, cartLines));
+        }(),
     };
     return Map.unmodifiable({
       for (final group in checkoutFulfilmentGroups)
@@ -10832,7 +11020,10 @@ class BuyV2Session extends ChangeNotifier {
               ? eligibleTotal
               : available;
           remainingDiscount[group.destination] = available - discount;
-          return discount;
+          return buyV2SumMinor([discount,
+            if (includeUnconfirmedStoreCoupons || _storeCouponsQuoteConfirmed)
+              for (final selection in _checkoutStoreCouponSelections)
+                for (final line in group.lines) selection.allocations[line.product.id] ?? 0]);
         }(),
     });
   }
@@ -10842,7 +11033,7 @@ class BuyV2Session extends ChangeNotifier {
       .map((key, minor) => MapEntry(key, buyV2WholeRupees(minor)));
   Map<String, int> _checkoutGroupPayablesMinor() {
     if (checkoutQuoteLoadState == BuyV2CommerceLoadState.ready &&
-        _checkoutQuote != null) {
+        _checkoutQuote != null && (_checkoutStoreCouponSelections.isEmpty || _storeCouponsQuoteConfirmed)) {
       return Map.unmodifiable({
         for (final line in _checkoutQuote!.lines)
           line.fulfilmentKey: line.totalMinor,
@@ -10868,7 +11059,8 @@ class BuyV2Session extends ChangeNotifier {
   }
   int get calculatedCheckoutPayableTotal => buyV2WholeRupees(calculatedCheckoutPayableTotalMinor);
 
-  BuyV2CheckoutQuote? get checkoutQuote => _checkoutQuote;
+  BuyV2CheckoutQuote? get checkoutQuote => _checkoutStoreCouponSelections.isNotEmpty && !_storeCouponsQuoteConfirmed
+      ? null : _checkoutQuote;
 
   int get checkoutPayableTotalMinor {
     final retained = legacyCheckoutAttempt?.payment.request;
@@ -10876,7 +11068,8 @@ class BuyV2Session extends ChangeNotifier {
     if (checkoutPaymentAttempt case final original?) {
       return buyV2SumMinor(original.groups.map((group) => group.request.totalMinor));
     }
-    if (checkoutQuoteLoadState == BuyV2CommerceLoadState.ready && _checkoutQuote != null) {
+    if (checkoutQuoteLoadState == BuyV2CommerceLoadState.ready && _checkoutQuote != null &&
+        (_checkoutStoreCouponSelections.isEmpty || _storeCouponsQuoteConfirmed)) {
       return _checkoutQuote!.totalMinor;
     }
     return calculatedCheckoutPayableTotalMinor;
@@ -11428,10 +11621,11 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool get checkoutQuoteEnabled => checkoutQuoteAdapter != null;
+  DateTime get _checkoutQuoteNow => _checkoutStoreCouponSelections.isEmpty ? DateTime.now() : catalogueNow();
 
   // Keep original references authoritative while eligibility is refreshing or
   // unavailable. Collection has its own independent quote/commitment lifecycle.
-  bool get _liveCouponQuoteRequired => liveCartBenefitsEnabled &&
+  bool get _liveCouponQuoteRequired => _checkoutStoreCouponSelections.isNotEmpty || liveCartBenefitsEnabled &&
       !collectionCheckoutSelected && collectionCheckout?.unresolved != true &&
       checkoutDestinations.any((destination) => _selectedCartBenefitRefs.containsKey(
         _cartBenefitSelectionKey(destination, BuyV2CartBenefitKind.coupon)));
@@ -11441,13 +11635,14 @@ class BuyV2Session extends ChangeNotifier {
       checkoutQuoteLoadState == BuyV2CommerceLoadState.loading;
 
   bool get checkoutQuoteReviewRequired {
+    if (_storeCouponSelectionNeedsReview) return true;
     if (!checkoutQuoteEnabled) {
       return _liveCouponQuoteRequired || checkoutLines.any((line) => line.scheduledFulfilment != null);
     }
     final quote = _checkoutQuote;
     return checkoutQuoteLoadState != BuyV2CommerceLoadState.ready ||
         quote == null ||
-        !DateTime.now().isBefore(quote.validUntil) ||
+        !_checkoutQuoteNow.isBefore(quote.validUntil) ||
         _checkoutQuoteFingerprint != _currentCheckoutQuoteFingerprint() ||
         !_validCheckoutQuote(quote, checkoutFulfilmentGroups);
   }
@@ -11498,6 +11693,15 @@ class BuyV2Session extends ChangeNotifier {
       checkoutQuoteLoadState = BuyV2CommerceLoadState.unavailable;
       checkoutQuoteMessage = message; _invalidateCommercialPaymentTerms(); notifyListeners();
     }
+    final storeCoupons = _checkoutStoreCouponSelections;
+    if (storeCoupons.isNotEmpty && checkoutBenefitReviewRequired) {
+      unavailable('Refresh the other selected coupons before confirming this total.'); return false;
+    }
+    if (storeCoupons.isNotEmpty && (_storeCouponSelectionNeedsReview || adapter is! BuyV2StoreCouponCheckoutQuoteAdapter)) {
+      unavailable(_storeCouponSelectionNeedsReview ? 'Recheck your Store coupon after the Cart changed.'
+        : 'Store coupon totals are not connected yet. Your selection and Cart are kept.');
+      return false;
+    }
     if (address == null || groups.isEmpty) {
       _checkoutQuote = null;
       _checkoutQuoteFingerprint = null;
@@ -11532,7 +11736,13 @@ class BuyV2Session extends ChangeNotifier {
       // A synchronous loading listener may retire this owner or start a successor.
       if (!currentContext()) return false;
       if (!currentInputs()) { unavailable('Prices or choices changed. Check the total again.'); return false; }
-      final snapshot = adapter is BuyV2MinorCheckoutQuoteAdapter ? await adapter.loadQuoteMinor(
+      final snapshot = storeCoupons.isNotEmpty ? await (adapter as BuyV2StoreCouponCheckoutQuoteAdapter).loadQuoteWithStoreCouponsMinor(
+        groups: List.unmodifiable(groups), address: address, selectedPaymentMethod: selectedPayment,
+        selectedBenefits: List.unmodifiable(benefits), selectedStoreCoupons: List.unmodifiable(storeCoupons),
+        tipAmountsMinorByFulfilmentKey: Map.unmodifiable({
+          for (final group in groups) group.key: buyV2ExactMinorAmount(legacyRupees: tipForGroup(group)),
+        }),
+      ) : adapter is BuyV2MinorCheckoutQuoteAdapter ? await adapter.loadQuoteMinor(
         groups: List.unmodifiable(groups), address: address, selectedPaymentMethod: selectedPayment,
         selectedBenefits: List.unmodifiable(benefits), tipAmountsMinorByFulfilmentKey: Map.unmodifiable({
           for (final group in groups) group.key: buyV2ExactMinorAmount(legacyRupees: tipForGroup(group)),
@@ -11591,12 +11801,18 @@ class BuyV2Session extends ChangeNotifier {
     if (quote.id.trim().isEmpty ||
         quote.sourceId.trim().isEmpty ||
         !quote.evaluatedAt.isBefore(quote.validUntil) ||
-        !DateTime.now().isBefore(quote.validUntil) ||
+        !_checkoutQuoteNow.isBefore(quote.validUntil) ||
         quote.lines.length != groups.length) {
       return false;
     }
     final groupByKey = {for (final group in groups) group.key: group};
-    final expectedCouponSaving = _checkoutGroupCouponSavingsMinor();
+    final selections = _checkoutStoreCouponSelections;
+    if (_storeCouponSelectionNeedsReview || (selections.isNotEmpty && checkoutBenefitReviewRequired) ||
+        quote.storeCouponBindings.length != selections.length ||
+        selections.any((value) => quote.storeCouponBindings[value.coupon.identity] != value.quoteBinding ||
+          quote.validUntil.isAfter(value.validUntil) || quote.evaluatedAt.isBefore(value.observedAt) ||
+          quote.evaluatedAt.isAfter(catalogueNow()))) { return false; }
+    final expectedCouponSaving = _checkoutGroupCouponSavingsMinor(includeUnconfirmedStoreCoupons: true);
     final seen = <String>{};
     final totals = <int>[];
     try {
@@ -11623,7 +11839,7 @@ class BuyV2Session extends ChangeNotifier {
 
   String _currentCheckoutQuoteFingerprint() {
     final address = selectedAddressOrNull;
-    final couponSavings = _checkoutGroupCouponSavingsMinor();
+    final couponSavings = _checkoutGroupCouponSavingsMinor(includeUnconfirmedStoreCoupons: true);
     // Stable grouping is not a quote for a changed delivery plan. Bind both
     // retained and in-flight quotes to the actual connector request context.
     return jsonEncode([
@@ -11657,6 +11873,7 @@ class BuyV2Session extends ChangeNotifier {
       else
         null,
       selectedPayment,
+      for (final selection in _checkoutStoreCouponSelections) selection.quoteBinding,
       for (final benefit in selectedCartBenefitsFor(cartDestinations))
         [
           benefit.id,
@@ -11733,6 +11950,7 @@ class BuyV2Session extends ChangeNotifier {
   ]);
 
   void _invalidateCheckoutQuote() {
+    _syncStoreCouponBasketInputs();
     if (!checkoutQuoteEnabled) {
       _checkoutQuoteRequestSequence += 1;
       _checkoutQuote = null; _checkoutQuoteFingerprint = null;
@@ -11748,6 +11966,16 @@ class BuyV2Session extends ChangeNotifier {
     checkoutQuoteLoadState = BuyV2CommerceLoadState.loading;
     checkoutQuoteMessage = null;
   }
+
+  bool get _storeCouponsQuoteConfirmed {
+    if (_checkoutStoreCouponSelections.isEmpty || _storeCouponSelectionNeedsReview ||
+        checkoutQuoteLoadState != BuyV2CommerceLoadState.ready || _checkoutQuote == null) { return false; }
+    return catalogueNow().isBefore(_checkoutQuote!.validUntil) &&
+      _checkoutQuoteFingerprint == _currentCheckoutQuoteFingerprint() &&
+      _validCheckoutQuote(_checkoutQuote!, checkoutFulfilmentGroups);
+  }
+  bool storeCouponQuoteConfirmed(BuyV2PublishedStoreCoupon coupon) =>
+    selectedStoreCouponFor(coupon) != null && _storeCouponsQuoteConfirmed;
 
   bool get commercialPaymentTermsEnabled =>
       commercialPaymentTermsAdapter != null;
@@ -12372,6 +12600,11 @@ class BuyV2Session extends ChangeNotifier {
       notice = 'This offer is no longer available.';
       notifyListeners();
       return false;
+    }
+    if (current.kind == BuyV2CartBenefitKind.coupon && _checkoutStoreCouponSelections.any((selection) =>
+      _couponStoreLines(selection.coupon).any((line) => current.appliesTo(line.product)))) {
+      notice = 'Remove the selected Store coupon first. It applies once across that Store’s selected channels.';
+      notifyListeners(); return false;
     }
     _selectedCartBenefitRefs[_cartBenefitSelectionKey(
       current.destination,
@@ -16929,6 +17162,10 @@ class BuyV2Session extends ChangeNotifier {
     _customDeliveryInstructions.clear();
     _publicDeliveryInstruction = null;
     _selectedCartBenefitRefs.clear();
+    _selectedStoreCouponRefs.clear();
+    _storeCouponApplyRequests.clear();
+    _storeCouponMessages.clear();
+    _scheduleStoreCouponExpiry();
     _tipsByFulfilmentKey.clear();
     destination = fallback;
     view = BuyV2View.catalogue;
@@ -17171,6 +17408,11 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool _checkoutEligibilityCurrent({bool placingOrder = false}) {
+    if (_checkoutStoreCouponSelections.isNotEmpty && (placingOrder ||
+        collectionCheckoutSelected && collectionCheckout?.unresolved != true)) {
+      showNotice('Store coupon order placement is not connected yet. Remove the coupon selection to continue without it.');
+      return false;
+    }
     if (placingOrder && !_requirePaymentEligible()) return false;
     if (placingOrder &&
         !collectionCheckoutSelected &&
@@ -19644,6 +19886,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void _pruneCartSelections() {
+    _syncStoreCouponBasketInputs();
     _excludedCartProductIds.removeWhere((id) => !_cart.containsKey(id));
     final destinations = _cart.values
         .map((line) => line.product.destination)

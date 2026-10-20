@@ -4018,15 +4018,15 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
     final itemCount = aggregateSummary || destination == BuyV2Destination.orders
         ? session.itemCount
         : session.countForDestination(destination);
-    final total = aggregateSummary || destination == BuyV2Destination.orders
-        ? session.cartTotal -
+    final totalMinor = aggregateSummary || destination == BuyV2Destination.orders
+        ? session.cartTotalMinor -
               BuyV2Destination.values.fold<int>(
                 0,
                 (saving, value) =>
-                    saving + session.couponSavingForDestination(value),
+                    saving + session.couponSavingMinorForDestination(value),
               )
-        : session.totalForDestination(destination) -
-              session.couponSavingForDestination(destination);
+        : session.totalMinorForDestination(destination) -
+              session.couponSavingMinorForDestination(destination);
     final itemLabel = itemCount == 1 ? 'item' : 'items';
     final itemText = '$itemCount $itemLabel';
     final summaryText = itemText;
@@ -4035,7 +4035,7 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
           ? null
           : destination,
     );
-    final totalText = priceUnavailable ? 'Price pending' : buyV2Money(total);
+    final totalText = priceUnavailable ? 'Price pending' : buyV2MoneyMinor(totalMinor);
     final acknowledgement = aggregate || destination == BuyV2Destination.orders
         ? session.cartAcknowledgement
         : session.cartAcknowledgementForDestination(destination);
@@ -4281,7 +4281,7 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
                                               : 'buy-cart-acknowledgement',
                                         ),
                                         stateKey:
-                                            '$summaryText|$cartMessage|$itemCount|$total',
+                                            '$summaryText|$cartMessage|$itemCount|$totalMinor',
                                         text: summaryText,
                                         ownerSize: Size(
                                           valueWidth,
@@ -4293,7 +4293,7 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
                                       const SizedBox(height: 2),
                                       BuyV2FiniteValueTransition(
                                         key: const ValueKey('buy-cart-total'),
-                                        stateKey: '$total|$totalText',
+                                        stateKey: '$totalMinor|$totalText',
                                         text: totalText,
                                         ownerSize: Size(
                                           valueWidth,

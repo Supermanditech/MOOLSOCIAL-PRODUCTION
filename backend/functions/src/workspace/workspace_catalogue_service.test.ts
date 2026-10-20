@@ -96,7 +96,9 @@ test('LF04-ELIGIBILITY actual reviewed prices, cross-channel tiers and read-only
         mediaReadbackVersion: 1, policyReadbackVersion: 1, productFactsReadbackVersion: 1,
         unbrandedProduceReadbackVersion: 1, supplierPublishersVersion: 1, storeDetailsReadbackVersion: 1,
         storeClassificationReadbackVersion: 1});
-      console.log('LF04_STORE_COUPON_ELIGIBILITY=' + JSON.stringify({query: normalizedQuery, result, page}));
+      const advertisement = await promotions().handleOperation('buyer-coupon-one', 'readPublicStoreCouponSnapshot', {
+        storeCouponTermsVersion: 1, storeCouponSnapshotVersion: 1, storeId});
+      console.log('LF04_STORE_COUPON_ELIGIBILITY=' + JSON.stringify({query: normalizedQuery, result, page, advertisement}));
     }
     assert.equal(JSON.stringify((await usage.get()).data()), originalUsage);
     assert.equal((await usage.collection('customers').get()).size, 0);

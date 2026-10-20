@@ -11,6 +11,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
@@ -210,6 +211,53 @@ class _HostMinorQuote extends _HostLegacyQuote implements BuyV2MinorCheckoutQuot
     return reply?.call(groups, tipAmountsMinorByFulfilmentKey) ??
       const BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.unavailable);
   }
+}
+// Explicit host quote only: zero charges here are test inputs, never provider defaults.
+class _HostStoreCouponQuote extends _HostMinorQuote implements BuyV2StoreCouponCheckoutQuoteAdapter {
+  int storeCalls = 0;
+  String mode = 'valid';
+  @override Future<BuyV2CheckoutQuoteSnapshot> loadQuoteWithStoreCouponsMinor({required List<BuyV2FulfilmentGroup> groups,
+    required BuyV2Address address, required String selectedPaymentMethod, required List<BuyV2CartBenefit> selectedBenefits,
+    required List<BuyV2StoreCouponEligibility> selectedStoreCoupons, required Map<String, int> tipAmountsMinorByFulfilmentKey}) async {
+    storeCalls++;
+    final selection = selectedStoreCoupons.single;
+    expect(selectedBenefits.any((benefit) => groups.expand((group) => group.lines).any(
+      (line) => selection.allocations.containsKey(line.product.id) && benefit.appliesTo(line.product))), isFalse);
+    final lines = [for (final group in groups) () {
+      final saving = buyV2SumMinor([for (final line in group.lines) selection.allocations[line.product.id] ?? 0,
+        for (final benefit in selectedBenefits) if (group.lines.any((line) => benefit.appliesTo(line.product))) benefit.savingAmountMinor]);
+      return BuyV2CheckoutQuoteLine.minor(fulfilmentKey: group.key, itemSubtotalMinor: group.totalMinor,
+        couponSavingMinor: mode == 'allocation' ? 0 : saving, taxMinor: 0, freightMinor: 0,
+        deliveryFeeMinor: 0, paymentChargeMinor: 0, tipMinor: tipAmountsMinorByFulfilmentKey[group.key]!,
+        totalMinor: group.totalMinor - (mode == 'allocation' ? 0 : saving) + tipAmountsMinorByFulfilmentKey[group.key]!);
+    }()];
+    return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready, quote: BuyV2CheckoutQuote.minor(
+      id: 'host-store-coupon-quote', sourceId: 'explicit-host-only-quote', evaluatedAt:
+        mode == 'future' ? selection.observedAt.add(const Duration(seconds: 1)) : selection.observedAt,
+      validUntil: mode == 'too-long' ? selection.validUntil.add(const Duration(seconds: 1)) : selection.validUntil,
+      lines: lines, totalMinor: buyV2SumMinor(lines.map((line) => line.totalMinor)), storeCouponBindings: {
+        if (mode != 'missing') selection.coupon.identity: mode == 'wrong-binding' ? 'wrong' : selection.quoteBinding,
+        if (mode == 'extra') 'another-Store-coupon': 'unrequested',
+      }));
+  }
+}
+class _HostStoreCouponLegacyBenefits implements BuyV2LiveCartBenefitsAdapter {
+  _HostStoreCouponLegacyBenefits(this.clock);
+  final DateTime Function() clock;
+  List<BuyV2CartBenefit> values = [];
+  BuyV2CartBenefitsLoadState state = BuyV2CartBenefitsLoadState.ready;
+  @override List<BuyV2CartBenefit> benefitsFor({required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations, required int itemTotal}) => values;
+  @override Future<BuyV2CartBenefitsSnapshot> loadEligibility(BuyV2CartBenefitsRequest request) async =>
+    BuyV2CartBenefitsSnapshot(state: state, benefits: values, evaluatedAt: clock());
+}
+class _HostCouponCartCommerce extends _HostExactOrderCommerce {
+  _HostCouponCartCommerce(this.products);
+  final List<BuyV2Product> products;
+  @override Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+    products: products, businessVerified: true, addresses: const [BuyV2Address(id: 'host-home', kind: BuyV2AddressKind.home,
+      label: 'Host Home', recipient: 'Evaluation buyer', phone: '9000000000', line: 'Isolated host address',
+      area: 'Jodhpur', pinCode: '342003', landmark: '')]);
 }
 class _HostLegacyTerms implements BuyV2CommercialPaymentTermsAdapter {
   int legacyCalls = 0;
@@ -1152,7 +1200,12 @@ class _StockSessionCatalogue extends SessionCatalogue implements WorkspaceStoreS
 }
 
 void main() {
-  test('LF04-ELIGIBILITY exact actual producer reply crosses the client boundary', () async {
+  setUpAll(() async {
+    if (Platform.environment['LF04_COUPON_CART_CAPTURE_ROOT'] == null) return;
+    final font = FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'));
+    await font.load();
+  });
+  testWidgets('LF04-ELIGIBILITY exact actual producer reply crosses the client boundary', (tester) async {
     const path = String.fromEnvironment('LF04_ELIGIBILITY_CAPTURE');
     if (path.isEmpty) return;
     final row = File(path).readAsLinesSync().singleWhere((line) => line.startsWith('LF04_STORE_COUPON_ELIGIBILITY='));
@@ -1209,13 +1262,21 @@ void main() {
         entry.product.packTerms!.priceMinorForQuantity(quantity, entry.product.priceMinor)), quantity: quantity);
     }()];
     var current = true;
+    var clock = at;
+    var failAdvertisement = false;
+    var advertisement = capture['advertisement'];
+    var eligibilityOnly = false;
     final bodies = <Map<String, Object?>>[];
     Completer<SocialContentResponse>? pending;
     final transport = OwnerTransport((body) async {
       bodies.add(body);
-      if (pending != null) return pending.future;
+      if (pending != null && (!eligibilityOnly || body['operation'] == 'evaluateStoreCouponEligibility')) return pending.future;
       if (body['operation'] == 'readPublicStoreCatalogue') {
         return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': page}));
+      }
+      if (body['operation'] == 'readPublicStoreCouponSnapshot') {
+        if (failAdvertisement) throw StateError('Isolated host publication read failure');
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': advertisement}));
       }
       expect(body['operation'], 'evaluateStoreCouponEligibility');
       final sent = Map<String, Object?>.of(body)..remove('operation')..remove('storeCouponEligibilityVersion');
@@ -1226,7 +1287,7 @@ void main() {
       endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
       credentials: Credentials(), transport: transport, realm: 'evaluation', ownerAccountId: 'buyer-coupon-one',
       productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true, supplierPublishersVersionSupported: true,
-      storeClassificationReadbackSupported: true, storeCouponTermsSupported: true, storeCouponEligibilitySupported: active, now: () => at);
+      storeClassificationReadbackSupported: true, storeCouponTermsSupported: true, storeCouponEligibilitySupported: active, now: () => clock);
     final gateway = connection();
     expect(gateway.forOwnerAccount('another-buyer').storeCouponEligibilitySupported, isTrue);
     expect((await gateway.evaluateStoreCoupon(coupon: coupon, lines: actualLines, current: () => current)).savingMinor, 48661);
@@ -1237,11 +1298,248 @@ void main() {
     pending = Completer<SocialContentResponse>();
     final retired = gateway.evaluateStoreCoupon(coupon: coupon, lines: actualLines, current: () => current);
     final rejection = expectLater(retired, throwsFormatException);
-    await Future<void>.delayed(Duration.zero);
+    await tester.pump();
     current = false;
     pending.complete(SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': page})));
     await rejection;
     expect(transport.calls, initialCalls + 1);
+    current = true; pending = null;
+    final source = WorkspaceStoreCatalogueSource(gateway: gateway, storeId: coupon.storeId, current: () => current);
+    final baseProducts = [for (final row in requested) WorkspacePublicCatalogueEntry.fromResponse(page,
+      storeId: coupon.storeId, realm: 'evaluation', channel: (row['listing'] as Map)['channel'] == 'retail'
+        ? BuyV2OfferClass.retail : BuyV2OfferClass.wholesale, now: at, supplierPublishersVersionSupported: true).product];
+    // Unrelated legacy Cart line fixture, not a second published catalogue claim.
+    final other = product.copyWith(id: 'host-other-product', storeId: 'host-other-store',
+      seller: 'Host second Store', priceMinor: 10000);
+    final core = BuySession(), quote = _HostStoreCouponQuote(), legacy = _HostStoreCouponLegacyBenefits(() => clock);
+    late final BuyV2Session session;
+    session = BuyV2Session(core: core, reviewDataEnabled: false, cataloguePageSource: source,
+      catalogueNow: () => clock, commerceAdapter: _HostCouponCartCommerce([...baseProducts, other]), checkoutQuoteAdapter: quote,
+      cartBenefitsAdapter: legacy,
+      productFactsAdapter: _HostOperationalFacts((product) => BuyV2ProductFactsSnapshot(productId: product.id,
+        priceMinor: product.priceMinor, deliveryPromise: 'Host courier fixture', partner: 'Host courier fixture',
+        orderabilityLabel: 'Host checked availability', sourceId: 'isolated-host-facts', observedAt: at,
+        eligibility: BuyV2OfferEligibility(productId: product.id, storeId: product.storeId!, sourceRevision: 'host-only-v1',
+          customerLocationKey: session.eligibilityLocationKey, observedAt: at, expiresAt: at.add(const Duration(hours: 1)),
+          offerClass: product.offerClass!, channelEnabled: true, storeReady: true, fleetAvailable: false,
+          customerLocationConfirmed: true, options: {BuyV2DeliveryOption.courier}))));
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    await session.restoreCommerce();
+    for (final row in requested) {
+      expect(session.addProduct(row['lineId'] as String, quantity: row['quantity'] as int), isTrue, reason: session.notice);
+    }
+    expect(session.checkoutTotalMinor, 146000);
+    session.chooseAddress('host-home');
+    expect(session.selectedAddressOrNull?.id, 'host-home');
+    for (final product in [...baseProducts, other]) { session.refreshProductFacts(product.id); }
+    expect(await session.refreshPublishedStoreCoupons(baseProducts.first.id), isTrue);
+    var advertised = session.cartStoreCoupons.single;
+    quote.mode = 'missing';
+    expect(await session.chooseStoreCoupon(advertised), isTrue);
+    expect(session.selectedStoreCoupons.length, 1);
+    expect(session.selectedCartBenefitsFor(session.cartDestinations), isEmpty);
+    expect(await session.refreshCheckoutQuote(), isFalse);
+    expect(session.scopedCouponSavingMinor, 0);
+    expect(session.scopedPayableTotalMinor, 146000);
+    for (final mode in ['wrong-binding', 'extra', 'allocation', 'too-long', 'future']) {
+      quote.mode = mode;
+      expect(await session.refreshCheckoutQuote(), isFalse, reason: mode);
+      expect(session.scopedCouponSavingMinor, 0, reason: mode);
+    }
+    quote.mode = 'valid';
+    expect(await session.refreshCheckoutQuote(), isTrue,
+      reason: 'message=${session.checkoutQuoteMessage}; review=${session.storeCouponNeedsReview(advertised)}; '
+        'calls=${quote.storeCalls}; groups=${session.checkoutFulfilmentGroups.map((g) => [g.key, g.totalMinor, g.lines.map((l) => l.product.id).toList()]).toList()}');
+    expect(session.storeCouponQuoteConfirmed(advertised), isTrue);
+    expect(session.scopedCouponSavingMinor, 48661);
+    expect(session.scopedPayableTotalMinor, 97339);
+    expect(session.couponSavingMinorForDestination(BuyV2Destination.shop), 8666);
+    expect(session.couponSavingMinorForDestination(BuyV2Destination.wholesale), 39995);
+    tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    session.openCart();
+    final hostBoundary = GlobalKey();
+    VoidCallback? staleRemove;
+    for (final scale in [1.0, 2.0]) {
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: MediaQuery(
+        data: MediaQueryData(size: const Size(360, 800), textScaler: TextScaler.linear(scale)),
+        child: RepaintBoundary(key: hostBoundary, child: BuyV2Screen(session: session,
+          initialDestination: session.destination, initialView: BuyV2View.cart)))));
+      await tester.pumpAndSettle();
+      expect(session.chooseAddress('host-home'), isTrue, reason: session.notice);
+      for (final product in [...baseProducts, other]) { session.refreshProductFacts(product.id); }
+      advertised = session.cartStoreCoupons.single;
+      if (session.storeCouponNeedsReview(advertised)) {
+        expect(await session.chooseStoreCoupon(advertised), isTrue);
+      }
+      expect(await session.refreshCheckoutQuote(), isTrue, reason: session.checkoutQuoteMessage);
+      await tester.pumpAndSettle();
+      expect(session.storeCouponQuoteConfirmed(advertised), isTrue);
+      expect(session.scopedPayableTotalMinor, 97339);
+      final panel = find.byKey(ValueKey('buy-cart-store-coupon-${advertised.identity}'));
+      final cartScroll = find.descendant(of: find.byKey(const ValueKey('buy-cart-scroll')),
+        matching: find.byWidgetPredicate((widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down)).first;
+      if (panel.evaluate().isEmpty) {
+        final toggle = find.byKey(const ValueKey('buy-cart-coupons'));
+        await tester.scrollUntilVisible(toggle, 220, scrollable: cartScroll);
+        if (find.byTooltip('Collapse coupons and offers').evaluate().isEmpty) {
+          await tester.tap(toggle); await tester.pumpAndSettle();
+        }
+      }
+      expect(session.cartStoreCoupons.length, 1, reason: 'Published Store coupon remains in the actual Cart source');
+      await tester.scrollUntilVisible(panel, 220, scrollable: cartScroll); await tester.pumpAndSettle();
+      expect(find.descendant(of: panel, matching: find.text(advertised.name)), findsOneWidget);
+      expect(find.descendant(of: panel, matching: find.text('Remove')), findsOneWidget);
+      staleRemove ??= tester.widget<TextButton>(find.ancestor(
+        of: find.descendant(of: panel, matching: find.text('Remove')),
+        matching: find.byType(TextButton)).first).onPressed;
+      expect(tester.takeException(), isNull, reason: 'Store coupon layout at $scale');
+      final captureRoot = Platform.environment['LF04_COUPON_CART_CAPTURE_ROOT'];
+      if (captureRoot != null) {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(hostBoundary));
+        await tester.runAsync(() async {
+          final file = File('$captureRoot/lf04-store-coupon-cart-host-${scale == 1 ? '1x' : '2x'}-confirmed-20261020-v2.png');
+          if (await file.exists()) throw StateError('Preserve previous host captures.');
+          final image = await boundary.toImage(pixelRatio: 1);
+          try { final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+            await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
+          } finally { image.dispose(); }
+        });
+      }
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+    advertised = session.cartStoreCoupons.single;
+    expect(session.chooseAddress('host-home'), isTrue, reason: session.notice);
+    for (final product in [...baseProducts, other]) { session.refreshProductFacts(product.id); }
+    final wholesale = baseProducts.singleWhere((p) => p.destination == BuyV2Destination.wholesale);
+    expect(session.setCartQuantity(wholesale.id, '3'), isTrue);
+    expect(session.setCartQuantity(wholesale.id, '5'), isTrue, reason: session.notice);
+    expect(session.storeCouponNeedsReview(advertised), isTrue);
+    expect(session.scopedCouponSavingMinor, 0);
+    expect(await session.chooseStoreCoupon(advertised), isTrue);
+    expect(await session.refreshCheckoutQuote(), isTrue, reason: session.checkoutQuoteMessage);
+    final recheckedSelection = session.selectedStoreCouponFor(advertised);
+    staleRemove!();
+    expect(identical(session.selectedStoreCouponFor(advertised), recheckedSelection), isTrue,
+      reason: 'An earlier rendered Remove must not clear a newer eligibility selection.');
+    pending = Completer<SocialContentResponse>();
+    final staleApply = session.chooseStoreCoupon(advertised);
+    await tester.pump();
+    session.setCartQuantity(wholesale.id, '3'); session.setCartQuantity(wholesale.id, '5');
+    pending.complete(SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': page})));
+    expect(await staleApply, isFalse);
+    expect(session.storeCouponNeedsReview(advertised), isTrue);
+    pending = null;
+    expect(await session.chooseStoreCoupon(advertised), isTrue);
+    expect(await session.refreshCheckoutQuote(), isTrue);
+    final unsupportedCore = BuySession(), unsupportedQuote = _HostMinorQuote();
+    final unsupportedSource = WorkspaceStoreCatalogueSource(gateway: gateway, storeId: coupon.storeId, current: () => current);
+    late final BuyV2Session unsupported;
+    unsupported = BuyV2Session(core: unsupportedCore, reviewDataEnabled: false, cataloguePageSource: unsupportedSource,
+      catalogueNow: () => clock, commerceAdapter: _HostCouponCartCommerce(baseProducts), checkoutQuoteAdapter: unsupportedQuote,
+      productFactsAdapter: _HostOperationalFacts((product) => session.productFactsAdapter.snapshotFor(product).copyWith(
+        eligibility: BuyV2OfferEligibility(productId: product.id, storeId: product.storeId!, sourceRevision: 'host-only-v1',
+          customerLocationKey: unsupported.eligibilityLocationKey, observedAt: at, expiresAt: at.add(const Duration(hours: 1)),
+          offerClass: product.offerClass!, channelEnabled: true, storeReady: true, fleetAvailable: false,
+          customerLocationConfirmed: true, options: {BuyV2DeliveryOption.courier}))));
+    addTearDown(unsupportedCore.dispose); addTearDown(unsupported.dispose);
+    await unsupported.restoreCommerce(); unsupported.chooseAddress('host-home');
+    for (final row in requested) {
+      expect(unsupported.addProduct(row['lineId'] as String, quantity: row['quantity'] as int), isTrue, reason: unsupported.notice);
+    }
+    await unsupported.refreshPublishedStoreCoupons(baseProducts.first.id);
+    await unsupported.refreshCheckoutQuote();
+    final beforeUnsupported = unsupportedQuote.minorCalls;
+    expect(await unsupported.chooseStoreCoupon(unsupported.cartStoreCoupons.single), isTrue);
+    expect(await unsupported.refreshCheckoutQuote(), isFalse);
+    expect(unsupportedQuote.minorCalls, beforeUnsupported);
+    expect(unsupported.scopedCouponSavingMinor, 0);
+    unsupported.clearCart();
+    for (final row in requested) { expect(unsupported.addProduct(row['lineId'] as String, quantity: row['quantity'] as int), isTrue); }
+    expect(unsupported.selectedStoreCoupons, isEmpty);
+    await unsupported.refreshPublishedStoreCoupons(baseProducts.first.id);
+    await unsupported.refreshCheckoutQuote();
+    final beforePublicationRace = unsupportedQuote.minorCalls;
+    pending = Completer<SocialContentResponse>(); eligibilityOnly = true;
+    final firstApply = unsupported.chooseStoreCoupon(unsupported.cartStoreCoupons.single);
+    await tester.pump();
+    expect(bodies.last['operation'], 'evaluateStoreCouponEligibility');
+    // Independent source invalidation probe; no emulator campaign is changed.
+    advertisement = Map<String, dynamic>.from(capture['advertisement'] as Map)..['items'] = [];
+    expect(await unsupported.refreshPublishedStoreCoupons(baseProducts.first.id), isTrue);
+    pending.complete(SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': capture['result']})));
+    expect(await firstApply, isFalse);
+    expect(unsupported.selectedStoreCoupons, isEmpty);
+    expect(unsupportedQuote.minorCalls, beforePublicationRace);
+    pending = null; eligibilityOnly = false; advertisement = capture['advertisement'];
+    expect(session.addProduct(other.id), isTrue, reason: '${session.notice}; '
+      'facts=${session.productFactsFor(other).orderabilityLabel}; stale=${session.productFactsFor(other).stale}; '
+      'eligibility=${session.productFactsFor(other).eligibility?.customerLocationKey}/${session.eligibilityLocationKey}');
+    final otherCoupon = BuyV2CartBenefit(id: 'host-other-coupon', kind: BuyV2CartBenefitKind.coupon,
+      destination: BuyV2Destination.shop, title: 'Other Store saving', detail: 'Isolated host coupon',
+      sourceId: 'host-other-source', scope: BuyV2CartBenefitScope.store, storeId: other.storeId, savingAmount: 10);
+    final platform = BuyV2CartBenefit(id: 'host-shared-coupon', kind: BuyV2CartBenefitKind.coupon,
+      destination: BuyV2Destination.shop, title: 'Host multi-Store saving', detail: 'Isolated indivisible host coupon',
+      sourceId: 'host-platform-source', savingAmount: 10);
+    legacy.values = [otherCoupon, platform];
+    await session.refreshCartBenefits();
+    expect(session.chooseCartBenefit(otherCoupon), isTrue);
+    expect(session.storeCouponNeedsReview(advertised), isFalse);
+    expect(await session.refreshCheckoutQuote(), isTrue);
+    expect(session.scopedPayableTotalMinor, 106339);
+    expect(session.chooseCartBenefit(platform), isFalse);
+    expect(session.isCartBenefitSelected(otherCoupon), isTrue);
+    session.removeStoreCoupon(advertised, expectedSelection: session.selectedStoreCouponFor(advertised)!);
+    expect(session.chooseCartBenefit(platform), isTrue);
+    session.selectCartProduct(other.id, false); await session.refreshCartBenefits();
+    expect(await session.chooseStoreCoupon(advertised), isFalse);
+    expect(session.isCartBenefitSelected(platform), isTrue);
+    expect(session.selectedStoreCoupons, isEmpty);
+    legacy.state = BuyV2CartBenefitsLoadState.unavailable; await session.refreshCartBenefits();
+    final beforeUnresolved = transport.calls;
+    expect(await session.chooseStoreCoupon(advertised), isFalse);
+    expect(transport.calls, beforeUnresolved);
+    legacy.state = BuyV2CartBenefitsLoadState.ready; await session.refreshCartBenefits();
+    expect(session.isCartBenefitSelected(platform), isTrue);
+    session.removeCartBenefit(kind: BuyV2CartBenefitKind.coupon, destination: BuyV2Destination.shop, expectedBenefit: platform);
+    session.selectCartProduct(other.id, true); await session.refreshCartBenefits();
+    expect(session.chooseCartBenefit(otherCoupon), isTrue);
+    legacy.state = BuyV2CartBenefitsLoadState.unavailable; await session.refreshCartBenefits();
+    // An unrelated Store's retained coupon cannot prevent this Store's
+    // eligibility read, but neither may be silently dropped from the quote.
+    expect(await session.chooseStoreCoupon(advertised), isTrue);
+    expect(await session.refreshCheckoutQuote(), isFalse);
+    expect(session.scopedCouponSavingMinor, 0);
+    legacy.state = BuyV2CartBenefitsLoadState.ready; await session.refreshCartBenefits();
+    expect(session.isCartBenefitSelected(otherCoupon), isTrue);
+    expect(await session.chooseStoreCoupon(advertised), isTrue);
+    expect(session.isCartBenefitSelected(otherCoupon), isTrue);
+    expect(await session.refreshCheckoutQuote(), isTrue);
+    final beforeHold = session.checkoutSubmissionState, callsBeforeHold = transport.calls;
+    session.checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentPending;
+    expect(await session.chooseStoreCoupon(advertised), isFalse);
+    session.removeStoreCoupon(advertised, expectedSelection: session.selectedStoreCouponFor(advertised)!);
+    expect(session.selectedStoreCoupons.length, 1);
+    expect(transport.calls, callsBeforeHold);
+    session.checkoutSubmissionState = beforeHold;
+    failAdvertisement = true;
+    expect(await session.refreshPublishedStoreCoupons(baseProducts.first.id), isFalse);
+    expect(session.storeCouponNeedsReview(advertised), isTrue);
+    expect(session.storeCouponQuoteConfirmed(advertised), isFalse);
+    failAdvertisement = false;
+    expect(await session.refreshPublishedStoreCoupons(baseProducts.first.id), isTrue);
+    expect(session.storeCouponNeedsReview(advertised), isTrue);
+    advertised = session.cartStoreCoupons.single;
+    expect(await session.chooseStoreCoupon(advertised), isTrue);
+    expect(await session.refreshCheckoutQuote(), isTrue);
+    clock = at.add(const Duration(minutes: 1));
+    await tester.pump(const Duration(minutes: 1));
+    expect(session.storeCouponQuoteConfirmed(advertised), isFalse);
+    expect(session.checkoutQuoteReviewRequired, isTrue);
+    expect(session.scopedCouponSavingMinor, 1000);
+    session.removeStoreCoupon(advertised, expectedSelection: session.selectedStoreCouponFor(advertised)!);
+    expect(session.selectedStoreCoupons, isEmpty);
+    expect(session.checkoutTotalMinor, 156000);
   }, skip: const String.fromEnvironment('LF04_ELIGIBILITY_CAPTURE').isEmpty);
   Map<String, dynamic> publicCoupon({String id = 'coupon-one', int revision = 1, String name = 'Host Diwali savings'}) => {
     'couponId': id, 'revision': revision, 'scope': 'store_basket', 'storeId': 'store-one',

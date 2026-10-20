@@ -12486,7 +12486,7 @@ class _CheckoutOrderDetails extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        if (selectedBenefits.isNotEmpty &&
+        if ((selectedBenefits.isNotEmpty || session.selectedStoreCoupons.isNotEmpty) &&
             !session.checkoutRequiresResolution) ...[
           const SizedBox(height: 8),
           Container(
@@ -12497,6 +12497,13 @@ class _CheckoutOrderDetails extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text('Coupons and payment offers', style: context.buyBody),
+                for (final selection in session.selectedStoreCoupons) ...[
+                  const SizedBox(height: 8),
+                  Text('${selection.coupon.name} · ${selection.coupon.publisherName}', style: context.buyBody),
+                  Text(session.storeCouponQuoteConfirmed(selection.coupon)
+                    ? 'Coupon saving −${_comparisonMoney(selection.savingMinor!)} included in this total.'
+                    : 'Selected Store coupon. Its saving is not confirmed in this total.', style: context.buyMeta),
+                ],
                 for (final benefit in selectedBenefits) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -21922,9 +21929,9 @@ class _InlineCartBenefitPanelState extends State<_InlineCartBenefitPanel>
                                     color: BuyV2ActionStyle.primaryForeground,
                                   ),
                                 ),
-                                if (selectedBenefits.isNotEmpty)
+                                if (selectedBenefits.isNotEmpty || session.selectedStoreCoupons.isNotEmpty)
                                   Text(
-                                    '${selectedBenefits.length} selected for review',
+                                    '${selectedBenefits.length + session.selectedStoreCoupons.length} selected for review',
                                     style: context.buyMeta.copyWith(
                                       fontSize: 10,
                                     ),
@@ -22053,6 +22060,16 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
   }
 
   void _scheduleBenefitsRead(BuyV2Session ownerSession) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !identical(widget.session, ownerSession)) return;
+      final seen = <String>{};
+      for (final line in ownerSession.cartLines) {
+        final listing = line.product.publicListingIdentity;
+        if (listing != null && seen.add('${listing.realm}:${listing.storeId}')) {
+          unawaited(ownerSession.refreshPublishedStoreCoupons(line.product.id));
+        }
+      }
+    });
     if (ownerSession.liveCartBenefitsEnabled &&
         ownerSession.cartBenefitsLoadState !=
             BuyV2CartBenefitsLoadState.ready) {
@@ -22189,7 +22206,7 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
             Expanded(
               child: _CartBenefitKindSelector(
                 kind: _kind,
-                couponCount: coupons.length,
+                couponCount: coupons.length + ownerSession.cartStoreCoupons.length,
                 paymentOfferCount: paymentOffers.length,
                 onChanged: (value) {
                   HapticFeedback.selectionClick();
@@ -22208,10 +22225,22 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
           ],
         ),
         const SizedBox(height: 6),
-        if (widget.session.cartBenefitsLoadState !=
-                BuyV2CartBenefitsLoadState.ready)
+        if (_kind == BuyV2CartBenefitKind.coupon && ownerSession.cartStoreCoupons.isNotEmpty) ...[
+          for (final coupon in ownerSession.cartStoreCoupons.take(2))
+            _CartStoreCouponRow(session: ownerSession, coupon: coupon),
+          if (ownerSession.cartStoreCoupons.length > 2)
+            TextButton(onPressed: () => showModalBottomSheet<void>(context: context, isScrollControlled: true,
+              builder: (context) => SafeArea(child: SizedBox(height: MediaQuery.sizeOf(context).height * .7,
+                child: AnimatedBuilder(animation: ownerSession, builder: (context, _) => ListView(
+                  padding: const EdgeInsets.all(16), children: [
+                    Text('Store coupons', style: context.buyBody),
+                    for (final coupon in ownerSession.cartStoreCoupons) _CartStoreCouponRow(session: ownerSession, coupon: coupon),
+                  ]))))), child: Text('View all ${ownerSession.cartStoreCoupons.length} Store coupons')),
+        ],
+        if (widget.session.cartBenefitsLoadState != BuyV2CartBenefitsLoadState.ready &&
+            (_kind != BuyV2CartBenefitKind.coupon || ownerSession.cartStoreCoupons.isEmpty || ownerSession.checkoutBenefitReviewRequired))
           _CartBenefitEligibilityState(session: widget.session)
-        else if (benefits.isEmpty)
+        else if (benefits.isEmpty && (_kind != BuyV2CartBenefitKind.coupon || ownerSession.cartStoreCoupons.isEmpty))
           if (destinations.length > 1)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -22290,6 +22319,39 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
           ),
       ],
     );
+  }
+}
+
+class _CartStoreCouponRow extends StatelessWidget {
+  const _CartStoreCouponRow({required this.session, required this.coupon});
+  final BuyV2Session session;
+  final BuyV2PublishedStoreCoupon coupon;
+  @override Widget build(BuildContext context) {
+    final selected = session.selectedStoreCouponFor(coupon), busy = session.storeCouponChecking(coupon);
+    final review = session.storeCouponNeedsReview(coupon), confirmed = session.storeCouponQuoteConfirmed(coupon);
+    final saving = coupon.terms.kind == 'flat' ? '${_comparisonMoney(coupon.terms.flatAmountMinor!)} off'
+      : '${(coupon.terms.percentageBasisPoints! / 100).toStringAsFixed(coupon.terms.percentageBasisPoints! % 100 == 0 ? 0 : 2)}% off';
+    return Padding(key: ValueKey('buy-cart-store-coupon-${coupon.identity}'),
+      padding: const EdgeInsets.symmetric(vertical: 6), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Padding(padding: EdgeInsets.only(top: 2, right: 8),
+            child: Icon(Icons.confirmation_number_outlined, size: 19, color: Color(0xff256b78))),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(coupon.name, style: context.buyBody.copyWith(fontWeight: FontWeight.w600)),
+            Text('${coupon.publisherName} · Store-wide · $saving', style: context.buyMeta),
+          ])),
+        ]),
+        if (selected != null) Text(review ? 'Cart changed or check expired. Recheck before using this coupon.'
+          : confirmed ? 'Saving ${_comparisonMoney(selected.savingMinor!)} confirmed in the total.'
+          : 'Eligible saving ${_comparisonMoney(selected.savingMinor!)} · not yet included in the total.', style: context.buyMeta),
+        if (session.storeCouponMessage(coupon) case final message?) Text(message, style: context.buyMeta),
+        Wrap(spacing: 8, alignment: WrapAlignment.end, children: [
+          if (selected != null) TextButton(onPressed: session.cartChangesBlocked || busy ? null : () => session.removeStoreCoupon(coupon, expectedSelection: selected),
+            child: const Text('Remove')),
+          TextButton(onPressed: session.cartChangesBlocked || busy ? null : () => unawaited(session.chooseStoreCoupon(coupon)),
+            child: Text(busy ? 'Checking…' : selected == null ? 'Apply' : review ? 'Recheck' : 'Check again')),
+        ]),
+      ]));
   }
 }
 

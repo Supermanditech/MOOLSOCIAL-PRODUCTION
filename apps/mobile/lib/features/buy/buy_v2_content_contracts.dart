@@ -649,6 +649,15 @@ class BuyV2StoreCouponEligibility {
   final int? savingMinor, subtotalMinor, basketSourceRevision;
   final Map<String, int> allocations;
   bool get eligible => reason == null && savingMinor != null;
+  /// Exact acknowledgement required from a compatible authoritative quote.
+  /// A request fingerprint alone does not bind price-source/allocation facts.
+  String get quoteBinding => jsonEncode([
+    coupon.identity, coupon.revision, coupon.name, accountId, requestFingerprint,
+    basketFingerprint, basketSourceId, basketSourceRevision, benefitRevision,
+    sourceReference, funderReference, subtotalMinor, savingMinor,
+    observedAt.toIso8601String(), validUntil.toIso8601String(),
+    for (final id in allocations.keys.toList()..sort()) [id, allocations[id]],
+  ]);
   bool matches(List<BuyV2CartLine> lines, DateTime now) =>
       !now.isBefore(observedAt) &&
       now.isBefore(validUntil) &&
@@ -3424,6 +3433,7 @@ class BuyV2CheckoutQuote {
     required this.lines,
     required int total,
     this.paymentGroups,
+    this.storeCouponBindings = const {},
     // ignore: prefer_initializing_formals
   }) : _total = total, _totalMinor = null;
 
@@ -3435,6 +3445,7 @@ class BuyV2CheckoutQuote {
     required this.lines,
     required int totalMinor,
     this.paymentGroups,
+    this.storeCouponBindings = const {},
   // Public argument names are retained for existing provider callers.
   // ignore: prefer_initializing_formals
   }) : _total = null, _totalMinor = totalMinor;
@@ -3452,6 +3463,9 @@ class BuyV2CheckoutQuote {
   /// Null retains legacy whole-basket placement. Empty/invalid is a hold.
   /// Never infer groups by dividing an amount to bypass a payment limit.
   final List<BuyV2CheckoutPaymentGroup>? paymentGroups;
+  /// Realm/Store/campaign identity -> exact negotiated eligibility binding.
+  /// Empty preserves legacy providers, never acknowledges new Store coupons.
+  final Map<String, String> storeCouponBindings;
 }
 
 @immutable
@@ -3487,6 +3501,19 @@ abstract interface class BuyV2MinorCheckoutQuoteAdapter
     required BuyV2Address address,
     required String selectedPaymentMethod,
     required List<BuyV2CartBenefit> selectedBenefits,
+    required Map<String, int> tipAmountsMinorByFulfilmentKey,
+  });
+}
+
+/// Explicit Store-basket negotiation, separate from destination-v1 benefits.
+abstract interface class BuyV2StoreCouponCheckoutQuoteAdapter
+    implements BuyV2MinorCheckoutQuoteAdapter {
+  Future<BuyV2CheckoutQuoteSnapshot> loadQuoteWithStoreCouponsMinor({
+    required List<BuyV2FulfilmentGroup> groups,
+    required BuyV2Address address,
+    required String selectedPaymentMethod,
+    required List<BuyV2CartBenefit> selectedBenefits,
+    required List<BuyV2StoreCouponEligibility> selectedStoreCoupons,
     required Map<String, int> tipAmountsMinorByFulfilmentKey,
   });
 }
