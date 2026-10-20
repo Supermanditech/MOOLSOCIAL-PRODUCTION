@@ -1275,6 +1275,287 @@ class _StockSessionCatalogue extends SessionCatalogue implements WorkspaceStoreS
 const _bulkServiceCapture20261020 = r'''{"capturedAt":"2026-10-20T12:01:00.000Z","request":{"schemaVersion":1,"requestId":"request-one","storeId":"store-one","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10}]},"offer":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"offer-one","expectedRevision":1,"validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025}]},"accept":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"accept-one","expectedRevision":2},"created":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"supplierRequested":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"offered":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"accepted":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"recovered":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"request","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"request-one","requestFingerprint":"e61bc6284c6b771f90677f3376ecbb035236e77c2ba49d131f164ee30c75e974","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"recorded","agreement":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"proof":null},"unobserved":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"accept","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"never-accept","requestFingerprint":"9a47224ccf5ad2833db6eaff3e27e70983d53fb33c04c396a6016edc2da9557a","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"not_found","agreement":null,"proof":null},"buyerPage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"buyer","storeId":null,"currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","storeName":"Isolated Bulk supplier","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null},"storePage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"supplier","storeId":"store-one","currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","storeName":"Isolated Bulk supplier","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null}}''';
 
 void main() {
+  Map<String, dynamic> restockClientPackets() {
+    const marker = 'RESTOCK_CLIENT_CAPTURE=';
+    final lines = File(Platform.environment['LF_RESTOCK_CLIENT_LOG']!).readAsLinesSync()
+      .where((line) => line.startsWith(marker)).toList();
+    expect(lines, hasLength(1));
+    return jsonDecode(lines.single.substring(marker.length)) as Map<String, dynamic>;
+  }
+  const restockContext = BuyV2ProcurementContext(accountId: 'buyer-one', storeId: 'buying-store',
+    purpose: BuyV2ProcurementPurpose.restock, originOperationId: 'host-procurement-origin');
+  AuthenticatedWorkspaceCatalogueGateway boundRestockGateway(SocialContentTransport api, {
+    bool Function()? current, DateTime Function()? clock, WorkspacePublicVariantSource? variants,
+    SocialContentCredentials? credentials,
+  }) => AuthenticatedWorkspaceCatalogueGateway(
+    endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+    credentials: credentials ?? Credentials(), transport: api, realm: 'evaluation', now: clock ?? () => at,
+    productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+    storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+    minorMoneyReadbackSupported: true, procurementReadbackSupported: true, reviewedVariants: variants)
+      .forStoreProcurement(restockContext, current: current ?? () => true);
+  BuyV2CatalogueQuery restockQuery({BuyV2ProcurementContext? context = restockContext,
+    BuyV2Destination destination = BuyV2Destination.wholesale}) => BuyV2CatalogueQuery(
+      destination: destination, regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas, procurementContext: context);
+  for (final path in ['access', 'discovery', 'stores', 'exact', 'page', 'resolve', 'content']) {
+    test('LF05-RESTOCK bound shared client reads actual persisted supplier $path', () async {
+      final packets = restockClientPackets(), credentials = Credentials();
+      final api = OwnerTransport((body) async {
+        expect(body['operation'], 'readStoreProcurementCatalogue');
+        final request = Map<String, Object?>.of(body)..remove('operation');
+        final packet = packets.values.cast<Map<String, dynamic>>().where((entry) =>
+          _mediaHash(entry['request']) == _mediaHash(request)).single;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': packet['response']}));
+      });
+      final base = AuthenticatedWorkspaceCatalogueGateway(
+        endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: credentials, transport: api, realm: 'evaluation', now: () => at,
+        productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+        storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+        minorMoneyReadbackSupported: true, procurementReadbackSupported: true);
+      final AuthenticatedWorkspaceCatalogueGateway bound = base
+        .forStoreProcurement(restockContext, current: () => true);
+      final source = WorkspacePublicDiscoverySource(gateway: bound, current: () => true);
+      addTearDown(source.dispose);
+      final query = BuyV2CatalogueQuery(destination: BuyV2Destination.wholesale, regionId: null,
+        areaScope: BuyV2CatalogueAreaScope.allAreas, procurementContext: restockContext);
+      final listingId = (((packets['exact'] as Map)['response'] as Map)['supplierGrants'] as List).single['listingId'] as String;
+      final products = <BuyV2Product>[];
+      switch (path) {
+        case 'access':
+          final snapshot = await bound.readProcurementAccess();
+          expect(snapshot.state, BuyV2CommerceLoadState.ready);
+          expect(snapshot.procurementAccessOnly, isTrue);
+          expect(snapshot.procurementBuyerGrant!.storeId, restockContext.storeId);
+          expect(snapshot.products, isEmpty); expect(snapshot.orders, isEmpty);
+          expect(snapshot.businessVerified, isFalse); expect(snapshot.paymentMethods, isEmpty);
+        case 'discovery':
+          products.addAll((await source.loadProducts(query, pageSize: 24)).items);
+        case 'stores':
+          final stores = await source.loadStores(query, pageSize: 24);
+          products.add(stores.items.single.previewProduct!);
+        case 'exact':
+          products.add((await bound.readPublicEntry(storeId: 'store-one', skuId: 'sku-one',
+            channel: BuyV2OfferClass.wholesale, current: () => true))!.product);
+        case 'page':
+          final store = WorkspaceStoreCatalogueSource(gateway: bound, storeId: 'store-one', current: () => true);
+          products.addAll((await store.loadProducts(BuyV2CatalogueQuery(destination: query.destination, regionId: null,
+            areaScope: query.areaScope, procurementContext: restockContext, storeId: 'store-one'), pageSize: 24)).items);
+        case 'resolve':
+          products.addAll(await source.resolveProducts({listingId}));
+        case 'content':
+          final entry = WorkspacePublicCatalogueEntry.fromResponse((packets['exact'] as Map)['response']['catalogue'] as Map<String, dynamic>,
+            storeId: 'store-one', realm: 'evaluation', channel: BuyV2OfferClass.wholesale, now: at,
+            supplierPublishersVersionSupported: true);
+          final result = await bound.read(entry.product);
+          expect(result.content.state, BuyV2ProductContentState.ready);
+          expect(result.validUntil, at.add(const Duration(minutes: 5)));
+      }
+      if (products.isNotEmpty) {
+        final product = products.single, grant = products.single.procurementSupplierGrant!;
+        expect(product.id, listingId); expect(product.priceMinor, 26000);
+        expect(grant.offerId, 'offer-one'); expect(grant.offerRevision, product.packTerms!.revision);
+        expect(grant.validUntil, at.add(const Duration(minutes: 5)));
+        expect(grant.approved && grant.published, isTrue);
+      }
+      expect(api.calls, 1);
+      expect(credentials.modes, [SocialAppCheckTokenMode.standard]);
+    }, skip: Platform.environment['LF_RESTOCK_CLIENT_LOG'] == null);
+  }
+  for (final path in ['discovery', 'page', 'exact', 'content']) {
+    for (final fault in ['version', 'extra', 'realm', 'account', 'buyerStore', 'purpose', 'origin', 'hash',
+      'future', 'expired', 'longWindow', 'nonCanonical', 'storeName', 'storeId', 'buyerAccount', 'buyerGrantStore',
+      'buyerDenied', 'buyerExpiry', 'missingGrant', 'duplicateGrant', 'grantExtra', 'supplierStore', 'self',
+      'workspace', 'retailer', 'consumer', 'unapproved', 'unpublished', 'listing', 'canonical', 'offer', 'revision',
+      'supplierExpired', 'supplierBeyondRoot', 'publicOffer', 'publicRole', 'ordering', 'publicOrdering',
+      'unwrapped', 'missingCatalogue', 'oversized', 'serviceUnavailable']) {
+      test('LF05-RESTOCK bound shared client rejects $path $fault before cache admission', () async {
+        final packets = restockClientPackets(), capture = packets[path == 'content' ? 'exact' : path] as Map;
+        final data = jsonDecode(jsonEncode(capture['response'])) as Map<String, dynamic>;
+        final grant = (data['supplierGrants'] as List).single as Map<String, dynamic>;
+        final catalogue = data['catalogue'] as Map<String, dynamic>;
+        final listing = path == 'discovery' ? catalogue['items'][0]['listing'] as Map<String, dynamic> : catalogue;
+        final row = path == 'page' ? catalogue['items'][0]['row'] as Map<String, dynamic>
+          : listing['items'][0] as Map<String, dynamic>;
+        switch (fault) {
+          case 'version': data['schemaVersion'] = 1.0;
+          case 'extra': data['unexpected'] = true;
+          case 'realm': data['realm'] = 'production';
+          case 'account': data['context']['accountId'] = 'another-account';
+          case 'buyerStore': data['context']['storeId'] = 'another-store';
+          case 'purpose': data['context']['purpose'] = 'buyDirect';
+          case 'origin': data['context']['originOperationId'] = 'another-visit';
+          case 'hash': data['requestFingerprint'] = '0' * 64;
+          case 'future': data['observedAt'] = at.add(const Duration(minutes: 1)).toIso8601String();
+          case 'expired': data['validUntil'] = at.toIso8601String();
+          case 'longWindow': data['validUntil'] = at.add(const Duration(minutes: 6)).toIso8601String();
+          case 'nonCanonical': data['observedAt'] = '2026-10-16T12:00:00Z';
+          case 'storeName': data['buyerStore']['name'] = '';
+          case 'storeId': data['buyerStore']['id'] = 'unrelated-store';
+          case 'buyerAccount': data['buyerGrant']['accountId'] = 'unrelated-buyer';
+          case 'buyerGrantStore': data['buyerGrant']['storeId'] = 'unrelated-store';
+          case 'buyerDenied': data['buyerGrant']['approved'] = false;
+          case 'buyerExpiry': data['buyerGrant']['validUntil'] = at.add(const Duration(minutes: 6)).toIso8601String();
+          case 'missingGrant': data['supplierGrants'] = [];
+          case 'duplicateGrant': data['supplierGrants'] = [grant, grant];
+          case 'grantExtra': grant['unrecognisedPermission'] = true;
+          case 'supplierStore': grant['storeId'] = 'unrelated-supplier';
+          case 'self': grant['storeId'] = grant['workspaceId'] = restockContext.storeId;
+          case 'workspace': grant['workspaceId'] = 'unrelated-workspace';
+          case 'retailer': grant['role'] = 'retailer';
+          case 'consumer': grant['channel'] = 'consumer';
+          case 'unapproved': grant['approved'] = false;
+          case 'unpublished': grant['published'] = false;
+          case 'listing': grant['listingId'] = 'unrelated-listing';
+          case 'canonical': grant['productCanonicalId'] = 'unrelated-product';
+          case 'offer': grant['offerId'] = 'unrelated-offer';
+          case 'revision': grant['offerRevision'] = 'unrelated-revision';
+          case 'supplierExpired': grant['validUntil'] = at.toIso8601String();
+          case 'supplierBeyondRoot': grant['validUntil'] = at.add(const Duration(minutes: 6)).toIso8601String();
+          case 'publicOffer': row['channels'][0]['offerId'] = 'changed-public-offer';
+          case 'publicRole': listing['publicStore']['profileId'] = 'retailer-grocery';
+          case 'ordering': data['orderingAvailable'] = true;
+          case 'publicOrdering': catalogue['orderingAvailable'] = true;
+          case 'missingCatalogue': data['catalogue'] = null;
+          case 'oversized': data['buyerStore']['name'] = 'x' * (512 * 1024);
+        }
+        Map<String, Object?>? sent;
+        final api = OwnerTransport((body) async {
+          sent = body;
+          return SocialContentResponse(statusCode: fault == 'serviceUnavailable' ? 503 : 200,
+            body: jsonEncode({'ok': true, 'data': fault == 'unwrapped' ? catalogue : data}));
+        });
+        final connection = boundRestockGateway(api);
+        final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => true);
+        addTearDown(source.dispose);
+        if (path == 'exact') {
+          expect(await connection.readPublicEntry(storeId: 'store-one', skuId: 'sku-one', channel: BuyV2OfferClass.wholesale,
+            current: () => true), isNull);
+        } else if (path == 'content') {
+          final original = WorkspacePublicCatalogueEntry.fromResponse((capture['response'] as Map)['catalogue'] as Map<String, dynamic>,
+            storeId: 'store-one', realm: 'evaluation', channel: BuyV2OfferClass.wholesale, now: at, supplierPublishersVersionSupported: true);
+          expect((await connection.read(original.product)).content.state, BuyV2ProductContentState.unavailable);
+        } else if (path == 'page') {
+          final store = WorkspaceStoreCatalogueSource(gateway: connection, storeId: 'store-one', current: () => true);
+          await expectLater(store.loadProducts(BuyV2CatalogueQuery(destination: BuyV2Destination.wholesale, regionId: null,
+            storeId: 'store-one', areaScope: BuyV2CatalogueAreaScope.allAreas, procurementContext: restockContext), pageSize: 24), throwsFormatException);
+        } else {
+          await expectLater(source.loadProducts(restockQuery(), pageSize: 24), throwsFormatException);
+        }
+        expect(api.calls, 1);
+        expect(sent!['operation'], 'readStoreProcurementCatalogue');
+        expect(_mediaHash(Map.of(sent!)..remove('operation')), _mediaHash(capture['request']));
+        expect(source.observedProductIds, isEmpty);
+      }, skip: Platform.environment['LF_RESTOCK_CLIENT_LOG'] == null);
+    }
+  }
+  for (final shorterSupplier in [false, true]) {
+    test('LF05-RESTOCK bound shared client cache expires with supplier authority shorter=$shorterSupplier', () async {
+      final packet = restockClientPackets()['discovery'] as Map;
+      final response = jsonDecode(jsonEncode(packet['response'])) as Map<String, dynamic>;
+      final until = at.add(Duration(minutes: shorterSupplier ? 1 : 5));
+      if (shorterSupplier) response['supplierGrants'][0]['validUntil'] = until.toIso8601String();
+      var clock = at;
+      final api = OwnerTransport((body) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': response})));
+      final source = WorkspacePublicDiscoverySource(gateway: boundRestockGateway(api, clock: () => clock), current: () => true);
+      addTearDown(source.dispose);
+      final product = (await source.loadProducts(restockQuery(), pageSize: 24)).items.single;
+      expect(source.displayedProduct(product)!.validUntil, until);
+      clock = until.subtract(const Duration(milliseconds: 1));
+      expect(source.displayedProduct(product), isNotNull);
+      clock = until;
+      expect(source.displayedProduct(product), isNull);
+      expect(api.calls, 1, reason: 'Reading a cached observation must not extend its authority.');
+    }, skip: Platform.environment['LF_RESTOCK_CLIENT_LOG'] == null);
+  }
+  for (final retirement in ['scope', 'dispose', 'expiry']) {
+    test('LF05-RESTOCK bound shared client ignores $retirement during transport', () async {
+      final packet = restockClientPackets()['discovery'] as Map;
+      var active = true, clock = at;
+      final started = Completer<void>(), release = Completer<SocialContentResponse>();
+      final api = OwnerTransport((body) { started.complete(); return release.future; });
+      final source = WorkspacePublicDiscoverySource(gateway: boundRestockGateway(api, current: () => active, clock: () => clock), current: () => true);
+      if (retirement != 'dispose') addTearDown(source.dispose);
+      final loading = source.loadProducts(restockQuery(), pageSize: 24);
+      final rejected = expectLater(loading, throwsFormatException);
+      await started.future;
+      if (retirement == 'scope') active = false;
+      if (retirement == 'dispose') source.dispose();
+      if (retirement == 'expiry') clock = at.add(const Duration(minutes: 5));
+      release.complete(SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': packet['response']})));
+      await rejected;
+      expect(source.observedProductIds, isEmpty);
+      if (retirement != 'expiry') expect(source.active, isFalse);
+    }, skip: Platform.environment['LF_RESTOCK_CLIENT_LOG'] == null);
+  }
+  test('LF05-RESTOCK bound shared client retires before credential dispatch', () async {
+    var active = true;
+    final release = Completer<void>(), credentials = AnalyticsHeldCredentials(release.future, after: 0);
+    final api = OwnerTransport((body) async => throw StateError('A retired request cannot dispatch.'));
+    final source = WorkspacePublicDiscoverySource(gateway: boundRestockGateway(api, current: () => active,
+      credentials: credentials), current: () => true);
+    addTearDown(source.dispose);
+    final rejected = expectLater(source.loadProducts(restockQuery(), pageSize: 24), throwsFormatException);
+    expect(credentials.reads, 1); active = false; release.complete();
+    await rejected;
+    expect(api.calls, 0); expect(credentials.modes, isEmpty);
+  });
+  for (final retirement in ['scope', 'dispose', 'expiry']) {
+    test('LF05-RESTOCK bound shared client variants cannot admit after $retirement', () async {
+      final packet = restockClientPackets()['discovery'] as Map;
+      var active = true, clock = at, held = true;
+      final started = Completer<List<WorkspacePublicCatalogueEntry>>(), release = Completer<void>();
+      final variants = HostReviewedVariantSource(memberships: (entries, current) async {
+        if (held) { started.complete(entries); await release.future; }
+        return entries.map((entry) => WorkspaceReviewedVariantMembership(listing: entry.product.publicListingIdentity!,
+          skuRevision: entry.readback.skuRevision!, catalogueVersion: entry.readback.catalogueVersion!,
+          familyId: null, sourceId: 'isolated-restock-membership', revision: held ? 5 : 1, observedAt: at,
+          validUntil: at.add(const Duration(minutes: 30)), attributes: const [])).toList();
+      });
+      final api = OwnerTransport((body) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': packet['response']})));
+      final connection = boundRestockGateway(api, current: () => active, clock: () => clock, variants: variants);
+      final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => true);
+      if (retirement != 'dispose') addTearDown(source.dispose);
+      final rejected = expectLater(source.loadProducts(restockQuery(), pageSize: 24), throwsFormatException);
+      final pending = await started.future;
+      expect(pending.single.product.procurementSupplierGrant, isNotNull);
+      if (retirement == 'scope') active = false;
+      if (retirement == 'dispose') source.dispose();
+      if (retirement == 'expiry') clock = at.add(const Duration(minutes: 5));
+      release.complete(); await rejected;
+      expect(source.observedProductIds, isEmpty);
+      active = true; clock = at; held = false;
+      final successor = WorkspacePublicDiscoverySource(gateway: connection, current: () => true);
+      addTearDown(successor.dispose);
+      final product = (await successor.loadProducts(restockQuery(), pageSize: 24)).items.single;
+      expect(product.procurementSupplierGrant!.offerRevision, product.packTerms!.revision);
+      expect(successor.displayedProduct(product)!.validUntil, at.add(const Duration(minutes: 5)),
+        reason: 'Discarded membership revision5 must not poison the subsequent revision1 read.');
+    }, skip: Platform.environment['LF_RESTOCK_CLIENT_LOG'] == null);
+  }
+  for (final mismatch in ['missing', 'account', 'store', 'purpose', 'origin', 'shop']) {
+    test('LF05-RESTOCK bound shared client refuses $mismatch query context before dispatch', () async {
+      final api = OwnerTransport((body) async => throw StateError('Wrong scope cannot dispatch.'));
+      final connection = boundRestockGateway(api), source = WorkspacePublicDiscoverySource(gateway: boundRestockGateway(api), current: () => true);
+      addTearDown(source.dispose);
+      final context = mismatch == 'missing' ? null : BuyV2ProcurementContext(
+        accountId: mismatch == 'account' ? 'other-buyer' : restockContext.accountId,
+        storeId: mismatch == 'store' ? 'other-store' : restockContext.storeId,
+        purpose: mismatch == 'purpose' ? BuyV2ProcurementPurpose.buyDirect : restockContext.purpose,
+        originOperationId: mismatch == 'origin' ? 'other-origin' : restockContext.originOperationId);
+      await expectLater(source.loadProducts(restockQuery(context: context,
+        destination: mismatch == 'shop' ? BuyV2Destination.shop : BuyV2Destination.wholesale), pageSize: 24), throwsFormatException);
+      expect(api.calls, 0);
+      expect(() => connection.forOwnerAccount('another-account'), throwsArgumentError);
+    });
+  }
+  test('LF05-RESTOCK bound shared client requires explicitly matching activation', () {
+    final api = OwnerTransport((body) async => throw StateError('Unconfigured catalogue cannot dispatch.'));
+    final gateway = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'), credentials: Credentials(), transport: api);
+    expect(() => gateway.forStoreProcurement(restockContext, current: () => true), throwsStateError);
+    expect(api.calls, 0);
+  });
   for (final path in ['discovery', 'exact', 'page']) {
     test('LF05-RESTOCK actual persisted dual-channel supplier decodes through shared public reader $path', () {
       const marker = 'RESTOCK_SOURCE_PATHS_CAPTURE=';

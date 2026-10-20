@@ -4035,6 +4035,29 @@ test('LF05-RESTOCK persisted supplier publication reaches scoped browsing after 
     const page = await service().readStoreProcurement(context.accountId, {schemaVersion: 1, context, kind: 'catalogue',
       request: {...shared, cataloguePageVersion: 2, pageSize: 1, query: {...viewQuery, destination: 'wholesale'}}});
     console.log('RESTOCK_SOURCE_PATHS_CAPTURE=' + JSON.stringify({discovery: first, exact, page}));
+    // Actual persisted producer output for the shared client's exact request
+    // shapes. The Dart bridge must not recompute a response fingerprint to make
+    // an invented request look like a server-authenticated read.
+    const clientQuery = {...viewQuery, destination: 'wholesale'};
+    const clientDiscovery = {discoveryPageVersion: 1, query: clientQuery, pageSize: 24,
+      resultKind: 'products', supplierPublishersVersion: 1};
+    const clientRequests: Record<string, {schemaVersion: number; context: typeof context; kind: string;
+      request: Record<string, unknown>}> = {
+      access: {schemaVersion: 1, context, kind: 'access', request: {}},
+      discovery: {schemaVersion: 1, context, kind: 'discovery', request: clientDiscovery},
+      stores: {schemaVersion: 1, context, kind: 'discovery', request: {...clientDiscovery, resultKind: 'stores'}},
+      exact: {schemaVersion: 1, context, kind: 'catalogue', request: {...shared, skuId: value.skuId,
+        listingReadbackVersion: 1, mediaReadbackVersion: 1, policyReadbackVersion: 1, unbrandedProduceReadbackVersion: 1}},
+      page: {schemaVersion: 1, context, kind: 'catalogue', request: {...shared, cataloguePageVersion: 2,
+        pageSize: 24, query: clientQuery, unbrandedProduceReadbackVersion: 1}},
+      resolve: {schemaVersion: 1, context, kind: 'discovery', request: {...clientDiscovery, pageSize: 50,
+        query: {...clientQuery, listingIds: [first.supplierGrants[0].listingId]}}},
+    };
+    const clientPackets: Record<string, {request: object; response: object}> = {};
+    for (const [key, body] of Object.entries(clientRequests)) {
+      clientPackets[key] = {request: body, response: await service().readStoreProcurement(context.accountId, body)};
+    }
+    console.log('RESTOCK_CLIENT_CAPTURE=' + JSON.stringify(clientPackets));
     const participant = producerParticipant('store-one', 'grocery', 'wholesaler');
     const revoked = applySupplyParticipantCommand(participant, {type: 'revoke_capability',
       actor: {actorId: 'capability-reviewer', tenantId: 'tenant-one', scopes: ['supply.capability.review']},

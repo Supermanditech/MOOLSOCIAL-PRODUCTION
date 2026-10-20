@@ -3624,7 +3624,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
         !{BuyV2Destination.shop, BuyV2Destination.wholesale}.contains(query.destination) ||
         query.shopSaleType != null || query.fulfilmentMode != null || query.pack != null || query.filter != null ||
         query.availableOnly || query.offersOnly || query.collectionOnly || query.offerPublisher != null ||
-        query.supplierOffersOnly || query.procurementContext != null || query.sort == BuyV2ProductSort.deliveryFastest) {
+        query.supplierOffersOnly || !gateway._matchesProcurementQuery(query) || query.sort == BuyV2ProductSort.deliveryFastest) {
       throw const FormatException('This Store catalogue query needs an additional provider.');
     }
     return {'destination': query.destination.name,
@@ -3698,9 +3698,12 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
       return entry;
     }).toList(growable: false);
     final admitMetadata = _prepareMetadata(data);
-    final entries = await gateway._enrichVariants(decodedEntries, active);
+    bool admissionCurrent() => active() && gateway._responseCurrent(response);
+    final checkedEntries = gateway._procurementEntries(response, decodedEntries);
+    final enriched = await gateway._enrichVariants(checkedEntries, admissionCurrent);
+    final entries = gateway._procurementEntries(response, enriched);
     final products = entries.map((entry) => entry.product).toList(growable: false);
-    if (products.map((product) => product.id).toSet().length != products.length || !active()) throw const FormatException();
+    if (products.map((product) => product.id).toSet().length != products.length || !admissionCurrent()) throw const FormatException();
     admitMetadata();
     if (contentReadback != null && contentOwner != null) {
       for (final entry in entries) { contentReadback!.admitPublicEntry(entry, expectedContext: contentOwner); }
@@ -3748,10 +3751,12 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
       throw const FormatException();
     }
     final products = <BuyV2Product>[];
-    for (final destination in [BuyV2Destination.shop, BuyV2Destination.wholesale]) {
+    for (final destination in gateway.procurementContext == null
+        ? [BuyV2Destination.shop, BuyV2Destination.wholesale] : [BuyV2Destination.wholesale]) {
       if (!current() || requestCurrent?.call() == false) throw const FormatException();
       final page = await _load(BuyV2CatalogueQuery(destination: destination, regionId: null,
-        areaScope: BuyV2CatalogueAreaScope.allAreas, storeId: storeId), pageSize: 50, listingIds: productIds,
+        areaScope: BuyV2CatalogueAreaScope.allAreas, storeId: storeId,
+        procurementContext: gateway.procurementContext), pageSize: 50, listingIds: productIds,
         requestCurrent: requestCurrent);
       products.addAll(page.items);
     }
@@ -4102,7 +4107,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   final _offerPrices = <String, WorkspaceCatalogueContentResult>{};
   final _offerCopies = <String, String>{};
   bool _closed = false;
-  bool get active => !_closed && current();
+  bool get active => !_closed && current() && gateway._procurementScopeCurrent;
   Iterable<String> get observedProductIds => _readback.observedProductIds;
   WorkspaceCatalogueContentResult? displayedProduct(BuyV2Product product) => active ? _readback.displayedProduct(product) : null;
   void _changed() { if (active) notifyListeners(); }
@@ -4114,7 +4119,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
         !{BuyV2Destination.shop, BuyV2Destination.wholesale}.contains(query.destination) ||
         query.shopSaleType != null || query.fulfilmentMode != null || query.pack != null || query.filter != null ||
         query.availableOnly || query.offersOnly || query.collectionOnly || query.offerPublisher != null ||
-        query.supplierOffersOnly || query.procurementContext != null || query.sort == BuyV2ProductSort.deliveryFastest) {
+        query.supplierOffersOnly || !gateway._matchesProcurementQuery(query) || query.sort == BuyV2ProductSort.deliveryFastest) {
       throw const FormatException('These filters require another connected provider.');
     }
     if (query.storeId != null) _id(query.storeId);
@@ -4184,8 +4189,11 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
       return entry;
     }).toList(growable: false);
     if (decoded.map((e) => kind == 'stores' ? e.product.storeId! : e.product.id).toSet().length != decoded.length) throw const FormatException();
-    final entries = await gateway._enrichVariants(decoded, valid);
-    if (!valid()) throw const FormatException();
+    bool admissionCurrent() => valid() && gateway._responseCurrent(response);
+    final checkedEntries = gateway._procurementEntries(response, decoded);
+    final enriched = await gateway._enrichVariants(checkedEntries, admissionCurrent);
+    final entries = gateway._procurementEntries(response, enriched);
+    if (!admissionCurrent()) throw const FormatException();
     for (final admission in admissions) { admission(); }
     for (final entry in entries) { _readback.admitPublicEntry(entry, expectedContext: this); }
     final products = entries.map((entry) => entry.product).toList(growable: false);
@@ -4339,9 +4347,11 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
     if (productIds.isEmpty) return const [];
     if (productIds.length > 50 || productIds.any((id) => !RegExp(r'^listing-[a-f0-9]{64}$').hasMatch(id))) throw const FormatException();
     final results = <BuyV2Product>[];
-    for (final destination in [BuyV2Destination.shop, BuyV2Destination.wholesale]) {
+    for (final destination in gateway.procurementContext == null
+        ? [BuyV2Destination.shop, BuyV2Destination.wholesale] : [BuyV2Destination.wholesale]) {
       results.addAll((await _load(BuyV2CatalogueQuery(destination: destination, regionId: null,
-        areaScope: BuyV2CatalogueAreaScope.allAreas), pageSize: 50, ids: productIds, requestCurrent: requestCurrent)).products.items);
+        areaScope: BuyV2CatalogueAreaScope.allAreas, procurementContext: gateway.procurementContext),
+        pageSize: 50, ids: productIds, requestCurrent: requestCurrent)).products.items);
     }
     if (!active || requestCurrent?.call() == false) throw const FormatException();
     return List.unmodifiable(results);
@@ -4415,6 +4425,7 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
     supplierTaxReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_TAX_V1'),
     commodityPriceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_COMMODITY_PRICE_V1'),
+    procurementReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROCUREMENT_V1'),
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     storeCouponTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V1'),
@@ -4482,6 +4493,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
     reviewedProductSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_REVIEW_V1'),
     reviewedProductMediaSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_MEDIA_REVIEW_V1'),
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
+    procurementReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROCUREMENT_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     storeCouponTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V1'),
     storeCouponEligibilitySupported: const bool.fromEnvironment(
@@ -4503,6 +4515,140 @@ bool _validEndpoint(Uri value) =>
     !value.hasFragment &&
     value.userInfo.isEmpty &&
     !value.hasPort;
+
+Map<String, Object?> _procurementContextBody(BuyV2ProcurementContext context) => {
+  'accountId': context.accountId, 'storeId': context.storeId, 'purpose': context.purpose.name,
+  'originOperationId': context.originOperationId,
+};
+
+/// Transport metadata stays outside the unchanged public catalogue decoder.
+/// Only a fully checked authenticated wrapper can construct this response.
+class _WorkspaceProcurementResponse extends SocialContentResponse {
+  _WorkspaceProcurementResponse({required this.buyer, required this.suppliers,
+    required this.observedAt, required this.validUntil, required this.storeName, required Object? catalogue})
+    : super(statusCode: 200, body: jsonEncode({'ok': true, 'data': catalogue}));
+  final BuyV2ProcurementBuyerGrant buyer;
+  final Map<String, BuyV2ProcurementSupplierGrant> suppliers;
+  final DateTime observedAt, validUntil;
+  final String storeName;
+  bool currentAt(DateTime now) => !observedAt.isAfter(now) && now.isBefore(validUntil) &&
+    suppliers.values.every((grant) => now.isBefore(grant.validUntil));
+}
+
+_WorkspaceProcurementResponse _procurementResponse(SocialContentResponse response,
+    Map<String, Object?> request, BuyV2ProcurementContext context, String realm, DateTime now) {
+  if (response.statusCode != 200 || utf8.encode(response.body).length > 512 * 1024) throw const FormatException();
+  final envelope = _map(jsonDecode(response.body));
+  _keys(envelope, ['ok', 'data']);
+  if (envelope['ok'] != true) throw const FormatException();
+  final data = _map(envelope['data']);
+  _keys(data, ['schemaVersion', 'realm', 'state', 'context', 'requestFingerprint', 'observedAt', 'validUntil',
+    'buyerStore', 'buyerGrant', 'supplierGrants', 'orderingAvailable', 'catalogue']);
+  final returnedContext = _map(data['context']);
+  _keys(returnedContext, ['accountId', 'storeId', 'purpose', 'originOperationId']);
+  if (data['schemaVersion'] is! int || data['schemaVersion'] != 1 || data['realm'] != realm ||
+      data['state'] != 'ready' || data['orderingAvailable'] != false ||
+      _catalogueHash(returnedContext) != _catalogueHash(_procurementContextBody(context)) ||
+      data['requestFingerprint'] != _catalogueHash(request)) {
+    throw const FormatException();
+  }
+  final observed = _stockTime(data['observedAt']), until = _stockTime(data['validUntil']);
+  if (observed.isAfter(now) || until != observed.add(const Duration(minutes: 5)) || !now.isBefore(until)) {
+    throw const FormatException();
+  }
+  final store = _map(data['buyerStore']), rawBuyer = _map(data['buyerGrant']);
+  _keys(store, ['id', 'name']);
+  _keys(rawBuyer, ['accountId', 'storeId', 'approved', 'validUntil']);
+  if (store['id'] != context.storeId || rawBuyer['accountId'] != context.accountId ||
+      rawBuyer['storeId'] != context.storeId || rawBuyer['approved'] != true ||
+      _stockTime(rawBuyer['validUntil']) != until) {
+    throw const FormatException();
+  }
+  final buyer = BuyV2ProcurementBuyerGrant(accountId: context.accountId, storeId: context.storeId,
+    approved: true, validUntil: until);
+  final suppliers = <String, BuyV2ProcurementSupplierGrant>{};
+  for (final raw in _list(data['supplierGrants'], 100)) {
+    final grant = _map(raw);
+    _keys(grant, ['workspaceId', 'storeId', 'role', 'approved', 'listingId', 'productCanonicalId',
+      'offerId', 'offerRevision', 'channel', 'published', 'validUntil']);
+    final expires = _stockTime(grant['validUntil']), listing = _id(grant['listingId']);
+    if (grant['workspaceId'] != grant['storeId'] || grant['storeId'] == context.storeId ||
+        !{'wholesaler', 'manufacturer'}.contains(grant['role']) ||
+        context.purpose == BuyV2ProcurementPurpose.buyDirect && grant['role'] != 'manufacturer' ||
+        !{'wholesale', 'bulk'}.contains(grant['channel']) || grant['approved'] != true || grant['published'] != true ||
+        !now.isBefore(expires) || expires.isAfter(until) || suppliers.containsKey(listing)) {
+      throw const FormatException();
+    }
+    suppliers[listing] = BuyV2ProcurementSupplierGrant(workspaceId: _id(grant['workspaceId']),
+      storeId: _id(grant['storeId']), role: BuyV2SupplierWorkspaceRole.values.byName(grant['role'] as String),
+      approved: true, listingId: listing, productCanonicalId: _id(grant['productCanonicalId']),
+      offerId: _id(grant['offerId']), offerRevision: _string(grant['offerRevision'], 512),
+      channel: BuyV2SupplierListingChannel.values.byName(grant['channel'] as String), published: true, validUntil: expires);
+  }
+  final catalogue = data['catalogue'];
+  final matched = <String>{};
+  void checkProjection(Map<String, dynamic> projection, {String? selectedChannel}) {
+    final supplierId = _id(projection['storeId']), supplier = _map(projection['publicStore']);
+    if (projection['realm'] != realm || projection['orderingAvailable'] != false ||
+        supplier['id'] != supplierId || _time(projection['observedAt']).isAfter(observed)) {
+      throw const FormatException();
+    }
+    for (final raw in _list(projection['items'], 50)) {
+      final row = _map(raw), bindings = _list(_map(raw)['listings'], 2).map(_map).toList();
+      for (final rawChannel in _list(row['channels'], 2)) {
+        final channel = _map(rawChannel), kind = channel['kind'];
+        if (selectedChannel != null && kind != selectedChannel || kind == 'retail') continue;
+        if (!{'wholesale', 'bulk'}.contains(kind)) throw const FormatException();
+        final binding = bindings.where((value) => value['channel'] == kind).single;
+        final grant = suppliers[binding['listingId']];
+        if (grant == null || !matched.add(grant.listingId) || grant.storeId != supplierId ||
+            grant.role.name != supplier['profileId'] || binding['realm'] != realm ||
+            binding['storeId'] != supplierId || binding['skuId'] != row['skuId'] ||
+            binding['verifiedPackId'] != row['verifiedPackId'] || binding['canonicalProductId'] != row['canonicalProductId'] ||
+            grant.productCanonicalId != row['canonicalProductId'] || grant.channel.name != kind ||
+            grant.offerId != channel['offerId'] || grant.offerRevision != channel['revision']) {
+          throw const FormatException();
+        }
+      }
+    }
+  }
+  if (request['kind'] == 'access') {
+    if (catalogue != null || suppliers.isNotEmpty) throw const FormatException();
+  } else {
+    final public = _map(catalogue);
+    if (public['state'] != 'ready' || public['realm'] != realm || public['orderingAvailable'] != false ||
+        _time(public['observedAt']).isAfter(observed)) {
+      throw const FormatException();
+    }
+    if (request['kind'] == 'discovery') {
+      for (final raw in _list(public['items'], 50)) {
+        final item = _map(raw);
+        checkProjection(_map(item['listing']), selectedChannel: item['channel'] as String);
+      }
+    } else if (public.containsKey('cataloguePageVersion')) {
+      for (final raw in _list(public['items'], 50)) {
+        final item = _map(raw);
+        checkProjection({...public, 'items': [item['row']]}, selectedChannel: item['channel'] as String);
+      }
+    } else {
+      checkProjection(public);
+    }
+    if (matched.length != suppliers.length) throw const FormatException();
+  }
+  return _WorkspaceProcurementResponse(buyer: buyer, suppliers: Map.unmodifiable(suppliers), observedAt: observed,
+    validUntil: until, storeName: _string(store['name'], 512), catalogue: catalogue);
+}
+
+WorkspaceCatalogueContentResult _limitCatalogueValidity(WorkspaceCatalogueContentResult result, DateTime until) {
+  if (result.content.state != BuyV2ProductContentState.ready) return result;
+  if (result.validUntil == null) throw const FormatException();
+  return WorkspaceCatalogueContentResult(content: result.content, skuRevision: result.skuRevision,
+    catalogueVersion: result.catalogueVersion, validUntil: result.validUntil!.isBefore(until) ? result.validUntil : until,
+    fingerprint: result.fingerprint, policyRevision: result.policyRevision, policyFingerprint: result.policyFingerprint,
+    publicOfferId: result.publicOfferId, publicOfferRevision: result.publicOfferRevision,
+    commodityPriceRevision: result.commodityPriceRevision, commodityPriceFingerprint: result.commodityPriceFingerprint,
+    commercialBaseFingerprint: result.commercialBaseFingerprint);
+}
 
 class AuthenticatedWorkspaceCatalogueGateway
     implements WorkspaceCatalogueGateway, WorkspaceCatalogueOwnerGateway, WorkspacePublicProductGateway, WorkspaceCommodityPriceGateway,
@@ -4534,10 +4680,15 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.storeCouponTermsSupported = false,
     this.storeCouponEligibilitySupported = false,
     this.stockSnapshotsSupported = false,
+    this.procurementReadbackSupported = false,
+    this.procurementContext,
+    this.procurementCurrent,
     DateTime Function()? now,
   }) : _reviewedVariantsOverride = reviewedVariants, _productMediaTransportOverride = productMediaTransport, now = now ?? DateTime.now {
     if (!_validEndpoint(endpoint) ||
-        !{'production', 'evaluation'}.contains(realm)) {
+        !{'production', 'evaluation'}.contains(realm) || procurementContext != null &&
+          (!procurementReadbackSupported || !procurementContext!.hasIdentity ||
+            ownerAccountId != procurementContext!.accountId || procurementCurrent == null)) {
       throw ArgumentError('Invalid catalogue connection.');
     }
   }
@@ -4547,6 +4698,10 @@ class AuthenticatedWorkspaceCatalogueGateway
   @override
   final String realm;
   final String? ownerAccountId;
+  final bool procurementReadbackSupported;
+  final BuyV2ProcurementContext? procurementContext;
+  final bool Function()? procurementCurrent;
+  bool get _procurementScopeCurrent => procurementContext == null || procurementCurrent?.call() == true;
   final bool policyReadbackRequired;
   // Enable only with the matching service contract; do not break strict legacy endpoints.
   final bool productFactsReadbackSupported;
@@ -4588,7 +4743,9 @@ class AuthenticatedWorkspaceCatalogueGateway
   final DateTime Function() now;
 
   /// Caller must pin the actual authenticated account/lifetime, not a contact label.
-  AuthenticatedWorkspaceCatalogueGateway forOwnerAccount(String accountId) {
+  AuthenticatedWorkspaceCatalogueGateway forOwnerAccount(String accountId, {
+    BuyV2ProcurementContext? procurementContext, bool Function()? procurementCurrent,
+  }) {
     _id(accountId);
     return AuthenticatedWorkspaceCatalogueGateway(
       endpoint: endpoint,
@@ -4616,8 +4773,75 @@ class AuthenticatedWorkspaceCatalogueGateway
       storeCouponTermsSupported: storeCouponTermsSupported,
       storeCouponEligibilitySupported: storeCouponEligibilitySupported,
       stockSnapshotsSupported: stockSnapshotsSupported,
+      procurementReadbackSupported: procurementReadbackSupported,
+      procurementContext: procurementContext ?? this.procurementContext,
+      procurementCurrent: procurementCurrent ?? this.procurementCurrent,
       now: now,
     );
+  }
+
+  AuthenticatedWorkspaceCatalogueGateway forStoreProcurement(BuyV2ProcurementContext context,
+      {required bool Function() current}) {
+    if (!procurementReadbackSupported || !productFactsReadbackSupported || !unbrandedProduceReadbackSupported ||
+        !storeClassificationReadbackSupported || !supplierPublishersVersionSupported || !minorMoneyReadbackSupported) {
+      throw StateError('Store purchasing catalogue is not connected.');
+    }
+    _id(context.accountId); _id(context.storeId); _id(context.originOperationId);
+    return forOwnerAccount(context.accountId, procurementContext: context, procurementCurrent: current);
+  }
+
+  bool _matchesProcurementQuery(BuyV2CatalogueQuery query) {
+    final bound = procurementContext, requested = query.procurementContext;
+    return bound == null ? requested == null : _procurementScopeCurrent && requested != null &&
+      bound.customerStateOwnerScope == requested.customerStateOwnerScope && query.destination == BuyV2Destination.wholesale;
+  }
+
+  bool _responseCurrent(SocialContentResponse response) => _procurementScopeCurrent &&
+    (procurementContext == null ? response is! _WorkspaceProcurementResponse :
+      response is _WorkspaceProcurementResponse && response.currentAt(now().toUtc()));
+
+  bool _productProcurementCurrent(BuyV2Product product) {
+    if (procurementContext == null) return true;
+    final grant = product.procurementSupplierGrant;
+    return _procurementScopeCurrent && grant != null && grant.approved && grant.published &&
+      now().toUtc().isBefore(grant.validUntil) && grant.listingId == product.id &&
+      grant.productCanonicalId == product.canonicalId && grant.storeId == product.storeId &&
+      grant.offerRevision == product.packTerms?.revision && product.publicListingIdentity?.realm == realm;
+  }
+
+  List<WorkspacePublicCatalogueEntry> _procurementEntries(SocialContentResponse response,
+      List<WorkspacePublicCatalogueEntry> entries) {
+    if (!_responseCurrent(response)) throw const FormatException();
+    if (procurementContext == null) return entries;
+    final checked = response as _WorkspaceProcurementResponse, context = procurementContext!;
+    return entries.map((entry) {
+      final product = entry.product, grant = checked.suppliers[entry.product.id];
+      if (grant == null || grant.offerRevision != product.packTerms?.revision ||
+          product.publicListingIdentity?.realm != realm || buyV2ProcurementEligibility(context: context,
+            activeAccountId: ownerAccountId, activeStoreId: context.storeId, buyer: checked.buyer,
+            supplier: grant, product: product, now: now().toUtc()) != BuyV2ProcurementEligibility.eligible) {
+        throw const FormatException();
+      }
+      final until = grant.validUntil.isBefore(checked.validUntil) ? grant.validUntil : checked.validUntil;
+      return WorkspacePublicCatalogueEntry(product: product.copyWith(procurementSupplierGrant: grant),
+        readback: _limitCatalogueValidity(entry.readback, until), publisherType: entry.publisherType);
+    }).toList(growable: false);
+  }
+
+  Future<BuyV2CommerceSnapshot> readProcurementAccess() async {
+    try {
+      final context = procurementContext;
+      if (context == null || !_procurementScopeCurrent) throw const FormatException();
+      final response = await _ownerRequest({'operation': 'readStoreProcurementCatalogue', 'schemaVersion': 1,
+        'context': _procurementContextBody(context), 'kind': 'access', 'request': <String, Object?>{}},
+        () => _procurementScopeCurrent, mutation: false);
+      if (response is! _WorkspaceProcurementResponse || !_responseCurrent(response)) throw const FormatException();
+      return BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready, procurementAccessOnly: true,
+        procurementBuyerGrant: response.buyer);
+    } catch (_) {
+      return const BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.unavailable, procurementAccessOnly: true,
+        customerMessage: 'Store purchasing approval could not be confirmed. Try again.');
+    }
   }
 
   bool _productSubmissionOwner(WorkspaceProductSubmissionScope scope, bool Function() current) => current() &&
@@ -4881,10 +5105,11 @@ class AuthenticatedWorkspaceCatalogueGateway
   Future<BuyV2VariantFamilySnapshot> _readReviewedFamily(BuyV2Product selected,
       BuyV2CatalogueQuery query, bool Function() current,
       Future<List<BuyV2Product>> Function(Set<String>) resolvePublished) async {
+    if (!_matchesProcurementQuery(query)) throw const FormatException();
     final source = reviewedVariants, member = _variantMemberships[selected.id];
     bool active() {
       final latest = _variantMemberships[selected.id];
-      return current() && latest != null && member != null && latest.revision == member.revision &&
+      return current() && _productProcurementCurrent(selected) && latest != null && member != null && latest.revision == member.revision &&
         latest.sourceId == member.sourceId && latest.fingerprint == member.fingerprint &&
         latest.skuRevision == member.skuRevision && latest.catalogueVersion == member.catalogueVersion &&
         now().toUtc().isBefore(latest.validUntil) &&
@@ -4930,18 +5155,26 @@ class AuthenticatedWorkspaceCatalogueGateway
         candidateMemberships[product.id] = _variantMemberships[product.id]!;
       }
     }
+    var validUntil = snapshot.validUntil;
+    if (procurementContext != null) {
+      for (final product in [selected, ...candidates]) {
+        if (!_productProcurementCurrent(product)) throw const FormatException();
+        final until = product.procurementSupplierGrant!.validUntil;
+        if (until.isBefore(validUntil)) validUntil = until;
+      }
+    }
     final confirmed = BuyV2VariantFamilySnapshot(productId: snapshot.productId, canonicalId: snapshot.canonicalId,
       variantFamilyId: snapshot.variantFamilyId, categoryId: snapshot.categoryId, offerClass: snapshot.offerClass,
       realm: snapshot.realm, storeId: snapshot.storeId, destination: snapshot.destination, queryKey: snapshot.queryKey,
       sourceId: snapshot.sourceId, revision: snapshot.revision, observedAt: snapshot.observedAt,
-      validUntil: snapshot.validUntil, complete: snapshot.complete, selectedAvailable: snapshot.selectedAvailable,
+      validUntil: validUntil, complete: snapshot.complete, selectedAvailable: snapshot.selectedAvailable,
       options: snapshot.options, candidates: candidates);
     // A later batch can await while another read advances an earlier sibling.
     // Revalidate the entire completed result without any intervening await.
     final completedAt = now().toUtc();
     if (!active() || !confirmed.isValidFor(selected, query, completedAt) || candidates.any((product) {
       final original = candidateMemberships[product.id], latest = _variantMemberships[product.id];
-      return original == null || latest == null || latest.revision != original.revision ||
+      return !_productProcurementCurrent(product) || original == null || latest == null || latest.revision != original.revision ||
         latest.skuRevision != original.skuRevision || latest.catalogueVersion != original.catalogueVersion ||
         latest.fingerprint != original.fingerprint || !completedAt.isBefore(latest.validUntil) ||
         _variantInputs[product.id] != WorkspaceCatalogueReadback._input(product);
@@ -5330,7 +5563,8 @@ class AuthenticatedWorkspaceCatalogueGateway
     required bool mutation,
     void Function()? onDispatch,
   }) async {
-    if (!current()) return null;
+    bool active() => current() && _procurementScopeCurrent;
+    if (!active()) return null;
     if (commodityPriceReadbackSupported && const {
       'readPublicStoreCatalogue', 'readPublicCatalogueDiscovery', 'readPublicStoreVariantFamilies',
       'readPublicStorePromotions', 'readPublicPromotionDiscovery',
@@ -5341,16 +5575,35 @@ class AuthenticatedWorkspaceCatalogueGateway
     }.contains(body['operation'])) {
       body = {...body, 'supplierTaxReadbackVersion': 1};
     }
+    if (unbrandedProduceReadbackSupported &&
+        {'listStoreCatalogueSkus', 'readPublicStoreCatalogue'}.contains(body['operation'])) {
+      body = {...body, 'unbrandedProduceReadbackVersion': 1};
+    }
+    Map<String, Object?>? procurementRequest;
+    final context = procurementContext;
+    if (context != null && {'readPublicStoreCatalogue', 'readPublicCatalogueDiscovery'}.contains(body['operation'])) {
+      if (mutation) throw const FormatException();
+      final operation = body['operation'], request = Map<String, Object?>.of(body)..remove('operation');
+      procurementRequest = {'schemaVersion': 1, 'context': _procurementContextBody(context),
+        'kind': operation == 'readPublicCatalogueDiscovery' ? 'discovery' : 'catalogue', 'request': request};
+      body = {'operation': 'readStoreProcurementCatalogue', ...procurementRequest};
+    } else if (context != null && body['operation'] == 'readStoreProcurementCatalogue') {
+      if (mutation) throw const FormatException();
+      procurementRequest = Map<String, Object?>.of(body)..remove('operation');
+    }
+    // Hash and dispatch the same frozen request, including negotiated fields.
+    body = _map(jsonDecode(jsonEncode(body)));
+    final requestFingerprint = procurementRequest == null ? null : _catalogueHash(procurementRequest);
     final token = await credentials.firebaseIdToken();
-    if (!current()) return null;
+    if (!active()) return null;
     final appCheck = await credentials.appCheckToken(
       mutation
           ? SocialAppCheckTokenMode.limitedUse
           : SocialAppCheckTokenMode.standard,
     );
-    if (!current()) return null;
+    if (!active()) return null;
     onDispatch?.call();
-    return transport
+    final response = await transport
         .postJson(
           endpoint,
           headers: {
@@ -5365,14 +5618,13 @@ class AuthenticatedWorkspaceCatalogueGateway
                   .padLeft(2, '0'),
             ).join(),
           },
-          body: {
-            ...body,
-            if (unbrandedProduceReadbackSupported &&
-                {'listStoreCatalogueSkus', 'readPublicStoreCatalogue'}.contains(body['operation']))
-              'unbrandedProduceReadbackVersion': 1,
-          },
+          body: body,
         )
         .timeout(const Duration(seconds: 20));
+    if (!active()) return null;
+    if (procurementRequest == null) return response;
+    if (_catalogueHash(procurementRequest) != requestFingerprint) throw const FormatException();
+    return _procurementResponse(response, procurementRequest, context!, realm, now().toUtc());
   }
 
   @override
@@ -5389,42 +5641,23 @@ class AuthenticatedWorkspaceCatalogueGateway
       }
       _id(product.storeId);
       _id(product.id);
-      final response = await transport
-          .postJson(
-            endpoint,
-            headers: {
-              'accept': 'application/json',
-              'authorization': 'Bearer ${await credentials.firebaseIdToken()}',
-              'x-firebase-appcheck': await credentials.appCheckToken(
-                SocialAppCheckTokenMode.standard,
-              ),
-              'x-request-id': List.generate(
-                16,
-                (_) => Random.secure()
-                    .nextInt(256)
-                    .toRadixString(16)
-                    .padLeft(2, '0'),
-              ).join(),
-            },
-            body: {
-              'operation': 'readPublicStoreCatalogue',
-              if (commodityPriceReadbackSupported) 'commodityPriceReadbackVersion': 1,
-              'mediaReadbackVersion': 1,
-              if (supplierTaxReadbackSupported) 'supplierTaxReadbackVersion': 1,
-              if (supplierPublishersVersionSupported) 'supplierPublishersVersion': 1,
-              if (productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
-              if (unbrandedProduceReadbackSupported) 'unbrandedProduceReadbackVersion': 1,
-              if (policyRequired) 'policyReadbackVersion': 1,
-              if (product.publicListingIdentity != null) 'listingReadbackVersion': 1,
-              if (storeClassificationReadbackSupported && product.publicListingIdentity != null) ...{
-                'storeDetailsReadbackVersion': 1, 'storeClassificationReadbackVersion': 1,
-              },
-              'storeId': product.storeId,
-              'skuId': product.sourceSkuId,
-            },
-          )
-          .timeout(const Duration(seconds: 20));
-      if (response.statusCode != 200) throw const FormatException();
+      final response = await _ownerRequest({
+        'operation': 'readPublicStoreCatalogue',
+        if (commodityPriceReadbackSupported) 'commodityPriceReadbackVersion': 1,
+        'mediaReadbackVersion': 1,
+        if (supplierTaxReadbackSupported) 'supplierTaxReadbackVersion': 1,
+        if (supplierPublishersVersionSupported) 'supplierPublishersVersion': 1,
+        if (productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
+        if (unbrandedProduceReadbackSupported) 'unbrandedProduceReadbackVersion': 1,
+        if (policyRequired) 'policyReadbackVersion': 1,
+        if (product.publicListingIdentity != null) 'listingReadbackVersion': 1,
+        if (storeClassificationReadbackSupported && product.publicListingIdentity != null) ...{
+          'storeDetailsReadbackVersion': 1, 'storeClassificationReadbackVersion': 1,
+        },
+        'storeId': product.storeId,
+        'skuId': product.sourceSkuId,
+      }, () => _procurementScopeCurrent, mutation: false);
+      if (response == null || response.statusCode != 200 || !_responseCurrent(response)) throw const FormatException();
       final envelope = _map(jsonDecode(response.body));
       if (envelope['ok'] != true) throw const FormatException();
       final data = _map(envelope['data']);
@@ -5433,13 +5666,24 @@ class AuthenticatedWorkspaceCatalogueGateway
       _checkStoreClassificationReadback(data, supported: storeClassificationReadbackSupported);
       if (storeClassificationReadbackSupported && product.publicListingIdentity != null &&
           data['storeClassificationReadbackVersion'] != 1) { throw const FormatException(); }
+      DateTime? procurementUntil;
+      if (procurementContext != null) {
+        if (product.offerClass == null) throw const FormatException();
+        final fresh = WorkspacePublicCatalogueEntry.fromResponse(data, storeId: product.storeId!, realm: realm,
+          channel: product.offerClass!, now: now().toUtc(), supplierPublishersVersionSupported: supplierPublishersVersionSupported,
+          supplierTaxReadbackSupported: supplierTaxReadbackSupported, commodityPriceReadbackSupported: commodityPriceReadbackSupported);
+        final checked = _procurementEntries(response, [fresh]).single;
+        if (checked.product.id != product.id || checked.product.sourceSkuId != product.sourceSkuId) throw const FormatException();
+        procurementUntil = checked.readback.validUntil;
+      }
       final items = data['items'];
       if (items is List && items.any((item) => item is Map && item.containsKey('supplierPolicy'))) {
         _policyObserved = true;
       }
-      return _decode(data, product, realm, now().toUtc(), policyRequired: policyRequired || policyResolutionRequired,
+      final result = _decode(data, product, realm, now().toUtc(), policyRequired: policyRequired || policyResolutionRequired,
         commoditySupported: commodityPriceReadbackSupported,
         supplierPublishersSupported: supplierPublishersVersionSupported);
+      return procurementUntil == null ? result : _limitCatalogueValidity(result, procurementUntil);
     } catch (_) {
       // Never expose provider diagnostics, retain a stale result, or fake success.
       return WorkspaceCatalogueContentResult(content: _unavailable(product,
@@ -5476,8 +5720,10 @@ class AuthenticatedWorkspaceCatalogueGateway
       // The response is scoped to the requested raw SKU, not merely a same-Store
       // listing. Account/session retirement never admits a delayed product.
       if (!current() || entry.product.sourceSkuId != skuId) return null;
-      final enriched = await _enrichVariants([entry], current);
-      return current() ? enriched.single : null;
+      bool active() => current() && _responseCurrent(response);
+      final checked = _procurementEntries(response, [entry]);
+      final enriched = await _enrichVariants(checked, active);
+      return active() ? _procurementEntries(response, enriched).single : null;
     } catch (_) {
       return null;
     }
