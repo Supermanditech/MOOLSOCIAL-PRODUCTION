@@ -2957,21 +2957,49 @@ Map<String, dynamic> _checkedPromotionProduct(Map<String, dynamic> sku,
 class WorkspaceProductPresentationGateway {
   WorkspaceProductPresentationGateway({required this.gateway, required this.current, required this.displayed,
     this.productPresentationsEnabled = true, this.storePresentationsEnabled = false, this.cartAdditionsEnabled = false,
-    this.discoverySourcesEnabled = false});
+    this.discoverySourcesEnabled = false, this.checkoutEntriesEnabled = false});
   final AuthenticatedWorkspaceCatalogueGateway gateway;
   final bool Function() current;
   final WorkspaceCatalogueContentResult? Function(BuyV2Product) displayed;
-  final bool productPresentationsEnabled, storePresentationsEnabled, cartAdditionsEnabled, discoverySourcesEnabled;
+  final bool productPresentationsEnabled, storePresentationsEnabled, cartAdditionsEnabled, discoverySourcesEnabled, checkoutEntriesEnabled;
   Map<String, Object?>? prepare(BuyV2Product product, String presentationId, {bool cartAddition = false,
-    BuyV2ProductEntrySurface entrySurface = BuyV2ProductEntrySurface.unknown}) {
+    bool checkoutEntry = false, BuyV2ProductEntrySurface entrySurface = BuyV2ProductEntrySurface.unknown}) {
     final identity = product.publicListingIdentity, result = displayed(product);
-    if (!(cartAddition ? cartAdditionsEnabled : productPresentationsEnabled) || !current() || identity == null || !identity.matches(product) || identity.realm != gateway.realm ||
+    if (cartAddition && checkoutEntry || !(checkoutEntry ? checkoutEntriesEnabled : cartAddition ? cartAdditionsEnabled : productPresentationsEnabled) || !current() || identity == null || !identity.matches(product) || identity.realm != gateway.realm ||
         result?.content.state != BuyV2ProductContentState.ready || result?.validUntil?.isAfter(gateway.now().toUtc()) != true ||
         result?.skuRevision == null || result?.catalogueVersion == null || !RegExp(r'^[a-f0-9]{32}$').hasMatch(presentationId)) {return null;}
-    final discovery = !cartAddition && discoverySourcesEnabled;
+    final discovery = !cartAddition && !checkoutEntry && discoverySourcesEnabled;
     return {'schemaVersion': discovery ? 2 : 1, 'presentationId': presentationId, 'storeId': identity.storeId, 'skuId': identity.skuId,
       'listingId': identity.listingId, 'skuRevision': result!.skuRevision, 'catalogueVersion': result.catalogueVersion,
       if (discovery) 'discoverySurface': entrySurface.wireValue};
+  }
+  List<Map<String, Object?>> prepareCheckout(List<BuyV2CartLine> lines, String presentationId) {
+    if (!checkoutEntriesEnabled || !current()) return const [];
+    final stores = <String, List<BuyV2CartLine>>{};
+    for (final line in lines) {
+      final storeId = line.product.storeId;
+      if (storeId != null) stores.putIfAbsent(storeId, () => []).add(line);
+    }
+    if (stores.length > 100) return const []; // Reporting bound, never a Cart restriction.
+    final results = <Map<String, Object?>>[];
+    for (final entry in stores.entries) {
+      int? version;
+      final listings = <String, Map<String, Object?>>{};
+      var valid = true;
+      for (final line in entry.value) {
+        final prepared = prepare(line.product, presentationId, checkoutEntry: true);
+        if (prepared == null || version != null && version != prepared['catalogueVersion']) { valid = false; break; }
+        version = prepared['catalogueVersion'] as int;
+        listings[prepared['listingId'] as String] = Map.unmodifiable({
+          'skuId': prepared['skuId'], 'listingId': prepared['listingId'], 'skuRevision': prepared['skuRevision']});
+      }
+      if (!valid || listings.isEmpty || listings.length > 100) continue;
+      final keys = listings.keys.toList()..sort();
+      results.add(Map.unmodifiable({'schemaVersion': 1, 'presentationId': presentationId, 'storeId': entry.key,
+        'catalogueVersion': version, 'observedAt': gateway.now().toUtc().toIso8601String(),
+        'listings': List.unmodifiable(keys.map((key) => listings[key]!))}));
+    }
+    return List.unmodifiable(results);
   }
   Map<String, Object?>? prepareStore(BuyV2PublicStoreObservation observation, String presentationId) {
     if (!storePresentationsEnabled || !current() || observation.realm != gateway.realm ||
@@ -2987,6 +3015,13 @@ class WorkspaceProductPresentationGateway {
   }
   Future<bool> recordCartAddition(Map<String, Object?> original, {required bool Function() ownerCurrent}) =>
     _record(original, visible: ownerCurrent, operation: 'recordPublicCartAddition', enabled: () => cartAdditionsEnabled);
+  Future<bool> recordCheckoutEntry(Map<String, Object?> original, {required bool Function() ownerCurrent}) async {
+    try {
+      // Witness lists must not change while credentials/transport are pending.
+      final copy = Map<String, Object?>.from(jsonDecode(jsonEncode(original)) as Map);
+      return await _record(copy, visible: ownerCurrent, operation: 'recordPublicCheckoutEntry', enabled: () => checkoutEntriesEnabled);
+    } on Object { return false; }
+  }
   Future<bool> _record(Map<String, Object?> original, {required bool Function() visible, required String operation, required bool Function() enabled}) async {
     final frozen = Map<String, Object?>.unmodifiable(original);
     bool valid() => current() && visible() && enabled();
@@ -2998,13 +3033,14 @@ class WorkspaceProductPresentationGateway {
       final data = _map(envelope['data']);
       _keys(data, [...frozen.keys, 'realm', 'acceptedAt', 'state', 'orderingAvailable']);
       return envelope['ok'] == true && data['realm'] == gateway.realm && data['state'] == 'recorded' && data['orderingAvailable'] == false &&
-        !_time(data['acceptedAt']).isAfter(gateway.now().toUtc()) && frozen.entries.every((e) => data[e.key] == e.value);
+        !_time(data['acceptedAt']).isAfter(gateway.now().toUtc()) && frozen.entries.every((e) =>
+          e.value is List || e.value is Map ? jsonEncode(data[e.key]) == jsonEncode(e.value) : data[e.key] == e.value);
     } on Object {return false;}
   }
   Future<WorkspaceAnalyticsSnapshot> readAnalytics(WorkspaceAnalyticsRequest request) async {
     final elapsed = Stopwatch()..start();
     if (!current() || !request.valid || request.accountScope != gateway.ownerAccountId) throw const FormatException();
-    if (!storePresentationsEnabled && !cartAdditionsEnabled && !discoverySourcesEnabled && productPresentationsEnabled) return _readProductAnalytics(request);
+    if (!storePresentationsEnabled && !cartAdditionsEnabled && !discoverySourcesEnabled && !checkoutEntriesEnabled && productPresentationsEnabled) return _readProductAnalytics(request);
     final results = <WorkspaceAnalyticsSnapshot>[];
     if (productPresentationsEnabled) {
       try {results.add(await _readProductAnalytics(request));} on Object {/* Independent coverage remains unknown, never zero. */}
@@ -3027,6 +3063,15 @@ class WorkspaceProductPresentationGateway {
         finally { permitted = false; }
       }
     }
+    if (checkoutEntriesEnabled && current()) {
+      final budget = const Duration(seconds: 28) - elapsed.elapsed;
+      var permitted = true;
+      if (budget > Duration.zero) {
+        try { results.add(await _readStoreAnalytics(request, checkout: true, permitted: () => permitted).timeout(budget)); }
+        on Object { /* Independent Checkout coverage cannot erase known base metrics. */ }
+        finally { permitted = false; }
+      }
+    }
     if (!current()) throw const FormatException();
     final verified = results.where((r) => r.state == WorkspaceAnalyticsState.verified && r.usableFor(request, gateway.now().toUtc())).toList();
     if (verified.isEmpty) {
@@ -3042,22 +3087,25 @@ class WorkspaceProductPresentationGateway {
       updatedAt: refreshed, coveredFrom: from, coveredUntil: until,
       metrics: verified.expand((r) => r.metrics), breakdowns: verified.expand((r) => r.breakdowns));
   }
-  Future<WorkspaceAnalyticsSnapshot> _readStoreAnalytics(WorkspaceAnalyticsRequest request) async {
-    if (!current() || !request.valid || request.accountScope != gateway.ownerAccountId) throw const FormatException();
+  Future<WorkspaceAnalyticsSnapshot> _readStoreAnalytics(WorkspaceAnalyticsRequest request,
+    {bool checkout = false, bool Function()? permitted}) async {
+    bool active() => current() && (permitted?.call() ?? true);
+    if (!active() || !request.valid || request.accountScope != gateway.ownerAccountId) throw const FormatException();
+    final sourceName = checkout ? 'Reported signed-in Checkout entries' : 'Recorded signed-in Store visits';
     DateTime floor(DateTime v) => DateTime.fromMillisecondsSinceEpoch(v.toUtc().millisecondsSinceEpoch, isUtc: true);
     final start = floor(request.start), end = floor(request.end);
     final fromRequest = start.isBefore(request.start) ? start.add(const Duration(milliseconds: 1)) : start;
     if (!fromRequest.isBefore(end)) throw const FormatException();
     final query = {'schemaVersion': 1, 'storeId': request.storeId, 'start': fromRequest.toIso8601String(),
       'end': end.toIso8601String(), 'skuIds': request.skuIds.toList()..sort()};
-    final response = await gateway._ownerRequest({'operation': 'readStorePublicPresentations', ...query}, current, mutation: false);
-    if (!current() || response?.statusCode != 200 || utf8.encode(response!.body).length > 512 * 1024) throw const FormatException();
+    final response = await gateway._ownerRequest({'operation': checkout ? 'readStoreCheckoutEntries' : 'readStorePublicPresentations', ...query}, active, mutation: false);
+    if (!active() || response?.statusCode != 200 || utf8.encode(response!.body).length > 512 * 1024) throw const FormatException();
     final envelope = _map(jsonDecode(response.body)); _keys(envelope, ['ok', 'data']);
     if (envelope['ok'] != true) throw const FormatException();
     final data = _map(envelope['data']);
     _keys(data, [...query.keys, 'realm', 'observedAt', 'source', 'state', 'coverage', 'collectionStartedAt', 'coveredFrom', 'coveredUntil', 'count', 'visitors']);
     final observed = _time(data['observedAt']);
-    if (data['realm'] != gateway.realm || data['source'] != 'Recorded signed-in Store visits' || observed.isAfter(gateway.now().toUtc()) ||
+    if (data['realm'] != gateway.realm || data['source'] != sourceName || observed.isAfter(gateway.now().toUtc()) ||
         query.entries.any((e) => jsonEncode(data[e.key]) != jsonEncode(e.value))) {
       throw const FormatException();
     }
@@ -3067,7 +3115,7 @@ class WorkspaceProductPresentationGateway {
         throw const FormatException();
       }
       return WorkspaceAnalyticsSnapshot(request: request, state: WorkspaceAnalyticsState.unavailable,
-        coverage: WorkspaceAnalyticsCoverage.unknown, source: 'Recorded signed-in Store visits', metrics: const []);
+        coverage: WorkspaceAnalyticsCoverage.unknown, source: sourceName, metrics: const []);
     }
     final from = _time(data['coveredFrom']), until = _time(data['coveredUntil']), collected = _time(data['collectionStartedAt']);
     final count = _int(data['count'], 0, 5000), visitors = _int(data['visitors'], 0, count);
@@ -3080,11 +3128,11 @@ class WorkspaceProductPresentationGateway {
       final local = value.toLocal();
       return '${local.day}/${local.month}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
     }
-    final source = 'Signed-in Store visits only · tracked ${date(from)} to ${date(until)}';
+    final source = '${checkout ? 'Signed-in Checkout accounts only' : 'Signed-in Store visits only'} · tracked ${date(from)} to ${date(until)}';
     return WorkspaceAnalyticsSnapshot(request: request, state: WorkspaceAnalyticsState.verified,
-      coverage: WorkspaceAnalyticsCoverage.partial, source: 'Recorded signed-in Store visits', updatedAt: observed,
+      coverage: WorkspaceAnalyticsCoverage.partial, source: sourceName, updatedAt: observed,
       coveredFrom: from, coveredUntil: until, metrics: [
-        for (final entry in {'store-views': count, 'visits': count, 'visitors': visitors, 'journey-store': visitors}.entries)
+        for (final entry in (checkout ? {'journey-checkout': visitors} : {'store-views': count, 'visits': count, 'visitors': visitors, 'journey-store': visitors}).entries)
           WorkspaceAnalyticsMetric(id: entry.key, state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.partial,
             basis: WorkspaceAnalyticsBasis.periodActivity, unit: WorkspaceAnalyticsUnit.count, source: source, value: entry.value, asOf: until),
       ]);
@@ -3502,15 +3550,16 @@ WorkspaceProductPresentationGateway? configuredWorkspaceProductPresentations({re
   const productEnabled = bool.fromEnvironment('MOOLSOCIAL_PRODUCT_PRESENTATIONS_V1'),
     storeEnabled = bool.fromEnvironment('MOOLSOCIAL_STORE_PRESENTATIONS_V1'),
     cartEnabled = bool.fromEnvironment('MOOLSOCIAL_CART_ADDITIONS_V1'),
+    checkoutEnabled = bool.fromEnvironment('MOOLSOCIAL_CHECKOUT_ENTRIES_V1'),
     discoveryEnabled = bool.fromEnvironment('MOOLSOCIAL_PRODUCT_DISCOVERY_SOURCES_V1');
-  if ((!productEnabled && !storeEnabled && !cartEnabled) || environment != 'firebase-service' ||
+  if ((!productEnabled && !storeEnabled && !cartEnabled && !checkoutEnabled) || environment != 'firebase-service' ||
       projectId != 'moolsocial-dev-503018' || tenantId != null || !{'evaluation', 'production'}.contains(realm)) {return null;}
   final endpoint = Uri.tryParse(const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL'));
   if (endpoint == null || !_validEndpoint(endpoint)) return null;
   return WorkspaceProductPresentationGateway(gateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: endpoint,
     credentials: FirebaseSocialContentCredentials(), transport: IoSocialContentTransport(), realm: realm, ownerAccountId: _id(accountUserId)),
     current: current, displayed: displayed, productPresentationsEnabled: productEnabled, storePresentationsEnabled: storeEnabled,
-    cartAdditionsEnabled: cartEnabled, discoverySourcesEnabled: discoveryEnabled);
+    cartAdditionsEnabled: cartEnabled, checkoutEntriesEnabled: checkoutEnabled, discoverySourcesEnabled: discoveryEnabled);
 }
 
 BuyV2ProductContentSnapshot _unavailable(BuyV2Product product, {bool policyResolutionPending = false}) =>

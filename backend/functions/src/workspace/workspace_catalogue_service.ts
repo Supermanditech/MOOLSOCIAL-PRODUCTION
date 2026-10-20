@@ -395,6 +395,21 @@ type ProductActivityAdmission = boolean | {validUntil: string};
 export interface StorePresentation {
   schemaVersion: 1; presentationId: string; storeId: string; catalogueVersion: number; observedAt: string;
 }
+export interface CheckoutEntry extends StorePresentation {
+  listings: Array<{skuId: string; listingId: string; skuRevision: number}>;
+}
+function checkoutEntry(raw: unknown): CheckoutEntry {
+  const v = exact(raw, ['schemaVersion', 'presentationId', 'storeId', 'catalogueVersion', 'observedAt', 'listings']);
+  const {listings, ...base} = v, input = storePresentation(base);
+  if (!Array.isArray(listings) || !listings.length || listings.length > 100) invalid();
+  const ids = new Set<string>();
+  return {...input, listings: listings.map(raw => {
+    const row = exact(raw, ['skuId', 'listingId', 'skuRevision']);
+    if (typeof row.listingId !== 'string' || !/^listing-[a-f0-9]{64}$/u.test(row.listingId) || ids.has(row.listingId)) invalid();
+    ids.add(row.listingId);
+    return {skuId: id(row.skuId), listingId: row.listingId, skuRevision: integer(row.skuRevision, 1, 1000000000)};
+  }).sort((a, b) => a.listingId.localeCompare(b.listingId))};
+}
 function storePresentation(raw: unknown): StorePresentation {
   const v = exact(raw, ['schemaVersion', 'presentationId', 'storeId', 'catalogueVersion', 'observedAt']);
   if (v.schemaVersion !== 1 || typeof v.presentationId !== 'string' || !/^[a-f0-9]{32}$/u.test(v.presentationId)) invalid();
@@ -464,6 +479,9 @@ export interface WorkspaceCatalogueRepository {
   recordStorePresentation?(actor: string, input: StorePresentation, identity: CatalogueIdentity,
     admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object>;
   readStorePresentations?(owner: string, query: ProductPresentationQuery): Promise<object>;
+  recordCheckoutEntry?(actor: string, input: CheckoutEntry, identity: CatalogueIdentity,
+    admit: (source: PublicCatalogueSource) => Promise<ProductActivityAdmission>): Promise<object>;
+  readCheckoutEntries?(owner: string, query: ProductPresentationQuery): Promise<object>;
   /** Complete bounded directory, never public product facts or approval. */
   publicDiscoveryBindings?(): Promise<PublicCatalogueListingBinding[]>;
   publicListingBindings?(record: StoreSkuRecord): Promise<PublicCatalogueListingBinding[] | undefined>;
@@ -1124,6 +1142,37 @@ export class WorkspaceCatalogueService {
     if (query.discoverySourcesVersion !== undefined) invalid();
     if (!this.repository.readStorePresentations) throw mediaUnavailable();
     return this.repository.readStorePresentations(id(owner), query);
+  }
+  /** Reported page entry only: never a quote, reservation, order or payment. */
+  async recordCheckoutEntry(actor: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    const input = checkoutEntry(body);
+    if (!this.identity || !this.repository.recordCheckoutEntry) throw mediaUnavailable();
+    return this.repository.recordCheckoutEntry(id(actor), input, this.identity, async source => {
+      const deadlines: string[] = [];
+      for (const witness of input.listings) {
+        const response = await this.publicCatalogue({storeId: input.storeId, skuId: witness.skuId,
+          listingReadbackVersion: 1, supplierPublishersVersion: 1, mediaReadbackVersion: 1,
+          productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1}, source) as {
+            state: string; catalogueVersion?: number; items: Array<{skuId: string; revision: number;
+              channels: Array<{kind: StoreSkuChannel['kind']; validUntil: string}>;
+              listings: PublicCatalogueListingBinding[]}>};
+        const item = response.state === 'ready' && response.catalogueVersion === input.catalogueVersion
+          ? response.items.find(item => item.skuId === witness.skuId && item.revision === witness.skuRevision &&
+              item.listings.some(listing => listing.listingId === witness.listingId)) : undefined;
+        if (!item) return false;
+        const channel = item.listings.find(listing => listing.listingId === witness.listingId)!.channel;
+        const terms = item.channels.find(terms => terms.kind === channel);
+        if (!terms) return false;
+        deadlines.push(presentationTime(terms.validUntil));
+      }
+      return {validUntil: deadlines.sort()[0]!};
+    });
+  }
+  async readCheckoutEntries(owner: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    const query = productPresentationQuery(body);
+    if (query.discoverySourcesVersion !== undefined) invalid();
+    if (!this.repository.readCheckoutEntries) throw mediaUnavailable();
+    return this.repository.readCheckoutEntries(id(owner), query);
   }
   async publicProductMedia(body: Readonly<Record<string, unknown>>): Promise<Buffer> {
     exact(body, ["realm", "storeId", "skuId", "assetId"]);
@@ -3377,10 +3426,19 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
   }
   async recordStorePresentation(actor: string, input: StorePresentation, identity: CatalogueIdentity,
     admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object> {
-    input = storePresentation(structuredClone(input)); actor = id(actor);
+    return this.recordStoreActivity(actor, input, identity, admit, false);
+  }
+  async recordCheckoutEntry(actor: string, input: CheckoutEntry, identity: CatalogueIdentity,
+    admit: (source: PublicCatalogueSource) => Promise<ProductActivityAdmission>): Promise<object> {
+    return this.recordStoreActivity(actor, input, identity, admit, true);
+  }
+  private async recordStoreActivity(actor: string, input: StorePresentation | CheckoutEntry, identity: CatalogueIdentity,
+    admit: (source: PublicCatalogueSource) => Promise<ProductActivityAdmission>, checkout: boolean): Promise<object> {
+    const normalize = checkout ? checkoutEntry : storePresentation;
+    input = normalize(structuredClone(input)); actor = id(actor);
     const root = this.root(input.storeId), fingerprint = cataloguePayloadHash(input),
-      visitorKey = cataloguePayloadHash([1, 'store-visitor', this.realm, input.storeId, actor]),
-      path = root.collection('storePresentations').doc(cataloguePayloadHash([1, this.realm, actor, input.presentationId]));
+      visitorKey = cataloguePayloadHash([1, checkout ? 'checkout-customer' : 'store-visitor', this.realm, input.storeId, actor]),
+      path = root.collection(checkout ? 'checkoutEntries' : 'storePresentations').doc(cataloguePayloadHash([1, this.realm, actor, input.presentationId]));
     return this.firestore.runTransaction(async tx => {
       const saved = await tx.get(path);
       const result = (acceptedAt: string) => ({...input, realm: this.realm, acceptedAt, state: 'recorded', orderingAvailable: false});
@@ -3388,23 +3446,27 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
         const prior = exact(saved.data(), ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'visitorKey', 'integrity']);
         const {integrity, ...retained} = prior;
         if (prior.schemaVersion !== 1 || prior.realm !== this.realm || prior.fingerprint !== fingerprint ||
-            cataloguePayloadHash(storePresentation(prior.input)) !== fingerprint || prior.visitorKey !== visitorKey ||
+            cataloguePayloadHash(normalize(prior.input)) !== fingerprint || prior.visitorKey !== visitorKey ||
             integrity !== cataloguePayloadHash(retained)) {
           throw new WorkspaceProfileError('conflict', 'This Store visit was already recorded with different details.', 409);
         }
         return result(presentationTime(prior.acceptedAt));
       }
-      const source = await this.publicCatalogueSource(input.storeId, identity, false, tx);
+      const selected = checkout ? [...new Set((input as CheckoutEntry).listings.map(row => row.skuId))] : undefined;
+      const source = await this.publicCatalogueSource(input.storeId, identity, false, tx, selected);
       if (!source || source.profile.ownerUserId === actor || !await admit(source)) throw mediaUnavailable();
       const admissionAt = this.now().toISOString();
       if (input.observedAt > admissionAt || Date.parse(admissionAt) - Date.parse(input.observedAt) > 300000) throw mediaUnavailable();
-      const day = root.collection('storePresentationDays').doc(admissionAt.slice(0, 10)), coverage = root.collection('storePresentationCoverage').doc('current');
+      const day = root.collection(checkout ? 'checkoutEntryDays' : 'storePresentationDays').doc(admissionAt.slice(0, 10)),
+        coverage = root.collection(checkout ? 'checkoutEntryCoverage' : 'storePresentationCoverage').doc('current');
       const [daily, collection] = await tx.getAll(day, coverage);
       if (daily?.exists && daily.get('schemaVersion') !== 1 || collection?.exists && collection.get('schemaVersion') !== 1) invalid();
       const count = daily?.exists ? integer(daily.get('count'), 0, 5000) : 0;
       if (count >= 5000) throw mediaUnavailable();
-      if (!await admit(source)) throw mediaUnavailable();
+      const finalAdmission = await admit(source);
+      if (!finalAdmission) throw mediaUnavailable();
       const acceptedAt = this.now().toISOString();
+      if (checkout && (typeof finalAdmission !== 'object' || acceptedAt >= presentationTime(finalAdmission.validUntil))) throw mediaUnavailable();
       if (acceptedAt.slice(0, 10) !== admissionAt.slice(0, 10) || input.observedAt > acceptedAt ||
           Date.parse(acceptedAt) - Date.parse(input.observedAt) > 300000) throw mediaUnavailable();
       const startedAt = collection?.exists ? presentationTime(collection.get('startedAt')) : acceptedAt;
@@ -3417,6 +3479,12 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
     });
   }
   async readStorePresentations(owner: string, query: ProductPresentationQuery): Promise<object> {
+    return this.readStoreActivity(owner, query, false);
+  }
+  async readCheckoutEntries(owner: string, query: ProductPresentationQuery): Promise<object> {
+    return this.readStoreActivity(owner, query, true);
+  }
+  private async readStoreActivity(owner: string, query: ProductPresentationQuery, checkout: boolean): Promise<object> {
     query = productPresentationQuery({schemaVersion: 1, ...structuredClone(query)}); owner = id(owner);
     if (query.discoverySourcesVersion !== undefined) invalid();
     return this.firestore.runTransaction(async tx => {
@@ -3424,8 +3492,9 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       if (profiles.size !== 1 || profiles.docs[0]!.id !== profiles.docs[0]!.get('caseId')) throw mediaUnavailable();
       requireStore(profiles.docs[0]!.data() as WorkspaceProfileRecord, query.storeId, owner);
       const root = this.root(query.storeId), observedAt = this.now().toISOString(),
-        collection = await tx.get(root.collection('storePresentationCoverage').doc('current'));
-      const base = {schemaVersion: 1, realm: this.realm, ...query, observedAt, source: 'Recorded signed-in Store visits'};
+        collection = await tx.get(root.collection(checkout ? 'checkoutEntryCoverage' : 'storePresentationCoverage').doc('current'));
+      const base = {schemaVersion: 1, realm: this.realm, ...query, observedAt,
+        source: checkout ? 'Reported signed-in Checkout entries' : 'Recorded signed-in Store visits'};
       const unavailable = (collectionStartedAt: string | null = null) => ({...base, state: 'unavailable', coverage: 'unknown',
         collectionStartedAt, coveredFrom: null, coveredUntil: null, count: null, visitors: null});
       if (!collection.exists) return unavailable();
@@ -3435,11 +3504,12 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       if (query.skuIds.length) return unavailable(startedAt);
       const from = [query.start, startedAt].sort().at(-1)!, until = [query.end, observedAt].sort()[0]!;
       if (from >= until) return unavailable(startedAt);
-      const events = await tx.get(root.collection('storePresentations').where('acceptedAt', '>=', from).where('acceptedAt', '<', until).orderBy('acceptedAt').limit(5001));
+      const events = await tx.get(root.collection(checkout ? 'checkoutEntries' : 'storePresentations').where('acceptedAt', '>=', from).where('acceptedAt', '<', until).orderBy('acceptedAt').limit(5001));
       if (events.size > 5000) return unavailable(startedAt);
       const visitors = new Set<string>();
       for (const doc of events.docs) {
-        const event = exact(doc.data(), ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'visitorKey', 'integrity']), input = storePresentation(event.input);
+        const event = exact(doc.data(), ['schemaVersion', 'realm', 'fingerprint', 'input', 'acceptedAt', 'visitorKey', 'integrity']),
+          input = checkout ? checkoutEntry(event.input) : storePresentation(event.input);
         const {integrity, ...retained} = event;
         if (event.schemaVersion !== 1 || event.realm !== this.realm || input.storeId !== query.storeId ||
             event.fingerprint !== cataloguePayloadHash(input) || integrity !== cataloguePayloadHash(retained) || typeof event.visitorKey !== 'string' ||

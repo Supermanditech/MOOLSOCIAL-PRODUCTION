@@ -5364,6 +5364,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
         final metric = eligible ? provider.metrics.where((m) => m.id == definition.id).firstOrNull : null;
         final percentage = const {'order-conversion', 'cart-dropoff'}.contains(definition.id);
         final known = storeAnalyticsMetricEligible(definition.id, metric);
+        if (definition.id == 'journey-checkout' && !known) { continue; }
         rows.add(StoreAnalyticsReportRow(area: _analyticsReportTitle(area),
           label: definition.label,
           value: known ? percentage ? '${metric!.value!.toStringAsFixed(1)}%' : '${_formatStoreAmount(metric!.value!.toInt())} count' : 'Unavailable',
@@ -6532,7 +6533,9 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
   WorkspaceAnalyticsRequest? get _request => widget.request;
   Future<WorkspaceAnalyticsSnapshot>? get _result => widget.result;
   static String metricGuide(String id, String fallback, WorkspaceAnalyticsMetric? metric) =>
-      id == 'journey-store' && storeAnalyticsMetricEligible(id, metric) &&
+      id == 'journey-checkout' && storeAnalyticsMetricEligible(id, metric)
+          ? 'Signed-in accounts · each counted once. Opening Checkout is not an order or conversion.'
+          : id == 'journey-store' && storeAnalyticsMetricEligible(id, metric) &&
         metric!.coverage == WorkspaceAnalyticsCoverage.partial &&
         metric.source.startsWith('Signed-in Store visits only · tracked ')
           ? 'Signed-in accounts · each counted once. Only recorded visits are included.'
@@ -6598,6 +6601,11 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
           id: 'journey-cart',
           label: 'Added to cart',
           guide: 'Customers adding your Store’s products',
+        ),
+        (
+          id: 'journey-checkout',
+          label: 'Opened Checkout',
+          guide: 'Signed-in accounts opening Checkout · not orders or conversion',
         ),
         (
           id: 'journey-order',
@@ -6689,7 +6697,6 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
     };
   @override
   Widget build(BuildContext context) {
-    final rows = definitions(widget.report);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -6714,6 +6721,8 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
             final values = verified
                 ? {for (final metric in snapshot.metrics) metric.id: metric}
                 : <String, WorkspaceAnalyticsMetric>{};
+            final rows = definitions(widget.report).where((row) => row.id != 'journey-checkout' ||
+              storeAnalyticsMetricEligible(row.id, values[row.id])).toList();
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -6857,6 +6866,7 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                         'journey-store' => Icons.storefront_outlined,
                         'journey-product' => Icons.inventory_2_outlined,
                         'journey-cart' => Icons.shopping_cart_outlined,
+                        'journey-checkout' => Icons.fact_check_outlined,
                         'journey-order' => Icons.receipt_long_outlined,
                         'journey-completed' => Icons.shopping_bag_outlined,
                         'supply-acceptance' => Icons.pending_actions_outlined,

@@ -2924,6 +2924,10 @@ export const moolSocialWorkspace = onRequest(
       if (storePresentationOperation && process.env.MOOLSOCIAL_STORE_PRESENTATIONS_V1 !== 'true') {
         throw new WorkspaceProfileError('service_unavailable', 'Store visit reporting is unavailable.', 503);
       }
+      const checkoutEntryOperation = ['recordPublicCheckoutEntry', 'readStoreCheckoutEntries'].includes(operation);
+      if (checkoutEntryOperation && process.env.MOOLSOCIAL_CHECKOUT_ENTRIES_V1 !== 'true') {
+        throw new WorkspaceProfileError('service_unavailable', 'Checkout entry reporting is not connected.', 503);
+      }
       const productPresentationOperation = ['recordPublicProductPresentation', 'readStoreProductPresentations'].includes(operation);
       if (productPresentationOperation && process.env.MOOLSOCIAL_PRODUCT_PRESENTATIONS_V1 !== 'true') {
         throw new WorkspaceProfileError('service_unavailable', 'Product view reporting is not connected.', 503);
@@ -2946,7 +2950,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStoreCoupon" || operation === "saveStorePublicDetails" ||
         variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || stockOperation === "save" || catalogueProductionAction !== undefined ||
-        operation === "prepareStoreProductMedia" || operation === "confirmStoreProductMedia" || operation === 'recordPublicProductPresentation' || operation === 'recordPublicStorePresentation' || operation === 'recordPublicCartAddition';
+        operation === "prepareStoreProductMedia" || operation === "confirmStoreProductMedia" || operation === 'recordPublicProductPresentation' || operation === 'recordPublicStorePresentation' || operation === 'recordPublicCartAddition' || operation === 'recordPublicCheckoutEntry';
       const supplierPolicyOperation = ["readStoreSupplierPolicy", "saveStoreSupplierPolicy",
         "reconcileStoreSupplierPolicy"].includes(operation);
       const promotionOperation = ["readStorePromotion", "saveStorePromotion", "reconcileStorePromotion",
@@ -3023,6 +3027,10 @@ export const moolSocialWorkspace = onRequest(
         ? await workspaceCatalogueService().recordStorePresentation(ownerUserId, catalogueBody)
         : operation === 'readStorePublicPresentations'
         ? await workspaceCatalogueService().readStorePresentations(ownerUserId, catalogueBody)
+        : operation === 'recordPublicCheckoutEntry'
+        ? await workspaceCatalogueService().recordCheckoutEntry(ownerUserId, catalogueBody)
+        : operation === 'readStoreCheckoutEntries'
+        ? await workspaceCatalogueService().readCheckoutEntries(ownerUserId, catalogueBody)
         : operation === 'recordPublicProductPresentation'
         ? await workspaceCatalogueService().recordProductPresentation(ownerUserId, catalogueBody)
         : operation === 'readStoreProductPresentations'

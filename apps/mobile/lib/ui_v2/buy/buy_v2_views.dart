@@ -10714,19 +10714,48 @@ class BuyV2CheckoutView extends StatefulWidget {
   State<BuyV2CheckoutView> createState() => _BuyV2CheckoutViewState();
 }
 
-class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> {
+class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> with WidgetsBindingObserver {
   final _instructionsKey = GlobalKey<_CheckoutDeliveryInstructionsState>();
+  bool _checkoutPresentationScheduled = false;
   BuyV2Session get session => widget.session;
   BuyV2GstInvoiceController get gstInvoiceController =>
       widget.gstInvoiceController;
   bool get keyboardVisible => widget.keyboardVisible;
   BuyV2PaymentHandoff? get paymentHandoff => widget.paymentHandoff;
 
+  @override void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); }
+  @override void dispose() { WidgetsBinding.instance.removeObserver(this); super.dispose(); }
+  @override void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (mounted && state == AppLifecycleState.resumed) setState(() {});
+  }
+  @override void didUpdateWidget(covariant BuyV2CheckoutView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.session, widget.session)) _checkoutPresentationScheduled = false;
+  }
+  void _scheduleCheckoutPresentation() {
+    final owner = session, token = session.pendingCheckoutPresentationToken;
+    if (token == null || _checkoutPresentationScheduled) return;
+    bool visible() {
+      if (!mounted || !identical(widget.session, owner) || !owner.checkoutPresentationCurrent(token) ||
+          ModalRoute.of(context)?.isCurrent != true || !TickerMode.valuesOf(context).enabled ||
+          WidgetsBinding.instance.lifecycleState != null && WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) { return false; }
+      var hidden = false;
+      context.visitAncestorElements((element) { if (element.widget case Offstage(offstage: true)) hidden = true; return !hidden; });
+      return !hidden;
+    }
+    _checkoutPresentationScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkoutPresentationScheduled = false;
+      if (visible()) owner.reportCheckoutPresentation(token, visible: visible);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: Listenable.merge([session, gstInvoiceController]),
       builder: (context, _) {
+        _scheduleCheckoutPresentation();
         final destinations = session.checkoutDestinations;
         final wholesaleReceiving =
             destinations.isNotEmpty &&

@@ -14470,6 +14470,7 @@ class BuyV2Session extends ChangeNotifier {
       }
     }
     _captureCheckoutPromiseSnapshot();
+    if (!retainingCheckout && !checkoutRequiresResolution) _prepareCheckoutPresentation();
     _invalidateAndRefreshCheckoutPricingContracts();
     _notifyNavigationIfChanged(
       previous,
@@ -16909,6 +16910,45 @@ class BuyV2Session extends ChangeNotifier {
       final original = reporter.prepare(product, eventId, cartAddition: true);
       if (original != null) unawaited(reporter.recordCartAddition(original, ownerCurrent: ownerCurrent));
     } on Object { /* Lossy reporting remains partial; commerce is independent. */ }
+  }
+
+  Object? _checkoutPresentationToken, _checkoutPresentationOwner;
+  WorkspaceProductPresentationGateway? _checkoutPresentationReporter;
+  List<Map<String, Object?>> _checkoutPresentationOriginals = const [];
+  String? _checkoutPresentationInput;
+  bool _checkoutPresentationClaimed = false;
+  String _checkoutPresentationLines() => jsonEncode([
+    for (final line in checkoutLines) [line.product.id, line.product.publicListingIdentity?.toJson(),
+      line.product.packTerms?.revision, line.quantity],
+  ]);
+  void _prepareCheckoutPresentation() {
+    _checkoutPresentationToken = null; _checkoutPresentationOriginals = const [];
+    _checkoutPresentationClaimed = false;
+    try {
+      final reporter = productPresentations;
+      if (_collectionDisposed || isStoreProcurement || !procurementScopeCurrent || reporter?.checkoutEntriesEnabled != true) return;
+      final random = math.Random.secure();
+      final eventId = List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+      final originals = reporter!.prepareCheckout(List.unmodifiable(checkoutLines), eventId);
+      if (originals.isEmpty) return;
+      _checkoutPresentationReporter = reporter; _checkoutPresentationOwner = _currentCustomerOrderScope;
+      _checkoutPresentationOriginals = originals; _checkoutPresentationInput = _checkoutPresentationLines();
+      _checkoutPresentationToken = Object();
+    } on Object { /* No verified witness means no report, never blocked Checkout. */ }
+  }
+  bool checkoutPresentationCurrent(Object token) => !_collectionDisposed && procurementScopeCurrent && !isStoreProcurement &&
+    view == BuyV2View.checkout && !checkoutRequiresResolution && identical(token, _checkoutPresentationToken) &&
+    _checkoutPresentationOwner == _currentCustomerOrderScope && identical(productPresentations, _checkoutPresentationReporter) &&
+    _checkoutPresentationInput == _checkoutPresentationLines();
+  Object? get pendingCheckoutPresentationToken => !_checkoutPresentationClaimed && _checkoutPresentationToken != null &&
+    checkoutPresentationCurrent(_checkoutPresentationToken!) ? _checkoutPresentationToken : null;
+  void reportCheckoutPresentation(Object token, {required bool Function() visible}) {
+    if (_checkoutPresentationClaimed || !checkoutPresentationCurrent(token) || !visible()) return;
+    final reporter = _checkoutPresentationReporter!, originals = _checkoutPresentationOriginals;
+    // Session-owned claim survives widget remounts and unknown telemetry replies.
+    _checkoutPresentationClaimed = true;
+    bool current() => checkoutPresentationCurrent(token) && visible();
+    for (final original in originals) { unawaited(reporter.recordCheckoutEntry(original, ownerCurrent: current)); }
   }
 
   bool approveSavedPrescription(String prescriptionId) {

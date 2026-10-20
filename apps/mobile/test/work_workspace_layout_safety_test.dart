@@ -8615,6 +8615,34 @@ void main() {
     });
   }
 
+  testWidgets('LF14 CHECKOUT optional journey row distinguishes verified zero and absent feed at large text', (
+    tester,
+  ) async {
+    // Isolated optional Checkout source; never native evaluation data.
+    var available = true;
+    final work = liveStore(analyticsReader: (request) async => WorkspaceAnalyticsSnapshot(
+      request: request, state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.partial,
+      source: 'Automated Checkout presentation fixture', updatedAt: DateTime.now(),
+      coveredFrom: request.start, coveredUntil: request.end,
+      metrics: [if (available) WorkspaceAnalyticsMetric(id: 'journey-checkout', state: WorkspaceAnalyticsState.verified,
+        coverage: WorkspaceAnalyticsCoverage.partial, basis: WorkspaceAnalyticsBasis.periodActivity,
+        unit: WorkspaceAnalyticsUnit.count, source: 'Signed-in Checkout accounts only · tracked selected period', value: 0, asOf: request.end)]));
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 720), textScale: 2, openHomeActions: false);
+    await _toggleHomeCategory(tester, 'journey');
+    expect(find.text('Opened Checkout'), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const Key('store-analytics-value-journey-checkout'))).data, '0');
+    expect(find.text('Signed-in accounts · each counted once. Opening Checkout is not an order or conversion.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    available = false;
+    await tester.ensureVisible(find.byTooltip('Refresh analytics'));
+    await tester.tap(find.byTooltip('Refresh analytics')); await tester.pumpAndSettle();
+    expect(find.text('Opened Checkout'), findsNothing);
+    expect(find.byKey(const Key('store-analytics-value-journey-checkout')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('ANALYTICS percentages require matching cohort basis and unit', (
     tester,
   ) async {

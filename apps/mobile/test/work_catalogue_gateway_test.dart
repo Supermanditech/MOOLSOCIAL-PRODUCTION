@@ -3134,6 +3134,127 @@ void main() {
     expect((await gateway.writeProductSubmission(original, current: () => true, reconcile: true)).state, WorkspaceProductSubmissionWriteState.notFound);
     expect((await gateway.writeProductSubmission(original, current: () => true)).state, WorkspaceProductSubmissionWriteState.unknown);
   });
+  final checkoutLog = Platform.environment['LF14_CHECKOUT_LOG'];
+  if (checkoutLog != null) {
+    Map<String, dynamic> checkoutCapture() {
+      const marker = 'LF14_CHECKOUT_ENTRIES_PROJECTION=';
+      return (jsonDecode(File(checkoutLog).readAsLinesSync().singleWhere((l) => l.startsWith(marker)).substring(marker.length)) as Map).cast<String, dynamic>();
+    }
+    WorkspaceProductPresentationGateway checkoutReporter(OwnerTransport transport, {bool enabled = true,
+      bool Function()? current, SocialContentCredentials? credentials}) {
+      final capture = checkoutCapture(), now = DateTime.parse(capture['aggregate']['observedAt']);
+      final entries = [for (final key in ['page', 'secondPage']) WorkspacePublicCatalogueEntry.fromResponse(
+        capture[key], storeId: 'store-one', realm: 'evaluation', channel: BuyV2OfferClass.retail, now: now)];
+      return WorkspaceProductPresentationGateway(current: current ?? () => true,
+        displayed: (p) => entries.where((e) => e.product.id == p.id).firstOrNull?.readback,
+        productPresentationsEnabled: false, checkoutEntriesEnabled: enabled,
+        gateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: credentials ?? Credentials(), transport: transport, realm: 'evaluation', ownerAccountId: 'owner-one', now: () => now));
+    }
+    WorkspaceAnalyticsRequest checkoutRequest({String key = 'aggregate'}) {
+      final data = checkoutCapture()[key];
+      return WorkspaceAnalyticsRequest(accountScope: 'owner-one', storeId: 'store-one',
+        start: DateTime.parse(data['start']), end: DateTime.parse(data['end']),
+        skuIds: Set<String>.from(data['skuIds']));
+    }
+    test('LF14 CHECKOUT real producer acknowledgement and distinct accounts reach Work without conversions', () async {
+      final capture = checkoutCapture();
+      final transport = OwnerTransport((body) async => SocialContentResponse(statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': body['operation'] == 'recordPublicCheckoutEntry' ? capture['accepted'] : capture['aggregate']})));
+      final reporter = checkoutReporter(transport);
+      final original = (jsonDecode(jsonEncode(capture['accepted']['input'])) as Map?)?.cast<String, Object?>() ??
+        (capture['event'] as Map).cast<String, Object?>();
+      (original['listings'] as List).sort((a, b) => (a['listingId'] as String).compareTo(b['listingId'] as String));
+      expect(await reporter.recordCheckoutEntry(original, ownerCurrent: () => true), true);
+      final snapshot = await reporter.readAnalytics(checkoutRequest());
+      expect(snapshot.metrics.single.id, 'journey-checkout'); expect(snapshot.metrics.single.value, 2);
+      expect(snapshot.metrics.single.source, startsWith('Signed-in Checkout accounts only'));
+      expect(snapshot.coverage, WorkspaceAnalyticsCoverage.partial);
+      expect(snapshot.metrics.any((m) => {'journey-order', 'order-conversion', 'cart-dropoff'}.contains(m.id)), false);
+      expect(transport.calls, 2);
+    });
+    test('LF14 CHECKOUT covered zero and SKU unavailable stay distinct', () async {
+      var key = 'zero';
+      final reporter = checkoutReporter(OwnerTransport((body) async => SocialContentResponse(statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': checkoutCapture()[key]}))));
+      expect((await reporter.readAnalytics(checkoutRequest(key: key))).metrics.single.value, 0);
+      key = 'sku';
+      final result = await reporter.readAnalytics(checkoutRequest(key: key));
+      expect(result.state, WorkspaceAnalyticsState.unavailable); expect(result.metrics, isEmpty);
+    });
+    for (final fault in ['extra', 'fraction', 'wrong Store', 'future', 'population', 'source']) {
+      test('LF14 CHECKOUT rejects malformed $fault aggregate', () async {
+        final data = Map<String, dynamic>.from(checkoutCapture()['aggregate']);
+        switch (fault) {
+          case 'extra': data['buyerId'] = 'private';
+          case 'fraction': data['visitors'] = 1.5;
+          case 'wrong Store': data['storeId'] = 'other-store';
+          case 'future': data['observedAt'] = '2027-01-01T00:00:00.000Z';
+          case 'population': data['visitors'] = 4;
+          case 'source': data['source'] = 'Recorded signed-in Store visits';
+        }
+        final reporter = checkoutReporter(OwnerTransport((_) async => SocialContentResponse(statusCode: 200,
+          body: jsonEncode({'ok': true, 'data': data}))));
+        expect((await reporter.readAnalytics(checkoutRequest())).state, WorkspaceAnalyticsState.unavailable);
+      });
+    }
+    test('LF14 CHECKOUT disabled and retired source never dispatch', () async {
+      final transport = OwnerTransport((_) async => throw StateError('Must not send'));
+      final original = (checkoutCapture()['event'] as Map).cast<String, Object?>();
+      expect(await checkoutReporter(transport, enabled: false).recordCheckoutEntry(original, ownerCurrent: () => true), false);
+      var current = true;
+      final reporter = checkoutReporter(transport, current: () => current,
+        credentials: RetiringOwnerCredentials(() => current = false));
+      expect(await reporter.recordCheckoutEntry(original, ownerCurrent: () => true), false);
+      expect(transport.calls, 0);
+    });
+    testWidgets('LF14 CHECKOUT actual visible entry reports once across SKUs and survives rebuild remount and lost reply', (tester) async {
+      final capture = checkoutCapture(), clock = DateTime.parse(capture['aggregate']['observedAt']);
+      final products = [for (final key in ['page', 'secondPage']) WorkspacePublicCatalogueEntry.fromResponse(
+        capture[key], storeId: 'store-one', realm: 'evaluation', channel: BuyV2OfferClass.retail, now: clock).product];
+      final sent = <Map<String, dynamic>>[];
+      final reporter = checkoutReporter(OwnerTransport((body) async {
+        sent.add(Map.of(body)); throw StateError('Isolated lost telemetry reply');
+      }));
+      final core = BuySession();
+      late final BuyV2Session session;
+      session = BuyV2Session(core: core, reviewDataEnabled: false, catalogueNow: () => clock,
+        productPresentations: reporter, commerceAdapter: _HostCouponCartCommerce(products),
+        productFactsAdapter: _HostOperationalFacts((product) => BuyV2ProductFactsSnapshot(productId: product.id,
+          priceMinor: product.priceMinor, deliveryPromise: 'Host courier fixture', partner: 'Host courier fixture',
+          orderabilityLabel: 'Host checked availability', sourceId: 'isolated-host-facts', observedAt: clock,
+          eligibility: BuyV2OfferEligibility(productId: product.id, storeId: product.storeId!, sourceRevision: 'host-only-v1',
+            customerLocationKey: session.eligibilityLocationKey, observedAt: clock, expiresAt: clock.add(const Duration(hours: 1)),
+            offerClass: product.offerClass!, channelEnabled: true, storeReady: true, fleetAvailable: false,
+            customerLocationConfirmed: true, options: {BuyV2DeliveryOption.courier}))));
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      await session.restoreCommerce();
+      expect(session.openCheckout(), false); expect(session.pendingCheckoutPresentationToken, isNull);
+      for (final product in products) { expect(session.addProduct(product.id), true, reason: session.notice); }
+      session.chooseAddress('host-home');
+      for (final product in products) { session.refreshProductFacts(product.id); }
+      await tester.pump();
+      expect(session.openCheckout(), true, reason: session.notice); expect(sent, isEmpty);
+      Widget screen({bool hidden = false}) => MaterialApp(home: Scaffold(body: Offstage(offstage: hidden,
+        child: BuyV2CheckoutView(session: session, gstInvoiceController: BuyV2GstInvoiceController(), keyboardVisible: false))));
+      await tester.pumpWidget(screen(hidden: true)); await tester.pumpAndSettle(); expect(sent, isEmpty);
+      await tester.pumpWidget(screen()); await tester.pumpAndSettle();
+      expect(sent, hasLength(1)); expect(sent.single['operation'], 'recordPublicCheckoutEntry');
+      expect(sent.single['listings'], hasLength(2));
+      final originalId = sent.single['presentationId'];
+      expect(session.openCheckout(), true); await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpWidget(screen()); await tester.pumpAndSettle();
+      expect(sent, hasLength(1));
+      session.goBack(); expect(session.openCheckout(), true); await tester.pumpAndSettle();
+      expect(sent, hasLength(2)); expect(sent.last['presentationId'], isNot(originalId));
+      session.goBack(); session.checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
+      expect(session.checkoutRequiresResolution, true);
+      expect(session.openCheckout(), true); await tester.pumpAndSettle();
+      expect(session.pendingCheckoutPresentationToken, isNull); expect(sent, hasLength(2));
+      expect(session.cartLines, hasLength(2)); expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
   final cartAdditionLog = Platform.environment['LF14_CART_LOG'];
   if (cartAdditionLog != null) {
     Map<String, dynamic> cartCapture() => jsonDecode(File(cartAdditionLog).readAsLinesSync()

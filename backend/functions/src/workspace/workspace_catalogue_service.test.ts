@@ -544,7 +544,7 @@ test('LF11 actual Store checkpoint publication, original recovery and private-co
 });
 test('LF14 rendered-product producer and owner aggregate are implemented in the existing catalogue owner', () => {
   for (const method of ['recordProductPresentation', 'readProductPresentations', 'recordStorePresentation', 'readStorePresentations',
-    'recordCartAddition', 'readCartAdditions']) {
+    'recordCartAddition', 'readCartAdditions', 'recordCheckoutEntry', 'readCheckoutEntries']) {
     assert.equal(typeof (WorkspaceCatalogueService.prototype as unknown as Record<string, unknown>)[method], 'function');
     assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>)[method], 'function');
   }
@@ -846,7 +846,75 @@ test('LF14 emulator reviewed public product to immutable presentation and restar
     await store.collection('productPresentationDays').doc('2026-10-16').set({schemaVersion: 1, count: 5000}); // Explicit isolated host capacity fixture.
     assert.deepEqual(await service().recordProductPresentation('buyer-one', event), accepted);
     await assert.rejects(service().recordProductPresentation('buyer-one', {...event, presentationId: 'b'.repeat(32)}), {code: 'service_unavailable'});
+    // Actual isolated Checkout page-entry producer; never a purchase or payment.
+    const checkout = {...visit, presentationId: '1'.repeat(32), observedAt: clock, listings: [
+      {skuId: event.skuId, listingId: event.listingId, skuRevision: event.skuRevision},
+      {skuId: secondAdd.skuId, listingId: secondAdd.listingId, skuRevision: secondAdd.skuRevision},
+    ]};
+    assert.equal((await service().readCheckoutEntries('owner-one', range) as any).count, null);
+    for (const changed of [{catalogueVersion: 7}, {amountMinor: 0}, {buyerUserId: 'buyer-one'},
+      {observedAt: '2026-10-16T12:00:04.000Z'}, {listings: []}, {listings: [checkout.listings[0], checkout.listings[0]]},
+      {listings: [{...checkout.listings[0], skuRevision: 500}]},
+      {listings: [{...checkout.listings[0], skuId: 'sku-two'}]},
+      {listings: [{...checkout.listings[0], quantity: 1}]},
+      {listings: [...checkout.listings, {...checkout.listings[0], listingId: 'listing-' + '0'.repeat(64)}]}]) {
+      await assert.rejects(service().recordCheckoutEntry('buyer-one', {...checkout, ...changed}));
+    }
+    await assert.rejects(service().recordCheckoutEntry('owner-one', checkout));
+    const entries = await Promise.allSettled([
+      service().recordCheckoutEntry('buyer-one', checkout), service().recordCheckoutEntry('buyer-one', checkout)]);
+    for (const result of entries) assert.equal(result.status, 'fulfilled', result.status === 'rejected' ? String(result.reason) : undefined);
+    const checkoutAccepted = (entries[0] as PromiseFulfilledResult<object>).value;
+    assert.deepEqual((entries[1] as PromiseFulfilledResult<object>).value, checkoutAccepted);
+    assert.deepEqual(await service().recordCheckoutEntry('buyer-one', {...checkout, listings: [...checkout.listings].reverse()}), checkoutAccepted);
+    await assert.rejects(service().recordCheckoutEntry('buyer-one', {...checkout, listings: [checkout.listings[0]]}), {code: 'conflict'});
+    await service().recordCheckoutEntry('buyer-one', {...checkout, presentationId: '2'.repeat(32)});
+    await service().recordCheckoutEntry('buyer-two', checkout);
+    clock = '2026-10-16T12:00:04.000Z';
+    const checkoutAggregate = await service().readCheckoutEntries('owner-one', range) as any;
+    assert.equal(checkoutAggregate.count, 3); assert.equal(checkoutAggregate.visitors, 2);
+    assert.equal(checkoutAggregate.source, 'Reported signed-in Checkout entries');
+    assert.equal(checkoutAggregate.coverage, 'signed_in_partial');
+    await assert.rejects(service().readCheckoutEntries('buyer-one', range), {code: 'not_found'});
+    const checkoutSku = await service().readCheckoutEntries('owner-one', {...range, skuIds: ['sku-one']}) as any;
+    assert.equal(checkoutSku.state, 'unavailable'); assert.equal(checkoutSku.count, null);
+    const checkoutZero = await service().readCheckoutEntries('owner-one', {...range, start: '2026-10-16T12:00:03.001Z'}) as any;
+    assert.equal(checkoutZero.count, 0); assert.equal(checkoutZero.visitors, 0);
+    const checkoutRows = (await store.collection('checkoutEntries').get()).docs;
+    assert.equal(checkoutRows.length, 3);
+    assert.equal(JSON.stringify(checkoutRows.map(row => row.data())).includes('buyer-one'), false);
+    assert.equal(JSON.stringify(checkoutAggregate).includes('visitorKey'), false);
+    assert.equal((await store.collection('storePresentations').get()).size, 3);
+    assert.equal((await store.collection('cartAdditions').get()).size, 3);
+    const savedCheckout = checkoutRows[0]!.data();
+    await checkoutRows[0]!.ref.update({visitorKey: '0'.repeat(64)});
+    await assert.rejects(service().readCheckoutEntries('owner-one', range));
+    await checkoutRows[0]!.ref.set(savedCheckout);
+    let checkoutAdmissions = 0;
+    const checkoutDayBefore = (await store.collection('checkoutEntryDays').doc('2026-10-16').get()).data();
+    await assert.rejects(repository().recordCheckoutEntry('buyer-one', {...checkout, presentationId: '4'.repeat(32)}, catalogueIdentity, async () => {
+      if (++checkoutAdmissions === 2) clock = '2026-10-16T12:00:05.000Z';
+      return {validUntil: '2026-10-16T12:00:05.000Z'};
+    }));
+    assert.equal(checkoutAdmissions, 2);
+    assert.equal((await store.collection('checkoutEntries').get()).size, 3);
+    assert.deepEqual((await store.collection('checkoutEntryDays').doc('2026-10-16').get()).data(), checkoutDayBefore);
+    clock = '2026-10-16T12:00:04.000Z'; checkoutAdmissions = 0;
+    clock = '2026-10-16T23:59:59.000Z';
+    await assert.rejects(repository().recordCheckoutEntry('buyer-one', {...checkout, observedAt: clock, presentationId: '3'.repeat(32)}, catalogueIdentity, async () => {
+      if (++checkoutAdmissions === 2) clock = '2026-10-17T00:00:00.000Z';
+      return {validUntil: '2026-10-17T01:00:00.000Z'};
+    }));
+    assert.equal(checkoutAdmissions, 2); assert.equal((await store.collection('checkoutEntries').get()).size, 3);
+    clock = '2026-10-16T12:00:04.000Z';
+    await store.collection('checkoutEntryDays').doc('2026-10-16').set({schemaVersion: 1, count: 5000});
+    assert.deepEqual(await service().recordCheckoutEntry('buyer-one', checkout), checkoutAccepted);
+    await assert.rejects(service().recordCheckoutEntry('buyer-one', {...checkout, presentationId: '3'.repeat(32)}));
+    if (process.env.LF14_CHECKOUT_CAPTURE === 'true') console.log(`LF14_CHECKOUT_ENTRIES_PROJECTION=${JSON.stringify({event: checkout,
+      accepted: checkoutAccepted, aggregate: checkoutAggregate, zero: checkoutZero, sku: checkoutSku, page, secondPage})}`);
     await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: {...value, publicListing: false}, expectedRevision: 1, idempotencyKey: 'withdraw-viewed-product'});
+    assert.deepEqual(await service().recordCheckoutEntry('buyer-one', checkout), checkoutAccepted);
+    await assert.rejects(service().recordCheckoutEntry('other-buyer', checkout));
     assert.deepEqual(await service().recordCartAddition('buyer-one', event), cartAccepted);
     await assert.rejects(service().recordCartAddition('other-buyer', event));
     assert.deepEqual(await service().recordProductPresentation('buyer-one', event), accepted);
