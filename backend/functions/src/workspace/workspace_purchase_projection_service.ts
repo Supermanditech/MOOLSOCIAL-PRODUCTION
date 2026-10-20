@@ -294,6 +294,20 @@ interface BulkAgreementRecord {
   requestedAt: string; updatedAt: string; lines: BulkQuotedLine[]; offer: BulkOffer | null;
   acceptance: {offerRevision: number; acceptedAt: string; agreementFingerprint: string} | null;
 }
+export type BulkSupplierQuoteAction = 'request' | 'offer' | 'accept' | 'withdraw' | 'read' | 'list_buyer' | 'list_store' | 'reconcile';
+export function bulkSupplierQuoteOperation(operation: unknown): BulkSupplierQuoteAction | undefined {
+  switch (operation) {
+    case 'requestBulkSupplierQuote': return 'request';
+    case 'offerBulkSupplierQuote': return 'offer';
+    case 'acceptBulkSupplierQuote': return 'accept';
+    case 'withdrawBulkSupplierQuote': return 'withdraw';
+    case 'readBulkSupplierQuote': return 'read';
+    case 'listBuyerBulkSupplierQuotes': return 'list_buyer';
+    case 'listStoreBulkSupplierQuotes': return 'list_store';
+    case 'reconcileBulkSupplierQuote': return 'reconcile';
+    default: return undefined;
+  }
+}
 /** Private merchandise negotiation, NOT a final Checkout quote, purchase, PO,
  * credit entitlement, reservation, payment or delivery instruction. The real
  * reviewed catalogue is read in the same transaction as the agreement write. */
@@ -457,6 +471,30 @@ export class WorkspaceBulkQuoteService {
       customerReference: `customer-${integrityHash([this.realm, record.storeId, buyerUserId]).slice(0, 32)}`,
       kind: 'supplier_merchandise_agreement', currency: 'INR', orderingAvailable: false, finalChargesDetermined: false, creditApproved: false};
   }
+  async handleOperation(actor: string, action: BulkSupplierQuoteAction, body: Readonly<Record<string, unknown>>): Promise<object> {
+    switch (action) {
+      case 'request': return this.request(actor, body);
+      case 'offer': return this.offer(actor, body);
+      case 'accept': return this.accept(actor, body);
+      case 'withdraw': return this.withdraw(actor, body);
+      case 'read': return this.read(actor, body);
+      case 'list_buyer': return this.listBuyer(actor, body);
+      case 'list_store': return this.listStore(actor, body);
+      case 'reconcile': return this.reconcile(actor, body);
+      default: return fail();
+    }
+  }
+  private acknowledged(raw: unknown, actor: string, quoteId: string, fingerprint: string, current: BulkAgreementRecord) {
+    const p = exact(raw, ['actor', 'quoteId', 'fingerprint', 'record', 'integrity']);
+    const {integrity, ...body} = p;
+    if (p.actor !== actor || p.quoteId !== quoteId || p.fingerprint !== fingerprint || integrity !== integrityHash(body)) fail('conflict', 409);
+    const original = this.stored(p.record);
+    if (original.quoteId !== quoteId || original.buyerUserId !== current.buyerUserId ||
+      original.supplierUserId !== current.supplierUserId || original.storeId !== current.storeId ||
+      original.storeCaseId !== current.storeCaseId || original.requestedAt !== current.requestedAt ||
+      original.revision > current.revision) fail('invalid_state', 409);
+    return original;
+  }
   async request(actor: string, raw: Readonly<Record<string, unknown>>): Promise<object> {
     actor = id(actor); const r = exact(structuredClone(raw), ['schemaVersion', 'requestId', 'storeId', 'lines']);
     if (r.schemaVersion !== 1) fail();
@@ -479,13 +517,8 @@ export class WorkspaceBulkQuoteService {
       const saved = doc!.exists ? await this.authorized(tx, doc!.data(), actor, quoteId) : null;
       if (!saved && !create) fail('not_found', 404);
       if (prior!.exists) {
-        const p = exact(prior!.data(), ['actor', 'quoteId', 'fingerprint', 'record', 'integrity']);
-        const {integrity, ...body} = p;
-        if (p.actor !== actor || p.quoteId !== quoteId || p.fingerprint !== fingerprint || integrity !== integrityHash(body)) fail('conflict', 409);
-        const original = this.stored(p.record);
-        if (!saved || original.quoteId !== quoteId || original.buyerUserId !== saved.buyerUserId ||
-          original.supplierUserId !== saved.supplierUserId) fail('invalid_state', 409);
-        return this.view(original, actor);
+        if (!saved) fail('invalid_state', 409);
+        return this.view(this.acknowledged(prior!.data(), actor, quoteId, fingerprint, saved), actor);
       }
       const result = await change(tx, saved), stored = {body: result, integrity: integrityHash(result)};
       this.stored(stored); // Same strict contract on write/read/replay.
@@ -544,6 +577,96 @@ export class WorkspaceBulkQuoteService {
       return this.view(record, actor);
     });
   }
+  /** Original acknowledgement only. No source refresh, mutation, retry or
+   * inferred rejection when a receipt has not been observed. Current head is
+   * returned separately so an old receipt cannot overwrite newer visible state. */
+  async reconcile(actor: string, raw: Readonly<Record<string, unknown>>): Promise<object> {
+    actor = id(actor);
+    const r = exact(structuredClone(raw), ['schemaVersion', 'originalOperation', 'original']);
+    if (r.schemaVersion !== 1 || typeof r.originalOperation !== 'string' ||
+      !['request', 'offer', 'accept', 'withdraw'].includes(r.originalOperation)) fail();
+    const action = r.originalOperation, original = exact(r.original, action === 'request'
+      ? ['schemaVersion', 'requestId', 'storeId', 'lines']
+      : ['schemaVersion', 'quoteId', 'operationId', 'expectedRevision', ...(action === 'offer' ? ['validUntil', 'prices'] : [])]);
+    if (original.schemaVersion !== 1) fail();
+    let quoteId: string, operationId: string;
+    if (action === 'request') {
+      operationId = id(original.requestId); id(original.storeId); this.requestLines(original.lines);
+      quoteId = `bulk-${integrityHash([this.realm, actor, operationId])}`;
+    } else {
+      quoteId = id(original.quoteId); operationId = id(original.operationId); integer(original.expectedRevision, 999999998, 1);
+      if (action === 'offer') {
+        timestamp(original.validUntil);
+        const prices = array(original.prices, 100).map(p => exact(p, ['lineId', 'unitPriceMinor']));
+        for (const p of prices) { id(p.lineId); integer(p.unitPriceMinor, 1000000000000, 1); }
+        unique(prices.map(p => String(p.lineId)));
+      }
+    }
+    const fingerprint = integrityHash(action === 'request' ? original : {action, ...original});
+    return this.db.runTransaction(async tx => {
+      const [head, receipt] = await tx.getAll(this.path(quoteId),
+        this.root().collection('bulkQuoteCommands').doc(integrityHash([actor, operationId])));
+      const saved = head!.exists ? await this.authorized(tx, head!.data(), actor, quoteId) : null;
+      if (!saved && action !== 'request') fail('not_found', 404);
+      if (saved && (action === 'request' || action === 'accept') && actor !== saved.buyerUserId ||
+          saved && action === 'offer' && actor !== saved.supplierUserId) fail('not_found', 404);
+      const base = {schemaVersion: 1, realm: this.realm, authNamespace: 'firebase-default', originalOperation: action,
+        quoteId, operationId, requestFingerprint: fingerprint, currentHead: saved ? this.view(saved, actor) : null};
+      if (receipt!.exists) {
+        if (!saved) fail('invalid_state', 409);
+        return {...base, state: 'recorded', agreement: this.view(this.acknowledged(receipt!.data(), actor, quoteId, fingerprint, saved), actor), proof: null};
+      }
+      const superseded = saved && action !== 'request' && (saved.revision > Number(original.expectedRevision) ||
+        saved.state === 'accepted' || saved.state === 'withdrawn');
+      return {...base, state: superseded ? 'superseded' : 'not_found', agreement: null,
+        proof: superseded ? {expectedRevision: original.expectedRevision, currentRevision: saved.revision, currentState: saved.state} : null};
+    });
+  }
+  private async list(actor: string, raw: Readonly<Record<string, unknown>>, supplier: boolean): Promise<object> {
+    actor = id(actor); const r = exact(raw, supplier ? ['storeId', 'limit', 'cursor'] : ['limit', 'cursor']);
+    const storeId = supplier ? id(r.storeId) : null, limit = integer(r.limit, 5, 1);
+    const scope = integrityHash([this.realm, 'firebase-default', 'bulk-quotation-inbox', actor, supplier ? 'supplier' : 'buyer', storeId, limit]);
+    let after: string | undefined;
+    if (r.cursor !== null) {
+      try {
+        const token = text(r.cursor, 512), c = exact(JSON.parse(Buffer.from(token, 'base64url').toString('utf8')), ['version', 'scope', 'after']);
+        if (c.version !== 1 || c.scope !== scope || typeof c.after !== 'string' || !/^bulk-[a-f0-9]{64}$/u.test(c.after) ||
+          Buffer.from(JSON.stringify(c)).toString('base64url') !== token) fail();
+        after = c.after;
+      } catch { fail(); }
+    }
+    return this.db.runTransaction(async tx => {
+      if (supplier) await this.profile(tx, storeId!, actor, undefined, false);
+      if (after) {
+        const position = await tx.get(this.path(after));
+        if (!position.exists) fail('not_found', 404);
+        const record = await this.authorized(tx, position.data(), actor, after);
+        if (supplier ? record.storeId !== storeId || record.supplierUserId !== actor : record.buyerUserId !== actor) fail('not_found', 404);
+      }
+      let query = this.root().collection('bulkQuoteRequests')
+        .where(supplier ? 'body.supplierUserId' : 'body.buyerUserId', '==', actor);
+      if (supplier) query = query.where('body.storeId', '==', storeId);
+      query = query.orderBy(FieldPath.documentId()).limit(limit + 1);
+      if (after) query = query.startAfter(after);
+      const docs = await tx.get(query), visible = docs.docs.slice(0, limit), summaries = [];
+      for (const doc of visible) {
+        const record = await this.authorized(tx, doc.data(), actor, doc.id);
+        if (supplier && (record.storeId !== storeId || record.supplierUserId !== actor) ||
+          !supplier && record.buyerUserId !== actor) fail('not_found', 404);
+        const view = this.view(record, actor);
+        summaries.push({quoteId: record.quoteId, storeId: record.storeId, revision: record.revision, state: record.state,
+          requestedAt: record.requestedAt, updatedAt: record.updatedAt, productCount: record.lines.length,
+          offerMerchandiseMinor: record.offer?.merchandiseMinor ?? null, offerValidUntil: record.offer?.validUntil ?? null,
+          customerReference: view.customerReference});
+      }
+      const last = docs.size > limit ? visible.at(-1)?.id : undefined;
+      return {schemaVersion: 1, realm: this.realm, authNamespace: 'firebase-default', viewerRole: supplier ? 'supplier' : 'buyer',
+        storeId, currency: 'INR', paging: 'refreshable_not_snapshot', coverage: 'saved_private_requests', summaries,
+        nextCursor: last ? Buffer.from(JSON.stringify({version: 1, scope, after: last})).toString('base64url') : null};
+    });
+  }
+  listBuyer(actor: string, body: Readonly<Record<string, unknown>>) {return this.list(actor, body, false);}
+  listStore(actor: string, body: Readonly<Record<string, unknown>>) {return this.list(actor, body, true);}
 }
 
 /** Local implementation of the operational authority, separate from originals.

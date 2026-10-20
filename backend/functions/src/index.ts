@@ -145,7 +145,8 @@ import {
   FirestoreRetailerOrderRepository,
   RetailerOrderService,
 } from "./workspace/retailer_order_service.js";
-import {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService, requireDefaultPurchaseTenant}
+import {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService, WorkspaceBulkQuoteService,
+  bulkSupplierQuoteOperation, requireDefaultPurchaseTenant}
   from "./workspace/workspace_purchase_projection_service.js";
 
 const youtubeServerApiKey = defineSecret("YOUTUBE_SERVER_API_KEY");
@@ -2912,6 +2913,11 @@ export const moolSocialWorkspace = onRequest(
       const variantFamilyOperation = storeVariantFamilyOperation(operation);
       const productSubmissionOperation = storeProductSubmissionOperation(operation);
       const catalogueProductionAction = catalogueProductionOperation(operation);
+      const bulkQuoteAction = bulkSupplierQuoteOperation(operation);
+      const bulkQuoteOperation = bulkQuoteAction !== undefined;
+      if (bulkQuoteOperation && process.env.MOOLSOCIAL_BULK_SUPPLIER_QUOTES_V1 !== 'true') {
+        throw new WorkspaceProfileError('service_unavailable', 'Bulk supplier quotations are not connected.', 503);
+      }
       if (catalogueProductionAction !== undefined && process.env.MOOLSOCIAL_CATALOGUE_PRODUCER_V1 !== "true") {
         throw new WorkspaceProfileError("service_unavailable", "Catalogue operations are not connected.", 503);
       }
@@ -2950,6 +2956,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStoreCoupon" || operation === "saveStorePublicDetails" ||
         variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || stockOperation === "save" || catalogueProductionAction !== undefined ||
+        ['request', 'offer', 'accept', 'withdraw'].includes(bulkQuoteAction ?? '') ||
         operation === "prepareStoreProductMedia" || operation === "confirmStoreProductMedia" || operation === 'recordPublicProductPresentation' || operation === 'recordPublicStorePresentation' || operation === 'recordPublicCartAddition' || operation === 'recordPublicCheckoutEntry';
       const supplierPolicyOperation = ["readStoreSupplierPolicy", "saveStoreSupplierPolicy",
         "reconcileStoreSupplierPolicy"].includes(operation);
@@ -2984,7 +2991,7 @@ export const moolSocialWorkspace = onRequest(
             ),
           verifyIdToken: async (token) => {
             const verified = await getAuth().verifyIdToken(token);
-            if (purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation) {
+            if (purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
               requireDefaultPurchaseTenant(verified.firebase?.tenant);
             }
             return verified;
@@ -3017,6 +3024,8 @@ export const moolSocialWorkspace = onRequest(
       }
       const result = catalogueProductionAction !== undefined
         ? await workspaceCatalogueService().handleCatalogueProduction(ownerUserId, operation, catalogueBody)
+        : bulkQuoteAction !== undefined
+        ? await workspaceBulkQuoteService().handleOperation(ownerUserId, bulkQuoteAction, catalogueBody)
         : stockOperation !== undefined
         ? await workspaceCatalogueService().handleStoreStock(ownerUserId, operation, catalogueBody)
         : operation === 'recordPublicCartAddition'
@@ -3167,6 +3176,14 @@ export const moolSocialWorkspace = onRequest(
     }
   },
 );
+
+function workspaceBulkQuoteService(): WorkspaceBulkQuoteService {
+  const realm = process.env.MOOLSOCIAL_PURCHASE_REALM;
+  if ((realm !== 'evaluation' && realm !== 'production') || realm !== process.env.MOOLSOCIAL_CATALOGUE_REALM) {
+    throw new WorkspaceProfileError('service_unavailable', 'Bulk supplier quotation sources are not connected.', 503);
+  }
+  return new WorkspaceBulkQuoteService(getFirestore(), realm, workspaceCatalogueService());
+}
 
 function workspaceOrderOperationsService(): WorkspaceOrderOperationsService {
   const realm = process.env.MOOLSOCIAL_PURCHASE_REALM;

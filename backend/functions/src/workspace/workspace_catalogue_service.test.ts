@@ -26,7 +26,7 @@ import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingB
   normalizeStoreVariantFamily, storeVariantFamilyOperation, storeVariantFamilySubmission, planStoreVariantFamilySubmission,
   planStoreVariantFamilyReview, type StoreVariantFamilyInput, type StoreVariantFamilyCandidate} from "./workspace_catalogue_service.js";
 import type {WorkspaceProfileRecord} from "./workspace_profile_service.js";
-import {requireDefaultPurchaseTenant, WorkspaceBulkQuoteService} from "./workspace_purchase_projection_service.js";
+import {requireDefaultPurchaseTenant, WorkspaceBulkQuoteService, bulkSupplierQuoteOperation} from "./workspace_purchase_projection_service.js";
 import {WorkspacePromotionService, FirestorePromotionRepository, planPromotionSave, type PromotionRepository, type PromotionRecord} from "./workspace_promotion_service.js";
 import {WorkspaceSupplierPolicyService, FirestoreSupplierPolicyRepository} from "./workspace_supplier_policy_service.js";
 import {createCatalogueAggregate, type CatalogueAggregate} from "../commerce/catalogue_contract.js";
@@ -605,6 +605,31 @@ test('LF14 rendered-product producer and owner aggregate are implemented in the 
     assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>)[method], 'function');
   }
 });
+test('LF-BULK HTTP dispatch keeps reads and recovery authenticated, namespace fenced and writes AppCheck-consumed', async () => {
+  const index = readFileSync(resolve(__dirname, '../../src/index.ts'), 'utf8');
+  const route = index.slice(index.indexOf('export const moolSocialWorkspace = onRequest('));
+  assert.ok(route.includes('const bulkQuoteAction = bulkSupplierQuoteOperation(operation)'));
+  assert.ok(route.includes("bulkQuoteOperation && process.env.MOOLSOCIAL_BULK_SUPPLIER_QUOTES_V1 !== 'true'"));
+  assert.ok(route.includes('workspaceBulkQuoteService().handleOperation(ownerUserId, bulkQuoteAction, catalogueBody)'));
+  assert.ok(route.includes('realm !== process.env.MOOLSOCIAL_CATALOGUE_REALM'));
+  const mutation = route.match(/const mutation = ([\s\S]*?);/u)?.[1]; assert.ok(mutation);
+  const callback = route.match(/verifyIdToken: async \(token\) => \{([\s\S]*?)\n\s*\},/u)?.[1]; assert.ok(callback);
+  const guard = callback.match(/if \(([^\n]+)\) \{/u)?.[1]; assert.ok(guard);
+  const flags = guard.split(' || ');
+  for (const operation of ['requestBulkSupplierQuote', 'offerBulkSupplierQuote', 'acceptBulkSupplierQuote', 'withdrawBulkSupplierQuote',
+    'readBulkSupplierQuote', 'listBuyerBulkSupplierQuotes', 'listStoreBulkSupplierQuotes', 'reconcileBulkSupplierQuote']) {
+    const action = bulkSupplierQuoteOperation(operation); assert.ok(action);
+    const writes: boolean = new Function('operation', 'variantFamilyOperation', 'productSubmissionOperation', 'stockOperation',
+      'catalogueProductionAction', 'bulkQuoteAction', `return ${mutation}`)(operation, undefined, undefined, undefined, undefined, action);
+    assert.equal(writes, ['request', 'offer', 'accept', 'withdraw'].includes(action));
+    const verify = new Function('getAuth', 'requireDefaultPurchaseTenant', ...flags, `return async(token) => {${callback}}`)(
+      () => ({verifyIdToken: async (token: object) => token}), requireDefaultPurchaseTenant,
+      ...flags.map(f => f === 'bulkQuoteOperation')) as (token: object) => Promise<object>;
+    assert.deepEqual(await verify({uid: 'same-uid'}), {uid: 'same-uid'});
+    for (const tenant of ['another-tenant', '', null]) await assert.rejects(verify({uid: 'same-uid', firebase: {tenant}}), {code: 'authentication_required'});
+  }
+});
+
 test('LF14 Checkout HTTP verifier rejects tenant UID collisions for recording and owner reads', async () => {
   // Execute the actual scoped callback with a token-verifier stub; no live Auth,
   // App Check, HTTP deployment or data access is claimed by this source-bound test.

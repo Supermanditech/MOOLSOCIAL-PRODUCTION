@@ -27,8 +27,22 @@ function operationalEvidence(): TrustedOperationalOrderEvidence {
 test('LF-BULK supplier negotiation has a distinct private lifecycle, not a Checkout quote or issued PO', () => {
   const Service = Reflect.get(purchaseModule, 'WorkspaceBulkQuoteService');
   assert.equal(typeof Service, 'function');
-  for (const method of ['request', 'offer', 'accept', 'withdraw', 'read']) {
+  for (const method of ['request', 'offer', 'accept', 'withdraw', 'read', 'listBuyer', 'listStore', 'reconcile']) {
     assert.equal(typeof Reflect.get(Service.prototype, method), 'function');
+  }
+});
+
+test('LF-BULK HTTP operation classification separates writes from observational inbox and recovery', () => {
+  const classify = Reflect.get(purchaseModule, 'bulkSupplierQuoteOperation');
+  assert.equal(typeof classify, 'function');
+  for (const [operation, action] of [
+    ['requestBulkSupplierQuote', 'request'], ['offerBulkSupplierQuote', 'offer'],
+    ['acceptBulkSupplierQuote', 'accept'], ['withdrawBulkSupplierQuote', 'withdraw'],
+    ['readBulkSupplierQuote', 'read'], ['listBuyerBulkSupplierQuotes', 'list_buyer'],
+    ['listStoreBulkSupplierQuotes', 'list_store'], ['reconcileBulkSupplierQuote', 'reconcile'],
+  ]) assert.equal(classify(operation), action);
+  for (const other of ['placeOrder', 'acceptQuote', 'readStorePurchaseProjection', null, {}, 'requestBulkSupplierQuote ']) {
+    assert.equal(classify(other), undefined);
   }
 });
 
@@ -41,7 +55,7 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
   const app = initializeApp({projectId: `demo-lf-bulk-${randomUUID().slice(0, 8)}`}, `bulk-${randomUUID()}`), db = getFirestore(app);
   let clock = '2026-10-20T12:00:00.000Z', channel = 'bulk', revision = 1, policyRevision = 1;
   const listingId = `listing-${'a'.repeat(64)}`;
-  let expireDuringRead = false;
+  let expireDuringRead = false, sourceReads = 0;
   const sourceFixture = {bulkQuotationSnapshot: async () => [{state: 'ready', realm: 'evaluation', storeId: 'store-one', items: [{
     skuId: 'sku-one', revision, canonicalProductId: 'canonical-one', verifiedPackId: 'pack-one',
     content: {title: 'Isolated Bulk rice'}, pack: {label: '25 kg bag'},
@@ -54,6 +68,7 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
         title: 'Isolated supplier terms', body: 'Discuss bank or delivery terms with supplier'}},
   }]}]};
   const source = {bulkQuotationSnapshot: async () => {
+    sourceReads++;
     const pages = await sourceFixture.bulkQuotationSnapshot();
     if (expireDuringRead) clock = '2026-10-20T12:05:00.000Z';
     return pages;
@@ -69,6 +84,9 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
       channel = value; await assert.rejects(service().request('buyer-one', request));
     }
     channel = 'bulk';
+    const unknownRequest = await service().reconcile('buyer-one', {schemaVersion: 1, originalOperation: 'request', original: request}) as any;
+    assert.equal(unknownRequest.state, 'not_found'); assert.equal(unknownRequest.agreement, null);
+    assert.equal(unknownRequest.currentHead, null); assert.equal(unknownRequest.proof, null);
     for (const change of [{buyerUserId: 'other-buyer'}, {lines: [{...request.lines[0], quantity: 11}]},
       {lines: [{...request.lines[0], quantity: 5}]}, {lines: [{...request.lines[0], unitPriceMinor: 1}]}]) {
       await assert.rejects(service().request('buyer-one', {...request, ...change}));
@@ -77,6 +95,17 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
     assert.equal(created.state, 'requested'); assert.equal(created.orderingAvailable, false);
     assert.equal(created.kind, 'supplier_merchandise_agreement');
     const scope = {quoteId: created.quoteId};
+    const page = {limit: 1, cursor: null};
+    const buyerPage = await service().listBuyer('buyer-one', page) as any;
+    assert.equal(buyerPage.summaries.length, 1); assert.equal(buyerPage.nextCursor, null);
+    assert.equal(buyerPage.paging, 'refreshable_not_snapshot'); assert.equal(buyerPage.summaries[0].quoteId, created.quoteId);
+    assert.equal(JSON.stringify(buyerPage).includes('buyer-one'), false);
+    assert.equal(JSON.stringify(buyerPage).includes('supplierPolicy'), false);
+    assert.equal((await service().listBuyer('other-buyer', page) as any).summaries.length, 0);
+    const storePage = await service().listStore('supplier-one', {storeId: 'store-one', ...page}) as any;
+    assert.equal(storePage.summaries[0].quoteId, created.quoteId); assert.equal(storePage.nextCursor, null);
+    await assert.rejects(service().listStore('other-supplier', {storeId: 'store-one', ...page}), {code: 'not_found'});
+    await assert.rejects(service().listStore('buyer-one', {storeId: 'store-one', ...page}), {code: 'not_found'});
     assert.deepEqual(await service().request('buyer-one', request), created);
     await assert.rejects(service().request('buyer-one', {...request, lines: [{...request.lines[0], quantity: 15}]}));
     await assert.rejects(service().read('other-buyer', scope));
@@ -86,6 +115,11 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
     await assert.rejects(service().offer('other-supplier', offer));
     await assert.rejects(service().offer('supplier-one', {...offer, prices: [{lineId: 'line-one', unitPriceMinor: 1.5}]}));
     const offered = await service().offer('supplier-one', offer) as any;
+    const beforeReconcileReads = sourceReads;
+    const unobserved = await service().reconcile('buyer-one', {schemaVersion: 1, originalOperation: 'accept',
+      original: {schemaVersion: 1, ...scope, operationId: 'never-accept', expectedRevision: 2}}) as any;
+    assert.equal(unobserved.state, 'not_found'); assert.equal(unobserved.currentHead.state, 'offered');
+    assert.equal(unobserved.proof, null); assert.equal(sourceReads, beforeReconcileReads);
     assert.equal(offered.offer.merchandiseMinor, 100250);
     assert.equal(offered.finalChargesDetermined, false); assert.equal(offered.creditApproved, false);
     assert.equal(offered.lines[0].quantity, 10); assert.equal(offered.lines[0].supplierPolicy.revision, 1);
@@ -120,11 +154,28 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
     assert.equal((await service().read('buyer-one', scope) as any).revision, 2);
     policyRevision = 2; await assert.rejects(service().accept('buyer-one', accept)); policyRevision = 1;
     clock = offer.validUntil; await assert.rejects(service().accept('buyer-one', accept));
+    const expiredAmendment = {...offer, expectedRevision: 2, operationId: 'unobserved-expired-offer'};
+    const expiredRecovery = await service().reconcile('supplier-one', {schemaVersion: 1, originalOperation: 'offer', original: expiredAmendment}) as any;
+    assert.equal(expiredRecovery.state, 'not_found'); assert.equal(expiredRecovery.proof, null);
+    assert.equal(expiredRecovery.currentHead.revision, 2);
+    await assert.rejects(service().offer('supplier-one', expiredAmendment));
     clock = '2026-10-20T12:01:00.000Z';
     const accepted = await service().accept('buyer-one', accept) as any;
     assert.equal(accepted.state, 'accepted'); assert.equal(accepted.acceptance.offerRevision, 2);
     assert.equal(accepted.orderingAvailable, false); assert.equal(accepted.offer.merchandiseMinor, 100250);
     assert.deepEqual(await service().read('buyer-one', scope), accepted);
+    const recovered = await service().reconcile('buyer-one', {schemaVersion: 1, originalOperation: 'request', original: request}) as any;
+    assert.equal(recovered.state, 'recorded'); assert.deepEqual(recovered.agreement, created);
+    assert.deepEqual(recovered.currentHead, accepted);
+    if (process.env.LF_BULK_API_CAPTURE === 'true') console.log(`LF_BULK_SERVICE_API=${JSON.stringify({
+      capturedAt: clock, request, offer, accept, created, offered, accepted, recovered, unobserved, buyerPage, storePage})}`);
+    const superseded = await service().reconcile('supplier-one', {schemaVersion: 1, originalOperation: 'offer',
+      original: {...offer, operationId: 'never-offer'}}) as any;
+    assert.equal(superseded.state, 'superseded'); assert.equal(superseded.agreement, null);
+    assert.deepEqual(superseded.proof, {expectedRevision: 1, currentRevision: 3, currentState: 'accepted'});
+    await assert.rejects(service().reconcile('supplier-one', {schemaVersion: 1, originalOperation: 'offer',
+      original: {...offer, prices: [{lineId: 'line-one', unitPriceMinor: 10026}]}}), {code: 'conflict'});
+    await assert.rejects(service().reconcile('other-buyer', {schemaVersion: 1, originalOperation: 'accept', original: accept}), {code: 'not_found'});
     const seller = await service().read('supplier-one', scope) as any;
     assert.equal(seller.viewerRole, 'supplier'); assert.deepEqual(seller.acceptance, accepted.acceptance);
     assert.equal(JSON.stringify(seller).includes('buyer-one'), false); assert.equal(JSON.stringify(accepted).includes('supplier-one'), false);
@@ -138,10 +189,29 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
     const racing = await Promise.allSettled([service().accept('buyer-one', raceAccept), service().withdraw('supplier-one', raceWithdraw)]);
     assert.equal(racing.filter(r => r.status === 'fulfilled').length, 1);
     const winner = await service().read('buyer-one', {quoteId: race.quoteId}) as any;
+    const firstPage = await service().listBuyer('buyer-one', page) as any;
+    assert.equal(firstPage.summaries.length, 1); assert.equal(typeof firstPage.nextCursor, 'string');
+    const lastPage = await service().listBuyer('buyer-one', {...page, cursor: firstPage.nextCursor}) as any;
+    assert.equal(lastPage.summaries.length, 1); assert.equal(lastPage.nextCursor, null);
+    assert.notEqual(firstPage.summaries[0].quoteId, lastPage.summaries[0].quoteId);
+    const invalidPosition = JSON.parse(Buffer.from(firstPage.nextCursor, 'base64url').toString('utf8'));
+    invalidPosition.after = `bulk-${'0'.repeat(64)}`;
+    await assert.rejects(service().listBuyer('buyer-one', {...page,
+      cursor: Buffer.from(JSON.stringify(invalidPosition)).toString('base64url')}), {code: 'not_found'});
+    for (const candidate of [
+      () => service().listBuyer('other-buyer', {...page, cursor: firstPage.nextCursor}),
+      () => service().listBuyer('buyer-one', {limit: 2, cursor: firstPage.nextCursor}),
+      () => service().listStore('supplier-one', {storeId: 'store-one', ...page, cursor: firstPage.nextCursor}),
+      () => new WorkspaceBulkQuoteService(db, 'production', source, () => new Date(clock)).listBuyer('buyer-one', {...page, cursor: firstPage.nextCursor}),
+    ]) await assert.rejects(candidate());
     assert.equal(winner.revision, 3); assert.ok(['accepted', 'withdrawn'].includes(winner.state));
     if (winner.state === 'accepted') assert.deepEqual(await service().accept('buyer-one', raceAccept), winner);
     else assert.equal((await service().withdraw('supplier-one', raceWithdraw) as any).state, 'withdrawn');
     revision = 2; clock = '2026-10-22T12:00:00.000Z';
+    const frozenReads = sourceReads;
+    const originalAccept = await service().reconcile('buyer-one', {schemaVersion: 1, originalOperation: 'accept', original: accept}) as any;
+    assert.equal(originalAccept.state, 'recorded'); assert.deepEqual(originalAccept.agreement, accepted);
+    assert.equal(sourceReads, frozenReads);
     assert.deepEqual(await service().accept('buyer-one', accept), accepted); // Original, not a new acceptance after expiry.
     assert.deepEqual(await service().offer('supplier-one', offer), offered);
     const heavyLines = Array.from({length: 80}, (_, i) => ({lineId: `line-${i}`, skuId: `sku-${i}`,
@@ -159,6 +229,8 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
       {...request, requestId: 'heavy-request', lines: heavyLines}), {code: 'invalid_input', httpStatus: 400});
     await db.collection('workspaceProfiles').doc('case-one').update({ownerUserId: 'new-supplier'});
     await assert.rejects(service().read('supplier-one', scope)); await assert.rejects(service().offer('supplier-one', offer));
+    await assert.rejects(service().listStore('supplier-one', {storeId: 'store-one', ...page}), {code: 'not_found'});
+    await assert.rejects(service().reconcile('supplier-one', {schemaVersion: 1, originalOperation: 'offer', original: offer}), {code: 'not_found'});
     await assert.rejects(service().read('new-supplier', scope));
     assert.deepEqual(await service().read('buyer-one', scope), accepted);
     const root = db.collection('workspacePurchaseProjections').doc('evaluation');
