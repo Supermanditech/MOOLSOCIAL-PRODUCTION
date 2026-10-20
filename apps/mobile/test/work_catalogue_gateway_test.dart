@@ -326,12 +326,13 @@ class _HostTipPolicy implements BuyV2TipPolicy {
 class _HostRetirableStateStore implements BuyV2CustomerStateStore {
   Future<BuyV2CustomerStateSnapshot?>? heldRead;
   bool writesSucceed = true;
+  int reads = 0, writes = 0;
   @override
   String? ownerScope = 'host-loading-owner';
   @override
-  Future<BuyV2CustomerStateSnapshot?> read() async => heldRead == null ? null : await heldRead;
+  Future<BuyV2CustomerStateSnapshot?> read() async { reads++; return heldRead == null ? null : await heldRead; }
   @override
-  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async => writesSucceed;
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async { writes++; return writesSucceed; }
 }
 class _HostProcurementBookmarks implements WorkProcurementBookmarkStore {
   WorkProcurementBookmark? value;
@@ -1284,9 +1285,9 @@ class _StockSessionCatalogue extends SessionCatalogue implements WorkspaceStoreS
 const _bulkServiceCapture20261020 = r'''{"capturedAt":"2026-10-20T12:01:00.000Z","request":{"schemaVersion":1,"requestId":"request-one","storeId":"store-one","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10}]},"offer":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"offer-one","expectedRevision":1,"validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025}]},"accept":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"accept-one","expectedRevision":2},"created":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"supplierRequested":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"offered":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"accepted":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"recovered":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"request","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"request-one","requestFingerprint":"e61bc6284c6b771f90677f3376ecbb035236e77c2ba49d131f164ee30c75e974","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"recorded","agreement":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"proof":null},"unobserved":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"accept","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"never-accept","requestFingerprint":"9a47224ccf5ad2833db6eaff3e27e70983d53fb33c04c396a6016edc2da9557a","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"not_found","agreement":null,"proof":null},"buyerPage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"buyer","storeId":null,"currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","storeName":"Isolated Bulk supplier","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null},"storePage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"supplier","storeId":"store-one","currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","storeName":"Isolated Bulk supplier","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null}}''';
 
 void main() {
-  Map<String, dynamic> restockClientPackets() {
-    const marker = 'RESTOCK_CLIENT_CAPTURE=';
-    final lines = File(Platform.environment['LF_RESTOCK_CLIENT_LOG']!).readAsLinesSync()
+  Map<String, dynamic> restockClientPackets({bool bulk = false}) {
+    final marker = bulk ? 'RESTOCK_BULK_CLIENT_CAPTURE=' : 'RESTOCK_CLIENT_CAPTURE=';
+    final lines = File(Platform.environment[bulk ? 'LF_RESTOCK_BULK_CLIENT_LOG' : 'LF_RESTOCK_CLIENT_LOG']!).readAsLinesSync()
       .where((line) => line.startsWith(marker)).toList();
     expect(lines, hasLength(1));
     return jsonDecode(lines.single.substring(marker.length)) as Map<String, dynamic>;
@@ -1306,6 +1307,132 @@ void main() {
   BuyV2CatalogueQuery restockQuery({BuyV2ProcurementContext? context = restockContext,
     BuyV2Destination destination = BuyV2Destination.wholesale}) => BuyV2CatalogueQuery(
       destination: destination, regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas, procurementContext: context);
+  test('LF05-RESTOCK initial catalogue scope preserves existing consumer default', () {
+    final core = BuySession();
+    final session = BuyV2Session(core: core, reviewDataEnabled: false);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    expect(session.catalogueAreaScope, BuyV2CatalogueAreaScope.regional);
+  });
+  for (final savedScope in BuyV2CatalogueAreaScope.values) {
+    test('LF05-RESTOCK configured scope waits for saved $savedScope without initial writes', () async {
+      final packets = restockClientPackets(bulk: true);
+      final api = OwnerTransport((body) async {
+        final request = Map<String, Object?>.of(body)..remove('operation');
+        final packet = packets.values.cast<Map<String, dynamic>>().where((entry) =>
+          _mediaHash(entry['request']) == _mediaHash(request)).single;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': packet['response']}));
+      });
+      final gate = Completer<BuyV2CustomerStateSnapshot?>();
+      addTearDown(() { if (!gate.isCompleted) gate.complete(null); });
+      final state = _HostRetirableStateStore()..ownerScope = restockContext.customerStateOwnerScope..heldRead = gate.future;
+      final controller = WorkProcurementController(currentAccountId: () => restockContext.accountId,
+        currentStoreId: () => restockContext.storeId, storeApproved: () => true, catalogueGateway: boundRestockGateway(api),
+        bookmarks: _HostProcurementBookmarks(), stateStoreFactory: (_) => state);
+      addTearDown(controller.dispose);
+      final opened = controller.open(purpose: restockContext.purpose, returnTo: 'stockStatement', exactContext: restockContext);
+      for (var i = 0; i < 20 && state.reads == 0; i++) { await Future<void>.delayed(Duration.zero); }
+      expect(state.reads, 1);
+      expect(state.writes, 0);
+      expect(controller.session!.catalogueAreaScope, BuyV2CatalogueAreaScope.allAreas);
+      gate.complete(BuyV2CustomerStateSnapshot(shoppingAreaScope: savedScope.name,
+        shoppingRegionId: savedScope == BuyV2CatalogueAreaScope.allAreas ? null : 'retained-region'));
+      expect(await opened, isTrue);
+      final session = controller.session!;
+      expect(session.catalogueAreaScope, savedScope);
+      expect(session.catalogueRegionId, savedScope == BuyV2CatalogueAreaScope.allAreas ? null : 'retained-region');
+      session.openDestination(BuyV2Destination.wholesale);
+      session.chooseWholesaleSaleType(BuyV2WholesaleSaleType.bulk);
+      final pager = session.acquireCatalogueProducts('host-retained-scope');
+      if (savedScope != BuyV2CatalogueAreaScope.allAreas) {
+        await pager.open(session.catalogueQuery());
+        expect(pager.page, isNull, reason: 'Unsupported saved scope must not silently widen');
+        expect(session.catalogueAreaScope, savedScope);
+      }
+      session.chooseCatalogueArea(null, BuyV2CatalogueAreaScope.allAreas);
+      await pager.open(session.catalogueQuery());
+      expect(pager.message, isNull);
+      expect(pager.page!.items.single.offerClass, BuyV2OfferClass.bulk);
+      session.releaseCatalogueProducts('host-retained-scope');
+    }, skip: Platform.environment['LF_RESTOCK_BULK_CLIENT_LOG'] == null);
+  }
+  for (final bulk in [false, true]) {
+    test('LF05-RESTOCK normal Store session browses actual saved ${bulk ? 'Bulk' : 'Wholesale'}', () async {
+      final packets = restockClientPackets(bulk: bulk);
+      final api = OwnerTransport((body) async {
+        final request = Map<String, Object?>.of(body)..remove('operation');
+        final packet = packets.values.cast<Map<String, dynamic>>().where((entry) =>
+          _mediaHash(entry['request']) == _mediaHash(request)).single;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': packet['response']}));
+      });
+      final state = _HostRetirableStateStore()..ownerScope = restockContext.customerStateOwnerScope;
+      final controller = WorkProcurementController(currentAccountId: () => restockContext.accountId,
+        currentStoreId: () => restockContext.storeId, storeApproved: () => true, catalogueGateway: boundRestockGateway(api),
+        bookmarks: _HostProcurementBookmarks(), stateStoreFactory: (_) => state);
+      addTearDown(controller.dispose);
+      expect(await controller.open(purpose: restockContext.purpose, returnTo: 'stockStatement', exactContext: restockContext), isTrue);
+      final session = controller.session!;
+      expect(session.catalogueAreaScope, BuyV2CatalogueAreaScope.allAreas);
+      session.openDestination(BuyV2Destination.wholesale);
+      session.chooseWholesaleSaleType(bulk ? BuyV2WholesaleSaleType.bulk : BuyV2WholesaleSaleType.wholesale);
+      final pager = session.acquireCatalogueProducts('host-normal-store');
+      await pager.open(session.catalogueQuery());
+      expect(pager.message, isNull);
+      expect(pager.page!.items, hasLength(1));
+      final product = pager.page!.items.single;
+      expect(product.offerClass, bulk ? BuyV2OfferClass.bulk : BuyV2OfferClass.wholesale);
+      expect(product.procurementSupplierGrant!.channel,
+        bulk ? BuyV2SupplierListingChannel.bulk : BuyV2SupplierListingChannel.wholesale);
+      expect(product.minimumOrder, bulk ? 24 : 1);
+      expect(product.quantityStep, bulk ? 12 : 1);
+      expect(product.priceMinor, bulk ? 25025 : 26000);
+      if (bulk) expect(product.packTerms!.priceMinorForQuantity(48, product.priceMinor), 24975);
+      expect(session.businessVerified, isFalse);
+      expect(session.addProduct(product.id), isFalse, reason: 'Fresh supplier grants do not invent operational availability');
+      session.releaseCatalogueProducts('host-normal-store');
+    }, skip: Platform.environment['LF_RESTOCK_BULK_CLIENT_LOG'] == null);
+  }
+  for (final path in ['discovery', 'tradeDiscovery', 'stores', 'tradeStores', 'exact', 'page', 'tradePage', 'resolve', 'content']) {
+    test('LF05-RESTOCK actual saved Bulk shared client $path', () async {
+      final packets = restockClientPackets(bulk: true);
+      final api = OwnerTransport((body) async {
+        final request = Map<String, Object?>.of(body)..remove('operation');
+        final packet = packets.values.cast<Map<String, dynamic>>().where((entry) =>
+          _mediaHash(entry['request']) == _mediaHash(request)).single;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': packet['response']}));
+      });
+      final gateway = boundRestockGateway(api), source = WorkspacePublicDiscoverySource(gateway: boundRestockGateway(api), current: () => true);
+      addTearDown(source.dispose);
+      final query = BuyV2CatalogueQuery(destination: BuyV2Destination.wholesale, regionId: null,
+        areaScope: BuyV2CatalogueAreaScope.allAreas, procurementContext: restockContext,
+        storeId: path == 'page' || path == 'tradePage' ? 'store-one' : null,
+        wholesaleSaleType: path.startsWith('trade') ? BuyV2WholesaleSaleType.bulk : null);
+      final listingId = (((packets['exact'] as Map)['response'] as Map)['supplierGrants'] as List).single['listingId'] as String;
+      final products = <BuyV2Product>[];
+      switch (path) {
+        case 'discovery' || 'tradeDiscovery': products.addAll((await source.loadProducts(query, pageSize: 24)).items);
+        case 'stores' || 'tradeStores': products.add((await source.loadStores(query, pageSize: 24)).items.single.previewProduct!);
+        case 'page' || 'tradePage':
+          final store = WorkspaceStoreCatalogueSource(gateway: gateway, storeId: 'store-one', current: () => true);
+          products.addAll((await store.loadProducts(query, pageSize: 24)).items);
+        case 'resolve': products.addAll(await source.resolveProducts({listingId}));
+        case 'exact' || 'content':
+          final entry = await gateway.readPublicEntry(storeId: 'store-one', skuId: 'sku-one', channel: BuyV2OfferClass.bulk, current: () => true);
+          expect(entry, isNotNull);
+          products.add(entry!.product);
+          if (path == 'content') expect((await gateway.read(entry.product)).content.state, BuyV2ProductContentState.ready);
+      }
+      expect(products, hasLength(1));
+      final product = products.single;
+      expect(product.id, listingId);
+      expect(product.offerClass, BuyV2OfferClass.bulk);
+      expect(product.priceMinor, 25025);
+      expect(product.minimumOrder, 24);
+      expect(product.quantityStep, 12);
+      expect(product.packTerms!.priceMinorForQuantity(48, product.priceMinor), 24975);
+      expect(product.procurementSupplierGrant!.channel, BuyV2SupplierListingChannel.bulk);
+      expect(product.hasValidPackTerms, isTrue);
+    }, skip: Platform.environment['LF_RESTOCK_BULK_CLIENT_LOG'] == null);
+  }
   test('LF05-RESTOCK Store controller configured failure cannot use review authority', () async {
     const account = 'host-configured-review-store';
     final seed = StoreReviewSeed(accountScope: account, orderCount: 1000, now: at);

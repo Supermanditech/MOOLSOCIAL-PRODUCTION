@@ -3714,6 +3714,7 @@ class BuyV2Session extends ChangeNotifier {
     this.shoppingAreaSource,
     Map<String, String> catalogueAreas = const {},
     String? initialCatalogueRegionId,
+    BuyV2CatalogueAreaScope initialCatalogueAreaScope = BuyV2CatalogueAreaScope.regional,
     BuyV2OrderResolutionAdapter? orderResolutionAdapter,
     BuyV2ShoppingAlertsAdapter? shoppingAlertsAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
@@ -3828,6 +3829,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     _catalogueAreas.addAll(catalogueAreas);
     _catalogueRegionId = initialCatalogueRegionId;
+    _catalogueAreaScope = initialCatalogueAreaScope;
     if (this.reviewDataEnabled &&
         cataloguePageSource == null &&
         buyV2DeviceReviewBenefitSeedsEnabled) {

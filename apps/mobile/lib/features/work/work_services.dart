@@ -133,6 +133,7 @@ class WorkProcurementController extends ChangeNotifier {
       productContentAdapter: _ownedCatalogueSource,
       catalogueNow: bound?.now ?? DateTime.now,
       initialCatalogueRegionId: review == null ? null : 'jodhpur',
+      initialCatalogueAreaScope: bound == null ? BuyV2CatalogueAreaScope.regional : BuyV2CatalogueAreaScope.allAreas,
     );
   }
 

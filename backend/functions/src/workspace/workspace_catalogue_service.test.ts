@@ -3988,7 +3988,8 @@ test('LF05-RESTOCK actual HTTP gate and authenticated read use only an isolated 
   }
 });
 
-test('LF05-RESTOCK persisted supplier publication reaches scoped browsing after restart and withdraws safely', {
+for (const trade of ['wholesale', 'bulk'] as const) {
+test(`LF05-RESTOCK persisted ${trade} supplier publication reaches scoped browsing after restart and withdraws safely`, {
   skip: !process.env.FIRESTORE_EMULATOR_HOST,
 }, async () => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
@@ -4006,8 +4007,10 @@ test('LF05-RESTOCK persisted supplier publication reaches scoped browsing after 
     await root.collection('participants').doc('store-one').set(producerParticipant('store-one', 'grocery', 'wholesaler'));
     await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
     await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
-    const value = input(); value.channels[0]!.kind = 'wholesale'; value.content.media = staticMedia(value);
-    const retail = {...value.channels[0]!, kind: 'retail' as const, offerId: 'restock-retail-offer'};
+    const value = input(); value.channels[0]!.kind = trade; value.content.media = staticMedia(value);
+    if (trade === 'bulk') Object.assign(value.channels[0]!, {minimumOrder: 24, quantityStep: 12, priceMinor: 25025,
+      tiers: [{minimumQuantity: 24, unitPriceMinor: 25025}, {minimumQuantity: 48, unitPriceMinor: 24975}]});
+    const retail = {...input().channels[0]!, kind: 'retail' as const, offerId: 'restock-retail-offer'};
     value.channels.push(retail);
     for (const original of productionCommands(value)) {
       const command = original.type === 'create_offer' ? {...original, buyingContext: 'wholesale'} : original;
@@ -4027,14 +4030,14 @@ test('LF05-RESTOCK persisted supplier publication reaches scoped browsing after 
     assert.equal(first.catalogue.items[0].listing.items[0].channels[0].priceMinor, value.channels[0]!.priceMinor);
     assert.equal(first.supplierGrants[0].offerId, value.channels[0]!.offerId);
     assert.equal(first.supplierGrants[0].role, 'wholesaler');
-    console.log('RESTOCK_SOURCE_CAPTURE=' + JSON.stringify(first));
+    console.log((trade === 'bulk' ? 'RESTOCK_BULK_SOURCE_CAPTURE=' : 'RESTOCK_SOURCE_CAPTURE=') + JSON.stringify(first));
     const shared = {storeId: 'store-one', supplierPublishersVersion: 1, productFactsReadbackVersion: 1,
       storeDetailsReadbackVersion: 1, storeClassificationReadbackVersion: 1};
     const exact = await service().readStoreProcurement(context.accountId, {schemaVersion: 1, context, kind: 'catalogue',
       request: {...shared, skuId: value.skuId, listingReadbackVersion: 1, mediaReadbackVersion: 1, policyReadbackVersion: 1}});
     const page = await service().readStoreProcurement(context.accountId, {schemaVersion: 1, context, kind: 'catalogue',
       request: {...shared, cataloguePageVersion: 2, pageSize: 1, query: {...viewQuery, destination: 'wholesale'}}});
-    console.log('RESTOCK_SOURCE_PATHS_CAPTURE=' + JSON.stringify({discovery: first, exact, page}));
+    console.log((trade === 'bulk' ? 'RESTOCK_BULK_SOURCE_PATHS_CAPTURE=' : 'RESTOCK_SOURCE_PATHS_CAPTURE=') + JSON.stringify({discovery: first, exact, page}));
     // Actual persisted producer output for the shared client's exact request
     // shapes. The Dart bridge must not recompute a response fingerprint to make
     // an invented request look like a server-authenticated read.
@@ -4052,12 +4055,28 @@ test('LF05-RESTOCK persisted supplier publication reaches scoped browsing after 
         pageSize: 24, query: clientQuery, unbrandedProduceReadbackVersion: 1}},
       resolve: {schemaVersion: 1, context, kind: 'discovery', request: {...clientDiscovery, pageSize: 50,
         query: {...clientQuery, listingIds: [first.supplierGrants[0].listingId]}}},
+      tradeDiscovery: {schemaVersion: 1, context, kind: 'discovery', request: {...clientDiscovery,
+        query: {...clientQuery, tradeType: trade}}},
+      tradeStores: {schemaVersion: 1, context, kind: 'discovery', request: {...clientDiscovery, resultKind: 'stores',
+        query: {...clientQuery, tradeType: trade}}},
+      tradePage: {schemaVersion: 1, context, kind: 'catalogue', request: {...shared, cataloguePageVersion: 2,
+        pageSize: 24, query: {...clientQuery, tradeType: trade}, unbrandedProduceReadbackVersion: 1}},
+      sessionDiscovery: {schemaVersion: 1, context, kind: 'discovery', request: {...clientDiscovery,
+        pageSize: 40, query: {...clientQuery, tradeType: trade}}},
+      sessionStores: {schemaVersion: 1, context, kind: 'discovery', request: {...clientDiscovery, resultKind: 'stores',
+        pageSize: 40, query: {...clientQuery, tradeType: trade}}},
+      sessionPage: {schemaVersion: 1, context, kind: 'catalogue', request: {...shared, cataloguePageVersion: 2,
+        pageSize: 40, query: {...clientQuery, tradeType: trade}, unbrandedProduceReadbackVersion: 1}},
     };
     const clientPackets: Record<string, {request: object; response: object}> = {};
     for (const [key, body] of Object.entries(clientRequests)) {
       clientPackets[key] = {request: body, response: await service().readStoreProcurement(context.accountId, body)};
     }
-    console.log('RESTOCK_CLIENT_CAPTURE=' + JSON.stringify(clientPackets));
+    const resolved = clientPackets.resolve!.response as any;
+    assert.equal(resolved.supplierGrants[0].channel, trade);
+    assert.equal(resolved.catalogue.items[0].channel, trade);
+    assert.equal(resolved.catalogue.items[0].listing.items[0].channels[0].minimumOrder, value.channels[0]!.minimumOrder);
+    console.log((trade === 'bulk' ? 'RESTOCK_BULK_CLIENT_CAPTURE=' : 'RESTOCK_CLIENT_CAPTURE=') + JSON.stringify(clientPackets));
     const participant = producerParticipant('store-one', 'grocery', 'wholesaler');
     const revoked = applySupplyParticipantCommand(participant, {type: 'revoke_capability',
       actor: {actorId: 'capability-reviewer', tenantId: 'tenant-one', scopes: ['supply.capability.review']},
@@ -4077,6 +4096,7 @@ test('LF05-RESTOCK persisted supplier publication reaches scoped browsing after 
     assert.equal((await db.collection('retailerOrders').limit(1).get()).empty, true, 'Browsing creates no order.');
   } finally {await db.terminate(); await deleteApp(app);}
 });
+}
 
 for (const profileId of ['wholesaler', 'manufacturer']) {
   test(`LF04-PUBLISHERS explicit catalogue and discovery readback ${profileId}`, async () => {
