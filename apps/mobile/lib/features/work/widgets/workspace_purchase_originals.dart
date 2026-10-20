@@ -678,6 +678,11 @@ class _WorkspacePurchaseOriginalsState
                       if (_details[reference.orderId] case final details?) ...[
                         _orderUpdate(reference),
                         WorkspaceOriginalFulfilmentForOrder(original: details),
+                        if (details.supplierQuote case final agreed?) ...[
+                          _BulkMoney(key: ValueKey('original-supplier-quote-${reference.orderId}'),
+                            label: 'Agreed Bulk product prices', amount: agreed.merchandiseMinor),
+                          const Text('From the supplier quote accepted for this order.', style: TextStyle(fontSize: 12)),
+                        ],
                         for (final line in details.lines)
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 6),

@@ -726,6 +726,88 @@ void main() {
   }
   for (final role in WorkspaceOrderIdentityRole.values) {
     for (final unknown in [false, true]) {
+      test('LF-BULK ORIGINAL strict purchased agreement version8 ${role.name} unknown=$unknown', () async {
+        final data = supplierQuotePurchaseResponse(role: role.name, unknown: unknown), order = data['orders'][0];
+        final result = await projectionGateway(Transport()..data = data, account: data['viewerUserId'])
+          .readPurchaseProjection(role: role, realm: 'evaluation', purchaseId: data['purchaseId'],
+            storeId: role == WorkspaceOrderIdentityRole.seller ? order['storeId'] : null,
+            orderId: role == WorkspaceOrderIdentityRole.seller ? order['orderId'] : null);
+        expect(result, isNotNull); final saved = result!.orders.single;
+        expect(saved.factsVersion, 8); expect(saved.hasSupplierQuoteSnapshot, isTrue);
+        expect(saved.supplierQuote?.toJson(), order['original']['supplierQuote']);
+        if (!unknown) {
+          final quote = saved.supplierQuote!;
+          expect(quote.merchandiseMinor, saved.totals['itemsMinor']);
+          expect(() => quote.quoteLineByPurchasedLineId['other-line'] = 'other', throwsUnsupportedError);
+          final copy = quote.toJson(); copy['merchandiseMinor'] = 1;
+          expect(quote.merchandiseMinor, saved.totals['itemsMinor']);
+        }
+      });
+    }
+  }
+  for (final entry in <String, void Function(Map<String, dynamic>)>{
+    'missing field': (d) => (d['orders'][0]['original'] as Map).remove('supplierQuote'),
+    'missing Bulk agreement': (d) => d['orders'][0]['original']['supplierQuote'] = null,
+    'foreign realm': (d) => d['orders'][0]['original']['supplierQuote']['realm'] = 'production',
+    'false revision': (d) => d['orders'][0]['original']['supplierQuote']['acceptedRevision'] = 20,
+    'invalid expiry': (d) => d['orders'][0]['original']['supplierQuote']['validUntil'] = '2026-10-19T00:00:00.000Z',
+    'foreign purchased line': (d) => d['orders'][0]['original']['supplierQuote']['lines'][0]['lineId'] = 'other-line',
+    'wrong subtotal': (d) => d['orders'][0]['original']['supplierQuote']['merchandiseMinor'] = 1,
+    'private identity leak': (d) => d['orders'][0]['original']['supplierQuote']['buyerUserId'] = 'private-id',
+  }.entries) {
+    test('LF-BULK ORIGINAL rejects ${entry.key} despite recomputed envelope fingerprint', () async {
+      final data = supplierQuotePurchaseResponse(); entry.value(data); rehashPurchaseOrder(data['orders'][0]);
+      expect(await projectionGateway(Transport()..data = data).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: data['purchaseId']), isNull);
+    });
+  }
+  if (Platform.environment['LF_BULK_PURCHASE_LOG'] case final path?) {
+    test('LF-BULK ORIGINAL reads actual persisted buyer and Store agreement projections', () async {
+      const marker = 'LF_BULK_PURCHASE_PROJECTION=';
+      final row = File(path).readAsLinesSync().singleWhere((line) => line.startsWith(marker));
+      final packet = (jsonDecode(row.substring(marker.length)) as Map).cast<String, dynamic>();
+      for (final data in [packet['buyer'], packet['seller']]) {
+        final role = data['viewerRole'] == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller,
+          order = data['orders'][0];
+        final saved = await projectionGateway(Transport()..data = data, account: data['viewerUserId'])
+          .readPurchaseProjection(role: role, realm: 'evaluation', purchaseId: data['purchaseId'],
+            storeId: role == WorkspaceOrderIdentityRole.seller ? order['storeId'] : null,
+            orderId: role == WorkspaceOrderIdentityRole.seller ? order['orderId'] : null);
+        expect(saved, isNotNull); expect(saved!.orders.single.factsVersion, 8);
+        expect(saved.orders.single.supplierQuote!.toJson(), order['original']['supplierQuote']);
+      }
+    });
+  }
+  for (final role in WorkspaceOrderIdentityRole.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF-BULK ORIGINAL buyer and Store navigate to frozen quote prices ${role.name} scale=$scale', (tester) async {
+        final data = supplierQuotePurchaseResponse(role: role.name), order = data['orders'][0],
+          refs = referenceResponse(role: role.name);
+        refs['references'][0]['originalFingerprint'] = order['originalFingerprint'];
+        final wire = Transport()..respond = (body) => switch (body['operation']) {
+          'listBuyerPurchaseReferences' || 'listStorePurchaseReferences' => refs,
+          'readBuyerPurchaseProjection' || 'readStorePurchaseProjection' => data,
+          _ => throw StateError('No payment or operational fixture'),
+        };
+        await tester.pumpWidget(MaterialApp(home: MediaQuery(data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+          child: Scaffold(body: SingleChildScrollView(child: WorkspacePurchaseOriginals(
+            gateway: projectionGateway(wire, account: data['viewerUserId']), role: role, realm: 'evaluation',
+            storeId: role == WorkspaceOrderIdentityRole.seller ? order['storeId'] : null))))));
+        await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey('original-order-${order['orderId']}'))); await tester.pumpAndSettle();
+        final agreed = find.byKey(ValueKey('original-supplier-quote-${order['orderId']}'));
+        await tester.ensureVisible(agreed); await tester.pumpAndSettle();
+        expect(agreed, findsOneWidget); expect(find.text('Agreed Bulk product prices'), findsOneWidget);
+        expect(find.text('From the supplier quote accepted for this order.'), findsOneWidget);
+        expect(find.text('Pay now'), findsNothing); expect(find.text('Credit approved'), findsNothing);
+        expect(wire.requests.every((body) => (body['operation'] as String).startsWith('read') ||
+          (body['operation'] as String).startsWith('list')), isTrue);
+        expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+  for (final role in WorkspaceOrderIdentityRole.values) {
+    for (final unknown in [false, true]) {
       test('LF-CONTEXT strict original reader retains version7 including null ${role.name} unknown=$unknown', () async {
         final data = fulfilmentPurchaseResponse(role: role.name, unknown: unknown), wire = Transport()..data = data;
         final result = await projectionGateway(wire, account: role == WorkspaceOrderIdentityRole.buyer ? 'buyer-1' : 'owner-1')
@@ -2013,6 +2095,27 @@ Map<String, dynamic> purchaseResponse({String role = 'buyer'}) {
       },
     ],
   };
+}
+
+Map<String, dynamic> supplierQuotePurchaseResponse({String role = 'buyer', bool unknown = false}) {
+  // Controlled host fixture, not an owner-created native record or real quote.
+  final data = fulfilmentPurchaseResponse(role: role)..['schemaVersion'] = 8;
+  final order = data['orders'][0] as Map<String, dynamic>; order['factsVersion'] = 8;
+  final lines = order['original']['lines'] as List;
+  if (!unknown) {
+    for (final line in lines) {
+      line['scheduledFulfilment'] = null;
+      line['publicListing']['channel'] = 'bulk';
+      line['publicListing']['listingId'] = 'listing-${sha256.convert(utf8.encode(jsonEncode([1, 'evaluation', order['storeId'], line['skuId'], 'bulk'])))}';
+    }
+  }
+  order['original']['supplierQuote'] = unknown ? null : {'schemaVersion': 1, 'realm': 'evaluation',
+    'quoteId': 'bulk-${'a' * 64}', 'acceptedRevision': 3, 'agreementFingerprint': 'b' * 64,
+    'offerRevision': 2, 'acceptedAt': '2026-10-20T12:00:00.000Z', 'validUntil': '2026-10-20T13:00:00.000Z',
+    'merchandiseMinor': order['original']['totals']['itemsMinor'],
+    'lines': [for (var i = 0; i < lines.length; i++) {'lineId': lines[i]['lineId'], 'quoteLineId': 'quote-line-$i'}]};
+  rehashPurchaseOrder(order);
+  return (jsonDecode(jsonEncode(data)) as Map).cast<String, dynamic>();
 }
 
 Map<String, dynamic> fulfilmentPurchaseResponse({String role = 'buyer', bool unknown = false}) {

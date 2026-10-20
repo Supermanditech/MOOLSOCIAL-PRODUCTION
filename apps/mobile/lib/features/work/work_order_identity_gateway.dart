@@ -362,7 +362,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         'state',
         'orders',
       ]);
-      if (data['schemaVersion'] is! int || !const [2, 3, 4, 5, 6, 7].contains(data['schemaVersion']) ||
+      if (data['schemaVersion'] is! int || !const [2, 3, 4, 5, 6, 7, 8].contains(data['schemaVersion']) ||
           data['realm'] != realm ||
           data['authNamespace'] != 'firebase-default' ||
           data['viewerRole'] != role.name ||
@@ -783,7 +783,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
   ) {
     final source = _map(value);
     final enriched = source.containsKey('originalFactsVersion');
-    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4, 5, 6, 7].contains(source['originalFactsVersion']))) {
+    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4, 5, 6, 7, 8].contains(source['originalFactsVersion']))) {
       throw const FormatException('Unsupported original facts.');
     }
     final data = _exactMap(source, [
@@ -1349,6 +1349,8 @@ class WorkspacePurchaseOrder {
     this.benefitAttribution,
     this.hasFulfilmentContextSnapshot = false,
     this.fulfilmentContext,
+    this.hasSupplierQuoteSnapshot = false,
+    this.supplierQuote,
   }) : lines = List.unmodifiable(lines),
        totals = Map.unmodifiable(totals);
   final String storeId, orderId, originalFingerprint;
@@ -1357,9 +1359,26 @@ class WorkspacePurchaseOrder {
   final WorkspaceOriginalBenefitAttribution? benefitAttribution;
   final bool hasFulfilmentContextSnapshot;
   final WorkspaceOriginalFulfilmentContext? fulfilmentContext;
-  int get factsVersion => hasFulfilmentContextSnapshot ? 7 : lines.any((line) => line.hasPublicListingSnapshot) ? 6 :
+  final bool hasSupplierQuoteSnapshot;
+  final WorkspaceOriginalSupplierQuote? supplierQuote;
+  int get factsVersion => hasSupplierQuoteSnapshot ? 8 : hasFulfilmentContextSnapshot ? 7 : lines.any((line) => line.hasPublicListingSnapshot) ? 6 :
     lines.any((line) => line.hasScheduledFulfilmentSnapshot) ? 5 :
     lines.any((line) => line.variant != null) ? 4 : benefitAttribution == null ? 2 : 3;
+}
+
+/// Immutable purchased merchandise attribution; not current payment or credit
+/// eligibility. Expiry limits first purchase, not historical original readback.
+class WorkspaceOriginalSupplierQuote {
+  WorkspaceOriginalSupplierQuote._(this._encoded);
+  final String _encoded;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  String get quoteId => toJson()['quoteId'] as String;
+  String get agreementFingerprint => toJson()['agreementFingerprint'] as String;
+  int get acceptedRevision => toJson()['acceptedRevision'] as int;
+  int get merchandiseMinor => toJson()['merchandiseMinor'] as int;
+  DateTime get validUntil => DateTime.parse(toJson()['validUntil'] as String).toUtc();
+  Map<String, String> get quoteLineByPurchasedLineId => Map.unmodifiable({
+    for (final b in toJson()['lines'] as List) b['lineId'] as String: b['quoteLineId'] as String});
 }
 
 /// Private frozen customer input, not verified address, eligibility or assignment.
@@ -1566,7 +1585,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     'originalFingerprint',
   ]);
   final version = data['factsVersion'];
-  if (version is! int || !const [2, 3, 4, 5, 6, 7].contains(version) ||
+  if (version is! int || !const [2, 3, 4, 5, 6, 7, 8].contains(version) ||
       !_id(data['storeId']) ||
       !_id(data['orderId'])) {
     throw const FormatException('Unsupported order reference.');
@@ -1577,6 +1596,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     'totals',
     if (version >= 3) 'benefitAttribution',
     if (version >= 7) 'fulfilmentContext',
+    if (version >= 8) 'supplierQuote',
   ]);
   final rawLines = original['lines'];
   if (original['currency'] != 'INR' ||
@@ -1684,6 +1704,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
   }
   final attribution = version >= 3 ? _decodeBenefits(original['benefitAttribution'], lines, totals['discountMinor']!) : null;
   final fulfilment = version >= 7 ? _decodeFulfilmentContext(original['fulfilmentContext'], lines) : null;
+  final supplierQuote = version >= 8 ? _decodeSupplierQuote(original['supplierQuote'], realm, lines) : null;
   final hash = sha256
       .convert(
         utf8.encode(
@@ -1697,6 +1718,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
               'totals': totals,
               if (attribution != null) 'benefitAttribution': attribution.toJson(),
               if (version >= 7) 'fulfilmentContext': fulfilment?.toJson(),
+              if (version >= 8) 'supplierQuote': supplierQuote?.toJson(),
             },
           }),
         ),
@@ -1714,7 +1736,54 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     benefitAttribution: attribution,
     hasFulfilmentContextSnapshot: version >= 7,
     fulfilmentContext: fulfilment,
+    hasSupplierQuoteSnapshot: version >= 8,
+    supplierQuote: supplierQuote,
   );
+}
+
+WorkspaceOriginalSupplierQuote? _decodeSupplierQuote(Object? value, String realm, List<WorkspacePurchasedSkuLine> lines) {
+  final bulk = lines.where((l) => l.publicListing?.channel == BuyV2OfferClass.bulk).toList();
+  if (value == null) {
+    if (bulk.isNotEmpty) throw const FormatException('Missing purchased supplier agreement.');
+    return null;
+  }
+  final r = _exactMap(value, const ['schemaVersion', 'realm', 'quoteId', 'acceptedRevision', 'agreementFingerprint',
+    'offerRevision', 'acceptedAt', 'validUntil', 'merchandiseMinor', 'lines']);
+  DateTime instant(Object? raw) {
+    if (raw is! String) throw const FormatException('Invalid supplier agreement time.');
+    final parsed = DateTime.parse(raw).toUtc();
+    if (parsed.toIso8601String() != raw) throw const FormatException('Invalid supplier agreement time.');
+    return parsed;
+  }
+  if (r['schemaVersion'] != 1 || r['schemaVersion'] is! int || r['realm'] != realm ||
+      r['quoteId'] is! String || !RegExp(r'^bulk-[a-f0-9]{64}$').hasMatch(r['quoteId'] as String) ||
+      r['agreementFingerprint'] is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(r['agreementFingerprint'] as String) ||
+      r['acceptedRevision'] is! int || r['offerRevision'] is! int || r['offerRevision'] < 2 ||
+      r['acceptedRevision'] > 999999999 || r['acceptedRevision'] != r['offerRevision'] + 1 ||
+      !instant(r['acceptedAt']).isBefore(instant(r['validUntil'])) ||
+      !_purchaseMoney(r['merchandiseMinor']) || r['merchandiseMinor'] < 1) {
+    throw const FormatException('Invalid purchased supplier agreement.');
+  }
+  final raw = r['lines'];
+  if (raw is! List || raw.isEmpty || raw.length > 100 || raw.length != bulk.length) {
+    throw const FormatException('Supplier agreement lines do not match.');
+  }
+  final ids = <String>{}, quoteIds = <String>{}, bindings = <Map<String, String>>[];
+  for (final value in raw) {
+    final b = _exactMap(value, const ['lineId', 'quoteLineId']);
+    if (!_id(b['lineId']) || !_id(b['quoteLineId']) || !ids.add(b['lineId'] as String) ||
+        !quoteIds.add(b['quoteLineId'] as String) || !bulk.any((l) => l.lineId == b['lineId'])) {
+      throw const FormatException('Supplier agreement lines do not match.');
+    }
+    bindings.add({'lineId': b['lineId'] as String, 'quoteLineId': b['quoteLineId'] as String});
+  }
+  if (bulk.fold<int>(0, (sum, l) => sum + l.lineTotalMinor) != r['merchandiseMinor']) {
+    throw const FormatException('Supplier merchandise amount changed.');
+  }
+  bindings.sort((a,b) => a['lineId']!.compareTo(b['lineId']!));
+  return WorkspaceOriginalSupplierQuote._(jsonEncode({'schemaVersion': 1, 'realm': realm, 'quoteId': r['quoteId'],
+    'acceptedRevision': r['acceptedRevision'], 'agreementFingerprint': r['agreementFingerprint'], 'offerRevision': r['offerRevision'],
+    'acceptedAt': r['acceptedAt'], 'validUntil': r['validUntil'], 'merchandiseMinor': r['merchandiseMinor'], 'lines': bindings}));
 }
 
 WorkspaceOriginalFulfilmentContext? _decodeFulfilmentContext(Object? value, List<WorkspacePurchasedSkuLine> lines) {

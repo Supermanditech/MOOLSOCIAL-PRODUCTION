@@ -4,7 +4,7 @@ import {WorkspaceProfileError} from "./workspace_profile_service.js";
 import type {WorkspaceCatalogueService} from "./workspace_catalogue_service.js";
 
 type Realm = "evaluation" | "production";
-export type PurchaseFactsVersion = 2 | 3 | 4 | 5 | 6 | 7;
+export type PurchaseFactsVersion = 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export interface PlacementLine {
   sourceLineId: string; skuId: string; canonicalProductId: string;
   verifiedPackId: string; offerId: string; offerRevision: string;
@@ -34,6 +34,7 @@ interface PlacementStore {
   lines: PlacementLine[]; totals: PurchaseTotals;
   benefitAttribution?: OriginalBenefitAttribution;
   fulfilmentContext?: OriginalFulfilmentContext | null;
+  supplierQuote?: OriginalSupplierQuote | null;
 }
 /** Frozen customer details, not address verification, serviceability or delivery
  * assignment. Instruction lineId references sourceLineId before materializing.
@@ -60,7 +61,7 @@ export interface OriginalBenefitAttribution {schemaVersion: 1; components: Origi
 /** Server-owned FINAL PLACEMENT, not a quote, client command, payment or stock proof.
  * No real upstream implementation is configured in this local slice. */
 export interface TrustedPlacementReceipt {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6; realm: Realm; authNamespace: "firebase-default";
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7; realm: Realm; authNamespace: "firebase-default";
   finalPlacement: true; issuer: string; receiptId: string; revision: string;
   buyerUserId: string; stores: PlacementStore[];
   /** Private independently versioned commit facts; never a public projection. */
@@ -85,6 +86,7 @@ export interface PurchaseOriginal {
   currency: "INR"; lines: PurchasedLine[]; totals: PurchaseTotals;
   benefitAttribution?: OriginalBenefitAttribution;
   fulfilmentContext?: OriginalFulfilmentContext | null;
+  supplierQuote?: OriginalSupplierQuote | null;
 }
 export interface PurchaseStoreProjection {
   factsVersion: PurchaseFactsVersion; storeId: string; orderId: string; original: PurchaseOriginal;
@@ -261,7 +263,7 @@ export interface OperationalOrderSnapshot {
   viewerRole: "buyer" | "seller"; viewerUserId: string;
   purchaseId: string; storeId: string; orderId: string;
   sourceRevision: string; originalFingerprint: string; original: PurchaseOriginal;
-  originalFactsVersion?: 3 | 4 | 5 | 6 | 7;
+  originalFactsVersion?: 3 | 4 | 5 | 6 | 7 | 8;
   operationalSourceRevision: string; revision: number; stage: OperationalOrderStage;
   fulfilment: "delivery" | "collection"; placedAt: string;
   acceptanceDeadline: string | null; fulfilmentDeadline: string | null;
@@ -304,6 +306,18 @@ interface BulkAgreementRecord {
   acceptance: {offerRevision: number; acceptedAt: string; agreementFingerprint: string} | null;
 }
 export type BulkSupplierQuoteAction = 'request' | 'offer' | 'accept' | 'withdraw' | 'read' | 'list_buyer' | 'list_store' | 'reconcile';
+/** Exact merchandise attribution, not final charges or a payment/credit grant.
+ * lineId is the trusted placement source ID; the materializer remaps it once. */
+export interface OriginalSupplierQuote {
+  schemaVersion: 1; realm: Realm; quoteId: string; acceptedRevision: number;
+  agreementFingerprint: string; offerRevision: number; acceptedAt: string;
+  validUntil: string; merchandiseMinor: number;
+  lines: {lineId: string; quoteLineId: string}[];
+}
+export interface BulkPurchaseReference {
+  schemaVersion: 1; quoteId: string; acceptedRevision: number; agreementFingerprint: string;
+  lines: {lineId: string; quoteLineId: string}[];
+}
 export function bulkSupplierQuoteOperation(operation: unknown): BulkSupplierQuoteAction | undefined {
   switch (operation) {
     case 'requestBulkSupplierQuote': return 'request';
@@ -328,6 +342,59 @@ export class WorkspaceBulkQuoteService {
   }
   private root() {return this.db.collection('workspacePurchaseProjections').doc(this.realm);}
   private path(quoteId: string) {return this.root().collection('bulkQuoteRequests').doc(quoteId);}
+  /** Server-internal final-purchase seam. Perform ALL preparation reads before
+   * calling commit in the SAME transaction as the immutable purchase create.
+   * Browsing/selection never calls this, and this method creates no purchase. */
+  async preparePurchase(tx: Transaction, context: {buyerUserId: string; storeId: string;
+    caseId: string; ownerUserId: string; purchaseId: string}, reference: BulkPurchaseReference,
+    lines: readonly PlacementLine[]): Promise<{supplierQuote: OriginalSupplierQuote; commit: () => void}> {
+    for (const value of Object.values(context)) id(value);
+    const r = exact(reference, ['schemaVersion', 'quoteId', 'acceptedRevision', 'agreementFingerprint', 'lines']);
+    const quoteId = id(r.quoteId), acceptedRevision = integer(r.acceptedRevision, 999999999, 3);
+    if (r.schemaVersion !== 1 || !/^bulk-[a-f0-9]{64}$/u.test(quoteId) ||
+        typeof r.agreementFingerprint !== 'string' || !/^[a-f0-9]{64}$/u.test(r.agreementFingerprint)) fail();
+    const bindings = array(r.lines, 100).map(raw => {
+      const b = exact(raw, ['lineId', 'quoteLineId']); return {lineId: id(b.lineId), quoteLineId: id(b.quoteLineId)};
+    }).sort((a, b) => compare(a.lineId, b.lineId));
+    unique(bindings.map(b => b.lineId)); unique(bindings.map(b => b.quoteLineId));
+    const doc = await tx.get(this.path(quoteId));
+    const record = await this.authorized(tx, doc.data(), context.buyerUserId, quoteId);
+    if (record.buyerUserId !== context.buyerUserId || record.storeId !== context.storeId ||
+        record.storeCaseId !== context.caseId || record.supplierUserId !== context.ownerUserId) fail('not_found', 404);
+    await this.profile(tx, context.storeId, context.ownerUserId, context.caseId);
+    if (record.state !== 'accepted' || record.revision !== acceptedRevision || !record.offer || !record.acceptance ||
+        record.acceptance.agreementFingerprint !== r.agreementFingerprint || bindings.length !== record.lines.length ||
+        bindings.length !== lines.length) fail('conflict', 409);
+    for (const binding of bindings) {
+      const agreed = record.lines.find(l => l.lineId === binding.quoteLineId),
+        purchased = lines.find(l => l.sourceLineId === binding.lineId),
+        price = record.offer.prices.find(p => p.lineId === binding.quoteLineId);
+      if (!agreed || !purchased || !price || purchased.skuId !== agreed.skuId ||
+          purchased.canonicalProductId !== agreed.canonicalProductId || purchased.verifiedPackId !== agreed.verifiedPackId ||
+          purchased.quantityUnit !== 'pack' || purchased.quantityMilli !== agreed.quantity * 1000 ||
+          purchased.unitPriceMinor !== price.unitPriceMinor || purchased.lineTotalMinor !== price.merchandiseMinor ||
+          purchased.publicListing?.realm !== this.realm || purchased.publicListing.storeId !== context.storeId ||
+          purchased.publicListing.channel !== 'bulk' || purchased.publicListing.skuId !== agreed.skuId ||
+          purchased.publicListing.listingId !== agreed.listingId || purchased.publicListing.canonicalProductId !== agreed.canonicalProductId ||
+          purchased.publicListing.verifiedPackId !== agreed.verifiedPackId || purchased.variant !== (agreed.variant ?? '') ||
+          purchased.name !== agreed.name || purchased.packLabel !== agreed.packLabel) fail('conflict', 409);
+    }
+    const use = this.root().collection('bulkQuoteUses').doc(quoteId), used = await tx.get(use);
+    if (used.exists || this.now().toISOString() >= record.offer.validUntil) fail('conflict', 409);
+    const supplierQuote: OriginalSupplierQuote = {schemaVersion: 1, realm: this.realm, quoteId,
+      acceptedRevision, agreementFingerprint: r.agreementFingerprint, offerRevision: record.offer.revision,
+      acceptedAt: record.acceptance.acceptedAt, validUntil: record.offer.validUntil,
+      merchandiseMinor: record.offer.merchandiseMinor, lines: bindings};
+    // Caller-owned objects cannot change authority between prepare and commit.
+    const frozen = structuredClone({supplierQuote, context});
+    return {supplierQuote: structuredClone(supplierQuote), commit: () => {
+      if (this.now().toISOString() >= frozen.supplierQuote.validUntil) fail('conflict', 409);
+      const body = {schemaVersion: 1, realm: this.realm, quoteId, purchaseId: frozen.context.purchaseId,
+        buyerUserId: frozen.context.buyerUserId, storeId: frozen.context.storeId,
+        acceptedRevision, agreementFingerprint: frozen.supplierQuote.agreementFingerprint, usedAt: this.now().toISOString()};
+      tx.create(use, {...body, integrity: integrityHash(body)});
+    }};
+  }
   private policy(raw: unknown, storeId: string, skuId: string): Record<string, unknown> {
     const p = exact(raw, ['schemaVersion', 'realm', 'storeId', 'skuId', 'state', 'revision', 'requiresAcceptance', 'policy']);
     if (p.schemaVersion !== 1 || p.realm !== this.realm || p.storeId !== storeId || p.skuId !== skuId ||
@@ -1373,15 +1440,37 @@ function fulfilmentContext(value: unknown, lines: readonly {lineId: string}[], h
   unique(instructions.map(i => i.lineId));
   return {schemaVersion: 1, method: r.method, recipient, address, instructions};
 }
+function supplierQuote(value: unknown, realm: Realm,
+  lines: readonly {lineId: string; lineTotalMinor: number; publicListing?: OriginalPublicListing | null}[]): OriginalSupplierQuote | null {
+  const bulk = lines.filter(l => l.publicListing?.channel === 'bulk');
+  if (value === null) { if (bulk.length) fail(); return null; }
+  const r = exact(value, ['schemaVersion', 'realm', 'quoteId', 'acceptedRevision', 'agreementFingerprint',
+    'offerRevision', 'acceptedAt', 'validUntil', 'merchandiseMinor', 'lines']);
+  const quoteId = id(r.quoteId), acceptedRevision = integer(r.acceptedRevision, 999999999, 3),
+    offerRevision = integer(r.offerRevision, 999999998, 2), acceptedAt = timestamp(r.acceptedAt), validUntil = timestamp(r.validUntil);
+  if (r.schemaVersion !== 1 || r.realm !== realm || !/^bulk-[a-f0-9]{64}$/u.test(quoteId) ||
+      typeof r.agreementFingerprint !== 'string' || !/^[a-f0-9]{64}$/u.test(r.agreementFingerprint) ||
+      acceptedRevision !== offerRevision + 1 || acceptedAt >= validUntil) fail();
+  const bindings = array(r.lines, 100).map(raw => {
+    const b = exact(raw, ['lineId', 'quoteLineId']); return {lineId: id(b.lineId), quoteLineId: id(b.quoteLineId)};
+  }).sort((a,b) => compare(a.lineId, b.lineId));
+  unique(bindings.map(b => b.lineId)); unique(bindings.map(b => b.quoteLineId));
+  if (bindings.length !== bulk.length || bindings.some(b => !bulk.some(l => l.lineId === b.lineId))) fail();
+  const merchandiseMinor = integer(r.merchandiseMinor, 1000000000000, 1);
+  if (bulk.reduce((sum,l) => sum + l.lineTotalMinor, 0) !== merchandiseMinor) fail();
+  return {schemaVersion: 1, realm, quoteId, acceptedRevision, agreementFingerprint: r.agreementFingerprint,
+    offerRevision, acceptedAt, validUntil, merchandiseMinor, lines: bindings};
+}
 export function normalizePlacement(value: unknown, realm: Realm): TrustedPlacementReceipt {
   const hasCouponContext = Object.hasOwn(obj(value), "couponUseContext");
   const r = exact(value, ["schemaVersion", "realm", "authNamespace", "finalPlacement", "issuer",
     "receiptId", "revision", "buyerUserId", "stores", ...(hasCouponContext ? ["couponUseContext"] : [])]);
-  if ((r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5 && r.schemaVersion !== 6) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
+  if ((r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5 && r.schemaVersion !== 6 && r.schemaVersion !== 7) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
       r.finalPlacement !== true || !["evaluation", "production"].includes(realm)) fail();
   const stores = array(r.stores, 10).map(raw => {
     const s = exact(raw, ["storeId", "caseId", "ownerUserId", "lines", "totals",
-      ...(r.schemaVersion !== 1 ? ["benefitAttribution"] : []), ...(r.schemaVersion === 6 ? ["fulfilmentContext"] : [])]);
+      ...(r.schemaVersion !== 1 ? ["benefitAttribution"] : []), ...((r.schemaVersion as number) >= 6 ? ["fulfilmentContext"] : []),
+      ...(r.schemaVersion === 7 ? ['supplierQuote'] : [])]);
     const lines = array(s.lines, 100).map(value => line(value, (r.schemaVersion as number) >= 3,
       (r.schemaVersion as number) >= 4 ? {realm, storeId: id(s.storeId)} : undefined, (r.schemaVersion as number) >= 5)).sort((a,b) => compare(a.sourceLineId, b.sourceLineId));
     unique(lines.map(l => l.sourceLineId));
@@ -1389,8 +1478,10 @@ export function normalizePlacement(value: unknown, realm: Realm): TrustedPlaceme
     return {storeId: id(s.storeId), caseId: id(s.caseId), ownerUserId: id(s.ownerUserId), lines, totals: amounts,
       ...(r.schemaVersion !== 1 ? {benefitAttribution: benefits(s.benefitAttribution,
         lines.map(l => ({lineId: l.sourceLineId, lineTotalMinor: l.lineTotalMinor})), amounts.discountMinor)} : {}),
-      ...(r.schemaVersion === 6 ? {fulfilmentContext: fulfilmentContext(s.fulfilmentContext,
-        lines.map(l => ({lineId: l.sourceLineId})), lines.some(l => l.scheduledFulfilment != null))} : {})};
+      ...((r.schemaVersion as number) >= 6 ? {fulfilmentContext: fulfilmentContext(s.fulfilmentContext,
+        lines.map(l => ({lineId: l.sourceLineId})), lines.some(l => l.scheduledFulfilment != null))} : {}),
+      ...(r.schemaVersion === 7 ? {supplierQuote: supplierQuote(s.supplierQuote, realm,
+        lines.map(l => ({...l, lineId: l.sourceLineId})))} : {})};
   }).sort((a,b) => compare(a.storeId, b.storeId));
   unique(stores.map(s => s.storeId)); unique(stores.map(s => s.caseId));
   if (stores.reduce((sum, s) => sum + s.lines.length, 0) > 200) fail();
@@ -1402,7 +1493,7 @@ export function normalizePlacement(value: unknown, realm: Realm): TrustedPlaceme
     .map(component => ({storeId: store.storeId, componentId: component.componentId})));
   if (declaredStoreCoupons.length && !hasCouponContext) fail();
   if (hasCouponContext) {
-    if (r.schemaVersion !== 6) fail();
+    if (r.schemaVersion !== 6 && r.schemaVersion !== 7) fail();
     const context = exact(r.couponUseContext, ["schemaVersion", "stores"]);
     if (context.schemaVersion !== 1) fail();
     const coupons = array(context.stores, 10).map(raw => {
@@ -1432,14 +1523,14 @@ function requireStore(value: unknown, expected: {caseId: string; storeId: string
       p.status !== "live" || (requireNewSales && p.shopEnabled !== true)) fail("not_found", 404);
 }
 export function purchaseOriginalFingerprint(storeId: string, orderId: string, original: PurchaseOriginal): string {
-  return digest({factsVersion: Object.hasOwn(original, "fulfilmentContext") ? 7 : original.lines.some(l => l.publicListing !== undefined) ? 6 : original.lines.some(l => l.scheduledFulfilment !== undefined) ? 5 : original.lines.some(l => l.variant !== undefined) ? 4 :
+  return digest({factsVersion: Object.hasOwn(original, "supplierQuote") ? 8 : Object.hasOwn(original, "fulfilmentContext") ? 7 : original.lines.some(l => l.publicListing !== undefined) ? 6 : original.lines.some(l => l.scheduledFulfilment !== undefined) ? 5 : original.lines.some(l => l.variant !== undefined) ? 4 :
     original.benefitAttribution === undefined ? 2 : 3, storeId, orderId, original});
 }
 function validateAggregate(value: unknown, purchaseId: string, realm: Realm): PurchaseAggregate {
   try {
     const r = exact(value, ["schemaVersion", "realm", "authNamespace", "purchaseId", "buyerUserId",
       "buyerId", "sourceRevision", "sourceFingerprint", "createdAt", "orders", "integrity"]);
-    if ((r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5 && r.schemaVersion !== 6 && r.schemaVersion !== 7) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
+    if ((r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5 && r.schemaVersion !== 6 && r.schemaVersion !== 7 && r.schemaVersion !== 8) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
         r.purchaseId !== purchaseId || !/^[a-f0-9]{64}$/u.test(String(r.sourceFingerprint))) fail();
     id(r.buyerUserId); id(r.buyerId); id(r.sourceRevision);
     if (typeof r.createdAt !== "string" || new Date(r.createdAt).toISOString() !== r.createdAt) fail();
@@ -1447,7 +1538,8 @@ function validateAggregate(value: unknown, purchaseId: string, realm: Realm): Pu
       const o = exact(raw, ["factsVersion", "storeId", "orderId", "original", "originalFingerprint", "caseId", "ownerUserId"]);
       if (o.factsVersion !== r.schemaVersion) fail();
       const original = exact(o.original, ["currency", "lines", "totals",
-        ...(o.factsVersion !== 2 ? ["benefitAttribution"] : []), ...(o.factsVersion === 7 ? ["fulfilmentContext"] : [])]);
+        ...(o.factsVersion !== 2 ? ["benefitAttribution"] : []), ...((o.factsVersion as number) >= 7 ? ["fulfilmentContext"] : []),
+        ...(o.factsVersion === 8 ? ['supplierQuote'] : [])]);
       if (original.currency !== "INR") fail();
       const lines = array(original.lines, 100).map(rawLine => {
         const l = exact(rawLine, [...lineKeys.filter(k => k !== "sourceLineId"), "lineId",
@@ -1462,8 +1554,9 @@ function validateAggregate(value: unknown, purchaseId: string, realm: Realm): Pu
       const canonical: PurchaseOriginal = {currency: "INR", lines,
         totals: totals(original.totals, lines.reduce((sum,l) => sum + l.lineTotalMinor, 0))};
       if (o.factsVersion !== 2) canonical.benefitAttribution = benefits(original.benefitAttribution, lines, canonical.totals.discountMinor);
-      if (o.factsVersion === 7) canonical.fulfilmentContext = fulfilmentContext(original.fulfilmentContext, lines,
+      if ((o.factsVersion as number) >= 7) canonical.fulfilmentContext = fulfilmentContext(original.fulfilmentContext, lines,
         lines.some(l => l.scheduledFulfilment != null));
+      if (o.factsVersion === 8) canonical.supplierQuote = supplierQuote(original.supplierQuote, realm, lines);
       const result: StoredOrder = {factsVersion: o.factsVersion as PurchaseFactsVersion, storeId: id(o.storeId), orderId: id(o.orderId),
         original: canonical, originalFingerprint: String(o.originalFingerprint),
         caseId: id(o.caseId), ownerUserId: id(o.ownerUserId)};
@@ -1481,7 +1574,8 @@ function validateAggregate(value: unknown, purchaseId: string, realm: Realm): Pu
  * seller transition, legacy retailerOrders writes or externally callable create. */
 export class WorkspacePurchaseProjectionService {
   constructor(private readonly db: Firestore, private readonly realm: Realm,
-    private readonly source?: FinalPlacementSource, private readonly coupons?: PurchaseCouponCommitter) {
+    private readonly source?: FinalPlacementSource, private readonly coupons?: PurchaseCouponCommitter,
+    private readonly bulkQuotes?: Pick<WorkspaceBulkQuoteService, 'preparePurchase'>) {
     if (!["evaluation", "production"].includes(realm)) fail("service_unavailable", 503);
   }
   private root() {return this.db.collection("workspacePurchaseProjections").doc(this.realm);}
@@ -1523,6 +1617,19 @@ export class WorkspacePurchaseProjectionService {
         const profile = await tx.get(this.db.collection("workspaceProfiles").doc(store.caseId));
         requireStore(profile.data(), store);
       }
+      const bulkCommits: (() => void)[] = [];
+      for (const store of input.stores) {
+        if (store.supplierQuote == null) continue;
+        if (!this.bulkQuotes) fail('service_unavailable', 503);
+        const q = store.supplierQuote;
+        const prepared = await this.bulkQuotes.preparePurchase(tx, {buyerUserId: input.buyerUserId, storeId: store.storeId,
+          caseId: store.caseId, ownerUserId: store.ownerUserId, purchaseId},
+        {schemaVersion: 1, quoteId: q.quoteId, acceptedRevision: q.acceptedRevision,
+          agreementFingerprint: q.agreementFingerprint, lines: q.lines},
+        store.lines.filter(l => q.lines.some(b => b.lineId === l.sourceLineId)));
+        if (integrityHash(prepared.supplierQuote) !== integrityHash(q)) fail('conflict', 409);
+        bulkCommits.push(prepared.commit);
+      }
       const orders: StoredOrder[] = allocatedOrders.map(s => {
         const lines = s.lines.map(l => {
           const {sourceLineId: _source, lineId, ...facts} = l;
@@ -1540,6 +1647,11 @@ export class WorkspacePurchaseProjectionService {
           original.fulfilmentContext = s.fulfilmentContext == null ? null : {...s.fulfilmentContext,
             instructions: s.fulfilmentContext.instructions.map(i => ({...i, lineId: savedIds.get(i.lineId)!})).sort((a,b) => compare(a.lineId, b.lineId))};
         }
+        if (Object.hasOwn(s, 'supplierQuote')) {
+          const savedIds = new Map(s.lines.map(l => [l.sourceLineId, l.lineId]));
+          original.supplierQuote = s.supplierQuote == null ? null : {...s.supplierQuote,
+            lines: s.supplierQuote.lines.map(b => ({...b, lineId: savedIds.get(b.lineId)!})).sort((a,b) => compare(a.lineId, b.lineId))};
+        }
         return {factsVersion: (input.schemaVersion + 1) as PurchaseFactsVersion, storeId: s.storeId, orderId: s.orderId, original,
           originalFingerprint: purchaseOriginalFingerprint(s.storeId, s.orderId, original),
           caseId: s.caseId, ownerUserId: s.ownerUserId};
@@ -1555,6 +1667,7 @@ export class WorkspacePurchaseProjectionService {
       if (Buffer.byteLength(JSON.stringify({ok: true, data: projection}), "utf8") > 480 * 1024) fail();
       const writeCouponHolds = input.couponUseContext ? await this.coupons!.prepareCouponHolds(tx,
         {receipt: input, purchaseId, createdAt, orders: allocatedOrders}) : undefined;
+      for (const commit of bulkCommits) commit();
       writeCouponHolds?.();
       tx.create(this.root().collection("purchases").doc(purchaseId), {...body, integrity: integrityHash(body)});
       for (const order of orders) tx.create(this.referencePath(order), this.pointer(body, order));

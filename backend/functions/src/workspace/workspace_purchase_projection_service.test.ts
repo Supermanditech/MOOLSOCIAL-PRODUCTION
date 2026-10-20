@@ -27,7 +27,7 @@ function operationalEvidence(): TrustedOperationalOrderEvidence {
 test('LF-BULK supplier negotiation has a distinct private lifecycle, not a Checkout quote or issued PO', () => {
   const Service = Reflect.get(purchaseModule, 'WorkspaceBulkQuoteService');
   assert.equal(typeof Service, 'function');
-  for (const method of ['request', 'offer', 'accept', 'withdraw', 'read', 'listBuyer', 'listStore', 'reconcile']) {
+  for (const method of ['request', 'offer', 'accept', 'withdraw', 'read', 'listBuyer', 'listStore', 'reconcile', 'preparePurchase']) {
     assert.equal(typeof Reflect.get(Service.prototype, method), 'function');
   }
 });
@@ -54,7 +54,7 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
   const app = initializeApp({projectId: `demo-lf-bulk-${randomUUID().slice(0, 8)}`}, `bulk-${randomUUID()}`), db = getFirestore(app);
   let clock = '2026-10-20T12:00:00.000Z', channel = 'bulk', revision = 1, policyRevision = 1;
-  const listingId = `listing-${'a'.repeat(64)}`;
+  const listingId = `listing-${createHash('sha256').update(JSON.stringify([1, 'evaluation', 'store-one', 'sku-one', 'bulk'])).digest('hex')}`;
   let expireDuringRead = false, sourceReads = 0;
   const sourceFixture = {bulkQuotationSnapshot: async () => [{state: 'ready', realm: 'evaluation', storeId: 'store-one',
     publicStore: {id: 'store-one', name: 'Isolated Bulk supplier', profileId: 'wholesaler'}, items: [{
@@ -175,6 +175,82 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
     assert.equal(accepted.state, 'accepted'); assert.equal(accepted.acceptance.offerRevision, 2);
     assert.equal(accepted.orderingAvailable, false); assert.equal(accepted.offer.merchandiseMinor, 100250);
     assert.deepEqual(await service().read('buyer-one', scope), accepted);
+    // Actual local final-purchase boundary: agreed prices are not themselves a
+    // final quote. Explicit isolated totals below exercise attribution only.
+    const supplierQuote = {schemaVersion: 1 as const, realm: 'evaluation' as const, quoteId: accepted.quoteId,
+      acceptedRevision: accepted.revision, agreementFingerprint: accepted.acceptance.agreementFingerprint,
+      offerRevision: accepted.offer.revision, acceptedAt: accepted.acceptance.acceptedAt,
+      validUntil: accepted.offer.validUntil, merchandiseMinor: accepted.offer.merchandiseMinor,
+      lines: [{lineId: 'placed-line-one', quoteLineId: 'line-one'}]};
+    const placement: TrustedPlacementReceipt = {schemaVersion: 7, realm: 'evaluation', authNamespace: 'firebase-default',
+      finalPlacement: true, issuer: 'isolated-final-source', receiptId: 'final-one', revision: 'revision-one', buyerUserId: 'buyer-one',
+      stores: [{storeId: 'store-one', caseId: 'case-one', ownerUserId: 'supplier-one', benefitAttribution: {schemaVersion: 1, components: []},
+        fulfilmentContext: null, supplierQuote, lines: [{sourceLineId: 'placed-line-one', skuId: 'sku-one',
+          canonicalProductId: 'canonical-one', verifiedPackId: 'pack-one', offerId: 'isolated-offer-one', offerRevision: 'offer-v1',
+          name: 'Isolated Bulk rice', packLabel: '25 kg bag', variant: 'Aged\ngrain', quantityMilli: 10000, quantityUnit: 'pack',
+          unitPriceMinor: 10025, lineTotalMinor: 100250, scheduledFulfilment: null,
+          publicListing: {schemaVersion: 1, realm: 'evaluation', storeId: 'store-one', skuId: 'sku-one', listingId,
+            canonicalProductId: 'canonical-one', verifiedPackId: 'pack-one', channel: 'bulk'}}],
+        totals: {itemsMinor: 100250, discountMinor: 0, taxMinor: 0, deliveryMinor: 0, freightMinor: 0, paymentFeeMinor: 0, tipMinor: 0, totalMinor: 100250}}]};
+    assert.deepEqual(normalizePlacement(placement, 'evaluation'), placement);
+    const rootForBinding = db.collection('workspacePurchaseProjections').doc('evaluation');
+    const materializer = (receipt: TrustedPlacementReceipt, binding = service()) => new WorkspacePurchaseProjectionService(db,
+      'evaluation', {readFinalPlacement: async () => receipt}, undefined, binding);
+    await assert.rejects(new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => placement})
+      .materialize('isolated-final'), {code: 'service_unavailable'});
+    for (const corrupt of [
+      (r: TrustedPlacementReceipt) => {r.buyerUserId = 'other-buyer';},
+      (r: TrustedPlacementReceipt) => {r.stores[0]!.lines[0]!.verifiedPackId = 'other-pack';
+        r.stores[0]!.lines[0]!.publicListing!.verifiedPackId = 'other-pack';},
+      (r: TrustedPlacementReceipt) => {r.stores[0]!.supplierQuote!.agreementFingerprint = 'f'.repeat(64);},
+      (r: TrustedPlacementReceipt) => {r.stores[0]!.supplierQuote!.validUntil = '2030-01-01T00:00:00.000Z';},
+      (r: TrustedPlacementReceipt) => {r.stores[0]!.supplierQuote!.lines[0]!.quoteLineId = 'wrong-line';},
+      (r: TrustedPlacementReceipt) => {r.stores[0]!.supplierQuote = null;},
+    ]) {const candidate = structuredClone(placement); corrupt(candidate); await assert.rejects(materializer(candidate).materialize('isolated-final'));}
+    const failingBinding = {preparePurchase: async (...args: Parameters<WorkspaceBulkQuoteService['preparePurchase']>) => {
+      const prepared = await service().preparePurchase(...args);
+      return {...prepared, commit: () => {prepared.commit(); throw new Error('isolated post-prepare failure');}};
+    }};
+    await assert.rejects(new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => placement},
+      undefined, failingBinding).materialize('isolated-final'), /isolated post-prepare failure/);
+    assert.equal((await rootForBinding.collection('bulkQuoteUses').get()).size, 0);
+    assert.equal((await rootForBinding.collection('purchases').get()).size, 0);
+    const unexpired = clock;
+    clock = accepted.offer.validUntil;
+    await assert.rejects(materializer(placement).materialize('isolated-final'), {code: 'conflict'});
+    assert.equal((await rootForBinding.collection('bulkQuoteUses').get()).size, 0);
+    clock = unexpired;
+    const expiringBinding = {preparePurchase: async (...args: Parameters<WorkspaceBulkQuoteService['preparePurchase']>) => {
+      const prepared = await service().preparePurchase(...args);
+      return {...prepared, commit: () => {clock = accepted.offer.validUntil; prepared.commit();}};
+    }};
+    await assert.rejects(new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => placement},
+      undefined, expiringBinding).materialize('isolated-final'), {code: 'conflict'});
+    clock = unexpired;
+    assert.equal((await rootForBinding.collection('bulkQuoteUses').get()).size, 0);
+    const later = {...structuredClone(placement), receiptId: 'final-two'};
+    const purchases = [materializer(placement), materializer(later)];
+    const attempts = await Promise.allSettled(purchases.map(p => p.materialize('isolated-final')));
+    assert.equal(attempts.filter(result => result.status === 'fulfilled').length, 1);
+    assert.equal((await rootForBinding.collection('bulkQuoteUses').get()).size, 1);
+    const winnerIndex = attempts.findIndex(result => result.status === 'fulfilled'),
+      purchase = (attempts[winnerIndex] as PromiseFulfilledResult<{purchaseId: string; buyerId: string}>).value;
+    const originalRead = await purchases[winnerIndex]!.readBuyer('buyer-one', {purchaseId: purchase.purchaseId}) as any;
+    assert.equal(originalRead.schemaVersion, 8);
+    const original = originalRead.orders[0].original;
+    assert.equal(original.supplierQuote.agreementFingerprint, supplierQuote.agreementFingerprint);
+    assert.equal(original.supplierQuote.lines[0].lineId, original.lines[0].lineId);
+    assert.notEqual(original.supplierQuote.lines[0].lineId, 'placed-line-one');
+    const sellerOriginal = await purchases[winnerIndex]!.readStore('supplier-one', {purchaseId: purchase.purchaseId,
+      storeId: 'store-one', orderId: originalRead.orders[0].orderId});
+    assert.deepEqual(sellerOriginal.orders[0]!.original, original);
+    if (process.env.LF_BULK_PURCHASE_CAPTURE === 'true') console.log(`LF_BULK_PURCHASE_PROJECTION=${JSON.stringify({buyer: originalRead, seller: sellerOriginal})}`);
+    const beforeExpiry = clock;
+    clock = accepted.offer.validUntil;
+    await assert.rejects(materializer({...structuredClone(placement), receiptId: 'expired-new'}).materialize('isolated-final'));
+    assert.deepEqual(await purchases[winnerIndex]!.materialize('isolated-final'), purchase);
+    assert.deepEqual(await purchases[winnerIndex]!.readBuyer('buyer-one', {purchaseId: purchase.purchaseId}), originalRead);
+    clock = beforeExpiry;
     const recovered = await service().reconcile('buyer-one', {schemaVersion: 1, originalOperation: 'request', original: request}) as any;
     assert.equal(recovered.state, 'recorded'); assert.deepEqual(recovered.agreement, created);
     assert.deepEqual(recovered.currentHead, accepted);
@@ -248,7 +324,8 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
     const root = db.collection('workspacePurchaseProjections').doc('evaluation');
     assert.equal((await root.collection('bulkQuoteRequests').get()).size, 2);
     assert.equal((await root.collection('bulkQuoteCommands').get()).size, 6);
-    for (const collection of ['purchases', 'operationalOrders', 'orderCompletions']) assert.equal((await root.collection(collection).get()).size, 0);
+    assert.equal((await root.collection('purchases').get()).size, 1);
+    for (const collection of ['operationalOrders', 'orderCompletions']) assert.equal((await root.collection(collection).get()).size, 0);
   } finally { await deleteApp(app); }
 });
 
