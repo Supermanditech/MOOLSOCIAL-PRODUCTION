@@ -207,6 +207,76 @@ void connectPurchaseFixture(Transport wire, bool Function() completed) {
 }
 
 void main() {
+  for (final kind in ['personal', 'store']) {
+    test('LF-PURCHASER strict original reader preserves $kind purchaser', () async {
+      final data = purchaserPurchaseResponse(kind: kind), wire = Transport()..data = data;
+      final result = await projectionGateway(wire).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: data['purchaseId'], buyingStoreId: kind == 'store' ? 'buying-store' : null);
+      expect(result, isNotNull); expect(result!.orders.single.factsVersion, 11);
+      expect(result.orders.single.purchaser!.toJson(), data['orders'][0]['original']['purchaser']);
+      expect(wire.sent!.containsKey('buyingStoreId'), kind == 'store');
+      expect(result.orders.single.totals['totalMinor'], data['orders'][0]['original']['totals']['totalMinor']);
+    });
+  }
+  for (final mismatch in ['personal reader', 'wrong Store', 'private field', 'missing purchaser', 'unknown purpose', 'changed hash']) {
+    test('LF-PURCHASER rejects $mismatch before admitting original', () async {
+      final data = purchaserPurchaseResponse(), order = data['orders'][0];
+      switch (mismatch) {
+        case 'private field': order['original']['purchaser']['accountId'] = 'buyer-1'; rehashPurchaseOrder(order);
+        case 'missing purchaser': order['original'].remove('purchaser'); rehashPurchaseOrder(order);
+        case 'unknown purpose': order['original']['purchaser']['purpose'] = 'anything'; rehashPurchaseOrder(order);
+        case 'changed hash': order['original']['purchaser']['name'] = 'Changed Store';
+      }
+      final wire = Transport()..data = data;
+      expect(await projectionGateway(wire).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: data['purchaseId'],
+        buyingStoreId: mismatch == 'personal reader' ? null : mismatch == 'wrong Store' ? 'other-store' : 'buying-store'), isNull);
+    });
+  }
+  test('LF-PURCHASER Store reference page echoes buyer selector without restricting supplier IDs', () async {
+    final data = purchaserReferenceResponse(), wire = Transport()..data = data;
+    final page = await projectionGateway(wire).listPurchaseReferences(role: WorkspaceOrderIdentityRole.buyer,
+      realm: 'evaluation', buyingStoreId: 'buying-store');
+    expect(page, isNotNull); expect(page!.references.single.storeId, 'store-one');
+    expect(wire.sent!['buyingStoreId'], 'buying-store'); expect(wire.sent!.containsKey('storeId'), isFalse);
+    data['buyingStoreId'] = 'other-store';
+    expect(await projectionGateway(wire).listPurchaseReferences(role: WorkspaceOrderIdentityRole.buyer,
+      realm: 'evaluation', buyingStoreId: 'buying-store'), isNull);
+  });
+  test('LF-PURCHASER buyer Store cannot admit legacy personal or seller-selected originals', () async {
+    final wire = Transport()..data = purchaseResponse();
+    final gateway = projectionGateway(wire);
+    expect(await gateway.readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation',
+      purchaseId: 'purchase-v2', buyingStoreId: 'buying-store'), isNull);
+    final calls = wire.calls;
+    expect(await gateway.listPurchaseReferences(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation',
+      storeId: 'store-one', buyingStoreId: 'buying-store'), isNull);
+    expect(wire.calls, calls);
+  });
+  if (Platform.environment['LF_PURCHASER_LOG'] case final path?) {
+    test('LF-PURCHASER actual persisted backend originals and operations decode unchanged', () async {
+      const marker = 'LF_PURCHASER_PROJECTION=';
+      final lines = File(path).readAsLinesSync().where((l) => l.contains(marker)).toList(); expect(lines, hasLength(1));
+      final packet = (jsonDecode(lines.single.substring(lines.single.indexOf(marker) + marker.length)) as Map).cast<String, dynamic>();
+      for (final role in WorkspaceOrderIdentityRole.values) {
+        final data = (packet[role == WorkspaceOrderIdentityRole.buyer ? 'buyer' : 'seller'] as Map).cast<String, dynamic>();
+        final account = data['viewerUserId'] as String, order = data['orders'][0];
+        final wire = Transport()..data = data, gateway = projectionGateway(wire, account: account);
+        final result = await gateway.readPurchaseProjection(role: role, realm: 'evaluation', purchaseId: data['purchaseId'],
+          buyingStoreId: role == WorkspaceOrderIdentityRole.buyer ? 'buying-store' : null,
+          storeId: role == WorkspaceOrderIdentityRole.seller ? order['storeId'] : null,
+          orderId: role == WorkspaceOrderIdentityRole.seller ? order['orderId'] : null);
+        expect(result, isNotNull); expect(result!.orders.first.purchaser!.storeId, 'buying-store');
+        expect(result.orders.first.originalFingerprint, order['originalFingerprint']);
+      }
+      final op = (packet['operational'] as Map).cast<String, dynamic>(), wire = Transport()..data = op;
+      final ref = WorkspacePurchaseReference(purchaseId: op['purchaseId'], storeId: op['storeId'], orderId: op['orderId'],
+        originalFingerprint: op['originalFingerprint'], sourceRevision: op['sourceRevision']);
+      final result = await AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, account: op['viewerUserId']))
+        .read(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: ref);
+      expect(result, isNotNull); expect(result!.original.purchaser!.storeId, 'buying-store');
+    });
+  }
   if (Platform.environment['LF13_STARS_RECOVERY_LOG'] case final path?) {
     for (final phase in ['before-commit', 'after-commit']) {
       test('LF13-RECOVERY actual service original survives lost $phase response through strict client', () async {
@@ -2320,6 +2390,18 @@ Map<String, dynamic> purchaseResponse({String role = 'buyer'}) {
       },
     ],
   };
+}
+
+Map<String, dynamic> purchaserPurchaseResponse({String role = 'buyer', String kind = 'store'}) {
+  final data = commodityPurchaseResponse(role: role)..['schemaVersion'] = 11;
+  final order = data['orders'][0] as Map<String, dynamic>; order['factsVersion'] = 11;
+  order['original']['purchaser'] = kind == 'personal' ? {'schemaVersion': 1, 'kind': kind} : {
+    'schemaVersion': 1, 'kind': kind, 'storeId': 'buying-store', 'name': 'Evaluation buying Store', 'purpose': 'restock'};
+  rehashPurchaseOrder(order); return data;
+}
+Map<String, dynamic> purchaserReferenceResponse() {
+  final data = referenceResponse()..['schemaVersion'] = 3 ..['buyingStoreId'] = 'buying-store';
+  data['references'][0]['originalFingerprint'] = purchaserPurchaseResponse()['orders'][0]['originalFingerprint']; return data;
 }
 
 Map<String, dynamic> commodityPurchaseResponse({String role = 'buyer'}) {

@@ -4,7 +4,12 @@ import {WorkspaceProfileError} from "./workspace_profile_service.js";
 import type {WorkspaceCatalogueService} from "./workspace_catalogue_service.js";
 
 type Realm = "evaluation" | "production";
-export type PurchaseFactsVersion = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+export type PurchaseFactsVersion = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+/** Accepted purchasing entity, not a current buying grant. Internal account,
+ * profile-case and navigation IDs stay outside supplier-visible originals. */
+export type OriginalPurchaser = {schemaVersion: 1; kind: 'personal'} |
+  {schemaVersion: 1; kind: 'store'; storeId: string; name: string;
+    purpose: 'restock' | 'buyDirect' | 'groupBulkBuying'};
 /** Accepted public selling-pack terms supplied by the trusted final-placement
  * source. Confirmation/acceptance times are distinct; neither is a payment
  * deadline or evidence of payment/reservation. Never refresh from today's SKU. */
@@ -80,9 +85,12 @@ export interface OriginalBenefitAttribution {schemaVersion: 1; components: Origi
 /** Server-owned FINAL PLACEMENT, not a quote, client command, payment or stock proof.
  * No real upstream implementation is configured in this local slice. */
 export interface TrustedPlacementReceipt {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9; realm: Realm; authNamespace: "firebase-default";
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10; realm: Realm; authNamespace: "firebase-default";
   finalPlacement: true; issuer: string; receiptId: string; revision: string;
   buyerUserId: string; stores: PlacementStore[];
+  /** Required in receipt10; absent in legacy receipts. */
+  purchaser?: OriginalPurchaser;
+  purchasingStoreCaseId?: string | null;
   /** Private independently versioned commit facts; never a public projection. */
   couponUseContext?: {schemaVersion: 1; stores: {
     storeId: string; couponId: string; couponRevision: number; componentId: string;
@@ -106,6 +114,7 @@ export interface PurchaseOriginal {
   benefitAttribution?: OriginalBenefitAttribution;
   fulfilmentContext?: OriginalFulfilmentContext | null;
   supplierQuote?: OriginalSupplierQuote | null;
+  purchaser?: OriginalPurchaser;
 }
 export interface PurchaseStoreProjection {
   factsVersion: PurchaseFactsVersion; storeId: string; orderId: string; original: PurchaseOriginal;
@@ -116,6 +125,7 @@ interface PurchaseAggregate {
   schemaVersion: PurchaseFactsVersion; realm: Realm; authNamespace: "firebase-default";
   purchaseId: string; buyerUserId: string; buyerId: string; sourceRevision: string;
   sourceFingerprint: string; createdAt: string; orders: StoredOrder[]; integrity: string;
+  purchasingStoreCaseId?: string | null;
 }
 export interface PurchaseProjection {
   schemaVersion: PurchaseFactsVersion; realm: Realm; authNamespace: "firebase-default";
@@ -129,10 +139,11 @@ export interface PurchaseReference {
   originalFingerprint: string; sourceRevision: string;
 }
 export interface PurchaseReferencePage {
-  schemaVersion: 2; realm: Realm; authNamespace: "firebase-default";
+  schemaVersion: 2 | 3; realm: Realm; authNamespace: "firebase-default";
   viewerRole: "buyer" | "seller"; viewerUserId: string; storeId: string | null;
   coverage: "saved_original_facts" | "indexed_original_facts";
   references: PurchaseReference[]; nextCursor: string | null;
+  buyingStoreId?: string;
 }
 const totalKeys = ["itemsMinor", "discountMinor", "taxMinor", "deliveryMinor",
   "freightMinor", "paymentFeeMinor", "tipMinor", "totalMinor"] as const;
@@ -282,7 +293,7 @@ export interface OperationalOrderSnapshot {
   viewerRole: "buyer" | "seller"; viewerUserId: string;
   purchaseId: string; storeId: string; orderId: string;
   sourceRevision: string; originalFingerprint: string; original: PurchaseOriginal;
-  originalFactsVersion?: 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  originalFactsVersion?: Exclude<PurchaseFactsVersion, 2>;
   operationalSourceRevision: string; revision: number; stage: OperationalOrderStage;
   fulfilment: "delivery" | "collection"; placedAt: string;
   acceptanceDeadline: string | null; fulfilmentDeadline: string | null;
@@ -905,7 +916,8 @@ export class WorkspaceOrderOperationsService {
         }
         const target = obj(raw.target);
         const {aggregate, order} = await this.original(tx, operationalScope(target));
-        if (aggregate.buyerUserId !== actor) fail("not_found", 404);
+        if (aggregatePurchaser(aggregate)?.kind === 'store') continue;
+        await requirePurchasingBuyer(this.db, tx, aggregate, actor);
         const terminal = await tx.get(this.completionPath({purchaseId: aggregate.purchaseId, storeId: order.storeId, orderId: order.orderId}));
         if (!terminal.exists) fail("invalid_state", 409);
         const saved = this.completionStored(terminal.data()); this.completionBound(saved, aggregate, order);
@@ -926,7 +938,7 @@ export class WorkspaceOrderOperationsService {
     if (!/^[a-f0-9]{64}$/u.test(fingerprint)) fail();
     return this.db.runTransaction(async tx => {
       const {aggregate, order} = await this.original(tx, scope);
-      if (aggregate.buyerUserId !== actor) fail("not_found", 404);
+      await requirePurchasingBuyer(this.db, tx, aggregate, actor);
       if (aggregate.sourceRevision !== revision || order.originalFingerprint !== fingerprint) fail("not_found", 404);
       const terminal = await tx.get(this.completionPath(scope));
       if (!terminal.exists) fail("not_found", 404);
@@ -970,7 +982,7 @@ export class WorkspaceOrderOperationsService {
     id(actor); exact(body, ["targetId"]); const targetId = id(body.targetId);
     return this.db.runTransaction(async tx => {
       const {target, aggregate} = await this.feedbackTarget(tx, targetId);
-      if (aggregate.buyerUserId !== actor) fail("not_found", 404);
+      await requirePurchasingBuyer(this.db, tx, aggregate, actor);
       const doc = await tx.get(this.root().collection("productStarRatings").doc(targetId));
       return doc.exists ? this.starsStored(doc.data(), target, actor).rating : null;
     });
@@ -983,7 +995,7 @@ export class WorkspaceOrderOperationsService {
     const receiptPath = this.root().collection("productStarReceipts").doc(digest([actor, targetId, operationId]));
     return this.db.runTransaction(async tx => {
       const {target, aggregate} = await this.feedbackTarget(tx, targetId);
-      if (aggregate.buyerUserId !== actor) fail("not_found", 404);
+      await requirePurchasingBuyer(this.db, tx, aggregate, actor);
       const receipt = await tx.get(receiptPath);
       if (receipt.exists) {
         const saved = exact(receipt.data(), ["schemaVersion", "realm", "authNamespace", "buyerUserId", "commandFingerprint", "result", "integrity"]);
@@ -1107,7 +1119,7 @@ export class WorkspaceOrderOperationsService {
     return this.db.runTransaction(async tx => {
       const {aggregate, order} = await this.original(tx, scope);
       if (role === "seller") await this.seller(tx, order, actor);
-      else if (aggregate.buyerUserId !== actor) fail("not_found", 404);
+      else await requirePurchasingBuyer(this.db, tx, aggregate, actor);
       const operational = this.stored((await tx.get(this.path(scope))).data(), aggregate, order);
       const doc = await tx.get(this.completionPath(scope));
       let acknowledgment: OrderCompletionAcknowledgment | undefined;
@@ -1218,7 +1230,7 @@ export class WorkspaceOrderOperationsService {
     return this.db.runTransaction(async tx => {
       const {aggregate, order} = await this.original(tx, scope);
       if (role === "seller") await this.seller(tx, order, actor);
-      else if (aggregate.buyerUserId !== actor) fail("not_found", 404);
+      else await requirePurchasingBuyer(this.db, tx, aggregate, actor);
       const doc = await tx.get(this.path(scope));
       const record = this.stored(doc.data(), aggregate, order);
       const completion = await tx.get(this.completionPath(scope));
@@ -1565,8 +1577,9 @@ function supplierQuote(value: unknown, realm: Realm,
 export function normalizePlacement(value: unknown, realm: Realm): TrustedPlacementReceipt {
   const hasCouponContext = Object.hasOwn(obj(value), "couponUseContext");
   const r = exact(value, ["schemaVersion", "realm", "authNamespace", "finalPlacement", "issuer",
-    "receiptId", "revision", "buyerUserId", "stores", ...(hasCouponContext ? ["couponUseContext"] : [])]);
-  if ((r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5 && r.schemaVersion !== 6 && r.schemaVersion !== 7 && r.schemaVersion !== 8 && r.schemaVersion !== 9) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
+    "receiptId", "revision", "buyerUserId", "stores", ...(obj(value).schemaVersion === 10 ? ['purchaser', 'purchasingStoreCaseId'] : []),
+    ...(hasCouponContext ? ["couponUseContext"] : [])]);
+  if ((r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5 && r.schemaVersion !== 6 && r.schemaVersion !== 7 && r.schemaVersion !== 8 && r.schemaVersion !== 9 && r.schemaVersion !== 10) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
       r.finalPlacement !== true || !["evaluation", "production"].includes(realm)) fail();
   const stores = array(r.stores, 10).map(raw => {
     const s = exact(raw, ["storeId", "caseId", "ownerUserId", "lines", "totals",
@@ -1590,12 +1603,20 @@ export function normalizePlacement(value: unknown, realm: Realm): TrustedPlaceme
   const result: TrustedPlacementReceipt = {schemaVersion: r.schemaVersion, realm, authNamespace: "firebase-default",
     finalPlacement: true, issuer: id(r.issuer), receiptId: id(r.receiptId), revision: id(r.revision),
     buyerUserId: id(r.buyerUserId), stores};
+  if (r.schemaVersion === 10) {
+    result.purchaser = purchaser(r.purchaser);
+    result.purchasingStoreCaseId = purchaserCase(r.purchasingStoreCaseId, result.purchaser);
+    if (result.purchaser.kind === 'store') {
+      const buyingStoreId = result.purchaser.storeId;
+      if (stores.some(s => s.storeId === buyingStoreId)) fail();
+    }
+  }
   const declaredStoreCoupons = stores.flatMap(store => (store.benefitAttribution?.components ?? [])
     .filter(component => /^store-coupon-v[1-9][0-9]*$/u.test(component.benefitRevision))
     .map(component => ({storeId: store.storeId, componentId: component.componentId})));
   if (declaredStoreCoupons.length && !hasCouponContext) fail();
   if (hasCouponContext) {
-    if (r.schemaVersion !== 6 && r.schemaVersion !== 7 && r.schemaVersion !== 8 && r.schemaVersion !== 9) fail();
+    if (r.schemaVersion !== 6 && r.schemaVersion !== 7 && r.schemaVersion !== 8 && r.schemaVersion !== 9 && r.schemaVersion !== 10) fail();
     const context = exact(r.couponUseContext, ["schemaVersion", "stores"]);
     if (context.schemaVersion !== 1) fail();
     const coupons = array(context.stores, 10).map(raw => {
@@ -1616,6 +1637,33 @@ export function normalizePlacement(value: unknown, realm: Realm): TrustedPlaceme
   return result;
 }
 function compare(a: string, b: string): number {return a < b ? -1 : a > b ? 1 : 0;}
+function purchaser(value: unknown): OriginalPurchaser {
+  const r = exact(value, obj(value).kind === 'store' ? ['schemaVersion', 'kind', 'storeId', 'name', 'purpose'] : ['schemaVersion', 'kind']);
+  if (r.schemaVersion !== 1) fail();
+  if (r.kind === 'personal') return {schemaVersion: 1, kind: 'personal'};
+  if (r.kind !== 'store' || !['restock', 'buyDirect', 'groupBulkBuying'].includes(String(r.purpose))) fail();
+  return {schemaVersion: 1, kind: 'store', storeId: id(r.storeId), name: text(r.name, 200),
+    purpose: r.purpose as 'restock' | 'buyDirect' | 'groupBulkBuying'};
+}
+function purchaserCase(value: unknown, identity: OriginalPurchaser): string | null {
+  if (identity.kind === 'store') return id(value);
+  if (value !== null) fail();
+  return null;
+}
+function aggregatePurchaser(a: Pick<PurchaseAggregate, 'orders'>): OriginalPurchaser | undefined {
+  return a.orders[0]?.original.purchaser;
+}
+/** Historical access requires both the original account and its current exact
+ * Store ownership. Closing public sales does not close procurement/history. */
+async function requirePurchasingBuyer(db: Firestore, tx: Transaction, a: PurchaseAggregate, actor: string): Promise<void> {
+  if (a.buyerUserId !== actor) fail('not_found', 404);
+  const identity = aggregatePurchaser(a);
+  if (identity?.kind === 'store') {
+    const caseId = id(a.purchasingStoreCaseId);
+    const profile = await tx.get(db.collection('workspaceProfiles').doc(caseId));
+    requireStore(profile.data(), {caseId, storeId: identity.storeId, ownerUserId: actor}, false);
+  }
+}
 function requireStore(value: unknown, expected: {caseId: string; storeId: string; ownerUserId: string}, requireNewSales = true): void {
   if (!value) fail("not_found", 404);
   const p = obj(value);
@@ -1625,14 +1673,15 @@ function requireStore(value: unknown, expected: {caseId: string; storeId: string
       p.status !== "live" || (requireNewSales && p.shopEnabled !== true)) fail("not_found", 404);
 }
 export function purchaseOriginalFingerprint(storeId: string, orderId: string, original: PurchaseOriginal): string {
-  return digest({factsVersion: original.lines.some(l => Object.hasOwn(l, 'commodityPriceSnapshot')) ? 10 : original.lines.some(l => Object.hasOwn(l, 'supplierTaxSnapshot')) ? 9 : Object.hasOwn(original, "supplierQuote") ? 8 : Object.hasOwn(original, "fulfilmentContext") ? 7 : original.lines.some(l => l.publicListing !== undefined) ? 6 : original.lines.some(l => l.scheduledFulfilment !== undefined) ? 5 : original.lines.some(l => l.variant !== undefined) ? 4 :
+  return digest({factsVersion: Object.hasOwn(original, 'purchaser') ? 11 : original.lines.some(l => Object.hasOwn(l, 'commodityPriceSnapshot')) ? 10 : original.lines.some(l => Object.hasOwn(l, 'supplierTaxSnapshot')) ? 9 : Object.hasOwn(original, "supplierQuote") ? 8 : Object.hasOwn(original, "fulfilmentContext") ? 7 : original.lines.some(l => l.publicListing !== undefined) ? 6 : original.lines.some(l => l.scheduledFulfilment !== undefined) ? 5 : original.lines.some(l => l.variant !== undefined) ? 4 :
     original.benefitAttribution === undefined ? 2 : 3, storeId, orderId, original});
 }
 function validateAggregate(value: unknown, purchaseId: string, realm: Realm): PurchaseAggregate {
   try {
     const r = exact(value, ["schemaVersion", "realm", "authNamespace", "purchaseId", "buyerUserId",
-      "buyerId", "sourceRevision", "sourceFingerprint", "createdAt", "orders", "integrity"]);
-    if ((r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5 && r.schemaVersion !== 6 && r.schemaVersion !== 7 && r.schemaVersion !== 8 && r.schemaVersion !== 9 && r.schemaVersion !== 10) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
+      "buyerId", "sourceRevision", "sourceFingerprint", "createdAt", "orders", "integrity",
+      ...(obj(value).schemaVersion === 11 ? ['purchasingStoreCaseId'] : [])]);
+    if ((r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5 && r.schemaVersion !== 6 && r.schemaVersion !== 7 && r.schemaVersion !== 8 && r.schemaVersion !== 9 && r.schemaVersion !== 10 && r.schemaVersion !== 11) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
         r.purchaseId !== purchaseId || !/^[a-f0-9]{64}$/u.test(String(r.sourceFingerprint))) fail();
     id(r.buyerUserId); id(r.buyerId); id(r.sourceRevision);
     if (typeof r.createdAt !== "string" || new Date(r.createdAt).toISOString() !== r.createdAt) fail();
@@ -1641,7 +1690,7 @@ function validateAggregate(value: unknown, purchaseId: string, realm: Realm): Pu
       if (o.factsVersion !== r.schemaVersion) fail();
       const original = exact(o.original, ["currency", "lines", "totals",
         ...(o.factsVersion !== 2 ? ["benefitAttribution"] : []), ...((o.factsVersion as number) >= 7 ? ["fulfilmentContext"] : []),
-        ...((o.factsVersion as number) >= 8 ? ['supplierQuote'] : [])]);
+        ...((o.factsVersion as number) >= 8 ? ['supplierQuote'] : []), ...(o.factsVersion === 11 ? ['purchaser'] : [])]);
       if (original.currency !== "INR") fail();
       const lines = array(original.lines, 100).map(rawLine => {
         const l = exact(rawLine, [...lineKeys.filter(k => k !== "sourceLineId"), "lineId",
@@ -1662,6 +1711,7 @@ function validateAggregate(value: unknown, purchaseId: string, realm: Realm): Pu
         lines.some(l => l.scheduledFulfilment != null));
       if ((o.factsVersion as number) >= 8) canonical.supplierQuote = supplierQuote(original.supplierQuote, realm, lines,
         (o.factsVersion as number) >= 10);
+      if (o.factsVersion === 11) canonical.purchaser = purchaser(original.purchaser);
       const result: StoredOrder = {factsVersion: o.factsVersion as PurchaseFactsVersion, storeId: id(o.storeId), orderId: id(o.orderId),
         original: canonical, originalFingerprint: String(o.originalFingerprint),
         caseId: id(o.caseId), ownerUserId: id(o.ownerUserId)};
@@ -1669,6 +1719,12 @@ function validateAggregate(value: unknown, purchaseId: string, realm: Realm): Pu
       return result;
     });
     unique(orders.map(o => o.storeId)); unique(orders.map(o => o.orderId));
+    if (r.schemaVersion === 11) {
+      const identity = orders[0]!.original.purchaser!;
+      purchaserCase(r.purchasingStoreCaseId, identity);
+      if (orders.some(o => integrityHash(o.original.purchaser) !== integrityHash(identity) ||
+          identity.kind === 'store' && o.storeId === identity.storeId)) fail();
+    }
     const {integrity, ...body} = r;
     if (integrity !== integrityHash(body)) fail();
     return {...r, orders} as unknown as PurchaseAggregate;
@@ -1718,6 +1774,11 @@ export class WorkspacePurchaseProjectionService {
       const buyerData = buyerDoc.data();
       if (buyerDoc.exists && (buyerData?.userId !== input.buyerUserId || buyerData.authNamespace !== input.authNamespace)) fail("invalid_state", 409);
       const buyerId = buyerDoc.exists ? id(buyerData!.buyerId) : candidateBuyerId;
+      if (input.purchaser?.kind === 'store') {
+        const caseId = id(input.purchasingStoreCaseId);
+        const profile = await tx.get(this.db.collection('workspaceProfiles').doc(caseId));
+        requireStore(profile.data(), {caseId, storeId: input.purchaser.storeId, ownerUserId: input.buyerUserId}, false);
+      }
       for (const store of input.stores) {
         const profile = await tx.get(this.db.collection("workspaceProfiles").doc(store.caseId));
         requireStore(profile.data(), store);
@@ -1757,13 +1818,15 @@ export class WorkspacePurchaseProjectionService {
           original.supplierQuote = s.supplierQuote == null ? null : {...s.supplierQuote,
             lines: s.supplierQuote.lines.map(b => ({...b, lineId: savedIds.get(b.lineId)!})).sort((a,b) => compare(a.lineId, b.lineId))};
         }
+        if (input.schemaVersion === 10) original.purchaser = input.purchaser!;
         return {factsVersion: (input.schemaVersion + 1) as PurchaseFactsVersion, storeId: s.storeId, orderId: s.orderId, original,
           originalFingerprint: purchaseOriginalFingerprint(s.storeId, s.orderId, original),
           caseId: s.caseId, ownerUserId: s.ownerUserId};
       });
       const body = {schemaVersion: (input.schemaVersion + 1) as PurchaseFactsVersion, realm: this.realm, authNamespace: "firebase-default" as const,
         purchaseId, buyerUserId: input.buyerUserId, buyerId, sourceRevision: input.revision,
-        sourceFingerprint, createdAt, orders};
+        sourceFingerprint, createdAt, orders,
+        ...(input.schemaVersion === 10 ? {purchasingStoreCaseId: input.purchasingStoreCaseId!} : {})};
       // Saved UUID line IDs expand each allocation. Bound the actual buyer
       // projection, not only source bytes, before any transaction creates.
       // Leave room below the existing 512KiB client cap for operational context
@@ -1813,11 +1876,13 @@ export class WorkspacePurchaseProjectionService {
   }
 
   private pageQuery(actor: string, body: Readonly<Record<string, unknown>>, seller: boolean) {
-    exact(body, seller ? ["storeId", "limit", "cursor"] : ["limit", "cursor"]);
+    exact(body, seller ? ["storeId", "limit", "cursor"] : ["limit", "cursor", ...(Object.hasOwn(body, 'buyingStoreId') ? ['buyingStoreId'] : [])]);
     id(actor);
     const storeId = seller ? id(body.storeId) : null;
+    const buyingStoreId = !seller && Object.hasOwn(body, 'buyingStoreId') ? id(body.buyingStoreId) : null;
     const limit = integer(body.limit, 5, 1);
-    const scope = digest([this.realm, "firebase-default", actor, seller ? "seller" : "buyer", storeId]);
+    const scope = digest([this.realm, "firebase-default", actor, seller ? "seller" : "buyer", storeId,
+      ...(buyingStoreId ? [buyingStoreId] : [])]);
     let after: string | undefined;
     if (body.cursor !== null) {
       try {
@@ -1828,29 +1893,42 @@ export class WorkspacePurchaseProjectionService {
         if (Buffer.from(JSON.stringify(parsed)).toString("base64url") !== token) fail();
       } catch {fail();}
     }
-    return {storeId, limit, after, cursor: (last: string | undefined) => last
+    return {storeId, buyingStoreId, limit, after, cursor: (last: string | undefined) => last
       ? Buffer.from(JSON.stringify({version: 1, scope, after: last})).toString("base64url") : null};
   }
   private page(actor: string, seller: boolean, storeId: string | null,
-    references: PurchaseReference[], nextCursor: string | null): PurchaseReferencePage {
-    return {schemaVersion: 2, realm: this.realm, authNamespace: "firebase-default",
+    references: PurchaseReference[], nextCursor: string | null, buyingStoreId?: string): PurchaseReferencePage {
+    return {schemaVersion: buyingStoreId ? 3 : 2, realm: this.realm, authNamespace: "firebase-default",
       viewerRole: seller ? "seller" : "buyer", viewerUserId: actor, storeId,
-      coverage: seller ? "indexed_original_facts" : "saved_original_facts", references, nextCursor};
+      coverage: seller ? "indexed_original_facts" : "saved_original_facts", references, nextCursor,
+      ...(buyingStoreId ? {buyingStoreId} : {})};
   }
 
   async listBuyer(actor: string, body: Readonly<Record<string, unknown>>): Promise<PurchaseReferencePage> {
     const p = this.pageQuery(actor, body, false);
-    let query = this.root().collection("purchases").where("buyerUserId", "==", actor)
-      .orderBy(FieldPath.documentId()).limit(p.limit);
-    if (p.after) query = query.startAfter(p.after);
-    const docs = await query.get();
-    const references = docs.docs.flatMap(doc => {
-      const a = validateAggregate(doc.data(), doc.id, this.realm);
-      if (a.buyerUserId !== actor) fail("invalid_state", 409);
-      return a.orders.map(o => this.reference(a, o));
+    return this.db.runTransaction(async tx => {
+      let caseId: string | undefined;
+      if (p.buyingStoreId) {
+        const profiles = await tx.get(this.db.collection('workspaceProfiles').where('workspaceId', '==', p.buyingStoreId).limit(2));
+        if (profiles.size !== 1) fail('not_found', 404);
+        caseId = profiles.docs[0]!.id;
+        requireStore(profiles.docs[0]!.data(), {caseId, storeId: p.buyingStoreId, ownerUserId: actor}, false);
+      }
+      let query = this.root().collection("purchases").where("buyerUserId", "==", actor)
+        .orderBy(FieldPath.documentId()).limit(p.limit);
+      if (p.after) query = query.startAfter(p.after);
+      const docs = await tx.get(query), references: PurchaseReference[] = [];
+      for (const doc of docs.docs) {
+        const a = validateAggregate(doc.data(), doc.id, this.realm);
+        if (a.buyerUserId !== actor) fail("invalid_state", 409);
+        const identity = aggregatePurchaser(a);
+        if (p.buyingStoreId ? identity?.kind !== 'store' || identity.storeId !== p.buyingStoreId ||
+            a.purchasingStoreCaseId !== caseId : identity?.kind === 'store') continue;
+        references.push(...a.orders.map(o => this.reference(a, o)));
+      }
+      return this.page(actor, false, null, references,
+        p.cursor(docs.size === p.limit ? docs.docs.at(-1)?.id : undefined), p.buyingStoreId ?? undefined);
     });
-    return this.page(actor, false, null, references,
-      p.cursor(docs.size === p.limit ? docs.docs.at(-1)?.id : undefined));
   }
 
   async listStore(actor: string, body: Readonly<Record<string, unknown>>): Promise<PurchaseReferencePage> {
@@ -1889,12 +1967,17 @@ export class WorkspacePurchaseProjectionService {
   }
 
   async readBuyer(actor: string, body: Readonly<Record<string, unknown>>): Promise<PurchaseProjection> {
-    exact(body, ["purchaseId"]); id(actor);
+    exact(body, ["purchaseId", ...(Object.hasOwn(body, 'buyingStoreId') ? ['buyingStoreId'] : [])]); id(actor);
     const purchaseId = id(body.purchaseId);
-    const doc = await this.root().collection("purchases").doc(purchaseId).get();
-    if (!doc.exists || doc.data()?.buyerUserId !== actor) fail("not_found", 404);
-    const aggregate = validateAggregate(doc.data(), purchaseId, this.realm);
-    return this.projection(aggregate, actor, "buyer", aggregate.orders);
+    const buyingStoreId = Object.hasOwn(body, 'buyingStoreId') ? id(body.buyingStoreId) : null;
+    return this.db.runTransaction(async tx => {
+      const doc = await tx.get(this.root().collection("purchases").doc(purchaseId));
+      if (!doc.exists || doc.data()?.buyerUserId !== actor) fail("not_found", 404);
+      const aggregate = validateAggregate(doc.data(), purchaseId, this.realm), identity = aggregatePurchaser(aggregate);
+      if (buyingStoreId ? identity?.kind !== 'store' || identity.storeId !== buyingStoreId : identity?.kind === 'store') fail('not_found', 404);
+      await requirePurchasingBuyer(this.db, tx, aggregate, actor);
+      return this.projection(aggregate, actor, "buyer", aggregate.orders);
+    });
   }
 
   async readStore(actor: string, body: Readonly<Record<string, unknown>>): Promise<PurchaseProjection> {

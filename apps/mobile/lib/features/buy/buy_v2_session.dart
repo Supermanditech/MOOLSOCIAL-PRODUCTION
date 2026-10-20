@@ -3672,15 +3672,32 @@ class BuyV2Session extends ChangeNotifier {
   final WorkspaceProductPresentationGateway? productPresentations;
   /// Owned by this session; never shared across authenticated lifetimes.
   final WorkspacePublicStockReader? storeStockReader;
-  final AuthenticatedWorkspaceOrderIdentityGateway? purchaseReader;
-  final String purchaseRealm;
+  AuthenticatedWorkspaceOrderIdentityGateway? _purchaseReader;
+  String _purchaseRealm;
+  AuthenticatedWorkspaceOrderIdentityGateway? get purchaseReader => _purchaseReader;
+  String get purchaseRealm => _purchaseRealm;
+  /// Replace only Store history access after source/auth configuration changes.
+  /// Keep Cart, pending payments, journals and their storage owner untouched.
+  bool rebindStorePurchaseReader({required AuthenticatedWorkspaceOrderIdentityGateway? reader, required String realm}) {
+    if (_collectionDisposed || !isStoreProcurement || !procurementScopeCurrent ||
+        reader != null && (!reader.isCurrent || reader.accountUserId != procurementContext?.accountId ||
+          !const ['evaluation', 'production'].contains(realm))) {
+      return false;
+    }
+    if (identical(reader, _purchaseReader) && realm == _purchaseRealm) {
+      return true;
+    }
+    _purchaseReader = reader; _purchaseRealm = realm;
+    notifyListeners();
+    return true;
+  }
   BuyV2Session({
     required this.core,
     this.bulkQuotes,
     this.productPresentations,
     this.storeStockReader,
-    this.purchaseReader,
-    this.purchaseRealm = const String.fromEnvironment('MOOLSOCIAL_PURCHASE_REALM'),
+    AuthenticatedWorkspaceOrderIdentityGateway? purchaseReader,
+    String purchaseRealm = const String.fromEnvironment('MOOLSOCIAL_PURCHASE_REALM'),
     BuyV2ProductFactsAdapter? productFactsAdapter,
     BuyV2ProductContentAdapter? productContentAdapter,
     BuyV2ComparisonSource? comparisonSource,
@@ -3719,7 +3736,9 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2ShoppingAlertsAdapter? shoppingAlertsAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
     bool? reviewDataEnabled,
-  }) : productFactsAdapter = productFactsAdapter ?? BuyV2CatalogueProductFactsAdapter(
+  }) : _purchaseReader = purchaseReader,
+       _purchaseRealm = purchaseRealm,
+       productFactsAdapter = productFactsAdapter ?? BuyV2CatalogueProductFactsAdapter(
          includeReviewFixtures: reviewDataEnabled ?? (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled)),
        purchaseOrderAdapter =
            purchaseOrderAdapter ??

@@ -24,6 +24,7 @@ import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
+import 'package:moolsocial/features/work/work_order_identity_gateway.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
@@ -33,6 +34,8 @@ import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen
 import 'package:moolsocial/features/work/widgets/store_publication_settings.dart';
 import 'package:moolsocial/features/work/widgets/workspace_purchase_originals.dart';
 import 'work_publication_test.dart' as publication_fixture show fixture;
+import 'work_order_identity_gateway_test.dart' as purchaser_fixture
+  show Transport, projectionGateway, purchaserReferenceResponse, purchaserPurchaseResponse;
 
 // Host fixtures only. No upload, device storage or real commerce.
 final at = DateTime.utc(2026, 10, 16, 12);
@@ -1434,6 +1437,109 @@ void main() {
       expect(product.hasValidPackTerms, isTrue);
     }, skip: Platform.environment['LF_RESTOCK_BULK_CLIENT_LOG'] == null);
   }
+  for (final retire in ['none', 'account', 'store', 'approval', 'source', 'replacement', 'realm', 'dispose']) {
+    test('LF-PURCHASER Store controller binds configured original reader and retires $retire', () async {
+      var account = 'buyer-1', store = 'buying-store', approved = true, sourceAlive = true, realm = 'evaluation';
+      final wire = purchaser_fixture.Transport()..data = purchaser_fixture.purchaserReferenceResponse();
+      var source = purchaser_fixture.projectionGateway(wire, lifetime: () => sourceAlive ? 'source-life' : null);
+      final controller = WorkProcurementController(currentAccountId: () => account, currentStoreId: () => store,
+        storeApproved: () => approved, originalPurchaseReader: () => source, originalPurchaseRealm: () => realm,
+        bookmarks: _HostProcurementBookmarks(), stateStoreFactory: (scope) => _HostRetirableStateStore()..ownerScope = scope);
+      var disposed = false; addTearDown(() {if (!disposed) controller.dispose();});
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'stockStatement'), isTrue);
+      final session = controller.session!, reader = session.purchaseReader!;
+      expect(session.purchaseRealm, 'evaluation'); expect(reader.isCurrent, isTrue); expect(identical(source, reader), isFalse);
+      expect(session.availablePaymentMethods, isEmpty);
+      if (retire == 'none') {
+        expect(await reader.listPurchaseReferences(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', buyingStoreId: store), isNotNull);
+      } else {
+        if (retire == 'account') account = 'other-account';
+        if (retire == 'store') store = 'other-store';
+        if (retire == 'approval') approved = false;
+        if (retire == 'source') sourceAlive = false;
+        if (retire == 'replacement') source = purchaser_fixture.projectionGateway(wire);
+        if (retire == 'realm') realm = 'production';
+        if (retire == 'dispose') {controller.dispose(); disposed = true;}
+        else {controller.invalidateIfChanged();}
+        expect(reader.isCurrent, isFalse); final calls = wire.calls;
+        expect(await reader.listPurchaseReferences(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', buyingStoreId: 'buying-store'), isNull);
+        expect(wire.calls, calls);
+      }
+    });
+  }
+  for (final change in ['replacement', 'null to ready', 'unavailable', 'realm', 'wrong account']) {
+    test('LF-PURCHASER same Store reader recovers $change without replacing Cart or recovery owner', () async {
+      final wire = purchaser_fixture.Transport()..data = purchaser_fixture.purchaserReferenceResponse();
+      AuthenticatedWorkspaceOrderIdentityGateway? source = change == 'null to ready' ? null : purchaser_fixture.projectionGateway(wire);
+      var realm = 'evaluation';
+      final controller = WorkProcurementController(currentAccountId: () => 'buyer-1', currentStoreId: () => 'buying-store',
+        storeApproved: () => true, originalPurchaseReader: () => source, originalPurchaseRealm: () => realm,
+        bookmarks: _HostProcurementBookmarks(), stateStoreFactory: (scope) => _HostRetirableStateStore()..ownerScope = scope);
+      addTearDown(controller.dispose);
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'stockStatement'), isTrue);
+      final session = controller.session!, oldReader = session.purchaseReader, storage = session.customerStateStore,
+        context = session.procurementContext, core = session.core;
+      if (change == 'unavailable') {source = null;}
+      else if (change == 'wrong account') {source = purchaser_fixture.projectionGateway(wire, account: 'other-account');}
+      else {source = purchaser_fixture.projectionGateway(wire);}
+      if (change == 'realm') {realm = 'production'; wire.data['realm'] = realm;}
+      controller.invalidateIfChanged();
+      expect(oldReader?.isCurrent ?? false, isFalse);
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'stockStatement'), isTrue);
+      expect(identical(controller.session, session), isTrue); expect(identical(session.customerStateStore, storage), isTrue);
+      expect(identical(session.procurementContext, context), isTrue); expect(identical(session.core, core), isTrue);
+      if (change == 'unavailable' || change == 'wrong account') {
+        expect(session.purchaseReader, isNull); expect(wire.calls, 0);
+        source = purchaser_fixture.projectionGateway(wire);
+        expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'stockStatement'), isTrue);
+      }
+      expect(session.purchaseReader?.isCurrent, isTrue); expect(session.purchaseRealm, realm);
+      expect(await session.purchaseReader!.listPurchaseReferences(role: WorkspaceOrderIdentityRole.buyer,
+        realm: realm, buyingStoreId: 'buying-store'), isNotNull);
+      expect(identical(controller.session, session), isTrue);
+    });
+  }
+  test('LF-PURCHASER old reader response remains retired after same Store source recovery', () async {
+    final wire = purchaser_fixture.Transport()..data = purchaser_fixture.purchaserReferenceResponse();
+    var source = purchaser_fixture.projectionGateway(wire);
+    final controller = WorkProcurementController(currentAccountId: () => 'buyer-1', currentStoreId: () => 'buying-store',
+      storeApproved: () => true, originalPurchaseReader: () => source, originalPurchaseRealm: () => 'evaluation',
+      bookmarks: _HostProcurementBookmarks(), stateStoreFactory: (scope) => _HostRetirableStateStore()..ownerScope = scope);
+    addTearDown(controller.dispose);
+    expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'stockStatement'), isTrue);
+    final old = controller.session!.purchaseReader!; wire.pending = Completer<void>();
+    final pending = old.listPurchaseReferences(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', buyingStoreId: 'buying-store');
+    await Future<void>.delayed(Duration.zero); expect(wire.calls, 1);
+    source = purchaser_fixture.projectionGateway(wire); controller.invalidateIfChanged();
+    final release = wire.pending!; wire.pending = null; release.complete();
+    expect(await pending, isNull); expect(old.isCurrent, isFalse);
+    expect(await controller.session!.purchaseReader!.listPurchaseReferences(role: WorkspaceOrderIdentityRole.buyer,
+      realm: 'evaluation', buyingStoreId: 'buying-store'), isNotNull);
+  });
+  test('LF-PURCHASER personal session cannot rebind Store history', () {
+    final core = BuySession(), wire = purchaser_fixture.Transport();
+    final session = BuyV2Session(core: core, reviewDataEnabled: false); addTearDown(() {session.dispose(); core.dispose();});
+    expect(session.rebindStorePurchaseReader(reader: purchaser_fixture.projectionGateway(wire), realm: 'evaluation'), isFalse);
+    expect(session.purchaseReader, isNull); expect(wire.calls, 0);
+  });
+  testWidgets('LF-PURCHASER default Store session Orders opens shared buyer originals with buying Store', (tester) async {
+    final wire = purchaser_fixture.Transport()..respond = (body) => body['operation'].toString().startsWith('list')
+      ? purchaser_fixture.purchaserReferenceResponse() : purchaser_fixture.purchaserPurchaseResponse();
+    final source = purchaser_fixture.projectionGateway(wire);
+    final controller = WorkProcurementController(currentAccountId: () => 'buyer-1', currentStoreId: () => 'buying-store',
+      storeApproved: () => true, originalPurchaseReader: () => source, originalPurchaseRealm: () => 'evaluation',
+      bookmarks: _HostProcurementBookmarks(), stateStoreFactory: (scope) => _HostRetirableStateStore()..ownerScope = scope);
+    addTearDown(controller.dispose);
+    expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'stockStatement'), isTrue);
+    final session = controller.session!;
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: BuyV2Screen(session: session)));
+    await tester.pumpAndSettle(); session.openDestination(BuyV2Destination.orders); await tester.pumpAndSettle();
+    expect(tester.widget<WorkspacePurchaseOriginals>(find.byType(WorkspacePurchaseOriginals)).buyingStoreId, 'buying-store');
+    await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+    expect(wire.sent!['buyingStoreId'], 'buying-store');
+    await tester.tap(find.byKey(const ValueKey('original-order-order-v2'))); await tester.pumpAndSettle();
+    expect(find.text('Buying for: Evaluation buying Store'), findsOneWidget); expect(tester.takeException(), isNull);
+  });
   test('LF05-RESTOCK Store controller configured failure cannot use review authority', () async {
     const account = 'host-configured-review-store';
     final seed = StoreReviewSeed(accountScope: account, orderCount: 1000, now: at);

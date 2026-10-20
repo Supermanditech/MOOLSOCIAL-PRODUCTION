@@ -807,6 +807,8 @@ class _WorkWorkspaceDashboardScreenState
             reviewCatalogueAllowed: () => session.canLoadStoreReviewSeed,
             catalogueGateway: session.catalogueGateway is AuthenticatedWorkspaceCatalogueGateway
                 ? session.catalogueGateway as AuthenticatedWorkspaceCatalogueGateway : null,
+            originalPurchaseReader: () => session.originalPurchaseReader,
+            originalPurchaseRealm: () => session.originalPurchaseRealm,
           );
       session.addListener(_procurementIdentityChanged);
       WidgetsBinding.instance.addPostFrameCallback((_) {

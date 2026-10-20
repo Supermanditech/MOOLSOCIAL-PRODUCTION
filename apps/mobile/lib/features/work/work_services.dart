@@ -45,6 +45,8 @@ class WorkProcurementController extends ChangeNotifier {
     this.bookmarks = const SecureWorkProcurementBookmarkStore(),
     this.reviewCatalogueAllowed,
     this.catalogueGateway,
+    this.originalPurchaseReader,
+    this.originalPurchaseRealm,
     WorkProcurementSessionFactory? sessionFactory,
     BuyV2CustomerStateStore Function(String scope)? stateStoreFactory,
   }) : _sessionFactory = sessionFactory,
@@ -56,7 +58,11 @@ class WorkProcurementController extends ChangeNotifier {
   final WorkProcurementBookmarkStore bookmarks;
   final bool Function()? reviewCatalogueAllowed;
   final AuthenticatedWorkspaceCatalogueGateway? catalogueGateway;
+  final AuthenticatedWorkspaceOrderIdentityGateway? Function()? originalPurchaseReader;
+  final String Function()? originalPurchaseRealm;
   WorkspacePublicDiscoverySource? _ownedCatalogueSource;
+  AuthenticatedWorkspaceOrderIdentityGateway? _purchaseSource;
+  String? _purchaseSourceRealm;
   int _catalogueLifetime = 0;
   final WorkProcurementSessionFactory? _sessionFactory;
   final bool _ownsCore;
@@ -121,11 +127,16 @@ class WorkProcurementController extends ChangeNotifier {
                 reviewCatalogueAllowed?.call() == true,
           )
         : null;
+    final purchaseSource = originalPurchaseReader?.call(), purchaseRealm = originalPurchaseRealm?.call();
+    _purchaseSource = purchaseSource; _purchaseSourceRealm = purchaseRealm;
+    final purchases = context == null ? null : _scopedPurchases(context, purchaseSource, purchaseRealm);
     return BuyV2Session(
       core: BuySession(),
       procurementIdentity: identity,
       customerStateStore: stateStore,
       reviewDataEnabled: false,
+      purchaseReader: purchases,
+      purchaseRealm: purchases == null ? bound?.realm ?? 'production' : purchaseRealm!,
       commerceAdapter: bound == null ? review : _StoreProcurementCommerceAdapter(bound),
       commercialPaymentTermsAdapter: review,
       cataloguePageSource: _ownedCatalogueSource ?? review,
@@ -135,6 +146,38 @@ class WorkProcurementController extends ChangeNotifier {
       initialCatalogueRegionId: review == null ? null : 'jodhpur',
       initialCatalogueAreaScope: bound == null ? BuyV2CatalogueAreaScope.regional : BuyV2CatalogueAreaScope.allAreas,
     );
+  }
+
+  AuthenticatedWorkspaceOrderIdentityGateway? _scopedPurchases(BuyV2ProcurementContext context,
+    AuthenticatedWorkspaceOrderIdentityGateway? source, String? realm) {
+    if (source == null || !source.isCurrent || source.accountUserId != context.accountId ||
+        !const ['evaluation', 'production'].contains(realm)) {
+      return null;
+    }
+    final lifetime = _catalogueLifetime, token = Object();
+    return AuthenticatedWorkspaceOrderIdentityGateway(endpoint: source.endpoint,
+      accountUserId: context.accountId, credentials: source.credentials, transport: source.transport,
+      lifetime: () => lifetime == _catalogueLifetime && scopeCurrent && source.isCurrent &&
+        identical(originalPurchaseReader?.call(), source) && originalPurchaseRealm?.call() == realm &&
+        _identity.value?.customerStateOwnerScope == context.customerStateOwnerScope ? token : null);
+  }
+
+  void _refreshPurchaseReader() {
+    final opened = session, context = bookmark?.context;
+    if (!_ownsCore || opened == null || context == null || !scopeCurrent) {
+      return;
+    }
+    final source = originalPurchaseReader?.call(), realm = originalPurchaseRealm?.call();
+    final usable = source != null && source.isCurrent && source.accountUserId == context.accountId &&
+      const ['evaluation', 'production'].contains(realm);
+    if (identical(source, _purchaseSource) && realm == _purchaseSourceRealm &&
+        usable == (opened.purchaseReader?.isCurrent == true)) {
+      return;
+    }
+    final replacement = _scopedPurchases(context, source, realm);
+    // Remember before session notification: listeners may inspect/reopen Restock.
+    _purchaseSource = source; _purchaseSourceRealm = realm;
+    opened.rebindStorePurchaseReader(reader: replacement, realm: realm ?? '');
   }
 
   bool get scopeCurrent {
@@ -148,7 +191,11 @@ class WorkProcurementController extends ChangeNotifier {
 
   /// Called synchronously when authentication or selected Store changes.
   void invalidateIfChanged() {
-    if (bookmark != null && !scopeCurrent) invalidate();
+    if (bookmark != null && !scopeCurrent) {
+      invalidate();
+    } else {
+      _refreshPurchaseReader();
+    }
   }
 
   void invalidate() {
@@ -161,6 +208,7 @@ class WorkProcurementController extends ChangeNotifier {
 
   void _disposeSession() {
     _catalogueLifetime++;
+    _purchaseSource = null; _purchaseSourceRealm = null;
     final source = _ownedCatalogueSource;
     _ownedCatalogueSource = null;
     final previous = session;
@@ -269,6 +317,7 @@ class WorkProcurementController extends ChangeNotifier {
         bookmark!.context.customerStateOwnerScope ==
             chosen.context.customerStateOwnerScope) {
       bookmark = chosen;
+      _refreshPurchaseReader();
       notifyListeners();
       return true;
     }

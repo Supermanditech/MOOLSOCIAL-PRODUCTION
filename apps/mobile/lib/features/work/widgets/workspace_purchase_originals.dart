@@ -370,12 +370,15 @@ class WorkspacePurchaseOriginals extends StatefulWidget {
     required this.role,
     required this.realm,
     this.storeId,
+    this.buyingStoreId,
     this.onRatePurchasedItem,
   });
   final AuthenticatedWorkspaceOrderIdentityGateway gateway;
   final WorkspaceOrderIdentityRole role;
   final String realm;
   final String? storeId;
+  /// Purchasing Store; [storeId] remains exclusively the supplier partition.
+  final String? buyingStoreId;
   /// Buyer-only entry after authoritative completion, scoped to one frozen line.
   final void Function(WorkspacePurchaseReference, WorkspacePurchaseOrder, WorkspacePurchasedSkuLine)? onRatePurchasedItem;
   @override
@@ -406,7 +409,8 @@ class _WorkspacePurchaseOriginalsState
     if (!identical(oldWidget.gateway, widget.gateway) ||
         oldWidget.role != widget.role ||
         oldWidget.realm != widget.realm ||
-        oldWidget.storeId != widget.storeId) {
+        oldWidget.storeId != widget.storeId ||
+        oldWidget.buyingStoreId != widget.buyingStoreId) {
       _generation++;
       _references.clear();
       _details.clear();
@@ -449,6 +453,7 @@ class _WorkspacePurchaseOriginalsState
       role: widget.role,
       realm: widget.realm,
       storeId: widget.storeId,
+      buyingStoreId: widget.buyingStoreId,
       cursor: more ? _cursor : null,
     );
     if (!_current(generation)) return;
@@ -485,6 +490,7 @@ class _WorkspacePurchaseOriginalsState
       role: widget.role,
       realm: widget.realm,
       reference: reference,
+      buyingStoreId: widget.buyingStoreId,
     );
     if (!_current(generation)) return;
     setState(() {
@@ -620,6 +626,7 @@ class _WorkspacePurchaseOriginalsState
           widget.role,
           widget.realm,
           widget.storeId,
+          widget.buyingStoreId,
         )),
         tilePadding: EdgeInsets.zero,
         title: const Text(
@@ -675,6 +682,7 @@ class _WorkspacePurchaseOriginalsState
                       widget.gateway,
                       widget.role,
                       widget.realm,
+                      widget.buyingStoreId,
                       reference.purchaseId,
                       reference.storeId,
                       reference.orderId,
@@ -702,6 +710,8 @@ class _WorkspacePurchaseOriginalsState
                           child: const Text('Details unavailable · retry'),
                         ),
                       if (_details[reference.orderId] case final details?) ...[
+                        if (details.purchaser?.kind == 'store')
+                          Text('Buying for: ${details.purchaser!.name}'),
                         _orderUpdate(reference),
                         WorkspaceOriginalFulfilmentForOrder(original: details),
                         if (details.supplierQuote case final agreed?) ...[

@@ -13982,8 +13982,9 @@ class BuyV2OrdersView extends StatelessWidget {
             subtitle: const Text('Requests and agreed product prices — separate from orders'),
             trailing: const Icon(Icons.chevron_right_rounded), onTap: () => _showBulkQuotes(context, session)),
           if (session.purchaseReader case final reader? when reader.isCurrent && session.query.trim().isEmpty)
-            WorkspacePurchaseOriginals(key: ValueKey(('buyer-originals',reader,session.purchaseRealm)),
+            WorkspacePurchaseOriginals(key: ValueKey(('buyer-originals',reader,session.purchaseRealm,session.procurementContext?.storeId)),
               gateway: reader, role: WorkspaceOrderIdentityRole.buyer, realm: session.purchaseRealm,
+              buyingStoreId: session.procurementContext?.storeId,
               onRatePurchasedItem: !session.privateStarsAvailable ? null : (reference, original, line) =>
                 unawaited(_showPrivateStarsSheet(context, session, reference: reference, original: original, line: line))),
           if (session.canReturnToAccount) ...[

@@ -1051,6 +1051,134 @@ test('LF-COMMODITY-ORIGINAL legacy contracts reject the new field and retain ori
   assert.throws(() => normalizePlacement(legacy, 'evaluation'), rejectsCode('invalid_input'));
 });
 
+function purchaserReceipt(kind: 'personal' | 'store' = 'store') {
+  const value = commodityOriginalReceipt(); value.schemaVersion = 10;
+  value.purchaser = kind === 'personal' ? {schemaVersion: 1, kind} : {
+    schemaVersion: 1, kind, storeId: 'buying-store', name: 'Evaluation buying Store', purpose: 'restock'};
+  value.purchasingStoreCaseId = kind === 'personal' ? null : 'buying-case';
+  for (const store of value.stores) for (const line of store.lines) {
+    if (line.publicListing?.channel === 'retail') {
+      line.publicListing.channel = 'wholesale';
+      line.publicListing.listingId = `listing-${createHash('sha256').update(JSON.stringify(
+        [1, 'evaluation', store.storeId, line.skuId, 'wholesale'])).digest('hex')}`;
+      if (line.scheduledFulfilment) line.scheduledFulfilment.listing = structuredClone(line.publicListing);
+    }
+  }
+  return value;
+}
+
+test('LF-PURCHASER trusted receipt freezes one explicit purchaser without changing legacy facts', () => {
+  for (const kind of ['personal', 'store'] as const) {
+    const input = purchaserReceipt(kind);
+    assert.deepEqual(normalizePlacement(input, 'evaluation'), input);
+  }
+  for (const legacy of [receipt(), commodityOriginalReceipt()]) {
+    assert.deepEqual(normalizePlacement(legacy, 'evaluation'), legacy);
+  }
+});
+for (const [name, change] of Object.entries({
+  'missing purchaser': (v: any) => {delete v.purchaser;},
+  'unsupported purpose': (v: any) => {v.purchaser.purpose = 'any-store';},
+  'private account in snapshot': (v: any) => {v.purchaser.accountId = v.buyerUserId;},
+  'missing case': (v: any) => {v.purchasingStoreCaseId = null;},
+  'self supplier': (v: any) => {v.purchaser.storeId = v.stores[0].storeId;},
+  'blank name': (v: any) => {v.purchaser.name = '';},
+  'personal with Store case': (v: any) => {v.purchaser = {schemaVersion: 1, kind: 'personal'};},
+  'legacy with new purchaser': (v: any) => {v.schemaVersion = 9;},
+})) test(`LF-PURCHASER rejects ${name}`, () => {
+  const input = purchaserReceipt(); change(input);
+  assert.throws(() => normalizePlacement(input, 'evaluation'), rejectsCode('invalid_input'));
+});
+
+test('LF-PURCHASER persisted Store originals separate history and enforce current original-owner access', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  const app = initializeApp({projectId: `demo-lf-purchaser-${randomUUID().slice(0,8)}`}, `purchaser-${randomUUID()}`),
+    db = purchaseTestFirestore(app), input = purchaserReceipt();
+  const profile = {schemaVersion: 1, caseId: 'buying-case', workspaceId: 'buying-store', ownerUserId: input.buyerUserId,
+    familyId: 'products-trade', profileId: 'retailer-grocery', status: 'live', shopEnabled: true};
+  try {
+    for (const store of input.stores) await db.collection('workspaceProfiles').doc(store.caseId).set({schemaVersion: 1,
+      caseId: store.caseId, workspaceId: store.storeId, ownerUserId: store.ownerUserId, familyId: 'products-trade',
+      profileId: 'wholesaler', status: 'live', shopEnabled: true});
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    const writer = new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => input});
+    const made = await writer.materialize('purchaser-source');
+    assert.deepEqual(await writer.materialize('purchaser-source'), made);
+    const reader = new WorkspacePurchaseProjectionService(db, 'evaluation');
+    const selector = {purchaseId: made.purchaseId, buyingStoreId: profile.workspaceId};
+    const buyer = await reader.readBuyer(input.buyerUserId, selector);
+    assert.equal(buyer.schemaVersion, 11);
+    assert.ok(buyer.orders.every(o => JSON.stringify(Reflect.get(o.original, 'purchaser')) === JSON.stringify(input.purchaser)));
+    assert.equal(JSON.stringify(buyer).includes('buying-case'), false);
+    assert.equal(JSON.stringify(buyer).includes('buyerUserId'), false);
+    await assert.rejects(reader.readBuyer(input.buyerUserId, {purchaseId: made.purchaseId}), rejectsCode('not_found'));
+    await assert.rejects(reader.readBuyer(input.buyerUserId, {...selector, buyingStoreId: 'other-store'}), rejectsCode('not_found'));
+    const personalInput = purchaserReceipt('personal'); personalInput.receiptId = 'personal-purchaser-receipt';
+    const personal = await new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => personalInput}).materialize('personal-source');
+    const otherInput = purchaserReceipt(); otherInput.receiptId = 'other-store-receipt';
+    otherInput.purchaser.storeId = 'other-buying-store'; otherInput.purchaser.purpose = 'buyDirect'; otherInput.purchasingStoreCaseId = 'other-buying-case';
+    await db.collection('workspaceProfiles').doc(otherInput.purchasingStoreCaseId).set({...profile,
+      caseId: otherInput.purchasingStoreCaseId, workspaceId: otherInput.purchaser.storeId, shopEnabled: false});
+    const other = await new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => otherInput}).materialize('other-store-source');
+    assert.equal(other.buyerId, made.buyerId, 'Existing buyerId remains account-scoped.');
+    assert.equal(personal.buyerId, made.buyerId);
+    const legacyInput = receipt('legacy-purchaser');
+    const legacy = await new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => legacyInput}).materialize('legacy-source');
+    const personalRefs = await reader.listBuyer(input.buyerUserId, {limit: 5, cursor: null});
+    assert.deepEqual(new Set(personalRefs.references.map(r => r.purchaseId)), new Set([personal.purchaseId, legacy.purchaseId]));
+    const storeRefs = await reader.listBuyer(input.buyerUserId, {limit: 5, cursor: null, buyingStoreId: profile.workspaceId});
+    assert.deepEqual(new Set(storeRefs.references.map(r => r.purchaseId)), new Set([made.purchaseId]));
+    assert.equal(storeRefs.schemaVersion, 3);
+    let cursor: string | null = null; const seen: string[] = [];
+    do {
+      const page = await reader.listBuyer(input.buyerUserId, {limit: 1, cursor, buyingStoreId: profile.workspaceId});
+      seen.push(...page.references.map(r => r.purchaseId)); cursor = page.nextCursor;
+      if (cursor) await assert.rejects(reader.listBuyer(input.buyerUserId, {limit: 1, cursor}), rejectsCode('invalid_input'));
+    } while (cursor);
+    assert.deepEqual(new Set(seen), new Set([made.purchaseId]));
+    const order = buyer.orders[0]!, tuple = {purchaseId: made.purchaseId, storeId: order.storeId, orderId: order.orderId};
+    const seller = await reader.readStore(input.stores[0].ownerUserId, tuple);
+    assert.deepEqual(seller.orders, [order]);
+    const proof = {...operationalEvidence(), ...tuple, originalFingerprint: order.originalFingerprint,
+      sourceRevision: buyer.sourceRevision, initialStage: 'Ready' as const};
+    const ops = new WorkspaceOrderOperationsService(db, 'evaluation', {readOperationalOrder: async () => proof}, () => new Date('2026-10-16T12:00:00.000Z'),
+      {issuer: 'trusted-fulfilment', readCompletion: async () => ({...completionEvidence(), ...tuple,
+        originalFingerprint: order.originalFingerprint, sourceRevision: buyer.sourceRevision, operationalRevision: 1})});
+    await ops.initialize('purchaser-operations');
+    const operational = await ops.read(input.buyerUserId, 'buyer', tuple);
+    assert.deepEqual(operational.original, order.original);
+    await ops.recordCompletion('purchaser-completion');
+    const targetScope = {...tuple, originalFingerprint: order.originalFingerprint, sourceRevision: buyer.sourceRevision,
+      orderLineId: order.original.lines[0]!.lineId};
+    const target = (await ops.readBuyerProductFeedbackTarget(input.buyerUserId, targetScope)).target;
+    assert.deepEqual((await ops.listBuyerProductFeedbackTargets(input.buyerUserId, {limit: 5, cursor: null})).targets, [],
+      'Store purchase targets do not appear in personal discovery.');
+    const stars = {targetId: target.id, expectedRevision: 0, operationId: 'purchaser-stars', stars: 4};
+    await ops.submitProductStars(input.buyerUserId, stars);
+    assert.equal((await ops.readBuyerProductStars(input.buyerUserId, {targetId: target.id}))!.stars, 4);
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({shopEnabled: false, name: 'Current renamed Store'});
+    assert.deepEqual(await reader.readBuyer(input.buyerUserId, selector), buyer, 'Historical facts survive paused sales and renaming.');
+    input.purchaser.purpose = 'buyDirect';
+    await assert.rejects(writer.materialize('purchaser-source'), rejectsCode('conflict'));
+    input.purchaser.purpose = 'restock';
+    input.purchaser.storeId = otherInput.purchaser.storeId; input.purchasingStoreCaseId = otherInput.purchasingStoreCaseId;
+    await assert.rejects(writer.materialize('purchaser-source'), rejectsCode('conflict'));
+    input.purchaser.storeId = profile.workspaceId; input.purchasingStoreCaseId = profile.caseId;
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({ownerUserId: 'new-owner'});
+    for (const actor of [input.buyerUserId, 'new-owner']) {
+      await assert.rejects(reader.readBuyer(actor, selector), rejectsCode('not_found'));
+      await assert.rejects(ops.read(actor, 'buyer', tuple), rejectsCode('not_found'));
+      await assert.rejects(ops.readCompletion(actor, 'buyer', tuple), rejectsCode('not_found'));
+      await assert.rejects(ops.readBuyerProductFeedbackTarget(actor, targetScope), rejectsCode('not_found'));
+      await assert.rejects(ops.readBuyerProductStars(actor, {targetId: target.id}), rejectsCode('not_found'));
+      await assert.rejects(ops.submitProductStars(actor, stars, true), rejectsCode('not_found'));
+    }
+    assert.deepEqual(await reader.readStore(input.stores[0].ownerUserId, tuple), seller, 'Supplier history is independently authorised.');
+    if (process.env.LF_PURCHASER_CAPTURE === 'true') console.log('LF_PURCHASER_PROJECTION=' + JSON.stringify({buyer, seller, operational, storeRefs}));
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+
 test('LF-COMMODITY-ORIGINAL materializer restart preserves buyer Store and operational originals', {
   skip: !process.env.FIRESTORE_EMULATOR_HOST,
 }, async () => {

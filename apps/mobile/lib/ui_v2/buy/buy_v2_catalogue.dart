@@ -3056,69 +3056,75 @@ class BuyV2CatalogueView extends StatelessWidget {
         session.pagedCatalogueEnabled &&
         !savedOnly &&
         !session.showingMonthlyBasketProducts;
-    return Column(
-      children: [
-        if (session.canReturnToAccount)
-          _CatalogueAccountReturn(session: session),
-        if (!storePaged)
-          _CatalogueToolbar(
-            session: session,
-            onVisitProduct: onVisitProduct,
-            savedOnly: savedOnly,
-            onSaved: () => session.showSavedProducts(!savedOnly),
-          ),
-        Expanded(
-          child: _CatalogueMotionOwner(
-            key: ValueKey(
-              'buy-catalogue-motion-${session.destination.name}-'
-              '${session.selectedCategoryId}-${session.saleTypeSignature}',
-            ),
-            destination: session.destination,
-            child:
-                session.pagedCatalogueEnabled &&
-                    !savedOnly &&
-                    !session.showingMonthlyBasketProducts
-                ? BuyV2PagedProductCatalogue(
-                    session: session,
-                    query: session.catalogueQuery(),
-                    scopeKey: 'catalogue-${session.destination.name}',
-                    toolbarBuilder: storePaged
-                        ? (total, loading) => _CatalogueToolbar(
-                            session: session,
-                            savedOnly: savedOnly,
-                            onSaved: () =>
-                                session.showSavedProducts(!savedOnly),
-                            onVisitProduct: onVisitProduct,
-                            productCount: total,
-                            showDigitalCount: true,
-                            updating: loading,
-                          )
-                        : null,
-                    includeStoreSearch:
-                        session.query.trim().isNotEmpty && onOpenStore != null,
-                    controlsAfterProducts:
-                        session.destination == BuyV2Destination.shop,
-                    header: session.query.trim().isEmpty || onOpenStore == null
-                        ? null
-                        : _CatalogueStoreMatches(
-                            session: session,
-                            query: session.catalogueQuery(),
-                            onOpenStore: onOpenStore!,
-                          ),
-                    usePrimaryScrollController:
-                        MediaQuery.sizeOf(context).width >
-                            MediaQuery.sizeOf(context).height &&
-                        MediaQuery.sizeOf(context).height <= 480,
-                  )
-                : BuyV2VerticalScrollIndicator(
-                    child: _ProductGrid(
+    final controls = <Widget>[
+      if (session.canReturnToAccount) _CatalogueAccountReturn(session: session),
+      if (!storePaged)
+        _CatalogueToolbar(
+          session: session,
+          onVisitProduct: onVisitProduct,
+          savedOnly: savedOnly,
+          onSaved: () => session.showSavedProducts(!savedOnly),
+        ),
+    ];
+    final catalogue = _CatalogueMotionOwner(
+      key: ValueKey(
+        'buy-catalogue-motion-${session.destination.name}-'
+        '${session.selectedCategoryId}-${session.saleTypeSignature}',
+      ),
+      destination: session.destination,
+      child:
+          session.pagedCatalogueEnabled &&
+              !savedOnly &&
+              !session.showingMonthlyBasketProducts
+          ? BuyV2PagedProductCatalogue(
+              session: session,
+              query: session.catalogueQuery(),
+              scopeKey: 'catalogue-${session.destination.name}',
+              toolbarBuilder: storePaged
+                  ? (total, loading) => _CatalogueToolbar(
                       session: session,
                       savedOnly: savedOnly,
-                      onShowAll: () => session.showSavedProducts(false),
+                      onSaved: () => session.showSavedProducts(!savedOnly),
+                      onVisitProduct: onVisitProduct,
+                      productCount: total,
+                      showDigitalCount: true,
+                      updating: loading,
+                    )
+                  : null,
+              includeStoreSearch:
+                  session.query.trim().isNotEmpty && onOpenStore != null,
+              controlsAfterProducts:
+                  session.destination == BuyV2Destination.shop,
+              header: session.query.trim().isEmpty || onOpenStore == null
+                  ? null
+                  : _CatalogueStoreMatches(
+                      session: session,
+                      query: session.catalogueQuery(),
+                      onOpenStore: onOpenStore!,
                     ),
-                  ),
-          ),
-        ),
+              usePrimaryScrollController:
+                  MediaQuery.sizeOf(context).width >
+                      MediaQuery.sizeOf(context).height &&
+                  MediaQuery.sizeOf(context).height <= 480,
+            )
+          : BuyV2VerticalScrollIndicator(
+              child: _ProductGrid(
+                session: session,
+                savedOnly: savedOnly,
+                onShowAll: () => session.showSavedProducts(false),
+                header: session.isStoreProcurement
+                    ? Column(children: controls)
+                    : null,
+              ),
+            ),
+    );
+    if (session.isStoreProcurement && !storePaged) {
+      return catalogue;
+    }
+    return Column(
+      children: [
+        ...controls,
+        Expanded(child: catalogue),
       ],
     );
   }
@@ -10622,16 +10628,32 @@ class _ProductGrid extends StatelessWidget {
     required this.session,
     required this.savedOnly,
     required this.onShowAll,
+    this.header,
   });
 
   final BuyV2Session session;
   final bool savedOnly;
   final VoidCallback onShowAll;
+  final Widget? header;
+
+  Widget _withHeader(Widget body) {
+    if (header == null) return body;
+    return CustomScrollView(
+      key: const ValueKey('buy-catalogue-status-scroll'),
+      slivers: [
+        SliverToBoxAdapter(child: header),
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: PrimaryScrollController.none(child: body),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     if (!savedOnly && !session.catalogueAvailable) {
-      return BuyV2CatalogueAvailabilityView(session: session);
+      return _withHeader(BuyV2CatalogueAvailabilityView(session: session));
     }
     final products = savedOnly
         ? session.visibleSavedProducts
@@ -10644,66 +10666,68 @@ class _ProductGrid extends StatelessWidget {
     if (products.isEmpty) {
       final savedCollectionEmpty =
           savedOnly && session.savedCountFor(session.destination) == 0;
-      return Center(
-        child: SingleChildScrollView(
-          key: const ValueKey('buy-empty-products-scroll'),
-          padding: const EdgeInsets.all(24),
-          child: BuyV2CartAvoidanceRegion(
-            key: const ValueKey('buy-empty-content-protection'),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.search_off_rounded,
-                  color: BuyV2Colors.muted,
-                  size: 34,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  savedCollectionEmpty
-                      ? 'No saved products yet'
-                      : savedOnly
-                      ? 'No matching saved products'
-                      : 'No matching products',
-                  style: context.buyTitle.copyWith(fontSize: 17),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  savedCollectionEmpty
-                      ? 'Save products while browsing to find them here.'
-                      : savedOnly
-                      ? 'Your products are still saved. Clear search and filters to see them.'
-                      : session.query.trim().isNotEmpty
-                      ? 'Check the product code or search by product name.'
-                      : 'Try another category or clear the filter.',
-                  textAlign: TextAlign.center,
-                  style: context.buyMeta,
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () {
-                    if (savedCollectionEmpty) {
-                      onShowAll();
-                    } else {
-                      session.updateQuery('');
-                      session.chooseFilter(null);
-                      session.chooseCategory('all');
-                      session.clearDiscoveryRefinements();
-                    }
-                  },
-                  child: Text(
-                    savedCollectionEmpty
-                        ? 'Show all products'
-                        : savedOnly
-                        ? 'Clear search and filters'
-                        : session.query.trim().isNotEmpty
-                        ? session.hasNarrowedProductSearchScope
-                              ? 'Clear search and filters'
-                              : 'Clear search'
-                        : 'Clear filters',
+      return _withHeader(
+        Center(
+          child: SingleChildScrollView(
+            key: const ValueKey('buy-empty-products-scroll'),
+            padding: const EdgeInsets.all(24),
+            child: BuyV2CartAvoidanceRegion(
+              key: const ValueKey('buy-empty-content-protection'),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.search_off_rounded,
+                    color: BuyV2Colors.muted,
+                    size: 34,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  Text(
+                    savedCollectionEmpty
+                        ? 'No saved products yet'
+                        : savedOnly
+                        ? 'No matching saved products'
+                        : 'No matching products',
+                    style: context.buyTitle.copyWith(fontSize: 17),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    savedCollectionEmpty
+                        ? 'Save products while browsing to find them here.'
+                        : savedOnly
+                        ? 'Your products are still saved. Clear search and filters to see them.'
+                        : session.query.trim().isNotEmpty
+                        ? 'Check the product code or search by product name.'
+                        : 'Try another category or clear the filter.',
+                    textAlign: TextAlign.center,
+                    style: context.buyMeta,
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () {
+                      if (savedCollectionEmpty) {
+                        onShowAll();
+                      } else {
+                        session.updateQuery('');
+                        session.chooseFilter(null);
+                        session.chooseCategory('all');
+                        session.clearDiscoveryRefinements();
+                      }
+                    },
+                    child: Text(
+                      savedCollectionEmpty
+                          ? 'Show all products'
+                          : savedOnly
+                          ? 'Clear search and filters'
+                          : session.query.trim().isNotEmpty
+                          ? session.hasNarrowedProductSearchScope
+                                ? 'Clear search and filters'
+                                : 'Clear search'
+                          : 'Clear filters',
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -10734,6 +10758,9 @@ class _ProductGrid extends StatelessWidget {
             '-${session.saleTypeSignature}-${savedOnly ? 'saved' : 'all'}',
           ),
           slivers: [
+            // Store controls share the product scroll when the keyboard or
+            // enlarged text leaves too little room for a fixed toolbar.
+            if (header != null) SliverToBoxAdapter(child: header),
             if (showPromotions)
               SliverToBoxAdapter(
                 child: _CataloguePromotionRail(session: session),

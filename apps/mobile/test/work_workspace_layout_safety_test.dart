@@ -1443,8 +1443,14 @@ class _StorePurchaseCommerce implements BuyV2CommerceAdapter {
   _StorePurchaseCommerce(this.context, {this.orders = const []});
   final BuyV2ProcurementContext context;
   final List<BuyV2Order> orders;
+  bool unavailable = false;
   @override
   Future<BuyV2CommerceSnapshot> refresh() async {
+    if (unavailable) {
+      return const BuyV2CommerceSnapshot(
+        state: BuyV2CommerceLoadState.unavailable,
+      );
+    }
     final expiry = DateTime.now().add(const Duration(hours: 1));
     return BuyV2CommerceSnapshot(
       state: BuyV2CommerceLoadState.ready,
@@ -4580,6 +4586,7 @@ void main() {
           procurementIdentity: identity,
           customerStateStore: state,
           commerceAdapter: _StorePurchaseCommerce(identity.value!),
+          productFactsAdapter: _StorePurchaseOrderReadyFacts(),
           reviewDataEnabled: false,
         );
       },
@@ -26561,7 +26568,13 @@ void main() {
           textScale: display.scale,
         );
         await openPromotionFromOperations(tester);
+        final editor = find.byKey(const Key('work-store-offers-screen'));
+        expect(editor, findsOneWidget);
         final prerequisites = find.byKey(const Key('work-offer-prerequisites'));
+        final editorScroll = find.descendant(of: editor, matching: find.byType(Scrollable)).first;
+        await tester.scrollUntilVisible(prerequisites, 100, scrollable: editorScroll, maxScrolls: 40);
+        await tester.ensureVisible(prerequisites);
+        await tester.pumpAndSettle();
         expect(prerequisites, findsOneWidget);
         final prerequisiteBounds = tester.getRect(prerequisites);
         final editorBounds = tester.getRect(
@@ -27207,7 +27220,7 @@ void main() {
 
   for (final origin in ['dashboard', 'stock', 'sourcing']) {
     testWidgets(
-      'S09 scanner cancel restores ${origin == 'sourcing' ? 'stock after leaving tracking' : origin}',
+      'S09 scanner cancel restores ${origin == 'sourcing' ? 'stock after leaving tracking' : origin == 'dashboard' ? 'stock after leaving Orders' : origin}',
       (tester) async {
         const channel = MethodChannel(
           'flutter.baseflow.com/permissions/methods',
@@ -27237,8 +27250,11 @@ void main() {
           textScale: 1,
         );
         if (origin == 'dashboard') {
-          // Analytics has no scanner. The operational Orders header does.
+          // Orders has no product scanner. Stock owns the barcode entry.
           await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-dashboard-scan')), findsNothing);
+          await tester.tap(find.byKey(const Key('work-store-stock')));
         } else if (origin == 'stock') {
           await tester.tap(find.byKey(const Key('work-store-stock')));
         } else if (origin == 'sourcing') {
@@ -27254,26 +27270,14 @@ void main() {
           await tester.pumpAndSettle();
         }
         await tester.tap(
-          find.byKey(
-            Key(
-              origin == 'dashboard'
-                  ? 'work-dashboard-scan'
-                  : 'work-add-products-scan',
-            ),
-          ),
+          find.byKey(const Key('work-add-products-scan')),
         );
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('buy-manual-code-panel')), findsOneWidget);
         await tester.tap(find.byKey(const Key('buy-cancel-product-code')));
         await tester.pumpAndSettle();
         expect(
-          find.byKey(
-            Key(switch (origin) {
-              'stock' => 'work-dashboard-catalogue-screen',
-              'sourcing' => 'work-dashboard-catalogue-screen',
-              _ => 'work-orders-destination',
-            }),
-          ),
+          find.byKey(const Key('work-dashboard-catalogue-screen')),
           findsOneWidget,
         );
         expect(work.workspaceCatalogueItems, orderedEquals(products));
@@ -50371,6 +50375,7 @@ void main() {
             customerStateStore: state,
             reviewDataEnabled: false,
             commerceAdapter: _StorePurchaseCommerce(identity.value!),
+            productFactsAdapter: _StorePurchaseOrderReadyFacts(),
           );
         },
       );
@@ -58667,7 +58672,7 @@ void main() {
     );
     expect(find.text('Wholesale and Bulk'), findsNothing);
     final storeName = find.byKey(const Key('work-store-full-name'));
-    expect(tester.widget<Text>(storeName).data, work.activeWorkspace!.name);
+    expect(tester.widget<Text>(storeName).data, 'Buying for ${work.activeWorkspace!.name}');
     expect(tester.widget<Text>(storeName).maxLines, isNull);
     expect(
       find.byKey(const Key('work-dashboard-inline-header')),
@@ -65235,6 +65240,7 @@ void main() {
               procurementIdentity: identity,
               customerStateStore: state,
               commerceAdapter: _StorePurchaseCommerce(identity.value!),
+              productFactsAdapter: _StorePurchaseOrderReadyFacts(),
               reviewDataEnabled: false,
             );
           },
@@ -65324,6 +65330,7 @@ void main() {
             procurementIdentity: identity,
             customerStateStore: state,
             commerceAdapter: _StorePurchaseCommerce(identity.value!),
+            productFactsAdapter: _StorePurchaseOrderReadyFacts(),
             reviewDataEnabled: false,
           );
         },
@@ -65404,7 +65411,7 @@ void main() {
       const oilQuery = 'Fortune Sunflower Oil 1 L pouch';
       expect(find.text('Wholesale and Bulk'), findsNothing);
       final storeName = find.byKey(const Key('work-store-full-name'));
-      expect(tester.widget<Text>(storeName).data, work.activeWorkspace!.name);
+      expect(tester.widget<Text>(storeName).data, 'Buying for ${work.activeWorkspace!.name}');
       expect(tester.widget<Text>(storeName).maxLines, isNull);
       expect(
         tester.renderObject<RenderParagraph>(storeName).textScaler.scale(1),
@@ -65455,8 +65462,47 @@ void main() {
       expect(buy.query, 'sunflower oil');
       expect(buy.quantityFor(cartProduct.id), cartQuantity);
       expect(find.byKey(const Key('work-local-navigation')), findsNothing);
+      expect(
+        find.byType(NestedScrollView).evaluate().length,
+        lessThanOrEqualTo(1),
+      );
       expect(tester.takeException(), isNull);
       await captureStoreView(tester, 'restock-search-keyboard-$scale');
+      buy.showSavedProducts(true);
+      await tester.pumpAndSettle();
+      final savedEmpty = find.text('No saved products yet');
+      final statusScroll = find.descendant(
+        of: find.byKey(const Key('buy-catalogue-status-scroll')),
+        matching: find.byType(Scrollable),
+      ).first;
+      await tester.scrollUntilVisible(
+        savedEmpty,
+        140,
+        scrollable: statusScroll,
+        maxScrolls: 20,
+      );
+      await tester.ensureVisible(savedEmpty);
+      await tester.pumpAndSettle();
+      expect(savedEmpty.hitTestable(), findsOneWidget);
+      expect(buy.quantityFor(cartProduct.id), cartQuantity);
+      expect(tester.takeException(), isNull);
+      buy.showSavedProducts(false);
+      final commerce = buy.commerceAdapter as _StorePurchaseCommerce;
+      commerce.unavailable = true;
+      await buy.restoreCommerce();
+      await tester.pumpAndSettle();
+      final retry = find.byKey(const Key('buy-catalogue-retry'));
+      expect(find.text('Store purchase unavailable'), findsOneWidget);
+      await tester.ensureVisible(retry);
+      await tester.pumpAndSettle();
+      expect(retry.hitTestable(), findsOneWidget);
+      expect(buy.commerceLoadState, BuyV2CommerceLoadState.unavailable);
+      expect(buy.quantityFor(cartProduct.id), cartQuantity);
+      expect(tester.takeException(), isNull);
+      commerce.unavailable = false;
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(buy.commerceLoadState, BuyV2CommerceLoadState.ready);
       tester.view.viewInsets = FakeViewPadding.zero;
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
@@ -65671,6 +65717,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(search).controller!.text, isEmpty);
       final bulkTab = find.text('Bulk');
+      final catalogueScroll = find.descendant(
+        of: find.byKey(PageStorageKey(
+          'buy-${buy.destination.name}-${buy.selectedCategoryId}'
+          '-${buy.saleTypeSignature}-all',
+        )),
+        matching: find.byType(Scrollable),
+      ).first;
+      await tester.scrollUntilVisible(
+        bulkTab,
+        -180,
+        scrollable: catalogueScroll,
+        maxScrolls: 30,
+      );
+      await tester.ensureVisible(bulkTab);
+      await tester.pumpAndSettle();
       expect(bulkTab.hitTestable(), findsOneWidget);
       await tester.tap(bulkTab);
       await tester.pumpAndSettle();
@@ -75282,6 +75343,7 @@ void main() {
             procurementIdentity: identity,
             customerStateStore: state,
             reviewDataEnabled: false,
+            productFactsAdapter: _StorePurchaseOrderReadyFacts(),
             commerceAdapter: _StorePurchaseCommerce(
               identity.value!,
               orders: [order],

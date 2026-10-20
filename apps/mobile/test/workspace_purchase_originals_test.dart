@@ -44,6 +44,31 @@ class _OrderPending implements WorkOrderPendingStore {
 }
 
 void main() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF-PURCHASER Store originals use separate buyer selector and compact immutable attribution scale=$scale', (tester) async {
+      tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1; addTearDown(tester.view.reset);
+      final details = fixtures.purchaserPurchaseResponse(), refs = fixtures.purchaserReferenceResponse();
+      final wire = fixtures.Transport()..respond = (body) => body['operation'].toString().startsWith('list') ? refs : details;
+      final gateway = fixtures.projectionGateway(wire);
+      Widget page(String buyingStoreId) => MaterialApp(home: Scaffold(body: MediaQuery(
+        data: MediaQueryData(textScaler: TextScaler.linear(scale)), child: SingleChildScrollView(
+          child: WorkspacePurchaseOriginals(gateway: gateway, role: WorkspaceOrderIdentityRole.buyer,
+            realm: 'evaluation', buyingStoreId: buyingStoreId)))));
+      await tester.pumpWidget(page('buying-store')); await tester.pumpAndSettle();
+      await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+      expect(wire.sent!['buyingStoreId'], 'buying-store');
+      await tester.tap(find.byKey(const ValueKey('original-order-order-v2'))); await tester.pumpAndSettle();
+      expect(wire.sent!['buyingStoreId'], 'buying-store');
+      final label = find.text('Buying for: Evaluation buying Store'); expect(label, findsOneWidget);
+      await tester.ensureVisible(label); await tester.pumpAndSettle();
+      expect(tester.widget<Text>(label).maxLines, isNull); expect(tester.takeException(), isNull);
+      await tester.pumpWidget(page('other-buying-store')); await tester.pumpAndSettle();
+      expect(label, findsNothing); expect(find.byKey(const ValueKey('original-order-order-v2')), findsNothing);
+      await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+      expect(wire.sent!['buyingStoreId'], 'other-buying-store');
+      expect(find.byKey(const ValueKey('original-order-order-v2')), findsNothing, reason: 'Wrong Store echo cannot populate history.');
+    });
+  }
   for (final kind in ['legacy', 'unknown', 'no supplied details']) {
     testWidgets('LF-CONTEXT absent original details and unrelated instructions add no blank section $kind', (tester) async {
       final data = kind == 'legacy' ? fixtures.publicListingPurchaseResponse()

@@ -128,13 +128,14 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
     required WorkspaceOrderIdentityRole role,
     required String realm,
     String? storeId,
+    String? buyingStoreId,
     String? cursor,
   }) async {
     if (!isCurrent ||
         !['evaluation', 'production'].contains(realm) ||
         (role == WorkspaceOrderIdentityRole.seller
-            ? !_id(storeId)
-            : storeId != null) ||
+            ? !_id(storeId) || buyingStoreId != null
+            : storeId != null || buyingStoreId != null && !_id(buyingStoreId)) ||
         cursor != null && (cursor.isEmpty || cursor.length > 512)) {
       return null;
     }
@@ -167,6 +168,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
               'limit': 5,
               'cursor': cursor,
               'storeId': ?storeId,
+              'buyingStoreId': ?buyingStoreId,
             },
           )
           .timeout(const Duration(seconds: 20));
@@ -177,7 +179,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
       }
       final envelope = _map(jsonDecode(reply.body));
       if (envelope['ok'] != true) return null;
-      final data = _exactMap(envelope['data'], const [
+      final data = _exactMap(envelope['data'], [
         'schemaVersion',
         'realm',
         'authNamespace',
@@ -187,8 +189,10 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         'coverage',
         'references',
         'nextCursor',
+        if (buyingStoreId != null) 'buyingStoreId',
       ]);
-      if (data['schemaVersion'] != 2 ||
+      if (data['schemaVersion'] != (buyingStoreId == null ? 2 : 3) ||
+          buyingStoreId != null && data['buyingStoreId'] != buyingStoreId ||
           data['realm'] != realm ||
           data['authNamespace'] != 'firebase-default' ||
           data['viewerRole'] != role.name ||
@@ -265,11 +269,13 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
     required WorkspaceOrderIdentityRole role,
     required String realm,
     required WorkspacePurchaseReference reference,
+    String? buyingStoreId,
   }) async {
     final result = await readPurchaseProjection(
       role: role,
       realm: realm,
       purchaseId: reference.purchaseId,
+      buyingStoreId: buyingStoreId,
       storeId: role == WorkspaceOrderIdentityRole.seller
           ? reference.storeId
           : null,
@@ -301,14 +307,15 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
     required String purchaseId,
     String? storeId,
     String? orderId,
+    String? buyingStoreId,
   }) async {
     bool current() => _ownerLifetime != null && lifetime() == _ownerLifetime;
     if (!current() ||
         !['evaluation', 'production'].contains(realm) ||
         !_id(purchaseId) ||
         (role == WorkspaceOrderIdentityRole.seller
-            ? !_id(storeId) || !_id(orderId)
-            : storeId != null || orderId != null)) {
+            ? !_id(storeId) || !_id(orderId) || buyingStoreId != null
+            : storeId != null || orderId != null || buyingStoreId != null && !_id(buyingStoreId))) {
       return null;
     }
     try {
@@ -340,6 +347,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
               'purchaseId': purchaseId,
               'storeId': ?storeId,
               'orderId': ?orderId,
+              'buyingStoreId': ?buyingStoreId,
             },
           )
           .timeout(const Duration(seconds: 20));
@@ -362,7 +370,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         'state',
         'orders',
       ]);
-      if (data['schemaVersion'] is! int || !const [2, 3, 4, 5, 6, 7, 8, 9, 10].contains(data['schemaVersion']) ||
+      if (data['schemaVersion'] is! int || !const [2, 3, 4, 5, 6, 7, 8, 9, 10, 11].contains(data['schemaVersion']) ||
           data['realm'] != realm ||
           data['authNamespace'] != 'firebase-default' ||
           data['viewerRole'] != role.name ||
@@ -381,6 +389,13 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         return null;
       }
       final orders = rawOrders.map((order) => _decodePurchaseOrder(order, realm)).toList();
+      final purchaser = orders.first.purchaser;
+      if (orders.any((o) => jsonEncode(o.purchaser?.toJson()) != jsonEncode(purchaser?.toJson())) ||
+          role == WorkspaceOrderIdentityRole.buyer && (buyingStoreId == null
+            ? purchaser?.kind == 'store'
+            : purchaser?.kind != 'store' || purchaser?.storeId != buyingStoreId)) {
+        return null;
+      }
       if (orders.any((o) => o.factsVersion != data['schemaVersion']) ||
           orders.map((o) => o.storeId).toSet().length != orders.length ||
           orders.map((o) => o.orderId).toSet().length != orders.length ||
@@ -783,7 +798,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
   ) {
     final source = _map(value);
     final enriched = source.containsKey('originalFactsVersion');
-    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4, 5, 6, 7, 8, 9, 10].contains(source['originalFactsVersion']))) {
+    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4, 5, 6, 7, 8, 9, 10, 11].contains(source['originalFactsVersion']))) {
       throw const FormatException('Unsupported original facts.');
     }
     final data = _exactMap(source, [
@@ -1351,6 +1366,7 @@ class WorkspacePurchaseOrder {
     this.fulfilmentContext,
     this.hasSupplierQuoteSnapshot = false,
     this.supplierQuote,
+    this.purchaser,
   }) : lines = List.unmodifiable(lines),
        totals = Map.unmodifiable(totals);
   final String storeId, orderId, originalFingerprint;
@@ -1361,9 +1377,31 @@ class WorkspacePurchaseOrder {
   final WorkspaceOriginalFulfilmentContext? fulfilmentContext;
   final bool hasSupplierQuoteSnapshot;
   final WorkspaceOriginalSupplierQuote? supplierQuote;
-  int get factsVersion => lines.any((line) => line.hasCommodityPriceSnapshot) ? 10 : lines.any((line) => line.hasSupplierTaxSnapshot) ? 9 : hasSupplierQuoteSnapshot ? 8 : hasFulfilmentContextSnapshot ? 7 : lines.any((line) => line.hasPublicListingSnapshot) ? 6 :
+  final WorkspaceOriginalPurchaser? purchaser;
+  int get factsVersion => purchaser != null ? 11 : lines.any((line) => line.hasCommodityPriceSnapshot) ? 10 : lines.any((line) => line.hasSupplierTaxSnapshot) ? 9 : hasSupplierQuoteSnapshot ? 8 : hasFulfilmentContextSnapshot ? 7 : lines.any((line) => line.hasPublicListingSnapshot) ? 6 :
     lines.any((line) => line.hasScheduledFulfilmentSnapshot) ? 5 :
     lines.any((line) => line.variant != null) ? 4 : benefitAttribution == null ? 2 : 3;
+}
+
+/// Frozen accepted buyer entity. It supplies attribution, never current access,
+/// payment, delivery or permission to post received goods into Stock.
+class WorkspaceOriginalPurchaser {
+  const WorkspaceOriginalPurchaser._(this.kind, this.storeId, this.name, this.purpose);
+  final String kind;
+  final String? storeId, name, purpose;
+  Map<String, Object> toJson() => {'schemaVersion': 1, 'kind': kind,
+    if (kind == 'store') ...{'storeId': storeId!, 'name': name!, 'purpose': purpose!}};
+  static WorkspaceOriginalPurchaser fromJson(Object? value) {
+    final raw = _map(value), data = _exactMap(raw, ['schemaVersion', 'kind',
+      if (raw['kind'] == 'store') ...['storeId', 'name', 'purpose']]);
+    if (data['schemaVersion'] != 1) throw const FormatException('Unsupported purchaser.');
+    if (data['kind'] == 'personal') return const WorkspaceOriginalPurchaser._('personal', null, null, null);
+    if (data['kind'] != 'store' || !_id(data['storeId']) || !_purchaseText(data['name']) ||
+        (data['name'] as String).length > 200 || !const ['restock', 'buyDirect', 'groupBulkBuying'].contains(data['purpose'])) {
+      throw const FormatException('Invalid purchasing Store.');
+    }
+    return WorkspaceOriginalPurchaser._('store', data['storeId'] as String, data['name'] as String, data['purpose'] as String);
+  }
 }
 
 /// Immutable purchased merchandise attribution; not current payment or credit
@@ -1683,7 +1721,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     'originalFingerprint',
   ]);
   final version = data['factsVersion'];
-  if (version is! int || !const [2, 3, 4, 5, 6, 7, 8, 9, 10].contains(version) ||
+  if (version is! int || !const [2, 3, 4, 5, 6, 7, 8, 9, 10, 11].contains(version) ||
       !_id(data['storeId']) ||
       !_id(data['orderId'])) {
     throw const FormatException('Unsupported order reference.');
@@ -1695,6 +1733,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     if (version >= 3) 'benefitAttribution',
     if (version >= 7) 'fulfilmentContext',
     if (version >= 8) 'supplierQuote',
+    if (version >= 11) 'purchaser',
   ]);
   final rawLines = original['lines'];
   if (original['currency'] != 'INR' ||
@@ -1820,6 +1859,8 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
   final attribution = version >= 3 ? _decodeBenefits(original['benefitAttribution'], lines, totals['discountMinor']!) : null;
   final fulfilment = version >= 7 ? _decodeFulfilmentContext(original['fulfilmentContext'], lines) : null;
   final supplierQuote = version >= 8 ? _decodeSupplierQuote(original['supplierQuote'], realm, lines, withCommodityPrice: version >= 10) : null;
+  final purchaser = version >= 11 ? WorkspaceOriginalPurchaser.fromJson(original['purchaser']) : null;
+  if (purchaser?.kind == 'store' && purchaser?.storeId == data['storeId']) throw const FormatException('Invalid self purchase.');
   final hash = sha256
       .convert(
         utf8.encode(
@@ -1834,6 +1875,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
               if (attribution != null) 'benefitAttribution': attribution.toJson(),
               if (version >= 7) 'fulfilmentContext': fulfilment?.toJson(),
               if (version >= 8) 'supplierQuote': supplierQuote?.toJson(),
+              if (version >= 11) 'purchaser': purchaser!.toJson(),
             },
           }),
         ),
@@ -1853,6 +1895,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     fulfilmentContext: fulfilment,
     hasSupplierQuoteSnapshot: version >= 8,
     supplierQuote: supplierQuote,
+    purchaser: purchaser,
   );
 }
 
