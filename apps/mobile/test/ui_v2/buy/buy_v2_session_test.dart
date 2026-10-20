@@ -8017,13 +8017,15 @@ void main() {
       List<BuyV2Order> orders = const [],
       BuyV2ProcurementBuyerGrant? grant,
       bool omitGrant = false,
+      bool verifiedBusiness = true,
     }) => BuyV2CommerceSnapshot(
       state: BuyV2CommerceLoadState.ready,
       products:
           products ?? [product.copyWith(procurementSupplierGrant: supplier())],
       orders: orders,
-      businessVerified: true,
-      businessVerificationState: BuyV2BusinessVerificationState.verified,
+      businessVerified: verifiedBusiness,
+      businessVerificationState: verifiedBusiness ? BuyV2BusinessVerificationState.verified
+          : BuyV2BusinessVerificationState.unavailable,
       paymentMethods: const {'Cash on Delivery', 'UPI'},
       addresses: const [
         BuyV2Address(
@@ -8057,6 +8059,7 @@ void main() {
       BuyV2CommerceSnapshot? snapshot,
       BuyV2CustomerStateStore? retainedStore,
       BuyV2CataloguePageSource? catalogueSource,
+      BuyV2ProductFactsAdapter? productFacts,
       DateTime Function()? clock,
     }) async {
       final entry = context ?? scope();
@@ -8075,7 +8078,7 @@ void main() {
             ? _StoreScopedTermsFixture()
             : null),
         reviewDataEnabled: false,
-        productFactsAdapter: _R669OrderReadyFacts(),
+        productFactsAdapter: productFacts ?? _R669OrderReadyFacts(),
         cataloguePageSource: catalogueSource,
         catalogueNow: clock ?? () => now,
       );
@@ -8096,6 +8099,140 @@ void main() {
       title: 'Isolated stock purchase', itemSummary: 'Accepted stock', total: 4200, partner: 'Host supplier',
       partnerType: 'Wholesaler', promise: 'Recorded delivery', destinationLabel: 'Store receiving',
       progress: 1, status: BuyV2OrderStatus.delivered);
+
+    for (final verified in [false, true]) {
+      test('LF05-RESTOCK Store buyer approval preserves personal verification=$verified', () {
+        final session = _r669OrderReadySession()..businessVerified = verified;
+        session.openDestination(BuyV2Destination.wholesale);
+        expect(session.wholesaleBuyerEligible, verified);
+        expect(session.addProduct(product.id), verified);
+        expect(session.businessVerified, verified);
+      });
+    }
+
+    for (final change in ['missing', 'denied', 'expired', 'account', 'store', 'retiredAccount', 'retiredStore', 'retiredOrigin']) {
+      test('LF05-RESTOCK Store buyer approval rejects $change despite personal verification', () async {
+        final fixture = await scopedSession();
+        final session = fixture.session;
+        await session.restoreCustomerState();
+        expect(session.addProduct(product.id), isTrue);
+        if (change.startsWith('retired')) {
+          fixture.identity.value = scope(account: change == 'retiredAccount' ? 'other-account' : 'buyer-account',
+            store: change == 'retiredStore' ? 'other-store' : 'purchasing-store',
+            origin: change == 'retiredOrigin' ? 'other-origin' : 'restock-operation');
+        } else {
+          fixture.adapter.snapshot = BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+            procurementAccessOnly: true, procurementBuyerGrant: change == 'missing' ? null : buyer(
+              approved: change != 'denied', until: change == 'expired' ? now : expiry,
+              account: change == 'account' ? 'other-account' : 'buyer-account',
+              store: change == 'store' ? 'other-store' : 'purchasing-store'));
+          await session.restoreCommerce();
+        }
+        expect(session.businessVerified, isTrue);
+        expect(session.wholesaleBuyerEligible, isFalse);
+        expect(session.addProduct(product.id), isFalse);
+        expect(session.setCartQuantity(product.id, '${product.minimumOrder + 1}'), isFalse);
+        session.openCart(scope: BuyV2CartScope.wholesale);
+        expect(session.purchaseOrderEligibleForCheckout, isFalse);
+        expect(session.openCheckout(), isFalse);
+      });
+    }
+
+    for (final missing in ['supplierApproval', 'supplierExpiry', 'availability']) {
+      test('LF05-RESTOCK Store buyer approval cannot replace $missing', () async {
+        final offered = product.copyWith(procurementSupplierGrant: supplier(
+          approved: missing != 'supplierApproval', until: missing == 'supplierExpiry' ? now : expiry));
+        final fixture = await scopedSession(snapshot: commerceSnapshot(products: [offered], verifiedBusiness: false),
+          productFacts: missing == 'availability' ? const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false) : null);
+        final session = fixture.session;
+        await session.restoreCustomerState();
+        expect(session.wholesaleBuyerEligible, isTrue);
+        expect(session.addProduct(product.id), isFalse);
+        expect(session.cartLines, isEmpty);
+        expect(session.businessVerified, isFalse);
+      });
+    }
+
+    for (final action in ['add', 'quantity', 'reorder']) {
+      test('LF05-RESTOCK Store buyer approval supports $action without consumer verification', () async {
+        final fixture = await scopedSession(snapshot: commerceSnapshot(verifiedBusiness: action == 'quantity'));
+        final session = fixture.session;
+        await session.restoreCustomerState();
+        if (action == 'quantity') {
+          expect(session.addProduct(product.id), isTrue);
+          session.businessVerified = false;
+        }
+        final quantity = session.quantityFor(product.id);
+        switch (action) {
+          case 'add': expect(session.addProduct(product.id), isTrue, reason: session.notice);
+          case 'quantity': expect(session.setCartQuantity(product.id, '${quantity + 1}'), isTrue, reason: session.notice);
+          case 'reorder':
+            final order = BuyV2Order(id: 'host-approved-store-original', destination: BuyV2Destination.wholesale,
+              title: 'Host original stock purchase', itemSummary: product.title, total: product.price,
+              partner: product.seller, partnerType: product.sellerType, promise: '', destinationLabel: 'Host Store',
+              progress: 1, status: BuyV2OrderStatus.delivered, productIds: [product.id]);
+            expect(session.reorder(order), isTrue, reason: session.notice);
+        }
+        expect(session.businessVerified, isFalse);
+        expect(session.businessVerificationState, BuyV2BusinessVerificationState.unavailable);
+        session.openCart(scope: BuyV2CartScope.wholesale);
+        expect(session.openCheckout(), isTrue, reason: session.notice);
+        expect(session.purchaseOrderEligibleForCheckout, isTrue, reason: 'Buyer prerequisite only; no payment or credit approval');
+        expect(session.choosePayment('Purchase order'), isFalse);
+      });
+    }
+
+    test('LF05-RESTOCK Store buyer approval does not create payment or credit authority', () async {
+      final fixture = await scopedSession(snapshot: BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+        products: [product.copyWith(procurementSupplierGrant: supplier())], procurementBuyerGrant: buyer()));
+      final session = fixture.session;
+      await session.restoreCustomerState();
+      expect(session.addProduct(product.id), isTrue, reason: session.notice);
+      expect(session.availablePaymentMethods, isEmpty);
+      expect(session.businessVerified, isFalse);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      session.openCheckout();
+      expect(session.choosePayment('UPI'), isFalse);
+      expect(session.choosePayment('Purchase order'), isFalse);
+      await session.refreshCommercialPaymentTerms();
+      expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+      for (final group in session.checkoutFulfilmentGroups) {
+        expect(session.commercialPaymentTermsFor(group.key), isEmpty);
+        expect(session.selectedCommercialPaymentTermFor(group.key), isNull);
+      }
+      expect(await session.submitOrder(), isFalse);
+      expect(fixture.adapter.placements, isEmpty);
+    });
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF05-RESTOCK Store buyer approval product UI uses Store authority $scale', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 568);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final fixture = await scopedSession(snapshot: commerceSnapshot(verifiedBusiness: false));
+        final session = fixture.session;
+        await session.restoreCustomerState();
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: BuyV2Screen(
+          session: session, initialDestination: BuyV2Destination.wholesale, onExit: () {})));
+        await tester.pumpAndSettle();
+        expect(session.openProduct(product.id), isTrue);
+        await tester.pumpAndSettle();
+        expect(find.byKey(ValueKey('buy-wholesale-verify-business-${product.id}')), findsNothing);
+        expect(find.text('Verify business'), findsNothing);
+        expect(tester.takeException(), isNull);
+        fixture.adapter.snapshot = const BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.unavailable,
+          procurementAccessOnly: true);
+        await session.restoreCommerce();
+        await tester.pumpAndSettle();
+        expect(find.text('Store purchase unavailable'), findsOneWidget);
+        expect(find.textContaining('could not be confirmed'), findsWidgets);
+        expect(find.text('Verify business'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
 
     test('LF05-RESTOCK access refresh preserves separately paged products and Store Cart', () async {
       final offered = product.copyWith(procurementSupplierGrant: supplier());
@@ -8183,15 +8320,17 @@ void main() {
       });
     }
 
-    test('LF05-RESTOCK access refresh supplies no business, address or payment authority', () async {
+    test('LF05-RESTOCK access refresh supplies no consumer verification, fulfilment or payment authority', () async {
       final offered = product.copyWith(procurementSupplierGrant: supplier());
       final fixture = await scopedSession(catalogueSource: _R669ProcurementCatalogue([offered]),
+        productFacts: const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false),
         snapshot: BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
           procurementAccessOnly: true, procurementBuyerGrant: buyer()));
       final session = fixture.session;
       await session.restoreCustomerState();
       expect(await session.openLinkedProduct(product.id), isTrue);
       expect(session.procurementUnavailableMessage, isNull);
+      expect(session.wholesaleBuyerEligible, isTrue);
       expect(session.businessVerified, isFalse);
       expect(session.addresses, isEmpty);
       expect(session.availablePaymentMethods, isEmpty);
@@ -8361,6 +8500,7 @@ void main() {
       final first = session.retryCommerce();
       await Future<void>.delayed(Duration.zero);
       expect(session.procurementUnavailableMessage, isNotNull);
+      expect(session.wholesaleBuyerEligible, isFalse);
       expect(session.addProduct(product.id), isFalse);
       source.resolutionGate = null;
       source.products.clear();

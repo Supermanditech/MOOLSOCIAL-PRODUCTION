@@ -1364,7 +1364,7 @@ class BuyV2ProductView extends StatelessWidget {
                                               facts: facts,
                                               decision: offerDecision!,
                                               actionWidth:
-                                                  !session.businessVerified ||
+                                                  !session.wholesaleBuyerEligible ||
                                                       !offerDecision.canAdd
                                                   ? double.infinity
                                                   : quantity > 0
@@ -1373,8 +1373,14 @@ class BuyV2ProductView extends StatelessWidget {
                                                       quantity,
                                                     )
                                                   : 44,
-                                              action: !session.businessVerified
+                                              action: !session.wholesaleBuyerEligible
+                                                  ? session.isStoreProcurement
                                                   ? TextButton(
+                                                      key: ValueKey('buy-wholesale-retry-store-${product.id}'),
+                                                      onPressed: () => unawaited(session.retryCommerce()),
+                                                      child: const Text('Retry'),
+                                                    )
+                                                  : TextButton(
                                                       key: ValueKey(
                                                         'buy-wholesale-verify-business-${product.id}',
                                                       ),
@@ -1601,7 +1607,7 @@ class BuyV2ProductView extends StatelessWidget {
                                         purchaseWidth <=
                                             constraints.maxWidth - 108 &&
                                         (!wholesale ||
-                                            (session.businessVerified &&
+                                            (session.wholesaleBuyerEligible &&
                                                 offerDecision!.canAdd))) {
                                       return Row(
                                         key: ValueKey(
@@ -1764,7 +1770,7 @@ class BuyV2ProductView extends StatelessWidget {
                           if (wholesale)
                             Column(
                               children: [
-                                if (!session.businessVerified) ...[
+                                if (!session.wholesaleBuyerEligible && !session.isStoreProcurement) ...[
                                   _WholesaleVerificationCard(
                                     state: session.businessVerificationState,
                                     onOpenWorkspace: () => context.push(

@@ -1387,6 +1387,7 @@ void main() {
       expect(product.priceMinor, bulk ? 25025 : 26000);
       if (bulk) expect(product.packTerms!.priceMinorForQuantity(48, product.priceMinor), 24975);
       expect(session.businessVerified, isFalse);
+      expect(session.wholesaleBuyerEligible, isTrue, reason: 'Actual server Store grant supplies only the buyer prerequisite');
       expect(session.addProduct(product.id), isFalse, reason: 'Fresh supplier grants do not invent operational availability');
       session.releaseCatalogueProducts('host-normal-store');
     }, skip: Platform.environment['LF_RESTOCK_BULK_CLIENT_LOG'] == null);

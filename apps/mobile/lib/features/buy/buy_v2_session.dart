@@ -6802,6 +6802,11 @@ class BuyV2Session extends ChangeNotifier {
   bool availableProductsOnly = false;
   BuyV2ShoppingIntent? activeShoppingIntent;
   bool businessVerified = true;
+  // Store buying approval is scoped independently of the personal business
+  // profile. Product, fulfilment, payment and credit authorities remain separate.
+  bool get wholesaleBuyerEligible => isStoreProcurement
+      ? procurementUnavailableMessage == null
+      : businessVerified;
   BuyV2BusinessVerificationState _businessVerificationState =
       BuyV2BusinessVerificationState.unavailable;
   BuyV2BusinessVerificationState get businessVerificationState {
@@ -6820,7 +6825,7 @@ class BuyV2Session extends ChangeNotifier {
 
   bool get purchaseOrderEligibleForCheckout {
     final lines = checkoutLines;
-    return businessVerified &&
+    return wholesaleBuyerEligible &&
         lines.isNotEmpty &&
         lines.every(
           (line) => line.product.destination == BuyV2Destination.wholesale,
@@ -17189,7 +17194,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    if (item.destination == BuyV2Destination.wholesale && !businessVerified) {
+    if (item.destination == BuyV2Destination.wholesale && !wholesaleBuyerEligible) {
       notice = 'Complete your business profile to place a wholesale order.';
       notifyListeners();
       return false;
@@ -17516,7 +17521,7 @@ class BuyV2Session extends ChangeNotifier {
       if (!_availableForDiscovery(item)) {
         return 'This product is unavailable right now.';
       }
-      if (item.destination == BuyV2Destination.wholesale && !businessVerified) {
+      if (item.destination == BuyV2Destination.wholesale && !wholesaleBuyerEligible) {
         return 'Complete your business profile to place a wholesale order.';
       }
       if (item.requiresPrescription && approvedMaximum == null) {
@@ -20540,7 +20545,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    if (order.destination == BuyV2Destination.wholesale && !businessVerified) {
+    if (order.destination == BuyV2Destination.wholesale && !wholesaleBuyerEligible) {
       notice = 'Complete your business profile to place a wholesale order.';
       notifyListeners();
       return false;
