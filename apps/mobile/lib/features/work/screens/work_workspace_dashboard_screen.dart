@@ -4616,7 +4616,10 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
   void _startOrderClock() {
     _orderClock?.cancel();
     _orderClock = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+        unawaited(widget.session.loadWorkspaceCommodityPriceAttention());
+      }
     });
   }
 
@@ -4649,6 +4652,11 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     builder: (context, _) {
       final session = widget.session;
       _loadOperationalPositions();
+      if (session.workspaceCommodityPriceAttentionConfigured) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && identical(widget.session, session)) unawaited(session.loadWorkspaceCommodityPriceAttention());
+        });
+      }
       final periodEnd = _periodEnd;
       final periodStart = DateTime(_today.year, _today.month, _today.day - _periodDays + 1);
       final periodLabel = _periodDays == 1 ? 'today' : 'in last $_periodDays days';
@@ -4834,6 +4842,17 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
               p.stock > 0 && p.purchasePriceMinor <= 0).length : 0;
       final receiptPurchases = session.workspacePurchases.where(_homeReceiptNeedsReview).toList();
       final stockAlerts = <_OperatingAttention>[
+        if (session.workspaceCommodityPriceAttentionProducts.isNotEmpty)
+          _OperatingAttention(id: 'commodity-price-refresh',
+            title: '${productCount(session.workspaceCommodityPriceAttentionProducts.length)} · confirm trade prices',
+            detail: '${session.workspaceCommodityPriceAttentionProducts.take(3).map((p) => p.title).join(', ')}. Price validity is ending, confirmation is pending, or buyers have requested a refresh.',
+            action: 'Review trade prices in Stock', onTap: widget.onStock,
+            color: _OperatingPalette.warning, expanded: _expandedCategories.contains('stock')),
+        if (session.workspaceCommodityPriceAttentionError != null)
+          _OperatingAttention(id: 'commodity-price-check-unavailable', title: 'Trade price reminders need checking',
+            detail: session.workspaceCommodityPriceAttentionError!, action: 'Check price reminders',
+            onTap: () => unawaited(session.loadWorkspaceCommodityPriceAttention(force: true)),
+            color: _OperatingPalette.warning, expanded: _expandedCategories.contains('stock')),
         if (unavailable > 0)
           _OperatingAttention(id: 'unavailable',
             title: '${productCount(unavailable)} unavailable',
@@ -26161,6 +26180,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     text: widget.product.visualLabel,
   );
   late final _sellingFields = <String, TextEditingController>{
+    'priceChangesFrequently': TextEditingController(text: widget.product.wholesaleOffer?.priceValidityMinutes == null ? 'no' : 'yes'),
+    'priceValidityMinutes': TextEditingController(text: widget.product.wholesaleOffer?.priceValidityMinutes?.toString() ?? ''),
     'gstPercent': TextEditingController(text: widget.product.supplierGst?.percentageText ?? ''),
     'gstBasis': TextEditingController(text: widget.product.supplierGst?.basis.name ?? ''),
     'quantityPerPack': TextEditingController(
@@ -26971,6 +26992,35 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     ),
   );
 
+  Future<void> _confirmTradePrice() async {
+    if (_hasUnsavedEdits || widget.session.workspaceCatalogueListingBusy) return;
+    final trade = widget.product.wholesaleOffer;
+    if (trade?.enabled != true || trade?.valid != true) return;
+    var input = trade!.priceValidityMinutes?.toString() ?? '';
+    String? error;
+    final minutes = await showDialog<int>(context: context, builder: (dialogContext) => StatefulBuilder(
+      builder: (context, refresh) => AlertDialog(title: const Text('Confirm supplier price'),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('₹${workspacePriceInputFromMinor(trade.priceAtMinor(trade.minimumPacks))} per ${widget.product.pack} · minimum ${trade.minimumPacks} packs.'),
+          const SizedBox(height: 12),
+          const Text('Confirm that you will honour these saved trade prices and quantity tiers for the period below.'),
+          const SizedBox(height: 12),
+          TextFormField(key: const Key('work-confirm-price-minutes'), initialValue: input,
+            keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Honour price for (minutes)', errorText: error),
+            onChanged: (value) { input = value; if (error != null) refresh(() => error = null); }),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          FilledButton(key: const Key('work-confirm-price-submit'), onPressed: () {
+            final parsed = int.tryParse(input.trim());
+            if (parsed == null || parsed < 1 || parsed > 525600) { refresh(() => error = 'Enter whole minutes from 1 to 525600.'); return; }
+            Navigator.pop(dialogContext, parsed);
+          }, child: const Text('Confirm price'))],
+      )));
+    if (minutes == null || !mounted || !_reviewEditorCurrent) return;
+    await widget.session.confirmWorkspaceCommodityPrice(widget.product.id, validityMinutes: minutes);
+    if (mounted) setState(() {});
+  }
+
   Widget _supplierGstFields() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
@@ -27345,6 +27395,14 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                               ),
                             if (_wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null)
                               _productSubmissionControls(),
+                            if (_wasOwned && widget.product.wholesaleOffer?.enabled == true && widget.purchaseScope == null &&
+                                widget.importRow == null && widget.onDraftReviewed == null) ...[
+                              TextButton.icon(key: const Key('work-product-confirm-trade-price'),
+                                onPressed: _hasUnsavedEdits || _savingInventory || widget.session.workspaceCatalogueListingBusy
+                                  ? null : _confirmTradePrice,
+                                icon: const Icon(Icons.price_check), label: const Text('Confirm current trade price')),
+                              if (_hasUnsavedEdits) const Text('Save your changes before confirming the public price.'),
+                            ],
                           ],
                           leading: StoreProductThumbnail(
                             product: product,
@@ -27467,6 +27525,15 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                   'bulk': 'Bulk supply',
                                 },
                               ),
+                              const SizedBox(height: 10),
+                              _sellingChoice('priceChangesFrequently', 'Does this price change frequently?',
+                                const {'no': 'No', 'yes': 'Yes'}),
+                              if (_sellingFields['priceChangesFrequently']!.text == 'yes') ...[
+                                const SizedBox(height: 10),
+                                _field('priceValidityMinutes', 'work-product-price-validity', 'Honour price for (minutes)',
+                                  _sellingFields['priceValidityMinutes']!, numeric: true),
+                                const Text('Confirm the public price separately after saving. Saving this product does not renew its public price.'),
+                              ],
                               const SizedBox(height: 6),
                               const Text(
                                 'Choose the offer type, not the delivery vehicle. Required before publishing.',

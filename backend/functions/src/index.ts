@@ -2957,7 +2957,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "finishRetailerSetup" ||
         operation === "setRetailerAvailability" ||
         operation === "saveRetailerProduct" ||
-        operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" ||
+        operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || operation === 'confirmStoreCommodityPrice' || operation === 'requestPublicCommodityPriceRefresh' ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStoreCoupon" || operation === "saveStorePublicDetails" ||
         variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || stockOperation === "save" || catalogueProductionAction !== undefined ||
         ['request', 'offer', 'accept', 'withdraw'].includes(bulkQuoteAction ?? '') ||
@@ -2968,6 +2968,8 @@ export const moolSocialWorkspace = onRequest(
         "listStorePromotions", "readPublicStorePromotions", "readPublicPromotionDiscovery",
         "saveStoreCoupon", "readStoreCoupon", "listStoreCoupons", "reconcileStoreCoupon", "readPublicStoreCoupons", "readPublicStoreCouponSnapshot", "evaluateStoreCouponEligibility"].includes(operation);
       const catalogueOperation = ["saveStoreCatalogueSku", "bindReviewedStoreCatalogueSku",
+        'confirmStoreCommodityPrice', 'readStoreCommodityPrice', 'reconcileStoreCommodityPrice',
+        'requestPublicCommodityPriceRefresh',
         "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue", "readPublicCatalogueDiscovery",
         "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined || productMediaOperation || stockOperation !== undefined || catalogueProductionAction !== undefined;
       const orderMutation = operation === "acceptRetailerOrder" ||
@@ -3094,6 +3096,10 @@ export const moolSocialWorkspace = onRequest(
           ? await orders.readIdentity(ownerUserId, "seller", catalogueBody)
         : ["readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation)
         ? await workspaceCatalogueService().handleStorePublicDetails(ownerUserId, operation, catalogueBody)
+        : operation === 'requestPublicCommodityPriceRefresh'
+        ? await workspaceCatalogueService().requestCommodityRefresh(ownerUserId, catalogueBody)
+        : ['confirmStoreCommodityPrice', 'readStoreCommodityPrice', 'reconcileStoreCommodityPrice'].includes(operation)
+        ? await workspaceCatalogueService().handleCommodityPrice(ownerUserId, operation, catalogueBody)
         : operation === "reconcileStoreCatalogueBinding"
         ? await workspaceCatalogueService().reconcileBinding(ownerUserId, catalogueBody)
         : operation === "bindReviewedStoreCatalogueSku"

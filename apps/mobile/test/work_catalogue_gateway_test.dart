@@ -1143,8 +1143,21 @@ class _SessionFamilyCatalogue extends SessionCatalogue implements WorkspaceVaria
       {required bool Function() current, bool reconcile = false}) => family.writeVariantFamily(original, current: current, reconcile: reconcile);
 }
 
-WorkspaceCatalogueItem listingItem() => WorkspaceCatalogueItem(
-  id: 'sku-one',
+class _CommodityAttentionCatalogue extends SessionCatalogue implements WorkspaceCommodityPriceGateway {
+  _CommodityAttentionCatalogue(this.head);
+  final WorkspaceCommodityPrice head;
+  final reads = <String>[];
+  @override String get realm => 'evaluation';
+  @override bool get commodityPriceReadbackSupported => true;
+  @override Future<WorkspaceCommodityPrice?> readCommodityPrice(String storeId, String skuId, {required bool Function() current}) async {
+    reads.add(skuId);
+    if (skuId != head.skuId) throw StateError('Host unpublished private SKU');
+    return current() ? head : null;
+  }
+}
+
+WorkspaceCatalogueItem listingItem([String id = 'sku-one']) => WorkspaceCatalogueItem(
+  id: id,
   canonicalId: 'canonical-one',
   categoryId: 'cooking-oil',
   brand: product.brand,
@@ -1175,7 +1188,7 @@ WorkspaceCatalogueItem listingItem() => WorkspaceCatalogueItem(
   ),
   stockEntry: WorkspaceStockEntry(
     method: WorkspaceStockEntryMethod.manual,
-    productId: 'sku-one',
+    productId: id,
     sku: 'HOST-ONE',
     pack: '1 L',
     stockMode: WorkspaceStockMode.exactQuantity,
@@ -1262,6 +1275,267 @@ class _StockSessionCatalogue extends SessionCatalogue implements WorkspaceStoreS
 const _bulkServiceCapture20261020 = r'''{"capturedAt":"2026-10-20T12:01:00.000Z","request":{"schemaVersion":1,"requestId":"request-one","storeId":"store-one","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10}]},"offer":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"offer-one","expectedRevision":1,"validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025}]},"accept":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"accept-one","expectedRevision":2},"created":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"supplierRequested":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"offered":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"accepted":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"recovered":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"request","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"request-one","requestFingerprint":"e61bc6284c6b771f90677f3376ecbb035236e77c2ba49d131f164ee30c75e974","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"recorded","agreement":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"proof":null},"unobserved":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"accept","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"never-accept","requestFingerprint":"9a47224ccf5ad2833db6eaff3e27e70983d53fb33c04c396a6016edc2da9557a","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"not_found","agreement":null,"proof":null},"buyerPage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"buyer","storeId":null,"currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","storeName":"Isolated Bulk supplier","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null},"storePage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"supplier","storeId":"store-one","currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","storeName":"Isolated Bulk supplier","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null}}''';
 
 void main() {
+  Map<String, dynamic> commodityCapture([String marker = 'LF_COMMODITY_PROJECTION=']) {
+    final lines = File(Platform.environment['LF_COMMODITY_LOG']!).readAsLinesSync().where((line) => line.startsWith(marker)).toList();
+    expect(lines, hasLength(1));
+    return jsonDecode(lines.single.substring(marker.length)) as Map<String, dynamic>;
+  }
+  WorkspacePublicCatalogueEntry commodityEntry(Map<String, dynamic> data, DateTime clock, {BuyV2OfferClass channel = BuyV2OfferClass.bulk}) =>
+    WorkspacePublicCatalogueEntry.fromResponse(data, storeId: 'store-one', realm: 'evaluation', channel: channel,
+      now: clock, commodityPriceReadbackSupported: true);
+  test('LF-COMMODITY shared Retail content accepts sibling trade revisions and rejects rollback', () {
+    final capture = commodityCapture('LF_COMMODITY_SHARED_PROJECTION='), owner = Object();
+    final clock = DateTime.utc(2026, 10, 16, 12, 10);
+    final before = commodityEntry(capture['before'] as Map<String, dynamic>, clock, channel: BuyV2OfferClass.retail);
+    final after = commodityEntry(capture['after'] as Map<String, dynamic>, clock, channel: BuyV2OfferClass.retail);
+    final reader = WorkspaceCatalogueReadback(gateway: const UnavailableWorkspaceCatalogueGateway(), context: () => owner, now: () => clock);
+    addTearDown(reader.dispose);
+    reader.admitPublicEntry(before, expectedContext: owner);
+    expect(reader.displayedProduct(before.product)?.content.state, BuyV2ProductContentState.ready);
+    reader.admitPublicEntry(after, expectedContext: owner);
+    expect(reader.displayedProduct(after.product)?.content.state, BuyV2ProductContentState.ready);
+    expect(before.product.priceMinor, after.product.priceMinor);
+    reader.admitPublicEntry(before, expectedContext: owner);
+    expect(reader.displayedProduct(before.product), isNull);
+    final bulk = commodityEntry(capture['expiredRetail'] as Map<String, dynamic>, DateTime.utc(2026, 10, 16, 13, 30));
+    expect(bulk.product.priceMinor, 10215);
+    expect(bulk.product.packTerms!.pricingCurrentAt(DateTime.utc(2026, 10, 16, 13, 30)), isTrue);
+  }, skip: Platform.environment['LF_COMMODITY_LOG'] == null);
+  for (final reversed in [false, true]) {
+    test('LF-COMMODITY private SKU does not suppress verified supplier reminders reversed=$reversed', () async {
+      final capture = commodityCapture(), clock = DateTime.utc(2026, 10, 16, 14, 20);
+      final head = WorkspaceCommodityPrice.decode(capture['confirmation'], 'evaluation', 'store-one', 'sku-one', clock,
+        refreshRequested: true);
+      final source = _CommodityAttentionCatalogue(head), work = listingSession(source, BindingStore());
+      addTearDown(work.dispose);
+      final saved = listingItem().copyWith(wholesaleOffer: WorkspaceWholesaleOffer(priceMinor: 10025,
+        minimumPacks: 1, enabled: true, saleType: BuyV2WholesaleSaleType.bulk, priceValidityMinutes: 120));
+      final privateItem = listingItem('private-sku').copyWith(wholesaleOffer: saved.wholesaleOffer);
+      work.workspaceCatalogueItems..clear()..addAll(reversed ? [privateItem, saved] : [saved, privateItem]);
+      await work.loadWorkspaceCommodityPriceAttention(force: true);
+      expect(source.reads, reversed ? ['private-sku', 'sku-one'] : ['sku-one', 'private-sku']);
+      expect(work.workspaceCommodityPriceAttentionProducts.map((p) => p.id), ['sku-one']);
+      expect(work.workspaceCommodityPriceAttentionError, contains('Some supplier prices'));
+    }, skip: Platform.environment['LF_COMMODITY_LOG'] == null);
+  }
+  test('LF-COMMODITY original confirmation journal survives unknown response and reconciles without resending', () async {
+    final capture = commodityCapture(), clock = DateTime.utc(2026, 10, 16, 12, 10), owner = Object();
+    final owned = WorkspaceCatalogueOwnedSku.decode(capture['owned'], storeId: 'store-one', skuId: 'sku-one', now: clock, realm: 'evaluation');
+    final original = WorkspaceCatalogueBindingIntent(accountId: 'owner-one', realm: 'evaluation', storeId: 'store-one',
+      sku: owned.input, expectedRevision: 0, idempotencyKey: 'confirm-one', priceConfirmation: capture['command'] as Map<String, dynamic>);
+    final operations = <String>[], credentials = Credentials();
+    final gateway = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      realm: 'evaluation', ownerAccountId: 'owner-one', commodityPriceReadbackSupported: true, now: () => clock,
+      credentials: credentials, transport: OwnerTransport((body) async {
+        operations.add(body['operation'] as String);
+        if (body['operation'] == 'confirmStoreCommodityPrice') throw StateError('Host response lost after dispatch');
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+          'schemaVersion': 1, 'realm': 'evaluation', 'storeId': 'store-one', 'skuId': 'sku-one',
+          'operation': 'reconcileStoreCommodityPrice', 'record': capture['confirmation'], 'orderingAvailable': false}}));
+      }));
+    const scope = (account: 'owner-one', store: 'store-one', realm: 'evaluation');
+    final journal = BindingStore();
+    final first = WorkspaceCatalogueListingController(scope: scope, gateway: gateway, pendingStore: journal, context: () => owner);
+    expect((await first.submit(original, inputCurrent: () => true)).state, WorkspaceCatalogueBindingState.unknown);
+    journal.saved = WorkspaceCatalogueBindingIntent.fromJson(jsonDecode(jsonEncode(journal.saved!.toJson())));
+    expect(journal.saved!.isPriceConfirmation, isTrue); first.dispose();
+    final restored = WorkspaceCatalogueListingController(scope: scope, gateway: gateway, pendingStore: journal, context: () => owner);
+    addTearDown(restored.dispose);
+    expect(await restored.restore(), isTrue);
+    final recovered = await restored.reconcile();
+    expect(recovered.state, WorkspaceCatalogueBindingState.saved);
+    expect(recovered.priceConfirmation!.confirmedAt, DateTime.utc(2026, 10, 16, 12));
+    expect(journal.saved, isNull);
+    expect(operations, ['confirmStoreCommodityPrice', 'reconcileStoreCommodityPrice']);
+  }, skip: Platform.environment['LF_COMMODITY_LOG'] == null);
+  test('LF-COMMODITY null GST retains original confirmation and price on payment and procurement restart', () async {
+    final value = commodityEntry(commodityCapture()['current'] as Map<String, dynamic>, DateTime.utc(2026, 10, 16, 12, 10)).product;
+    expect(value.packTerms!.supplierTaxDeclaration, isNull);
+    const address = BuyV2Address(id: 'commodity-host-home', kind: BuyV2AddressKind.home, label: 'Host', recipient: 'Host buyer',
+      phone: '9000000000', line: 'Host address', area: 'Host area', pinCode: '342003', landmark: '');
+    final request = BuyV2OrderPlacementRequest.minor(lines: [BuyV2CartLine(product: value, quantity: 1)], address: address,
+      paymentMethod: 'UPI', idempotencyKey: 'commodity-original', totalMinor: 10025, amountDueNowMinor: 10025,
+      checkoutQuoteId: 'host-price-quote');
+    final payment = BuyV2CheckoutGroupAttempt(request: request, fulfilmentKeys: const {'host-price-fulfilment'},
+      obligations: [BuyV2CheckoutFulfilmentObligation(fulfilmentKey: 'host-price-fulfilment', productIds: {value.id}, totalMinor: 10025, dueNowMinor: 10025)],
+      state: BuyV2CheckoutSubmissionState.paymentUnknown, paymentReference: 'host-price-reference');
+    final preferences = _ExactMoneyHostPreferences();
+    BuyV2SharedPreferencesCustomerStateStore fresh() => BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'commodity-original-owner');
+    expect(await fresh().write(BuyV2CustomerStateSnapshot(checkoutIdempotencyKey: request.idempotencyKey,
+      legacyCheckoutAttempt: BuyV2LegacyCheckoutAttempt(ownerScope: 'commodity-original-owner', payment: payment),
+      procurementDraft: BuyV2ProcurementDraftSnapshot(ownerScope: 'commodity-original-owner', cartProducts: {value.id: value}))), isTrue);
+    final restored = (await fresh().read())!;
+    for (final retained in [restored.legacyCheckoutAttempt!.payment.request.lines.single.product,
+      restored.procurementDraft!.cartProducts[value.id]!]) {
+      expect(retained.packTerms!.toRetainedJson(), value.packTerms!.toRetainedJson());
+      expect(retained.priceMinor, 10025);
+    }
+    expect(restored.legacyCheckoutAttempt!.payment.request.amountDueNowMinor, 10025);
+    expect(commodityEntry(commodityCapture()['decreased'] as Map<String, dynamic>, DateTime.utc(2026, 10, 16, 12, 10)).product.priceMinor, 9815);
+  }, skip: Platform.environment['LF_COMMODITY_LOG'] == null);
+  test('LF-COMMODITY Cart rechecks increases and decreases and retains the basket on expired prices', () async {
+    final capture = commodityCapture(), clock = DateTime.utc(2026, 10, 16, 12, 10);
+    final first = commodityEntry(capture['current'] as Map<String, dynamic>, clock).product;
+    final source = _ExactMoneyHostCatalogue()..rows.add(first), core = BuySession();
+    late final BuyV2Session session;
+    session = BuyV2Session(core: core, cataloguePageSource: source, reviewDataEnabled: false, catalogueNow: () => clock,
+      commerceAdapter: _HostCouponCartCommerce([first]),
+      productFactsAdapter: _HostOperationalFacts((product) => BuyV2ProductFactsSnapshot(productId: product.id,
+        priceMinor: product.priceMinor, deliveryPromise: 'Host courier fixture', partner: 'Host courier fixture',
+        orderabilityLabel: 'Host checked availability', sourceId: 'isolated-host-commodity-facts', observedAt: clock,
+        eligibility: BuyV2OfferEligibility(productId: product.id, storeId: product.storeId!, sourceRevision: 'host-only-commodity-v1',
+          customerLocationKey: session.eligibilityLocationKey, observedAt: clock, expiresAt: clock.add(const Duration(hours: 1)),
+          offerClass: product.offerClass!, channelEnabled: true, storeReady: true, fleetAvailable: false,
+          customerLocationConfirmed: true, options: {BuyV2DeliveryOption.courier}))));
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    await session.restoreCommerce();
+    expect(session.addProduct(first.id, quantity: 1), isTrue, reason: session.notice);
+    expect(session.hasSupplierQuoteProducts, isFalse);
+    expect(session.supplierQuoteReviewRequired, isFalse);
+    expect(session.checkoutQuoteRequired, isTrue);
+    expect(session.checkoutQuoteReviewRequired, isTrue);
+    expect(await session.refreshCheckoutQuote(), isFalse);
+    expect(session.checkoutQuoteMessage, contains('Final charges'));
+    expect(session.checkoutTotalMinor, 10025);
+    for (final (key, amount) in [('increased', 10215), ('decreased', 9815)]) {
+      source.rows[0] = commodityEntry(capture[key] as Map<String, dynamic>, clock).product;
+      expect(await session.refreshCommodityPricesInCart(), isFalse);
+      expect(session.checkoutPriceReviewRequired, isTrue);
+      expect(session.checkoutPriceChanges.single.currentPriceMinor, amount);
+      expect(session.cartLines.single.quantity, 1);
+      expect(session.cartLines.single.product.priceMinor, amount);
+      session.acceptCheckoutPriceChanges();
+    }
+    source.rows.clear();
+    expect(await session.refreshCommodityPricesInCart(), isFalse);
+    expect(session.cartLines.single.product.priceMinor, 9815);
+    expect(session.cartLines.single.quantity, 1);
+  }, skip: Platform.environment['LF_COMMODITY_LOG'] == null);
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF-COMMODITY public grid freshness fits compact viewport scale=$scale and expires', (tester) async {
+      final capture = commodityCapture();
+      var clock = DateTime.utc(2026, 10, 16, 12, 10);
+      final entry = commodityEntry(capture['current'] as Map<String, dynamic>, clock);
+      final core = BuySession(), session = BuyV2Session(core: BuySession(), reviewDataEnabled: false, catalogueNow: () => clock);
+      addTearDown(core.dispose); addTearDown(session.core.dispose); addTearDown(session.dispose);
+      tester.view.physicalSize = const Size(320, 800); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+        home: Scaffold(body: SingleChildScrollView(child: BuyV2ProgressiveProductGrid(session: session, products: [entry.product],
+          storageKey: 'host-commodity-grid', semanticLabel: 'Host commodity grid', fitSmallCatalogue: true)))));
+      await tester.pumpAndSettle();
+      expect(find.text('Price confirmed 10 min ago'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      clock = DateTime.utc(2026, 10, 16, 14, 20);
+      await tester.pump(const Duration(minutes: 1));
+      expect(find.textContaining('Price confirmation pending'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }, skip: Platform.environment['LF_COMMODITY_LOG'] == null);
+  }
+  testWidgets('LF-COMMODITY expired refresh recovers from failure and fences responses from a previous revision', (tester) async {
+    final capture = commodityCapture(), clock = DateTime.utc(2026, 10, 16, 14, 20);
+    final first = commodityEntry(capture['current'] as Map<String, dynamic>, clock).product;
+    final next = commodityEntry(capture['increased'] as Map<String, dynamic>, clock).product;
+    final pending = Completer<bool>();
+    int calls = 0;
+    Future<bool> request() { calls++; return calls == 1 ? Future<bool>.error(StateError('Host offline')) : pending.future; }
+    Future<void> render(BuyV2Product product) => tester.pumpWidget(MaterialApp(home: Scaffold(
+      body: BuyV2PriceFreshness(product: product, now: () => clock, onRequestRefresh: request))));
+    await render(first);
+    await tester.tap(find.text('Ask supplier to refresh price')); await tester.pump();
+    expect(find.textContaining('Price refresh request not confirmed'), findsOneWidget);
+    await tester.tap(find.text('Ask supplier to refresh price')); await tester.pump();
+    expect(find.text('Requesting price refresh…'), findsOneWidget);
+    await render(next); await tester.pump();
+    expect(find.text('Ask supplier to refresh price'), findsOneWidget);
+    pending.complete(true); await tester.pump();
+    expect(find.text('Price refresh requested'), findsNothing);
+    expect(find.text('Ask supplier to refresh price'), findsOneWidget);
+    expect(calls, 2); expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, skip: Platform.environment['LF_COMMODITY_LOG'] == null);
+  test('LF-COMMODITY Store and discovery promotions accept reconfirmed prices and reject rollback', () async {
+    final capture = commodityCapture(), clock = DateTime.utc(2026, 10, 16, 12, 10);
+    var after = false;
+    final gateway = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      realm: 'evaluation', ownerAccountId: 'buyer-one', commodityPriceReadbackSupported: true, productFactsReadbackSupported: true,
+      unbrandedProduceReadbackSupported: true, storeClassificationReadbackSupported: true, promotionDiscoverySupported: true,
+      now: () => clock, credentials: Credentials(), transport: OwnerTransport((body) async {
+        expect(body['commodityPriceReadbackVersion'], 1);
+        final suffix = after ? 'After' : 'Before';
+        final discovery = capture['discovery$suffix'] as Map<String, dynamic>;
+        final data = switch (body['operation']) {
+          'readPublicStorePromotions' => capture['promotion$suffix'],
+          'readPublicPromotionDiscovery' => discovery,
+          'readPublicStoreCatalogue' => (discovery['items'] as List).single['listing'],
+          _ => throw StateError('Unexpected host read ${body['operation']}'),
+        };
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      }));
+    final store = WorkspaceStoreCatalogueSource(gateway: gateway, storeId: 'store-one', current: () => true);
+    final discovery = WorkspacePublicDiscoverySource(gateway: gateway, current: () => true);
+    addTearDown(discovery.dispose);
+    final query = BuyV2CatalogueQuery(regionId: null, destination: BuyV2Destination.shop,
+      areaScope: BuyV2CatalogueAreaScope.allAreas, offersOnly: true);
+    for (final increased in [false, true]) {
+      after = increased;
+      expect((await store.loadStoreOffers(storeId: 'store-one', destination: BuyV2Destination.wholesale)).single.product.priceMinor,
+        increased ? 10215 : 10025);
+      expect((await discovery.loadOffers(query, pageSize: 20)).items.single.product.priceMinor, increased ? 10215 : 10025);
+    }
+    after = false;
+    await expectLater(store.loadStoreOffers(storeId: 'store-one', destination: BuyV2Destination.wholesale), throwsFormatException);
+    await expectLater(discovery.loadOffers(query, pageSize: 20), throwsFormatException);
+  }, skip: Platform.environment['LF_COMMODITY_LOG'] == null);
+  test('LF-COMMODITY real persisted public prices decode with readable expiry and retained confirmation identity', () {
+    final path = Platform.environment['LF_COMMODITY_LOG']!;
+    final markers = File(path).readAsLinesSync().where((line) => line.startsWith('LF_COMMODITY_PROJECTION=')).toList();
+    expect(markers, hasLength(1));
+    final capture = jsonDecode(markers.single.substring('LF_COMMODITY_PROJECTION='.length)) as Map;
+    WorkspacePublicCatalogueEntry decode(Map<String, dynamic> data, DateTime clock, {bool supported = true}) =>
+      WorkspacePublicCatalogueEntry.fromResponse(data, storeId: 'store-one', realm: 'evaluation',
+        channel: BuyV2OfferClass.bulk, now: clock, commodityPriceReadbackSupported: supported);
+    final data = Map<String, dynamic>.from(capture['current'] as Map);
+    final entry = decode(data, DateTime.utc(2026, 10, 16, 12, 10));
+    expect(entry.product.priceMinor, 10025);
+    final terms = entry.product.packTerms!;
+    expect(terms.priceObservedAt, DateTime.utc(2026, 10, 16, 12));
+    expect(terms.commodityPriceRevision, 1);
+    expect(terms.priceFreshnessLabel(DateTime.utc(2026, 10, 16, 12, 10)), 'Price confirmed 10 min ago');
+    expect(BuyV2PackTerms.fromRetainedJson(terms.toRetainedJson())!.toRetainedJson(), terms.toRetainedJson());
+    expect(() => decode(data, DateTime.utc(2026, 10, 16, 12, 10), supported: false), throwsFormatException);
+    final expired = decode(Map<String, dynamic>.from(capture['expired'] as Map), DateTime.utc(2026, 10, 16, 14, 20));
+    expect(expired.product.packTerms!.pricingCurrentAt(DateTime.utc(2026, 10, 16, 14, 20)), isFalse);
+    expect(expired.product.packTerms!.priceFreshnessLabel(DateTime.utc(2026, 10, 16, 14, 20)), startsWith('Price confirmation pending'));
+    expect(expired.readback.content.state, BuyV2ProductContentState.ready);
+    final corrupt = jsonDecode(jsonEncode(data)) as Map<String, dynamic>;
+    ((corrupt['items'] as List).single['channels'] as List).single['priceConfirmation']['confirmedAt'] = '2026-10-16T12:11:00.000Z';
+    expect(() => decode(corrupt, DateTime.utc(2026, 10, 16, 12, 10)), throwsFormatException);
+  }, skip: Platform.environment['LF_COMMODITY_LOG'] == null);
+  test('LF-COMMODITY supplier validity survives edit and saved inventory without a fabricated confirmation', () {
+    final fields = <String, String>{'sellingChannels': 'wholesale', 'wholesaleSaleType': 'bulk',
+      'wholesalePrice': '100.25', 'priceChangesFrequently': 'yes', 'priceValidityMinutes': '120'};
+    final offer = WorkspaceSellingInputs.parse(fields).wholesale!;
+    expect(offer.toJson()['priceRefresh'], {'version': 1, 'validityMinutes': 120});
+    expect(offer.toJson().containsKey('confirmedAt'), isFalse);
+    final restored = WorkspaceWholesaleOffer.fromJson(offer.toJson())!;
+    expect(WorkspaceSellingInputs.parse({'wholesalePrice': '102.15'}, existingWholesale: restored)
+      .wholesale!.toJson()['priceRefresh'], offer.toJson()['priceRefresh']);
+    expect(WorkspaceSellingInputs.parse({'priceChangesFrequently': 'no'}, existingWholesale: restored)
+      .wholesale!.toJson().containsKey('priceRefresh'), isFalse);
+  });
+  test('LF-COMMODITY frequent prices require a supplier stated positive whole minute validity', () {
+    for (final duration in ['', '0', '-1', '1.5', '999999999999999999']) {
+      expect(() => WorkspaceSellingInputs.parse({'sellingChannels': 'wholesale',
+        'wholesalePrice': '100', 'priceChangesFrequently': 'yes', 'priceValidityMinutes': duration}),
+        throwsFormatException, reason: duration);
+    }
+    expect(() => WorkspaceWholesaleOffer.fromJson({'priceRupees': 100, 'minimumPacks': 1,
+      'incrementPacks': 1, 'enabled': true, 'tiers': [],
+      'priceRefresh': {'version': 1, 'validityMinutes': 0}}), throwsFormatException);
+  });
   // Captured from the actual isolated Firestore/service journey, not phone data.
   Map<String, dynamic> bulkCapture() {
     const path = String.fromEnvironment('LF_BULK_CLIENT_CAPTURE');
@@ -6066,6 +6340,13 @@ void main() {
     expect(s.checkoutQuote!.totalMinor, 90274); expect(adapter.supplierCalls, 1);
     expect(adapter.minorCalls + adapter.storeCalls + adapter.legacyCalls, 0);
     final selection = s.selectedSupplierQuotes.single, copy = selection.toJson(); copy['merchandiseMinor'] = 1;
+    if (Platform.environment['LF_COMMODITY_LOG'] != null) {
+      final direct = commodityEntry(commodityCapture()['current'] as Map<String, dynamic>, DateTime.utc(2026, 10, 16, 12, 10))
+        .product.copyWith(id: 'direct-host-product');
+      expect(selection.matchesLines([...s.cartLines, BuyV2CartLine(product: direct, quantity: 1)]), isTrue);
+      expect(selection.matchesLines([...s.cartLines,
+        BuyV2CartLine(product: host.product.copyWith(id: 'unquoted-legacy-product'), quantity: 10)]), isFalse);
+    }
     expect(selection.merchandiseMinor, 90010); expect(() => selection.lines.single['quantity'] = 1, throwsUnsupportedError);
     final saved = await s.customerStateStore!.read(); expect(saved!.supplierQuoteSelections['store-one']!.quoteBinding, selection.quoteBinding);
     for (final mode in ['missing', 'wrong', 'extra', 'too-long']) {

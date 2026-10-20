@@ -2452,13 +2452,59 @@ abstract interface class WorkspaceCatalogueOwnerGateway {
     required bool Function() current,
   });
 }
+abstract interface class WorkspaceCommodityPriceGateway {
+  bool get commodityPriceReadbackSupported;
+  Future<WorkspaceCommodityPrice?> readCommodityPrice(String storeId, String skuId, {required bool Function() current});
+}
+
+class WorkspaceCommodityPrice {
+  WorkspaceCommodityPrice._(this._encoded, {this.refreshRequested = false});
+  final String _encoded;
+  final bool refreshRequested;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  int get revision => toJson()['revision'] as int;
+  String get skuId => toJson()['skuId'] as String;
+  DateTime get confirmedAt => _time(toJson()['confirmedAt']);
+  DateTime get validUntil => _time(toJson()['validUntil']);
+  String get channel => toJson()['channel'] as String;
+  static WorkspaceCommodityPrice decode(Object? raw, String realm, String storeId, String skuId, DateTime now, {bool refreshRequested = false}) {
+    final r = _map(raw);
+    _keys(r, ['schemaVersion', 'realm', 'storeId', 'skuId', 'channel', 'revision', 'skuRevision',
+      'baseFingerprint', 'confirmedBy', 'confirmedAt', 'validUntil', 'frequent', 'terms', 'integrity']);
+    if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['realm'] != realm || r['storeId'] != storeId ||
+        r['skuId'] != skuId || !{'wholesale', 'bulk'}.contains(r['channel']) || r['frequent'] is! bool ||
+        r['baseFingerprint'] is! String || !RegExp(r'^[A-F0-9]{64}$').hasMatch(r['baseFingerprint'] as String) ||
+        _time(r['confirmedAt']).isAfter(now.toUtc()) || !_time(r['validUntil']).isAfter(_time(r['confirmedAt'])) ||
+        r['integrity'] != _catalogueHash(Map<String, dynamic>.of(r)..remove('integrity'))) throw const FormatException();
+    _id(r['confirmedBy']); _int(r['revision'], 1, 1000000000); _int(r['skuRevision'], 1, 1000000000);
+    final t = _map(r['terms']);
+    _keys(t, ['kind', 'offerId', 'priceMinor', 'mrpMinor', 'minimumOrder', 'quantityStep', 'tiers', if (t.containsKey('supplierTax')) 'supplierTax']);
+    if (t['kind'] != r['channel']) throw const FormatException();
+    _id(t['offerId']); final price = _int(t['priceMinor']); _int(t['minimumOrder']); _int(t['quantityStep']);
+    if (t['mrpMinor'] != null) _int(t['mrpMinor'], price);
+    for (final raw in _list(t['tiers'], 20)) { final tier = _map(raw); _keys(tier, ['minimumQuantity', 'unitPriceMinor']);
+      _int(tier['minimumQuantity']); _int(tier['unitPriceMinor']); }
+    return WorkspaceCommodityPrice._(jsonEncode(r), refreshRequested: refreshRequested);
+  }
+  bool matches(WorkspaceCatalogueBindingIntent original) {
+    if (!original.isPriceConfirmation) return false;
+    final r = toJson(), q = original.body;
+    final channel = _list(original.sku['channels'], 2).map(_map).where((c) => c['kind'] == q['channel']).firstOrNull;
+    return channel != null && r['realm'] == original.realm && r['storeId'] == original.storeId &&
+      r['skuId'] == original.skuId && r['confirmedBy'] == original.accountId && r['skuRevision'] == q['skuRevision'] &&
+      r['revision'] == original.expectedRevision + 1 && r['frequent'] == q['frequent'] &&
+      validUntil.difference(confirmedAt) == Duration(minutes: q['validityMinutes'] as int) &&
+      jsonEncode(_sorted(r['terms'])) == jsonEncode(_sorted({...channel, 'priceMinor': q['priceMinor'], 'tiers': q['tiers']}));
+  }
+}
 
 enum WorkspaceCatalogueBindingState { saved, notSent, rejected, unknown }
 
 class WorkspaceCatalogueBindingResult {
-  const WorkspaceCatalogueBindingResult(this.state, {this.saved});
+  const WorkspaceCatalogueBindingResult(this.state, {this.saved, this.priceConfirmation});
   final WorkspaceCatalogueBindingState state;
   final WorkspaceCatalogueOwnedSku? saved;
+  final WorkspaceCommodityPrice? priceConfirmation;
   // A saved mirror or recovered receipt never authorizes current publication.
   bool get publicationConfirmed => false;
 }
@@ -2550,9 +2596,11 @@ class WorkspaceCatalogueBindingIntent {
     required this.idempotencyKey,
     required Map<String, dynamic> sku,
     Map<String, dynamic>? reviewCandidate,
+    Map<String, dynamic>? priceConfirmation,
     this.reviewedSource,
     this.reviewedMedia,
-  }) : _encodedSku = jsonEncode(sku), _encodedReviewCandidate = reviewCandidate == null ? null : jsonEncode(reviewCandidate) {
+  }) : _encodedSku = jsonEncode(sku), _encodedReviewCandidate = reviewCandidate == null ? null : jsonEncode(reviewCandidate),
+       _encodedPriceRequest = priceConfirmation == null ? null : jsonEncode(priceConfirmation) {
     _id(accountId);
     if (!{'production', 'evaluation'}.contains(realm)) {
       throw const FormatException();
@@ -2561,6 +2609,17 @@ class WorkspaceCatalogueBindingIntent {
     _id(idempotencyKey);
     _int(expectedRevision, 0, 1000000000);
     _ownerSkuInput(_map(jsonDecode(_encodedSku)), storeId);
+    if (_encodedPriceRequest != null) {
+      final p = _map(jsonDecode(_encodedPriceRequest));
+      _keys(p, ['storeId', 'skuId', 'channel', 'skuRevision', 'expectedRevision', 'idempotencyKey',
+        'frequent', 'validityMinutes', 'priceMinor', 'tiers']);
+      if (p['storeId'] != storeId || p['skuId'] != skuId || p['expectedRevision'] != expectedRevision ||
+          p['idempotencyKey'] != idempotencyKey || !{'wholesale', 'bulk'}.contains(p['channel']) || p['frequent'] is! bool ||
+          reviewCandidate != null || reviewedSource != null || reviewedMedia != null) throw const FormatException();
+      _int(p['skuRevision']); _int(p['validityMinutes'], 1, 525600); _int(p['priceMinor'], 1, 99999999900);
+      for (final raw in _list(p['tiers'], 20)) { final t = _map(raw); _keys(t, ['minimumQuantity', 'unitPriceMinor']);
+        _int(t['minimumQuantity']); _int(t['unitPriceMinor']); }
+    }
     if ((_encodedReviewCandidate == null) != (reviewedSource == null)) throw const FormatException();
     if (reviewedSource != null && (reviewedSource!.input.skuId != skuId || reviewedSource!.toJson()['submittedBy'] != accountId ||
         reviewedSource!.toJson()['realm'] != realm || reviewedSource!.toJson()['storeId'] != storeId)) { throw const FormatException(); }
@@ -2580,19 +2639,24 @@ class WorkspaceCatalogueBindingIntent {
   }
   final String accountId, realm, storeId, idempotencyKey, _encodedSku;
   final String? _encodedReviewCandidate;
+  final String? _encodedPriceRequest;
+  bool get isPriceConfirmation => _encodedPriceRequest != null;
   final WorkspaceProductSubmissionRecord? reviewedSource;
   final WorkspaceReviewedProductMediaProof? reviewedMedia;
   final int expectedRevision;
   Map<String, dynamic> get sku => _map(jsonDecode(_encodedSku));
   String get skuId => sku['skuId'] as String;
-  Map<String, Object?> get body => {
+  Map<String, Object?> get body => _encodedPriceRequest != null ? _map(jsonDecode(_encodedPriceRequest)) : {
     'storeId': storeId,
     'sku': sku,
     'expectedRevision': expectedRevision,
     'idempotencyKey': idempotencyKey,
     if (_encodedReviewCandidate != null) 'reviewCandidate': jsonDecode(_encodedReviewCandidate),
   };
-  Map<String, Object?> toJson() => {
+  Map<String, Object?> toJson() => isPriceConfirmation ? {
+    'schemaVersion': 4, 'accountId': accountId, 'realm': realm, 'storeId': storeId, 'sku': sku,
+    'expectedRevision': expectedRevision, 'idempotencyKey': idempotencyKey, 'priceConfirmation': body,
+  } : {
     'schemaVersion': _encodedReviewCandidate == null ? 1 : reviewedMedia == null ? 2 : 3,
     'accountId': accountId,
     'realm': realm,
@@ -2613,8 +2677,9 @@ class WorkspaceCatalogueBindingIntent {
       if (raw['schemaVersion'] == 2 || raw['schemaVersion'] == 3) 'reviewCandidate',
       if (raw['schemaVersion'] == 2 || raw['schemaVersion'] == 3) 'reviewedSource',
       if (raw['schemaVersion'] == 3) 'reviewedMedia',
+      if (raw['schemaVersion'] == 4) 'priceConfirmation',
     ]);
-    if (raw['schemaVersion'] is! int || !{1, 2, 3}.contains(raw['schemaVersion'])) throw const FormatException();
+    if (raw['schemaVersion'] is! int || !{1, 2, 3, 4}.contains(raw['schemaVersion'])) throw const FormatException();
     return WorkspaceCatalogueBindingIntent(
       accountId: _id(raw['accountId']),
       realm: _string(raw['realm']),
@@ -2622,6 +2687,7 @@ class WorkspaceCatalogueBindingIntent {
       expectedRevision: _int(raw['expectedRevision'], 0, 1000000000),
       idempotencyKey: _id(raw['idempotencyKey']),
       sku: _map(raw['sku']),
+      priceConfirmation: raw['schemaVersion'] == 4 ? _map(raw['priceConfirmation']) : null,
       reviewCandidate: raw['schemaVersion'] == 2 || raw['schemaVersion'] == 3 ? _map(raw['reviewCandidate']) : null,
       reviewedSource: raw['schemaVersion'] == 2 || raw['schemaVersion'] == 3 ? WorkspaceProductSubmissionRecord.decode(raw['reviewedSource'],
         (account: _id(raw['accountId']), store: _id(raw['storeId']), realm: _string(raw['realm']), sku: _id(_map(raw['sku'])['skuId'])),
@@ -2813,7 +2879,7 @@ class WorkspaceCatalogueListingController extends ChangeNotifier {
       );
     }
     final saved = result.saved;
-    final exact =
+    final exact = original.isPriceConfirmation ? result.priceConfirmation?.matches(original) == true :
         saved != null &&
         saved.realm == original.realm &&
         saved.storeId == original.storeId &&
@@ -2835,7 +2901,7 @@ class WorkspaceCatalogueListingController extends ChangeNotifier {
     }
     if (result.state == WorkspaceCatalogueBindingState.saved && exact && original.body.containsKey('reviewCandidate')) {
       final complete = completeReviewedBinding;
-      if (complete == null || !await complete(original, saved, () => _current(owner)).timeout(const Duration(seconds: 10)) || !_current(owner)) {
+      if (complete == null || saved == null || !await complete(original, saved, () => _current(owner)).timeout(const Duration(seconds: 10)) || !_current(owner)) {
         error = 'The reviewed listing result is kept. Finish restoring this product before another update.';
         return const WorkspaceCatalogueBindingResult(WorkspaceCatalogueBindingState.unknown);
       }
@@ -2871,6 +2937,9 @@ class WorkspaceCatalogueContentResult {
     this.policyFingerprint,
     this.publicOfferId,
     this.publicOfferRevision,
+    this.commodityPriceRevision,
+    this.commodityPriceFingerprint,
+    this.commercialBaseFingerprint,
   });
   final BuyV2ProductContentSnapshot content;
   final int? skuRevision, catalogueVersion;
@@ -2879,6 +2948,8 @@ class WorkspaceCatalogueContentResult {
   final int? policyRevision;
   final String? policyFingerprint;
   final String? publicOfferId, publicOfferRevision;
+  final int? commodityPriceRevision;
+  final String? commodityPriceFingerprint, commercialBaseFingerprint;
 }
 
 /// One channel of an exact-SKU public read. Never construct public products
@@ -2987,6 +3058,22 @@ String _catalogueBrand(Map<String, dynamic> content, {Map<String, dynamic>? read
   return brand;
 }
 
+Map<String, dynamic>? _commodityConfirmation(Map<String, dynamic> channel, Map<String, dynamic> data, DateTime now) {
+  if (!channel.containsKey('priceConfirmation')) return null;
+  final value = _map(channel['priceConfirmation']);
+  _keys(value, ['version', 'revision', 'confirmedAt', 'validUntil', 'frequent']);
+  final revision = _int(value['revision'], 1, 1000000000);
+  if (data['commodityPriceReadbackVersion'] is! int || data['commodityPriceReadbackVersion'] != 1 ||
+      value['version'] is! int || value['version'] != 1 || value['frequent'] is! bool ||
+      !{'wholesale', 'bulk'}.contains(channel['kind']) ||
+      channel['revision'] is! String || !RegExp('^commodity-$revision-[A-F0-9]{16}\$').hasMatch(channel['revision'] as String) ||
+      _time(value['confirmedAt']).isAfter(_time(data['observedAt'])) ||
+      _time(value['confirmedAt']).isAfter(now.toUtc()) ||
+      !_time(value['validUntil']).isAfter(_time(value['confirmedAt'])) ||
+      value['validUntil'] != channel['validUntil']) throw const FormatException('Supplier price confirmation is inconsistent.');
+  return value;
+}
+
 class WorkspacePublicCatalogueEntry {
   const WorkspacePublicCatalogueEntry({required this.product, required this.readback, this.publisherType});
   final BuyV2Product product;
@@ -3005,10 +3092,15 @@ class WorkspacePublicCatalogueEntry {
     required DateTime now,
     bool supplierPublishersVersionSupported = false,
     bool supplierTaxReadbackSupported = false,
+    bool commodityPriceReadbackSupported = false,
   }) {
     _checkSupplierPublishersReadback(data, supported: supplierPublishersVersionSupported);
     _checkProductFactsReadbackVersion(data);
     _checkProduceReadback(data);
+    if (data.containsKey('commodityPriceReadbackVersion') &&
+        (!commodityPriceReadbackSupported || data['commodityPriceReadbackVersion'] is! int || data['commodityPriceReadbackVersion'] != 1)) {
+      throw const FormatException('Supplier price confirmation is not connected.');
+    }
     if (data.containsKey('supplierTaxReadbackVersion') && !supplierTaxReadbackSupported) {
       throw const FormatException('Supplier tax readback is not connected.');
     }
@@ -3048,11 +3140,14 @@ class WorkspacePublicCatalogueEntry {
     if (amount % BigInt.from(count) != BigInt.zero) throw const FormatException();
     amount ~/= BigInt.from(count);
     if (amount <= BigInt.zero || amount > BigInt.from(9007199254740991)) throw const FormatException();
+    final confirmation = _commodityConfirmation(terms, data, now);
     final packTerms = BuyV2PackTerms(skuId: identity.listingId,
       revision: _id(terms['revision']), sellUnit: label, sourceLabel: label,
       containedUnits: count, netContentMilli: amount.toInt(), contentUnit: unit,
       quantityStep: _int(terms['quantityStep']), pricingStoreId: storeId,
-      priceObservedAt: _time(row['observedAt']), priceValidUntil: _time(terms['validUntil']),
+      priceObservedAt: confirmation == null ? _time(row['observedAt']) : _time(confirmation['confirmedAt']),
+      priceValidUntil: _time(terms['validUntil']),
+      commodityPriceRevision: confirmation?['revision'] as int?, priceChangesFrequently: confirmation?['frequent'] as bool?,
       supplierGst: gst, supplierTax: tax,
       pricesIncludeTax: gst == null && tax == null ? null :
         (gst?.basis ?? tax!.basis) == BuyV2SupplierTaxBasis.included,
@@ -3074,6 +3169,7 @@ class WorkspacePublicCatalogueEntry {
       deliveryPromise: '', origin: '', confirmedOn: '', visualLabel: '', visualKind: '',
       minimumOrder: _int(terms['minimumOrder']), offerClass: channel);
     final readback = _decode(data, product, realm, now.toUtc(), policyRequired: true,
+      commoditySupported: commodityPriceReadbackSupported,
       supplierPublishersSupported: supplierPublishersVersionSupported);
     if (readback.content.state != BuyV2ProductContentState.ready || !product.hasValidPackTerms) {
       throw const FormatException();
@@ -3146,7 +3242,7 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
     _checkStoreClassificationReadback(data, supported: gateway.storeClassificationReadbackSupported);
     if (gateway.storeClassificationReadbackSupported && data['storeClassificationReadbackVersion'] != 1) throw const FormatException();
     _checkSupplierPublishersReadback(data, supported: gateway.supplierPublishersVersionSupported);
-    _keys(Map<String, dynamic>.of(data)..remove('supplierPublishersVersion')..remove('storeClassificationReadbackVersion')..remove('storeDetailsReadbackVersion')..remove('supplierTaxReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'observedAt', 'orderingAvailable', 'state',
+    _keys(Map<String, dynamic>.of(data)..remove('supplierPublishersVersion')..remove('storeClassificationReadbackVersion')..remove('storeDetailsReadbackVersion')..remove('supplierTaxReadbackVersion')..remove('commodityPriceReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'observedAt', 'orderingAvailable', 'state',
       'catalogueVersion', 'publicStore', 'sourceId', 'revision', 'validUntil', 'memberships', 'family']);
     final now = gateway.now().toUtc(), observed = _time(data['observedAt']), expires = _time(data['validUntil']);
     if (data['schemaVersion'] is! int || data['schemaVersion'] != 1 || data['realm'] != gateway.realm ||
@@ -3243,13 +3339,15 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
         'coverage': 'verified_public_only', 'listingCoverage': 'complete', 'listingReadbackVersion': 1,
         'productFactsReadbackVersion': 1, 'mediaReadbackVersion': 1, 'unbrandedProduceReadbackVersion': 1,
         if (data.containsKey('supplierTaxReadbackVersion')) 'supplierTaxReadbackVersion': data['supplierTaxReadbackVersion'],
+        if (data.containsKey('commodityPriceReadbackVersion')) 'commodityPriceReadbackVersion': data['commodityPriceReadbackVersion'],
         if (data.containsKey('supplierPublishersVersion')) 'supplierPublishersVersion': data['supplierPublishersVersion'],
         if (data.containsKey('storeClassificationReadbackVersion')) 'storeClassificationReadbackVersion': data['storeClassificationReadbackVersion'],
         if (data.containsKey('storeDetailsReadbackVersion')) 'storeDetailsReadbackVersion': data['storeDetailsReadbackVersion'],
         'catalogueVersion': data['catalogueVersion'], 'publicStore': data['publicStore'], 'items': [row['product']], 'nextCursor': null},
         storeId: identity.storeId, realm: gateway.realm, channel: identity.channel, now: gateway.now().toUtc(),
         supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported,
-        supplierTaxReadbackSupported: gateway.supplierTaxReadbackSupported);
+        supplierTaxReadbackSupported: gateway.supplierTaxReadbackSupported,
+        commodityPriceReadbackSupported: gateway.commodityPriceReadbackSupported);
       if (!member.validFor(entry, gateway.realm, gateway.now().toUtc()) || member.familyId != previous.familyId ||
           products.any((p) => p.id == entry.product.id)) { throw const FormatException(); }
       products.add(entry.product.copyWith(variantFamilyId: member.familyId, variantAttributes: member.attributes));
@@ -3281,6 +3379,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
   String? _publicStoreName;
   int _promotionGeneration = 0;
   final _promotionHeads = <String, ({int revision, DateTime observed, String copy})>{};
+  final _promotionPrices = <String, WorkspaceCatalogueContentResult>{};
   int _couponGeneration = 0;
   final _couponHeads = <String, ({int revision, String? copy})>{};
   @override bool get storeCouponsActive => current() && gateway.storeCouponTermsSupported;
@@ -3443,7 +3542,9 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
       final data = _map(envelope['data']);
       _keys(data, ['schemaVersion', 'realm', 'storeId', 'observedAt', 'state', 'coverage',
         'orderingAvailable', 'items', 'nextCursor', if (gateway.promotionTermsSupported) 'promotionTermsVersion',
+        if (gateway.commodityPriceReadbackSupported) 'commodityPriceReadbackVersion',
         if (gateway.supplierPublishersVersionSupported) 'supplierPublishersVersion']);
+      if (gateway.commodityPriceReadbackSupported) _int(data['commodityPriceReadbackVersion'], 1, 1);
       _checkSupplierPublishersReadback(data, supported: gateway.supplierPublishersVersionSupported);
       if (gateway.promotionTermsSupported) _int(data['promotionTermsVersion'], 1, 1);
       final observed = _time(data['observedAt']), now = gateway.now().toUtc();
@@ -3485,7 +3586,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
         // content/price fact, and separately pin the governed term window. Never
         // manufacture the missing listings/envelope from a promotion payload.
         final actual = _checkedPromotionProduct(sku, entry, expiry);
-        final copy = jsonEncode([source, headline, detail, _sorted(actual), if (benefitTerms != null) benefitTerms.toJson()]);
+        final copy = jsonEncode([source, headline, detail, _promotionProductCopy(actual, entry), if (benefitTerms != null) benefitTerms.toJson()]);
         final head = (revision: revision, observed: itemObserved, copy: copy), old = _promotionHeads[id];
         if (old != null && (revision < old.revision || itemObserved.isBefore(old.observed) ||
             revision == old.revision && copy != old.copy)) { throw const FormatException(); }
@@ -3509,6 +3610,8 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
       throw const FormatException('Promotions could not be fully checked.');
     }
     // No high-water/cache admission from a partial, retired or expired traversal.
+    for (final entry in entries) { _checkPromotionPrice(_promotionPrices[entry.product.id], entry.readback); }
+    for (final entry in entries) { _promotionPrices[entry.product.id] = entry.readback; }
     _promotionHeads.addAll(heads);
     if (contentReadback != null && contentOwner != null) {
       for (final entry in entries) { contentReadback!.admitPublicEntry(entry, expectedContext: contentOwner); }
@@ -3585,7 +3688,8 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
         'items': [_map(item['row'])], 'nextCursor': null},
         storeId: storeId, realm: gateway.realm, channel: channel, now: gateway.now().toUtc(),
         supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported,
-        supplierTaxReadbackSupported: gateway.supplierTaxReadbackSupported);
+        supplierTaxReadbackSupported: gateway.supplierTaxReadbackSupported,
+        commodityPriceReadbackSupported: gateway.commodityPriceReadbackSupported);
       if (entry.product.destination != query.destination ||
           (query.wholesaleSaleType != null && channel.name != query.wholesaleSaleType!.name) ||
           (listingIds.isNotEmpty && !listingIds.contains(entry.product.id))) {
@@ -3680,6 +3784,21 @@ Map<String, dynamic> _checkedPromotionProduct(Map<String, dynamic> sku,
       _time(channelRow['validUntil']) != entry.product.packTerms?.priceValidUntil ||
       expiry.isAfter(entry.product.packTerms!.priceValidUntil!)) { throw const FormatException(); }
   return actual;
+}
+
+Object? _promotionProductCopy(Map<String, dynamic> actual, WorkspacePublicCatalogueEntry entry) =>
+  entry.readback.commercialBaseFingerprint == null ? _sorted(actual) :
+    [entry.readback.commercialBaseFingerprint, entry.product.publicListingIdentity?.channel.name];
+
+void _checkPromotionPrice(WorkspaceCatalogueContentResult? prior, WorkspaceCatalogueContentResult next) {
+  if (prior == null) return;
+  final confirmed = prior.commodityPriceRevision != null || next.commodityPriceRevision != null;
+  if (next.skuRevision! < prior.skuRevision! || next.catalogueVersion! < prior.catalogueVersion! ||
+      next.skuRevision == prior.skuRevision && (confirmed
+        ? next.commercialBaseFingerprint != prior.commercialBaseFingerprint || next.commodityPriceRevision == null ||
+          next.commodityPriceRevision! < (prior.commodityPriceRevision ?? 0) ||
+          next.commodityPriceRevision == prior.commodityPriceRevision && next.commodityPriceFingerprint != prior.commodityPriceFingerprint
+        : next.fingerprint != prior.fingerprint)) throw const FormatException('Supplier price changed. Refresh this product.');
 }
 
 /// One authenticated account-generation's public discovery/content owner.
@@ -3980,6 +4099,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   late final WorkspaceCatalogueReadback _readback;
   final _stores = <String, WorkspaceStoreCatalogueSource>{};
   final _offerHeads = <String, ({int revision, DateTime observed, String copy})>{};
+  final _offerPrices = <String, WorkspaceCatalogueContentResult>{};
   final _offerCopies = <String, String>{};
   bool _closed = false;
   bool get active => !_closed && current();
@@ -4053,7 +4173,8 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
       final entry = WorkspacePublicCatalogueEntry.fromResponse(listing, storeId: storeId,
         realm: gateway.realm, channel: channels.single, now: gateway.now().toUtc(),
         supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported,
-        supplierTaxReadbackSupported: gateway.supplierTaxReadbackSupported);
+        supplierTaxReadbackSupported: gateway.supplierTaxReadbackSupported,
+        commodityPriceReadbackSupported: gateway.commodityPriceReadbackSupported);
       if (entry.product.destination != query.destination || ids.isNotEmpty && !ids.contains(entry.product.id) ||
           query.wholesaleSaleType != null && entry.product.offerClass?.name != query.wholesaleSaleType!.name) { throw const FormatException(); }
       final storeCopy = jsonEncode(_sorted(listing['publicStore']));
@@ -4113,7 +4234,9 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
       final data = _map(envelope['data']);
       _keys(data, ['schemaVersion', 'promotionDiscoveryVersion', 'realm', 'state', 'coverage', 'orderingAvailable',
         'observedAt', 'query', 'items', 'page', if (gateway.promotionTermsSupported) 'promotionTermsVersion',
+        if (gateway.commodityPriceReadbackSupported) 'commodityPriceReadbackVersion',
         if (gateway.supplierPublishersVersionSupported) 'supplierPublishersVersion']);
+      if (gateway.commodityPriceReadbackSupported) _int(data['commodityPriceReadbackVersion'], 1, 1);
       _checkSupplierPublishersReadback(data, supported: gateway.supplierPublishersVersionSupported);
       final publisherCoverage = [BuyV2OfferPublisherType.retailer,
         if (gateway.supplierPublishersVersionSupported) ...[BuyV2OfferPublisherType.wholesaler, BuyV2OfferPublisherType.manufacturer]];
@@ -4153,7 +4276,8 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
             !itemObserved.isBefore(expiry) || !now.isBefore(expiry)) { throw const FormatException(); }
         final entry = WorkspacePublicCatalogueEntry.fromResponse(listing, storeId: storeId, realm: gateway.realm, channel: channel, now: now,
           supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported,
-          supplierTaxReadbackSupported: gateway.supplierTaxReadbackSupported);
+          supplierTaxReadbackSupported: gateway.supplierTaxReadbackSupported,
+        commodityPriceReadbackSupported: gateway.commodityPriceReadbackSupported);
         if (entry.publisherType == null || publication['publisherType'] != entry.publisherType!.name ||
             !publisherCoverage.contains(entry.publisherType) || !query.acceptsOfferPublisher(entry.publisherType!)) {
           throw const FormatException();
@@ -4162,7 +4286,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
         final headline = _string(publication['headline'], 160), detail = _string(publication['detail'], 2000, true);
         _string(publication['publisherName'], 240);
         final identity = jsonEncode([gateway.realm, entry.publisherType!.name, storeId, id]),
-          copy = jsonEncode([source, headline, detail, _sorted(actual), if (benefitTerms != null) benefitTerms.toJson()]), old = _offerHeads[identity];
+          copy = jsonEncode([source, headline, detail, _promotionProductCopy(actual, entry), if (benefitTerms != null) benefitTerms.toJson()]), old = _offerHeads[identity];
         if (heads.containsKey(identity) || old != null && (revision < old.revision || itemObserved.isBefore(old.observed) || revision == old.revision && copy != old.copy)) throw const FormatException();
         heads[identity] = (revision: revision, observed: itemObserved, copy: copy);
         final key = '$snapshot:${entry.product.id}', productCopy = entry.readback.fingerprint!;
@@ -4192,11 +4316,14 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
       for (final entry in copies.entries) {
         if (_offerCopies[entry.key] case final known? when known != entry.value) throw const FormatException();
       }
+      for (final entry in enriched) { _checkPromotionPrice(_offerPrices[entry.product.id], entry.readback); }
+      for (final entry in enriched) { _offerPrices[entry.product.id] = entry.readback; }
       for (final admit in admissions) { admit(); }
       for (final entry in enriched) { _readback.admitPublicEntry(entry, expectedContext: this); }
       _offerHeads.addAll(heads); _offerCopies.addAll(copies);
       while (_offerCopies.length > 500) { _offerCopies.remove(_offerCopies.keys.first); }
       while (_offerHeads.length > 500) { _offerHeads.remove(_offerHeads.keys.first); }
+      while (_offerPrices.length > 500) { _offerPrices.remove(_offerPrices.keys.first); }
       return BuyV2CataloguePage(queryKey: query.key, snapshotId: snapshot, items: offers, startIndex: start, totalCount: total,
         previousCursor: previous, nextCursor: next, offerCoverage: BuyV2OfferCoverage(publisherCoverage));
     } finally {reading = false;}
@@ -4287,6 +4414,7 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
     supplierPublishersVersionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_PUBLISHERS_V1'),
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
     supplierTaxReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_TAX_V1'),
+    commodityPriceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_COMMODITY_PRICE_V1'),
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     storeCouponTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V1'),
@@ -4363,6 +4491,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
     supplierPublishersVersionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_PUBLISHERS_V1'),
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
     supplierTaxReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_TAX_V1'),
+    commodityPriceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_COMMODITY_PRICE_V1'),
   );
 }
 
@@ -4376,7 +4505,7 @@ bool _validEndpoint(Uri value) =>
     !value.hasPort;
 
 class AuthenticatedWorkspaceCatalogueGateway
-    implements WorkspaceCatalogueGateway, WorkspaceCatalogueOwnerGateway, WorkspacePublicProductGateway,
+    implements WorkspaceCatalogueGateway, WorkspaceCatalogueOwnerGateway, WorkspacePublicProductGateway, WorkspaceCommodityPriceGateway,
       WorkspacePublicDetailsOwnerGateway, WorkspaceVariantFamilyOwnerGateway, WorkspaceProductSubmissionOwnerGateway,
       WorkspaceReviewedProductSubmissionGateway, WorkspaceProductMediaGateway, WorkspaceStoreStockOwnerGateway, WorkspaceStoreStockPublicGateway {
   AuthenticatedWorkspaceCatalogueGateway({
@@ -4399,6 +4528,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.supplierPublishersVersionSupported = false,
     this.minorMoneyReadbackSupported = false,
     this.supplierTaxReadbackSupported = false,
+    this.commodityPriceReadbackSupported = false,
     this.promotionDiscoverySupported = false,
     this.promotionTermsSupported = false,
     this.storeCouponTermsSupported = false,
@@ -4439,6 +4569,7 @@ class AuthenticatedWorkspaceCatalogueGateway
   // Opt-in only for the matching integer-paise paged contract; legacy stays v1.
   final bool minorMoneyReadbackSupported;
   final bool supplierTaxReadbackSupported;
+  final bool commodityPriceReadbackSupported;
   final bool promotionDiscoverySupported;
   final bool storeCouponEligibilitySupported;
   final bool promotionTermsSupported;
@@ -4479,6 +4610,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       supplierPublishersVersionSupported: supplierPublishersVersionSupported,
       minorMoneyReadbackSupported: minorMoneyReadbackSupported,
       supplierTaxReadbackSupported: supplierTaxReadbackSupported,
+      commodityPriceReadbackSupported: commodityPriceReadbackSupported,
       promotionDiscoverySupported: promotionDiscoverySupported,
       promotionTermsSupported: promotionTermsSupported,
       storeCouponTermsSupported: storeCouponTermsSupported,
@@ -4897,6 +5029,42 @@ class AuthenticatedWorkspaceCatalogueGateway
   );
 
   @override
+  Future<WorkspaceCommodityPrice?> readCommodityPrice(String storeId, String skuId, {required bool Function() current}) async {
+    if (!commodityPriceReadbackSupported || ownerAccountId == null || !current()) {
+      throw const FormatException('Supplier price confirmation is not connected.');
+    }
+    final response = await _ownerRequest({'operation': 'readStoreCommodityPrice', 'storeId': _id(storeId), 'skuId': _id(skuId)},
+      current, mutation: false);
+    if (!current() || response?.statusCode != 200) throw const FormatException('The current supplier price could not be checked.');
+    final envelope = _map(jsonDecode(response!.body));
+    if (envelope['ok'] != true) throw const FormatException();
+    final data = _map(envelope['data']);
+    _keys(data, ['schemaVersion', 'realm', 'storeId', 'skuId', 'operation', 'record', 'orderingAvailable', 'refreshRequested']);
+    if (data['schemaVersion'] != 1 || data['realm'] != realm || data['storeId'] != storeId || data['skuId'] != skuId ||
+        data['operation'] != 'readStoreCommodityPrice' || data['orderingAvailable'] != false || data['refreshRequested'] is! bool) throw const FormatException();
+    return data['record'] == null ? null : WorkspaceCommodityPrice.decode(data['record'], realm, storeId, skuId, now(),
+      refreshRequested: data['refreshRequested'] as bool);
+  }
+  Future<bool> requestCommodityPriceRefresh(BuyV2Product product, {required bool Function() current}) async {
+    var reading = true;
+    bool valid() => reading && current();
+    final identity = product.publicListingIdentity, terms = product.packTerms;
+    if (!commodityPriceReadbackSupported || !valid() || identity?.realm != realm || identity?.matches(product) != true ||
+        terms?.commodityPriceRevision == null || terms!.pricingCurrentAt(now())) return false;
+    try {
+      final response = await _ownerRequest({'operation': 'requestPublicCommodityPriceRefresh',
+        'storeId': identity!.storeId, 'skuId': identity.skuId, 'priceRevision': terms.commodityPriceRevision}, valid, mutation: true)
+        .timeout(const Duration(seconds: 25));
+      if (!valid() || response?.statusCode != 200) return false;
+      final envelope = _map(jsonDecode(response!.body)), data = _map(envelope['data']);
+      _keys(data, ['schemaVersion', 'realm', 'storeId', 'skuId', 'priceRevision', 'state', 'orderingAvailable']);
+      return envelope['ok'] == true && data['schemaVersion'] == 1 && data['realm'] == realm &&
+        data['storeId'] == identity.storeId && data['skuId'] == identity.skuId &&
+        data['priceRevision'] == terms.commodityPriceRevision && data['state'] == 'recorded' && data['orderingAvailable'] == false;
+    } on Object { return false; } finally { reading = false; }
+  }
+
+  @override
   Future<WorkspaceCatalogueBindingResult> reconcileBinding(
     WorkspaceCatalogueBindingIntent original, {
     required bool Function() current,
@@ -4915,6 +5083,9 @@ class AuthenticatedWorkspaceCatalogueGateway
   }) async {
     var sent = false;
     try {
+      if (original.isPriceConfirmation && !commodityPriceReadbackSupported && !reconciliation) {
+        return const WorkspaceCatalogueBindingResult(WorkspaceCatalogueBindingState.notSent);
+      }
       // Do not start a new binding that this connection cannot read back.
       // An original uncertain attempt must still use its existing reconciliation.
       if (!reconciliation && !recoveringUnknown && !unbrandedProduceReadbackSupported &&
@@ -4932,7 +5103,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       }
       final response = await _ownerRequest(
         {
-          'operation': reconciliation
+          'operation': original.isPriceConfirmation ? reconciliation ? 'reconcileStoreCommodityPrice' : 'confirmStoreCommodityPrice' : reconciliation
               ? 'reconcileStoreCatalogueBinding'
               : 'bindReviewedStoreCatalogueSku',
           ...original.body,
@@ -4970,6 +5141,16 @@ class AuthenticatedWorkspaceCatalogueGateway
         );
       }
       final data = _map(envelope['data']);
+      if (original.isPriceConfirmation) {
+        _keys(data, ['schemaVersion', 'realm', 'storeId', 'skuId', 'operation', 'record', 'orderingAvailable']);
+        if (data['schemaVersion'] != 1 || data['realm'] != realm || data['storeId'] != original.storeId ||
+            data['skuId'] != original.skuId || data['orderingAvailable'] != false ||
+            data['operation'] != (reconciliation ? 'reconcileStoreCommodityPrice' : 'confirmStoreCommodityPrice')) throw const FormatException();
+        if (data['record'] == null) return const WorkspaceCatalogueBindingResult(WorkspaceCatalogueBindingState.unknown);
+        final price = WorkspaceCommodityPrice.decode(data['record'], realm, original.storeId, original.skuId, now());
+        if (!price.matches(original)) throw const FormatException();
+        return WorkspaceCatalogueBindingResult(WorkspaceCatalogueBindingState.saved, priceConfirmation: price);
+      }
       _keys(data, [
         'schemaVersion',
         'realm',
@@ -5077,7 +5258,7 @@ class AuthenticatedWorkspaceCatalogueGateway
           entry.readback.skuRevision == null ||
           entry.readback.publicOfferId == null ||
           entry.readback.publicOfferRevision == null ||
-          supplierQuote != null && listing.channel == BuyV2OfferClass.bulk && supplierQuote.lines.singleWhere(
+          supplierQuote != null && product.requiresSupplierQuote && supplierQuote.lines.singleWhere(
             (l) => l['productId'] == product.id)['skuRevision'] != entry.readback.skuRevision ||
           entry.product.packTerms?.revision != product.packTerms?.revision ||
           entry.product.minimumOrder != product.minimumOrder ||
@@ -5105,6 +5286,8 @@ class AuthenticatedWorkspaceCatalogueGateway
       (a, b) => (a['lineId'] as String).compareTo(b['lineId'] as String),
     );
     // Freeze request ownership independently of the transport's body object.
+    final mixedPrices = supplierQuote != null && lines.any((l) => l.product.packTerms?.commodityPriceRevision != null);
+    if (mixedPrices && !commodityPriceReadbackSupported) throw const FormatException('Update MoolSocial to check these supplier prices.');
     final frozen = jsonEncode({
       'storeId': coupon.storeId,
       'couponId': coupon.couponId,
@@ -5112,11 +5295,12 @@ class AuthenticatedWorkspaceCatalogueGateway
       'selectionPolicy': 'exclusive_store_basket',
       'lines': requested,
       if (supplierQuote != null) 'supplierQuote': supplierQuote.couponReference,
+      if (mixedPrices) 'commodityPriceReadbackVersion': 1,
     });
     final response = await _ownerRequest(
       {
         'operation': 'evaluateStoreCouponEligibility',
-        'storeCouponEligibilityVersion': supplierQuote == null ? 1 : 2,
+        'storeCouponEligibilityVersion': mixedPrices ? 3 : supplierQuote == null ? 1 : 2,
         ..._map(jsonDecode(frozen)),
       },
       current,
@@ -5147,6 +5331,10 @@ class AuthenticatedWorkspaceCatalogueGateway
     void Function()? onDispatch,
   }) async {
     if (!current()) return null;
+    if (commodityPriceReadbackSupported && const {
+      'readPublicStoreCatalogue', 'readPublicCatalogueDiscovery', 'readPublicStoreVariantFamilies',
+      'readPublicStorePromotions', 'readPublicPromotionDiscovery',
+    }.contains(body['operation'])) body = {...body, 'commodityPriceReadbackVersion': 1};
     if (supplierTaxReadbackSupported && const {
       'readPublicStoreCatalogue', 'readPublicCatalogueDiscovery', 'listStoreCatalogueSkus',
       'readPublicStoreVariantFamilies',
@@ -5220,6 +5408,7 @@ class AuthenticatedWorkspaceCatalogueGateway
             },
             body: {
               'operation': 'readPublicStoreCatalogue',
+              if (commodityPriceReadbackSupported) 'commodityPriceReadbackVersion': 1,
               'mediaReadbackVersion': 1,
               if (supplierTaxReadbackSupported) 'supplierTaxReadbackVersion': 1,
               if (supplierPublishersVersionSupported) 'supplierPublishersVersion': 1,
@@ -5249,6 +5438,7 @@ class AuthenticatedWorkspaceCatalogueGateway
         _policyObserved = true;
       }
       return _decode(data, product, realm, now().toUtc(), policyRequired: policyRequired || policyResolutionRequired,
+        commoditySupported: commodityPriceReadbackSupported,
         supplierPublishersSupported: supplierPublishersVersionSupported);
     } catch (_) {
       // Never expose provider diagnostics, retain a stale result, or fake success.
@@ -5281,7 +5471,8 @@ class AuthenticatedWorkspaceCatalogueGateway
       final entry = WorkspacePublicCatalogueEntry.fromResponse(_map(envelope['data']),
         storeId: storeId, realm: realm, channel: channel, now: now().toUtc(),
         supplierPublishersVersionSupported: supplierPublishersVersionSupported,
-        supplierTaxReadbackSupported: supplierTaxReadbackSupported);
+        supplierTaxReadbackSupported: supplierTaxReadbackSupported,
+        commodityPriceReadbackSupported: commodityPriceReadbackSupported);
       // The response is scoped to the requested raw SKU, not merely a same-Store
       // listing. Account/session retirement never admits a delayed product.
       if (!current() || entry.product.sourceSkuId != skuId) return null;
@@ -5535,7 +5726,13 @@ class WorkspaceCatalogueReadback extends ChangeNotifier
           (result.skuRevision! < prior!.skuRevision! ||
               result.catalogueVersion! < prior.catalogueVersion! ||
               (result.skuRevision == prior.skuRevision &&
-                  result.fingerprint != prior.fingerprint));
+                (result.commodityPriceRevision != null || prior.commodityPriceRevision != null
+                  ? result.commercialBaseFingerprint == null || result.commercialBaseFingerprint != prior.commercialBaseFingerprint ||
+                    result.commodityPriceRevision == null ||
+                    result.commodityPriceRevision! < (prior.commodityPriceRevision ?? 0) ||
+                    result.commodityPriceRevision == prior.commodityPriceRevision &&
+                      result.commodityPriceFingerprint != prior.commodityPriceFingerprint
+                  : result.fingerprint != prior.fingerprint)));
       _results[key] = ready && !regressed
           ? result
           : WorkspaceCatalogueContentResult(content: _unavailable(product,
@@ -5783,7 +5980,10 @@ WorkspaceCatalogueContentResult _decode(
   DateTime now, {
   bool policyRequired = false,
   bool supplierPublishersSupported = false,
+  bool commoditySupported = false,
 }) {
+  if (data.containsKey('commodityPriceReadbackVersion') &&
+      (!commoditySupported || data['commodityPriceReadbackVersion'] != 1 || data['commodityPriceReadbackVersion'] is! int)) throw const FormatException();
   _checkSupplierPublishersReadback(data, supported: supplierPublishersSupported);
   _checkProductFactsReadbackVersion(data);
   _checkProduceReadback(data);
@@ -5893,7 +6093,7 @@ WorkspaceCatalogueContentResult _decode(
     };
     final amount = packTerms.netContentMilli;
     if (!product.hasValidPackTerms ||
-        !packTerms.pricingCurrentAt(now) ||
+        (!packTerms.pricingCurrentAt(now) && packTerms.commodityPriceRevision == null) ||
         packTerms.requiresMeasurement ||
         scale == null ||
         amount == null ||
@@ -5916,7 +6116,7 @@ WorkspaceCatalogueContentResult _decode(
   DateTime? validUntil;
   final coreChannels = <Map<String, dynamic>>[];
   for (final channel in channels) {
-    _keys(Map<String, dynamic>.of(channel)..remove('supplierTax'), [
+    _keys(Map<String, dynamic>.of(channel)..remove('supplierTax')..remove('priceConfirmation')..remove('priceState'), [
       'kind',
       'offerId',
       'priceMinor',
@@ -5953,9 +6153,14 @@ WorkspaceCatalogueContentResult _decode(
       lastPrice = tierPrice;
     }
     final expires = _time(channel['validUntil']);
-    if (!expires.isAfter(now)) throw const FormatException();
-    validUntil = validUntil == null || expires.isBefore(validUntil)
-        ? expires
+    final confirmation = _commodityConfirmation(channel, data, now);
+    final siblingExpired = channel['priceState'] == 'expired' && channel['kind'] != product.offerClass?.name &&
+      data['commodityPriceReadbackVersion'] == 1 && channels.any((c) => c['priceConfirmation'] is Map) && !expires.isAfter(observed);
+    if (channel.containsKey('priceState') && !siblingExpired) throw const FormatException();
+    if (!expires.isAfter(now) && confirmation == null && !siblingExpired) throw const FormatException();
+    final contentExpiry = (confirmation != null || siblingExpired) && !expires.isAfter(now) ? observed.add(const Duration(minutes: 5)) : expires;
+    validUntil = validUntil == null || contentExpiry.isBefore(validUntil)
+        ? contentExpiry
         : validUntil;
     coreChannels.add(
       Map.of(channel)
@@ -5978,7 +6183,10 @@ WorkspaceCatalogueContentResult _decode(
   }
   if (identity != null && packTerms != null &&
       (packTerms.revision != matching.single['revision'] ||
-          packTerms.priceObservedAt != _time(row['observedAt']) ||
+          packTerms.priceObservedAt != _time(matching.single['priceConfirmation'] is Map
+              ? (matching.single['priceConfirmation'] as Map)['confirmedAt'] : row['observedAt']) ||
+          packTerms.commodityPriceRevision != (matching.single['priceConfirmation'] as Map?)?['revision'] ||
+          packTerms.priceChangesFrequently != (matching.single['priceConfirmation'] as Map?)?['frequent'] ||
           packTerms.priceValidUntil != _time(matching.single['validUntil']))) {
     throw const FormatException();
   }
@@ -6087,12 +6295,22 @@ WorkspaceCatalogueContentResult _decode(
   );
   // Immutable SKU payload, excluding legitimately rotating governed term windows.
   final core = Map<String, dynamic>.of(row)..remove('supplierPolicy')..['channels'] = coreChannels;
+  final commercialBase = Map<String, dynamic>.of(core)..['channels'] = coreChannels.map((channel) {
+    final copy = Map<String, dynamic>.of(channel)..remove('priceState');
+    if (copy['kind'] != 'retail') { copy..remove('priceConfirmation')..remove('priceMinor')..remove('tiers'); }
+    return copy;
+  }).toList();
+  final confirmedChannels = channels.where((c) => c['priceConfirmation'] is Map).toList();
+  final priceConfirmation = confirmedChannels.isEmpty ? null : confirmedChannels.first['priceConfirmation'] as Map;
   return WorkspaceCatalogueContentResult(
     content: result,
     skuRevision: revision,
     catalogueVersion: catalogueVersion,
     validUntil: validUntil,
     fingerprint: jsonEncode(_sorted(core)),
+    commercialBaseFingerprint: jsonEncode(_sorted(commercialBase)),
+    commodityPriceRevision: priceConfirmation?['revision'] as int?,
+    commodityPriceFingerprint: priceConfirmation == null ? null : jsonEncode(_sorted(confirmedChannels)),
     policyRevision: policy?.revision,
     policyFingerprint: policy?.fingerprint,
     publicOfferId: _id(matching.single['offerId']),

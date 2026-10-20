@@ -617,6 +617,8 @@ class BuyV2PackTerms {
     this.pricesIncludeFreight,
     this.supplierGst,
     this.supplierTax,
+    this.commodityPriceRevision,
+    this.priceChangesFrequently,
   });
 
   final String skuId;
@@ -640,12 +642,23 @@ class BuyV2PackTerms {
   final BuyV2SupplierGstRate? supplierGst;
   /// Legacy exact amount; never converted into a GST rate.
   final BuyV2SupplierTaxAmount? supplierTax;
+  final int? commodityPriceRevision;
+  final bool? priceChangesFrequently;
+  String? priceFreshnessLabel(DateTime now) {
+    if (commodityPriceRevision == null || priceObservedAt == null) return null;
+    final age = now.toUtc().difference(priceObservedAt!.toUtc());
+    if (age.isNegative) return 'Price confirmation pending';
+    final elapsed = age.inMinutes < 1 ? 'just now' : age.inMinutes < 60 ? '${age.inMinutes} min ago'
+      : age.inHours < 24 ? '${age.inHours} hr ago' : '${age.inDays} days ago';
+    return pricingCurrentAt(now) ? 'Price confirmed $elapsed' : 'Price confirmation pending · last confirmed $elapsed';
+  }
   Map<String, Object?>? get supplierTaxDeclaration =>
       supplierGst?.toChannelJson() ?? supplierTax?.toJson();
 
   /// Frozen terms only. Expiry is retained, never extended for an old payment.
   Map<String, Object?> toRetainedJson() => {
-    'version': 1, 'skuId': skuId, 'revision': revision, 'sellUnit': sellUnit,
+    'version': commodityPriceRevision == null ? 1 : 2, 'skuId': skuId, 'revision': revision, 'sellUnit': sellUnit,
+    if (commodityPriceRevision != null) 'commodityPrice': {'version': 1, 'revision': commodityPriceRevision, 'frequent': priceChangesFrequently},
     'sourceLabel': sourceLabel, 'containedUnits': containedUnits,
     'netContentMilli': netContentMilli, 'contentUnit': contentUnit,
     'quantityStep': quantityStep, 'requiresMeasurement': requiresMeasurement,
@@ -662,12 +675,13 @@ class BuyV2PackTerms {
     const invalid = FormatException('Saved selling terms need recovery.');
     const strings = ['skuId', 'revision', 'sellUnit'];
     const optionalStrings = ['sourceLabel', 'contentUnit', 'unitPriceLabel', 'pricingStoreId'];
-    const keys = {'version', 'skuId', 'revision', 'sellUnit', 'sourceLabel', 'containedUnits',
+    final commodity = raw is Map && raw['version'] == 2;
+    final keys = {'version', 'skuId', 'revision', 'sellUnit', 'sourceLabel', 'containedUnits',
       'netContentMilli', 'contentUnit', 'quantityStep', 'requiresMeasurement', 'unitPriceLabel',
       'pricingStoreId', 'priceObservedAt', 'priceValidUntil', 'pricesIncludeTax',
-      'pricesIncludeFreight', 'priceTiers', 'supplierTax'};
+      'pricesIncludeFreight', 'priceTiers', 'supplierTax', if (commodity) 'commodityPrice'};
     if (raw is! Map || raw.length != keys.length || raw.keys.any((k) => !keys.contains(k)) ||
-        raw['version'] is! int || raw['version'] != 1 ||
+        raw['version'] is! int || raw['version'] != (commodity ? 2 : 1) ||
         strings.any((k) => raw[k] is! String) ||
         optionalStrings.any((k) => raw[k] != null && raw[k] is! String) ||
         raw['containedUnits'] is! int || raw['quantityStep'] is! int ||
@@ -683,6 +697,9 @@ class BuyV2PackTerms {
       return at;
     }
     final declaration = raw['supplierTax'];
+    final confirmation = raw['commodityPrice'];
+    if (commodity && (confirmation is! Map || confirmation.length != 3 || confirmation['version'] is! int ||
+        confirmation['version'] != 1 || confirmation['revision'] is! int || confirmation['frequent'] is! bool)) throw invalid;
     final gst = declaration is Map && declaration['version'] == 2
       ? BuyV2SupplierGstRate.fromChannelJson(declaration) : null;
     final result = BuyV2PackTerms(skuId: raw['skuId'] as String, revision: raw['revision'] as String,
@@ -694,6 +711,8 @@ class BuyV2PackTerms {
       priceValidUntil: time('priceValidUntil'), pricesIncludeTax: raw['pricesIncludeTax'] as bool?,
       pricesIncludeFreight: raw['pricesIncludeFreight'] as bool?, supplierGst: gst,
       supplierTax: declaration != null && gst == null ? BuyV2SupplierTaxAmount.fromJson(declaration) : null,
+      commodityPriceRevision: commodity ? confirmation['revision'] as int : null,
+      priceChangesFrequently: commodity ? confirmation['frequent'] as bool : null,
       priceTiers: List.unmodifiable((raw['priceTiers'] as List).map((t) {
         if (t is! Map || t.length != 2 || t['minimumPacks'] is! int || t['priceMinor'] is! int) throw invalid;
         return BuyV2PackPriceTier(minimumPacks: t['minimumPacks'] as int, priceMinor: t['priceMinor'] as int);
@@ -768,6 +787,10 @@ class BuyV2PackTerms {
 
   bool isValidFor(String id) =>
       skuId == id &&
+      ((commodityPriceRevision == null && priceChangesFrequently == null) ||
+        (commodityPriceRevision != null && commodityPriceRevision! > 0 && commodityPriceRevision! <= 1000000000 &&
+          priceChangesFrequently != null && priceObservedAt != null && priceValidUntil != null &&
+          priceValidUntil!.isAfter(priceObservedAt!))) &&
       (supplierGst?.valid ?? true) && (supplierTax?.valid ?? true) &&
       (supplierGst == null || supplierTax == null) &&
       (supplierGst == null || pricesIncludeTax == null ||
@@ -927,6 +950,7 @@ class BuyV2Product {
   final BuyV2PublicListingIdentity? publicListingIdentity;
   String get sourceSkuId => publicListingIdentity?.skuId ?? id;
   bool get hasValidPublicListingIdentity => publicListingIdentity == null || publicListingIdentity!.matches(this);
+  bool get requiresSupplierQuote => publicListingIdentity?.channel == BuyV2OfferClass.bulk && packTerms?.commodityPriceRevision == null;
   final BuyV2Destination destination;
   final String categoryId;
   final String brand;

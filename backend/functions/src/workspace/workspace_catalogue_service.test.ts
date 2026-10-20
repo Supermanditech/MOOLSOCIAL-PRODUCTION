@@ -36,6 +36,185 @@ import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
 const at = "2026-10-16T12:00:00.000Z";
 
+test('LF-COMMODITY explicit supplier confirmation freezes exact prices with server time and replay-safe revisions', () => {
+  const value = input(); value.channels[0]!.kind = 'bulk';
+  const record = {...value, schemaVersion: 1 as const, storeId: 'store-one', revision: 1, observedAt: at};
+  let aggregate: any;
+  for (const original of productionCommands(value)) {
+    const body = original.type === 'create_offer' ? {...original, buyingContext: 'wholesale'} : original;
+    const owner = original.type !== 'create' && !String(original.type).startsWith('review');
+    aggregate = planCatalogueProduction({operatorUserId: owner ? 'owner-one' : 'reviewer-one',
+      identity: catalogueIdentity, input: body, observedAt: at},
+      producerAuthority(owner), aggregate, producerParticipant(), profile).aggregate;
+  }
+  const plan = (catalogueModule as any).planCommodityPriceConfirmation;
+  assert.equal(typeof plan, 'function', 'A supplier confirmation needs an authoritative command planner.');
+  const command = {storeId: 'store-one', skuId: value.skuId, channel: 'bulk', skuRevision: 1,
+    expectedRevision: 0, idempotencyKey: 'price-first', frequent: true, validityMinutes: 120,
+    priceMinor: 10025, tiers: []};
+  const source = {record, catalogue: aggregate, profile, authority: producerAuthority(), participant: producerParticipant()};
+  const first = plan('owner-one', 'evaluation', catalogueIdentity, command, source, at);
+  assert.equal(first.record.confirmedAt, at);
+  assert.equal(first.record.validUntil, '2026-10-16T14:00:00.000Z');
+  assert.equal(first.record.terms.priceMinor, 10025);
+  assert.equal(first.record.revision, 1);
+  assert.deepEqual(plan('owner-one', 'evaluation', catalogueIdentity, command, source,
+    '2026-10-16T12:10:00.000Z', first.record, first).record, first.record);
+  const next = plan('owner-one', 'evaluation', catalogueIdentity,
+    {...command, expectedRevision: 1, idempotencyKey: 'price-second'}, source,
+    '2026-10-16T12:10:00.000Z', first.record);
+  assert.equal(next.record.revision, 2);
+  assert.equal(next.record.confirmedAt, '2026-10-16T12:10:00.000Z');
+  for (const invalid of [
+    {...command, confirmedAt: at}, {...command, expectedRevision: 1},
+    {...command, validityMinutes: 0}, {...command, validityMinutes: 1440},
+    {...command, priceMinor: -1}, {...command, channel: 'retail'},
+  ]) assert.throws(() => plan('owner-one', 'evaluation', catalogueIdentity, invalid, source, at));
+  assert.throws(() => plan('another-owner', 'evaluation', catalogueIdentity, command, source, at));
+  assert.throws(() => plan('owner-one', 'evaluation', catalogueIdentity, command,
+    {...source, authority: undefined}, at));
+  assert.throws(() => plan('owner-one', 'evaluation', catalogueIdentity, command,
+    {...source, record: {...record, publicListing: false}}, at));
+  assert.throws(() => plan('owner-one', 'evaluation', catalogueIdentity,
+    {...command, priceMinor: 10200}, source, at, first.record, first));
+});
+
+test('LF-COMMODITY persisted supplier confirmations reach public and transactional prices with expiry and recovery', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-commodity-${randomUUID().slice(0, 8)}`}, `commodity-${randomUUID()}`), db = getFirestore(app);
+  let clock = at;
+  const value = input(); value.channels[0]!.kind = 'bulk'; value.content.media = staticMedia(value);
+  const root = db.collection('workspaceCatalogues').doc('evaluation');
+  const repo = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(clock));
+  const service = () => new WorkspaceCatalogueService(repo(), catalogueIdentity, () => new Date(clock));
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    await root.collection('participants').doc('store-one').set(producerParticipant());
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    for (const original of productionCommands(value)) {
+      const command = original.type === 'create_offer' ? {...original, buyingContext: 'wholesale'} : original;
+      await repo().produceCatalogue(['propose_product', 'propose_pack', 'create_offer'].includes(String(original.type))
+        ? 'owner-one' : 'reviewer-one', catalogueIdentity, command);
+    }
+    await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: value, expectedRevision: 0, idempotencyKey: 'bind-commodity'});
+    const command = {storeId: 'store-one', skuId: value.skuId, channel: 'bulk', skuRevision: 1,
+      expectedRevision: 0, idempotencyKey: 'confirm-one', frequent: true, validityMinutes: 120, priceMinor: 10025, tiers: []};
+    const first = await service().handleCommodityPrice('owner-one', 'confirmStoreCommodityPrice', command) as any;
+    assert.equal(first.record.revision, 1);
+    clock = '2026-10-16T12:10:00.000Z';
+    assert.deepEqual((await service().handleCommodityPrice('owner-one', 'reconcileStoreCommodityPrice', command) as any).record, first.record);
+    assert.deepEqual((await service().handleCommodityPrice('owner-one', 'readStoreCommodityPrice', {storeId: 'store-one', skuId: value.skuId}) as any).record, first.record);
+    const query = {storeId: 'store-one', skuId: value.skuId, listingReadbackVersion: 1,
+      mediaReadbackVersion: 1, productFactsReadbackVersion: 1, policyReadbackVersion: 1, commodityPriceReadbackVersion: 1};
+    const projected = await service().publicCatalogue(query) as any;
+    assert.equal(projected.state, 'ready');
+    assert.equal(projected.items[0].channels[0].priceMinor, 10025);
+    assert.equal(projected.items[0].channels[0].priceConfirmation.confirmedAt, at);
+    assert.equal(projected.items[0].channels[0].validUntil, '2026-10-16T14:00:00.000Z');
+    const unavailable = repo(); unavailable.publicCatalogueSource = async () => undefined;
+    const closed = await new WorkspaceCatalogueService(unavailable, catalogueIdentity, () => new Date(clock)).publicCatalogue(query) as any;
+    assert.equal(closed.state, 'unavailable'); assert.deepEqual(closed.items, [], 'Never fall back to the old base price when heads cannot be read.');
+    const {commodityPriceReadbackVersion: _, ...oldReader} = query;
+    await assert.rejects(service().publicCatalogue(oldReader), (error: any) => error.code === 'unsupported_version');
+    const promotions = () => new WorkspacePromotionService(new FirestorePromotionRepository(db, 'evaluation', () => new Date(clock)),
+      service(), () => new Date(clock));
+    await promotions().handleOperation('owner-one', 'saveStorePromotion', {storeId: 'store-one', placementId: 'commodity-promotion',
+      expectedRevision: 0, idempotencyKey: 'commodity-promotion-save', promotion: {skuId: value.skuId, skuRevision: 1, channel: 'bulk',
+        headline: 'Host confirmed commodity', detail: 'Host commodity promotion fixture', validFrom: at,
+        validUntil: '2026-10-16T13:00:00.000Z', active: true}});
+    const promotionRequest = {storeId: 'store-one', limit: 20, commodityPriceReadbackVersion: 1};
+    const discoveryRequest = {promotionDiscoveryVersion: 1, commodityPriceReadbackVersion: 1,
+      query: {search: '', categoryId: 'all', publisher: null, supplierOnly: false}, pageSize: 20};
+    const promotionBefore = await promotions().publicPage(promotionRequest);
+    const discoveryBefore = await promotions().publicDiscovery(discoveryRequest);
+    assert.equal(promotionBefore.items.length, 1); assert.equal((discoveryBefore as any).items.length, 1);
+    assert.equal((await promotions().publicPage({storeId: 'store-one', limit: 20})).state, 'unavailable');
+    const pages = await db.runTransaction(tx => service().couponPriceSnapshot('store-one', [value.skuId], tx)) as any[];
+    assert.equal(pages[0].items[0].channels[0].priceMinor, 10025);
+    await assert.rejects(service().requestCommodityRefresh('buyer-one', {storeId: 'store-one', skuId: value.skuId, priceRevision: 1}));
+    await service().handleCommodityPrice('owner-one', 'confirmStoreCommodityPrice',
+      {...command, expectedRevision: 1, idempotencyKey: 'price-increase', priceMinor: 10215});
+    const increased = await service().publicCatalogue(query);
+    const promotionAfter = await promotions().publicPage(promotionRequest);
+    const discoveryAfter = await promotions().publicDiscovery(discoveryRequest);
+    assert.equal(promotionAfter.items.length, 1); assert.equal((discoveryAfter as any).items.length, 1);
+    await service().handleCommodityPrice('owner-one', 'confirmStoreCommodityPrice',
+      {...command, expectedRevision: 2, idempotencyKey: 'price-decrease', priceMinor: 9815});
+    const decreased = await service().publicCatalogue(query);
+    const attempts = await Promise.allSettled([10215, 9815].map((priceMinor, i) => service().handleCommodityPrice('owner-one',
+      'confirmStoreCommodityPrice', {...command, expectedRevision: 3, idempotencyKey: `competing-${i}`, priceMinor})));
+    assert.equal(attempts.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(attempts.filter(r => r.status === 'rejected').length, 1);
+    clock = '2026-10-16T14:20:00.000Z';
+    const expired = await service().publicCatalogue(query) as any;
+    assert.equal(expired.state, 'ready', 'Expired commodity price keeps reviewed product readable.');
+    assert.equal(expired.items.length, 1);
+    assert.ok(expired.items[0].channels[0].validUntil < clock);
+    console.log('LF_COMMODITY_PROJECTION=' + JSON.stringify({current: projected, increased, decreased, expired,
+      promotionBefore, promotionAfter, discoveryBefore, discoveryAfter,
+      confirmation: first.record, command, owned: (await repo().page(profile, 'owner-one', undefined, 1, value.skuId))[0]}));
+    await Promise.all(['buyer-one', 'buyer-two', 'buyer-one'].map(buyer => service().requestCommodityRefresh(buyer,
+      {storeId: 'store-one', skuId: value.skuId, priceRevision: 4})));
+    const requested = await service().handleCommodityPrice('owner-one', 'readStoreCommodityPrice', {storeId: 'store-one', skuId: value.skuId}) as any;
+    assert.equal(requested.refreshRequested, true);
+    assert.equal((await root.collection('stores').doc('store-one').collection('commodityRefreshDemand').get()).size, 1);
+    await assert.rejects(service().handleCommodityPrice('other-owner', 'readStoreCommodityPrice', {storeId: 'store-one', skuId: value.skuId}));
+    const canonical = await repo().catalogue(catalogueIdentity.catalogueId);
+    assert.equal(canonical!.version, 6, 'Repeated price confirmations do not grow the shared canonical catalogue.');
+    assert.equal((await root.collection('stores').doc('store-one').collection('commodityPrices').doc(value.skuId).collection('revisions').get()).size, 4);
+    await service().handleCommodityPrice('owner-one', 'confirmStoreCommodityPrice',
+      {...command, expectedRevision: 4, idempotencyKey: 'price-renew-after-demand', priceMinor: 10200});
+    assert.equal((await service().handleCommodityPrice('owner-one', 'readStoreCommodityPrice', {storeId: 'store-one', skuId: value.skuId}) as any).refreshRequested, false);
+    await root.collection('producerAuthorities').doc('owner-one').update({enabled: false});
+    assert.equal((await service().publicCatalogue(query) as any).items.length, 0);
+  } finally { await deleteApp(app); }
+});
+
+test('LF-COMMODITY shared Retail and Bulk preserve reviewed identities across independent price updates and expiry', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  const app = initializeApp({projectId: `demo-lf-commodity-shared-${randomUUID().slice(0, 8)}`}, `commodity-shared-${randomUUID()}`), db = getFirestore(app);
+  let clock = at;
+  const value = input(); value.channels.push({...value.channels[0]!, kind: 'bulk', offerId: 'bulk-offer'});
+  value.content.media = staticMedia(value);
+  const root = db.collection('workspaceCatalogues').doc('evaluation');
+  const repo = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(clock));
+  const service = () => new WorkspaceCatalogueService(repo(), catalogueIdentity, () => new Date(clock));
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    await root.collection('participants').doc('store-one').set(producerParticipant());
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    for (const command of productionCommands(value)) await repo().produceCatalogue(
+      ['propose_product', 'propose_pack', 'create_offer'].includes(String(command.type)) ? 'owner-one' : 'reviewer-one', catalogueIdentity, command);
+    await repo().produceCatalogue('owner-one', catalogueIdentity, {type: 'create_offer', commandId: 'shared-bulk-offer', expectedVersion: 6,
+      offerId: 'bulk-offer', packId: value.verifiedPackId, buyingContext: 'wholesale', serviceAreaIds: ['host-area'],
+      termWindows: [{termSnapshotId: 'bulk-base', termSnapshotSha256: cataloguePayloadHash(channelTerms(value.channels[1]!)),
+        effectiveFrom: at, expiresAt: '2026-10-16T13:00:00.000Z'}]});
+    await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: value, expectedRevision: 0, idempotencyKey: 'bind-shared'});
+    const command = {storeId: 'store-one', skuId: value.skuId, channel: 'bulk', skuRevision: 1,
+      expectedRevision: 0, idempotencyKey: 'confirm-shared', frequent: true, validityMinutes: 120, priceMinor: 10025, tiers: []};
+    await service().handleCommodityPrice('owner-one', 'confirmStoreCommodityPrice', command);
+    const query = {storeId: 'store-one', skuId: value.skuId, listingReadbackVersion: 1,
+      mediaReadbackVersion: 1, productFactsReadbackVersion: 1, policyReadbackVersion: 1, commodityPriceReadbackVersion: 1};
+    const before = await service().publicCatalogue(query);
+    clock = '2026-10-16T12:10:00.000Z';
+    await service().handleCommodityPrice('owner-one', 'confirmStoreCommodityPrice',
+      {...command, expectedRevision: 1, idempotencyKey: 'confirm-shared-next', priceMinor: 10215});
+    const after = await service().publicCatalogue(query) as any;
+    assert.equal(after.items[0].channels.find((c: any) => c.kind === 'retail').priceMinor, value.channels[0]!.priceMinor);
+    clock = '2026-10-16T13:30:00.000Z';
+    const expiredRetail = await service().publicCatalogue(query) as any;
+    assert.equal(expiredRetail.state, 'ready'); assert.equal(expiredRetail.items.length, 1);
+    assert.equal(expiredRetail.items[0].channels.find((c: any) => c.kind === 'retail').priceState, 'expired');
+    assert.ok(expiredRetail.items[0].channels.find((c: any) => c.kind === 'bulk').validUntil > clock);
+    console.log('LF_COMMODITY_SHARED_PROJECTION=' + JSON.stringify({before, after, expiredRetail}));
+  } finally { await deleteApp(app); }
+});
+
 test('LF-BULK actual reviewed catalogue and transactional supplier policy reach the private agreement', {
   skip: !process.env.FIRESTORE_EMULATOR_HOST,
 }, async () => {
@@ -90,6 +269,45 @@ test('LF-BULK actual reviewed catalogue and transactional supplier policy reach 
     assert.equal(accepted.state, 'accepted'); assert.equal(accepted.creditApproved, false);
     assert.equal(accepted.finalChargesDetermined, false); assert.equal(accepted.currency, 'INR');
     assert.deepEqual(await quotes().read('buyer-one', {quoteId: first.quoteId}), accepted);
+    const direct = {...structuredClone(value), skuId: 'sku-direct', sku: 'HOST-DIRECT',
+      canonicalProductId: 'canonical-direct', verifiedPackId: 'pack-direct'};
+    direct.channels[0]!.offerId = 'offer-direct'; direct.content.media = staticMedia(direct);
+    for (const original of productionCommands(direct).slice(1)) {
+      const command = {...original, commandId: `direct-${original.commandId}`, expectedVersion: Number(original.expectedVersion) + 5,
+        ...(original.type === 'create_offer' ? {buyingContext: 'wholesale'} : {}),
+        ...(original.codes ? {codes: [{type: 'internal', value: `DIRECT-${original.type}`}]} : {})};
+      await repo().produceCatalogue(['propose_product', 'propose_pack', 'create_offer'].includes(String(original.type))
+        ? 'owner-one' : 'reviewer-one', catalogueIdentity, command);
+    }
+    const directBound = await catalogue().bindReviewedSku('owner-one', {storeId: 'store-one', sku: direct,
+      expectedRevision: 0, idempotencyKey: 'bind-direct-price'}) as any;
+    assert.ok(directBound);
+    await catalogue().handleCommodityPrice('owner-one', 'confirmStoreCommodityPrice', {
+      storeId: 'store-one', skuId: direct.skuId, channel: 'bulk', skuRevision: 1, expectedRevision: 0,
+      idempotencyKey: 'mixed-direct-price', frequent: true, validityMinutes: 30, priceMinor: 10025, tiers: []});
+    const promotionRepo = new FirestorePromotionRepository(db, 'evaluation', () => new Date(at), quotes());
+    const promotions = new WorkspacePromotionService(promotionRepo, catalogue(), () => new Date(at),
+      {storeCouponTermsSupported: true, storeCouponEligibilitySupported: true});
+    await promotions.handleOperation('owner-one', 'saveStoreCoupon', {storeCouponTermsVersion: 1, storeId: 'store-one',
+      couponId: 'mixed-coupon', expectedRevision: 0, idempotencyKey: 'mixed-coupon-save', fundingAcknowledged: true,
+      coupon: {name: 'Host mixed prices', percentage: false, discount: 100, maximumSavingMinor: 100,
+        minimumSpendMinor: 1, startsAt: at, endsAt: '2026-10-16T13:00:00.000Z', totalUses: 20, usesPerCustomer: 1, active: true}});
+    const pages = await db.runTransaction(tx => catalogue().couponPriceSnapshot('store-one', [value.skuId, direct.skuId], tx)) as any[];
+    const query = {storeCouponEligibilityVersion: 3, commodityPriceReadbackVersion: 1, storeId: 'store-one',
+      couponId: 'mixed-coupon', couponRevision: 1, selectionPolicy: 'exclusive_store_basket',
+      supplierQuote: {schemaVersion: 1, quoteId: accepted.quoteId, acceptedRevision: accepted.revision,
+        agreementFingerprint: accepted.acceptance.agreementFingerprint, lines: [{lineId: 'legacy-line', quoteLineId: 'line-one'}]},
+      lines: pages.map(page => { const row = page.items[0], channel = row.channels[0]; return {
+        lineId: row.skuId === value.skuId ? 'legacy-line' : 'direct-line', listing: row.listings[0],
+        skuRevision: row.revision, offerId: channel.offerId, offerRevision: channel.revision, quantity: 5}; })};
+    const result = await promotions.handleOperation('buyer-one', 'evaluateStoreCouponEligibility', query) as any;
+    assert.equal(result.storeCouponEligibilityVersion, 3); assert.equal(result.eligible, true);
+    assert.equal(result.evaluation.eligibleSubtotalMinor, 125005 + 50125);
+    assert.equal(result.evaluation.savingMinor, 100);
+    const oldRequest = {...query, storeCouponEligibilityVersion: 2} as any; delete oldRequest.commodityPriceReadbackVersion;
+    await assert.rejects(promotions.handleOperation('buyer-one', 'evaluateStoreCouponEligibility', oldRequest));
+    await root.collection('stores').doc('store-one').collection('commodityPrices').doc(direct.skuId).delete();
+    await assert.rejects(promotions.handleOperation('buyer-one', 'evaluateStoreCouponEligibility', query));
   } finally { await deleteApp(app); }
 });
 

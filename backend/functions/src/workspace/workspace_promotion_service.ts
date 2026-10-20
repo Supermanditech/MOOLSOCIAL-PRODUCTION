@@ -50,6 +50,7 @@ export interface StoreCouponSnapshot {
 export interface StoreCouponEligibilityQuery {
   storeId: string; couponId: string; couponRevision: number;
   supplierQuote?: BulkPurchaseReference;
+  commodityPriceReadbackVersion?: 1;
   selectionPolicy: "exclusive_store_basket";
   lines: {lineId: string; listing: {schemaVersion: 1; realm: PromotionRecord["realm"]; listingId: string;
     storeId: string; skuId: string; canonicalProductId: string; verifiedPackId: string;
@@ -69,8 +70,10 @@ function couponSupplierQuote(raw: unknown): BulkPurchaseReference {
     agreementFingerprint: r.agreementFingerprint, lines};
 }
 function couponEligibilityQuery(body: Readonly<Record<string, unknown>>, realm: PromotionRecord["realm"]): StoreCouponEligibilityQuery {
-  const v2 = body.storeCouponEligibilityVersion === 2;
-  const row = exact(body, ["storeCouponEligibilityVersion", "storeId", "couponId", "couponRevision", "selectionPolicy", "lines", ...(v2 ? ['supplierQuote'] : [])]);
+  const mixed = body.storeCouponEligibilityVersion === 3;
+  const v2 = body.storeCouponEligibilityVersion === 2 || mixed;
+  const row = exact(body, ["storeCouponEligibilityVersion", "storeId", "couponId", "couponRevision", "selectionPolicy", "lines", ...(v2 ? ['supplierQuote'] : []), ...(mixed ? ['commodityPriceReadbackVersion'] : [])]);
+  if (mixed && row.commodityPriceReadbackVersion !== 1) fail();
   if ((!v2 && row.storeCouponEligibilityVersion !== 1) || row.selectionPolicy !== "exclusive_store_basket" ||
       !Array.isArray(row.lines) || !row.lines.length || row.lines.length > 100) fail();
   const storeId = id(row.storeId), seen = new Set<string>(), listings = new Set<string>();
@@ -90,10 +93,10 @@ function couponEligibilityQuery(body: Readonly<Record<string, unknown>>, realm: 
   }).sort((a, b) => a.lineId < b.lineId ? -1 : a.lineId > b.lineId ? 1 : 0);
   const supplierQuote = v2 ? couponSupplierQuote(row.supplierQuote) : undefined;
   const bulk = lines.filter(line => line.listing.channel === 'bulk');
-  if (supplierQuote && (supplierQuote.lines.length !== bulk.length ||
+  if (supplierQuote && (!mixed && supplierQuote.lines.length !== bulk.length ||
       supplierQuote.lines.some(b => !bulk.some(l => l.lineId === b.lineId)))) fail();
   return {storeId, couponId: id(row.couponId), couponRevision: integer(row.couponRevision, 1),
-    selectionPolicy: "exclusive_store_basket", lines, ...(supplierQuote ? {supplierQuote} : {})};
+    selectionPolicy: "exclusive_store_basket", lines, ...(supplierQuote ? {supplierQuote} : {}), ...(mixed ? {commodityPriceReadbackVersion: 1 as const} : {})};
 }
 
 function couponBasketFromPrices(query: StoreCouponEligibilityQuery, pages: object[], realm: PromotionRecord["realm"],
@@ -142,10 +145,18 @@ function couponBasketFromPrices(query: StoreCouponEligibilityQuery, pages: objec
       if (quantity <= line.quantity) price = amount;
     }
     const agreed = negotiated?.prices.find(p => p.lineId === line.lineId);
-    if (line.listing.channel === 'bulk' && negotiated) {
+    if (line.listing.channel === 'bulk' && negotiated && (query.commodityPriceReadbackVersion !== 1 || agreed)) {
       if (!agreed || agreed.merchandiseMinor !== agreed.unitPriceMinor * line.quantity) fail('conflict', 409);
       price = agreed.unitPriceMinor;
     } else if (agreed) fail('conflict', 409);
+    else if (line.listing.channel === 'bulk' && negotiated) {
+      // Only the trusted catalogue snapshot can authorise the unquoted subset.
+      const confirmation = object(channel.priceConfirmation);
+      if (query.commodityPriceReadbackVersion !== 1 || confirmation.version !== 1 ||
+          !Number.isSafeInteger(confirmation.revision) || (confirmation.revision as number) < 1 ||
+          channel.revision !== line.offerRevision || !new RegExp(`^commodity-${confirmation.revision}-[A-F0-9]{16}$`, 'u').test(line.offerRevision) ||
+          time(confirmation.confirmedAt) > now || time(confirmation.validUntil) !== expires) fail('conflict', 409);
+    }
     return {lineId: line.lineId, storeId: query.storeId, skuId: line.listing.skuId,
       packId: line.listing.verifiedPackId, offerId: line.offerId, offerRevision: line.offerRevision,
       priceSourceId: agreed ? cataloguePayloadHash(query.supplierQuote) : line.offerRevision, channel: line.listing.channel, quantity: line.quantity, unitPriceMinor: price,
@@ -315,7 +326,8 @@ export function evaluateStoreCouponBasket(rawCoupon: StoreCouponRecord,
       subtotalMinor: Number(subtotal)};
   }).sort((a, b) => a.lineId < b.lineId ? -1 : a.lineId > b.lineId ? 1 : 0);
   if (supplierQuote) {
-    const bulk = lines.filter(l => l.channel === 'bulk');
+    const bulk = lines.filter(l => l.channel === 'bulk' &&
+      !(typeof l.offerRevision === 'string' && /^commodity-[1-9][0-9]*-[A-F0-9]{16}$/u.test(l.offerRevision) && l.priceSourceId === l.offerRevision));
     if (bulk.length !== supplierQuote.lines.length || bulk.some(l =>
         !supplierQuote.lines.some(b => b.lineId === l.lineId) || l.priceSourceId !== cataloguePayloadHash(supplierQuote))) fail();
   }
@@ -564,11 +576,13 @@ export class WorkspacePromotionService {
     private readonly now: () => Date = () => new Date(),
     private readonly options: {benefitTermsSupported?: boolean; storeCouponTermsSupported?: boolean; storeCouponEligibilitySupported?: boolean} = {}) {}
   private negotiation(body: Readonly<Record<string, unknown>>) {
-    const {promotionTermsVersion, supplierPublishersVersion, ...plain} = body;
+    const {promotionTermsVersion, supplierPublishersVersion, commodityPriceReadbackVersion, ...plain} = body;
     if (Object.hasOwn(body, "promotionTermsVersion") && promotionTermsVersion !== 1) fail();
     if (Object.hasOwn(body, "supplierPublishersVersion") && supplierPublishersVersion !== 1) fail();
+    if (Object.hasOwn(body, 'commodityPriceReadbackVersion') && commodityPriceReadbackVersion !== 1) fail();
     if (promotionTermsVersion === 1 && !this.options.benefitTermsSupported) fail("unavailable", 503);
-    return {body: plain, terms: promotionTermsVersion === 1, suppliers: supplierPublishersVersion === 1};
+    return {body: plain, terms: promotionTermsVersion === 1, suppliers: supplierPublishersVersion === 1,
+      commodity: commodityPriceReadbackVersion === 1};
   }
   /** Endpoint still performs Firebase/default-tenant/AppCheck verification. */
   async handleOperation(userId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
@@ -586,7 +600,7 @@ export class WorkspacePromotionService {
     const negotiated = this.negotiation(body);
     if (operation === "readPublicStorePromotions") return this.publicPage(body);
     if (operation === "readPublicPromotionDiscovery") return this.publicDiscovery(body);
-    if (negotiated.suppliers) fail(); // Read negotiation never grants owner authority.
+    if (negotiated.suppliers || negotiated.commodity) fail(); // Read negotiation never grants owner authority.
     if (operation === "listStorePromotions") {
       const query = exact(negotiated.body, ["storeId", "limit"], ["after"]), storeId = id(query.storeId);
       const limit = integer(query.limit, 1, 20), after = query.after === undefined ? undefined : id(query.after);
@@ -728,6 +742,7 @@ export class WorkspacePromotionService {
         const cursors = new Set<string>();
         for (let pageIndex = 0; pageIndex < 11; pageIndex++) {
           const page = object(await this.catalogue.publicDiscovery!({discoveryPageVersion: 1,
+            ...(negotiated.commodity ? {commodityPriceReadbackVersion: 1} : {}),
             ...(negotiated.suppliers ? {supplierPublishersVersion: 1} : {}),
             query: catalogueQuery, pageSize: 50, resultKind: "products", ...(cursor ? {cursor} : {})}));
           const metadata = object(page.page);
@@ -771,6 +786,7 @@ export class WorkspacePromotionService {
         let after: string | undefined, complete = false;
         for (let pageIndex = 0; pageIndex < 26; pageIndex++) {
           const page = await this.publicPage({storeId, limit: 20, ...(after ? {after} : {}),
+            ...(negotiated.commodity ? {commodityPriceReadbackVersion: 1} : {}),
             ...(negotiated.suppliers ? {supplierPublishersVersion: 1} : {}),
             ...(negotiated.terms ? {promotionTermsVersion: 1} : {})}, promotion => {
             if (++scannedRecords > 500) unavailable();
@@ -832,7 +848,7 @@ export class WorkspacePromotionService {
       a.publication.publicationId.localeCompare(b.publication.publicationId));
     const snapshotId = cataloguePayloadHash([this.repository.realm, coverage, firstDirectory.fingerprint, stableItems(confirmed)]).toLowerCase();
     const queryHash = cataloguePayloadHash([this.repository.realm, query, coverage, ...(negotiated.terms ? [1] : []),
-      ...(negotiated.suppliers ? ["supplier-publishers-v1"] : [])]).toLowerCase();
+      ...(negotiated.suppliers ? ["supplier-publishers-v1"] : []), ...(negotiated.commodity ? ['commodity-price-v1'] : [])]).toLowerCase();
     let index = 0;
     if (body.cursor !== undefined) {
       const encoded = text(body.cursor, 2048);
@@ -845,6 +861,7 @@ export class WorkspacePromotionService {
     }
     const cursorAt = (i: number) => Buffer.from(JSON.stringify({v: 1, q: queryHash, s: snapshotId, n: pageSize, i})).toString("base64url");
     const result = {schemaVersion: 1, promotionDiscoveryVersion: 1, realm: this.repository.realm, state: "ready", coverage,
+      ...(negotiated.commodity ? {commodityPriceReadbackVersion: 1} : {}),
       ...(negotiated.suppliers ? {supplierPublishersVersion: 1} : {}),
       ...(negotiated.terms ? {promotionTermsVersion: 1} : {}),
       orderingAvailable: false, observedAt, query, items: selected.slice(index, index + pageSize),
@@ -861,6 +878,7 @@ export class WorkspacePromotionService {
     const base = (): Omit<PublicPromotionPage, "state" | "items" | "nextCursor"> => ({schemaVersion: 1,
       realm: this.repository.realm, storeId, observedAt: this.now().toISOString(), orderingAvailable: false,
       coverage: "verified_public_promotions_only", ...(negotiated.terms ? {promotionTermsVersion: 1} : {}),
+      ...(negotiated.commodity ? {commodityPriceReadbackVersion: 1} : {}),
       ...(negotiated.suppliers ? {supplierPublishersVersion: 1} : {})});
     try {
       const initialStore = owner(await this.repository.store(storeId), storeId);
@@ -873,6 +891,7 @@ export class WorkspacePromotionService {
         if (!promotion.active || promotion.observedAt > now || promotion.validFrom > now || promotion.validUntil <= now) continue;
         if (promotion.benefitTerms && !negotiated.terms) fail("unavailable", 503);
         const response = object(await this.catalogue.publicCatalogue({storeId, skuId: promotion.skuId,
+          ...(negotiated.commodity ? {commodityPriceReadbackVersion: 1} : {}),
           ...(negotiated.suppliers ? {supplierPublishersVersion: 1} : {}),
           policyReadbackVersion: 1, productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1}));
         if ((negotiated.suppliers ? response.supplierPublishersVersion !== 1 : Object.hasOwn(response, "supplierPublishersVersion")) ||
@@ -961,7 +980,8 @@ export class FirestorePromotionRepository implements PromotionRepository {
       } else if (!(await tx.get(buyerRef.collection("orders").limit(1))).empty) fail("invalid_state", 409);
       if (query.supplierQuote && !this.bulkQuotes) fail('unavailable', 503);
       const negotiated = query.supplierQuote ? await this.bulkQuotes!.readCouponPrices(tx, actor, query.storeId,
-        query.supplierQuote, query.lines.filter(l => l.listing.channel === 'bulk')) : undefined;
+        query.supplierQuote, query.lines.filter(l => l.listing.channel === 'bulk' &&
+          (query.commodityPriceReadbackVersion !== 1 || query.supplierQuote!.lines.some(b => b.lineId === l.lineId)))) : undefined;
       const now = this.now().toISOString(), basket = couponBasketFromPrices(query, pages, this.realm, actor, now, negotiated);
       if (campaign.observedAt > now) fail("unavailable", 503);
       const subtotal = basket.lines.reduce((sum, line) => sum + BigInt(line.quantity) * BigInt(line.unitPriceMinor), 0n);
@@ -974,11 +994,11 @@ export class FirestorePromotionRepository implements PromotionRepository {
       // currently selected platform/Store coupons. Apply/quote must enforce it.
       const evaluation = reason === null ? evaluateStoreCouponBasket(campaign, profile, basket, now) : null;
       const expires = reason === null && campaign.endsAt < basket.validUntil ? campaign.endsAt : basket.validUntil;
-      return {schemaVersion: 1, storeCouponEligibilityVersion: query.supplierQuote ? 2 : 1, realm: this.realm,
+      return {schemaVersion: 1, storeCouponEligibilityVersion: query.commodityPriceReadbackVersion === 1 ? 3 : query.supplierQuote ? 2 : 1, realm: this.realm,
         viewerUserId: actor, storeId: query.storeId, selectionPolicy: query.selectionPolicy,
         exclusiveSelectionRequired: true, state: "ready", eligible: evaluation !== null, reason,
         observedAt: now, validUntil: expires,
-        requestFingerprint: cataloguePayloadHash({operation: query.supplierQuote ? "storeCouponEligibilityV2" : "storeCouponEligibilityV1", realm: this.realm, actor,
+        requestFingerprint: cataloguePayloadHash({operation: query.commodityPriceReadbackVersion === 1 ? "storeCouponEligibilityV3" : query.supplierQuote ? "storeCouponEligibilityV2" : "storeCouponEligibilityV1", realm: this.realm, actor,
           query, exclusiveSelectionRequired: true}),
         orderingAvailable: false, reservationCreated: false, evaluation,
         attribution: evaluation ? storeCouponAttributionReferences(this.realm, query.storeId, campaign.couponId, campaign.revision) : null,

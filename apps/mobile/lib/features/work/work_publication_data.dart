@@ -295,6 +295,8 @@ class WorkspaceSellingInputs {
     'wholesaleMinimum': 'Wholesale minimum packs',
     'wholesaleIncrement': 'Wholesale quantity step',
     'wholesaleTiers': 'Quantity prices (packs:price; packs:price)',
+    'priceChangesFrequently': 'Trade price changes frequently (yes or no)',
+    'priceValidityMinutes': 'Trade price validity in minutes',
     'retailTaxAmount': 'Retail tax amount per selling pack',
     'retailTaxBasis': 'Retail tax basis (included or additional)',
     'wholesaleTaxAmount': 'Trade tax amount per selling pack',
@@ -449,6 +451,16 @@ class WorkspaceSellingInputs {
       }
       final exact = existingWholesale?.usesExplicitMinor == true ||
           price % 100 != 0 || tiers.any((tier) => tier.packPriceMinor % 100 != 0);
+      final refreshChoice = value('priceChangesFrequently').toLowerCase();
+      if (!{'', 'yes', 'no'}.contains(refreshChoice)) {
+        throw const FormatException('priceChangesFrequently: choose yes or no.');
+      }
+      final frequent = refreshChoice.isEmpty ? existingWholesale?.priceValidityMinutes != null : refreshChoice == 'yes';
+      final validity = frequent ? (fields.containsKey('priceValidityMinutes')
+          ? int.tryParse(value('priceValidityMinutes')) : existingWholesale?.priceValidityMinutes) : null;
+      if (frequent && (validity == null || validity < 1 || validity > 525600)) {
+        throw const FormatException('priceValidityMinutes: enter how many minutes you will honour this price (1–525600).');
+      }
       wholesale = WorkspaceWholesaleOffer(
         priceRupees: exact ? null : price ~/ 100,
         priceMinor: exact ? price : null,
@@ -457,6 +469,7 @@ class WorkspaceSellingInputs {
         tiers: tiers,
         enabled: enabled,
         saleType: saleType,
+        priceValidityMinutes: validity,
       );
       if (!wholesale.valid) {
         throw const FormatException(
@@ -472,6 +485,7 @@ class WorkspaceSellingInputs {
         tiers: wholesale.tiers,
         enabled: false,
         saleType: wholesale.saleType,
+        priceValidityMinutes: wholesale.priceValidityMinutes,
       );
     }
     BuyV2SupplierTaxAmount? tax(String prefix, BuyV2SupplierTaxAmount? existing) {
@@ -617,6 +631,7 @@ class WorkspaceWholesaleOffer {
     this.incrementPacks = 1,
     this.enabled = false,
     this.saleType,
+    this.priceValidityMinutes,
     List<BuyV2ComparisonPriceTier> tiers = const [],
   }) : _legacyPrice = priceRupees, _priceMinor = priceMinor,
        tiers = List.unmodifiable(tiers);
@@ -630,9 +645,13 @@ class WorkspaceWholesaleOffer {
   /// Explicit business classification, never inferred from pack, MOQ or price.
   /// Missing legacy values may remain private stock but are not publish-ready.
   final BuyV2WholesaleSaleType? saleType;
+  /// Private supplier preference. Only an explicit server confirmation can
+  /// establish a public confirmation time or reserve a selling price.
+  final int? priceValidityMinutes;
   final List<BuyV2ComparisonPriceTier> tiers;
   bool get valid {
-    if (_legacyPrice != null && _priceMinor != null) return false;
+    if (_legacyPrice != null && _priceMinor != null ||
+        priceValidityMinutes != null && (priceValidityMinutes! < 1 || priceValidityMinutes! > 525600)) return false;
     final int price;
     try { price = priceMinor; } on FormatException { return false; }
     if (price <= 0 ||
@@ -685,6 +704,7 @@ class WorkspaceWholesaleOffer {
     'incrementPacks': incrementPacks,
     'enabled': enabled,
     if (saleType != null) 'saleType': saleType!.name,
+    if (priceValidityMinutes != null) 'priceRefresh': {'version': 1, 'validityMinutes': priceValidityMinutes},
     'tiers': [
       for (final t in tiers)
         {'minimumPacks': t.minimumPacks, 'packPriceMinor': t.packPriceMinor},
@@ -707,6 +727,11 @@ class WorkspaceWholesaleOffer {
       throw const FormatException('Invalid wholesale amount units.');
     }
     final rawType = raw['saleType'];
+    final refresh = raw['priceRefresh'];
+    if (raw.containsKey('priceRefresh') && (refresh is! Map || refresh.length != 2 ||
+        refresh['version'] is! int || refresh['version'] != 1 || refresh['validityMinutes'] is! int)) {
+      throw const FormatException('Saved price validity needs recovery.');
+    }
     final saleType = switch (rawType) {
       null => null,
       'wholesale' => BuyV2WholesaleSaleType.wholesale,
@@ -734,6 +759,7 @@ class WorkspaceWholesaleOffer {
       incrementPacks: raw['incrementPacks'] as int,
       enabled: raw['enabled'] as bool,
       saleType: saleType,
+      priceValidityMinutes: refresh == null ? null : refresh['validityMinutes'] as int,
       tiers: tiers,
     );
     if (!result.valid) {

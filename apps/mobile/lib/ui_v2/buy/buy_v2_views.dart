@@ -3752,7 +3752,9 @@ class _ProductPriceExtrasState extends State<_ProductPriceExtras>
                   _ProductInfoRow(label: 'Supplier GST',
                     value: _supplierGstDisclosure(product.packTerms,
                       facts.stale ? null : _supplierGstForPack(product.packTerms,
-                        product.offerClass == BuyV2OfferClass.bulk ? null : facts.priceMinor))),
+                        product.requiresSupplierQuote ? null : facts.priceMinor))),
+                  BuyV2PriceFreshness(product: product, now: widget.session.catalogueNow,
+                    onRequestRefresh: () => widget.session.requestCommodityPriceRefresh(product)),
                   if (hasTiers) ...[
                     for (final tier in terms.priceTiers)
                       _ProductInfoRow(
@@ -4806,7 +4808,7 @@ class _WholesaleTradeDecisionPanelState
         : null;
     final taxAndInvoice = terms?.supplierTaxDeclaration != null
         ? '${_supplierGstDisclosure(terms, facts.stale ? null : _supplierGstForPack(terms,
-            product.offerClass == BuyV2OfferClass.bulk ? null : facts.priceMinor))} · Invoice not confirmed'
+            product.requiresSupplierQuote ? null : facts.priceMinor))} · Invoice not confirmed'
         : taxIncluded == null
         ? 'Tax and invoice not confirmed'
         : '${taxIncluded ? 'Tax included' : 'Tax excluded'} · Invoice not confirmed';
@@ -4878,9 +4880,9 @@ class _WholesaleTradeDecisionPanelState
               _DecisionRow(
                 icon: Icons.event_available_outlined,
                 label: 'Price checked',
-                value: _signal?.hasCurrentSignal == true
+                value: product.packTerms?.priceFreshnessLabel(widget.session.catalogueNow()) ?? (_signal?.hasCurrentSignal == true
                     ? _signal?.priceValidUntilLabel ?? product.confirmedOn
-                    : product.confirmedOn,
+                    : product.confirmedOn),
               ),
             ],
           ),
@@ -8650,6 +8652,10 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
             onPressed: session.cartChangesBlocked ? null : () => _showBulkQuotes(context, session, requestStore: store),
             icon: const Icon(Icons.request_quote_outlined),
             label: Text('Request Bulk quote · ${session.cartLines.firstWhere((line) => line.product.storeId == store).product.seller.trim().isEmpty ? 'Store' : session.cartLines.firstWhere((line) => line.product.storeId == store).product.seller}'))),
+      if (lines.any((line) => line.product.packTerms?.commodityPriceRevision != null))
+        TextButton.icon(key: const Key('buy-cart-refresh-commodity-prices'),
+          onPressed: session.cartChangesBlocked ? null : session.refreshCommodityPricesInCart,
+          icon: const Icon(Icons.price_check), label: const Text('Check current supplier prices')),
       if (!session.isStoreProcurement &&
           session.cartScope != BuyV2CartScope.medicine &&
           lines.isNotEmpty)
@@ -8842,7 +8848,9 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
           final compactAccessible =
               constraints.maxWidth < 350 && textScale > 1.2;
           final priceUnavailable = session.scopedProcurementPricesUnavailable || session.hasSupplierQuoteProducts &&
-            session.cartLines.any((l) => l.product.publicListingIdentity?.channel == BuyV2OfferClass.bulk && session.agreedUnitPriceFor(l) == null);
+            session.cartLines.any((l) => l.product.requiresSupplierQuote && session.agreedUnitPriceFor(l) == null) ||
+            !session.checkoutRequiresResolution && lines.any((l) => l.product.packTerms?.commodityPriceRevision != null &&
+              l.product.packTerms?.pricingCurrentAt(session.catalogueNow()) != true);
           final freightIncluded = lines.every(
             (line) => line.product.freightIncluded,
           );
@@ -24871,8 +24879,9 @@ class _CartLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final product = line.product;
     final agreed = session.agreedUnitPriceFor(line);
-    final publishedBulk = !session.isStoreProcurement && product.publicListingIdentity?.channel == BuyV2OfferClass.bulk;
-    final priceUnavailable = publishedBulk && agreed == null || session.procurementRetainedPriceUnavailable(
+    final publishedBulk = !session.isStoreProcurement && product.requiresSupplierQuote;
+    final priceUnavailable = publishedBulk && agreed == null || product.packTerms?.commodityPriceRevision != null &&
+      product.packTerms?.pricingCurrentAt(session.catalogueNow()) != true || session.procurementRetainedPriceUnavailable(
       product,
     );
     final facts = session.productFactsFor(product);
@@ -25301,6 +25310,8 @@ class _CartLine extends StatelessWidget {
                       ),
                     if (compactTitle && !stackMedia) purchaseControls,
                     BuyV2AdvertisedOfferLink(session: session, product: product),
+                    BuyV2PriceFreshness(product: product, now: session.catalogueNow,
+                      onRequestRefresh: () => session.requestCommodityPriceRefresh(product)),
                     if (line.scheduledFulfilment case final selected?) ...[
                       const SizedBox(height: 5),
                       Text('Requested delivery · ${_scheduledWindowLabel(context, selected)}',

@@ -892,6 +892,62 @@ enum BuyV2ProductOfferDecisionState {
 }
 
 @immutable
+class BuyV2PriceFreshness extends StatefulWidget {
+  const BuyV2PriceFreshness({super.key, required this.product, required this.now, this.onRequestRefresh});
+  final BuyV2Product product;
+  final DateTime Function() now;
+  final Future<bool> Function()? onRequestRefresh;
+  @override State<BuyV2PriceFreshness> createState() => _BuyV2PriceFreshnessState();
+}
+class _BuyV2PriceFreshnessState extends State<BuyV2PriceFreshness> {
+  Timer? _timer;
+  bool _requesting = false, _recorded = false;
+  int _requestGeneration = 0;
+  String? _requestError;
+  @override void initState() { super.initState(); _schedule(); }
+  @override void didUpdateWidget(covariant BuyV2PriceFreshness oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.product.id != widget.product.id || oldWidget.product.packTerms?.revision != widget.product.packTerms?.revision) {
+      _requestGeneration++;
+      _requesting = false; _recorded = false; _requestError = null;
+    }
+    _schedule();
+  }
+  Future<void> _request() async {
+    final callback = widget.onRequestRefresh;
+    if (_requesting || callback == null) return;
+    final generation = ++_requestGeneration;
+    setState(() { _requesting = true; _requestError = null; });
+    bool recorded;
+    try { recorded = await callback(); } on Object { recorded = false; }
+    if (!mounted || generation != _requestGeneration) return;
+    setState(() { _requesting = false; _recorded = recorded; _requestError = recorded ? null : 'Price refresh request not confirmed. Try checking the product again.'; });
+  }
+  void _schedule() {
+    _timer?.cancel();
+    final terms = widget.product.packTerms;
+    if (terms?.commodityPriceRevision == null) return;
+    final remaining = terms!.priceValidUntil!.difference(widget.now());
+    final delay = remaining > Duration.zero && remaining < const Duration(minutes: 1) ? remaining : const Duration(minutes: 1);
+    _timer = Timer(delay, () { if (mounted) { setState(() {}); _schedule(); } });
+  }
+  @override void dispose() { _timer?.cancel(); super.dispose(); }
+  @override Widget build(BuildContext context) {
+    final terms = widget.product.packTerms, label = widget.product.packTerms?.priceFreshnessLabel(widget.now());
+    if (label == null) return const SizedBox.shrink();
+    final text = Text(label, key: ValueKey('buy-price-freshness-${widget.product.id}'),
+      style: TextStyle(fontSize: 11, height: 1.25,
+        color: terms!.pricingCurrentAt(widget.now()) ? BuyV2Colors.muted : BuyV2Colors.orange));
+    if (widget.onRequestRefresh == null || terms.pricingCurrentAt(widget.now())) return text;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [text,
+      TextButton(key: ValueKey('buy-request-price-refresh-${widget.product.id}'),
+        onPressed: _requesting || _recorded ? null : _request,
+        child: Text(_recorded ? 'Price refresh requested' : _requesting ? 'Requesting price refresh…' : 'Ask supplier to refresh price')),
+      if (_requestError != null) Text(_requestError!, style: const TextStyle(fontSize: 12)),
+    ]);
+  }
+}
+
 class BuyV2ProductOfferDecision {
   const BuyV2ProductOfferDecision({
     required this.state,

@@ -323,6 +323,98 @@ export interface StoreSkuInput {
 export interface StoreSkuRecord extends StoreSkuInput {
   schemaVersion: 1; storeId: string; revision: number; observedAt: string;
 }
+export interface CommodityPriceRecord {
+  schemaVersion: 1; realm: "evaluation" | "production"; storeId: string; skuId: string;
+  channel: "wholesale" | "bulk"; revision: number; skuRevision: number;
+  baseFingerprint: string; confirmedBy: string; confirmedAt: string; validUntil: string;
+  frequent: boolean; terms: StoreSkuChannel; integrity: string;
+}
+interface CommodityPriceReceipt {fingerprint: string; record: CommodityPriceRecord}
+interface CommodityPriceSource {
+  record: StoreSkuRecord; catalogue: CatalogueAggregate; profile: WorkspaceProfileRecord;
+  authority?: CatalogueProducerAuthority | undefined; participant?: SupplyParticipantWorkspace | undefined;
+}
+function commodityRequest(raw: Readonly<Record<string, unknown>>) {
+  const r = exact(raw, ['storeId', 'skuId', 'channel', 'skuRevision', 'expectedRevision',
+    'idempotencyKey', 'frequent', 'validityMinutes', 'priceMinor', 'tiers']);
+  if (r.channel !== 'wholesale' && r.channel !== 'bulk') invalid();
+  return {storeId: id(r.storeId), skuId: id(r.skuId), channel: r.channel as 'wholesale' | 'bulk',
+    skuRevision: integer(r.skuRevision, 1, 1000000000), expectedRevision: integer(r.expectedRevision, 0, 999999999),
+    idempotencyKey: id(r.idempotencyKey), frequent: boolean(r.frequent),
+    validityMinutes: integer(r.validityMinutes, 1, 525600), priceMinor: integer(r.priceMinor, 1, 99999999900),
+    tiers: list(r.tiers, 20).map(raw => {const t = exact(raw, ['minimumQuantity', 'unitPriceMinor']);
+      return {minimumQuantity: integer(t.minimumQuantity, 1, 999999), unitPriceMinor: integer(t.unitPriceMinor, 1, 99999999900)};})};
+}
+function checkedCommodityPrice(raw: unknown): CommodityPriceRecord {
+  const r = exact(raw, ['schemaVersion', 'realm', 'storeId', 'skuId', 'channel', 'revision', 'skuRevision',
+    'baseFingerprint', 'confirmedBy', 'confirmedAt', 'validUntil', 'frequent', 'terms', 'integrity']);
+  const terms = exact(r.terms, ['kind', 'offerId', 'priceMinor', 'mrpMinor', 'minimumOrder', 'quantityStep', 'tiers'], ['supplierTax']);
+  const normalized = {...authoredChannel(terms), offerId: id(terms.offerId)};
+  const {integrity, ...body} = r;
+  if (r.schemaVersion !== 1 || !['evaluation', 'production'].includes(String(r.realm)) ||
+      !['wholesale', 'bulk'].includes(String(r.channel)) || normalized.kind !== r.channel ||
+      cataloguePayloadHash(normalized) !== cataloguePayloadHash(r.terms) || integrity !== cataloguePayloadHash(body) ||
+      typeof r.baseFingerprint !== 'string' || !/^[A-F0-9]{64}$/u.test(r.baseFingerprint) ||
+      stockTime(r.confirmedAt) >= stockTime(r.validUntil)) invalid('Saved price confirmation needs recovery.');
+  id(r.storeId); id(r.skuId); id(r.confirmedBy); boolean(r.frequent);
+  integer(r.revision, 1, 1000000000); integer(r.skuRevision, 1, 1000000000);
+  return structuredClone(r) as unknown as CommodityPriceRecord;
+}
+function commoditySupplier(actorId: string, identity: CatalogueIdentity, source: CommodityPriceSource,
+  at: string, until = at): void {
+  const actor = producerActor(actorId, identity, at, source.authority), p = source.participant;
+  const r = source.record;
+  const deny = () => new WorkspaceProfileError('forbidden', 'Supplier price confirmation is not available.', 403);
+  requireStore(source.profile, r.storeId, actorId, true);
+  if (!source.profile.shopEnabled || actor.workspaceId !== r.storeId || !actor.scopes.includes('supply.workspace.admin') ||
+      !p || p.workspaceId !== r.storeId || p.tenantId !== identity.tenantId || p.status !== 'registered' ||
+      Date.parse(source.authority!.expiresAt) <= Date.parse(until)) throw deny();
+  const base = r.channels.find(c => c.kind !== 'retail');
+  const offer = base && source.catalogue.offers.find(o => o.offerId === base.offerId && o.workspaceId === r.storeId &&
+    o.packId === r.verifiedPackId && o.buyingContext === 'wholesale');
+  if (!offer?.serviceAreaIds.length || offer.serviceAreaIds.some(serviceAreaId => [at, until].some(time =>
+    !currentCapability(p, {capability: 'wholesale_supply', at: time, categoryId: r.content.categoryId, serviceAreaId})))) throw deny();
+}
+/** Supplier commercial authority is separate from reviewed product/media facts.
+ * No caller timestamp, public approval, Stock movement or payment result. */
+export function planCommodityPriceConfirmation(actorId: string, realm: CommodityPriceRecord['realm'], identity: CatalogueIdentity,
+  raw: Readonly<Record<string, unknown>>, source: CommodityPriceSource, at: string,
+  current?: CommodityPriceRecord, receipt?: CommodityPriceReceipt): CommodityPriceReceipt {
+  const q = commodityRequest(raw), r = normalizeRecord(source.record, q.storeId);
+  stockTime(at);
+  if (source.catalogue.catalogueId !== identity.catalogueId || source.catalogue.tenantId !== identity.tenantId ||
+      r.storeId !== q.storeId || r.skuId !== q.skuId) invalid();
+  // Receipt recovery returns the original, never a renewed confirmation.
+  requireStore(source.profile, q.storeId, actorId, true);
+  const fingerprint = cataloguePayloadHash({actorId, realm, identity, request: q});
+  if (receipt) {
+    const saved = checkedCommodityPrice(receipt.record);
+    if (receipt.fingerprint !== fingerprint || saved.realm !== realm || saved.storeId !== q.storeId ||
+        saved.skuId !== q.skuId || saved.confirmedBy !== actorId) {
+      throw new WorkspaceProfileError('conflict', 'Use the original price confirmation request.', 409);
+    }
+    return {fingerprint, record: saved};
+  }
+  const until = new Date(Date.parse(at) + q.validityMinutes * 60000).toISOString();
+  commoditySupplier(actorId, identity, source, at, until);
+  const base = r.channels.find(c => c.kind === q.channel), pack = source.catalogue.packs.find(p => p.packId === r.verifiedPackId);
+  const product = reviewedCanonicalProduct(source.catalogue, r.canonicalProductId, cataloguePayloadHash(r.content));
+  const offer = base && source.catalogue.offers.find(o => o.offerId === base.offerId && o.workspaceId === q.storeId &&
+    o.packId === r.verifiedPackId && o.buyingContext === 'wholesale');
+  if (!r.publicListing || !base || product?.state !== 'verified' || pack?.state !== 'verified' ||
+      pack.productId !== product.productId || pack.descriptorSha256.toUpperCase() !== cataloguePayloadHash(r.pack) ||
+      !canonicalContentMatches(product, r.content) || !offer?.termWindows.some(w =>
+        w.termSnapshotSha256.toUpperCase() === cataloguePayloadHash(channelTerms(base)))) invalid('Publish and review this exact product before confirming its price.');
+  if (r.revision !== q.skuRevision || (current ? checkedCommodityPrice(current).revision : 0) !== q.expectedRevision) {
+    throw new WorkspaceProfileError('conflict', 'Price or product changed. Review the current price first.', 409);
+  }
+  const {offerId, ...baseTerms} = base;
+  const terms = {...authoredChannel({...baseTerms, priceMinor: q.priceMinor, tiers: q.tiers}), offerId};
+  const body = {schemaVersion: 1 as const, realm, storeId: q.storeId, skuId: q.skuId, channel: q.channel,
+    revision: q.expectedRevision + 1, skuRevision: r.revision, baseFingerprint: cataloguePayloadHash(r),
+    confirmedBy: actorId, confirmedAt: at, validUntil: until, frequent: q.frequent, terms};
+  return {fingerprint, record: {...body, integrity: cataloguePayloadHash(body)}};
+}
 /** Owner-authored intent, not canonical/pack/offer identity or publication. */
 export interface StoreProductSubmissionInput {
   schemaVersion: 1; skuId: string; sku: string; barcode: string;
@@ -444,6 +536,12 @@ function productPresentationQuery(raw: unknown): ProductPresentationQuery {
 
 export interface WorkspaceCatalogueRepository {
   readonly realm: "evaluation" | "production";
+  commodityPrice?(owner: string, action: 'confirm' | 'read' | 'reconcile', raw: Readonly<Record<string, unknown>>,
+    identity: CatalogueIdentity): Promise<CommodityPriceRecord | null>;
+  commodityRefreshRequested?(owner: string, storeId: string, skuId: string, priceRevision: number): Promise<boolean>;
+  commodityReadbackRequired?(storeId: string, skuId?: string): Promise<boolean>;
+  requestCommodityRefresh?(actor: string, raw: Readonly<Record<string, unknown>>, identity: CatalogueIdentity,
+    admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object>;
   produceCatalogue?(operatorUserId: string, identity: CatalogueIdentity,
     input: Readonly<Record<string, unknown>>): Promise<CatalogueAggregate>;
   proposeSubmittedCatalogue?(operatorUserId: string, identity: CatalogueIdentity,
@@ -506,6 +604,9 @@ export interface PublicCatalogueSource {
   profile: WorkspaceProfileRecord; catalogue: CatalogueAggregate; records: StoreSkuRecord[];
   bindings: PublicCatalogueListingBinding[]; policy: unknown; publicDetails?: unknown;
   variantFamilies?: {revision: number; reviews: StoreVariantFamilyReview[]};
+  commodityPrices?: CommodityPriceRecord[];
+  commodityAuthority?: CatalogueProducerAuthority;
+  commodityParticipant?: SupplyParticipantWorkspace;
 }
 
 export function normalizeStorePublicDetails(raw: unknown): StorePublicDetailsInput {
@@ -945,6 +1046,34 @@ export class WorkspaceCatalogueService {
     private readonly now: () => Date = () => new Date(),
     private readonly policyReader?: Pick<WorkspaceSupplierPolicyService, "forPublicSku">) {}
 
+  async handleCommodityPrice(owner: string, operation: string, raw: Readonly<Record<string, unknown>>): Promise<object> {
+    const action = operation === 'confirmStoreCommodityPrice' ? 'confirm' : operation === 'readStoreCommodityPrice' ? 'read'
+      : operation === 'reconcileStoreCommodityPrice' ? 'reconcile' : undefined;
+    if (!action) invalid();
+    if (!this.identity || !this.repository.commodityPrice) {
+      throw new WorkspaceProfileError('service_unavailable', 'Supplier price confirmation is not connected.', 503, true);
+    }
+    const record = await this.repository.commodityPrice(owner, action, raw, this.identity);
+    const refreshRequested = action === 'read' && record && this.repository.commodityRefreshRequested
+      ? await this.repository.commodityRefreshRequested(owner, id(raw.storeId), id(raw.skuId), record.revision) : false;
+    return {schemaVersion: 1, realm: this.repository.realm, storeId: id(raw.storeId), skuId: id(raw.skuId),
+      operation, record, orderingAvailable: false, ...(action === 'read' ? {refreshRequested} : {})};
+  }
+  async requestCommodityRefresh(actor: string, raw: Readonly<Record<string, unknown>>): Promise<object> {
+    const q = exact(raw, ['storeId', 'skuId', 'priceRevision']);
+    const storeId = id(q.storeId), skuId = id(q.skuId), revision = integer(q.priceRevision, 1, 1000000000);
+    if (!this.identity || !this.repository.requestCommodityRefresh) {
+      throw new WorkspaceProfileError('service_unavailable', 'Supplier price refresh is not connected.', 503, true);
+    }
+    return this.repository.requestCommodityRefresh(id(actor), {storeId, skuId, priceRevision: revision}, this.identity, async source => {
+      const response = await this.publicCatalogue({storeId, skuId, listingReadbackVersion: 1, commodityPriceReadbackVersion: 1,
+        supplierTaxReadbackVersion: 1, supplierPublishersVersion: 1, productFactsReadbackVersion: 1,
+        mediaReadbackVersion: 1, unbrandedProduceReadbackVersion: 1}, source) as {state: string; items: Array<{channels: Array<{priceConfirmation?: {revision: number}; validUntil: string}>}>};
+      return response.state === 'ready' && response.items.length === 1 && response.items[0]!.channels.some(c =>
+        c.priceConfirmation?.revision === revision && c.validUntil <= this.now().toISOString());
+    });
+  }
+
   /** Internal coupon price projection from the caller's read transaction.
    * Selected SKU reads do not scan/truncate a larger Store catalogue. */
   async couponPriceSnapshot(storeId: string, skuIds: readonly string[], tx: Transaction): Promise<object[]> {
@@ -963,6 +1092,7 @@ export class WorkspaceCatalogueService {
     const source = await this.repository.publicCatalogueSource(storeId, this.identity, false, tx, selected);
     if (!source) invalid("Coupon price source is unavailable.");
     return Promise.all(selected.map(skuId => this.publicCatalogue({storeId, skuId,
+      ...(source.commodityPrices?.length ? {commodityPriceReadbackVersion: 1} : {}),
       supplierTaxReadbackVersion: 1,
       listingReadbackVersion: 1, mediaReadbackVersion: 1, productFactsReadbackVersion: 1,
       unbrandedProduceReadbackVersion: 1, supplierPublishersVersion: 1, ...(policies ? {policyReadbackVersion: 1} : {})},
@@ -1047,6 +1177,7 @@ export class WorkspaceCatalogueService {
     return this.repository.storeStock(action === "public" ? undefined : actor, action, request, {...this.identity}, async source => {
       const page = await this.publicCatalogue({storeId: request.storeId, skuId: request.binding.skuId,
         supplierTaxReadbackVersion: 1,
+        ...(source.commodityPrices?.length ? {commodityPriceReadbackVersion: 1} : {}),
         supplierPublishersVersion: 1,
         listingReadbackVersion: 1, mediaReadbackVersion: 1, productFactsReadbackVersion: 1,
         unbrandedProduceReadbackVersion: 1}, source) as {state: string;
@@ -1114,6 +1245,7 @@ export class WorkspaceCatalogueService {
     return record.call(this.repository, id(actor), input, this.identity, async source => {
       const response = await this.publicCatalogue({storeId: input.storeId, skuId: input.skuId, listingReadbackVersion: 1,
         supplierTaxReadbackVersion: 1,
+        ...(source.commodityPrices?.length ? {commodityPriceReadbackVersion: 1} : {}),
         supplierPublishersVersion: 1,
         mediaReadbackVersion: 1, productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1}, source) as {
           state: string; catalogueVersion?: number; items: Array<{skuId: string; revision: number;
@@ -1145,6 +1277,7 @@ export class WorkspaceCatalogueService {
     return this.repository.recordStorePresentation(id(actor), input, this.identity, async source => {
       const page = await this.publicCatalogue({storeId: input.storeId, listingReadbackVersion: 1, mediaReadbackVersion: 1,
         supplierTaxReadbackVersion: 1,
+        ...(source.commodityPrices?.length ? {commodityPriceReadbackVersion: 1} : {}),
         supplierPublishersVersion: 1,
         productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1,
         storeDetailsReadbackVersion: 1, storeClassificationReadbackVersion: 1}, source) as {state: string; catalogueVersion?: number};
@@ -1166,6 +1299,7 @@ export class WorkspaceCatalogueService {
       for (const witness of input.listings) {
         const response = await this.publicCatalogue({storeId: input.storeId, skuId: witness.skuId,
           supplierTaxReadbackVersion: 1,
+        ...(source.commodityPrices?.length ? {commodityPriceReadbackVersion: 1} : {}),
           listingReadbackVersion: 1, supplierPublishersVersion: 1, mediaReadbackVersion: 1,
           productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1}, source) as {
             state: string; catalogueVersion?: number; items: Array<{skuId: string; revision: number;
@@ -1208,6 +1342,7 @@ export class WorkspaceCatalogueService {
       independentProductReview(source.catalogue, record, upload.ownerUserId);
       const page = await this.publicCatalogue({storeId, skuId, listingReadbackVersion: 1, productFactsReadbackVersion: 1,
         supplierTaxReadbackVersion: 1,
+        ...(source.commodityPrices?.length ? {commodityPriceReadbackVersion: 1} : {}),
         supplierPublishersVersion: 1,
         unbrandedProduceReadbackVersion: 1, mediaReadbackVersion: 1}, source) as {state?: string; items?: Array<{skuId: string}>};
       if (page.state !== "ready" || !page.items?.some(item => item.skuId === skuId)) throw missing();
@@ -1227,7 +1362,8 @@ export class WorkspaceCatalogueService {
    * projection. Above capacity fail honestly; never sort/count a truncated set.
    */
   async publicDiscovery(body: Readonly<Record<string, unknown>>): Promise<object> {
-    exact(body, ["discoveryPageVersion", "query", "pageSize"], ["cursor", "resultKind", "storeId", "supplierPublishersVersion", "supplierTaxReadbackVersion"]);
+    exact(body, ["discoveryPageVersion", "query", "pageSize"], ["cursor", "resultKind", "storeId", "supplierPublishersVersion", "supplierTaxReadbackVersion", "commodityPriceReadbackVersion"]);
+    const commodityRequested = commodityPriceReadbackRequested(body);
     const taxRequested = supplierTaxReadbackRequested(body);
     const suppliersRequested = supplierPublishersRequested(body);
     if (body.discoveryPageVersion !== 1) invalid();
@@ -1275,6 +1411,7 @@ export class WorkspaceCatalogueService {
         const source = values[i]!.source;
         if (!source) continue;
         const data = await service.publicCatalogue({storeId: storeIds[i], listingReadbackVersion: 1,
+          ...(commodityRequested ? {commodityPriceReadbackVersion: 1} : {}),
           ...(taxRequested ? {supplierTaxReadbackVersion: 1} : {}),
           ...(suppliersRequested ? {supplierPublishersVersion: 1} : {}),
           productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1,
@@ -1309,6 +1446,7 @@ export class WorkspaceCatalogueService {
       channels: Array<StoreSkuChannel & {revision: string; validUntil: string}>; listings: PublicCatalogueListingBinding[]};
     const selected: Array<{channel: StoreSkuChannel["kind"]; listing: Record<string, unknown>; listingId: string; price: number}> = [];
     for (const data of finalProjections) for (const row of data.items as Row[]) for (const channel of row.channels) {
+      if ('priceState' in channel && channel.priceState === 'expired') continue;
       if (requestedStore !== null && data.storeId !== requestedStore) continue;
       if (query.destination === "shop" ? channel.kind !== "retail" : channel.kind === "retail") continue;
       if (query.tradeType !== null && channel.kind !== query.tradeType) continue;
@@ -1380,7 +1518,8 @@ export class WorkspaceCatalogueService {
   }
 
   async publicVariantFamilies(body: Readonly<Record<string, unknown>>): Promise<object> {
-    exact(body, ["storeId", "listings"], ["familyId", "storeClassificationReadbackVersion", "supplierPublishersVersion", "supplierTaxReadbackVersion"]);
+    exact(body, ["storeId", "listings"], ["familyId", "storeClassificationReadbackVersion", "supplierPublishersVersion", "supplierTaxReadbackVersion", "commodityPriceReadbackVersion"]);
+    const commodityRequested = commodityPriceReadbackRequested(body);
     const taxRequested = supplierTaxReadbackRequested(body);
     const suppliersRequested = supplierPublishersRequested(body);
     const classificationRequested = body.storeClassificationReadbackVersion === 1;
@@ -1396,6 +1535,7 @@ export class WorkspaceCatalogueService {
         familyId !== undefined && requested.length !== 1) invalid();
     const observedAt = this.now().toISOString();
     const base = {schemaVersion: 1, realm: this.repository.realm, storeId, observedAt, orderingAvailable: false,
+      ...(commodityRequested ? {commodityPriceReadbackVersion: 1} : {}),
       ...(taxRequested ? {supplierTaxReadbackVersion: 1} : {}),
       ...(suppliersRequested ? {supplierPublishersVersion: 1} : {}),
       ...(classificationRequested ? {storeClassificationReadbackVersion: 1, storeDetailsReadbackVersion: 1} : {})};
@@ -1416,6 +1556,7 @@ export class WorkspaceCatalogueService {
     if (relevant.size > 500) return unavailable();
     const records = source.records.filter(r => relevant.has(r.skuId));
     const projection = await this.publicCatalogue({storeId, listingReadbackVersion: 1, policyReadbackVersion: 1,
+      ...(commodityRequested ? {commodityPriceReadbackVersion: 1} : {}),
       ...(taxRequested ? {supplierTaxReadbackVersion: 1} : {}),
       ...(suppliersRequested ? {supplierPublishersVersion: 1} : {}),
       ...(classificationRequested ? {storeClassificationReadbackVersion: 1, storeDetailsReadbackVersion: 1} : {}),
@@ -1592,7 +1733,8 @@ export class WorkspaceCatalogueService {
   }
 
   private async publicCataloguePage(body: Readonly<Record<string, unknown>>): Promise<object> {
-    exact(body, ["storeId", "cataloguePageVersion", "query", "pageSize"], ["cursor", "storeDetailsReadbackVersion", "productFactsReadbackVersion", "unbrandedProduceReadbackVersion", "storeClassificationReadbackVersion", "supplierPublishersVersion", "supplierTaxReadbackVersion"]);
+    exact(body, ["storeId", "cataloguePageVersion", "query", "pageSize"], ["cursor", "storeDetailsReadbackVersion", "productFactsReadbackVersion", "unbrandedProduceReadbackVersion", "storeClassificationReadbackVersion", "supplierPublishersVersion", "supplierTaxReadbackVersion", "commodityPriceReadbackVersion"]);
+    const commodityRequested = commodityPriceReadbackRequested(body);
     const taxRequested = supplierTaxReadbackRequested(body);
     const suppliersRequested = supplierPublishersRequested(body);
     const classificationRequested = body.storeClassificationReadbackVersion === 1;
@@ -1617,6 +1759,7 @@ export class WorkspaceCatalogueService {
     const sourceHash = cataloguePayloadHash(source);
     const data = await this.publicCatalogue({storeId, listingReadbackVersion: 1,
       ...(taxRequested ? {supplierTaxReadbackVersion: 1} : {}),
+      ...(commodityRequested ? {commodityPriceReadbackVersion: 1} : {}),
       ...(suppliersRequested ? {supplierPublishersVersion: 1} : {}),
       ...(classificationRequested ? {storeClassificationReadbackVersion: 1} : {}),
       ...(produceRequested ? {unbrandedProduceReadbackVersion: 1} : {}),
@@ -1631,6 +1774,7 @@ export class WorkspaceCatalogueService {
       listings: PublicCatalogueListingBinding[]; supplierPolicy: Record<string, unknown>}>;
     const selected: Array<{channel: StoreSkuChannel["kind"]; listingId: string; row: (typeof rows)[number]; price: number}> = [];
     for (const row of rows) for (const channel of row.channels) {
+      if ('priceState' in channel && channel.priceState === 'expired') continue;
       if (query.destination === "shop" ? channel.kind !== "retail" : channel.kind === "retail") continue;
       if (query.tradeType !== null && channel.kind !== query.tradeType) continue;
       const binding = row.listings.find(value => value.channel === channel.kind)!;
@@ -1681,6 +1825,7 @@ export class WorkspaceCatalogueService {
     // of ALL candidates, including offers which were not active on the first pass.
     const finalProjection = await new WorkspaceCatalogueService(this.repository, this.identity,
       () => new Date(responseAt), this.policyReader).publicCatalogue({storeId, listingReadbackVersion: 1,
+      ...(commodityRequested ? {commodityPriceReadbackVersion: 1} : {}),
       ...(taxRequested ? {supplierTaxReadbackVersion: 1} : {}),
       ...(suppliersRequested ? {supplierPublishersVersion: 1} : {}),
       ...(classificationRequested ? {storeClassificationReadbackVersion: 1} : {}),
@@ -1704,6 +1849,9 @@ export class WorkspaceCatalogueService {
   async publicCatalogue(body: Readonly<Record<string, unknown>>, source?: PublicCatalogueSource): Promise<object> {
     if (Object.hasOwn(body, "cataloguePageVersion")) return this.publicCataloguePage(body);
     const queryBody = structuredClone(body) as Record<string, unknown>;
+    const commodityRequested = queryBody.commodityPriceReadbackVersion === 1;
+    if (Object.hasOwn(queryBody, 'commodityPriceReadbackVersion') && !commodityRequested) invalid();
+    delete queryBody.commodityPriceReadbackVersion;
     const taxRequested = supplierTaxReadbackRequested(queryBody);
     delete queryBody.supplierTaxReadbackVersion;
     const suppliersRequested = supplierPublishersRequested(queryBody);
@@ -1732,9 +1880,34 @@ export class WorkspaceCatalogueService {
     if (detailsRequested && !listingsRequested) invalid();
     if (classificationRequested && !detailsRequested) invalid();
     const query = pageQuery(queryBody);
+    let snapshotUnavailable = false;
+    const checkLegacyPrices = async () => {
+      if (!source && !commodityRequested && await this.repository.commodityReadbackRequired?.(query.storeId, query.skuId)) {
+        throw new WorkspaceProfileError('unsupported_version', 'Update MoolSocial to check the current supplier price.', 409);
+      }
+    };
+    await checkLegacyPrices();
+    // Include price heads, supplier authority and reviewed facts in one source
+    // snapshot, then detect changes during asynchronous policy/content reads.
+    if (!source && commodityRequested && this.identity && this.repository.publicCatalogueSource) {
+      const snapshot = await this.repository.publicCatalogueSource(query.storeId, this.identity, false, undefined,
+        query.skuId ? [query.skuId] : undefined);
+      if (snapshot) {
+        const records = snapshot.records.filter(r => !query.after || r.skuId > query.after).slice(0, query.limit);
+        const result = await this.publicCatalogue(body, {...snapshot, records});
+        const fresh = await this.repository.publicCatalogueSource(query.storeId, this.identity, false, undefined,
+          query.skuId ? [query.skuId] : undefined);
+        if (cataloguePayloadHash(fresh ?? null) !== cataloguePayloadHash(snapshot)) {
+          throw new WorkspaceProfileError('stale_snapshot', 'Prices changed. Refresh products.', 409);
+        }
+        return result;
+      }
+      snapshotUnavailable = true;
+    }
     const profile = source ? source.profile : await this.repository.store(query.storeId);
     const observedAt = this.now().toISOString();
     const base = {schemaVersion: 1, realm: this.repository.realm, storeId: query.storeId, observedAt,
+      ...(commodityRequested ? {commodityPriceReadbackVersion: 1} : {}),
       ...(taxRequested ? {supplierTaxReadbackVersion: 1} : {}),
       ...(suppliersRequested ? {supplierPublishersVersion: 1} : {}),
       orderingAvailable: false, coverage: "verified_public_only",
@@ -1743,7 +1916,7 @@ export class WorkspaceCatalogueService {
       ...(mediaRequested ? {mediaReadbackVersion: 1} : {}),
       ...(detailsRequested ? {storeDetailsReadbackVersion: 1} : {}),
       ...(listingsRequested ? {listingReadbackVersion: 1, listingCoverage: "unavailable"} : {})};
-    if (!profile || profile.workspaceId !== query.storeId || profile.status !== "live" ||
+    if (snapshotUnavailable || !profile || profile.workspaceId !== query.storeId || profile.status !== "live" ||
         profile.familyId !== "products-trade" || typeof profile.profileId !== "string" ||
         !(profile.profileId.startsWith("retailer-") || suppliersRequested && knownSupplierProfile(profile.profileId)) ||
         profile.shopEnabled !== true || !this.identity) {
@@ -1779,7 +1952,26 @@ export class WorkspaceCatalogueService {
         const offer = catalogue.offers.find(o => o.offerId === channel.offerId &&
           o.workspaceId === query.storeId && o.packId === pack.packId &&
           o.buyingContext === (channel.kind === "retail" ? "consumer" : "wholesale"));
+        const savedPrice = source?.commodityPrices?.find(p => p.skuId === record.skuId && p.channel === channel.kind);
+        if (savedPrice) {
+          if (!commodityRequested) throw new WorkspaceProfileError('unsupported_version', 'Update MoolSocial to check the current price.', 409);
+          const price = checkedCommodityPrice(savedPrice);
+          if (price.realm !== this.repository.realm || price.storeId !== query.storeId || price.confirmedAt > readbackAt ||
+              price.skuRevision !== record.revision || price.baseFingerprint !== cataloguePayloadHash(record)) return null;
+          try { commoditySupplier(price.confirmedBy, this.identity!, {record, catalogue, profile,
+            authority: source?.commodityAuthority, participant: source?.commodityParticipant}, readbackAt); }
+          catch { return null; }
+          return {...price.terms, revision: `commodity-${price.revision}-${price.integrity.slice(0, 16)}`,
+            validUntil: price.validUntil, priceConfirmation: {version: 1, revision: price.revision,
+              confirmedAt: price.confirmedAt, validUntil: price.validUntil, frequent: price.frequent}};
+        }
         const window = offer && referencedOfferTermAt(offer, readbackAt);
+        if (!window && commodityRequested && source?.commodityPrices?.some(p => p.skuId === record.skuId)) {
+          const expired = offer?.termWindows.filter(w => w.effectiveFrom <= readbackAt && w.expiresAt <= readbackAt &&
+            w.termSnapshotSha256.toUpperCase() === cataloguePayloadHash(channelTerms(channel)))
+            .sort((a, b) => b.expiresAt.localeCompare(a.expiresAt))[0];
+          if (expired) return {...channel, revision: expired.termSnapshotId, validUntil: expired.expiresAt, priceState: 'expired' as const};
+        }
         if (!window || window.termSnapshotSha256.toUpperCase() !== cataloguePayloadHash(channelTerms(channel))) return null;
         return {...channel, revision: window.termSnapshotId, validUntil: window.expiresAt};
       });
@@ -1833,7 +2025,7 @@ export class WorkspaceCatalogueService {
           if (!bindings || bindings.length !== expected.length) continue;
           const checked = expected.map(binding => checkedListingBinding(
             bindings.find(v => v.channel === binding.channel), binding));
-          if (item.channels.some(c => c!.validUntil <= this.now().toISOString())) continue;
+          if (item.channels.some(c => c!.validUntil <= this.now().toISOString() && !('priceConfirmation' in c!) && !('priceState' in c!))) continue;
           linked.push({...item, listings: checked});
         } catch { /* Retain an unavailable/partial result, never guess identity. */ }
       }
@@ -1854,10 +2046,11 @@ export class WorkspaceCatalogueService {
         if (!store.shopEnabled) throw new Error("Store withdrawn");
         text(store.name, 240);
       } catch { return {...base, state: "unavailable", items: [], nextCursor: null}; }
+      await checkLegacyPrices();
       // All awaits are finished. Do not let a metadata/policy lookup extend
       // reviewed selling terms beyond their original expiry.
       const responseAt = this.now().toISOString();
-      const liveLinked = linked.filter(item => item.channels.every(c => c!.validUntil > responseAt));
+      const liveLinked = linked.filter(item => item.channels.every(c => c!.validUntil > responseAt || 'priceConfirmation' in c! || 'priceState' in c!));
       const coverage = liveLinked.length === publicItems.length ? "complete" : "partial";
       return {...base, observedAt: responseAt,
         ...(produceRequested && liveLinked.some(item => item.content.brand === "") ? {unbrandedProduceReadbackVersion: 1} : {}),
@@ -1867,12 +2060,22 @@ export class WorkspaceCatalogueService {
           ...(detailsRequested ? {details: publicDetailsProjection(details, this.repository.realm, query.storeId, store, responseAt, classificationRequested)} : {})},
         items: liveLinked, nextCursor: !query.skuId && rows.length === query.limit ? rows.at(-1)!.skuId : null};
     }
-    return {...base, observedAt: readbackAt, state: "ready", catalogueVersion: catalogue.version, items: publicItems,
+    await checkLegacyPrices();
+    const completedAt = this.now().toISOString();
+    if (publicItems.some(item => item.channels.some(c => c!.validUntil <= completedAt && !('priceConfirmation' in c!) && !('priceState' in c!)))) {
+      return {...base, observedAt: completedAt, state: 'unavailable', items: [], nextCursor: null};
+    }
+    return {...base, observedAt: completedAt, state: "ready", catalogueVersion: catalogue.version, items: publicItems,
       ...(produceRequested && publicItems.some(item => item.content.brand === "") ? {unbrandedProduceReadbackVersion: 1} : {}),
       nextCursor: !query.skuId && rows.length === query.limit ? rows.at(-1)!.skuId : null};
   }
 }
 
+function commodityPriceReadbackRequested(body: Readonly<Record<string, unknown>>): boolean {
+  const supported = body.commodityPriceReadbackVersion === 1;
+  if (Object.hasOwn(body, 'commodityPriceReadbackVersion') && !supported) invalid();
+  return supported;
+}
 function supplierTaxReadbackRequested(body: Readonly<Record<string, unknown>>): boolean {
   const requested = body.supplierTaxReadbackVersion === 1;
   if (Object.hasOwn(body, "supplierTaxReadbackVersion") && !requested) invalid();
@@ -2912,6 +3115,76 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
     return this.firestore.collection("workspaceCatalogues").doc(this.realm)
       .collection("stores").doc(id(storeId));
   }
+  async commodityPrice(owner: string, action: 'confirm' | 'read' | 'reconcile', raw: Readonly<Record<string, unknown>>,
+    identity: CatalogueIdentity): Promise<CommodityPriceRecord | null> {
+    const request = action === 'read' ? exact(raw, ['storeId', 'skuId']) : commodityRequest(raw);
+    const storeId = id(request.storeId), skuId = id(request.skuId), actor = id(owner);
+    const head = this.root(storeId).collection('commodityPrices').doc(skuId);
+    const root = this.firestore.collection('workspaceCatalogues').doc(this.realm);
+    const key = action === 'read' ? undefined : cataloguePayloadHash([actor, commodityRequest(raw).idempotencyKey]);
+    const receiptRef = key ? head.collection('receipts').doc(key) : undefined;
+    return this.firestore.runTransaction(async tx => {
+      const profiles = await tx.get(this.firestore.collection('workspaceProfiles').where('workspaceId', '==', storeId).limit(2));
+      if (profiles.size !== 1 || profiles.docs[0]!.get('caseId') !== profiles.docs[0]!.id) {
+        throw new WorkspaceProfileError('forbidden', 'Use your active selling Store.', 403);
+      }
+      const profile = requireStore(profiles.docs[0]!.data() as WorkspaceProfileRecord, storeId, actor, true);
+      const [skuDoc, catalogueDoc, currentDoc, authorityDoc, participantDoc, receiptDoc] = await tx.getAll(
+        this.root(storeId).collection('skus').doc(skuId), root.collection('canonicalCatalogues').doc(id(identity.catalogueId)),
+        head, root.collection('producerAuthorities').doc(actor), root.collection('participants').doc(storeId),
+        ...(receiptRef ? [receiptRef] : []));
+      if (!skuDoc?.exists || !catalogueDoc?.exists) throw new WorkspaceProfileError('not_found', 'Published product is unavailable.', 404);
+      const record = normalizeRecord(skuDoc.data(), storeId);
+      if (record.skuId !== skuId) invalid();
+      const current = currentDoc?.exists ? checkedCommodityPrice(currentDoc.data()) : undefined;
+      if (current && (current.realm !== this.realm || current.storeId !== storeId || current.skuId !== skuId)) invalid();
+      if (action === 'read') return current ?? null;
+      const source = {record, profile, catalogue: catalogueDoc.data() as CatalogueAggregate,
+        authority: authorityDoc?.data() as CatalogueProducerAuthority | undefined,
+        participant: participantDoc?.data() as SupplyParticipantWorkspace | undefined};
+      const receipt = receiptDoc?.exists ? receiptDoc.data() as CommodityPriceReceipt : undefined;
+      if (action === 'reconcile' && !receipt) return null;
+      const result = planCommodityPriceConfirmation(actor, this.realm, identity, raw, source, this.now().toISOString(), current, receipt);
+      if (!receipt) {
+        tx.set(head, result.record);
+        tx.create(head.collection('revisions').doc(String(result.record.revision)), result.record);
+        tx.create(receiptRef!, result);
+      }
+      return result.record;
+    });
+  }
+  async commodityRefreshRequested(owner: string, storeId: string, skuId: string, priceRevision: number): Promise<boolean> {
+    return this.firestore.runTransaction(async tx => {
+      await this.productSubmissionOwner(tx, id(storeId), id(owner));
+      const [price, demand] = await tx.getAll(this.root(storeId).collection('commodityPrices').doc(id(skuId)),
+        this.root(storeId).collection('commodityRefreshDemand').doc(id(skuId)));
+      if (!price?.exists || checkedCommodityPrice(price.data()).revision !== priceRevision) {
+        throw new WorkspaceProfileError('stale_snapshot', 'Supplier price changed. Check it again.', 409);
+      }
+      return demand?.exists === true && demand.get('schemaVersion') === 1 && demand.get('realm') === this.realm &&
+        demand.get('storeId') === storeId && demand.get('skuId') === skuId && demand.get('priceRevision') === priceRevision;
+    });
+  }
+  async commodityReadbackRequired(storeId: string, skuId?: string): Promise<boolean> {
+    const prices = this.root(id(storeId)).collection('commodityPrices');
+    return skuId === undefined ? !(await prices.limit(1).get()).empty : (await prices.doc(id(skuId)).get()).exists;
+  }
+  async requestCommodityRefresh(actor: string, raw: Readonly<Record<string, unknown>>, identity: CatalogueIdentity,
+    admit: (source: PublicCatalogueSource) => Promise<boolean>): Promise<object> {
+    id(actor); const q = exact(raw, ['storeId', 'skuId', 'priceRevision']), storeId = id(q.storeId), skuId = id(q.skuId);
+    const priceRevision = integer(q.priceRevision, 1, 1000000000);
+    const ref = this.root(storeId).collection('commodityRefreshDemand').doc(skuId);
+    return this.firestore.runTransaction(async tx => {
+      const source = await this.publicCatalogueSource(storeId, identity, false, tx, [skuId]);
+      const current = await tx.get(ref);
+      if (!source || !await admit(source)) throw new WorkspaceProfileError('conflict', 'Check the current product price first.', 409);
+      // One pending reminder per SKU/price revision, regardless of how many
+      // buyers tap. No buyer identities, orders or stock reservations are made.
+      if (!current.exists || current.get('priceRevision') !== priceRevision) tx.set(ref,
+        {schemaVersion: 1, realm: this.realm, storeId, skuId, priceRevision, requestedAt: this.now().toISOString()});
+      return {schemaVersion: 1, realm: this.realm, storeId, skuId, priceRevision, state: 'recorded', orderingAvailable: false};
+    });
+  }
   private productSubmissionHead(storeId: string, skuId: string) {
     return this.root(storeId).collection("productSubmissions").doc(id(skuId));
   }
@@ -3614,6 +3887,22 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
         if (row.skuId !== doc.id) invalid();
         return row;
       });
+      const priceDocs = records.length ? await transaction.getAll(...records.map(row =>
+        this.root(storeId).collection('commodityPrices').doc(row.skuId))) : [];
+      const commodityPrices = priceDocs.flatMap((doc, index) => {
+        if (!doc.exists) return [];
+        const price = checkedCommodityPrice(doc.data());
+        if (price.storeId !== storeId || price.skuId !== records[index]!.skuId || price.realm !== this.realm) invalid();
+        return [price];
+      });
+      let commodityAuthority: CatalogueProducerAuthority | undefined, commodityParticipant: SupplyParticipantWorkspace | undefined;
+      if (commodityPrices.length) {
+        const [authority, participant] = await transaction.getAll(
+          this.firestore.collection('workspaceCatalogues').doc(this.realm).collection('producerAuthorities').doc(id(profile.ownerUserId)),
+          this.firestore.collection('workspaceCatalogues').doc(this.realm).collection('participants').doc(storeId));
+        commodityAuthority = authority?.data() as CatalogueProducerAuthority | undefined;
+        commodityParticipant = participant?.data() as SupplyParticipantWorkspace | undefined;
+      }
       const expected = records.flatMap(row => cataloguePublicListingBindings(this.realm, row));
       const docs = expected.length ? await transaction.getAll(...expected.map(row => this.listingRoot().doc(row.listingId))) : [];
       const bindings = docs.flatMap((doc, i) => doc.exists ? [checkedListingBinding(doc.data(), expected[i]!)] : []);
@@ -3633,7 +3922,9 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
           })};
       }
       return {profile, catalogue, records, bindings, policy: policyDoc.exists ? policyDoc.data()! : null,
-        publicDetails: detailsDoc.exists ? detailsDoc.data()! : null, ...(variantFamilies ? {variantFamilies} : {})};
+        publicDetails: detailsDoc.exists ? detailsDoc.data()! : null, ...(variantFamilies ? {variantFamilies} : {}),
+        ...(commodityPrices.length ? {commodityPrices, ...(commodityAuthority ? {commodityAuthority} : {}),
+          ...(commodityParticipant ? {commodityParticipant} : {})} : {})};
     };
     return existingTransaction ? load(existingTransaction) : this.firestore.runTransaction(load);
   }

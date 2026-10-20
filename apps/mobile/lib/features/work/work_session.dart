@@ -1587,7 +1587,7 @@ class WorkSession extends ChangeNotifier {
       _ownerInputValuesEqual(owned.input['provenance'], {'entryMethod': origin.method.name, 'sourceRecordId': origin.productId});
   }
   bool _listingMirrorMatches(WorkspaceCatalogueOwnedSku owned, WorkspaceCatalogueItem item,
-    {bool reviewedFamily = false, bool adopting = false, WorkspaceReviewedProductMediaProof? reviewedMedia}) {
+    {bool reviewedFamily = false, bool adopting = false, bool confirmingPrice = false, WorkspaceReviewedProductMediaProof? reviewedMedia}) {
     // The legacy reviewed reader has no family contract. Never strip options
     // and publish a different legacy SKU while that connection is pending.
     if (item.variantMembership != null && !reviewedFamily) return false;
@@ -1651,8 +1651,146 @@ class WorkSession extends ChangeNotifier {
     final channels = value['channels'] as List;
     return channels.length == expected.length && channels.every((raw) {
       final channel = Map<String, dynamic>.from(raw as Map)..remove('offerId');
+      if (confirmingPrice && channel['kind'] != 'retail') {
+        final wanted = expected[channel['kind']];
+        if (wanted == null) return false;
+        return _ownerInputValuesEqual(Map.of(channel)..remove('priceMinor')..remove('tiers'),
+          Map.of(wanted)..remove('priceMinor')..remove('tiers'));
+      }
       return _ownerInputValuesEqual(channel, expected[channel['kind']]);
     });
+  }
+
+  final Map<WorkspaceCatalogueBindingScope, Map<String, WorkspaceCommodityPrice?>> _commodityPriceHeads = {};
+  final Map<WorkspaceCatalogueBindingScope, DateTime> _commodityPriceCheckedAt = {};
+  final Map<WorkspaceCatalogueBindingScope, String> _commodityPriceInputs = {};
+  final Set<WorkspaceCatalogueBindingScope> _commodityPriceLoads = {};
+  final Map<WorkspaceCatalogueBindingScope, String> _commodityPriceAttentionErrors = {};
+  String? get workspaceCommodityPriceAttentionError => _commodityPriceAttentionErrors[_catalogueListingController?.scope];
+  bool get workspaceCommodityPriceAttentionConfigured {
+    final source = _catalogueListingController?.gateway;
+    return source is WorkspaceCommodityPriceGateway && (source as WorkspaceCommodityPriceGateway).commodityPriceReadbackSupported;
+  }
+  List<WorkspaceCatalogueItem> get workspaceCommodityPriceAttentionProducts {
+    final scope = _catalogueListingController?.scope, heads = scope == null ? null : _commodityPriceHeads[scope];
+    if (heads == null) return const [];
+    final source = catalogueGateway;
+    final now = source is AuthenticatedWorkspaceCatalogueGateway ? source.now().toUtc() : DateTime.now().toUtc();
+    return [for (final item in workspaceCatalogueItems)
+      if (item.wholesaleOffer?.enabled == true && heads.containsKey(item.id) && (
+          heads[item.id]?.refreshRequested == true || item.wholesaleOffer?.priceValidityMinutes != null &&
+          (heads[item.id] == null || heads[item.id]!.validUntil.difference(now) <= const Duration(minutes: 5)))) item];
+  }
+  Future<void> loadWorkspaceCommodityPriceAttention({bool force = false}) async {
+    final controller = _catalogueListingController, source = _catalogueListingController?.gateway;
+    if (controller == null || source is! WorkspaceCommodityPriceGateway ||
+        !(source as WorkspaceCommodityPriceGateway).commodityPriceReadbackSupported || _commodityPriceLoads.contains(controller.scope)) return;
+    final products = workspaceCatalogueItems.where((p) => p.wholesaleOffer?.enabled == true).toList();
+    final signature = jsonEncode([for (final p in products) [p.id, p.wholesaleOffer!.toJson()]]);
+    final clock = catalogueGateway is AuthenticatedWorkspaceCatalogueGateway
+      ? (catalogueGateway as AuthenticatedWorkspaceCatalogueGateway).now().toUtc() : DateTime.now().toUtc();
+    if (!force && _commodityPriceInputs[controller.scope] == signature &&
+        _commodityPriceCheckedAt[controller.scope]?.add(const Duration(minutes: 5)).isAfter(clock) == true) return;
+    final context = publicationPreferencesContext;
+    var reading = true;
+    bool current() => reading && !_disposed && publicationPreferencesContext == context;
+    _commodityPriceLoads.add(controller.scope);
+    final next = <String, WorkspaceCommodityPrice?>{};
+    var partial = false;
+    try {
+      Future<void> read() async {
+        for (final product in products) {
+          if (!current()) return;
+          try {
+            final price = await (source as WorkspaceCommodityPriceGateway).readCommodityPrice(controller.scope.store, product.id, current: current);
+            if (!current()) return;
+            next[product.id] = price;
+          } on Object {
+            if (!current()) return;
+            partial = true;
+          }
+        }
+      }
+      await read().timeout(const Duration(seconds: 28));
+      if (!current()) return;
+      _commodityPriceHeads[controller.scope] = next;
+      _commodityPriceInputs[controller.scope] = signature;
+      _commodityPriceCheckedAt[controller.scope] = clock;
+      if (partial) {
+        _commodityPriceAttentionErrors[controller.scope] = 'Some supplier prices could not be checked. Verified reminders are shown.';
+      } else {
+        _commodityPriceAttentionErrors.remove(controller.scope);
+      }
+    } on Object {
+      if (current()) {
+        _commodityPriceHeads[controller.scope] = next;
+        _commodityPriceAttentionErrors[controller.scope] = 'Supplier price reminders could not be checked. Review public trade prices in Stock.';
+        _commodityPriceCheckedAt[controller.scope] = clock; _commodityPriceInputs[controller.scope] = signature;
+      }
+    } finally {
+      final owns = current(); reading = false; _commodityPriceLoads.remove(controller.scope);
+      if (owns) notifyListeners();
+    }
+  }
+
+  /// Explicit owner price confirmation; ordinary editor/CSV saves never upload.
+  Future<bool> confirmWorkspaceCommodityPrice(String productId, {required int validityMinutes}) async {
+    final item = workspaceCatalogueItems.where((p) => p.id == productId).firstOrNull, controller = _catalogueListingController;
+    final offer = item?.wholesaleOffer, source = controller?.gateway;
+    if (item == null || offer?.enabled != true || offer?.valid != true || offer?.saleType == null ||
+        controller == null || source is! WorkspaceCommodityPriceGateway ||
+        !(source as WorkspaceCommodityPriceGateway).commodityPriceReadbackSupported || validityMinutes < 1 || validityMinutes > 525600) {
+      showError('Supplier price confirmation is not connected or the saved trade price is incomplete.'); return false;
+    }
+    if (workspaceCatalogueListingBusy) return false;
+    final owner = publicationPreferencesContext, originalInput = _listingInput(item);
+    bool current() => !_disposed && publicationPreferencesContext == owner;
+    bool unchanged() => current() && workspaceCatalogueItems.any((p) => p.id == productId && _listingInput(p) == originalInput);
+    _catalogueListingLoads.add(controller.scope); notifyListeners();
+    try {
+      if (!await controller.restore() || !unchanged()) return false;
+      if (controller.pending != null) {
+        final result = await controller.reconcile();
+        if (current()) showNotice(result.priceConfirmation == null ? controller.error ?? 'Check the saved update before confirming a new price.'
+          : 'Original supplier price confirmation recovered.');
+        // Recover the original attempt only. A different product's pending
+        // confirmation must never acknowledge the button just pressed.
+        return result.priceConfirmation?.skuId == productId;
+      }
+      if (!_stockEditAvailable() || localInventoryEnabled && !await workspaceInventorySaved || !unchanged()) return false;
+      final owned = await controller.gateway.readOwnedSku(storeId: controller.scope.store, skuId: productId, current: unchanged);
+      if (!unchanged()) return false;
+      if (owned == null || owned.input['publicListing'] != true || !_listingMirrorMatches(owned, item, confirmingPrice: true,
+          reviewedFamily: source is WorkspaceVariantFamilyOwnerGateway &&
+            (source as WorkspaceVariantFamilyOwnerGateway).variantFamilySubmissionSupported)) {
+        showError('Publish matching reviewed product details before confirming this trade price.'); return false;
+      }
+      final head = await (source as WorkspaceCommodityPriceGateway).readCommodityPrice(controller.scope.store, productId, current: unchanged);
+      if (!unchanged()) return false;
+      final key = _newCounterIdentity('commodity-price');
+      final prices = {if (offer!.tiers.isNotEmpty) offer.minimumPacks: offer.priceAtMinor(offer.minimumPacks),
+        for (final tier in offer.tiers) tier.minimumPacks: tier.packPriceMinor};
+      final original = WorkspaceCatalogueBindingIntent(accountId: controller.scope.account, realm: controller.scope.realm,
+        storeId: controller.scope.store, sku: owned.input, expectedRevision: head?.revision ?? 0, idempotencyKey: key,
+        priceConfirmation: {'storeId': controller.scope.store, 'skuId': productId, 'channel': offer.saleType!.name,
+          'skuRevision': owned.revision, 'expectedRevision': head?.revision ?? 0, 'idempotencyKey': key,
+          'frequent': offer.priceValidityMinutes != null, 'validityMinutes': validityMinutes,
+          'priceMinor': offer.priceAtMinor(offer.minimumPacks),
+          'tiers': [for (final entry in prices.entries) {'minimumQuantity': entry.key, 'unitPriceMinor': entry.value}]});
+      final result = await controller.submit(original, inputCurrent: unchanged);
+      if (!current()) return false;
+      if (result.priceConfirmation != null) {
+        (_commodityPriceHeads[controller.scope] ??= {})[productId] = result.priceConfirmation;
+        _commodityPriceCheckedAt.remove(controller.scope);
+      }
+      showNotice(result.priceConfirmation != null ? 'Supplier price confirmed until ${result.priceConfirmation!.validUntil.toLocal()}.'
+        : result.state == WorkspaceCatalogueBindingState.rejected ? 'Price confirmation was not accepted. Review the current product and price.'
+        : controller.error ?? 'Price confirmation could not be completed. Check the saved update before trying again.');
+      return result.priceConfirmation != null;
+    } on Object {
+      if (current()) showError('Supplier price could not be confirmed. Your saved product and original request are kept.');
+      return false;
+    } finally { _catalogueListingLoads.remove(controller.scope); if (current()) notifyListeners(); }
   }
 
   /// Explicit owner listing intent only; ordinary editor/CSV/inventory saves never upload.
@@ -13478,6 +13616,7 @@ class WorkSession extends ChangeNotifier {
     _supplierPolicies.clear();
     for (final listing in _catalogueListings.values) { listing.dispose(); }
     _catalogueListings.clear();
+    _commodityPriceHeads.clear(); _commodityPriceCheckedAt.clear(); _commodityPriceInputs.clear(); _commodityPriceLoads.clear(); _commodityPriceAttentionErrors.clear();
     for (final publisher in _variantFamilyPublishers.values) { publisher.dispose(); }
     _variantFamilyPublishers.clear();
     for (final publisher in _productSubmissions.values) { publisher.dispose(); }

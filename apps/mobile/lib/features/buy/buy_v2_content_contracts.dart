@@ -753,7 +753,7 @@ class BuyV2StoreCouponEligibility {
     if (data['schemaVersion'] is! int ||
         data['schemaVersion'] != 1 ||
         data['storeCouponEligibilityVersion'] is! int ||
-        data['storeCouponEligibilityVersion'] != (supplierQuote == null ? 1 : 2) ||
+        data['storeCouponEligibilityVersion'] != (supplierQuote == null ? 1 : query['commodityPriceReadbackVersion'] == 1 ? 3 : 2) ||
         data['realm'] != coupon.realm ||
         data['viewerUserId'] != accountId ||
         data['storeId'] != coupon.storeId ||
@@ -787,7 +787,7 @@ class BuyV2StoreCouponEligibility {
     final fingerprint = digest(data['requestFingerprint']);
     if (fingerprint !=
         hash({
-          'operation': supplierQuote == null ? 'storeCouponEligibilityV1' : 'storeCouponEligibilityV2',
+          'operation': supplierQuote == null ? 'storeCouponEligibilityV1' : query['commodityPriceReadbackVersion'] == 1 ? 'storeCouponEligibilityV3' : 'storeCouponEligibilityV2',
           'realm': coupon.realm,
           'actor': accountId,
           'query': query,
@@ -2687,7 +2687,7 @@ class BuyV2SupplierQuoteSelection {
     'lines': [for (final line in lines) {'lineId': line['productId'], 'quoteLineId': line['quoteLineId']}]};
   bool current(DateTime now) => now.toUtc().isBefore(validUntil);
   bool matchesLines(Iterable<BuyV2CartLine> items) {
-    final selected = items.where((l) => l.product.offerClass == BuyV2OfferClass.bulk && l.product.storeId == storeId).toList();
+    final selected = items.where((l) => l.product.requiresSupplierQuote && l.product.storeId == storeId).toList();
     final frozen = lines;
     if (selected.length != frozen.length) return false;
     return frozen.every((f) {

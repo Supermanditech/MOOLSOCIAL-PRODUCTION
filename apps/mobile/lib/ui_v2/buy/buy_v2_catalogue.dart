@@ -11739,6 +11739,14 @@ double _productGlanceCardHeight(
         ? BuyV2Metrics.minimumTap
         : priceHeight;
   }
+  if (product.packTerms?.commodityPriceRevision != null) {
+    final painter = TextPainter(text: TextSpan(text: 'Price confirmation pending · last confirmed 9999 days ago',
+      style: DefaultTextStyle.of(context).style.merge(const TextStyle(fontSize: 11, height: 1.25))),
+      textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))
+      ..layout(maxWidth: (cardWidth - 16).clamp(1, double.infinity));
+    height += painter.height.ceilToDouble() + 2;
+    painter.dispose();
+  }
   return height;
 }
 
@@ -13961,6 +13969,7 @@ class BuyV2ProductCard extends StatelessWidget {
                                 ),
                                 if (!compact) const SizedBox(height: 6),
                               ],
+                              BuyV2PriceFreshness(product: product, now: session.catalogueNow),
                               if (!compact) cartAction,
                             ],
                           ),
