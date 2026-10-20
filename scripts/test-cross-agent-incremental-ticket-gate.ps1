@@ -207,6 +207,12 @@ if ($RequireLfPublicationProbes) {
     $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $probe.batch04DocumentExport.owners+='backend/functions/src/index.ts'
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Export widened into backend.'
+    $oldExport=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $oldExport.batch04DocumentExport.owners=@($oldExport.batch04DocumentExport.owners |
+      Where-Object { $_ -cne 'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart' })
+    Assert-Fixture (Test-Lf27Batch01Continuation $oldExport @()) 'Historical two-owner export rejected.'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $oldExport @('apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart'))) 'Unrecorded preview owner admitted.'
+    $cases+=2
     $legacy=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $legacy.PSObject.Properties.Remove('batch04DocumentExport')
     Assert-Fixture (Test-Lf27Batch01Continuation $legacy @()) 'Historical export-absent continuation rejected.'

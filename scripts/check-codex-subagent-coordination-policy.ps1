@@ -8134,6 +8134,11 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     $exportOwners=@('apps/mobile/lib/ui_v2/buy/buy_v2_invoice_downloader.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart')
     if ($null -eq $export -or $export -isnot [pscustomobject]) { return $false }
+    # Existing cumulative frontend owner: optional exact preview consumer only.
+    if ($null -ne $export.PSObject.Properties['owners'] -and
+        @($export.owners) -ccontains 'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart') {
+      $exportOwners += 'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart'
+    }
     foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
       if ($null -eq $export.PSObject.Properties[$key]) { return $false }
     }

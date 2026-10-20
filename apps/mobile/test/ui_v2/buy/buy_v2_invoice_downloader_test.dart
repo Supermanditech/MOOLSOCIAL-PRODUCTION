@@ -1,11 +1,69 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_invoice_downloader.dart';
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('LF12-MINOR exports supplied seller and platform paise without rounding', () async {
+    final result = await _saveDocument(_minorOrder());
+    expect(result.outcome, BuyV2InvoiceDownloadOutcome.saved);
+    expect(result.calls, 1);
+    final text = result.lines.join('\n');
+    for (final exact in ['Unit INR 24.67', 'Taxable INR 74.01',
+      'CGST 6.66 | SGST 6.66', 'Unit INR 0.03', 'Taxable INR 0.06',
+      'IGST 0.01', 'Order total: INR 92.40']) {
+      expect(text, contains(exact));
+    }
+    expect(text, isNot(contains('Taxable INR 7401')));
+  });
+  for (final conflict in [false, true]) {
+    test('LF12-MINOR invalid supplied amounts never dispatch conflict=$conflict', () async {
+      final invalid = BuyV2TaxInvoiceLine(description: 'Host invalid', hsnSac: 'HOST',
+        taxableValue: conflict ? 74 : null, taxableValueMinor: 7401,
+        gstRate: 18, cgstMinor: 666, sgstMinor: 666, igstMinor: 0,
+        cessMinor: conflict ? 0 : null);
+      final order = _minorOrder(sellerLine: invalid);
+      expect(BuyV2InvoiceDocument(order: order).hasExactLines, isFalse);
+      final result = await _saveDocument(order);
+      expect(result.outcome, BuyV2InvoiceDownloadOutcome.unavailable);
+      expect(result.calls, 0);
+    });
+  }
+  for (final scale in [1.0, 2.0]) {
+    for (final large in [false, true]) {
+      testWidgets('LF12-MINOR preview exact amounts scale=$scale large=$large', (tester) async {
+        tester.view.physicalSize = const Size(320, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
+            child: r66VisualCaptureRoot(child!)),
+          home: BuyV2InvoicePage(order: _minorOrder(large: large))));
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(find.byKey(const ValueKey('buy-tax-invoice-details-HOST-EXACT-INVOICE')),
+          300, scrollable: find.byType(Scrollable).first);
+        await tester.pumpAndSettle();
+        expect(find.textContaining(large ? '₹1,00,00,00,000' : '₹24.67'), findsWidgets);
+        expect(tester.takeException(), isNull);
+        await captureR66Visual(tester, 'lf12-minor-host-invoice-$scale-$large-20261020-v3');
+        await tester.scrollUntilVisible(find.textContaining('₹0.03'), 300,
+          scrollable: find.byType(Scrollable).first);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('₹0.06'), findsWidgets);
+        expect(find.textContaining('₹0.01'), findsWidgets);
+        expect(tester.takeException(), isNull);
+        await captureR66Visual(tester, 'lf12-minor-host-platform-$scale-$large-20261020-v2');
+      });
+    }
+  }
 
   test('LF12 export keeps normalized address suffix beyond240', () async {
     final source = 'Host address ${List.filled(300, 'a').join()} ORIGINAL-END';
@@ -223,6 +281,36 @@ void main() {
 BuyV2Product _product() => BuyV2Catalogue.products.firstWhere(
   (product) => product.destination == BuyV2Destination.shop,
 );
+
+// Supplied-document host fixtures only: never create/issue a native invoice.
+BuyV2TaxInvoiceDetails _minorFacts(String issuer, BuyV2TaxInvoiceLine line) => BuyV2TaxInvoiceDetails(
+  invoiceNumber: 'HOST-$issuer', issuedAt: DateTime.utc(2026, 10, 20),
+  sellerLegalName: 'Host $issuer', sellerAddress: 'Host address',
+  sellerGstin: '123456789012345', placeOfSupply: 'Host source',
+  sourceId: 'host-$issuer', lines: [line]);
+
+BuyV2Order _minorOrder({bool large = false, BuyV2TaxInvoiceLine? sellerLine}) {
+  final price = large ? 100000000000 : 2467;
+  final quantity = large ? 1 : 3;
+  final items = price * quantity;
+  final tax = large ? 18000000000 : 1332;
+  final product = _product().copyWith(priceMinor: price, mrpMinor: price + 100);
+  return BuyV2Order.minor(id: 'HOST-EXACT-INVOICE', destination: BuyV2Destination.shop,
+    title: 'Host exact invoice', itemSummary: 'Host supplied facts', totalMinor: items + tax + 507,
+    partner: 'Host seller', partnerType: 'Host', promise: 'Host', destinationLabel: 'Host address',
+    progress: .2, status: BuyV2OrderStatus.confirmed,
+    lines: [BuyV2CartLine(product: product, quantity: quantity)],
+    taxMinor: tax, tipMinor: 500, paymentChargeMinor: 7,
+    taxInvoiceState: BuyV2TaxInvoiceState.ready,
+    taxInvoiceDetails: _minorFacts('seller', sellerLine ?? BuyV2TaxInvoiceLine(
+      description: 'Host supplied product', hsnSac: 'HOST', quantity: quantity, unit: 'packs',
+      unitPriceMinor: price, taxableValueMinor: items, gstRate: 18,
+      cgstMinor: tax ~/ 2, sgstMinor: tax ~/ 2, igstMinor: 0, cessMinor: 0)),
+    platformTaxInvoiceDetails: _minorFacts('platform', const BuyV2TaxInvoiceLine(
+      description: 'Host supplied service', hsnSac: 'HOST', quantity: 2, unit: 'units',
+      unitPriceMinor: 3, taxableValueMinor: 6, gstRate: 18,
+      cgstMinor: 0, sgstMinor: 0, igstMinor: 1, cessMinor: 0)));
+}
 
 // Isolated channel/payload fixtures only; no runtime order or issued invoice.
 Future<({BuyV2InvoiceDownloadOutcome outcome, List<String> lines, int calls})> _saveAddress(String address) async {

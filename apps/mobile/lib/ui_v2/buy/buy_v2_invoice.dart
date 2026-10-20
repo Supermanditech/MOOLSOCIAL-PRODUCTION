@@ -20,6 +20,8 @@ class BuyV2InvoiceDocument {
 
   bool get hasExactLines =>
       order.lines.isNotEmpty &&
+      (order.taxInvoiceDetails?.hasValidAmounts ?? true) &&
+      (order.platformTaxInvoiceDetails?.hasValidAmounts ?? true) &&
       (order.taxInvoiceState == null ||
           ((order.taxInvoiceState == BuyV2TaxInvoiceState.ready ||
                   order.taxInvoiceState == BuyV2TaxInvoiceState.corrected) &&
@@ -58,11 +60,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
 
   Future<void> _download() async {
     final order = widget.order;
-    final legalInvoiceReady =
-        order.taxInvoiceState == null ||
-        ((order.taxInvoiceState == BuyV2TaxInvoiceState.ready ||
-                order.taxInvoiceState == BuyV2TaxInvoiceState.corrected) &&
-            order.taxInvoiceDetails != null);
+    final legalInvoiceReady = BuyV2InvoiceDocument(order: order).hasExactLines;
     if (_downloading || !legalInvoiceReady) return;
     HapticFeedback.selectionClick();
     setState(() => _downloading = true);
@@ -114,10 +112,12 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
     final taxInvoice = order.taxInvoiceDetails;
     final legalInvoiceRequired = order.taxInvoiceState != null;
     final legalInvoiceReady =
-        !legalInvoiceRequired ||
+        (!legalInvoiceRequired ||
         ((order.taxInvoiceState == BuyV2TaxInvoiceState.ready ||
                 order.taxInvoiceState == BuyV2TaxInvoiceState.corrected) &&
-            taxInvoice != null);
+            taxInvoice != null)) &&
+        (taxInvoice?.hasValidAmounts ?? true) &&
+        (order.platformTaxInvoiceDetails?.hasValidAmounts ?? true);
     final subtotal = buyV2SumMinor(order.lines.map((line) => line.totalMinor));
     return Scaffold(
       key: ValueKey('buy-invoice-page-${order.id}'),
@@ -379,7 +379,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                   ),
                 ),
               ],
-              if (order.platformTaxInvoiceDetails case final platformTax?) ...[
+              if (order.platformTaxInvoiceDetails case final platformTax? when platformTax.hasValidAmounts) ...[
                 const SizedBox(height: 9),
                 _InvoiceSection(
                   key: ValueKey('buy-platform-tax-invoice-${order.id}'),
@@ -776,24 +776,24 @@ class _TaxInvoiceLine extends StatelessWidget {
             label: 'Quantity',
             value: line.unit == null ? '$quantity' : '$quantity ${line.unit}',
           ),
-        if (line.unitPrice case final unitPrice?)
-          _InvoiceFact(label: 'Unit price', value: buyV2Money(unitPrice)),
+        if (line.unitPriceMinor case final unitPrice?)
+          _InvoiceFact(label: 'Unit price', value: buyV2MoneyMinor(unitPrice)),
         _InvoiceFact(
           label: 'Taxable value',
-          value: buyV2Money(line.taxableValue),
+          value: buyV2MoneyMinor(line.taxableValueMinor),
         ),
         _InvoiceFact(
           label: 'GST rate',
           value: '${line.gstRate.toStringAsFixed(2)}%',
         ),
-        if (line.cgst > 0)
-          _InvoiceFact(label: 'CGST', value: buyV2Money(line.cgst)),
-        if (line.sgst > 0)
-          _InvoiceFact(label: 'SGST', value: buyV2Money(line.sgst)),
-        if (line.igst > 0)
-          _InvoiceFact(label: 'IGST', value: buyV2Money(line.igst)),
-        if (line.cess > 0)
-          _InvoiceFact(label: 'Cess', value: buyV2Money(line.cess)),
+        if (line.cgstMinor > 0)
+          _InvoiceFact(label: 'CGST', value: buyV2MoneyMinor(line.cgstMinor)),
+        if (line.sgstMinor > 0)
+          _InvoiceFact(label: 'SGST', value: buyV2MoneyMinor(line.sgstMinor)),
+        if (line.igstMinor > 0)
+          _InvoiceFact(label: 'IGST', value: buyV2MoneyMinor(line.igstMinor)),
+        if (line.cessMinor > 0)
+          _InvoiceFact(label: 'Cess', value: buyV2MoneyMinor(line.cessMinor)),
       ],
     );
   }

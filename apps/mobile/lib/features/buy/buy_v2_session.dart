@@ -7556,6 +7556,12 @@ class BuyV2Session extends ChangeNotifier {
   bool _validTaxInvoiceForOrder(BuyV2Order order) {
     final state = order.taxInvoiceState;
     final details = order.taxInvoiceDetails;
+    // A readiness state cannot excuse malformed facts supplied by a provider.
+    // Validate both documents before pending/absent seller-state early returns.
+    if (!(details?.hasValidAmounts ?? true) ||
+        !(order.platformTaxInvoiceDetails?.hasValidAmounts ?? true)) {
+      return false;
+    }
     if (state == null) return true;
     if (state == BuyV2TaxInvoiceState.pending ||
         state == BuyV2TaxInvoiceState.unavailable) {
@@ -7575,26 +7581,24 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     for (final line in details.lines) {
-      final intraStateTax = line.cgst > 0 || line.sgst > 0;
+      if (!line.hasValidAmounts) return false;
+      final intraStateTax = line.cgstMinor > 0 || line.sgstMinor > 0;
       if (line.description.trim().isEmpty ||
           line.hsnSac.trim().isEmpty ||
-          line.taxableValue < 0 ||
+          line.taxableValueMinor < 0 ||
           line.gstRate < 0 ||
           line.gstRate > 100 ||
-          line.cgst < 0 ||
-          line.sgst < 0 ||
-          line.igst < 0 ||
-          line.cess < 0 ||
-          (intraStateTax && line.igst > 0)) {
+          line.cgstMinor < 0 ||
+          line.sgstMinor < 0 ||
+          line.igstMinor < 0 ||
+          line.cessMinor < 0 ||
+          (intraStateTax && line.igstMinor > 0)) {
         return false;
       }
     }
     try {
-      // Issued invoice DTOs retain their legacy rupee units. A fractional tax
-      // unsupported by that contract is a mismatch, not a connection failure.
-      return buyV2SumMinor([for (final line in details.lines)
-        for (final amount in [line.cgst, line.sgst, line.igst, line.cess])
-          buyV2ExactMinorAmount(legacyRupees: amount)]) == order.taxMinor;
+      // Reconcile supplied amounts only. Rates do not authorize recalculation.
+      return details.totalTaxMinor == order.taxMinor;
     } on FormatException {
       return false;
     }

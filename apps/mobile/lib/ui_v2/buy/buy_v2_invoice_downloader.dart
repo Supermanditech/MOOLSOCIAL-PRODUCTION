@@ -132,9 +132,10 @@ Iterable<String> _invoiceLogicalLines(BuyV2Order order, int subtotal) sync* {
     for (final line in taxInvoice.lines) {
       yield '${_invoiceText(line.description)} | HSN/SAC ${_invoiceText(line.hsnSac)} | '
             '${line.quantity == null ? '' : 'Quantity ${line.quantity}${line.unit == null ? '' : ' ${_invoiceText(line.unit!)}'} | '}'
-            '${line.unitPrice == null ? '' : 'Unit INR ${line.unitPrice} | '}'
-            'Taxable INR ${line.taxableValue} | GST ${line.gstRate.toStringAsFixed(2)}% | '
-            'CGST ${line.cgst} | SGST ${line.sgst} | IGST ${line.igst} | Cess ${line.cess}';
+            '${line.unitPriceMinor == null ? '' : 'Unit INR ${_invoiceMinorNumber(line.unitPriceMinor!)} | '}'
+            'Taxable INR ${_invoiceMinorNumber(line.taxableValueMinor)} | GST ${line.gstRate.toStringAsFixed(2)}% | '
+            'CGST ${_invoiceMinorNumber(line.cgstMinor)} | SGST ${_invoiceMinorNumber(line.sgstMinor)} | '
+            'IGST ${_invoiceMinorNumber(line.igstMinor)} | Cess ${_invoiceMinorNumber(line.cessMinor)}';
     }
   }
   if (order.platformTaxInvoiceDetails case final platformTax?) {
@@ -155,8 +156,11 @@ Iterable<String> _invoiceLogicalLines(BuyV2Order order, int subtotal) sync* {
     ];
     for (final line in platformTax.lines) {
       yield '${_invoiceText(line.description)} | HSN/SAC ${_invoiceText(line.hsnSac)} | '
-            'Taxable INR ${line.taxableValue} | GST ${line.gstRate.toStringAsFixed(2)}% | '
-            'CGST ${line.cgst} | SGST ${line.sgst} | IGST ${line.igst} | Cess ${line.cess}';
+            '${line.quantity == null ? '' : 'Quantity ${line.quantity}${line.unit == null ? '' : ' ${_invoiceText(line.unit!)}'} | '}'
+            '${line.unitPriceMinor == null ? '' : 'Unit INR ${_invoiceMinorNumber(line.unitPriceMinor!)} | '}'
+            'Taxable INR ${_invoiceMinorNumber(line.taxableValueMinor)} | GST ${line.gstRate.toStringAsFixed(2)}% | '
+            'CGST ${_invoiceMinorNumber(line.cgstMinor)} | SGST ${_invoiceMinorNumber(line.sgstMinor)} | '
+            'IGST ${_invoiceMinorNumber(line.igstMinor)} | Cess ${_invoiceMinorNumber(line.cessMinor)}';
     }
   }
   yield* <String>[

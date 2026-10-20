@@ -1637,6 +1637,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
   };
 
   static Map<String, Object?> _encodeInvoiceDetails(BuyV2TaxInvoiceDetails d) => {
+    if (d.usesMinorAmounts) 'moneyVersion': 2,
     'invoiceNumber': d.invoiceNumber, 'issuedAt': d.issuedAt.toIso8601String(),
     'sellerLegalName': d.sellerLegalName, 'sellerAddress': d.sellerAddress, 'sellerGstin': d.sellerGstin,
     'buyerGstin': d.buyerGstin, 'placeOfSupply': d.placeOfSupply, 'sourceId': d.sourceId,
@@ -1645,7 +1646,11 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'sellerFssaiNumber': d.sellerFssaiNumber, 'reverseCharge': d.reverseCharge, 'irn': d.irn,
     'acknowledgementNumber': d.acknowledgementNumber, 'authorizedSignatory': d.authorizedSignatory,
     'supplyStatement': d.supplyStatement,
-    'lines': [for (final l in d.lines) {
+    'lines': [for (final l in d.lines) if (d.usesMinorAmounts) {
+      'description': l.description, 'hsnSac': l.hsnSac, 'taxableValueMinor': l.taxableValueMinor, 'gstRate': l.gstRate,
+      'cgstMinor': l.cgstMinor, 'sgstMinor': l.sgstMinor, 'igstMinor': l.igstMinor, 'cessMinor': l.cessMinor,
+      'quantity': l.quantity, 'unit': l.unit, 'unitPriceMinor': l.unitPriceMinor,
+    } else {
       'description': l.description, 'hsnSac': l.hsnSac, 'taxableValue': l.taxableValue, 'gstRate': l.gstRate,
       'cgst': l.cgst, 'sgst': l.sgst, 'igst': l.igst, 'cess': l.cess,
       'quantity': l.quantity, 'unit': l.unit, 'unitPrice': l.unitPrice,
@@ -1672,14 +1677,16 @@ final class BuyV2SharedPreferencesCustomerStateStore
   }
 
   static BuyV2TaxInvoiceDetails _decodeInvoiceDetails(Object? raw) {
+    final minorMoney = raw is Map && raw.containsKey('moneyVersion');
     const requiredText = {'invoiceNumber', 'issuedAt', 'sellerLegalName', 'sellerAddress', 'sellerGstin', 'placeOfSupply', 'sourceId'};
     const optionalText = {'buyerGstin', 'revisionLabel', 'recipientLegalName', 'recipientBillingAddress',
       'sellerPan', 'sellerCin', 'sellerFssaiNumber', 'irn', 'acknowledgementNumber', 'authorizedSignatory', 'supplyStatement'};
-    final keys = {...requiredText, ...optionalText, 'reverseCharge', 'lines'};
+    final keys = {...requiredText, ...optionalText, 'reverseCharge', 'lines', if (minorMoney) 'moneyVersion'};
     if (raw is! Map || raw.length != keys.length || raw.keys.any((key) => !keys.contains(key)) ||
         requiredText.any((key) => raw[key] is! String) ||
         optionalText.any((key) => raw[key] != null && raw[key] is! String) ||
-        raw['reverseCharge'] is! bool || raw['lines'] is! List) {
+        raw['reverseCharge'] is! bool || raw['lines'] is! List ||
+        minorMoney && (raw['moneyVersion'] is! int || raw['moneyVersion'] != 2)) {
       throw const FormatException('Saved invoice details need checking.');
     }
     final issuedAt = DateTime.tryParse(raw['issuedAt'] as String);
@@ -1689,18 +1696,26 @@ final class BuyV2SharedPreferencesCustomerStateStore
     bool integer(Object? value) => value is int && value >= -9007199254740991 && value <= 9007199254740991;
     final lines = <BuyV2TaxInvoiceLine>[];
     for (final line in raw['lines'] as List) {
-      const lineKeys = {'description', 'hsnSac', 'taxableValue', 'gstRate', 'cgst', 'sgst', 'igst', 'cess', 'quantity', 'unit', 'unitPrice'};
-      const amounts = {'taxableValue', 'cgst', 'sgst', 'igst', 'cess'};
+      final lineKeys = minorMoney
+        ? const {'description', 'hsnSac', 'taxableValueMinor', 'gstRate', 'cgstMinor', 'sgstMinor', 'igstMinor', 'cessMinor', 'quantity', 'unit', 'unitPriceMinor'}
+        : const {'description', 'hsnSac', 'taxableValue', 'gstRate', 'cgst', 'sgst', 'igst', 'cess', 'quantity', 'unit', 'unitPrice'};
+      final amounts = minorMoney ? const {'taxableValueMinor', 'cgstMinor', 'sgstMinor', 'igstMinor', 'cessMinor'}
+        : const {'taxableValue', 'cgst', 'sgst', 'igst', 'cess'};
+      final priceKey = minorMoney ? 'unitPriceMinor' : 'unitPrice';
       if (line is! Map || line.length != lineKeys.length || line.keys.any((key) => !lineKeys.contains(key)) ||
           line['description'] is! String || line['hsnSac'] is! String ||
-          amounts.any((key) => !integer(line[key])) || line['gstRate'] is! num ||
+          amounts.any((key) => !integer(line[key]) || minorMoney && (line[key] as int) < 0) || line['gstRate'] is! num ||
           !(line['gstRate'] as num).isFinite ||
           (line['quantity'] != null && !integer(line['quantity'])) ||
-          (line['unitPrice'] != null && !integer(line['unitPrice'])) ||
+          (line[priceKey] != null && (!integer(line[priceKey]) || minorMoney && (line[priceKey] as int) < 0)) ||
           (line['unit'] != null && line['unit'] is! String)) {
         throw const FormatException('Saved invoice line needs checking.');
       }
-      lines.add(BuyV2TaxInvoiceLine(description: line['description'] as String, hsnSac: line['hsnSac'] as String,
+      lines.add(minorMoney ? BuyV2TaxInvoiceLine(description: line['description'] as String, hsnSac: line['hsnSac'] as String,
+        taxableValueMinor: line['taxableValueMinor'] as int, gstRate: (line['gstRate'] as num).toDouble(),
+        cgstMinor: line['cgstMinor'] as int, sgstMinor: line['sgstMinor'] as int, igstMinor: line['igstMinor'] as int, cessMinor: line['cessMinor'] as int,
+        quantity: line['quantity'] as int?, unit: line['unit'] as String?, unitPriceMinor: line['unitPriceMinor'] as int?)
+        : BuyV2TaxInvoiceLine(description: line['description'] as String, hsnSac: line['hsnSac'] as String,
         taxableValue: line['taxableValue'] as int, gstRate: (line['gstRate'] as num).toDouble(),
         cgst: line['cgst'] as int, sgst: line['sgst'] as int, igst: line['igst'] as int, cess: line['cess'] as int,
         quantity: line['quantity'] as int?, unit: line['unit'] as String?, unitPrice: line['unitPrice'] as int?));

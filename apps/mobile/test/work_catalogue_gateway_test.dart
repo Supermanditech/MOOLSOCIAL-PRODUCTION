@@ -8309,7 +8309,8 @@ void main() {
     int price = 1025, String title = 'Host purchase', double progress = 0,
     String? purchaseId = 'host-purchase', String storeId = 'store-one',
     List<String>? ids, BuyV2CollectionOrderReference? collection, int total = 1044,
-    BuyV2TaxInvoiceDetails? invoice}) => BuyV2Order.minor(
+    BuyV2TaxInvoiceDetails? invoice, BuyV2TaxInvoiceDetails? platformInvoice,
+    bool omitInvoiceState = false, BuyV2TaxInvoiceState? invoiceState}) => BuyV2Order.minor(
     id: 'host-order', destination: BuyV2Destination.shop, title: title, itemSummary: 'One host SKU',
     totalMinor: total, partner: 'Host Store', partnerType: 'Retailer', promise: 'Host delivery',
     destinationLabel: 'Host address', progress: progress, status: BuyV2OrderStatus.preparing,
@@ -8317,7 +8318,100 @@ void main() {
     lines: [BuyV2CartLine(product: product.copyWith(priceMinor: price, storeId: storeId), quantity: 1)],
     tipMinor: 5, discountMinor: 1, taxMinor: tax, freightMinor: 3, deliveryFeeMinor: 4,
     paymentChargeMinor: 6, amountPaidNowMinor: paid, balanceDueMinor: balance,
-    taxInvoiceState: invoice == null ? null : BuyV2TaxInvoiceState.ready, taxInvoiceDetails: invoice);
+    taxInvoiceState: omitInvoiceState ? null : invoiceState ?? (invoice == null ? null : BuyV2TaxInvoiceState.ready), taxInvoiceDetails: invoice,
+    platformTaxInvoiceDetails: platformInvoice);
+  BuyV2TaxInvoiceDetails suppliedMinorInvoice({int tax = 2, int? legacyTax, bool omit = false, String issuer = 'seller'}) =>
+    BuyV2TaxInvoiceDetails(invoiceNumber: 'HOST-$issuer', issuedAt: at,
+      sellerLegalName: 'Host $issuer', sellerAddress: 'Host address', sellerGstin: '123456789012345',
+      placeOfSupply: 'Host source place', sourceId: 'host-$issuer', lines: [BuyV2TaxInvoiceLine(
+        description: 'Host supplied document line', hsnSac: 'HOST', quantity: 1, unit: 'pack',
+        taxableValueMinor: 1025, unitPriceMinor: 1025, gstRate: 18,
+        cgst: legacyTax, cgstMinor: omit ? null : tax, sgstMinor: 0, igstMinor: 0, cessMinor: 0)]);
+  for (final kind in ['platform absent state', 'platform pending', 'platform unavailable', 'seller absent state']) {
+    test('LF12-MINOR malformed supplied document rejects early-return path $kind', () async {
+      final original = exactHistoryOrder();
+      final malformed = suppliedMinorInvoice(omit: true);
+      final commerce = _HostExactOrderCommerce()..records = [original]
+        ..refreshedOrder = exactHistoryOrder(progress: .5,
+          invoice: kind.startsWith('seller') ? malformed : null,
+          platformInvoice: kind.startsWith('platform') ? malformed : null,
+          omitInvoiceState: kind.endsWith('absent state'),
+          invoiceState: kind.endsWith('pending') ? BuyV2TaxInvoiceState.pending
+            : kind.endsWith('unavailable') ? BuyV2TaxInvoiceState.unavailable : null);
+      final core = BuySession(), session = BuyV2Session(core: core, commerceAdapter: commerce, reviewDataEnabled: false);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      await session.restoreCommerce();
+      expect(await session.refreshOrder(original.id), false);
+      expect(session.orders.single.progress, 0);
+      expect(session.orders.single.payableTotalMinor, original.payableTotalMinor);
+      expect(session.orders.single.platformTaxInvoiceDetails, isNull);
+    });
+  }
+  for (final kind in ['exact', 'mismatch', 'negative', 'overflow', 'missing', 'conflict']) {
+    test('LF12-MINOR supplied tax refresh $kind preserves exact money and last verified order', () async {
+      final original = exactHistoryOrder();
+      final invoice = suppliedMinorInvoice(tax: switch (kind) {'mismatch' => 3, 'negative' => -1,
+        'overflow' => 9007199254740992, _ => 2}, legacyTax: kind == 'conflict' ? 1 : null, omit: kind == 'missing');
+      final commerce = _HostExactOrderCommerce()..records = [original]
+        ..refreshedOrder = exactHistoryOrder(invoice: invoice, progress: .5);
+      final core = BuySession(), session = BuyV2Session(core: core, commerceAdapter: commerce, reviewDataEnabled: false);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      await session.restoreCommerce();
+      expect(await session.refreshOrder(original.id), kind == 'exact');
+      expect(session.orders.single.progress, kind == 'exact' ? .5 : 0);
+      expect(session.orders.single.taxMinor, 2); expect(session.orders.single.payableTotalMinor, 1044);
+      if (kind == 'exact') {
+        final line = session.orders.single.taxInvoiceDetails!.lines.single;
+        expect(line.unitPriceMinor, 1025); expect(line.totalTaxMinor, 2);
+        expect(() => line.cgst, throwsFormatException, reason: 'An old rupee getter must never truncate paise.');
+      }
+    });
+  }
+  test('LF12-MINOR seller and platform recover through strict versioned codec without reinterpreting v1', () async {
+    final preferences = _ExactMoneyHostPreferences();
+    BuyV2SharedPreferencesCustomerStateStore store() => BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-invoice-owner');
+    final order = exactHistoryOrder(invoice: suppliedMinorInvoice(), platformInvoice: suppliedMinorInvoice(tax: 3, issuer: 'platform'));
+    expect(await store().write(BuyV2CustomerStateSnapshot(orders: [order])), true);
+    final key = preferences.values.keys.single, original = preferences.values[key]!;
+    final wire = jsonDecode(original) as Map<String, dynamic>;
+    final context = wire['orders'][0]['invoiceContext'] as Map;
+    expect(context['version'], 1); expect(context['seller']['moneyVersion'], 2); expect(context['platform']['moneyVersion'], 2);
+    expect(context['seller']['lines'][0].containsKey('cgst'), false);
+    final recovered = (await store().read())!.orders.single;
+    expect(recovered.taxInvoiceDetails!.lines.single.taxableValueMinor, 1025);
+    expect(recovered.taxInvoiceDetails!.lines.single.unitPriceMinor, 1025);
+    expect(recovered.platformTaxInvoiceDetails!.totalTaxMinor, 3);
+    expect(await store().write(BuyV2CustomerStateSnapshot(orders: [recovered])), true);
+    expect(preferences.values[key], original);
+    for (final edit in <void Function(Map)>[
+      (d) { d['moneyVersion'] = 3; }, (d) { d['moneyVersion'] = 2.0; }, (d) { d.remove('moneyVersion'); },
+      (d) { d['lines'][0]['cgstMinor'] = '2'; }, (d) { d['lines'][0]['cgstMinor'] = 2.0; },
+      (d) { d['lines'][0].remove('cgstMinor'); }, (d) { d['lines'][0]['cgst'] = 0; },
+      (d) { d['lines'][0]['cgstMinor'] = -1; }, (d) { d['lines'][0]['cgstMinor'] = 9007199254740992; },
+    ]) {
+      final changed = jsonDecode(original) as Map<String, dynamic>;
+      edit(changed['orders'][0]['invoiceContext']['seller'] as Map);
+      preferences.values[key] = jsonEncode(changed);
+      final badBytes = preferences.values[key];
+      await expectLater(store().read(), throwsFormatException);
+      expect(preferences.values[key], badBytes, reason: 'Reject, never erase or rewrite retained unsupported data.');
+    }
+    final legacy = BuyV2TaxInvoiceDetails(invoiceNumber: 'HOST-LEGACY', issuedAt: at,
+      sellerLegalName: 'Host Store', sellerAddress: 'Host address', sellerGstin: '123456789012345',
+      placeOfSupply: 'Host place', sourceId: 'host-source', lines: const [BuyV2TaxInvoiceLine(
+        description: 'Host legacy line', hsnSac: 'HOST', taxableValue: 10, gstRate: 10, cgst: 1, sgst: 0, igst: 0, cess: 0)]);
+    preferences.values.clear();
+    expect(await store().write(BuyV2CustomerStateSnapshot(orders: [exactHistoryOrder(invoice: legacy, tax: 100, total: 1142, balance: 1141)])), true);
+    final legacyBytes = preferences.values.values.single;
+    final legacyWire = jsonDecode(legacyBytes) as Map;
+    expect(legacyWire['orders'][0]['invoiceContext']['seller'].containsKey('moneyVersion'), false);
+    expect(legacyWire['orders'][0]['invoiceContext']['seller']['lines'][0]['cgst'], 1);
+    expect(jsonEncode(legacyWire['orders'][0]['invoiceContext']['seller']['lines'][0]),
+      '{"description":"Host legacy line","hsnSac":"HOST","taxableValue":10,"gstRate":10.0,"cgst":1,"sgst":0,"igst":0,"cess":0,"quantity":null,"unit":null,"unitPrice":null}');
+    final old = (await store().read())!;
+    expect(old.orders.single.taxInvoiceDetails!.totalTaxMinor, 100);
+    expect(await store().write(old), true); expect(preferences.values.values.single, legacyBytes);
+  });
   for (final kind in ['matching whole tax', 'fractional cannot match legacy', 'unsafe legacy tax']) {
     test('LF-PAISE invoice refresh $kind uses checked original units without offline misclassification', () async {
       final tax = kind == 'fractional cannot match legacy' ? 2 : 100;

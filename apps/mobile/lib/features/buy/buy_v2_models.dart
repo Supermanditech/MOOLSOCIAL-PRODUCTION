@@ -1163,30 +1163,65 @@ class BuyV2TaxInvoiceLine {
   const BuyV2TaxInvoiceLine({
     required this.description,
     required this.hsnSac,
-    required this.taxableValue,
+    int? taxableValue,
+    int? taxableValueMinor,
     required this.gstRate,
-    required this.cgst,
-    required this.sgst,
-    required this.igst,
-    required this.cess,
+    int? cgst,
+    int? sgst,
+    int? igst,
+    int? cess,
+    int? cgstMinor,
+    int? sgstMinor,
+    int? igstMinor,
+    int? cessMinor,
     this.quantity,
     this.unit,
-    this.unitPrice,
-  });
+    int? unitPrice,
+    int? unitPriceMinor,
+    // Keep public named arguments compatible while backing the legacy getters.
+    // ignore: prefer_initializing_formals
+  }) : _taxableValue = taxableValue, _taxableValueMinor = taxableValueMinor,
+       // ignore: prefer_initializing_formals
+       _cgst = cgst, _sgst = sgst, _igst = igst, _cess = cess,
+       // ignore: prefer_initializing_formals
+       _cgstMinor = cgstMinor, _sgstMinor = sgstMinor, _igstMinor = igstMinor, _cessMinor = cessMinor,
+       // ignore: prefer_initializing_formals
+       _unitPrice = unitPrice, _unitPriceMinor = unitPriceMinor;
 
   final String description;
   final String hsnSac;
-  final int taxableValue;
+  final int? _taxableValue, _taxableValueMinor;
   final double gstRate;
-  final int cgst;
-  final int sgst;
-  final int igst;
-  final int cess;
+  final int? _cgst, _sgst, _igst, _cess;
+  final int? _cgstMinor, _sgstMinor, _igstMinor, _cessMinor;
   final int? quantity;
   final String? unit;
-  final int? unitPrice;
+  final int? _unitPrice, _unitPriceMinor;
 
-  int get totalTax => cgst + sgst + igst + cess;
+  bool get usesMinorAmounts => [_taxableValueMinor, _cgstMinor, _sgstMinor, _igstMinor, _cessMinor, _unitPriceMinor]
+    .any((amount) => amount != null);
+  int get taxableValueMinor => buyV2ExactMinorAmount(minor: _taxableValueMinor, legacyRupees: _taxableValue);
+  int get cgstMinor => buyV2ExactMinorAmount(minor: _cgstMinor, legacyRupees: _cgst);
+  int get sgstMinor => buyV2ExactMinorAmount(minor: _sgstMinor, legacyRupees: _sgst);
+  int get igstMinor => buyV2ExactMinorAmount(minor: _igstMinor, legacyRupees: _igst);
+  int get cessMinor => buyV2ExactMinorAmount(minor: _cessMinor, legacyRupees: _cess);
+  int? get unitPriceMinor => _unitPrice == null && _unitPriceMinor == null ? null
+    : buyV2ExactMinorAmount(minor: _unitPriceMinor, legacyRupees: _unitPrice);
+  // Legacy APIs retain rupee semantics; no truncation of a new paise amount.
+  int get taxableValue => _taxableValue ?? buyV2WholeRupees(taxableValueMinor);
+  int get cgst => _cgst ?? buyV2WholeRupees(cgstMinor);
+  int get sgst => _sgst ?? buyV2WholeRupees(sgstMinor);
+  int get igst => _igst ?? buyV2WholeRupees(igstMinor);
+  int get cess => _cess ?? buyV2WholeRupees(cessMinor);
+  int? get unitPrice => _unitPrice ?? (unitPriceMinor == null ? null : buyV2WholeRupees(unitPriceMinor!));
+  int get totalTaxMinor => buyV2SumMinor([cgstMinor, sgstMinor, igstMinor, cessMinor]);
+  int get totalTax => buyV2WholeRupees(totalTaxMinor);
+  bool get hasValidAmounts {
+    try {
+      taxableValueMinor; unitPriceMinor; totalTaxMinor;
+      return gstRate.isFinite;
+    } on FormatException { return false; }
+  }
 }
 
 class BuyV2TaxInvoiceDetails {
@@ -1234,7 +1269,13 @@ class BuyV2TaxInvoiceDetails {
   final String? authorizedSignatory;
   final String? supplyStatement;
 
-  int get totalTax => lines.fold(0, (total, line) => total + line.totalTax);
+  bool get usesMinorAmounts => lines.any((line) => line.usesMinorAmounts);
+  int get totalTaxMinor => buyV2SumMinor(lines.map((line) => line.totalTaxMinor));
+  int get totalTax => buyV2WholeRupees(totalTaxMinor);
+  bool get hasValidAmounts {
+    try { totalTaxMinor; return lines.every((line) => line.hasValidAmounts); }
+    on FormatException { return false; }
+  }
 }
 
 /// A customer-collection reference supplied by the authenticated commerce
