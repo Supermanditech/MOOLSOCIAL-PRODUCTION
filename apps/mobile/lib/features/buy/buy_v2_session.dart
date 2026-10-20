@@ -3342,6 +3342,7 @@ class BuyV2RootSessions {
   BuyV2RootSessions({required this.core, required this.currentIdentity,
     this.preserveReview = false, this.accountStoreFactory, this.accountSessionFactory,
     this.purchaseReaderFactory, this.catalogueSourceFactory, this.productPresentationFactory,
+    this.bulkQuoteGatewayFactory, this.bulkQuoteJournalFactory,
     this.purchaseRealm = const String.fromEnvironment('MOOLSOCIAL_PURCHASE_REALM'),
   }) : guest = BuyV2Session(core: core, reviewDataEnabled: preserveReview ? null : false),
        unavailable = BuyV2Session(core: core, reviewDataEnabled: false) {
@@ -3353,6 +3354,8 @@ class BuyV2RootSessions {
   final AuthenticatedWorkspaceOrderIdentityGateway? Function(BuyV2AccountPersistenceIdentity, bool Function())? purchaseReaderFactory;
   final WorkspacePublicDiscoverySource? Function(BuyV2AccountPersistenceIdentity, bool Function())? catalogueSourceFactory;
   final WorkspaceProductPresentationGateway? Function(BuyV2AccountPersistenceIdentity, bool Function(), WorkspacePublicDiscoverySource?)? productPresentationFactory;
+  final WorkspaceBulkQuoteGateway? Function(BuyV2AccountPersistenceIdentity, bool Function())? bulkQuoteGatewayFactory;
+  final WorkspaceBulkQuoteJournal Function(BuyV2AccountPersistenceIdentity, bool Function())? bulkQuoteJournalFactory;
   final BuyV2AccountPersistenceIdentity? Function() currentIdentity;
   final bool preserveReview;
   final BuyV2CustomerStateStore Function(BuyV2AccountPersistenceIdentity,
@@ -3400,8 +3403,16 @@ class BuyV2RootSessions {
       : configuredWorkspaceProductPresentations(environment: identity.environment, projectId: identity.projectId,
           tenantId: identity.tenantId, accountUserId: identity.userId, realm: purchaseRealm,
           current: catalogueCurrent, displayed: (product) => catalogue?.displayedProduct(product));
+    final quoteGateway = accountSessionFactory != null || bulkQuoteJournalFactory == null ? null : bulkQuoteGatewayFactory != null
+      ? bulkQuoteGatewayFactory!(identity, catalogueCurrent)
+      : configuredWorkspaceBulkQuotes(environment: identity.environment, projectId: identity.projectId,
+        tenantId: identity.tenantId, accountUserId: identity.userId, realm: purchaseRealm);
+    final quotes = quoteGateway == null || quoteGateway.gateway.ownerAccountId != identity.userId || quoteGateway.gateway.realm != purchaseRealm
+      ? null : WorkspaceBulkQuoteAccess(gateway: quoteGateway,
+      journal: bulkQuoteJournalFactory!(identity, catalogueCurrent), role: 'buyer', current: catalogueCurrent);
     final next = accountSessionFactory?.call(store, pending) ??
       BuyV2Session(core: core, reviewDataEnabled: false,
+        bulkQuotes: quotes,
         productPresentations: presentations,
         storeStockReader: catalogue?.gateway.stockSnapshotsSupported == true ? WorkspacePublicStockReader(
           gateway: catalogue!.gateway, displayed: catalogue.displayedProduct, current: catalogueCurrent, now: catalogue.gateway.now) : null,
@@ -3445,6 +3456,41 @@ class BuyV2RootSessions {
 }
 
 class BuyV2Session extends ChangeNotifier {
+  final WorkspaceBulkQuoteAccess? bulkQuotes;
+  Set<String> get bulkQuoteRequestStores => bulkQuotes?.active != true || isStoreProcurement ? {} :
+    {for (final line in cartLines) if (line.product.offerClass == BuyV2OfferClass.bulk && line.product.storeId != null) line.product.storeId!};
+  List<({WorkspacePublicCatalogueEntry entry, int quantity})> _bulkQuoteSelections(String store) {
+    final source = cataloguePageSource, access = bulkQuotes;
+    if (_collectionDisposed || isStoreProcurement || cartChangesBlocked || access?.active != true ||
+      source is! WorkspacePublicDiscoverySource || !source.active) {
+      throw const FormatException();
+    }
+    final selected = cartLines.where((line) => line.product.storeId == store && line.product.offerClass == BuyV2OfferClass.bulk).toList();
+    if (selected.isEmpty) throw const FormatException();
+    final now = access!.gateway.gateway.now().toUtc();
+    return [for (final line in selected) (
+      entry: WorkspacePublicCatalogueEntry(product: line.product, readback: () {
+        final facts = source.displayedProduct(line.product);
+        if (facts == null || facts.validUntil?.isAfter(now) != true || facts.content.state != BuyV2ProductContentState.ready ||
+          facts.content.observedAt == null || facts.content.observedAt!.isAfter(now)) {
+          throw const FormatException();
+        }
+        return facts;
+      }()), quantity: line.quantity)];
+  }
+  ({WorkspaceBulkQuoteIntent original, List<({String name, String pack, String? variant, int quantity})> products,
+    bool Function() current}) prepareBulkQuoteRequest(String store) {
+    final access = bulkQuotes!, selections = _bulkQuoteSelections(store);
+    String signature(List<({WorkspacePublicCatalogueEntry entry, int quantity})> rows) => jsonEncode([
+      for (final row in rows) [row.entry.product.publicListingIdentity?.toJson(), row.entry.readback.skuRevision, row.quantity]]);
+    final original = access.requestIntent(selections), frozen = signature(selections);
+    return (original: original, products: List.unmodifiable([for (final row in selections)
+      (name: row.entry.product.customerTitle, pack: row.entry.product.pack, variant: row.entry.product.variant, quantity: row.quantity)]),
+      current: () {
+        try { return identical(bulkQuotes, access) && access.active && signature(_bulkQuoteSelections(store)) == frozen; }
+        catch (_) { return false; }
+      });
+  }
   final WorkspaceProductPresentationGateway? productPresentations;
   /// Owned by this session; never shared across authenticated lifetimes.
   final WorkspacePublicStockReader? storeStockReader;
@@ -3452,6 +3498,7 @@ class BuyV2Session extends ChangeNotifier {
   final String purchaseRealm;
   BuyV2Session({
     required this.core,
+    this.bulkQuotes,
     this.productPresentations,
     this.storeStockReader,
     this.purchaseReader,
@@ -5245,6 +5292,7 @@ class BuyV2Session extends ChangeNotifier {
     _storeCouponExpiry?.cancel();
     storeStockReader?.removeListener(_onStoreStockChanged);
     storeStockReader?.dispose();
+    bulkQuotes?.dispose();
     _ordersNavigationVisit = null;
     _cartOrderReturnOrigin = null;
     for (final controller in _productAcceptance.values) {

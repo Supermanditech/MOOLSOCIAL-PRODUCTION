@@ -40,6 +40,23 @@ import 'buy_v2_store_address.dart';
 typedef BuyV2LiveDeliveryMapBuilder =
     Widget Function(BuildContext context, BuyV2LiveDeliverySnapshot snapshot);
 
+Future<void> _showBulkQuotes(BuildContext context, BuyV2Session session, {String? requestStore}) async {
+  final access = session.bulkQuotes;
+  if (access?.active != true) return;
+  try {
+    final request = requestStore == null ? null : session.prepareBulkQuoteRequest(requestStore);
+    await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true, showDragHandle: true,
+      builder: (sheet) => SizedBox(height: MediaQuery.sizeOf(sheet).height * .92,
+        child: WorkspaceBulkQuotes(access: access!, request: request?.original, requestLines: request?.products ?? const [],
+          inputCurrent: request?.current, onClose: () => Navigator.pop(sheet))));
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Refresh the selected Bulk product details before requesting a quote.')));
+    }
+  }
+}
+
 Future<void> _openOrderInvoice(
   BuildContext context, {
   required BuyV2Session session,
@@ -8590,6 +8607,12 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
       ),
     );
     final contents = <Widget>[
+      if (session.bulkQuotes?.active == true && !session.isStoreProcurement)
+        for (final store in session.bulkQuoteRequestStores) Padding(padding: const EdgeInsets.only(bottom: 6),
+          child: OutlinedButton.icon(key: ValueKey('buy-bulk-request-$store'),
+            onPressed: session.cartChangesBlocked ? null : () => _showBulkQuotes(context, session, requestStore: store),
+            icon: const Icon(Icons.request_quote_outlined),
+            label: Text('Request Bulk quote · ${session.cartLines.firstWhere((line) => line.product.storeId == store).product.seller.trim().isEmpty ? 'Store' : session.cartLines.firstWhere((line) => line.product.storeId == store).product.seller}'))),
       if (!session.isStoreProcurement &&
           session.cartScope != BuyV2CartScope.medicine &&
           lines.isNotEmpty)
@@ -13897,6 +13920,10 @@ class BuyV2OrdersView extends StatelessWidget {
         key: const PageStorageKey('buy-orders'),
         padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
         children: [
+          if (session.bulkQuotes?.active == true) ListTile(key: const ValueKey('buy-orders-bulk-quotes'),
+            leading: const Icon(Icons.request_quote_outlined), title: const Text('Bulk quotes'),
+            subtitle: const Text('Requests and agreed product prices — separate from orders'),
+            trailing: const Icon(Icons.chevron_right_rounded), onTap: () => _showBulkQuotes(context, session)),
           if (session.purchaseReader case final reader? when reader.isCurrent && session.query.trim().isEmpty)
             WorkspacePurchaseOriginals(key: ValueKey(('buyer-originals',reader,session.purchaseRealm)),
               gateway: reader, role: WorkspaceOrderIdentityRole.buyer, realm: session.purchaseRealm,

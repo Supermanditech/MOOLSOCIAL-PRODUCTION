@@ -23,6 +23,7 @@ import '../features/ride/ride_session.dart';
 import '../features/shared/shared_session.dart';
 import '../features/shared/social_create_draft_repository.dart';
 import '../features/work/work_session.dart';
+import '../features/work/work_services.dart' show SecureWorkBulkQuoteJournal;
 import '../ui_v2/launch/launch_interruption_guard.dart';
 import '../ui_v2/launch/launch_presentation_gate.dart';
 import '../ui_v2/motion/mool_buy_tap_acknowledgement.dart';
@@ -147,6 +148,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   final List<VoidCallback> _retiredRouterCleanups = [];
 
   GoRouter _createRouter(String initialLocation) {
+    _workSession.bindBulkQuoteSource(_buyRoot.current.bulkQuotes);
     _workSession.bindOriginalPurchaseReader(_buyRoot.current.purchaseReader, _buyRoot.current.purchaseRealm);
     _workSession.bindProductPresentationReader(_buyRoot.current.productPresentations);
     return createJourneyRouter(
@@ -182,6 +184,8 @@ class _MoolSocialAppState extends State<MoolSocialApp>
     super.initState();
     _buyRoot = BuyV2RootSessions(core: _buySession,
       currentIdentity: () => _session.authenticatedBuyPersistenceIdentity,
+      bulkQuoteJournalFactory: (identity, current) => SecureWorkBulkQuoteJournal(
+        currentAccount: () => current() ? identity.userId : null),
       preserveReview: widget.uiReviewOnly ||
         const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') ||
         (kDebugMode && _session.usesReviewAccountIdentity));

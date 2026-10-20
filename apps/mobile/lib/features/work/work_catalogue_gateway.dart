@@ -41,6 +41,7 @@ class WorkspaceBulkQuote {
   final int? merchandiseMinor;
   final DateTime? validUntil;
   Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  String? get storeName => toJson()['storeName'] as String?;
   String get customerReference => toJson()['customerReference'] as String;
   bool get accepted => state == 'accepted';
   bool offerCurrent(DateTime now) => state == 'offered' && validUntil != null && now.toUtc().isBefore(validUntil!);
@@ -49,7 +50,8 @@ class WorkspaceBulkQuote {
     final r = _map(raw);
     _keys(r, ['schemaVersion', 'realm', 'quoteId', 'storeId', 'revision', 'state', 'requestedAt', 'updatedAt',
       'lines', 'offer', 'acceptance', 'viewerRole', 'customerReference', 'kind', 'currency',
-      'orderingAvailable', 'finalChargesDetermined', 'creditApproved']);
+      'orderingAvailable', 'finalChargesDetermined', 'creditApproved', if (r.containsKey('storeName')) 'storeName']);
+    if (r.containsKey('storeName')) _string(r['storeName']);
     _bulk(utf8.encode(jsonEncode(r)).length <= 420000 && r['schemaVersion'] == 1 &&
       {'evaluation', 'production'}.contains(realm) && r['realm'] == realm &&
       r['kind'] == 'supplier_merchandise_agreement' && r['currency'] == 'INR' &&
@@ -147,8 +149,10 @@ class WorkspaceBulkQuoteLine {
 /// Serializing this object is not proof that storage succeeded or a request sent.
 @immutable
 class WorkspaceBulkQuoteIntent {
-  const WorkspaceBulkQuoteIntent._(this.account, this.realm, this.kind, this._body, this.base, this._expected);
+  const WorkspaceBulkQuoteIntent._(this.account, this.realm, this.kind, this._body, this.base, this._expected, this._presentation);
   final String account, realm, kind, _body, _expected;
+  final String? _presentation;
+  Map<String, dynamic>? get presentation => _presentation == null ? null : _map(jsonDecode(_presentation));
   final WorkspaceBulkQuote? base;
   Map<String, dynamic> get body => _map(jsonDecode(_body));
   String get operationId => body[kind == 'request' ? 'requestId' : 'operationId'] as String;
@@ -158,9 +162,9 @@ class WorkspaceBulkQuoteIntent {
   String get operation => {'request': 'requestBulkSupplierQuote', 'offer': 'offerBulkSupplierQuote',
     'accept': 'acceptBulkSupplierQuote', 'withdraw': 'withdrawBulkSupplierQuote'}[kind]!;
   Map<String, dynamic> toJson() => {'schemaVersion': 1, 'account': account, 'realm': realm, 'kind': kind,
-    'body': body, 'base': base?.toJson(), 'expected': jsonDecode(_expected)};
+    'body': body, 'base': base?.toJson(), 'expected': jsonDecode(_expected), if (_presentation != null) 'presentation': presentation};
   factory WorkspaceBulkQuoteIntent.decode(Object? value, {required String account, required String realm, required DateTime now}) {
-    final r = _map(value); _keys(r, ['schemaVersion', 'account', 'realm', 'kind', 'body', 'base', 'expected']);
+    final r = _map(value); _keys(r, ['schemaVersion', 'account', 'realm', 'kind', 'body', 'base', 'expected', if (r.containsKey('presentation')) 'presentation']);
     _bulk(r['schemaVersion'] == 1 && r['account'] == _id(account) && r['realm'] == realm &&
       {'evaluation', 'production'}.contains(realm) && {'request', 'offer', 'accept', 'withdraw'}.contains(r['kind']));
     final kind = r['kind'] as String, body = _map(r['body']);
@@ -208,7 +212,22 @@ class WorkspaceBulkQuoteIntent {
         _bulk(sum <= 1000000000000);
       }
     }
-    return WorkspaceBulkQuoteIntent._(account, realm, kind, jsonEncode(body), base, jsonEncode(expected));
+    String? presentation;
+    if (r.containsKey('presentation')) {
+      final p = _map(r['presentation']); _keys(p, ['storeName', 'lines']); _string(p['storeName']);
+      final rows = _list(p['lines'], 100), seen = <String>{}; _bulk(rows.length == expected.length);
+      for (final value in rows) {
+        final row = _map(value); _keys(row, ['lineId', 'skuId', 'listingId', 'skuRevision', 'quantity',
+          'canonicalProductId', 'verifiedPackId', 'name', 'packLabel', if (row.containsKey('variant')) 'variant']);
+        _bulk(seen.add(_id(row['lineId'])) && expected.any((e) {
+          final identity = _map(e);
+          return _bulkHash(identity) == _bulkHash(<String, dynamic>{for (final key in identity.keys) key: row[key]});
+        }));
+        _string(row['name']); _string(row['packLabel']); if (row.containsKey('variant')) _string(row['variant']);
+      }
+      presentation = jsonEncode(p);
+    }
+    return WorkspaceBulkQuoteIntent._(account, realm, kind, jsonEncode(body), base, jsonEncode(expected), presentation);
   }
   void verifyHead(WorkspaceBulkQuote quote) {
     final expected = (_list(jsonDecode(_expected), 100).cast<Map<String, dynamic>>().toList()
@@ -304,7 +323,8 @@ class WorkspaceBulkQuotePage {
     String? previous = verifyCursor(requestedCursor, realm: realm, account: account, storeId: storeId, limit: limit);
     for (final value in rows) {
       final row = _map(value); _keys(row, ['quoteId', 'storeId', 'revision', 'state', 'requestedAt', 'updatedAt',
-        'productCount', 'offerMerchandiseMinor', 'offerValidUntil', 'customerReference']);
+        'productCount', 'offerMerchandiseMinor', 'offerValidUntil', 'customerReference', if (row.containsKey('storeName')) 'storeName']);
+      if (row.containsKey('storeName')) _string(row['storeName']);
       final id = _bulkId(row['quoteId']), store = _id(row['storeId']), revision = _int(row['revision'], 1, 999999999);
       final requested = _bulkTime(row['requestedAt']), updated = _bulkTime(row['updatedAt']);
       _int(row['productCount'], 1, 100);
@@ -405,6 +425,10 @@ class WorkspaceBulkQuoteGateway {
 }
 
 typedef WorkspaceBulkQuoteScope = ({String account, String realm, String store, String role});
+typedef WorkspaceBulkQuoteNamespace = ({String account, String realm, String role});
+abstract interface class WorkspaceBulkQuoteIndex {
+  Future<List<String>> pendingStores(WorkspaceBulkQuoteNamespace owner);
+}
 void validateWorkspaceBulkQuoteScope(WorkspaceBulkQuoteScope scope) {
   _id(scope.account); _id(scope.store);
   _bulk({'evaluation', 'production'}.contains(scope.realm) && {'buyer', 'supplier'}.contains(scope.role));
@@ -413,6 +437,77 @@ abstract interface class WorkspaceBulkQuoteJournal {
   Future<List<WorkspaceBulkQuoteIntent>> read(WorkspaceBulkQuoteScope scope);
   Future<void> save(WorkspaceBulkQuoteScope scope, WorkspaceBulkQuoteIntent original);
   Future<void> remove(WorkspaceBulkQuoteScope scope, WorkspaceBulkQuoteIntent original);
+}
+
+/// One authenticated UI lifetime; quote controllers are shared by Cart and
+/// Orders, not recreated when a sheet closes. Disposal never erases journals.
+class WorkspaceBulkQuoteAccess {
+  WorkspaceBulkQuoteAccess({required this.gateway, required this.journal, required this.role, required this.current}) {
+    _id(gateway.gateway.ownerAccountId); _bulk({'buyer', 'supplier'}.contains(role));
+  }
+  final WorkspaceBulkQuoteGateway gateway;
+  final WorkspaceBulkQuoteJournal journal;
+  final String role;
+  final bool Function() current;
+  final _token = Object();
+  final _controllers = <String, WorkspaceBulkQuoteController>{};
+  bool _closed = false;
+  String get account => gateway.gateway.ownerAccountId!;
+  String get realm => gateway.gateway.realm;
+  bool get active => !_closed && gateway.enabled && current();
+  WorkspaceBulkQuoteController forStore(String store) {
+    _id(store); _bulk(active);
+    return _controllers.putIfAbsent(store, () => WorkspaceBulkQuoteController(
+      scope: (account: account, realm: realm, store: store, role: role), gateway: gateway, journal: journal,
+      context: () => active ? _token : null));
+  }
+  WorkspaceBulkQuoteIntent requestIntent(List<({WorkspacePublicCatalogueEntry entry, int quantity})> selections) {
+    _bulk(active && role == 'buyer' && selections.isNotEmpty && selections.length <= 100);
+    final now = gateway.gateway.now().toUtc(), store = selections.first.entry.product.storeId;
+    final expected = <Map<String, dynamic>>[], presentation = <Map<String, dynamic>>[];
+    final name = _string(selections.first.entry.product.seller);
+    for (final selection in selections) {
+      final product = selection.entry.product, facts = selection.entry.readback, listing = product.publicListingIdentity;
+      _bulk(product.seller == name && listing != null && listing.realm == realm && listing.storeId == store && listing.channel == BuyV2OfferClass.bulk &&
+        listing.matches(product) && product.offerClass == BuyV2OfferClass.bulk && facts.skuRevision != null &&
+        facts.content.productId == product.id && facts.content.state == BuyV2ProductContentState.ready &&
+        facts.content.observedAt != null && !facts.content.observedAt!.isAfter(now) && facts.validUntil?.isAfter(now) == true);
+      expected.add({'lineId': 'line-${_bulkHash([realm, listing!.storeId, listing.listingId]).substring(0, 32)}',
+        'skuId': listing.skuId, 'listingId': listing.listingId, 'skuRevision': facts.skuRevision, 'quantity': selection.quantity,
+        'canonicalProductId': listing.canonicalProductId, 'verifiedPackId': listing.verifiedPackId});
+      presentation.add({...expected.last, 'name': product.title, 'packLabel': product.pack,
+        if (product.variant.trim().isNotEmpty) 'variant': product.variant});
+    }
+    final key = 'request-${List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
+    return WorkspaceBulkQuoteIntent.decode({'schemaVersion': 1, 'account': account, 'realm': realm, 'kind': 'request', 'base': null,
+      'body': {'schemaVersion': 1, 'requestId': key, 'storeId': store, 'lines': [for (final e in expected)
+        {for (final k in ['lineId', 'skuId', 'listingId', 'skuRevision', 'quantity']) k: e[k]}]}, 'expected': expected,
+        'presentation': {'storeName': name, 'lines': presentation}},
+      account: account, realm: realm, now: now);
+  }
+  Future<List<String>> pendingStores() async {
+    _bulk(active);
+    final index = journal;
+    final stored = index is WorkspaceBulkQuoteIndex ? await (index as WorkspaceBulkQuoteIndex).pendingStores((account: account, realm: realm, role: role)) : <String>[];
+    _bulk(active); return {...stored, ..._controllers.keys}.toList()..sort();
+  }
+  void dispose() {
+    if (_closed) return; _closed = true;
+    for (final controller in _controllers.values) { controller.dispose(); }
+  }
+}
+
+WorkspaceBulkQuoteGateway? configuredWorkspaceBulkQuotes({required String environment, required String projectId,
+    required String? tenantId, required String accountUserId, required String realm}) {
+  if (!const bool.fromEnvironment('MOOLSOCIAL_BULK_SUPPLIER_QUOTES_V1') || environment != 'firebase-service' ||
+      projectId != 'moolsocial-dev-503018' || tenantId != null || !{'evaluation', 'production'}.contains(realm)) {
+    return null;
+  }
+  final endpoint = Uri.tryParse(const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL'));
+  if (endpoint == null || !_validEndpoint(endpoint)) return null;
+  return WorkspaceBulkQuoteGateway(AuthenticatedWorkspaceCatalogueGateway(endpoint: endpoint,
+    credentials: FirebaseSocialContentCredentials(), transport: IoSocialContentTransport(), realm: realm,
+    ownerAccountId: _id(accountUserId)), enabled: true);
 }
 
 /// Scoped presentation/recovery owner only. A caller supplies a stable lifetime

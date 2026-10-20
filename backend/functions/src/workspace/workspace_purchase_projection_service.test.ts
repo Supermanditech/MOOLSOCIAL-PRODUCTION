@@ -56,7 +56,8 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
   let clock = '2026-10-20T12:00:00.000Z', channel = 'bulk', revision = 1, policyRevision = 1;
   const listingId = `listing-${'a'.repeat(64)}`;
   let expireDuringRead = false, sourceReads = 0;
-  const sourceFixture = {bulkQuotationSnapshot: async () => [{state: 'ready', realm: 'evaluation', storeId: 'store-one', items: [{
+  const sourceFixture = {bulkQuotationSnapshot: async () => [{state: 'ready', realm: 'evaluation', storeId: 'store-one',
+    publicStore: {id: 'store-one', name: 'Isolated Bulk supplier', profileId: 'wholesaler'}, items: [{
     skuId: 'sku-one', revision, canonicalProductId: 'canonical-one', verifiedPackId: 'pack-one',
     content: {title: 'Isolated Bulk rice', variant: 'Aged\ngrain'}, pack: {label: '25 kg bag'},
     channels: [{kind: channel, minimumOrder: 10, quantityStep: 5, validUntil: '2026-10-21T12:00:00.000Z'}],
@@ -93,6 +94,7 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
     }
     const created = await service().request('buyer-one', request) as any;
     assert.equal(created.state, 'requested'); assert.equal(created.orderingAvailable, false);
+    assert.equal(created.storeName, 'Isolated Bulk supplier');
     assert.equal(created.kind, 'supplier_merchandise_agreement');
     const scope = {quoteId: created.quoteId};
     const supplierRequested = await service().read('supplier-one', scope) as any;
@@ -145,6 +147,7 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
     }
     await path.set(originalStored);
     const legacy = structuredClone(originalStored.body);
+    delete legacy.storeName;
     for (const line of legacy.lines) delete line.variant;
     await path.set({body: legacy, integrity: hash(legacy)});
     const legacyRead = await service().read('buyer-one', scope) as any;
@@ -226,7 +229,8 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
       listingId: `listing-${hash(['heavy-listing', i])}`, skuRevision: 1, quantity: 10}));
     const heavySource = {bulkQuotationSnapshot: async () => {
       const base = (await sourceFixture.bulkQuotationSnapshot())[0]!.items[0]!;
-      return heavyLines.map(line => ({state: 'ready', realm: 'evaluation', storeId: 'store-one', items: [{...base,
+      return heavyLines.map(line => ({state: 'ready', realm: 'evaluation', storeId: 'store-one',
+        publicStore: {id: 'store-one', name: 'Isolated Bulk supplier', profileId: 'wholesaler'}, items: [{...base,
         skuId: line.skuId, revision: 1, channels: [{kind: 'bulk', minimumOrder: 10, quantityStep: 5, validUntil: '2030-01-01T00:00:00.000Z'}],
         listings: [{...base.listings[0], skuId: line.skuId, listingId: line.listingId}],
         supplierPolicy: {...base.supplierPolicy, skuId: line.skuId, policy: {...base.supplierPolicy.policy,

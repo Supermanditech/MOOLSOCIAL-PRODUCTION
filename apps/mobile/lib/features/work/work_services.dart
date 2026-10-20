@@ -4201,7 +4201,7 @@ class SecureWorkCatalogueBindingPendingStore implements WorkspaceCatalogueBindin
 /// Same account-scoped encrypted/native-tail pattern as product submissions.
 /// Dedicated Bulk originals; reuses the existing encrypted serialized-storage
 /// pattern without mixing agreements with orders, payment attempts or Stock.
-class SecureWorkBulkQuoteJournal implements WorkspaceBulkQuoteJournal {
+class SecureWorkBulkQuoteJournal implements WorkspaceBulkQuoteJournal, WorkspaceBulkQuoteIndex {
   SecureWorkBulkQuoteJournal({FlutterSecureStorage? storage, String? Function()? currentAccount, DateTime Function()? now})
     : _storage = storage ?? const FlutterSecureStorage(),
       _currentAccount = currentAccount ?? SecureWorkOrderPendingStore._signedInAccount, _now = now ?? DateTime.now;
@@ -4209,6 +4209,43 @@ class SecureWorkBulkQuoteJournal implements WorkspaceBulkQuoteJournal {
   final String? Function() _currentAccount;
   final DateTime Function() _now;
   static final _tails = <String, Future<void>>{};
+  String _indexKey(WorkspaceBulkQuoteNamespace owner) => 'moolsocial.workspace.bulk-quote-index.v1.${
+    base64UrlEncode(utf8.encode(jsonEncode([owner.account, owner.realm, owner.role])))}';
+  WorkspaceBulkQuoteNamespace _namespace(WorkspaceBulkQuoteScope scope) => (account: scope.account, realm: scope.realm, role: scope.role);
+  void _checkNamespace(WorkspaceBulkQuoteNamespace owner) {
+    if (!RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(owner.account) ||
+      !{'production', 'evaluation'}.contains(owner.realm) || !{'buyer', 'supplier'}.contains(owner.role) ||
+      _currentAccount() != owner.account) {
+      throw const WorkGatewayException('Sign in again to check saved requests.');
+    }
+  }
+  Future<List<String>> _readIndex(WorkspaceBulkQuoteNamespace owner) async {
+    _checkNamespace(owner); final raw = await _storage.read(key: _indexKey(owner)); _checkNamespace(owner);
+    if (raw == null) return [];
+    if (raw.length > 20000) throw const FormatException('Keep saved request recovery.');
+    final r = jsonDecode(raw), keys = {'schemaVersion', 'account', 'realm', 'role', 'stores'};
+    if (r is! Map || r.length != keys.length || r.keys.any((k) => !keys.contains(k)) || r['schemaVersion'] != 1 ||
+      r['account'] != owner.account || r['realm'] != owner.realm || r['role'] != owner.role || r['stores'] is! List ||
+      (r['stores'] as List).length > 100) {
+      throw const FormatException('Keep saved request recovery.');
+    }
+    final stores = <String>[];
+    for (final value in r['stores'] as List) {
+      if (value is! String || !RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(value) ||
+        stores.isNotEmpty && stores.last.compareTo(value) >= 0) {
+        throw const FormatException('Keep saved request recovery.');
+      }
+      stores.add(value);
+    }
+    return stores;
+  }
+  Future<void> _writeIndex(WorkspaceBulkQuoteNamespace owner, List<String> stores) async {
+    _checkNamespace(owner); if (stores.length > 100) throw const FormatException('Check saved requests before adding more.');
+    final encoded = jsonEncode({'schemaVersion': 1, 'account': owner.account, 'realm': owner.realm, 'role': owner.role, 'stores': stores..sort()});
+    await _storage.write(key: _indexKey(owner), value: encoded); _checkNamespace(owner);
+    if (await _storage.read(key: _indexKey(owner)) != encoded) throw const FormatException('Saved requests could not be verified.');
+    _checkNamespace(owner);
+  }
   String _key(WorkspaceBulkQuoteScope scope) => 'moolsocial.workspace.bulk-quote.v1.${
     base64UrlEncode(utf8.encode(jsonEncode([scope.account, scope.realm, scope.store, scope.role])))}';
   void _check(WorkspaceBulkQuoteScope scope) {
@@ -4221,13 +4258,24 @@ class SecureWorkBulkQuoteJournal implements WorkspaceBulkQuoteJournal {
       throw const FormatException('Keep the original request owner.');
     }
   }
-  Future<T> _serial<T>(WorkspaceBulkQuoteScope scope, Future<T> Function() action) {
-    final key = _key(scope), result = (_tails[key] ?? Future<void>.value()).then((_) => action());
+  Future<T> _serialKey<T>(String key, Future<T> Function() action) {
+    final result = (_tails[key] ?? Future<void>.value()).then((_) => action());
     final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     _tails[key] = tail;
     unawaited(tail.then((_) { if (identical(_tails[key], tail)) _tails.remove(key); }));
     return result;
   }
+  Future<T> _serial<T>(WorkspaceBulkQuoteScope scope, Future<T> Function() action) => _serialKey(_indexKey(_namespace(scope)), action);
+  @override Future<List<String>> pendingStores(WorkspaceBulkQuoteNamespace owner) => _serialKey(_indexKey(owner), () async {
+    final stored = await _readIndex(owner), pending = <String>[];
+    for (final store in stored) {
+      // The account queue has settled: an absent/validated-empty payload is a
+      // harmless partial-save/cleanup pointer, not an unresolved command.
+      if ((await _read((account: owner.account, realm: owner.realm, store: store, role: owner.role))).isNotEmpty) pending.add(store);
+    }
+    if (stored.length != pending.length) await _writeIndex(owner, pending);
+    _checkNamespace(owner); return pending;
+  });
   Future<List<WorkspaceBulkQuoteIntent>> _read(WorkspaceBulkQuoteScope scope) async {
     _check(scope); final raw = await _storage.read(key: _key(scope)); _check(scope);
     if (raw == null) return [];
@@ -4245,16 +4293,25 @@ class SecureWorkBulkQuoteJournal implements WorkspaceBulkQuoteJournal {
       if (!seen.add('${value.kind}:${value.operationId}')) throw const FormatException('Keep distinct originals.');
       values.add(value);
     }
+    if (values.isNotEmpty) {
+      final owner = _namespace(scope), stores = await _readIndex(_namespace(scope));
+      if (!stores.contains(scope.store)) await _writeIndex(owner, [...stores, scope.store]);
+    }
     return values;
   }
   Future<void> _write(WorkspaceBulkQuoteScope scope, List<WorkspaceBulkQuoteIntent> values) async {
     _check(scope);
+    final owner = _namespace(scope), stores = await _readIndex(_namespace(scope));
+    // The discoverable pointer must be durable first. A partial write may leave
+    // an empty pointer, never an undiscoverable original or another Store's data.
+    if (values.isNotEmpty && !stores.contains(scope.store)) await _writeIndex(owner, [...stores, scope.store]);
     final encoded = jsonEncode({'schemaVersion': 1, 'account': scope.account, 'realm': scope.realm,
       'store': scope.store, 'role': scope.role, 'originals': [for (final value in values) value.toJson()]});
     if (utf8.encode(encoded).length > 1024 * 1024) throw const FormatException('Keep saved request recovery.');
     await _storage.write(key: _key(scope), value: encoded); _check(scope);
     final saved = await _storage.read(key: _key(scope)); _check(scope);
     if (saved != encoded) throw const FormatException('Saved requests could not be verified.');
+    if (values.isEmpty && stores.contains(scope.store)) await _writeIndex(owner, stores.where((s) => s != scope.store).toList());
   }
   @override Future<List<WorkspaceBulkQuoteIntent>> read(WorkspaceBulkQuoteScope scope) => _serial(scope, () => _read(scope));
   @override Future<void> save(WorkspaceBulkQuoteScope scope, WorkspaceBulkQuoteIntent original) => _serial(scope, () async {

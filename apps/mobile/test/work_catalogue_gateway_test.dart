@@ -31,6 +31,7 @@ import 'package:moolsocial/features/work/work_publication.dart';
 import 'package:moolsocial/features/work/work_product_promotions.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
 import 'package:moolsocial/features/work/widgets/store_publication_settings.dart';
+import 'package:moolsocial/features/work/widgets/workspace_purchase_originals.dart';
 import 'work_publication_test.dart' as publication_fixture show fixture;
 
 // Host fixtures only. No upload, device storage or real commerce.
@@ -1212,7 +1213,7 @@ class _StockSessionCatalogue extends SessionCatalogue implements WorkspaceStoreS
 
 // Actual loopback Firestore capture, 2026-10-20. Evaluation identities only;
 // never injected into native storage or claimed as live-service acceptance.
-const _bulkServiceCapture20261020 = r'''{"capturedAt":"2026-10-20T12:01:00.000Z","request":{"schemaVersion":1,"requestId":"request-one","storeId":"store-one","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10}]},"offer":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"offer-one","expectedRevision":1,"validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025}]},"accept":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"accept-one","expectedRevision":2},"created":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"supplierRequested":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"offered":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"accepted":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"recovered":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"request","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"request-one","requestFingerprint":"e61bc6284c6b771f90677f3376ecbb035236e77c2ba49d131f164ee30c75e974","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"recorded","agreement":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"proof":null},"unobserved":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"accept","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"never-accept","requestFingerprint":"9a47224ccf5ad2833db6eaff3e27e70983d53fb33c04c396a6016edc2da9557a","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"not_found","agreement":null,"proof":null},"buyerPage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"buyer","storeId":null,"currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null},"storePage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"supplier","storeId":"store-one","currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null}}''';
+const _bulkServiceCapture20261020 = r'''{"capturedAt":"2026-10-20T12:01:00.000Z","request":{"schemaVersion":1,"requestId":"request-one","storeId":"store-one","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10}]},"offer":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"offer-one","expectedRevision":1,"validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025}]},"accept":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"accept-one","expectedRevision":2},"created":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"supplierRequested":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"offered":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"accepted":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"recovered":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"request","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"request-one","requestFingerprint":"e61bc6284c6b771f90677f3376ecbb035236e77c2ba49d131f164ee30c75e974","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"recorded","agreement":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"proof":null},"unobserved":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"accept","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"never-accept","requestFingerprint":"9a47224ccf5ad2833db6eaff3e27e70983d53fb33c04c396a6016edc2da9557a","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"not_found","agreement":null,"proof":null},"buyerPage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"buyer","storeId":null,"currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","storeName":"Isolated Bulk supplier","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null},"storePage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"supplier","storeId":"store-one","currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","storeName":"Isolated Bulk supplier","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null}}''';
 
 void main() {
   // Captured from the actual isolated Firestore/service journey, not phone data.
@@ -1419,7 +1420,27 @@ void main() {
     final remove = fresh().remove(bulkBuyerScope, original);
     await Future<void>.delayed(Duration.zero); expect(storage.writes, 1);
     storage.release.complete(); await save; await remove;
-    expect(storage.writes, 2); expect(await fresh().read(bulkBuyerScope), isEmpty);
+    expect(storage.writes, 4); expect(await fresh().read(bulkBuyerScope), isEmpty);
+  });
+  test('LF-BULK pending Store index discovers an unsent request with no Cart and fences retired access', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final c = bulkCapture(), original = bulkIntent(c, 'request'); var account = 'buyer-one', current = true;
+    SecureWorkBulkQuoteJournal fresh() => SecureWorkBulkQuoteJournal(currentAccount: () => account,
+      now: () => DateTime.parse(c['capturedAt'] as String));
+    await fresh().save(bulkBuyerScope, original);
+    expect(await fresh().pendingStores((account: account, realm: 'evaluation', role: 'buyer')), ['store-one']);
+    expect(await fresh().pendingStores((account: account, realm: 'production', role: 'buyer')), isEmpty);
+    expect(await fresh().pendingStores((account: account, realm: 'evaluation', role: 'supplier')), isEmpty);
+    final transport = OwnerTransport((_) async => throw StateError('discovery must not dispatch'));
+    final access = WorkspaceBulkQuoteAccess(gateway: bulkClient(c, transport), journal: fresh(), role: 'buyer', current: () => current);
+    addTearDown(access.dispose); expect(await access.pendingStores(), ['store-one']);
+    final controller = access.forStore('store-one'); expect(await controller.restore(), isTrue);
+    expect(controller.pending.single.fingerprint, original.fingerprint); expect(transport.calls, 0);
+    current = false; expect(controller.active, isFalse); expect(access.active, isFalse);
+    await expectLater(access.pendingStores(), throwsFormatException);
+    account = 'other'; await expectLater(fresh().pendingStores((account: 'buyer-one', realm: 'evaluation', role: 'buyer')), throwsA(isA<WorkGatewayException>()));
+    account = 'buyer-one'; await fresh().remove(bulkBuyerScope, original);
+    expect(await fresh().pendingStores((account: account, realm: 'evaluation', role: 'buyer')), isEmpty);
   });
   test('LF-BULK controller saves and reads original before dispatch and keeps acknowledgement separate from head', () async {
     final c = bulkCapture(), request = bulkIntent(c, 'request'), storage = _DelayedDetailsStorage(), lifetime = Object();
@@ -1555,8 +1576,218 @@ void main() {
     expect(controller.pending.single.operationId, original.operationId);
     expect(await controller.recover(), isTrue); expect(controller.pending, isEmpty); expect(await journal.read(bulkBuyerScope), isEmpty);
   });
+  Future<void> captureBulkHost(WidgetTester tester, String name) async {
+    final root = Platform.environment['LF_BULK_UI_CAPTURE_ROOT']; if (root == null) return;
+    final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(const ValueKey('bulk-host-boundary')));
+    await tester.runAsync(() async {
+      final file = File('$root/$name.png'); if (await file.exists()) throw StateError('Preserve prior captures');
+      await file.parent.create(recursive: true); final image = await boundary.toImage(pixelRatio: 1);
+      try { final bytes = await image.toByteData(format: ui.ImageByteFormat.png); await file.writeAsBytes(bytes!.buffer.asUint8List()); }
+      finally { image.dispose(); }
+    });
+  }
+  Widget bulkHost(WorkspaceBulkQuoteAccess access, {String? store, double scale = 1}) => RepaintBoundary(
+    key: const ValueKey('bulk-host-boundary'), child: MaterialApp(theme: MoolTheme.light(),
+    builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale), alwaysUse24HourFormat: true), child: child!),
+    home: Scaffold(body: WorkspaceBulkQuotes(access: access, storeId: store))));
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF-BULK UI buyer reviews exact supplier quote and explicitly accepts terms scale=$scale', (tester) async {
+      tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(360, 740);
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      FlutterSecureStorage.setMockInitialValues({}); final c = bulkCapture();
+      final sent = <Map<String, Object?>>[];
+      final transport = OwnerTransport((body) async {
+        sent.add(body);
+        final data = body['operation'] == 'listBuyerBulkSupplierQuotes' ? c['buyerPage'] :
+          body['operation'] == 'readBulkSupplierQuote' ? c['unobserved']['currentHead'] : c['accepted'];
+        if (body['operation'] == 'acceptBulkSupplierQuote') expect(body['expectedRevision'], 2);
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      });
+      final access = WorkspaceBulkQuoteAccess(gateway: bulkClient(c, transport), journal: SecureWorkBulkQuoteJournal(
+        currentAccount: () => 'buyer-one', now: () => DateTime.parse(c['capturedAt'] as String)), role: 'buyer', current: () => true);
+      addTearDown(access.dispose); await tester.pumpWidget(bulkHost(access, scale: scale)); await tester.pumpAndSettle();
+      expect(find.text('Isolated Bulk supplier'), findsOneWidget);
+      await tester.tap(find.byKey(ValueKey('bulk-quote-${c['created']['quoteId']}'))); await tester.pumpAndSettle();
+      expect(find.text('Isolated Bulk supplier'), findsOneWidget); expect(find.text('Isolated Bulk rice'), findsOneWidget);
+      expect(find.textContaining('10 × 25 kg bag'), findsOneWidget); expect(find.textContaining('₹1,002.50'), findsWidgets);
+      expect(find.textContaining('Discuss bank or delivery terms'), findsOneWidget);
+      final accept = find.widgetWithText(FilledButton, 'Accept quote');
+      expect(tester.widget<FilledButton>(accept).onPressed, isNull);
+      await captureBulkHost(tester, 'bulk-buyer-offered-${scale}x');
+      await tester.ensureVisible(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+      await tester.tap(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+      final staleAccept = tester.widget<FilledButton>(accept).onPressed!;
+      await tester.tap(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+      staleAccept(); await tester.pumpAndSettle();
+      expect(find.text('Agree to these prices?'), findsNothing);
+      expect(sent.where((b) => b['operation'] == 'acceptBulkSupplierQuote'), isEmpty);
+      await tester.tap(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+      if (scale == 1) {
+        await tester.ensureVisible(find.byTooltip('All Bulk quotes')); await tester.tap(find.byTooltip('All Bulk quotes')); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey('bulk-quote-${c['created']['quoteId']}'))); await tester.pumpAndSettle();
+        await tester.ensureVisible(find.byType(CheckboxListTile)); await tester.tap(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+        staleAccept(); await tester.pumpAndSettle();
+        expect(find.text('Agree to these prices?'), findsNothing);
+        expect(sent.where((b) => b['operation'] == 'acceptBulkSupplierQuote'), isEmpty);
+      }
+      await tester.ensureVisible(accept); await tester.tap(accept); await tester.pumpAndSettle();
+      expect(find.text('Agree to these prices?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Confirm')); await tester.pumpAndSettle();
+      expect(sent.where((b) => b['operation'] == 'acceptBulkSupplierQuote'), hasLength(1));
+      expect(find.text('Prices agreed'), findsOneWidget); expect(find.textContaining('This is not a placed order'), findsOneWidget);
+      expect(tester.takeException(), isNull); await captureBulkHost(tester, 'bulk-buyer-agreed-${scale}x');
+      await tester.pumpWidget(const SizedBox()); await tester.pumpAndSettle();
+    });
+  }
+  testWidgets('LF-BULK UI supplier edits genuine prior prices without repeating all inputs', (tester) async {
+    tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(360, 740);
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    FlutterSecureStorage.setMockInitialValues({}); final c = bulkCapture(); var offers = 0;
+    final transport = OwnerTransport((body) async {
+      Object? data;
+      if (body['operation'] == 'listStoreBulkSupplierQuotes') { data = c['storePage']; }
+      else if (body['operation'] == 'readBulkSupplierQuote') { data = c['offered']; }
+      else {
+        // Controlled next-revision host reply; not a real supplier submission.
+        expect(body['operation'], 'offerBulkSupplierQuote'); expect(body['expectedRevision'], 2); offers++;
+        final price = (body['prices'] as List).single['unitPriceMinor'] as int; expect(price, 10026);
+        final reply = jsonDecode(jsonEncode(c['offered'])) as Map<String, dynamic>;
+        reply['revision'] = 3; reply['updatedAt'] = c['capturedAt']; reply['offer']['revision'] = 3;
+        reply['offer']['offeredAt'] = c['capturedAt']; reply['offer']['validUntil'] = body['validUntil'];
+        reply['offer']['prices'][0]['unitPriceMinor'] = price; reply['offer']['prices'][0]['merchandiseMinor'] = price * 10;
+        reply['offer']['merchandiseMinor'] = price * 10; data = reply;
+      }
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    });
+    final access = WorkspaceBulkQuoteAccess(gateway: bulkClient(c, transport, account: 'supplier-one'),
+      journal: SecureWorkBulkQuoteJournal(currentAccount: () => 'supplier-one', now: () => DateTime.parse(c['capturedAt'] as String)),
+      role: 'supplier', current: () => true); addTearDown(access.dispose);
+    await tester.pumpWidget(bulkHost(access, store: 'store-one')); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('bulk-quote-${c['created']['quoteId']}'))); await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Update quote')); await tester.tap(find.text('Update quote')); await tester.pumpAndSettle();
+    final field = find.byKey(const ValueKey('bulk-price-line-one'));
+    expect(tester.widget<TextFormField>(field).controller!.text, '100.25');
+    expect(find.textContaining('Valid until'), findsOneWidget); await captureBulkHost(tester, 'bulk-supplier-editor-1x');
+    await tester.enterText(field, '100.26'); await tester.ensureVisible(find.text('Send quoted prices')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Send quoted prices')); await tester.pumpAndSettle();
+    expect(offers, 1); expect(find.textContaining('₹1,002.60'), findsWidgets); expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox()); await tester.pumpAndSettle();
+  });
+  testWidgets('LF-BULK UI empty Cart recovery stays reachable when the online inbox fails', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({}); final c = bulkCapture(), raw = bulkIntent(c, 'request').toJson();
+    raw['presentation'] = {'storeName': 'Isolated Bulk supplier', 'lines': [{...(raw['expected'] as List).single as Map<String, dynamic>, 'name': 'Isolated Bulk rice', 'packLabel': '25 kg bag', 'variant': 'Aged grain'}]};
+    final original = WorkspaceBulkQuoteIntent.decode(raw, account: 'buyer-one', realm: 'evaluation', now: DateTime.parse(c['capturedAt'] as String));
+    final wrong = jsonDecode(jsonEncode(raw)) as Map<String, dynamic>; wrong['presentation']['lines'][0]['verifiedPackId'] = 'another-pack';
+    expect(() => WorkspaceBulkQuoteIntent.decode(wrong, account: 'buyer-one', realm: 'evaluation', now: DateTime.parse(c['capturedAt'] as String)), throwsFormatException);
+    final journal = SecureWorkBulkQuoteJournal(currentAccount: () => 'buyer-one', now: () => DateTime.parse(c['capturedAt'] as String));
+    await journal.save(bulkBuyerScope, original);
+    final transport = OwnerTransport((_) async => SocialContentResponse(statusCode: 503, body: '{}'));
+    final access = WorkspaceBulkQuoteAccess(gateway: bulkClient(c, transport), journal: journal, role: 'buyer', current: () => true);
+    addTearDown(access.dispose); await tester.pumpWidget(bulkHost(access)); await tester.pumpAndSettle();
+    expect(find.byKey(ValueKey('bulk-pending-${original.operationId}')), findsOneWidget);
+    await tester.tap(find.byKey(ValueKey('bulk-pending-${original.operationId}'))); await tester.pumpAndSettle();
+    expect(find.text('Isolated Bulk supplier'), findsOneWidget); expect(find.text('Isolated Bulk rice'), findsOneWidget);
+    expect(find.textContaining('10 × 25 kg bag'), findsOneWidget);
+    expect((await journal.read(bulkBuyerScope)).single.fingerprint, original.fingerprint);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox()); await tester.pumpAndSettle();
+  });
+  for (final dimensions in [const Size(320, 640), const Size(640, 360)]) {
+    testWidgets('LF-BULK UI 100 crore fits without truncated amounts or blocked actions $dimensions', (tester) async {
+      tester.view.devicePixelRatio = 1; tester.view.physicalSize = dimensions;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      FlutterSecureStorage.setMockInitialValues({}); final c = bulkCapture();
+      // Explicit layout-only amount mutation, never a phone/provider value.
+      final offered = jsonDecode(jsonEncode(c['unobserved']['currentHead'])) as Map<String, dynamic>;
+      offered['offer']['prices'][0]['unitPriceMinor'] = 10000000000;
+      offered['offer']['prices'][0]['merchandiseMinor'] = 100000000000;
+      offered['offer']['merchandiseMinor'] = 100000000000;
+      final transport = OwnerTransport((body) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true,
+        'data': body['operation'] == 'listBuyerBulkSupplierQuotes' ? c['buyerPage'] : offered})));
+      final access = WorkspaceBulkQuoteAccess(gateway: bulkClient(c, transport), journal: SecureWorkBulkQuoteJournal(
+        currentAccount: () => 'buyer-one', now: () => DateTime.parse(c['capturedAt'] as String)), role: 'buyer', current: () => true);
+      addTearDown(access.dispose); await tester.pumpWidget(bulkHost(access, scale: 2)); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey('bulk-quote-${c['created']['quoteId']}'))); await tester.pumpAndSettle();
+      expect(find.textContaining('₹1,00,00,00,000.00'), findsWidgets);
+      await tester.ensureVisible(find.byKey(const ValueKey('bulk-quote-product-prices'))); await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await captureBulkHost(tester, 'bulk-100cr-${dimensions.width.toInt()}x${dimensions.height.toInt()}-2x');
+      await tester.ensureVisible(find.widgetWithText(OutlinedButton, 'Check status')); await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox()); await tester.pumpAndSettle();
+    });
+  }
+  test('LF-BULK known pre-index original backfills discovery without rewriting original bytes', () async {
+    final c = bulkCapture(), original = bulkIntent(c, 'request'), storage = _DelayedDetailsStorage();
+    storage.release.complete();
+    final key = 'moolsocial.workspace.bulk-quote.v1.${base64UrlEncode(utf8.encode(jsonEncode(['buyer-one', 'evaluation', 'store-one', 'buyer'])))}';
+    // Explicit previous-version secure-storage fixture, never native app data.
+    final raw = jsonEncode({'schemaVersion': 1, 'account': 'buyer-one', 'realm': 'evaluation', 'store': 'store-one', 'role': 'buyer', 'originals': [original.toJson()]});
+    storage.rows[key] = raw;
+    final journal = SecureWorkBulkQuoteJournal(storage: storage, currentAccount: () => 'buyer-one', now: () => DateTime.parse(c['capturedAt'] as String));
+    expect((await journal.read(bulkBuyerScope)).single.fingerprint, original.fingerprint);
+    expect(storage.rows[key], raw); expect(storage.writes, 1);
+    expect(await journal.pendingStores((account: 'buyer-one', realm: 'evaluation', role: 'buyer')), ['store-one']);
+  });
+  test('LF-BULK authenticated root retires quote access across A B A without reusing old controllers', () async {
+    const a = (environment: 'host-service', projectId: 'host-project', tenantId: null as String?, userId: 'buyer-one');
+    const b = (environment: 'host-service', projectId: 'host-project', tenantId: null as String?, userId: 'buyer-two');
+    BuyV2AccountPersistenceIdentity live = a;
+    final c = bulkCapture(), core = BuySession();
+    final transport = OwnerTransport((_) async => throw StateError('root construction must not dispatch'));
+    final root = BuyV2RootSessions(core: core, currentIdentity: () => live, purchaseRealm: 'evaluation',
+      accountStoreFactory: (_, _) => _HostRetirableStateStore(),
+      bulkQuoteGatewayFactory: (identity, _) => bulkClient(c, transport, account: identity.userId),
+      bulkQuoteJournalFactory: (identity, current) => SecureWorkBulkQuoteJournal(currentAccount: () => current() ? identity.userId : null));
+    addTearDown(root.dispose); addTearDown(core.dispose);
+    root.synchronize(accountRequired: true); final first = root.current.bulkQuotes!, controller = first.forStore('store-one');
+    expect(first.active, isTrue); expect(controller.active, isTrue);
+    live = b; root.synchronize(accountRequired: true); expect(first.active, isFalse); expect(controller.active, isFalse);
+    live = a; root.synchronize(accountRequired: true); final latest = root.current.bulkQuotes!;
+    expect(latest, isNot(same(first))); expect(latest.active, isTrue); expect(first.active, isFalse);
+    expect(latest.forStore('store-one'), isNot(same(controller))); expect(transport.calls, 0);
+  });
+  testWidgets('LF-BULK ENTRY buyer Orders opens quotes with no Cart or catalogue', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({}); final c = bulkCapture(), core = BuySession();
+    final sent = <String>[];
+    final transport = OwnerTransport((body) async { sent.add(body['operation'] as String);
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': c['buyerPage']})); });
+    final access = WorkspaceBulkQuoteAccess(gateway: bulkClient(c, transport), journal: SecureWorkBulkQuoteJournal(
+      currentAccount: () => 'buyer-one', now: () => DateTime.parse(c['capturedAt'] as String)), role: 'buyer', current: () => true);
+    final session = BuyV2Session(core: core, reviewDataEnabled: false, bulkQuotes: access);
+    await session.restoreCommerce();
+    addTearDown(session.dispose); addTearDown(core.dispose); expect(session.cartLines, isEmpty);
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Scaffold(body: BuyV2OrdersView(session: session, onOpenOrderHelp: (_) {}))));
+    await tester.pumpAndSettle(); await tester.tap(find.byKey(const ValueKey('buy-orders-bulk-quotes'))); await tester.pumpAndSettle();
+    expect(find.text('Isolated Bulk supplier'), findsOneWidget); expect(sent, ['listBuyerBulkSupplierQuotes']);
+    await tester.tap(find.byTooltip('Back to orders')); await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-orders-bulk-quotes')), findsOneWidget);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox()); await tester.pumpAndSettle();
+  });
+  testWidgets('LF-BULK ENTRY Store Orders uses compact entry and returns without creating an order', (tester) async {
+    tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(360, 740);
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    SharedPreferences.setMockInitialValues({}); FlutterSecureStorage.setMockInitialValues({}); final c = bulkCapture();
+    final account = ListingAccount()..owner = 'supplier-one', sent = <String>[];
+    final transport = OwnerTransport((body) async { sent.add(body['operation'] as String);
+      expect(body['storeId'], 'store-one'); return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': c['storePage']})); });
+    final source = WorkspaceBulkQuoteAccess(gateway: bulkClient(c, transport, account: 'supplier-one'), journal: SecureWorkBulkQuoteJournal(
+      currentAccount: () => account.owner, now: () => DateTime.parse(c['capturedAt'] as String)), role: 'buyer', current: () => true);
+    final work = WorkSession(contactDraftStore: account)
+      ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Isolated Bulk supplier', profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Jaipur', verified: true)
+      ..workspaceId = 'store-one' ..retailerSetupSaved = true ..reviewStage = WorkReviewStage.live;
+    work.bindBulkQuoteSource(source); final core = BuySession(), buyer = BuyV2Session(core: core, reviewDataEnabled: false);
+    addTearDown(source.dispose); addTearDown(work.dispose); addTearDown(core.dispose); addTearDown(buyer.dispose);
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: WorkWorkspaceDashboardScreen(
+      session: work, procurementSession: buyer, initialSection: 'orders', accountAuthenticated: true)));
+    await tester.pumpAndSettle(); final ordersBefore = work.visibleWorkspaceOrders.length;
+    final entry = find.byKey(const ValueKey('work-orders-bulk-quotes')); expect(entry, findsOneWidget);
+    await tester.ensureVisible(entry); await tester.tap(entry); await tester.pumpAndSettle();
+    expect(find.text('Isolated Bulk supplier'), findsWidgets); expect(sent, ['listStoreBulkSupplierQuotes']);
+    await tester.tap(find.byTooltip('Back to orders')); await tester.pumpAndSettle();
+    expect(entry, findsOneWidget); expect(work.visibleWorkspaceOrders.length, ordersBefore);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox()); await tester.pumpAndSettle();
+  });
   setUpAll(() async {
-    if (Platform.environment['LF04_COUPON_CART_CAPTURE_ROOT'] == null) return;
+    if (Platform.environment['LF04_COUPON_CART_CAPTURE_ROOT'] == null && Platform.environment['LF_BULK_UI_CAPTURE_ROOT'] == null) return;
     final font = FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'));
     await font.load();
   });
@@ -5415,6 +5646,43 @@ void main() {
     final scoped = await source.loadProducts(discoveryQuery(storeId: 'store-one'), pageSize: 40);
     expect(scoped.items.single.id, selected.id); expect(requests.last['storeId'], 'store-one');
     expect(requests.map((body) => body['resultKind']), ['products', 'stores', 'products']);
+  });
+  test('LF-BULK new RFQ freezes current selected Cart rather than historical Checkout scope', () async {
+    SharedPreferences.setMockInitialValues({}); FlutterSecureStorage.setMockInitialValues({});
+    // Isolated discovery/facts fixture, never native Stock or live eligibility.
+    final connection = discoveryGateway(OwnerTransport((body) async {
+      final data = discoveryData(body), listing = (data['items'] as List).single['listing'] as Map<String, dynamic>;
+      final item = row(listing), terms = Map<String, dynamic>.from((item['channels'] as List).single as Map);
+      item['channels'] = [{...terms, 'kind': 'bulk', 'minimumOrder': 10, 'quantityStep': 1}];
+      item['listings'] = [publicIdentity(channel: BuyV2OfferClass.bulk).toJson()];
+      item['supplierPolicy'] = policyEnvelope(state: 'none', revision: 0);
+      (data['items'] as List).single['channel'] = 'bulk';
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    }));
+    final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => true), core = BuySession();
+    addTearDown(source.dispose); addTearDown(core.dispose);
+    final page = await source.loadProducts(BuyV2CatalogueQuery(destination: BuyV2Destination.wholesale, regionId: null,
+      areaScope: BuyV2CatalogueAreaScope.allAreas, wholesaleSaleType: BuyV2WholesaleSaleType.bulk), pageSize: 40);
+    final selected = page.items.single;
+    final access = WorkspaceBulkQuoteAccess(gateway: WorkspaceBulkQuoteGateway(connection.forOwnerAccount('buyer-one'), enabled: true),
+      journal: SecureWorkBulkQuoteJournal(currentAccount: () => 'buyer-one', now: () => at), role: 'buyer', current: () => true);
+    late final BuyV2Session session;
+    session = BuyV2Session(core: core, bulkQuotes: access, cataloguePageSource: source, productContentAdapter: source,
+      reviewDataEnabled: false, catalogueNow: () => at, commerceAdapter: _HostCouponCartCommerce([selected]),
+      productFactsAdapter: _HostOperationalFacts((p) => BuyV2ProductFactsSnapshot(productId: p.id, priceMinor: p.priceMinor,
+        deliveryPromise: 'Host-only courier', partner: 'Host-only courier', orderabilityLabel: 'Host-only availability',
+        sourceId: 'isolated-bulk-cart-facts', observedAt: at, eligibility: BuyV2OfferEligibility(productId: p.id, storeId: p.storeId!,
+          sourceRevision: 'host-only-v1', customerLocationKey: session.eligibilityLocationKey, observedAt: at,
+          expiresAt: at.add(const Duration(hours: 1)), offerClass: BuyV2OfferClass.bulk, channelEnabled: true, storeReady: true,
+          fleetAvailable: false, customerLocationConfirmed: true, options: {BuyV2DeliveryOption.courier}))));
+    addTearDown(session.dispose); await session.restoreCommerce();
+    expect(session.addProduct(selected.id, quantity: 10), isTrue, reason: session.notice);
+    session.openCart(scope: BuyV2CartScope.wholesale); session.checkoutScope = BuyV2CartScope.medicine;
+    expect(session.checkoutLines, isEmpty); expect(session.bulkQuoteRequestStores, {'store-one'});
+    final prepared = session.prepareBulkQuoteRequest('store-one');
+    expect(prepared.original.body['storeId'], 'store-one'); expect((prepared.original.body['lines'] as List).single['quantity'], 10);
+    expect(prepared.original.presentation!['storeName'], selected.seller); expect(prepared.current(), isTrue);
+    expect(session.setCartQuantity(selected.id, '11'), isTrue, reason: session.notice); expect(prepared.current(), isFalse);
   });
   for (final fault in ['realm', 'query', 'kind', 'Store', 'count', 'duplicate', 'future', 'version', 'binding']) {
     test('LF-DISCOVERY client rejects mismatched public response $fault', () async {

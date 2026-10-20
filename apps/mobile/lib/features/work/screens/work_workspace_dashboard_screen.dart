@@ -29249,6 +29249,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
     with WidgetsBindingObserver {
   late String _filter;
   bool _feedbackOpen = false;
+  bool _bulkQuotesOpen = false;
   Object? _operationalViewScope;
   final _selectedFilterKey = GlobalKey();
   final _filterViewportKey = GlobalKey();
@@ -29380,6 +29381,11 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
           unawaited(widget.session.loadWorkspaceOperationalOrders());
         }
       });
+    }
+    if (session.workspaceBulkQuotes case final quotes? when _bulkQuotesOpen) {
+      return WorkspaceBulkQuotes(key: ValueKey(('store-bulk-quotes', quotes, session.activeWorkspace?.id)),
+        access: quotes, storeId: session.activeWorkspace!.id,
+        onClose: () => setState(() { _bulkQuotesOpen = false; }));
     }
     if (_feedbackOpen) {
       return StoreCustomerFeedback(
@@ -29563,6 +29569,11 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
             }
             return header;
           }),
+          if (widget.orderId == null && session.workspaceBulkQuotes?.active == true)
+            Material(type: MaterialType.transparency, child: ListTile(key: const ValueKey('work-orders-bulk-quotes'), dense: true,
+              leading: const Icon(Icons.request_quote_outlined), title: const Text('Bulk quotes'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => setState(() { _feedbackOpen = false; _bulkQuotesOpen = true; }))),
           if (widget.orderId == null)
             keyboardVisible ? const SizedBox.shrink() : Row(
               children: [

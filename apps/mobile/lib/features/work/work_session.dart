@@ -861,6 +861,20 @@ class WorkSession extends ChangeNotifier {
     }
   }
   final WorkspaceCatalogueGateway? catalogueGateway;
+  WorkspaceBulkQuoteAccess? _bulkQuoteSource, _bulkQuoteAccess;
+  Object? _bulkQuoteContext;
+  void bindBulkQuoteSource(WorkspaceBulkQuoteAccess? source) {
+    if (identical(_bulkQuoteSource, source)) return;
+    _bulkQuoteAccess?.dispose(); _bulkQuoteAccess = null; _bulkQuoteContext = null; _bulkQuoteSource = source;
+  }
+  WorkspaceBulkQuoteAccess? get workspaceBulkQuotes {
+    final source = _bulkQuoteSource, store = activeWorkspace?.id, owner = publicationPreferencesContext;
+    if (_disposed || source?.active != true || source!.account != _contactAccountScope || store == null || !workspaceStoreAuthoringAvailable) return null;
+    if (_bulkQuoteContext == owner && _bulkQuoteAccess?.active == true) return _bulkQuoteAccess;
+    _bulkQuoteAccess?.dispose(); _bulkQuoteContext = owner;
+    return _bulkQuoteAccess = WorkspaceBulkQuoteAccess(gateway: source.gateway, journal: source.journal, role: 'supplier',
+      current: () => !_disposed && source.active && identical(_bulkQuoteSource, source) && publicationPreferencesContext == owner);
+  }
   final WorkspacePublicDetailsOwnerGateway? publicDetailsGateway;
   final String? publicDetailsRealm;
   final WorkspacePublicDetailsJournal Function(WorkspacePublicDetailsScope scope)? publicDetailsJournalFactory;
@@ -13450,6 +13464,7 @@ class WorkSession extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _bulkQuoteAccess?.dispose(); _bulkQuoteAccess = null; _bulkQuoteSource = null;
     for (final publisher in _publicDetailsPublishers.values) { publisher.dispose(); }
     _publicDetailsPublishers.clear();
     for (final policy in _supplierPolicies.values) { policy.dispose(); }

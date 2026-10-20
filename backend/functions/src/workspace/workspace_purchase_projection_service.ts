@@ -297,6 +297,7 @@ interface BulkOffer {revision: number; offeredAt: string; validUntil: string; pr
   merchandiseMinor: number; policyFingerprint: string}
 interface BulkAgreementRecord {
   schemaVersion: 1; realm: Realm; quoteId: string; storeId: string; storeCaseId: string;
+  storeName?: string;
   buyerUserId: string; supplierUserId: string; revision: number;
   state: 'requested' | 'offered' | 'accepted' | 'withdrawn';
   requestedAt: string; updatedAt: string; lines: BulkQuotedLine[]; offer: BulkOffer | null;
@@ -360,7 +361,8 @@ export class WorkspaceBulkQuoteService {
       throw new WorkspaceProfileError('invalid_input', 'This Bulk request is too large. Request fewer products together.', 400);
     }
     exact(body, ['schemaVersion', 'realm', 'quoteId', 'storeId', 'storeCaseId', 'buyerUserId', 'supplierUserId',
-      'revision', 'state', 'requestedAt', 'updatedAt', 'lines', 'offer', 'acceptance']);
+      'revision', 'state', 'requestedAt', 'updatedAt', 'lines', 'offer', 'acceptance', ...(Object.hasOwn(body, 'storeName') ? ['storeName'] : [])]);
+    if (Object.hasOwn(body, 'storeName')) bulkVariant(body.storeName);
     if (r.integrity !== integrityHash(body) || body.schemaVersion !== 1 || body.realm !== this.realm ||
       typeof body.state !== 'string' || !['requested', 'offered', 'accepted', 'withdrawn'].includes(body.state)) fail('invalid_state', 409);
     for (const key of ['quoteId', 'storeId', 'storeCaseId', 'buyerUserId', 'supplierUserId']) id(body[key]);
@@ -440,11 +442,15 @@ export class WorkspaceBulkQuoteService {
   private async source(tx: Transaction, storeId: string, lines: BulkRequestLine[]) {
     const pages = await this.catalogue.bulkQuotationSnapshot(storeId, [...new Set(lines.map(l => l.skuId))], tx);
     const facts: BulkQuotedLine[] = [], deadlines: string[] = [];
+    let storeName: string | undefined;
     for (const line of lines) {
       let matched: Record<string, unknown> | undefined;
       for (const value of pages) {
         const page = obj(value);
         if (page.state !== 'ready' || page.realm !== this.realm || page.storeId !== storeId) fail('service_unavailable', 503);
+        const publicStore = obj(page.publicStore), name = bulkVariant(publicStore.name);
+        if (publicStore.id !== storeId || storeName !== undefined && storeName !== name) fail('service_unavailable', 503);
+        storeName = name;
         for (const item of array(page.items, 100)) {
           const row = obj(item);
           if (row.skuId === line.skuId) {
@@ -474,7 +480,8 @@ export class WorkspaceBulkQuoteService {
       facts.push({...line, canonicalProductId: id(matched.canonicalProductId), verifiedPackId: id(matched.verifiedPackId),
         name: text(content.title), packLabel: text(pack.label), supplierPolicy, ...(variant === undefined ? {} : {variant})});
     }
-    return {lines: facts, validUntil: deadlines.sort()[0]!};
+    if (!storeName) fail('service_unavailable', 503);
+    return {lines: facts, validUntil: deadlines.sort()[0]!, storeName};
   }
   private view(record: BulkAgreementRecord, actor: string) {
     const {buyerUserId, supplierUserId: _supplier, storeCaseId: _case, ...body} = structuredClone(record);
@@ -517,7 +524,7 @@ export class WorkspaceBulkQuoteService {
       if (at >= source.validUntil) fail('service_unavailable', 503);
       return {schemaVersion: 1, realm: this.realm, quoteId, storeId, storeCaseId: profile.caseId,
         buyerUserId: actor, supplierUserId: profile.ownerUserId, revision: 1, state: 'requested', requestedAt: at,
-        updatedAt: at, lines: source.lines, offer: null, acceptance: null};
+        updatedAt: at, storeName: source.storeName, lines: source.lines, offer: null, acceptance: null};
     }, true);
   }
   private async command(actor: string, quoteId: string, operationId: string, input: object,
@@ -564,7 +571,7 @@ export class WorkspaceBulkQuoteService {
       if (action === 'offer') {
         const validUntil = timestamp(r.validUntil); if (validUntil <= finalAt) fail('conflict', 409);
         const prices = this.prices(r.prices, record.lines);
-        next.lines = source.lines; next.state = 'offered';
+        next.lines = source.lines; next.storeName = source.storeName; next.state = 'offered';
         next.offer = {revision: next.revision, offeredAt: finalAt, validUntil, prices,
           merchandiseMinor: prices.reduce((sum, p) => sum + p.merchandiseMinor, 0),
           policyFingerprint: integrityHash(next.lines.map(l => [l.lineId, l.supplierPolicy]))};
@@ -666,6 +673,7 @@ export class WorkspaceBulkQuoteService {
           !supplier && record.buyerUserId !== actor) fail('not_found', 404);
         const view = this.view(record, actor);
         summaries.push({quoteId: record.quoteId, storeId: record.storeId, revision: record.revision, state: record.state,
+          ...(record.storeName === undefined ? {} : {storeName: record.storeName}),
           requestedAt: record.requestedAt, updatedAt: record.updatedAt, productCount: record.lines.length,
           offerMerchandiseMinor: record.offer?.merchandiseMinor ?? null, offerValidUntil: record.offer?.validUntil ?? null,
           customerReference: view.customerReference});
