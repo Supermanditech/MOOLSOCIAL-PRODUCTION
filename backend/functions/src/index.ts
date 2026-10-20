@@ -2919,6 +2919,12 @@ export const moolSocialWorkspace = onRequest(
       const catalogueProductionAction = catalogueProductionOperation(operation);
       const bulkQuoteAction = bulkSupplierQuoteOperation(operation);
       const bulkQuoteOperation = bulkQuoteAction !== undefined;
+      const commodityPriceMutation = ['confirmStoreCommodityPrice', 'requestPublicCommodityPriceRefresh'].includes(operation);
+      // Disable new writes without stranding existing confirmation recovery or
+      // removing public prices that were already explicitly confirmed.
+      if (commodityPriceMutation && process.env.MOOLSOCIAL_WORKSPACE_COMMODITY_PRICE_V1 !== 'true') {
+        throw new WorkspaceProfileError('service_unavailable', 'Commodity price updates are not connected.', 503);
+      }
       if (bulkQuoteOperation && process.env.MOOLSOCIAL_BULK_SUPPLIER_QUOTES_V1 !== 'true') {
         throw new WorkspaceProfileError('service_unavailable', 'Bulk supplier quotations are not connected.', 503);
       }
@@ -2957,7 +2963,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "finishRetailerSetup" ||
         operation === "setRetailerAvailability" ||
         operation === "saveRetailerProduct" ||
-        operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || operation === 'confirmStoreCommodityPrice' || operation === 'requestPublicCommodityPriceRefresh' ||
+        operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || commodityPriceMutation ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStoreCoupon" || operation === "saveStorePublicDetails" ||
         variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || stockOperation === "save" || catalogueProductionAction !== undefined ||
         ['request', 'offer', 'accept', 'withdraw'].includes(bulkQuoteAction ?? '') ||

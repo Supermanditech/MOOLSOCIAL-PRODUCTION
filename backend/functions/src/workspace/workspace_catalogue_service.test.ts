@@ -6,6 +6,8 @@ import {Readable} from "node:stream";
 import {readFileSync} from "node:fs";
 import {resolve} from "node:path";
 import {EventEmitter} from "node:events";
+import {execFile} from "node:child_process";
+import {promisify} from "node:util";
 import {Storage} from "@google-cloud/storage";
 import sharp from "sharp";
 import * as catalogueModule from "./workspace_catalogue_service.js";
@@ -35,6 +37,81 @@ import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
 
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
 const at = "2026-10-16T12:00:00.000Z";
+
+test('LF-COMMODITY HTTP writes require explicit activation without blocking reads or bypassing authentication', {
+  timeout: 30000,
+}, async () => {
+  // Isolated handler bootstrap. Authentication doubles reject before any data
+  // access; no deployed endpoint, credentials or evaluation Store is used.
+  const child = `
+    const handler = require(${JSON.stringify(resolve(__dirname, '../index.js'))}).moolSocialWorkspace;
+    const checks = [], identities = [], rows = [];
+    let consumed = false;
+    require('firebase-admin/app-check').getAppCheck().verifyToken = async (token, options) => {
+      checks.push(options?.consume === true);
+      return {alreadyConsumed: consumed};
+    };
+    require('firebase-admin/auth').getAuth().verifyIdToken = async token => {
+      identities.push(token);
+      return {uid: 'isolated-http-buyer', firebase: {tenant: 'isolated-foreign-tenant'}};
+    };
+    async function invoke(operation, headers = {}) {
+      checks.length = identities.length = 0;
+      const body = {operation};
+      const row = {operation};
+      const response = {setHeader() {}, status(value) {row.status = value; return this;},
+        json(value) {row.code = value.error?.code;}};
+      await handler({method: 'POST', headers, body, rawBody: Buffer.from(JSON.stringify(body)),
+        query: {}, path: '/'}, response);
+      return {...row, checks: [...checks], identities: identities.length};
+    }
+    (async () => {
+      for (const flag of [undefined, 'false', 'TRUE', '1', 'true ', 'true']) {
+        if (flag === undefined) delete process.env.MOOLSOCIAL_WORKSPACE_COMMODITY_PRICE_V1;
+        else process.env.MOOLSOCIAL_WORKSPACE_COMMODITY_PRICE_V1 = flag;
+        for (const operation of ['confirmStoreCommodityPrice', 'requestPublicCommodityPriceRefresh',
+          'readStoreCommodityPrice', 'reconcileStoreCommodityPrice',
+          'readPublicStoreCatalogue', 'readPublicCatalogueDiscovery']) {
+          rows.push({flag: flag ?? null, mode: 'missing-app-check', ...await invoke(operation)});
+        }
+      }
+      process.env.MOOLSOCIAL_WORKSPACE_COMMODITY_PRICE_V1 = 'true';
+      for (const operation of ['confirmStoreCommodityPrice', 'requestPublicCommodityPriceRefresh',
+        'readStoreCommodityPrice', 'reconcileStoreCommodityPrice']) {
+        for (const mode of ['consumed-app-check', 'missing-bearer', 'foreign-tenant']) {
+          consumed = mode === 'consumed-app-check';
+          const headers = {'x-firebase-appcheck': 'isolated-app-check'};
+          if (mode !== 'missing-bearer') headers.authorization = 'Bearer isolated-id-token';
+          rows.push({flag: 'true', mode, ...await invoke(operation, headers)});
+        }
+      }
+      console.log('COMMODITY_HTTP ' + JSON.stringify(rows));
+    })().catch(error => {console.error(error); process.exitCode = 1;});`;
+  const result = await promisify(execFile)(process.execPath, ['-e', child], {
+    cwd: resolve(__dirname, '../..'), timeout: 20000,
+    env: {...process.env, GCLOUD_PROJECT: 'demo-lf-commodity-http',
+      GOOGLE_CLOUD_PROJECT: 'demo-lf-commodity-http',
+      FIREBASE_CONFIG: JSON.stringify({projectId: 'demo-lf-commodity-http'})},
+  });
+  const line = result.stdout.split('\n').find(value => value.startsWith('COMMODITY_HTTP '));
+  assert.ok(line, result.stdout + result.stderr);
+  const rows = JSON.parse(line.slice('COMMODITY_HTTP '.length)) as Array<{
+    flag: string | null; mode: string; operation: string; status: number;
+    code: string; checks: boolean[]; identities: number;
+  }>;
+  assert.equal(rows.length, 48);
+  for (const row of rows) {
+    const mutation = ['confirmStoreCommodityPrice', 'requestPublicCommodityPriceRefresh'].includes(row.operation);
+    const blocked = mutation && row.flag !== 'true';
+    const verifiesIdentity = row.mode === 'foreign-tenant' || (!mutation && row.mode === 'consumed-app-check');
+    assert.equal(row.status, blocked ? 503 : 401, JSON.stringify(row));
+    assert.equal(row.code, blocked ? 'service_unavailable' :
+      verifiesIdentity || row.mode === 'missing-bearer' ? 'authentication_required' : 'permission_denied',
+    JSON.stringify(row));
+    assert.deepEqual(row.checks, row.mode === 'missing-app-check' ? [] : [mutation], JSON.stringify(row));
+    assert.equal(row.identities, verifiesIdentity ? 1 : 0, JSON.stringify(row));
+  }
+});
 
 test('LF-COMMODITY explicit supplier confirmation freezes exact prices with server time and replay-safe revisions', () => {
   const value = input(); value.channels[0]!.kind = 'bulk';
@@ -833,6 +910,7 @@ test('LF-BULK HTTP dispatch keeps reads and recovery authenticated, namespace fe
   assert.ok(route.includes('workspaceBulkQuoteService().handleOperation(ownerUserId, bulkQuoteAction, catalogueBody)'));
   assert.ok(route.includes('realm !== process.env.MOOLSOCIAL_CATALOGUE_REALM'));
   const mutation = route.match(/const mutation = ([\s\S]*?);/u)?.[1]; assert.ok(mutation);
+  const commodityMutation = route.match(/const commodityPriceMutation = ([^;]+);/u)?.[1]; assert.ok(commodityMutation);
   const callback = route.match(/verifyIdToken: async \(token\) => \{([\s\S]*?)\n\s*\},/u)?.[1]; assert.ok(callback);
   const guard = callback.match(/if \(([^\n]+)\) \{/u)?.[1]; assert.ok(guard);
   const flags = guard.split(' || ');
@@ -840,7 +918,8 @@ test('LF-BULK HTTP dispatch keeps reads and recovery authenticated, namespace fe
     'readBulkSupplierQuote', 'listBuyerBulkSupplierQuotes', 'listStoreBulkSupplierQuotes', 'reconcileBulkSupplierQuote']) {
     const action = bulkSupplierQuoteOperation(operation); assert.ok(action);
     const writes: boolean = new Function('operation', 'variantFamilyOperation', 'productSubmissionOperation', 'stockOperation',
-      'catalogueProductionAction', 'bulkQuoteAction', `return ${mutation}`)(operation, undefined, undefined, undefined, undefined, action);
+      'catalogueProductionAction', 'bulkQuoteAction',
+      `const commodityPriceMutation = ${commodityMutation}; return ${mutation}`)(operation, undefined, undefined, undefined, undefined, action);
     assert.equal(writes, ['request', 'offer', 'accept', 'withdraw'].includes(action));
     const verify = new Function('getAuth', 'requireDefaultPurchaseTenant', ...flags, `return async(token) => {${callback}}`)(
       () => ({verifyIdToken: async (token: object) => token}), requireDefaultPurchaseTenant,
