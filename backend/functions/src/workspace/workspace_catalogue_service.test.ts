@@ -26,6 +26,7 @@ import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingB
   normalizeStoreVariantFamily, storeVariantFamilyOperation, storeVariantFamilySubmission, planStoreVariantFamilySubmission,
   planStoreVariantFamilyReview, type StoreVariantFamilyInput, type StoreVariantFamilyCandidate} from "./workspace_catalogue_service.js";
 import type {WorkspaceProfileRecord} from "./workspace_profile_service.js";
+import {requireDefaultPurchaseTenant} from "./workspace_purchase_projection_service.js";
 import {WorkspacePromotionService, FirestorePromotionRepository, planPromotionSave, type PromotionRepository, type PromotionRecord} from "./workspace_promotion_service.js";
 import {WorkspaceSupplierPolicyService, FirestoreSupplierPolicyRepository} from "./workspace_supplier_policy_service.js";
 import {createCatalogueAggregate, type CatalogueAggregate} from "../commerce/catalogue_contract.js";
@@ -549,6 +550,37 @@ test('LF14 rendered-product producer and owner aggregate are implemented in the 
     assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>)[method], 'function');
   }
 });
+test('LF14 Checkout HTTP verifier rejects tenant UID collisions for recording and owner reads', async () => {
+  // Execute the actual scoped callback with a token-verifier stub; no live Auth,
+  // App Check, HTTP deployment or data access is claimed by this source-bound test.
+  const index = readFileSync(resolve(__dirname, '../../src/index.ts'), 'utf8');
+  const route = index.slice(index.indexOf('export const moolSocialWorkspace = onRequest('));
+  const callback = route.match(/verifyIdToken: async \(token\) => \{([\s\S]*?)\n\s*\},/u)?.[1];
+  assert.ok(callback);
+  const guarded = callback.match(/if \(([^\n]+)\) \{/u)?.[1]; assert.ok(guarded);
+  const flags = guarded.split(' || ');
+  const classification = route.match(/const checkoutEntryOperation = ([^;]+);/u)?.[1]; assert.ok(classification);
+  assert.match(route, /checkoutEntryOperation && process\.env\.MOOLSOCIAL_CHECKOUT_ENTRIES_V1 !== 'true'/u);
+  assert.ok(route.slice(route.indexOf('const mutation ='), route.indexOf('const supplierPolicyOperation'))
+    .includes("operation === 'recordPublicCheckoutEntry'"));
+  for (const [operation, activeFlag] of [
+    ['recordPublicCheckoutEntry', 'checkoutEntryOperation'], ['readStoreCheckoutEntries', 'checkoutEntryOperation'],
+    ['recordPublicCartAddition', 'cartAdditionOperation'], ['recordPublicStorePresentation', 'storePresentationOperation'],
+    ['recordPublicProductPresentation', 'productPresentationOperation'],
+  ]) {
+    const checkout = new Function('operation', `return ${classification}`)(operation) as boolean;
+    assert.equal(checkout, activeFlag === 'checkoutEntryOperation');
+    const verify = new Function('getAuth', 'requireDefaultPurchaseTenant', ...flags,
+      `return async (token) => {${callback}}`)(
+      () => ({verifyIdToken: async (token: object) => token}), requireDefaultPurchaseTenant,
+      ...flags.map(flag => flag === activeFlag)) as (token: object) => Promise<object>;
+    assert.deepEqual(await verify({uid: 'same-uid', firebase: {}}), {uid: 'same-uid', firebase: {}});
+    for (const tenant of ['another-tenant', '', null]) {
+      await assert.rejects(verify({uid: 'same-uid', firebase: {tenant}}), {code: 'authentication_required'});
+    }
+  }
+});
+
 test('LF14 discovery source contract keeps the existing HTTP reporting activation default off', () => {
   const source = readFileSync(resolve(__dirname, '../../src/index.ts'), 'utf8');
   assert.match(source, /productPresentationOperation && \(body\.schemaVersion === 2 \|\| Object\.hasOwn\(body, 'discoverySourcesVersion'\)\) &&\s*process\.env\.MOOLSOCIAL_PRODUCT_DISCOVERY_SOURCES_V1 !== 'true'/u);
