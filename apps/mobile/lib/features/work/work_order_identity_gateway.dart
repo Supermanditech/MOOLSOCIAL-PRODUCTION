@@ -362,7 +362,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         'state',
         'orders',
       ]);
-      if (data['schemaVersion'] is! int || !const [2, 3, 4, 5, 6, 7, 8, 9].contains(data['schemaVersion']) ||
+      if (data['schemaVersion'] is! int || !const [2, 3, 4, 5, 6, 7, 8, 9, 10].contains(data['schemaVersion']) ||
           data['realm'] != realm ||
           data['authNamespace'] != 'firebase-default' ||
           data['viewerRole'] != role.name ||
@@ -783,7 +783,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
   ) {
     final source = _map(value);
     final enriched = source.containsKey('originalFactsVersion');
-    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4, 5, 6, 7, 8, 9].contains(source['originalFactsVersion']))) {
+    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4, 5, 6, 7, 8, 9, 10].contains(source['originalFactsVersion']))) {
       throw const FormatException('Unsupported original facts.');
     }
     final data = _exactMap(source, [
@@ -1361,7 +1361,7 @@ class WorkspacePurchaseOrder {
   final WorkspaceOriginalFulfilmentContext? fulfilmentContext;
   final bool hasSupplierQuoteSnapshot;
   final WorkspaceOriginalSupplierQuote? supplierQuote;
-  int get factsVersion => lines.any((line) => line.hasSupplierTaxSnapshot) ? 9 : hasSupplierQuoteSnapshot ? 8 : hasFulfilmentContextSnapshot ? 7 : lines.any((line) => line.hasPublicListingSnapshot) ? 6 :
+  int get factsVersion => lines.any((line) => line.hasCommodityPriceSnapshot) ? 10 : lines.any((line) => line.hasSupplierTaxSnapshot) ? 9 : hasSupplierQuoteSnapshot ? 8 : hasFulfilmentContextSnapshot ? 7 : lines.any((line) => line.hasPublicListingSnapshot) ? 6 :
     lines.any((line) => line.hasScheduledFulfilmentSnapshot) ? 5 :
     lines.any((line) => line.variant != null) ? 4 : benefitAttribution == null ? 2 : 3;
 }
@@ -1460,6 +1460,57 @@ class WorkspaceOriginalSupplierTaxSnapshot {
   }
 }
 
+/// Historical supplier price, not current catalogue, payment or reservation.
+class WorkspaceOriginalCommodityPriceSnapshot {
+  WorkspaceOriginalCommodityPriceSnapshot._(this._encoded);
+  final String _encoded;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  DateTime get confirmedAt => DateTime.parse(toJson()['confirmedAt']);
+  DateTime get agreedAt => DateTime.parse(toJson()['agreedAt']);
+  DateTime get validUntil => DateTime.parse(toJson()['validUntil']);
+  int get confirmationRevision => toJson()['confirmationRevision'] as int;
+  static WorkspaceOriginalCommodityPriceSnapshot fromJson(Object? value, {
+    required String termsRevision, required BuyV2PublicListingIdentity? listing,
+    required int quantityMilli, required String quantityUnit, required int unitPriceMinor,
+  }) {
+    Never bad() => throw const FormatException('Purchased supplier price needs checking.');
+    int bounded(Object? v, int max) { if (v is! int || v < 1 || v > max) bad(); return v; }
+    DateTime time(Object? v) {
+      if (v is! String || v.length != 24) bad();
+      final parsed = DateTime.tryParse(v)?.toUtc();
+      if (parsed == null || parsed.toIso8601String() != v) bad();
+      return parsed;
+    }
+    final r = _exactMap(value, const ['schemaVersion', 'termsRevision', 'confirmationRevision', 'confirmedAt', 'validUntil',
+      'frequent', 'agreedAt', 'priceMinor', 'minimumPacks', 'incrementPacks', 'tiers']);
+    final revision = bounded(r['confirmationRevision'], 1000000000);
+    final confirmed = time(r['confirmedAt']), expiry = time(r['validUntil']), agreed = time(r['agreedAt']);
+    if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['frequent'] is! bool || r['termsRevision'] != termsRevision ||
+        !RegExp('^commodity-$revision-[A-F0-9]{16}\$').hasMatch(termsRevision) || listing == null ||
+        !const [BuyV2OfferClass.wholesale, BuyV2OfferClass.bulk].contains(listing.channel) ||
+        quantityUnit != 'pack' || quantityMilli % 1000 != 0 || confirmed.isAfter(agreed) || !agreed.isBefore(expiry) ||
+        r['tiers'] is! List || (r['tiers'] as List).length > 20) bad();
+    final price = bounded(r['priceMinor'], 99999999900), minimum = bounded(r['minimumPacks'], 100000000),
+      increment = bounded(r['incrementPacks'], 100000000), quantity = quantityMilli ~/ 1000;
+    if (quantity < minimum || (quantity - minimum) % increment != 0) bad();
+    int lastMinimum = 0, lastPrice = price, selectedPrice = price;
+    final tiers = <Map<String, int>>[];
+    for (final raw in r['tiers'] as List) {
+      final t = _exactMap(raw, const ['minimumPacks', 'unitPriceMinor']);
+      final count = bounded(t['minimumPacks'], 999999), amount = bounded(t['unitPriceMinor'], 99999999900);
+      if (count <= lastMinimum || count < minimum || (count - minimum) % increment != 0 || amount > lastPrice ||
+          tiers.isEmpty && (count != minimum || amount != price)) bad();
+      lastMinimum = count; lastPrice = amount;
+      if (count <= quantity) selectedPrice = amount;
+      tiers.add({'minimumPacks': count, 'unitPriceMinor': amount});
+    }
+    if (selectedPrice != unitPriceMinor) bad();
+    return WorkspaceOriginalCommodityPriceSnapshot._(jsonEncode({'schemaVersion': 1, 'termsRevision': termsRevision,
+      'confirmationRevision': revision, 'confirmedAt': r['confirmedAt'], 'validUntil': r['validUntil'], 'frequent': r['frequent'],
+      'agreedAt': r['agreedAt'], 'priceMinor': price, 'minimumPacks': minimum, 'incrementPacks': increment, 'tiers': tiers}));
+  }
+}
+
 class WorkspacePurchasedSkuLine {
   const WorkspacePurchasedSkuLine({
     required this.lineId,
@@ -1481,6 +1532,8 @@ class WorkspacePurchasedSkuLine {
     this.publicListing,
     this.hasSupplierTaxSnapshot = false,
     this.supplierTaxSnapshot,
+    this.hasCommodityPriceSnapshot = false,
+    this.commodityPriceSnapshot,
   });
   final String lineId,
       skuId,
@@ -1500,6 +1553,8 @@ class WorkspacePurchasedSkuLine {
   final BuyV2PublicListingIdentity? publicListing;
   final bool hasSupplierTaxSnapshot;
   final WorkspaceOriginalSupplierTaxSnapshot? supplierTaxSnapshot;
+  final bool hasCommodityPriceSnapshot;
+  final WorkspaceOriginalCommodityPriceSnapshot? commodityPriceSnapshot;
   final int quantityMilli, unitPriceMinor, lineTotalMinor;
   String get quantityLabel {
     final fraction = quantityMilli % 1000;
@@ -1523,6 +1578,7 @@ class WorkspacePurchasedSkuLine {
     if (hasScheduledFulfilmentSnapshot) 'scheduledFulfilment': scheduledFulfilment?.toJson(),
     if (hasPublicListingSnapshot) 'publicListing': publicListing?.toJson(),
     if (hasSupplierTaxSnapshot) 'supplierTaxSnapshot': supplierTaxSnapshot?.toJson(),
+    if (hasCommodityPriceSnapshot) 'commodityPriceSnapshot': commodityPriceSnapshot?.toJson(),
   };
 }
 
@@ -1627,7 +1683,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     'originalFingerprint',
   ]);
   final version = data['factsVersion'];
-  if (version is! int || !const [2, 3, 4, 5, 6, 7, 8, 9].contains(version) ||
+  if (version is! int || !const [2, 3, 4, 5, 6, 7, 8, 9, 10].contains(version) ||
       !_id(data['storeId']) ||
       !_id(data['orderId'])) {
     throw const FormatException('Unsupported order reference.');
@@ -1650,7 +1706,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
   final lines = <WorkspacePurchasedSkuLine>[];
   for (final raw in rawLines) {
     final l = _exactMap(raw, [..._purchaseLineKeys, if (version >= 4) 'variant', if (version >= 5) 'scheduledFulfilment',
-      if (version >= 6) 'publicListing', if (version >= 9) 'supplierTaxSnapshot']);
+      if (version >= 6) 'publicListing', if (version >= 9) 'supplierTaxSnapshot', if (version >= 10) 'commodityPriceSnapshot']);
     if (version >= 4 && (l['variant'] is! String ||
         (l['variant'] as String).trim() != l['variant'] ||
         (l['variant'] as String).length > 240 ||
@@ -1705,6 +1761,14 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
     if (supplierTax?.legacyAmount != null && l['quantityUnit'] != 'pack') {
       throw const FormatException('Original supplier amount needs its selling pack.');
     }
+    final commodityPrice = version >= 10 && l['commodityPriceSnapshot'] != null
+      ? WorkspaceOriginalCommodityPriceSnapshot.fromJson(l['commodityPriceSnapshot'], termsRevision: l['offerRevision'] as String,
+        listing: listing, quantityMilli: l['quantityMilli'] as int, quantityUnit: l['quantityUnit'] as String,
+        unitPriceMinor: l['unitPriceMinor'] as int) : null;
+    if (version >= 10 && commodityPrice == null && listing?.channel == BuyV2OfferClass.wholesale &&
+        RegExp(r'^commodity-[1-9][0-9]*-[A-F0-9]{16}$').hasMatch(l['offerRevision'] as String)) {
+      throw const FormatException('Missing purchased supplier price.');
+    }
     lines.add(
       WorkspacePurchasedSkuLine(
         lineId: l['lineId'] as String,
@@ -1726,6 +1790,8 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
         publicListing: listing,
         hasSupplierTaxSnapshot: version >= 9,
         supplierTaxSnapshot: supplierTax,
+        hasCommodityPriceSnapshot: version >= 10,
+        commodityPriceSnapshot: commodityPrice,
       ),
     );
   }
@@ -1753,7 +1819,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
   }
   final attribution = version >= 3 ? _decodeBenefits(original['benefitAttribution'], lines, totals['discountMinor']!) : null;
   final fulfilment = version >= 7 ? _decodeFulfilmentContext(original['fulfilmentContext'], lines) : null;
-  final supplierQuote = version >= 8 ? _decodeSupplierQuote(original['supplierQuote'], realm, lines) : null;
+  final supplierQuote = version >= 8 ? _decodeSupplierQuote(original['supplierQuote'], realm, lines, withCommodityPrice: version >= 10) : null;
   final hash = sha256
       .convert(
         utf8.encode(
@@ -1790,8 +1856,9 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value, String realm) {
   );
 }
 
-WorkspaceOriginalSupplierQuote? _decodeSupplierQuote(Object? value, String realm, List<WorkspacePurchasedSkuLine> lines) {
-  final bulk = lines.where((l) => l.publicListing?.channel == BuyV2OfferClass.bulk).toList();
+WorkspaceOriginalSupplierQuote? _decodeSupplierQuote(Object? value, String realm, List<WorkspacePurchasedSkuLine> lines, {bool withCommodityPrice = false}) {
+  final bulk = lines.where((l) => l.publicListing?.channel == BuyV2OfferClass.bulk &&
+    !(withCommodityPrice && l.commodityPriceSnapshot != null)).toList();
   if (value == null) {
     if (bulk.isNotEmpty) throw const FormatException('Missing purchased supplier agreement.');
     return null;

@@ -961,6 +961,143 @@ function supplierTaxReceipt() {
   return value;
 }
 
+function commodityOriginalReceipt() {
+  const value = supplierTaxReceipt(); value.schemaVersion = 9;
+  for (const [index, store] of value.stores.entries()) {
+    for (const line of store.lines) line.commodityPriceSnapshot = null;
+    if (index !== 0) continue;
+    const line = store.lines[0];
+    line.offerRevision = 'commodity-2-AAAAAAAAAAAAAAAA';
+    line.publicListing.channel = 'bulk';
+    line.publicListing.listingId = `listing-${createHash('sha256').update(JSON.stringify(
+      [1, 'evaluation', store.storeId, line.skuId, 'bulk'])).digest('hex')}`;
+    if (line.scheduledFulfilment) line.scheduledFulfilment.listing = structuredClone(line.publicListing);
+    line.commodityPriceSnapshot = {schemaVersion: 1, termsRevision: line.offerRevision, confirmationRevision: 2,
+      confirmedAt: '2026-10-01T12:00:00.000Z', validUntil: '2026-10-01T14:00:00.000Z', frequent: true,
+      agreedAt: '2026-10-01T12:10:00.000Z', priceMinor: line.unitPriceMinor,
+      minimumPacks: 1, incrementPacks: 1, tiers: []};
+  }
+  return value;
+}
+
+test('LF-COMMODITY-ORIGINAL direct Bulk preserves a purchased confirmation without a negotiated quote', () => {
+  const input = commodityOriginalReceipt();
+  assert.deepEqual(normalizePlacement(input, 'evaluation'), input);
+  assert.equal(input.stores[0].supplierQuote, null);
+  assert.equal(input.stores[1].lines[0].commodityPriceSnapshot, null);
+  assert.deepEqual(input.stores.map((s: any) => s.totals), supplierTaxReceipt().stores.map((s: any) => s.totals));
+  input.stores[0].lines[0].commodityPriceSnapshot.incrementPacks = 1000000;
+  assert.deepEqual(normalizePlacement(input, 'evaluation'), input, 'Match the existing source quantity-step bound.');
+});
+
+test('LF-COMMODITY-ORIGINAL direct Wholesale cannot omit its confirmed-price provenance', () => {
+  const input = commodityOriginalReceipt(), store = input.stores[0], l = store.lines[0];
+  l.publicListing.channel = 'wholesale';
+  l.publicListing.listingId = `listing-${createHash('sha256').update(JSON.stringify(
+    [1, 'evaluation', store.storeId, l.skuId, 'wholesale'])).digest('hex')}`;
+  if (l.scheduledFulfilment) l.scheduledFulfilment.listing = structuredClone(l.publicListing);
+  assert.deepEqual(normalizePlacement(input, 'evaluation'), input);
+  l.commodityPriceSnapshot = null;
+  assert.throws(() => normalizePlacement(input, 'evaluation'), rejectsCode('invalid_input'));
+});
+
+test('LF-COMMODITY-ORIGINAL tier applicability and mixed quote authority remain exact', () => {
+  const input = commodityOriginalReceipt(), store = input.stores[0], direct = store.lines[0];
+  const oldTotal = direct.lineTotalMinor;
+  direct.quantityMilli = 3000; direct.unitPriceMinor = 9001; direct.lineTotalMinor = 27003;
+  direct.commodityPriceSnapshot.tiers = [{minimumPacks: 1, unitPriceMinor: 10051}, {minimumPacks: 3, unitPriceMinor: 9001}];
+  store.totals.itemsMinor += direct.lineTotalMinor - oldTotal; store.totals.totalMinor += direct.lineTotalMinor - oldTotal;
+  const quoted = {...structuredClone(direct), sourceLineId: 'quoted-source', skuId: 'quoted-sku',
+    offerRevision: 'legacy-terms', scheduledFulfilment: null, commodityPriceSnapshot: null};
+  quoted.publicListing.skuId = quoted.skuId;
+  quoted.publicListing.listingId = `listing-${createHash('sha256').update(JSON.stringify(
+    [1, 'evaluation', store.storeId, quoted.skuId, 'bulk'])).digest('hex')}`;
+  store.lines.push(quoted); store.lines.sort((a: any,b: any) => a.sourceLineId.localeCompare(b.sourceLineId));
+  store.totals.itemsMinor += quoted.lineTotalMinor; store.totals.totalMinor += quoted.lineTotalMinor;
+  store.supplierQuote = {schemaVersion: 1, realm: 'evaluation', quoteId: `bulk-${'a'.repeat(64)}`,
+    acceptedRevision: 3, agreementFingerprint: 'b'.repeat(64), offerRevision: 2,
+    acceptedAt: '2026-10-01T12:10:00.000Z', validUntil: '2026-10-01T14:00:00.000Z',
+    merchandiseMinor: quoted.lineTotalMinor, lines: [{lineId: quoted.sourceLineId, quoteLineId: 'quote-line-one'}]};
+  assert.deepEqual(normalizePlacement(input, 'evaluation'), input);
+  store.supplierQuote.lines.push({lineId: direct.sourceLineId, quoteLineId: 'quote-line-two'});
+  assert.throws(() => normalizePlacement(input, 'evaluation'), rejectsCode('invalid_input'));
+});
+
+for (const [name, mutate] of Object.entries({
+  missing: (l: any) => {delete l.commodityPriceSnapshot;},
+  nullBulk: (l: any) => {l.commodityPriceSnapshot = null;},
+  unknownVersion: (l: any) => {l.commodityPriceSnapshot.schemaVersion = 2;},
+  revision: (l: any) => {l.commodityPriceSnapshot.confirmationRevision = 3;},
+  source: (l: any) => {l.commodityPriceSnapshot.termsRevision = 'commodity-2-BBBBBBBBBBBBBBBB';},
+  futureConfirmation: (l: any) => {l.commodityPriceSnapshot.confirmedAt = '2026-10-01T12:11:00.000Z';},
+  expiredAgreement: (l: any) => {l.commodityPriceSnapshot.agreedAt = l.commodityPriceSnapshot.validUntil;},
+  retail: (l: any) => {l.publicListing.channel = 'retail';},
+  missingListing: (l: any) => {l.publicListing = null; l.scheduledFulfilment = null;},
+  measured: (l: any) => {l.quantityUnit = 'L';},
+  fractionalPack: (l: any) => {l.quantityMilli = 1500;},
+  minimum: (l: any) => {l.commodityPriceSnapshot.minimumPacks = 2;},
+  step: (l: any) => {l.commodityPriceSnapshot.incrementPacks = 0;},
+  price: (l: any) => {l.commodityPriceSnapshot.priceMinor++;},
+  tier: (l: any) => {l.commodityPriceSnapshot.tiers = [{minimumPacks: 2, unitPriceMinor: l.unitPriceMinor}];},
+  claim: (l: any) => {l.commodityPriceSnapshot.paid = true;},
+})) test(`LF-COMMODITY-ORIGINAL rejects ${name}`, () => {
+  const input = commodityOriginalReceipt(); mutate(input.stores[0].lines[0]);
+  assert.throws(() => normalizePlacement(input, 'evaluation'), rejectsCode('invalid_input'));
+});
+
+test('LF-COMMODITY-ORIGINAL legacy contracts reject the new field and retain original bytes', () => {
+  const legacy = supplierTaxReceipt(); assert.deepEqual(normalizePlacement(legacy, 'evaluation'), legacy);
+  for (const store of legacy.stores) for (const l of store.lines) l.commodityPriceSnapshot = null;
+  assert.throws(() => normalizePlacement(legacy, 'evaluation'), rejectsCode('invalid_input'));
+});
+
+test('LF-COMMODITY-ORIGINAL materializer restart preserves buyer Store and operational originals', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  const app = initializeApp({projectId: `demo-lf-commodity-original-${randomUUID().slice(0,8)}`}, `commodity-original-${randomUUID()}`),
+    db = purchaseTestFirestore(app), input = commodityOriginalReceipt();
+  try {
+    for (const store of input.stores) await db.collection('workspaceProfiles').doc(store.caseId).set({schemaVersion: 1,
+      caseId: store.caseId, workspaceId: store.storeId, ownerUserId: store.ownerUserId, familyId: 'products-trade',
+      profileId: 'retailer-grocery', status: 'live', shopEnabled: true});
+    const writer = new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => input});
+    const created = await writer.materialize('commodity-original-source');
+    assert.deepEqual(await writer.materialize('commodity-original-source'), created);
+    const reader = new WorkspacePurchaseProjectionService(db, 'evaluation');
+    const buyer = await reader.readBuyer(input.buyerUserId, {purchaseId: created.purchaseId});
+    assert.equal(buyer.schemaVersion, 10);
+    const sellers = [], operational = [];
+    for (const order of buyer.orders) {
+      const source = input.stores.find((s: any) => s.storeId === order.storeId)!;
+      const tuple = {purchaseId: created.purchaseId, storeId: order.storeId, orderId: order.orderId};
+      for (const saved of order.original.lines) {
+        const supplied = source.lines.find((l: any) => l.skuId === saved.skuId)!;
+        assert.deepEqual(saved.commodityPriceSnapshot, supplied.commodityPriceSnapshot);
+        assert.equal(saved.unitPriceMinor, supplied.unitPriceMinor);
+      }
+      assert.deepEqual(order.original.totals, source.totals);
+      sellers.push(await reader.readStore(source.ownerUserId, tuple));
+      assert.deepEqual(sellers.at(-1)!.orders, [order]);
+      await assert.rejects(reader.readStore('foreign-owner', tuple), rejectsCode('not_found'));
+      const proof = {...operationalEvidence(), ...tuple, originalFingerprint: order.originalFingerprint, sourceRevision: buyer.sourceRevision,
+        fulfilment: source.fulfilmentContext.method,
+        allowedActions: source.fulfilmentContext.method === 'collection' ? [] : operationalEvidence().allowedActions};
+      const ops = new WorkspaceOrderOperationsService(db, 'evaluation', {readOperationalOrder: async () => proof},
+        () => new Date('2026-10-16T12:00:00.000Z'));
+      await ops.initialize('commodity-operation-source');
+      const sellerOperation = await ops.read(source.ownerUserId, 'seller', tuple), buyerOperation = await ops.read(input.buyerUserId, 'buyer', tuple);
+      assert.equal(sellerOperation.originalFactsVersion, 10); assert.deepEqual(sellerOperation.original, order.original);
+      operational.push(sellerOperation, buyerOperation);
+    }
+    const changed = input.stores[0].lines[0];
+    changed.commodityPriceSnapshot.confirmationRevision = 3;
+    changed.offerRevision = changed.commodityPriceSnapshot.termsRevision = 'commodity-3-BBBBBBBBBBBBBBBB';
+    await assert.rejects(writer.materialize('commodity-original-source'), rejectsCode('conflict'));
+    assert.deepEqual(await reader.readBuyer(input.buyerUserId, {purchaseId: created.purchaseId}), buyer);
+    if (process.env.LF_COMMODITY_ORIGINAL_CAPTURE === 'true') console.log('LF_COMMODITY_ORIGINAL_PROJECTION=' + JSON.stringify({buyer, sellers, operational}));
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+
 test('LF-GST-ORIGINAL trusted receipt retains the historical supplier declaration without changing money', () => {
   for (const declaration of [null, {version: 2, rateBasisPoints: 0, basis: 'additional'},
     {version: 2, rateBasisPoints: 500, basis: 'included'}, {version: 1, amountMinor: 7, basis: 'additional'}]) {

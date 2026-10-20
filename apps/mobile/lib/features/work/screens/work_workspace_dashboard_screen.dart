@@ -30140,6 +30140,7 @@ class _ExactOrderInformation extends StatelessWidget {
               Text('${line.name} · ${line.packLabel}', style: const TextStyle(fontWeight: FontWeight.w600)),
               WorkspaceOriginalVariantForLine(line: line),
               WorkspaceOriginalSupplierTaxForLine(line: line),
+              WorkspaceOriginalCommodityPriceForLine(line: line),
               WorkspaceOriginalScheduledForLine(line: line),
               WorkspaceOriginalInstructionsForLine(original: exact.original, lineId: line.lineId),
               _StoreMoneyLine(leading: Text('${line.quantityLabel} × ${_price(line.unitPriceMinor)}'),

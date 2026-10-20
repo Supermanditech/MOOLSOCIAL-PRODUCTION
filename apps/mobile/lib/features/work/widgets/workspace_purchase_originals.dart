@@ -726,6 +726,7 @@ class _WorkspacePurchaseOriginalsState
                                 ),
                                 WorkspaceOriginalVariantForLine(line: line),
                                 WorkspaceOriginalSupplierTaxForLine(line: line),
+                                WorkspaceOriginalCommodityPriceForLine(line: line),
                                 WorkspaceOriginalScheduledForLine(line: line),
                                 WorkspaceOriginalInstructionsForLine(original: details, lineId: line.lineId),
                                 _amount(line.lineTotalMinor),
@@ -875,6 +876,26 @@ class WorkspaceOriginalSupplierTaxForLine extends StatelessWidget {
       : '${gst != null ? 'Supplier-declared GST ${gst.percentageText}%' : 'Supplier-declared tax ${_money(amount!.amountMinor)} per selling pack'}'
         ' · ${included ? 'Included in' : 'Additional to'} the ordered price';
     return Text(label, key: ValueKey('original-supplier-gst-${line.lineId}'),
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.4));
+  }
+}
+
+/// Frozen agreed price; current catalogue expiry cannot rewrite this purchase.
+class WorkspaceOriginalCommodityPriceForLine extends StatelessWidget {
+  const WorkspaceOriginalCommodityPriceForLine({super.key, required this.line});
+  final WorkspacePurchasedSkuLine line;
+  @override
+  Widget build(BuildContext context) {
+    final snapshot = line.commodityPriceSnapshot;
+    if (snapshot == null) return const SizedBox.shrink();
+    final local = MaterialLocalizations.of(context);
+    String instant(DateTime value) {
+      final date = value.toLocal();
+      return '${local.formatMediumDate(date)} ${local.formatTimeOfDay(TimeOfDay.fromDateTime(date),
+        alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context))}';
+    }
+    return Text('Agreed supplier price ${_money(line.unitPriceMinor)} per selling pack · ${instant(snapshot.agreedAt)}\n'
+      'Supplier confirmed ${instant(snapshot.confirmedAt)}', key: ValueKey('original-commodity-price-${line.lineId}'),
       style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.4));
   }
 }

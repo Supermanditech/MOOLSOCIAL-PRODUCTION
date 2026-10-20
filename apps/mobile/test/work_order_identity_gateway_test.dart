@@ -725,6 +725,126 @@ void main() {
     });
   }
   for (final role in WorkspaceOrderIdentityRole.values) {
+    test('LF-COMMODITY-ORIGINAL frozen direct price ${role.name} remains readable after expiry', () async {
+      final data = commodityPurchaseResponse(role: role.name), order = data['orders'][0];
+      final saved = await projectionGateway(Transport()..data = data, account: data['viewerUserId'])
+        .readPurchaseProjection(role: role, realm: 'evaluation', purchaseId: data['purchaseId'],
+          storeId: role == WorkspaceOrderIdentityRole.seller ? order['storeId'] : null,
+          orderId: role == WorkspaceOrderIdentityRole.seller ? order['orderId'] : null);
+      expect(saved, isNotNull); expect(saved!.orders.single.factsVersion, 10);
+      final line = saved.orders.single.lines.single;
+      expect(line.toJson(), order['original']['lines'][0]);
+      expect(line.commodityPriceSnapshot!.agreedAt, DateTime.utc(2026, 10, 1, 12, 10));
+      expect(saved.orders.single.supplierQuote, isNull);
+      expect(saved.orders.single.totals, order['original']['totals']);
+      final copy = line.commodityPriceSnapshot!.toJson()..['priceMinor'] = 1;
+      expect(copy['priceMinor'], 1); expect(line.commodityPriceSnapshot!.toJson()['priceMinor'], line.unitPriceMinor);
+      order['original']['lines'][0]['commodityPriceSnapshot']['incrementPacks'] = 1000000;
+      rehashPurchaseOrder(order);
+      expect(await projectionGateway(Transport()..data = data, account: data['viewerUserId']).readPurchaseProjection(
+        role: role, realm: 'evaluation', purchaseId: data['purchaseId'],
+        storeId: role == WorkspaceOrderIdentityRole.seller ? order['storeId'] : null,
+        orderId: role == WorkspaceOrderIdentityRole.seller ? order['orderId'] : null), isNotNull);
+    });
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF-COMMODITY-ORIGINAL purchased disclosure ${role.name} scale=$scale', (tester) async {
+        await tester.binding.setSurfaceSize(const Size(320, 844)); addTearDown(() => tester.binding.setSurfaceSize(null));
+        final data = commodityPurchaseResponse(role: role.name), order = data['orders'][0], refs = referenceResponse(role: role.name);
+        refs['references'][0]['originalFingerprint'] = order['originalFingerprint'];
+        final wire = Transport()..respond = (body) => (body['operation'] as String).startsWith('list') ? refs : data;
+        await tester.pumpWidget(MaterialApp(home: Scaffold(body: MediaQuery(data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+          child: SingleChildScrollView(child: WorkspacePurchaseOriginals(gateway: projectionGateway(wire, account: data['viewerUserId']),
+            role: role, realm: 'evaluation', storeId: role == WorkspaceOrderIdentityRole.seller ? order['storeId'] : null))))));
+        await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey('original-order-${order['orderId']}'))); await tester.pumpAndSettle();
+        final disclosure = find.byKey(const ValueKey('original-commodity-price-line-one'));
+        await tester.ensureVisible(disclosure); await tester.pumpAndSettle();
+        final text = tester.widget<Text>(disclosure);
+        expect(text.data, contains('Agreed supplier price ₹100.51 per selling pack'));
+        expect(text.data, contains('Supplier confirmed')); expect(text.data, isNot(contains('pending')));
+        expect(text.maxLines, isNull); expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+  for (final entry in <String, void Function(Map<String, dynamic>)>{
+    'missing': (l) => l.remove('commodityPriceSnapshot'),
+    'null Bulk': (l) => l['commodityPriceSnapshot'] = null,
+    'version': (l) => l['commodityPriceSnapshot']['schemaVersion'] = 2,
+    'revision': (l) => l['commodityPriceSnapshot']['confirmationRevision'] = 3,
+    'terms': (l) => l['commodityPriceSnapshot']['termsRevision'] = 'commodity-2-BBBBBBBBBBBBBBBB',
+    'agreement expiry': (l) => l['commodityPriceSnapshot']['agreedAt'] = l['commodityPriceSnapshot']['validUntil'],
+    'future confirmation': (l) => l['commodityPriceSnapshot']['confirmedAt'] = '2026-10-01T13:00:00.000Z',
+    'minimum': (l) => l['commodityPriceSnapshot']['minimumPacks'] = 2,
+    'tier price': (l) => l['commodityPriceSnapshot']['priceMinor'] = 1,
+    'measured unit': (l) => l['quantityUnit'] = 'L',
+    'paid claim': (l) => l['commodityPriceSnapshot']['paid'] = true,
+  }.entries) {
+    test('LF-COMMODITY-ORIGINAL rejects ${entry.key} even with a recomputed fingerprint', () async {
+      final data = commodityPurchaseResponse(), order = data['orders'][0] as Map<String,dynamic>;
+      entry.value(order['original']['lines'][0]); rehashPurchaseOrder(order);
+      expect(await projectionGateway(Transport()..data = data).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: data['purchaseId']), isNull);
+    });
+  }
+  test('LF-COMMODITY-ORIGINAL mixed quote covers exactly its legacy Bulk subset', () async {
+    final data = supplierQuotePurchaseResponse(), order = data['orders'][0] as Map<String,dynamic>;
+    data['schemaVersion'] = 10; order['factsVersion'] = 10;
+    final lines = order['original']['lines'] as List;
+    for (final l in lines) { l['supplierTaxSnapshot'] = null; l['commodityPriceSnapshot'] = null; }
+    final direct = commodityPurchaseResponse()['orders'][0]['original']['lines'][0] as Map<String,dynamic>;
+    direct['lineId'] = 'z-direct-line'; direct['skuId'] = 'direct-sku'; direct['publicListing']['skuId'] = 'direct-sku';
+    direct['publicListing']['listingId'] = 'listing-${sha256.convert(utf8.encode(jsonEncode([1,'evaluation',order['storeId'],'direct-sku','bulk'])))}';
+    lines.add(direct); order['original']['totals']['itemsMinor'] += direct['lineTotalMinor'];
+    order['original']['totals']['totalMinor'] += direct['lineTotalMinor']; rehashPurchaseOrder(order);
+    Future<WorkspacePurchaseProjection?> read() => projectionGateway(Transport()..data = data).readPurchaseProjection(
+      role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: data['purchaseId']);
+    expect(await read(), isNotNull);
+    order['original']['supplierQuote']['lines'].add({'lineId': direct['lineId'], 'quoteLineId': 'quote-direct-line'});
+    rehashPurchaseOrder(order); expect(await read(), isNull);
+  });
+  test('LF-COMMODITY-ORIGINAL direct Wholesale requires its confirmed-price provenance', () async {
+    final data = commodityPurchaseResponse(), order = data['orders'][0] as Map<String,dynamic>, line = order['original']['lines'][0];
+    line['publicListing']['channel'] = 'wholesale';
+    line['publicListing']['listingId'] = 'listing-${sha256.convert(utf8.encode(jsonEncode(
+      [1,'evaluation',order['storeId'],line['skuId'],'wholesale'])))}';
+    rehashPurchaseOrder(order);
+    Future<WorkspacePurchaseProjection?> read() => projectionGateway(Transport()..data = data).readPurchaseProjection(
+      role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: data['purchaseId']);
+    expect(await read(), isNotNull);
+    line['commodityPriceSnapshot'] = null; rehashPurchaseOrder(order); expect(await read(), isNull);
+  });
+  if (Platform.environment['LF_COMMODITY_ORIGINAL_LOG'] case final path?) {
+    test('LF-COMMODITY-ORIGINAL actual restarted materializer crosses buyer Store and operational decoders', () async {
+      const marker = 'LF_COMMODITY_ORIGINAL_PROJECTION=';
+      final row = File(path).readAsLinesSync().singleWhere((line) => line.startsWith(marker));
+      final packet = (jsonDecode(row.substring(marker.length)) as Map).cast<String,dynamic>();
+      for (final data in [packet['buyer'], ...(packet['sellers'] as List)]) {
+        final role = data['viewerRole'] == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller;
+        final order = data['orders'][0];
+        final saved = await projectionGateway(Transport()..data = data, account: data['viewerUserId']).readPurchaseProjection(
+          role: role, realm: 'evaluation', purchaseId: data['purchaseId'],
+          storeId: role == WorkspaceOrderIdentityRole.seller ? order['storeId'] : null,
+          orderId: role == WorkspaceOrderIdentityRole.seller ? order['orderId'] : null);
+        expect(saved, isNotNull);
+        for (final original in saved!.orders) {
+          expect(original.factsVersion, 10);
+          final raw = (data['orders'] as List).singleWhere((o) => o['orderId'] == original.orderId);
+          for (final line in original.lines) expect(line.toJson(), (raw['original']['lines'] as List).singleWhere((l) => l['lineId'] == line.lineId));
+        }
+      }
+      for (final data in packet['operational'] as List) {
+        final role = data['viewerRole'] == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller;
+        final reference = WorkspacePurchaseReference(purchaseId: data['purchaseId'], storeId: data['storeId'], orderId: data['orderId'],
+          sourceRevision: data['sourceRevision'], originalFingerprint: data['originalFingerprint']);
+        final saved = await AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(Transport()..data = data,
+          account: data['viewerUserId'])).read(role: role, realm: 'evaluation', reference: reference);
+        expect(saved, isNotNull); expect(saved!.original.factsVersion, 10);
+        expect(saved.original.lines.map((l) => l.toJson()), data['original']['lines']);
+      }
+    });
+  }
+  for (final role in WorkspaceOrderIdentityRole.values) {
     for (final declaration in [null, {'version': 2, 'rateBasisPoints': 0, 'basis': 'additional'},
       {'version': 2, 'rateBasisPoints': 500, 'basis': 'included'}, {'version': 1, 'amountMinor': 7, 'basis': 'additional'}]) {
       test('LF-GST-ORIGINAL strict frozen source ${role.name} declaration=$declaration', () async {
@@ -2200,6 +2320,20 @@ Map<String, dynamic> purchaseResponse({String role = 'buyer'}) {
       },
     ],
   };
+}
+
+Map<String, dynamic> commodityPurchaseResponse({String role = 'buyer'}) {
+  final data = supplierTaxPurchaseResponse(role: role, declaration: null)..['schemaVersion'] = 10;
+  final order = data['orders'][0] as Map<String,dynamic>; order['factsVersion'] = 10;
+  for (final l in order['original']['lines']) {
+    l['scheduledFulfilment'] = null; l['publicListing']['channel'] = 'bulk';
+    l['publicListing']['listingId'] = 'listing-${sha256.convert(utf8.encode(jsonEncode([1,'evaluation',order['storeId'],l['skuId'],'bulk'])))}';
+    l['offerRevision'] = 'commodity-2-AAAAAAAAAAAAAAAA';
+    l['commodityPriceSnapshot'] = {'schemaVersion': 1, 'termsRevision': l['offerRevision'], 'confirmationRevision': 2,
+      'confirmedAt': '2026-10-01T12:00:00.000Z', 'validUntil': '2026-10-01T14:00:00.000Z', 'frequent': true,
+      'agreedAt': '2026-10-01T12:10:00.000Z', 'priceMinor': l['unitPriceMinor'], 'minimumPacks': 1, 'incrementPacks': 1, 'tiers': []};
+  }
+  rehashPurchaseOrder(order); return data;
 }
 
 Map<String, dynamic> supplierTaxPurchaseResponse({String role = 'buyer', Map<String, Object>? declaration = const {
