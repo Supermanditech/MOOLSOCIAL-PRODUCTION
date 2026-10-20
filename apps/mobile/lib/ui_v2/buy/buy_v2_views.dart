@@ -44,11 +44,14 @@ Future<void> _showBulkQuotes(BuildContext context, BuyV2Session session, {String
   final access = session.bulkQuotes;
   if (access?.active != true) return;
   try {
+    var selected = false;
     final request = requestStore == null ? null : session.prepareBulkQuoteRequest(requestStore);
     await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true, showDragHandle: true,
       builder: (sheet) => SizedBox(height: MediaQuery.sizeOf(sheet).height * .92,
         child: WorkspaceBulkQuotes(access: access!, request: request?.original, requestLines: request?.products ?? const [],
-          inputCurrent: request?.current, onClose: () => Navigator.pop(sheet))));
+          inputCurrent: request?.current, onClose: () => Navigator.pop(sheet),
+          onUseForCart: (quote) async { final saved = await session.chooseSupplierQuote(quote); selected = saved; return saved; })));
+    if (selected && access!.active) session.openCart();
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -8606,7 +8609,25 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
         ),
       ),
     );
+    final quoteOwner = session;
     final contents = <Widget>[
+      for (final quote in session.selectedSupplierQuotes) Padding(padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Material(type: MaterialType.transparency, child: ListTile(contentPadding: EdgeInsets.zero,
+          key: ValueKey('buy-selected-supplier-quote-${quote.storeId}'), leading: const Icon(Icons.request_quote_outlined),
+          title: Text('Supplier quote · ${session.cartLines.firstWhere((l) => l.product.storeId == quote.storeId).product.seller}'),
+          subtitle: Text(session.supplierQuoteCurrentForCart(quote)
+            ? 'Agreed product prices ${_comparisonMoney(quote.merchandiseMinor)} · final charges at Checkout'
+            : 'Quote needs review. Check its validity, products and quantities.'),
+          trailing: IconButton(tooltip: 'Remove selected supplier quote', icon: const Icon(Icons.close_rounded),
+            onPressed: session.cartChangesBlocked ? null : () async {
+              if (!mounted || !identical(widget.session, quoteOwner)) return;
+              final removed = await quoteOwner.removeSupplierQuote(quote);
+              if (!removed && mounted && identical(widget.session, quoteOwner) && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('The supplier quote selection could not be removed.')));
+              }
+            }), onTap: () {
+              if (mounted && identical(widget.session, quoteOwner)) _showBulkQuotes(context, quoteOwner);
+            }))),
       if (session.bulkQuotes?.active == true && !session.isStoreProcurement)
         for (final store in session.bulkQuoteRequestStores) Padding(padding: const EdgeInsets.only(bottom: 6),
           child: OutlinedButton.icon(key: ValueKey('buy-bulk-request-$store'),
@@ -8804,7 +8825,8 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
           final textScale = MediaQuery.textScalerOf(context).scale(1);
           final compactAccessible =
               constraints.maxWidth < 350 && textScale > 1.2;
-          final priceUnavailable = session.scopedProcurementPricesUnavailable;
+          final priceUnavailable = session.scopedProcurementPricesUnavailable || session.hasSupplierQuoteProducts &&
+            session.cartLines.any((l) => l.product.publicListingIdentity?.channel == BuyV2OfferClass.bulk && session.agreedUnitPriceFor(l) == null);
           final freightIncluded = lines.every(
             (line) => line.product.freightIncluded,
           );
@@ -8813,7 +8835,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
               : 'Freight confirmed before payment';
           final totalText = priceUnavailable
               ? 'Pending'
-              : _comparisonMoney(session.scopedPayableTotalMinor);
+              : _comparisonMoney(session.hasSupplierQuoteProducts ? session.scopedCartTotalMinor : session.scopedPayableTotalMinor);
           final totalStyle = TextStyle(
             color: BuyV2Colors.ink,
             fontSize: compactAccessible ? 20 : 22,
@@ -8840,6 +8862,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
               : _itemCountLabel(session.scopedItemCount);
           final baseTotalLabel = priceUnavailable
               ? 'Price confirmation required'
+              : session.hasSupplierQuoteProducts ? '$selectedCountLabel · product prices before coupons/charges'
               : session.scopedTipTotal > 0
               ? '$selectedCountLabel selected · total (incl. tip)'
               : '$selectedCountLabel selected · total';
@@ -12534,6 +12557,7 @@ class _CheckoutOrderDetails extends StatelessWidget {
         const SizedBox(height: 7),
         for (var index = 0; index < groups.length; index++) ...[
           _CheckoutDeliverySummaryCard(
+            session: session,
             key: ValueKey('buy-checkout-confirm-delivery-${groups[index].key}'),
             group: groups[index],
             artwork: buyV2DeliveryArtworkForLines(
@@ -12843,9 +12867,10 @@ class _CheckoutPrimaryActionBar extends StatelessWidget {
 }
 
 class _WholesaleCheckoutReceivingLines extends StatelessWidget {
-  const _WholesaleCheckoutReceivingLines({required this.group});
+  const _WholesaleCheckoutReceivingLines({required this.group, required this.session});
 
   final BuyV2FulfilmentGroup group;
+  final BuyV2Session session;
 
   @override
   Widget build(BuildContext context) {
@@ -12861,7 +12886,7 @@ class _WholesaleCheckoutReceivingLines extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var index = 0; index < group.lines.length; index++) ...[
-            _WholesaleCheckoutReceivingLine(line: group.lines[index]),
+            _WholesaleCheckoutReceivingLine(line: group.lines[index], session: session),
             if (index != group.lines.length - 1)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 6),
@@ -12875,19 +12900,21 @@ class _WholesaleCheckoutReceivingLines extends StatelessWidget {
 }
 
 class _WholesaleCheckoutReceivingLine extends StatelessWidget {
-  const _WholesaleCheckoutReceivingLine({required this.line});
+  const _WholesaleCheckoutReceivingLine({required this.line, required this.session});
 
   final BuyV2CartLine line;
+  final BuyV2Session session;
 
   @override
   Widget build(BuildContext context) {
     final product = line.product;
+    final agreed = session.agreedUnitPriceFor(line, checkout: true), subtotalMinor = session.merchandiseForLine(line, checkout: true);
     final quantityLabel = _packCountLabel(line.quantity);
     final semanticLabel =
         '${product.customerTitle}. $quantityLabel. ${product.pack}. '
         'Minimum order ${_packCountLabel(product.minimumOrder)}. '
-        '${_comparisonMoney(product.priceMinor)} per pack. ${product.unitPrice}. '
-        'Item total ${_comparisonMoney(line.totalMinor)}.';
+        '${_comparisonMoney(agreed ?? product.priceMinor)} per pack. ${agreed == null ? product.unitPrice : 'Agreed supplier price'}. '
+        'Item total ${_comparisonMoney(subtotalMinor)}.';
     return Semantics(
       key: ValueKey('buy-wholesale-checkout-receiving-line-${product.id}'),
       container: true,
@@ -12914,7 +12941,7 @@ class _WholesaleCheckoutReceivingLine extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 'Minimum order ${_packCountLabel(product.minimumOrder)} · '
-                '${_comparisonMoney(product.priceMinor)} per pack · ${product.unitPrice}',
+                '${_comparisonMoney(agreed ?? product.priceMinor)} per pack · ${agreed == null ? product.unitPrice : 'Agreed supplier price'}',
                 style: context.buyMeta,
               ),
             ],
@@ -12931,7 +12958,7 @@ class _WholesaleCheckoutReceivingLine extends StatelessWidget {
                   Text('Item total', style: context.buyMeta),
                   const SizedBox(height: 2),
                   Text(
-                    _comparisonMoney(line.totalMinor),
+                    _comparisonMoney(subtotalMinor),
                     style: context.buyBody.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -24652,6 +24679,10 @@ class _CartBillSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (session.hasSupplierQuoteProducts) {
+      return Padding(key: const ValueKey('buy-cart-bill-summary'), padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text('Supplier prices cover products only. Coupons, tax, delivery charges and payment terms are confirmed at Checkout.', style: context.buyMeta));
+    }
     if (session.scopedProcurementPricesUnavailable) {
       return Container(
         key: const ValueKey('buy-cart-bill-summary'),
@@ -24823,7 +24854,9 @@ class _CartLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final product = line.product;
-    final priceUnavailable = session.procurementRetainedPriceUnavailable(
+    final agreed = session.agreedUnitPriceFor(line);
+    final publishedBulk = !session.isStoreProcurement && product.publicListingIdentity?.channel == BuyV2OfferClass.bulk;
+    final priceUnavailable = publishedBulk && agreed == null || session.procurementRetainedPriceUnavailable(
       product,
     );
     final facts = session.productFactsFor(product);
@@ -24964,7 +24997,7 @@ class _CartLine extends StatelessWidget {
             container: true,
             label:
                 'Minimum order ${_packCountLabel(product.minimumOrder)}. '
-                '${_comparisonMoney(product.priceMinor)} per pack. ${product.unitPrice}. '
+                '${_comparisonMoney(agreed ?? product.priceMinor)} per pack. ${agreed == null ? product.unitPrice : 'Agreed supplier price'}. '
                 '${product.freightIncluded ? 'Freight included in price.' : 'Freight confirmed before payment.'}',
             excludeSemantics: true,
             child: Container(
@@ -24981,7 +25014,7 @@ class _CartLine extends StatelessWidget {
                     priceUnavailable
                         ? 'Price unavailable'
                         : 'Minimum order ${_packCountLabel(product.minimumOrder)} · '
-                              '${_comparisonMoney(product.priceMinor)} per pack',
+                              '${_comparisonMoney(agreed ?? product.priceMinor)} per pack',
                     style: context.buyMeta.copyWith(
                       color: BuyV2Colors.ink,
                       fontSize: 11,
@@ -24990,7 +25023,7 @@ class _CartLine extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${product.unitPrice} · '
+                    '${agreed == null ? product.unitPrice : 'Agreed supplier price'} · '
                     '${product.freightIncluded ? 'Freight included' : 'Freight confirmed later'}',
                     style: context.buyMeta.copyWith(fontSize: 11),
                   ),
@@ -25007,7 +25040,7 @@ class _CartLine extends StatelessWidget {
     );
     final lineTotalText = priceUnavailable
         ? 'Price pending'
-        : _comparisonMoney(line.totalMinor);
+        : _comparisonMoney(session.merchandiseForLine(line));
     final lineTotalSize = buyV2ValueTextSize(
       context,
       lineTotalText,
@@ -25037,7 +25070,7 @@ class _CartLine extends StatelessWidget {
         BuyV2FiniteValueTransition(
           key: ValueKey('buy-cart-line-total-motion-${product.id}'),
           incomingOnly: true,
-          stateKey: line.totalMinor,
+          stateKey: session.merchandiseForLine(line),
           text: lineTotalText,
           ownerSize: lineTotalSize,
           textAlign: TextAlign.end,
@@ -25383,10 +25416,12 @@ class _CheckoutDeliverySummaryCard extends StatefulWidget {
   const _CheckoutDeliverySummaryCard({
     super.key,
     required this.group,
+    required this.session,
     required this.artwork,
   });
 
   final BuyV2FulfilmentGroup group;
+  final BuyV2Session session;
   final BuyV2DeliveryArtwork artwork;
 
   @override
@@ -25479,7 +25514,7 @@ class _CheckoutDeliverySummaryCardState
               child: Divider(height: 1),
             ),
             if (group.destination == BuyV2Destination.wholesale)
-              _WholesaleCheckoutReceivingLines(group: group),
+              _WholesaleCheckoutReceivingLines(group: group, session: widget.session),
             for (final line in group.lines) ...[
               if (line.scheduledFulfilment case final selected?)
                 Padding(padding: const EdgeInsets.symmetric(vertical: 4),

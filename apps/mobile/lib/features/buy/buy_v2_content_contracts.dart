@@ -2640,6 +2640,81 @@ abstract interface class BuyV2VerifiedRatingAdapter {
   Future<BuyV2RatingResult> submitRating(BuyV2RatingRequest request);
 }
 
+/// Selected accepted merchandise agreement, NOT final payable charges, current
+/// Stock, credit permission or proof of unused redemption. Verify server-side.
+@immutable
+class BuyV2SupplierQuoteSelection {
+  const BuyV2SupplierQuoteSelection._(this._encoded);
+  final String _encoded;
+  Map<String, dynamic> toJson() => (jsonDecode(_encoded) as Map).cast<String, dynamic>();
+  String get realm => toJson()['realm'] as String;
+  String get storeId => toJson()['storeId'] as String;
+  String get quoteId => toJson()['quoteId'] as String;
+  int get acceptedRevision => toJson()['acceptedRevision'] as int;
+  String get agreementFingerprint => toJson()['agreementFingerprint'] as String;
+  DateTime get validUntil => DateTime.parse(toJson()['validUntil'] as String).toUtc();
+  DateTime get acceptedAt => DateTime.parse(toJson()['acceptedAt'] as String).toUtc();
+  int get merchandiseMinor => toJson()['merchandiseMinor'] as int;
+  List<Map<String, dynamic>> get lines => List.unmodifiable([
+    for (final line in toJson()['lines'] as List) Map<String, dynamic>.unmodifiable((line as Map).cast<String, dynamic>())]);
+  String get quoteBinding => sha256.convert(utf8.encode(_encoded)).toString();
+  bool current(DateTime now) => now.toUtc().isBefore(validUntil);
+  bool matchesLines(Iterable<BuyV2CartLine> items) {
+    final selected = items.where((l) => l.product.offerClass == BuyV2OfferClass.bulk && l.product.storeId == storeId).toList();
+    final frozen = lines;
+    if (selected.length != frozen.length) return false;
+    return frozen.every((f) {
+      final match = selected.where((l) => l.product.id == f['productId']).toList();
+      if (match.length != 1) return false;
+      final line = match.single, listing = line.product.publicListingIdentity;
+      return line.quantity == f['quantity'] && listing != null && listing.realm == realm && listing.storeId == storeId &&
+        listing.listingId == f['listingId'] && listing.skuId == f['skuId'] && listing.canonicalProductId == f['canonicalProductId'] &&
+        listing.verifiedPackId == f['verifiedPackId'] && listing.channel == BuyV2OfferClass.bulk;
+    });
+  }
+  factory BuyV2SupplierQuoteSelection.fromJson(Object? value) {
+    Never invalid() => throw const FormatException('Supplier quote selection needs checking.');
+    Map<String, dynamic> exact(Object? value, List<String> keys) {
+      if (value is! Map || value.length != keys.length || keys.any((key) => !value.containsKey(key))) invalid();
+      return value.cast<String, dynamic>();
+    }
+    bool id(Object? value) => value is String && RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(value);
+    bool integer(Object? value, int min, int max) => value is int && value >= min && value <= max;
+    final r = exact(value, ['schemaVersion', 'realm', 'storeId', 'quoteId', 'acceptedRevision',
+      'agreementFingerprint', 'acceptedAt', 'validUntil', 'merchandiseMinor', 'lines']);
+    if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || !const ['evaluation', 'production'].contains(r['realm']) ||
+        !id(r['storeId']) || r['quoteId'] is! String || !RegExp(r'^bulk-[a-f0-9]{64}$').hasMatch(r['quoteId'] as String) ||
+        !integer(r['acceptedRevision'], 3, 999999999) || r['agreementFingerprint'] is! String ||
+        !RegExp(r'^[a-f0-9]{64}$').hasMatch(r['agreementFingerprint'] as String) ||
+        r['acceptedAt'] is! String || r['validUntil'] is! String || !integer(r['merchandiseMinor'], 1, 1000000000000)) { invalid(); }
+    final expiry = DateTime.parse(r['validUntil'] as String).toUtc(), accepted = DateTime.parse(r['acceptedAt'] as String).toUtc();
+    if (expiry.toIso8601String() != r['validUntil'] || r['lines'] is! List ||
+        (r['lines'] as List).isEmpty || (r['lines'] as List).length > 100 ||
+        accepted.toIso8601String() != r['acceptedAt'] || !accepted.isBefore(expiry)) { invalid(); }
+    final products = <String>{}, quoteLines = <String>{}, listings = <String>{}, lines = <Map<String, dynamic>>[];
+    var total = 0;
+    for (final raw in r['lines'] as List) {
+      final l = exact(raw, ['productId', 'quoteLineId', 'skuId', 'listingId', 'skuRevision',
+        'canonicalProductId', 'verifiedPackId', 'quantity', 'unitPriceMinor', 'merchandiseMinor']);
+      if (['productId', 'quoteLineId', 'skuId', 'canonicalProductId', 'verifiedPackId'].any((key) => !id(l[key])) ||
+          l['listingId'] is! String || !RegExp(r'^listing-[a-f0-9]{64}$').hasMatch(l['listingId'] as String) ||
+          !integer(l['skuRevision'], 1, 999999999) || !integer(l['quantity'], 1, 1000000) ||
+          !integer(l['unitPriceMinor'], 1, 1000000000000) || !integer(l['merchandiseMinor'], 1, 1000000000000) ||
+          BigInt.from(l['unitPriceMinor'] as int) * BigInt.from(l['quantity'] as int) != BigInt.from(l['merchandiseMinor'] as int) ||
+          !products.add(l['productId'] as String) || !quoteLines.add(l['quoteLineId'] as String) || !listings.add(l['listingId'] as String)) { invalid(); }
+      total += l['merchandiseMinor'] as int;
+      if (l['listingId'] != 'listing-${sha256.convert(utf8.encode(jsonEncode([1, r['realm'], r['storeId'], l['skuId'], 'bulk'])))}') { invalid(); }
+      lines.add({for (final key in ['productId', 'quoteLineId', 'skuId', 'listingId', 'skuRevision',
+        'canonicalProductId', 'verifiedPackId', 'quantity', 'unitPriceMinor', 'merchandiseMinor']) key: l[key]});
+    }
+    if (total != r['merchandiseMinor'] || total > 1000000000000) invalid();
+    lines.sort((a,b) => (a['productId'] as String).compareTo(b['productId'] as String));
+    return BuyV2SupplierQuoteSelection._(jsonEncode({'schemaVersion': 1, 'realm': r['realm'], 'storeId': r['storeId'],
+      'quoteId': r['quoteId'], 'acceptedRevision': r['acceptedRevision'], 'agreementFingerprint': r['agreementFingerprint'],
+      'acceptedAt': r['acceptedAt'], 'validUntil': r['validUntil'], 'merchandiseMinor': total, 'lines': lines}));
+  }
+}
+
 @immutable
 class BuyV2OrderPlacementRequest {
   const BuyV2OrderPlacementRequest({
@@ -2658,6 +2733,7 @@ class BuyV2OrderPlacementRequest {
     this.procurementContext,
     this.checkoutAttemptId,
     this.paymentGroupId,
+    this.supplierQuotes = const [],
     // Preserve the public legacy constructor's required int argument types.
     // ignore: prefer_initializing_formals
   }) : _total = total, _amountDueNow = amountDueNow,
@@ -2679,6 +2755,7 @@ class BuyV2OrderPlacementRequest {
     this.procurementContext,
     this.checkoutAttemptId,
     this.paymentGroupId,
+    this.supplierQuotes = const [],
   // Public argument names are retained for existing provider callers.
   // ignore: prefer_initializing_formals
   }) : _total = null, _totalMinor = totalMinor,
@@ -2719,6 +2796,11 @@ class BuyV2OrderPlacementRequest {
   /// Deduplicate the immutable key and authorize only these lines and amounts.
   final String? checkoutAttemptId;
   final String? paymentGroupId;
+  /// Frozen selection only; the server verifies and consumes it atomically.
+  final List<BuyV2SupplierQuoteSelection> supplierQuotes;
+  bool get hasValidSupplierQuotes => supplierQuotes.length <= 10 &&
+    supplierQuotes.map((q) => q.storeId).toSet().length == supplierQuotes.length &&
+    supplierQuotes.every((q) => q.matchesLines(lines));
 }
 
 @immutable
@@ -2738,10 +2820,12 @@ class BuyV2OrderPlacementResult {
     this.paymentGroupId,
     this.idempotencyKey,
     this.retryAllowed = false,
+    this.supplierQuoteBindings = const {},
   });
 
   final BuyV2OrderPlacementOutcome outcome;
   final String customerMessage;
+  final Map<String, String> supplierQuoteBindings;
   final String? purchaseReference;
   final String? paymentReference;
   final Uri? paymentActionUri;
@@ -3434,6 +3518,7 @@ class BuyV2CheckoutQuote {
     required int total,
     this.paymentGroups,
     this.storeCouponBindings = const {},
+    this.supplierQuoteBindings = const {},
     // ignore: prefer_initializing_formals
   }) : _total = total, _totalMinor = null;
 
@@ -3446,6 +3531,7 @@ class BuyV2CheckoutQuote {
     required int totalMinor,
     this.paymentGroups,
     this.storeCouponBindings = const {},
+    this.supplierQuoteBindings = const {},
   // Public argument names are retained for existing provider callers.
   // ignore: prefer_initializing_formals
   }) : _total = null, _totalMinor = totalMinor;
@@ -3466,6 +3552,8 @@ class BuyV2CheckoutQuote {
   /// Realm/Store/campaign identity -> exact negotiated eligibility binding.
   /// Empty preserves legacy providers, never acknowledges new Store coupons.
   final Map<String, String> storeCouponBindings;
+  /// Store ID -> exact selected supplier-quote binding, never a credit grant.
+  final Map<String, String> supplierQuoteBindings;
 }
 
 @immutable
@@ -3514,6 +3602,18 @@ abstract interface class BuyV2StoreCouponCheckoutQuoteAdapter
     required String selectedPaymentMethod,
     required List<BuyV2CartBenefit> selectedBenefits,
     required List<BuyV2StoreCouponEligibility> selectedStoreCoupons,
+    required Map<String, int> tipAmountsMinorByFulfilmentKey,
+  });
+}
+
+/// One combined method prevents coupon negotiation from dropping supplier
+/// agreements (or vice versa). Unsupported legacy connectors must fail closed.
+abstract interface class BuyV2SupplierQuoteCheckoutAdapter implements BuyV2StoreCouponCheckoutQuoteAdapter {
+  Future<BuyV2CheckoutQuoteSnapshot> loadQuoteWithSupplierQuotesMinor({
+    required List<BuyV2FulfilmentGroup> groups, required BuyV2Address address,
+    required String selectedPaymentMethod, required List<BuyV2CartBenefit> selectedBenefits,
+    required List<BuyV2StoreCouponEligibility> selectedStoreCoupons,
+    required List<BuyV2SupplierQuoteSelection> supplierQuotes,
     required Map<String, int> tipAmountsMinorByFulfilmentKey,
   });
 }
@@ -3925,6 +4025,12 @@ abstract interface class BuyV2MinorGroupedOrderPlacementAdapter {
 /// exact selections in returned order lines; reconciliation needs no new grant.
 abstract interface class BuyV2ScheduledOrderPlacementAdapter {
   bool get supportsScheduledFulfilment;
+}
+
+/// Explicit capability for frozen agreements on single/grouped minor requests.
+/// The server must verify, echo and atomically consume the agreement on purchase.
+abstract interface class BuyV2SupplierQuoteOrderPlacementAdapter {
+  bool get supportsSupplierQuotes;
 }
 
 abstract interface class BuyV2CommerceAdapter {

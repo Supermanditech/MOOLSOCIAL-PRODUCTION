@@ -3457,6 +3457,163 @@ class BuyV2RootSessions {
 
 class BuyV2Session extends ChangeNotifier {
   final WorkspaceBulkQuoteAccess? bulkQuotes;
+  final _supplierQuoteSelections = <String, BuyV2SupplierQuoteSelection>{};
+  Map<String, BuyV2SupplierQuoteSelection>? _supplierQuoteSelectionsInFlight;
+  Object? _supplierQuoteSaveOperation;
+  Completer<void>? _supplierQuoteSettlement;
+  bool _supplierQuoteSaveBusy = false;
+  Timer? _supplierQuoteExpiry;
+  List<BuyV2SupplierQuoteSelection> _supplierSelectionsFor(Iterable<BuyV2CartLine> items) => List.unmodifiable([
+    for (final store in items.where((l) => l.product.publicListingIdentity?.channel == BuyV2OfferClass.bulk)
+      .map((l) => l.product.storeId).whereType<String>().toSet().toList()..sort())
+      ?_supplierQuoteSelections[store],
+  ]);
+  List<BuyV2SupplierQuoteSelection> get selectedSupplierQuotes => _supplierSelectionsFor(cartLines);
+  List<BuyV2SupplierQuoteSelection> get _selectedCheckoutSupplierQuotes => _supplierSelectionsFor(checkoutLines);
+  bool get hasSupplierQuoteProducts => !isStoreProcurement && cartLines.any((l) => l.product.publicListingIdentity?.channel == BuyV2OfferClass.bulk);
+  bool supplierQuoteCurrentForCart(BuyV2SupplierQuoteSelection quote) => _supplierQuoteCurrent(quote, cartLines);
+  int? agreedUnitPriceFor(BuyV2CartLine line, {bool checkout = false}) {
+    if (checkout) {
+      final request = legacyCheckoutAttempt?.payment.request ?? currentCheckoutPaymentGroup?.request;
+      if (request != null) {
+        final frozen = request.supplierQuotes.where((q) => q.storeId == line.product.storeId && q.matchesLines(request.lines)).firstOrNull;
+        if (frozen != null) return frozen.lines.where((f) => f['productId'] == line.product.id).firstOrNull?['unitPriceMinor'] as int?;
+      }
+    }
+    final q = _supplierQuoteSelections[line.product.storeId];
+    if (q == null || !_supplierQuoteCurrent(q, checkout ? checkoutLines : cartLines)) return null;
+    return q.lines.where((f) => f['productId'] == line.product.id).firstOrNull?['unitPriceMinor'] as int?;
+  }
+  int merchandiseForLine(BuyV2CartLine line, {bool checkout = false}) {
+    final unit = agreedUnitPriceFor(line, checkout: checkout);
+    return unit == null ? line.totalMinor : buyV2MultiplyMinor(unit, line.quantity);
+  }
+  bool _supplierQuoteCurrent(BuyV2SupplierQuoteSelection quote, Iterable<BuyV2CartLine> items) {
+    final source = cataloguePageSource, access = bulkQuotes;
+    if (_collectionDisposed || isStoreProcurement || access?.active != true || access!.realm != quote.realm ||
+        source is! WorkspacePublicDiscoverySource || !source.active || !quote.current(catalogueNow()) || !quote.matchesLines(items)) { return false; }
+    try {
+      return quote.lines.every((f) {
+        final product = items.singleWhere((l) => l.product.id == f['productId']).product,
+          facts = source.displayedProduct(product);
+        return facts != null && facts.validUntil?.isAfter(catalogueNow()) == true &&
+          facts.content.observedAt != null && !facts.content.observedAt!.isAfter(catalogueNow()) &&
+          facts.skuRevision == f['skuRevision'] && facts.content.state == BuyV2ProductContentState.ready;
+      });
+    } on Object { return false; }
+  }
+  bool get supplierQuoteReviewRequired {
+    if (isStoreProcurement) return false;
+    final required = checkoutLines.where((l) => l.product.publicListingIdentity?.channel == BuyV2OfferClass.bulk).toList();
+    return required.any((line) {
+      final selected = _supplierQuoteSelections[line.product.storeId];
+      return selected == null || !_supplierQuoteCurrent(selected, checkoutLines);
+    });
+  }
+  bool get _supplierQuoteRequired => !isStoreProcurement &&
+    checkoutLines.any((l) => l.product.publicListingIdentity?.channel == BuyV2OfferClass.bulk);
+  List<BuyV2SupplierQuoteSelection> _supplierQuotesForLines(Iterable<BuyV2CartLine> items) {
+    if (isStoreProcurement) return const [];
+    final rows = items.toList(), result = <BuyV2SupplierQuoteSelection>[];
+    for (final store in rows.where((l) => l.product.publicListingIdentity?.channel == BuyV2OfferClass.bulk)
+        .map((l) => l.product.storeId).whereType<String>().toSet().toList()..sort()) {
+      final quote = _supplierQuoteSelections[store];
+      if (quote == null || !_supplierQuoteCurrent(quote, rows)) throw const FormatException('Review the supplier quote for this Cart.');
+      result.add(quote);
+    }
+    return List.unmodifiable(result);
+  }
+  int _supplierQuoteGroupSubtotal(BuyV2FulfilmentGroup group) => buyV2SumMinor([
+    for (final line in group.lines) if (!isStoreProcurement && line.product.publicListingIdentity?.channel == BuyV2OfferClass.bulk)
+      _supplierQuoteSelections[line.product.storeId]!.lines.singleWhere((f) => f['productId'] == line.product.id)['merchandiseMinor'] as int
+      else line.totalMinor,
+  ]);
+  bool _supplierQuoteInputsCurrent(BuyV2OrderPlacementRequest request) => request.hasValidSupplierQuotes &&
+    request.supplierQuotes.every((q) => q.quoteBinding == _supplierQuoteSelections[q.storeId]?.quoteBinding &&
+      _supplierQuoteCurrent(q, request.lines));
+  bool _supplierQuoteResponseMatches(BuyV2OrderPlacementRequest request, BuyV2OrderPlacementResult result) =>
+    result.supplierQuoteBindings.length == request.supplierQuotes.length &&
+    request.supplierQuotes.every((q) => result.supplierQuoteBindings[q.storeId] == q.quoteBinding);
+  int _frozenRequestUnitPrice(BuyV2OrderPlacementRequest request, BuyV2CartLine original) {
+    final quote = request.supplierQuotes.where((q) => q.storeId == original.product.storeId).firstOrNull;
+    return quote?.lines.where((f) => f['productId'] == original.product.id).firstOrNull?['unitPriceMinor'] as int? ?? original.product.priceMinor;
+  }
+  void _armSupplierQuoteExpiry() {
+    _supplierQuoteExpiry?.cancel();
+    final dates = _supplierQuoteSelections.values.map((q) => q.validUntil).where((d) => d.isAfter(catalogueNow())).toList()..sort();
+    if (dates.isEmpty || _collectionDisposed) return;
+    _supplierQuoteExpiry = Timer(dates.first.difference(catalogueNow()), () {
+      if (!_collectionDisposed) {
+        if (!cartChangesBlocked) { _invalidateCheckoutQuote(); _invalidateCommercialPaymentTerms(); }
+        notifyListeners(); _armSupplierQuoteExpiry();
+      }
+    });
+  }
+  Future<bool> chooseSupplierQuote(WorkspaceBulkQuote quote) async {
+    final access = bulkQuotes;
+    if (_supplierQuoteSaveBusy || access?.active != true || access!.role != 'buyer' || cartChangesBlocked ||
+        !quote.accepted || quote.validUntil?.isAfter(catalogueNow()) != true || quote.toJson()['viewerRole'] != 'buyer' ||
+        jsonEncode(access.forStore(quote.storeId).head(quote.quoteId)?.toJson()) != jsonEncode(quote.toJson())) { return false; }
+    late final BuyV2SupplierQuoteSelection selected;
+    try {
+      final rows = _bulkQuoteSelections(quote.storeId), raw = quote.toJson(), prices = raw['offer']['prices'] as List;
+      if (rows.length != quote.lines.length) return false;
+      selected = BuyV2SupplierQuoteSelection.fromJson({'schemaVersion': 1, 'realm': access.realm, 'storeId': quote.storeId,
+        'quoteId': quote.quoteId, 'acceptedRevision': quote.revision,
+        'agreementFingerprint': raw['acceptance']['agreementFingerprint'], 'acceptedAt': raw['acceptance']['acceptedAt'], 'validUntil': raw['offer']['validUntil'],
+        'merchandiseMinor': raw['offer']['merchandiseMinor'], 'lines': [for (final row in rows) () {
+          final identity = row.entry.product.publicListingIdentity!, agreed = quote.lines.singleWhere((l) =>
+            l.listingId == identity.listingId && l.skuId == identity.skuId && l.skuRevision == row.entry.readback.skuRevision &&
+            l.canonicalProductId == identity.canonicalProductId && l.verifiedPackId == identity.verifiedPackId && l.quantity == row.quantity),
+            price = prices.singleWhere((p) => p['lineId'] == agreed.lineId);
+          return {'productId': row.entry.product.id, 'quoteLineId': agreed.lineId, 'skuId': agreed.skuId, 'listingId': agreed.listingId,
+            'skuRevision': agreed.skuRevision, 'canonicalProductId': agreed.canonicalProductId, 'verifiedPackId': agreed.verifiedPackId,
+            'quantity': agreed.quantity, 'unitPriceMinor': price['unitPriceMinor'], 'merchandiseMinor': price['merchandiseMinor']};
+        }()]});
+      if (!_supplierQuoteCurrent(selected, cartLines)) return false;
+    } on Object { return false; }
+    final saved = await _saveSupplierQuoteSelections({..._supplierQuoteSelections, selected.storeId: selected});
+    if (!saved || _collectionDisposed || !identical(access, bulkQuotes) || !access.active || cartChangesBlocked ||
+        !_supplierQuoteCurrent(selected, cartLines)) { return false; }
+    _armSupplierQuoteExpiry(); _invalidateCheckoutQuote(); _invalidateCommercialPaymentTerms();
+    notice = 'Supplier prices selected. Confirm final charges before ordering.'; notifyListeners(); return true;
+  }
+  Future<bool> _saveSupplierQuoteSelections(Map<String, BuyV2SupplierQuoteSelection> next) async {
+    final store = customerStateStore, operation = Object();
+    if (store?.ownerScope == null || _supplierQuoteSaveBusy) return false;
+    final settlement = Completer<void>();
+    _supplierQuoteSettlement = settlement;
+    _supplierQuoteSaveOperation = operation; _supplierQuoteSaveBusy = true;
+    _supplierQuoteSelectionsInFlight = Map.unmodifiable(next);
+    try {
+      final saved = await _awaitPaymentWrite(_persistCustomerState());
+      if (!saved) {
+        // Supersede queued candidates in the same writer. Retired owners hand
+        // rollback to their original root, never a replacement account.
+        _supplierQuoteSelectionsInFlight = null;
+        final retired = _collectionDisposed || bulkQuotes?.active != true;
+        await _awaitPaymentWrite(_persistCustomerState(retainSupplierQuoteRollback: retired ? (store: store!, operation: operation) : null));
+        return false;
+      }
+      _supplierQuoteSelections..clear()..addAll(next);
+      return true;
+    } finally {
+      if (!settlement.isCompleted) settlement.complete();
+      if (identical(_supplierQuoteSettlement, settlement)) _supplierQuoteSettlement = null;
+      if (identical(_supplierQuoteSaveOperation, operation)) {
+        _supplierQuoteSelectionsInFlight = null; _supplierQuoteSaveBusy = false; _supplierQuoteSaveOperation = null;
+      }
+    }
+  }
+  Future<bool> removeSupplierQuote(BuyV2SupplierQuoteSelection expected) async {
+    final access = bulkQuotes;
+    if (_supplierQuoteSaveBusy || _collectionDisposed || access?.active != true || cartChangesBlocked ||
+        _supplierQuoteSelections[expected.storeId]?.quoteBinding != expected.quoteBinding) { return false; }
+    final next = Map<String, BuyV2SupplierQuoteSelection>.of(_supplierQuoteSelections)..remove(expected.storeId);
+    if (!await _saveSupplierQuoteSelections(next) || _collectionDisposed || !identical(access, bulkQuotes) ||
+        !access!.active || cartChangesBlocked) { return false; }
+    _armSupplierQuoteExpiry(); _invalidateCheckoutQuote(); _invalidateCommercialPaymentTerms(); notifyListeners(); return true;
+  }
   Set<String> get bulkQuoteRequestStores => bulkQuotes?.active != true || isStoreProcurement ? {} :
     {for (final line in cartLines) if (line.product.offerClass == BuyV2OfferClass.bulk && line.product.storeId != null) line.product.storeId!};
   List<({WorkspacePublicCatalogueEntry entry, int quantity})> _bulkQuoteSelections(String store) {
@@ -5288,6 +5445,7 @@ class BuyV2Session extends ChangeNotifier {
   @override
   void dispose() {
     _collectionDisposed = true;
+    _supplierQuoteExpiry?.cancel();
     _advertisedOfferExpiry?.cancel();
     _storeCouponExpiry?.cancel();
     storeStockReader?.removeListener(_onStoreStockChanged);
@@ -5744,6 +5902,7 @@ class BuyV2Session extends ChangeNotifier {
     final inherited = _pendingAccountStateImported ? null : await pendingAccountState;
     await _privateStarsSettlement?.future;
     await _scheduledCartSettlement?.future;
+    await _supplierQuoteSettlement?.future;
     await _consumerStateWrites;
     return _consumerPendingSnapshot ??
       (_pendingAccountStateImported ? null : inherited);
@@ -9802,7 +9961,7 @@ class BuyV2Session extends ChangeNotifier {
   }) {
     final owner = customerStateStore?.ownerScope;
     // Validate every resolved binding before replacing any live Cart state.
-    if (!snapshot.hasValidProductReportStates || !snapshot.hasValidProductStarAttempts) {
+    if (!snapshot.hasValidProductReportStates || !snapshot.hasValidProductStarAttempts || !snapshot.hasValidSupplierQuoteSelections) {
       throw const FormatException('Saved product report recovery needs checking.');
     }
     for (final entry in snapshot.cartScheduledFulfilments.entries) {
@@ -9837,6 +9996,8 @@ class BuyV2Session extends ChangeNotifier {
     _ensureProductReportOwner();
     _productReportStates..clear()..addAll(snapshot.productReportStates);
     _productStarAttempts..clear()..addAll(snapshot.productStarAttempts);
+    _supplierQuoteSelections..clear()..addAll(snapshot.supplierQuoteSelections);
+    _armSupplierQuoteExpiry();
     _productReportJournalLoadedOwner = owner;
     _ensureSupplierPolicyOwner();
     _supplierPolicyAcceptances
@@ -10227,16 +10388,21 @@ class BuyV2Session extends ChangeNotifier {
   Future<bool>? _persistCustomerState({
     Map<String, String>? supplierPolicyAcceptances,
     Map<String, BuyV2ProductStarsAttempt>? productStarAttempts,
+    Map<String, BuyV2SupplierQuoteSelection>? supplierQuoteSelections,
     void Function(bool)? written,
     ({BuyV2CustomerStateStore store, Object operation})? retainScheduledRollback,
     ({BuyV2CustomerStateStore store, Object operation})? retainStarsRollback,
+    ({BuyV2CustomerStateStore store, Object operation})? retainSupplierQuoteRollback,
   }) {
     final retainOnly = retainScheduledRollback != null && !isStoreProcurement &&
         identical(retainScheduledRollback.store, customerStateStore) &&
         identical(retainScheduledRollback.operation, _scheduledCartSave) ||
       retainStarsRollback != null && !isStoreProcurement &&
         identical(retainStarsRollback.store, customerStateStore) &&
-        identical(retainStarsRollback.operation, _privateStarsOperation);
+        identical(retainStarsRollback.operation, _privateStarsOperation) ||
+      retainSupplierQuoteRollback != null && !isStoreProcurement &&
+        identical(retainSupplierQuoteRollback.store, customerStateStore) &&
+        identical(retainSupplierQuoteRollback.operation, _supplierQuoteSaveOperation);
     if (!retainOnly && (_collectionDisposed || !procurementScopeCurrent ||
         (customerStateRecoveryPending &&
             (!_customerStateSnapshotLoaded ||
@@ -10260,6 +10426,7 @@ class BuyV2Session extends ChangeNotifier {
       reviewDrafts: Map.unmodifiable(_reviewDrafts),
       productReportStates: Map.unmodifiable(_productReportStates),
       productStarAttempts: Map.unmodifiable(productStarAttempts ?? _productStarAttempts),
+      supplierQuoteSelections: Map.unmodifiable(supplierQuoteSelections ?? _supplierQuoteSelectionsInFlight ?? _supplierQuoteSelections),
       supplierPolicyAcceptances: Map.unmodifiable(
         supplierPolicyAcceptances ??
             _supplierPolicyAcceptancesInFlight ??
@@ -10862,7 +11029,7 @@ class BuyV2Session extends ChangeNotifier {
   int get scopedItemCount =>
       cartLines.fold(0, (total, line) => total + line.quantity);
 
-  int get scopedCartTotalMinor => buyV2SumMinor(cartLines.map((line) => line.totalMinor));
+  int get scopedCartTotalMinor => buyV2SumMinor(cartLines.map(merchandiseForLine));
   int get scopedCartTotal => buyV2WholeRupees(scopedCartTotalMinor);
 
   int get scopedCartListPriceTotalMinor => buyV2SumMinor(cartLines.map((line) {
@@ -10885,7 +11052,7 @@ class BuyV2Session extends ChangeNotifier {
       if (cartLines.any((line) => line.product.destination == destination))
         destination: buyV2SumMinor(cartLines
             .where((line) => line.product.destination == destination)
-            .map((line) => line.totalMinor)),
+            .map(merchandiseForLine)),
   });
   Map<BuyV2Destination, int> get scopedCartFamilyTotals => Map.unmodifiable(
     scopedCartFamilyTotalsMinor.map((key, minor) => MapEntry(key, buyV2WholeRupees(minor))));
@@ -10901,7 +11068,7 @@ class BuyV2Session extends ChangeNotifier {
   int get checkoutItemCount =>
       checkoutLines.fold(0, (total, line) => total + line.quantity);
 
-  int get checkoutTotalMinor => buyV2SumMinor(checkoutLines.map((line) => line.totalMinor));
+  int get checkoutTotalMinor => buyV2SumMinor(checkoutLines.map((line) => merchandiseForLine(line, checkout: true)));
   int get checkoutTotal => buyV2WholeRupees(checkoutTotalMinor);
 
   List<BuyV2FulfilmentGroup> get scopedCartFulfilmentGroups =>
@@ -11685,7 +11852,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool get checkoutQuoteEnabled => checkoutQuoteAdapter != null;
-  DateTime get _checkoutQuoteNow => _checkoutStoreCouponSelections.isEmpty ? DateTime.now() : catalogueNow();
+  DateTime get _checkoutQuoteNow => _checkoutStoreCouponSelections.isEmpty && !_supplierQuoteRequired ? DateTime.now() : catalogueNow();
 
   // Keep original references authoritative while eligibility is refreshing or
   // unavailable. Collection has its own independent quote/commitment lifecycle.
@@ -11693,15 +11860,15 @@ class BuyV2Session extends ChangeNotifier {
       !collectionCheckoutSelected && collectionCheckout?.unresolved != true &&
       checkoutDestinations.any((destination) => _selectedCartBenefitRefs.containsKey(
         _cartBenefitSelectionKey(destination, BuyV2CartBenefitKind.coupon)));
-  bool get checkoutQuoteRequired => checkoutQuoteEnabled || _liveCouponQuoteRequired;
+  bool get checkoutQuoteRequired => checkoutQuoteEnabled || _liveCouponQuoteRequired || _supplierQuoteRequired;
 
   bool get checkoutQuoteBusy =>
       checkoutQuoteLoadState == BuyV2CommerceLoadState.loading;
 
   bool get checkoutQuoteReviewRequired {
-    if (_storeCouponSelectionNeedsReview) return true;
+    if (_storeCouponSelectionNeedsReview || supplierQuoteReviewRequired) return true;
     if (!checkoutQuoteEnabled) {
-      return _liveCouponQuoteRequired || checkoutLines.any((line) => line.scheduledFulfilment != null);
+      return _liveCouponQuoteRequired || _supplierQuoteRequired || checkoutLines.any((line) => line.scheduledFulfilment != null);
     }
     final quote = _checkoutQuote;
     return checkoutQuoteLoadState != BuyV2CommerceLoadState.ready ||
@@ -11738,6 +11905,13 @@ class BuyV2Session extends ChangeNotifier {
     final adapter = checkoutQuoteAdapter;
     final address = selectedAddressOrNull;
     final groups = checkoutFulfilmentGroups;
+    if (_supplierQuoteRequired && (supplierQuoteReviewRequired || adapter is! BuyV2SupplierQuoteCheckoutAdapter)) {
+      _invalidateCheckoutQuote(); _invalidateCommercialPaymentTerms();
+      checkoutQuoteLoadState = BuyV2CommerceLoadState.unavailable;
+      checkoutQuoteMessage = supplierQuoteReviewRequired ? 'Choose a current supplier quote for the selected Bulk products.'
+        : 'Final Bulk charges are not connected yet. Your Cart and agreed prices are kept.';
+      notifyListeners(); return false;
+    }
     if (adapter == null) {
       if (_liveCouponQuoteRequired) {
         _invalidateCheckoutQuote();
@@ -11800,7 +11974,14 @@ class BuyV2Session extends ChangeNotifier {
       // A synchronous loading listener may retire this owner or start a successor.
       if (!currentContext()) return false;
       if (!currentInputs()) { unavailable('Prices or choices changed. Check the total again.'); return false; }
-      final snapshot = storeCoupons.isNotEmpty ? await (adapter as BuyV2StoreCouponCheckoutQuoteAdapter).loadQuoteWithStoreCouponsMinor(
+      final supplierQuotes = _supplierQuotesForLines(checkoutLines);
+      final snapshot = supplierQuotes.isNotEmpty ? await (adapter as BuyV2SupplierQuoteCheckoutAdapter).loadQuoteWithSupplierQuotesMinor(
+        groups: List.unmodifiable(groups), address: address, selectedPaymentMethod: selectedPayment,
+        selectedBenefits: List.unmodifiable(benefits), selectedStoreCoupons: List.unmodifiable(storeCoupons),
+        supplierQuotes: supplierQuotes, tipAmountsMinorByFulfilmentKey: Map.unmodifiable({
+          for (final group in groups) group.key: buyV2ExactMinorAmount(legacyRupees: tipForGroup(group)),
+        }),
+      ) : storeCoupons.isNotEmpty ? await (adapter as BuyV2StoreCouponCheckoutQuoteAdapter).loadQuoteWithStoreCouponsMinor(
         groups: List.unmodifiable(groups), address: address, selectedPaymentMethod: selectedPayment,
         selectedBenefits: List.unmodifiable(benefits), selectedStoreCoupons: List.unmodifiable(storeCoupons),
         tipAmountsMinorByFulfilmentKey: Map.unmodifiable({
@@ -11871,6 +12052,11 @@ class BuyV2Session extends ChangeNotifier {
     }
     final groupByKey = {for (final group in groups) group.key: group};
     final selections = _checkoutStoreCouponSelections;
+    final supplierQuotes = _selectedCheckoutSupplierQuotes;
+    if (supplierQuoteReviewRequired || quote.supplierQuoteBindings.length != supplierQuotes.length ||
+        supplierQuotes.any((q) => quote.supplierQuoteBindings[q.storeId] != q.quoteBinding ||
+          quote.validUntil.isAfter(q.validUntil) || quote.evaluatedAt.isBefore(q.acceptedAt) ||
+          quote.evaluatedAt.isAfter(catalogueNow()))) { return false; }
     if (_storeCouponSelectionNeedsReview || (selections.isNotEmpty && checkoutBenefitReviewRequired) ||
         quote.storeCouponBindings.length != selections.length ||
         selections.any((value) => quote.storeCouponBindings[value.coupon.identity] != value.quoteBinding ||
@@ -11889,7 +12075,7 @@ class BuyV2Session extends ChangeNotifier {
             ? group.lines.any((item) => item.scheduledFulfilment != null)
             : !line.scheduledFulfilments!.matches(group.lines)) ||
           !line.hasValidMoney ||
-          line.itemSubtotalMinor != group.totalMinor ||
+          line.itemSubtotalMinor != _supplierQuoteGroupSubtotal(group) ||
           line.couponSavingMinor !=
               (expectedCouponSaving[line.fulfilmentKey] ?? 0) ||
           line.tipMinor != buyV2ExactMinorAmount(legacyRupees: tipForGroup(group))) {
@@ -11937,6 +12123,7 @@ class BuyV2Session extends ChangeNotifier {
       else
         null,
       selectedPayment,
+      for (final q in _selectedCheckoutSupplierQuotes) [q.storeId, q.quoteBinding],
       for (final selection in _checkoutStoreCouponSelections) selection.quoteBinding,
       for (final benefit in selectedCartBenefitsFor(cartDestinations))
         [
@@ -11995,6 +12182,7 @@ class BuyV2Session extends ChangeNotifier {
   // an older request's expiry or silently change its fee allocation after save.
   String? _checkoutQuoteAgreement(BuyV2CheckoutQuote? quote) => quote == null ? null : jsonEncode([
     quote.id, quote.sourceId, quote.evaluatedAt.toIso8601String(), quote.validUntil.toIso8601String(), quote.totalMinor,
+    for (final store in quote.supplierQuoteBindings.keys.toList()..sort()) [store, quote.supplierQuoteBindings[store]],
     for (final line in quote.lines) [line.fulfilmentKey, line.itemSubtotalMinor, line.couponSavingMinor,
       line.taxMinor, line.freightMinor, line.deliveryFeeMinor, line.tipMinor, line.paymentChargeMinor, line.totalMinor,
       if (line.scheduledFulfilments case final acknowledgement?)
@@ -12018,10 +12206,12 @@ class BuyV2Session extends ChangeNotifier {
     if (!checkoutQuoteEnabled) {
       _checkoutQuoteRequestSequence += 1;
       _checkoutQuote = null; _checkoutQuoteFingerprint = null;
-      checkoutQuoteLoadState = _liveCouponQuoteRequired
+      checkoutQuoteLoadState = _liveCouponQuoteRequired || _supplierQuoteRequired
           ? BuyV2CommerceLoadState.unavailable : BuyV2CommerceLoadState.ready;
-      checkoutQuoteMessage = _liveCouponQuoteRequired
-          ? 'Coupon savings need a confirmed Checkout total. Your Cart is unchanged.' : null;
+      checkoutQuoteMessage = _supplierQuoteRequired
+          ? 'Bulk needs a confirmed Checkout total for the accepted supplier quote. Your Cart is unchanged.'
+          : _liveCouponQuoteRequired
+              ? 'Coupon savings need a confirmed Checkout total. Your Cart is unchanged.' : null;
       return;
     }
     _checkoutQuoteRequestSequence += 1;
@@ -18006,6 +18196,7 @@ class BuyV2Session extends ChangeNotifier {
             group.key: term.id,
       }),
       checkoutQuoteId: _checkoutQuote?.id,
+      supplierQuotes: List.unmodifiable(_selectedCheckoutSupplierQuotes),
       purchaseOrderRequestId: _pendingPurchaseOrderRequestId,
       purchaseOrderRevision: _pendingPurchaseOrderRevision,
       procurementContext: procurementContext,
@@ -18088,7 +18279,7 @@ class BuyV2Session extends ChangeNotifier {
         termsAgreement != _checkoutTermsAgreement(termKeys) ||
         (originalQuote != null && (request.checkoutQuoteId != originalQuote.id ||
           !catalogueNow().isBefore(originalQuote.validUntil)));
-    if (!retained || stockChanged || !policiesCurrent ||
+    if (!retained || stockChanged || !policiesCurrent || !_supplierQuoteInputsCurrent(request) ||
         agreementChanged ||
         (request.lines.any((line) => line.scheduledFulfilment != null) &&
           (!_selectedScheduledInputsCurrent(request) || checkoutQuoteReviewRequired || originalQuote == null)) ||
@@ -18173,7 +18364,9 @@ class BuyV2Session extends ChangeNotifier {
 
   BuyV2OrderPlacementRequest? _placementRequestForAdapter(
     BuyV2OrderPlacementRequest exact, List<BuyV2FulfilmentGroup> groups, {bool grouped = false}) {
-    if (!exact.hasValidMoney) return null;
+    if (!exact.hasValidMoney || !exact.hasValidSupplierQuotes || !_supplierQuoteInputsCurrent(exact) ||
+        exact.supplierQuotes.isNotEmpty && (commerceAdapter is! BuyV2SupplierQuoteOrderPlacementAdapter ||
+          !(commerceAdapter as BuyV2SupplierQuoteOrderPlacementAdapter).supportsSupplierQuotes)) { return null; }
     if (exact.lines.any((line) => line.scheduledFulfilment != null) &&
         (!_selectedScheduledInputsCurrent(exact) || checkoutQuoteReviewRequired)) {
       return null;
@@ -18182,6 +18375,7 @@ class BuyV2Session extends ChangeNotifier {
         : commerceAdapter is BuyV2MinorOrderPlacementAdapter) {
       return exact;
     }
+    if (exact.supplierQuotes.isNotEmpty) return null;
     if (grouped && commerceAdapter is! BuyV2GroupedOrderPlacementAdapter) return null;
     final keys = groups.map((group) => group.key).toSet();
     try {
@@ -18207,6 +18401,9 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool _placementDispatchSupported(BuyV2OrderPlacementRequest request, {required bool grouped}) {
+    if (!request.hasValidSupplierQuotes || request.supplierQuotes.isNotEmpty &&
+        (commerceAdapter is! BuyV2SupplierQuoteOrderPlacementAdapter ||
+          !(commerceAdapter as BuyV2SupplierQuoteOrderPlacementAdapter).supportsSupplierQuotes)) { return false; }
     if (!request.hasValidMoney || request.lines.any((line) => !line.hasValidScheduledFulfilment) ||
         !_selectedScheduledConnectorSupported(request.lines)) {
       return false;
@@ -18365,6 +18562,8 @@ class BuyV2Session extends ChangeNotifier {
         paymentMethod: group.paymentMethod, totalMinor: group.totalMinor, amountDueNowMinor: group.amountDueNowMinor,
         idempotencyKey: '$id:${Uri.encodeComponent(group.id)}', checkoutAttemptId: id, paymentGroupId: group.id,
         checkoutQuoteId: quote.id, useUpiQr: group.amountDueNowMinor > 0 && useUpiQr,
+        supplierQuotes: List.unmodifiable(_selectedCheckoutSupplierQuotes.where((q) => selected.any((g) =>
+          g.lines.any((l) => l.product.storeId == q.storeId && l.product.offerClass == BuyV2OfferClass.bulk)))),
         commercialPaymentTermIds: Map.unmodifiable({for (final key in group.fulfilmentKeys)
           if (selectedCommercialPaymentTermFor(key) case final term?) key: term.id}),
         deliveryInstructionsByProductId: Map.unmodifiable({for (final line in selected.expand((value) => value.lines))
@@ -18651,7 +18850,7 @@ class BuyV2Session extends ChangeNotifier {
       final agreementChanged = !catalogueNow().isBefore(attempt.quoteValidUntil) ||
           quoteAgreement != _checkoutQuoteAgreement(_checkoutQuote) ||
           termsAgreement != _checkoutTermsAgreement(group.fulfilmentKeys);
-      if (stockChanged || !policiesCurrent || agreementChanged ||
+      if (stockChanged || !policiesCurrent || agreementChanged || !_supplierQuoteInputsCurrent(request) ||
           request.lines.any((line) => line.scheduledFulfilment != null) && !_selectedScheduledInputsCurrent(request)) {
         checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
         _syncCheckoutGroupState(); _checkoutIdempotencyKey = null;
@@ -18796,7 +18995,8 @@ class BuyV2Session extends ChangeNotifier {
                 line.product.destination != original.product.destination ||
                 line.product.variant != original.product.variant ||
                 line.product.pack != original.product.pack ||
-                line.product.priceMinor != original.product.priceMinor;
+                line.product.priceMinor != _frozenRequestUnitPrice(request, original) ||
+                request.supplierQuotes.isNotEmpty && line.product.publicListingIdentity != original.product.publicListingIdentity;
           })) {
         return false;
       }
@@ -18820,7 +19020,7 @@ class BuyV2Session extends ChangeNotifier {
     final request = group.request;
     if (result.checkoutAttemptId != attempt.id ||
         result.paymentGroupId != request.paymentGroupId ||
-        result.idempotencyKey != request.idempotencyKey ||
+        result.idempotencyKey != request.idempotencyKey || !_supplierQuoteResponseMatches(request, result) ||
         (group.paymentReference != null &&
             result.paymentReference != null &&
             group.paymentReference != result.paymentReference)) {
@@ -19148,6 +19348,7 @@ class BuyV2Session extends ChangeNotifier {
         _lateSettlementNeedsReview ||
         placement.checkoutAttemptId != null ||
         placement.paymentGroupId != null ||
+        !_supplierQuoteResponseMatches(attempt.payment.request, placement) ||
         (placement.idempotencyKey != null && placement.idempotencyKey != key) ||
         (_paymentReference != null &&
             placement.paymentReference != null &&

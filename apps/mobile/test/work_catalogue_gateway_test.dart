@@ -252,6 +252,39 @@ class _HostStoreCouponLegacyBenefits implements BuyV2LiveCartBenefitsAdapter {
   @override Future<BuyV2CartBenefitsSnapshot> loadEligibility(BuyV2CartBenefitsRequest request) async =>
     BuyV2CartBenefitsSnapshot(state: state, benefits: values, evaluatedAt: clock());
 }
+// Explicit nonzero host charges, not runtime tariffs or live provider evidence.
+class _HostSupplierQuoteCheckout extends _HostStoreCouponQuote implements BuyV2SupplierQuoteCheckoutAdapter {
+  int supplierCalls = 0;
+  List<BuyV2SupplierQuoteSelection> received = const [];
+  List<BuyV2StoreCouponEligibility> coupons = const [];
+  Completer<void>? pending;
+  @override Future<BuyV2CheckoutQuoteSnapshot> loadQuoteWithSupplierQuotesMinor({
+    required List<BuyV2FulfilmentGroup> groups, required BuyV2Address address, required String selectedPaymentMethod,
+    required List<BuyV2CartBenefit> selectedBenefits, required List<BuyV2StoreCouponEligibility> selectedStoreCoupons,
+    required List<BuyV2SupplierQuoteSelection> supplierQuotes, required Map<String, int> tipAmountsMinorByFulfilmentKey,
+  }) async {
+    supplierCalls++; received = supplierQuotes; coupons = selectedStoreCoupons;
+    await pending?.future;
+    final quote = supplierQuotes.single;
+    final rows = [for (final group in groups) () {
+      final items = buyV2SumMinor([for (final l in group.lines)
+        quote.lines.singleWhere((f) => f['productId'] == l.product.id)['merchandiseMinor'] as int]),
+        tips = tipAmountsMinorByFulfilmentKey[group.key] ?? 0,
+        saving = selectedStoreCoupons.isEmpty ? 0 : selectedStoreCoupons.single.savingMinor!;
+      return BuyV2CheckoutQuoteLine.minor(fulfilmentKey: group.key, itemSubtotalMinor: items, couponSavingMinor: saving,
+        taxMinor: 123, deliveryFeeMinor: 45, freightMinor: 89, paymentChargeMinor: 7, tipMinor: tips,
+        totalMinor: items - saving + 264 + tips);
+    }()];
+    return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready, quote: BuyV2CheckoutQuote.minor(
+      id: 'host-final-supplier-quote', sourceId: 'isolated-final-charges', evaluatedAt: quote.acceptedAt,
+      validUntil: mode == 'too-long' ? quote.validUntil.add(const Duration(seconds: 1)) : quote.validUntil,
+      lines: rows, totalMinor: buyV2SumMinor(rows.map((r) => r.totalMinor)),
+      supplierQuoteBindings: {if (mode != 'missing') quote.storeId: mode == 'wrong' ? 'changed' : quote.quoteBinding,
+        if (mode == 'extra') 'foreign-store': 'unrequested'},
+      storeCouponBindings: {for (final c in selectedStoreCoupons) c.coupon.identity: c.quoteBinding}));
+  }
+}
+
 class _HostCouponCartCommerce extends _HostExactOrderCommerce {
   _HostCouponCartCommerce(this.products);
   final List<BuyV2Product> products;
@@ -374,10 +407,11 @@ class _ExactMoneyHostCatalogue implements BuyV2CataloguePageSource {
   Future<List<BuyV2Product>> resolveProducts(Set<String> ids) async => rows.where((p) => ids.contains(p.id)).toList();
 }
 final class _ExactMoneyHostPreferences implements SharedPreferencesAsync {
-  _ExactMoneyHostPreferences({this.beforeSet, this.beforeWrite});
+  _ExactMoneyHostPreferences({this.beforeSet, this.beforeWrite, this.afterWrite});
   final values = <String, String>{};
   final void Function(String key, String value)? beforeSet;
   final Future<void> Function(String key, String value)? beforeWrite;
+  final void Function(String key, String value)? afterWrite;
   @override
   Future<String?> getString(String key) async => values[key];
   @override
@@ -385,6 +419,7 @@ final class _ExactMoneyHostPreferences implements SharedPreferencesAsync {
     beforeSet?.call(key, value);
     await beforeWrite?.call(key, value);
     values[key] = value;
+    afterWrite?.call(key, value);
   }
   @override
   dynamic noSuchMethod(Invocation invocation) => throw StateError('Unexpected host preferences operation');
@@ -5607,11 +5642,13 @@ void main() {
     row(data)['supplierPolicy'] = policyEnvelope();
     return data;
   }
-  AuthenticatedWorkspaceCatalogueGateway discoveryGateway(SocialContentTransport transport, {String realm = 'production', bool promotions = false, bool advertisedTerms = false, bool supplierPublishers = false}) =>
+  AuthenticatedWorkspaceCatalogueGateway discoveryGateway(SocialContentTransport transport, {String realm = 'production', bool promotions = false, bool advertisedTerms = false, bool supplierPublishers = false,
+    DateTime Function()? clock, bool coupons = false}) =>
     AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
       credentials: Credentials(), transport: transport, realm: realm, productFactsReadbackSupported: true,
       unbrandedProduceReadbackSupported: true, storeClassificationReadbackSupported: true, promotionDiscoverySupported: promotions,
-      promotionTermsSupported: advertisedTerms, supplierPublishersVersionSupported: supplierPublishers, now: () => at);
+      promotionTermsSupported: advertisedTerms, supplierPublishersVersionSupported: supplierPublishers,
+      storeCouponTermsSupported: coupons, now: clock ?? () => at);
   Map<String, dynamic> discoveryData(Map<String, Object?> body, {bool empty = false}) {
     final listing = publicPage();
     listing.addAll({'productFactsReadbackVersion': 1, 'storeClassificationReadbackVersion': 1, 'storeDetailsReadbackVersion': 1});
@@ -5683,6 +5720,301 @@ void main() {
     expect(prepared.original.body['storeId'], 'store-one'); expect((prepared.original.body['lines'] as List).single['quantity'], 10);
     expect(prepared.original.presentation!['storeName'], selected.seller); expect(prepared.current(), isTrue);
     expect(session.setCartQuantity(selected.id, '11'), isTrue, reason: session.notice); expect(prepared.current(), isFalse);
+  });
+  Future<({BuyV2Session session, BuyV2Product product, WorkspaceBulkQuote accepted,
+    WorkspaceBulkQuoteAccess access, _ExactMoneyHostPreferences preferences, VoidCallback retire, VoidCallback dispose, void Function(DateTime) time,
+    Future<WorkspaceBulkQuote> Function() replacement})>
+      supplierSelectionHost({_HostSupplierQuoteCheckout? quote, _ExactMoneyHostPreferences? preferences}) async {
+    // Controlled host discovery/agreement fixture. No phone or live-service data.
+    FlutterSecureStorage.setMockInitialValues({}); var clock = at, current = true;
+    late Map<String, dynamic> accepted;
+    final identity = BuyV2PublicListingIdentity(
+      listingId: 'listing-${sha256.convert(utf8.encode(jsonEncode([1, 'production', 'store-one', 'sku-one', 'bulk'])))}',
+      realm: 'production', storeId: 'store-one', skuId: 'sku-one', canonicalProductId: 'canonical-one', verifiedPackId: 'pack-one', channel: BuyV2OfferClass.bulk);
+    final connection = discoveryGateway(OwnerTransport((body) async {
+      if (body['operation'] == 'readBulkSupplierQuote') { return SocialContentResponse(statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': accepted})); }
+      final data = discoveryData(body), listing = (data['items'] as List).single['listing'] as Map<String, dynamic>, item = row(listing);
+      item['channels'] = [{...(item['channels'] as List).single as Map, 'kind': 'bulk', 'minimumOrder': 10, 'quantityStep': 1}];
+      item['listings'] = [identity.toJson()]; item['supplierPolicy'] = policyEnvelope(state: 'none', revision: 0);
+      (data['items'] as List).single['channel'] = 'bulk';
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    }), clock: () => clock, coupons: true);
+    final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => current), core = BuySession();
+    var sourceDisposed = false;
+    void disposeSource() { if (!sourceDisposed) { sourceDisposed = true; source.dispose(); } }
+    addTearDown(disposeSource); addTearDown(core.dispose);
+    final products = await source.loadProducts(BuyV2CatalogueQuery(destination: BuyV2Destination.wholesale,
+      regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas, wholesaleSaleType: BuyV2WholesaleSaleType.bulk), pageSize: 40);
+    final selected = products.items.single;
+    final scopedGateway = connection.forOwnerAccount('buyer-one');
+    final access = WorkspaceBulkQuoteAccess(gateway: WorkspaceBulkQuoteGateway(scopedGateway, enabled: true),
+      journal: SecureWorkBulkQuoteJournal(currentAccount: () => 'buyer-one', now: () => clock), role: 'buyer', current: () => current);
+    final prefs = preferences ?? _ExactMoneyHostPreferences();
+    late final BuyV2Session session;
+    session = BuyV2Session(core: core, bulkQuotes: access, cataloguePageSource: source, productContentAdapter: source,
+      reviewDataEnabled: false, catalogueNow: () => clock, checkoutQuoteAdapter: quote,
+      customerStateStore: BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'controlled-bulk-buyer'),
+      commerceAdapter: _HostCouponCartCommerce([selected]),
+      productFactsAdapter: _HostOperationalFacts((p) => BuyV2ProductFactsSnapshot(productId: p.id, priceMinor: p.priceMinor,
+        deliveryPromise: 'Host-only courier', partner: 'Host-only courier', orderabilityLabel: 'Host-only availability', sourceId: 'isolated-bulk-selection',
+        observedAt: at, eligibility: BuyV2OfferEligibility(productId: p.id, storeId: p.storeId!, sourceRevision: 'host-only-v1',
+          customerLocationKey: session.eligibilityLocationKey, observedAt: at, expiresAt: at.add(const Duration(hours: 1)),
+          offerClass: BuyV2OfferClass.bulk, channelEnabled: true, storeReady: true, fleetAvailable: false, customerLocationConfirmed: true,
+          options: {BuyV2DeliveryOption.courier}))));
+    var sessionDisposed = false;
+    void disposeSession() { if (!sessionDisposed) { sessionDisposed = true; session.dispose(); } }
+    addTearDown(disposeSession); await session.restoreCommerce();
+    expect(session.chooseAddress('host-home'), isTrue);
+    expect(session.addProduct(selected.id, quantity: 10), isTrue, reason: session.notice);
+    session.openCart(scope: BuyV2CartScope.wholesale); session.checkoutScope = BuyV2CartScope.wholesale;
+    accepted = (jsonDecode(jsonEncode(bulkCapture()['accepted'])) as Map).cast<String, dynamic>();
+    accepted.addAll({'realm': 'production', 'customerReference': 'customer-${_mediaHash(['production', 'store-one', 'buyer-one']).toLowerCase().substring(0, 32)}',
+      'quoteId': 'bulk-${sha256.convert(utf8.encode(jsonEncode(['production', 'buyer-one', 'controlled-request'])))}',
+      'requestedAt': at.subtract(const Duration(minutes: 1)).toIso8601String(), 'updatedAt': at.toIso8601String(),
+      'lines': [{'lineId': 'controlled-line-one', 'skuId': 'sku-one', 'listingId': identity.listingId, 'skuRevision': 1, 'quantity': 10,
+        'canonicalProductId': 'canonical-one', 'verifiedPackId': 'pack-one', 'name': selected.title, 'packLabel': selected.pack,
+        'variant': selected.variant, 'supplierPolicy': {'schemaVersion': 1, 'realm': 'production', 'storeId': 'store-one', 'skuId': 'sku-one',
+          'state': 'none', 'revision': 0, 'requiresAcceptance': false, 'policy': null}}]});
+    if (selected.variant.trim().isEmpty) (accepted['lines'][0] as Map).remove('variant');
+    accepted['offer'] = {'revision': 2, 'offeredAt': at.subtract(const Duration(seconds: 30)).toIso8601String(),
+      'validUntil': at.add(const Duration(minutes: 5)).toIso8601String(), 'merchandiseMinor': 90010,
+      'prices': [{'lineId': 'controlled-line-one', 'unitPriceMinor': 9001, 'merchandiseMinor': 90010}],
+      'policyFingerprint': _mediaHash([['controlled-line-one', accepted['lines'][0]['supplierPolicy']]]).toLowerCase()};
+    accepted['acceptance'] = {'offerRevision': 2, 'acceptedAt': at.toIso8601String(),
+      'agreementFingerprint': _mediaHash({'lines': accepted['lines'], 'offer': accepted['offer']}).toLowerCase()};
+    // The scoped transport uses its existing fixture clock; decode chronology
+    // is exactly at, not later real time and not a grant to place an order.
+    WorkspaceBulkQuote.decode(accepted, realm: 'production', now: at);
+    expect(await access.forStore('store-one').refresh(accepted['quoteId'] as String), isTrue);
+    final dto = access.forStore('store-one').head(accepted['quoteId'] as String)!;
+    return (session: session, product: selected, accepted: dto, access: access, preferences: prefs,
+      retire: () {current = false;}, dispose: () { disposeSession(); disposeSource(); }, time: (value) {clock = value;}, replacement: () async {
+        accepted = (jsonDecode(jsonEncode(accepted)) as Map).cast<String, dynamic>();
+        accepted['quoteId'] = 'bulk-${sha256.convert(utf8.encode(jsonEncode(['production', 'buyer-one', 'replacement-request'])))}';
+        expect(await access.forStore('store-one').refresh(accepted['quoteId'] as String), isTrue);
+        return access.forStore('store-one').head(accepted['quoteId'] as String)!;
+      });
+  }
+  test('LF-BULK SELECT exact Cart selection preserves product price and negotiates final charges explicitly', () async {
+    final adapter = _HostSupplierQuoteCheckout(), host = await supplierSelectionHost(quote: adapter), s = host.session;
+    expect(await s.chooseSupplierQuote(host.accepted), isTrue);
+    expect(host.product.priceMinor, 10025); expect(s.agreedUnitPriceFor(s.cartLines.single), 9001);
+    expect(s.scopedCartTotalMinor, 90010); expect(s.supplierQuoteReviewRequired, isFalse);
+    expect(await s.refreshCheckoutQuote(), isTrue, reason: s.checkoutQuoteMessage);
+    expect(s.checkoutQuote!.totalMinor, 90274); expect(adapter.supplierCalls, 1);
+    expect(adapter.minorCalls + adapter.storeCalls + adapter.legacyCalls, 0);
+    final selection = s.selectedSupplierQuotes.single, copy = selection.toJson(); copy['merchandiseMinor'] = 1;
+    expect(selection.merchandiseMinor, 90010); expect(() => selection.lines.single['quantity'] = 1, throwsUnsupportedError);
+    final saved = await s.customerStateStore!.read(); expect(saved!.supplierQuoteSelections['store-one']!.quoteBinding, selection.quoteBinding);
+    for (final mode in ['missing', 'wrong', 'extra', 'too-long']) {
+      adapter.mode = mode; expect(await s.refreshCheckoutQuote(), isFalse, reason: mode);
+    }
+    adapter.mode = 'valid'; expect(s.setCartQuantity(host.product.id, '${host.product.minimumOrder + host.product.quantityStep}'), isTrue, reason: s.notice);
+    expect(s.supplierQuoteReviewRequired, isTrue); final calls = adapter.supplierCalls;
+    expect(await s.refreshCheckoutQuote(), isFalse); expect(adapter.supplierCalls, calls);
+  });
+  test('LF-BULK SELECT storage failure and expiry cannot activate an agreement or fall back to old prices', () async {
+    var refuse = false;
+    final prefs = _ExactMoneyHostPreferences(beforeWrite: (_, _) async {if (refuse) throw StateError('isolated failed selection write');});
+    final host = await supplierSelectionHost(preferences: prefs), s = host.session;
+    refuse = true; expect(await s.chooseSupplierQuote(host.accepted), isFalse); expect(s.selectedSupplierQuotes, isEmpty);
+    refuse = false; expect(await s.chooseSupplierQuote(host.accepted), isTrue);
+    expect(await s.refreshCheckoutQuote(), isFalse); expect(s.checkoutQuoteMessage, contains('Final Bulk charges'));
+    host.time(at.add(const Duration(minutes: 5))); expect(s.supplierQuoteReviewRequired, isTrue);
+    expect(await s.refreshCheckoutQuote(), isFalse); expect(await s.chooseSupplierQuote(host.accepted), isFalse);
+  });
+  test('LF-BULK SELECT frozen original survives expiry and malformed extensions never disappear on restore', () async {
+    final host = await supplierSelectionHost(), s = host.session;
+    expect(await s.chooseSupplierQuote(host.accepted), isTrue); final selected = s.selectedSupplierQuotes.single;
+    final request = BuyV2OrderPlacementRequest.minor(lines: List.unmodifiable(s.cartLines), address: s.selectedAddressOrNull!,
+      paymentMethod: 'UPI', totalMinor: 90274, amountDueNowMinor: 90274, idempotencyKey: 'controlled-original-request',
+      checkoutQuoteId: 'host-final-supplier-quote', supplierQuotes: [selected]);
+    final original = BuyV2LegacyCheckoutAttempt(ownerScope: s.customerStateStore!.ownerScope!, payment: BuyV2CheckoutGroupAttempt(
+      request: request, fulfilmentKeys: const {'controlled-fulfilment'}, state: BuyV2CheckoutSubmissionState.paymentUnknown,
+      obligations: [BuyV2CheckoutFulfilmentObligation(fulfilmentKey: 'controlled-fulfilment', productIds: {host.product.id},
+        totalMinor: 90274, dueNowMinor: 90274)]));
+    expect(await s.customerStateStore!.write(BuyV2CustomerStateSnapshot(legacyCheckoutAttempt: original,
+      supplierQuoteSelections: {'store-one': selected})), isTrue);
+    host.time(at.add(const Duration(days: 1)));
+    final fresh = BuyV2SharedPreferencesCustomerStateStore(host.preferences, ownerScope: 'controlled-bulk-buyer');
+    final restored = await fresh.read();
+    expect(restored!.legacyCheckoutAttempt!.payment.request.supplierQuotes.single.quoteBinding, selected.quoteBinding);
+    final key = host.preferences.values.keys.single, raw = jsonDecode(host.preferences.values[key]!) as Map;
+    (raw['legacyCheckoutAttempt']['payment']['request']['supplierQuotes'][0] as Map).remove('lines');
+    host.preferences.values[key] = jsonEncode(raw);
+    await expectLater(fresh.read(), throwsFormatException);
+    expect(host.preferences.values[key], jsonEncode(raw));
+  });
+  for (final removing in [false, true]) {
+    test('LF-BULK SELECT concurrent Cart save cannot erase or resurrect selection removing=$removing', () async {
+      var armed = false, intercepted = false;
+      final entered = Completer<void>(), release = Completer<void>(), cartWritten = Completer<void>();
+      final prefs = _ExactMoneyHostPreferences(beforeWrite: (_, value) async {
+        if (armed && !intercepted) {intercepted = true; entered.complete(); await release.future;}
+      }, afterWrite: (_, value) {
+        final raw = jsonDecode(value) as Map, cart = raw['cartQuantities'] as Map;
+        if (armed && cart.values.contains(11) && !cartWritten.isCompleted) cartWritten.complete();
+      });
+      final host = await supplierSelectionHost(preferences: prefs), s = host.session;
+      if (removing) expect(await s.chooseSupplierQuote(host.accepted), isTrue);
+      final expected = s.selectedSupplierQuotes.firstOrNull;
+      armed = true;
+      final saving = removing ? s.removeSupplierQuote(expected!) : s.chooseSupplierQuote(host.accepted);
+      await entered.future;
+      expect(s.setCartQuantity(host.product.id, '11'), isTrue, reason: s.notice);
+      release.complete(); await saving; await cartWritten.future;
+      final restored = await s.customerStateStore!.read();
+      expect(restored!.cartQuantities[host.product.id], 11);
+      expect(restored.supplierQuoteSelections.isEmpty, removing);
+      expect(s.selectedSupplierQuotes.isEmpty, removing);
+      expect(s.supplierQuoteReviewRequired, isTrue);
+    });
+  }
+  test('LF-BULK SELECT captured Remove A cannot clear replacement B', () async {
+    final host = await supplierSelectionHost(), s = host.session;
+    expect(await s.chooseSupplierQuote(host.accepted), isTrue); final first = s.selectedSupplierQuotes.single;
+    final next = await host.replacement(); expect(await s.chooseSupplierQuote(next), isTrue);
+    final replacement = s.selectedSupplierQuotes.single;
+    expect(replacement.quoteBinding, isNot(first.quoteBinding));
+    expect(await s.removeSupplierQuote(first), isFalse); expect(s.selectedSupplierQuotes.single.quoteBinding, replacement.quoteBinding);
+    expect(await s.removeSupplierQuote(replacement), isTrue); expect(s.selectedSupplierQuotes, isEmpty);
+  });
+  test('LF-BULK SELECT retirement during save retains only the original owner preference and cannot activate it', () async {
+    var armed = false;
+    final entered = Completer<void>(), release = Completer<void>();
+    final prefs = _ExactMoneyHostPreferences(beforeWrite: (_, _) async {
+      if (armed) {armed = false; entered.complete(); await release.future;}
+    });
+    final host = await supplierSelectionHost(preferences: prefs); armed = true;
+    final saving = host.session.chooseSupplierQuote(host.accepted); await entered.future;
+    host.retire(); release.complete(); expect(await saving, isFalse);
+    expect(host.session.supplierQuoteReviewRequired, isTrue);
+    final other = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'another-buyer');
+    expect(await other.read(), isNull);
+  });
+  test('LF-BULK SELECT handback waits for failed candidate rollback and retains concurrent Cart edits', () async {
+    var armed = false;
+    final entered = Completer<void>(), release = Completer<void>();
+    final prefs = _ExactMoneyHostPreferences(beforeWrite: (_, _) async {
+      if (armed) {armed = false; entered.complete(); await release.future; throw StateError('Host failed save');}
+    });
+    final host = await supplierSelectionHost(preferences: prefs), s = host.session;
+    armed = true; final saving = s.chooseSupplierQuote(host.accepted); await entered.future;
+    expect(s.setCartQuantity(host.product.id, '11'), isTrue);
+    host.retire(); final handback = s.retainedAccountState(); release.complete();
+    final retained = await handback;
+    expect(await saving, isFalse); expect(retained!.supplierQuoteSelections, isEmpty);
+    expect(retained.cartQuantities[host.product.id], 11);
+  });
+  for (final replaced in [false, true]) {
+    testWidgets('LF-BULK SELECT confirmed Use action respects current surface callback replaced=$replaced', (tester) async {
+      final host = await supplierSelectionHost();
+      final intent = WorkspaceBulkQuoteIntent.decode({'schemaVersion': 1, 'account': 'buyer-one', 'realm': 'production',
+        'kind': 'request', 'body': {'schemaVersion': 1, 'requestId': 'controlled-request', 'storeId': 'store-one', 'lines': [
+          for (final line in host.accepted.lines) {for (final key in ['lineId', 'skuId', 'listingId', 'skuRevision', 'quantity']) key: line.identity[key]},
+        ]}, 'base': null, 'expected': [for (final line in host.accepted.lines) line.identity]},
+        account: 'buyer-one', realm: 'production', now: at);
+      var closed = false, calls = 0;
+      Future<bool> use(WorkspaceBulkQuote quote) async {calls++; return host.session.chooseSupplierQuote(quote);}
+      Future<bool> replacement(WorkspaceBulkQuote _) async {calls++; return false;}
+      Widget page(Future<bool> Function(WorkspaceBulkQuote) callback) => MaterialApp(theme: MoolTheme.light(),
+        home: Scaffold(body: WorkspaceBulkQuotes(access: host.access, request: intent, onUseForCart: callback, onClose: () {closed = true;})));
+      await tester.pumpWidget(page(use)); await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Use for this Cart')); await tester.tap(find.text('Use for this Cart'));
+      await tester.pumpAndSettle(); expect(find.text('Use these prices for this Cart?'), findsOneWidget);
+      if (replaced) await tester.pumpWidget(page(replacement));
+      await tester.tap(find.text('Confirm')); await tester.pumpAndSettle();
+      expect(calls, replaced ? 0 : 1); expect(closed, !replaced);
+      expect(host.session.selectedSupplierQuotes.isNotEmpty, !replaced);
+      await tester.pumpWidget(const SizedBox.shrink()); host.dispose();
+      expect(tester.takeException(), isNull);
+    });
+  }
+  for (final grouped in [false, true]) {
+    for (final fault in ['none', 'catalogue-price', 'missing-binding', 'wrong-binding']) {
+      test('LF-BULK SELECT original confirmation grouped=$grouped fault=$fault preserves agreed price after expiry', () async {
+        final host = await supplierSelectionHost(), s = host.session;
+        expect(await s.chooseSupplierQuote(host.accepted), isTrue);
+        final selection = s.selectedSupplierQuotes.single, line = s.cartLines.single;
+        final request = BuyV2OrderPlacementRequest.minor(lines: [line], address: s.selectedAddressOrNull!,
+          paymentMethod: 'UPI', idempotencyKey: 'host-original-key', totalMinor: 90274, amountDueNowMinor: 90274,
+          checkoutAttemptId: grouped ? 'host-original-attempt' : null, paymentGroupId: grouped ? 'host-original-group' : null,
+          checkoutQuoteId: 'host-original-quote', supplierQuotes: [selection]);
+        final payment = BuyV2CheckoutGroupAttempt(request: request, fulfilmentKeys: const {'host-original-fulfilment'},
+          obligations: [BuyV2CheckoutFulfilmentObligation(fulfilmentKey: 'host-original-fulfilment',
+            productIds: {line.product.id}, totalMinor: 90274, dueNowMinor: 90274)],
+          state: BuyV2CheckoutSubmissionState.paymentUnknown, paymentReference: 'host-original-reference');
+        final store = BuyV2SharedPreferencesCustomerStateStore(_ExactMoneyHostPreferences(), ownerScope: 'bulk-original-owner');
+        expect(await store.write(BuyV2CustomerStateSnapshot(cartQuantities: {line.product.id: 10},
+          checkoutIdempotencyKey: 'host-original-key',
+          legacyCheckoutAttempt: grouped ? null : BuyV2LegacyCheckoutAttempt(ownerScope: store.ownerScope, payment: payment),
+          checkoutPaymentAttempt: grouped ? BuyV2CheckoutPaymentAttempt(id: 'host-original-attempt', ownerScope: store.ownerScope,
+            quoteValidUntil: at.add(const Duration(minutes: 5)), groups: [payment]) : null)), isTrue);
+        final order = BuyV2Order.minor(id: 'bulk-original-order', purchaseId: 'bulk-original-purchase',
+          destination: line.product.destination, title: 'Host agreed purchase', itemSummary: 'Ten host packs',
+          totalMinor: 90274, partner: line.product.seller, partnerType: 'Host supplier', promise: 'Host delivery',
+          destinationLabel: request.address.shortLine, recipient: request.address.recipient, addressLine: request.address.line,
+          paymentMethod: request.paymentMethod, progress: 0, status: BuyV2OrderStatus.preparing,
+          productIds: [line.product.id], lines: [BuyV2CartLine(product: line.product.copyWith(
+            priceMinor: fault == 'catalogue-price' ? 10025 : 9001), quantity: 10)],
+          amountPaidNowMinor: 90274, balanceDueMinor: 0, taxMinor: 123, freightMinor: 89, deliveryFeeMinor: 45, paymentChargeMinor: 7);
+        final commerce = _HostExactOrderCommerce()..reconciliation = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.confirmed, customerMessage: 'Host original readback', orders: [order],
+          purchaseReference: 'bulk-original-purchase', paymentReference: 'host-original-reference', idempotencyKey: 'host-original-key',
+          checkoutAttemptId: grouped ? 'host-original-attempt' : null, paymentGroupId: grouped ? 'host-original-group' : null,
+          supplierQuoteBindings: fault == 'missing-binding' ? const {} : {'store-one': fault == 'wrong-binding' ? 'wrong' : selection.quoteBinding});
+        final core = BuySession();
+        final restored = BuyV2Session(core: core, commerceAdapter: commerce,
+          customerStateStore: store, cataloguePageSource: _ExactMoneyHostCatalogue()..rows.add(host.product),
+          reviewDataEnabled: true, catalogueNow: () => at.add(const Duration(days: 1)));
+        addTearDown(core.dispose); addTearDown(restored.dispose);
+        await restored.restoreCustomerState(restoreBrowsing: false);
+        expect(await restored.reconcilePayment(), fault == 'none', reason: restored.notice);
+        expect(commerce.placementCalls, 0); expect(commerce.reconciliationCalls, 1);
+        if (fault == 'none') {
+          expect(restored.orders.firstWhere((o) => o.id == order.id).lines.single.product.priceMinor, 9001);
+          expect(restored.quantityFor(line.product.id), 0);
+        } else {
+          expect(restored.checkoutRequiresResolution, isTrue);
+          expect(restored.orders.any((o) => o.id == order.id), isFalse);
+          expect(restored.quantityFor(line.product.id), 10);
+        }
+      });
+    }
+  }
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF-BULK SELECT Cart quote surface and stale Remove stay owner-scoped text=$scale', (tester) async {
+      final host = await supplierSelectionHost();
+      expect(await host.session.chooseSupplierQuote(host.accepted), isTrue);
+      Widget page(BuyV2Session owner) => MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+        MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+        home: Scaffold(body: BuyV2CartView(session: owner, onBrowseMore: () {})));
+      await tester.pumpWidget(page(host.session)); await tester.pumpAndSettle();
+      final selected = find.byKey(const ValueKey('buy-selected-supplier-quote-store-one'));
+      expect(selected, findsOneWidget);
+      expect(find.textContaining('Agreed product prices'), findsOneWidget);
+      final oldRemove = tester.widget<IconButton>(find.byWidgetPredicate((w) => w is IconButton &&
+        w.tooltip == 'Remove selected supplier quote')).onPressed!;
+      final successor = await supplierSelectionHost();
+      expect(await successor.session.chooseSupplierQuote(successor.accepted), isTrue);
+      await tester.pumpWidget(page(successor.session)); await tester.pumpAndSettle();
+      oldRemove(); await tester.pumpAndSettle();
+      expect(successor.session.selectedSupplierQuotes, hasLength(1));
+      expect(host.session.selectedSupplierQuotes, hasLength(1));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink()); host.dispose(); successor.dispose();
+    });
+  }
+  testWidgets('LF-BULK SELECT coupon refresh cannot suppress passive agreement expiry', (tester) async {
+    final host = await supplierSelectionHost(), s = host.session;
+    expect(await s.chooseSupplierQuote(host.accepted), isTrue);
+    await s.refreshPublishedStoreCoupons(host.product.id);
+    var notified = false; s.addListener(() {notified = true;});
+    host.time(at.add(const Duration(minutes: 5)));
+    await tester.pump(const Duration(minutes: 5));
+    expect(notified, isTrue); expect(s.supplierQuoteReviewRequired, isTrue);
+    host.dispose(); await tester.pumpWidget(const SizedBox.shrink());
   });
   for (final fault in ['realm', 'query', 'kind', 'Store', 'count', 'duplicate', 'future', 'version', 'binding']) {
     test('LF-DISCOVERY client rejects mismatched public response $fault', () async {

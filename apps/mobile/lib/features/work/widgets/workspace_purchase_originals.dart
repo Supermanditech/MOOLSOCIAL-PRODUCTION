@@ -8,13 +8,14 @@ import '../work_catalogue_gateway.dart';
 /// Shared quotation surface, deliberately separate from purchased orders.
 class WorkspaceBulkQuotes extends StatefulWidget {
   const WorkspaceBulkQuotes({super.key, required this.access, this.storeId, this.onClose,
-    this.request, this.requestLines = const [], this.inputCurrent});
+    this.request, this.requestLines = const [], this.inputCurrent, this.onUseForCart});
   final WorkspaceBulkQuoteAccess access;
   final String? storeId;
   final VoidCallback? onClose;
   final WorkspaceBulkQuoteIntent? request;
   final List<({String name, String pack, String? variant, int quantity})> requestLines;
   final bool Function()? inputCurrent;
+  final Future<bool> Function(WorkspaceBulkQuote)? onUseForCart;
   @override State<WorkspaceBulkQuotes> createState() => _WorkspaceBulkQuotesState();
 }
 
@@ -50,8 +51,8 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
   }
   void _armExpiry() {
     _expiry?.cancel(); final quote = controller?.head(_quoteId ?? ''), generation = _generation;
-    if (quote?.state != 'offered') return;
-    final delay = quote!.validUntil!.difference(access.gateway.gateway.now().toUtc());
+    if (quote == null || !{'offered', 'accepted'}.contains(quote.state)) return;
+    final delay = quote.validUntil!.difference(access.gateway.gateway.now().toUtc());
     if (delay.isNegative) return;
     _expiry = Timer(delay, () { if (_current(generation)) setState(() { _termsAccepted = false; }); });
   }
@@ -106,6 +107,26 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
     builder: (dialog) => AlertDialog(title: Text(title), content: Text(body), scrollable: true,
       actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Not now')),
         FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Confirm'))])) == true;
+  Future<void> _useForCart(WorkspaceBulkQuote quote, Object visit, Future<bool> Function(WorkspaceBulkQuote) callback) async {
+    final originalAccess = access, generation = _generation;
+    bool current() => _current(generation) && identical(_detailVisit, visit) && identical(access, originalAccess) &&
+      identical(widget.onUseForCart, callback) && _quoteId == quote.quoteId && _store == quote.storeId &&
+      jsonEncode(controller?.head(quote.quoteId)?.toJson()) == jsonEncode(quote.toJson()) &&
+      quote.accepted && quote.validUntil?.isAfter(access.gateway.gateway.now().toUtc()) == true;
+    if (_acting || !current()) return;
+    setState(() { _acting = true; _error = null; });
+    try {
+      if (!await _confirm('Use these prices for this Cart?',
+        'The exact products and quantities must match. Final charges and payment terms are confirmed at Checkout. No order or payment is made now.') || !current()) { return; }
+      setState(() { _sending = true; });
+      final saved = await callback(quote);
+      if (!current()) return;
+      if (saved) { widget.onClose?.call(); }
+      else { setState(() { _error = 'These prices could not be selected. Check the Cart quantities and refresh the quote.'; }); }
+    } catch (_) {
+      if (current()) setState(() { _error = 'These prices could not be saved for your Cart. Please try again.'; });
+    } finally { if (_current(generation)) setState(() { _acting = false; _sending = false; }); }
+  }
   WorkspaceBulkQuoteIntent _command(WorkspaceBulkQuote quote, String kind, {Map<String, dynamic> fields = const {}}) {
     final key = '$kind-${List.generate(16, (_) => math.Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
     return WorkspaceBulkQuoteIntent.decode({'schemaVersion': 1, 'account': access.account, 'realm': access.realm, 'kind': kind,
@@ -159,7 +180,7 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
     'accepted' => 'Prices agreed', 'withdrawn' => 'Closed', _ => 'Check status'};
   Widget _detail() {
     final owner = controller!, quote = owner.head(_quoteId!), request = widget.request;
-    final visit = _detailVisit;
+    final visit = _detailVisit, useForCart = widget.onUseForCart;
     final pending = owner.pending.where((p) => p.quoteId == _quoteId).toList();
     final isNew = quote == null && pending.isEmpty && request?.quoteId == _quoteId;
     final original = pending.firstOrNull ?? (request?.quoteId == _quoteId ? request : null);
@@ -186,6 +207,8 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
         for (final policy in policies.values) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text('${policy['title']}\n${policy['body']}')),
         if (quote.state == 'accepted') const Padding(padding: EdgeInsets.symmetric(vertical: 8),
           child: Text('Prices agreed. This is not a placed order. Final tax, delivery charges and permitted payment terms must be confirmed before ordering.')),
+        if (quote.accepted && quote.validUntil?.isAfter(access.gateway.gateway.now().toUtc()) != true && widget.onUseForCart != null)
+          const Text('This quote has expired. Request a fresh quote from the supplier.'),
       ] else if (presentation != null) ...[
         for (final row in presentation['lines'] as List) ListTile(contentPadding: EdgeInsets.zero,
           title: Text(row['name'] as String), subtitle: Text([if (row['variant'] != null) row['variant'] as String,
@@ -202,6 +225,9 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
           title: const Text('I have read the supplier terms shown above.')),
       const SizedBox(height: 8),
       Wrap(spacing: 8, runSpacing: 8, children: [
+        if (quote?.accepted == true && access.role == 'buyer' && useForCart != null)
+          FilledButton(onPressed: _acting || quote!.validUntil?.isAfter(access.gateway.gateway.now().toUtc()) != true
+            ? null : () => _useForCart(quote, visit, useForCart), child: const Text('Use for this Cart')),
         if (isNew) FilledButton(onPressed: _acting || owner.busy || owner.pending.isNotEmpty ? null : () => _act('request', visit: visit, original: request), child: const Text('Request prices')),
         if (isNew && owner.pending.isNotEmpty) TextButton(onPressed: _acting ? null : () => _open(owner.pending.first.storeId, owner.pending.first.quoteId), child: const Text('View earlier unconfirmed request')),
         if (quote != null && pending.isEmpty && {'requested', 'offered'}.contains(quote.state) && access.role == 'supplier')

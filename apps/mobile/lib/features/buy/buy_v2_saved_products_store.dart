@@ -331,6 +331,7 @@ class BuyV2CustomerStateSnapshot {
     this.reviewDrafts = const {},
     this.productReportStates = const {},
     this.productStarAttempts = const {},
+    this.supplierQuoteSelections = const {},
     this.supplierPolicyAcceptances = const {},
     this.supplierPolicyRequiredProductKeys = const {},
     this.supplierPolicyUnresolvedProductKeys = const {},
@@ -382,6 +383,9 @@ class BuyV2CustomerStateSnapshot {
   /// Local original-owner retry protection, not moderation/publication state.
   final Map<String, String> productReportStates;
   final Map<String, BuyV2ProductStarsAttempt> productStarAttempts;
+  final Map<String, BuyV2SupplierQuoteSelection> supplierQuoteSelections;
+  bool get hasValidSupplierQuoteSelections => supplierQuoteSelections.length <= 10 &&
+    supplierQuoteSelections.entries.every((entry) => entry.key == entry.value.storeId);
   bool get hasValidProductStarAttempts => productStarAttempts.length <= 100 &&
     productStarAttempts.entries.every((entry) => entry.key == entry.value.targetId);
   bool get hasValidProductReportStates => productReportStates.entries.every((entry) {
@@ -530,7 +534,8 @@ final class BuyV2SharedPreferencesCustomerStateStore
       final hasSupplyRecovery = decoded.containsKey('orderSupplyCheckpoints') ||
           decoded['orders'] is List && (decoded['orders'] as List).any(
             (order) => order is Map && order.containsKey('supplyProgress'));
-      if (invalidDraft && (decoded.containsKey('productReportStates') || decoded.containsKey('productStarAttempts') || hasSupplyRecovery)) {
+      if (invalidDraft && (decoded.containsKey('productReportStates') || decoded.containsKey('productStarAttempts') ||
+          decoded.containsKey('supplierQuoteSelections') || hasSupplyRecovery)) {
         // An unreadable draft cannot discard supplied order/report recovery.
         throw const FormatException('Saved purchase and order recovery need checking.');
       }
@@ -554,7 +559,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
     if (!_ownerCurrent) return false;
-    if (!snapshot.hasValidProductReportStates || !snapshot.hasValidProductStarAttempts) return false;
+    if (!snapshot.hasValidProductReportStates || !snapshot.hasValidProductStarAttempts || !snapshot.hasValidSupplierQuoteSelections) return false;
     if (!_validSupplyCache(snapshot)) return false;
     try {
       for (final order in snapshot.orders.where(_hasInvoiceContext)) {
@@ -630,6 +635,8 @@ final class BuyV2SharedPreferencesCustomerStateStore
       'productStarAttempts': {'version': 1, 'records': {
         for (final entry in snapshot.productStarAttempts.entries) entry.key: entry.value.toJson(),
       }},
+    if (snapshot.supplierQuoteSelections.isNotEmpty) 'supplierQuoteSelections': {
+      for (final entry in snapshot.supplierQuoteSelections.entries) entry.key: entry.value.toJson()},
     'supplierPolicyAcceptances': snapshot.supplierPolicyAcceptances,
     'supplierPolicyUnresolvedProductKeys': snapshot.supplierPolicyUnresolvedProductKeys.toList(),
     'supplierPolicyRequiredProductKeys': snapshot
@@ -773,6 +780,8 @@ final class BuyV2SharedPreferencesCustomerStateStore
         ? _decodeProductReportStates(source['productReportStates']) : const {},
     productStarAttempts: source.containsKey('productStarAttempts')
         ? _decodeProductStarAttempts(source['productStarAttempts']) : const {},
+    supplierQuoteSelections: source.containsKey('supplierQuoteSelections')
+        ? _decodeSupplierQuoteSelections(source['supplierQuoteSelections']) : const {},
     supplierPolicyAcceptances: _stringMap(source['supplierPolicyAcceptances']),
     supplierPolicyUnresolvedProductKeys: _unresolvedPolicyKeys(source['supplierPolicyUnresolvedProductKeys']),
     supplierPolicyRequiredProductKeys: _stringList(
@@ -885,7 +894,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
   }
 
   Map<String, Object?> _encodeFrozenPayment(BuyV2CheckoutGroupAttempt group, {bool minorAmounts = false}) {
-    if (!group.request.hasValidMoney) throw const FormatException('Original payment amounts are invalid.');
+    if (!group.request.hasValidMoney || !group.request.hasValidSupplierQuotes) throw const FormatException('Original payment amounts or agreement are invalid.');
     if (minorAmounts && !group.hasValidObligations) {
       throw const FormatException('Original exact payment obligations are invalid.');
     }
@@ -924,6 +933,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
           'deliveryInstructionsByProductId':
               group.request.deliveryInstructionsByProductId,
           'checkoutQuoteId': group.request.checkoutQuoteId,
+          if (group.request.supplierQuotes.isNotEmpty) 'supplierQuotes': [for (final quote in group.request.supplierQuotes) quote.toJson()],
           'purchaseOrderRequestId': group.request.purchaseOrderRequestId,
           'purchaseOrderRevision': group.request.purchaseOrderRevision,
           'useUpiQr': group.request.useUpiQr,
@@ -976,6 +986,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
   static BuyV2OrderPlacementRequest _restoreFrozenRequest(
     Map<String, Object?> raw, List<BuyV2CartLine> lines, BuyV2Address address,
     ({int total, int due}) money, {required bool minorAmounts}) {
+    final quotes = raw.containsKey('supplierQuotes') ? _decodeFrozenSupplierQuotes(raw['supplierQuotes'], lines) : const <BuyV2SupplierQuoteSelection>[];
     if (minorAmounts) {
       return BuyV2OrderPlacementRequest.minor(
         lines: List.unmodifiable(lines), address: address, paymentMethod: _string(raw['paymentMethod'])!,
@@ -984,6 +995,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
         commercialPaymentTermIds: Map.unmodifiable(_stringMap(raw['commercialPaymentTermIds'])),
         deliveryInstructionsByProductId: Map.unmodifiable(_stringMap(raw['deliveryInstructionsByProductId'])),
         checkoutQuoteId: _string(raw['checkoutQuoteId']),
+        supplierQuotes: quotes,
         purchaseOrderRequestId: _string(raw['purchaseOrderRequestId']),
         purchaseOrderRevision: _string(raw['purchaseOrderRevision']),
         procurementContext: _decodeProcurementContext(raw['procurementContext']),
@@ -996,10 +1008,33 @@ final class BuyV2SharedPreferencesCustomerStateStore
       commercialPaymentTermIds: Map.unmodifiable(_stringMap(raw['commercialPaymentTermIds'])),
       deliveryInstructionsByProductId: Map.unmodifiable(_stringMap(raw['deliveryInstructionsByProductId'])),
       checkoutQuoteId: _string(raw['checkoutQuoteId']),
+      supplierQuotes: quotes,
       purchaseOrderRequestId: _string(raw['purchaseOrderRequestId']),
       purchaseOrderRevision: _string(raw['purchaseOrderRevision']),
       procurementContext: _decodeProcurementContext(raw['procurementContext']),
       checkoutAttemptId: _string(raw['checkoutAttemptId']), paymentGroupId: _string(raw['paymentGroupId']));
+  }
+
+  static Map<String, BuyV2SupplierQuoteSelection> _decodeSupplierQuoteSelections(Object? value) {
+    if (value is! Map || value.length > 10 || value.keys.any((key) => key is! String)) {
+      throw const FormatException('Saved supplier selections need checking.');
+    }
+    final result = <String, BuyV2SupplierQuoteSelection>{};
+    for (final entry in value.entries) {
+      final quote = BuyV2SupplierQuoteSelection.fromJson(entry.value);
+      if (entry.key != quote.storeId) throw const FormatException('Saved supplier selection scope changed.');
+      result[entry.key as String] = quote;
+    }
+    return Map.unmodifiable(result);
+  }
+
+  static List<BuyV2SupplierQuoteSelection> _decodeFrozenSupplierQuotes(Object? value, List<BuyV2CartLine> lines) {
+    if (value is! List || value.length > 10) throw const FormatException('Original supplier agreement needs checking.');
+    final quotes = value.map(BuyV2SupplierQuoteSelection.fromJson).toList(), stores = <String>{};
+    if (quotes.any((quote) => !stores.add(quote.storeId) || !quote.matchesLines(lines))) {
+      throw const FormatException('Original supplier agreement lines changed.');
+    }
+    return List.unmodifiable(quotes);
   }
 
   BuyV2LegacyCheckoutAttempt? _decodeLegacyAttempt(Object? value) {
