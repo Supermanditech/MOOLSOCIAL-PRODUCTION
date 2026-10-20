@@ -469,7 +469,8 @@ export interface WorkspaceCatalogueRepository {
   publicListingBindings?(record: StoreSkuRecord): Promise<PublicCatalogueListingBinding[] | undefined>;
   confirmPublicListingSnapshot?(storeId: string, records: readonly StoreSkuRecord[],
     identity: CatalogueIdentity, catalogueFingerprint: string, detailsFingerprint?: string): Promise<WorkspaceProfileRecord | undefined>;
-  publicCatalogueSource?(storeId: string, identity: CatalogueIdentity, includeFamilies?: boolean): Promise<PublicCatalogueSource | undefined>;
+  publicCatalogueSource?(storeId: string, identity: CatalogueIdentity, includeFamilies?: boolean,
+    existingTransaction?: Transaction, selectedSkuIds?: readonly string[]): Promise<PublicCatalogueSource | undefined>;
   readStorePublicDetails?(storeId: string, ownerUserId?: string): Promise<StorePublicDetailsRecord | undefined>;
   saveStorePublicDetails?(command: StorePublicDetailsCommand): Promise<StorePublicDetailsRecord>;
   reconcileStorePublicDetails?(command: StorePublicDetailsCommand): Promise<StorePublicDetailsRecord | undefined>;
@@ -923,6 +924,21 @@ export class WorkspaceCatalogueService {
     private readonly identity?: CatalogueIdentity,
     private readonly now: () => Date = () => new Date(),
     private readonly policyReader?: Pick<WorkspaceSupplierPolicyService, "forPublicSku">) {}
+
+  /** Internal coupon price projection from the caller's read transaction.
+   * Selected SKU reads do not scan/truncate a larger Store catalogue. */
+  async couponPriceSnapshot(storeId: string, skuIds: readonly string[], tx: Transaction): Promise<object[]> {
+    storeId = id(storeId);
+    const selected = skuIds.map(id);
+    if (!selected.length || selected.length > 100 || new Set(selected).size !== selected.length) invalid();
+    if (!this.identity || !this.repository.publicCatalogueSource) invalid("Coupon price source is unavailable.");
+    const source = await this.repository.publicCatalogueSource(storeId, this.identity, false, tx, selected);
+    if (!source) invalid("Coupon price source is unavailable.");
+    return Promise.all(selected.map(skuId => this.publicCatalogue({storeId, skuId,
+      listingReadbackVersion: 1, mediaReadbackVersion: 1, productFactsReadbackVersion: 1,
+      unbrandedProduceReadbackVersion: 1, supplierPublishersVersion: 1},
+      {...source, records: source.records.filter(record => record.skuId === skuId)})));
+  }
 
   /** Privileged caller facade. HTTP activation is default-off. Current authority
    * is checked by the existing repository transaction, including receipt replay.
@@ -3434,13 +3450,18 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
         coveredFrom: from, coveredUntil: until, count: events.size, visitors: visitors.size};
     });
   }
-  async publicCatalogueSource(storeId: string, identity: CatalogueIdentity, includeFamilies = false, existingTransaction?: Transaction): Promise<PublicCatalogueSource | undefined> {
+  async publicCatalogueSource(storeId: string, identity: CatalogueIdentity, includeFamilies = false,
+    existingTransaction?: Transaction, selectedSkuIds?: readonly string[]): Promise<PublicCatalogueSource | undefined> {
     storeId = id(storeId);
+    const selected = selectedSkuIds?.map(id).sort();
+    if (selected && (!selected.length || selected.length > 100 || new Set(selected).size !== selected.length || includeFamilies)) invalid();
     const load = async (transaction: Transaction): Promise<PublicCatalogueSource | undefined> => {
       const [profiles, catalogueDoc, skuDocs, policyDoc, detailsDoc] = await Promise.all([
         transaction.get(this.firestore.collection("workspaceProfiles").where("workspaceId", "==", storeId).limit(2)),
         transaction.get(this.firestore.collection("workspaceCatalogues").doc(this.realm).collection("canonicalCatalogues").doc(id(identity.catalogueId))),
-        transaction.get(this.root(storeId).collection("skus").orderBy(FieldPath.documentId()).limit(501)),
+        selected ? transaction.getAll(...selected.map(skuId => this.root(storeId).collection("skus").doc(skuId)))
+          .then(docs => ({docs: docs.filter(doc => doc.exists), size: docs.filter(doc => doc.exists).length}))
+          : transaction.get(this.root(storeId).collection("skus").orderBy(FieldPath.documentId()).limit(501)),
         transaction.get(this.root(storeId).collection("supplierPolicies").doc("current")),
         transaction.get(this.detailsHead(storeId)),
       ]);

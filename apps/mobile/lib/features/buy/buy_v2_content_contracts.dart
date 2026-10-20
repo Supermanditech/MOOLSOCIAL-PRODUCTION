@@ -586,6 +586,323 @@ abstract interface class BuyV2StoreCouponSource {
   Future<List<BuyV2PublishedStoreCoupon>> loadStoreCoupons({required String storeId});
 }
 
+/// Separate from destination-scoped legacy benefits. One checked replacement
+/// candidate spans this Store's selected Retail/Wholesale/Bulk lines.
+abstract interface class BuyV2StoreCouponEligibilitySource {
+  bool get storeCouponEligibilityActive;
+  Future<BuyV2StoreCouponEligibility> evaluateStoreCoupon({
+    required BuyV2PublishedStoreCoupon coupon,
+    required List<BuyV2CartLine> lines,
+    required bool Function() current,
+  });
+}
+
+String buyV2StoreCouponCartInput(List<BuyV2CartLine> lines) {
+  final ordered = List<BuyV2CartLine>.of(lines)
+    ..sort((a, b) => a.product.id.compareTo(b.product.id));
+  return jsonEncode([
+    for (final line in ordered)
+      [
+        line.product.id,
+        line.product.storeId,
+        line.product.canonicalId,
+        line.product.publicListingIdentity?.toJson(),
+        line.product.packTerms?.revision,
+        line.product.priceMinor,
+        line.product.mrpMinor,
+        line.product.minimumOrder,
+        line.product.quantityStep,
+        line.quantity,
+      ],
+  ]);
+}
+
+@immutable
+class BuyV2StoreCouponEligibility {
+  const BuyV2StoreCouponEligibility._({
+    required this.coupon,
+    required this.accountId,
+    required this.input,
+    required this.requestFingerprint,
+    required this.observedAt,
+    required this.validUntil,
+    required this.reason,
+    required this.savingMinor,
+    required this.subtotalMinor,
+    required this.basketFingerprint,
+    required this.basketSourceId,
+    required this.basketSourceRevision,
+    required this.benefitRevision,
+    required this.sourceReference,
+    required this.funderReference,
+    required this.allocations,
+  });
+  final BuyV2PublishedStoreCoupon coupon;
+  final String accountId, input, requestFingerprint;
+  final DateTime observedAt, validUntil;
+  final String? reason,
+      basketFingerprint,
+      basketSourceId,
+      benefitRevision,
+      sourceReference,
+      funderReference;
+  final int? savingMinor, subtotalMinor, basketSourceRevision;
+  final Map<String, int> allocations;
+  bool get eligible => reason == null && savingMinor != null;
+  bool matches(List<BuyV2CartLine> lines, DateTime now) =>
+      !now.isBefore(observedAt) &&
+      now.isBefore(validUntil) &&
+      input == buyV2StoreCouponCartInput(lines);
+
+  /// Exact negotiated reply, bound to the authenticated request and actual
+  /// selected line money. This never establishes a quote or reserves a use.
+  factory BuyV2StoreCouponEligibility.decode(
+    Object? raw, {
+    required BuyV2PublishedStoreCoupon coupon,
+    required String accountId,
+    required Map<String, Object?> query,
+    required List<BuyV2CartLine> lines,
+    required DateTime now,
+  }) {
+    Never bad() =>
+        throw const FormatException('Store coupon could not be checked.');
+    Map<String, dynamic> map(Object? value) {
+      if (value is! Map || value.keys.any((key) => key is! String)) bad();
+      return Map<String, dynamic>.from(value);
+    }
+
+    void keys(Map<String, dynamic> value, Set<String> expected) {
+      if (value.length != expected.length || !expected.every(value.containsKey)) {
+        bad();
+      }
+    }
+
+    Object? sorted(Object? value) => value is Map
+        ? {
+            for (final key in (value.keys.cast<String>().toList()..sort()))
+              key: sorted(value[key]),
+          }
+        : value is List
+        ? value.map(sorted).toList()
+        : value;
+    String hash(Object? value) => sha256
+        .convert(utf8.encode(jsonEncode(sorted(value))))
+        .toString()
+        .toUpperCase();
+    int amount(Object? value, {int minimum = 0}) {
+      if (value is! int || value < minimum || value > 9007199254740991) bad();
+      return value;
+    }
+
+    String digest(Object? value) {
+      if (value is! String || !RegExp(r'^[A-F0-9]{64}$').hasMatch(value)) bad();
+      return value;
+    }
+
+    DateTime time(Object? value) {
+      if (value is! String) bad();
+      final parsed = DateTime.tryParse(value);
+      if (parsed == null || parsed.toUtc().toIso8601String() != value) bad();
+      return parsed.toUtc();
+    }
+
+    final data = map(raw);
+    keys(data, {
+      'schemaVersion',
+      'storeCouponEligibilityVersion',
+      'realm',
+      'viewerUserId',
+      'storeId',
+      'selectionPolicy',
+      'exclusiveSelectionRequired',
+      'state',
+      'eligible',
+      'reason',
+      'observedAt',
+      'validUntil',
+      'requestFingerprint',
+      'orderingAvailable',
+      'reservationCreated',
+      'evaluation',
+      'attribution',
+    });
+    if (data['schemaVersion'] is! int ||
+        data['schemaVersion'] != 1 ||
+        data['storeCouponEligibilityVersion'] is! int ||
+        data['storeCouponEligibilityVersion'] != 1 ||
+        data['realm'] != coupon.realm ||
+        data['viewerUserId'] != accountId ||
+        data['storeId'] != coupon.storeId ||
+        data['selectionPolicy'] != 'exclusive_store_basket' ||
+        data['exclusiveSelectionRequired'] != true ||
+        data['state'] != 'ready' ||
+        data['eligible'] is! bool ||
+        data['orderingAvailable'] != false ||
+        data['reservationCreated'] != false ||
+        lines.isEmpty ||
+        lines.length > 100 ||
+        lines.any(
+          (line) =>
+              line.product.storeId != coupon.storeId || line.quantity <= 0,
+        )) {
+      bad();
+    }
+    final observed = time(data['observedAt']), until = time(data['validUntil']);
+    if (observed.isAfter(now) ||
+        !until.isAfter(now) ||
+        !until.isAfter(observed) ||
+        until.difference(observed) > const Duration(minutes: 1)) {
+      bad();
+    }
+    final fingerprint = digest(data['requestFingerprint']);
+    if (fingerprint !=
+        hash({
+          'operation': 'storeCouponEligibilityV1',
+          'realm': coupon.realm,
+          'actor': accountId,
+          'query': query,
+          'exclusiveSelectionRequired': true,
+        })) {
+      bad();
+    }
+    final reason = data['reason'];
+    Map<String, dynamic>? evaluation, attribution;
+    final allocations = <String, int>{};
+    if (data['eligible'] == true) {
+      if (reason != null || until.isAfter(coupon.validUntil)) bad();
+      evaluation = map(data['evaluation']);
+      attribution = map(data['attribution']);
+      keys(evaluation, {
+        'schemaVersion',
+        'realm',
+        'storeId',
+        'buyerUserId',
+        'couponId',
+        'couponRevision',
+        'name',
+        'basketSourceId',
+        'basketSourceRevision',
+        'basketFingerprint',
+        'eligibleSubtotalMinor',
+        'savingMinor',
+        'allocations',
+      });
+      keys(attribution, {
+        'benefitRevision',
+        'sourceReference',
+        'funderReference',
+      });
+      if (evaluation['schemaVersion'] is! int ||
+          evaluation['schemaVersion'] != 1 ||
+          evaluation['realm'] != coupon.realm ||
+          evaluation['storeId'] != coupon.storeId ||
+          evaluation['buyerUserId'] != accountId ||
+          evaluation['couponId'] != coupon.couponId ||
+          evaluation['couponRevision'] is! int ||
+          evaluation['couponRevision'] != coupon.revision ||
+          evaluation['name'] != coupon.name ||
+          attribution['benefitRevision'] !=
+              'store-coupon-v${coupon.revision}' ||
+          attribution['sourceReference'] !=
+              hash([
+                'storeCouponCampaignV1',
+                coupon.realm,
+                coupon.storeId,
+                coupon.couponId,
+                coupon.revision,
+              ]) ||
+          attribution['funderReference'] !=
+              hash(['storeCouponFunderV1', coupon.realm, coupon.storeId])) {
+        bad();
+      }
+      digest(evaluation['basketSourceId']);
+      digest(evaluation['basketFingerprint']);
+      amount(evaluation['basketSourceRevision'], minimum: 1);
+      final expected = {
+        for (final line in lines)
+          if (line.totalMinor > 0) line.product.id: line,
+      };
+      final requestLines = query['lines'];
+      if (requestLines is! List ||
+          expected.length !=
+              lines.where((line) => line.totalMinor > 0).length ||
+          evaluation['allocations'] is! List) {
+        bad();
+      }
+      var subtotal = 0, saving = 0;
+      for (final rawLine in evaluation['allocations'] as List) {
+        final row = map(rawLine);
+        keys(row, {
+          'lineId',
+          'skuId',
+          'packId',
+          'offerId',
+          'offerRevision',
+          'subtotalMinor',
+          'savingMinor',
+        });
+        final line = expected[row['lineId']];
+        final requested = requestLines
+            .map(map)
+            .where((entry) => entry['lineId'] == row['lineId'])
+            .toList();
+        if (line == null ||
+            allocations.containsKey(line.product.id) ||
+            requested.length != 1) {
+          bad();
+        }
+        final listing = line.product.publicListingIdentity;
+        if (listing == null ||
+            row['skuId'] != listing.skuId ||
+            row['packId'] != listing.verifiedPackId ||
+            row['offerId'] != requested.single['offerId'] ||
+            row['offerRevision'] != requested.single['offerRevision'] ||
+            amount(row['subtotalMinor']) != line.totalMinor ||
+            amount(row['savingMinor']) > line.totalMinor) {
+          bad();
+        }
+        subtotal = buyV2SumMinor([subtotal, row['subtotalMinor'] as int]);
+        saving = buyV2SumMinor([saving, row['savingMinor'] as int]);
+        allocations[line.product.id] = row['savingMinor'] as int;
+      }
+      if (allocations.length != expected.length ||
+          subtotal != amount(evaluation['eligibleSubtotalMinor'], minimum: 1) ||
+          saving != amount(evaluation['savingMinor'], minimum: 1) ||
+          saving > subtotal) {
+        bad();
+      }
+    } else if (reason is! String ||
+        !{
+          'inactive',
+          'usage_limit',
+          'minimum_spend',
+          'zero_saving',
+        }.contains(reason) ||
+        data['evaluation'] != null ||
+        data['attribution'] != null) {
+      bad();
+    }
+    return BuyV2StoreCouponEligibility._(
+      coupon: coupon,
+      accountId: accountId,
+      input: buyV2StoreCouponCartInput(lines),
+      requestFingerprint: fingerprint,
+      observedAt: observed,
+      validUntil: until,
+      reason: reason as String?,
+      savingMinor: evaluation?['savingMinor'] as int?,
+      subtotalMinor: evaluation?['eligibleSubtotalMinor'] as int?,
+      basketFingerprint: evaluation?['basketFingerprint'] as String?,
+      basketSourceId: evaluation?['basketSourceId'] as String?,
+      basketSourceRevision: evaluation?['basketSourceRevision'] as int?,
+      benefitRevision: attribution?['benefitRevision'] as String?,
+      sourceReference: attribution?['sourceReference'] as String?,
+      funderReference: attribution?['funderReference'] as String?,
+      allocations: Map.unmodifiable(allocations),
+    );
+  }
+}
+
 /// A published placement owns an exact Store listing and current source facts.
 /// Being returned by an offersOnly product filter is not publication evidence.
 @immutable

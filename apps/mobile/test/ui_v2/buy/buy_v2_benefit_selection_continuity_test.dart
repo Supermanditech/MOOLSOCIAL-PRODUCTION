@@ -50,12 +50,14 @@ class _ScopedBenefitAdapter implements BuyV2LiveCartBenefitsAdapter {
 class _BenefitTermsCapture implements BuyV2CommercialPaymentTermsAdapter {
   List<BuyV2FulfilmentGroup> groups = [];
   Map<String, int> totals = {};
+  int calls = 0;
   @override
   Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({
     required List<BuyV2FulfilmentGroup> groups,
     required String selectedPaymentMethod,
     required Map<String, int> quotedTotalsByFulfilmentKey,
   }) async {
+    calls++;
     this.groups = groups;
     totals = quotedTotalsByFulfilmentKey;
     return const BuyV2CommercialPaymentTermsSnapshot(
@@ -230,14 +232,13 @@ void main() {
       await session.refreshCartBenefits();
       expect(session.chooseCartBenefit(benefit), isTrue);
       expect(session.scopedCouponSaving, 10);
-      await session.refreshCommercialPaymentTerms();
-      expect(terms.groups, hasLength(2));
-      for (final group in terms.groups) {
-        final eligible = group.lines.any(
-          (line) => benefit.appliesTo(line.product),
-        );
-        expect(terms.totals[group.key], group.total - (eligible ? 10 : 0));
-      }
+      // An advertised/eligible coupon is not a confirmed Checkout quote.
+      // Never send a locally reduced payable to the terms provider before it.
+      final callsBeforeQuote = terms.calls;
+      expect(session.checkoutQuoteReviewRequired, isTrue);
+      expect(await session.refreshCommercialPaymentTerms(), isFalse);
+      expect(terms.calls, callsBeforeQuote);
+      expect(session.commercialPaymentTermsLoadState, BuyV2CommerceLoadState.unavailable);
 
       session.remove('s-tomato');
       await session.refreshCartBenefits();

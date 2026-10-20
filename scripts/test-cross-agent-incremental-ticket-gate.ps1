@@ -313,6 +313,7 @@ if ($RequireLfPublicationProbes) {
   if ($null -ne $continuation.PSObject.Properties['batch02Promotions']) {
     foreach ($moneyFixture in @('apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart',
         'apps/mobile/test/work_vertical_slice_test.dart')) {
     $claimed=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     if (@($claimed.batch02Promotions.owners) -cnotcontains $moneyFixture) {

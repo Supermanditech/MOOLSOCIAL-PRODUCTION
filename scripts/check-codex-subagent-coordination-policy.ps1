@@ -8120,6 +8120,9 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     if (@($promotion.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart') {
       $promotionOwners += 'apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart'
     }
+    if (@($promotion.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart') {
+      $promotionOwners += 'apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart'
+    }
     if (@($promotion.owners) -ccontains 'apps/mobile/test/work_vertical_slice_test.dart') {
       $promotionOwners += 'apps/mobile/test/work_vertical_slice_test.dart'
     }
@@ -8520,6 +8523,10 @@ function Invoke-Lf01Admission {
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Promotions'] -and
         @($record.frontendContinuation.batch02Promotions.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart') {
       $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart'
+    }
+    if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Promotions'] -and
+        @($record.frontendContinuation.batch02Promotions.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart') {
+      $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart'
     }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch03PolicyRecovery']) {
       $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart'

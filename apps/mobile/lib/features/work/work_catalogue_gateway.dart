@@ -2191,6 +2191,8 @@ class WorkspaceCatalogueContentResult {
     this.fingerprint,
     this.policyRevision,
     this.policyFingerprint,
+    this.publicOfferId,
+    this.publicOfferRevision,
   });
   final BuyV2ProductContentSnapshot content;
   final int? skuRevision, catalogueVersion;
@@ -2198,6 +2200,7 @@ class WorkspaceCatalogueContentResult {
   final String? fingerprint;
   final int? policyRevision;
   final String? policyFingerprint;
+  final String? publicOfferId, publicOfferRevision;
 }
 
 /// One channel of an exact-SKU public read. Never construct public products
@@ -2541,7 +2544,8 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
 
 /// Genuine exact-Store catalogue source. Global/geo discovery and Store address
 /// metadata require their own providers; an unsupported call is not an empty feed.
-class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2VariantFamilySource, BuyV2StorePublishedOffersSource, BuyV2StoreCouponSource {
+class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2VariantFamilySource, BuyV2StorePublishedOffersSource, BuyV2StoreCouponSource,
+        BuyV2StoreCouponEligibilitySource {
   WorkspaceStoreCatalogueSource({required this.gateway, required this.storeId, required this.current, this.contentReadback});
   final AuthenticatedWorkspaceCatalogueGateway gateway;
   final String storeId;
@@ -2556,6 +2560,20 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
   int _couponGeneration = 0;
   final _couponHeads = <String, ({int revision, String? copy})>{};
   @override bool get storeCouponsActive => current() && gateway.storeCouponTermsSupported;
+  @override
+  bool get storeCouponEligibilityActive =>
+      storeCouponsActive && gateway.storeCouponEligibilitySupported;
+  @override
+  Future<BuyV2StoreCouponEligibility> evaluateStoreCoupon({
+    required BuyV2PublishedStoreCoupon coupon,
+    required List<BuyV2CartLine> lines,
+    required bool Function() current,
+  }) => gateway.evaluateStoreCoupon(
+    coupon: coupon,
+    lines: lines,
+    current: () =>
+        storeCouponEligibilityActive && coupon.storeId == storeId && current(),
+  );
   @override Future<List<BuyV2PublishedStoreCoupon>> loadStoreCoupons({required String storeId}) {
     var reading = true;
     final generation = ++_couponGeneration;
@@ -3157,7 +3175,8 @@ class WorkspaceProductPresentationGateway {
 
 class WorkspacePublicDiscoverySource extends ChangeNotifier
     implements BuyV2CataloguePageSource, BuyV2VariantFamilySource,
-      BuyV2ProductContentAdapter, BuyV2StorePublishedOffersSource, BuyV2PublishedCatalogueSource, BuyV2StoreCouponSource {
+      BuyV2ProductContentAdapter, BuyV2StorePublishedOffersSource, BuyV2PublishedCatalogueSource, BuyV2StoreCouponSource,
+        BuyV2StoreCouponEligibilitySource {
   WorkspacePublicDiscoverySource({required this.gateway, required this.current}) {
     if (!gateway.productFactsReadbackSupported || !gateway.unbrandedProduceReadbackSupported ||
         !gateway.storeClassificationReadbackSupported) { throw ArgumentError('Matching discovery contracts are required.'); }
@@ -3416,6 +3435,19 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   @override
   bool get storeOffersActive => active;
   @override bool get storeCouponsActive => active && gateway.storeCouponTermsSupported;
+  @override
+  bool get storeCouponEligibilityActive =>
+      storeCouponsActive && gateway.storeCouponEligibilitySupported;
+  @override
+  Future<BuyV2StoreCouponEligibility> evaluateStoreCoupon({
+    required BuyV2PublishedStoreCoupon coupon,
+    required List<BuyV2CartLine> lines,
+    required bool Function() current,
+  }) => gateway.evaluateStoreCoupon(
+    coupon: coupon,
+    lines: lines,
+    current: () => storeCouponEligibilityActive && current(),
+  );
   @override Future<List<BuyV2PublishedStoreCoupon>> loadStoreCoupons({required String storeId}) =>
     _store(storeId).loadStoreCoupons(storeId: storeId);
   @override
@@ -3457,6 +3489,9 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     storeCouponTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V1'),
+    storeCouponEligibilitySupported: const bool.fromEnvironment(
+      'MOOLSOCIAL_STORE_COUPON_ELIGIBILITY_V1',
+    ),
     promotionDiscoverySupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PROMOTION_DISCOVERY_V1'));
   return WorkspacePublicDiscoverySource(gateway: gateway, current: current);
 }
@@ -3519,6 +3554,9 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     storeCouponTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V1'),
+    storeCouponEligibilitySupported: const bool.fromEnvironment(
+      'MOOLSOCIAL_STORE_COUPON_ELIGIBILITY_V1',
+    ),
     storeClassificationReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_STORE_CLASSIFICATION_V1'),
     supplierPublishersVersionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_PUBLISHERS_V1'),
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
@@ -3560,6 +3598,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.promotionDiscoverySupported = false,
     this.promotionTermsSupported = false,
     this.storeCouponTermsSupported = false,
+    this.storeCouponEligibilitySupported = false,
     this.stockSnapshotsSupported = false,
     DateTime Function()? now,
   }) : _reviewedVariantsOverride = reviewedVariants, _productMediaTransportOverride = productMediaTransport, now = now ?? DateTime.now {
@@ -3596,6 +3635,7 @@ class AuthenticatedWorkspaceCatalogueGateway
   // Opt-in only for the matching integer-paise paged contract; legacy stays v1.
   final bool minorMoneyReadbackSupported;
   final bool promotionDiscoverySupported;
+  final bool storeCouponEligibilitySupported;
   final bool promotionTermsSupported;
   final bool storeCouponTermsSupported;
   @override
@@ -3636,6 +3676,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       promotionDiscoverySupported: promotionDiscoverySupported,
       promotionTermsSupported: promotionTermsSupported,
       storeCouponTermsSupported: storeCouponTermsSupported,
+      storeCouponEligibilitySupported: storeCouponEligibilitySupported,
       stockSnapshotsSupported: stockSnapshotsSupported,
       now: now,
     );
@@ -4159,6 +4200,124 @@ class AuthenticatedWorkspaceCatalogueGateway
             : WorkspaceCatalogueBindingState.notSent,
       );
     }
+  }
+
+  Future<BuyV2StoreCouponEligibility> evaluateStoreCoupon({
+    required BuyV2PublishedStoreCoupon coupon,
+    required List<BuyV2CartLine> lines,
+    required bool Function() current,
+  }) {
+    var reading = true;
+    bool valid() =>
+        reading &&
+        current() &&
+        storeCouponTermsSupported &&
+        storeCouponEligibilitySupported;
+    final captured = List<BuyV2CartLine>.unmodifiable(lines);
+    return _evaluateStoreCoupon(
+      coupon,
+      captured,
+      valid,
+    ).timeout(const Duration(seconds: 26)).whenComplete(() => reading = false);
+  }
+
+  Future<BuyV2StoreCouponEligibility> _evaluateStoreCoupon(
+    BuyV2PublishedStoreCoupon coupon,
+    List<BuyV2CartLine> lines,
+    bool Function() current,
+  ) async {
+    final account = ownerAccountId;
+    if (!current() ||
+        account == null ||
+        coupon.realm != realm ||
+        !coupon.isCurrent(now().toUtc()) ||
+        lines.isEmpty ||
+        lines.length > 100 ||
+        lines.map((line) => line.product.id).toSet().length != lines.length) {
+      throw const FormatException('Store coupons are not connected.');
+    }
+    final requested = <Map<String, Object?>>[];
+    for (final line in lines) {
+      final product = line.product, listing = product.publicListingIdentity;
+      if (!current() ||
+          listing?.valid != true ||
+          !listing!.matches(product) ||
+          listing.realm != realm ||
+          listing.storeId != coupon.storeId ||
+          line.quantity < product.minimumOrder ||
+          line.quantity > 1000000000 ||
+          (line.quantity - product.minimumOrder) % product.quantityStep != 0) {
+        throw const FormatException();
+      }
+      final entry = await readPublicEntry(
+        storeId: coupon.storeId,
+        skuId: listing.skuId,
+        channel: listing.channel,
+        current: current,
+      );
+      if (!current() ||
+          entry == null ||
+          entry.product.publicListingIdentity != listing ||
+          entry.readback.skuRevision == null ||
+          entry.readback.publicOfferId == null ||
+          entry.readback.publicOfferRevision == null ||
+          entry.product.packTerms?.revision != product.packTerms?.revision ||
+          entry.product.minimumOrder != product.minimumOrder ||
+          entry.product.quantityStep != product.quantityStep ||
+          entry.product.mrpMinor != product.mrpMinor ||
+          entry.product.packTerms?.priceMinorForQuantity(
+                line.quantity,
+                entry.product.priceMinor,
+              ) !=
+              product.priceMinor) {
+        throw const FormatException(
+          'Product details changed. Review your Cart before applying this coupon.',
+        );
+      }
+      requested.add({
+        'lineId': product.id,
+        'listing': listing.toJson(),
+        'skuRevision': entry.readback.skuRevision,
+        'offerId': entry.readback.publicOfferId,
+        'offerRevision': entry.readback.publicOfferRevision,
+        'quantity': line.quantity,
+      });
+    }
+    requested.sort(
+      (a, b) => (a['lineId'] as String).compareTo(b['lineId'] as String),
+    );
+    // Freeze request ownership independently of the transport's body object.
+    final frozen = jsonEncode({
+      'storeId': coupon.storeId,
+      'couponId': coupon.couponId,
+      'couponRevision': coupon.revision,
+      'selectionPolicy': 'exclusive_store_basket',
+      'lines': requested,
+    });
+    final response = await _ownerRequest(
+      {
+        'operation': 'evaluateStoreCouponEligibility',
+        'storeCouponEligibilityVersion': 1,
+        ..._map(jsonDecode(frozen)),
+      },
+      current,
+      mutation: false,
+    );
+    if (!current() || response?.statusCode != 200) {
+      throw const FormatException('Store coupon could not be checked.');
+    }
+    final envelope = _map(jsonDecode(response!.body));
+    if (envelope['ok'] != true) throw const FormatException();
+    final result = BuyV2StoreCouponEligibility.decode(
+      envelope['data'],
+      coupon: coupon,
+      accountId: account,
+      query: Map<String, Object?>.from(_map(jsonDecode(frozen))),
+      lines: lines,
+      now: now().toUtc(),
+    );
+    if (!current()) throw const FormatException();
+    return result;
   }
 
   Future<SocialContentResponse?> _ownerRequest(
@@ -5102,6 +5261,8 @@ WorkspaceCatalogueContentResult _decode(
     fingerprint: jsonEncode(_sorted(core)),
     policyRevision: policy?.revision,
     policyFingerprint: policy?.fingerprint,
+    publicOfferId: _id(matching.single['offerId']),
+    publicOfferRevision: _id(matching.single['revision']),
   );
 }
 

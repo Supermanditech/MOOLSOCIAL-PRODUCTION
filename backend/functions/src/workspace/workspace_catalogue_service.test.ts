@@ -35,6 +35,91 @@ import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
 const at = "2026-10-16T12:00:00.000Z";
 
+test('LF04-ELIGIBILITY actual reviewed prices, cross-channel tiers and read-only customer capacity', {
+  skip: process.env.FIRESTORE_EMULATOR_HOST === undefined,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: 'demo-lf-coupon-prices'}, `coupon-prices-${randomUUID()}`), db = getFirestore(app);
+  const storeId = `store-${randomUUID()}`, caseId = `case-${randomUUID()}`;
+  const identity = {...catalogueIdentity, catalogueId: `catalogue-${randomUUID()}`};
+  const root = db.collection('workspaceCatalogues').doc('evaluation'), localProfile = {...profile, workspaceId: storeId, caseId};
+  const value = input();
+  value.channels.push({kind: 'wholesale', offerId: 'offer-wholesale', priceMinor: 25000, mrpMinor: 28000,
+    minimumOrder: 3, quantityStep: 2, tiers: [{minimumQuantity: 3, unitPriceMinor: 25000}, {minimumQuantity: 5, unitPriceMinor: 24000}]});
+  value.content.media = staticMedia(value, storeId);
+  const repository = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at));
+  const prices = () => new WorkspaceCatalogueService(repository(), identity, () => new Date(at));
+  const promotions = (enabled = true) => new WorkspacePromotionService(new FirestorePromotionRepository(db, 'evaluation', () => new Date(at)),
+    prices(), () => new Date(at), {storeCouponTermsSupported: true, storeCouponEligibilitySupported: enabled});
+  try {
+    await db.collection('workspaceProfiles').doc(caseId).create(localProfile);
+    await root.collection('participants').doc(storeId).set(producerParticipant(storeId));
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority(true, storeId));
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    for (const command of productionCommands(value)) {
+      await repository().produceCatalogue(['propose_product', 'propose_pack', 'create_offer'].includes(String(command.type))
+        ? 'owner-one' : 'reviewer-one', identity, command);
+    }
+    await repository().produceCatalogue('owner-one', identity, {type: 'create_offer', commandId: 'wholesale-offer', expectedVersion: 6,
+      offerId: 'offer-wholesale', packId: value.verifiedPackId, buyingContext: 'wholesale', serviceAreaIds: ['host-area'],
+      termWindows: [{termSnapshotId: 'term-wholesale-one', termSnapshotSha256: cataloguePayloadHash(channelTerms(value.channels[1]!)),
+        effectiveFrom: at, expiresAt: '2026-10-16T13:00:00.000Z'}]});
+    const bound = await repository().bindReviewed({ownerUserId: 'owner-one', profile: localProfile, input: value,
+      expectedRevision: 0, idempotencyKey: 'coupon-price-binding',
+      fingerprint: cataloguePayloadHash({storeId, input: value, expectedRevision: 0}), observedAt: at}, identity);
+    const campaign = {storeCouponTermsVersion: 1, storeId, couponId: 'coupon-one', expectedRevision: 0,
+      idempotencyKey: 'coupon-one-original', fundingAcknowledged: true, coupon: {name: 'Host Diwali savings',
+        percentage: true, discount: 3333, maximumSavingMinor: 99999, minimumSpendMinor: 100,
+        startsAt: at, endsAt: '2026-10-16T13:00:00.000Z', totalUses: 20, usesPerCustomer: 1, active: true}};
+    await promotions().handleOperation('owner-one', 'saveStoreCoupon', campaign);
+    const binding = cataloguePublicListingBindings('evaluation', bound);
+    const query = {storeCouponEligibilityVersion: 1, storeId, couponId: 'coupon-one', couponRevision: 1,
+      selectionPolicy: 'exclusive_store_basket', lines: binding.map(listing => ({lineId: listing.listingId, listing,
+        skuRevision: bound.revision, offerId: listing.channel === 'retail' ? 'offer-one' : 'offer-wholesale',
+        offerRevision: listing.channel === 'retail' ? 'term-host-one' : 'term-wholesale-one',
+        quantity: listing.channel === 'retail' ? 1 : 5}))};
+    const usage = root.collection('stores').doc(storeId).collection('storeCouponUsage').doc('coupon-one');
+    const originalUsage = JSON.stringify((await usage.get()).data());
+    // This malformed unrelated private SKU must not force a whole-Store scan.
+    await root.collection('stores').doc(storeId).collection('skus').doc('unrelated-private-sku').set({privateUnpublished: true});
+    const result = await promotions().handleOperation('buyer-coupon-one', 'evaluateStoreCouponEligibility', query) as any;
+    assert.equal(result.eligible, true); assert.equal(result.viewerUserId, 'buyer-coupon-one');
+    assert.equal(result.selectionPolicy, 'exclusive_store_basket'); assert.equal(result.exclusiveSelectionRequired, true);
+    assert.equal(result.evaluation.eligibleSubtotalMinor, 146000); assert.equal(result.evaluation.savingMinor, 48661);
+    assert.equal(result.evaluation.basketSourceRevision, 7); assert.equal(result.evaluation.name, 'Host Diwali savings');
+    assert.equal(result.evaluation.allocations.reduce((sum: number, a: any) => sum + a.savingMinor, 0), 48661);
+    assert.equal(result.orderingAvailable, false); assert.equal(result.reservationCreated, false);
+    assert.equal(result.validUntil, '2026-10-16T12:01:00.000Z');
+    if (process.env.LF04_CAPTURE_ELIGIBILITY === 'true') {
+      const {storeCouponEligibilityVersion: _version, ...normalizedQuery} = query;
+      const page = await prices().publicCatalogue({storeId, skuId: value.skuId, listingReadbackVersion: 1,
+        mediaReadbackVersion: 1, policyReadbackVersion: 1, productFactsReadbackVersion: 1,
+        unbrandedProduceReadbackVersion: 1, supplierPublishersVersion: 1, storeDetailsReadbackVersion: 1,
+        storeClassificationReadbackVersion: 1});
+      console.log('LF04_STORE_COUPON_ELIGIBILITY=' + JSON.stringify({query: normalizedQuery, result, page}));
+    }
+    assert.equal(JSON.stringify((await usage.get()).data()), originalUsage);
+    assert.equal((await usage.collection('customers').get()).size, 0);
+    assert.equal((await root.collection('stores').doc(storeId).collection('storeCouponOrderUses').get()).size, 0);
+    await assert.rejects(promotions(false).handleOperation('buyer-coupon-one', 'evaluateStoreCouponEligibility', query), {code: 'unavailable'});
+    for (const extra of [{unitPriceMinor: 1}, {savingMinor: 99999}, {buyerUserId: 'another-buyer'}, {heldUses: 0}]) {
+      await assert.rejects(promotions().handleOperation('buyer-coupon-one', 'evaluateStoreCouponEligibility', {...query, ...extra}), {code: 'invalid_input'});
+    }
+    const badStep = structuredClone(query); badStep.lines.find(line => line.listing.channel === 'wholesale')!.quantity = 4;
+    await assert.rejects(promotions().handleOperation('buyer-coupon-one', 'evaluateStoreCouponEligibility', badStep), {code: 'conflict'});
+    const stale = structuredClone(query); stale.lines[0]!.offerRevision = 'stale-term';
+    await assert.rejects(promotions().handleOperation('buyer-coupon-one', 'evaluateStoreCouponEligibility', stale), {code: 'conflict'});
+    await usage.update({usageRevision: 1, heldUses: 1});
+    await usage.collection('customers').doc(cataloguePayloadHash('buyer-coupon-one')).create({schemaVersion: 1,
+      realm: 'evaluation', storeId, couponId: 'coupon-one', buyerUserId: 'buyer-coupon-one', usageRevision: 1, heldUses: 1, redeemedUses: 0});
+    const exhausted = await promotions().handleOperation('buyer-coupon-one', 'evaluateStoreCouponEligibility', query) as any;
+    assert.equal(exhausted.eligible, false); assert.equal(exhausted.reason, 'usage_limit'); assert.equal(exhausted.evaluation, null);
+    assert.equal((await promotions().handleOperation('buyer-coupon-two', 'evaluateStoreCouponEligibility', query) as any).eligible, true);
+    await usage.update({origin: null});
+    await assert.rejects(promotions().handleOperation('buyer-coupon-two', 'evaluateStoreCouponEligibility', query));
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+
 test('LF03-EXEC trusted catalogue commands have an existing-service runtime facade', () => {
   assert.equal(typeof (WorkspaceCatalogueService.prototype as unknown as Record<string, unknown>).handleCatalogueProduction, 'function');
   assert.equal(typeof (catalogueModule as unknown as Record<string, unknown>).catalogueProductionOperation, 'function');

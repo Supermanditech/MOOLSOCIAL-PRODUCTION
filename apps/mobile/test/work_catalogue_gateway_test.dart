@@ -1152,6 +1152,97 @@ class _StockSessionCatalogue extends SessionCatalogue implements WorkspaceStoreS
 }
 
 void main() {
+  test('LF04-ELIGIBILITY exact actual producer reply crosses the client boundary', () async {
+    const path = String.fromEnvironment('LF04_ELIGIBILITY_CAPTURE');
+    if (path.isEmpty) return;
+    final row = File(path).readAsLinesSync().singleWhere((line) => line.startsWith('LF04_STORE_COUPON_ELIGIBILITY='));
+    final capture = jsonDecode(row.substring('LF04_STORE_COUPON_ELIGIBILITY='.length)) as Map<String, dynamic>;
+    final query = Map<String, Object?>.from(capture['query'] as Map);
+    final requested = List<Map<String, dynamic>>.from((query['lines'] as List).map((row) => Map<String, dynamic>.from(row as Map)))
+      ..sort((a, b) => (a['lineId'] as String).compareTo(b['lineId'] as String));
+    query['lines'] = requested;
+    final lines = [for (final row in requested) BuyV2CartLine(
+      product: product.copyWith(id: row['lineId'] as String, storeId: query['storeId'] as String,
+        publicListingIdentity: BuyV2PublicListingIdentity.fromJson(row['listing']),
+        priceMinor: (row['listing'] as Map)['channel'] == 'retail' ? 26000 : 24000,
+        mrpMinor: 28000), quantity: row['quantity'] as int)];
+    final coupon = BuyV2PublishedStoreCoupon(realm: 'evaluation', storeId: query['storeId'] as String,
+      couponId: 'coupon-one', revision: 1, name: 'Host Diwali savings', publisherName: 'Host Store',
+      publisherType: BuyV2OfferPublisherType.retailer, sourceId: 'store-coupon:evaluation:${query['storeId']}:coupon-one:1',
+      observedAt: at, validFrom: at, validUntil: at.add(const Duration(hours: 1)),
+      terms: BuyV2AdvertisedBenefitTerms(kind: 'percentage', percentageBasisPoints: 3333,
+        maximumSavingMinor: 99999, minimumSpendMinor: 100), configuredTotalUses: 20, configuredUsesPerCustomer: 1);
+    BuyV2StoreCouponEligibility decode(Object? data, {String buyer = 'buyer-coupon-one',
+      List<BuyV2CartLine>? basket, DateTime? clock}) => BuyV2StoreCouponEligibility.decode(data,
+        coupon: coupon, accountId: buyer, query: query, lines: basket ?? lines, now: clock ?? at);
+    final result = decode(capture['result']);
+    expect(result.eligible, isTrue);
+    expect(result.subtotalMinor, 146000);
+    expect(result.savingMinor, 48661);
+    expect(result.allocations.values.reduce((a, b) => a + b), 48661);
+    expect(result.matches(lines, at), isTrue);
+    expect(result.matches(lines, at.add(const Duration(minutes: 1))), isFalse);
+    expect(() => decode(capture['result'], buyer: 'another-buyer'), throwsFormatException);
+    expect(() => decode(capture['result'], clock: at.subtract(const Duration(milliseconds: 1))), throwsFormatException);
+    expect(() => decode(capture['result'], clock: at.add(const Duration(minutes: 1))), throwsFormatException);
+    expect(() => decode(capture['result'], basket: [lines.first.copyWith(quantity: 99), ...lines.skip(1)]), throwsFormatException);
+    for (final field in ['viewerUserId', 'storeId', 'realm', 'requestFingerprint', 'selectionPolicy']) {
+      final changed = Map<String, dynamic>.from(capture['result'] as Map)..[field] = 'wrong-value';
+      expect(() => decode(changed), throwsFormatException, reason: field);
+    }
+    final over = jsonDecode(jsonEncode(capture['result'])) as Map<String, dynamic>;
+    (over['evaluation'] as Map)['savingMinor'] = 48662;
+    expect(() => decode(over), throwsFormatException);
+    final extra = Map<String, dynamic>.from(capture['result'] as Map)..['heldUses'] = 0;
+    expect(() => decode(extra), throwsFormatException);
+    final negative = Map<String, dynamic>.from(capture['result'] as Map)
+      ..['eligible'] = false..['reason'] = 'usage_limit'..['evaluation'] = null..['attribution'] = null;
+    expect(decode(negative).eligible, isFalse);
+    expect(decode(negative).savingMinor, isNull);
+    final page = Map<String, dynamic>.from(capture['page'] as Map);
+    final actualLines = [for (final row in requested) () {
+      final entry = WorkspacePublicCatalogueEntry.fromResponse(page, storeId: coupon.storeId,
+        realm: 'evaluation', channel: (row['listing'] as Map)['channel'] == 'retail'
+          ? BuyV2OfferClass.retail : BuyV2OfferClass.wholesale, now: at, supplierPublishersVersionSupported: true);
+      final quantity = row['quantity'] as int;
+      return BuyV2CartLine(product: entry.product.copyWith(priceMinor:
+        entry.product.packTerms!.priceMinorForQuantity(quantity, entry.product.priceMinor)), quantity: quantity);
+    }()];
+    var current = true;
+    final bodies = <Map<String, Object?>>[];
+    Completer<SocialContentResponse>? pending;
+    final transport = OwnerTransport((body) async {
+      bodies.add(body);
+      if (pending != null) return pending.future;
+      if (body['operation'] == 'readPublicStoreCatalogue') {
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': page}));
+      }
+      expect(body['operation'], 'evaluateStoreCouponEligibility');
+      final sent = Map<String, Object?>.of(body)..remove('operation')..remove('storeCouponEligibilityVersion');
+      expect(sent, query);
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': capture['result']}));
+    });
+    AuthenticatedWorkspaceCatalogueGateway connection({bool active = true}) => AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, realm: 'evaluation', ownerAccountId: 'buyer-coupon-one',
+      productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true, supplierPublishersVersionSupported: true,
+      storeClassificationReadbackSupported: true, storeCouponTermsSupported: true, storeCouponEligibilitySupported: active, now: () => at);
+    final gateway = connection();
+    expect(gateway.forOwnerAccount('another-buyer').storeCouponEligibilitySupported, isTrue);
+    expect((await gateway.evaluateStoreCoupon(coupon: coupon, lines: actualLines, current: () => current)).savingMinor, 48661);
+    expect(bodies.length, 3);
+    final initialCalls = transport.calls;
+    await expectLater(connection(active: false).evaluateStoreCoupon(coupon: coupon, lines: actualLines, current: () => true), throwsFormatException);
+    expect(transport.calls, initialCalls);
+    pending = Completer<SocialContentResponse>();
+    final retired = gateway.evaluateStoreCoupon(coupon: coupon, lines: actualLines, current: () => current);
+    final rejection = expectLater(retired, throwsFormatException);
+    await Future<void>.delayed(Duration.zero);
+    current = false;
+    pending.complete(SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': page})));
+    await rejection;
+    expect(transport.calls, initialCalls + 1);
+  }, skip: const String.fromEnvironment('LF04_ELIGIBILITY_CAPTURE').isEmpty);
   Map<String, dynamic> publicCoupon({String id = 'coupon-one', int revision = 1, String name = 'Host Diwali savings'}) => {
     'couponId': id, 'revision': revision, 'scope': 'store_basket', 'storeId': 'store-one',
     'publisherType': 'retailer', 'publisherName': 'Host Store',

@@ -2951,7 +2951,7 @@ export const moolSocialWorkspace = onRequest(
         "reconcileStoreSupplierPolicy"].includes(operation);
       const promotionOperation = ["readStorePromotion", "saveStorePromotion", "reconcileStorePromotion",
         "listStorePromotions", "readPublicStorePromotions", "readPublicPromotionDiscovery",
-        "saveStoreCoupon", "readStoreCoupon", "listStoreCoupons", "reconcileStoreCoupon", "readPublicStoreCoupons", "readPublicStoreCouponSnapshot"].includes(operation);
+        "saveStoreCoupon", "readStoreCoupon", "listStoreCoupons", "reconcileStoreCoupon", "readPublicStoreCoupons", "readPublicStoreCouponSnapshot", "evaluateStoreCouponEligibility"].includes(operation);
       const catalogueOperation = ["saveStoreCatalogueSku", "bindReviewedStoreCatalogueSku",
         "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue", "readPublicCatalogueDiscovery",
         "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined || productMediaOperation || stockOperation !== undefined || catalogueProductionAction !== undefined;
@@ -3186,7 +3186,8 @@ function workspacePromotionService(): WorkspacePromotionService {
   }
   return new WorkspacePromotionService(new FirestorePromotionRepository(getFirestore(), realm), workspaceCatalogueService(),
     () => new Date(), {benefitTermsSupported: process.env.MOOLSOCIAL_STORE_PROMOTION_TERMS_V1 === "true",
-      storeCouponTermsSupported: process.env.MOOLSOCIAL_STORE_COUPON_TERMS_V1 === "true"});
+      storeCouponTermsSupported: process.env.MOOLSOCIAL_STORE_COUPON_TERMS_V1 === "true",
+      storeCouponEligibilitySupported: process.env.MOOLSOCIAL_STORE_COUPON_ELIGIBILITY_V1 === "true"});
 }
 
 function workspaceSupplierPolicyService(): WorkspaceSupplierPolicyService {

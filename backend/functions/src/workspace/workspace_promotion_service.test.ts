@@ -385,6 +385,41 @@ async function couponPlacementScenario(firstLifetimeMs?: number) {
   }
   return {app, db, source, repository, materializer, storeIds, clock, end};
 }
+test('LF04-ELIGIBILITY subpaise saving is ordinary ineligibility, not a source error', async t => {
+  if (!process.env.FIRESTORE_EMULATOR_HOST) {t.skip('Explicit loopback emulator required'); return;}
+  const {app, db, repository, storeIds, clock, end} = await couponPlacementScenario();
+  const storeId = storeIds[0]!;
+  try {
+    const service = new WorkspacePromotionService(repository(), {
+      publicCatalogue: async () => {throw new Error('Use the transaction price capability.');},
+      // Isolated trusted-price double for the 50paise edge only. The paired
+      // catalogue test covers actual reviewed-producer prices end to end.
+      couponPriceSnapshot: async () => [{schemaVersion: 1, realm: 'evaluation', storeId,
+        observedAt: clock.toISOString(), state: 'ready', coverage: 'verified_public_only', listingReadbackVersion: 1,
+        listingCoverage: 'complete', catalogueVersion: 7, nextCursor: null,
+        items: [{skuId: 'sku-one', canonicalProductId: 'canonical-one', verifiedPackId: 'pack-one', revision: 1,
+          listings: [{schemaVersion: 1, realm: 'evaluation', storeId, skuId: 'sku-one', canonicalProductId: 'canonical-one',
+            verifiedPackId: 'pack-one', channel: 'retail', listingId: `listing-${cataloguePayloadHash([1, 'evaluation', storeId, 'sku-one', 'retail']).toLowerCase()}`}],
+          channels: [{kind: 'retail', offerId: 'offer-one', revision: 'host-price-term', validUntil: end,
+            priceMinor: 50, minimumOrder: 1, quantityStep: 1, tiers: []}]}]}],
+    }, () => clock, {storeCouponTermsSupported: true, storeCouponEligibilitySupported: true});
+    await service.handleOperation('owner-one', 'saveStoreCoupon', {storeCouponTermsVersion: 1, storeId, couponId: 'coupon-one',
+      expectedRevision: 1, idempotencyKey: 'subpaise-coupon', fundingAcknowledged: true,
+      coupon: {name: 'Host subpaise offer', percentage: true, discount: 100, maximumSavingMinor: 100,
+        minimumSpendMinor: 0, startsAt: clock.toISOString(), endsAt: end, totalUses: 20, usesPerCustomer: 1, active: true}});
+    const query = {storeCouponEligibilityVersion: 1, storeId, couponId: 'coupon-one', couponRevision: 2,
+      selectionPolicy: 'exclusive_store_basket', lines: [{lineId: 'host-line-one', skuRevision: 1,
+        listing: {schemaVersion: 1, realm: 'evaluation', storeId, skuId: 'sku-one', canonicalProductId: 'canonical-one',
+          verifiedPackId: 'pack-one', channel: 'retail', listingId: `listing-${cataloguePayloadHash([1, 'evaluation', storeId, 'sku-one', 'retail']).toLowerCase()}`},
+        offerId: 'offer-one', offerRevision: 'host-price-term', quantity: 1}]};
+    const result = await service.handleOperation('buyer-one', 'evaluateStoreCouponEligibility', query) as any;
+    assert.equal(result.state, 'ready'); assert.equal(result.eligible, false); assert.equal(result.reason, 'zero_saving');
+    assert.equal(result.evaluation, null); assert.equal(result.attribution, null);
+    const usage = db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc(storeId)
+      .collection('storeCouponUsage').doc('coupon-one');
+    assert.equal((await usage.get()).get('heldUses'), 0); assert.equal((await usage.collection('customers').get()).size, 0);
+  } finally {await db.terminate(); await deleteApp(app);}
+});
 test('LF04-ATOMIC materialize holds once, respects capacity, maps lines and applies trusted events once', async t => {
   const host = process.env.FIRESTORE_EMULATOR_HOST;
   if (!host) {t.skip('Explicit loopback emulator required'); return;}
