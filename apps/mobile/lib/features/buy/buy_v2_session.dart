@@ -9065,6 +9065,37 @@ class BuyV2Session extends ChangeNotifier {
           !procurementScopeCurrent) {
         return;
       }
+      if (snapshot.procurementAccessOnly) {
+        final grant = snapshot.procurementBuyerGrant;
+        final context = procurementContext;
+        // Catalogue access is a separate read from commerce. In particular, an
+        // empty access response must not erase paged products, receiving details
+        // or the original order/payment recovery held by this Store session.
+        final accessOnly = snapshot.products.isEmpty &&
+            snapshot.addresses.isEmpty && snapshot.orders.isEmpty &&
+            snapshot.paymentMethods.isEmpty && snapshot.paymentCapabilities == null &&
+            !snapshot.upiQrAvailable && snapshot.selectedAddressId == null &&
+            !snapshot.businessVerified &&
+            snapshot.businessVerificationState == BuyV2BusinessVerificationState.unavailable &&
+            !snapshot.productReportsAvailable && snapshot.reviewableProductIds.isEmpty &&
+            snapshot.ratingTargets.isEmpty;
+        final valid = isStoreProcurement && context != null && accessOnly &&
+            snapshot.state != BuyV2CommerceLoadState.loading &&
+            (snapshot.state == BuyV2CommerceLoadState.ready
+                ? grant != null && grant.approved && grant.accountId == context.accountId &&
+                    grant.storeId == context.storeId && catalogueNow().isBefore(grant.validUntil)
+                : grant == null);
+        if (valid) {
+          _procurementBuyerGrant = grant;
+          commerceLoadState = snapshot.state;
+          commerceMessage = snapshot.customerMessage;
+        } else {
+          commerceLoadState = BuyV2CommerceLoadState.unavailable;
+          commerceMessage = 'Store purchasing approval could not be confirmed. Try again.';
+        }
+        notifyListeners();
+        return;
+      }
       if (isStoreProcurement) {
         final grant = snapshot.procurementBuyerGrant;
         final context = procurementContext!;

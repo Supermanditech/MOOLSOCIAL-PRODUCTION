@@ -2521,6 +2521,7 @@ class BuyV2CommerceSnapshot {
     this.ratingTargets = const [],
     this.customerMessage,
     this.procurementBuyerGrant,
+    this.procurementAccessOnly = false,
   });
 
   final BuyV2CommerceLoadState state;
@@ -2545,6 +2546,11 @@ class BuyV2CommerceSnapshot {
   final List<BuyV2RatingTarget> ratingTargets;
   final String? customerMessage;
   final BuyV2ProcurementBuyerGrant? procurementBuyerGrant;
+
+  /// Refreshes only the exact Store buyer's access. It is not a replacement
+  /// catalogue, address book, order feed, business verification or payment offer.
+  /// All other commerce fields must retain their empty/default values.
+  final bool procurementAccessOnly;
 }
 
 enum BuyV2RatingKind { product, store, delivery, purchase }

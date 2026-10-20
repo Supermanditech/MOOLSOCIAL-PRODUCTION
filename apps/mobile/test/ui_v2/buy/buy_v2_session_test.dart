@@ -8054,6 +8054,7 @@ void main() {
       BuyV2CommerceSnapshot? snapshot,
       BuyV2CustomerStateStore? retainedStore,
       BuyV2CataloguePageSource? catalogueSource,
+      DateTime Function()? clock,
     }) async {
       final entry = context ?? scope();
       final core = BuySession();
@@ -8073,7 +8074,7 @@ void main() {
         reviewDataEnabled: false,
         productFactsAdapter: _R669OrderReadyFacts(),
         cataloguePageSource: catalogueSource,
-        catalogueNow: () => now,
+        catalogueNow: clock ?? () => now,
       );
       addTearDown(core.dispose);
       addTearDown(identity.dispose);
@@ -8086,6 +8087,218 @@ void main() {
         store: store,
         adapter: adapter,
       );
+    }
+
+    const accessHistorical = BuyV2Order(id: 'host-access-historical', destination: BuyV2Destination.wholesale,
+      title: 'Isolated stock purchase', itemSummary: 'Accepted stock', total: 4200, partner: 'Host supplier',
+      partnerType: 'Wholesaler', promise: 'Recorded delivery', destinationLabel: 'Store receiving',
+      progress: 1, status: BuyV2OrderStatus.delivered);
+
+    test('LF05-RESTOCK access refresh preserves separately paged products and Store Cart', () async {
+      final offered = product.copyWith(procurementSupplierGrant: supplier());
+      final source = _R669ProcurementCatalogue([offered]);
+      final fixture = await scopedSession(snapshot: commerceSnapshot(products: [], orders: [accessHistorical]), catalogueSource: source);
+      final session = fixture.session;
+      await session.restoreCustomerState();
+      expect(await session.openLinkedProduct(product.id), isTrue);
+      expect(session.addProduct(product.id), isTrue);
+      final address = session.selectedAddressId, methods = session.availablePaymentMethods;
+      final quantity = session.quantityFor(product.id);
+      fixture.adapter.snapshot = BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+        procurementAccessOnly: true, procurementBuyerGrant: buyer());
+      await session.restoreCommerce();
+      expect(session.findProduct(product.id), same(offered));
+      expect(session.quantityFor(product.id), quantity);
+      expect(session.selectedAddressId, address);
+      expect(session.availablePaymentMethods, methods);
+      expect(session.businessVerified, isTrue);
+      expect(session.orders.single, same(accessHistorical));
+      expect(session.procurementUnavailableMessage, isNull);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isTrue, reason: session.notice);
+    });
+
+    for (final change in ['missing', 'account', 'store', 'denied', 'expired', 'loading', 'failedGrant',
+      'products', 'addresses', 'orders', 'paymentMethods', 'paymentCapabilities', 'upiQr', 'selectedAddress',
+      'businessVerified', 'businessState', 'reports', 'reviewable', 'ratingTargets']) {
+      test('LF05-RESTOCK access refresh rejects $change without replacing commerce', () async {
+        final fixture = await scopedSession();
+        final session = fixture.session;
+        await session.restoreCustomerState();
+        expect(session.addProduct(product.id), isTrue);
+        final original = session.findProduct(product.id), address = session.selectedAddressId;
+        final methods = session.availablePaymentMethods, quantity = session.quantityFor(product.id);
+        fixture.adapter.snapshot = BuyV2CommerceSnapshot(state: change == 'loading' ? BuyV2CommerceLoadState.loading
+          : change == 'failedGrant' ? BuyV2CommerceLoadState.offline : BuyV2CommerceLoadState.ready,
+          procurementAccessOnly: true,
+          procurementBuyerGrant: change == 'missing' ? null : buyer(
+            account: change == 'account' ? 'other-account' : 'buyer-account',
+            store: change == 'store' ? 'other-store' : 'purchasing-store',
+            approved: change != 'denied', until: change == 'expired' ? now : expiry),
+          products: change == 'products' ? [product] : const [],
+          addresses: change == 'addresses' ? commerceSnapshot().addresses : const [],
+          orders: change == 'orders' ? [accessHistorical] : const [],
+          paymentMethods: change == 'paymentMethods' ? {'UPI'} : const {},
+          paymentCapabilities: change == 'paymentCapabilities' ? const [] : null,
+          upiQrAvailable: change == 'upiQr', selectedAddressId: change == 'selectedAddress' ? address : null,
+          businessVerified: change == 'businessVerified',
+          businessVerificationState: change == 'businessState' ? BuyV2BusinessVerificationState.verified
+            : BuyV2BusinessVerificationState.unavailable,
+          productReportsAvailable: change == 'reports', reviewableProductIds: change == 'reviewable' ? {product.id} : const {},
+          ratingTargets: change == 'ratingTargets' ? [BuyV2RatingTarget(id: 'host-access-rating',
+            ownerScope: scope().customerStateOwnerScope, orderId: 'host-access-order', orderLineId: 'host-line',
+            storeId: product.storeId!, productId: product.id, purchaseLabel: 'Isolated fixture')] : const []);
+        await session.restoreCommerce();
+        expect(session.commerceLoadState, BuyV2CommerceLoadState.unavailable);
+        expect(session.procurementUnavailableMessage, isNotNull);
+        expect(session.findProduct(product.id), same(original));
+        expect(session.quantityFor(product.id), quantity);
+        expect(session.selectedAddressId, address);
+        expect(session.availablePaymentMethods, methods);
+        expect(session.orders, isEmpty);
+        expect(session.setCartQuantity(product.id, '${quantity + 1}'), isFalse);
+      });
+    }
+
+    for (final state in [BuyV2CommerceLoadState.unavailable, BuyV2CommerceLoadState.offline]) {
+      test('LF05-RESTOCK access refresh $state retains commerce while closing purchase access', () async {
+        final fixture = await scopedSession();
+        final session = fixture.session;
+        await session.restoreCustomerState();
+        expect(session.addProduct(product.id), isTrue);
+        final original = session.findProduct(product.id), address = session.selectedAddressId;
+        final methods = session.availablePaymentMethods, quantity = session.quantityFor(product.id);
+        fixture.adapter.snapshot = BuyV2CommerceSnapshot(state: state, procurementAccessOnly: true,
+          customerMessage: 'Store purchasing is unavailable. Try again.');
+        await session.restoreCommerce();
+        expect(session.commerceLoadState, state);
+        expect(session.findProduct(product.id), same(original));
+        expect(session.quantityFor(product.id), quantity);
+        expect(session.selectedAddressId, address);
+        expect(session.availablePaymentMethods, methods);
+        expect(session.procurementUnavailableMessage, isNotNull);
+      });
+    }
+
+    test('LF05-RESTOCK access refresh supplies no business, address or payment authority', () async {
+      final offered = product.copyWith(procurementSupplierGrant: supplier());
+      final fixture = await scopedSession(catalogueSource: _R669ProcurementCatalogue([offered]),
+        snapshot: BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+          procurementAccessOnly: true, procurementBuyerGrant: buyer()));
+      final session = fixture.session;
+      await session.restoreCustomerState();
+      expect(await session.openLinkedProduct(product.id), isTrue);
+      expect(session.procurementUnavailableMessage, isNull);
+      expect(session.businessVerified, isFalse);
+      expect(session.addresses, isEmpty);
+      expect(session.availablePaymentMethods, isEmpty);
+      expect(session.addProduct(product.id), isFalse);
+      expect(fixture.adapter.placements, isEmpty);
+    });
+
+    test('LF05-RESTOCK access refresh cannot be admitted to personal shopping', () async {
+      final core = BuySession(), adapter = _R669ProcurementCommerce(commerceSnapshot());
+      final session = BuyV2Session(core: core, commerceAdapter: adapter, reviewDataEnabled: false);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await session.restoreCommerce();
+      final original = session.findProduct(product.id), address = session.selectedAddressId;
+      final methods = session.availablePaymentMethods;
+      adapter.snapshot = BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+        procurementAccessOnly: true, procurementBuyerGrant: buyer());
+      await session.restoreCommerce();
+      expect(session.isStoreProcurement, isFalse);
+      expect(session.commerceLoadState, BuyV2CommerceLoadState.unavailable);
+      expect(session.findProduct(product.id), same(original));
+      expect(session.selectedAddressId, address);
+      expect(session.availablePaymentMethods, methods);
+    });
+
+    test('LF05-RESTOCK access refresh ignores completion after disposal', () async {
+      final core = BuySession(), adapter = _R669ProcurementCommerce(commerceSnapshot());
+      final identity = ValueNotifier<BuyV2ProcurementContext?>(scope());
+      final session = BuyV2Session(core: core, commerceAdapter: adapter, reviewDataEnabled: false,
+        procurementIdentity: identity, catalogueNow: () => now,
+        customerStateStore: _MemoryCustomerStateStore(scope().customerStateOwnerScope));
+      addTearDown(core.dispose);
+      addTearDown(identity.dispose);
+      await session.restoreCommerce();
+      var notifications = 0;
+      session.addListener(() => notifications++);
+      final gate = Completer<BuyV2CommerceSnapshot>();
+      adapter.refreshGate = gate;
+      final pending = session.restoreCommerce();
+      final loadingNotifications = notifications;
+      session.dispose();
+      gate.complete(BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+        procurementAccessOnly: true, procurementBuyerGrant: buyer()));
+      await pending;
+      expect(notifications, loadingNotifications);
+    });
+
+    test('LF05-RESTOCK access refresh cannot renew a supplier grant', () async {
+      var clock = now;
+      final fixture = await scopedSession(clock: () => clock);
+      final session = fixture.session;
+      await session.restoreCustomerState();
+      expect(session.addProduct(product.id), isTrue);
+      final original = session.findProduct(product.id), quantity = session.quantityFor(product.id);
+      clock = expiry;
+      fixture.adapter.snapshot = BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+        procurementAccessOnly: true, procurementBuyerGrant: buyer(until: clock.add(const Duration(minutes: 5))));
+      await session.restoreCommerce();
+      expect(session.procurementUnavailableMessage, isNull);
+      expect(session.findProduct(product.id), same(original));
+      expect(session.procurementEligibilityFor(original!), BuyV2ProcurementEligibility.supplierUnavailable);
+      expect(session.quantityFor(product.id), quantity);
+      expect(session.setCartQuantity(product.id, '${quantity + 1}'), isFalse);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isFalse);
+    });
+
+    for (final change in ['account', 'store', 'origin']) {
+      test('LF05-RESTOCK access refresh ignores late $change response', () async {
+        final fixture = await scopedSession();
+        final session = fixture.session;
+        await session.restoreCustomerState();
+        expect(session.addProduct(product.id), isTrue);
+        final quantity = session.quantityFor(product.id), original = session.findProduct(product.id);
+        final gate = Completer<BuyV2CommerceSnapshot>();
+        fixture.adapter.refreshGate = gate;
+        final pending = session.restoreCommerce();
+        fixture.identity.value = scope(account: change == 'account' ? 'other-account' : 'buyer-account',
+          store: change == 'store' ? 'other-store' : 'purchasing-store',
+          origin: change == 'origin' ? 'other-origin' : 'restock-operation');
+        gate.complete(BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+          procurementAccessOnly: true, procurementBuyerGrant: buyer()));
+        await pending;
+        expect(session.commerceLoadState, BuyV2CommerceLoadState.unavailable);
+        expect(session.procurementScopeCurrent, isFalse);
+        expect(session.findProduct(product.id), same(original));
+        expect(session.quantityFor(product.id), quantity);
+        expect(session.setCartQuantity(product.id, '${quantity + 1}'), isFalse);
+      });
+    }
+
+    for (final latestReady in [false, true]) {
+      test('LF05-RESTOCK access refresh latest result wins ready=$latestReady', () async {
+        final fixture = await scopedSession();
+        final session = fixture.session;
+        final original = session.findProduct(product.id);
+        final gate = Completer<BuyV2CommerceSnapshot>();
+        fixture.adapter.refreshGate = gate;
+        final pending = session.restoreCommerce();
+        BuyV2CommerceSnapshot response(bool ready) => BuyV2CommerceSnapshot(
+          state: ready ? BuyV2CommerceLoadState.ready : BuyV2CommerceLoadState.unavailable,
+          procurementAccessOnly: true, procurementBuyerGrant: ready ? buyer() : null);
+        fixture.adapter.snapshot = response(latestReady);
+        await session.restoreCommerce();
+        gate.complete(response(!latestReady));
+        await pending;
+        expect(session.commerceLoadState, latestReady ? BuyV2CommerceLoadState.ready : BuyV2CommerceLoadState.unavailable);
+        expect(session.procurementUnavailableMessage == null, latestReady);
+        expect(session.findProduct(product.id), same(original));
+      });
     }
 
     for (final role in [
@@ -9192,6 +9405,36 @@ void main() {
           isTrue,
         );
       }
+    }
+
+    for (final ready in [false, true]) {
+      test('LF05-RESTOCK access refresh preserves original pending payment ready=$ready', () async {
+        final fixture = await scopedSession(withPaymentTerms: true);
+        final session = fixture.session;
+        await prepareProcurementPayment(session);
+        expect(await session.submitOrder(), isFalse);
+        expect(session.checkoutSubmissionState, BuyV2CheckoutSubmissionState.paymentPending);
+        final original = session.legacyCheckoutAttempt!, request = fixture.adapter.placements.single;
+        final quantity = session.quantityFor(product.id);
+        fixture.adapter.snapshot = BuyV2CommerceSnapshot(
+          state: ready ? BuyV2CommerceLoadState.ready : BuyV2CommerceLoadState.unavailable,
+          procurementAccessOnly: true, procurementBuyerGrant: ready ? buyer() : null);
+        await session.restoreCommerce();
+        expect(session.legacyCheckoutAttempt, same(original));
+        expect(session.legacyCheckoutAttempt!.payment.request, same(request));
+        expect(session.checkoutSubmissionState, BuyV2CheckoutSubmissionState.paymentPending);
+        expect(session.quantityFor(product.id), quantity);
+        expect(await session.submitOrder(), isFalse);
+        expect(fixture.adapter.placements, hasLength(1));
+        expect(await session.reconcilePayment(), isFalse);
+        expect(fixture.adapter.reconciliations, 1);
+        expect(session.checkoutSubmissionState, BuyV2CheckoutSubmissionState.paymentPending);
+        await Future<void>.delayed(Duration.zero);
+        final retained = (await fixture.store.read())!.legacyCheckoutAttempt!;
+        expect(retained.payment.request.idempotencyKey, request.idempotencyKey);
+        expect(retained.payment.request.totalMinor, request.totalMinor);
+        expect(retained.payment.request.procurementContext!.customerStateOwnerScope, scope().customerStateOwnerScope);
+      });
     }
 
     for (final candidate in [(due: 600, limit: 600, accepted: true),
