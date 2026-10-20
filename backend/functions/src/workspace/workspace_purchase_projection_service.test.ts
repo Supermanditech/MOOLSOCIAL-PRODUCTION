@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import {createHash, randomUUID} from "node:crypto";
+import {execFile} from "node:child_process";
+import {readFileSync} from "node:fs";
+import {dirname, resolve} from "node:path";
+import {promisify} from "node:util";
 import test from "node:test";
+import {Server, ServerCredentials, status as grpcStatus, type ServiceDefinition} from "@grpc/grpc-js";
+import {GrpcClient} from "google-gax";
 import {initializeApp, deleteApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 import {WorkspaceProfileError} from "./workspace_profile_service.js";
@@ -12,6 +18,112 @@ import {WorkspacePurchaseProjectionService, normalizePlacement, requireDefaultPu
 import {WorkspaceBulkQuoteService} from "./workspace_purchase_projection_service.js";
 import {FirestorePromotionRepository, WorkspacePromotionService, storeCouponAttributionReferences} from './workspace_promotion_service.js';
 import {cataloguePayloadHash} from './workspace_catalogue_service.js';
+
+test('LF13 production bootstrap lets a read abort restart the whole transaction without replaying its closed ID', {
+  timeout: 30000,
+}, async () => {
+  // Loopback transport fault fixture only: no app records or commerce outcome.
+  // Use the installed wire definitions and the real SDK/default-client bootstrap.
+  const protos = JSON.parse(readFileSync(resolve(dirname(require.resolve('@google-cloud/firestore')),
+    '../protos/v1.json'), 'utf8'));
+  const loaded = new GrpcClient().loadProtoJSON(protos) as any;
+  const server = new Server();
+  const started: string[] = [], aborted = new Set<string>(), replays: string[] = [], rollbacks: string[] = [];
+  const commits: any[] = [];
+  let queryAttempts = 0;
+  const timestamp = {seconds: 1792497600, nanos: 0};
+  server.addService(loaded.google.firestore.v1.Firestore.service as ServiceDefinition, {
+    batchGetDocuments(call: any) {
+      let transaction = Buffer.from(call.request.transaction ?? []);
+      if (!transaction.length) {
+        transaction = Buffer.from(`transport-attempt-${started.length + 1}`);
+        started.push(transaction.toString());
+      }
+      const id = transaction.toString();
+      if (aborted.has(id)) {
+        replays.push(id);
+        call.emit('error', {code: grpcStatus.INVALID_ARGUMENT, details: 'Transaction is invalid or closed.'});
+        return;
+      }
+      if (started.length === 1 && call.request.documents[0].endsWith('/transport/second')) {
+        aborted.add(id);
+        call.emit('error', {code: grpcStatus.ABORTED, details: 'Transaction lock timeout.'});
+        return;
+      }
+      for (const name of call.request.documents) call.write({transaction,
+        found: {name, fields: {value: {integerValue: '2'}}, createTime: timestamp, updateTime: timestamp},
+        readTime: timestamp});
+      call.end();
+    },
+    rollback(call: any, done: any) {
+      rollbacks.push(Buffer.from(call.request.transaction).toString());
+      done(null, {});
+    },
+    commit(call: any, done: any) {
+      commits.push(call.request);
+      done(null, {commitTime: timestamp, writeResults: call.request.writes.map(() => ({updateTime: timestamp}))});
+    },
+    runQuery(call: any) {
+      if (++queryAttempts === 1) {
+        call.emit('error', {code: grpcStatus.UNAVAILABLE, details: 'Isolated transient query failure.'});
+        return;
+      }
+      call.write({document: {name: `${call.request.parent}/transport/query-result`,
+        fields: {value: {integerValue: '2'}}, createTime: timestamp, updateTime: timestamp}, readTime: timestamp});
+      call.end();
+    },
+  });
+  const port = await new Promise<number>((accept, reject) => server.bindAsync('127.0.0.1:0',
+    ServerCredentials.createInsecure(), (error, assigned) => error ? reject(error) : accept(assigned)));
+  try {
+    const indexPath = resolve(__dirname, '../index.js');
+    const child = `
+      require(${JSON.stringify(indexPath)});
+      const {getFirestore} = require('firebase-admin/firestore');
+      const db = getFirestore();
+      (async () => {
+        let attempts = 0;
+        try {
+          const value = await db.runTransaction(async tx => {
+            attempts++;
+            const first = await tx.get(db.doc('transport/first'));
+            const second = await tx.get(db.doc('transport/second'));
+            const value = first.get('value') + second.get('value');
+            tx.set(db.doc('transport/result'), {value});
+            return value;
+          });
+          const query = await db.collection('transport').where('value', '==', 2).get();
+          console.log('LF13_TRANSPORT ' + JSON.stringify({attempts, value, queryValues: query.docs.map(doc => doc.get('value'))}));
+        } finally { await db.terminate(); }
+      })().catch(error => { console.error(error); process.exitCode = 1; });`;
+    const result = await promisify(execFile)(process.execPath, ['-e', child], {
+      cwd: resolve(__dirname, '../..'), timeout: 20000,
+      env: {...process.env, FIRESTORE_EMULATOR_HOST: `127.0.0.1:${port}`,
+        GCLOUD_PROJECT: 'demo-lf13-transport', GOOGLE_CLOUD_PROJECT: 'demo-lf13-transport',
+        FIREBASE_CONFIG: JSON.stringify({projectId: 'demo-lf13-transport'})},
+    });
+    const line = result.stdout.split('\n').find(value => value.startsWith('LF13_TRANSPORT '));
+    assert.ok(line, result.stdout + result.stderr);
+    assert.deepEqual(JSON.parse(line.slice('LF13_TRANSPORT '.length)), {attempts: 2, value: 4, queryValues: [2]});
+    assert.deepEqual(started, ['transport-attempt-1', 'transport-attempt-2']);
+    assert.deepEqual([...aborted], ['transport-attempt-1']);
+    assert.deepEqual(replays, [], 'streaming layer must not resend an aborted transaction ID');
+    assert.deepEqual(rollbacks, ['transport-attempt-1']);
+    assert.equal(commits.length, 1);
+    assert.equal(Buffer.from(commits[0].transaction).toString(), 'transport-attempt-2');
+    assert.equal(commits[0].writes.length, 1);
+    assert.equal(commits[0].writes[0].update.fields.value.integerValue, '4');
+    assert.equal(queryAttempts, 2, 'transient query retry remains available on the configured shared client');
+  } finally { server.forceShutdown(); }
+});
+
+function purchaseTestFirestore(app: ReturnType<typeof initializeApp>) {
+  const db = getFirestore(app);
+  // Named emulator fixtures use the same supported transport mode as production.
+  // The separate bootstrap regression above exercises the real index configuration.
+  db.settings({gaxServerStreamingRetries: true});
+  return db;
+}
 
 function operationalEvidence(): TrustedOperationalOrderEvidence {
   const now = new Date("2026-10-16T12:00:00.000Z");
@@ -54,7 +166,7 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
   // Isolated catalogue-source fixture and actual loopback Firestore only.
   // Not a phone record, real quotation, payment or live catalogue acceptance.
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
-  const app = initializeApp({projectId: `demo-lf-bulk-${randomUUID().slice(0, 8)}`}, `bulk-${randomUUID()}`), db = getFirestore(app);
+  const app = initializeApp({projectId: `demo-lf-bulk-${randomUUID().slice(0, 8)}`}, `bulk-${randomUUID()}`), db = purchaseTestFirestore(app);
   let clock = '2026-10-20T12:00:00.000Z', channel = 'bulk', revision = 1, policyRevision = 1;
   const listingId = `listing-${createHash('sha256').update(JSON.stringify([1, 'evaluation', 'store-one', 'sku-one', 'bulk'])).digest('hex')}`;
   let expireDuringRead = false, sourceReads = 0;
@@ -474,7 +586,7 @@ test("completion proof is strict scoped source evidence, not payment or client c
 for (const fulfilment of ["delivery", "collection"] as const) {
 test(`completion ${fulfilment} is atomic, authorized, durable and never inferred`, {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
-  const app = initializeApp({projectId: "demo-lf-completion"}, `completion-${randomUUID()}`), db = getFirestore(app);
+  const app = initializeApp({projectId: "demo-lf-completion"}, `completion-${randomUUID()}`), db = purchaseTestFirestore(app);
   const value = receipt(randomUUID()), suffix = randomUUID(), now = new Date("2026-10-16T12:00:00.000Z");
   value.buyerUserId = `buyer-${suffix}`;
   for (const [i, store] of value.stores.entries()) {
@@ -601,7 +713,7 @@ test("actual operational order initialization, revisions and original-attempt re
 }, async () => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
   const app = initializeApp({projectId: "demo-lf-operations"}, `operations-${randomUUID()}`);
-  const db = getFirestore(app);
+  const db = purchaseTestFirestore(app);
   const value = receipt(randomUUID());
   const suffix = randomUUID();
   value.buyerUserId = `buyer-${suffix}`;
@@ -877,7 +989,7 @@ test('LF-GST-ORIGINAL persisted historical declarations survive restart and both
   skip: !process.env.FIRESTORE_EMULATOR_HOST,
 }, async () => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
-  const app = initializeApp({projectId: 'demo-lf-gst-original'}, `gst-original-${randomUUID()}`), db = getFirestore(app);
+  const app = initializeApp({projectId: 'demo-lf-gst-original'}, `gst-original-${randomUUID()}`), db = purchaseTestFirestore(app);
   const input = supplierTaxReceipt(), suffix = randomUUID();
   input.receiptId = `gst-${suffix}`; input.buyerUserId = `buyer-${suffix}`;
   for (const [index, store] of input.stores.entries()) {
@@ -974,7 +1086,7 @@ test('LF-CONTEXT emulator freezes two Store contexts, remaps notes, preserves fe
   skip: !process.env.FIRESTORE_EMULATOR_HOST,
 }, async () => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
-  const app = initializeApp({projectId: `demo-lf-context-${randomUUID().slice(0,8)}`}, `context-${randomUUID()}`), db = getFirestore(app);
+  const app = initializeApp({projectId: `demo-lf-context-${randomUUID().slice(0,8)}`}, `context-${randomUUID()}`), db = purchaseTestFirestore(app);
   const value = fulfilmentContextReceipt(), originalSource = structuredClone(value), now = new Date('2026-10-16T12:00:00.000Z');
   const service = new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => value});
   const reader = new WorkspacePurchaseProjectionService(db, 'evaluation');
@@ -1076,7 +1188,7 @@ test(`LF-LISTING actual persisted originals preserve explicit provenance across 
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
   // Isolated demo project per run: historical fixtures must not populate this
   // Store's private paginated feed or contend with another test's transactions.
-  const app = initializeApp({projectId: `demo-lf-listing-${randomUUID().slice(0, 8)}`}, `listing-${randomUUID()}`), db = getFirestore(app);
+  const app = initializeApp({projectId: `demo-lf-listing-${randomUUID().slice(0, 8)}`}, `listing-${randomUUID()}`), db = purchaseTestFirestore(app);
   const value = publicListingReceipt(); value.receiptId = `receipt-${randomUUID()}`; value.buyerUserId = `buyer-${randomUUID()}`;
   if (allNull) for (const store of value.stores) for (const line of store.lines) line.publicListing = null;
   for (const store of value.stores) await db.collection("workspaceProfiles").doc(store.caseId).set({
@@ -1182,6 +1294,11 @@ test(`LF-LISTING actual persisted originals preserve explicit provenance across 
       assert.ok(starOne); assert.ok(replayOne);
       t.diagnostic("private stars: concurrent original attempt accepted");
       assert.deepEqual(starOne, replayOne); assert.equal(starOne.rating!.stars, 1);
+      const [savedRatings, savedReceipts] = await Promise.all([
+        root.collection('productStarRatings').get(), root.collection('productStarReceipts').get()]);
+      assert.equal(savedRatings.size, 1);
+      assert.equal(savedRatings.docs[0]!.id, target.id);
+      assert.equal(savedReceipts.size, receiptCount + 1, 'concurrent original creates exactly one immutable operation receipt');
       const restart = new WorkspaceOrderOperationsService(db, "evaluation");
       assert.deepEqual(await restart.submitProductStars(value.buyerUserId, starCommand, true), starOne);
       for (let stars = 2; stars <= 5; stars++) {
@@ -1250,7 +1367,7 @@ test('LF13-RECOVERY real original stars survive unknown acknowledgements without
   {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async (t) => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
   const app = initializeApp({projectId: `demo-lf-stars-recovery-${randomUUID().slice(0, 8)}`}, `recovery-${randomUUID()}`);
-  const db = getFirestore(app), root = db.collection('workspacePurchaseProjections').doc('evaluation');
+  const db = purchaseTestFirestore(app), root = db.collection('workspacePurchaseProjections').doc('evaluation');
   try {
     const value = publicListingReceipt(); value.receiptId = `receipt-${randomUUID()}`; value.buyerUserId = `buyer-${randomUUID()}`;
     for (const store of value.stores) await db.collection('workspaceProfiles').doc(store.caseId).set({
@@ -1329,7 +1446,7 @@ test("LF-FEEDBACK private stars have submit/reconcile and retailer reader surfac
 });
 
 test("LF-FEEDBACK collected maximum100-line Store completion creates bounded exact targets atomically", {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
-  const app = initializeApp({projectId: "demo-lf-feedback-max"}, `feedback-${randomUUID()}`), db = getFirestore(app);
+  const app = initializeApp({projectId: "demo-lf-feedback-max"}, `feedback-${randomUUID()}`), db = purchaseTestFirestore(app);
   const value = publicListingReceipt(), store = value.stores[0], base = store.lines[0], suffix = randomUUID();
   value.stores = [store]; value.receiptId = `max-${suffix}`; value.buyerUserId = `buyer-${suffix}`;
   store.caseId = `case-${suffix}`;
@@ -1569,7 +1686,7 @@ test(`LF-ATTR actual materializer retains exact source allocations across restar
 }, async () => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
   const app = initializeApp({projectId: "demo-lf-benefit-original"}, `benefits-${randomUUID()}`);
-  const db = getFirestore(app), suffix = randomUUID();
+  const db = purchaseTestFirestore(app), suffix = randomUUID();
   const input: TrustedPlacementReceipt = {...(includeScheduled ? normalizePlacement(scheduledReceipt(), "evaluation") :
     includeVariants ? variantReceipt() : normalizePlacement(attributedReceipt(), "evaluation")),
     receiptId: `benefit-${suffix}`, buyerUserId: `buyer-${suffix}`, schemaVersion: includeScheduled ? 4 : includeVariants ? 3 : 2};
@@ -1684,7 +1801,7 @@ test("LF-ATTR allocation-heavy source cannot commit an original exceeding client
 }, async () => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
   const app = initializeApp({projectId: "demo-lf-benefit-budget"}, `budget-${randomUUID()}`);
-  const db = getFirestore(app), suffix = randomUUID();
+  const db = purchaseTestFirestore(app), suffix = randomUUID();
   const input: TrustedPlacementReceipt = {...receipt(), schemaVersion: 2, buyerUserId: `buyer-${suffix}`, receiptId: `receipt-${suffix}`};
   input.stores.forEach((s, index) => {
     s.storeId = `store-${suffix}-${index}`; s.caseId = `case-${suffix}-${index}`; s.ownerUserId = `owner-${suffix}-${index}`;
@@ -1768,7 +1885,7 @@ test("actual atomic producer, recovery and exact-Store projections", {
   const projectId = "demo-lf-purchase";
   const firstApp = initializeApp({projectId}, `producer-${randomUUID()}`);
   const secondApp = initializeApp({projectId}, `reader-${randomUUID()}`);
-  const db = getFirestore(firstApp), fresh = getFirestore(secondApp);
+  const db = purchaseTestFirestore(firstApp), fresh = purchaseTestFirestore(secondApp);
   const source = new Map<string, TrustedPlacementReceipt>();
   const suffix = randomUUID();
   const value = receipt(suffix);

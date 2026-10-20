@@ -178,6 +178,10 @@ const publicAuthRuntimeServiceAccount =
 if (getApps().length === 0) {
   initializeApp();
 }
+// Configure once, before any RPC: let read ABORTED reach the SDK transaction
+// runner instead of replaying a closed transaction in the legacy stream layer.
+// Keep the existing Admin client, credentials, project and database routing.
+getFirestore().settings({gaxServerStreamingRetries: true});
 
 let providerService: YouTubeProviderService | undefined;
 let providerStores: FirestoreYouTubeStores | undefined;
