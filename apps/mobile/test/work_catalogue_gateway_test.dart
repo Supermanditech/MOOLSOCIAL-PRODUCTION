@@ -1390,6 +1390,61 @@ void main() {
       await tester.scrollUntilVisible(panel, 220, scrollable: cartScroll); await tester.pumpAndSettle();
       expect(find.descendant(of: panel, matching: find.text(advertised.name)), findsOneWidget);
       expect(find.descendant(of: panel, matching: find.text('Remove')), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-cart-refresh-store-coupons')), findsOneWidget);
+      final refresh = find.byKey(const ValueKey('buy-cart-refresh-store-coupons'));
+      Future<void> tapRefresh() async {
+        await tester.scrollUntilVisible(refresh, 120, scrollable: cartScroll);
+        await Scrollable.ensureVisible(tester.element(refresh), alignment: .5);
+        await tester.pumpAndSettle();
+        expect(refresh.hitTestable(), findsOneWidget);
+        await tester.tap(refresh); await tester.pumpAndSettle();
+      }
+      final eligibilityReads = bodies.where((body) => body['operation'] == 'evaluateStoreCouponEligibility').length;
+      if (scale == 1) {
+        final retained = session.selectedStoreCouponFor(advertised);
+        failAdvertisement = true; await tapRefresh();
+        expect(session.storeCouponNeedsReview(advertised), isTrue);
+        expect(identical(session.selectedStoreCouponFor(advertised), retained), isTrue);
+        expect(find.textContaining('Some Store coupons could not be refreshed.'), findsOneWidget);
+        failAdvertisement = false;
+        expect(session.cartStoreCouponRefreshProducts.length, 1, reason: 'Retail/Wholesale share one Store refresh');
+        session.removeStoreCoupon(advertised, expectedSelection: retained!); await tester.pumpAndSettle();
+        expect(session.cartStoreCoupons, isEmpty);
+        expect(refresh, findsOneWidget, reason: 'Failed read retains its recovery control');
+        await tapRefresh();
+        expect(session.selectedStoreCoupons, isEmpty, reason: 'Refresh never automatically selects a coupon');
+      } else {
+        await tapRefresh();
+      }
+      expect(bodies.where((body) => body['operation'] == 'evaluateStoreCouponEligibility').length, eligibilityReads,
+        reason: 'Refresh does not evaluate/redeem a coupon');
+      advertised = session.cartStoreCoupons.single;
+      expect(await session.chooseStoreCoupon(advertised), isTrue);
+      expect(await session.refreshCheckoutQuote(), isTrue);
+      await tester.pumpAndSettle();
+      final termsToggle = find.byKey(ValueKey('buy-cart-store-coupon-terms-${advertised.identity}'));
+      await tester.scrollUntilVisible(termsToggle, 120, scrollable: cartScroll);
+      await Scrollable.ensureVisible(tester.element(termsToggle), alignment: .5); await tester.pumpAndSettle();
+      final termsLabel = find.descendant(of: termsToggle, matching: find.text('View terms'));
+      expect(termsLabel.hitTestable(), findsOneWidget);
+      await tester.tap(termsLabel); await tester.pumpAndSettle();
+      expect(find.textContaining('Minimum Store purchase'), findsOneWidget);
+      expect(find.textContaining('use per customer · Campaign limit:'), findsOneWidget);
+      expect(tester.takeException(), isNull, reason: 'Shared coupon terms at $scale');
+      final termsCaptureRoot = Platform.environment['LF04_COUPON_CART_CAPTURE_ROOT'];
+      if (termsCaptureRoot != null) {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(hostBoundary));
+        await tester.runAsync(() async {
+          final file = File('$termsCaptureRoot/lf04-store-coupon-terms-host-${scale == 1 ? '1x' : '2x'}-20261020-v4.png');
+          if (await file.exists()) throw StateError('Preserve previous host captures.');
+          final image = await boundary.toImage(pixelRatio: 1);
+          try { final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+            await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
+          } finally { image.dispose(); }
+        });
+      }
+      await Scrollable.ensureVisible(tester.element(termsLabel), alignment: .5); await tester.pumpAndSettle();
+      await tester.tap(termsLabel); await tester.pumpAndSettle();
       staleRemove ??= tester.widget<TextButton>(find.ancestor(
         of: find.descendant(of: panel, matching: find.text('Remove')),
         matching: find.byType(TextButton)).first).onPressed;
@@ -1398,7 +1453,7 @@ void main() {
       if (captureRoot != null) {
         final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(hostBoundary));
         await tester.runAsync(() async {
-          final file = File('$captureRoot/lf04-store-coupon-cart-host-${scale == 1 ? '1x' : '2x'}-confirmed-20261020-v2.png');
+          final file = File('$captureRoot/lf04-store-coupon-cart-host-${scale == 1 ? '1x' : '2x'}-confirmed-20261020-v4.png');
           if (await file.exists()) throw StateError('Preserve previous host captures.');
           final image = await boundary.toImage(pixelRatio: 1);
           try { final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -1471,6 +1526,29 @@ void main() {
     expect(await firstApply, isFalse);
     expect(unsupported.selectedStoreCoupons, isEmpty);
     expect(unsupportedQuote.minorCalls, beforePublicationRace);
+    // Complete-empty is a genuine withdrawal. Keep its source tombstone;
+    // demonstrate refresh access without reviving the withdrawn revision.
+    pending = null; eligibilityOnly = false;
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: BuyV2Screen(
+      session: unsupported, initialDestination: unsupported.destination, initialView: BuyV2View.cart)));
+    await tester.pumpAndSettle();
+    final emptyRefresh = find.byKey(const ValueKey('buy-cart-refresh-store-coupons'));
+    final emptyScroll = find.descendant(of: find.byKey(const ValueKey('buy-cart-scroll')),
+      matching: find.byWidgetPredicate((widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down)).first;
+    if (emptyRefresh.evaluate().isEmpty) {
+      final toggle = find.byKey(const ValueKey('buy-cart-coupons'));
+      await tester.scrollUntilVisible(toggle, 120, scrollable: emptyScroll);
+      if (find.byTooltip('Collapse coupons and offers').evaluate().isEmpty) {
+        await tester.tap(toggle); await tester.pumpAndSettle();
+      }
+    }
+    await tester.scrollUntilVisible(emptyRefresh, 120, scrollable: emptyScroll);
+    await Scrollable.ensureVisible(tester.element(emptyRefresh), alignment: .5); await tester.pumpAndSettle();
+    expect(emptyRefresh.hitTestable(), findsOneWidget);
+    await tester.tap(emptyRefresh); await tester.pumpAndSettle();
+    expect(unsupported.cartStoreCoupons, isEmpty);
+    expect(unsupported.selectedStoreCoupons, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
     pending = null; eligibilityOnly = false; advertisement = capture['advertisement'];
     expect(session.addProduct(other.id), isTrue, reason: '${session.notice}; '
       'facts=${session.productFactsFor(other).orderabilityLabel}; stale=${session.productFactsFor(other).stale}; '
@@ -1540,6 +1618,30 @@ void main() {
     session.removeStoreCoupon(advertised, expectedSelection: session.selectedStoreCouponFor(advertised)!);
     expect(session.selectedStoreCoupons, isEmpty);
     expect(session.checkoutTotalMinor, 156000);
+    Future<Finder> mountRefresh(BuyV2Session owner) async {
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: BuyV2Screen(
+        session: owner, initialDestination: owner.destination, initialView: BuyV2View.cart)));
+      await tester.pumpAndSettle();
+      final scroll = find.descendant(of: find.byKey(const ValueKey('buy-cart-scroll')),
+        matching: find.byWidgetPredicate((widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down)).first;
+      final toggle = find.byKey(const ValueKey('buy-cart-coupons'));
+      await tester.scrollUntilVisible(toggle, 120, scrollable: scroll);
+      if (find.byTooltip('Collapse coupons and offers').evaluate().isEmpty) {
+        await tester.tap(toggle); await tester.pumpAndSettle();
+      }
+      return find.byKey(const ValueKey('buy-cart-refresh-store-coupons'));
+    }
+    final oldRefresh = tester.widget<TextButton>(await mountRefresh(session)).onPressed!;
+    final inline = find.byKey(ValueKey('buy-cart-benefits-scope-${session.cartScope.name}'));
+    final inlineState = tester.state(inline);
+    await mountRefresh(unsupported);
+    expect(inlineState.mounted, isFalse, reason: 'The real root retires its old inline owner on replacement');
+    expect(identical(tester.state(inline), inlineState), isFalse);
+    final beforeStaleRefresh = transport.calls, originalQuote = unsupported.checkoutQuote;
+    oldRefresh(); await tester.pumpAndSettle();
+    expect(transport.calls, beforeStaleRefresh, reason: 'Captured owner A action cannot dispatch for B');
+    expect(identical(unsupported.checkoutQuote, originalQuote), isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
   }, skip: const String.fromEnvironment('LF04_ELIGIBILITY_CAPTURE').isEmpty);
   Map<String, dynamic> publicCoupon({String id = 'coupon-one', int revision = 1, String name = 'Host Diwali savings'}) => {
     'couponId': id, 'revision': revision, 'scope': 'store_basket', 'storeId': 'store-one',

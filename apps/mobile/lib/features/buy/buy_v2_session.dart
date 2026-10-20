@@ -4810,6 +4810,22 @@ class BuyV2Session extends ChangeNotifier {
     }
     return List.unmodifiable(values.values);
   }
+  // Discover refresh targets independently of cached rows, including a failed
+  // or complete-empty read. One read per real realm/Store, not per SKU/channel.
+  List<BuyV2Product> get cartStoreCouponRefreshProducts {
+    if (_collectionDisposed || !procurementScopeCurrent || isStoreProcurement) return const [];
+    final seen = <String>{}, products = <BuyV2Product>[];
+    for (final line in cartLines) {
+      final key = _storeCouponKey(line.product), source = _sourceForCatalogue(line.product.destination);
+      if (key != null && source is BuyV2StoreCouponSource &&
+          (source as BuyV2StoreCouponSource).storeCouponsActive && seen.add(key)) {
+        products.add(line.product);
+      }
+    }
+    return List.unmodifiable(products);
+  }
+  bool storeCouponAdvertisementCurrent(BuyV2PublishedStoreCoupon coupon) =>
+    cartLines.any((line) => publishedStoreCouponsFor(line.product).any((value) => identical(value, coupon)));
   List<BuyV2StoreCouponEligibility> get _checkoutStoreCouponSelections => List.unmodifiable([
     for (final selected in _selectedStoreCouponRefs.values)
       if (selected.owner == _currentCustomerOrderScope && _couponStoreLines(selected.value.coupon).isNotEmpty) selected.value,

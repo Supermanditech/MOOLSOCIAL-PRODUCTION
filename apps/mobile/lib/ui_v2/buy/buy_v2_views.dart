@@ -7567,9 +7567,6 @@ class _PublishedStoreCouponTile extends StatelessWidget {
   const _PublishedStoreCouponTile({required this.coupon});
   final BuyV2PublishedStoreCoupon coupon;
   @override Widget build(BuildContext context) {
-    final terms = coupon.terms, dates = MaterialLocalizations.of(context);
-    final saving = terms.kind == 'flat' ? '${_comparisonMoney(terms.flatAmountMinor!)} off'
-      : '${(terms.percentageBasisPoints! / 100).toStringAsFixed(terms.percentageBasisPoints! % 100 == 0 ? 0 : 2)}% off';
     return Padding(padding: const EdgeInsets.only(bottom: 6), child: Material(
       color: const Color(0xfff2f8f7), borderRadius: BorderRadius.circular(13),
       child: ExpansionTile(key: ValueKey('buy-published-store-coupon-${coupon.identity}'),
@@ -7577,14 +7574,22 @@ class _PublishedStoreCouponTile extends StatelessWidget {
         leading: const Icon(Icons.confirmation_number_outlined, color: Color(0xff256b78)),
         title: Text(coupon.name, style: context.buyBody.copyWith(fontWeight: FontWeight.w600)),
         subtitle: Text('Store-wide coupon · View terms', style: context.buyMeta),
-        children: [Align(alignment: Alignment.centerLeft, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(terms.kind == 'flat' ? saving : '$saving · up to ${_comparisonMoney(terms.maximumSavingMinor!)}', style: context.buyBody),
-          Text('Minimum Store purchase ${_comparisonMoney(terms.minimumSpendMinor!)}', style: context.buyMeta),
-          Text('Valid ${dates.formatShortDate(coupon.validFrom.toLocal())} – ${dates.formatShortDate(coupon.validUntil.toLocal())}', style: context.buyMeta),
-          Text('${coupon.configuredUsesPerCustomer} ${coupon.configuredUsesPerCustomer == 1 ? 'use' : 'uses'} per customer · Campaign limit: ${coupon.configuredTotalUses} uses. This is not the remaining count.', style: context.buyMeta),
-          Text('${coupon.publisherName} · One saving per eligible Store basket, not per product. This information does not apply a discount; eligibility and the final saving need confirmation at Checkout.', style: context.buyMeta),
-        ]))] )));
+        children: [_publishedStoreCouponTerms(context, coupon)] )));
   }
+}
+
+Widget _publishedStoreCouponTerms(BuildContext context, BuyV2PublishedStoreCoupon coupon, {bool inCart = false}) {
+  final terms = coupon.terms, dates = MaterialLocalizations.of(context);
+  final saving = terms.kind == 'flat' ? '${_comparisonMoney(terms.flatAmountMinor!)} off'
+    : '${(terms.percentageBasisPoints! / 100).toStringAsFixed(terms.percentageBasisPoints! % 100 == 0 ? 0 : 2)}% off';
+  return Align(alignment: Alignment.centerLeft, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(terms.kind == 'flat' ? saving : '$saving · up to ${_comparisonMoney(terms.maximumSavingMinor!)}', style: context.buyBody),
+    Text('Minimum Store purchase ${_comparisonMoney(terms.minimumSpendMinor!)}', style: context.buyMeta),
+    Text('Valid ${dates.formatShortDate(coupon.validFrom.toLocal())} – ${dates.formatShortDate(coupon.validUntil.toLocal())}', style: context.buyMeta),
+    Text('${coupon.configuredUsesPerCustomer} ${coupon.configuredUsesPerCustomer == 1 ? 'use' : 'uses'} per customer · Campaign limit: ${coupon.configuredTotalUses} uses. This is not the remaining count.', style: context.buyMeta),
+    Text(inCart ? '${coupon.publisherName} · Applies once to eligible items from this Store, not per product. Other Stores are unaffected.'
+      : '${coupon.publisherName} · One saving per eligible Store basket, not per product. This information does not apply a discount; eligibility and the final saving need confirmation at Checkout.', style: context.buyMeta),
+  ]));
 }
 
 class _ProductBenefitsPreview extends StatelessWidget {
@@ -22050,6 +22055,25 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
   late BuyV2Destination _destination = widget.initialDestination;
   late String _filter = widget.session.cartDisplayFilter;
   BuyV2CartBenefitKind _kind = BuyV2CartBenefitKind.coupon;
+  bool _refreshingStoreCoupons = false;
+  String? _storeCouponRefreshMessage;
+  int _storeCouponRefreshSequence = 0;
+
+  Future<void> _refreshStoreCoupons(BuyV2Session owner) async {
+    if (!mounted || !identical(widget.session, owner)) return;
+    final products = owner.cartStoreCouponRefreshProducts;
+    if (_refreshingStoreCoupons || owner.cartChangesBlocked || products.isEmpty) return;
+    final sequence = ++_storeCouponRefreshSequence;
+    setState(() { _refreshingStoreCoupons = true; _storeCouponRefreshMessage = null; });
+    final results = await Future.wait(products.map((product) => owner.refreshPublishedStoreCoupons(product.id)));
+    if (!mounted || !identical(widget.session, owner) || sequence != _storeCouponRefreshSequence) return;
+    setState(() {
+      _refreshingStoreCoupons = false;
+      _storeCouponRefreshMessage = results.every((success) => success)
+        ? 'Store coupons refreshed.'
+        : 'Some Store coupons could not be refreshed. Your Cart and selections are kept.';
+    });
+  }
 
   @override
   void initState() {
@@ -22096,6 +22120,9 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
   void didUpdateWidget(covariant _CartBenefitsInline oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.session, widget.session)) {
+      _storeCouponRefreshSequence++;
+      _refreshingStoreCoupons = false;
+      _storeCouponRefreshMessage = null;
       oldWidget.session.removeListener(_sessionChanged);
       widget.session.addListener(_sessionChanged);
       _scheduleBenefitsRead(widget.session);
@@ -22225,6 +22252,14 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
           ],
         ),
         const SizedBox(height: 6),
+        if (_kind == BuyV2CartBenefitKind.coupon && ownerSession.cartStoreCouponRefreshProducts.isNotEmpty) ...[
+          Align(alignment: Alignment.centerRight, child: TextButton.icon(
+            key: const ValueKey('buy-cart-refresh-store-coupons'),
+            onPressed: _refreshingStoreCoupons || ownerSession.cartChangesBlocked ? null : () => _refreshStoreCoupons(ownerSession),
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: Text(_refreshingStoreCoupons ? 'Refreshing Store coupons…' : 'Refresh Store coupons'))),
+          if (_storeCouponRefreshMessage case final message?) Text(message, style: context.buyMeta),
+        ],
         if (_kind == BuyV2CartBenefitKind.coupon && ownerSession.cartStoreCoupons.isNotEmpty) ...[
           for (final coupon in ownerSession.cartStoreCoupons.take(2))
             _CartStoreCouponRow(session: ownerSession, coupon: coupon),
@@ -22345,6 +22380,10 @@ class _CartStoreCouponRow extends StatelessWidget {
           : confirmed ? 'Saving ${_comparisonMoney(selected.savingMinor!)} confirmed in the total.'
           : 'Eligible saving ${_comparisonMoney(selected.savingMinor!)} · not yet included in the total.', style: context.buyMeta),
         if (session.storeCouponMessage(coupon) case final message?) Text(message, style: context.buyMeta),
+        Material(color: Colors.transparent, child: ExpansionTile(key: ValueKey('buy-cart-store-coupon-terms-${coupon.identity}'),
+          tilePadding: EdgeInsets.zero, childrenPadding: const EdgeInsets.only(bottom: 6),
+          title: Text(session.storeCouponAdvertisementCurrent(coupon) ? 'View terms' : 'Previously checked terms', style: context.buyMeta),
+          children: [_publishedStoreCouponTerms(context, coupon, inCart: true)])),
         Wrap(spacing: 8, alignment: WrapAlignment.end, children: [
           if (selected != null) TextButton(onPressed: session.cartChangesBlocked || busy ? null : () => session.removeStoreCoupon(coupon, expectedSelection: selected),
             child: const Text('Remove')),
