@@ -62,6 +62,19 @@ export interface TrustedPlacementReceipt {
   schemaVersion: 1 | 2 | 3 | 4 | 5 | 6; realm: Realm; authNamespace: "firebase-default";
   finalPlacement: true; issuer: string; receiptId: string; revision: string;
   buyerUserId: string; stores: PlacementStore[];
+  /** Private independently versioned commit facts; never a public projection. */
+  couponUseContext?: {schemaVersion: 1; stores: {
+    storeId: string; couponId: string; couponRevision: number; componentId: string;
+    basket: Record<string, unknown>; holdUntil: string; lifecycleSourceId: string;
+  }[]};
+}
+export interface PurchaseCouponTransactionContext {
+  receipt: TrustedPlacementReceipt; purchaseId: string; createdAt: string;
+  orders: {storeId: string; orderId: string; lines: {sourceLineId: string; lineId: string}[]}[];
+}
+export interface PurchaseCouponCommitter {
+  /** Read all Stores first; returned writer runs before the purchase creates. */
+  prepareCouponHolds(tx: Transaction, context: PurchaseCouponTransactionContext): Promise<() => void>;
 }
 export interface FinalPlacementSource {
   readFinalPlacement(reference: string): Promise<TrustedPlacementReceipt | undefined>;
@@ -951,8 +964,9 @@ function fulfilmentContext(value: unknown, lines: readonly {lineId: string}[], h
   return {schemaVersion: 1, method: r.method, recipient, address, instructions};
 }
 export function normalizePlacement(value: unknown, realm: Realm): TrustedPlacementReceipt {
+  const hasCouponContext = Object.hasOwn(obj(value), "couponUseContext");
   const r = exact(value, ["schemaVersion", "realm", "authNamespace", "finalPlacement", "issuer",
-    "receiptId", "revision", "buyerUserId", "stores"]);
+    "receiptId", "revision", "buyerUserId", "stores", ...(hasCouponContext ? ["couponUseContext"] : [])]);
   if ((r.schemaVersion !== 1 && r.schemaVersion !== 2 && r.schemaVersion !== 3 && r.schemaVersion !== 4 && r.schemaVersion !== 5 && r.schemaVersion !== 6) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
       r.finalPlacement !== true || !["evaluation", "production"].includes(realm)) fail();
   const stores = array(r.stores, 10).map(raw => {
@@ -973,6 +987,27 @@ export function normalizePlacement(value: unknown, realm: Realm): TrustedPlaceme
   const result: TrustedPlacementReceipt = {schemaVersion: r.schemaVersion, realm, authNamespace: "firebase-default",
     finalPlacement: true, issuer: id(r.issuer), receiptId: id(r.receiptId), revision: id(r.revision),
     buyerUserId: id(r.buyerUserId), stores};
+  const declaredStoreCoupons = stores.flatMap(store => (store.benefitAttribution?.components ?? [])
+    .filter(component => /^store-coupon-v[1-9][0-9]*$/u.test(component.benefitRevision))
+    .map(component => ({storeId: store.storeId, componentId: component.componentId})));
+  if (declaredStoreCoupons.length && !hasCouponContext) fail();
+  if (hasCouponContext) {
+    if (r.schemaVersion !== 6) fail();
+    const context = exact(r.couponUseContext, ["schemaVersion", "stores"]);
+    if (context.schemaVersion !== 1) fail();
+    const coupons = array(context.stores, 10).map(raw => {
+      const c = exact(raw, ["storeId", "couponId", "couponRevision", "componentId", "basket", "holdUntil", "lifecycleSourceId"]);
+      const storeId = id(c.storeId), componentId = id(c.componentId);
+      const store = stores.find(s => s.storeId === storeId);
+      if (!store || !store.benefitAttribution?.components.some(component => component.componentId === componentId)) fail();
+      return {storeId, couponId: id(c.couponId), couponRevision: integer(c.couponRevision, 1_000_000_000, 1), componentId,
+        basket: structuredClone(obj(c.basket)), holdUntil: timestamp(c.holdUntil), lifecycleSourceId: id(c.lifecycleSourceId)};
+    }).sort((a, b) => compare(a.storeId, b.storeId));
+    unique(coupons.map(c => c.storeId));
+    result.couponUseContext = {schemaVersion: 1, stores: coupons};
+    if (declaredStoreCoupons.some(component => !coupons.some(c =>
+      c.storeId === component.storeId && c.componentId === component.componentId))) fail();
+  }
   // Strictly below Firestore's 1MiB aggregate bound, including generated IDs.
   if (Buffer.byteLength(JSON.stringify(result), "utf8") > 300_000) fail();
   return result;
@@ -1036,7 +1071,7 @@ function validateAggregate(value: unknown, purchaseId: string, realm: Realm): Pu
  * seller transition, legacy retailerOrders writes or externally callable create. */
 export class WorkspacePurchaseProjectionService {
   constructor(private readonly db: Firestore, private readonly realm: Realm,
-    private readonly source?: FinalPlacementSource) {
+    private readonly source?: FinalPlacementSource, private readonly coupons?: PurchaseCouponCommitter) {
     if (!["evaluation", "production"].includes(realm)) fail("service_unavailable", 503);
   }
   private root() {return this.db.collection("workspacePurchaseProjections").doc(this.realm);}
@@ -1069,6 +1104,7 @@ export class WorkspacePurchaseProjectionService {
         if (aggregate.sourceFingerprint !== sourceFingerprint || aggregate.buyerUserId !== input.buyerUserId) fail("invalid_state", 409);
         return {purchaseId: aggregate.purchaseId, buyerId: aggregate.buyerId};
       }
+      if (input.couponUseContext && !this.coupons) fail("service_unavailable", 503);
       const buyerDoc = await tx.get(buyer);
       const buyerData = buyerDoc.data();
       if (buyerDoc.exists && (buyerData?.userId !== input.buyerUserId || buyerData.authNamespace !== input.authNamespace)) fail("invalid_state", 409);
@@ -1107,6 +1143,9 @@ export class WorkspacePurchaseProjectionService {
       // and the response envelope. Never truncate immutable original facts.
       const projection = this.projection(body, input.buyerUserId, "buyer", orders);
       if (Buffer.byteLength(JSON.stringify({ok: true, data: projection}), "utf8") > 480 * 1024) fail();
+      const writeCouponHolds = input.couponUseContext ? await this.coupons!.prepareCouponHolds(tx,
+        {receipt: input, purchaseId, createdAt, orders: allocatedOrders}) : undefined;
+      writeCouponHolds?.();
       tx.create(this.root().collection("purchases").doc(purchaseId), {...body, integrity: integrityHash(body)});
       for (const order of orders) tx.create(this.referencePath(order), this.pointer(body, order));
       tx.create(receipt, {purchaseId, sourceFingerprint});

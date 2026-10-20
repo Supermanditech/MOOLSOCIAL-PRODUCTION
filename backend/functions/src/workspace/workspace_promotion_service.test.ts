@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {randomUUID} from "node:crypto";
+import {createHash, randomUUID} from "node:crypto";
+import {WorkspacePurchaseProjectionService, type TrustedPlacementReceipt} from "./workspace_purchase_projection_service.js";
 import {initializeApp, deleteApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 import {FirestorePromotionRepository, WorkspacePromotionService, planPromotionSave,
-  planStoreCouponSave, evaluateStoreCouponBasket, planStoreCouponUseEvent, type StoreCouponBasket,
+  planStoreCouponSave, evaluateStoreCouponBasket, planStoreCouponUseEvent, storeCouponAttributionReferences, type StoreCouponBasket,
   type StoreCouponUse, type StoreCouponUseEvent,
   type StoreCouponCommand, type StoreCouponRecord, type StoreCouponReceipt,
   type PromotionCommand, type PromotionRecord, type PromotionReceipt,
@@ -326,9 +327,204 @@ test('LF04-APPLIED uses exact intermediates and binds changes without mutating o
     maximumSavingMinor: 9000000000000}), profile, basket, at);
   assert.equal(result.savingMinor, 8999100000000);
   assert.deepEqual(basket, original);
-  basket.lines[0]!.offerRevision++;
+  basket.lines[0]!.offerRevision = 2;
   assert.notEqual(evaluateStoreCouponBasket(appliedCampaign({percentage: true, discount: 9999,
     maximumSavingMinor: 9000000000000}), profile, basket, at).basketFingerprint, result.basketFingerprint);
+});
+// Real isolated emulator transactions through the actual purchase materializer;
+// trusted-source fixtures only, never orders/payments injected into OPPO.
+async function couponPlacementScenario(firstLifetimeMs?: number) {
+  const suffix = randomUUID().replaceAll('-', ''), clock = new Date();
+  const start = new Date(clock.getTime() - 60000).toISOString(), end = new Date(clock.getTime() + 3600000).toISOString();
+  const app = initializeApp({projectId: 'demo-lf-store-coupon'}, `coupon-commit-${suffix}`), db = getFirestore(app);
+  const storeIds = [`store-first-${suffix}`, `store-second-${suffix}`];
+  const repository = () => new FirestorePromotionRepository(db, 'evaluation', () => clock);
+  const campaigns = new Map<string, StoreCouponRecord>();
+  for (const storeId of storeIds) {
+    const caseId = `case-${storeId}`;
+    await db.collection('workspaceProfiles').doc(caseId).create({...profile, workspaceId: storeId, caseId});
+    const result = await storeCouponService(repository(), () => clock.toISOString()).handleOperation('owner-one', 'saveStoreCoupon',
+      storeCouponBody({storeId, coupon: {...storeCouponBody().coupon, startsAt: start,
+        endsAt: firstLifetimeMs && storeId === storeIds[0] ? new Date(clock.getTime() + firstLifetimeMs).toISOString() : end}})) as any;
+    campaigns.set(storeId, result.record);
+  }
+  function source(buyer: string, key: string, ids = [storeIds[0]!]): TrustedPlacementReceipt {
+    const baskets = ids.map(storeId => {
+      const basket = appliedBasket(); Object.assign(basket, {storeId, buyerUserId: buyer, observedAt: start, validUntil: end});
+      basket.lines = basket.lines.filter(line => line.storeId === 'store-one').map(line => ({...line, storeId,
+        offerRevision: `offer-revision-${line.offerRevision}`}));
+      return basket;
+    });
+    const results = baskets.map(basket => evaluateStoreCouponBasket(campaigns.get(basket.storeId)!,
+      {...profile, workspaceId: basket.storeId}, basket, clock.toISOString()));
+    return {schemaVersion: 6, realm: 'evaluation', authNamespace: 'firebase-default', finalPlacement: true,
+      issuer: 'host-trusted-placement', receiptId: `${key}-${suffix}`, revision: 'placement-revision-one', buyerUserId: buyer,
+      stores: baskets.map((basket, index) => ({storeId: basket.storeId, caseId: `case-${basket.storeId}`, ownerUserId: 'owner-one',
+        fulfilmentContext: null, lines: basket.lines.map(line => ({sourceLineId: line.lineId, skuId: line.skuId,
+          canonicalProductId: `canonical-${line.skuId}`, verifiedPackId: line.packId, offerId: line.offerId,
+          offerRevision: String(line.offerRevision), name: 'Host supplied product', packLabel: 'Host pack',
+          quantityMilli: line.quantity * 1000, quantityUnit: 'pack', unitPriceMinor: line.unitPriceMinor,
+          lineTotalMinor: line.quantity * line.unitPriceMinor, variant: '', scheduledFulfilment: null,
+          publicListing: {schemaVersion: 1, realm: 'evaluation', storeId: basket.storeId, skuId: line.skuId,
+            canonicalProductId: `canonical-${line.skuId}`, verifiedPackId: line.packId, channel: line.channel,
+            listingId: `listing-${createHash('sha256').update(JSON.stringify([1, 'evaluation', basket.storeId, line.skuId, line.channel])).digest('hex')}`}})),
+        totals: {itemsMinor: 20003, discountMinor: 1050, taxMinor: 17, deliveryMinor: 19, freightMinor: 0,
+          paymentFeeMinor: 5, tipMinor: 7, totalMinor: 19001},
+        benefitAttribution: {schemaVersion: 1, components: [{componentId: 'host-coupon-component', benefitId: 'coupon-one',
+          ...storeCouponAttributionReferences('evaluation', basket.storeId, 'coupon-one', 1),
+          label: results[index]!.name, publisherType: 'supplier', effect: 'instant_discount', amountBasis: 'applied',
+          amountMinor: results[index]!.savingMinor,
+          allocations: results[index]!.allocations.filter(a => a.savingMinor > 0).map(a => ({lineId: a.lineId, amountMinor: a.savingMinor}))}]}})),
+      couponUseContext: {schemaVersion: 1, stores: baskets.map(basket => ({storeId: basket.storeId, couponId: 'coupon-one',
+        couponRevision: 1, componentId: 'host-coupon-component', basket: basket as unknown as Record<string, unknown>,
+        holdUntil: end, lifecycleSourceId: 'host-order-lifecycle'}))}};
+  }
+  function materializer(input: TrustedPlacementReceipt, useCoupons = true) {
+    return new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => structuredClone(input)},
+      useCoupons ? repository() : undefined);
+  }
+  return {app, db, source, repository, materializer, storeIds, clock, end};
+}
+test('LF04-ATOMIC materialize holds once, respects capacity, maps lines and applies trusted events once', async t => {
+  const host = process.env.FIRESTORE_EMULATOR_HOST;
+  if (!host) {t.skip('Explicit loopback emulator required'); return;}
+  assert.match(host, /^127\.0\.0\.1:\d+$/u);
+  const scenario = await couponPlacementScenario();
+  const {app, db, source, repository, materializer, storeIds} = scenario;
+  const root = db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc(storeIds[0]!);
+  try {
+    await root.collection('storeCoupons').doc('coupon-one').update({totalUses: 1, usesPerCustomer: 1});
+    const first = source('buyer-first', 'host-placement-first'), second = source('buyer-second', 'host-placement-second');
+    const withoutContext = structuredClone(first); delete withoutContext.couponUseContext;
+    await assert.rejects(materializer(withoutContext).materialize('missing-coupon-context'));
+    await assert.rejects(materializer(first, false).materialize('host-reference'));
+    const race = await Promise.allSettled([materializer(first).materialize('first-reference'), materializer(second).materialize('second-reference')]);
+    assert.equal(race.filter(result => result.status === 'fulfilled').length, 1,
+      race.map(result => result.status === 'rejected' ? String(result.reason?.stack) : 'fulfilled').join('\n'));
+    const index = race[0]!.status === 'fulfilled' ? 0 : 1, input = index === 0 ? first : second;
+    const created = (race[index] as PromiseFulfilledResult<{purchaseId: string; buyerId: string}>).value;
+    assert.deepEqual(await materializer(input).materialize('same-original-reference'), created);
+    assert.deepEqual(await materializer(input, false).materialize('same-original-no-new-participant'), created);
+    const usage = root.collection('storeCouponUsage').doc('coupon-one');
+    assert.equal((await usage.get()).get('heldUses'), 1);
+    const holds = await root.collection('storeCouponOrderUses').get(); assert.equal(holds.size, 1);
+    const held = holds.docs[0]!.get('current') as StoreCouponUse;
+    const projection = await materializer(input).readBuyer(input.buyerUserId, {purchaseId: created.purchaseId});
+    const ids = new Set(projection.orders[0]!.original.lines.map(line => line.lineId));
+    assert.ok((holds.docs[0]!.get('evaluation.allocations') as {lineId: string}[]).every(line => ids.has(line.lineId)));
+    assert.equal(JSON.stringify(projection).includes('couponUseContext'), false);
+    const event: StoreCouponUseEvent = {...hostUseEvent(), realm: held.realm, storeId: held.storeId, buyerUserId: held.buyerUserId,
+      purchaseId: held.purchaseId, storeOrderId: held.storeOrderId, basketFingerprint: held.basketFingerprint,
+      sourceId: held.lifecycleSourceId, observedAt: held.heldAt};
+    const consumed = await repository().applyCouponUseEvent(event);
+    assert.equal(consumed.record.state, 'consumed');
+    assert.equal((await usage.get()).get('heldUses'), 0); assert.equal((await usage.get()).get('redeemedUses'), 1);
+    const beforeReplay = JSON.stringify((await usage.get()).data());
+    assert.deepEqual(await repository().applyCouponUseEvent(event), consumed);
+    assert.equal(JSON.stringify((await usage.get()).data()), beforeReplay);
+    const cancelled = await repository().applyCouponUseEvent({...event, eventId: 'pre-fulfilment-cancel',
+      sourceRevision: 2, expectedRevision: 2, outcome: 'cancelled_before_fulfilment'});
+    assert.equal(cancelled.record.state, 'released'); assert.equal((await usage.get()).get('redeemedUses'), 0);
+    assert.deepEqual(await repository().applyCouponUseEvent(event), consumed);
+    assert.equal((await holds.docs[0]!.ref.get()).get('current.state'), 'released', 'Old acknowledgement must never roll back current state.');
+    const successor = source(input.buyerUserId, 'host-placement-after-release');
+    const successorCreated = await materializer(successor).materialize('after-release-reference');
+    assert.equal((await usage.get()).get('heldUses'), 1);
+    const successorHold = (await root.collection('storeCouponOrderUses').get()).docs
+      .find(d => d.get('current.purchaseId') === successorCreated.purchaseId)!.get('current') as StoreCouponUse;
+    const successorEvent: StoreCouponUseEvent = {...event, eventId: 'successor-paid', purchaseId: successorHold.purchaseId,
+      storeOrderId: successorHold.storeOrderId, basketFingerprint: successorHold.basketFingerprint,
+      observedAt: successorHold.heldAt};
+    await repository().applyCouponUseEvent(successorEvent);
+    await assert.rejects(repository().applyCouponUseEvent({...successorEvent, eventId: 'future-event',
+      expectedRevision: 2, sourceRevision: 2, observedAt: scenario.end, outcome: 'completed_order_refunded'}));
+    await repository().applyCouponUseEvent({...successorEvent, eventId: 'completed-refund',
+      expectedRevision: 2, sourceRevision: 2, outcome: 'completed_order_refunded'});
+    assert.equal((await usage.get()).get('heldUses'), 0); assert.equal((await usage.get()).get('redeemedUses'), 1);
+    await assert.rejects(repository().applyCouponUseEvent({...successorEvent, eventId: 'late-cancel',
+      expectedRevision: 3, sourceRevision: 3, outcome: 'cancelled_before_fulfilment'}));
+    await assert.rejects(materializer(source('buyer-after-refund', 'after-completed-refund')).materialize('after-completed-refund'));
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+test('LF04-ATOMIC multi-Store failure rolls back purchase, all holds and capacity', async t => {
+  const host = process.env.FIRESTORE_EMULATOR_HOST;
+  if (!host) {t.skip('Explicit loopback emulator required'); return;}
+  const {app, db, source, materializer, storeIds} = await couponPlacementScenario();
+  try {
+    const incomplete = source(`buyer-incomplete-${randomUUID()}`, 'incomplete-coverage', storeIds);
+    incomplete.couponUseContext!.stores.pop();
+    await assert.rejects(materializer(incomplete).materialize('incomplete-coverage'));
+    const second = db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc(storeIds[1]!);
+    await second.collection('storeCouponUsage').doc('coupon-one').update({origin: null});
+    const input = source(`buyer-rollback-${randomUUID()}`, 'host-multi-store-rollback', storeIds);
+    await assert.rejects(materializer(input).materialize('rollback-reference'));
+    for (const storeId of storeIds) {
+      const root = db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc(storeId);
+      assert.equal((await root.collection('storeCouponOrderUses').get()).size, 0);
+      assert.equal((await root.collection('storeCouponUsage').doc('coupon-one').get()).get('heldUses'), 0);
+    }
+    assert.equal((await db.collection('workspacePurchaseProjections').doc('evaluation').collection('purchases')
+      .where('buyerUserId', '==', input.buyerUserId).get()).size, 0);
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+test('LF04-ATOMIC rejects mismatched coupon attribution and rechecks every Store deadline after final read', async t => {
+  if (!process.env.FIRESTORE_EMULATOR_HOST) {t.skip('Explicit loopback emulator required'); return;}
+  const {app, db, source, materializer, storeIds, clock} = await couponPlacementScenario(1000);
+  try {
+    for (const field of ['benefitRevision', 'sourceReference', 'funderReference'] as const) {
+      const input = source(`buyer-${field}`, `mismatch-${field}`);
+      input.stores[0]!.benefitAttribution!.components[0]![field] = 'unrelated-reference';
+      await assert.rejects(materializer(input).materialize(`mismatch-${field}`));
+    }
+    const input = source(`buyer-clock-${randomUUID()}`, 'multi-store-expiry', storeIds);
+    let clockReads = 0;
+    const participant = new FirestorePromotionRepository(db, 'evaluation', () =>
+      new Date(clock.getTime() + (++clockReads <= 2 ? 0 : 2000)));
+    const purchases = new WorkspacePurchaseProjectionService(db, 'evaluation',
+      {readFinalPlacement: async () => structuredClone(input)}, participant);
+    await assert.rejects(purchases.materialize('final-time-check'));
+    assert.equal(clockReads, 3, 'Two per-Store reads then one shared final-time check.');
+    for (const storeId of storeIds) {
+      const root = db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc(storeId);
+      assert.equal((await root.collection('storeCouponOrderUses').get()).size, 0);
+      assert.equal((await root.collection('storeCouponUsage').doc('coupon-one').get()).get('heldUses'), 0);
+    }
+    assert.equal((await db.collection('workspacePurchaseProjections').doc('evaluation').collection('purchases')
+      .where('buyerUserId', '==', input.buyerUserId).get()).size, 0);
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+test('LF04-ATOMIC enforces customer limit, detects missing customer history and serializes trusted outcome races', async t => {
+  if (!process.env.FIRESTORE_EMULATOR_HOST) {t.skip('Explicit loopback emulator required'); return;}
+  const {app, db, source, materializer, repository, storeIds} = await couponPlacementScenario();
+  const storeId = storeIds[0]!, root = db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc(storeId);
+  try {
+    const buyer = `buyer-customer-${randomUUID()}`;
+    const race = await Promise.allSettled(['first', 'second'].map(key =>
+      materializer(source(buyer, `customer-${key}`)).materialize(`customer-${key}`)));
+    assert.equal(race.filter(result => result.status === 'fulfilled').length, 1);
+    assert.equal((await root.collection('storeCouponUsage').doc('coupon-one').get()).get('heldUses'), 1);
+    await materializer(source('buyer-independent', 'independent-original')).materialize('independent-reference');
+    assert.equal((await root.collection('storeCouponUsage').doc('coupon-one').get()).get('heldUses'), 2);
+    const holds = await root.collection('storeCouponOrderUses').get();
+    const doc = holds.docs.find(d => d.get('current.buyerUserId') === buyer)!;
+    const held = doc.get('current') as StoreCouponUse;
+    const base: StoreCouponUseEvent = {...hostUseEvent(), realm: held.realm, storeId, buyerUserId: buyer,
+      purchaseId: held.purchaseId, storeOrderId: held.storeOrderId, basketFingerprint: held.basketFingerprint,
+      sourceId: held.lifecycleSourceId, observedAt: held.heldAt};
+    const outcomes = await Promise.allSettled([
+      repository().applyCouponUseEvent({...base, eventId: 'paid-race', outcome: 'payment_confirmed'}),
+      repository().applyCouponUseEvent({...base, eventId: 'failed-race', outcome: 'payment_failed'}),
+    ]);
+    assert.equal(outcomes.filter(result => result.status === 'fulfilled').length, 1);
+    const current = (await doc.ref.get()).get('current') as StoreCouponUse;
+    const usage = (await root.collection('storeCouponUsage').doc('coupon-one').get()).data()!;
+    assert.equal(usage.heldUses, 1); assert.equal(usage.redeemedUses, Number(current.state === 'consumed'));
+    const customerRef = root.collection('storeCouponUsage').doc('coupon-one').collection('customers').doc(cataloguePayloadHash(buyer));
+    // Deliberately corrupt only isolated emulator history, not application data.
+    await customerRef.delete();
+    await assert.rejects(materializer(source(buyer, 'missing-customer-history')).materialize('missing-customer-history'));
+    assert.equal((await root.collection('storeCouponUsage').doc('coupon-one').get()).get('heldUses'), 1);
+  } finally {await db.terminate(); await deleteApp(app);}
 });
 for (const percentage of [false, true]) {
   test(`LF04-STORE-COUPON original lifecycle readback and private-public separation ${percentage}`, async () => {
