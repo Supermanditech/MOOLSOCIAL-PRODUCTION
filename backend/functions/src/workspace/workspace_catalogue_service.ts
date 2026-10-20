@@ -311,6 +311,8 @@ export interface StoreSkuChannel {
   kind: "retail" | "wholesale" | "bulk"; offerId: string;
   priceMinor: number; mrpMinor: number | null; minimumOrder: number;
   quantityStep: number; tiers: Array<{minimumQuantity: number; unitPriceMinor: number}>;
+  supplierTax?: {version: 1; amountMinor: number; basis: "included" | "additional"} |
+    {version: 2; rateBasisPoints: number; basis: "included" | "additional"};
 }
 export interface StoreSkuInput {
   skuId: string; canonicalProductId: string; verifiedPackId: string; sku: string;
@@ -961,6 +963,7 @@ export class WorkspaceCatalogueService {
     const source = await this.repository.publicCatalogueSource(storeId, this.identity, false, tx, selected);
     if (!source) invalid("Coupon price source is unavailable.");
     return Promise.all(selected.map(skuId => this.publicCatalogue({storeId, skuId,
+      supplierTaxReadbackVersion: 1,
       listingReadbackVersion: 1, mediaReadbackVersion: 1, productFactsReadbackVersion: 1,
       unbrandedProduceReadbackVersion: 1, supplierPublishersVersion: 1, ...(policies ? {policyReadbackVersion: 1} : {})},
       {...source, records: source.records.filter(record => record.skuId === skuId)})));
@@ -1043,6 +1046,7 @@ export class WorkspaceCatalogueService {
     id(actor);
     return this.repository.storeStock(action === "public" ? undefined : actor, action, request, {...this.identity}, async source => {
       const page = await this.publicCatalogue({storeId: request.storeId, skuId: request.binding.skuId,
+        supplierTaxReadbackVersion: 1,
         supplierPublishersVersion: 1,
         listingReadbackVersion: 1, mediaReadbackVersion: 1, productFactsReadbackVersion: 1,
         unbrandedProduceReadbackVersion: 1}, source) as {state: string;
@@ -1109,6 +1113,7 @@ export class WorkspaceCatalogueService {
     if (!this.identity || !record) throw mediaUnavailable();
     return record.call(this.repository, id(actor), input, this.identity, async source => {
       const response = await this.publicCatalogue({storeId: input.storeId, skuId: input.skuId, listingReadbackVersion: 1,
+        supplierTaxReadbackVersion: 1,
         supplierPublishersVersion: 1,
         mediaReadbackVersion: 1, productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1}, source) as {
           state: string; catalogueVersion?: number; items: Array<{skuId: string; revision: number;
@@ -1139,6 +1144,7 @@ export class WorkspaceCatalogueService {
     if (!this.identity || !this.repository.recordStorePresentation) throw mediaUnavailable();
     return this.repository.recordStorePresentation(id(actor), input, this.identity, async source => {
       const page = await this.publicCatalogue({storeId: input.storeId, listingReadbackVersion: 1, mediaReadbackVersion: 1,
+        supplierTaxReadbackVersion: 1,
         supplierPublishersVersion: 1,
         productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1,
         storeDetailsReadbackVersion: 1, storeClassificationReadbackVersion: 1}, source) as {state: string; catalogueVersion?: number};
@@ -1159,6 +1165,7 @@ export class WorkspaceCatalogueService {
       const deadlines: string[] = [];
       for (const witness of input.listings) {
         const response = await this.publicCatalogue({storeId: input.storeId, skuId: witness.skuId,
+          supplierTaxReadbackVersion: 1,
           listingReadbackVersion: 1, supplierPublishersVersion: 1, mediaReadbackVersion: 1,
           productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1}, source) as {
             state: string; catalogueVersion?: number; items: Array<{skuId: string; revision: number;
@@ -1200,6 +1207,7 @@ export class WorkspaceCatalogueService {
       if (!record.content.media.some(media => cataloguePayloadHash(media) === cataloguePayloadHash(descriptor))) throw missing();
       independentProductReview(source.catalogue, record, upload.ownerUserId);
       const page = await this.publicCatalogue({storeId, skuId, listingReadbackVersion: 1, productFactsReadbackVersion: 1,
+        supplierTaxReadbackVersion: 1,
         supplierPublishersVersion: 1,
         unbrandedProduceReadbackVersion: 1, mediaReadbackVersion: 1}, source) as {state?: string; items?: Array<{skuId: string}>};
       if (page.state !== "ready" || !page.items?.some(item => item.skuId === skuId)) throw missing();
@@ -1219,7 +1227,8 @@ export class WorkspaceCatalogueService {
    * projection. Above capacity fail honestly; never sort/count a truncated set.
    */
   async publicDiscovery(body: Readonly<Record<string, unknown>>): Promise<object> {
-    exact(body, ["discoveryPageVersion", "query", "pageSize"], ["cursor", "resultKind", "storeId", "supplierPublishersVersion"]);
+    exact(body, ["discoveryPageVersion", "query", "pageSize"], ["cursor", "resultKind", "storeId", "supplierPublishersVersion", "supplierTaxReadbackVersion"]);
+    const taxRequested = supplierTaxReadbackRequested(body);
     const suppliersRequested = supplierPublishersRequested(body);
     if (body.discoveryPageVersion !== 1) invalid();
     const resultKind = body.resultKind === undefined ? "products" : body.resultKind;
@@ -1266,6 +1275,7 @@ export class WorkspaceCatalogueService {
         const source = values[i]!.source;
         if (!source) continue;
         const data = await service.publicCatalogue({storeId: storeIds[i], listingReadbackVersion: 1,
+          ...(taxRequested ? {supplierTaxReadbackVersion: 1} : {}),
           ...(suppliersRequested ? {supplierPublishersVersion: 1} : {}),
           productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1,
           storeDetailsReadbackVersion: 1, storeClassificationReadbackVersion: 1,
@@ -1370,7 +1380,8 @@ export class WorkspaceCatalogueService {
   }
 
   async publicVariantFamilies(body: Readonly<Record<string, unknown>>): Promise<object> {
-    exact(body, ["storeId", "listings"], ["familyId", "storeClassificationReadbackVersion", "supplierPublishersVersion"]);
+    exact(body, ["storeId", "listings"], ["familyId", "storeClassificationReadbackVersion", "supplierPublishersVersion", "supplierTaxReadbackVersion"]);
+    const taxRequested = supplierTaxReadbackRequested(body);
     const suppliersRequested = supplierPublishersRequested(body);
     const classificationRequested = body.storeClassificationReadbackVersion === 1;
     if (Object.hasOwn(body, "storeClassificationReadbackVersion") && !classificationRequested) invalid();
@@ -1385,6 +1396,7 @@ export class WorkspaceCatalogueService {
         familyId !== undefined && requested.length !== 1) invalid();
     const observedAt = this.now().toISOString();
     const base = {schemaVersion: 1, realm: this.repository.realm, storeId, observedAt, orderingAvailable: false,
+      ...(taxRequested ? {supplierTaxReadbackVersion: 1} : {}),
       ...(suppliersRequested ? {supplierPublishersVersion: 1} : {}),
       ...(classificationRequested ? {storeClassificationReadbackVersion: 1, storeDetailsReadbackVersion: 1} : {})};
     const unavailable = () => ({...base, state: "unavailable", memberships: [], family: null});
@@ -1404,6 +1416,7 @@ export class WorkspaceCatalogueService {
     if (relevant.size > 500) return unavailable();
     const records = source.records.filter(r => relevant.has(r.skuId));
     const projection = await this.publicCatalogue({storeId, listingReadbackVersion: 1, policyReadbackVersion: 1,
+      ...(taxRequested ? {supplierTaxReadbackVersion: 1} : {}),
       ...(suppliersRequested ? {supplierPublishersVersion: 1} : {}),
       ...(classificationRequested ? {storeClassificationReadbackVersion: 1, storeDetailsReadbackVersion: 1} : {}),
       productFactsReadbackVersion: 1, mediaReadbackVersion: 1, unbrandedProduceReadbackVersion: 1},
@@ -1543,6 +1556,8 @@ export class WorkspaceCatalogueService {
 
   async listSkus(ownerUserId: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const queryBody = structuredClone(body) as Record<string, unknown>;
+    const taxRequested = supplierTaxReadbackRequested(queryBody);
+    delete queryBody.supplierTaxReadbackVersion;
     const produceRequested = queryBody.unbrandedProduceReadbackVersion === 1;
     if (Object.hasOwn(queryBody, "unbrandedProduceReadbackVersion") && !produceRequested) invalid();
     delete queryBody.unbrandedProduceReadbackVersion;
@@ -1556,6 +1571,7 @@ export class WorkspaceCatalogueService {
     const profile = requireStore(await this.repository.store(query.storeId), query.storeId, ownerUserId);
     const records = await this.repository.page(profile, ownerUserId, query.after, query.limit, query.skuId);
     const items = records.map(r => normalizeRecord(r, query.storeId));
+    requireSupplierTaxReader(items, taxRequested);
     if (!produceRequested && items.some(item => item.content.brand === "")) {
       throw new WorkspaceProfileError("unsupported_version", "Update MoolSocial to open these product details. Saved data is unchanged.", 409);
     }
@@ -1568,6 +1584,7 @@ export class WorkspaceCatalogueService {
       throw new WorkspaceProfileError("unsupported_version", "Update MoolSocial to open these saved photo details. Saved data is unchanged.", 409);
     }
     return {schemaVersion: 1, realm: this.repository.realm, storeId: query.storeId, items,
+      ...(taxRequested ? {supplierTaxReadbackVersion: 1} : {}),
       ...(produceRequested && items.some(item => item.content.brand === "") ? {unbrandedProduceReadbackVersion: 1} : {}),
       ...(factsRequested ? {productFactsReadbackVersion: 1} : {}),
       ...(mediaRequested ? {mediaReadbackVersion: 1} : {}),
@@ -1575,7 +1592,8 @@ export class WorkspaceCatalogueService {
   }
 
   private async publicCataloguePage(body: Readonly<Record<string, unknown>>): Promise<object> {
-    exact(body, ["storeId", "cataloguePageVersion", "query", "pageSize"], ["cursor", "storeDetailsReadbackVersion", "productFactsReadbackVersion", "unbrandedProduceReadbackVersion", "storeClassificationReadbackVersion", "supplierPublishersVersion"]);
+    exact(body, ["storeId", "cataloguePageVersion", "query", "pageSize"], ["cursor", "storeDetailsReadbackVersion", "productFactsReadbackVersion", "unbrandedProduceReadbackVersion", "storeClassificationReadbackVersion", "supplierPublishersVersion", "supplierTaxReadbackVersion"]);
+    const taxRequested = supplierTaxReadbackRequested(body);
     const suppliersRequested = supplierPublishersRequested(body);
     const classificationRequested = body.storeClassificationReadbackVersion === 1;
     if (Object.hasOwn(body, "storeClassificationReadbackVersion") && !classificationRequested) invalid();
@@ -1598,6 +1616,7 @@ export class WorkspaceCatalogueService {
     }
     const sourceHash = cataloguePayloadHash(source);
     const data = await this.publicCatalogue({storeId, listingReadbackVersion: 1,
+      ...(taxRequested ? {supplierTaxReadbackVersion: 1} : {}),
       ...(suppliersRequested ? {supplierPublishersVersion: 1} : {}),
       ...(classificationRequested ? {storeClassificationReadbackVersion: 1} : {}),
       ...(produceRequested ? {unbrandedProduceReadbackVersion: 1} : {}),
@@ -1662,6 +1681,7 @@ export class WorkspaceCatalogueService {
     // of ALL candidates, including offers which were not active on the first pass.
     const finalProjection = await new WorkspaceCatalogueService(this.repository, this.identity,
       () => new Date(responseAt), this.policyReader).publicCatalogue({storeId, listingReadbackVersion: 1,
+      ...(taxRequested ? {supplierTaxReadbackVersion: 1} : {}),
       ...(suppliersRequested ? {supplierPublishersVersion: 1} : {}),
       ...(classificationRequested ? {storeClassificationReadbackVersion: 1} : {}),
       ...(produceRequested ? {unbrandedProduceReadbackVersion: 1} : {}),
@@ -1684,6 +1704,8 @@ export class WorkspaceCatalogueService {
   async publicCatalogue(body: Readonly<Record<string, unknown>>, source?: PublicCatalogueSource): Promise<object> {
     if (Object.hasOwn(body, "cataloguePageVersion")) return this.publicCataloguePage(body);
     const queryBody = structuredClone(body) as Record<string, unknown>;
+    const taxRequested = supplierTaxReadbackRequested(queryBody);
+    delete queryBody.supplierTaxReadbackVersion;
     const suppliersRequested = supplierPublishersRequested(queryBody);
     delete queryBody.supplierPublishersVersion;
     const classificationRequested = queryBody.storeClassificationReadbackVersion === 1;
@@ -1713,6 +1735,7 @@ export class WorkspaceCatalogueService {
     const profile = source ? source.profile : await this.repository.store(query.storeId);
     const observedAt = this.now().toISOString();
     const base = {schemaVersion: 1, realm: this.repository.realm, storeId: query.storeId, observedAt,
+      ...(taxRequested ? {supplierTaxReadbackVersion: 1} : {}),
       ...(suppliersRequested ? {supplierPublishersVersion: 1} : {}),
       orderingAvailable: false, coverage: "verified_public_only",
       ...(classificationRequested ? {storeClassificationReadbackVersion: 1} : {}),
@@ -1779,6 +1802,7 @@ export class WorkspaceCatalogueService {
         revision: record.revision, observedAt: record.observedAt,
         content: publicContent, pack: record.pack, channels: terms}];
     });
+    requireSupplierTaxReader(items, taxRequested);
     const publicItems = policyRequested ? await Promise.all(items.map(async item => {
       const unavailable = () => ({schemaVersion: 1 as const, realm: this.repository.realm,
         storeId: query.storeId, skuId: item.skuId, observedAt: this.now().toISOString(),
@@ -1849,6 +1873,16 @@ export class WorkspaceCatalogueService {
   }
 }
 
+function supplierTaxReadbackRequested(body: Readonly<Record<string, unknown>>): boolean {
+  const requested = body.supplierTaxReadbackVersion === 1;
+  if (Object.hasOwn(body, "supplierTaxReadbackVersion") && !requested) invalid();
+  return requested;
+}
+function requireSupplierTaxReader(items: ReadonlyArray<{channels: ReadonlyArray<{supplierTax?: unknown} | null>}>, supported: boolean): void {
+  if (!supported && items.some(item => item.channels.some(channel => channel?.supplierTax !== undefined))) {
+    throw new WorkspaceProfileError("unsupported_version", "Update MoolSocial to open these supplier tax details. Saved data is unchanged.", 409);
+  }
+}
 function canonicalContentMatches(product: CatalogueAggregate["products"][number], content: StoreSkuContent): boolean {
   if (product.categoryId !== content.categoryId) return false;
   // The proposal contains a hash, not content. Independently pin its declared
@@ -1976,11 +2010,36 @@ function authoredChannel(a: Record<string, unknown>): Omit<StoreSkuChannel, "off
   if ((tiers.length && (tiers[0]!.minimumQuantity !== minimumOrder || tiers[0]!.unitPriceMinor !== priceMinor)) ||
       tiers.some((t, i) => (t.minimumQuantity - minimumOrder) % quantityStep !== 0 || i > 0 &&
         (t.minimumQuantity <= tiers[i - 1]!.minimumQuantity || t.unitPriceMinor > tiers[i - 1]!.unitPriceMinor))) invalid();
-  return {kind: a.kind as StoreSkuChannel["kind"], priceMinor, mrpMinor, minimumOrder, quantityStep, tiers};
+  let supplierTax: StoreSkuChannel["supplierTax"];
+  if (Object.hasOwn(a, "supplierTax")) {
+    const rawTax = object(a.supplierTax);
+    if (rawTax.version === 2) {
+      const tax = exact(rawTax, ["version", "rateBasisPoints", "basis"]);
+      if (typeof tax.basis !== "string" || !["included", "additional"].includes(tax.basis)) invalid();
+      const rateBasisPoints = integer(tax.rateBasisPoints, 0, 10000);
+      if (tax.basis === "additional" && [priceMinor, ...tiers.map(t => t.unitPriceMinor)].some(price => {
+        const extra = (BigInt(price) * BigInt(rateBasisPoints) + 5000n) / 10000n;
+        return BigInt(price) + extra > BigInt(Number.MAX_SAFE_INTEGER);
+      })) invalid();
+      supplierTax = {version: 2, rateBasisPoints, basis: tax.basis as "included" | "additional"};
+    } else {
+      const tax = exact(rawTax, ["version", "amountMinor", "basis"]);
+      if (tax.version !== 1 || typeof tax.basis !== "string" || !["included", "additional"].includes(tax.basis)) invalid();
+      const amountMinor = integer(tax.amountMinor, 0);
+      if ([priceMinor, ...tiers.map(t => t.unitPriceMinor)].some(price =>
+        tax.basis === "included" ? amountMinor > price : amountMinor > Number.MAX_SAFE_INTEGER - price)) invalid();
+      supplierTax = {version: 1, amountMinor, basis: tax.basis as "included" | "additional"};
+    }
+  }
+  return {kind: a.kind as StoreSkuChannel["kind"], priceMinor, mrpMinor, minimumOrder, quantityStep, tiers,
+    ...(supplierTax ? {supplierTax} : {})};
 }
-function authoredChannelsValid(channels: Array<{kind: StoreSkuChannel["kind"]}>): void {
+function authoredChannelsValid(channels: Array<{kind: StoreSkuChannel["kind"]; supplierTax?: StoreSkuChannel["supplierTax"]}>): void {
   if (!channels.length || new Set(channels.map(c => c.kind)).size !== channels.length ||
       channels.some(c => c.kind === "wholesale") && channels.some(c => c.kind === "bulk")) invalid();
+  const shared = channels.find(c => c.supplierTax?.version === 2)?.supplierTax;
+  if (shared?.version === 2 && channels.some(c => c.supplierTax?.version !== 2 ||
+      c.supplierTax.rateBasisPoints !== shared.rateBasisPoints || c.supplierTax.basis !== shared.basis)) invalid();
 }
 
 export function normalizeSku(value: unknown, storeId: string): StoreSkuInput {
@@ -2008,10 +2067,11 @@ export function normalizeSku(value: unknown, storeId: string): StoreSkuInput {
   });
   if (new Set(media.map(m => m.id)).size !== media.length) invalid();
   const channels = list(v.channels, 2).map(value => {
-    const a = exact(value, ["kind", "offerId", "priceMinor", "mrpMinor", "minimumOrder", "quantityStep", "tiers"]);
+    const a = exact(value, ["kind", "offerId", "priceMinor", "mrpMinor", "minimumOrder", "quantityStep", "tiers"], ["supplierTax"]);
     const terms = authoredChannel(a);
     return {kind: terms.kind, offerId: id(a.offerId), priceMinor: terms.priceMinor, mrpMinor: terms.mrpMinor,
-      minimumOrder: terms.minimumOrder, quantityStep: terms.quantityStep, tiers: terms.tiers};
+      minimumOrder: terms.minimumOrder, quantityStep: terms.quantityStep, tiers: terms.tiers,
+      ...(terms.supplierTax ? {supplierTax: terms.supplierTax} : {})};
   });
   authoredChannelsValid(channels);
   return {skuId, canonicalProductId, verifiedPackId: id(v.verifiedPackId), sku: text(v.sku, 80),
@@ -2028,7 +2088,7 @@ export function normalizeSubmittedProduct(value: unknown): StoreProductSubmissio
   if (p.schemaVersion !== 1) invalid();
   const skuId = id(p.skuId), c = exact(p.content, ["title", "brand", "variant", "categoryId", "description", "highlights", "specifications"], ["productFacts"]);
   const channels = list(p.channels, 2).map(raw => authoredChannel(exact(raw,
-    ["kind", "priceMinor", "mrpMinor", "minimumOrder", "quantityStep", "tiers"])));
+    ["kind", "priceMinor", "mrpMinor", "minimumOrder", "quantityStep", "tiers"], ["supplierTax"])));
   authoredChannelsValid(channels);
   const origin = exact(p.provenance, ["entryMethod", "sourceRecordId"]);
   if (typeof origin.entryMethod !== "string" || !["catalogue", "manual", "csv"].includes(origin.entryMethod) || origin.sourceRecordId !== skuId) invalid();

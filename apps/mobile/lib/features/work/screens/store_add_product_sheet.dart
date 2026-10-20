@@ -2592,6 +2592,9 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
       _select(
         owned ??
             product.copyWith(
+              clearSupplierGst: true,
+              clearRetailTax: true,
+              clearWholesaleTax: true,
               purchasePrice: 0,
               sellingPrice: 0,
               stock: 0,

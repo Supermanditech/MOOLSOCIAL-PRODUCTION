@@ -3679,6 +3679,36 @@ void main() {
     expect(() => WorkspaceProductSubmissionInput.fromJson(mutated), throwsFormatException);
     expect(() => WorkspaceProductSubmissionInput.fromSaved(listingItem().copyWith(clearPackMeasure: true)), throwsFormatException);
   });
+  test('LF-GST submitted shared SKU rate is preserved rather than omitted or copied as money', () {
+    final item = listingItem().copyWith(supplierGst: const BuyV2SupplierGstRate(
+      rateBasisPoints: 1800, basis: BuyV2SupplierTaxBasis.included));
+    final input = WorkspaceProductSubmissionInput.fromSaved(item);
+    for (final row in input.toJson()['channels'] as List) {
+      expect(row['supplierTax'], {'version': 2, 'rateBasisPoints': 1800, 'basis': 'included'});
+    }
+    expect(WorkspaceProductSubmissionInput.fromJson(input.toJson()).fingerprint, input.fingerprint);
+    final corrupt = input.toJson();
+    final channels = corrupt['channels'] as List;
+    if (channels.length == 1) {
+      channels.add({...Map<String, dynamic>.from(channels.first as Map), 'kind': 'wholesale'});
+    }
+    (channels.last as Map)['supplierTax'] = {'version': 2, 'rateBasisPoints': 500, 'basis': 'included'};
+    expect(() => WorkspaceProductSubmissionInput.fromJson(corrupt), throwsFormatException);
+  });
+  test('LF-GST clearing shared rate never revives a retained legacy amount', () {
+    final legacy = listingItem().copyWith(retailTax: const BuyV2SupplierTaxAmount(
+      amountMinor: 700, basis: BuyV2SupplierTaxBasis.included));
+    final rated = legacy.copyWith(supplierGst: const BuyV2SupplierGstRate(
+      rateBasisPoints: 1800, basis: BuyV2SupplierTaxBasis.included));
+    final cleared = WorkspaceCatalogueItem.fromInventoryJson(
+      rated.copyWith(clearSupplierGst: true).toInventoryJson());
+    expect(cleared.retailTax!.amountMinor, 700, reason: 'Historical input remains recoverable.');
+    for (final channel in WorkspaceProductSubmissionInput.fromSaved(cleared).toJson()['channels'] as List) {
+      expect((channel as Map).containsKey('supplierTax'), isFalse);
+    }
+    expect(WorkspaceProductSubmissionInput.fromSaved(legacy).toJson()['channels'].first['supplierTax'],
+      {'version': 1, 'amountMinor': 700, 'basis': 'included'});
+  });
   test('LF03-SUBMIT private photo selection is retained as a change fence without private owner or image metadata', () {
     final base = listingItem();
     WorkspaceCatalogueItem withPhoto(String hash) => base.copyWith(privatePhoto: WorkspacePrivateProductPhoto(owner: 'private-owner-do-not-send',
@@ -7013,7 +7043,24 @@ void main() {
   WorkspacePublicCatalogueEntry factoryEntry(Map<String, dynamic> data,
     {BuyV2OfferClass channel = BuyV2OfferClass.retail}) =>
       WorkspacePublicCatalogueEntry.fromResponse(data, storeId: 'store-one',
-        realm: 'production', channel: channel, now: at);
+        realm: 'production', channel: channel, now: at, supplierTaxReadbackSupported: true);
+  test('LF-GST reviewed public rate uses actual tier subtotal and included tax only once', () {
+    final data = publicPage(trade: true)..['supplierTaxReadbackVersion'] = 1;
+    for (final channel in row(data)['channels'] as List) {
+      channel['supplierTax'] = {'version': 2, 'rateBasisPoints': 1800, 'basis': 'included'};
+    }
+    final entry = factoryEntry(data, channel: BuyV2OfferClass.wholesale);
+    expect(entry.product.packTerms!.supplierGst!.percentageText, '18');
+    expect(entry.product.packTerms!.supplierGst!.taxMinorForSubtotal(250000), 38136);
+    expect(entry.product.packTerms!.supplierGst!.additionalMinorForSubtotal(250000), 0);
+    final unknown = factoryEntry(publicPage());
+    expect(unknown.product.packTerms!.supplierGst, isNull);
+    final unsupported = jsonDecode(jsonEncode(data)) as Map<String, dynamic>;
+    unsupported.remove('supplierTaxReadbackVersion');
+    expect(() => factoryEntry(unsupported), throwsFormatException);
+    (row(data)['channels'] as List).last['supplierTax']['rateBasisPoints'] = 500;
+    expect(() => factoryEntry(data), throwsFormatException);
+  });
   WorkspacePublicStockQuery stockPublicQuery(Map<String, Object?> body) => WorkspacePublicStockQuery(realm: 'production',
     storeId: body['storeId'] as String, binding: Map<String, dynamic>.from(body['binding'] as Map), requestedPacks: body['requestedPacks'] as int);
   AuthenticatedWorkspaceCatalogueGateway publicStockApi(OwnerTransport transport, {DateTime Function()? clock, bool enabled = true, bool discovery = false}) =>
@@ -8249,8 +8296,8 @@ void main() {
       expect(() => request.totalMinor, throwsFormatException); expect(() => request.total, throwsFormatException);
     });
   }
-  BuyV2CheckoutGroupAttempt frozenPayment({required bool grouped, bool exact = true, int? totalOverride}) {
-    final value = exact ? product.copyWith(priceMinor: 1025) : product;
+  BuyV2CheckoutGroupAttempt frozenPayment({required bool grouped, bool exact = true, int? totalOverride, BuyV2PackTerms? taxTerms}) {
+    final value = exact ? product.copyWith(priceMinor: 1025, packTerms: taxTerms) : product;
     final request = exact ? BuyV2OrderPlacementRequest.minor(
       lines: [BuyV2CartLine(product: value, quantity: 1)], address: frozenAddress,
       paymentMethod: 'UPI', idempotencyKey: 'host-original-key', totalMinor: totalOverride ?? 1025, amountDueNowMinor: 1,
@@ -8273,6 +8320,41 @@ void main() {
       checkoutPaymentAttempt: grouped ? BuyV2CheckoutPaymentAttempt(id: 'host-original-attempt', ownerScope: 'host-paise',
         quoteValidUntil: at.add(const Duration(minutes: 5)), groups: [payment]) : null);
   for (final grouped in [false, true]) {
+    test('LF-GST frozen payment restart grouped=$grouped retains original rate and money', () async {
+      final preferences = _ExactMoneyHostPreferences();
+      BuyV2SharedPreferencesCustomerStateStore fresh() => BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+      final terms = BuyV2PackTerms(skuId: product.id, revision: 'tax-original', sellUnit: '1 L',
+        supplierGst: const BuyV2SupplierGstRate(rateBasisPoints: 1800, basis: BuyV2SupplierTaxBasis.included));
+      final payment = frozenPayment(grouped: grouped, taxTerms: terms);
+      expect(await fresh().write(frozenSnapshot(payment, grouped: grouped)), isTrue);
+      final core = BuySession();
+      final session = BuyV2Session(core: core, customerStateStore: fresh(),
+        cataloguePageSource: _ExactMoneyHostCatalogue()..rows.add(product.copyWith(priceMinor: 1025,
+          packTerms: BuyV2PackTerms(skuId: product.id, revision: 'tax-current', sellUnit: '1 L',
+            supplierGst: const BuyV2SupplierGstRate(rateBasisPoints: 500, basis: BuyV2SupplierTaxBasis.additional)))),
+        reviewDataEnabled: true, catalogueNow: () => at);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      await session.restoreCustomerState(restoreBrowsing: false);
+      final original = grouped ? session.currentCheckoutPaymentGroup!.request : session.legacyCheckoutAttempt!.payment.request;
+      expect(original.lines.single.product.packTerms!.supplierGst!.rateBasisPoints, 1800);
+      expect(original.lines.single.product.packTerms!.revision, 'tax-original');
+      expect(original.totalMinor, 1025); expect(original.amountDueNowMinor, 1);
+      expect(original.idempotencyKey, 'host-original-key');
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(session.checkoutPayableTotalMinor, 1025);
+      final stored = preferences.values.values.single;
+      for (final corruption in ['tax version', 'money', 'identity']) {
+        final raw = jsonDecode(stored) as Map;
+        final attempt = raw[grouped ? 'checkoutPaymentAttempt' : 'legacyCheckoutAttempt'] as Map;
+        final request = (grouped ? (attempt['groups'] as List).single : attempt['payment'])['request'] as Map;
+        final purchased = request['lines'][0]['purchasedProduct'] as Map;
+        if (corruption == 'tax version') purchased['supplierTaxTerms']['supplierTax']['version'] = 3;
+        if (corruption == 'money') purchased['priceMinor'] = '7';
+        if (corruption == 'identity') purchased['id'] = null;
+        preferences.values[preferences.values.keys.single] = jsonEncode(raw);
+        await expectLater(fresh().read(), throwsFormatException, reason: corruption);
+      }
+    });
     for (final difference in ['none', 'total', 'paid', 'balance', 'price', 'unknown paid']) {
       test('LF-PAISE original confirmation grouped=$grouped difference=$difference retains exact commitment', () async {
         final preferences = _ExactMoneyHostPreferences();
@@ -8499,9 +8581,10 @@ void main() {
     {BuyV2ProductFactsAdapter? facts, BuyV2CheckoutQuoteAdapter? quoteAdapter,
       BuyV2CommercialPaymentTermsAdapter? termsAdapter, BuyV2TipPolicy tipPolicy = const BuyV2DisabledTipPolicy(),
       BuyV2CustomerStateStore? customerStateStore, BuyV2CommerceAdapter? commerceAdapter, bool reviewDataEnabled = true,
-      WorkspacePublicStockReader? stockReader, WorkspaceProductPresentationGateway? presentations, bool disposeAtTearDown = true}) async {
+      WorkspacePublicStockReader? stockReader, WorkspaceProductPresentationGateway? presentations,
+      DateTime Function()? clock, bool disposeAtTearDown = true}) async {
     final core = BuySession(), source = _ExactMoneyHostCatalogue()..rows.addAll(values);
-    final session = BuyV2Session(core: core, cataloguePageSource: source, reviewDataEnabled: reviewDataEnabled, catalogueNow: () => at,
+    final session = BuyV2Session(core: core, cataloguePageSource: source, reviewDataEnabled: reviewDataEnabled, catalogueNow: clock ?? () => at,
       productFactsAdapter: facts ?? const BuyV2CatalogueProductFactsAdapter(), cartBenefitsAdapter: adapter,
       checkoutQuoteAdapter: quoteAdapter, commercialPaymentTermsAdapter: termsAdapter, tipPolicy: tipPolicy,
       customerStateStore: customerStateStore, commerceAdapter: commerceAdapter, storeStockReader: stockReader, productPresentations: presentations);
@@ -9206,19 +9289,23 @@ void main() {
     _HostPlacement adapter, {bool grouped = false, int price = 1025, int quantity = 1, int fee = 0,
     int? mrp, bool withTerms = false, void Function(String key, String value)? beforeSet,
     Future<void> Function(String key, String value)? beforeWrite,
-    WorkspacePublicCatalogueEntry? stockEntry, WorkspacePublicStockReader? stockReader}) async {
+    WorkspacePublicCatalogueEntry? stockEntry, WorkspacePublicStockReader? stockReader, BuyV2PackTerms? packTerms}) async {
     final quote = _HostMinorQuote()..reply = ((groups, tips) async {
       final value = _hostExactQuote(groups, tips, fee: fee).quote!;
       return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready, quote: BuyV2CheckoutQuote.minor(
         id: value.id, sourceId: value.sourceId, evaluatedAt: value.evaluatedAt, validUntil: value.validUntil,
         lines: value.lines, totalMinor: value.totalMinor,
+        supplierTaxBindings: {for (final group in groups) for (final line in group.lines)
+          if (line.product.packTerms?.supplierTaxDeclaration != null) line.product.id:
+            buyV2SupplierTaxQuoteBinding(line: line, merchandiseMinor: line.totalMinor, groupCouponSavingMinor: 0)!},
         paymentGroups: !grouped ? null : [BuyV2CheckoutPaymentGroup.minor(id: 'host-payment-group',
           fulfilmentKeys: groups.map((group) => group.key).toSet(), paymentMethod: 'UPI',
           totalMinor: value.totalMinor, amountDueNowMinor: value.totalMinor)]));
     });
     final preferences = _ExactMoneyHostPreferences(beforeSet: beforeSet, beforeWrite: beforeWrite);
     final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-placement');
-    final value = (stockEntry?.product ?? product).copyWith(priceMinor: price, mrpMinor: mrp ?? 28000, deliveryPromise: 'Host-only fulfilment');
+    final value = (stockEntry?.product ?? product).copyWith(priceMinor: price, mrpMinor: mrp ?? 28000,
+      packTerms: packTerms, deliveryPromise: 'Host-only fulfilment');
     final facts = stockEntry == null ? null : _HostOperationalFacts((p) => const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false).snapshotFor(p));
     final session = await benefitSession(_HostMinorBenefits(), [value], quoteAdapter: quote,
       customerStateStore: store, commerceAdapter: adapter, stockReader: stockReader, facts: facts, termsAdapter: !withTerms ? null :
@@ -9230,6 +9317,33 @@ void main() {
     return (session: session, preferences: preferences);
   }
   for (final grouped in [false, true]) {
+    test('LF-GST rate change during original save blocks first dispatch grouped=$grouped', () async {
+      final adapter = _HostMinorGroupedPlacement();
+      var intercepted = false;
+      late BuyV2Session session;
+      BuyV2PackTerms terms(int rate) => BuyV2PackTerms(skuId: product.id, revision: 'gst-$rate',
+        sellUnit: product.pack,
+        supplierGst: BuyV2SupplierGstRate(rateBasisPoints: rate, basis: BuyV2SupplierTaxBasis.included));
+      final fixture = await placementFixture(adapter, grouped: grouped, packTerms: terms(1800),
+        beforeWrite: (_, saved) async {
+          final state = jsonDecode(saved) as Map;
+          if (!intercepted && (state['legacyCheckoutAttempt'] != null || state['checkoutPaymentAttempt'] != null)) {
+            intercepted = true;
+            final source = session.cataloguePageSource as _ExactMoneyHostCatalogue;
+            source.rows[0] = source.rows[0].copyWith(packTerms: terms(500));
+            final pager = session.acquireCatalogueProducts('host-gst-save-race');
+            addTearDown(() => session.releaseCatalogueProducts('host-gst-save-race'));
+            await pager.open(BuyV2CatalogueQuery(destination: BuyV2Destination.shop, regionId: 'host-region',
+              areaScope: BuyV2CatalogueAreaScope.allAreas));
+            expect(session.findProduct(product.id)!.packTerms!.supplierGst!.rateBasisPoints, 500);
+          }
+        });
+      session = fixture.session;
+      expect(await session.submitOrder(), isFalse); expect(intercepted, isTrue);
+      expect(adapter.minorSingle, isEmpty); expect(adapter.minorGroups, isEmpty);
+      expect(session.notice, contains(grouped ? 'Supplier GST changed' : 'Order agreement changed'));
+      expect(session.cartLines.single.quantity, 1);
+    });
     test('LF11 Stock fresh shortage during frozen save prevents new dispatch grouped=$grouped', () async {
       final entry = factoryEntry(publicPage()), adapter = _HostMinorGroupedPlacement(); var shortage = false, intercepted = false;
       late BuyV2Session session;
@@ -9506,6 +9620,109 @@ void main() {
     expect(adapter.minorSingle, isEmpty); expect(adapter.legacyGroups, isEmpty);
     expect(fixture.session.checkoutPaymentAttempt, isNull);
   });
+  test('LF-GST supplied tax cannot bypass final quote when provider is unavailable', () async {
+    final value = product.copyWith(priceMinor: 7, deliveryPromise: 'Host-only fulfilment',
+      packTerms: BuyV2PackTerms(skuId: product.id, revision: 'gst-source', sellUnit: 'piece',
+        supplierGst: const BuyV2SupplierGstRate(rateBasisPoints: 1800, basis: BuyV2SupplierTaxBasis.additional)));
+    final session = await benefitSession(_HostMinorBenefits(), [value]);
+    expect(session.addProduct(value.id, quantity: 3), isTrue);
+    session.addAddress(frozenAddress); session.openCart();
+    expect(session.checkoutQuoteRequired, isTrue); expect(session.checkoutQuoteReviewRequired, isTrue);
+    expect(await session.refreshCheckoutQuote(), isFalse);
+    expect(await session.submitOrder(), isFalse);
+    expect(session.cartLines.single.totalMinor, 21);
+  });
+  for (final stale in [false, true]) {
+    test('LF-GST quote cannot outlive the GST source stale=$stale', () async {
+      final now = DateTime.now(), sourceEnd = now.add(const Duration(minutes: 2));
+      var clockTime = now;
+      final value = product.copyWith(priceMinor: 7, deliveryPromise: 'Host-only fulfilment',
+        packTerms: BuyV2PackTerms(skuId: product.id, revision: 'gst-expiry', sellUnit: 'piece',
+          pricingStoreId: product.storeId, priceObservedAt: now.subtract(const Duration(hours: 1)),
+          priceValidUntil: sourceEnd, supplierGst: const BuyV2SupplierGstRate(
+            rateBasisPoints: 1800, basis: BuyV2SupplierTaxBasis.included),
+          priceTiers: const [BuyV2PackPriceTier(minimumPacks: 1, priceMinor: 7)]));
+      final quote = _HostMinorQuote()..reply = ((groups, tips) async {
+        final group = groups.single, line = group.lines.single;
+        return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready, quote: BuyV2CheckoutQuote.minor(
+          id: 'host-expired-gst', sourceId: 'host-gst-provider', evaluatedAt: now,
+          validUntil: now.add(const Duration(minutes: 5)),
+          supplierTaxBindings: {line.product.id: buyV2SupplierTaxQuoteBinding(
+            line: line, merchandiseMinor: group.totalMinor, groupCouponSavingMinor: 0)!},
+          lines: [BuyV2CheckoutQuoteLine.minor(fulfilmentKey: group.key, itemSubtotalMinor: group.totalMinor,
+            couponSavingMinor: 0, taxMinor: 0, freightMinor: 0, deliveryFeeMinor: 0,
+            tipMinor: 0, paymentChargeMinor: 0, totalMinor: group.totalMinor)], totalMinor: group.totalMinor));
+      });
+      final session = await benefitSession(_HostMinorBenefits(), [value], quoteAdapter: quote, clock: () => clockTime);
+      expect(session.addProduct(value.id), isTrue);
+      if (stale) clockTime = now.add(const Duration(minutes: 3));
+      session.addAddress(frozenAddress); session.openCart();
+      expect(await session.refreshCheckoutQuote(), isFalse);
+      expect(session.checkoutQuoteReviewRequired, isTrue);
+      expect(session.cartLines.single.totalMinor, 7);
+      if (stale) expect(session.supplierTaxForLine(session.cartLines.single), isNull);
+    });
+  }
+  for (final included in [true, false]) {
+    for (final mode in ['missing', 'changed rate', 'valid']) {
+      test('LF-GST quote acknowledges exact supplier declaration included=$included mode=$mode', () async {
+        final basis = included ? BuyV2SupplierTaxBasis.included : BuyV2SupplierTaxBasis.additional;
+        final value = product.copyWith(priceMinor: 7, deliveryPromise: 'Host-only fulfilment',
+          packTerms: BuyV2PackTerms(skuId: product.id, revision: 'gst-source', sellUnit: 'piece',
+            supplierGst: BuyV2SupplierGstRate(rateBasisPoints: 1800, basis: basis)));
+        final quote = _HostMinorQuote()..reply = ((groups, tips) async {
+          final group = groups.single, line = group.lines.single;
+          final original = mode == 'changed rate' ? BuyV2CartLine(product: value.copyWith(
+            packTerms: BuyV2PackTerms(skuId: product.id, revision: 'gst-source', sellUnit: 'piece',
+              supplierGst: BuyV2SupplierGstRate(rateBasisPoints: 500, basis: basis))), quantity: line.quantity) : line;
+          final additional = included ? 0 : 4;
+          final quotedAt = DateTime.now();
+          return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready, quote: BuyV2CheckoutQuote.minor(
+            id: 'host-gst-quote', sourceId: 'host-gst-provider', evaluatedAt: quotedAt,
+            validUntil: quotedAt.add(const Duration(minutes: 5)),
+            supplierTaxBindings: mode == 'missing' ? {} : {line.product.id: buyV2SupplierTaxQuoteBinding(
+              line: original, merchandiseMinor: group.totalMinor, groupCouponSavingMinor: 0)!},
+            lines: [BuyV2CheckoutQuoteLine.minor(fulfilmentKey: group.key, itemSubtotalMinor: group.totalMinor,
+              couponSavingMinor: 0, taxMinor: additional, freightMinor: 0, deliveryFeeMinor: 0,
+              tipMinor: 0, paymentChargeMinor: 0, totalMinor: group.totalMinor + additional)],
+            totalMinor: group.totalMinor + additional));
+        });
+        final session = await benefitSession(_HostMinorBenefits(), [value], quoteAdapter: quote);
+        expect(session.addProduct(value.id, quantity: 3), isTrue);
+        expect(session.merchandiseForLine(session.cartLines.single), 21);
+        expect(session.supplierTaxForLine(session.cartLines.single), included ? 3 : 4);
+        session.addAddress(frozenAddress); session.openCart();
+        expect(await session.refreshCheckoutQuote(), mode == 'valid', reason: session.checkoutQuoteMessage);
+        expect(quote.minorCalls, greaterThan(0));
+        if (mode == 'valid') {
+          expect(session.checkoutPayableTotalMinor, included ? 21 : 25);
+          expect(session.checkoutQuotedTaxMinor, included ? 0 : 4);
+        } else {
+          expect(session.checkoutQuoteReviewRequired, isTrue);
+        }
+      });
+    }
+    testWidgets('LF-GST Cart shows supplier disclosure with exact subtotal included=$included', (tester) async {
+      final value = product.copyWith(priceMinor: 7, deliveryPromise: 'Host-only fulfilment',
+        packTerms: BuyV2PackTerms(skuId: product.id, revision: 'gst-ui-source', sellUnit: 'piece',
+          supplierGst: BuyV2SupplierGstRate(rateBasisPoints: 1800,
+            basis: included ? BuyV2SupplierTaxBasis.included : BuyV2SupplierTaxBasis.additional)));
+      final session = await benefitSession(_HostMinorBenefits(), [value]);
+      expect(session.addProduct(value.id, quantity: 3), isTrue); session.openCart();
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+        home: Scaffold(body: BuyV2CartView(session: session, onBrowseMore: () {}))));
+      await tester.pumpAndSettle();
+      final disclosure = find.byKey(ValueKey('buy-cart-supplier-gst-${value.id}'));
+      expect(disclosure, findsOneWidget);
+      expect(tester.widget<Text>(disclosure).data, contains(included ? '₹0.03 in item price' : '₹0.04 above item price'));
+      expect(tester.widget<Text>(disclosure).data, contains('Final tax confirmed at checkout'));
+      final semantics = tester.widget<Semantics>(find.byKey(ValueKey('buy-cart-product-summary-${value.id}')));
+      expect(semantics.properties.label, contains('Supplier GST 18%'));
+      expect(session.cartLines.single.totalMinor, 21);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
   test('LF-PAISE exact quote and retail terms consume canonical paise without legacy dispatch', () async {
     final quote = _HostMinorQuote()..reply = ((groups, tips) async => _hostExactQuote(groups, tips, coupon: 25, fee: 1));
     final terms = _HostMinorTerms()..reply = ((groups, totals) async => _hostExactRetailTerms(groups, totals));

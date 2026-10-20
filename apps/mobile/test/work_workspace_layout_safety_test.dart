@@ -62718,6 +62718,60 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final large in [false, true]) {
+    testWidgets('LF-GST Store editor shared rate save and recovery large=$large', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final account = _ContactDraftFixtureStore();
+      WorkSession fresh() => WorkSession(contactDraftStore: account,
+          inventoryStore: SecureWorkInventoryStore(accountScope: () => account.accountScope))
+        ..selectedProfile = workProfiles.first ..workspaceId = 'qa-supplier-tax'
+        ..activeWorkspace = const WorkWorkspace(id: 'qa-supplier-tax', name: 'Evaluation Store',
+          profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery', area: 'Local QA', verified: true)
+        ..reviewStage = WorkReviewStage.live ..initialWorkspaceStateLoaded = true ..retailerSetupSaved = true;
+      final work = fresh();
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      final original = workspaceMasterCatalogue.first.copyWith(stock: 3, purchasePrice: 20,
+        sellingPrice: 30, publicListing: false);
+      work.addOrUpdateWorkspaceProduct(original);
+      expect(await work.workspaceInventorySaved, isTrue);
+      final movementIds = work.workspaceStockMovements.map((m) => m.id).toList();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        textScale: 1, viewport: const Size(360, 800));
+      await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key('work-catalogue-stock-${original.id}'))); await tester.pumpAndSettle();
+      if (large) {
+        // Exercise the actual open editor after rotation; don't tap the Stock
+        // row's obscured full-width centre under its landscape action rail.
+        tester.view.physicalSize = const Size(800, 360);
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        await tester.pumpAndSettle();
+      }
+      final heading = find.text('Pack quantity & selling channels');
+      await reveal(tester, heading); await tester.tap(heading); await tester.pumpAndSettle();
+      final amount = find.byKey(const Key('work-product-gst-percent'));
+      expect(tester.widget<TextField>(amount).decoration!.prefixText, isNull);
+      expect(tester.widget<TextField>(amount).decoration!.suffixText, '%');
+      await reveal(tester, amount); await tester.enterText(amount, '18');
+      tester.testTextInput.hide(); await tester.pumpAndSettle();
+      final basis = find.byKey(const Key('work-product-gstBasis'));
+      await reveal(tester, basis); await tester.tap(basis); await tester.pumpAndSettle();
+      await tester.tap(find.text('GST included in price').last); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-product-save'))); await tester.pumpAndSettle();
+      expect(find.text('Edit product'), findsNothing);
+      expect(await work.workspaceInventorySaved, isTrue);
+      expect(work.workspaceCatalogueItems.single.supplierGst!.rateBasisPoints, 1800);
+      expect(work.workspaceCatalogueItems.single.supplierGst!.basis, BuyV2SupplierTaxBasis.included);
+      expect(work.workspaceCatalogueItems.single.retailTax, isNull);
+      expect(work.workspaceCatalogueItems.single.wholesaleTax, isNull);
+      expect(work.workspaceCatalogueItems.single.stock, 3);
+      expect(work.workspaceStockMovements.map((m) => m.id).toList(), movementIds);
+      final reopened = fresh(); addTearDown(reopened.dispose);
+      expect(await reopened.loadWorkspaceInventory(), isTrue);
+      expect(reopened.workspaceCatalogueItems.single.supplierGst!.rateBasisPoints, 1800);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'STOCK-AUDIT-10 failed inventory save retains edits and retries',
     (tester) async {

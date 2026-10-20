@@ -275,11 +275,16 @@ class WorkspaceSellingInputs {
   const WorkspaceSellingInputs(
     this.measure,
     this.wholesale,
-    this.retailEnabled,
-  );
+    this.retailEnabled, {
+    this.retailTax,
+    this.wholesaleTax,
+    this.supplierGst,
+  });
   final WorkspacePackMeasure? measure;
   final WorkspaceWholesaleOffer? wholesale;
   final bool retailEnabled;
+  final BuyV2SupplierTaxAmount? retailTax, wholesaleTax;
+  final BuyV2SupplierGstRate? supplierGst;
   static const labels = {
     'quantityPerPack': 'Quantity in each selling pack',
     'quantityUnit': 'Quantity unit (kg, L or unit)',
@@ -290,6 +295,12 @@ class WorkspaceSellingInputs {
     'wholesaleMinimum': 'Wholesale minimum packs',
     'wholesaleIncrement': 'Wholesale quantity step',
     'wholesaleTiers': 'Quantity prices (packs:price; packs:price)',
+    'retailTaxAmount': 'Retail tax amount per selling pack',
+    'retailTaxBasis': 'Retail tax basis (included or additional)',
+    'wholesaleTaxAmount': 'Trade tax amount per selling pack',
+    'wholesaleTaxBasis': 'Trade tax basis (included or additional)',
+    'gstPercent': 'Supplier-confirmed GST percentage for this SKU',
+    'gstBasis': 'Selling price GST basis (included or additional)',
   };
   static WorkspaceSellingInputs parse(
     Map<String, String> fields, {
@@ -297,6 +308,10 @@ class WorkspaceSellingInputs {
     WorkspaceWholesaleOffer? existingWholesale,
     bool existingRetailEnabled = true,
     bool clearBlankTiers = false,
+    BuyV2SupplierTaxAmount? existingRetailTax,
+    BuyV2SupplierTaxAmount? existingWholesaleTax,
+    BuyV2SupplierGstRate? existingSupplierGst,
+    bool clearBlankTaxes = false,
   }) {
     String value(String key) => fields[key]?.trim() ?? '';
     var measure = existingMeasure;
@@ -459,7 +474,41 @@ class WorkspaceSellingInputs {
         saleType: wholesale.saleType,
       );
     }
-    return WorkspaceSellingInputs(measure, wholesale, retail);
+    BuyV2SupplierTaxAmount? tax(String prefix, BuyV2SupplierTaxAmount? existing) {
+      final amountKey = '${prefix}TaxAmount', basisKey = '${prefix}TaxBasis';
+      if (!fields.containsKey(amountKey) && !fields.containsKey(basisKey)) return existing;
+      final amount = fields.containsKey(amountKey) ? value(amountKey)
+          : existing == null ? '' : workspacePriceInputFromMinor(existing.amountMinor);
+      final basis = fields.containsKey(basisKey) ? value(basisKey).toLowerCase() : existing?.basis.name ?? '';
+      if (amount.isEmpty && basis.isEmpty) return clearBlankTaxes ? null : existing;
+      final minor = workspacePriceMinorFromInput(amount, maximumMinor: BuyV2SupplierTaxAmount.maximumMinor);
+      if (minor == null) throw FormatException('$amountKey: enter an amount with at most two decimal places, or clear both tax fields.');
+      if (!const ['included', 'additional'].contains(basis)) {
+        throw FormatException('$basisKey: choose included or additional for this selling pack.');
+      }
+      return BuyV2SupplierTaxAmount(amountMinor: minor, basis: BuyV2SupplierTaxBasis.values.byName(basis));
+    }
+    var gst = existingSupplierGst;
+    if (fields.containsKey('gstPercent') || fields.containsKey('gstBasis')) {
+      final percent = fields.containsKey('gstPercent') ? value('gstPercent') : gst?.percentageText ?? '';
+      final basis = fields.containsKey('gstBasis') ? value('gstBasis').toLowerCase() : gst?.basis.name ?? '';
+      if (percent.isEmpty && basis.isEmpty) {
+        if (clearBlankTaxes) gst = null;
+      } else {
+        if (!RegExp(r'^\d{1,3}(\.\d{1,2})?$').hasMatch(percent)) {
+          throw const FormatException('gstPercent: enter a confirmed percentage with at most two decimal places, or leave both fields blank.');
+        }
+        final parts = percent.split('.');
+        final points = int.parse(parts.first) * 100 + (parts.length == 1 ? 0 : int.parse(parts.last.padRight(2, '0')));
+        if (points > 10000) throw const FormatException('gstPercent: check the supplier-confirmed percentage.');
+        if (!const ['included', 'additional'].contains(basis)) {
+          throw const FormatException('gstBasis: choose whether selling prices include GST or add it separately.');
+        }
+        gst = BuyV2SupplierGstRate(rateBasisPoints: points, basis: BuyV2SupplierTaxBasis.values.byName(basis));
+      }
+    }
+    return WorkspaceSellingInputs(measure, wholesale, retail, supplierGst: gst,
+      retailTax: tax('retail', existingRetailTax), wholesaleTax: tax('wholesale', existingWholesaleTax));
   }
 }
 

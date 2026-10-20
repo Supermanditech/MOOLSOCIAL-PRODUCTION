@@ -1632,7 +1632,9 @@ class WorkSession extends ChangeNotifier {
     final expected = <String, Map<String, Object?>>{};
     if (item.retailEnabled) {
       expected['retail'] = {'kind': 'retail', 'priceMinor': item.sellingPriceMinor,
-      'mrpMinor': item.mrpMinor, 'minimumOrder': item.minimumOrder, 'quantityStep': 1, 'tiers': <Object>[]};
+      'mrpMinor': item.mrpMinor, 'minimumOrder': item.minimumOrder, 'quantityStep': 1, 'tiers': <Object>[],
+      if (item.supplierGst != null) 'supplierTax': item.supplierGst!.toChannelJson()
+      else if (!item.legacySupplierTaxInactive && item.retailTax != null) 'supplierTax': item.retailTax!.toJson()};
     }
     final trade = item.wholesaleOffer;
     if (trade?.enabled == true) {
@@ -1642,7 +1644,9 @@ class WorkSession extends ChangeNotifier {
       expected[trade.saleType!.name] = {'kind': trade.saleType!.name, 'priceMinor': trade.priceAtMinor(trade.minimumPacks),
         'mrpMinor': item.mrpMinor, 'minimumOrder': trade.minimumPacks,
         'quantityStep': trade.incrementPacks, 'tiers': [for (final price in prices.entries)
-          {'minimumQuantity': price.key, 'unitPriceMinor': price.value}]};
+          {'minimumQuantity': price.key, 'unitPriceMinor': price.value}],
+        if (item.supplierGst != null) 'supplierTax': item.supplierGst!.toChannelJson()
+        else if (!item.legacySupplierTaxInactive && item.wholesaleTax != null) 'supplierTax': item.wholesaleTax!.toJson()};
     }
     final channels = value['channels'] as List;
     return channels.length == expected.length && channels.every((raw) {
@@ -13314,6 +13318,9 @@ class WorkSession extends ChangeNotifier {
   }
 
   void _checkProductMoney(WorkspaceCatalogueItem product) {
+    if (!product.supplierTaxValid) {
+      throw const FormatException('Review the supplied tax against the selling-channel prices.');
+    }
     if (!product.usesMinorAmounts) return;
     // Canonical access validates unit ambiguity and supported integer bounds.
     product.purchasePriceMinor;

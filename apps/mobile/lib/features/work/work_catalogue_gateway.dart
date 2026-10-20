@@ -1181,6 +1181,7 @@ class WorkspaceProductSubmissionInput {
   String get authoredSha256 => _catalogueHash(Map<String, dynamic>.of(toJson())..remove('catalogueProductHint'));
   bool get mediaPending => toJson()['mediaIntent']['pendingUpload'] == true;
   static WorkspaceProductSubmissionInput fromSaved(WorkspaceCatalogueItem item, {WorkspaceVariantFamily? family}) {
+    if (!item.supplierTaxValid) throw const FormatException('Review the saved supplier tax and selling prices.');
     final origin = item.stockEntry, measure = item.packMeasure, membership = item.variantMembership;
     if (origin?.valid != true || origin!.productId != item.id || measure?.valid != true) {
       throw const FormatException('Save the product with its pack quantity before submitting.');
@@ -1193,7 +1194,9 @@ class WorkspaceProductSubmissionInput {
       composition: item.composition, regulatoryNote: item.regulatoryNote, requiresPrescription: item.requiresPrescription);
     final channels = <Map<String, Object?>>[];
     if (item.retailEnabled) { channels.add({'kind': 'retail', 'priceMinor': item.sellingPriceMinor,
-      'mrpMinor': item.mrpMinor, 'minimumOrder': item.minimumOrder, 'quantityStep': 1, 'tiers': <Object>[]}); }
+      'mrpMinor': item.mrpMinor, 'minimumOrder': item.minimumOrder, 'quantityStep': 1, 'tiers': <Object>[],
+      if (item.supplierGst != null) 'supplierTax': item.supplierGst!.toChannelJson()
+      else if (!item.legacySupplierTaxInactive && item.retailTax != null) 'supplierTax': item.retailTax!.toJson()}); }
     final trade = item.wholesaleOffer;
     if (trade?.enabled == true) {
       if (!trade!.valid || trade.saleType == null) throw const FormatException('Check the saved trade prices.');
@@ -1201,7 +1204,9 @@ class WorkspaceProductSubmissionInput {
         for (final tier in trade.tiers) tier.minimumPacks: tier.packPriceMinor};
       channels.add({'kind': trade.saleType!.name, 'priceMinor': trade.priceAtMinor(trade.minimumPacks),
         'mrpMinor': item.mrpMinor, 'minimumOrder': trade.minimumPacks, 'quantityStep': trade.incrementPacks,
-        'tiers': [for (final entry in prices.entries) {'minimumQuantity': entry.key, 'unitPriceMinor': entry.value}]});
+        'tiers': [for (final entry in prices.entries) {'minimumQuantity': entry.key, 'unitPriceMinor': entry.value}],
+        if (item.supplierGst != null) 'supplierTax': item.supplierGst!.toChannelJson()
+        else if (!item.legacySupplierTaxInactive && item.wholesaleTax != null) 'supplierTax': item.wholesaleTax!.toJson()});
     }
     final photo = item.cataloguePhoto, private = item.privatePhoto;
     if (private != null && !private.matches(item) || private == null && photo != null && !photo.matches(item)) {
@@ -1244,23 +1249,34 @@ class WorkspaceProductSubmissionInput {
     _string(pack['label']); _int(pack['quantityMilli']); _int(pack['unitsPerCase']);
     if (!{'kg', 'L', 'count'}.contains(pack['unit'])) throw const FormatException();
     final kinds = <String>{};
+    final gstDeclarations = <String?>[];
     for (final raw in _list(p['channels'], 2)) {
-      final row = _map(raw); _keys(row, ['kind', 'priceMinor', 'mrpMinor', 'minimumOrder', 'quantityStep', 'tiers']);
+      final row = _map(raw); _keys(row, ['kind', 'priceMinor', 'mrpMinor', 'minimumOrder', 'quantityStep', 'tiers',
+        if (row.containsKey('supplierTax')) 'supplierTax']);
       final kind = _string(row['kind']);
       if (!{'retail', 'wholesale', 'bulk'}.contains(kind) || !kinds.add(kind)) throw const FormatException();
       final price = _int(row['priceMinor']), minimum = _int(row['minimumOrder']), step = _int(row['quantityStep']);
+      final rawTax = row['supplierTax'];
+      final gst = rawTax is Map && rawTax['version'] == 2 ? BuyV2SupplierGstRate.fromChannelJson(rawTax) : null;
+      final tax = gst == null && row.containsKey('supplierTax') ? BuyV2SupplierTaxAmount.fromJson(rawTax) : null;
+      gstDeclarations.add(gst == null ? null : jsonEncode(gst.toJson()));
+      gst?.additionalMinorForSubtotal(price);
+      if (row.containsKey('supplierTax') && tax == null && gst == null || tax?.validForPrice(price) == false) throw const FormatException();
       if (row['mrpMinor'] != null) _int(row['mrpMinor'], price);
       int? lastQuantity, lastPrice;
       for (final raw in _list(row['tiers'], 20)) {
         final tier = _map(raw); _keys(tier, ['minimumQuantity', 'unitPriceMinor']);
         final q = _int(tier['minimumQuantity']), amount = _int(tier['unitPriceMinor']);
+        gst?.additionalMinorForSubtotal(amount);
+        if (tax?.validForPrice(amount) == false) throw const FormatException();
         if ((q - minimum) % step != 0 || (lastQuantity == null ? q != minimum || amount != price : q <= lastQuantity || amount > lastPrice!)) {
           throw const FormatException();
         }
         lastQuantity = q; lastPrice = amount;
       }
     }
-    if (kinds.isEmpty || kinds.contains('wholesale') && kinds.contains('bulk')) throw const FormatException();
+    if (kinds.isEmpty || kinds.contains('wholesale') && kinds.contains('bulk') ||
+        gstDeclarations.any((g) => g != null) && gstDeclarations.toSet().length != 1) { throw const FormatException(); }
     final origin = _map(p['provenance']); _keys(origin, ['entryMethod', 'sourceRecordId']);
     if (!{'catalogue', 'manual', 'csv'}.contains(origin['entryMethod']) || origin['sourceRecordId'] != p['skuId']) throw const FormatException();
     final media = _map(p['mediaIntent']); _keys(media, ['pendingUpload', 'pendingSelectionSha256', 'publishedReferences']);
@@ -2923,6 +2939,38 @@ void _checkProductFactsReadbackVersion(Map<String, dynamic> data) {
   }
 }
 
+void _supplierTaxChannels(List<dynamic> channels, {Map<String, dynamic>? readback}) {
+  if (readback != null && readback.containsKey('supplierTaxReadbackVersion') &&
+      (readback['supplierTaxReadbackVersion'] is! int || readback['supplierTaxReadbackVersion'] != 1)) {
+    throw const FormatException();
+  }
+  final declarations = <Map<String, Object?>?>[];
+  for (final raw in channels) {
+    final channel = _map(raw), value = channel['supplierTax'];
+    if (!channel.containsKey('supplierTax')) { declarations.add(null); continue; }
+    if (value == null || readback != null && readback['supplierTaxReadbackVersion'] != 1) {
+      throw const FormatException('Supplier tax details could not be confirmed.');
+    }
+    if (value is Map && value['version'] == 2) {
+      final rate = BuyV2SupplierGstRate.fromChannelJson(value)!;
+      for (final price in [channel['priceMinor'], ..._list(channel['tiers'], 20).map((t) => _map(t)['unitPriceMinor'])]) {
+        rate.additionalMinorForSubtotal(_int(price));
+      }
+      declarations.add(rate.toChannelJson());
+    } else {
+      final tax = BuyV2SupplierTaxAmount.fromJson(value)!;
+      for (final price in [channel['priceMinor'], ..._list(channel['tiers'], 20).map((t) => _map(t)['unitPriceMinor'])]) {
+        if (!tax.validForPrice(_int(price))) throw const FormatException();
+      }
+      declarations.add(tax.toJson());
+    }
+  }
+  final shared = declarations.where((value) => value?['version'] == 2).firstOrNull;
+  if (shared != null && declarations.any((value) => jsonEncode(_sorted(value)) != jsonEncode(_sorted(shared)))) {
+    throw const FormatException('The SKU GST declaration differs between channels.');
+  }
+}
+
 void _checkProduceReadback(Map<String, dynamic> data, {bool supported = true}) {
   if (data.containsKey('unbrandedProduceReadbackVersion') &&
       (!supported || data['unbrandedProduceReadbackVersion'] is! int ||
@@ -2956,10 +3004,14 @@ class WorkspacePublicCatalogueEntry {
     required BuyV2OfferClass channel,
     required DateTime now,
     bool supplierPublishersVersionSupported = false,
+    bool supplierTaxReadbackSupported = false,
   }) {
     _checkSupplierPublishersReadback(data, supported: supplierPublishersVersionSupported);
     _checkProductFactsReadbackVersion(data);
     _checkProduceReadback(data);
+    if (data.containsKey('supplierTaxReadbackVersion') && !supplierTaxReadbackSupported) {
+      throw const FormatException('Supplier tax readback is not connected.');
+    }
     if (!{'production', 'evaluation'}.contains(realm) ||
         data['realm'] != realm || data['storeId'] != storeId ||
         data['state'] != 'ready' || data['listingCoverage'] != 'complete' ||
@@ -2979,6 +3031,11 @@ class WorkspacePublicCatalogueEntry {
       .where((value) => value['kind'] == channel.name).toList();
     if (bindings.length != 1 || channels.length != 1) throw const FormatException();
     final identity = bindings.single, terms = channels.single;
+    _supplierTaxChannels(_list(row['channels'], 2), readback: data);
+    final declaration = terms['supplierTax'];
+    final gst = declaration is Map && declaration['version'] == 2
+      ? BuyV2SupplierGstRate.fromChannelJson(declaration) : null;
+    final tax = declaration != null && gst == null ? BuyV2SupplierTaxAmount.fromJson(declaration) : null;
     final label = _string(pack['label'], 240);
     final count = _int(pack['unitsPerCase']), quantity = BigInt.from(_int(pack['quantityMilli']));
     var unit = switch (pack['unit']) { 'kg' => 'kg', 'L' => 'L', 'count' => 'piece', _ => throw const FormatException() };
@@ -2996,6 +3053,9 @@ class WorkspacePublicCatalogueEntry {
       containedUnits: count, netContentMilli: amount.toInt(), contentUnit: unit,
       quantityStep: _int(terms['quantityStep']), pricingStoreId: storeId,
       priceObservedAt: _time(row['observedAt']), priceValidUntil: _time(terms['validUntil']),
+      supplierGst: gst, supplierTax: tax,
+      pricesIncludeTax: gst == null && tax == null ? null :
+        (gst?.basis ?? tax!.basis) == BuyV2SupplierTaxBasis.included,
       priceTiers: List.unmodifiable(_list(terms['tiers'], 20).map((raw) {
         final tier = _map(raw);
         return BuyV2PackPriceTier(minimumPacks: _int(tier['minimumQuantity']), priceMinor: _int(tier['unitPriceMinor']));
@@ -3086,7 +3146,7 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
     _checkStoreClassificationReadback(data, supported: gateway.storeClassificationReadbackSupported);
     if (gateway.storeClassificationReadbackSupported && data['storeClassificationReadbackVersion'] != 1) throw const FormatException();
     _checkSupplierPublishersReadback(data, supported: gateway.supplierPublishersVersionSupported);
-    _keys(Map<String, dynamic>.of(data)..remove('supplierPublishersVersion')..remove('storeClassificationReadbackVersion')..remove('storeDetailsReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'observedAt', 'orderingAvailable', 'state',
+    _keys(Map<String, dynamic>.of(data)..remove('supplierPublishersVersion')..remove('storeClassificationReadbackVersion')..remove('storeDetailsReadbackVersion')..remove('supplierTaxReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'observedAt', 'orderingAvailable', 'state',
       'catalogueVersion', 'publicStore', 'sourceId', 'revision', 'validUntil', 'memberships', 'family']);
     final now = gateway.now().toUtc(), observed = _time(data['observedAt']), expires = _time(data['validUntil']);
     if (data['schemaVersion'] is! int || data['schemaVersion'] != 1 || data['realm'] != gateway.realm ||
@@ -3182,12 +3242,14 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
         'storeId': identity.storeId, 'observedAt': data['observedAt'], 'state': 'ready', 'orderingAvailable': false,
         'coverage': 'verified_public_only', 'listingCoverage': 'complete', 'listingReadbackVersion': 1,
         'productFactsReadbackVersion': 1, 'mediaReadbackVersion': 1, 'unbrandedProduceReadbackVersion': 1,
+        if (data.containsKey('supplierTaxReadbackVersion')) 'supplierTaxReadbackVersion': data['supplierTaxReadbackVersion'],
         if (data.containsKey('supplierPublishersVersion')) 'supplierPublishersVersion': data['supplierPublishersVersion'],
         if (data.containsKey('storeClassificationReadbackVersion')) 'storeClassificationReadbackVersion': data['storeClassificationReadbackVersion'],
         if (data.containsKey('storeDetailsReadbackVersion')) 'storeDetailsReadbackVersion': data['storeDetailsReadbackVersion'],
         'catalogueVersion': data['catalogueVersion'], 'publicStore': data['publicStore'], 'items': [row['product']], 'nextCursor': null},
         storeId: identity.storeId, realm: gateway.realm, channel: identity.channel, now: gateway.now().toUtc(),
-        supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported);
+        supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported,
+        supplierTaxReadbackSupported: gateway.supplierTaxReadbackSupported);
       if (!member.validFor(entry, gateway.realm, gateway.now().toUtc()) || member.familyId != previous.familyId ||
           products.any((p) => p.id == entry.product.id)) { throw const FormatException(); }
       products.add(entry.product.copyWith(variantFamilyId: member.familyId, variantAttributes: member.attributes));
@@ -3522,7 +3584,8 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
         // through the same exact-SKU binding/content decoder, not owner storage.
         'items': [_map(item['row'])], 'nextCursor': null},
         storeId: storeId, realm: gateway.realm, channel: channel, now: gateway.now().toUtc(),
-        supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported);
+        supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported,
+        supplierTaxReadbackSupported: gateway.supplierTaxReadbackSupported);
       if (entry.product.destination != query.destination ||
           (query.wholesaleSaleType != null && channel.name != query.wholesaleSaleType!.name) ||
           (listingIds.isNotEmpty && !listingIds.contains(entry.product.id))) {
@@ -3976,7 +4039,8 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
           _time(listing['observedAt']).isAfter(_time(data['observedAt']))) { throw const FormatException(); }
       final entry = WorkspacePublicCatalogueEntry.fromResponse(listing, storeId: storeId,
         realm: gateway.realm, channel: channels.single, now: gateway.now().toUtc(),
-        supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported);
+        supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported,
+        supplierTaxReadbackSupported: gateway.supplierTaxReadbackSupported);
       if (entry.product.destination != query.destination || ids.isNotEmpty && !ids.contains(entry.product.id) ||
           query.wholesaleSaleType != null && entry.product.offerClass?.name != query.wholesaleSaleType!.name) { throw const FormatException(); }
       final storeCopy = jsonEncode(_sorted(listing['publicStore']));
@@ -4075,7 +4139,8 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
             source != 'store-promotion:${gateway.realm}:$storeId:$id:$revision' || itemObserved.isAfter(observed) ||
             !itemObserved.isBefore(expiry) || !now.isBefore(expiry)) { throw const FormatException(); }
         final entry = WorkspacePublicCatalogueEntry.fromResponse(listing, storeId: storeId, realm: gateway.realm, channel: channel, now: now,
-          supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported);
+          supplierPublishersVersionSupported: gateway.supplierPublishersVersionSupported,
+          supplierTaxReadbackSupported: gateway.supplierTaxReadbackSupported);
         if (entry.publisherType == null || publication['publisherType'] != entry.publisherType!.name ||
             !publisherCoverage.contains(entry.publisherType) || !query.acceptsOfferPublisher(entry.publisherType!)) {
           throw const FormatException();
@@ -4208,6 +4273,7 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
     reviewedFamilyReadbackSupported: true, storeClassificationReadbackSupported: true,
     supplierPublishersVersionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_PUBLISHERS_V1'),
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
+    supplierTaxReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_TAX_V1'),
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     storeCouponTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V1'),
@@ -4283,6 +4349,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
     storeClassificationReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_STORE_CLASSIFICATION_V1'),
     supplierPublishersVersionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_PUBLISHERS_V1'),
     minorMoneyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_CATALOGUE_MONEY_V2'),
+    supplierTaxReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_TAX_V1'),
   );
 }
 
@@ -4318,6 +4385,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.storeClassificationReadbackSupported = false,
     this.supplierPublishersVersionSupported = false,
     this.minorMoneyReadbackSupported = false,
+    this.supplierTaxReadbackSupported = false,
     this.promotionDiscoverySupported = false,
     this.promotionTermsSupported = false,
     this.storeCouponTermsSupported = false,
@@ -4357,6 +4425,7 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool supplierPublishersVersionSupported;
   // Opt-in only for the matching integer-paise paged contract; legacy stays v1.
   final bool minorMoneyReadbackSupported;
+  final bool supplierTaxReadbackSupported;
   final bool promotionDiscoverySupported;
   final bool storeCouponEligibilitySupported;
   final bool promotionTermsSupported;
@@ -4396,6 +4465,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       storeClassificationReadbackSupported: storeClassificationReadbackSupported,
       supplierPublishersVersionSupported: supplierPublishersVersionSupported,
       minorMoneyReadbackSupported: minorMoneyReadbackSupported,
+      supplierTaxReadbackSupported: supplierTaxReadbackSupported,
       promotionDiscoverySupported: promotionDiscoverySupported,
       promotionTermsSupported: promotionTermsSupported,
       storeCouponTermsSupported: storeCouponTermsSupported,
@@ -4764,7 +4834,11 @@ class AuthenticatedWorkspaceCatalogueGateway
       }
       final data = _map(envelope['data']);
       _keys(Map<String, dynamic>.of(data)..remove('mediaReadbackVersion')..remove('productFactsReadbackVersion')
-        ..remove('unbrandedProduceReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'items', 'nextCursor']);
+        ..remove('unbrandedProduceReadbackVersion')..remove('supplierTaxReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'items', 'nextCursor']);
+      if (data.containsKey('supplierTaxReadbackVersion') &&
+          (!supplierTaxReadbackSupported || data['supplierTaxReadbackVersion'] is! int || data['supplierTaxReadbackVersion'] != 1)) {
+        throw const FormatException();
+      }
       if (data.containsKey('mediaReadbackVersion') && data['mediaReadbackVersion'] != 1) throw const FormatException();
       _checkProductFactsReadbackVersion(data);
       _checkProduceReadback(data, supported: unbrandedProduceReadbackSupported);
@@ -4786,6 +4860,7 @@ class AuthenticatedWorkspaceCatalogueGateway
         realm: realm,
       );
       final content = _map(owned.input['content']);
+      _supplierTaxChannels(_list(owned.input['channels'], 2), readback: data);
       _catalogueBrand(content, readback: data);
       if (content.containsKey('productFacts') && data['productFactsReadbackVersion'] != 1) return null;
       if (_list(content['media'], 10).any((raw) => _map(_map(raw)['file']).containsKey('frameCount')) &&
@@ -5059,6 +5134,12 @@ class AuthenticatedWorkspaceCatalogueGateway
     void Function()? onDispatch,
   }) async {
     if (!current()) return null;
+    if (supplierTaxReadbackSupported && const {
+      'readPublicStoreCatalogue', 'readPublicCatalogueDiscovery', 'listStoreCatalogueSkus',
+      'readPublicStoreVariantFamilies',
+    }.contains(body['operation'])) {
+      body = {...body, 'supplierTaxReadbackVersion': 1};
+    }
     final token = await credentials.firebaseIdToken();
     if (!current()) return null;
     final appCheck = await credentials.appCheckToken(
@@ -5127,6 +5208,7 @@ class AuthenticatedWorkspaceCatalogueGateway
             body: {
               'operation': 'readPublicStoreCatalogue',
               'mediaReadbackVersion': 1,
+              if (supplierTaxReadbackSupported) 'supplierTaxReadbackVersion': 1,
               if (supplierPublishersVersionSupported) 'supplierPublishersVersion': 1,
               if (productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
               if (unbrandedProduceReadbackSupported) 'unbrandedProduceReadbackVersion': 1,
@@ -5145,6 +5227,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       if (envelope['ok'] != true) throw const FormatException();
       final data = _map(envelope['data']);
       _checkProduceReadback(data, supported: unbrandedProduceReadbackSupported);
+      if (data.containsKey('supplierTaxReadbackVersion') && !supplierTaxReadbackSupported) throw const FormatException();
       _checkStoreClassificationReadback(data, supported: storeClassificationReadbackSupported);
       if (storeClassificationReadbackSupported && product.publicListingIdentity != null &&
           data['storeClassificationReadbackVersion'] != 1) { throw const FormatException(); }
@@ -5184,7 +5267,8 @@ class AuthenticatedWorkspaceCatalogueGateway
       if (storeClassificationReadbackSupported && _map(envelope['data'])['storeClassificationReadbackVersion'] != 1) throw const FormatException();
       final entry = WorkspacePublicCatalogueEntry.fromResponse(_map(envelope['data']),
         storeId: storeId, realm: realm, channel: channel, now: now().toUtc(),
-        supplierPublishersVersionSupported: supplierPublishersVersionSupported);
+        supplierPublishersVersionSupported: supplierPublishersVersionSupported,
+        supplierTaxReadbackSupported: supplierTaxReadbackSupported);
       // The response is scoped to the requested raw SKU, not merely a same-Store
       // listing. Account/session retirement never admits a delayed product.
       if (!current() || entry.product.sourceSkuId != skuId) return null;
@@ -5341,6 +5425,7 @@ class WorkspaceCatalogueReadback extends ChangeNotifier
       terms.pricingStoreId,
       terms.priceObservedAt?.toIso8601String(),
       terms.priceValidUntil?.toIso8601String(),
+      if (terms.supplierTaxDeclaration != null) {'supplierTax': terms.supplierTaxDeclaration},
       for (var i = 0; i < terms.priceTiers.length; i++)
         [terms.priceTiers[i].minimumPacks, exact ? tiers[i] : tiers[i] ~/ 100],
     ],
@@ -5638,7 +5723,7 @@ void _ownerSkuInput(Map<String, dynamic> sku, String storeId) {
   if (channels.isEmpty) throw const FormatException();
   for (final raw in channels) {
     final channel = _map(raw);
-    _keys(channel, [
+    _keys(Map<String, dynamic>.of(channel)..remove('supplierTax'), [
       'kind',
       'offerId',
       'priceMinor',
@@ -5675,6 +5760,7 @@ void _ownerSkuInput(Map<String, dynamic> sku, String storeId) {
       index++;
     }
   }
+  _supplierTaxChannels(channels);
 }
 
 WorkspaceCatalogueContentResult _decode(
@@ -5817,7 +5903,7 @@ WorkspaceCatalogueContentResult _decode(
   DateTime? validUntil;
   final coreChannels = <Map<String, dynamic>>[];
   for (final channel in channels) {
-    _keys(channel, [
+    _keys(Map<String, dynamic>.of(channel)..remove('supplierTax'), [
       'kind',
       'offerId',
       'priceMinor',
@@ -5864,10 +5950,13 @@ WorkspaceCatalogueContentResult _decode(
         ..remove('validUntil'),
     );
   }
+  _supplierTaxChannels(channels, readback: data);
   final matching = channels
       .where((c) => c['kind'] == product.offerClass?.name)
       .toList();
   if (matching.length != 1 ||
+      jsonEncode(_sorted(matching.single['supplierTax'])) !=
+        jsonEncode(_sorted(packTerms?.supplierTaxDeclaration)) ||
       matching.single['priceMinor'] != product.priceMinor ||
       matching.single['mrpMinor'] != product.mrpMinor ||
       matching.single['minimumOrder'] != product.minimumOrder ||

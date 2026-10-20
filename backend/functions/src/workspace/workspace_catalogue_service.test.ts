@@ -1717,6 +1717,37 @@ function submittedProduct(skuId = 'sku-one'): StoreProductSubmissionInput {
     provenance: {entryMethod: 'manual', sourceRecordId: skuId},
     mediaIntent: {pendingUpload: false, pendingSelectionSha256: null, publishedReferences: []}, variantIntent: null};
 }
+for (const basis of ['included', 'additional']) for (const amountMinor of [0, 7]) {
+  test(`LF-TAX channel tax survives submission and reviewed selling terms ${basis}/${amountMinor}`, () => {
+    const tax = {version: 1, amountMinor, basis};
+    const sku = input(); Object.assign(sku.channels[0]!, {supplierTax: tax});
+    const normalized = normalizeSku(sku, 'store-one');
+    assert.deepEqual(Reflect.get(normalized.channels[0]!, 'supplierTax'), tax);
+    assert.deepEqual(Reflect.get(channelTerms(normalized.channels[0]!), 'supplierTax'), tax);
+    const submitted = submittedProduct(); Object.assign(submitted.channels[0]!, {supplierTax: tax});
+    assert.deepEqual(Reflect.get(normalizeSubmittedProduct(submitted).channels[0]!, 'supplierTax'), tax);
+  });
+}
+for (const basis of ['included', 'additional']) for (const rateBasisPoints of [0, 25, 1800]) {
+  test(`LF-GST shared SKU percentage survives strict reviewed terms ${basis}/${rateBasisPoints}`, () => {
+    const tax = {version: 2, rateBasisPoints, basis};
+    const sku = input(); Object.assign(sku.channels[0]!, {supplierTax: tax});
+    const normalized = normalizeSku(sku, 'store-one');
+    assert.deepEqual(normalized.channels[0]!.supplierTax, tax);
+    assert.deepEqual(Reflect.get(channelTerms(normalized.channels[0]!), 'supplierTax'), tax);
+    const submitted = submittedProduct(); Object.assign(submitted.channels[0]!, {supplierTax: tax});
+    assert.deepEqual(normalizeSubmittedProduct(submitted).channels[0]!.supplierTax, tax);
+    const mismatched = structuredClone(submitted);
+    mismatched.channels.push({...mismatched.channels[0]!, kind: 'wholesale',
+      supplierTax: {version: 2, rateBasisPoints: rateBasisPoints === 500 ? 1800 : 500, basis: 'included'}});
+    assert.throws(() => normalizeSubmittedProduct(mismatched));
+    for (const invalidTax of [{...tax, rateBasisPoints: -1}, {...tax, rateBasisPoints: 10001},
+      {...tax, rateBasisPoints: 2.5}, {...tax, version: 3}, {...tax, amountMinor: 100}]) {
+      const broken = structuredClone(submitted); Object.assign(broken.channels[0]!, {supplierTax: invalidTax});
+      assert.throws(() => normalizeSubmittedProduct(broken));
+    }
+  });
+}
 function productRequest(overrides: Record<string, unknown> = {}) {
   return {productSubmissionVersion: 1, storeId: 'store-one', expectedRevision: 0,
     idempotencyKey: 'saved-product-one', product: submittedProduct(), ...overrides};
@@ -2913,6 +2944,32 @@ function subject(repository: Memory) {
   return new WorkspaceCatalogueService(repository,
     {catalogueId: "catalogue-one", tenantId: "tenant-one"}, () => new Date(at));
 }
+test('LF-GST owner and public readback negotiate exact rate without stripping data', async () => {
+  for (const supplierTax of [
+    {version: 2 as const, rateBasisPoints: 1800, basis: 'included' as const},
+    {version: 2 as const, rateBasisPoints: 0, basis: 'additional' as const},
+    {version: 1 as const, amountMinor: 7, basis: 'included' as const},
+  ]) {
+    const repository = new Memory(), value = input();
+    value.channels[0]!.supplierTax = supplierTax;
+    repository.aggregate = verifiedCatalogue(value);
+    await subject(repository).saveSku('owner-one', save(value));
+    const before = structuredClone(repository.records.get('store-one/sku-one'));
+    await assert.rejects(subject(repository).listSkus('owner-one', {storeId: 'store-one'}), {code: 'unsupported_version'});
+    await assert.rejects(subject(repository).publicCatalogue({storeId: 'store-one'}), {code: 'unsupported_version'});
+    for (const version of [0, 2, null, '1']) {
+      await assert.rejects(subject(repository).publicCatalogue({storeId: 'store-one', supplierTaxReadbackVersion: version}), {code: 'invalid_input'});
+    }
+    for (const result of [
+      await subject(repository).listSkus('owner-one', {storeId: 'store-one', supplierTaxReadbackVersion: 1}),
+      await subject(repository).publicCatalogue({storeId: 'store-one', supplierTaxReadbackVersion: 1}),
+    ] as Array<{supplierTaxReadbackVersion: number; items: Array<{channels: StoreSkuChannel[]}>}>) {
+      assert.equal(result.supplierTaxReadbackVersion, 1);
+      assert.deepEqual(result.items[0]!.channels[0]!.supplierTax, supplierTax);
+    }
+    assert.deepEqual(repository.records.get('store-one/sku-one'), before);
+  }
+});
 function descriptiveFacts() {
   return {schemaVersion: 1, compliance: {
     genericName: "Host oil", netQuantity: "1 L", manufacturerName: "Host maker",

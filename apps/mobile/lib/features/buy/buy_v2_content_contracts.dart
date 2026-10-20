@@ -3546,6 +3546,7 @@ class BuyV2CheckoutQuote {
     this.paymentGroups,
     this.storeCouponBindings = const {},
     this.supplierQuoteBindings = const {},
+    this.supplierTaxBindings = const {},
     // ignore: prefer_initializing_formals
   }) : _total = total, _totalMinor = null;
 
@@ -3559,6 +3560,7 @@ class BuyV2CheckoutQuote {
     this.paymentGroups,
     this.storeCouponBindings = const {},
     this.supplierQuoteBindings = const {},
+    this.supplierTaxBindings = const {},
   // Public argument names are retained for existing provider callers.
   // ignore: prefer_initializing_formals
   }) : _total = null, _totalMinor = totalMinor;
@@ -3581,6 +3583,25 @@ class BuyV2CheckoutQuote {
   final Map<String, String> storeCouponBindings;
   /// Store ID -> exact selected supplier-quote binding, never a credit grant.
   final Map<String, String> supplierQuoteBindings;
+  /// Product ID -> declaration/quantity/merchandise/coupon context acknowledged
+  /// by the quote provider. This does not verify registration or issue an invoice.
+  final Map<String, String> supplierTaxBindings;
+}
+
+String? buyV2SupplierTaxQuoteBinding({required BuyV2CartLine line,
+    required int merchandiseMinor, required int groupCouponSavingMinor}) {
+  final terms = line.product.packTerms, declaration = line.product.packTerms?.supplierTaxDeclaration;
+  if (declaration == null) return null;
+  buyV2ExactMinorAmount(minor: merchandiseMinor);
+  buyV2ExactMinorAmount(minor: groupCouponSavingMinor);
+  if (!line.product.hasValidPackTerms || line.quantity < 1) throw const FormatException();
+  return sha256.convert(utf8.encode(jsonEncode({'version': 1,
+    'productId': line.product.id, 'storeId': line.product.storeId,
+    'listing': line.product.publicListingIdentity?.toJson(), 'termsRevision': terms!.revision,
+    'observedAt': terms.priceObservedAt?.toUtc().toIso8601String(),
+    'validUntil': terms.priceValidUntil?.toUtc().toIso8601String(),
+    'declaration': declaration, 'quantity': line.quantity, 'merchandiseMinor': merchandiseMinor,
+    'groupCouponSavingMinor': groupCouponSavingMinor}))).toString();
 }
 
 @immutable

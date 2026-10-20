@@ -8902,6 +8902,13 @@ class WorkspaceProductImport {
         continue;
       }
       final product = base.copyWith(
+        // Catalogue matches supply product facts, not another supplier's tax.
+        supplierGst: sellingDetails.supplierGst,
+        clearSupplierGst: sellingDetails.supplierGst == null,
+        retailTax: sellingDetails.retailTax,
+        wholesaleTax: sellingDetails.wholesaleTax,
+        clearRetailTax: sellingDetails.retailTax == null,
+        clearWholesaleTax: sellingDetails.wholesaleTax == null,
         variantMembership: membership,
         packMeasure: sellingDetails.measure,
         wholesaleOffer: sellingDetails.wholesale,
@@ -8959,6 +8966,21 @@ class WorkspaceProductImport {
             catalogueFactsChanged ||
             contentChanged,
       );
+      if (product.supplierGst == null && !product.legacySupplierTaxInactive &&
+          product.retailEnabled && product.retailTax?.validForPrice(selling) == false) {
+        result.add(blocked('Retail tax cannot exceed an included selling price or the exact money limit.',
+          fields: ['retailTaxAmount', 'retailTaxBasis', 'sellingPrice']));
+        continue;
+      }
+      final trade = product.wholesaleOffer;
+      if (product.supplierGst == null && !product.legacySupplierTaxInactive &&
+          trade != null && trade.enabled && product.wholesaleTax != null &&
+          [trade.priceMinor, ...trade.tiers.map((t) => t.packPriceMinor)]
+            .any((price) => !product.wholesaleTax!.validForPrice(price))) {
+        result.add(blocked('Trade tax must fit every supplied pack price; review tax and quantity prices.',
+          fields: ['wholesaleTaxAmount', 'wholesaleTaxBasis', 'wholesalePrice', 'wholesaleTiers']));
+        continue;
+      }
       if (product.wholesaleOffer?.enabled == true &&
           product.mrpMinor != null &&
           product.wholesaleOffer!.priceMinor > product.mrpMinor!) {
@@ -10559,6 +10581,10 @@ class WorkspaceCatalogueItem {
     this.content = const WorkspaceProductContent(),
     this.stockEntry,
     this.variantMembership,
+    this.retailTax,
+    this.wholesaleTax,
+    this.supplierGst,
+    this.legacySupplierTaxInactive = false,
   }) : assert(purchasePrice != null || purchasePriceMinor != null),
        assert(sellingPrice != null || sellingPriceMinor != null),
        _legacyPurchasePrice = purchasePrice, _legacySellingPrice = sellingPrice,
@@ -10620,6 +10646,32 @@ class WorkspaceCatalogueItem {
   final WorkspaceProductContent content;
   final WorkspaceStockEntry? stockEntry;
   final WorkspaceVariantMembership? variantMembership;
+  final BuyV2SupplierTaxAmount? retailTax, wholesaleTax;
+  final BuyV2SupplierGstRate? supplierGst;
+  /// Historical money declarations remain recoverable after shared GST clears.
+  final bool legacySupplierTaxInactive;
+  bool get supplierTaxValid {
+    if (supplierGst != null) {
+      if (!supplierGst!.valid) return false;
+      try {
+        if (retailEnabled) supplierGst!.additionalMinorForSubtotal(sellingPriceMinor);
+        final trade = wholesaleOffer;
+        if (trade != null && trade.enabled) {
+          for (final price in [trade.priceMinor, ...trade.tiers.map((t) => t.packPriceMinor)]) {
+            supplierGst!.additionalMinorForSubtotal(price);
+          }
+        }
+      } on FormatException { return false; }
+      return true;
+    }
+    if (legacySupplierTaxInactive) return true;
+    if (retailTax?.valid == false || wholesaleTax?.valid == false ||
+        retailEnabled && retailTax?.validForPrice(sellingPriceMinor) == false) { return false; }
+    final trade = wholesaleOffer;
+    return trade?.enabled != true || wholesaleTax == null ||
+      [trade!.priceMinor, ...trade.tiers.map((t) => t.packPriceMinor)]
+        .every(wholesaleTax!.validForPrice);
+  }
 
   /// Projection only; callers still need publication authority and a content
   /// source revision. Does not create a preview route or publish the product.
@@ -10960,9 +11012,12 @@ class WorkspaceCatalogueItem {
 
   /// Device inventory record, not publication or financial authority.
   /// Keep QA/production and account/Store identity in the enclosing checkpoint.
+  int get _inventoryBaseVersion => variantMembership != null ? 4 : usesMinorAmounts ? 3 : stockEntry == null ? 1 : 2;
   Map<String, Object?> toInventoryJson() => {
     // Old readers reject this version instead of silently dropping provenance.
-    'version': variantMembership != null ? 4 : usesMinorAmounts ? 3 : stockEntry == null ? 1 : 2,
+    'version': supplierGst != null || legacySupplierTaxInactive ? 6 : retailTax != null || wholesaleTax != null ? 5 : _inventoryBaseVersion,
+    if (supplierGst != null || legacySupplierTaxInactive || retailTax != null || wholesaleTax != null) 'baseVersion': _inventoryBaseVersion,
+    if (supplierGst != null || legacySupplierTaxInactive) 'supplierGst': supplierGst?.toJson(),
     if (variantMembership != null) ...{
       'variantMembership': variantMembership!.toJson(), 'moneyVersion': usesMinorAmounts ? 2 : 1,
     },
@@ -11009,21 +11064,43 @@ class WorkspaceCatalogueItem {
     'wholesaleOffer': wholesaleOffer?.toJson(),
     'retailEnabled': retailEnabled,
     'content': content.toJson(),
+    if (retailTax != null || wholesaleTax != null) ...{
+      'supplierTaxVersion': 1,
+      if (retailTax != null) 'retailTax': retailTax!.toJson(),
+      if (wholesaleTax != null) 'wholesaleTax': wholesaleTax!.toJson(),
+    },
   };
 
   static WorkspaceCatalogueItem fromInventoryJson(Object? raw) {
     const invalid = FormatException(
       'Saved product needs recovery. Its data has been kept.',
     );
-    if (raw is! Map || !const [1, 2, 3, 4].contains(raw['version']) ||
-        (raw['version'] == 2 && raw['stockEntry'] == null) ||
-        (raw['version'] == 1 && raw['stockEntry'] != null) ||
-        (raw['version'] == 4 ? raw['version'] is! int || raw['variantMembership'] == null ||
+    if (raw is! Map) throw invalid;
+    final gstVersion = raw['version'] == 6;
+    final taxVersion = raw['version'] == 5 || gstVersion;
+    if (gstVersion ? raw['version'] is! int || !raw.containsKey('supplierGst')
+        : raw.containsKey('supplierGst')) { throw invalid; }
+    if (taxVersion ? raw['version'] is! int || raw['baseVersion'] is! int
+        : raw.containsKey('baseVersion')) { throw invalid; }
+    final version = taxVersion ? raw['baseVersion'] : raw['version'];
+    if (!const [1, 2, 3, 4].contains(version) ||
+        (version == 2 && raw['stockEntry'] == null) ||
+        (version == 1 && raw['stockEntry'] != null) ||
+        (version == 4 ? version is! int || raw['variantMembership'] == null ||
           raw['moneyVersion'] is! int || !const {1, 2}.contains(raw['moneyVersion'])
           : raw.containsKey('variantMembership') || raw.containsKey('moneyVersion'))) {
       throw invalid;
     }
-    final exact = raw['version'] == 3 || raw['version'] == 4 && raw['moneyVersion'] == 2;
+    final exact = version == 3 || version == 4 && raw['moneyVersion'] == 2;
+    final hasLegacyTax = raw['retailTax'] != null || raw['wholesaleTax'] != null;
+    if (taxVersion && (!gstVersion || hasLegacyTax)
+        ? raw['supplierTaxVersion'] is! int || raw['supplierTaxVersion'] != 1 ||
+          raw['retailTax'] == null && raw['wholesaleTax'] == null ||
+          raw.containsKey('retailTax') && raw['retailTax'] == null ||
+          raw.containsKey('wholesaleTax') && raw['wholesaleTax'] == null
+        : raw.containsKey('supplierTaxVersion') || raw.containsKey('retailTax') || raw.containsKey('wholesaleTax')) {
+      throw invalid;
+    }
     const minorKeys = ['purchasePriceMinor', 'sellingPriceMinor', 'mrpMinor'];
     const legacyKeys = ['purchasePrice', 'sellingPrice', 'mrp'];
     if (exact
@@ -11089,6 +11166,10 @@ class WorkspaceCatalogueItem {
       );
       WorkspaceProductContent.parse(content.inputValues);
       final product = WorkspaceCatalogueItem(
+        supplierGst: BuyV2SupplierGstRate.fromJson(raw['supplierGst']),
+        legacySupplierTaxInactive: gstVersion && hasLegacyTax,
+        retailTax: BuyV2SupplierTaxAmount.fromJson(raw['retailTax']),
+        wholesaleTax: BuyV2SupplierTaxAmount.fromJson(raw['wholesaleTax']),
         variantMembership: WorkspaceVariantMembership.fromJson(raw['variantMembership']),
         stockEntry: WorkspaceStockEntry.fromJson(raw['stockEntry']),
         id: text('id', required: true),
@@ -11137,6 +11218,7 @@ class WorkspaceCatalogueItem {
         throw invalid;
       }
       if (privatePhoto != null && !privatePhoto.matches(product)) throw invalid;
+      if (!product.supplierTaxValid) throw invalid;
       return product;
     } on FormatException {
       rethrow;
@@ -11148,6 +11230,12 @@ class WorkspaceCatalogueItem {
   }
 
   WorkspaceCatalogueItem copyWith({
+    BuyV2SupplierGstRate? supplierGst,
+    bool clearSupplierGst = false,
+    BuyV2SupplierTaxAmount? retailTax,
+    BuyV2SupplierTaxAmount? wholesaleTax,
+    bool clearRetailTax = false,
+    bool clearWholesaleTax = false,
     WorkspaceStockEntry? stockEntry,
     WorkspaceVariantMembership? variantMembership,
     WorkspaceProductContent? content,
@@ -11194,6 +11282,12 @@ class WorkspaceCatalogueItem {
     bool clearPackMeasure = false,
     bool clearWholesaleOffer = false,
   }) => WorkspaceCatalogueItem(
+    supplierGst: clearSupplierGst ? null : supplierGst ?? this.supplierGst,
+    legacySupplierTaxInactive: legacySupplierTaxInactive ||
+        (retailTax != null || wholesaleTax != null || this.retailTax != null || this.wholesaleTax != null) &&
+          (supplierGst != null || this.supplierGst != null),
+    retailTax: clearRetailTax ? null : retailTax ?? this.retailTax,
+    wholesaleTax: clearWholesaleTax ? null : wholesaleTax ?? this.wholesaleTax,
     id: id,
     stockEntry: stockEntry ?? this.stockEntry,
     variantMembership: variantMembership ?? this.variantMembership,

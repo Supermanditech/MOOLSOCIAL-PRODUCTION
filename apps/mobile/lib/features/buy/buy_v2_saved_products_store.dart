@@ -1328,9 +1328,11 @@ final class BuyV2SharedPreferencesCustomerStateStore
     BuyV2ProcurementDraftSnapshot draft,
   ) {
     final hasFamilies = draft.cartProducts.values.any((p) => p.variantFamilyId != null);
+    final hasTaxTerms = draft.cartProducts.values.any((p) => p.packTerms?.supplierTaxDeclaration != null);
+    final baseVersion = hasFamilies ? 3 : draft.cartProducts.values.any(_hasExactProductMoney) ? 2 : 1;
     return {
-    'version': hasFamilies ? 3
-        : draft.cartProducts.values.any(_hasExactProductMoney) ? 2 : 1,
+    'version': hasTaxTerms ? 4 : baseVersion,
+    if (hasTaxTerms) 'baseVersion': baseVersion,
     'ownerScope': draft.ownerScope,
     if (draft.navigation case final navigation?)
       'navigation': _encodeProcurementNavigation(navigation),
@@ -1348,6 +1350,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
           'variant': entry.value.variant,
           'variantAttributes': _encodeVariantAttributes(entry.value),
           'pack': entry.value.pack,
+          if (hasTaxTerms) 'supplierTaxTerms': entry.value.packTerms?.toRetainedJson(),
           ..._encodeRetainedProductMoney(entry.value),
           'unitPrice': entry.value.unitPrice,
           'seller': entry.value.seller,
@@ -1366,6 +1369,16 @@ final class BuyV2SharedPreferencesCustomerStateStore
   BuyV2ProcurementDraftSnapshot? _decodeProcurementDraft(Object? value) {
     if (value is! Map) return null;
     final source = _objectMap(value);
+    final hasTaxTerms = source['version'] == 4;
+    if (hasTaxTerms) {
+      if (source['version'] is! int || source['baseVersion'] is! int ||
+          !const {1, 2, 3}.contains(source['baseVersion'])) {
+        throw const FormatException('Saved supplier tax terms need recovery.');
+      }
+      source['version'] = source.remove('baseVersion');
+    } else if (source.containsKey('baseVersion')) {
+      throw const FormatException('Saved supplier tax terms need recovery.');
+    }
     final scope = _string(source['ownerScope']);
     if (source['version'] is! int || !const {1, 2, 3}.contains(source['version']) || scope == null || scope != ownerScope) {
       return null;
@@ -1373,6 +1386,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
     final products = <String, BuyV2Product>{};
     for (final entry in _objectMap(source['cartProducts']).entries) {
       final item = _objectMap(entry.value);
+      if (hasTaxTerms != item.containsKey('supplierTaxTerms')) {
+        throw const FormatException('Saved supplier tax terms need recovery.');
+      }
+      final taxTerms = hasTaxTerms ? BuyV2PackTerms.fromRetainedJson(item['supplierTaxTerms']) : null;
       if (!_validRetainedFamily(item, source['version'], allowLegacyMember: true)) {
         throw const FormatException('Saved product family needs checking.');
       }
@@ -1380,7 +1397,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
       final minimum = item['minimumOrder'];
       final publicIdentity = BuyV2PublicListingIdentity.fromJson(item['publicListingIdentity']);
       if (item.containsKey('publicListingIdentity') && publicIdentity == null) {
-        if (source['version'] == 3) throw const FormatException('Saved product identity needs checking.');
+        if (hasTaxTerms || source['version'] == 3) throw const FormatException('Saved product identity needs checking.');
         continue;
       }
       if (id != entry.key ||
@@ -1388,7 +1405,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
           !_validRetainedProductMoney(item, allowMinor: source['version'] != 1) ||
           minimum is! int ||
           minimum < 1) {
-        if (source['version'] == 3) {
+        if (hasTaxTerms || source['version'] == 3) {
           throw const FormatException('Saved product family needs checking.');
         }
         continue;
@@ -1420,6 +1437,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
         title: _string(item['title']) ?? 'Unavailable item',
         variant: _string(item['variant']) ?? '',
         pack: _string(item['pack']) ?? 'Pack details unavailable',
+        packTerms: taxTerms,
         price: item['price'] as int?,
         priceMinor: item['priceMinor'] as int?,
         mrp: item['mrp'] as int?,
@@ -1437,8 +1455,11 @@ final class BuyV2SharedPreferencesCustomerStateStore
         procurementSupplierGrant: identity,
         catalogueListing: false,
       );
+      if (taxTerms != null && !products[id]!.hasValidPackTerms) {
+        throw const FormatException('Saved supplier tax terms need recovery.');
+      }
       if (!products[id]!.hasValidPublicListingIdentity) {
-        if (source['version'] == 3) throw const FormatException('Saved product identity needs checking.');
+        if (hasTaxTerms || source['version'] == 3) throw const FormatException('Saved product identity needs checking.');
         products.remove(id);
       }
     }
@@ -2305,7 +2326,12 @@ final class BuyV2SharedPreferencesCustomerStateStore
     ));
   }
   static Map<String, Object?> _encodePurchasedProduct(BuyV2Product product) => {
-    'version': product.variantFamilyId != null ? 3 : _hasExactProductMoney(product) ? 2 : 1,
+    'version': product.packTerms?.supplierTaxDeclaration != null ? 4
+      : product.variantFamilyId != null ? 3 : _hasExactProductMoney(product) ? 2 : 1,
+    if (product.packTerms?.supplierTaxDeclaration != null) ...{
+      'baseVersion': product.variantFamilyId != null ? 3 : _hasExactProductMoney(product) ? 2 : 1,
+      'supplierTaxTerms': product.packTerms!.toRetainedJson(),
+    },
     'id': product.id,
     'canonicalId': product.canonicalId,
     'variantFamilyId': ?product.variantFamilyId,
@@ -2333,6 +2359,17 @@ final class BuyV2SharedPreferencesCustomerStateStore
 
   static BuyV2Product? _decodePurchasedProduct(Object? value) {
     final source = _objectMap(value);
+    final hasTaxTerms = source['version'] == 4;
+    if (hasTaxTerms) {
+      if (source['version'] is! int || source['baseVersion'] is! int ||
+          !const {1, 2, 3}.contains(source['baseVersion']) || source['supplierTaxTerms'] == null) {
+        throw const FormatException('Saved supplier tax terms need recovery.');
+      }
+      source['version'] = source.remove('baseVersion');
+    } else if (source.containsKey('baseVersion') || source.containsKey('supplierTaxTerms')) {
+      throw const FormatException('Saved supplier tax terms need recovery.');
+    }
+    final taxTerms = hasTaxTerms ? BuyV2PackTerms.fromRetainedJson(source['supplierTaxTerms']) : null;
     if (!_validRetainedFamily(source, source['version'])) {
       throw const FormatException('Saved purchased family needs checking.');
     }
@@ -2366,7 +2403,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
         minimumOrder < 1 ||
         source['requiresPrescription'] is! bool ||
         textFields.any((key) => source[key] is! String)) {
-      if (source['version'] == 3) throw const FormatException('Saved purchased identity needs checking.');
+      if (hasTaxTerms || source['version'] == 3) throw const FormatException('Saved purchased identity needs checking.');
       return null;
     }
     final product = BuyV2Product(
@@ -2383,6 +2420,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
       title: title,
       variant: source['variant'] as String,
       pack: source['pack'] as String,
+      packTerms: taxTerms,
       price: source['price'] as int?,
       priceMinor: source['priceMinor'] as int?,
       mrp: source['mrp'] as int?,
@@ -2404,7 +2442,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
       visualKind: 'unavailable',
       catalogueListing: false,
     );
-    if (!product.hasValidPublicListingIdentity && source['version'] == 3) {
+    if (taxTerms != null && !product.hasValidPackTerms) {
+      throw const FormatException('Saved supplier tax terms need recovery.');
+    }
+    if (!product.hasValidPublicListingIdentity && (hasTaxTerms || source['version'] == 3)) {
       throw const FormatException('Saved purchased identity needs checking.');
     }
     return product.hasValidPublicListingIdentity ? product : null;

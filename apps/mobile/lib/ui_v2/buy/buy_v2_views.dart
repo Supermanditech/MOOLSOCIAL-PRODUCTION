@@ -3068,6 +3068,23 @@ Future<void> _showBuyV2ProductComparison(
 
 String _comparisonMoney(int minor) => buyV2MoneyMinor(minor);
 
+String _supplierGstDisclosure(BuyV2PackTerms? terms, int? taxMinor) {
+  final rate = terms?.supplierGst, legacy = terms?.supplierTax;
+  if (rate == null && legacy == null) {
+    return terms?.pricesIncludeTax == null ? 'GST not confirmed'
+      : '${terms!.pricesIncludeTax! ? 'Tax included' : 'Tax additional'} · GST rate not confirmed';
+  }
+  final included = (rate?.basis ?? legacy!.basis) == BuyV2SupplierTaxBasis.included;
+  final label = rate == null ? 'Supplier tax' : 'Supplier GST ${rate.percentageText}%';
+  return '$label ${included ? 'included' : 'additional'}'
+    '${taxMinor == null ? '' : ' · ${_comparisonMoney(taxMinor)} ${included ? 'in item price' : 'above item price'}'}';
+}
+int? _supplierGstForPack(BuyV2PackTerms? terms, int? priceMinor) {
+  if (priceMinor == null) return null;
+  try { return terms?.supplierGst?.taxMinorForSubtotal(priceMinor) ?? terms?.supplierTax?.amountMinor; }
+  on FormatException { return null; }
+}
+
 /// Reuses the existing Compare sheet; only eligible same-pack offers change.
 class _ProductComparisonSheet extends StatefulWidget {
   const _ProductComparisonSheet({
@@ -3732,20 +3749,16 @@ class _ProductPriceExtrasState extends State<_ProductPriceExtras>
                     label: hasTiers ? 'Price per ${terms.sellUnit}' : 'Total',
                     value: _comparisonMoney(facts.priceMinor),
                   ),
+                  _ProductInfoRow(label: 'Supplier GST',
+                    value: _supplierGstDisclosure(product.packTerms,
+                      facts.stale ? null : _supplierGstForPack(product.packTerms,
+                        product.offerClass == BuyV2OfferClass.bulk ? null : facts.priceMinor))),
                   if (hasTiers) ...[
                     for (final tier in terms.priceTiers)
                       _ProductInfoRow(
                         label: '${tier.minimumPacks}+ packs',
                         value: '${_comparisonMoney(tier.priceMinor)} / ${terms.sellUnit}',
                       ),
-                    _ProductInfoRow(
-                      label: 'Tax',
-                      value: terms.pricesIncludeTax == null
-                          ? 'Not yet confirmed'
-                          : terms.pricesIncludeTax!
-                          ? 'Included'
-                          : 'Extra',
-                    ),
                     _ProductInfoRow(
                       label: 'Freight',
                       value: terms.pricesIncludeFreight == null
@@ -4791,7 +4804,10 @@ class _WholesaleTradeDecisionPanelState
             terms?.pricingCurrentAt(widget.session.catalogueNow()) == true
         ? terms?.pricesIncludeTax
         : null;
-    final taxAndInvoice = taxIncluded == null
+    final taxAndInvoice = terms?.supplierTaxDeclaration != null
+        ? '${_supplierGstDisclosure(terms, facts.stale ? null : _supplierGstForPack(terms,
+            product.offerClass == BuyV2OfferClass.bulk ? null : facts.priceMinor))} · Invoice not confirmed'
+        : taxIncluded == null
         ? 'Tax and invoice not confirmed'
         : '${taxIncluded ? 'Tax included' : 'Tax excluded'} · Invoice not confirmed';
     final showSignal =
@@ -24899,7 +24915,10 @@ class _CartLine extends StatelessWidget {
             .clamp(76.0, double.infinity)
             .toDouble();
     final stockLabel = session.storeStockLabelFor(product);
-    final productDetailsLabel = 'View ${product.customerTitle} product details${stockLabel == null ? '' : '. $stockLabel'}';
+    final gstDisclosure = product.packTerms == null ? null :
+      '${_supplierGstDisclosure(product.packTerms, facts.stale ? null : session.supplierTaxForLine(line))}. Final tax confirmed at checkout.';
+    final productDetailsLabel = 'View ${product.customerTitle} product details${stockLabel == null ? '' : '. $stockLabel'}'
+      '${gstDisclosure == null ? '' : '. $gstDisclosure'}';
     void openProductDetails() {
       HapticFeedback.selectionClick();
       session.openProduct(product.id);
@@ -24974,6 +24993,10 @@ class _CartLine extends StatelessWidget {
                         ),
                         if (stockLabel != null) Text(stockLabel,
                           key: ValueKey('buy-cart-stock-${product.id}'),
+                          style: context.buyMeta.copyWith(fontSize: 11)),
+                        if (gstDisclosure != null) Text(
+                          gstDisclosure,
+                          key: ValueKey('buy-cart-supplier-gst-${product.id}'),
                           style: context.buyMeta.copyWith(fontSize: 11)),
                       ],
                     ),

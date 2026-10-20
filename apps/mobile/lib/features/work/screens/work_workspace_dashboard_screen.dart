@@ -26161,6 +26161,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     text: widget.product.visualLabel,
   );
   late final _sellingFields = <String, TextEditingController>{
+    'gstPercent': TextEditingController(text: widget.product.supplierGst?.percentageText ?? ''),
+    'gstBasis': TextEditingController(text: widget.product.supplierGst?.basis.name ?? ''),
     'quantityPerPack': TextEditingController(
       text: widget.product.packMeasure?.quantityText ?? '',
     ),
@@ -26505,6 +26507,10 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           existingMeasure: widget.product.packMeasure,
           existingWholesale: widget.product.wholesaleOffer,
           existingRetailEnabled: widget.product.retailEnabled,
+          existingRetailTax: widget.product.retailTax,
+          existingWholesaleTax: widget.product.wholesaleTax,
+          existingSupplierGst: widget.product.supplierGst,
+          clearBlankTaxes: true,
         );
       } on FormatException catch (error) {
         final field = error.message.split(':').first;
@@ -26523,6 +26529,19 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         );
         return;
       }
+      if (sellingInputs.supplierGst == null && widget.product.supplierGst == null &&
+          !widget.product.legacySupplierTaxInactive && sellingInputs.retailEnabled &&
+          sellingInputs.retailTax?.validForPrice(selling!) == false) {
+        _reject('Included tax cannot exceed the selling price; check the amount and basis.', field: 'retailTaxAmount');
+        return;
+      }
+      final tradeTax = sellingInputs.wholesaleTax, trade = sellingInputs.wholesale;
+      if (sellingInputs.supplierGst == null && widget.product.supplierGst == null &&
+          !widget.product.legacySupplierTaxInactive && tradeTax != null && trade != null && trade.enabled &&
+          [trade.priceMinor, ...trade.tiers.map((t) => t.packPriceMinor)].any((p) => !tradeTax.validForPrice(p))) {
+        _reject('Check the trade tax against every quantity price.', field: 'wholesaleTaxAmount');
+        return;
+      }
       final measureChanged =
           jsonEncode(sellingInputs.measure?.toJson()) !=
           jsonEncode(widget.product.packMeasure?.toJson());
@@ -26532,6 +26551,12 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           purchaseMinor > 214748364700 || sellingMinor > 214748364700 ||
           mrp != null && mrp > 214748364700;
       final reviewedProduct = widget.product.copyWith(
+        supplierGst: sellingInputs.supplierGst,
+        clearSupplierGst: sellingInputs.supplierGst == null,
+        retailTax: sellingInputs.retailTax,
+        wholesaleTax: sellingInputs.wholesaleTax,
+        clearRetailTax: sellingInputs.retailTax == null,
+        clearWholesaleTax: sellingInputs.wholesaleTax == null,
         variantMembership: _variantFamily == null ? null : WorkspaceVariantMembership(
           familyId: _variantFamily!.id, selections: _variantSelections,
           useSharedContent: _useSharedVariantContent),
@@ -26734,6 +26759,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     TextEditingController controller, {
     bool numeric = false,
     bool money = false,
+    bool percentage = false,
     int lines = 1,
     String? hint,
   }) {
@@ -26773,7 +26799,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                   }
                 : null,
             keyboardType: numeric
-                ? money ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number
+                ? money || percentage ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number
                 : lines > 1
                 ? TextInputType.multiline
                 : TextInputType.text,
@@ -26793,6 +26819,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
               floatingLabelBehavior: FloatingLabelBehavior.always,
               hintText: hint,
               prefixText: money ? '₹ ' : null,
+              suffixText: percentage ? '%' : null,
               error: error == null
                   ? null
                   : Semantics(
@@ -26942,6 +26969,56 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         _clearFieldError(field);
       },
     ),
+  );
+
+  Widget _supplierGstFields() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const SizedBox(height: 10),
+      _group([
+        _field('gstPercent', 'work-product-gst-percent', 'GST rate %',
+          _sellingFields['gstPercent']!, numeric: true, percentage: true, hint: 'If confirmed'),
+        _sellingChoice('gstBasis', 'Selling price basis', const {
+          '': 'Not confirmed', 'included': 'GST included in price', 'additional': 'GST added separately',
+        }),
+      ]),
+      const SizedBox(height: 6),
+      const Text('One confirmed rate for this SKU across Retail, Wholesale or Bulk. Blank means unknown, not 0%.'),
+      Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+        key: const Key('work-product-gst-help'),
+        icon: const Icon(Icons.help_outline, size: 18),
+        label: const Text('Not sure of the GST rate?'),
+        onPressed: () => showModalBottomSheet<void>(context: context, isScrollControlled: true,
+          builder: (sheetContext) => SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.all(20),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const Text('Confirm the rate before charging GST', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              const Text('Use the official GST portal: Services → User Services → Search HSN Code. Search by product description or HSN. A matching description alone does not confirm the applicable rate or your permission to collect GST. If unsure, check with your CA. You can keep your product saved privately while confirming.'),
+              const SizedBox(height: 12),
+              OutlinedButton(onPressed: () async {
+                try {
+                  final opened = await launchUrl(Uri.https('www.gst.gov.in'), mode: LaunchMode.externalApplication);
+                  if (!opened && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Open www.gst.gov.in in your browser.')));
+                } catch (_) {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Open www.gst.gov.in in your browser.')));
+                }
+              }, child: const Text('Open official GST portal')),
+              TextButton(onPressed: () => Navigator.pop(sheetContext), child: const Text('Done')),
+            ])))),
+      )),
+      if (widget.product.retailTax != null || widget.product.wholesaleTax != null)
+        const Text('Earlier fixed tax amounts are retained in saved history; they are not converted into a GST rate.'),
+      if (_sellingFields['gstPercent']!.text.isNotEmpty || _sellingFields['gstBasis']!.text.isNotEmpty)
+        Align(alignment: Alignment.centerLeft, child: TextButton(
+        key: const Key('work-product-gst-clear'),
+        style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+        onPressed: () => setState(() {
+          _sellingFields['gstPercent']!.clear(); _sellingFields['gstBasis']!.clear();
+          if (_errorField == 'gstPercent' || _errorField == 'gstBasis') {
+            _errorField = null; _error = null;
+          }
+        }), child: const Text('Clear GST details'))),
+    ],
   );
 
   Future<void> _editGuidedDetails() async {
@@ -27378,6 +27455,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                 },
                               ),
                             ]),
+                            _supplierGstFields(),
                             if (_sellingFields['sellingChannels']!.text !=
                                 'retail') ...[
                               const SizedBox(height: 10),

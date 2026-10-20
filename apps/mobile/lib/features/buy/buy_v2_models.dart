@@ -482,6 +482,104 @@ class BuyV2VariantAttribute {
               swatchArgb! <= 0xffffffff));
 }
 
+enum BuyV2SupplierTaxBasis { included, additional }
+
+/// One owner-confirmed SKU rate, not automatic HSN classification or a verified
+/// payable quote. Calculate against the actual line subtotal, not a cached price.
+class BuyV2SupplierGstRate {
+  const BuyV2SupplierGstRate({required this.rateBasisPoints, required this.basis});
+  final int rateBasisPoints;
+  final BuyV2SupplierTaxBasis basis;
+  bool get valid => rateBasisPoints >= 0 && rateBasisPoints <= 10000;
+  String get percentageText {
+    final whole = rateBasisPoints ~/ 100, fraction = rateBasisPoints % 100;
+    return fraction == 0 ? '$whole' : '$whole.${fraction.toString().padLeft(2, '0').replaceFirst(RegExp(r'0$'), '')}';
+  }
+  int taxMinorForSubtotal(int subtotalMinor) {
+    if (!valid || subtotalMinor < 0 || subtotalMinor > BuyV2SupplierTaxAmount.maximumMinor) {
+      throw const FormatException('Check the GST rate and actual selling subtotal.');
+    }
+    // Exact integer arithmetic; round once per supplied line subtotal to the
+    // nearest paise, half up. Included GST is extracted, never added again.
+    final denominator = BigInt.from(basis == BuyV2SupplierTaxBasis.included
+      ? 10000 + rateBasisPoints : 10000);
+    final numerator = BigInt.from(subtotalMinor) * BigInt.from(rateBasisPoints);
+    return ((numerator + denominator ~/ BigInt.two) ~/ denominator).toInt();
+  }
+  int additionalMinorForSubtotal(int subtotalMinor) {
+    final amount = taxMinorForSubtotal(subtotalMinor);
+    if (basis == BuyV2SupplierTaxBasis.included) return 0;
+    if (amount > BuyV2SupplierTaxAmount.maximumMinor - subtotalMinor) {
+      throw const FormatException('The GST-inclusive total is too large.');
+    }
+    return amount;
+  }
+  Map<String, Object?> toJson() {
+    if (!valid) throw const FormatException('Check the supplier-confirmed GST percentage.');
+    return {'version': 1, 'rateBasisPoints': rateBasisPoints, 'basis': basis.name};
+  }
+  Map<String, Object?> toChannelJson() => {...toJson(), 'version': 2};
+  static BuyV2SupplierGstRate? fromChannelJson(Object? raw) {
+    if (raw == null) return null;
+    if (raw is! Map || raw['version'] is! int || raw['version'] != 2) {
+      throw const FormatException('This supplier GST declaration needs review.');
+    }
+    return fromJson({...raw, 'version': 1});
+  }
+  static BuyV2SupplierGstRate? fromJson(Object? raw) {
+    if (raw == null) return null;
+    const invalid = FormatException('Saved GST details need recovery.');
+    if (raw is! Map || raw.length != 3 || raw['version'] is! int || raw['version'] != 1 ||
+        raw['rateBasisPoints'] is! int || !const ['included', 'additional'].contains(raw['basis'])) {
+      throw invalid;
+    }
+    final value = BuyV2SupplierGstRate(rateBasisPoints: raw['rateBasisPoints'] as int,
+      basis: BuyV2SupplierTaxBasis.values.byName(raw['basis'] as String));
+    if (!value.valid) throw invalid;
+    return value;
+  }
+}
+
+/// Supplier-declared exact money for one selling pack, never a statutory rate.
+/// Null at the owning SKU means unknown; an explicit zero is still supplied.
+class BuyV2SupplierTaxAmount {
+  const BuyV2SupplierTaxAmount({required this.amountMinor, required this.basis});
+  static const maximumMinor = 9007199254740991;
+  final int amountMinor;
+  final BuyV2SupplierTaxBasis basis;
+  bool get valid => amountMinor >= 0 && amountMinor <= maximumMinor;
+  bool validForPrice(int unitPriceMinor) => valid && unitPriceMinor >= 0 &&
+      unitPriceMinor <= maximumMinor && (basis == BuyV2SupplierTaxBasis.included
+        ? amountMinor <= unitPriceMinor : amountMinor <= maximumMinor - unitPriceMinor);
+  int taxMinorForPacks(int packs) {
+    if (!valid || packs < 1 || packs > maximumMinor ||
+        amountMinor != 0 && packs > maximumMinor ~/ amountMinor) {
+      throw const FormatException('Supplier tax quantity needs review.');
+    }
+    return amountMinor * packs;
+  }
+  int additionalMinorForPacks(int packs) {
+    final declared = taxMinorForPacks(packs);
+    return basis == BuyV2SupplierTaxBasis.additional ? declared : 0;
+  }
+  Map<String, Object?> toJson() {
+    if (!valid) throw const FormatException('Supplier tax amount needs review.');
+    return {'version': 1, 'amountMinor': amountMinor, 'basis': basis.name};
+  }
+  static BuyV2SupplierTaxAmount? fromJson(Object? raw) {
+    if (raw == null) return null;
+    const invalid = FormatException('Saved supplier tax needs recovery.');
+    if (raw is! Map || raw.length != 3 || raw['version'] is! int || raw['version'] != 1 ||
+        raw['amountMinor'] is! int || !const ['included', 'additional'].contains(raw['basis'])) {
+      throw invalid;
+    }
+    final result = BuyV2SupplierTaxAmount(amountMinor: raw['amountMinor'] as int,
+        basis: BuyV2SupplierTaxBasis.values.byName(raw['basis'] as String));
+    if (!result.valid) throw invalid;
+    return result;
+  }
+}
+
 /// Provider definition of one sellable SKU, independent of order quantity.
 /// Net content describes each contained unit, never the entire outer case.
 class BuyV2PackPriceTier {
@@ -517,6 +615,8 @@ class BuyV2PackTerms {
     this.priceValidUntil,
     this.pricesIncludeTax,
     this.pricesIncludeFreight,
+    this.supplierGst,
+    this.supplierTax,
   });
 
   final String skuId;
@@ -537,6 +637,70 @@ class BuyV2PackTerms {
   final DateTime? priceValidUntil;
   final bool? pricesIncludeTax;
   final bool? pricesIncludeFreight;
+  final BuyV2SupplierGstRate? supplierGst;
+  /// Legacy exact amount; never converted into a GST rate.
+  final BuyV2SupplierTaxAmount? supplierTax;
+  Map<String, Object?>? get supplierTaxDeclaration =>
+      supplierGst?.toChannelJson() ?? supplierTax?.toJson();
+
+  /// Frozen terms only. Expiry is retained, never extended for an old payment.
+  Map<String, Object?> toRetainedJson() => {
+    'version': 1, 'skuId': skuId, 'revision': revision, 'sellUnit': sellUnit,
+    'sourceLabel': sourceLabel, 'containedUnits': containedUnits,
+    'netContentMilli': netContentMilli, 'contentUnit': contentUnit,
+    'quantityStep': quantityStep, 'requiresMeasurement': requiresMeasurement,
+    'unitPriceLabel': unitPriceLabel, 'pricingStoreId': pricingStoreId,
+    'priceObservedAt': priceObservedAt?.toUtc().toIso8601String(),
+    'priceValidUntil': priceValidUntil?.toUtc().toIso8601String(),
+    'pricesIncludeTax': pricesIncludeTax, 'pricesIncludeFreight': pricesIncludeFreight,
+    'priceTiers': [for (final tier in priceTiers)
+      {'minimumPacks': tier.minimumPacks, 'priceMinor': tier.priceMinor}],
+    'supplierTax': supplierTaxDeclaration,
+  };
+  static BuyV2PackTerms? fromRetainedJson(Object? raw) {
+    if (raw == null) return null;
+    const invalid = FormatException('Saved selling terms need recovery.');
+    const strings = ['skuId', 'revision', 'sellUnit'];
+    const optionalStrings = ['sourceLabel', 'contentUnit', 'unitPriceLabel', 'pricingStoreId'];
+    const keys = {'version', 'skuId', 'revision', 'sellUnit', 'sourceLabel', 'containedUnits',
+      'netContentMilli', 'contentUnit', 'quantityStep', 'requiresMeasurement', 'unitPriceLabel',
+      'pricingStoreId', 'priceObservedAt', 'priceValidUntil', 'pricesIncludeTax',
+      'pricesIncludeFreight', 'priceTiers', 'supplierTax'};
+    if (raw is! Map || raw.length != keys.length || raw.keys.any((k) => !keys.contains(k)) ||
+        raw['version'] is! int || raw['version'] != 1 ||
+        strings.any((k) => raw[k] is! String) ||
+        optionalStrings.any((k) => raw[k] != null && raw[k] is! String) ||
+        raw['containedUnits'] is! int || raw['quantityStep'] is! int ||
+        raw['netContentMilli'] != null && raw['netContentMilli'] is! int ||
+        raw['requiresMeasurement'] is! bool ||
+        ['pricesIncludeTax', 'pricesIncludeFreight'].any((k) => raw[k] != null && raw[k] is! bool) ||
+        raw['priceTiers'] is! List || (raw['priceTiers'] as List).length > 20) { throw invalid; }
+    DateTime? time(String key) {
+      if (raw[key] == null) return null;
+      if (raw[key] is! String) throw invalid;
+      final at = DateTime.tryParse(raw[key] as String)?.toUtc();
+      if (at == null || at.toIso8601String() != raw[key]) throw invalid;
+      return at;
+    }
+    final declaration = raw['supplierTax'];
+    final gst = declaration is Map && declaration['version'] == 2
+      ? BuyV2SupplierGstRate.fromChannelJson(declaration) : null;
+    final result = BuyV2PackTerms(skuId: raw['skuId'] as String, revision: raw['revision'] as String,
+      sellUnit: raw['sellUnit'] as String, sourceLabel: raw['sourceLabel'] as String?,
+      containedUnits: raw['containedUnits'] as int, netContentMilli: raw['netContentMilli'] as int?,
+      contentUnit: raw['contentUnit'] as String?, quantityStep: raw['quantityStep'] as int,
+      requiresMeasurement: raw['requiresMeasurement'] as bool, unitPriceLabel: raw['unitPriceLabel'] as String?,
+      pricingStoreId: raw['pricingStoreId'] as String?, priceObservedAt: time('priceObservedAt'),
+      priceValidUntil: time('priceValidUntil'), pricesIncludeTax: raw['pricesIncludeTax'] as bool?,
+      pricesIncludeFreight: raw['pricesIncludeFreight'] as bool?, supplierGst: gst,
+      supplierTax: declaration != null && gst == null ? BuyV2SupplierTaxAmount.fromJson(declaration) : null,
+      priceTiers: List.unmodifiable((raw['priceTiers'] as List).map((t) {
+        if (t is! Map || t.length != 2 || t['minimumPacks'] is! int || t['priceMinor'] is! int) throw invalid;
+        return BuyV2PackPriceTier(minimumPacks: t['minimumPacks'] as int, priceMinor: t['priceMinor'] as int);
+      })));
+    if (!result.isValidFor(result.skuId)) throw invalid;
+    return result;
+  }
 
   bool validPricingFor(String? storeId, int minimumOrder, {bool requireSourceMetadata = false}) {
     if (priceTiers.isEmpty && !requireSourceMetadata) {
@@ -604,6 +768,12 @@ class BuyV2PackTerms {
 
   bool isValidFor(String id) =>
       skuId == id &&
+      (supplierGst?.valid ?? true) && (supplierTax?.valid ?? true) &&
+      (supplierGst == null || supplierTax == null) &&
+      (supplierGst == null || pricesIncludeTax == null ||
+        pricesIncludeTax == (supplierGst!.basis == BuyV2SupplierTaxBasis.included)) &&
+      (supplierTax == null || pricesIncludeTax == null ||
+        pricesIncludeTax == (supplierTax!.basis == BuyV2SupplierTaxBasis.included)) &&
       [
         skuId,
         revision,

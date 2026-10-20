@@ -591,6 +591,164 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  test('LF-GST shared SKU rate follows actual channel price without double adding', () {
+    const gst = BuyV2SupplierGstRate(rateBasisPoints: 1800, basis: BuyV2SupplierTaxBasis.included);
+    expect(gst.taxMinorForSubtotal(11800), 1800);
+    expect(gst.taxMinorForSubtotal(23600), 3600);
+    expect(gst.additionalMinorForSubtotal(11800), 0);
+    const extra = BuyV2SupplierGstRate(rateBasisPoints: 1800, basis: BuyV2SupplierTaxBasis.additional);
+    expect(extra.taxMinorForSubtotal(10000), 1800);
+    expect(extra.additionalMinorForSubtotal(10000), 1800);
+    expect(extra.taxMinorForSubtotal(7), 1);
+    expect(extra.taxMinorForSubtotal(3), 1);
+    expect(() => extra.taxMinorForSubtotal(-1), throwsFormatException);
+  });
+  test('LF-GST shared rate survives saved SKU price changes and explicit clearing', () {
+    const gst = BuyV2SupplierGstRate(rateBasisPoints: 500, basis: BuyV2SupplierTaxBasis.included);
+    final item = _product().copyWith(supplierGst: gst);
+    final raw = item.toInventoryJson();
+    expect(raw['version'], 6);
+    expect(raw.containsKey('retailTax'), isFalse);
+    final restored = WorkspaceCatalogueItem.fromInventoryJson(raw).copyWith(sellingPriceMinor: 21000);
+    expect(restored.supplierGst!.rateBasisPoints, 500);
+    expect(restored.supplierGst!.taxMinorForSubtotal(restored.sellingPriceMinor), 1000);
+    expect(restored.copyWith(clearSupplierGst: true).toInventoryJson().containsKey('supplierGst'), isFalse);
+  });
+  test('LF-GST unknown differs from explicit zero and legacy amounts are not rates', () {
+    expect(_product().supplierGst, isNull);
+    const gst = BuyV2SupplierGstRate(rateBasisPoints: 0, basis: BuyV2SupplierTaxBasis.included);
+    expect(WorkspaceCatalogueItem.fromInventoryJson(_product().copyWith(supplierGst: gst).toInventoryJson())
+      .supplierGst!.rateBasisPoints, 0);
+    const old = BuyV2SupplierTaxAmount(amountMinor: 7, basis: BuyV2SupplierTaxBasis.included);
+    final restored = WorkspaceCatalogueItem.fromInventoryJson(_product().copyWith(retailTax: old).toInventoryJson());
+    expect(restored.supplierGst, isNull);
+    expect(restored.retailTax!.amountMinor, 7);
+    expect(() => BuyV2SupplierGstRate.fromJson({'version': 2, 'rateBasisPoints': 500, 'basis': 'included'}), throwsFormatException);
+    expect(() => BuyV2SupplierGstRate.fromJson({'version': 1, 'rateBasisPoints': 500.0, 'basis': 'included'}), throwsFormatException);
+    expect(() => const BuyV2SupplierGstRate(rateBasisPoints: -1, basis: BuyV2SupplierTaxBasis.included).toJson(), throwsFormatException);
+  });
+  test('LF-GST shared CSV percentage parses exact decimals and incomplete input is rejected', () {
+    final parsed = WorkspaceSellingInputs.parse({'gstPercent': '0.25', 'gstBasis': 'included'});
+    expect(parsed.supplierGst!.rateBasisPoints, 25);
+    expect(WorkspaceSellingInputs.parse({}, existingSupplierGst: parsed.supplierGst).supplierGst!.rateBasisPoints, 25);
+    expect(WorkspaceSellingInputs.parse({'gstPercent': '', 'gstBasis': ''}, existingSupplierGst: parsed.supplierGst,
+      clearBlankTaxes: true).supplierGst, isNull);
+    for (final value in ['-1', '18.001', '1e1', '100.01']) {
+      expect(() => WorkspaceSellingInputs.parse({'gstPercent': value, 'gstBasis': 'included'}), throwsFormatException);
+    }
+    expect(() => WorkspaceSellingInputs.parse({'gstPercent': '18'}), throwsFormatException);
+  });
+  Map<String, Object?> supplierTaxRecord() {
+    final raw = _product().toInventoryJson();
+    raw['baseVersion'] = raw['version']; raw['version'] = 5;
+    return raw;
+  }
+  test('LF-TAX saved SKU retains exact supplier tax by selling channel', () {
+    final raw = supplierTaxRecord();
+    raw['supplierTaxVersion'] = 1;
+    raw['retailTax'] = {'version': 1, 'amountMinor': 7, 'basis': 'included'};
+    raw['wholesaleTax'] = {'version': 1, 'amountMinor': 0, 'basis': 'additional'};
+    final restored = WorkspaceCatalogueItem.fromInventoryJson(raw).toInventoryJson();
+    expect(restored['retailTax'], raw['retailTax']);
+    expect(restored['wholesaleTax'], raw['wholesaleTax']);
+    expect(restored['supplierTaxVersion'], 1);
+    expect(restored['version'], 5);
+    expect(restored['baseVersion'], 1);
+  });
+
+  test('LF-TAX saved unknown declaration version is retained for recovery', () {
+    final raw = supplierTaxRecord();
+    raw['supplierTaxVersion'] = 2;
+    raw['retailTax'] = {'version': 1, 'amountMinor': 7, 'basis': 'included'};
+    expect(() => WorkspaceCatalogueItem.fromInventoryJson(raw), throwsFormatException);
+  });
+
+  test('LF-TAX legacy unknown stays absent and channel clearing preserves other tax', () {
+    final legacy = _product().toInventoryJson();
+    expect(WorkspaceCatalogueItem.fromInventoryJson(legacy).toInventoryJson(), legacy);
+    expect(legacy.containsKey('supplierTaxVersion'), isFalse);
+    const retail = BuyV2SupplierTaxAmount(amountMinor: 7, basis: BuyV2SupplierTaxBasis.included);
+    const trade = BuyV2SupplierTaxAmount(amountMinor: 0, basis: BuyV2SupplierTaxBasis.additional);
+    final saved = _product().copyWith(retailTax: retail, wholesaleTax: trade);
+    final copied = WorkspaceCatalogueItem.fromInventoryJson(saved.copyWith(stock: 12).toInventoryJson());
+    expect(copied.retailTax!.toJson(), retail.toJson());
+    expect(copied.wholesaleTax!.toJson(), trade.toJson());
+    final cleared = copied.copyWith(clearRetailTax: true);
+    expect(cleared.retailTax, isNull);
+    expect(cleared.wholesaleTax!.amountMinor, 0);
+    expect(cleared.copyWith(clearWholesaleTax: true).toInventoryJson().containsKey('supplierTaxVersion'), isFalse);
+  });
+
+  test('LF-TAX exact selling-pack quantity is not contained units and included is not added', () {
+    const included = BuyV2SupplierTaxAmount(amountMinor: 7, basis: BuyV2SupplierTaxBasis.included);
+    const additional = BuyV2SupplierTaxAmount(amountMinor: 7, basis: BuyV2SupplierTaxBasis.additional);
+    expect(included.taxMinorForPacks(3), 21);
+    expect(included.additionalMinorForPacks(3), 0);
+    expect(additional.additionalMinorForPacks(3), 21);
+    expect(included.validForPrice(6), isFalse);
+    expect(included.validForPrice(7), isTrue);
+    expect(additional.validForPrice(BuyV2SupplierTaxAmount.maximumMinor), isFalse);
+    expect(() => included.taxMinorForPacks(0), throwsFormatException);
+    expect(() => included.taxMinorForPacks(BuyV2SupplierTaxAmount.maximumMinor), throwsFormatException);
+  });
+
+  for (final malformed in <Map<String, Object?>>[
+    {'version': 1, 'amountMinor': -1, 'basis': 'included'},
+    {'version': 1, 'amountMinor': 0.07, 'basis': 'included'},
+    {'version': 1, 'amountMinor': '7', 'basis': 'included'},
+    {'version': 1, 'amountMinor': 9007199254740992, 'basis': 'additional'},
+    {'version': 1, 'amountMinor': 7, 'basis': 'rate'},
+    {'version': 1, 'amountMinor': 7},
+    {'version': 1, 'amountMinor': 7, 'basis': 'included', 'verified': true},
+    {'version': 2, 'amountMinor': 7, 'basis': 'included'},
+    {'version': 1.0, 'amountMinor': 7, 'basis': 'included'},
+  ]) {
+    test('LF-TAX malformed supplier declaration is not silently lost $malformed', () {
+      final raw = supplierTaxRecord()..['supplierTaxVersion'] = 1..['retailTax'] = malformed;
+      expect(() => WorkspaceCatalogueItem.fromInventoryJson(raw), throwsFormatException);
+    });
+  }
+
+  test('LF-TAX shared inputs preserve, clear and distinguish amount from basis', () {
+    final parsed = WorkspaceSellingInputs.parse({'retailTaxAmount': '0.07', 'retailTaxBasis': 'included',
+      'wholesaleTaxAmount': '0', 'wholesaleTaxBasis': 'additional'});
+    expect(parsed.retailTax!.amountMinor, 7);
+    expect(parsed.wholesaleTax!.amountMinor, 0);
+    expect(WorkspaceSellingInputs.parse({}, existingRetailTax: parsed.retailTax).retailTax!.amountMinor, 7);
+    expect(WorkspaceSellingInputs.parse({'retailTaxAmount': '', 'retailTaxBasis': ''},
+      existingRetailTax: parsed.retailTax, clearBlankTaxes: true).retailTax, isNull);
+    for (final fields in [
+      {'retailTaxAmount': '0.07'}, {'retailTaxBasis': 'included'},
+      {'retailTaxAmount': '-1', 'retailTaxBasis': 'additional'},
+      {'retailTaxAmount': '0.001', 'retailTaxBasis': 'included'},
+    ]) {
+      expect(() => WorkspaceSellingInputs.parse(fields), throwsFormatException);
+    }
+  });
+
+  test('LF-TAX enriched inventory cannot masquerade as an older version or exceed an included price', () {
+    const amount = BuyV2SupplierTaxAmount(amountMinor: 7, basis: BuyV2SupplierTaxBasis.included);
+    final valid = _product().copyWith(retailTax: amount).toInventoryJson();
+    final downgrade = Map<String, Object?>.of(valid)..['version'] = 1;
+    expect(() => WorkspaceCatalogueItem.fromInventoryJson(downgrade), throwsFormatException);
+    final badPrice = Map<String, Object?>.of(valid)..['sellingPrice'] = 0;
+    expect(() => WorkspaceCatalogueItem.fromInventoryJson(badPrice), throwsFormatException);
+    expect(_product().copyWith(retailTax: amount, sellingPriceMinor: 6).supplierTaxValid, isFalse);
+    expect(_product().copyWith(retailTax: amount, sellingPriceMinor: 6, retailEnabled: false).supplierTaxValid, isTrue);
+  });
+
+  test('LF-TAX CSV accepts supplier amounts without inventing an absent trade declaration', () {
+    final imported = WorkspaceProductImport.parse(
+      'title,brand,pack,purchasePrice,sellingPrice,stock,sku,retailTaxAmount,retailTaxBasis\n'
+      'Evaluation rice,Evaluation,1 kg,80,100,2,TAX-EVAL-1,0.07,included',
+      catalogue: const [], owned: const []);
+    final product = imported.rows.single.product!;
+    expect(product.retailTax!.amountMinor, 7);
+    expect(product.wholesaleTax, isNull);
+    expect(product.publicListing, isFalse);
+    expect(WorkspaceCatalogueItem.fromInventoryJson(product.toInventoryJson()).retailTax!.amountMinor, 7);
+  });
+
   group('LF operational order bridge', () {
     late identity_fixtures.Transport wire;
     late WorkspaceOperationalOrderCommandGateway bridge;
