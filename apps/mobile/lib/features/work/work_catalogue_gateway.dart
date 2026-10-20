@@ -3207,7 +3207,7 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
 /// Genuine exact-Store catalogue source. Global/geo discovery and Store address
 /// metadata require their own providers; an unsupported call is not an empty feed.
 class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2VariantFamilySource, BuyV2StorePublishedOffersSource, BuyV2StoreCouponSource,
-        BuyV2StoreCouponEligibilitySource {
+        BuyV2SupplierQuoteCouponEligibilitySource {
   WorkspaceStoreCatalogueSource({required this.gateway, required this.storeId, required this.current, this.contentReadback});
   final AuthenticatedWorkspaceCatalogueGateway gateway;
   final String storeId;
@@ -3236,6 +3236,12 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
     current: () =>
         storeCouponEligibilityActive && coupon.storeId == storeId && current(),
   );
+  @override
+  Future<BuyV2StoreCouponEligibility> evaluateStoreCouponWithSupplierQuote({
+    required BuyV2PublishedStoreCoupon coupon, required List<BuyV2CartLine> lines,
+    required BuyV2SupplierQuoteSelection supplierQuote, required bool Function() current,
+  }) => gateway.evaluateStoreCoupon(coupon: coupon, lines: lines, supplierQuote: supplierQuote,
+    current: () => storeCouponEligibilityActive && coupon.storeId == storeId && current());
   @override Future<List<BuyV2PublishedStoreCoupon>> loadStoreCoupons({required String storeId}) {
     var reading = true;
     final generation = ++_couponGeneration;
@@ -3886,7 +3892,7 @@ class WorkspaceProductPresentationGateway {
 class WorkspacePublicDiscoverySource extends ChangeNotifier
     implements BuyV2CataloguePageSource, BuyV2VariantFamilySource,
       BuyV2ProductContentAdapter, BuyV2StorePublishedOffersSource, BuyV2PublishedCatalogueSource, BuyV2StoreCouponSource,
-        BuyV2StoreCouponEligibilitySource {
+        BuyV2SupplierQuoteCouponEligibilitySource {
   WorkspacePublicDiscoverySource({required this.gateway, required this.current}) {
     if (!gateway.productFactsReadbackSupported || !gateway.unbrandedProduceReadbackSupported ||
         !gateway.storeClassificationReadbackSupported) { throw ArgumentError('Matching discovery contracts are required.'); }
@@ -4158,6 +4164,12 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
     lines: lines,
     current: () => storeCouponEligibilityActive && current(),
   );
+  @override
+  Future<BuyV2StoreCouponEligibility> evaluateStoreCouponWithSupplierQuote({
+    required BuyV2PublishedStoreCoupon coupon, required List<BuyV2CartLine> lines,
+    required BuyV2SupplierQuoteSelection supplierQuote, required bool Function() current,
+  }) => gateway.evaluateStoreCoupon(coupon: coupon, lines: lines, supplierQuote: supplierQuote,
+    current: () => storeCouponEligibilityActive && current());
   @override Future<List<BuyV2PublishedStoreCoupon>> loadStoreCoupons({required String storeId}) =>
     _store(storeId).loadStoreCoupons(storeId: storeId);
   @override
@@ -4917,6 +4929,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     required BuyV2PublishedStoreCoupon coupon,
     required List<BuyV2CartLine> lines,
     required bool Function() current,
+    BuyV2SupplierQuoteSelection? supplierQuote,
   }) {
     var reading = true;
     bool valid() =>
@@ -4929,6 +4942,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       coupon,
       captured,
       valid,
+      supplierQuote,
     ).timeout(const Duration(seconds: 26)).whenComplete(() => reading = false);
   }
 
@@ -4936,6 +4950,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     BuyV2PublishedStoreCoupon coupon,
     List<BuyV2CartLine> lines,
     bool Function() current,
+    BuyV2SupplierQuoteSelection? supplierQuote,
   ) async {
     final account = ownerAccountId;
     if (!current() ||
@@ -4947,6 +4962,8 @@ class AuthenticatedWorkspaceCatalogueGateway
         lines.map((line) => line.product.id).toSet().length != lines.length) {
       throw const FormatException('Store coupons are not connected.');
     }
+    if (supplierQuote != null && (!supplierQuote.current(now()) || !supplierQuote.matchesLines(lines) ||
+        supplierQuote.realm != realm || supplierQuote.storeId != coupon.storeId)) { throw const FormatException(); }
     final requested = <Map<String, Object?>>[];
     for (final line in lines) {
       final product = line.product, listing = product.publicListingIdentity;
@@ -4972,6 +4989,8 @@ class AuthenticatedWorkspaceCatalogueGateway
           entry.readback.skuRevision == null ||
           entry.readback.publicOfferId == null ||
           entry.readback.publicOfferRevision == null ||
+          supplierQuote != null && listing.channel == BuyV2OfferClass.bulk && supplierQuote.lines.singleWhere(
+            (l) => l['productId'] == product.id)['skuRevision'] != entry.readback.skuRevision ||
           entry.product.packTerms?.revision != product.packTerms?.revision ||
           entry.product.minimumOrder != product.minimumOrder ||
           entry.product.quantityStep != product.quantityStep ||
@@ -5004,11 +5023,12 @@ class AuthenticatedWorkspaceCatalogueGateway
       'couponRevision': coupon.revision,
       'selectionPolicy': 'exclusive_store_basket',
       'lines': requested,
+      if (supplierQuote != null) 'supplierQuote': supplierQuote.couponReference,
     });
     final response = await _ownerRequest(
       {
         'operation': 'evaluateStoreCouponEligibility',
-        'storeCouponEligibilityVersion': 1,
+        'storeCouponEligibilityVersion': supplierQuote == null ? 1 : 2,
         ..._map(jsonDecode(frozen)),
       },
       current,
@@ -5026,6 +5046,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       query: Map<String, Object?>.from(_map(jsonDecode(frozen))),
       lines: lines,
       now: now().toUtc(),
+      supplierQuote: supplierQuote,
     );
     if (!current()) throw const FormatException();
     return result;

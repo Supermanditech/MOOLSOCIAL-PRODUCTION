@@ -10,6 +10,8 @@ import {WorkspacePurchaseProjectionService, normalizePlacement, requireDefaultPu
   normalizeOrderCompletion, purchaseOriginalFingerprint, type TrustedOrderCompletionEvidence,
   type TrustedOperationalOrderEvidence, type TrustedPlacementReceipt} from "./workspace_purchase_projection_service.js";
 import {WorkspaceBulkQuoteService} from "./workspace_purchase_projection_service.js";
+import {FirestorePromotionRepository, WorkspacePromotionService, storeCouponAttributionReferences} from './workspace_promotion_service.js';
+import {cataloguePayloadHash} from './workspace_catalogue_service.js';
 
 function operationalEvidence(): TrustedOperationalOrderEvidence {
   const now = new Date("2026-10-16T12:00:00.000Z");
@@ -27,7 +29,7 @@ function operationalEvidence(): TrustedOperationalOrderEvidence {
 test('LF-BULK supplier negotiation has a distinct private lifecycle, not a Checkout quote or issued PO', () => {
   const Service = Reflect.get(purchaseModule, 'WorkspaceBulkQuoteService');
   assert.equal(typeof Service, 'function');
-  for (const method of ['request', 'offer', 'accept', 'withdraw', 'read', 'listBuyer', 'listStore', 'reconcile', 'preparePurchase']) {
+  for (const method of ['request', 'offer', 'accept', 'withdraw', 'read', 'listBuyer', 'listStore', 'reconcile', 'preparePurchase', 'readCouponPrices']) {
     assert.equal(typeof Reflect.get(Service.prototype, method), 'function');
   }
 });
@@ -182,6 +184,67 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
       offerRevision: accepted.offer.revision, acceptedAt: accepted.acceptance.acceptedAt,
       validUntil: accepted.offer.validUntil, merchandiseMinor: accepted.offer.merchandiseMinor,
       lines: [{lineId: 'placed-line-one', quoteLineId: 'line-one'}]};
+    const reference = {schemaVersion: 1 as const, quoteId: accepted.quoteId, acceptedRevision: accepted.revision,
+      agreementFingerprint: accepted.acceptance.agreementFingerprint, lines: supplierQuote.lines};
+    const queriedLine = {lineId: 'placed-line-one', skuRevision: 1, quantity: 10, listing: {
+      schemaVersion: 1 as const, realm: 'evaluation' as const, storeId: 'store-one', skuId: 'sku-one', listingId,
+      canonicalProductId: 'canonical-one', verifiedPackId: 'pack-one', channel: 'bulk' as const}};
+    const readPrices = (actor = 'buyer-one', ref = reference, lines = [queriedLine]) =>
+      db.runTransaction(tx => service().readCouponPrices(tx, actor, 'store-one', ref, lines));
+    assert.deepEqual((await readPrices()).prices, [{lineId: 'placed-line-one', unitPriceMinor: 10025, merchandiseMinor: 100250}]);
+    await assert.rejects(readPrices('other-buyer'), {code: 'not_found'});
+    for (const changed of [{...queriedLine, quantity: 15}, {...queriedLine, skuRevision: 2},
+      {...queriedLine, listing: {...queriedLine.listing, verifiedPackId: 'wrong-pack'}}]) await assert.rejects(readPrices('buyer-one', reference, [changed]));
+    let couponExpireDuringRead = false;
+    const couponRepo = () => new FirestorePromotionRepository(db, 'evaluation', () => new Date(clock), service());
+    const couponService = () => new WorkspacePromotionService(couponRepo(), {
+      publicCatalogue: async () => {throw new Error('Use actual transactional price snapshot seam');},
+      couponPriceSnapshot: async (_store, ids) => {
+        const pages = ids.map(skuId => {const bulk = skuId === 'sku-one', kind = bulk ? 'bulk' : 'retail';
+          return {schemaVersion: 1, realm: 'evaluation', storeId: 'store-one', state: 'ready', coverage: 'verified_public_only',
+            listingReadbackVersion: 1, listingCoverage: 'complete', catalogueVersion: 7, observedAt: clock, nextCursor: null,
+            items: [{skuId, revision: 1, canonicalProductId: bulk ? 'canonical-one' : 'canonical-two', verifiedPackId: bulk ? 'pack-one' : 'pack-two',
+              listings: [{schemaVersion: 1, realm: 'evaluation', storeId: 'store-one', skuId, channel: kind,
+                canonicalProductId: bulk ? 'canonical-one' : 'canonical-two', verifiedPackId: bulk ? 'pack-one' : 'pack-two',
+                listingId: `listing-${cataloguePayloadHash([1, 'evaluation', 'store-one', skuId, kind]).toLowerCase()}`}],
+              channels: [{kind, offerId: `offer-${skuId}`, revision: 'host-price-v1', priceMinor: bulk ? 20000 : 500,
+                minimumOrder: bulk ? 10 : 1, quantityStep: bulk ? 5 : 1, tiers: [], validUntil: '2026-10-21T12:00:00.000Z'}]}]};});
+        if (couponExpireDuringRead) clock = accepted.offer.validUntil;
+        return pages;
+      }}, () => new Date(clock), {storeCouponTermsSupported: true, storeCouponEligibilitySupported: true});
+    const campaign = {name: 'Host agreed-price savings', percentage: true, discount: 1000, minimumSpendMinor: 150000,
+      maximumSavingMinor: 50000, startsAt: clock, endsAt: '2026-10-21T12:00:00.000Z', totalUses: 20, usesPerCustomer: 2, active: true};
+    await couponService().handleOperation('supplier-one', 'saveStoreCoupon', {storeCouponTermsVersion: 1, storeId: 'store-one',
+      couponId: 'coupon-bulk', expectedRevision: 0, idempotencyKey: 'create-bulk-coupon', fundingAcknowledged: true, coupon: campaign});
+    const couponLine = {...queriedLine, offerId: 'offer-sku-one', offerRevision: 'host-price-v1'};
+    const couponQuery = {storeCouponEligibilityVersion: 2, storeId: 'store-one', couponId: 'coupon-bulk', couponRevision: 1,
+      selectionPolicy: 'exclusive_store_basket', supplierQuote: reference, lines: [couponLine]};
+    const evaluate = (query: Record<string, unknown> = couponQuery, actor = 'buyer-one') =>
+      couponService().handleOperation(actor, 'evaluateStoreCouponEligibility', query) as Promise<Record<string, any>>;
+    const lower = await evaluate(); assert.equal(lower.eligible, false); assert.equal(lower.reason, 'minimum_spend');
+    const {supplierQuote: _unusedQuote, ...oldQuery} = couponQuery;
+    assert.equal((await evaluate({...oldQuery, storeCouponEligibilityVersion: 1})).eligible, true);
+    await couponService().handleOperation('supplier-one', 'saveStoreCoupon', {storeCouponTermsVersion: 1, storeId: 'store-one',
+      couponId: 'coupon-bulk', expectedRevision: 1, idempotencyKey: 'amend-bulk-coupon', fundingAcknowledged: true,
+      coupon: {...campaign, minimumSpendMinor: 0}});
+    couponQuery.couponRevision = 2;
+    const negotiated = await evaluate(); assert.equal(negotiated.storeCouponEligibilityVersion, 2);
+    assert.equal(negotiated.evaluation.eligibleSubtotalMinor, 100250); assert.equal(negotiated.evaluation.savingMinor, 10025);
+    assert.deepEqual(negotiated.supplierQuote, reference); assert.equal(negotiated.reservationCreated, false);
+    assert.equal(Date.parse(negotiated.validUntil) <= Date.parse(accepted.offer.validUntil), true);
+    const retailLine = {lineId: 'retail-line', skuRevision: 1, quantity: 2, offerId: 'offer-sku-two', offerRevision: 'host-price-v1',
+      listing: {schemaVersion: 1, realm: 'evaluation', storeId: 'store-one', skuId: 'sku-two', canonicalProductId: 'canonical-two',
+        verifiedPackId: 'pack-two', channel: 'retail', listingId: `listing-${cataloguePayloadHash([1, 'evaluation', 'store-one', 'sku-two', 'retail']).toLowerCase()}`}};
+    const mixed = await evaluate({...couponQuery, lines: [couponLine, retailLine]});
+    assert.equal(mixed.evaluation.eligibleSubtotalMinor, 101250); assert.equal(mixed.evaluation.savingMinor, 10125);
+    await assert.rejects(evaluate(couponQuery, 'other-buyer'));
+    await assert.rejects(evaluate({...couponQuery, supplierQuote: {...reference, lines: []}}));
+    const beforeCouponExpiry = clock; couponExpireDuringRead = true; await assert.rejects(evaluate());
+    clock = beforeCouponExpiry; couponExpireDuringRead = false;
+    const couponUsage = db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc('store-one').collection('storeCouponUsage').doc('coupon-bulk');
+    assert.equal((await couponUsage.get()).get('heldUses'), 0);
+    assert.equal((await couponUsage.collection('customers').get()).size, 0);
+    if (process.env.LF_BULK_COUPON_CAPTURE === 'true') console.log(`LF_BULK_COUPON_PROJECTION=${JSON.stringify({query: couponQuery, accepted, lower, negotiated, mixed})}`);
     const placement: TrustedPlacementReceipt = {schemaVersion: 7, realm: 'evaluation', authNamespace: 'firebase-default',
       finalPlacement: true, issuer: 'isolated-final-source', receiptId: 'final-one', revision: 'revision-one', buyerUserId: 'buyer-one',
       stores: [{storeId: 'store-one', caseId: 'case-one', ownerUserId: 'supplier-one', benefitAttribution: {schemaVersion: 1, components: []},
@@ -215,6 +278,23 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
       undefined, failingBinding).materialize('isolated-final'), /isolated post-prepare failure/);
     assert.equal((await rootForBinding.collection('bulkQuoteUses').get()).size, 0);
     assert.equal((await rootForBinding.collection('purchases').get()).size, 0);
+    const couponPlacement = structuredClone(placement), store = couponPlacement.stores[0]!;
+    const attribution = storeCouponAttributionReferences('evaluation', 'store-one', 'coupon-bulk', 2);
+    store.totals.discountMinor = 10025; store.totals.totalMinor = 90225;
+    store.benefitAttribution!.components = [{componentId: 'bulk-coupon-component', benefitId: 'coupon-bulk', label: campaign.name,
+      ...attribution, publisherType: 'supplier', effect: 'instant_discount', amountBasis: 'applied', amountMinor: 10025,
+      allocations: [{lineId: 'placed-line-one', amountMinor: 10025}]}];
+    couponPlacement.couponUseContext = {schemaVersion: 1, stores: [{storeId: 'store-one', couponId: 'coupon-bulk', couponRevision: 2,
+      componentId: 'bulk-coupon-component', holdUntil: negotiated.validUntil, lifecycleSourceId: 'host-future-payment-source', basket: {
+        schemaVersion: 2, realm: 'evaluation', storeId: 'store-one', buyerUserId: 'buyer-one', couponRevision: 2,
+        sourceId: negotiated.evaluation.basketSourceId, sourceRevision: negotiated.evaluation.basketSourceRevision,
+        observedAt: negotiated.observedAt, validUntil: negotiated.validUntil, supplierQuote: reference,
+        lines: [{lineId: 'placed-line-one', storeId: 'store-one', skuId: 'sku-one', packId: 'pack-one', offerId: 'isolated-offer-one',
+          offerRevision: 'offer-v1', priceSourceId: cataloguePayloadHash(reference), channel: 'bulk', quantity: 10, unitPriceMinor: 10025, otherCouponApplied: false}]}}]};
+    await assert.rejects(new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => couponPlacement},
+      couponRepo(), failingBinding).materialize('isolated-with-coupon'), /isolated post-prepare failure/);
+    assert.equal((await couponUsage.get()).get('heldUses'), 0);
+    assert.equal((await rootForBinding.collection('bulkQuoteUses').get()).size, 0);
     const unexpired = clock;
     clock = accepted.offer.validUntil;
     await assert.rejects(materializer(placement).materialize('isolated-final'), {code: 'conflict'});
@@ -233,6 +313,7 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
     const attempts = await Promise.allSettled(purchases.map(p => p.materialize('isolated-final')));
     assert.equal(attempts.filter(result => result.status === 'fulfilled').length, 1);
     assert.equal((await rootForBinding.collection('bulkQuoteUses').get()).size, 1);
+    await assert.rejects(evaluate(), {code: 'conflict'});
     const winnerIndex = attempts.findIndex(result => result.status === 'fulfilled'),
       purchase = (attempts[winnerIndex] as PromiseFulfilledResult<{purchaseId: string; buyerId: string}>).value;
     const originalRead = await purchases[winnerIndex]!.readBuyer('buyer-one', {purchaseId: purchase.purchaseId}) as any;
@@ -326,6 +407,41 @@ test('LF-BULK local persisted request offer acceptance and original recovery kee
     assert.equal((await root.collection('bulkQuoteCommands').get()).size, 6);
     assert.equal((await root.collection('purchases').get()).size, 1);
     for (const collection of ['operationalOrders', 'orderCompletions']) assert.equal((await root.collection(collection).get()).size, 0);
+    // Independent successful v2 combination after the preceding legacy count
+    // checks. Real local agreement + coupon + original writes, not phone data.
+    revision = 1; clock = beforeCouponExpiry;
+    await db.collection('workspaceProfiles').doc('case-one').set(profile);
+    const fresh: any[] = [];
+    for (const suffix of ['coupon-next-one', 'coupon-next-two']) {
+      const created = await service().request('buyer-one', {...request, requestId: suffix}) as any;
+      await service().offer('supplier-one', {...offer, quoteId: created.quoteId, operationId: `${suffix}-offer`});
+      fresh.push(await service().accept('buyer-one', {...accept, quoteId: created.quoteId, operationId: `${suffix}-accept`}));
+    }
+    const references = fresh.map(a => ({...reference, quoteId: a.quoteId, acceptedRevision: a.revision,
+      agreementFingerprint: a.acceptance.agreementFingerprint}));
+    const evaluations = await Promise.all(references.map(ref => evaluate({...couponQuery, supplierQuote: ref})));
+    assert.equal(evaluations[0]!.evaluation.savingMinor, evaluations[1]!.evaluation.savingMinor);
+    assert.notEqual(evaluations[0]!.requestFingerprint, evaluations[1]!.requestFingerprint);
+    assert.notEqual(evaluations[0]!.evaluation.basketFingerprint, evaluations[1]!.evaluation.basketFingerprint);
+    const successful = structuredClone(couponPlacement), selectedReference = references[0]!;
+    successful.receiptId = 'final-coupon-success';
+    successful.stores[0]!.supplierQuote = {...supplierQuote, quoteId: fresh[0].quoteId,
+      agreementFingerprint: fresh[0].acceptance.agreementFingerprint, acceptedAt: fresh[0].acceptance.acceptedAt};
+    const selectedBasket = successful.couponUseContext!.stores[0]!.basket;
+    selectedBasket.supplierQuote = selectedReference;
+    selectedBasket.sourceId = evaluations[0]!.evaluation.basketSourceId;
+    for (const line of selectedBasket.lines as Record<string, unknown>[]) line.priceSourceId = cataloguePayloadHash(selectedReference);
+    const combined = new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => successful}, couponRepo(), service());
+    const combinedPurchase = await combined.materialize('combined-coupon-final');
+    const originalCombined = await combined.readBuyer('buyer-one', {purchaseId: combinedPurchase.purchaseId});
+    assert.equal(originalCombined.orders[0]!.original.totals.totalMinor, 90225);
+    assert.equal(originalCombined.orders[0]!.original.supplierQuote!.quoteId, fresh[0].quoteId);
+    assert.equal((await couponUsage.get()).get('heldUses'), 1);
+    assert.equal((await root.collection('bulkQuoteUses').get()).size, 2);
+    clock = accepted.offer.validUntil;
+    assert.deepEqual(await combined.materialize('combined-coupon-final'), combinedPurchase);
+    assert.equal((await couponUsage.get()).get('heldUses'), 1);
+    assert.equal((await root.collection('bulkQuoteUses').get()).size, 2);
   } finally { await deleteApp(app); }
 });
 

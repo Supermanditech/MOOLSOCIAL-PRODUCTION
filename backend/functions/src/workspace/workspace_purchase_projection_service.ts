@@ -318,6 +318,13 @@ export interface BulkPurchaseReference {
   schemaVersion: 1; quoteId: string; acceptedRevision: number; agreementFingerprint: string;
   lines: {lineId: string; quoteLineId: string}[];
 }
+export interface BulkCouponPriceLine {
+  lineId: string; listing: OriginalPublicListing; skuRevision: number; quantity: number;
+}
+export interface BulkCouponPrices {
+  supplierQuote: OriginalSupplierQuote;
+  prices: {lineId: string; unitPriceMinor: number; merchandiseMinor: number}[];
+}
 export function bulkSupplierQuoteOperation(operation: unknown): BulkSupplierQuoteAction | undefined {
   switch (operation) {
     case 'requestBulkSupplierQuote': return 'request';
@@ -349,26 +356,12 @@ export class WorkspaceBulkQuoteService {
     caseId: string; ownerUserId: string; purchaseId: string}, reference: BulkPurchaseReference,
     lines: readonly PlacementLine[]): Promise<{supplierQuote: OriginalSupplierQuote; commit: () => void}> {
     for (const value of Object.values(context)) id(value);
-    const r = exact(reference, ['schemaVersion', 'quoteId', 'acceptedRevision', 'agreementFingerprint', 'lines']);
-    const quoteId = id(r.quoteId), acceptedRevision = integer(r.acceptedRevision, 999999999, 3);
-    if (r.schemaVersion !== 1 || !/^bulk-[a-f0-9]{64}$/u.test(quoteId) ||
-        typeof r.agreementFingerprint !== 'string' || !/^[a-f0-9]{64}$/u.test(r.agreementFingerprint)) fail();
-    const bindings = array(r.lines, 100).map(raw => {
-      const b = exact(raw, ['lineId', 'quoteLineId']); return {lineId: id(b.lineId), quoteLineId: id(b.quoteLineId)};
-    }).sort((a, b) => compare(a.lineId, b.lineId));
-    unique(bindings.map(b => b.lineId)); unique(bindings.map(b => b.quoteLineId));
-    const doc = await tx.get(this.path(quoteId));
-    const record = await this.authorized(tx, doc.data(), context.buyerUserId, quoteId);
-    if (record.buyerUserId !== context.buyerUserId || record.storeId !== context.storeId ||
-        record.storeCaseId !== context.caseId || record.supplierUserId !== context.ownerUserId) fail('not_found', 404);
-    await this.profile(tx, context.storeId, context.ownerUserId, context.caseId);
-    if (record.state !== 'accepted' || record.revision !== acceptedRevision || !record.offer || !record.acceptance ||
-        record.acceptance.agreementFingerprint !== r.agreementFingerprint || bindings.length !== record.lines.length ||
-        bindings.length !== lines.length) fail('conflict', 409);
+    const {record, bindings, supplierQuote, use} = await this.acceptedForUse(tx, context.buyerUserId, context.storeId, reference);
+    if (record.storeCaseId !== context.caseId || record.supplierUserId !== context.ownerUserId || bindings.length !== lines.length) fail('not_found', 404);
     for (const binding of bindings) {
       const agreed = record.lines.find(l => l.lineId === binding.quoteLineId),
         purchased = lines.find(l => l.sourceLineId === binding.lineId),
-        price = record.offer.prices.find(p => p.lineId === binding.quoteLineId);
+        price = record.offer!.prices.find(p => p.lineId === binding.quoteLineId);
       if (!agreed || !purchased || !price || purchased.skuId !== agreed.skuId ||
           purchased.canonicalProductId !== agreed.canonicalProductId || purchased.verifiedPackId !== agreed.verifiedPackId ||
           purchased.quantityUnit !== 'pack' || purchased.quantityMilli !== agreed.quantity * 1000 ||
@@ -379,21 +372,57 @@ export class WorkspaceBulkQuoteService {
           purchased.publicListing.verifiedPackId !== agreed.verifiedPackId || purchased.variant !== (agreed.variant ?? '') ||
           purchased.name !== agreed.name || purchased.packLabel !== agreed.packLabel) fail('conflict', 409);
     }
+    const frozen = structuredClone({supplierQuote, context});
+    return {supplierQuote: structuredClone(supplierQuote), commit: () => {
+      if (this.now().toISOString() >= frozen.supplierQuote.validUntil) fail('conflict', 409);
+      const body = {schemaVersion: 1, realm: this.realm, quoteId: frozen.supplierQuote.quoteId, purchaseId: frozen.context.purchaseId,
+        buyerUserId: frozen.context.buyerUserId, storeId: frozen.context.storeId,
+        acceptedRevision: frozen.supplierQuote.acceptedRevision, agreementFingerprint: frozen.supplierQuote.agreementFingerprint, usedAt: this.now().toISOString()};
+      tx.create(use, {...body, integrity: integrityHash(body)});
+    }};
+  }
+  /** Read-only, caller-transaction authority. Browsing neither consumes the
+   * agreement nor reserves a coupon. Catalogue revisions remain independently
+   * verified by the coupon producer in this same transaction. */
+  async readCouponPrices(tx: Transaction, buyerUserId: string, storeId: string, reference: BulkPurchaseReference,
+    lines: readonly BulkCouponPriceLine[]): Promise<BulkCouponPrices> {
+    const {record, bindings, supplierQuote} = await this.acceptedForUse(tx, buyerUserId, storeId, reference);
+    if (lines.length !== bindings.length || new Set(lines.map(l => l.lineId)).size !== lines.length) fail('conflict', 409);
+    const prices = bindings.map(binding => {
+      const agreed = record.lines.find(l => l.lineId === binding.quoteLineId), line = lines.find(l => l.lineId === binding.lineId),
+        price = record.offer!.prices.find(p => p.lineId === binding.quoteLineId);
+      if (!agreed || !line || !price || line.skuRevision !== agreed.skuRevision || line.quantity !== agreed.quantity ||
+          line.listing.schemaVersion !== 1 || line.listing.realm !== this.realm || line.listing.storeId !== storeId ||
+          line.listing.channel !== 'bulk' || line.listing.listingId !== agreed.listingId || line.listing.skuId !== agreed.skuId ||
+          line.listing.canonicalProductId !== agreed.canonicalProductId || line.listing.verifiedPackId !== agreed.verifiedPackId) fail('conflict', 409);
+      return {lineId: binding.lineId, unitPriceMinor: price.unitPriceMinor, merchandiseMinor: price.merchandiseMinor};
+    });
+    return {supplierQuote: structuredClone(supplierQuote), prices};
+  }
+  private async acceptedForUse(tx: Transaction, actor: string, storeId: string, reference: BulkPurchaseReference) {
+    id(actor); id(storeId);
+    const r = exact(reference, ['schemaVersion', 'quoteId', 'acceptedRevision', 'agreementFingerprint', 'lines']);
+    const quoteId = id(r.quoteId), acceptedRevision = integer(r.acceptedRevision, 999999999, 3);
+    if (r.schemaVersion !== 1 || !/^bulk-[a-f0-9]{64}$/u.test(quoteId) ||
+        typeof r.agreementFingerprint !== 'string' || !/^[a-f0-9]{64}$/u.test(r.agreementFingerprint)) fail();
+    const bindings = array(r.lines, 100).map(raw => {
+      const b = exact(raw, ['lineId', 'quoteLineId']); return {lineId: id(b.lineId), quoteLineId: id(b.quoteLineId)};
+    }).sort((a, b) => compare(a.lineId, b.lineId));
+    unique(bindings.map(b => b.lineId)); unique(bindings.map(b => b.quoteLineId));
+    const doc = await tx.get(this.path(quoteId));
+    const record = await this.authorized(tx, doc.data(), actor, quoteId);
+    if (record.buyerUserId !== actor || record.storeId !== storeId) fail('not_found', 404);
+    await this.profile(tx, storeId, record.supplierUserId, record.storeCaseId);
+    if (record.state !== 'accepted' || record.revision !== acceptedRevision || !record.offer || !record.acceptance ||
+        record.acceptance.agreementFingerprint !== r.agreementFingerprint || bindings.length !== record.lines.length ||
+        bindings.some(b => !record.lines.some(l => l.lineId === b.quoteLineId))) fail('conflict', 409);
     const use = this.root().collection('bulkQuoteUses').doc(quoteId), used = await tx.get(use);
     if (used.exists || this.now().toISOString() >= record.offer.validUntil) fail('conflict', 409);
     const supplierQuote: OriginalSupplierQuote = {schemaVersion: 1, realm: this.realm, quoteId,
       acceptedRevision, agreementFingerprint: r.agreementFingerprint, offerRevision: record.offer.revision,
       acceptedAt: record.acceptance.acceptedAt, validUntil: record.offer.validUntil,
       merchandiseMinor: record.offer.merchandiseMinor, lines: bindings};
-    // Caller-owned objects cannot change authority between prepare and commit.
-    const frozen = structuredClone({supplierQuote, context});
-    return {supplierQuote: structuredClone(supplierQuote), commit: () => {
-      if (this.now().toISOString() >= frozen.supplierQuote.validUntil) fail('conflict', 409);
-      const body = {schemaVersion: 1, realm: this.realm, quoteId, purchaseId: frozen.context.purchaseId,
-        buyerUserId: frozen.context.buyerUserId, storeId: frozen.context.storeId,
-        acceptedRevision, agreementFingerprint: frozen.supplierQuote.agreementFingerprint, usedAt: this.now().toISOString()};
-      tx.create(use, {...body, integrity: integrityHash(body)});
-    }};
+    return {record, bindings, supplierQuote, use};
   }
   private policy(raw: unknown, storeId: string, skuId: string): Record<string, unknown> {
     const p = exact(raw, ['schemaVersion', 'realm', 'storeId', 'skuId', 'state', 'revision', 'requiresAcceptance', 'policy']);

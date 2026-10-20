@@ -5643,12 +5643,12 @@ void main() {
     return data;
   }
   AuthenticatedWorkspaceCatalogueGateway discoveryGateway(SocialContentTransport transport, {String realm = 'production', bool promotions = false, bool advertisedTerms = false, bool supplierPublishers = false,
-    DateTime Function()? clock, bool coupons = false}) =>
+    DateTime Function()? clock, bool coupons = false, bool couponEligibility = false, String? ownerAccountId}) =>
     AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
       credentials: Credentials(), transport: transport, realm: realm, productFactsReadbackSupported: true,
       unbrandedProduceReadbackSupported: true, storeClassificationReadbackSupported: true, promotionDiscoverySupported: promotions,
       promotionTermsSupported: advertisedTerms, supplierPublishersVersionSupported: supplierPublishers,
-      storeCouponTermsSupported: coupons, now: clock ?? () => at);
+      storeCouponTermsSupported: coupons, storeCouponEligibilitySupported: couponEligibility, ownerAccountId: ownerAccountId, now: clock ?? () => at);
   Map<String, dynamic> discoveryData(Map<String, Object?> body, {bool empty = false}) {
     final listing = publicPage();
     listing.addAll({'productFactsReadbackVersion': 1, 'storeClassificationReadbackVersion': 1, 'storeDetailsReadbackVersion': 1});
@@ -5724,7 +5724,8 @@ void main() {
   Future<({BuyV2Session session, BuyV2Product product, WorkspaceBulkQuote accepted,
     WorkspaceBulkQuoteAccess access, _ExactMoneyHostPreferences preferences, VoidCallback retire, VoidCallback dispose, void Function(DateTime) time,
     Future<WorkspaceBulkQuote> Function() replacement})>
-      supplierSelectionHost({_HostSupplierQuoteCheckout? quote, _ExactMoneyHostPreferences? preferences}) async {
+      supplierSelectionHost({_HostSupplierQuoteCheckout? quote, _ExactMoneyHostPreferences? preferences,
+        bool couponsAvailable = false, Future<void> Function()? beforeCouponReply}) async {
     // Controlled host discovery/agreement fixture. No phone or live-service data.
     FlutterSecureStorage.setMockInitialValues({}); var clock = at, current = true;
     late Map<String, dynamic> accepted;
@@ -5734,12 +5735,46 @@ void main() {
     final connection = discoveryGateway(OwnerTransport((body) async {
       if (body['operation'] == 'readBulkSupplierQuote') { return SocialContentResponse(statusCode: 200,
         body: jsonEncode({'ok': true, 'data': accepted})); }
+      if (couponsAvailable && body['operation'] == 'readPublicStoreCouponSnapshot') {
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+          'schemaVersion': 1, 'storeCouponTermsVersion': 1, 'storeCouponSnapshotVersion': 1, 'realm': 'production',
+          'storeId': 'store-one', 'orderingAvailable': false, 'redemptionAvailable': false, 'state': 'ready',
+          'coverage': 'published_store_coupon_terms_only', 'complete': true, 'observedAt': clock.toIso8601String(), 'items': [{
+            'couponId': 'coupon-bulk', 'revision': 1, 'scope': 'store_basket', 'storeId': 'store-one',
+            'publisherType': 'wholesaler', 'publisherName': 'Host Store', 'sourceId': 'store-coupon:production:store-one:coupon-bulk:1',
+            'terms': {'name': 'Host agreed-price savings', 'percentage': true, 'discount': 1000, 'minimumSpendMinor': 0,
+              'maximumSavingMinor': 50000, 'startsAt': at.toIso8601String(), 'endsAt': at.add(const Duration(hours: 1)).toIso8601String(),
+              'totalUses': 20, 'usesPerCustomer': 2, 'active': true}}]}}));
+      }
+      if (couponsAvailable && body['operation'] == 'evaluateStoreCouponEligibility') {
+        expect(body['storeCouponEligibilityVersion'], 2);
+        final query = Map<String, Object?>.from(body)..remove('operation')..remove('storeCouponEligibilityVersion');
+        final requested = (query['lines'] as List).single as Map, now = clock;
+        final result = {'schemaVersion': 1, 'storeCouponEligibilityVersion': 2, 'realm': 'production', 'viewerUserId': 'buyer-one',
+          'storeId': 'store-one', 'selectionPolicy': 'exclusive_store_basket', 'exclusiveSelectionRequired': true,
+          'state': 'ready', 'eligible': true, 'reason': null, 'observedAt': now.toIso8601String(),
+          'validUntil': now.add(const Duration(seconds: 30)).toIso8601String(),
+          'requestFingerprint': _mediaHash({'operation': 'storeCouponEligibilityV2', 'realm': 'production', 'actor': 'buyer-one',
+            'query': query, 'exclusiveSelectionRequired': true}), 'orderingAvailable': false, 'reservationCreated': false,
+          'supplierQuote': query['supplierQuote'], 'evaluation': {'schemaVersion': 1, 'realm': 'production', 'storeId': 'store-one',
+            'buyerUserId': 'buyer-one', 'couponId': 'coupon-bulk', 'couponRevision': 1, 'name': 'Host agreed-price savings',
+            'basketSourceId': 'B' * 64, 'basketSourceRevision': 1, 'basketFingerprint': 'C' * 64,
+            'eligibleSubtotalMinor': 90010, 'savingMinor': 9001, 'allocations': [{'lineId': requested['lineId'],
+              'skuId': 'sku-one', 'packId': 'pack-one', 'offerId': requested['offerId'], 'offerRevision': requested['offerRevision'],
+              'subtotalMinor': 90010, 'savingMinor': 9001}]},
+          'attribution': {'benefitRevision': 'store-coupon-v1',
+            'sourceReference': _mediaHash(['storeCouponCampaignV1', 'production', 'store-one', 'coupon-bulk', 1]),
+            'funderReference': _mediaHash(['storeCouponFunderV1', 'production', 'store-one'])}};
+        await beforeCouponReply?.call();
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': result}));
+      }
       final data = discoveryData(body), listing = (data['items'] as List).single['listing'] as Map<String, dynamic>, item = row(listing);
       item['channels'] = [{...(item['channels'] as List).single as Map, 'kind': 'bulk', 'minimumOrder': 10, 'quantityStep': 1}];
       item['listings'] = [identity.toJson()]; item['supplierPolicy'] = policyEnvelope(state: 'none', revision: 0);
       (data['items'] as List).single['channel'] = 'bulk';
-      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
-    }), clock: () => clock, coupons: true);
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data':
+        body['operation'] == 'readPublicStoreCatalogue' ? listing : data}));
+    }), clock: () => clock, coupons: true, couponEligibility: couponsAvailable, ownerAccountId: 'buyer-one');
     final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => current), core = BuySession();
     var sourceDisposed = false;
     void disposeSource() { if (!sourceDisposed) { sourceDisposed = true; source.dispose(); } }
@@ -5795,6 +5830,79 @@ void main() {
         expect(await access.forStore('store-one').refresh(accepted['quoteId'] as String), isTrue);
         return access.forStore('store-one').head(accepted['quoteId'] as String)!;
       });
+  }
+  final bulkCouponLog = Platform.environment['LF_BULK_COUPON_LOG'];
+  test('LF-BULK COUPON actual transactional agreed-price packet crosses strict client boundary', () {
+    final raw = File(bulkCouponLog!).readAsLinesSync().singleWhere((l) => l.startsWith('LF_BULK_COUPON_PROJECTION='));
+    final capture = jsonDecode(raw.substring('LF_BULK_COUPON_PROJECTION='.length)) as Map<String, dynamic>;
+    final query = Map<String, Object?>.from(capture['query'] as Map)..remove('storeCouponEligibilityVersion');
+    final accepted = capture['accepted'] as Map, requested = (query['lines'] as List).single as Map;
+    final listing = BuyV2PublicListingIdentity.fromJson(requested['listing'])!;
+    final line = BuyV2CartLine(product: BuyV2Catalogue.products.firstWhere((p) => p.destination == BuyV2Destination.wholesale)
+      .copyWith(id: requested['lineId'] as String, storeId: 'store-one',
+      canonicalId: 'canonical-one', offerClass: BuyV2OfferClass.bulk,
+      publicListingIdentity: listing, priceMinor: 20000), quantity: 10);
+    final selected = BuyV2SupplierQuoteSelection.fromJson({'schemaVersion': 1, 'realm': 'evaluation', 'storeId': 'store-one',
+      'quoteId': accepted['quoteId'], 'acceptedRevision': accepted['revision'],
+      'agreementFingerprint': accepted['acceptance']['agreementFingerprint'], 'acceptedAt': accepted['acceptance']['acceptedAt'],
+      'validUntil': accepted['offer']['validUntil'], 'merchandiseMinor': 100250, 'lines': [{
+        'productId': requested['lineId'], 'quoteLineId': 'line-one', 'skuId': 'sku-one', 'listingId': listing.listingId,
+        'skuRevision': 1, 'canonicalProductId': 'canonical-one', 'verifiedPackId': 'pack-one', 'quantity': 10,
+        'unitPriceMinor': 10025, 'merchandiseMinor': 100250}]});
+    final now = DateTime.parse(capture['negotiated']['observedAt'] as String);
+    final coupon = BuyV2PublishedStoreCoupon(realm: 'evaluation', storeId: 'store-one', couponId: 'coupon-bulk', revision: 2,
+      name: 'Host agreed-price savings', publisherName: 'Host supplier', publisherType: BuyV2OfferPublisherType.wholesaler,
+      sourceId: 'store-coupon:evaluation:store-one:coupon-bulk:2', observedAt: now, validFrom: now,
+      validUntil: now.add(const Duration(days: 1)), terms: BuyV2AdvertisedBenefitTerms(kind: 'percentage', percentageBasisPoints: 1000,
+        minimumSpendMinor: 0, maximumSavingMinor: 50000), configuredTotalUses: 20, configuredUsesPerCustomer: 2);
+    BuyV2StoreCouponEligibility decode(Object? data, {BuyV2SupplierQuoteSelection? agreement}) =>
+      BuyV2StoreCouponEligibility.decode(data, coupon: coupon, accountId: 'buyer-one', query: query, lines: [line],
+        now: now, supplierQuote: agreement ?? selected);
+    final result = decode(capture['negotiated']);
+    expect(result.subtotalMinor, 100250); expect(result.savingMinor, 10025); expect(line.totalMinor, 200000);
+    expect(result.matches([line], now, supplierQuote: selected), isTrue);
+    expect(result.matches([line], now), isFalse);
+    expect(() => BuyV2StoreCouponEligibility.decode(capture['negotiated'], coupon: coupon, accountId: 'buyer-one',
+      query: query, lines: [line], now: now), throwsFormatException);
+    for (final fault in ['missing-reference', 'wrong-reference', 'catalogue-subtotal']) {
+      final changed = jsonDecode(jsonEncode(capture['negotiated'])) as Map<String, dynamic>;
+      if (fault == 'missing-reference') changed.remove('supplierQuote');
+      if (fault == 'wrong-reference') (changed['supplierQuote'] as Map)['quoteId'] = 'bulk-${'f' * 64}';
+      if (fault == 'catalogue-subtotal') (changed['evaluation']['allocations'][0] as Map)['subtotalMinor'] = 200000;
+      expect(() => decode(changed), throwsFormatException, reason: fault);
+    }
+    final shortened = BuyV2SupplierQuoteSelection.fromJson({...selected.toJson(), 'validUntil': now.add(const Duration(seconds: 30)).toIso8601String()});
+    expect(() => decode(capture['negotiated'], agreement: shortened), throwsFormatException);
+  }, skip: bulkCouponLog == null);
+  test('LF-BULK COUPON uses accepted price and equal-price agreement replacement invalidates selection', () async {
+    var calls = 0;
+    final host = await supplierSelectionHost(couponsAvailable: true, beforeCouponReply: () async {calls++;}), s = host.session;
+    expect(await s.refreshPublishedStoreCoupons(host.product.id), isTrue);
+    final coupon = s.cartStoreCoupons.single;
+    expect(await s.chooseStoreCoupon(coupon), isFalse); expect(calls, 0);
+    expect(await s.chooseSupplierQuote(host.accepted), isTrue);
+    expect(await s.chooseStoreCoupon(coupon), isTrue, reason: s.storeCouponMessage(coupon));
+    expect(s.selectedStoreCoupons.single.subtotalMinor, 90010); expect(s.selectedStoreCoupons.single.savingMinor, 9001);
+    expect(s.storeCouponNeedsReview(coupon), isFalse); expect(host.product.priceMinor, 10025);
+    final replacement = await host.replacement(); expect(await s.chooseSupplierQuote(replacement), isTrue);
+    expect(s.storeCouponNeedsReview(coupon), isTrue); expect(calls, 1);
+    expect(await s.chooseStoreCoupon(coupon), isTrue); expect(calls, 2);
+    final current = s.selectedSupplierQuotes.single;
+    expect(await s.removeSupplierQuote(current), isTrue); expect(s.storeCouponNeedsReview(coupon), isTrue);
+  });
+  for (final change in ['replace', 'remove', 'expiry']) {
+    test('LF-BULK COUPON delayed eligibility cannot survive agreement $change', () async {
+      final entered = Completer<void>(), release = Completer<void>();
+      final host = await supplierSelectionHost(couponsAvailable: true, beforeCouponReply: () async {entered.complete(); await release.future;}), s = host.session;
+      expect(await s.chooseSupplierQuote(host.accepted), isTrue);
+      expect(await s.refreshPublishedStoreCoupons(host.product.id), isTrue);
+      final coupon = s.cartStoreCoupons.single, selecting = s.chooseStoreCoupon(coupon); await entered.future;
+      if (change == 'replace') expect(await s.chooseSupplierQuote(await host.replacement()), isTrue);
+      if (change == 'remove') expect(await s.removeSupplierQuote(s.selectedSupplierQuotes.single), isTrue);
+      if (change == 'expiry') host.time(at.add(const Duration(minutes: 5)));
+      release.complete(); expect(await selecting, isFalse); expect(s.selectedStoreCoupons, isEmpty);
+      expect(s.quantityFor(host.product.id), 10); expect(host.product.priceMinor, 10025);
+    });
   }
   test('LF-BULK SELECT exact Cart selection preserves product price and negotiates final charges explicitly', () async {
     final adapter = _HostSupplierQuoteCheckout(), host = await supplierSelectionHost(quote: adapter), s = host.session;

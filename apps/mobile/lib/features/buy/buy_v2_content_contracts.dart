@@ -596,6 +596,14 @@ abstract interface class BuyV2StoreCouponEligibilitySource {
     required bool Function() current,
   });
 }
+/// Versioned negotiated-price capability; older coupon readers cannot silently
+/// price an accepted Bulk agreement at the published catalogue amount.
+abstract interface class BuyV2SupplierQuoteCouponEligibilitySource implements BuyV2StoreCouponEligibilitySource {
+  Future<BuyV2StoreCouponEligibility> evaluateStoreCouponWithSupplierQuote({
+    required BuyV2PublishedStoreCoupon coupon, required List<BuyV2CartLine> lines,
+    required BuyV2SupplierQuoteSelection supplierQuote, required bool Function() current,
+  });
+}
 
 String buyV2StoreCouponCartInput(List<BuyV2CartLine> lines) {
   final ordered = List<BuyV2CartLine>.of(lines)
@@ -636,6 +644,7 @@ class BuyV2StoreCouponEligibility {
     required this.sourceReference,
     required this.funderReference,
     required this.allocations,
+    this.supplierQuoteBinding,
   });
   final BuyV2PublishedStoreCoupon coupon;
   final String accountId, input, requestFingerprint;
@@ -648,6 +657,7 @@ class BuyV2StoreCouponEligibility {
       funderReference;
   final int? savingMinor, subtotalMinor, basketSourceRevision;
   final Map<String, int> allocations;
+  final String? supplierQuoteBinding;
   bool get eligible => reason == null && savingMinor != null;
   /// Exact acknowledgement required from a compatible authoritative quote.
   /// A request fingerprint alone does not bind price-source/allocation facts.
@@ -657,10 +667,13 @@ class BuyV2StoreCouponEligibility {
     sourceReference, funderReference, subtotalMinor, savingMinor,
     observedAt.toIso8601String(), validUntil.toIso8601String(),
     for (final id in allocations.keys.toList()..sort()) [id, allocations[id]],
+    if (supplierQuoteBinding != null) ['supplierQuote', supplierQuoteBinding],
   ]);
-  bool matches(List<BuyV2CartLine> lines, DateTime now) =>
+  bool matches(List<BuyV2CartLine> lines, DateTime now, {BuyV2SupplierQuoteSelection? supplierQuote}) =>
       !now.isBefore(observedAt) &&
       now.isBefore(validUntil) &&
+      supplierQuoteBinding == supplierQuote?.quoteBinding &&
+      (supplierQuote == null || supplierQuote.current(now) && supplierQuote.matchesLines(lines)) &&
       input == buyV2StoreCouponCartInput(lines);
 
   /// Exact negotiated reply, bound to the authenticated request and actual
@@ -672,6 +685,7 @@ class BuyV2StoreCouponEligibility {
     required Map<String, Object?> query,
     required List<BuyV2CartLine> lines,
     required DateTime now,
+    BuyV2SupplierQuoteSelection? supplierQuote,
   }) {
     Never bad() =>
         throw const FormatException('Store coupon could not be checked.');
@@ -734,11 +748,12 @@ class BuyV2StoreCouponEligibility {
       'reservationCreated',
       'evaluation',
       'attribution',
+      if (supplierQuote != null) 'supplierQuote',
     });
     if (data['schemaVersion'] is! int ||
         data['schemaVersion'] != 1 ||
         data['storeCouponEligibilityVersion'] is! int ||
-        data['storeCouponEligibilityVersion'] != 1 ||
+        data['storeCouponEligibilityVersion'] != (supplierQuote == null ? 1 : 2) ||
         data['realm'] != coupon.realm ||
         data['viewerUserId'] != accountId ||
         data['storeId'] != coupon.storeId ||
@@ -757,6 +772,12 @@ class BuyV2StoreCouponEligibility {
       bad();
     }
     final observed = time(data['observedAt']), until = time(data['validUntil']);
+    if (supplierQuote != null && (!supplierQuote.matchesLines(lines) || !supplierQuote.current(now) ||
+        supplierQuote.realm != coupon.realm || supplierQuote.storeId != coupon.storeId ||
+        hash(query['supplierQuote']) != hash(supplierQuote.couponReference) ||
+        hash(data['supplierQuote']) != hash(supplierQuote.couponReference) ||
+        observed.isBefore(supplierQuote.acceptedAt) || until.isAfter(supplierQuote.validUntil))) { bad(); }
+    if (supplierQuote == null && query.containsKey('supplierQuote')) bad();
     if (observed.isAfter(now) ||
         !until.isAfter(now) ||
         !until.isAfter(observed) ||
@@ -766,7 +787,7 @@ class BuyV2StoreCouponEligibility {
     final fingerprint = digest(data['requestFingerprint']);
     if (fingerprint !=
         hash({
-          'operation': 'storeCouponEligibilityV1',
+          'operation': supplierQuote == null ? 'storeCouponEligibilityV1' : 'storeCouponEligibilityV2',
           'realm': coupon.realm,
           'actor': accountId,
           'query': query,
@@ -827,14 +848,16 @@ class BuyV2StoreCouponEligibility {
       digest(evaluation['basketSourceId']);
       digest(evaluation['basketFingerprint']);
       amount(evaluation['basketSourceRevision'], minimum: 1);
+      int lineSubtotal(BuyV2CartLine line) => supplierQuote?.lines
+        .where((l) => l['productId'] == line.product.id).firstOrNull?['merchandiseMinor'] as int? ?? line.totalMinor;
       final expected = {
         for (final line in lines)
-          if (line.totalMinor > 0) line.product.id: line,
+          if (lineSubtotal(line) > 0) line.product.id: line,
       };
       final requestLines = query['lines'];
       if (requestLines is! List ||
           expected.length !=
-              lines.where((line) => line.totalMinor > 0).length ||
+              lines.where((line) => lineSubtotal(line) > 0).length ||
           evaluation['allocations'] is! List) {
         bad();
       }
@@ -866,8 +889,8 @@ class BuyV2StoreCouponEligibility {
             row['packId'] != listing.verifiedPackId ||
             row['offerId'] != requested.single['offerId'] ||
             row['offerRevision'] != requested.single['offerRevision'] ||
-            amount(row['subtotalMinor']) != line.totalMinor ||
-            amount(row['savingMinor']) > line.totalMinor) {
+            amount(row['subtotalMinor']) != lineSubtotal(line) ||
+            amount(row['savingMinor']) > lineSubtotal(line)) {
           bad();
         }
         subtotal = buyV2SumMinor([subtotal, row['subtotalMinor'] as int]);
@@ -895,6 +918,7 @@ class BuyV2StoreCouponEligibility {
       coupon: coupon,
       accountId: accountId,
       input: buyV2StoreCouponCartInput(lines),
+      supplierQuoteBinding: supplierQuote?.quoteBinding,
       requestFingerprint: fingerprint,
       observedAt: observed,
       validUntil: until,
@@ -2658,6 +2682,9 @@ class BuyV2SupplierQuoteSelection {
   List<Map<String, dynamic>> get lines => List.unmodifiable([
     for (final line in toJson()['lines'] as List) Map<String, dynamic>.unmodifiable((line as Map).cast<String, dynamic>())]);
   String get quoteBinding => sha256.convert(utf8.encode(_encoded)).toString();
+  Map<String, Object?> get couponReference => {'schemaVersion': 1, 'quoteId': quoteId,
+    'acceptedRevision': acceptedRevision, 'agreementFingerprint': agreementFingerprint,
+    'lines': [for (final line in lines) {'lineId': line['productId'], 'quoteLineId': line['quoteLineId']}]};
   bool current(DateTime now) => now.toUtc().isBefore(validUntil);
   bool matchesLines(Iterable<BuyV2CartLine> items) {
     final selected = items.where((l) => l.product.offerClass == BuyV2OfferClass.bulk && l.product.storeId == storeId).toList();

@@ -4972,12 +4972,16 @@ class BuyV2Session extends ChangeNotifier {
   String _couponStoreKey(BuyV2PublishedStoreCoupon coupon) => jsonEncode([coupon.realm, coupon.storeId]);
   List<BuyV2CartLine> _couponStoreLines(BuyV2PublishedStoreCoupon coupon) => List.unmodifiable(checkoutLines.where(
     (line) => line.product.storeId == coupon.storeId && line.product.publicListingIdentity?.realm == coupon.realm));
+  bool _couponNeedsSupplierQuote(List<BuyV2CartLine> lines) => lines.any((l) => l.product.publicListingIdentity?.channel == BuyV2OfferClass.bulk);
+  BuyV2SupplierQuoteSelection? _couponSupplierQuote(BuyV2PublishedStoreCoupon coupon) =>
+    _couponNeedsSupplierQuote(_couponStoreLines(coupon)) ? _supplierQuoteSelections[coupon.storeId] : null;
   void _syncStoreCouponBasketInputs() {
     for (final key in {..._storeCouponApplyRequests.keys, ..._selectedStoreCouponRefs.keys}) {
       final scope = jsonDecode(key) as List;
       final lines = checkoutLines.where((line) => line.product.storeId == scope[1] &&
         line.product.publicListingIdentity?.realm == scope[0]).toList();
-      final input = jsonEncode([checkoutScope.name, collectionCheckoutSelected, buyV2StoreCouponCartInput(lines)]);
+      final input = jsonEncode([checkoutScope.name, collectionCheckoutSelected, buyV2StoreCouponCartInput(lines),
+        if (_couponNeedsSupplierQuote(lines)) ['supplierQuote', _supplierQuoteSelections[scope[1]]?.quoteBinding]]);
       if (_storeCouponBasketInputs[key] != input) {
         _storeCouponBasketInputs[key] = input;
         _storeCouponBasketEpochs[key] = (_storeCouponBasketEpochs[key] ?? 0) + 1;
@@ -4986,10 +4990,13 @@ class BuyV2Session extends ChangeNotifier {
   }
   bool _selectedStoreCouponCurrent(String key) {
     final selected = _selectedStoreCouponRefs[key];
-    return selected != null && selected.owner == _currentCustomerOrderScope &&
+    if (selected == null) return false;
+    final lines = _couponStoreLines(selected.value.coupon), supplier = _couponSupplierQuote(selected.value.coupon);
+    if (_couponNeedsSupplierQuote(lines) && (supplier == null || !_supplierQuoteCurrent(supplier, lines))) return false;
+    return selected.owner == _currentCustomerOrderScope &&
       selected.epoch == _storeCouponBasketEpochs[key] && selected.source.storeCouponEligibilityActive &&
       identical(_sourceForCatalogue(selected.destination), selected.source) &&
-      selected.value.eligible && selected.value.matches(_couponStoreLines(selected.value.coupon), catalogueNow());
+      selected.value.eligible && selected.value.matches(lines, catalogueNow(), supplierQuote: supplier);
   }
   BuyV2StoreCouponEligibility? selectedStoreCouponFor(BuyV2PublishedStoreCoupon coupon) {
     final selected = _selectedStoreCouponRefs[_couponStoreKey(coupon)];
@@ -5058,6 +5065,11 @@ class BuyV2Session extends ChangeNotifier {
     if (_collectionDisposed || !procurementScopeCurrent || isStoreProcurement || _holdCartForPaymentResolution()) return false;
     final key = _couponStoreKey(coupon), lines = _couponStoreLines(coupon);
     if (lines.isEmpty) return false;
+    final supplierQuote = _couponSupplierQuote(coupon);
+    if (_couponNeedsSupplierQuote(lines) && (supplierQuote == null || !_supplierQuoteCurrent(supplierQuote, lines))) {
+      _storeCouponMessages[key] = 'Select a current supplier quote for these Bulk quantities before checking this Store coupon.';
+      notifyListeners(); return false;
+    }
     if (_unresolvedLegacyCouponFor(lines)) {
       _storeCouponMessages[key] = 'Refresh or remove the current coupon before choosing a Store coupon.';
       notifyListeners(); return false;
@@ -5071,6 +5083,10 @@ class BuyV2Session extends ChangeNotifier {
       _storeCouponMessages[key] = 'Refresh this Store’s coupons before applying.'; notifyListeners(); return false;
     }
     final reader = source as BuyV2StoreCouponEligibilitySource, owner = _currentCustomerOrderScope;
+    if (supplierQuote != null && reader is! BuyV2SupplierQuoteCouponEligibilitySource) {
+      _storeCouponMessages[key] = 'Coupon checks for agreed Bulk prices are not connected yet. No saving has been applied.';
+      notifyListeners(); return false;
+    }
     final sequence = ++_storeCouponApplySequence;
     _storeCouponApplyRequests[key] = sequence;
     _syncStoreCouponBasketInputs();
@@ -5080,12 +5096,17 @@ class BuyV2Session extends ChangeNotifier {
       owner == _currentCustomerOrderScope && _storeCouponApplyRequests[key] == sequence &&
       epoch == _storeCouponBasketEpochs[key] && reader.storeCouponEligibilityActive &&
       identical(_sourceForCatalogue(destination), source) &&
+      _couponSupplierQuote(coupon)?.quoteBinding == supplierQuote?.quoteBinding &&
+      (supplierQuote == null || _supplierQuoteCurrent(supplierQuote, _couponStoreLines(coupon))) &&
       publishedStoreCouponsFor(lines.first.product).any((row) => identical(row, coupon)) &&
       buyV2StoreCouponCartInput(lines) == buyV2StoreCouponCartInput(_couponStoreLines(coupon));
     try {
       if (!current()) return false;
-      final result = await reader.evaluateStoreCoupon(coupon: coupon, lines: lines, current: current).timeout(const Duration(seconds: 26));
-      if (!current() || !result.matches(lines, catalogueNow()) || result.coupon.identity != coupon.identity ||
+      final pending = supplierQuote == null ? reader.evaluateStoreCoupon(coupon: coupon, lines: lines, current: current) :
+        (reader as BuyV2SupplierQuoteCouponEligibilitySource).evaluateStoreCouponWithSupplierQuote(
+          coupon: coupon, lines: lines, supplierQuote: supplierQuote, current: current);
+      final result = await pending.timeout(const Duration(seconds: 26));
+      if (!current() || !result.matches(lines, catalogueNow(), supplierQuote: supplierQuote) || result.coupon.identity != coupon.identity ||
           result.coupon.revision != coupon.revision || result.coupon.name != coupon.name ||
           (owner.$2 != null && result.accountId != owner.$2)) { return false; }
       if (!result.eligible) {
