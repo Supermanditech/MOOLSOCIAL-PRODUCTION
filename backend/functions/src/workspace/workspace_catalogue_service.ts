@@ -588,7 +588,7 @@ export interface WorkspaceCatalogueRepository {
   confirmPublicListingSnapshot?(storeId: string, records: readonly StoreSkuRecord[],
     identity: CatalogueIdentity, catalogueFingerprint: string, detailsFingerprint?: string): Promise<WorkspaceProfileRecord | undefined>;
   publicCatalogueSource?(storeId: string, identity: CatalogueIdentity, includeFamilies?: boolean,
-    existingTransaction?: Transaction, selectedSkuIds?: readonly string[]): Promise<PublicCatalogueSource | undefined>;
+    existingTransaction?: Transaction, selectedSkuIds?: readonly string[], includeProcurement?: boolean): Promise<PublicCatalogueSource | undefined>;
   readStorePublicDetails?(storeId: string, ownerUserId?: string): Promise<StorePublicDetailsRecord | undefined>;
   saveStorePublicDetails?(command: StorePublicDetailsCommand): Promise<StorePublicDetailsRecord>;
   reconcileStorePublicDetails?(command: StorePublicDetailsCommand): Promise<StorePublicDetailsRecord | undefined>;
@@ -607,6 +607,7 @@ export interface PublicCatalogueSource {
   commodityPrices?: CommodityPriceRecord[];
   commodityAuthority?: CatalogueProducerAuthority;
   commodityParticipant?: SupplyParticipantWorkspace;
+  procurementParticipant?: SupplyParticipantWorkspace | null;
 }
 
 export function normalizeStorePublicDetails(raw: unknown): StorePublicDetailsInput {
@@ -704,6 +705,20 @@ function discoveryBinding(value: unknown, realm: WorkspaceCatalogueRepository["r
     listingId: `listing-${cataloguePayloadHash([1, realm, storeId, skuId, channel]).toLowerCase()}`});
 }
 export interface CatalogueIdentity {catalogueId: string; tenantId: string}
+export interface StoreProcurementContext {
+  accountId: string; storeId: string;
+  purpose: 'restock' | 'buyDirect' | 'groupBulkBuying'; originOperationId: string;
+}
+function procurementContext(value: unknown): StoreProcurementContext {
+  const context = exact(value, ['accountId', 'storeId', 'purpose', 'originOperationId']);
+  if (typeof context.purpose !== 'string' || !['restock', 'buyDirect', 'groupBulkBuying'].includes(context.purpose)) invalid();
+  return {accountId: id(context.accountId), storeId: id(context.storeId),
+    purpose: context.purpose as StoreProcurementContext['purpose'], originOperationId: id(context.originOperationId)};
+}
+function procurementSupplierAllowed(context: StoreProcurementContext, storeId: string, profileId: unknown): boolean {
+  return storeId !== context.storeId && (profileId === 'manufacturer' ||
+    context.purpose !== 'buyDirect' && profileId === 'wholesaler');
+}
 
 /** Server-owned grants, never accepted from an owner/client request. No grant writer. */
 export interface CatalogueProducerAuthority {
@@ -836,6 +851,25 @@ function currentCapability(participant: SupplyParticipantWorkspace, query: Suppl
       Date.parse(capability.effectiveFrom!) >= Date.parse(capability.expiresAt!) ||
       !Array.isArray(capability.qualifiers?.categoryIds) || !Array.isArray(capability.qualifiers?.serviceAreaIds)) return false;
   return isSupplyCapabilityActive(participant, query);
+}
+
+function procurementCapabilityExpiry(source: PublicCatalogueSource | undefined, identity: CatalogueIdentity,
+  context: StoreProcurementContext, record: StoreSkuRecord, channel: StoreSkuChannel, at: string): string | null {
+  if (!source || !Object.hasOwn(source, 'procurementParticipant')) {
+    throw new WorkspaceProfileError('unavailable', 'Current supplier authorization could not be confirmed.', 503);
+  }
+  const participant = source.procurementParticipant;
+  if (!participant || participant.workspaceId !== record.storeId || participant.tenantId !== identity.tenantId ||
+      participant.participantType !== source.profile.profileId ||
+      !procurementSupplierAllowed(context, record.storeId, source.profile.profileId) || channel.kind === 'retail') return null;
+  const offer = source.catalogue.offers.find(value => value.offerId === channel.offerId &&
+    value.workspaceId === record.storeId && value.packId === record.verifiedPackId && value.buyingContext === 'wholesale');
+  if (!offer || !Array.isArray(offer.serviceAreaIds) || !offer.serviceAreaIds.length ||
+      !offer.serviceAreaIds.every(serviceAreaId => currentCapability(participant, {
+        capability: 'wholesale_supply', categoryId: record.content.categoryId, serviceAreaId, at}))) return null;
+  // This is the existing supplier capability window, never a promise that the
+  // buyer's address is serviceable or that stock has been reserved.
+  return new Date(participant.capabilities.find(value => value.kind === 'wholesale_supply')!.expiresAt!).toISOString();
 }
 
 function productionInput(raw: Readonly<Record<string, unknown>>): Record<string, unknown> {
@@ -1045,6 +1079,94 @@ export class WorkspaceCatalogueService {
     private readonly identity?: CatalogueIdentity,
     private readonly now: () => Date = () => new Date(),
     private readonly policyReader?: Pick<WorkspaceSupplierPolicyService, "forPublicSku">) {}
+
+  /** Authenticated Store browsing, not reservation, credit or order acceptance. */
+  async readStoreProcurement(owner: string, raw: Readonly<Record<string, unknown>>): Promise<object> {
+    const body = exact(structuredClone(raw), ['schemaVersion', 'context', 'kind', 'request']);
+    const context = procurementContext(body.context), actor = id(owner), request = object(body.request);
+    if (body.schemaVersion !== 1 || context.accountId !== actor || typeof body.kind !== 'string' ||
+        !['access', 'discovery', 'catalogue'].includes(body.kind)) invalid();
+    if (!this.identity) throw new WorkspaceProfileError('service_unavailable', 'Store purchasing is not connected.', 503);
+    const profile = requireStore(await this.repository.store(context.storeId), context.storeId, actor);
+    const originalOwner = cataloguePayloadHash(profile);
+    let catalogue: Record<string, unknown> | null = null;
+    if (body.kind === 'access') exact(request, []);
+    else {
+      if (request.supplierPublishersVersion !== 1) invalid('Matching supplier publication readback is required.');
+      if (body.kind === 'discovery') {
+        if (publicPageQuery(request.query).destination !== 'wholesale') invalid();
+        catalogue = await this.publicDiscovery(request, context) as Record<string, unknown>;
+      } else {
+        const supplierId = id(request.storeId), supplier = await this.repository.store(supplierId);
+        if (!procurementSupplierAllowed(context, supplierId, supplier?.profileId)) {
+          throw new WorkspaceProfileError('not_found', 'That supplier is unavailable for this Store purchase.', 404);
+        }
+        if (request.storeClassificationReadbackVersion !== 1 || request.storeDetailsReadbackVersion !== 1 ||
+            request.cataloguePageVersion === undefined && (request.listingReadbackVersion !== 1 || request.skuId === undefined) ||
+            request.cataloguePageVersion !== undefined && publicPageQuery(request.query).destination !== 'wholesale') invalid();
+        catalogue = await this.publicCatalogue(request, undefined, context) as Record<string, unknown>;
+      }
+      if (catalogue.state !== 'ready') {
+        throw new WorkspaceProfileError('unavailable', 'Supplier catalogue could not be confirmed.', 503);
+      }
+    }
+    // Recheck the buyer after the complete public source validation. Never return
+    // a grant obtained before an account/Store withdrawal or ownership change.
+    const current = requireStore(await this.repository.store(context.storeId), context.storeId, actor);
+    if (cataloguePayloadHash(current) !== originalOwner) {
+      throw new WorkspaceProfileError('stale_snapshot', 'Your Store changed. Reopen Restock.', 409);
+    }
+    const observedAt = this.now().toISOString(), validUntil = new Date(Date.parse(observedAt) + 300000).toISOString();
+    const supplierGrants: Array<{workspaceId: string; storeId: string; role: string; approved: true;
+      listingId: string; productCanonicalId: string; offerId: string; offerRevision: string;
+      channel: 'wholesale' | 'bulk'; published: true; validUntil: string}> = [];
+    const projections: Array<Record<string, unknown>> = catalogue === null ? [] : body.kind === 'discovery'
+      ? list(catalogue.items, 50).map(item => object(object(item).listing))
+      : catalogue.cataloguePageVersion !== undefined
+      ? list(catalogue.items, 50).map(item => {
+        const selected = object(item), row = object(selected.row);
+        return {...catalogue, items: [{...row, channels: list(row.channels, 2)
+          .filter(channel => object(channel).kind === selected.channel)}]};
+      }) : [catalogue];
+    for (const projection of projections) {
+      const storeId = id(projection.storeId), supplier = object(projection.publicStore);
+      const capabilityExpiries = object(projection._procurementCapabilityExpiries);
+      if (supplier.id !== storeId || !procurementSupplierAllowed(context, storeId, supplier.profileId)) {
+        throw new WorkspaceProfileError('unavailable', 'Supplier publication could not be confirmed.', 503);
+      }
+      for (const rawRow of list(projection.items, 50)) {
+        const row = object(rawRow), bindings = list(row.listings, 2).map(value => object(value));
+        for (const rawChannel of list(row.channels, 2)) {
+          const channel = object(rawChannel);
+          if (channel.kind === 'retail') continue;
+          if (channel.kind !== 'wholesale' && channel.kind !== 'bulk') invalid();
+          const binding = bindings.find(value => value.channel === channel.kind);
+          if (!binding || binding.storeId !== storeId || binding.skuId !== row.skuId ||
+              binding.canonicalProductId !== row.canonicalProductId || binding.verifiedPackId !== row.verifiedPackId ||
+              binding.realm !== this.repository.realm || supplierGrants.some(grant => grant.listingId === binding.listingId)) invalid();
+          const expiry = text(capabilityExpiries[String(binding.listingId)], 24);
+          if (!Number.isFinite(Date.parse(expiry)) || expiry <= observedAt) {
+            throw new WorkspaceProfileError('stale_snapshot', 'Supplier authorization changed. Refresh Restock.', 409);
+          }
+          supplierGrants.push({workspaceId: storeId, storeId, role: String(supplier.profileId), approved: true,
+            listingId: id(binding.listingId), productCanonicalId: id(row.canonicalProductId),
+            offerId: id(channel.offerId), offerRevision: text(channel.revision, 512), channel: channel.kind,
+            published: true, validUntil: expiry < validUntil ? expiry : validUntil});
+        }
+      }
+      delete projection._procurementCapabilityExpiries;
+    }
+    if (catalogue) delete catalogue._procurementCapabilityExpiries;
+    const result = {schemaVersion: 1, realm: this.repository.realm, state: 'ready', context,
+      requestFingerprint: cataloguePayloadHash(body), observedAt, validUntil,
+      buyerStore: {id: context.storeId, name: text(current.name)},
+      buyerGrant: {accountId: actor, storeId: context.storeId, approved: true, validUntil},
+      supplierGrants, orderingAvailable: false, catalogue};
+    if (Buffer.byteLength(JSON.stringify(result), 'utf8') > 512 * 1024) {
+      throw new WorkspaceProfileError('unavailable', 'Supplier catalogue is too large. Refine your selection.', 503);
+    }
+    return result;
+  }
 
   async handleCommodityPrice(owner: string, operation: string, raw: Readonly<Record<string, unknown>>): Promise<object> {
     const action = operation === 'confirmStoreCommodityPrice' ? 'confirm' : operation === 'readStoreCommodityPrice' ? 'read'
@@ -1361,7 +1483,7 @@ export class WorkspaceCatalogueService {
    * Directory rows are only candidates: every item uses the existing reviewed
    * projection. Above capacity fail honestly; never sort/count a truncated set.
    */
-  async publicDiscovery(body: Readonly<Record<string, unknown>>): Promise<object> {
+  async publicDiscovery(body: Readonly<Record<string, unknown>>, procurement?: StoreProcurementContext): Promise<object> {
     exact(body, ["discoveryPageVersion", "query", "pageSize"], ["cursor", "resultKind", "storeId", "supplierPublishersVersion", "supplierTaxReadbackVersion", "commodityPriceReadbackVersion"]);
     const commodityRequested = commodityPriceReadbackRequested(body);
     const taxRequested = supplierTaxReadbackRequested(body);
@@ -1396,8 +1518,9 @@ export class WorkspaceCatalogueService {
       // Keep confirmed withdrawal in the snapshot. Undefined source also means
       // missing catalogue/duplicate profiles/tenant mismatch; it is NOT zero.
       if (profile.status !== "live" || profile.shopEnabled === false ||
+          procurement !== undefined && !procurementSupplierAllowed(procurement, storeId, profile.profileId) ||
           !suppliersRequested && knownSupplierProfile(profile.profileId)) return {profile, source: null};
-      const source = await this.repository.publicCatalogueSource!(storeId, identity);
+      const source = await this.repository.publicCatalogueSource!(storeId, identity, false, undefined, undefined, procurement !== undefined);
       if (!source || source.records.length > 500 || cataloguePayloadHash(source.profile) !== cataloguePayloadHash(profile)) throw unavailable();
       return {profile, source};
     };
@@ -1416,7 +1539,7 @@ export class WorkspaceCatalogueService {
           ...(suppliersRequested ? {supplierPublishersVersion: 1} : {}),
           productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1,
           storeDetailsReadbackVersion: 1, storeClassificationReadbackVersion: 1,
-          mediaReadbackVersion: 1, policyReadbackVersion: 1}, source) as Record<string, unknown>;
+          mediaReadbackVersion: 1, policyReadbackVersion: 1}, source, procurement) as Record<string, unknown>;
         if (data.state === "unavailable" && (source.profile.status !== "live" || !source.profile.shopEnabled)) continue;
         if (data.state !== "ready" || data.listingCoverage !== "complete") throw unavailable();
         projections.push(data);
@@ -1459,8 +1582,13 @@ export class WorkspaceCatalogueService {
           query.maximumPriceMinor !== null && channel.priceMinor > query.maximumPriceMinor ||
           query.search && ![row.content.title, row.content.brand, row.content.variant, row.pack.label]
             .join(" ").toLowerCase().replace(/\s+/gu, " ").includes(query.search)) continue;
-      selected.push({channel: channel.kind, listingId: binding.listingId, price: channel.priceMinor,
-        listing: {...data, items: [row], nextCursor: null}});
+      const listing: Record<string, unknown> = {...data, items: [row], nextCursor: null};
+      if (procurement !== undefined) {
+        const expiries = object(data._procurementCapabilityExpiries);
+        listing._procurementCapabilityExpiries = Object.fromEntries(row.listings
+          .map(value => [value.listingId, expiries[value.listingId]]).filter(([, expiry]) => typeof expiry === 'string'));
+      }
+      selected.push({channel: channel.kind, listingId: binding.listingId, price: channel.priceMinor, listing});
     }
     if (selected.length > 500 || new Set(selected.map(item => item.listingId)).size !== selected.length) throw unavailable();
     selected.sort((a, b) => (query.sort === "priceLowToHigh" ? a.price - b.price :
@@ -1468,7 +1596,8 @@ export class WorkspaceCatalogueService {
       (a.listingId < b.listingId ? -1 : a.listingId === b.listingId ? 0 : 1));
     const resultItems = resultKind === "products" ? selected : selected.filter((value, i) =>
       selected.findIndex(other => other.listing.storeId === value.listing.storeId) === i);
-    const queryIdentity = [identity, this.repository.realm, query, resultKind, requestedStore];
+    const queryIdentity = [identity, this.repository.realm, query, resultKind, requestedStore,
+      ...(procurement === undefined ? [] : [{procurement}])];
     const queryHash = cataloguePayloadHash(suppliersRequested ? [...queryIdentity, "supplier-publishers-v1"] : queryIdentity).toLowerCase();
     const snapshotId = cataloguePayloadHash([sourceHash, stable(finalProjections)]).toLowerCase();
     let index = 0;
@@ -1493,7 +1622,9 @@ export class WorkspaceCatalogueService {
       items: resultItems.slice(index, index + pageSize).map(({channel, listing}) => ({channel, listing})),
       page: {snapshotId, startIndex: index, totalCount: resultItems.length,
         previousCursor: index === 0 ? null : cursorAt(Math.max(0, index - pageSize)), nextCursor}};
-    if (Buffer.byteLength(JSON.stringify(result), "utf8") > 480 * 1024) throw unavailable();
+    const externalJson = JSON.stringify(result, (key, value: unknown) =>
+      procurement !== undefined && key === '_procurementCapabilityExpiries' ? undefined : value);
+    if (Buffer.byteLength(externalJson, "utf8") > 480 * 1024) throw unavailable();
     return result;
   }
 
@@ -1732,7 +1863,7 @@ export class WorkspaceCatalogueService {
       nextCursor: !query.skuId && items.length === query.limit ? items.at(-1)!.skuId : null};
   }
 
-  private async publicCataloguePage(body: Readonly<Record<string, unknown>>): Promise<object> {
+  private async publicCataloguePage(body: Readonly<Record<string, unknown>>, procurement?: StoreProcurementContext): Promise<object> {
     exact(body, ["storeId", "cataloguePageVersion", "query", "pageSize"], ["cursor", "storeDetailsReadbackVersion", "productFactsReadbackVersion", "unbrandedProduceReadbackVersion", "storeClassificationReadbackVersion", "supplierPublishersVersion", "supplierTaxReadbackVersion", "commodityPriceReadbackVersion"]);
     const commodityRequested = commodityPriceReadbackRequested(body);
     const taxRequested = supplierTaxReadbackRequested(body);
@@ -1752,7 +1883,7 @@ export class WorkspaceCatalogueService {
     if (!this.identity || !this.repository.publicCatalogueSource) {
       throw new WorkspaceProfileError("unavailable", "Store catalogue is not connected.", 503);
     }
-    const source = await this.repository.publicCatalogueSource(storeId, this.identity);
+    const source = await this.repository.publicCatalogueSource(storeId, this.identity, false, undefined, undefined, procurement !== undefined);
     if (!source || source.records.length > 500) {
       throw new WorkspaceProfileError("unavailable", "The complete Store catalogue could not be confirmed.", 503);
     }
@@ -1765,7 +1896,7 @@ export class WorkspaceCatalogueService {
       ...(produceRequested ? {unbrandedProduceReadbackVersion: 1} : {}),
       ...(factsRequested ? {productFactsReadbackVersion: 1} : {}),
       ...(detailsRequested ? {storeDetailsReadbackVersion: 1} : {}),
-      policyReadbackVersion: 1, mediaReadbackVersion: 1}, source) as Record<string, unknown>;
+      policyReadbackVersion: 1, mediaReadbackVersion: 1}, source, procurement) as Record<string, unknown>;
     if (data.state !== "ready" || data.listingCoverage !== "complete") {
       throw new WorkspaceProfileError("unavailable", "Store listings could not be confirmed.", 503);
     }
@@ -1800,7 +1931,8 @@ export class WorkspaceCatalogueService {
       query.sort === "priceHighToLow" ? b.price - a.price : 0) ||
       (a.listingId < b.listingId ? -1 : a.listingId === b.listingId ? 0 : 1));
     const stableRows = stablePublicProjection(data);
-    const queryIdentity = exactMoney ? [storeId, query, pageVersion, 'paise'] : [storeId, query];
+    const queryIdentity = [...(exactMoney ? [storeId, query, pageVersion, 'paise'] : [storeId, query]),
+      ...(procurement === undefined ? [] : [{procurement}])];
     const queryHash = cataloguePayloadHash(suppliersRequested ? [...queryIdentity, "supplier-publishers-v1"] : queryIdentity).toLowerCase();
     const snapshotId = cataloguePayloadHash([sourceHash, stableRows]).toLowerCase();
     let index = 0;
@@ -1816,7 +1948,7 @@ export class WorkspaceCatalogueService {
       index = integer(cursor.i, 0, 1000);
       if (index % pageSize || index >= selected.length) invalid("Catalogue cursor is outside this snapshot.");
     }
-    const current = await this.repository.publicCatalogueSource(storeId, this.identity);
+    const current = await this.repository.publicCatalogueSource(storeId, this.identity, false, undefined, undefined, procurement !== undefined);
     const responseAt = this.now().toISOString();
     if (!current || cataloguePayloadHash(current) !== sourceHash) {
       throw new WorkspaceProfileError("stale_snapshot", "Store catalogue changed. Refresh the Store.", 409);
@@ -1832,7 +1964,7 @@ export class WorkspaceCatalogueService {
       ...(produceRequested ? {unbrandedProduceReadbackVersion: 1} : {}),
       ...(factsRequested ? {productFactsReadbackVersion: 1} : {}),
       ...(detailsRequested ? {storeDetailsReadbackVersion: 1} : {}),
-      policyReadbackVersion: 1, mediaReadbackVersion: 1}, current) as Record<string, unknown>;
+      policyReadbackVersion: 1, mediaReadbackVersion: 1}, current, procurement) as Record<string, unknown>;
     if (cataloguePayloadHash(stablePublicProjection(finalProjection)) !== cataloguePayloadHash(stableRows)) {
       throw new WorkspaceProfileError("stale_snapshot", "Store catalogue changed. Refresh the Store.", 409);
     }
@@ -1846,8 +1978,9 @@ export class WorkspaceCatalogueService {
       nextCursor, page: {snapshotId, startIndex: index, totalCount: selected.length, previousCursor, nextCursor}};
   }
 
-  async publicCatalogue(body: Readonly<Record<string, unknown>>, source?: PublicCatalogueSource): Promise<object> {
-    if (Object.hasOwn(body, "cataloguePageVersion")) return this.publicCataloguePage(body);
+  async publicCatalogue(body: Readonly<Record<string, unknown>>, source?: PublicCatalogueSource,
+    procurement?: StoreProcurementContext): Promise<object> {
+    if (Object.hasOwn(body, "cataloguePageVersion")) return this.publicCataloguePage(body, procurement);
     const queryBody = structuredClone(body) as Record<string, unknown>;
     const commodityRequested = queryBody.commodityPriceReadbackVersion === 1;
     if (Object.hasOwn(queryBody, 'commodityPriceReadbackVersion') && !commodityRequested) invalid();
@@ -1889,14 +2022,14 @@ export class WorkspaceCatalogueService {
     await checkLegacyPrices();
     // Include price heads, supplier authority and reviewed facts in one source
     // snapshot, then detect changes during asynchronous policy/content reads.
-    if (!source && commodityRequested && this.identity && this.repository.publicCatalogueSource) {
+    if (!source && (commodityRequested || procurement !== undefined) && this.identity && this.repository.publicCatalogueSource) {
       const snapshot = await this.repository.publicCatalogueSource(query.storeId, this.identity, false, undefined,
-        query.skuId ? [query.skuId] : undefined);
+        query.skuId ? [query.skuId] : undefined, procurement !== undefined);
       if (snapshot) {
         const records = snapshot.records.filter(r => !query.after || r.skuId > query.after).slice(0, query.limit);
-        const result = await this.publicCatalogue(body, {...snapshot, records});
+        const result = await this.publicCatalogue(body, {...snapshot, records}, procurement);
         const fresh = await this.repository.publicCatalogueSource(query.storeId, this.identity, false, undefined,
-          query.skuId ? [query.skuId] : undefined);
+          query.skuId ? [query.skuId] : undefined, procurement !== undefined);
         if (cataloguePayloadHash(fresh ?? null) !== cataloguePayloadHash(snapshot)) {
           throw new WorkspaceProfileError('stale_snapshot', 'Prices changed. Refresh products.', 409);
         }
@@ -1939,6 +2072,7 @@ export class WorkspaceCatalogueService {
     }
     const readbackAt = this.now().toISOString();
     const rows = records.map(r => normalizeRecord(r, query.storeId));
+    const procurementExpiries: Record<string, string> = {};
     const items = rows.flatMap(record => {
       if (!record.publicListing || record.observedAt > readbackAt) return [];
       const product = reviewedCanonicalProduct(catalogue, record.canonicalProductId, cataloguePayloadHash(record.content));
@@ -1948,7 +2082,15 @@ export class WorkspaceCatalogueService {
           !canonicalContentMatches(product, record.content) ||
           product.contentSha256.toUpperCase() !== cataloguePayloadHash(record.content) ||
           pack.descriptorSha256.toUpperCase() !== cataloguePayloadHash(record.pack)) return [];
-      const terms = record.channels.map(channel => {
+      const channels = procurement === undefined ? record.channels : record.channels.filter(channel => {
+        const expiry = procurementCapabilityExpiry(source, this.identity!, procurement, record, channel, readbackAt);
+        if (expiry === null) return false;
+        const listing = cataloguePublicListingBindings(this.repository.realm, record).find(value => value.channel === channel.kind)!;
+        procurementExpiries[listing.listingId] = expiry;
+        return true;
+      });
+      if (!channels.length) return [];
+      const terms = channels.map(channel => {
         const offer = catalogue.offers.find(o => o.offerId === channel.offerId &&
           o.workspaceId === query.storeId && o.packId === pack.packId &&
           o.buyingContext === (channel.kind === "retail" ? "consumer" : "wholesale"));
@@ -2026,7 +2168,8 @@ export class WorkspaceCatalogueService {
           const checked = expected.map(binding => checkedListingBinding(
             bindings.find(v => v.channel === binding.channel), binding));
           if (item.channels.some(c => c!.validUntil <= this.now().toISOString() && !('priceConfirmation' in c!) && !('priceState' in c!))) continue;
-          linked.push({...item, listings: checked});
+          linked.push({...item, listings: procurement === undefined ? checked :
+            checked.filter(binding => item.channels.some(channel => channel!.kind === binding.channel))});
         } catch { /* Retain an unavailable/partial result, never guess identity. */ }
       }
       let details: unknown;
@@ -2050,9 +2193,13 @@ export class WorkspaceCatalogueService {
       // All awaits are finished. Do not let a metadata/policy lookup extend
       // reviewed selling terms beyond their original expiry.
       const responseAt = this.now().toISOString();
-      const liveLinked = linked.filter(item => item.channels.every(c => c!.validUntil > responseAt || 'priceConfirmation' in c! || 'priceState' in c!));
+      const liveLinked = linked.filter(item => item.channels.every(c =>
+        (c!.validUntil > responseAt || 'priceConfirmation' in c! || 'priceState' in c!) &&
+        (procurement === undefined || item.listings.some(binding => binding.channel === c!.kind &&
+          procurementExpiries[binding.listingId]! > responseAt))));
       const coverage = liveLinked.length === publicItems.length ? "complete" : "partial";
       return {...base, observedAt: responseAt,
+        ...(procurement === undefined ? {} : {_procurementCapabilityExpiries: procurementExpiries}),
         ...(produceRequested && liveLinked.some(item => item.content.brand === "") ? {unbrandedProduceReadbackVersion: 1} : {}),
         state: liveLinked.length === 0 && publicItems.length > 0 ? "unavailable" : "ready",
         catalogueVersion: catalogue.version, listingCoverage: coverage,
@@ -3862,7 +4009,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
     });
   }
   async publicCatalogueSource(storeId: string, identity: CatalogueIdentity, includeFamilies = false,
-    existingTransaction?: Transaction, selectedSkuIds?: readonly string[]): Promise<PublicCatalogueSource | undefined> {
+    existingTransaction?: Transaction, selectedSkuIds?: readonly string[], includeProcurement = false): Promise<PublicCatalogueSource | undefined> {
     storeId = id(storeId);
     const selected = selectedSkuIds?.map(id).sort();
     if (selected && (!selected.length || selected.length > 100 || new Set(selected).size !== selected.length || includeFamilies)) invalid();
@@ -3896,12 +4043,19 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
         return [price];
       });
       let commodityAuthority: CatalogueProducerAuthority | undefined, commodityParticipant: SupplyParticipantWorkspace | undefined;
+      let procurementParticipant: SupplyParticipantWorkspace | null = null;
       if (commodityPrices.length) {
         const [authority, participant] = await transaction.getAll(
           this.firestore.collection('workspaceCatalogues').doc(this.realm).collection('producerAuthorities').doc(id(profile.ownerUserId)),
           this.firestore.collection('workspaceCatalogues').doc(this.realm).collection('participants').doc(storeId));
         commodityAuthority = authority?.data() as CatalogueProducerAuthority | undefined;
         commodityParticipant = participant?.data() as SupplyParticipantWorkspace | undefined;
+        if (includeProcurement) procurementParticipant = commodityParticipant ?? null;
+      }
+      if (includeProcurement && !commodityPrices.length) {
+        const participant = await transaction.get(this.firestore.collection('workspaceCatalogues').doc(this.realm)
+          .collection('participants').doc(storeId));
+        procurementParticipant = participant.exists ? participant.data() as SupplyParticipantWorkspace : null;
       }
       const expected = records.flatMap(row => cataloguePublicListingBindings(this.realm, row));
       const docs = expected.length ? await transaction.getAll(...expected.map(row => this.listingRoot().doc(row.listingId))) : [];
@@ -3922,6 +4076,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
           })};
       }
       return {profile, catalogue, records, bindings, policy: policyDoc.exists ? policyDoc.data()! : null,
+        ...(includeProcurement ? {procurementParticipant} : {}),
         publicDetails: detailsDoc.exists ? detailsDoc.data()! : null, ...(variantFamilies ? {variantFamilies} : {}),
         ...(commodityPrices.length ? {commodityPrices, ...(commodityAuthority ? {commodityAuthority} : {}),
           ...(commodityParticipant ? {commodityParticipant} : {})} : {})};

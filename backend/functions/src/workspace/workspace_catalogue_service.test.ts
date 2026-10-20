@@ -3415,14 +3415,17 @@ class BoundMemory extends Memory {
 class ViewMemory extends BoundMemory {
   sourceReads = 0;
   onSourceRead?: (read: number) => void;
-  async publicCatalogueSource(storeId: string, _identity: {catalogueId: string; tenantId: string}): Promise<PublicCatalogueSource | undefined> {
+  procurementParticipants = new Map<string, SupplyParticipantWorkspace>();
+  async publicCatalogueSource(storeId: string, _identity: {catalogueId: string; tenantId: string},
+    _families = false, _transaction?: unknown, _selected?: readonly string[], includeProcurement = false): Promise<PublicCatalogueSource | undefined> {
     const profile = await this.store(storeId), catalogue = await this.catalogue();
     if (!profile || !catalogue) return undefined;
     const records = [...this.records.values()].filter(record => record.storeId === storeId)
       .sort((a, b) => a.skuId < b.skuId ? -1 : a.skuId === b.skuId ? 0 : 1);
     const result = structuredClone({profile, catalogue, records,
       bindings: records.flatMap(record => cataloguePublicListingBindings(this.realm, record)), policy: null,
-      publicDetails: this.details.get(storeId) ?? null});
+      publicDetails: this.details.get(storeId) ?? null,
+      ...(includeProcurement ? {procurementParticipant: this.procurementParticipants.get(storeId) ?? null} : {})});
     this.onSourceRead?.(++this.sourceReads);
     return result;
   }
@@ -3646,6 +3649,412 @@ async function discoveryFixture() {
   await subject(repository).saveSku('owner-one', save(unreviewed));
   return repository;
 }
+
+const procurementContext = {accountId: 'buyer-one', storeId: 'buying-store',
+  purpose: 'restock', originOperationId: 'host-procurement-origin'};
+async function procurementFixture() {
+  // Isolated host catalogue fixture, never device records or purchasing authority.
+  const repository = await discoveryFixture();
+  repository.stores.set('buying-store', {...profile, ownerUserId: 'buyer-one',
+    workspaceId: 'buying-store', caseId: 'buying-case', name: 'Host buying Store', shopEnabled: false});
+  repository.stores.set('store-two', {...repository.stores.get('store-two')!, profileId: 'wholesaler'});
+  repository.procurementParticipants.set('store-one', producerParticipant('store-one', 'grocery', 'manufacturer'));
+  repository.procurementParticipants.set('store-two', producerParticipant('store-two', 'grocery', 'wholesaler'));
+  for (const record of repository.records.values()) record.channels[0]!.kind = 'wholesale';
+  repository.aggregate = {...repository.aggregate!, offers: repository.aggregate!.offers.map(offer => ({...offer,
+    buyingContext: 'wholesale', termWindows: offer.termWindows.map(window => ({...window,
+      termSnapshotSha256: cataloguePayloadHash(channelTerms([...repository.records.values()]
+        .find(row => row.channels[0]!.offerId === offer.offerId)!.channels[0]!))}))}))};
+  return repository;
+}
+
+test('LF05-RESTOCK authenticated Store access reuses actual supplier discovery and exact published grants', async () => {
+  const repository = await procurementFixture(), service = subject(repository);
+  const read = (service as any).readStoreProcurement;
+  assert.equal(typeof read, 'function', 'Restock needs an authenticated Store-owned catalogue source.');
+  const request = (kind: string, input: object = {}) => ({schemaVersion: 1, context: procurementContext, kind, request: input});
+  const access = await read.call(service, 'buyer-one', request('access'));
+  assert.deepEqual(access.buyerStore, {id: 'buying-store', name: 'Host buying Store'});
+  assert.deepEqual(access.buyerGrant, {accountId: 'buyer-one', storeId: 'buying-store', approved: true,
+    validUntil: '2026-10-16T12:05:00.000Z'});
+  assert.equal(access.catalogue, null);
+  assert.equal(access.orderingAvailable, false);
+  const query = discoveryRequest({supplierPublishersVersion: 1, query: {...viewQuery, destination: 'wholesale'}});
+  const page = await read.call(service, 'buyer-one', request('discovery', query));
+  assert.equal(page.catalogue.page.totalCount, 1, 'Retailer candidates must be excluded before counting and paging.');
+  assert.equal(page.catalogue.items[0].listing.storeId, 'store-two');
+  const row = page.catalogue.items[0].listing.items[0], channel = row.channels[0], binding = row.listings[0];
+  assert.deepEqual(page.supplierGrants, [{workspaceId: 'store-two', storeId: 'store-two', role: 'wholesaler',
+    approved: true, listingId: binding.listingId, productCanonicalId: row.canonicalProductId,
+    offerId: channel.offerId, offerRevision: channel.revision, channel: 'wholesale', published: true,
+    validUntil: page.validUntil}]);
+  assert.equal(page.requestFingerprint, cataloguePayloadHash(request('discovery', query)));
+  const direct = await read.call(service, 'buyer-one', request('catalogue', {storeId: 'store-two', skuId: 'sku-two',
+    supplierPublishersVersion: 1, listingReadbackVersion: 1, storeClassificationReadbackVersion: 1,
+    storeDetailsReadbackVersion: 1}));
+  assert.equal(direct.catalogue.items[0].skuId, 'sku-two');
+  assert.deepEqual(direct.supplierGrants, page.supplierGrants);
+  const ordinary = await service.publicDiscovery(query) as DiscoveryResult;
+  assert.equal(ordinary.page.totalCount, 2, 'The existing public customer cohort remains unchanged.');
+  for (const [owner, body] of [
+    ['other-buyer', request('access')],
+    ['buyer-one', {...request('access'), context: {...procurementContext, accountId: 'other-buyer'}}],
+    ['buyer-one', {...request('access'), context: {...procurementContext, storeId: 'store-one'}}],
+    ['buyer-one', request('discovery', discoveryRequest({supplierPublishersVersion: 1}))],
+    ['buyer-one', request('catalogue', {storeId: 'store-one', supplierPublishersVersion: 1,
+      listingReadbackVersion: 1, storeClassificationReadbackVersion: 1})],
+  ] as const) await assert.rejects(read.call(service, owner, body));
+});
+
+test('LF05-RESTOCK withdrawal, malformed context and changed buyer cannot yield purchasing grants', async () => {
+  for (const state of ['suspended', 'approved', 'rejected', 'pending']) {
+    const repository = await procurementFixture();
+    repository.stores.set('buying-store', {...repository.stores.get('buying-store')!, status: state as any});
+    await assert.rejects(subject(repository).readStoreProcurement('buyer-one', {schemaVersion: 1,
+      context: procurementContext, kind: 'access', request: {}}), {code: 'invalid_state'});
+  }
+  const repository = await procurementFixture(), service = subject(repository);
+  const access = {schemaVersion: 1, context: procurementContext, kind: 'access', request: {}};
+  for (const body of [
+    {...access, schemaVersion: 2}, {...access, extra: true}, {...access, kind: ['access']},
+    {...access, context: {...procurementContext, purpose: ['restock']}},
+    {...access, context: {...procurementContext, originOperationId: ''}},
+    {...access, context: {...procurementContext, approved: true}},
+    {...access, request: {approved: true}},
+  ]) await assert.rejects(service.readStoreProcurement('buyer-one', body), {code: 'invalid_input'});
+  await assert.rejects(new WorkspaceCatalogueService(repository).readStoreProcurement('buyer-one', access),
+    {code: 'service_unavailable'});
+  const original = repository.publicCatalogueSource.bind(repository);
+  repository.publicCatalogueSource = async (...args) => {
+    const source = await original(...args);
+    repository.stores.set('buying-store', {...repository.stores.get('buying-store')!, ownerUserId: 'new-owner'});
+    return source;
+  };
+  await assert.rejects(service.readStoreProcurement('buyer-one', {schemaVersion: 1, context: procurementContext,
+    kind: 'discovery', request: discoveryRequest({supplierPublishersVersion: 1,
+      query: {...viewQuery, destination: 'wholesale'}})}), {code: 'not_found'});
+});
+
+test('LF05-RESTOCK supplier grants require current scoped wholesale capability on every read path', async () => {
+  for (const defect of ['missing', 'revoked', 'expired', 'category', 'area', 'tenant', 'workspace']) {
+    const repository = await procurementFixture(), service = subject(repository);
+    const participant = repository.procurementParticipants.get('store-two')!;
+    if (defect === 'missing') repository.procurementParticipants.delete('store-two');
+    else repository.procurementParticipants.set('store-two', {...participant,
+      ...(defect === 'tenant' ? {tenantId: 'another-tenant'} : {}),
+      ...(defect === 'workspace' ? {workspaceId: 'another-workspace'} : {}),
+      capabilities: participant.capabilities.map(capability => capability.kind !== 'wholesale_supply' ? capability :
+        {...capability, ...(defect === 'revoked' ? {state: 'revoked' as const} : {}),
+          ...(defect === 'expired' ? {expiresAt: at} : {}), qualifiers: {
+            categoryIds: defect === 'category' ? ['different-category'] : capability.qualifiers.categoryIds,
+            serviceAreaIds: defect === 'area' ? ['different-area'] : capability.qualifiers.serviceAreaIds}})});
+    for (const kind of ['discovery', 'exact', 'page']) {
+      const input = kind === 'discovery'
+        ? discoveryRequest({supplierPublishersVersion: 1, query: {...viewQuery, destination: 'wholesale'}})
+        : {storeId: 'store-two', supplierPublishersVersion: 1, storeDetailsReadbackVersion: 1,
+          storeClassificationReadbackVersion: 1, ...(kind === 'exact'
+            ? {skuId: 'sku-two', listingReadbackVersion: 1}
+            : {cataloguePageVersion: 2, query: {...viewQuery, destination: 'wholesale'}, pageSize: 1})};
+      const result = await service.readStoreProcurement('buyer-one', {schemaVersion: 1, context: procurementContext,
+        kind: kind === 'discovery' ? 'discovery' : 'catalogue', request: input}) as any;
+      assert.deepEqual(result.supplierGrants, [], `${defect}/${kind}`);
+      assert.deepEqual(result.catalogue.items, [], `${defect}/${kind}`);
+      if (kind !== 'exact') assert.equal(result.catalogue.page.totalCount, 0, `${defect}/${kind}`);
+    }
+  }
+});
+
+test('LF05-RESTOCK supplier expiry bounds grants and in-flight withdrawal cannot issue stale authority', async () => {
+  for (const kind of ['discovery', 'exact', 'page']) {
+    const input = kind === 'discovery'
+      ? discoveryRequest({supplierPublishersVersion: 1, query: {...viewQuery, destination: 'wholesale'}})
+      : {storeId: 'store-two', supplierPublishersVersion: 1, storeDetailsReadbackVersion: 1,
+        storeClassificationReadbackVersion: 1, ...(kind === 'exact'
+          ? {skuId: 'sku-two', listingReadbackVersion: 1}
+          : {cataloguePageVersion: 2, query: {...viewQuery, destination: 'wholesale'}, pageSize: 1})};
+    const body = {schemaVersion: 1, context: procurementContext,
+      kind: kind === 'discovery' ? 'discovery' : 'catalogue', request: input};
+    const repository = await procurementFixture();
+    const participant = repository.procurementParticipants.get('store-two')!;
+    const expiry = '2026-10-16T12:00:30.000Z';
+    const expiring = {...participant, capabilities: participant.capabilities.map(capability =>
+      capability.kind === 'wholesale_supply' ? {...capability, expiresAt: expiry} : capability)};
+    repository.procurementParticipants.set('store-two', expiring);
+    const ready = await subject(repository).readStoreProcurement('buyer-one', body) as any;
+    assert.equal(ready.validUntil, '2026-10-16T12:05:00.000Z');
+    assert.equal(ready.supplierGrants[0].validUntil, expiry, kind);
+    assert.equal(JSON.stringify(ready).includes('_procurementCapabilityExpiries'), false);
+    assert.equal(JSON.stringify(ready).includes('legalEntityReference'), false);
+    let clock = at;
+    repository.sourceReads = 0;
+    repository.onSourceRead = read => {if (read === 2) clock = expiry;};
+    await assert.rejects(new WorkspaceCatalogueService(repository, catalogueIdentity, () => new Date(clock))
+      .readStoreProcurement('buyer-one', body), {code: 'stale_snapshot'}, `expiry/${kind}`);
+    delete repository.onSourceRead; repository.sourceReads = 0;
+    repository.onSourceRead = read => {
+      if (read === 1) repository.procurementParticipants.set('store-two', {...expiring,
+        capabilities: expiring.capabilities.map(capability => capability.kind === 'wholesale_supply'
+          ? {...capability, state: 'revoked'} : capability)});
+    };
+    await assert.rejects(subject(repository).readStoreProcurement('buyer-one', body), {code: 'stale_snapshot'}, `revoke/${kind}`);
+  }
+  const repository = await procurementFixture();
+  repository.aggregate = {...repository.aggregate!, offers: repository.aggregate!.offers.map(offer =>
+    offer.offerId === 'offer-two' ? {...offer, serviceAreaIds: ['host-area', 'another-offer-area']} : offer)};
+  const unsupportedArea = await subject(repository).readStoreProcurement('buyer-one', {schemaVersion: 1,
+    context: procurementContext, kind: 'discovery', request: discoveryRequest({supplierPublishersVersion: 1,
+      query: {...viewQuery, destination: 'wholesale'}})}) as any;
+  assert.deepEqual(unsupportedArea.supplierGrants, [], 'Every actual offer area requires the source capability.');
+});
+
+test('LF05-RESTOCK dual Retail and Wholesale SKU projects only matching eligible bindings on all paths', async () => {
+  const repository = await procurementFixture(), service = subject(repository);
+  const row = repository.records.get('store-two/sku-two')!;
+  const retail = {...row.channels[0]!, kind: 'retail' as const, offerId: 'retail-offer-two'};
+  row.channels.push(retail);
+  const trade = repository.aggregate!.offers.find(offer => offer.offerId === 'offer-two')!;
+  repository.aggregate = {...repository.aggregate!, offers: [...repository.aggregate!.offers,
+    {...trade, offerId: retail.offerId, buyingContext: 'consumer', termWindows: trade.termWindows.map(window =>
+      ({...window, termSnapshotSha256: cataloguePayloadHash(channelTerms(retail))}))}]};
+  for (const kind of ['discovery', 'exact', 'page']) {
+    const request = kind === 'discovery'
+      ? discoveryRequest({supplierPublishersVersion: 1, query: {...viewQuery, destination: 'wholesale'}})
+      : {storeId: 'store-two', supplierPublishersVersion: 1, storeDetailsReadbackVersion: 1,
+        storeClassificationReadbackVersion: 1, ...(kind === 'exact'
+          ? {skuId: 'sku-two', listingReadbackVersion: 1}
+          : {cataloguePageVersion: 2, query: {...viewQuery, destination: 'wholesale'}, pageSize: 1})};
+    const result = await service.readStoreProcurement('buyer-one', {schemaVersion: 1, context: procurementContext,
+      kind: kind === 'discovery' ? 'discovery' : 'catalogue', request}) as any;
+    const projected = kind === 'discovery' ? result.catalogue.items[0].listing.items[0]
+      : kind === 'page' ? result.catalogue.items[0].row : result.catalogue.items[0];
+    assert.equal(projected.channels.length, 1, kind);
+    assert.equal(projected.listings.length, 1, kind);
+    assert.equal(projected.listings[0].channel, 'wholesale');
+    assert.equal(projected.listings[0].listingId, result.supplierGrants[0].listingId);
+  }
+});
+
+test('LF05-RESTOCK complete500-SKU supplier keeps an otherwise valid50-item page bounded', async () => {
+  const repository = await procurementFixture(), service = subject(repository);
+  const original = repository.records.get('store-two/sku-two')!, offer = repository.aggregate!.offers.find(value => value.offerId === 'offer-two')!;
+  repository.records.clear();
+  const offers = [];
+  for (let index = 0; index < 500; index++) {
+    const row = structuredClone(original); row.skuId = `host-sku-${index}`; row.sku = `HOST-SKU-${index}`;
+    row.channels[0]!.offerId = `host-offer-${index}`;
+    repository.records.set(`store-two/${row.skuId}`, row);
+    offers.push({...structuredClone(offer), offerId: row.channels[0]!.offerId});
+  }
+  repository.aggregate = {...repository.aggregate!, offers};
+  const request = {schemaVersion: 1, context: procurementContext, kind: 'discovery',
+    request: discoveryRequest({pageSize: 50, supplierPublishersVersion: 1, query: {...viewQuery, destination: 'wholesale'}})};
+  const first = await service.readStoreProcurement('buyer-one', request) as any;
+  assert.equal(first.catalogue.page.totalCount, 500); assert.equal(first.catalogue.items.length, 50);
+  assert.equal(first.supplierGrants.length, 50);
+  assert.ok(Buffer.byteLength(JSON.stringify(first), 'utf8') < 512 * 1024);
+  const second = await service.readStoreProcurement('buyer-one', {...request,
+    request: {...request.request, cursor: first.catalogue.page.nextCursor}}) as any;
+  assert.equal(second.catalogue.page.startIndex, 50); assert.equal(second.supplierGrants.length, 50);
+  assert.equal(new Set([...first.supplierGrants, ...second.supplierGrants].map(value => value.listingId)).size, 100);
+});
+
+test('LF05-RESTOCK discovery and Store page cursors cannot cross buying Store, purpose or visit', async () => {
+  const repository = await procurementFixture(), service = subject(repository);
+  repository.stores.set('store-one', {...profile, profileId: 'manufacturer'});
+  repository.stores.set('another-buyer-store', {...repository.stores.get('buying-store')!,
+    workspaceId: 'another-buyer-store', caseId: 'another-buying-case'});
+  const request = discoveryRequest({supplierPublishersVersion: 1, query: {...viewQuery, destination: 'wholesale'}});
+  const wrap = (context = procurementContext, input: Record<string, unknown> = request, kind = 'discovery') =>
+    ({schemaVersion: 1, context, kind, request: input});
+  const first = await service.readStoreProcurement('buyer-one', wrap()) as any;
+  assert.equal(first.catalogue.page.totalCount, 2);
+  const next = first.catalogue.page.nextCursor;
+  assert.ok(next);
+  assert.equal((await service.readStoreProcurement('buyer-one', wrap(procurementContext,
+    {...request, cursor: next})) as any).catalogue.page.startIndex, 1);
+  for (const context of [
+    {...procurementContext, originOperationId: 'another-visit'},
+    {...procurementContext, storeId: 'another-buyer-store'},
+    {...procurementContext, purpose: 'groupBulkBuying'},
+  ]) await assert.rejects(service.readStoreProcurement('buyer-one', wrap(context, {...request, cursor: next})),
+    {code: 'stale_cursor'});
+  await assert.rejects(service.publicDiscovery({...request, cursor: next}), {code: 'stale_cursor'});
+  const publicPage = await service.publicDiscovery(request) as any;
+  await assert.rejects(service.readStoreProcurement('buyer-one', wrap(procurementContext,
+    {...request, cursor: publicPage.page.nextCursor})), {code: 'stale_cursor'});
+  const extra = structuredClone(repository.records.get('store-two/sku-two')!);
+  extra.skuId = 'sku-third'; extra.sku = 'SKU-THIRD'; extra.channels[0]!.offerId = 'offer-third';
+  repository.records.set('store-two/sku-third', extra);
+  repository.aggregate = {...repository.aggregate!, offers: [...repository.aggregate!.offers,
+    {...repository.aggregate!.offers.find(offer => offer.offerId === 'offer-two')!, offerId: 'offer-third'}]};
+  const catalogueRequest = {storeId: 'store-two', cataloguePageVersion: 2, pageSize: 1,
+    query: {...viewQuery, destination: 'wholesale'}, supplierPublishersVersion: 1,
+    storeDetailsReadbackVersion: 1, storeClassificationReadbackVersion: 1};
+  const source = await service.readStoreProcurement('buyer-one', {schemaVersion: 1, context: procurementContext,
+    kind: 'catalogue', request: catalogueRequest}) as any;
+  assert.equal(source.catalogue.page.totalCount, 2);
+  const storeCursor = source.catalogue.page.nextCursor;
+  assert.ok(storeCursor);
+  assert.equal(source.supplierGrants[0].listingId, source.catalogue.items[0].row.listings[0].listingId);
+  assert.equal((await service.readStoreProcurement('buyer-one', {schemaVersion: 1, context: procurementContext,
+    kind: 'catalogue', request: {...catalogueRequest, cursor: storeCursor}}) as any).catalogue.page.startIndex, 1);
+  for (const context of [{...procurementContext, originOperationId: 'another-visit'},
+    {...procurementContext, storeId: 'another-buyer-store'}, {...procurementContext, purpose: 'groupBulkBuying'}]) {
+    await assert.rejects(service.readStoreProcurement('buyer-one', {schemaVersion: 1, context,
+      kind: 'catalogue', request: {...catalogueRequest, cursor: storeCursor}}), {code: 'stale_cursor'});
+  }
+  await assert.rejects(service.publicCatalogue({...catalogueRequest, cursor: storeCursor}), {code: 'stale_cursor'});
+  const manufacturerOnly = await service.readStoreProcurement('buyer-one', wrap(
+    {...procurementContext, purpose: 'buyDirect'})) as any;
+  assert.equal(manufacturerOnly.catalogue.page.totalCount, 1);
+  assert.equal(manufacturerOnly.supplierGrants[0].role, 'manufacturer');
+});
+
+test('LF05-RESTOCK actual HTTP gate and authenticated read use only an isolated emulator Store', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST, timeout: 45000,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const child = `
+    const handler = require(${JSON.stringify(resolve(__dirname, '../index.js'))}).moolSocialWorkspace;
+    const {getFirestore} = require('firebase-admin/firestore');
+    const db = getFirestore(), rows = [], checks = [];
+    let foreign = false, identities = 0;
+    require('firebase-admin/app-check').getAppCheck().verifyToken = async (token, options) => {
+      checks.push(options?.consume === true); return {alreadyConsumed: true};
+    };
+    require('firebase-admin/auth').getAuth().verifyIdToken = async () => {
+      identities++; return {uid: 'http-buyer', firebase: foreign ? {tenant: 'isolated-other-tenant'} : {}};
+    };
+    const context = {accountId: 'http-buyer', storeId: 'http-buying-store', purpose: 'restock', originOperationId: 'http-origin'};
+    async function invoke(mode = 'valid') {
+      checks.length = 0; identities = 0; foreign = mode === 'foreign-tenant';
+      const headers = {};
+      if (mode !== 'missing-app-check') headers['x-firebase-appcheck'] = 'isolated-app-check';
+      if (mode !== 'missing-bearer') headers.authorization = 'Bearer isolated-id-token';
+      const body = {operation: 'readStoreProcurementCatalogue', schemaVersion: 1, kind: 'access', request: {},
+        context: {...context, ...(mode === 'wrong-account' ? {accountId: 'another-account'} : {}),
+          ...(mode === 'wrong-store' ? {storeId: 'someone-elses-store'} : {})}};
+      const row = {mode};
+      const response = {setHeader() {}, status(status) {row.status = status; return this;}, json(value) {
+        row.code = value.error?.code ?? null;
+        if (value.ok) row.buyerStore = value.data.buyerStore;
+      }};
+      await handler({method: 'POST', headers, body, rawBody: Buffer.from(JSON.stringify(body)), query: {}, path: '/'}, response);
+      return {...row, checks: [...checks], identities};
+    }
+    (async () => {try {
+      await db.collection('workspaceProfiles').doc('http-buying-case').set({schemaVersion: 1, caseId: 'http-buying-case',
+        workspaceId: 'http-buying-store', ownerUserId: 'http-buyer', status: 'live', familyId: 'products-trade',
+        profileId: 'retailer-grocery', name: 'Isolated HTTP buying Store', shopEnabled: false});
+      await db.collection('workspaceProfiles').doc('someone-elses-case').set({schemaVersion: 1, caseId: 'someone-elses-case',
+        workspaceId: 'someone-elses-store', ownerUserId: 'someone-else', status: 'live', familyId: 'products-trade',
+        profileId: 'retailer-grocery', name: 'Isolated other Store', shopEnabled: true});
+      for (const flag of [undefined, 'false', 'TRUE', '1', 'true ', 'true']) {
+        if (flag === undefined) delete process.env.MOOLSOCIAL_STORE_PROCUREMENT_V1;
+        else process.env.MOOLSOCIAL_STORE_PROCUREMENT_V1 = flag;
+        rows.push({flag: flag ?? null, ...await invoke()});
+      }
+      for (const mode of ['missing-app-check', 'missing-bearer', 'foreign-tenant', 'wrong-account', 'wrong-store']) {
+        rows.push({flag: 'true', ...await invoke(mode)});
+      }
+      console.log('RESTOCK_HTTP ' + JSON.stringify(rows));
+    } finally {await db.terminate();}})().catch(error => {console.error(error); process.exitCode = 1;});`;
+  const project = `demo-lf-restock-http-${randomUUID().slice(0, 8)}`;
+  const result = await promisify(execFile)(process.execPath, ['-e', child], {
+    cwd: resolve(__dirname, '../..'), timeout: 35000,
+    env: {...process.env, GCLOUD_PROJECT: project, GOOGLE_CLOUD_PROJECT: project,
+      FIREBASE_CONFIG: JSON.stringify({projectId: project, storageBucket: `${project}.appspot.com`}),
+      MOOLSOCIAL_CATALOGUE_REALM: 'evaluation',
+      MOOLSOCIAL_CATALOGUE_ID: 'isolated-http-catalogue', MOOLSOCIAL_CATALOGUE_TENANT_ID: 'isolated-http-tenant'},
+  });
+  const line = result.stdout.split('\n').find(value => value.startsWith('RESTOCK_HTTP '));
+  assert.ok(line, result.stdout + result.stderr);
+  const rows = JSON.parse(line.slice('RESTOCK_HTTP '.length)) as Array<{
+    flag: string | null; mode: string; status: number; code: string | null; checks: boolean[];
+    identities: number; buyerStore?: object;
+  }>;
+  assert.equal(rows.length, 11);
+  for (const row of rows) {
+    const disabled = row.flag !== 'true';
+    const code = disabled ? 'service_unavailable' : ({'missing-app-check': 'permission_denied',
+      'missing-bearer': 'authentication_required', 'foreign-tenant': 'authentication_required',
+      'wrong-account': 'invalid_input', 'wrong-store': 'not_found'} as Record<string, string>)[row.mode] ?? null;
+    assert.equal(row.code, code, JSON.stringify(row));
+    assert.equal(row.status, disabled ? 503 : code === null ? 200 :
+      row.mode === 'wrong-account' ? 400 : row.mode === 'wrong-store' ? 404 : 401, JSON.stringify(row));
+    assert.deepEqual(row.checks, disabled || row.mode === 'missing-app-check' ? [] : [false], JSON.stringify(row));
+    assert.equal(row.identities, disabled || ['missing-app-check', 'missing-bearer'].includes(row.mode) ? 0 : 1);
+    if (row.status === 200) assert.deepEqual(row.buyerStore, {id: 'http-buying-store', name: 'Isolated HTTP buying Store'});
+  }
+});
+
+test('LF05-RESTOCK persisted supplier publication reaches scoped browsing after restart and withdraws safely', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-restock-${randomUUID().slice(0, 8)}`}, `restock-${randomUUID()}`);
+  const db = getFirestore(app), root = db.collection('workspaceCatalogues').doc('evaluation');
+  const repo = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at));
+  const service = () => new WorkspaceCatalogueService(repo(), catalogueIdentity, () => new Date(at));
+  const context = {...procurementContext};
+  const request = {schemaVersion: 1, context, kind: 'discovery', request: discoveryRequest({
+    supplierPublishersVersion: 1, query: {...viewQuery, destination: 'wholesale'}})};
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set({...profile, profileId: 'wholesaler'});
+    await db.collection('workspaceProfiles').doc('buying-case').set({...profile, ownerUserId: context.accountId,
+      workspaceId: context.storeId, caseId: 'buying-case', name: 'Isolated Store buyer', shopEnabled: false});
+    await root.collection('participants').doc('store-one').set(producerParticipant('store-one', 'grocery', 'wholesaler'));
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    const value = input(); value.channels[0]!.kind = 'wholesale'; value.content.media = staticMedia(value);
+    const retail = {...value.channels[0]!, kind: 'retail' as const, offerId: 'restock-retail-offer'};
+    value.channels.push(retail);
+    for (const original of productionCommands(value)) {
+      const command = original.type === 'create_offer' ? {...original, buyingContext: 'wholesale'} : original;
+      await repo().produceCatalogue(['propose_product', 'propose_pack', 'create_offer'].includes(String(command.type))
+        ? 'owner-one' : 'reviewer-one', catalogueIdentity, command);
+    }
+    await repo().produceCatalogue('owner-one', catalogueIdentity, {type: 'create_offer', commandId: 'restock-retail-offer',
+      expectedVersion: 6, offerId: retail.offerId, packId: value.verifiedPackId, buyingContext: 'consumer',
+      serviceAreaIds: ['host-area'], termWindows: [{termSnapshotId: 'restock-retail-term',
+        termSnapshotSha256: cataloguePayloadHash(channelTerms(retail)), effectiveFrom: at, expiresAt: '2026-10-16T13:00:00.000Z'}]});
+    await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: value,
+      expectedRevision: 0, idempotencyKey: 'restock-publish'});
+    const first = await service().readStoreProcurement(context.accountId, request) as any;
+    assert.equal(first.catalogue.page.totalCount, 1);
+    const persisted = await service().readStoreProcurement(context.accountId, request) as any;
+    assert.deepEqual(persisted, first, 'New service/repository instances read the same actual persisted publication.');
+    assert.equal(first.catalogue.items[0].listing.items[0].channels[0].priceMinor, value.channels[0]!.priceMinor);
+    assert.equal(first.supplierGrants[0].offerId, value.channels[0]!.offerId);
+    assert.equal(first.supplierGrants[0].role, 'wholesaler');
+    console.log('RESTOCK_SOURCE_CAPTURE=' + JSON.stringify(first));
+    const shared = {storeId: 'store-one', supplierPublishersVersion: 1, productFactsReadbackVersion: 1,
+      storeDetailsReadbackVersion: 1, storeClassificationReadbackVersion: 1};
+    const exact = await service().readStoreProcurement(context.accountId, {schemaVersion: 1, context, kind: 'catalogue',
+      request: {...shared, skuId: value.skuId, listingReadbackVersion: 1, mediaReadbackVersion: 1, policyReadbackVersion: 1}});
+    const page = await service().readStoreProcurement(context.accountId, {schemaVersion: 1, context, kind: 'catalogue',
+      request: {...shared, cataloguePageVersion: 2, pageSize: 1, query: {...viewQuery, destination: 'wholesale'}}});
+    console.log('RESTOCK_SOURCE_PATHS_CAPTURE=' + JSON.stringify({discovery: first, exact, page}));
+    const participant = producerParticipant('store-one', 'grocery', 'wholesaler');
+    const revoked = applySupplyParticipantCommand(participant, {type: 'revoke_capability',
+      actor: {actorId: 'capability-reviewer', tenantId: 'tenant-one', scopes: ['supply.capability.review']},
+      commandId: 'host-restock-revoke', workspaceId: 'store-one', expectedVersion: participant.version,
+      occurredAt: at, capability: 'wholesale_supply', reason: 'Isolated supplier authorization withdrawal'});
+    await root.collection('participants').doc('store-one').set(revoked);
+    const noAuthorization = await service().readStoreProcurement(context.accountId, request) as any;
+    assert.equal(noAuthorization.catalogue.page.totalCount, 0); assert.deepEqual(noAuthorization.supplierGrants, []);
+    assert.equal((await service().publicDiscovery(request.request) as any).page.totalCount, 1,
+      'Legacy public visibility is not itself current procurement authorization.');
+    await root.collection('participants').doc('store-one').set(participant);
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({status: 'suspended'});
+    const withdrawn = await service().readStoreProcurement(context.accountId, request) as any;
+    assert.equal(withdrawn.catalogue.page.totalCount, 0); assert.deepEqual(withdrawn.supplierGrants, []);
+    await db.collection('workspaceProfiles').doc('buying-case').update({ownerUserId: 'different-buyer'});
+    await assert.rejects(service().readStoreProcurement(context.accountId, request), {code: 'not_found'});
+    assert.equal((await db.collection('retailerOrders').limit(1).get()).empty, true, 'Browsing creates no order.');
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+
 for (const profileId of ['wholesaler', 'manufacturer']) {
   test(`LF04-PUBLISHERS explicit catalogue and discovery readback ${profileId}`, async () => {
     const repository = await discoveryFixture(), service = subject(repository);

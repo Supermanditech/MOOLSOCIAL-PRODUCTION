@@ -2919,6 +2919,10 @@ export const moolSocialWorkspace = onRequest(
       const catalogueProductionAction = catalogueProductionOperation(operation);
       const bulkQuoteAction = bulkSupplierQuoteOperation(operation);
       const bulkQuoteOperation = bulkQuoteAction !== undefined;
+      const storeProcurementRead = operation === 'readStoreProcurementCatalogue';
+      if (storeProcurementRead && process.env.MOOLSOCIAL_STORE_PROCUREMENT_V1 !== 'true') {
+        throw new WorkspaceProfileError('service_unavailable', 'Store purchasing is not connected.', 503);
+      }
       const commodityPriceMutation = ['confirmStoreCommodityPrice', 'requestPublicCommodityPriceRefresh'].includes(operation);
       // Disable new writes without stranding existing confirmation recovery or
       // removing public prices that were already explicitly confirmed.
@@ -2973,7 +2977,7 @@ export const moolSocialWorkspace = onRequest(
       const promotionOperation = ["readStorePromotion", "saveStorePromotion", "reconcileStorePromotion",
         "listStorePromotions", "readPublicStorePromotions", "readPublicPromotionDiscovery",
         "saveStoreCoupon", "readStoreCoupon", "listStoreCoupons", "reconcileStoreCoupon", "readPublicStoreCoupons", "readPublicStoreCouponSnapshot", "evaluateStoreCouponEligibility"].includes(operation);
-      const catalogueOperation = ["saveStoreCatalogueSku", "bindReviewedStoreCatalogueSku",
+      const catalogueOperation = storeProcurementRead || ["saveStoreCatalogueSku", "bindReviewedStoreCatalogueSku",
         'confirmStoreCommodityPrice', 'readStoreCommodityPrice', 'reconcileStoreCommodityPrice',
         'requestPublicCommodityPriceRefresh',
         "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue", "readPublicCatalogueDiscovery",
@@ -3036,6 +3040,8 @@ export const moolSocialWorkspace = onRequest(
       }
       const result = catalogueProductionAction !== undefined
         ? await workspaceCatalogueService().handleCatalogueProduction(ownerUserId, operation, catalogueBody)
+        : storeProcurementRead
+        ? await workspaceCatalogueService().readStoreProcurement(ownerUserId, catalogueBody)
         : bulkQuoteAction !== undefined
         ? await workspaceBulkQuoteService().handleOperation(ownerUserId, bulkQuoteAction, catalogueBody)
         : stockOperation !== undefined
