@@ -4,7 +4,9 @@ import {randomUUID} from "node:crypto";
 import {initializeApp, deleteApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 import {FirestorePromotionRepository, WorkspacePromotionService, planPromotionSave,
-  planStoreCouponSave, type StoreCouponCommand, type StoreCouponRecord, type StoreCouponReceipt,
+  planStoreCouponSave, evaluateStoreCouponBasket, planStoreCouponUseEvent, type StoreCouponBasket,
+  type StoreCouponUse, type StoreCouponUseEvent,
+  type StoreCouponCommand, type StoreCouponRecord, type StoreCouponReceipt,
   type PromotionCommand, type PromotionRecord, type PromotionReceipt,
   type PromotionRepository} from "./workspace_promotion_service.js";
 import type {WorkspaceProfileRecord} from "./workspace_profile_service.js";
@@ -180,6 +182,154 @@ function storeCouponService(repository: PromotionRepository, clock = () => at, e
     () => new Date(clock()), {storeCouponTermsSupported: enabled});
 }
 const publicCoupons = {storeCouponTermsVersion: 1, storeId: 'store-one', limit: 20};
+
+function appliedCampaign(changes: Partial<StoreCouponRecord> = {}): StoreCouponRecord {
+  return {schemaVersion: 1, realm: 'evaluation', storeId: 'store-one', couponId: 'coupon-one',
+    revision: 1, observedAt: at, ...storeCouponBody().coupon, ...changes};
+}
+function appliedBasket(): StoreCouponBasket {
+  return {schemaVersion: 1, realm: 'evaluation', storeId: 'store-one', buyerUserId: 'buyer-one',
+    couponRevision: 1, sourceId: 'trusted-basket-one', sourceRevision: 1, observedAt: at, validUntil: until,
+    lines: [
+      {lineId: 'line-retail', storeId: 'store-one', skuId: 'sku-one', packId: 'pack-one',
+        offerId: 'offer-retail', offerRevision: 1, priceSourceId: 'price-retail', channel: 'retail',
+        quantity: 1, unitPriceMinor: 10001, otherCouponApplied: false},
+      {lineId: 'line-wholesale', storeId: 'store-one', skuId: 'sku-two', packId: 'pack-two',
+        offerId: 'offer-wholesale', offerRevision: 2, priceSourceId: 'price-wholesale', channel: 'wholesale',
+        quantity: 2, unitPriceMinor: 5001, otherCouponApplied: false},
+      {lineId: 'line-other', storeId: 'store-two', skuId: 'sku-three', packId: 'pack-three',
+        offerId: 'offer-other', offerRevision: 1, priceSourceId: 'price-other', channel: 'bulk',
+        quantity: 5, unitPriceMinor: 100000, otherCouponApplied: false},
+    ]};
+}
+function hostCouponUse(): StoreCouponUse {
+  const evaluated = evaluateStoreCouponBasket(appliedCampaign(), profile, appliedBasket(), at);
+  return {schemaVersion: 1, realm: 'evaluation', storeId: 'store-one', buyerUserId: 'buyer-one',
+    couponId: 'coupon-one', couponRevision: 1, purchaseId: 'purchase-one', storeOrderId: 'order-one',
+    basketFingerprint: evaluated.basketFingerprint, savingMinor: evaluated.savingMinor,
+    revision: 1, state: 'held', heldAt: at, holdUntil: until,
+    lifecycleSourceId: 'trusted-order-source', lastSourceRevision: 0, lastObservedAt: at, fulfilmentStarted: false};
+}
+function hostUseEvent(outcome: StoreCouponUseEvent['outcome'] = 'payment_confirmed'): StoreCouponUseEvent {
+  const use = hostCouponUse();
+  return {eventId: 'trusted-event-one', sourceId: 'trusted-order-source', sourceRevision: 1,
+    observedAt: at, realm: use.realm, storeId: use.storeId, buyerUserId: use.buyerUserId,
+    couponId: use.couponId, couponRevision: use.couponRevision, purchaseId: use.purchaseId,
+    storeOrderId: use.storeOrderId, basketFingerprint: use.basketFingerprint, expectedRevision: 1, outcome};
+}
+test('LF04-APPLIED trusted usage consumes once and exact event replay preserves receipt', () => {
+  const original = hostCouponUse(), event = hostUseEvent();
+  const receipt = planStoreCouponUseEvent(original, event);
+  assert.equal(receipt.record.state, 'consumed'); assert.equal(receipt.record.revision, 2);
+  assert.equal(original.state, 'held'); assert.equal(original.revision, 1);
+  assert.deepEqual(planStoreCouponUseEvent(receipt.record, event, receipt), receipt);
+  assert.throws(() => planStoreCouponUseEvent(receipt.record, {...event, outcome: 'payment_failed'}, receipt));
+  assert.throws(() => planStoreCouponUseEvent(receipt.record, {...event, eventId: 'other-event', expectedRevision: 2}));
+  for (const changed of [{buyerUserId: 'other-buyer'}, {savingMinor: 1}, {revision: 8}, {state: 'released'}, {fulfilmentStarted: true}]) {
+    assert.throws(() => planStoreCouponUseEvent(receipt.record, event,
+      {...receipt, record: {...receipt.record, ...changed} as StoreCouponUse}));
+  }
+});
+test('LF04-APPLIED definite failure/expiry release but time passing alone is not a payment outcome', () => {
+  assert.equal(planStoreCouponUseEvent(hostCouponUse(), hostUseEvent('payment_failed')).record.state, 'released');
+  const expiry = hostUseEvent('payment_expired');
+  assert.throws(() => planStoreCouponUseEvent(hostCouponUse(), expiry));
+  expiry.observedAt = until;
+  const released = planStoreCouponUseEvent(hostCouponUse(), expiry).record;
+  assert.equal(released.state, 'released');
+  assert.throws(() => planStoreCouponUseEvent(released, {...hostUseEvent(), expectedRevision: 2}));
+});
+test('LF04-APPLIED prefulfilment cancellation releases consumed use; completed refund does not', () => {
+  const paid = planStoreCouponUseEvent(hostCouponUse(), hostUseEvent()).record;
+  assert.equal(planStoreCouponUseEvent(paid, {...hostUseEvent('cancelled_before_fulfilment'),
+    eventId: 'cancel-event', expectedRevision: 2, sourceRevision: 2}).record.state, 'released');
+  const refund = planStoreCouponUseEvent(paid, {...hostUseEvent('completed_order_refunded'),
+    eventId: 'refund-event', expectedRevision: 2, sourceRevision: 2});
+  assert.equal(refund.record.state, 'consumed');
+});
+test('LF04-APPLIED completed refund cannot be followed by a stale cancellation release', () => {
+  const paid = planStoreCouponUseEvent(hostCouponUse(), hostUseEvent()).record;
+  const refunded = planStoreCouponUseEvent(paid, {...hostUseEvent('completed_order_refunded'),
+    eventId: 'refund-event', expectedRevision: 2, sourceRevision: 2}).record;
+  assert.throws(() => planStoreCouponUseEvent(refunded, {...hostUseEvent('cancelled_before_fulfilment'),
+    eventId: 'late-cancel', expectedRevision: 3, sourceRevision: 3}));
+});
+test('LF04-APPLIED binds sequenced lifecycle source and retains fulfilment boundary', () => {
+  const paid = planStoreCouponUseEvent(hostCouponUse(), hostUseEvent()).record;
+  for (const change of [{sourceId: 'foreign-source'}, {sourceRevision: 1}, {observedAt: '2026-10-16T01:00:00.000Z'}]) {
+    assert.throws(() => planStoreCouponUseEvent(paid, {...hostUseEvent('cancelled_before_fulfilment'),
+      eventId: 'cancel-event', expectedRevision: 2, sourceRevision: 2, ...change}));
+  }
+  const dispatched = planStoreCouponUseEvent(paid, {...hostUseEvent('fulfilment_started'),
+    eventId: 'fulfilment-event', expectedRevision: 2, sourceRevision: 2}).record;
+  assert.equal(dispatched.state, 'consumed'); assert.equal(dispatched.fulfilmentStarted, true);
+  assert.throws(() => planStoreCouponUseEvent(dispatched, {...hostUseEvent('cancelled_before_fulfilment'),
+    eventId: 'cancel-event', expectedRevision: 3, sourceRevision: 3}));
+});
+for (const field of ['buyerUserId', 'storeId', 'purchaseId', 'storeOrderId', 'basketFingerprint', 'couponId']) {
+  test(`LF04-APPLIED rejects foreign lifecycle ${field}`, () => {
+    const event = {...hostUseEvent(), [field]: 'foreign'};
+    assert.throws(() => planStoreCouponUseEvent(hostCouponUse(), event));
+  });
+}
+test('LF04-APPLIED floors once across Store channels and allocates exact paise', () => {
+  const result = evaluateStoreCouponBasket(appliedCampaign({percentage: true, discount: 3333,
+    maximumSavingMinor: 10000}), profile, appliedBasket(), at);
+  assert.equal(result.eligibleSubtotalMinor, 20003);
+  assert.equal(result.savingMinor, 6666);
+  assert.equal(result.name, 'Host Diwali savings');
+  assert.equal(result.allocations.length, 2);
+  assert.equal(result.allocations.reduce((sum, line) => sum + line.savingMinor, 0), 6666);
+  assert.ok(result.allocations.every(line => line.savingMinor <= line.subtotalMinor));
+  const reversed = appliedBasket(); reversed.lines.reverse();
+  assert.deepEqual(evaluateStoreCouponBasket(appliedCampaign({percentage: true, discount: 3333,
+    maximumSavingMinor: 10000}), profile, reversed, at), result);
+});
+test('LF04-APPLIED flat/cap apply once and existing discounted items are excluded', () => {
+  const basket = appliedBasket(); basket.lines[0]!.otherCouponApplied = true;
+  const result = evaluateStoreCouponBasket(appliedCampaign(), profile, basket, at);
+  assert.equal(result.eligibleSubtotalMinor, 10002); assert.equal(result.savingMinor, 1050);
+  assert.deepEqual(result.allocations.map(line => line.lineId), ['line-wholesale']);
+  assert.equal(evaluateStoreCouponBasket(appliedCampaign({percentage: true, discount: 10000,
+    maximumSavingMinor: 300}), profile, appliedBasket(), at).savingMinor, 300);
+});
+test('LF04-APPLIED floors percentage once, not separately per channel or SKU', () => {
+  const basket = appliedBasket(); basket.lines = [basket.lines[0]!, basket.lines[1]!];
+  for (const line of basket.lines) {line.quantity = 1; line.unitPriceMinor = 3;}
+  basket.lines.push({...basket.lines[0]!, lineId: 'line-bulk', channel: 'bulk'});
+  const result = evaluateStoreCouponBasket(appliedCampaign({percentage: true, discount: 3333,
+    maximumSavingMinor: 100, minimumSpendMinor: 0}), profile, basket, at);
+  assert.equal(result.eligibleSubtotalMinor, 9); assert.equal(result.savingMinor, 2);
+  assert.equal(result.allocations.reduce((sum, line) => sum + line.savingMinor, 0), 2);
+  assert.equal(result.allocations.length, 3);
+});
+for (const kind of ['minimum', 'paused', 'expired', 'future', 'revision', 'duplicate', 'fraction', 'overflow', 'extra']) {
+  test(`LF04-APPLIED rejects invalid authoritative context ${kind}`, () => {
+    const basket = appliedBasket(), campaign = appliedCampaign();
+    if (kind === 'minimum') campaign.minimumSpendMinor = 20004;
+    if (kind === 'paused') campaign.active = false;
+    if (kind === 'expired') campaign.endsAt = at;
+    if (kind === 'future') basket.observedAt = until;
+    if (kind === 'revision') basket.couponRevision = 2;
+    if (kind === 'duplicate') basket.lines.push(structuredClone(basket.lines[0]!));
+    if (kind === 'fraction') basket.lines[0]!.unitPriceMinor = 1.5;
+    if (kind === 'overflow') basket.lines[0]!.quantity = Number.MAX_SAFE_INTEGER;
+    if (kind === 'extra') Object.assign(basket, {taxMinor: 0});
+    assert.throws(() => evaluateStoreCouponBasket(campaign, profile, basket, at));
+  });
+}
+test('LF04-APPLIED uses exact intermediates and binds changes without mutating originals', () => {
+  const basket = appliedBasket(); basket.lines = [basket.lines[0]!];
+  basket.lines[0]!.unitPriceMinor = 9000000000000;
+  const original = structuredClone(basket);
+  const result = evaluateStoreCouponBasket(appliedCampaign({percentage: true, discount: 9999,
+    maximumSavingMinor: 9000000000000}), profile, basket, at);
+  assert.equal(result.savingMinor, 8999100000000);
+  assert.deepEqual(basket, original);
+  basket.lines[0]!.offerRevision++;
+  assert.notEqual(evaluateStoreCouponBasket(appliedCampaign({percentage: true, discount: 9999,
+    maximumSavingMinor: 9000000000000}), profile, basket, at).basketFingerprint, result.basketFingerprint);
+});
 for (const percentage of [false, true]) {
   test(`LF04-STORE-COUPON original lifecycle readback and private-public separation ${percentage}`, async () => {
     const repo = new CouponMemory(), subject = storeCouponService(repo, () => repo.now), original = storeCouponBody();

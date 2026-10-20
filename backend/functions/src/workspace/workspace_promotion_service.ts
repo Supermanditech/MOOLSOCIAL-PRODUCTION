@@ -46,6 +46,176 @@ export interface StoreCouponReceipt {fingerprint: string; record: StoreCouponRec
 export interface StoreCouponSnapshot {
   profile: WorkspaceProfileRecord; records: StoreCouponRecord[]; observedAt: string;
 }
+/** Server-resolved basket facts only. Never accept this DTO from a public
+ * client as price, eligibility, tax, payment or final-placement authority. */
+export interface StoreCouponBasket {
+  schemaVersion: 1; realm: PromotionRecord["realm"]; storeId: string; buyerUserId: string;
+  couponRevision: number; sourceId: string; sourceRevision: number;
+  observedAt: string; validUntil: string;
+  lines: {lineId: string; storeId: string; skuId: string; packId: string;
+    offerId: string; offerRevision: number; priceSourceId: string;
+    channel: "retail" | "wholesale" | "bulk"; quantity: number;
+    unitPriceMinor: number; otherCouponApplied: boolean}[];
+}
+export interface StoreCouponEvaluation {
+  schemaVersion: 1; realm: PromotionRecord["realm"]; storeId: string; buyerUserId: string;
+  couponId: string; couponRevision: number; name: string;
+  basketSourceId: string; basketSourceRevision: number; basketFingerprint: string;
+  eligibleSubtotalMinor: number; savingMinor: number;
+  allocations: {lineId: string; skuId: string; packId: string; offerId: string;
+    offerRevision: number; subtotalMinor: number; savingMinor: number}[];
+}
+export interface StoreCouponUse {
+  schemaVersion: 1; realm: PromotionRecord["realm"]; storeId: string; buyerUserId: string;
+  couponId: string; couponRevision: number; purchaseId: string; storeOrderId: string;
+  basketFingerprint: string; savingMinor: number; revision: number;
+  state: "held" | "consumed" | "released"; heldAt: string; holdUntil: string;
+  lifecycleSourceId: string; lastSourceRevision: number; lastObservedAt: string; fulfilmentStarted: boolean;
+}
+/** Internal verified lifecycle source, never a public callback/request body. */
+export interface StoreCouponUseEvent {
+  eventId: string; sourceId: string; sourceRevision: number; observedAt: string;
+  realm: PromotionRecord["realm"]; storeId: string; buyerUserId: string;
+  couponId: string; couponRevision: number; purchaseId: string; storeOrderId: string;
+  basketFingerprint: string; expectedRevision: number;
+  outcome: "payment_confirmed" | "payment_failed" | "payment_expired" |
+    "cancelled_before_fulfilment" | "fulfilment_started" | "completed_order_refunded";
+}
+export interface StoreCouponUseReceipt {
+  eventId: string; fingerprint: string; record: StoreCouponUse;
+}
+
+/** Atomic repository must read current use + exact event receipt and persist
+ * both together with aggregate/customer usage. Does not call payment or Stock. */
+export function planStoreCouponUseEvent(current: StoreCouponUse, event: StoreCouponUseEvent,
+  priorReceipt?: StoreCouponUseReceipt): StoreCouponUseReceipt {
+  const row = exact(current, ["schemaVersion", "realm", "storeId", "buyerUserId", "couponId", "couponRevision",
+    "purchaseId", "storeOrderId", "basketFingerprint", "savingMinor", "revision", "state", "heldAt", "holdUntil",
+    "lifecycleSourceId", "lastSourceRevision", "lastObservedAt", "fulfilmentStarted"]);
+  const command = exact(event, ["eventId", "sourceId", "sourceRevision", "observedAt", "realm", "storeId", "buyerUserId",
+    "couponId", "couponRevision", "purchaseId", "storeOrderId", "basketFingerprint", "expectedRevision", "outcome"]);
+  if (row.schemaVersion !== 1 || !["evaluation", "production"].includes(row.realm as string) ||
+      !["held", "consumed", "released"].includes(row.state as string)) fail();
+  for (const key of ["storeId", "buyerUserId", "couponId", "purchaseId", "storeOrderId"]) {
+    id(row[key]); if (command[key] !== row[key]) fail("conflict", 409);
+  }
+  if (command.realm !== row.realm || integer(command.couponRevision, 1) !== integer(row.couponRevision, 1) ||
+      typeof row.basketFingerprint !== "string" || !/^[A-F0-9]{64}$/u.test(row.basketFingerprint) ||
+      command.basketFingerprint !== row.basketFingerprint) fail("conflict", 409);
+  integer(row.savingMinor, 1, Number.MAX_SAFE_INTEGER);
+  const revision = integer(row.revision, 1), expectedRevision = integer(command.expectedRevision, 1);
+  id(command.eventId); id(command.sourceId); integer(command.sourceRevision, 1);
+  id(row.lifecycleSourceId); integer(row.lastSourceRevision, 0);
+  if (command.sourceId !== row.lifecycleSourceId || typeof row.fulfilmentStarted !== "boolean" ||
+      row.fulfilmentStarted && row.state !== "consumed") fail("conflict", 409);
+  const observedAt = time(command.observedAt), heldAt = time(row.heldAt), holdUntil = time(row.holdUntil);
+  const lastObservedAt = time(row.lastObservedAt);
+  if (lastObservedAt < heldAt) fail();
+  if (heldAt >= holdUntil || observedAt < heldAt || !["payment_confirmed", "payment_failed", "payment_expired",
+      "cancelled_before_fulfilment", "fulfilment_started", "completed_order_refunded"].includes(command.outcome as string)) fail();
+  const fingerprint = cataloguePayloadHash({operation: "storeCouponUseEventV1", ...event});
+  if (priorReceipt) {
+    exact(priorReceipt, ["eventId", "fingerprint", "record"]);
+    const retained = exact(priorReceipt.record, Object.keys(row));
+    const outcomeState = event.outcome === "payment_confirmed" || event.outcome === "completed_order_refunded" || event.outcome === "fulfilment_started"
+      ? "consumed" : "released";
+    for (const key of ["schemaVersion", "realm", "storeId", "buyerUserId", "couponId", "couponRevision",
+      "purchaseId", "storeOrderId", "basketFingerprint", "savingMinor", "heldAt", "holdUntil", "lifecycleSourceId"]) {
+      if (retained[key] !== row[key]) fail("conflict", 409);
+    }
+    if (priorReceipt.eventId !== event.eventId || priorReceipt.fingerprint !== fingerprint ||
+        retained.revision !== expectedRevision + 1 || retained.state !== outcomeState ||
+        retained.lastSourceRevision !== event.sourceRevision || retained.lastObservedAt !== event.observedAt ||
+        typeof retained.fulfilmentStarted !== "boolean" ||
+        event.outcome === "payment_confirmed" && retained.fulfilmentStarted !== false ||
+        (event.outcome === "completed_order_refunded" || event.outcome === "fulfilment_started") && retained.fulfilmentStarted !== true ||
+        retained.state !== "consumed" && retained.fulfilmentStarted !== false ||
+        revision < (retained.revision as number)) fail("conflict", 409);
+    return structuredClone(priorReceipt);
+  }
+  if (expectedRevision !== revision || revision >= 1_000_000_000) fail("conflict", 409);
+  if (event.sourceRevision <= current.lastSourceRevision || observedAt < lastObservedAt) fail("conflict", 409);
+  let state = current.state;
+  let fulfilmentStarted = current.fulfilmentStarted;
+  switch (event.outcome) {
+    case "payment_confirmed":
+      if (state !== "held") fail("conflict", 409);
+      state = "consumed"; break;
+    case "payment_failed": case "payment_expired":
+      if (state !== "held" || event.outcome === "payment_expired" && observedAt < holdUntil) fail("conflict", 409);
+      state = "released"; break;
+    case "cancelled_before_fulfilment":
+      if (state === "released" || fulfilmentStarted) fail("conflict", 409);
+      state = "released"; break;
+    case "fulfilment_started": case "completed_order_refunded":
+      if (state !== "consumed") fail("conflict", 409);
+      fulfilmentStarted = true;
+      // Approved MVP: a completed-order refund never restores coupon usage.
+      break;
+  }
+  return {eventId: event.eventId, fingerprint, record: {...structuredClone(current), state, revision: revision + 1,
+    lifecycleSourceId: event.sourceId, lastSourceRevision: event.sourceRevision, lastObservedAt: observedAt, fulfilmentStarted}};
+}
+
+/** Pure calculation, not a use/hold/redemption or an authoritative quote.
+ * Trusted caller must resolve prices/tiers/revisions and usage eligibility.
+ * Floor once per Store, then apportion exact paise in stable line-ID order. */
+export function evaluateStoreCouponBasket(rawCoupon: StoreCouponRecord,
+  profile: WorkspaceProfileRecord | undefined, rawBasket: StoreCouponBasket,
+  evaluatedAt: string): StoreCouponEvaluation {
+  const now = time(evaluatedAt), row = exact(rawBasket, ["schemaVersion", "realm", "storeId", "buyerUserId",
+    "couponRevision", "sourceId", "sourceRevision", "observedAt", "validUntil", "lines"]);
+  if (row.schemaVersion !== 1 || !["evaluation", "production"].includes(row.realm as string)) fail();
+  const realm = row.realm as PromotionRecord["realm"], storeId = id(row.storeId), buyerUserId = id(row.buyerUserId);
+  owner(profile, storeId);
+  const coupon = couponRecord(rawCoupon, realm, storeId);
+  const revision = integer(row.couponRevision, 1), sourceId = id(row.sourceId), sourceRevision = integer(row.sourceRevision, 1);
+  const observedAt = time(row.observedAt), validUntil = time(row.validUntil);
+  if (revision !== coupon.revision || !coupon.active || coupon.observedAt > now ||
+      coupon.startsAt > now || coupon.endsAt <= now || observedAt > now ||
+      observedAt >= validUntil || validUntil <= now || !Array.isArray(row.lines) ||
+      row.lines.length === 0 || row.lines.length > 500) fail("invalid_state", 409);
+  const seen = new Set<string>();
+  const lines = row.lines.map(raw => {
+    const line = exact(raw, ["lineId", "storeId", "skuId", "packId", "offerId", "offerRevision",
+      "priceSourceId", "channel", "quantity", "unitPriceMinor", "otherCouponApplied"]);
+    const lineId = id(line.lineId);
+    if (seen.has(lineId) || !["retail", "wholesale", "bulk"].includes(line.channel as string) ||
+        typeof line.otherCouponApplied !== "boolean") fail();
+    seen.add(lineId);
+    const quantity = integer(line.quantity, 1), unitPriceMinor = integer(line.unitPriceMinor, 0, 9_000_000_000_000);
+    const subtotal = BigInt(quantity) * BigInt(unitPriceMinor);
+    if (subtotal > BigInt(Number.MAX_SAFE_INTEGER)) fail();
+    return {lineId, storeId: id(line.storeId), skuId: id(line.skuId), packId: id(line.packId),
+      offerId: id(line.offerId), offerRevision: integer(line.offerRevision, 1), priceSourceId: id(line.priceSourceId),
+      channel: line.channel, quantity, unitPriceMinor, otherCouponApplied: line.otherCouponApplied,
+      subtotalMinor: Number(subtotal)};
+  }).sort((a, b) => a.lineId < b.lineId ? -1 : a.lineId > b.lineId ? 1 : 0);
+  const eligible = lines.filter(line => line.storeId === storeId && !line.otherCouponApplied && line.subtotalMinor > 0);
+  const subtotal = eligible.reduce((sum, line) => sum + BigInt(line.subtotalMinor), 0n);
+  if (subtotal <= 0n || subtotal > BigInt(Number.MAX_SAFE_INTEGER) || subtotal < BigInt(coupon.minimumSpendMinor)) {
+    fail("invalid_state", 409);
+  }
+  const calculated = coupon.percentage ? subtotal * BigInt(coupon.discount) / 10000n : BigInt(coupon.discount);
+  const cap = BigInt(coupon.maximumSavingMinor);
+  const saving = calculated < cap ? calculated : cap;
+  const bounded = saving < subtotal ? saving : subtotal;
+  if (bounded <= 0n) fail("invalid_state", 409);
+  let cumulative = 0n, allocated = 0n;
+  const allocations = eligible.map(line => {
+    cumulative += BigInt(line.subtotalMinor);
+    const next = cumulative * bounded / subtotal, savingMinor = Number(next - allocated);
+    allocated = next;
+    return {lineId: line.lineId, skuId: line.skuId, packId: line.packId, offerId: line.offerId,
+      offerRevision: line.offerRevision, subtotalMinor: line.subtotalMinor, savingMinor};
+  });
+  return {schemaVersion: 1, realm, storeId, buyerUserId, couponId: coupon.couponId,
+    couponRevision: coupon.revision, name: coupon.name, basketSourceId: sourceId,
+    basketSourceRevision: sourceRevision,
+    basketFingerprint: cataloguePayloadHash({operation: "storeCouponBasketV1", realm, storeId, buyerUserId,
+      sourceId, sourceRevision, observedAt, validUntil, coupon, lines: lines.filter(line => line.storeId === storeId)}),
+    eligibleSubtotalMinor: Number(subtotal), savingMinor: Number(bounded), allocations};
+}
 export interface PromotionRepository {
   readonly realm: PromotionRecord["realm"];
   store(storeId: string): Promise<WorkspaceProfileRecord | undefined>;
