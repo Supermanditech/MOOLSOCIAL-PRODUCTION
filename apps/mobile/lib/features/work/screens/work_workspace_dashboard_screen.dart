@@ -21976,7 +21976,8 @@ class _WorkspaceOperationSurface extends StatelessWidget {
                 queryParameters: {'order': movement.referenceId!},
               ).toString(),
             );
-          } else if (movement.referenceKind == WorkspaceStockReferenceKind.manualSupplierReceipt) {
+          } else if (movement.referenceKind == WorkspaceStockReferenceKind.manualSupplierReceipt ||
+              movement.referenceKind == WorkspaceStockReferenceKind.restockGoodsArrival) {
             final scope = session.workspaceSupplierScope, epoch = session.navigationScopeRevision;
             if (session.workspaceReceivingForStockMovement(movement) == null) {
               session.showNotice('Saved receiving details are unavailable. Recover Purchases before opening this receipt.');
@@ -21987,7 +21988,9 @@ class _WorkspaceOperationSurface extends StatelessWidget {
                 final record = session.workspaceSupplierScope == scope && session.navigationScopeRevision == epoch
                   ? session.workspaceReceivingForStockMovement(movement) : null;
                 return Column(children: [ListTile(title: const Text('Receiving details'),
-                  trailing: IconButton(tooltip: 'Close receiving details', onPressed: () => Navigator.pop(dialogContext), icon: const Icon(Icons.close))),
+                  trailing: IconButton(tooltip: 'Close receiving details', onPressed: () {
+                    if (dialogContext.mounted && ModalRoute.of(dialogContext)?.isCurrent == true) Navigator.pop(dialogContext);
+                  }, icon: const Icon(Icons.close))),
                   Expanded(child: ListView(padding: const EdgeInsets.all(16), children: record == null
                     ? [const Text('This receiving record is no longer available in the current Store. Close and reopen it.')]
                     : [Text(record.$1.reference, style: const TextStyle(fontWeight: FontWeight.w600)),

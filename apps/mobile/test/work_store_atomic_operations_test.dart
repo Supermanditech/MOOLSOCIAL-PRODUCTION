@@ -6692,7 +6692,8 @@ void main() {
   }
 
   Future<({WorkSession owner, identity_fixtures.Transport wire, WorkspaceSupplierGoodsReceipt receipt,
-    WorkspaceGoodsArrivalCommand command, _OrderJournalStorage storage})> serverReceivingSession({int linkedUnits = 0}) async {
+    WorkspaceGoodsArrivalCommand command, _OrderJournalStorage storage})> serverReceivingSession({int linkedUnits = 0,
+      WorkspaceReceivingLotDetails? lotDetails}) async {
     final storage = _OrderJournalStorage(), account = _CommandAccountStore();
     final purchases = SecureWorkPurchaseEntryStore(accountScope: () => account.accountScope, storage: storage);
     final stock = SecureWorkInventoryStore(accountScope: () => account.accountScope, storage: storage);
@@ -6744,7 +6745,7 @@ void main() {
       restockOriginal: source, lines: [WorkspaceSupplierGoodsReceiptLine(sourceLineId: line.lineId,
         productId: 'host-local-stock', productLabel: 'HOST saved Stock', purchaseUnit: line.quantityUnit, stockUnit: 'piece',
         unitsPerPack: 10, deliveredMilli: 600, acceptedMilli: 600, damagedMilli: 0, shortMilli: 0, expectedMilli: line.quantityMilli,
-        priorStockUnits: linkedUnits == 0 ? const {} : {'HOST-opening-stock': linkedUnits})]);
+        priorStockUnits: linkedUnits == 0 ? const {} : {'HOST-opening-stock': linkedUnits}, lotDetails: lotDetails)]);
     final owner = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: account,
       purchaseEntryStore: purchases, inventoryStore: stock)..activeWorkspace = _commandStore;
     addTearDown(owner.dispose); owner.bindOriginalPurchaseReader(reader, 'evaluation');
@@ -6784,6 +6785,104 @@ void main() {
     expect(await owner.loadWorkspaceInventory(), isTrue);
     return owner;
   }
+  test('PF08 RESTOCKDETAIL recorded Stock lot link survives restart without a live reader', () async {
+    final lot = WorkspaceReceivingLotDetails(batch: 'HOST-RESTOCK-LOT', manufacturedLabel: '09/2026',
+      expiryLabel: 'Best before 03/2027', mrpMinor: 12550);
+    final fixture = await serverReceivingSession(lotDetails: lot), owner = fixture.owner, receipt = fixture.receipt;
+    expect(await owner.saveWorkspaceGoodsReceiptDraft(receipt, supplierId: fixture.command.supplierId,
+      scope: owner.workspaceSupplierScope!, expectedRevision: 1), isTrue);
+    expect(await owner.confirmWorkspaceSupplierGoodsReceipt(receipt, supplierId: fixture.command.supplierId,
+      scope: owner.workspaceSupplierScope!, expectedPurchaseRevision: owner.workspacePurchaseEntryRevision!,
+      expectedSupplierRevision: 0, requireSavedReview: true), WorkspaceGoodsReceiptSaveResult.saved);
+    final reopened = await reopenServerReceivingSession(fixture.storage, fixture.wire);
+    reopened.bindOriginalPurchaseReader(null, 'evaluation');
+    final movement = reopened.workspaceStockMovements.singleWhere((m) => m.referenceKind == WorkspaceStockReferenceKind.restockGoodsArrival);
+    final before = Map<String, String>.of(fixture.storage.values), calls = fixture.wire.requests.length;
+    final record = reopened.workspaceReceivingForStockMovement(movement);
+    expect(record?.$1.toJson(), receipt.toJson());
+    expect(record?.$2.lotDetails?.toJson(), lot.toJson());
+    expect(record?.$3, reopened.workspaceSuppliers.singleWhere((s) => s.id == fixture.command.supplierId).name);
+    expect(reopened.workspaceCatalogueItems.single.stock, 16);
+    expect(fixture.storage.values, before);
+    expect(fixture.wire.requests.length, calls);
+    for (final change in ['sku', 'quantity', 'store', 'display-reference']) {
+      final altered = WorkspaceStockMovement(id: movement.id,
+        productId: change == 'sku' ? 'foreign-sku' : movement.productId, productLabel: movement.productLabel,
+        kind: movement.kind, quantityDelta: movement.quantityDelta + (change == 'quantity' ? 1 : 0),
+        reason: movement.reason, occurredAt: movement.occurredAt, referenceKind: movement.referenceKind,
+        referenceId: change == 'store' ? '["evaluation","other-store","${receipt.id}","${receipt.lines.single.sourceLineId}"]'
+          : change == 'display-reference' ? receipt.reference : movement.referenceId);
+      expect(reopened.workspaceReceivingForStockMovement(altered), isNull);
+    }
+    reopened.activeWorkspace = null;
+    expect(reopened.workspaceReceivingForStockMovement(movement), isNull);
+  });
+
+  test('PF08 RESTOCKDETAIL fully linked earlier Stock creates no arrival movement', () async {
+    final fixture = await serverReceivingSession(linkedUnits: 6), owner = fixture.owner;
+    expect(await owner.saveWorkspaceGoodsReceiptDraft(fixture.receipt, supplierId: fixture.command.supplierId,
+      scope: owner.workspaceSupplierScope!, expectedRevision: 1), isTrue);
+    expect(await owner.confirmWorkspaceSupplierGoodsReceipt(fixture.receipt, supplierId: fixture.command.supplierId,
+      scope: owner.workspaceSupplierScope!, expectedPurchaseRevision: owner.workspacePurchaseEntryRevision!,
+      expectedSupplierRevision: 0, requireSavedReview: true), WorkspaceGoodsReceiptSaveResult.saved);
+    final reopened = await reopenServerReceivingSession(fixture.storage, fixture.wire);
+    expect(reopened.workspaceCatalogueItems.single.stock, 10);
+    expect(reopened.workspaceStockMovements.where((m) => m.referenceKind == WorkspaceStockReferenceKind.restockGoodsArrival), isEmpty);
+    expect(reopened.workspaceReceivingForStockMovement(reopened.workspaceStockMovements.single), isNull);
+  });
+
+  for (final fault in ['missing-attempt', 'unresolved', 'closed', 'duplicate-attempt', 'missing-projection',
+    'projection-integrity', 'projection-revision', 'wrong-account', 'wrong-store', 'wrong-realm']) {
+    test('PF08 RESTOCKDETAIL refuses $fault retained evidence', () async {
+      // Isolated corruption/recovery fixture; never runtime Store data.
+      final fixture = await serverReceivingSession(), owner = fixture.owner, receipt = fixture.receipt;
+      expect(await owner.saveWorkspaceGoodsReceiptDraft(receipt, supplierId: fixture.command.supplierId,
+        scope: owner.workspaceSupplierScope!, expectedRevision: 1), isTrue);
+      expect(await owner.confirmWorkspaceSupplierGoodsReceipt(receipt, supplierId: fixture.command.supplierId,
+        scope: owner.workspaceSupplierScope!, expectedPurchaseRevision: owner.workspacePurchaseEntryRevision!,
+        expectedSupplierRevision: 0, requireSavedReview: true), WorkspaceGoodsReceiptSaveResult.saved);
+      final movement = owner.workspaceStockMovements.singleWhere((m) => m.referenceKind == WorkspaceStockReferenceKind.restockGoodsArrival);
+      final bookKey = fixture.storage.values.keys.singleWhere((key) => key.contains('workspace.purchase-entry.'));
+      final stockKey = fixture.storage.values.keys.singleWhere((key) => key.contains('workspace.inventory.'));
+      final book = jsonDecode(fixture.storage.values[bookKey]!) as Map<String, dynamic>;
+      final stock = jsonDecode(fixture.storage.values[stockKey]!) as Map<String, dynamic>;
+      final attempts = book['restockGoodsAttempts'] as List;
+      if (fault == 'missing-attempt') book.remove('restockGoodsAttempts');
+      if (fault == 'unresolved' || fault == 'closed') {
+        final attempt = attempts.single as Map;
+        attempt.remove('recorded'); attempt.remove('recordedRevision');
+        if (fault == 'closed') {
+          attempt['closed'] = identity_fixtures.restockClosureResponse(fixture.command);
+          attempt['closedRevision'] = book['revision'];
+        }
+      }
+      if (fault == 'duplicate-attempt') attempts.add(jsonDecode(jsonEncode(attempts.single)));
+      if (fault == 'missing-projection') stock.remove('restockProjections');
+      if (fault.startsWith('projection-')) {
+        final projection = (stock['restockProjections'] as List).single as Map;
+        if (fault == 'projection-integrity') projection['proofIntegrity'] = 'f' * 64;
+        if (fault == 'projection-revision') projection['groupRevision'] += 1;
+      }
+      if (fault == 'wrong-account') book['account'] = 'other-account';
+      if (fault == 'wrong-store') book['store'] = 'other-store';
+      if (fault == 'wrong-realm') book['qa'] = false;
+      fixture.storage.values[bookKey] = jsonEncode(book); fixture.storage.values[stockKey] = jsonEncode(stock);
+      final account = _CommandAccountStore();
+      final reopened = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: account,
+        purchaseEntryStore: SecureWorkPurchaseEntryStore(accountScope: () => account.accountScope, storage: fixture.storage),
+        inventoryStore: SecureWorkInventoryStore(accountScope: () => account.accountScope, storage: fixture.storage))
+        ..activeWorkspace = _commandStore;
+      addTearDown(reopened.dispose);
+      final suppliersLoaded = await reopened.loadWorkspaceSuppliers(), inventoryLoaded = await reopened.loadWorkspaceInventory();
+      final invalidBook = ['duplicate-attempt', 'wrong-account', 'wrong-store', 'wrong-realm'].contains(fault);
+      expect(suppliersLoaded, !invalidBook);
+      expect(inventoryLoaded, !invalidBook && fault != 'missing-projection');
+      final before = Map<String, String>.of(fixture.storage.values), writes = fixture.storage.writes.length;
+      expect(reopened.workspaceReceivingForStockMovement(movement), isNull);
+      expect(fixture.storage.values, before); expect(fixture.storage.writes.length, writes);
+    });
+  }
+
   for (final fault in ['none', 'reply', 'proof-write', 'intent-write', 'intent-reply', 'recorded-winner']) {
     test('LF-RESTOCK-CLOSE connected durable recovery $fault', () async {
       final fixture = await serverReceivingSession(), owner = fixture.owner, receipt = fixture.receipt;

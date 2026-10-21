@@ -17435,7 +17435,7 @@ void main() {
     );
   }
 
-  for (final mode in ['normal', 'large-text', 'unrelated', 'save-failure', 'scoped-reader', 'reader-retires', 'navigation-leave-return', 'review', 'server-confirm', 'server-reply', 'server-large-text', 'server-baseline', 'server-conflict', 'server-partial', 'server-close', 'server-close-reply', 'server-close-recorded', 'server-close-large-text', 'partial', 'completed', 'partial-other-draft', 'completed-other-draft']) {
+  for (final mode in ['normal', 'large-text', 'unrelated', 'save-failure', 'scoped-reader', 'reader-retires', 'navigation-leave-return', 'review', 'server-confirm', 'server-reply', 'server-large-text', 'server-stock-history', 'server-stock-history-large-text', 'server-baseline', 'server-conflict', 'server-partial', 'server-close', 'server-close-reply', 'server-close-recorded', 'server-close-large-text', 'partial', 'completed', 'partial-other-draft', 'completed-other-draft']) {
     testWidgets('LF-RESTOCK-EDITOR original to existing receiving preserves draft and host $mode', (tester) async {
       // Isolated host evaluation; never device data or production authority.
       FlutterSecureStorage.setMockInitialValues({});
@@ -17736,6 +17736,17 @@ void main() {
           await tester.tap(find.text('${product.title} · ${product.pack}').last); await tester.pumpAndSettle();
           await receivingField('work-receive-factor-0'); await tester.enterText(find.byKey(const Key('work-receive-factor-0')), mode == 'server-partial' ? '2' : '1');
           await receivingField('work-receive-delivered-0'); await tester.enterText(find.byKey(const Key('work-receive-delivered-0')), mode == 'server-partial' ? '0.5' : '1');
+          if (mode.startsWith('server-stock-history') || mode == 'server-partial') {
+            await receivingField('work-receive-lot-0');
+            await tester.tap(find.descendant(of: find.byKey(const Key('work-receive-lot-0')),
+              matching: find.text('Batch & pack details · optional'))); await tester.pumpAndSettle();
+            for (final (field, value) in [('batch', 'HOST-RESTOCK-LOT'), ('manufactured', '09/2026'),
+              ('expiry', 'Best before 03/2027'), ('mrp', '125.50')]) {
+              await receivingField('work-receive-$field-0');
+              await tester.enterText(find.byKey(Key('work-receive-$field-0')), value);
+              FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+            }
+          }
           if (mode == 'server-partial') {
             await receivingField('work-receive-arrives-1'); await tester.tap(find.byKey(const Key('work-receive-arrives-1')));
             await tester.pumpAndSettle();
@@ -17804,6 +17815,53 @@ void main() {
             expect(work.workspaceSupplierLedger(supplier.id), isNull);
             expect(wire.requests.where((r) => r['operation'] == 'recordBuyerGoodsArrival'), hasLength(1));
             expect(find.byKey(const Key('work-receive-return-goods')), findsNothing);
+            if (mode.startsWith('server-stock-history')) {
+              final savedReceipt = work.workspaceGoodsReceiptDrafts.single.receipt;
+              final movement = work.workspaceStockMovements.singleWhere((m) =>
+                m.referenceKind == WorkspaceStockReferenceKind.restockGoodsArrival);
+              expect(work.workspaceReceivingForStockMovement(movement)?.$1.toJson(), savedReceipt.toJson());
+              await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
+              await openStoreStockStatement(tester); await tester.pumpAndSettle();
+              final position = find.byKey(Key('work-stock-position-${product.id}'));
+              final statementScroll = find.descendant(of: find.byKey(const Key('work-stock-statement-screen')),
+                matching: find.byType(Scrollable)).first;
+              await tester.scrollUntilVisible(position, 100, scrollable: statementScroll); await tester.pumpAndSettle();
+              await Scrollable.ensureVisible(tester.element(position), alignment: .4); await tester.pumpAndSettle();
+              await tester.tap(position); await tester.pumpAndSettle();
+              final reference = find.byKey(ValueKey('work-stock-reference-${movement.id}'));
+              final historyScroll = find.descendant(of: find.byKey(const Key('work-stock-statement-screen')),
+                matching: find.byType(Scrollable)).first;
+              await tester.scrollUntilVisible(reference, 100, scrollable: historyScroll); await tester.pumpAndSettle();
+              await Scrollable.ensureVisible(tester.element(reference), alignment: .4); await tester.pumpAndSettle();
+              await tester.tap(reference); await tester.pumpAndSettle();
+              expect(find.text('Receiving details'), findsOneWidget);
+              final detailScroll = find.descendant(of: find.byType(Dialog), matching: find.byType(Scrollable)).first;
+              for (final label in ['Recorded from this arrival · private', 'Batch: HOST-RESTOCK-LOT', 'Manufactured: 09/2026',
+                'Expiry / best before: Best before 03/2027', 'Pack MRP ₹125.50']) {
+                final detail = find.text(label);
+                await tester.scrollUntilVisible(detail, 80, scrollable: detailScroll); await tester.pumpAndSettle();
+                await Scrollable.ensureVisible(tester.element(detail), alignment: .4); await tester.pumpAndSettle();
+                expect(detail.hitTestable(), findsOneWidget);
+              }
+              final close = tester.widget<IconButton>(find.byWidgetPredicate((widget) =>
+                widget is IconButton && widget.tooltip == 'Close receiving details')).onPressed!;
+              final dialogContext = tester.element(find.byType(Dialog));
+              final covered = showDialog<void>(context: dialogContext, builder: (_) => const AlertDialog(title: Text('HOST successor')));
+              await tester.pumpAndSettle(); close(); await tester.pumpAndSettle();
+              expect(find.text('HOST successor'), findsOneWidget, reason: 'A covered dialog Close cannot pop the successor.');
+              Navigator.of(tester.element(find.text('HOST successor'))).pop(); await tester.pumpAndSettle(); await covered;
+              final current = work.activeWorkspace;
+              work.activeWorkspace = null; work.activeWorkspace = current; work.notifyListeners(); await tester.pumpAndSettle();
+              expect(find.text('Batch: HOST-RESTOCK-LOT'), findsNothing);
+              expect(find.text('This receiving record is no longer available in the current Store. Close and reopen it.'), findsOneWidget);
+              await tester.tap(find.byTooltip('Close receiving details')); await tester.pumpAndSettle();
+              expect(find.text('Receiving details'), findsNothing);
+              close(); await tester.pumpAndSettle();
+              expect(find.byKey(const Key('work-stock-statement-screen')), findsOneWidget);
+              expect(work.workspaceCatalogueItems.singleWhere((p) => p.id == product.id).stock, before + 1);
+              expect(work.workspaceGoodsReceiptDrafts.single.receipt.toJson(), savedReceipt.toJson());
+              expect(wire.requests.where((r) => r['operation'] == 'recordBuyerGoodsArrival'), hasLength(1));
+            }
             if (mode == 'server-partial') {
               expect(work.workspaceGoodsReceiptDrafts.single.receipt.restockOriginal!.lines, hasLength(2));
               expect(work.workspaceGoodsReceiptDrafts.single.receipt.lines, hasLength(1));
@@ -17814,6 +17872,11 @@ void main() {
               final factor = tester.widget<TextField>(find.byKey(const Key('work-receive-factor-0')));
               expect(factor.controller!.text, '2'); expect(factor.enabled, isFalse);
               await receivingField('work-receive-delivered-0'); await tester.enterText(find.byKey(const Key('work-receive-delivered-0')), '0.5');
+              await receivingField('work-receive-lot-0');
+              await tester.tap(find.descendant(of: find.byKey(const Key('work-receive-lot-0')),
+                matching: find.text('Batch & pack details · optional'))); await tester.pumpAndSettle();
+              await receivingField('work-receive-batch-0');
+              await tester.enterText(find.byKey(const Key('work-receive-batch-0')), 'HOST-RESTOCK-SECOND');
               await receivingField('work-receive-product-1'); await tester.tap(find.byKey(const Key('work-receive-product-1'))); await tester.pumpAndSettle();
               await tester.tap(find.text('${product.title} · ${product.pack}').last); await tester.pumpAndSettle();
               await receivingField('work-receive-factor-1'); await tester.enterText(find.byKey(const Key('work-receive-factor-1')), '1');
@@ -17824,6 +17887,14 @@ void main() {
               await receivingField('work-receive-status'); expect(find.text('Goods recorded'), findsOneWidget);
               expect(work.workspaceCatalogueItems.singleWhere((p) => p.id == product.id).stock, before + 3);
               expect(work.workspaceGoodsReceiptDrafts, hasLength(2));
+              for (final (index, batch) in [(0, 'HOST-RESTOCK-LOT'), (1, 'HOST-RESTOCK-SECOND')]) {
+                final arrival = work.workspaceGoodsReceiptDrafts[index].receipt;
+                final movement = work.workspaceStockMovements.singleWhere((m) =>
+                  m.referenceKind == WorkspaceStockReferenceKind.restockGoodsArrival &&
+                  work.workspaceReceivingForStockMovement(m)?.$1.id == arrival.id &&
+                  work.workspaceReceivingForStockMovement(m)?.$2.sourceLineId == 'line-one');
+                expect(work.workspaceReceivingForStockMovement(movement)?.$2.lotDetails?.batch, batch);
+              }
               expect(find.byKey(const Key('work-receive-next')), findsNothing);
               expect(work.workspaceSupplierLedger(supplier.id), isNull);
               expect(wire.requests.where((r) => r['operation'] == 'recordBuyerGoodsArrival'), hasLength(2));

@@ -8861,11 +8861,43 @@ class WorkSession extends ChangeNotifier {
   ) {
     if (_disposed || workspaceSupplierScope == null || !workspaceSuppliersLoaded ||
         workspaceSupplierRecoveryRequired || workspaceGoodsReceiptRecoveryPending ||
-        movement.referenceKind != WorkspaceStockReferenceKind.manualSupplierReceipt ||
         !workspaceStockMovements.any((saved) => saved.contentIdentity == movement.contentIdentity)) {
       return null;
     }
     try {
+      if (movement.referenceKind == WorkspaceStockReferenceKind.restockGoodsArrival) {
+        final key = _supplierKey;
+        if (key == null || !workspaceInventoryLoaded || workspaceInventoryError != null ||
+            _storeData.inventoryRestockBaselineOwner != key ||
+            _storeData.inventoryRestockConflict != null ||
+            workspaceStockMovements.where((saved) => saved.contentIdentity == movement.contentIdentity).length != 1) {
+          return null;
+        }
+        final link = jsonDecode(movement.referenceId ?? '');
+        if (link is! List || link.length != 4 || link.any((v) => v is! String) ||
+            link[0] != (key.$3 ? 'evaluation' : 'production') || link[1] != key.$2) {
+          return null;
+        }
+        final attempt = _supplierDirectories[key]?.restockGoodsAttempts
+          .where((a) => a.command.receipt.id == link[2]).singleOrNull;
+        final proof = attempt?.recorded?.proof;
+        if (attempt == null || !attempt.valid || attempt.closed != null || proof == null ||
+            proof.command.fingerprint != attempt.command.fingerprint) {
+          return null;
+        }
+        final receipt = attempt.command.receipt, source = receipt.restockOriginal;
+        if (source == null || source.accountScope != key.$1 || source.buyingStoreId != key.$2 || source.realm != link[0]) return null;
+        final projection = _storeData.inventoryRestockProjections.where((p) => p.matches(proof)).singleOrNull;
+        final line = receipt.lines.where((l) => l.sourceLineId == link[3]).singleOrNull;
+        final supplier = workspaceSuppliers.where((s) => s.id == attempt.command.supplierId).singleOrNull;
+        if (projection == null || !projection.valid || line == null || supplier == null ||
+            projection.referenceFor(line) != movement.referenceId ||
+            projection.movementFor(line)?.contentIdentity != movement.contentIdentity) {
+          return null;
+        }
+        return (receipt, line, supplier.name);
+      }
+      if (movement.referenceKind != WorkspaceStockReferenceKind.manualSupplierReceipt) return null;
       final link = jsonDecode(movement.referenceId ?? '');
       if (link is! List || link.length != 2 || link.any((v) => v is! String)) return null;
       final matches = <(WorkspaceSupplierGoodsReceipt, WorkspaceSupplierGoodsReceiptLine, String)>[];
