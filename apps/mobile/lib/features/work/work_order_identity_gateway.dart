@@ -979,7 +979,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
           data['authNamespace'] != 'firebase-default' || data['viewerRole'] != 'buyer' || data['viewerUserId'] != identity.accountUserId ||
           data['coverage'] != 'indexed_recorded_completions' || data['targets'] is! List || (data['targets'] as List).length > 5 ||
           data['nextCursor'] != null && (data['nextCursor'] is! String || (data['nextCursor'] as String).isEmpty ||
-            (data['nextCursor'] as String).length > 512 || data['nextCursor'] == cursor || (data['targets'] as List).isEmpty)) {
+            (data['nextCursor'] as String).length > 512 || data['nextCursor'] == cursor)) {
         throw const FormatException('Invalid feedback target page.');
       }
       final targets = <WorkspaceProductFeedbackTarget>[], ids = <String>{};

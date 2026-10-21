@@ -8077,14 +8077,19 @@ class _ProductReviewSheet extends StatefulWidget {
 class _ProductReviewSheetState extends State<_ProductReviewSheet> {
   late final Object? _feedbackContext;
   late final String? _owner;
+  late final AuthenticatedWorkspaceOrderIdentityGateway? _reader;
+  late final String _realm;
   final _selections = <String, int>{};
-  bool get _current => _feedbackContext == widget.session.productFeedbackContext &&
-    _owner == widget.session.reviewDraftOwnerScope;
+  bool get _current => mounted && _feedbackContext == widget.session.productFeedbackContext &&
+    _owner == widget.session.reviewDraftOwnerScope && identical(_reader, widget.session.purchaseReader) &&
+    _realm == widget.session.purchaseRealm && _reader?.isCurrent == true;
   @override
   void initState() {
     super.initState();
     _feedbackContext = widget.session.productFeedbackContext;
     _owner = widget.session.reviewDraftOwnerScope;
+    _reader = widget.session.purchaseReader;
+    _realm = widget.session.purchaseRealm;
     scheduleMicrotask(() {if (mounted && _current) {unawaited(widget.session.loadPrivateStarsFor(widget.reference, widget.line));}});
   }
 
@@ -8094,7 +8099,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
     if (!_current) {
       return Padding(padding: const EdgeInsets.all(16),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Text('Your account changed. Reopen your purchase to rate it.'),
+        const Text('Purchase access changed. Reopen your purchase to rate it.'),
         TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
       ]));
     }
@@ -8138,7 +8143,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                         tooltip: '$value ${value == 1 ? 'star' : 'stars'}',
                         constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                         onPressed: !session.canSavePrivateStars(target.id) ? null
-                          : () => setState(() => _selections[target.id] = value),
+                          : () { if (mounted && _current) setState(() => _selections[target.id] = value); },
                         icon: Icon(value <= selected ? Icons.star_rounded : Icons.star_border_rounded,
                           color: BuyV2Colors.orange))),
                   ]),
@@ -8146,22 +8151,24 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                     Text('Original ${pending.stars}-star save needs checking. Changing the rating is locked until it is resolved.',
                       style: context.buyBody),
                     Wrap(spacing: 8, runSpacing: 4, children: [
-                      OutlinedButton(onPressed: busy ? null : () => session.checkPrivateStars(target.id),
+                      OutlinedButton(onPressed: busy ? null : () { if (_current) unawaited(session.checkPrivateStars(target.id)); },
                         child: const Text('Check original save')),
-                      TextButton(onPressed: busy ? null : () => session.checkPrivateStars(target.id, retryOriginal: true),
+                      TextButton(onPressed: busy ? null : () { if (_current) unawaited(session.checkPrivateStars(target.id, retryOriginal: true)); },
                         child: Text('Retry original ${pending.stars} stars')),
                     ]),
                   ] else
                     FilledButton.icon(key: const ValueKey('buy-submit-private-stars'),
                       style: BuyV2ActionStyle.button(),
                       onPressed: !session.canSavePrivateStars(target.id) || selected == 0 ? null
-                        : () => session.savePrivateStars(target.id, selected),
+                        : () { if (_current) unawaited(session.savePrivateStars(target.id, selected)); },
                       icon: const Icon(Icons.check_rounded, size: 18),
                       label: const Text('Send rating')),
                 ],
                 Wrap(spacing: 8, runSpacing: 4, children: [
                   TextButton.icon(key: const ValueKey('buy-private-stars-refresh'),
-                    style: BuyV2ActionStyle.button(), onPressed: busy ? null : () => session.loadPrivateStarsFor(widget.reference, widget.line),
+                    style: BuyV2ActionStyle.button(), onPressed: busy ? null : () {
+                      if (_current) unawaited(session.loadPrivateStarsFor(widget.reference, widget.line));
+                    },
                     icon: const Icon(Icons.refresh), label: Text(session.privateStarsLoading ? 'Checking purchase…' : 'Refresh rating')),
                 ]),
               ],

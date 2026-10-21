@@ -7094,8 +7094,9 @@ class BuyV2Session extends ChangeNotifier {
   Object? _privateStarsScope, _privateStarsLoad, _privateStarsOperation;
   Completer<void>? _privateStarsSettlement;
   String? privateStarsMessage, _privateStarsCursor;
-  bool get privateStarsAvailable => !_collectionDisposed && !isStoreProcurement &&
+  bool get privateStarsAvailable => !_collectionDisposed && procurementScopeCurrent &&
     purchaseReader?.isCurrent == true && customerStateStore?.ownerScope != null &&
+    (!isStoreProcurement || purchaseReader!.accountUserId == procurementContext?.accountId) &&
     const ['evaluation', 'production'].contains(purchaseRealm);
   bool get privateStarsLoading => _privateStarsLoad != null;
   bool get privateStarsBusy => _privateStarsOperation != null;
@@ -7139,6 +7140,25 @@ class BuyV2Session extends ChangeNotifier {
     _productReportJournalLoadedOwner == customerStateStore?.ownerScope &&
     _privateStarsSaved.containsKey(targetId) && !_productStarAttempts.containsKey(targetId);
 
+  Future<bool> _privateStarsStoreOriginalCurrent(WorkspacePurchaseReference reference, {
+    required String orderLineId, required String productLabel, required BuyV2PublicListingIdentity? listing,
+  }) async {
+    if (!isStoreProcurement) return true;
+    final reader = purchaseReader, realm = purchaseRealm, context = procurementContext;
+    if (!privateStarsAvailable || reader == null || context == null || listing == null) return false;
+    final original = await reader.readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+      realm: realm, purchaseId: reference.purchaseId, buyingStoreId: context.storeId);
+    if (!privateStarsAvailable || !identical(purchaseReader, reader) || purchaseRealm != realm ||
+        procurementContext?.customerStateOwnerScope != context.customerStateOwnerScope ||
+        original == null || original.sourceRevision != reference.sourceRevision) {
+      return false;
+    }
+    final orders = original.orders.where((order) => order.storeId == reference.storeId &&
+      order.orderId == reference.orderId && order.originalFingerprint == reference.originalFingerprint).toList(growable: false);
+    return orders.length == 1 && orders.single.lines.any((line) => line.lineId == orderLineId &&
+      line.name == productLabel && line.publicListing == listing);
+  }
+
   Future<bool> loadPrivateStarsFor(WorkspacePurchaseReference reference, WorkspacePurchasedSkuLine line) async {
     final scope = _preparePrivateStars();
     if (scope == null || privateStarsLoading || privateStarsBusy) return false;
@@ -7150,6 +7170,11 @@ class BuyV2Session extends ChangeNotifier {
     privateStarsMessage = null; notifyListeners();
     try {
       if (!current()) return false;
+      if (!await _privateStarsStoreOriginalCurrent(reference, orderLineId: line.lineId,
+          productLabel: line.name, listing: line.publicListing) || !current()) {
+        if (current()) privateStarsMessage = 'This purchased item could not be checked for your Store. Any original rating save is kept.';
+        return false;
+      }
       final gateway = AuthenticatedWorkspaceOrderOperationsGateway(reader);
       final target = await gateway.readProductFeedbackTarget(realm: realm, reference: reference, line: line);
       if (!current()) return false;
@@ -7174,6 +7199,9 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> loadPrivateStars({bool more = false}) async {
+    // Account-wide discovery is personal. Store ratings use completed original
+    // lines and the exact buying-Store lookup above.
+    if (isStoreProcurement) return false;
     final scope = _preparePrivateStars();
     if (scope == null || privateStarsLoading || privateStarsBusy || more && _privateStarsCursor == null) return false;
     final reader = purchaseReader!, realm = purchaseRealm, token = Object(); _privateStarsLoad = token;
@@ -7256,6 +7284,12 @@ class BuyV2Session extends ChangeNotifier {
           retainOriginal(); if (current()) privateStarsMessage = 'Your rating was kept for recovery but was not sent. Check the original attempt.';
           return false;
         }
+      }
+      if (!await _privateStarsStoreOriginalCurrent(target.reference, orderLineId: target.orderLineId,
+          productLabel: target.productLabel, listing: target.purchasedListing) || !current()) {
+        retainOriginal();
+        if (current()) privateStarsMessage = 'This original purchase could not be checked for your Store. Your rating attempt is kept.';
+        return false;
       }
       final result = await gateway.submitProductStars(target: target, stars: attempt.stars,
         expectedRevision: attempt.expectedRevision, operationId: attempt.operationId, reconcile: reconcile);

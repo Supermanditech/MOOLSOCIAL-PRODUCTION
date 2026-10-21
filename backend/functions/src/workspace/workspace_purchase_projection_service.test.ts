@@ -1151,14 +1151,26 @@ test('LF-PURCHASER persisted Store originals separate history and enforce curren
     await ops.recordCompletion('purchaser-completion');
     const targetScope = {...tuple, originalFingerprint: order.originalFingerprint, sourceRevision: buyer.sourceRevision,
       orderLineId: order.original.lines[0]!.lineId};
-    const target = (await ops.readBuyerProductFeedbackTarget(input.buyerUserId, targetScope)).target;
+    const targetRead = await ops.readBuyerProductFeedbackTarget(input.buyerUserId, targetScope), target = targetRead.target;
     assert.deepEqual((await ops.listBuyerProductFeedbackTargets(input.buyerUserId, {limit: 5, cursor: null})).targets, [],
       'Store purchase targets do not appear in personal discovery.');
+    const emptyPersonalPage = await ops.listBuyerProductFeedbackTargets(input.buyerUserId, {limit: 1, cursor: null});
+    assert.deepEqual(emptyPersonalPage.targets, []); assert.equal(typeof emptyPersonalPage.nextCursor, 'string');
+    const starsRead = async () => ({schemaVersion: 1, realm: 'evaluation', authNamespace: 'firebase-default',
+      viewerRole: 'buyer', viewerUserId: input.buyerUserId, targetId: target.id,
+      rating: await ops.readBuyerProductStars(input.buyerUserId, {targetId: target.id})});
+    const beforeStars = await starsRead(); assert.equal(beforeStars.rating, null);
     const stars = {targetId: target.id, expectedRevision: 0, operationId: 'purchaser-stars', stars: 4};
-    await ops.submitProductStars(input.buyerUserId, stars);
+    const savedStars = await ops.submitProductStars(input.buyerUserId, stars);
+    const recoveredStars = await ops.submitProductStars(input.buyerUserId, stars, true);
+    assert.deepEqual(recoveredStars, savedStars);
     assert.equal((await ops.readBuyerProductStars(input.buyerUserId, {targetId: target.id}))!.stars, 4);
     await db.collection('workspaceProfiles').doc(profile.caseId).update({shopEnabled: false, name: 'Current renamed Store'});
     assert.deepEqual(await reader.readBuyer(input.buyerUserId, selector), buyer, 'Historical facts survive paused sales and renaming.');
+    assert.deepEqual(await ops.readBuyerProductFeedbackTarget(input.buyerUserId, targetScope), targetRead);
+    if (process.env.LF_STORE_FEEDBACK_CAPTURE === 'true') console.log('LF_STORE_PURCHASE_FEEDBACK_CAPTURE=' + JSON.stringify({
+      buyer, storeRefs, completion: await ops.readCompletion(input.buyerUserId, 'buyer', tuple),
+      targetRead, beforeStars, afterStars: await starsRead(), savedStars, recoveredStars, command: stars, emptyPersonalPage}));
     input.purchaser.purpose = 'buyDirect';
     await assert.rejects(writer.materialize('purchaser-source'), rejectsCode('conflict'));
     input.purchaser.purpose = 'restock';
