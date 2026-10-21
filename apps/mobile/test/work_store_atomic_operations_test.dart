@@ -4825,6 +4825,26 @@ void main() {
       delivered: delivered, accepted: delivered).toJson(),
     'restockOriginal': restockOriginalFixture(),
   };
+  for (final fault in ['none', 'account', 'store', 'group', 'unit', 'quantity', 'missing', 'extra']) {
+    test('LF-RESTOCK-INPUT retains exact ordered source $fault', () {
+      final source = restockOriginalFixture();
+      final original = WorkspaceRestockPurchaseOriginal.fromJson(source);
+      final rows = <Object?>['Delivery input', '2026-10-21',
+        ['line-A', '', true, '1 kg', '', '12', '', '0', '0', <String, String>{}]];
+      if (fault == 'account') source['accountScope'] = 'account-B';
+      if (fault == 'store') source['buyingStoreId'] = 'store-B';
+      if (fault == 'unit') (rows[2] as List)[3] = 'litre';
+      if (fault == 'quantity') (rows[2] as List)[5] = '13';
+      if (fault == 'missing') rows.removeLast();
+      if (fault == 'extra') rows.add(['extra-line', '', false, '1 kg', '', '1', '', '0', '0', <String, String>{}]);
+      final draft = WorkspaceLedgerFormDraft(key: (account: 'account-A', store: 'store-A', customer: 'supplier-A',
+        invoice: 'receiving-input', order: 'receiving-input:qa', kind: 'supplierReceivingInput', ledgerRevision: 1),
+        revision: 1, fields: {'arrivalId': 'arrival-A', 'groupId': fault == 'group' ? 'manual-group' : original.deliveryGroupId,
+          'input': jsonEncode(rows), 'restockOriginal': jsonEncode(source)});
+      expect(draft.valid, fault == 'none');
+      if (fault == 'none') expect(WorkspaceLedgerFormDraft.fromJson(draft.toJson())?.fields, draft.fields);
+    });
+  }
   test('LF-RESTOCK-RECEIVING canonical original persists without rewriting manual receipts', () {
     final raw = restockReceiptFixture(), restored = WorkspaceSupplierGoodsReceipt.fromJson(raw);
     expect(restored.valid, isTrue); expect(restored.toJson(), raw);

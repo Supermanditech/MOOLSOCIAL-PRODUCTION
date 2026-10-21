@@ -7440,7 +7440,7 @@ class WorkspaceLedgerFormDraft {
                     : key.kind == 'supplierAllocation'
                     ? const ['amount', 'sourceKind', 'sourceId', 'attempt']
                     : key.kind == 'supplierReceivingInput'
-                    ? const ['arrivalId', 'groupId', 'input']
+                    ? const ['arrivalId', 'groupId', 'input', 'restockOriginal']
                     : key.kind == 'supplierGoodsReturn'
                     ? const ['reference', 'reason', 'returnedOn', 'items', 'attempt']
                     : key.kind == 'supplierCredit'
@@ -7457,7 +7457,9 @@ class WorkspaceLedgerFormDraft {
                 .contains(field),
       ) &&
       fields.entries.every((entry) =>
-          entry.key == 'input' && key.kind == 'supplierReceivingInput'
+          entry.key == 'restockOriginal' && key.kind == 'supplierReceivingInput'
+              ? entry.value.length <= 65536 && _validRestockReceivingInput()
+              : entry.key == 'input' && key.kind == 'supplierReceivingInput'
               ? entry.value.length <= 262144 && _validReceivingInput(entry.value)
               : entry.key == 'items' && key.kind == 'return'
               ? _validReturnItems(entry.value)
@@ -7484,7 +7486,7 @@ class WorkspaceLedgerFormDraft {
       (key.kind != 'supplierReceivingInput' ||
         (key.ledgerRevision == 1 && key.invoice == 'receiving-input' &&
           const ['receiving-input:qa', 'receiving-input:live'].contains(key.order) &&
-          (fields.isEmpty || (fields.length == 3 &&
+          (fields.isEmpty || (fields.length == (fields.containsKey('restockOriginal') ? 4 : 3) &&
             fields['arrivalId']?.trim().isNotEmpty == true &&
             fields['groupId']?.trim().isNotEmpty == true && fields.containsKey('input'))))) &&
       (key.kind != 'supplierRefund' || RegExp(
@@ -7498,6 +7500,33 @@ class WorkspaceLedgerFormDraft {
 
   // Editable input, not a goods receipt or an authority to post Stock. Keep
   // incomplete quantities as text; validate their meaning only during Review.
+  bool _validRestockReceivingInput() {
+    try {
+      final source = WorkspaceRestockPurchaseOriginal.fromJson(jsonDecode(fields['restockOriginal']!));
+      if (source.accountScope != key.account || source.buyingStoreId != key.store ||
+          source.deliveryGroupId != fields['groupId']) {
+        return false;
+      }
+      final rows = jsonDecode(fields['input']!) as List;
+      if (!_validReceivingInput(fields['input']!) || rows.length != source.lines.length + 2) return false;
+      for (final row in rows.skip(2).cast<List>()) {
+        final ordered = source.lines[row[0]];
+        final quantity = row[5] as String;
+        if (ordered == null || row[3] != ordered.quantityUnit ||
+            !RegExp(r'^\d+(\.\d{1,3})?$').hasMatch(quantity)) {
+          return false;
+        }
+        final parts = quantity.split('.');
+        final whole = int.tryParse(parts.first);
+        if (whole == null || whole > 2147483 ||
+            whole * 1000 + int.parse(parts.length == 1 ? '0' : parts.last.padRight(3, '0')) != ordered.quantityMilli) {
+          return false;
+        }
+      }
+      return true;
+    } on Object { return false; }
+  }
+
   static bool _validReceivingInput(String text) {
     try {
       final value = jsonDecode(text);

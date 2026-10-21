@@ -17,6 +17,7 @@ import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_session.dart';
 import '../../features/journey01/journey_services.dart';
+import '../../features/work/work_order_identity_gateway.dart';
 import '../profile/global_profile_panel_v2.dart';
 import '../universal/mool_global_navigation_v2.dart';
 import 'buy_v2_chat_route_adapter.dart';
@@ -309,6 +310,8 @@ class BuyV2Screen extends StatefulWidget {
     this.onOpenMainAction,
     this.onOpenChat,
     this.onDestinationChanged,
+    this.onReceivePurchasedOrder,
+    this.onEmbeddedSystemBack,
     this.invoiceDownloader = saveBuyV2InvoiceToDevice,
     this.paymentHandoff,
     this.liveDeliveryMapBuilder,
@@ -339,6 +342,9 @@ class BuyV2Screen extends StatefulWidget {
   final ValueChanged<PersonalMoolActionSpec>? onOpenMainAction;
   final VoidCallback? onOpenChat;
   final ValueChanged<BuyV2Destination>? onDestinationChanged;
+  final void Function(WorkspacePurchaseReference, WorkspacePurchaseOrder)? onReceivePurchasedOrder;
+  /// A Store editor can cover Buy while keeping its basket/navigation mounted.
+  final VoidCallback? onEmbeddedSystemBack;
   final BuyV2InvoiceDownloader? invoiceDownloader;
   final BuyV2PaymentHandoff? paymentHandoff;
 
@@ -1246,6 +1252,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) {
+            if (widget.embeddedStore && widget.onEmbeddedSystemBack != null) {
+              widget.onEmbeddedSystemBack!();
+              return;
+            }
             HapticFeedback.selectionClick();
             if (_moolNavigationController.isOpen) {
               unawaited(_moolNavigationController.close());
@@ -2921,7 +2931,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     child: PopScope<Object?>(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) onReturn();
+        if (!didPop) {
+          if (widget.embeddedStore && widget.onEmbeddedSystemBack != null) {
+            widget.onEmbeddedSystemBack!();
+          } else {
+            onReturn();
+          }
+        }
       },
       child: _BuySystemBars(
         child: Scaffold(
@@ -3019,6 +3035,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         session.view == BuyV2View.catalogue) {
       return BuyV2OrdersView(
         session: session,
+        onReceivePurchasedOrder: widget.embeddedStore ? widget.onReceivePurchasedOrder : null,
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
         browseProducts: session.visibleProducts.isEmpty

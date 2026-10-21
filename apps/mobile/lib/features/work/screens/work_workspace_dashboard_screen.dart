@@ -1974,6 +1974,8 @@ class _WorkWorkspaceDashboardScreenState
               }
               final surface = _StoreProcurementSurface(
                 session: _activeProcurement,
+                workSession: session,
+                receivingKey: _receivingKey,
                 accountIdentity: widget.accountIdentity,
                 accountAuthenticated: widget.accountAuthenticated,
                 ready: _procurementReady,
@@ -2710,6 +2712,11 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   Future<void> _leaveProcurement() async {
+    final receiving = _receivingKey.currentState;
+    if (receiving != null) {
+      await receiving._close();
+      return;
+    }
     if (_leavingProcurement) return;
     _leavingProcurement = true;
     const returnError =
@@ -3455,6 +3462,8 @@ enum _WorkspaceControlView {
 class _StoreProcurementSurface extends StatefulWidget {
   const _StoreProcurementSurface({
     required this.session,
+    required this.workSession,
+    required this.receivingKey,
     required this.accountIdentity,
     required this.accountAuthenticated,
     required this.ready,
@@ -3464,6 +3473,8 @@ class _StoreProcurementSurface extends StatefulWidget {
     required this.onDestinationChanged,
   });
   final BuyV2Session session;
+  final WorkSession workSession;
+  final GlobalKey<_StoreReceiveGoodsState> receivingKey;
   final AuthenticatedAccountIdentity? accountIdentity;
   final bool accountAuthenticated, ready;
   final String? productId, orderId;
@@ -3476,6 +3487,52 @@ class _StoreProcurementSurface extends StatefulWidget {
 }
 
 class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
+  WorkspaceRestockPurchaseOriginal? _receivingOriginal;
+  WorkspacePurchaseOrder? _receivingOrder;
+  bool _openingReceiving = false;
+
+  Future<void> _receiveOriginal(WorkspacePurchaseReference reference, WorkspacePurchaseOrder original) async {
+    final work = widget.workSession, buy = widget.session;
+    final scope = work.workspaceSupplierScope, reader = work.originalPurchaseReader, realm = work.originalPurchaseRealm;
+    final buyerReader = buy.purchaseReader;
+    final visit = buy.navigationMotionSequence;
+    bool current() => mounted && identical(widget.workSession, work) && identical(widget.session, buy) &&
+      scope != null && scope == work.workspaceSupplierScope && reader != null && reader.isCurrent &&
+      identical(work.originalPurchaseReader, reader) && work.originalPurchaseRealm == realm &&
+      buyerReader != null && buyerReader.isCurrent && identical(buy.purchaseReader, buyerReader) &&
+      buyerReader.accountUserId == scope.$1 && buy.purchaseRealm == realm &&
+      buy.isStoreProcurement && buy.procurementScopeCurrent && buy.navigationMotionSequence == visit &&
+      buy.destination == BuyV2Destination.orders && buy.view == BuyV2View.catalogue &&
+      buy.procurementContext?.accountId == scope.$1 &&
+      buy.procurementContext?.storeId == scope.$2 && reader.accountUserId == scope.$1;
+    if (_openingReceiving || _receivingOriginal != null || scope == null || reader == null || buyerReader == null || !current() ||
+        original.purchaser?.kind != 'store' || original.purchaser?.storeId != scope.$2 ||
+        original.originalFingerprint != reference.originalFingerprint) {
+      return;
+    }
+    setState(() => _openingReceiving = true);
+    try {
+      final checked = await buyerReader.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer,
+        realm: realm, reference: reference, buyingStoreId: scope.$2);
+      if (!mounted || !current()) return;
+      if (checked == null || checked.purchaser?.kind != 'store' || checked.purchaser?.storeId != scope.$2) {
+        work.showError('This purchase could not be checked for your Store. Reopen its saved details and try again.');
+        return;
+      }
+      final source = WorkspaceRestockPurchaseOriginal.fromJson({'schemaVersion': 1, 'realm': realm,
+        'accountScope': scope.$1, 'buyingStoreId': scope.$2, 'reference': reference.toJson(),
+        'lines': [for (final line in checked.lines) {'lineId': line.lineId,
+          'quantityMilli': line.quantityMilli, 'quantityUnit': line.quantityUnit}]});
+      FocusScope.of(context).unfocus();
+      setState(() { _receivingOriginal = source; _receivingOrder = checked; });
+    } on Object {
+      if (current()) work.showError('This purchase could not be opened for receiving. Your saved goods are kept.');
+    } finally { if (mounted) setState(() => _openingReceiving = false); }
+  }
+
+  void _closeReceiving() {
+    if (mounted) setState(() { _receivingOriginal = null; _receivingOrder = null; });
+  }
   bool _trackingOpened = false;
   bool _returnScheduled = false;
   late BuyV2View _initialView;
@@ -3526,6 +3583,10 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
   @override
   void didUpdateWidget(covariant _StoreProcurementSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final source = _receivingOriginal, scope = widget.workSession.workspaceSupplierScope;
+    if (source != null && (scope == null || source.accountScope != scope.$1 || source.buyingStoreId != scope.$2)) {
+      _receivingOriginal = null; _receivingOrder = null;
+    }
     if (oldWidget.session != widget.session ||
         oldWidget.productId != widget.productId ||
         oldWidget.orderId != widget.orderId) {
@@ -3601,7 +3662,7 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
           key: const Key('work-store-procurement-screen'),
           children: [
             Positioned.fill(
-              child: ClipRect(
+              child: Offstage(offstage: _receivingOriginal != null, child: ClipRect(
                 child: OverflowBox(
                   alignment: Alignment.topCenter,
                   minHeight: height,
@@ -3621,6 +3682,10 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
                         key: const ValueKey('work-store-procurement-buy-host'),
                         session: session,
                         embeddedStore: session.isStoreProcurement,
+                        onReceivePurchasedOrder: session.isStoreProcurement
+                          ? (reference, original) => unawaited(_receiveOriginal(reference, original)) : null,
+                        onEmbeddedSystemBack: _receivingOriginal == null ? null
+                          : () => unawaited(widget.receivingKey.currentState?._close() ?? Future.value()),
                         accountIdentity: accountIdentity,
                         accountAuthenticated: accountAuthenticated,
                         initialDestination: _initialDestination,
@@ -3634,8 +3699,14 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
                     ),
                   ),
                 ),
-              ),
+              )),
             ),
+            if (_receivingOriginal case final source?) Positioned.fill(child: Material(color: const Color(0xFFF8FAFF),
+              child: Padding(padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+                child: _StoreReceiveGoodsSurface(key: widget.receivingKey, session: widget.workSession,
+                  initialRestockOriginal: source, initialRestockOrder: _receivingOrder, onBack: _closeReceiving)))),
+            if (_openingReceiving) const Positioned(top: 0, left: 0, right: 0,
+              child: LinearProgressIndicator(minHeight: 2, semanticsLabel: 'Opening goods receiving')),
             if (!ready)
               const Positioned.fill(
                 child: ColoredBox(
@@ -17522,11 +17593,13 @@ class _ReceivingLineInput {
 /// operation before posting and always resume its exact immutable snapshot.
 class _StoreReceiveGoodsSurface extends StatefulWidget {
   const _StoreReceiveGoodsSurface({super.key, required this.session, required this.onBack,
-    this.initialSupplierId, this.initialBill});
+    this.initialSupplierId, this.initialBill, this.initialRestockOriginal, this.initialRestockOrder});
   final WorkSession session;
   final VoidCallback onBack;
   final String? initialSupplierId;
   final WorkspacePurchaseSavedCopy? initialBill;
+  final WorkspaceRestockPurchaseOriginal? initialRestockOriginal;
+  final WorkspacePurchaseOrder? initialRestockOrder;
   @override
   State<_StoreReceiveGoodsSurface> createState() => _StoreReceiveGoodsState();
 }
@@ -17539,6 +17612,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   String _groupId = '', _arrivalId = '';
   int? _bookRevision;
   WorkspaceSupplierGoodsReceipt? _frozen;
+  WorkspaceRestockPurchaseOriginal? _restockOriginal;
   WorkspaceGoodsReceiptReviewCancellation? _cancelAttempt;
   WorkspaceGoodsReceiptSaveResult? _postResult;
   _LedgerFormAutosave? _draft;
@@ -17563,7 +17637,8 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     _postResult != WorkspaceGoodsReceiptSaveResult.statusUnknown;
   bool get _hasPendingArrival {
     final group = _ledger?.goodsReceipts.values.where((r) => r.expectedDeliveryId == _groupId).toList() ?? [];
-    final expected = <String, int?>{for (final receipt in group) for (final line in receipt.lines) line.sourceLineId: line.expectedMilli};
+    final expected = <String, int?>{for (final receipt in group) for (final line in receipt.lines) line.sourceLineId: line.expectedMilli,
+      if (_restockOriginal case final source?) for (final line in source.lines.entries) line.key: line.value.quantityMilli};
     return expected.isNotEmpty && expected.entries.any((entry) => entry.value == null ||
       group.expand((r) => r.lines).where((line) => line.sourceLineId == entry.key)
         .fold<int>(0, (total, line) => total + line.deliveredMilli) < entry.value!);
@@ -17578,7 +17653,10 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   @override
   void dispose() { _draft?.removeListener(_draftChanged); _draft?.dispose(); _reference.dispose(); _day.dispose(); for (final line in _lines) { line.dispose(); } super.dispose(); }
   void _draftChanged() { if (_current) setState(() {}); }
-  Map<String, String> get _draftFields => {'arrivalId': _arrivalId, 'groupId': _groupId, 'input': _input};
+  Map<String, String> get _draftFields => {'arrivalId': _arrivalId, 'groupId': _groupId, 'input': _input,
+    if (_restockOriginal != null) 'restockOriginal': jsonEncode(_restockOriginal!.toJson())};
+  bool get _showingOtherDelivery => widget.initialRestockOriginal != null && _arrivalId.isNotEmpty &&
+    jsonEncode(widget.initialRestockOriginal!.toJson()) != jsonEncode(_restockOriginal?.toJson());
   void _saveInput() {
     if (!_current || _frozen != null || _arrivalId.isEmpty || _draft?.key == null) return;
     final fields = _draftFields;
@@ -17613,6 +17691,8 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       }
       final values = jsonDecode(fields['input']!) as List;
       final group = fields['groupId']!;
+      final source = fields.containsKey('restockOriginal')
+        ? WorkspaceRestockPurchaseOriginal.fromJson(jsonDecode(fields['restockOriginal']!)) : null;
       final originals = <String, WorkspaceSupplierGoodsReceiptLine>{
         for (final receipt in _ledger?.goodsReceipts.values ?? const <WorkspaceSupplierGoodsReceipt>[])
           if (receipt.expectedDeliveryId == group)
@@ -17647,11 +17727,19 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       for (final line in _lines) { line.dispose(); }
       _lines..clear()..addAll(restored);
       _arrivalId = arrival!; _groupId = group;
+      _restockOriginal = source;
       _reference.text = values[0] as String; _day.text = values[1] as String;
       _frozen = null; _reviewVerified = false; _cancelAttempt = null; _postResult = null;
       _notice = 'Unfinished delivery restored · Stock has not changed.';
-    } else if (reviews.isNotEmpty) { _restore(reviews.last.receipt); }
-    else { _newArrival(); }
+    } else if (reviews.isNotEmpty) {
+      final requested = widget.initialRestockOriginal;
+      final matching = requested == null ? null : reviews.where((r) =>
+        jsonEncode(r.receipt.restockOriginal?.toJson()) == jsonEncode(requested.toJson())).lastOrNull;
+      final unfinished = reviews.where((r) => _ledger?.goodsReceipts.containsKey(r.receipt.id) != true).lastOrNull;
+      if (matching != null) { _restore(matching.receipt); }
+      else if (unfinished != null || requested == null) { _restore((unfinished ?? reviews.last).receipt); }
+      else { _newArrival(); }
+    } else { _newArrival(); }
   }
   Future<void> _retryInput() async {
     if (!_current || _busy || _draft == null) return;
@@ -17724,12 +17812,22 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     for (final line in _lines) { line.dispose(); }
     _lines..clear()..addAll(receipt.lines.map((line) => _ReceivingLineInput(line.sourceLineId, saved: line, restoreLot: true)));
     _arrivalId = receipt.id; _groupId = receipt.expectedDeliveryId;
+    _restockOriginal = receipt.restockOriginal;
     _reference.text = receipt.reference; _day.text = receipt.deliveredOn;
     _frozen = receipt; _reviewVerified = true; _cancelAttempt = null; _postResult = null;
   }
   Future<void> _chooseSupplier(String id) async {
     if (_supplierId == id) return;
     if (_busy) { _supplierPicker.currentState?.didChange(_supplierId); return; }
+    final requested = widget.initialRestockOriginal;
+    final linked = requested == null ? null : session.workspaceSuppliers.where((supplier) =>
+      session.workspaceSupplierLedger(supplier.id)?.goodsReceipts.values.any((receipt) =>
+        receipt.expectedDeliveryId == requested.deliveryGroupId) == true).singleOrNull;
+    if (linked != null && linked.id != id) {
+      setState(() => _error = 'This purchase is already linked to ${linked.name}. Choose that supplier to continue.');
+      _supplierPicker.currentState?.didChange(_supplierId);
+      return;
+    }
     setState(() => _busy = true);
     if (!await _flushInput()) {
       if (_current) setState(() { _busy = false; _supplierPicker.currentState?.didChange(_supplierId); });
@@ -17751,30 +17849,48 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     setState(() => _busy = false);
   }
   void _newArrival({WorkspaceSupplierGoodsReceipt? previous}) {
+    final source = previous != null ? previous.restockOriginal : widget.initialRestockOriginal;
+    final groupId = source?.deliveryGroupId ?? previous?.expectedDeliveryId;
+    final receipts = _ledger?.goodsReceipts.values.where((receipt) => receipt.expectedDeliveryId == groupId).toList() ??
+      const <WorkspaceSupplierGoodsReceipt>[];
+    if (source != null && receipts.isNotEmpty && source.lines.entries.every((entry) =>
+        receipts.expand((receipt) => receipt.lines).where((line) => line.sourceLineId == entry.key)
+          .fold<int>(0, (sum, line) => sum + line.deliveredMilli) >= entry.value.quantityMilli)) {
+      _error = 'All ordered quantities for this purchase are already recorded. Saved goods are kept.';
+      return;
+    }
     _billReceiptChosen = true;
     for (final line in _lines) { line.dispose(); }
     _lines.clear();
-    if (previous != null) {
+    _restockOriginal = source;
+    if (previous != null || receipts.isNotEmpty) {
       final inherited = <String, WorkspaceSupplierGoodsReceiptLine>{
-        for (final receipt in _ledger?.goodsReceipts.values ?? const <WorkspaceSupplierGoodsReceipt>[])
-          if (receipt.expectedDeliveryId == previous.expectedDeliveryId)
-            for (final line in receipt.lines) line.sourceLineId: line,
-        for (final line in previous.lines) line.sourceLineId: line,
+        for (final receipt in receipts) for (final line in receipt.lines) line.sourceLineId: line,
+        if (previous != null) for (final line in previous.lines) line.sourceLineId: line,
       };
       for (final saved in inherited.values) {
         final line = _ReceivingLineInput(saved.sourceLineId, saved: saved);
         line.delivered.clear(); line.damaged.text = '0'; line.short.text = '0';
-        final earlier = _ledger?.goodsReceipts.values.where((r) => r.expectedDeliveryId == previous.expectedDeliveryId)
-          .expand((r) => r.lines).where((l) => l.sourceLineId == saved.sourceLineId)
-          .fold<int>(0, (sum, l) => sum + l.deliveredMilli) ?? 0;
+        final earlier = receipts.expand((r) => r.lines).where((l) => l.sourceLineId == saved.sourceLineId)
+          .fold<int>(0, (sum, l) => sum + l.deliveredMilli);
         line.arrives = saved.expectedMilli == null || earlier < saved.expectedMilli!;
         for (final c in line.prior.values) { c.dispose(); } line.prior.clear();
         _lines.add(line);
       }
-    } else { _lines.add(_ReceivingLineInput(session.newWorkspaceDeliveryLineId())); }
+    } else if (_restockOriginal == null) { _lines.add(_ReceivingLineInput(session.newWorkspaceDeliveryLineId())); }
+    if (_restockOriginal case final source?) {
+      for (final entry in source.lines.entries) {
+        if (_lines.any((line) => line.id == entry.key)) continue;
+        final line = _ReceivingLineInput(entry.key);
+        line.unit.text = entry.value.quantityUnit;
+        line.expected.text = _ReceivingLineInput._quantity(entry.value.quantityMilli);
+        line.factor.clear();
+        _lines.add(line);
+      }
+    }
     _arrivalId = session.newWorkspaceGoodsReceiptId();
-    _groupId = previous?.expectedDeliveryId ?? session.newWorkspaceDeliveryGroupId();
-    _reference.text = previous?.reference ?? '';
+    _groupId = _restockOriginal?.deliveryGroupId ?? previous?.expectedDeliveryId ?? session.newWorkspaceDeliveryGroupId();
+    _reference.text = previous?.reference ?? _restockOriginal?.reference['orderId'] ?? '';
     _day.text = DateTime.now().toIso8601String().substring(0, 10);
     _frozen = null; _reviewVerified = false; _cancelAttempt = null; _postResult = null;
     _error = null; _notice = null;
@@ -17813,7 +17929,8 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         lotDetails: lot.isEmpty ? null : lot));
     }
     final receipt = WorkspaceSupplierGoodsReceipt(id: _arrivalId, expectedDeliveryId: _groupId,
-      reference: _reference.text.trim(), deliveredOn: _day.text.trim(), recordedAt: DateTime.now().toUtc(), lines: values);
+      reference: _reference.text.trim(), deliveredOn: _day.text.trim(), recordedAt: DateTime.now().toUtc(), lines: values,
+      restockOriginal: _restockOriginal);
     return receipt.valid ? receipt : null;
   }
   Future<void> _review() async {
@@ -17992,6 +18109,20 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     // WorkPageScaffold owns system Back; parent and local actions share confirmLeave.
     return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
         _receivingHeader(_committed && !_conflict ? 'Goods received' : 'Receive goods'),
+        if (widget.initialRestockOriginal case final requested?) ...[
+          Text('Purchase ${requested.reference['orderId']}', key: const Key('work-receive-order-context'),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
+          if (_showingOtherDelivery) ...[
+            const Text('This supplier has another saved delivery. Its details are kept; the selected purchase has not been started.',
+              key: Key('work-receive-other-delivery'), style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+            if (_savedStatusResolved && (_committed || _cancelled)) TextButton(
+              key: const Key('work-receive-start-selected-order'), onPressed: _busy ? null : () => setState(() => _newArrival()),
+              child: const Text('Start receiving selected purchase')),
+          ] else const Text('Match the supplier and saved Stock items. Confirm only the quantities actually received.',
+            style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+        ] else if (_restockOriginal case final source?)
+          Text('Purchase ${source.reference['orderId']}', key: const Key('work-receive-order-context'),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
         if (bill != null) ...[
           Text('Supplier bill ${bill.draft.invoiceReference}', key: const Key('work-receive-bill-context'),
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
@@ -18044,7 +18175,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           if (_ledger?.openingRecord == null) const Text('Confirm this supplier’s Opening dues before recording goods. Choose zero only when there are no earlier dues or advances.',
             style: TextStyle(fontSize: 12, color: MoolColors.ink)),
           for (final (index, line) in _lines.indexed) _lineView(line, index),
-          if (editable) TextButton.icon(key: const Key('work-receive-add-line'), onPressed: _lines.length >= 100 ? null : () => setState(() {
+          if (editable && _restockOriginal == null) TextButton.icon(key: const Key('work-receive-add-line'), onPressed: _lines.length >= 100 ? null : () => setState(() {
             _lines.add(_ReceivingLineInput(session.newWorkspaceDeliveryLineId())); _saveInput(); }), icon: const Icon(Icons.add, size: 18), label: const Text('Add item')),
           if (_frozen != null) Text(_conflict ? 'Receipt and cancellation conflict · recover saved records'
             : _postResult == WorkspaceGoodsReceiptSaveResult.statusUnknown ? 'Receiving status unverified · recover before retrying'
@@ -18076,7 +18207,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
                   ? null : () => _showSupplierGoodsReturn(context, session, _supplierId!, _frozen!),
                 icon: const Icon(Icons.assignment_return_outlined, size: 18),
                 label: Text(session.workspaceGoodsReceiptRecoveryPending ? 'Recover goods return' : 'Return goods')),
-            if (_savedStatusResolved && _committed)
+            if (_savedStatusResolved && _committed && _restockOriginal == null && widget.initialRestockOriginal == null)
               TextButton(key: const Key('work-receive-new-delivery'), onPressed: _busy ? null : () => setState(() => _newArrival()),
                 child: const Text('New delivery')),
           ]),
@@ -18130,15 +18261,20 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     }
     return Padding(key: ValueKey(('receiving-line', line.id)), padding: const EdgeInsets.symmetric(vertical: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [Expanded(child: Text('Item ${index + 1}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.navy))),
-        if (!_busy && _frozen == null && !inherited && _lines.length > 1) TextButton(key: ValueKey('work-receive-remove-$index'),
+        if (!_busy && _frozen == null && !inherited && _restockOriginal == null && _lines.length > 1) TextButton(key: ValueKey('work-receive-remove-$index'),
           onPressed: () => setState(() { _lines.remove(line); line.dispose(); _saveInput(); }), child: const Text('Remove item'))]),
-      if (inherited && _frozen == null) CheckboxListTile(key: ValueKey('work-receive-arrives-$index'),
+      if ((inherited || _restockOriginal != null) && _frozen == null) CheckboxListTile(key: ValueKey('work-receive-arrives-$index'),
         value: line.arrives, dense: true, contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading,
         title: const Text('Received in this delivery', style: TextStyle(fontSize: 12)),
         onChanged: _busy || !_loaded || _discarding || _draft?.ready != true ? null : (value) => setState(() { line.arrives = value ?? false; _saveInput(); })),
       if (!line.arrives) Text('${line.original?.productLabel ?? product?.title ?? 'Saved item'} · not received this time. Earlier goods history is unchanged.',
         style: const TextStyle(fontSize: 12)),
       if (line.arrives) ...[
+      if (_restockOriginal != null) Text(
+        '${widget.initialRestockOrder?.originalFingerprint == _restockOriginal!.reference['originalFingerprint']
+          ? widget.initialRestockOrder!.lines.where((p) => p.lineId == line.id).singleOrNull?.name ?? line.id : line.id}'
+        ' · ordered ${line.expected.text} ${line.unit.text}',
+        key: ValueKey('work-receive-ordered-$index'), style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
       DropdownButtonFormField<String>(key: ValueKey('work-receive-product-$index'), initialValue: line.productId.isEmpty ? null : line.productId,
         isExpanded: true, style: const TextStyle(fontSize: 13, color: MoolColors.ink),
         decoration: const InputDecoration(labelText: 'Match saved Stock product', filled: false,
@@ -18151,15 +18287,17 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
             DropdownMenuItem(value: line.productId, enabled: false, child: const Text('Saved product unavailable · recover Stock'))],
         onChanged: !_busy && _loaded && !_discarding && _draft?.ready == true && _frozen == null && !inherited ? (value) => setState(() {
           line.productId = value ?? ''; for (final c in line.prior.values) { c.dispose(); } line.prior.clear();
-          line.unit.text = session.workspaceCatalogueItems.where((p) => p.id == value).firstOrNull?.pack ?? '';
-          line.factor.text = '1';
+          if (_restockOriginal == null) {
+            line.unit.text = session.workspaceCatalogueItems.where((p) => p.id == value).firstOrNull?.pack ?? '';
+            line.factor.text = '1';
+          } else { line.factor.clear(); }
           for (final controller in line.lotControllers) { controller.clear(); }
           _saveInput();
         }) : null),
       Wrap(spacing: 12, runSpacing: 12, children: [
-        _field('Delivery unit', line.unit, 'work-receive-unit-$index', number: false, enabled: !inherited),
+        _field('Delivery unit', line.unit, 'work-receive-unit-$index', number: false, enabled: !inherited && _restockOriginal == null),
         _field('Stock units / unit', line.factor, 'work-receive-factor-$index', enabled: !inherited),
-        _field('Expected qty', line.expected, 'work-receive-expected-$index', enabled: !inherited,
+        _field('Expected qty', line.expected, 'work-receive-expected-$index', enabled: !inherited && _restockOriginal == null,
           errorText: expected == null && line.expected.text.trim().isNotEmpty ? 'Enter a complete qty' : null),
         _field('Delivered qty', line.delivered, 'work-receive-delivered-$index'),
         _field('Damaged qty', line.damaged, 'work-receive-damaged-$index'),
@@ -18173,7 +18311,10 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           child: Text(line.lotError ?? 'Only for this delivery · not published',
             style: TextStyle(fontSize: 12, color: line.lotError == null ? null : Theme.of(context).colorScheme.error))),
         children: [
-          const Text('Copy the pack label as printed, including month/year or best-before wording. Leave unknown details blank. For multiple batches, use a separate item line for each batch. These details do not change Stock cost.', style: TextStyle(fontSize: 12)),
+          Text(_restockOriginal == null
+            ? 'Copy the pack label as printed, including month/year or best-before wording. Leave unknown details blank. For multiple batches, use a separate item line for each batch. These details do not change Stock cost.'
+            : 'Copy the pack label as printed, including month/year or best-before wording. Leave unknown details blank. For multiple batches, record each batch separately using Next arrival for the remaining quantity. These details do not change Stock cost.',
+            style: const TextStyle(fontSize: 12)),
           _field('Batch / lot number', line.batch, 'work-receive-batch-$index', number: false, errorText: line.printedLabelError(line.batch)),
           _field('Manufactured · as printed', line.manufactured, 'work-receive-manufactured-$index', number: false, errorText: line.printedLabelError(line.manufactured)),
           _field('Expiry / best before / use by · as printed', line.expiry, 'work-receive-expiry-$index', number: false, errorText: line.printedLabelError(line.expiry)),

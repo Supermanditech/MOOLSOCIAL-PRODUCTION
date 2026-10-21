@@ -372,6 +372,7 @@ class WorkspacePurchaseOriginals extends StatefulWidget {
     this.storeId,
     this.buyingStoreId,
     this.onRatePurchasedItem,
+    this.onReceivePurchasedOrder,
   });
   final AuthenticatedWorkspaceOrderIdentityGateway gateway;
   final WorkspaceOrderIdentityRole role;
@@ -381,6 +382,8 @@ class WorkspacePurchaseOriginals extends StatefulWidget {
   final String? buyingStoreId;
   /// Buyer-only entry after authoritative completion, scoped to one frozen line.
   final void Function(WorkspacePurchaseReference, WorkspacePurchaseOrder, WorkspacePurchasedSkuLine)? onRatePurchasedItem;
+  /// Store owner confirms physical arrival separately from delivery updates.
+  final void Function(WorkspacePurchaseReference, WorkspacePurchaseOrder)? onReceivePurchasedOrder;
   @override
   State<WorkspacePurchaseOriginals> createState() =>
       _WorkspacePurchaseOriginalsState();
@@ -600,6 +603,23 @@ class _WorkspacePurchaseOriginalsState
     );
   }
 
+  Widget _receivingAction(WorkspacePurchaseReference reference, WorkspacePurchaseOrder original) {
+    final generation = _generation, gateway = widget.gateway, callback = widget.onReceivePurchasedOrder;
+    final store = widget.buyingStoreId;
+    return Align(alignment: AlignmentDirectional.centerStart, child: TextButton.icon(
+      key: ValueKey('purchase-receive-order-${reference.orderId}'),
+      onPressed: () {
+        if (!_current(generation) || !identical(widget.gateway, gateway) ||
+            widget.role != WorkspaceOrderIdentityRole.buyer || callback == null ||
+            !identical(widget.onReceivePurchasedOrder, callback) || store == null || widget.buyingStoreId != store ||
+            original.purchaser?.kind != 'store' || original.purchaser?.storeId != store ||
+            !identical(_details[reference.orderId], original)) {
+          return;
+        }
+        callback(reference, original);
+      }, icon: const Icon(Icons.inventory_2_outlined, size: 18), label: const Text('Receive goods')));
+  }
+
   Widget _ratingAction(WorkspacePurchaseReference reference, WorkspacePurchaseOrder original, WorkspacePurchasedSkuLine line) {
     final generation = _generation, gateway = widget.gateway, callback = widget.onRatePurchasedItem;
     final completion = _completions[reference.orderId];
@@ -718,6 +738,10 @@ class _WorkspacePurchaseOriginalsState
                       if (_details[reference.orderId] case final details?) ...[
                         if (details.purchaser?.kind == 'store')
                           Text('Buying for: ${details.purchaser!.name}'),
+                        if (widget.role == WorkspaceOrderIdentityRole.buyer && widget.onReceivePurchasedOrder != null &&
+                            widget.buyingStoreId != null && details.purchaser?.kind == 'store' &&
+                            details.purchaser?.storeId == widget.buyingStoreId)
+                          _receivingAction(reference, details),
                         _orderUpdate(reference),
                         WorkspaceOriginalFulfilmentForOrder(original: details),
                         if (details.supplierQuote case final agreed?) ...[

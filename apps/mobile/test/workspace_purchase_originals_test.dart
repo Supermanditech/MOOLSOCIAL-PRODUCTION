@@ -44,6 +44,39 @@ class _OrderPending implements WorkOrderPendingStore {
 }
 
 void main() {
+  for (final changed in ['current', 'reader', 'store', 'realm', 'callback', 'closed', 'retired']) {
+    testWidgets('LF-RESTOCK-ACTION exact Store original scope=$changed', (tester) async {
+      Object? lifetime = Object();
+      final refs = fixtures.purchaserReferenceResponse(), details = fixtures.purchaserPurchaseResponse();
+      final wire = fixtures.Transport()..respond = (body) => body['operation'] == 'listBuyerPurchaseReferences' ? refs : details;
+      final reader = fixtures.projectionGateway(wire, lifetime: () => lifetime);
+      final invoked = <WorkspacePurchaseOrder>[];
+      void receive(WorkspacePurchaseReference reference, WorkspacePurchaseOrder original) {
+        expect(reference.originalFingerprint, original.originalFingerprint); invoked.add(original);
+      }
+      Widget page({AuthenticatedWorkspaceOrderIdentityGateway? gateway, String store = 'buying-store',
+        String realm = 'evaluation', bool enabled = true}) => MaterialApp(home: Scaffold(body: SingleChildScrollView(
+          child: WorkspacePurchaseOriginals(gateway: gateway ?? reader, role: WorkspaceOrderIdentityRole.buyer,
+            realm: realm, buyingStoreId: store, onReceivePurchasedOrder: enabled ? receive : null))));
+      await tester.pumpWidget(page()); await tester.pumpAndSettle();
+      await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('original-order-order-v2'))); await tester.pumpAndSettle();
+      final action = find.byKey(const ValueKey('purchase-receive-order-order-v2'));
+      expect(action, findsOneWidget, reason: 'Receiving physical goods does not require a delivery-completion feed.');
+      final retained = tester.widget<TextButton>(action).onPressed!;
+      switch (changed) {
+        case 'reader': await tester.pumpWidget(page(gateway: fixtures.projectionGateway(fixtures.Transport())));
+        case 'store': await tester.pumpWidget(page(store: 'another-store'));
+        case 'realm': await tester.pumpWidget(page(realm: 'production'));
+        case 'callback': await tester.pumpWidget(page(enabled: false));
+        case 'closed': await tester.pumpWidget(const SizedBox.shrink());
+        case 'retired': lifetime = Object();
+      }
+      retained(); await tester.pumpAndSettle();
+      expect(invoked.length, changed == 'current' ? 1 : 0);
+      expect(tester.takeException(), isNull);
+    });
+  }
   for (final action in ['expand-list', 'retry-list', 'more', 'expand-order', 'retry-details', 'update']) {
     for (final changed in ['reader', 'store', 'account', 'realm', 'role', 'closed', 'retired', 'current']) {
       testWidgets('LF-ORIGINAL-ACTION retained $action scope=$changed', (tester) async {

@@ -13954,12 +13954,14 @@ class BuyV2OrdersView extends StatelessWidget {
     required this.onOpenOrderHelp,
     this.invoiceDownloader,
     this.browseProducts,
+    this.onReceivePurchasedOrder,
   });
 
   final BuyV2Session session;
   final ValueChanged<BuyV2Order> onOpenOrderHelp;
   final BuyV2InvoiceDownloader? invoiceDownloader;
   final Widget? browseProducts;
+  final void Function(WorkspacePurchaseReference, WorkspacePurchaseOrder)? onReceivePurchasedOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -13992,6 +13994,7 @@ class BuyV2OrdersView extends StatelessWidget {
             WorkspacePurchaseOriginals(key: ValueKey(('buyer-originals',reader,session.purchaseRealm,session.procurementContext?.storeId)),
               gateway: reader, role: WorkspaceOrderIdentityRole.buyer, realm: session.purchaseRealm,
               buyingStoreId: session.procurementContext?.storeId,
+              onReceivePurchasedOrder: session.isStoreProcurement ? onReceivePurchasedOrder : null,
               onRatePurchasedItem: !session.privateStarsAvailable ? null : (reference, original, line) =>
                 unawaited(_showPrivateStarsSheet(context, session, reference: reference, original: original, line: line))),
           if (session.canReturnToAccount) ...[

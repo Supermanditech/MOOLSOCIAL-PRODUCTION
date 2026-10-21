@@ -38,8 +38,10 @@ import 'package:moolsocial/shared/commerce/commerce_downloads.dart';
 import 'package:moolsocial/shared/commerce/commerce_downloads_screen.dart';
 import 'commerce_downloads_test.dart' as download_test show Source;
 import 'work_catalogue_gateway_test.dart' as catalogue_fixture;
+import 'work_order_identity_gateway_test.dart' as purchase_fixture;
 import 'ui_v2/buy/buy_v2_discovery_refinement_test.dart' show BuyTestEligibilityFacts;
 import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
+import 'package:moolsocial/features/work/work_order_identity_gateway.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart' show SocialContentResponse;
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
@@ -17419,6 +17421,280 @@ void main() {
         await tester.pumpWidget(const SizedBox.shrink());
       },
     );
+  }
+
+  for (final mode in ['normal', 'large-text', 'unrelated', 'save-failure', 'scoped-reader', 'reader-retires', 'navigation-leave-return', 'review', 'partial', 'completed', 'partial-other-draft', 'completed-other-draft']) {
+    testWidgets('LF-RESTOCK-EDITOR original to existing receiving preserves draft and host $mode', (tester) async {
+      // Isolated host evaluation; never device data or production authority.
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore(), forms = _LedgerFormFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint, inventory: true, moneyStore: forms);
+      final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
+      final partial = mode.startsWith('partial'), completed = mode.startsWith('completed');
+      final otherDraft = mode.endsWith('other-draft');
+      final supplier = WorkspaceSupplierProfile(id: 'host-restock-supplier', name: 'HOST saved supplier',
+        phone: '', address: '', gstin: '', createdAt: at, updatedAt: at);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 1, profiles: [supplier]);
+      final details = purchase_fixture.purchaserPurchaseResponse(), refs = purchase_fixture.purchaserReferenceResponse();
+      details['viewerUserId'] = scope.$1;
+      details['orders'][0]['original']['purchaser']['storeId'] = scope.$2;
+      if (partial || completed) {
+        final original = details['orders'][0]['original'] as Map;
+        final second = jsonDecode(jsonEncode((original['lines'] as List).first)) as Map<String, dynamic>;
+        second['lineId'] = 'line-two'; (original['lines'] as List).add(second);
+        original['benefitAttribution'] = {'schemaVersion': 1, 'components': <Object>[]}; original['supplierQuote'] = null;
+        final totals = original['totals'] as Map;
+        totals['itemsMinor'] = 2 * (second['lineTotalMinor'] as int); totals['discountMinor'] = 0;
+        totals['totalMinor'] = totals['itemsMinor'] + totals['taxMinor'] + totals['deliveryMinor'] +
+          totals['freightMinor'] + totals['paymentFeeMinor'] + totals['tipMinor'];
+      }
+      purchase_fixture.rehashPurchaseOrder(details['orders'][0]);
+      refs['viewerUserId'] = scope.$1; refs['buyingStoreId'] = scope.$2;
+      refs['references'][0]['originalFingerprint'] = details['orders'][0]['originalFingerprint'];
+      final wire = purchase_fixture.Transport()..respond = (body) =>
+        body['operation'] == 'listBuyerPurchaseReferences' ? refs : details;
+      final reader = purchase_fixture.projectionGateway(wire, account: scope.$1);
+      work.bindOriginalPurchaseReader(reader, 'evaluation');
+      final checked = await reader.readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: 'purchase-v2', buyingStoreId: scope.$2);
+      expect(checked, isNotNull, reason: 'Strictly decode the isolated authenticated original before using it.');
+      if (partial || completed) {
+        final source = WorkspaceRestockPurchaseOriginal.fromJson({'schemaVersion': 1, 'realm': 'evaluation',
+          'accountScope': scope.$1, 'buyingStoreId': scope.$2, 'reference': refs['references'][0],
+          'lines': [for (final line in checked!.orders.single.lines) {'lineId': line.lineId,
+            'quantityMilli': line.quantityMilli, 'quantityUnit': line.quantityUnit}]});
+        final product = work.workspaceCatalogueItems.firstWhere((p) => p.stockMode == WorkspaceStockMode.exactQuantity);
+        final opening = WorkspaceSupplierOpeningRecord(id: 'host-restock-opening', basisId: 'host-restock-basis',
+          account: scope.$1, store: scope.$2, qa: scope.$3, supplierId: supplier.id, revision: 1,
+          asOfDate: '2026-10-01', savedAt: at, amountMinor: 0, supplierCredit: false,
+          sourceNote: 'HOST ONLY explicitly confirmed no earlier dues', bills: const []);
+        final receipt = WorkspaceSupplierGoodsReceipt(id: 'host-restock-first-arrival', expectedDeliveryId: source.deliveryGroupId,
+          reference: 'HOST first actual arrival', deliveredOn: '2026-10-01', recordedAt: at, restockOriginal: source,
+          lines: [for (final line in checked.orders.single.lines.where((line) => completed || line.lineId == 'line-one'))
+            WorkspaceSupplierGoodsReceiptLine(sourceLineId: line.lineId, productId: product.id, productLabel: product.title,
+              purchaseUnit: line.quantityUnit, stockUnit: product.pack, unitsPerPack: partial ? 2 : 1,
+              deliveredMilli: partial ? 500 : 1000, acceptedMilli: partial ? 500 : 1000,
+              damagedMilli: 0, shortMilli: 0, expectedMilli: line.quantityMilli)]);
+        entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+          revision: 1, profiles: [supplier], openingRecords: [opening], goodsReceiptDrafts: [
+            WorkspaceSupplierGoodsReceiptDraft(supplierId: supplier.id, revision: 1, receipt: receipt)]);
+        expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+        expect(await work.loadWorkspaceInventory(), isTrue);
+        expect(work.addOrUpdateWorkspaceProduct(product.copyWith(stock: product.stock + 1)), isTrue);
+        expect(await work.workspaceInventorySaved, isTrue);
+        expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope, expectedRevision: 1, confirmedAt: at), isTrue);
+        expect(await work.confirmWorkspaceSupplierGoodsReceipt(receipt, supplierId: supplier.id, scope: scope,
+          expectedPurchaseRevision: 1, expectedSupplierRevision: work.workspaceSupplierLedger(supplier.id)!.revision,
+          requireSavedReview: true), WorkspaceGoodsReceiptSaveResult.saved);
+        if (otherDraft) {
+          final other = WorkspaceSupplierGoodsReceipt(id: 'host-unrelated-committed-arrival', expectedDeliveryId: 'host-unrelated-delivery',
+            reference: 'HOST unrelated completed delivery', deliveredOn: '2026-10-01', recordedAt: at, lines: [
+              WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'host-other-line', productId: product.id, productLabel: product.title,
+                purchaseUnit: product.pack, stockUnit: product.pack, unitsPerPack: 1, deliveredMilli: 1000,
+                acceptedMilli: 1000, damagedMilli: 0, shortMilli: 0, expectedMilli: 1000)]);
+          expect(await work.saveWorkspaceGoodsReceiptDraft(other, supplierId: supplier.id, scope: scope,
+            expectedRevision: work.workspacePurchaseEntryRevision!), isTrue);
+          expect(await work.confirmWorkspaceSupplierGoodsReceipt(other, supplierId: supplier.id, scope: scope,
+            expectedPurchaseRevision: work.workspacePurchaseEntryRevision!,
+            expectedSupplierRevision: work.workspaceSupplierLedger(supplier.id)!.revision, requireSavedReview: true),
+            WorkspaceGoodsReceiptSaveResult.saved);
+          final key = work.supplierReceivingInputFormKey(supplier.id)!;
+          forms.drafts[key] = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {'arrivalId': other.id,
+            'groupId': other.expectedDeliveryId, 'input': jsonEncode([other.reference, other.deliveredOn,
+              ['host-other-line', product.id, true, product.pack, '1', '1', '1', '0', '0', <String, String>{}]])});
+        }
+      }
+      expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      final states = <String, _StorePurchaseState>{};
+      final controller = WorkProcurementController(currentAccountId: () => scope.$1,
+        currentStoreId: () => work.activeWorkspace?.id, storeApproved: () => true,
+        originalPurchaseReader: () => work.originalPurchaseReader, originalPurchaseRealm: () => work.originalPurchaseRealm,
+        bookmarks: _StorePurchaseBookmarks(), stateStoreFactory: (id) => states.putIfAbsent(id, () => _StorePurchaseState(id)),
+        sessionFactory: mode == 'scoped-reader' ? null : (identity, state) {
+          final core = BuySession(); addTearDown(core.dispose);
+          return BuyV2Session(core: core, procurementIdentity: identity, customerStateStore: state,
+            purchaseReader: reader, purchaseRealm: 'evaluation', reviewDataEnabled: false,
+            commerceAdapter: _StorePurchaseCommerce(identity.value!), productFactsAdapter: _StorePurchaseOrderReadyFacts());
+        });
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), isTrue);
+      expect(await controller.leave(), isTrue);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: mode == 'large-text' ? 2 : 1,
+        viewport: const Size(360, 800), procurementFactory: () => controller);
+      addTearDown(() async => tester.pumpWidget(const SizedBox.shrink()));
+      await reveal(tester, find.byKey(const Key('work-quick-buy')));
+      await tester.tap(find.byKey(const Key('work-quick-buy'))); await tester.pumpAndSettle();
+      final buy = controller.session!;
+      if (mode != 'scoped-reader') expect(buy.addProduct(buy.visibleProducts.first.id), isTrue);
+      final cartBefore = buy.itemCount;
+      buy.openOrders(); await tester.pumpAndSettle();
+      await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('original-order-order-v2'))); await tester.pumpAndSettle();
+      Finder originalTile() => find.descendant(of: find.byKey(const ValueKey('original-order-order-v2')),
+        matching: find.byType(ExpansionTile));
+      final originalState = tester.state(originalTile());
+      final receive = find.byKey(const ValueKey('purchase-receive-order-order-v2'));
+      await reveal(tester, receive);
+      if (mode == 'reader-retires' || mode == 'navigation-leave-return') {
+        final entered = Completer<void>(), release = Completer<void>();
+        wire.beforePost = (_) { entered.complete(); return release.future; };
+        await tester.tap(receive); await tester.pump();
+        expect(entered.isCompleted, isTrue);
+        if (mode == 'reader-retires') {
+          work.bindOriginalPurchaseReader(null, 'evaluation');
+        } else {
+          buy.openCart(); buy.openOrders();
+        }
+        release.complete(); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-goods-receiving')), findsNothing);
+        expect(forms.drafts, isEmpty); expect(buy.itemCount, cartBefore); return;
+      }
+      if (mode == 'unrelated') {
+        final key = work.supplierReceivingInputFormKey(supplier.id)!;
+        forms.drafts[key] = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {'arrivalId': 'host-other-arrival',
+          'groupId': 'host-other-group', 'input': jsonEncode(['Keep unrelated draft', '2026-10-01',
+            ['host-other-line', '', true, '', '1', '', '', '0', '0', <String, String>{}]])});
+      }
+      await tester.tap(receive); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
+      final picker = find.byKey(const Key('work-receive-supplier'));
+      await tester.tap(picker); await tester.pumpAndSettle();
+      await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+      final key = work.supplierReceivingInputFormKey(supplier.id)!;
+      Future<void> receivingField(String key, {double delta = 140}) async {
+        final scroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')), matching: find.byType(Scrollable)).first;
+        await tester.scrollUntilVisible(find.byKey(Key(key)), delta, scrollable: scroll);
+        await tester.pumpAndSettle(); await tester.ensureVisible(find.byKey(Key(key))); await tester.pumpAndSettle();
+      }
+      if (partial || completed) {
+        await receivingField('work-receive-status');
+        expect(find.byKey(const Key('work-receive-new-delivery')), findsNothing);
+        if (otherDraft) {
+          expect(find.byKey(const Key('work-receive-other-delivery')), findsOneWidget);
+          await receivingField('work-receive-start-selected-order', delta: -140);
+          await tester.tap(find.byKey(const Key('work-receive-start-selected-order'))); await tester.pumpAndSettle();
+        }
+        if (completed) {
+          expect(find.byKey(const Key('work-receive-next')), findsNothing);
+          if (otherDraft) {
+            await receivingField('work-receive-error');
+            expect(find.text('All ordered quantities for this purchase are already recorded. Saved goods are kept.'), findsOneWidget);
+            expect(forms.drafts[key]!.fields['groupId'], 'host-unrelated-delivery');
+          }
+        } else {
+          if (!otherDraft) {
+            await receivingField('work-receive-next');
+            await tester.tap(find.byKey(const Key('work-receive-next'))); await tester.pumpAndSettle();
+          }
+          await receivingField('work-receive-product-0', delta: -140);
+          expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const Key('work-receive-product-0'))).onChanged, isNull);
+          await receivingField('work-receive-factor-0');
+          expect(tester.widget<TextField>(find.byKey(const Key('work-receive-factor-0'))).controller!.text, '2');
+          expect(tester.widget<TextField>(find.byKey(const Key('work-receive-factor-0'))).enabled, isFalse);
+          await receivingField('work-receive-delivered-0');
+          await tester.enterText(find.byKey(const Key('work-receive-delivered-0')), '0.5');
+          await receivingField('work-receive-product-1');
+          await tester.tap(find.byKey(const Key('work-receive-product-1'))); await tester.pumpAndSettle();
+          final product = work.workspaceCatalogueItems.firstWhere((p) => p.stockMode == WorkspaceStockMode.exactQuantity);
+          await tester.tap(find.text('${product.title} · ${product.pack}').last); await tester.pumpAndSettle();
+          await receivingField('work-receive-factor-1'); await tester.enterText(find.byKey(const Key('work-receive-factor-1')), '1');
+          await receivingField('work-receive-delivered-1'); await tester.enterText(find.byKey(const Key('work-receive-delivered-1')), '1');
+          FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+          await receivingField('work-receive-review'); await tester.tap(find.byKey(const Key('work-receive-review'))); await tester.pumpAndSettle();
+          final reviewed = entry.value!.goodsReceiptDrafts.last.receipt;
+          expect(reviewed.restockOriginal!.deliveryGroupId, entry.value!.goodsReceiptDrafts.first.receipt.expectedDeliveryId);
+          expect(reviewed.lines.map((line) => line.sourceLineId).toSet(), {'line-one', 'line-two'});
+          final beforeStock = work.workspaceCatalogueItems.singleWhere((p) => p.id == product.id).stock;
+          await receivingField('work-receive-confirm'); await tester.tap(find.byKey(const Key('work-receive-confirm'))); await tester.pumpAndSettle();
+          expect(work.workspaceSupplierLedger(supplier.id)!.goodsReceipts.length, otherDraft ? 3 : 2);
+          expect(work.workspaceCatalogueItems.singleWhere((p) => p.id == product.id).stock, beforeStock + 2);
+          expect(find.byKey(const Key('work-receive-next')), findsNothing);
+        }
+        expect(tester.takeException(), isNull); return;
+      }
+      if (mode == 'unrelated') {
+        expect(find.byKey(const Key('work-receive-other-delivery')), findsOneWidget);
+        expect(forms.drafts[key]!.fields['groupId'], 'host-other-group');
+        expect(forms.drafts[key]!.fields.containsKey('restockOriginal'), isFalse);
+      } else {
+        final saved = forms.drafts[key]!;
+        expect(saved.fields.containsKey('restockOriginal'), isTrue);
+        final source = WorkspaceRestockPurchaseOriginal.fromJson(jsonDecode(saved.fields['restockOriginal']!));
+        expect(source.accountScope, scope.$1); expect(source.buyingStoreId, scope.$2);
+        expect(saved.fields['groupId'], source.deliveryGroupId);
+        final expected = find.byKey(const Key('work-receive-expected-0'));
+        await reveal(tester, expected);
+        expect(tester.widget<TextField>(expected).enabled, isFalse);
+        expect(tester.widget<TextField>(find.byKey(const Key('work-receive-unit-0'))).enabled, isFalse);
+        final reference = find.byKey(const Key('work-receive-reference'));
+        tester.state<ScrollableState>(find.descendant(of: find.byKey(const Key('work-goods-receiving')),
+          matching: find.byType(Scrollable)).first).position.jumpTo(0);
+        await tester.pumpAndSettle();
+        await reveal(tester, reference);
+        if (mode == 'save-failure') forms.failWrite = true;
+        await tester.enterText(reference, 'HOST actual arrival input');
+        FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+        if (mode == 'save-failure') {
+          await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
+          expect(jsonDecode(forms.drafts[key]!.fields['input']!)[0], 'order-v2');
+          forms.failWrite = false;
+        }
+        if (mode == 'review') {
+          await receivingField('work-receive-product-0'); await tester.tap(find.byKey(const Key('work-receive-product-0')));
+          await tester.pumpAndSettle();
+          final product = work.workspaceCatalogueItems.firstWhere((p) => p.stockMode == WorkspaceStockMode.exactQuantity);
+          await tester.tap(find.text('${product.title} · ${product.pack}').last); await tester.pumpAndSettle();
+          await receivingField('work-receive-factor-0'); await tester.enterText(find.byKey(const Key('work-receive-factor-0')), '1');
+          await receivingField('work-receive-delivered-0'); await tester.enterText(find.byKey(const Key('work-receive-delivered-0')), '1');
+          FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+          await receivingField('work-receive-review'); await tester.tap(find.byKey(const Key('work-receive-review'))); await tester.pumpAndSettle();
+          expect(entry.value!.goodsReceiptDrafts.single.receipt.restockOriginal!.toJson(), source.toJson());
+          await receivingField('work-receive-confirm');
+          expect(tester.widget<TextButton>(find.byKey(const Key('work-receive-confirm'))).onPressed, isNull,
+            reason: 'An order or saved review does not invent a confirmed financial opening.');
+        }
+      }
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-goods-receiving')), findsNothing);
+      expect(controller.session, same(buy)); expect(buy.itemCount, cartBefore);
+      expect(tester.state(originalTile()), same(originalState));
+      expect(find.byKey(const ValueKey('purchase-receive-order-order-v2')), findsOneWidget);
+      if (mode != 'unrelated') {
+        expect(jsonDecode(forms.drafts[key]!.fields['input']!)[0], 'HOST actual arrival input');
+        await reveal(tester, receive); await tester.tap(receive); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-receive-supplier'))); await tester.pumpAndSettle();
+        await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+        await receivingField('work-receive-reference');
+        expect(tester.widget<TextField>(find.byKey(const Key('work-receive-reference'))).controller!.text, 'HOST actual arrival input');
+        expect(forms.drafts[key]!.fields.containsKey('restockOriginal'), isTrue);
+        await tester.tap(find.byKey(const Key('work-back'))); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-goods-receiving')), findsNothing);
+      }
+      expect(entry.value!.goodsReceiptDrafts.length, mode == 'review' ? 1 : 0,
+        reason: 'Opening or saving input never posts Stock or a receipt review.');
+      if (mode == 'normal' || mode == 'review') {
+        final savedInput = Map<String, String>.of(forms.drafts[key]!.fields);
+        await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+        final resumed = postingOpeningFixture(entry, checkpoint, inventory: true, moneyStore: forms);
+        await mount(tester, route: '/app/work/workspace/dashboard', work: resumed, textScale: 1);
+        await openPurchaseList(tester);
+        final action = await purchaseRegisterAction(tester, 'work-purchase-receive-goods');
+        await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-receive-supplier'))); await tester.pumpAndSettle();
+        await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+        expect(forms.drafts[key]!.fields, savedInput);
+        expect(find.byKey(const Key('work-receive-order-context')), findsOneWidget);
+        if (mode == 'review') {
+          await receivingField('work-receive-status'); expect(find.text('Saved review · not yet received'), findsOneWidget);
+        } else {
+          await receivingField('work-receive-expected-0');
+          expect(tester.widget<TextField>(find.byKey(const Key('work-receive-expected-0'))).enabled, isFalse);
+        }
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 
   for (final failDiscard in [false, true]) {
