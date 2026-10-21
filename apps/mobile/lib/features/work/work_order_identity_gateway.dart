@@ -7,7 +7,8 @@ import 'package:crypto/crypto.dart';
 import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
 import 'work_customer_feedback.dart';
-import 'work_models.dart' show WorkspaceRestockPurchaseOriginal, WorkspaceSupplierGoodsReceipt, WorkspacePurchasedUnitRow;
+import 'work_models.dart' show WorkspaceRestockPurchaseOriginal, WorkspaceSupplierGoodsReceipt, WorkspacePurchasedUnitRow,
+  WorkspacePurchasedUnitPublishCommand;
 
 enum WorkspaceOrderIdentityState { linked, unlinked, unavailable }
 
@@ -144,7 +145,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
     return _readPurchasedLineSupplement<WorkspacePurchasedWarrantyRead>(role: role, realm: realm, reference: reference,
       line: line, buyingStoreId: buyingStoreId, inputCurrent: inputCurrent,
       sourceCurrent: () => reader.isCurrent && readerLifetime != null && reader.lifetime == readerLifetime && reader.accountUserId == accountUserId,
-      read: reader.read, valid: (result, target) => result.validFor(target));
+      read: (target, _) => reader.read(target), valid: (result, target) => result.validFor(target));
   }
 
   Future<WorkspacePurchasedUnitsRead?> readPurchasedUnits({required WorkspaceOrderIdentityRole role, required String realm,
@@ -154,13 +155,40 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
     return _readPurchasedLineSupplement<WorkspacePurchasedUnitsRead>(role: role, realm: realm, reference: reference,
       line: line, buyingStoreId: buyingStoreId, inputCurrent: inputCurrent,
       sourceCurrent: () => source.isCurrent && owner != null && source.lifetime == owner && source.accountUserId == accountUserId,
-      read: source.read, valid: (result, target) => result.validFor(target));
+      read: (target, _) => source.read(target), valid: (result, target) => result.validFor(target));
+  }
+
+  /// Proposed owner-only publisher boundary. No HTTP operation is implemented.
+  /// A recovered original command is checked; it is never automatically resent.
+  Future<WorkspacePurchasedUnitPublishReply?> publishPurchasedUnits({required WorkspacePurchasedUnitPublishCommand command,
+    required String realm, required WorkspacePurchaseReference reference, required WorkspacePurchasedSkuLine line,
+    required bool reconcile, bool Function()? inputCurrent}) {
+    final source = purchasedUnitSource, lifetime = purchasedUnitSource?.lifetime;
+    if (source is! WorkspacePurchasedUnitPublisher || !command.valid) return Future.value(null);
+    WorkspacePurchasedUnitOwnerAccess? grant;
+    bool authorised() => grant != null && source.ownerAccessCurrent(grant!) && grant!.allows(
+      WorkspacePurchasedLineTarget(accountUserId: accountUserId, role: WorkspaceOrderIdentityRole.seller,
+        realm: realm, reference: reference, line: line), DateTime.now().toUtc());
+    return _readPurchasedLineSupplement<WorkspacePurchasedUnitPublishReply>(role: WorkspaceOrderIdentityRole.seller,
+      realm: realm, reference: reference, line: line, inputCurrent: inputCurrent,
+      sourceCurrent: () => source.isCurrent && lifetime != null && source.lifetime == lifetime && source.accountUserId == accountUserId,
+      read: (target, current) async {
+        if (command.key.account != accountUserId || command.key.realm != realm || command.key.store != reference.storeId || command.key.binding != target.binding) return null;
+        final fresh = await source.read(target);
+        if (!current() || fresh == null || !fresh.validFor(target) || !fresh.complete ||
+          !reconcile && fresh.revision != command.expectedRevision) {
+          return null;
+        }
+        grant = fresh.ownerAccess;
+        if (!authorised()) return null;
+        return reconcile ? source.checkSharing(target, command) : source.share(target, command);
+      }, valid: (reply, target) => authorised() && reply.validFor(command, target));
   }
 
   Future<T?> _readPurchasedLineSupplement<T>({required WorkspaceOrderIdentityRole role, required String realm,
     required WorkspacePurchaseReference reference, required WorkspacePurchasedSkuLine line, String? buyingStoreId,
     bool Function()? inputCurrent, required bool Function() sourceCurrent,
-    required Future<T?> Function(WorkspacePurchasedLineTarget) read, required bool Function(T, WorkspacePurchasedLineTarget) valid}) async {
+    required Future<T?> Function(WorkspacePurchasedLineTarget, bool Function()) read, required bool Function(T, WorkspacePurchasedLineTarget) valid}) async {
     var active = true;
     bool current() => active && isCurrent && sourceCurrent() && inputCurrent?.call() != false;
     // Absence is unavailable, not an invented operation against the order API.
@@ -174,7 +202,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         if (!current() || original == null) return null;
         final savedLine = original.lines.where((candidate) => candidate.lineId == line.lineId).singleOrNull;
         if (savedLine == null || jsonEncode(savedLine.toJson()) != jsonEncode(line.toJson())) return null;
-        return read(target);
+        return read(target, current);
       })().timeout(const Duration(seconds: 15));
       return current() && result != null && valid(result, target) ? result : null;
     } on Object { return null; }
@@ -1447,8 +1475,8 @@ class WorkspacePurchasedLineTarget {
 
 typedef WorkspacePurchasedWarrantyTarget = WorkspacePurchasedLineTarget;
 
-/// Proposed private device reader; no device endpoint or write operation exists
-/// here. Source implementations must verify the authenticated purchase/owner.
+/// Proposed private device reader; no network implementation exists here.
+/// Source implementations must verify the authenticated purchase/owner.
 abstract interface class WorkspacePurchasedUnitSource {
   String get accountUserId;
   bool get isCurrent;
@@ -1459,6 +1487,32 @@ abstract interface class WorkspacePurchasedUnitSource {
   /// Must retire an expired/revoked owner grant even when the reader survives.
   bool ownerAccessCurrent(WorkspacePurchasedUnitOwnerAccess access);
   Future<WorkspacePurchasedUnitsRead?> read(WorkspacePurchasedLineTarget target);
+}
+
+/// A proposed integration capability, separate from read-only sources. The
+/// provider must enforce owner membership, revision checks and operation IDs.
+abstract interface class WorkspacePurchasedUnitPublisher implements WorkspacePurchasedUnitSource {
+  Future<WorkspacePurchasedUnitPublishReply?> share(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitPublishCommand command);
+  Future<WorkspacePurchasedUnitPublishReply?> checkSharing(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitPublishCommand command);
+}
+
+enum WorkspacePurchasedUnitPublishState { applied, pending, closed }
+
+class WorkspacePurchasedUnitPublishReply {
+  const WorkspacePurchasedUnitPublishReply({required this.operationId, required this.commandFingerprint,
+    required this.targetBinding, required this.state, this.record});
+  final String operationId, commandFingerprint, targetBinding;
+  final WorkspacePurchasedUnitPublishState state;
+  final WorkspacePurchasedUnitsRead? record;
+  /// Closed is authoritative: this operation did not apply and cannot apply
+  /// later. Missing/not-found/transport failure is pending, never closed.
+  bool validFor(WorkspacePurchasedUnitPublishCommand command, WorkspacePurchasedLineTarget target) =>
+    command.valid && targetBinding == target.binding && command.key.binding == target.binding && command.key.account == target.accountUserId &&
+    command.key.realm == target.realm && command.key.store == target.reference.storeId &&
+    operationId == command.operationId && commandFingerprint == command.fingerprint &&
+    (state == WorkspacePurchasedUnitPublishState.applied ? record != null && record!.validFor(target) && record!.complete &&
+      record!.revision == command.expectedRevision + 1 && jsonEncode(record!.rows.map((r) => r.toJson()).toList()) ==
+      jsonEncode(command.rows.map((r) => r.toJson()).toList()) : record == null);
 }
 
 class WorkspacePurchasedUnitOwnerAccess {

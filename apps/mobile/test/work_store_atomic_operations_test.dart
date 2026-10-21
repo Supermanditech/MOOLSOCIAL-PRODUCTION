@@ -601,6 +601,29 @@ void main() {
     WorkspacePurchasedUnitDraft draft({int revision = 1, String serial = 'HOST-PARTIAL '}) => WorkspacePurchasedUnitDraft(
       key: key, revision: revision, publishedRevision: 0, rows: [WorkspacePurchasedUnitRow(id: 'local-device-1', serial: serial,
         imei1: '123', imei2: '456')]);
+    test('PF08 SHARE original pending payload survives native restart and rejects tampered journal bytes', () async {
+      final native = _OrderJournalStorage();
+      SecureWorkPurchasedUnitDraftStore create() => SecureWorkPurchasedUnitDraftStore(accountScope: () => key.account,
+        targetScope: () => key.identity, storage: native);
+      final command = WorkspacePurchasedUnitPublishCommand(key: key, operationId: 'a' * 32, expectedRevision: 0,
+        rows: const [WorkspacePurchasedUnitRow(id: 'actual-device', serial: 'HOST-SERIAL', imei1: '111111', imei2: '222222')]);
+      final pending = WorkspacePurchasedUnitDraft(key: key, revision: 1, publishedRevision: 0, rows: command.rows, pending: command);
+      await create().save(pending, expectedRevision: null);
+      expect((await create().read(key))!.toJson(), pending.toJson()); expect(pending.toJson()['version'], 2);
+      expect(draft().toJson()['version'], 1, reason: 'Existing unsent private draft codec is unchanged.');
+      for (final bad in [
+        {...command.toJson(), 'operationId': 'b' * 32}, {...command.toJson(), 'expectedRevision': 0.0},
+        {...command.toJson(), 'outside': true}, {...command.toJson(), 'rows': [const WorkspacePurchasedUnitRow(id: 'other', serial: 'OTHER').toJson()]},
+      ]) { expect(() => WorkspacePurchasedUnitPublishCommand.fromJson(bad), throwsFormatException); }
+      expect(() => WorkspacePurchasedUnitDraft.fromJson({...pending.toJson(), 'rows': draft().toJson()['rows']}), throwsFormatException);
+      final storageKey = native.values.keys.single, writes = native.writes.length;
+      final corrupt = jsonDecode(native.values[storageKey]!) as Map<String, dynamic>;
+      (corrupt['pending'] as Map)['fingerprint'] = 'f' * 64; native.values[storageKey] = jsonEncode(corrupt);
+      final retained = native.values[storageKey];
+      await expectLater(create().read(key), throwsA(isA<WorkGatewayException>()));
+      await expectLater(create().save(draft(revision: 2), expectedRevision: 1), throwsA(isA<WorkGatewayException>()));
+      expect(native.values[storageKey], retained); expect(native.writes, hasLength(writes));
+    });
     test('partial per-device identifiers survive encrypted restart and strict legacy boundaries', () async {
       final native = _OrderJournalStorage();
       SecureWorkPurchasedUnitDraftStore create() => SecureWorkPurchasedUnitDraftStore(accountScope: () => key.account,

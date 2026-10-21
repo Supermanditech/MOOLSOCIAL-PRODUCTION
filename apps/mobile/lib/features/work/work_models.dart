@@ -219,7 +219,7 @@ enum WorkspaceIssueResponse {
 }
 
 /// One actual device. IDs are opaque printed values, not verified identities.
-/// Draft row IDs are local UI identities; published IDs must come from the source.
+/// Draft row IDs are local; only a source-accepted revision makes them published.
 class WorkspacePurchasedUnitRow {
   const WorkspacePurchasedUnitRow({required this.id, this.serial = '', this.imei1 = '', this.imei2 = ''});
   final String id, serial, imei1, imei2;
@@ -260,26 +260,57 @@ class WorkspacePurchasedUnitDraftKey {
   }
 }
 
-/// Private unsent input. Partial identifiers are retained without making them
-/// published supplier facts or rewriting the purchased original.
+/// Frozen owner intent, never proof that device details were published.
+class WorkspacePurchasedUnitPublishCommand {
+  WorkspacePurchasedUnitPublishCommand({required this.key, required this.operationId, required this.expectedRevision,
+    required List<WorkspacePurchasedUnitRow> rows}) : rows = List.unmodifiable(rows);
+  final WorkspacePurchasedUnitDraftKey key;
+  final String operationId;
+  final int expectedRevision;
+  final List<WorkspacePurchasedUnitRow> rows;
+  bool get valid => key.valid && RegExp(r'^[a-f0-9]{32}$').hasMatch(operationId) && expectedRevision >= 0 &&
+    expectedRevision < 2147483647 && rows.length <= 1000 && rows.every((r) => r.ready) && rows.map((r) => r.id).toSet().length == rows.length;
+  String get fingerprint => sha256.convert(utf8.encode(jsonEncode([1, key.toJson(), operationId, expectedRevision,
+    rows.map((r) => r.toJson()).toList()]))).toString();
+  Map<String, Object?> toJson() => {'version': 1, 'key': key.toJson(), 'operationId': operationId,
+    'expectedRevision': expectedRevision, 'rows': rows.map((r) => r.toJson()).toList(), 'fingerprint': fingerprint};
+  static WorkspacePurchasedUnitPublishCommand fromJson(Object? raw) {
+    const keys = {'version', 'key', 'operationId', 'expectedRevision', 'rows', 'fingerprint'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) || raw['version'] is! int || raw['version'] != 1 ||
+      raw['operationId'] is! String || raw['expectedRevision'] is! int || raw['rows'] is! List || (raw['rows'] as List).length > 1000) {
+      throw const FormatException('Saved device sharing request needs recovery.');
+    }
+    final command = WorkspacePurchasedUnitPublishCommand(key: WorkspacePurchasedUnitDraftKey.fromJson(raw['key']),
+      operationId: raw['operationId'], expectedRevision: raw['expectedRevision'],
+      rows: [for (final row in raw['rows']) WorkspacePurchasedUnitRow.fromJson(row)]);
+    if (!command.valid || raw['fingerprint'] != command.fingerprint) throw const FormatException('Saved device sharing request needs recovery.');
+    return command;
+  }
+}
+
+/// Private input and its unresolved original command, never a supplier result.
 class WorkspacePurchasedUnitDraft {
   WorkspacePurchasedUnitDraft({required this.key, required this.revision, required this.publishedRevision,
-    required List<WorkspacePurchasedUnitRow> rows}) : rows = List.unmodifiable(rows);
+    required List<WorkspacePurchasedUnitRow> rows, this.pending}) : rows = List.unmodifiable(rows);
   final WorkspacePurchasedUnitDraftKey key;
   final int revision, publishedRevision;
   final List<WorkspacePurchasedUnitRow> rows;
+  final WorkspacePurchasedUnitPublishCommand? pending;
   bool get valid => key.valid && revision > 0 && revision <= 2147483647 && publishedRevision >= 0 &&
-    publishedRevision <= 2147483647 && rows.length <= 1000 && rows.every((r) => r.validDraft) && rows.map((r) => r.id).toSet().length == rows.length;
-  Map<String, Object?> toJson() => {'version': 1, 'key': key.toJson(), 'revision': revision,
-    'publishedRevision': publishedRevision, 'rows': rows.map((r) => r.toJson()).toList()};
+    publishedRevision <= 2147483647 && rows.length <= 1000 && rows.every((r) => r.validDraft) && rows.map((r) => r.id).toSet().length == rows.length &&
+    (pending == null || pending!.valid && pending!.key.identity == key.identity && pending!.expectedRevision == publishedRevision &&
+      jsonEncode(pending!.rows.map((r) => r.toJson()).toList()) == jsonEncode(rows.map((r) => r.toJson()).toList()));
+  Map<String, Object?> toJson() => {'version': pending == null ? 1 : 2, 'key': key.toJson(), 'revision': revision,
+    'publishedRevision': publishedRevision, 'rows': rows.map((r) => r.toJson()).toList(), if (pending != null) 'pending': pending!.toJson()};
   static WorkspacePurchasedUnitDraft fromJson(Object? raw) {
-    const keys = {'version', 'key', 'revision', 'publishedRevision', 'rows'};
-    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) || raw['version'] is! int || raw['version'] != 1 ||
+    final keys = {'version', 'key', 'revision', 'publishedRevision', 'rows', if (raw is Map && raw['version'] == 2) 'pending'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) || raw['version'] is! int || !const [1, 2].contains(raw['version']) ||
         raw['revision'] is! int || raw['publishedRevision'] is! int || raw['rows'] is! List || (raw['rows'] as List).length > 1000) {
       throw const FormatException('Device draft needs recovery.');
     }
     final draft = WorkspacePurchasedUnitDraft(key: WorkspacePurchasedUnitDraftKey.fromJson(raw['key']), revision: raw['revision'],
-      publishedRevision: raw['publishedRevision'], rows: [for (final r in raw['rows']) WorkspacePurchasedUnitRow.fromJson(r)]);
+      publishedRevision: raw['publishedRevision'], rows: [for (final r in raw['rows']) WorkspacePurchasedUnitRow.fromJson(r)],
+      pending: raw['version'] == 2 ? WorkspacePurchasedUnitPublishCommand.fromJson(raw['pending']) : null);
     if (!draft.valid) throw const FormatException('Device draft needs recovery.');
     return draft;
   }

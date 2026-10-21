@@ -63,6 +63,28 @@ class DeviceDraftFixture implements WorkPurchasedUnitDraftStore {
   }
 }
 
+class DevicePublisherFixture extends DeviceSourceFixture implements WorkspacePurchasedUnitPublisher {
+  final shares = <WorkspacePurchasedUnitPublishCommand>[], checks = <WorkspacePurchasedUnitPublishCommand>[];
+  FutureOr<WorkspacePurchasedUnitPublishReply?> Function(WorkspacePurchasedLineTarget, WorkspacePurchasedUnitPublishCommand)? onShare, onCheck;
+  Future<void> Function()? beforeRead;
+  @override Future<WorkspacePurchasedUnitsRead?> read(WorkspacePurchasedLineTarget target) async {
+    await beforeRead?.call(); return super.read(target);
+  }
+  WorkspacePurchasedUnitPublishReply reply(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitPublishCommand command,
+    WorkspacePurchasedUnitPublishState state, {WorkspacePurchasedUnitsRead? record, String? operationId}) => WorkspacePurchasedUnitPublishReply(
+      operationId: operationId ?? command.operationId, commandFingerprint: command.fingerprint, targetBinding: target.binding, state: state, record: record);
+  Future<WorkspacePurchasedUnitPublishReply> apply(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitPublishCommand command) async {
+    rows = List.of(command.rows); revision = command.expectedRevision + 1;
+    return reply(target, command, WorkspacePurchasedUnitPublishState.applied, record: await read(target));
+  }
+  @override Future<WorkspacePurchasedUnitPublishReply?> share(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitPublishCommand command) async {
+    shares.add(command); return onShare == null ? apply(target, command) : await onShare!(target, command);
+  }
+  @override Future<WorkspacePurchasedUnitPublishReply?> checkSharing(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitPublishCommand command) async {
+    checks.add(command); return onCheck == null ? apply(target, command) : await onCheck!(target, command);
+  }
+}
+
 class DeviceNativeStorageFixture extends FlutterSecureStorage {
   final values = <String, String>{};
   final writes = <String>[];
@@ -610,6 +632,177 @@ void main() {
     expect(find.text('No device identifiers were supplied for this purchase.'), findsNothing);
     expect(find.text('Prepare device details'), findsNothing); expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+
+  for (final scale in [1.0, 2.0]) {
+  for (final outcome in ['applied', 'closed', 'pending', 'wrong-proof', 'lost-response', 'cleanup-failure']) {
+  testWidgets('PF08 SHARE owner review writeahead and $outcome recovery scale=$scale', (tester) async {
+    tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DevicePublisherFixture(), drafts = DeviceDraftFixture();
+    final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+    final original = jsonEncode(line.toJson());
+    source.onShare = (target, command) async {
+      expect(drafts.saved!.pending!.toJson(), command.toJson(), reason: 'Original intent must be durable before source dispatch.');
+      expect(command.rows.single.serial, 'HOST-PRIVATE-DEVICE');
+      if (outcome == 'applied') return source.apply(target, command);
+      if (outcome == 'closed') return source.reply(target, command, WorkspacePurchasedUnitPublishState.closed);
+      if (outcome == 'lost-response') { await source.apply(target, command); return null; }
+      if (outcome == 'cleanup-failure') { final reply = await source.apply(target, command); drafts.failNextSave = true; return reply; }
+      return source.reply(target, command, WorkspacePurchasedUnitPublishState.pending, operationId: outcome == 'wrong-proof' ? 'f' * 32 : null);
+    };
+    Widget host() => MaterialApp(home: MediaQuery(data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+      child: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference, line: line, draftStore: drafts)))));
+    Future<void> tapText(String label) async {
+      await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+      await tester.tap(find.text(label)); await tester.pumpAndSettle();
+    }
+    await tester.pumpWidget(host()); await tapText('Device details'); await tapText('Prepare device details'); await tapText('Add device');
+    expect(tester.widget<TextButton>(find.widgetWithText(TextButton, 'Review and share device details')).onPressed, isNull);
+    await tester.enterText(find.byType(TextFormField).first, 'HOST-PRIVATE-DEVICE');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tapText('Review and share device details');
+    expect(find.text('Serial: HOST-PRIVATE-DEVICE'), findsOneWidget); expect(source.shares, isEmpty); expect(drafts.saved!.pending, isNull);
+    await tapText('Back to editing'); expect(source.shares, isEmpty);
+    await tapText('Review and share device details'); await tapText('Share device details');
+    expect(source.shares, hasLength(1));
+    if (outcome == 'applied' || outcome == 'closed') {
+      expect(drafts.saved!.pending, isNull);
+      expect(find.text(outcome == 'applied' ? 'Device details shared with the buyer.' : 'Not shared. Your private draft is kept.'), findsOneWidget);
+      expect(source.rows, outcome == 'applied' ? hasLength(1) : isEmpty);
+    } else {
+      final pending = drafts.saved!.pending!; expect(find.text('Device details shared with the buyer.'), findsNothing);
+      expect(tester.widget<TextFormField>(find.byType(TextFormField).first).enabled, isFalse);
+      await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpWidget(host());
+      await tapText('Device details'); await tapText('Prepare device details');
+      expect(drafts.saved!.pending!.toJson(), pending.toJson()); expect(source.shares, hasLength(1)); expect(source.checks, isEmpty);
+      await tapText('Check sharing status');
+      expect(source.checks.single.toJson(), pending.toJson()); expect(source.shares, hasLength(1));
+      expect(drafts.saved!.pending, isNull); expect(find.text('Device details shared with the buyer.'), findsOneWidget);
+    }
+    expect(jsonEncode(line.toJson()), original); expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+  }
+  }
+
+  testWidgets('PF08 SHARE delayed encrypted journal save cannot dispatch after UI deadline or exit', (tester) async {
+    final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DevicePublisherFixture(), native = DeviceNativeStorageFixture();
+    final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+    final target = WorkspacePurchasedLineTarget(accountUserId: 'owner-1', role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference, line: line);
+    final key = WorkspacePurchasedUnitDraftKey(account: 'owner-1', realm: 'evaluation', store: reference.storeId, binding: target.binding);
+    final store = SecureWorkPurchasedUnitDraftStore(accountScope: () => 'owner-1', targetScope: () => key.identity, storage: native);
+    source.onCheck = (target, command) => source.reply(target, command, WorkspacePurchasedUnitPublishState.closed);
+    Widget host() => MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference, line: line, draftStore: store))));
+    Future<void> tapText(String label) async {
+      await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+      await tester.tap(find.text(label)); await tester.pumpAndSettle();
+    }
+    await tester.pumpWidget(host()); await tapText('Device details'); await tapText('Prepare device details'); await tapText('Add device');
+    await tester.enterText(find.byType(TextFormField).first, 'HOST-DEVICE');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tapText('Review and share device details');
+    final held = Completer<void>(); native.holdNextWrite = held;
+    await tapText('Share device details'); expect(source.shares, isEmpty);
+    await tester.pump(const Duration(seconds: 11)); await tester.pumpAndSettle();
+    expect(source.shares, isEmpty); expect(find.text('Device details shared with the buyer.'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink()); held.complete(); await tester.pumpAndSettle();
+    expect(source.shares, isEmpty); final pending = (await store.read(key))!.pending!;
+    await tester.pumpWidget(host()); await tapText('Device details'); await tapText('Prepare device details');
+    await tapText('Check sharing status'); expect(source.checks.single.toJson(), pending.toJson());
+    expect(source.shares, isEmpty); expect((await store.read(key))!.pending, isNull);
+    expect(find.text('Not shared. Your private draft is kept.'), findsOneWidget);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+
+  testWidgets('PF08 SHARE preflight timeout or retirement cannot dispatch later', (tester) async {
+    final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DevicePublisherFixture();
+    final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+    final target = WorkspacePurchasedLineTarget(accountUserId: 'owner-1', role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference, line: line);
+    final command = WorkspacePurchasedUnitPublishCommand(key: WorkspacePurchasedUnitDraftKey(account: 'owner-1', realm: 'evaluation', store: reference.storeId,
+      binding: target.binding), operationId: 'a' * 32, expectedRevision: 0, rows: const [WorkspacePurchasedUnitRow(id: 'unit-A', serial: 'HOST-DEVICE')]);
+    for (final timeout in [true, false]) {
+      final held = Completer<void>(); source.beforeRead = () => held.future; var current = true;
+      final sending = gateway.publishPurchasedUnits(command: command, realm: 'evaluation', reference: reference, line: line,
+        reconcile: false, inputCurrent: () => current);
+      await tester.pump();
+      if (timeout) { await tester.pump(const Duration(seconds: 16)); expect(await sending, isNull); }
+      else { current = false; }
+      held.complete(); await tester.pumpAndSettle(); if (!timeout) expect(await sending, isNull);
+      expect(source.shares, isEmpty); expect(source.checks, isEmpty);
+    }
+    source.dispose();
+  });
+
+  test('PF08 SHARE rejects contradictory operation proofs and insufficient current owner authority', () async {
+    final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DevicePublisherFixture();
+    final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+    final target = WorkspacePurchasedLineTarget(accountUserId: 'owner-1', role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference, line: line);
+    final key = WorkspacePurchasedUnitDraftKey(account: 'owner-1', realm: 'evaluation', store: reference.storeId, binding: target.binding);
+    final command = WorkspacePurchasedUnitPublishCommand(key: key, operationId: 'a' * 32, expectedRevision: 0,
+      rows: const [WorkspacePurchasedUnitRow(id: 'unit-A', serial: 'HOST-DEVICE')]);
+    WorkspacePurchasedUnitsRead record({int revision = 1, bool complete = true, List<WorkspacePurchasedUnitRow>? rows}) =>
+      WorkspacePurchasedUnitsRead(target: target, revision: revision, complete: complete, rows: rows ?? command.rows, observedAt: DateTime.utc(2026, 10, 21));
+    for (final invalid in [null, record(revision: 2), record(complete: false), record(rows: const []),
+      record(rows: const [WorkspacePurchasedUnitRow(id: 'unit-A', serial: 'OTHER')])]) {
+      expect(source.reply(target, command, WorkspacePurchasedUnitPublishState.applied, record: invalid).validFor(command, target), isFalse);
+    }
+    expect(source.reply(target, command, WorkspacePurchasedUnitPublishState.applied, record: record()).validFor(command, target), isTrue);
+    for (final state in [WorkspacePurchasedUnitPublishState.closed, WorkspacePurchasedUnitPublishState.pending]) {
+      expect(source.reply(target, command, state, record: record()).validFor(command, target), isFalse);
+    }
+    for (final denial in ['no-owner', 'expired', 'partial', 'changed-revision', 'wrong-key']) {
+      source.owner = denial != 'no-owner'; source.complete = denial != 'partial'; source.revision = denial == 'changed-revision' ? 1 : 0;
+      source.expiresAt = DateTime.now().toUtc().add(Duration(minutes: denial == 'expired' ? -1 : 5));
+      final sent = denial == 'wrong-key' ? WorkspacePurchasedUnitPublishCommand(key: WorkspacePurchasedUnitDraftKey(account: 'owner-1', realm: 'production',
+        store: reference.storeId, binding: key.binding), operationId: command.operationId, expectedRevision: 0, rows: command.rows) : command;
+      expect(await gateway.publishPurchasedUnits(command: sent, realm: 'evaluation', reference: reference, line: line, reconcile: false), isNull);
+      expect(source.shares, isEmpty); expect(source.checks, isEmpty);
+    }
+    source.dispose();
+  });
+
+  testWidgets('PF08 SHARE checking another panel request keeps unsaved conflicting edits for explicit review', (tester) async {
+    final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DevicePublisherFixture(), drafts = DeviceDraftFixture();
+    final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference, line: line, draftStore: drafts)))));
+    Future<void> tapText(String label) async {
+      await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+      await tester.tap(find.text(label)); await tester.pumpAndSettle();
+    }
+    await tapText('Device details'); await tapText('Prepare device details'); await tapText('Add device');
+    await tester.enterText(find.byType(TextFormField).first, 'HOST-FIRST');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    drafts.failNextSave = true;
+    await tester.enterText(find.byType(TextFormField).first, 'HOST-KEPT-CONFLICT');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    final saved = drafts.saved!, command = WorkspacePurchasedUnitPublishCommand(key: drafts.saved!.key, operationId: 'b' * 32, expectedRevision: 0,
+      rows: const [WorkspacePurchasedUnitRow(id: 'other-panel-unit', serial: 'HOST-OTHER-PANEL')]);
+    // Isolated same-owner second-panel journal, not runtime storage injection.
+    drafts.saved = WorkspacePurchasedUnitDraft(key: saved.key, revision: saved.revision + 1, publishedRevision: 0, rows: command.rows, pending: command);
+    await tapText('Recover private draft'); await tapText('Check sharing status');
+    expect(source.checks.single.toJson(), command.toJson()); expect(source.shares, isEmpty);
+    expect(find.text('Your kept edits'), findsOneWidget); expect(find.text('Serial: HOST-KEPT-CONFLICT'), findsOneWidget);
+    expect(find.text('Serial: HOST-OTHER-PANEL'), findsNWidgets(2), reason: 'Published supplier row and saved private comparison are separate.');
+    await tapText('Save kept edits'); expect(drafts.saved!.rows.single.serial, 'HOST-KEPT-CONFLICT');
+    expect(drafts.saved!.pending, isNull); expect(drafts.saved!.publishedRevision, 0);
+    await tapText('Keep this draft against updated records'); expect(drafts.saved!.publishedRevision, 1);
+    expect(source.rows.single.serial, 'HOST-OTHER-PANEL'); expect(source.shares, isEmpty);
+    expect(tester.widget<TextButton>(find.widgetWithText(TextButton, 'Review and share device details')).onPressed, isNotNull);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
   });
 
   testWidgets('PF07 WARRANTY original line opens unavailable details without a service', (tester) async {

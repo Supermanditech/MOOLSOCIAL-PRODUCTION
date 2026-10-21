@@ -531,7 +531,7 @@ void main() {
       : scenario.$2 == 'variant' ? fixtures.variantOperationalResponse(role: 'seller')
       : scenario.$2 == 'attribution' ? fixtures.attributedOperationalResponse(role: 'seller')
       : fixtures.operationalResponse(role: 'seller');
-    final devices = scenario.$2 == 'devices' ? fixtures.DeviceSourceFixture() : null;
+    final devices = scenario.$2 == 'devices' ? fixtures.DevicePublisherFixture() : null;
     final deviceOriginal = devices == null ? null : fixtures.purchaseResponse(role: 'seller');
     if (devices != null) {
       FlutterSecureStorage.setMockInitialValues({});
@@ -605,6 +605,12 @@ void main() {
       expect(work.workspaceOrders.single.stage, 'Preparing');
       await tapText('Device details'); await tapText('Prepare device details'); await tapText('Add device');
       expect(find.byType(TextFormField), findsNWidgets(3));
+      await tester.enterText(find.byType(TextFormField).first, 'HOST-PACKED-DEVICE');
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      await tapText('Review and share device details');
+      expect(find.text('Serial: HOST-PACKED-DEVICE'), findsOneWidget);
+      expect(find.byType(TextFormField), findsNothing);
+      await tapText('Back to editing'); expect(devices.shares, isEmpty);
       expect(devices.requests, hasLength(1)); expect(devices.requests.single.role, WorkspaceOrderIdentityRole.seller);
       expect(devices.requests.single.reference.storeId, 'store-one');
       expect(find.text('Saved on this device · not shared'), findsOneWidget);
