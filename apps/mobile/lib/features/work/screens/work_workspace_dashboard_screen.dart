@@ -2044,6 +2044,12 @@ class _WorkWorkspaceDashboardScreenState
               );
               return Column(children: [
                 if (_storeProcurement case final controller? when
+                    controller.bookmark?.context.purpose == BuyV2ProcurementPurpose.restock &&
+                    _activeProcurement.view == BuyV2View.catalogue &&
+                    _activeProcurement.destination == BuyV2Destination.wholesale)
+                  _StoreRestockSupplierFilter(controller: controller),
+                if (_storeProcurement case final controller? when
+                    controller.bookmark?.context.purpose != BuyV2ProcurementPurpose.restock &&
                     _activeProcurement.view == BuyV2View.catalogue &&
                     _activeProcurement.destination == BuyV2Destination.wholesale &&
                     controller.restockPurposeOptions.isNotEmpty &&
@@ -2827,11 +2833,14 @@ class _WorkWorkspaceDashboardScreenState
   void _procurementIdentityChanged() {
     final controller = _storeProcurement;
     if (controller == null ||
-        controller.bookmark == null ||
-        controller.scopeCurrent) {
+        controller.bookmark == null) {
       return;
     }
+    final scopeCurrent = controller.scopeCurrent;
     controller.invalidateIfChanged();
+    if (scopeCurrent) {
+      return;
+    }
     if (mounted) {
       setState(() {
         _trackedPurchase = null;
@@ -3523,6 +3532,37 @@ enum _WorkspaceControlView {
   alerts,
   procurement,
   operation,
+}
+
+class _StoreRestockSupplierFilter extends StatelessWidget {
+  const _StoreRestockSupplierFilter({required this.controller});
+  final WorkProcurementController controller;
+  @override
+  Widget build(BuildContext context) {
+    final types = controller.restockSupplierTypes, names = controller.restockSupplierTypesLabel;
+    final status = controller.restockSupplierFilterConnected ? 'The catalogue requests these supplier types. Check each product before buying.' :
+      'Supplier filter awaiting connection. Matching results cannot be confirmed yet.';
+    return Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: TextButton(
+      key: const Key('work-restock-supplier-types'),
+      style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+      onPressed: () => showModalBottomSheet<void>(context: context, isScrollControlled: true,
+        builder: (sheetContext) => SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Supplier types', style: Theme.of(sheetContext).textTheme.titleMedium),
+            const SizedBox(height: 12), Text(names), const SizedBox(height: 12), Text(status),
+            const SizedBox(height: 12), TextButton(key: const Key('work-restock-supplier-types-close'),
+              onPressed: () {
+                if (sheetContext.mounted && ModalRoute.of(sheetContext)?.isCurrent == true) {
+                  Navigator.of(sheetContext).pop();
+                }
+              }, child: const Text('Close')),
+          ])))),
+      child: Row(children: [const Icon(Icons.filter_alt_outlined, size: 18), const SizedBox(width: 8),
+        Expanded(child: Text(!controller.restockSupplierFilterConnected ? 'Supplier defaults' :
+          types.length == 1 ? names : 'Supplier types (${types.isEmpty ? 'all' : types.length})',
+          maxLines: 1, overflow: TextOverflow.ellipsis)), const SizedBox(width: 8), const Icon(Icons.info_outline, size: 18)]),
+    ));
+  }
 }
 
 class _StoreRestockPurposeControl extends StatelessWidget {

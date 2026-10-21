@@ -3875,7 +3875,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
         query.supplierOffersOnly || !gateway._matchesProcurementQuery(query) || query.sort == BuyV2ProductSort.deliveryFastest) {
       throw const FormatException('This Store catalogue query needs an additional provider.');
     }
-    return {'destination': query.destination.name,
+    return {...gateway._supplierTypeQuery(), 'destination': query.destination.name,
       'search': query.query.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '),
       'categoryId': query.categoryId, 'sort': query.sort.name, 'brands': query.brands.toList()..sort(),
       'maximumPriceMinor': query.maximumPrice == null ? null : query.maximumPrice! * 100,
@@ -4344,7 +4344,7 @@ class WorkspaceProductPresentationGateway {
 class WorkspacePublicDiscoverySource extends ChangeNotifier
     implements BuyV2CataloguePageSource, BuyV2VariantFamilySource,
       BuyV2ProductContentAdapter, BuyV2StorePublishedOffersSource, BuyV2PublishedCatalogueSource, BuyV2StoreCouponSource,
-        BuyV2SupplierQuoteCouponEligibilitySource {
+        BuyV2SupplierQuoteCouponEligibilitySource, BuyV2PublicRestockSource {
   WorkspacePublicDiscoverySource({required this.gateway, required this.current, this.requestGeneration}) {
     if (!gateway.productFactsReadbackSupported || !gateway.unbrandedProduceReadbackSupported ||
         !gateway.storeClassificationReadbackSupported) { throw ArgumentError('Matching discovery contracts are required.'); }
@@ -4359,6 +4359,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   void _retireAdmissions() {
     _admissionOwner = Object();
     _stores.clear();
+    _publicRestockPublishers.clear();
     _readback._retireAdmissions(_admissionOwner);
     if (!_closed) notifyListeners();
   }
@@ -4367,10 +4368,21 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   final _offerHeads = <String, ({int revision, DateTime observed, String copy})>{};
   final _offerPrices = <String, WorkspaceCatalogueContentResult>{};
   final _offerCopies = <String, String>{};
+  final _publicRestockPublishers = <String, String>{};
   bool _closed = false;
   bool get active => !_closed && current() && gateway._procurementScopeCurrent;
   Iterable<String> get observedProductIds => _readback.observedProductIds;
   WorkspaceCatalogueContentResult? displayedProduct(BuyV2Product product) => active ? _readback.displayedProduct(product) : null;
+  @override
+  BuyV2ProcurementContext? get publicRestockContext =>
+      gateway._publicRestockCatalogue ? gateway.procurementContext : null;
+  @override
+  bool publicRestockProductCurrent(BuyV2Product product) => publicRestockContext != null &&
+      active && product.destination == BuyV2Destination.wholesale &&
+      product.publicListingIdentity?.realm == gateway.realm &&
+      product.hasValidPublicListingIdentity && product.publicListingIdentity != null &&
+      product.hasValidPackTerms && product.packTerms != null && displayedProduct(product) != null &&
+      (gateway._restockSupplierTypes.isEmpty || gateway._restockSupplierTypes.contains(_publicRestockPublishers[product.id]));
   void _changed() { if (active) notifyListeners(); }
   WorkspaceStoreCatalogueSource _store(String storeId) => _stores.putIfAbsent(_id(storeId), () {
     final owner = _admissionOwner;
@@ -4387,7 +4399,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
       throw const FormatException('These filters require another connected provider.');
     }
     if (query.storeId != null) _id(query.storeId);
-    return {'destination': query.destination.name,
+    return {...gateway._supplierTypeQuery(), 'destination': query.destination.name,
       'search': query.query.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '),
       'categoryId': query.categoryId, 'sort': query.sort.name, 'brands': query.brands.toList()..sort(),
       'maximumPriceMinor': query.maximumPrice == null ? null : query.maximumPrice! * 100,
@@ -4460,7 +4472,12 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
     final entries = gateway._procurementEntries(response, enriched);
     if (!admissionCurrent()) throw const FormatException();
     for (final admission in admissions) { admission(); }
-    for (final entry in entries) { _readback.admitPublicEntry(entry, expectedContext: owner); }
+    for (final entry in entries) {
+      _readback.admitPublicEntry(entry, expectedContext: owner);
+      if (gateway._publicRestockCatalogue && entry.publisherType != null) {
+        _publicRestockPublishers[entry.product.id] = entry.publisherType!.name;
+      }
+    }
     final products = entries.map((entry) => entry.product).toList(growable: false);
     final stores = <BuyV2StoreListing>[];
     if (kind == 'stores') { for (final product in products) {
@@ -4702,6 +4719,7 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
     supplierTaxReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_TAX_V1'),
     commodityPriceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_COMMODITY_PRICE_V1'),
     procurementReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROCUREMENT_V1'),
+    publicSupplierTypeFilterSupported: const bool.fromEnvironment('MOOLSOCIAL_PUBLIC_SUPPLIER_TYPE_FILTER_V1'),
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
     stockQuantityVisibilitySupported: const bool.fromEnvironment('MOOLSOCIAL_STOCK_QUANTITY_VISIBILITY_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
@@ -4772,6 +4790,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
     stockQuantityVisibilitySupported: const bool.fromEnvironment('MOOLSOCIAL_STOCK_QUANTITY_VISIBILITY_V1'),
     procurementReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROCUREMENT_V1'),
+    publicSupplierTypeFilterSupported: const bool.fromEnvironment('MOOLSOCIAL_PUBLIC_SUPPLIER_TYPE_FILTER_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     storeCouponTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V1'),
     storeCouponEligibilitySupported: const bool.fromEnvironment(
@@ -4963,11 +4982,16 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.procurementReadbackSupported = false,
     this.procurementContext,
     this.procurementCurrent,
+    bool publicRestockCatalogue = false,
+    this.publicSupplierTypeFilterSupported = false,
+    this.publicRestockSupplierTypes,
     DateTime Function()? now,
-  }) : _reviewedVariantsOverride = reviewedVariants, _productMediaTransportOverride = productMediaTransport, now = now ?? DateTime.now {
+  }) : _publicRestockCatalogue = publicRestockCatalogue,
+       _reviewedVariantsOverride = reviewedVariants, _productMediaTransportOverride = productMediaTransport, now = now ?? DateTime.now {
     if (!_validEndpoint(endpoint) ||
+        publicRestockCatalogue && procurementContext?.purpose != BuyV2ProcurementPurpose.restock ||
         !{'production', 'evaluation'}.contains(realm) || procurementContext != null &&
-          (!procurementReadbackSupported || !procurementContext!.hasIdentity ||
+          ((!procurementReadbackSupported && !publicRestockCatalogue) || !procurementContext!.hasIdentity ||
             ownerAccountId != procurementContext!.accountId || procurementCurrent == null)) {
       throw ArgumentError('Invalid catalogue connection.');
     }
@@ -4979,6 +5003,29 @@ class AuthenticatedWorkspaceCatalogueGateway
   final String realm;
   final String? ownerAccountId;
   final bool procurementReadbackSupported;
+  final bool _publicRestockCatalogue;
+  /// Proposed matching public-query contract; never enabled by a local profile.
+  final bool publicSupplierTypeFilterSupported;
+  final List<String> Function()? publicRestockSupplierTypes;
+  List<String> get _restockSupplierTypes {
+    if (!_publicRestockCatalogue) return const [];
+    final types = publicRestockSupplierTypes?.call() ?? const <String>[];
+    if (types.toSet().length != types.length || types.any((type) =>
+        !const {'manufacturer', 'wholesaler', 'distributor'}.contains(type))) {
+      throw const FormatException();
+    }
+    return List<String>.of(types)..sort();
+  }
+  Map<String, Object?> _supplierTypeQuery() {
+    final types = _restockSupplierTypes;
+    if (types.isEmpty) return const {};
+    if (!publicSupplierTypeFilterSupported) {
+      throw const FormatException('Supplier-type filtering is not connected. Your Store basket is kept.');
+    }
+    return {'supplierTypes': types};
+  }
+  bool get publicRestockReadbackSupported => productFactsReadbackSupported && unbrandedProduceReadbackSupported &&
+      storeClassificationReadbackSupported && supplierPublishersVersionSupported && minorMoneyReadbackSupported;
   final BuyV2ProcurementContext? procurementContext;
   final bool Function()? procurementCurrent;
   bool get _procurementScopeCurrent => procurementContext == null || procurementCurrent?.call() == true;
@@ -5027,6 +5074,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   /// Caller must pin the actual authenticated account/lifetime, not a contact label.
   AuthenticatedWorkspaceCatalogueGateway forOwnerAccount(String accountId, {
     BuyV2ProcurementContext? procurementContext, bool Function()? procurementCurrent,
+    bool? publicRestockCatalogue,
+    List<String> Function()? publicRestockSupplierTypes,
   }) {
     _id(accountId);
     return AuthenticatedWorkspaceCatalogueGateway(
@@ -5059,18 +5108,22 @@ class AuthenticatedWorkspaceCatalogueGateway
       procurementReadbackSupported: procurementReadbackSupported,
       procurementContext: procurementContext ?? this.procurementContext,
       procurementCurrent: procurementCurrent ?? this.procurementCurrent,
+      publicRestockCatalogue: publicRestockCatalogue ?? _publicRestockCatalogue,
+      publicSupplierTypeFilterSupported: publicSupplierTypeFilterSupported,
+      publicRestockSupplierTypes: publicRestockSupplierTypes ?? this.publicRestockSupplierTypes,
       now: now,
     );
   }
 
   AuthenticatedWorkspaceCatalogueGateway forStoreProcurement(BuyV2ProcurementContext context,
-      {required bool Function() current}) {
-    if (!procurementReadbackSupported || !productFactsReadbackSupported || !unbrandedProduceReadbackSupported ||
+      {required bool Function() current, bool publicCatalogue = false, List<String> Function()? supplierTypes}) {
+    if ((!procurementReadbackSupported && !publicCatalogue) || !productFactsReadbackSupported || !unbrandedProduceReadbackSupported ||
         !storeClassificationReadbackSupported || !supplierPublishersVersionSupported || !minorMoneyReadbackSupported) {
       throw StateError('Store purchasing catalogue is not connected.');
     }
     _id(context.accountId); _id(context.storeId); _id(context.originOperationId);
-    return forOwnerAccount(context.accountId, procurementContext: context, procurementCurrent: current);
+    return forOwnerAccount(context.accountId, procurementContext: context, procurementCurrent: current,
+      publicRestockCatalogue: publicCatalogue, publicRestockSupplierTypes: supplierTypes);
   }
 
   bool _matchesProcurementQuery(BuyV2CatalogueQuery query) {
@@ -5080,11 +5133,17 @@ class AuthenticatedWorkspaceCatalogueGateway
   }
 
   bool _responseCurrent(SocialContentResponse response) => _procurementScopeCurrent &&
-    (procurementContext == null ? response is! _WorkspaceProcurementResponse :
-      response is _WorkspaceProcurementResponse && response.currentAt(now().toUtc()));
+    (response is _WorkspaceProcurementResponse
+      ? procurementContext != null && response.currentAt(now().toUtc())
+      : procurementContext == null || _publicRestockCatalogue);
 
   bool _productProcurementCurrent(BuyV2Product product) {
     if (procurementContext == null) return true;
+    if (_publicRestockCatalogue) {
+      return _procurementScopeCurrent && product.publicListingIdentity?.realm == realm &&
+        product.publicListingIdentity != null && product.hasValidPublicListingIdentity &&
+        product.destination == BuyV2Destination.wholesale;
+    }
     final grant = product.procurementSupplierGrant;
     return _procurementScopeCurrent && grant != null && grant.approved && grant.published &&
       now().toUtc().isBefore(grant.validUntil) && grant.listingId == product.id &&
@@ -5096,6 +5155,14 @@ class AuthenticatedWorkspaceCatalogueGateway
       List<WorkspacePublicCatalogueEntry> entries) {
     if (!_responseCurrent(response)) throw const FormatException();
     if (procurementContext == null) return entries;
+    if (_publicRestockCatalogue) {
+      final types = _restockSupplierTypes;
+      if (types.isNotEmpty && (!publicSupplierTypeFilterSupported ||
+          entries.any((entry) => !types.contains(entry.publisherType?.name)))) {
+        throw const FormatException('These supplier types could not be confirmed.');
+      }
+      return entries;
+    }
     final checked = response as _WorkspaceProcurementResponse, context = procurementContext!;
     return entries.map((entry) {
       final product = entry.product, grant = checked.suppliers[entry.product.id];
@@ -5114,7 +5181,7 @@ class AuthenticatedWorkspaceCatalogueGateway
   Future<BuyV2CommerceSnapshot> readProcurementAccess() async {
     try {
       final context = procurementContext;
-      if (context == null || !_procurementScopeCurrent) throw const FormatException();
+      if (context == null || !procurementReadbackSupported || !_procurementScopeCurrent) throw const FormatException();
       final response = await _ownerRequest({'operation': 'readStoreProcurementCatalogue', 'schemaVersion': 1,
         'context': _procurementContextBody(context), 'kind': 'access', 'request': <String, Object?>{}},
         () => _procurementScopeCurrent, mutation: false);
@@ -5897,7 +5964,8 @@ class AuthenticatedWorkspaceCatalogueGateway
     }
     Map<String, Object?>? procurementRequest;
     final context = procurementContext;
-    if (context != null && {'readPublicStoreCatalogue', 'readPublicCatalogueDiscovery'}.contains(body['operation'])) {
+    if (context != null && !_publicRestockCatalogue &&
+        {'readPublicStoreCatalogue', 'readPublicCatalogueDiscovery'}.contains(body['operation'])) {
       if (mutation) throw const FormatException();
       final operation = body['operation'], request = Map<String, Object?>.of(body)..remove('operation');
       procurementRequest = {'schemaVersion': 1, 'context': _procurementContextBody(context),

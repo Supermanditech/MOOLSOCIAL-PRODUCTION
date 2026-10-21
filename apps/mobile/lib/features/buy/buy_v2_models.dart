@@ -185,6 +185,13 @@ enum BuyV2ProcurementEligibility {
   offerChanged,
 }
 
+/// The Store-bound public catalogue retains its own source admissions. Saved
+/// products and caller-supplied flags cannot stand in for this current readback.
+abstract interface class BuyV2PublicRestockSource {
+  BuyV2ProcurementContext? get publicRestockContext;
+  bool publicRestockProductCurrent(BuyV2Product product);
+}
+
 /// Shared mandatory eligibility decision. It does not apply customer filters,
 /// mutate a cart, admit payment, or authorize historical order visibility.
 BuyV2ProcurementEligibility buyV2ProcurementEligibility({

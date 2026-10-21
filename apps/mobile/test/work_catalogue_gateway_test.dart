@@ -302,8 +302,11 @@ class _HostListedTradePlacement extends _HostMinorGroupedPlacement {
 class _HostCouponCartCommerce extends _HostExactOrderCommerce {
   _HostCouponCartCommerce(this.products);
   final List<BuyV2Product> products;
-  @override Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
-    products: products, businessVerified: true, addresses: const [BuyV2Address(id: 'host-home', kind: BuyV2AddressKind.home,
+  bool accessOnly = false;
+  @override Future<BuyV2CommerceSnapshot> refresh() async => accessOnly
+    ? BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready, procurementAccessOnly: true, procurementBuyerGrant: storeGrant)
+    : BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+    products: products, businessVerified: true, procurementBuyerGrant: storeGrant, addresses: const [BuyV2Address(id: 'host-home', kind: BuyV2AddressKind.home,
       label: 'Host Home', recipient: 'Evaluation buyer', phone: '9000000000', line: 'Isolated host address',
       area: 'Jodhpur', pinCode: '342003', landmark: '')]);
 }
@@ -7440,6 +7443,244 @@ void main() {
   }
   BuyV2CatalogueQuery discoveryQuery({String? storeId}) => BuyV2CatalogueQuery(destination: BuyV2Destination.shop,
     regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas, storeId: storeId);
+
+  for (final sellerProfile in ['retailer-grocery', 'wholesaler', 'manufacturer', 'own-store']) {
+    test('RESTOCK-PUBLIC shared catalogue admits competitor $sellerProfile without invented supplier grants', () async {
+      SharedPreferences.setMockInitialValues({}); FlutterSecureStorage.setMockInitialValues({});
+      var clock = at, current = true, visible = true, failed = false;
+      final buyerContext = sellerProfile == 'own-store' ? const BuyV2ProcurementContext(accountId: 'buyer-one',
+        storeId: 'store-one', purpose: BuyV2ProcurementPurpose.restock, originOperationId: 'host-own-store') : restockContext;
+      final generation = ValueNotifier(0), requests = <Map<String, Object?>>[];
+      final connection = AuthenticatedWorkspaceCatalogueGateway(
+        endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), realm: 'production', now: () => clock,
+        productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+        storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+        minorMoneyReadbackSupported: true,
+        transport: OwnerTransport((body) async {
+          requests.add(body); expect(body['operation'], 'readPublicCatalogueDiscovery');
+          expect(body.containsKey('context'), false);
+          if (failed) throw StateError('Isolated public source unavailable');
+          final data = discoveryData(body, empty: !visible);
+          data['supplierPublishersVersion'] = 1;
+          if (!visible) return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+          final listing = (data['items'] as List).single['listing'] as Map<String, dynamic>;
+          data['supplierPublishersVersion'] = 1; listing['supplierPublishersVersion'] = 1;
+          (listing['publicStore'] as Map)['profileId'] = sellerProfile == 'own-store' ? 'retailer-grocery' : sellerProfile;
+          final item = row(listing);
+          item['channels'] = [{...(item['channels'] as List).single as Map,
+            'kind': 'wholesale', 'minimumOrder': 10, 'quantityStep': 1,
+            'tiers': [{'minimumQuantity': 10, 'unitPriceMinor': 10025},
+              {'minimumQuantity': 20, 'unitPriceMinor': 9500}]}];
+          item['listings'] = [publicIdentity(channel: BuyV2OfferClass.wholesale).toJson()];
+          item['supplierPolicy'] = policyEnvelope(state: 'none', revision: 0);
+          (data['items'] as List).single['channel'] = 'wholesale';
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+        })).forStoreProcurement(buyerContext, current: () => current, publicCatalogue: true);
+      final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => true, requestGeneration: generation);
+      addTearDown(generation.dispose); addTearDown(source.dispose);
+      final page = await source.loadProducts(restockQuery(context: buyerContext), pageSize: 40), selected = page.items.single;
+      expect(page.totalCount, 1); expect(selected.procurementSupplierGrant, isNull);
+      expect(source.publicRestockProductCurrent(selected), true);
+      expect(source.publicRestockProductCurrent(selected.copyWith(priceMinor: selected.priceMinor + 1)), false);
+      final beforeAccess = requests.length;
+      expect((await connection.readProcurementAccess()).state, BuyV2CommerceLoadState.unavailable);
+      expect(requests.length, beforeAccess, reason: 'Absent buyer-access service must not be invented or dispatched.');
+      final identity = ValueNotifier<BuyV2ProcurementContext?>(buyerContext), core = BuySession();
+      final commerce = _HostCouponCartCommerce([selected]);
+      late final BuyV2Session session;
+      session = BuyV2Session(core: core, procurementIdentity: identity, cataloguePageSource: source,
+        customerStateStore: _HostRetirableStateStore()..ownerScope = buyerContext.customerStateOwnerScope,
+        productContentAdapter: source, reviewDataEnabled: false, catalogueNow: () => clock, commerceAdapter: commerce,
+        productFactsAdapter: _HostOperationalFacts((p) => BuyV2ProductFactsSnapshot(productId: p.id, priceMinor: p.priceMinor,
+          deliveryPromise: 'Host-only courier', partner: 'Host-only courier', orderabilityLabel: 'Host-only availability',
+          sourceId: 'isolated-public-restock', observedAt: at, eligibility: BuyV2OfferEligibility(productId: p.id,
+            storeId: p.storeId!, sourceRevision: 'host-v1', customerLocationKey: session.eligibilityLocationKey,
+            observedAt: at, expiresAt: at.add(const Duration(hours: 1)), offerClass: BuyV2OfferClass.wholesale,
+            channelEnabled: true, storeReady: true, fleetAvailable: false, customerLocationConfirmed: true,
+            options: {BuyV2DeliveryOption.courier}))));
+      addTearDown(core.dispose); addTearDown(identity.dispose); addTearDown(session.dispose);
+      await session.restoreCustomerState(); await session.restoreCommerce();
+      expect(session.procurementEligibilityFor(selected), BuyV2ProcurementEligibility.buyerUnavailable);
+      expect(session.addProduct(selected.id, quantity: 10), false);
+      commerce.storeGrant = BuyV2ProcurementBuyerGrant(accountId: buyerContext.accountId,
+        storeId: buyerContext.storeId, approved: true, validUntil: at.add(const Duration(hours: 1)));
+      await session.restoreCommerce();
+      if (sellerProfile == 'own-store') {
+        expect(page.totalCount, 1, reason: 'Public browsing counts are not role- or self-filtered.');
+        expect(session.procurementEligibilityFor(selected), BuyV2ProcurementEligibility.listingNotPermitted);
+        expect(session.addProduct(selected.id, quantity: 10), false);
+        expect(session.cartLines, isEmpty);
+        return;
+      }
+      expect(session.procurementEligibilityFor(selected), BuyV2ProcurementEligibility.eligible);
+      expect(session.addProduct(selected.id, quantity: 10), true, reason: session.notice);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.cartLines.single.product.id, selected.id); expect(session.scopedProcurementPricesUnavailable, false);
+      expect(session.setCartQuantity(selected.id, '20'), true, reason: session.notice);
+      expect(session.cartLines.single.product.priceMinor, 9500);
+      expect(source.publicRestockProductCurrent(session.cartLines.single.product), false,
+        reason: 'Effective tier price is not the exact published base-price product.');
+      expect(session.procurementEligibilityFor(selected, retainedProduct: session.cartLines.single.product),
+        BuyV2ProcurementEligibility.eligible);
+      final preferences = _ExactMoneyHostPreferences();
+      BuyV2SharedPreferencesCustomerStateStore savedState() => BuyV2SharedPreferencesCustomerStateStore(preferences,
+        ownerScope: buyerContext.customerStateOwnerScope);
+      expect(await savedState().write(BuyV2CustomerStateSnapshot(cartQuantities: {selected.id: 20},
+        procurementDraft: BuyV2ProcurementDraftSnapshot(ownerScope: buyerContext.customerStateOwnerScope,
+          cartProducts: {selected.id: session.cartLines.single.product}))), true);
+      final saved = (await savedState().read())!, retained = saved.procurementDraft!.cartProducts[selected.id]!;
+      expect(retained.priceMinor, 9500); expect(retained.publicListingIdentity, selected.publicListingIdentity);
+      expect(retained.packTerms!.toRetainedJson(), selected.packTerms!.toRetainedJson());
+      expect(retained.procurementSupplierGrant?.approved, isNot(true));
+      final restoredCore = BuySession(), restored = BuyV2Session(core: restoredCore,
+        procurementIdentity: identity, customerStateStore: savedState(), cataloguePageSource: source,
+        productContentAdapter: source, catalogueNow: () => clock, reviewDataEnabled: false, commerceAdapter: commerce);
+      try {
+        await restored.restoreCommerce(); await restored.restoreCustomerState();
+        restored.openCart(scope: BuyV2CartScope.wholesale);
+        expect(restored.cartLines.single.quantity, 20); expect(restored.cartLines.single.product.priceMinor, 9500);
+        expect(restored.procurementCheckoutUnavailableMessage, isNull);
+        expect((await BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'isolated-personal').read()), isNull);
+      } finally { restored.dispose(); restoredCore.dispose(); }
+      expect(session.procurementEligibilityFor(selected, retainedProduct: selected.copyWith(priceMinor: selected.priceMinor + 1)),
+        BuyV2ProcurementEligibility.offerChanged);
+      commerce.accessOnly = true; visible = false;
+      await session.restoreCommerce();
+      expect(session.procurementUnavailableMessage, isNull, reason: 'Withdrawn product does not revoke genuine buyer access.');
+      expect(session.procurementCheckoutUnavailableMessage, isNotNull);
+      expect(session.cartLines.single.quantity, 20); expect(session.cartLines.single.product.priceMinor, 9500);
+      visible = true;
+      await session.restoreCommerce();
+      expect(session.procurementUnavailableMessage, isNull);
+      expect(session.procurementCheckoutUnavailableMessage, isNull);
+      failed = true;
+      await session.restoreCommerce();
+      expect(session.procurementUnavailableMessage, isNull, reason: 'Failed product read does not revoke genuine buyer access.');
+      expect(session.procurementCheckoutUnavailableMessage, isNotNull);
+      expect(session.cartLines.single.quantity, 20);
+      failed = false; await session.restoreCommerce();
+      expect(session.procurementCheckoutUnavailableMessage, isNull);
+      generation.value++;
+      expect(source.publicRestockProductCurrent(selected), false);
+      expect(session.procurementEligibilityFor(selected), BuyV2ProcurementEligibility.supplierUnavailable);
+      final resolved = (await source.resolveProducts({selected.id})).single;
+      expect(source.publicRestockProductCurrent(resolved), true);
+      clock = at.add(const Duration(hours: 2));
+      expect(source.publicRestockProductCurrent(resolved), false);
+      current = false;
+      await expectLater(source.resolveProducts({selected.id}), throwsFormatException);
+    });
+  }
+  for (final scenario in [
+    (name: 'manufacturer', types: ['manufacturer'], seller: 'manufacturer', supported: true, accepted: true),
+    (name: 'manufacturer rejects wholesaler', types: ['manufacturer'], seller: 'wholesaler', supported: true, accepted: false),
+    (name: 'retailer', types: ['manufacturer', 'wholesaler', 'distributor'], seller: 'wholesaler', supported: true, accepted: true),
+    (name: 'retailer rejects retailer', types: ['manufacturer', 'wholesaler', 'distributor'], seller: 'retailer-grocery', supported: true, accepted: false),
+    (name: 'distributor', types: ['manufacturer', 'wholesaler'], seller: 'manufacturer', supported: true, accepted: true),
+    (name: 'unsupported source', types: ['manufacturer'], seller: 'manufacturer', supported: false, accepted: false),
+    (name: 'unknown distributor publication', types: ['distributor'], seller: 'distributor', supported: true, accepted: false),
+  ]) {
+    testWidgets('RESTOCK-PUBLIC supplier-type query ${scenario.name} preserves source counts', (tester) async {
+      var calls = 0, disposed = false;
+      final types = List<String>.of(scenario.types);
+      final gateway = AuthenticatedWorkspaceCatalogueGateway(
+        endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), realm: 'production', now: () => at,
+        productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+        storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+        minorMoneyReadbackSupported: true, publicSupplierTypeFilterSupported: scenario.supported,
+        transport: OwnerTransport((body) async {
+          calls++; expect(body['operation'], 'readPublicCatalogueDiscovery');
+          expect((body['query'] as Map)['supplierTypes'], List<String>.of(types)..sort());
+          final data = discoveryData(body), listing = (data['items'] as List).single['listing'] as Map<String, dynamic>;
+          data['supplierPublishersVersion'] = 1; listing['supplierPublishersVersion'] = 1;
+          (listing['publicStore'] as Map)['profileId'] = scenario.seller;
+          final item = row(listing);
+          item['channels'] = [{...(item['channels'] as List).single as Map, 'kind': 'wholesale', 'minimumOrder': 10}];
+          item['listings'] = [publicIdentity(channel: BuyV2OfferClass.wholesale).toJson()];
+          (data['items'] as List).single['channel'] = 'wholesale';
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+        })).forStoreProcurement(restockContext, current: () => true, publicCatalogue: true, supplierTypes: () => types);
+      final source = WorkspacePublicDiscoverySource(gateway: gateway, current: () => true);
+      addTearDown(() {
+        if (!disposed) { source.dispose(); }
+      });
+      if (!scenario.accepted) {
+        await expectLater(source.loadProducts(restockQuery(), pageSize: 40), throwsFormatException);
+        expect(calls, scenario.supported ? 1 : 0);
+      } else {
+        final page = await source.loadProducts(restockQuery(), pageSize: 40);
+        expect(page.totalCount, 1); expect(page.items, hasLength(1));
+        expect(source.publicRestockProductCurrent(page.items.single), true);
+        final identity = ValueNotifier<BuyV2ProcurementContext?>(restockContext), core = BuySession();
+        final session = BuyV2Session(core: core, procurementIdentity: identity,
+          customerStateStore: _HostRetirableStateStore()..ownerScope = restockContext.customerStateOwnerScope,
+          cataloguePageSource: source, productContentAdapter: source, catalogueNow: () => at,
+          initialCatalogueAreaScope: BuyV2CatalogueAreaScope.allAreas,
+          reviewDataEnabled: false, commerceAdapter: _HostExactOrderCommerce());
+        try {
+          await session.restoreCustomerState(); await session.restoreCommerce();
+          await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: BuyV2Screen(session: session,
+            embeddedStore: true, accountAuthenticated: true, initialDestination: BuyV2Destination.wholesale)));
+          await tester.pumpAndSettle();
+          expect(session.procurementUnavailableMessage, isNotNull);
+          expect(find.text('Store purchase unavailable'), findsNothing,
+            reason: 'Public browsing must work before a genuine Store checkout grant is available.');
+          expect(find.text(page.items.single.title), findsWidgets);
+          expect(session.addProduct(page.items.single.id, quantity: 10), false);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        } finally { session.dispose(); core.dispose(); identity.dispose(); }
+        types..clear()..add('distributor');
+        expect(source.publicRestockProductCurrent(page.items.single), false,
+          reason: 'A retained source admission cannot satisfy a different current supplier filter.');
+      }
+      source.dispose(); disposed = true;
+    });
+  }
+  test('RESTOCK-PUBLIC pending pages retire across Store profile ABA without replacing basket', () async {
+    var profile = 'manufacturer', hold = true;
+    final dispatched = Completer<void>(), reply = Completer<void>();
+    final gateway = AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), realm: 'production', now: () => at,
+      productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+      storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+      minorMoneyReadbackSupported: true, publicSupplierTypeFilterSupported: true,
+      transport: OwnerTransport((body) async {
+        expect(body['operation'], 'readPublicCatalogueDiscovery');
+        expect((body['query'] as Map)['supplierTypes'], ['manufacturer']);
+        final data = discoveryData(body), listing = (data['items'] as List).single['listing'] as Map<String, dynamic>;
+        data['supplierPublishersVersion'] = 1; listing['supplierPublishersVersion'] = 1;
+        (listing['publicStore'] as Map)['profileId'] = 'manufacturer';
+        final item = row(listing);
+        item['channels'] = [{...(item['channels'] as List).single as Map, 'kind': 'wholesale', 'minimumOrder': 10}];
+        item['listings'] = [publicIdentity(channel: BuyV2OfferClass.wholesale).toJson()];
+        (data['items'] as List).single['channel'] = 'wholesale';
+        if (hold) { dispatched.complete(); await reply.future; }
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      }));
+    final controller = WorkProcurementController(currentAccountId: () => restockContext.accountId,
+      currentStoreId: () => restockContext.storeId, currentProfileId: () => profile, storeApproved: () => true,
+      catalogueGateway: gateway, bookmarks: _HostProcurementBookmarks(),
+      stateStoreFactory: (scope) => _HostRetirableStateStore()..ownerScope = scope);
+    addTearDown(controller.dispose);
+    expect(await controller.open(purpose: restockContext.purpose, returnTo: 'stockStatement', exactContext: restockContext), true);
+    final session = controller.session!, source = controller.session!.cataloguePageSource! as WorkspacePublicDiscoverySource;
+    final pending = source.loadProducts(restockQuery(), pageSize: 40);
+    await dispatched.future;
+    profile = 'retailer-grocery'; controller.invalidateIfChanged();
+    profile = 'manufacturer'; controller.invalidateIfChanged();
+    hold = false; reply.complete();
+    await expectLater(pending, throwsFormatException);
+    expect(source.observedProductIds, isEmpty);
+    expect(controller.session, same(session));
+    expect(session.customerStateStore!.ownerScope, restockContext.customerStateOwnerScope);
+    final fresh = await source.loadProducts(restockQuery(), pageSize: 40);
+    expect(fresh.totalCount, 1); expect(source.publicRestockProductCurrent(fresh.items.single), true);
+    expect(session.procurementUnavailableMessage, isNotNull, reason: 'No buyer access provider is configured.');
+  });
   test('LF-DISCOVERY client products Store preview and content use exact public identity and paise', () async {
     final requests = <Map<String, Object?>>[];
     final connection = discoveryGateway(OwnerTransport((body) async {

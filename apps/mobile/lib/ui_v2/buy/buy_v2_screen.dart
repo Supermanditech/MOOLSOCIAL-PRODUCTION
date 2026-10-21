@@ -2967,6 +2967,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         session.linkedProductRecoveryId != null) {
       return null;
     }
+    // Public browsing is independent of the genuine Store checkout grant.
+    // Scope recovery and all Cart/purchase action checks still apply.
+    if (session.usesPublicRestockCatalogue && session.procurementScopeCurrent &&
+        (session.view == BuyV2View.product || session.view == BuyV2View.catalogue &&
+          session.destination == BuyV2Destination.wholesale)) {
+      return null;
+    }
     final message = switch (session.view) {
       BuyV2View.catalogue when session.destination != BuyV2Destination.orders =>
         session.procurementUnavailableMessage,

@@ -4016,6 +4016,18 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
   }
 
+  BuyV2PublicRestockSource? get _publicRestockSource {
+    final source = cataloguePageSource, context = procurementContext;
+    final publicSource = source is BuyV2PublicRestockSource ? source as BuyV2PublicRestockSource : null;
+    if (publicSource == null || !identical(source, productContentAdapter) ||
+        context?.purpose != BuyV2ProcurementPurpose.restock ||
+        publicSource.publicRestockContext?.customerStateOwnerScope != context?.customerStateOwnerScope) {
+      return null;
+    }
+    return publicSource;
+  }
+  bool get usesPublicRestockCatalogue => _publicRestockSource != null;
+
   BuyV2ProcurementEligibility procurementEligibilityFor(
     BuyV2Product product, {
     BuyV2Product? retainedProduct,
@@ -4030,6 +4042,21 @@ class BuyV2Session extends ChangeNotifier {
     final retained = retainedProduct?.procurementSupplierGrant;
     final quantityPrice = retainedProduct == null ? product :
         _productAtPackQuantity(product, _cart[retainedProduct.id]?.quantity ?? 1);
+    final publicSource = _publicRestockSource;
+    if (publicSource != null) {
+      if (procurementUnavailableMessage != null) return BuyV2ProcurementEligibility.buyerUnavailable;
+      if (!publicSource.publicRestockProductCurrent(product)) return BuyV2ProcurementEligibility.supplierUnavailable;
+      if (product.storeId == active.storeId) return BuyV2ProcurementEligibility.listingNotPermitted;
+      if (retainedProduct != null &&
+          (retainedProduct.publicListingIdentity != product.publicListingIdentity ||
+            retainedProduct.variant != product.variant || retainedProduct.pack != product.pack ||
+            retainedProduct.packTerms?.revision != product.packTerms?.revision ||
+            !retainedProduct.hasValidMoney || !product.hasValidMoney ||
+            retainedProduct.priceMinor != quantityPrice.priceMinor)) {
+        return BuyV2ProcurementEligibility.offerChanged;
+      }
+      return BuyV2ProcurementEligibility.eligible;
+    }
     if (retainedProduct != null &&
         (retained == null ||
             retained.offerId.isEmpty ||
@@ -4081,7 +4108,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool _procurementDiscoveryAllows(BuyV2Product product) =>
-      switch (procurementEligibilityFor(product)) {
+      _publicRestockSource?.publicRestockProductCurrent(product) ?? switch (procurementEligibilityFor(product)) {
         BuyV2ProcurementEligibility.notRequested ||
         BuyV2ProcurementEligibility.eligible => true,
         _ => false,
@@ -4219,6 +4246,10 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (!isStoreProcurement) return true;
+    if (_publicRestockSource != null) {
+      return procurementEligibilityFor(offer.product) == BuyV2ProcurementEligibility.eligible &&
+        offer.product.storeId == offer.storeId && offer.channel == BuyV2ComparisonChannel.wholesale;
+    }
     final grant = offer.product.procurementSupplierGrant;
     return grant != null &&
         grant.workspaceId == offer.supplierWorkspaceId &&
@@ -4273,6 +4304,10 @@ class BuyV2Session extends ChangeNotifier {
 
   String? get procurementDiscoveryUnavailableMessage {
     if (!isStoreProcurement) return null;
+    if (_publicRestockSource != null) {
+      return _knownCatalogueProducts.any(_procurementDiscoveryAllows) ? null :
+        'Public wholesale and bulk products could not be confirmed. Try again.';
+    }
     final unavailable = procurementUnavailableMessage;
     if (unavailable != null) return unavailable;
     if (_knownCatalogueProducts.any(_procurementDiscoveryAllows)) return null;
@@ -4284,7 +4319,10 @@ class BuyV2Session extends ChangeNotifier {
   bool procurementRetainedPriceUnavailable(BuyV2Product product) =>
       isStoreProcurement &&
       _cart.containsKey(product.id) &&
-      (product.procurementSupplierGrant?.offerId.isEmpty ?? true);
+      (_publicRestockSource != null
+        ? product.publicListingIdentity == null || !product.hasValidPublicListingIdentity ||
+            product.packTerms == null || !product.hasValidPackTerms
+        : (product.procurementSupplierGrant?.offerId.isEmpty ?? true));
 
   bool procurementPricesUnavailableFor([BuyV2Destination? destination]) =>
       isStoreProcurement &&
@@ -4681,7 +4719,9 @@ class BuyV2Session extends ChangeNotifier {
         isStoreProcurement &&
         (query.procurementContext?.customerStateOwnerScope !=
                 procurementContext?.customerStateOwnerScope ||
-            _procurementProductMessage(product) != null)) {
+            (_publicRestockSource != null
+              ? !_procurementDiscoveryAllows(product)
+              : _procurementProductMessage(product) != null))) {
       throw const FormatException(
         'Store purchase availability could not be confirmed',
       );
@@ -9221,14 +9261,26 @@ class BuyV2Session extends ChangeNotifier {
               _openedStorePromotion = null;
               _pagedStores.clear();
               notifyListeners();
-              final products = await _resolvePersistedCatalogueProducts(ids, refreshKnown: true)
-                  .timeout(const Duration(seconds: 15));
+              Map<String, BuyV2Product> products;
+              try {
+                products = await _resolvePersistedCatalogueProducts(ids, refreshKnown: true)
+                    .timeout(const Duration(seconds: 15));
+              } on Object {
+                if (_publicRestockSource == null) rethrow;
+                // A failed product refresh does not revoke genuine buyer access.
+                // Retain Cart agreements, but retire these current offer copies.
+                products = {};
+              }
               if (refreshSequence != _commerceRefreshSequence || _collectionDisposed ||
                   procurementEpoch != _procurementEpoch || feedbackScope != _currentCustomerOrderScope ||
                   !procurementScopeCurrent) { return; }
               // Validate the complete result before installing any authority.
+              if (_publicRestockSource != null) {
+                products.removeWhere((_, next) => !_procurementDiscoveryAllows(next));
+              }
               for (final next in products.values) {
-                if (procurementEligibilityFor(next) != BuyV2ProcurementEligibility.eligible) {
+                if (_publicRestockSource != null ? !_procurementDiscoveryAllows(next) :
+                    procurementEligibilityFor(next) != BuyV2ProcurementEligibility.eligible) {
                   throw const FormatException('Supplier offer approval could not be confirmed');
                 }
               }

@@ -14180,6 +14180,36 @@ void main() {
         reference: reference, line: line, buyingStoreId: 's'), isNull);
       expect(warranty.requests, hasLength(1));
     });
+    test('RESTOCK-PUBLIC every Store profile browses without an input or role wizard', () async {
+      for (final profile in ['retailer-grocery', 'wholesaler', 'manufacturer', 'distributor', 'unknown']) {
+        profileId = profile;
+        expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
+        expect(controller.restockRestrictionMessage, isNull, reason: profile);
+        final scope = controller.session!.customerStateStore!.ownerScope;
+        controller.dispose(); controller = create();
+        expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard', restoreOnly: true), true);
+        expect(controller.restockRestrictionMessage, isNull, reason: 'Restored $profile');
+        expect(controller.session!.customerStateStore!.ownerScope, scope);
+        await controller.leave();
+      }
+    });
+    test('RESTOCK-PUBLIC supplier-type defaults reuse the same Store basket', () async {
+      const expected = {
+        'retailer-grocery': ['manufacturer', 'wholesaler', 'distributor'],
+        'retailer-speciality': ['manufacturer', 'wholesaler', 'distributor'],
+        'manufacturer': ['manufacturer'], 'wholesaler': ['manufacturer'],
+        'distributor': ['manufacturer', 'wholesaler'], 'sub-distributor': ['manufacturer', 'wholesaler'],
+      };
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
+      final opened = controller.session!, scope = opened.customerStateStore!.ownerScope;
+      for (final entry in expected.entries) {
+        profileId = entry.key; controller.invalidateIfChanged();
+        expect(controller.restockSupplierTypes, entry.value);
+        expect(controller.restockSupplierFilterConnected, false);
+        expect(controller.session, same(opened)); expect(opened.customerStateStore!.ownerScope, scope);
+        expect(controller.restockRestrictionMessage, isNull);
+      }
+    });
     test('RESTOCK-PURPOSE local choice survives restart without changing basket identity', () async {
       profileId = 'manufacturer';
       expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
@@ -14188,7 +14218,7 @@ void main() {
       expect(await controller.selectRestockPurpose(WorkRestockPurchasePurpose.rawMaterials), true);
       expect(controller.session, same(opened));
       expect(controller.bookmark!.context.customerStateOwnerScope, scope);
-      expect(controller.restockRestrictionMessage, contains('eligibility'));
+      expect(controller.restockRestrictionMessage, isNull, reason: 'Legacy purpose metadata no longer gates public Restock.');
       controller.dispose(); controller = create();
       expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard', restoreOnly: true), true);
       expect(controller.restockPurpose, WorkRestockPurchasePurpose.rawMaterials);
@@ -14214,7 +14244,7 @@ void main() {
       final opened = controller.session!, revision = controller.restockPolicyRevision;
       expect(controller.restockRestrictionMessage, isNull);
       profileId = 'manufacturer'; controller.invalidateIfChanged();
-      expect(controller.restockRestrictionMessage, isNotNull);
+      expect(controller.restockRestrictionMessage, isNull);
       profileId = 'retailer-grocery'; controller.invalidateIfChanged();
       expect(controller.restockPolicyRevision, greaterThan(revision + 1));
       expect(controller.session, same(opened));

@@ -92,6 +92,18 @@ class WorkProcurementController extends ChangeNotifier {
   bool restockChoiceBusy = false;
   String? restockChoiceMessage;
   int get restockPolicyRevision => _restockPolicyGeneration.value;
+  List<String> get restockSupplierTypes => switch (currentProfileId?.call()) {
+    'manufacturer' || 'wholesaler' => const ['manufacturer'],
+    'distributor' || 'sub-distributor' => const ['manufacturer', 'wholesaler'],
+    'retailer-grocery' || 'retailer-speciality' => const ['manufacturer', 'wholesaler', 'distributor'],
+    _ => const [],
+  };
+  String get restockSupplierTypesLabel => restockSupplierTypes.isEmpty ? 'All public supplier types' :
+    restockSupplierTypes.map((type) => switch (type) {
+      'manufacturer' => 'Manufacturers', 'wholesaler' => 'Wholesalers', _ => 'Distributors',
+    }).join(', ');
+  bool get restockSupplierFilterConnected => restockSupplierTypes.isEmpty ||
+      catalogueGateway?.publicSupplierTypeFilterSupported == true;
   WorkRestockPurchasePurpose? get restockPurpose =>
     bookmark?.uiProfileId == currentProfileId?.call() ? bookmark?.restockPurpose : null;
   List<WorkRestockPurchasePurpose> get restockPurposeOptions => switch (currentProfileId?.call()) {
@@ -101,6 +113,9 @@ class WorkProcurementController extends ChangeNotifier {
     _ => const [],
   };
   String? get restockRestrictionMessage {
+    // MVP Restock uses the public catalogue. Legacy saved profile/purpose
+    // choices remain recoverable metadata, never supplier-access rules.
+    if (bookmark?.context.purpose == BuyV2ProcurementPurpose.restock) return null;
     if (restockChoiceBusy) return 'Saving your purchase purpose. Your basket is kept.';
     final profile = currentProfileId?.call(), choice = restockPurpose;
     if (profile == null || restockPurposeOptions.isEmpty) {
@@ -178,14 +193,17 @@ class WorkProcurementController extends ChangeNotifier {
     BuyV2CustomerStateStore stateStore,
   ) {
     final context = identity.value;
-    final configured = catalogueGateway?.procurementReadbackSupported == true;
+    final configured = catalogueGateway?.procurementReadbackSupported == true ||
+        context?.purpose == BuyV2ProcurementPurpose.restock && catalogueGateway?.publicRestockReadbackSupported == true;
     AuthenticatedWorkspaceCatalogueGateway? bound;
     if (configured && context != null) {
       final lifetime = _catalogueLifetime;
       bool current() => lifetime == _catalogueLifetime && scopeCurrent && restockRestrictionMessage == null &&
           identity.value?.customerStateOwnerScope == context.customerStateOwnerScope;
       try {
-        bound = catalogueGateway!.forStoreProcurement(context, current: current);
+        bound = catalogueGateway!.forStoreProcurement(context, current: current,
+          publicCatalogue: context.purpose == BuyV2ProcurementPurpose.restock,
+          supplierTypes: () => restockSupplierTypes);
         _ownedCatalogueSource = WorkspacePublicDiscoverySource(gateway: bound, current: current,
           requestGeneration: _restockPolicyGeneration);
       } on Object {
