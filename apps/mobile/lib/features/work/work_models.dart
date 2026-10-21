@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/material.dart';
 
 import '../buy/buy_v2_content_contracts.dart';
@@ -3366,16 +3367,71 @@ class WorkspaceSupplierGoodsReceiptLine {
   }
 }
 
+/// Retained original identity, not receiving permission. New receipts still
+/// require an authenticated current-original check before posting.
+class WorkspaceRestockPurchaseOriginal {
+  WorkspaceRestockPurchaseOriginal._(this.realm, this.accountScope, this.buyingStoreId,
+    Map<String, String> reference, Map<String, ({int quantityMilli, String quantityUnit})> lines)
+    : reference = Map.unmodifiable(reference), lines = Map.unmodifiable(lines);
+  final String realm, accountScope, buyingStoreId;
+  final Map<String, String> reference;
+  final Map<String, ({int quantityMilli, String quantityUnit})> lines;
+  String get deliveryGroupId => 'restock-${sha256.convert(utf8.encode(jsonEncode([
+    realm, buyingStoreId, reference['purchaseId'], reference['storeId'], reference['orderId']])))}';
+  bool matchesReceipt(WorkspaceSupplierGoodsReceipt receipt) => receipt.expectedDeliveryId == deliveryGroupId &&
+    receipt.lines.every((line) => lines[line.sourceLineId]?.quantityMilli == line.expectedMilli &&
+      lines[line.sourceLineId]?.quantityUnit == line.purchaseUnit);
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'realm': realm, 'accountScope': accountScope,
+    'buyingStoreId': buyingStoreId, 'reference': reference,
+    'lines': [for (final line in lines.entries) {'lineId': line.key,
+      'quantityMilli': line.value.quantityMilli, 'quantityUnit': line.value.quantityUnit}]};
+  static WorkspaceRestockPurchaseOriginal fromJson(Object? value) {
+    const keys = {'schemaVersion', 'realm', 'accountScope', 'buyingStoreId', 'reference', 'lines'};
+    const referenceKeys = ['purchaseId', 'storeId', 'orderId', 'originalFingerprint', 'sourceRevision'];
+    bool id(Object? v) => v is String && RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(v);
+    if (value is! Map || value.length != keys.length || !value.keys.every(keys.contains) ||
+        value['schemaVersion'] is! int || value['schemaVersion'] != 1 || !const ['evaluation', 'production'].contains(value['realm']) ||
+        !id(value['accountScope']) || !id(value['buyingStoreId'])) {
+      throw const FormatException('Invalid receiving original');
+    }
+    final reference = value['reference'], rawLines = value['lines'];
+    if (reference is! Map || reference.length != referenceKeys.length ||
+        !reference.keys.every(referenceKeys.contains) || referenceKeys.where((key) => key != 'originalFingerprint')
+          .any((key) => !id(reference[key])) || reference['originalFingerprint'] is! String ||
+        !RegExp(r'^[a-f0-9]{64}$').hasMatch(reference['originalFingerprint'] as String) ||
+        rawLines is! List || rawLines.isEmpty || rawLines.length > 100) {
+      throw const FormatException('Invalid receiving original');
+    }
+    final lines = <String, ({int quantityMilli, String quantityUnit})>{};
+    for (final row in rawLines) {
+      if (row is! Map || row.length != 3 || !row.keys.every(const {'lineId', 'quantityMilli', 'quantityUnit'}.contains) ||
+          !id(row['lineId']) || lines.containsKey(row['lineId']) || row['quantityMilli'] is! int ||
+          (row['quantityMilli'] as int) <= 0 || (row['quantityMilli'] as int) > 2147483647 ||
+          row['quantityUnit'] is! String || (row['quantityUnit'] as String).trim().isEmpty ||
+          (row['quantityUnit'] as String).length > 240) {
+        throw const FormatException('Invalid receiving original line');
+      }
+      lines[row['lineId'] as String] = (quantityMilli: row['quantityMilli'] as int, quantityUnit: row['quantityUnit'] as String);
+    }
+    final sorted = lines.keys.toList()..sort();
+    return WorkspaceRestockPurchaseOriginal._(value['realm'] as String, value['accountScope'] as String,
+      value['buyingStoreId'] as String, {for (final key in referenceKeys) key: reference[key] as String},
+      {for (final key in sorted) key: lines[key]!});
+  }
+}
+
 /// A physical arrival event, independent of bill acceptance and money. A group
 /// identifies one expected delivery across partial arrivals, not one arrival.
 class WorkspaceSupplierGoodsReceipt {
   WorkspaceSupplierGoodsReceipt({required this.id, required this.expectedDeliveryId,
     required this.reference, required this.deliveredOn, required this.recordedAt,
     required List<WorkspaceSupplierGoodsReceiptLine> lines,
+    this.restockOriginal,
   }) : lines = List.unmodifiable(lines);
   final String id, expectedDeliveryId, reference, deliveredOn;
   final DateTime recordedAt;
   final List<WorkspaceSupplierGoodsReceiptLine> lines;
+  final WorkspaceRestockPurchaseOriginal? restockOriginal;
   bool get valid {
     final day = DateTime.tryParse(deliveredOn);
     final local = recordedAt.toLocal();
@@ -3386,7 +3442,8 @@ class WorkspaceSupplierGoodsReceipt {
       !DateTime.utc(day.year, day.month, day.day).isAfter(
         DateTime.utc(local.year, local.month, local.day)) &&
       lines.isNotEmpty && lines.length <= 200 && lines.every((line) => line.valid) &&
-      lines.map((line) => line.sourceLineId).toSet().length == lines.length;
+      lines.map((line) => line.sourceLineId).toSet().length == lines.length &&
+      (restockOriginal == null || restockOriginal!.matchesReceipt(this));
   }
   String stockReference(WorkspaceSupplierGoodsReceiptLine line) =>
       jsonEncode([id, line.sourceLineId]);
@@ -3401,16 +3458,20 @@ class WorkspaceSupplierGoodsReceipt {
   Map<String, Object?> toJson() => {'id': id, 'expectedDeliveryId': expectedDeliveryId,
     'reference': reference, 'deliveredOn': deliveredOn,
     'recordedAt': recordedAt.toUtc().toIso8601String(),
-    'lines': lines.map((line) => line.toJson()).toList()};
+    'lines': lines.map((line) => line.toJson()).toList(),
+    if (restockOriginal != null) 'restockOriginal': restockOriginal!.toJson()};
   static WorkspaceSupplierGoodsReceipt fromJson(Object? raw) {
     const keys = {'id', 'expectedDeliveryId', 'reference', 'deliveredOn', 'recordedAt', 'lines'};
-    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains)) {
+    if (raw is! Map || !keys.every(raw.containsKey) ||
+        raw.length != keys.length + (raw.containsKey('restockOriginal') ? 1 : 0) ||
+        !raw.keys.every((key) => keys.contains(key) || key == 'restockOriginal')) {
       throw const FormatException('Invalid supplier delivery');
     }
     final result = WorkspaceSupplierGoodsReceipt(id: raw['id'] as String,
       expectedDeliveryId: raw['expectedDeliveryId'] as String,
       reference: raw['reference'] as String, deliveredOn: raw['deliveredOn'] as String,
       recordedAt: DateTime.parse(raw['recordedAt'] as String),
+      restockOriginal: raw.containsKey('restockOriginal') ? WorkspaceRestockPurchaseOriginal.fromJson(raw['restockOriginal']) : null,
       lines: [for (final line in raw['lines'] as List)
         WorkspaceSupplierGoodsReceiptLine.fromJson(line)]);
     if (!result.valid) {
@@ -4384,11 +4445,19 @@ class WorkspaceSupplierLedger {
       return false;
     }
     final groups = <(String, String), (Object, int)>{};
+    final originals = <String, String?>{};
     for (final entry in goodsReceipts.entries) {
       final receipt = entry.value;
       if (entry.key != receipt.id || !receipt.valid || receipt.recordedAt.isAfter(asOf)) {
         return false;
       }
+      final source = receipt.restockOriginal;
+      final identity = source == null ? null : jsonEncode(source.toJson());
+      if (source != null && (source.accountScope != accountScope || source.buyingStoreId != workspaceId) ||
+          originals.containsKey(receipt.expectedDeliveryId) && originals[receipt.expectedDeliveryId] != identity) {
+        return false;
+      }
+      originals[receipt.expectedDeliveryId] = identity;
       for (final line in receipt.lines) {
         final key = (receipt.expectedDeliveryId, line.sourceLineId);
         final previous = groups[key];

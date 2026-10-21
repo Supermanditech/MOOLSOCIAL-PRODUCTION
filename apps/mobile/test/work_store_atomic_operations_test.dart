@@ -98,6 +98,7 @@ class _OrderJournalStorage extends FlutterSecureStorage {
   String? failWriteKey;
   String? failReadKey;
   Completer<void>? holdWrite;
+  Future<void> Function(String key)? beforeRead;
   @override
   Future<String?> read({
     required String key,
@@ -108,6 +109,7 @@ class _OrderJournalStorage extends FlutterSecureStorage {
     AppleOptions? mOptions,
     WindowsOptions? wOptions,
   }) async {
+    await beforeRead?.call(key);
     if (failRead || key == failReadKey) throw StateError('test read failure');
     return values[key];
   }
@@ -4811,6 +4813,79 @@ void main() {
     feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0,
     payments: const [], payouts: const [], historyComplete: true);
 
+  Map<String, Object?> restockOriginalFixture() => {
+    'schemaVersion': 1, 'realm': 'evaluation', 'accountScope': 'account-A', 'buyingStoreId': 'store-A',
+    'reference': {'purchaseId': 'purchase-A', 'storeId': 'supplier-store-A', 'orderId': 'order-A',
+      'originalFingerprint': 'a' * 64, 'sourceRevision': 'placement-A'},
+    'lines': [{'lineId': 'line-A', 'quantityMilli': 12000, 'quantityUnit': '1 kg'}],
+  };
+  Map<String, Object?> restockReceiptFixture({String id = 'receipt-A', int delivered = 6000}) => {
+    ...goodsReceiptFixture(id: id, group: 'restock-${contract_hash.sha256.convert(utf8.encode(jsonEncode(
+      ['evaluation', 'store-A', 'purchase-A', 'supplier-store-A', 'order-A'])))}',
+      delivered: delivered, accepted: delivered).toJson(),
+    'restockOriginal': restockOriginalFixture(),
+  };
+  test('LF-RESTOCK-RECEIVING canonical original persists without rewriting manual receipts', () {
+    final raw = restockReceiptFixture(), restored = WorkspaceSupplierGoodsReceipt.fromJson(raw);
+    expect(restored.valid, isTrue); expect(restored.toJson(), raw);
+    expect(WorkspaceSupplierGoodsReceipt.fromJson(restored.toJson()).toJson(), raw);
+    final manual = goodsReceiptFixture().toJson();
+    expect(WorkspaceSupplierGoodsReceipt.fromJson(manual).toJson(), manual);
+    expect(manual.containsKey('restockOriginal'), isFalse);
+  });
+  for (final fault in ['group', 'quantity', 'unit', 'line', 'fingerprint', 'empty-lines', 'duplicate-lines', 'extra-field', 'floating-version']) {
+    test('LF-RESTOCK-RECEIVING rejects changed canonical $fault', () {
+      final raw = restockReceiptFixture(), original = raw['restockOriginal']! as Map<String, Object?>;
+      final line = (original['lines']! as List).single as Map<String, Object?>;
+      switch (fault) {
+        case 'group': raw['expectedDeliveryId'] = 'another-manual-group';
+        case 'quantity': line['quantityMilli'] = 13000;
+        case 'unit': line['quantityUnit'] = 'different-pack';
+        case 'line': line['lineId'] = 'different-original-line';
+        case 'fingerprint': (original['reference']! as Map<String, Object?>)['originalFingerprint'] = 'unverified';
+        case 'empty-lines': original['lines'] = <Object>[];
+        case 'duplicate-lines': original['lines'] = [line, Map<String, Object?>.of(line)];
+        case 'extra-field': original['paid'] = true;
+        case 'floating-version': original['schemaVersion'] = 1.0;
+      }
+      expect(() => WorkspaceSupplierGoodsReceipt.fromJson(raw), throwsFormatException);
+    });
+  }
+  test('LF-RESTOCK-RECEIVING original partial arrivals retain one source and cumulative limit', () {
+    final first = WorkspaceSupplierGoodsReceipt.fromJson(restockReceiptFixture());
+    final second = WorkspaceSupplierGoodsReceipt.fromJson(restockReceiptFixture(id: 'receipt-B'));
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0))!;
+    final received = opening.receiveGoods(first, expectedRevision: opening.revision)!;
+    final complete = received.receiveGoods(second, expectedRevision: received.revision)!;
+    expect(complete.goodsReceipts, hasLength(2));
+    expect(complete.receiveGoods(second, expectedRevision: complete.revision), same(complete));
+    final extra = WorkspaceSupplierGoodsReceipt.fromJson(restockReceiptFixture(id: 'receipt-C'));
+    expect(complete.receiveGoods(extra, expectedRevision: complete.revision), isNull);
+    final changed = restockReceiptFixture(id: 'receipt-C');
+    final source = changed['restockOriginal']! as Map<String, Object?>;
+    (source['reference']! as Map<String, Object?>)['sourceRevision'] = 'changed-source';
+    expect(received.receiveGoods(WorkspaceSupplierGoodsReceipt.fromJson(changed), expectedRevision: received.revision), isNull);
+  });
+  for (final fault in ['account', 'store', 'manual', 'mapping']) {
+    test('LF-RESTOCK-RECEIVING journal rejects changed $fault', () {
+      final first = WorkspaceSupplierGoodsReceipt.fromJson(restockReceiptFixture());
+      final opening = confirmedOpeningFixture(openingFixture(amount: 0))!;
+      final received = opening.receiveGoods(first, expectedRevision: opening.revision)!;
+      final next = restockReceiptFixture(id: 'receipt-B');
+      final source = next['restockOriginal']! as Map<String, Object?>;
+      if (fault == 'account') source['accountScope'] = 'other-account';
+      if (fault == 'store') source['buyingStoreId'] = 'other-store';
+      if (fault == 'manual') next.remove('restockOriginal');
+      if (fault == 'mapping') ((next['lines']! as List).single as Map<String, Object?>)['productId'] = 'different-stock-sku';
+      if (fault == 'account' || fault == 'store') {
+        next['expectedDeliveryId'] = WorkspaceRestockPurchaseOriginal.fromJson(source).deliveryGroupId;
+      }
+      expect(received.receiveGoods(WorkspaceSupplierGoodsReceipt.fromJson(next), expectedRevision: received.revision), isNull);
+      expect(received.goodsReceipts['receipt-A']!.toJson(), first.toJson());
+      expect(received.goodsReceipts.keys, ['receipt-A']);
+    });
+  }
+
   WorkspaceInventoryLedger receiptInventoryFixture(List<WorkspaceStockMovement> movements) =>
     WorkspaceInventoryLedger(accountScope: 'account-A', workspaceId: 'store-A',
       revision: 1, asOf: DateTime.utc(2026, 10, 3),
@@ -6330,6 +6405,84 @@ void main() {
         productLabel: '${product.title} · ${product.pack}', purchaseUnit: product.pack,
         stockUnit: product.pack, unitsPerPack: 1, deliveredMilli: 6000, acceptedMilli: 6000,
         damagedMilli: 0, shortMilli: 0, expectedMilli: 12000, priorStockUnits: prior)]);
+  }
+
+  for (final fault in ['valid', 'missing-reader', 'wrong-account', 'wrong-realm', 'denied', 'quantity',
+    'reader-change', 'realm-change', 'retired-reader', 'journal-reader-change', 'journal-realm-change', 'journal-retired-reader']) {
+    test('LF-RESTOCK-RECEIVING new receipt checks current authenticated original $fault', () async {
+      final storage = _OrderJournalStorage(), opening = openingFixture(amount: 0);
+      final owner = await openingPostingSession(storage, initialRecord: opening, inventory: true);
+      expect(await owner.confirmWorkspaceSupplierOpeningRecord(opening, scope: owner.workspaceSupplierScope!,
+        expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+      final data = identity_fixtures.purchaserPurchaseResponse();
+      data['viewerUserId'] = 'account-A'; data['orders'][0]['original']['purchaser']['storeId'] = 'store-A';
+      identity_fixtures.rehashPurchaseOrder(data['orders'][0]);
+      final wire = identity_fixtures.Transport()..data = data;
+      Object? lifetime = Object();
+      final reader = identity_fixtures.projectionGateway(wire, account: 'account-A', lifetime: () => lifetime);
+      final purchase = (await reader.readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: data['purchaseId'], buyingStoreId: 'store-A'))!;
+      final order = purchase.orders.single, line = order.lines.single;
+      final expected = line.quantityMilli + (fault == 'quantity' ? 1000 : 0);
+      final source = WorkspaceRestockPurchaseOriginal.fromJson({
+        'schemaVersion': 1, 'realm': 'evaluation', 'accountScope': 'account-A', 'buyingStoreId': 'store-A',
+        'reference': {'purchaseId': data['purchaseId'], 'storeId': order.storeId, 'orderId': order.orderId,
+          'originalFingerprint': order.originalFingerprint, 'sourceRevision': purchase.sourceRevision},
+        'lines': [{'lineId': line.lineId, 'quantityMilli': expected, 'quantityUnit': line.quantityUnit}],
+      });
+      final raw = sessionReceipt(owner).toJson();
+      raw['expectedDeliveryId'] = source.deliveryGroupId; raw['restockOriginal'] = source.toJson();
+      final arrival = (raw['lines']! as List).single as Map<String, Object?>;
+      arrival['sourceLineId'] = line.lineId; arrival['purchaseUnit'] = line.quantityUnit;
+      arrival['expectedMilli'] = expected; arrival['deliveredMilli'] = expected; arrival['acceptedMilli'] = expected;
+      final receipt = WorkspaceSupplierGoodsReceipt.fromJson(raw);
+      owner.bindOriginalPurchaseReader(fault == 'missing-reader' ? null : fault == 'wrong-account'
+        ? identity_fixtures.projectionGateway(wire, account: 'other-account') : reader,
+        fault == 'wrong-realm' ? 'production' : 'evaluation');
+      if (fault == 'denied') wire.fail = true;
+      final before = wire.calls, stock = owner.workspaceCatalogueItems.single.stock;
+      expect(await owner.saveWorkspaceGoodsReceiptDraft(receipt, supplierId: opening.supplierId,
+        scope: owner.workspaceSupplierScope!, expectedRevision: 3), isTrue);
+      Future<WorkspaceGoodsReceiptSaveResult> post() => owner.confirmWorkspaceSupplierGoodsReceipt(receipt,
+        supplierId: opening.supplierId, scope: owner.workspaceSupplierScope!, expectedPurchaseRevision: 4,
+        expectedSupplierRevision: 1, requireSavedReview: true);
+      late WorkspaceGoodsReceiptSaveResult result;
+      if (fault.contains('change') || fault.contains('retired-reader')) {
+        final entered = Completer<void>(), release = Completer<void>();
+        if (fault.startsWith('journal-')) {
+          wire.respond = (_) {
+            storage.beforeRead = (key) async {
+              if (key.contains('workspace.ledger.v1.')) {
+                if (!entered.isCompleted) entered.complete();
+                await release.future;
+              }
+            };
+            return data;
+          };
+        } else {
+          wire.beforePost = (_) async {entered.complete(); await release.future;};
+        }
+        final posting = post(); await entered.future;
+        if (fault.endsWith('reader-change')) {
+          owner.bindOriginalPurchaseReader(identity_fixtures.projectionGateway(identity_fixtures.Transport()..data = data,
+            account: 'account-A'), 'evaluation');
+        } else if (fault.endsWith('realm-change')) {
+          owner.bindOriginalPurchaseReader(reader, 'production');
+        } else { lifetime = null; }
+        release.complete(); result = await posting;
+      } else { result = await post(); }
+      expect(result, fault == 'valid' ? WorkspaceGoodsReceiptSaveResult.saved : WorkspaceGoodsReceiptSaveResult.notPosted);
+      expect(owner.workspaceCatalogueItems.single.stock, fault == 'valid' ? stock + expected ~/ 1000 : stock);
+      if (fault == 'valid') {
+        expect(wire.calls, before + 1); expect(wire.sent!['buyingStoreId'], 'store-A');
+        owner.bindOriginalPurchaseReader(null, '');
+        expect(await post(), WorkspaceGoodsReceiptSaveResult.saved, reason: 'A committed original reconciles from durable proof.');
+        expect(owner.workspaceCatalogueItems.single.stock, stock + expected ~/ 1000);
+      } else {
+        expect(owner.workspaceSupplierLedger(opening.supplierId)!.goodsReceipts, isEmpty);
+        expect(owner.workspaceGoodsReceiptDrafts.single.receipt.toJson(), receipt.toJson());
+      }
+    });
   }
 
   test('PF08 receiving preserves optional printed lot facts and legacy bytes', () {

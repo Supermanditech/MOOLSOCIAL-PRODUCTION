@@ -2397,6 +2397,25 @@ class WorkSession extends ChangeNotifier {
     }
   }
 
+  Future<bool> _restockReceivingOriginalCurrent(WorkspaceRestockPurchaseOriginal? source) async {
+    if (source == null) return true;
+    final reader = originalPurchaseReader, realm = originalPurchaseRealm, scope = _supplierKey;
+    if (_disposed || reader == null || scope == null || source.realm != realm ||
+        source.accountScope != scope.$1 || source.buyingStoreId != scope.$2 ||
+        reader.accountUserId != source.accountScope) {
+      return false;
+    }
+    final original = await reader.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: realm,
+      reference: WorkspacePurchaseReference.fromJson(source.reference), buyingStoreId: source.buyingStoreId);
+    if (_disposed || _supplierKey != scope || !identical(originalPurchaseReader, reader) || originalPurchaseRealm != realm ||
+        original == null || original.purchaser?.kind != 'store' || original.purchaser?.storeId != source.buyingStoreId ||
+        original.lines.length != source.lines.length) {
+      return false;
+    }
+    return original.lines.every((line) => source.lines[line.lineId]?.quantityMilli == line.quantityMilli &&
+      source.lines[line.lineId]?.quantityUnit == line.quantityUnit);
+  }
+
   /// Review-only receiving uses the financial journal as its single authority.
   /// The standalone Stock copy is projected under the shared inventory queue.
   /// An uncertain reply is never described as a definite unposted receipt.
@@ -2450,6 +2469,13 @@ class WorkSession extends ChangeNotifier {
           data.customerCollectionBusy || data.pendingCustomerCollection != null ||
           data.pendingCustomerReturn != null || data.pendingCustomerRefund != null) {
         return reject('Recover saved Stock and the supplier account before receiving goods. Your entries are kept.');
+      }
+      final recorded = data.supplierLedgers[(key.$1, supplierId)]?.goodsReceipts[frozen.id];
+      final receiptReader = originalPurchaseReader, receiptRealm = originalPurchaseRealm;
+      bool sourceCurrent() => frozen.restockOriginal == null || receiptReader != null && receiptReader.isCurrent &&
+        identical(originalPurchaseReader, receiptReader) && originalPurchaseRealm == receiptRealm;
+      if (recorded == null && !await _restockReceivingOriginalCurrent(frozen.restockOriginal) || !current()) {
+        return reject('This original purchase could not be checked for your Store. Your receiving review is kept.');
       }
       data.customerCollectionBusy = true;
       financeLease = true;
@@ -2509,6 +2535,9 @@ class WorkSession extends ChangeNotifier {
                   moneyRegisters: journal.moneyRegisters, expenses: journal.expenses);
                 if (!next.valid) {
                   return refuseProjection('Previously entered Stock does not match this receipt. Check its original entry and linked quantities.');
+                }
+                if (!current() || !sourceCurrent()) {
+                  return refuseProjection('Purchase access changed. Reopen the original purchase before receiving these goods. Your review is kept.');
                 }
                 attemptedCommit = true;
                 try {
