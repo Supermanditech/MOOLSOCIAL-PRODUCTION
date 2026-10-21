@@ -1733,6 +1733,104 @@ function validateAggregate(value: unknown, purchaseId: string, realm: Realm): Pu
 
 /** Internal producer + read projections only. No pricing, payment, inventory,
  * seller transition, legacy retailerOrders writes or externally callable create. */
+type GoodsMapping = {productId: string; productLabel: string; purchaseUnit: string; stockUnit: string;
+  unitsPerPack: number; expectedMilli: number};
+type GoodsLine = GoodsMapping & {sourceLineId: string; deliveredMilli: number; acceptedMilli: number;
+  damagedMilli: number; shortMilli: number; priorStockUnits: Record<string, number>; lotDetails?: Record<string, unknown>};
+type GoodsSource = {schemaVersion: 1; realm: Realm; accountScope: string; buyingStoreId: string;
+  reference: PurchaseReference; lines: {lineId: string; quantityMilli: number; quantityUnit: string}[]};
+type GoodsArrival = {id: string; expectedDeliveryId: string; reference: string; deliveredOn: string;
+  recordedAt: string; recordedUtcOffsetMinutes: number; lines: GoodsLine[]; restockOriginal: GoodsSource};
+type GoodsCommand = {schemaVersion: 1; buyingStoreId: string; supplierId: string; receipt: GoodsArrival};
+type GoodsTotal = {lineId: string; deliveredMilli: number; acceptedMilli: number; damagedMilli: number; mapping: GoodsMapping};
+type GoodsGroup = {schemaVersion: 1; realm: Realm; buyingStoreId: string; groupId: string; source: GoodsSource;
+  supplierId: string; revision: number; lines: GoodsTotal[]; integrity: string};
+type GoodsProof = {schemaVersion: 1; realm: Realm; buyingStoreId: string; operationId: string; report: 'owner_reported';
+  supplierId: string; receipt: GoodsArrival; commandFingerprint: string; receiptFingerprint: string;
+  groupRevision: number; recordedAt: string; integrity: string};
+type GoodsClosure = Omit<GoodsProof, 'groupRevision' | 'recordedAt'> & {outcome: 'closed'; closedAt: string};
+
+function goodsReference(value: unknown): PurchaseReference {
+  const r = exact(value, ['purchaseId', 'storeId', 'orderId', 'originalFingerprint', 'sourceRevision']);
+  if (typeof r.originalFingerprint !== 'string' || !/^[a-f0-9]{64}$/u.test(r.originalFingerprint)) fail();
+  return {purchaseId: id(r.purchaseId), storeId: id(r.storeId), orderId: id(r.orderId),
+    originalFingerprint: r.originalFingerprint, sourceRevision: id(r.sourceRevision)};
+}
+function goodsGroupId(source: GoodsSource): string {
+  const r = source.reference;
+  return `restock-${digest([source.realm, source.buyingStoreId, r.purchaseId, r.storeId, r.orderId])}`;
+}
+function goodsText(value: unknown, max = 240): string {
+  const result = text(value, max);
+  if (result.includes('\x7f')) fail();
+  return result;
+}
+function goodsMapping(line: GoodsMapping): GoodsMapping {
+  return {productId: goodsText(line.productId), productLabel: goodsText(line.productLabel), purchaseUnit: goodsText(line.purchaseUnit),
+    stockUnit: goodsText(line.stockUnit), unitsPerPack: integer(line.unitsPerPack, 1000000, 1),
+    expectedMilli: integer(line.expectedMilli, 2147483647, 1)};
+}
+function goodsSource(value: unknown, realm: Realm, actor: string, store: string): GoodsSource {
+  const r = exact(value, ['schemaVersion', 'realm', 'accountScope', 'buyingStoreId', 'reference', 'lines']);
+  if (r.schemaVersion !== 1 || r.realm !== realm || r.accountScope !== actor || r.buyingStoreId !== store) fail();
+  const lines = array(r.lines, 100).map(raw => {
+    const line = exact(raw, ['lineId', 'quantityMilli', 'quantityUnit']);
+    return {lineId: id(line.lineId), quantityMilli: integer(line.quantityMilli, 2147483647, 1), quantityUnit: goodsText(line.quantityUnit)};
+  }).sort((a,b) => compare(a.lineId,b.lineId));
+  unique(lines.map(line => line.lineId));
+  return {schemaVersion: 1, realm, accountScope: actor, buyingStoreId: store, reference: goodsReference(r.reference), lines};
+}
+/** Physical facts reported by the authenticated purchaser; no payment or courier claim. */
+function goodsCommand(value: unknown, realm: Realm, actor: string): GoodsCommand {
+  const c = exact(value, ['schemaVersion', 'buyingStoreId', 'supplierId', 'receipt']);
+  // Preserve the existing endpoint's 64 KiB request boundary, including routing fields.
+  if (c.schemaVersion !== 1 || Buffer.byteLength(JSON.stringify(value), 'utf8') > 60 * 1024) fail();
+  const store = id(c.buyingStoreId), r = exact(c.receipt, ['id', 'expectedDeliveryId', 'reference', 'deliveredOn',
+    'recordedAt', 'recordedUtcOffsetMinutes', 'lines', 'restockOriginal']);
+  const source = goodsSource(r.restockOriginal, realm, actor, store);
+  if (!Number.isInteger(r.recordedUtcOffsetMinutes) || (r.recordedUtcOffsetMinutes as number) < -720 ||
+      (r.recordedUtcOffsetMinutes as number) > 840) fail();
+  const recordedUtcOffsetMinutes = r.recordedUtcOffsetMinutes as number;
+  if (r.expectedDeliveryId !== goodsGroupId(source) || typeof r.deliveredOn !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/u.test(r.deliveredOn) ||
+      !Number.isFinite(Date.parse(r.deliveredOn)) || new Date(r.deliveredOn).toISOString().slice(0,10) !== r.deliveredOn ||
+      r.deliveredOn > new Date(Date.now() + 86400000).toISOString().slice(0,10) || typeof r.recordedAt !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}(?:\d{3})?Z$/u.test(r.recordedAt) || !Number.isFinite(Date.parse(r.recordedAt)) ||
+      new Date(r.recordedAt).toISOString() !== r.recordedAt.slice(0,23) + 'Z' ||
+      r.recordedAt.length === 27 && r.recordedAt.slice(23,26) === '000' ||
+      r.deliveredOn > new Date(Date.parse(r.recordedAt) + recordedUtcOffsetMinutes * 60000).toISOString().slice(0,10)) fail();
+  const lines: GoodsLine[] = array(r.lines, 100).map(raw => {
+    const l = exact(raw, ['sourceLineId', 'productId', 'productLabel', 'purchaseUnit', 'stockUnit', 'unitsPerPack',
+      'deliveredMilli', 'acceptedMilli', 'damagedMilli', 'shortMilli', 'expectedMilli', 'priorStockUnits',
+      ...(Object.hasOwn(obj(raw), 'lotDetails') ? ['lotDetails'] : [])]);
+    const mapping = goodsMapping(l as GoodsMapping), sourceLineId = id(l.sourceLineId);
+    const ordered = source.lines.find(line => line.lineId === sourceLineId);
+    const deliveredMilli = integer(l.deliveredMilli, 2147483647, 1), acceptedMilli = integer(l.acceptedMilli, 2147483647),
+      damagedMilli = integer(l.damagedMilli, 2147483647), shortMilli = integer(l.shortMilli, 2147483647);
+    if (!ordered || mapping.expectedMilli !== ordered.quantityMilli || mapping.purchaseUnit !== ordered.quantityUnit ||
+        deliveredMilli !== acceptedMilli + damagedMilli || deliveredMilli + shortMilli > ordered.quantityMilli ||
+        acceptedMilli * mapping.unitsPerPack % 1000 !== 0 || acceptedMilli * mapping.unitsPerPack / 1000 > 2147483647) fail();
+    const priorStockUnits = Object.fromEntries(Object.entries(obj(l.priorStockUnits)).map(([key, amount]) =>
+      [goodsText(key, 512), integer(amount, 2147483647, 1)]));
+    if (Object.keys(priorStockUnits).length > 200 || Object.values(priorStockUnits).reduce((a,b) => a+b,0) > acceptedMilli * mapping.unitsPerPack / 1000) fail();
+    let lotDetails: Record<string, unknown> | undefined;
+    if (Object.hasOwn(l, 'lotDetails')) {
+      const lot = exact(l.lotDetails, ['schemaVersion', 'batch', 'manufacturedLabel', 'expiryLabel', 'mrpMinor']);
+      if (lot.schemaVersion !== 1) fail();
+      const label = (v: unknown) => v === '' ? '' : goodsText(v);
+      lotDetails = {schemaVersion: 1, batch: label(lot.batch), manufacturedLabel: label(lot.manufacturedLabel),
+        expiryLabel: label(lot.expiryLabel), mrpMinor: lot.mrpMinor === null ? null : integer(lot.mrpMinor, Number.MAX_SAFE_INTEGER)};
+      if (!lotDetails.batch && !lotDetails.manufacturedLabel && !lotDetails.expiryLabel && lotDetails.mrpMinor === null) fail();
+    }
+    return {sourceLineId, ...mapping, deliveredMilli, acceptedMilli, damagedMilli, shortMilli, priorStockUnits,
+      ...(lotDetails ? {lotDetails} : {})};
+  });
+  unique(lines.map(line => line.sourceLineId));
+  return {schemaVersion: 1, buyingStoreId: store, supplierId: goodsText(c.supplierId), receipt: {
+    id: goodsText(r.id), expectedDeliveryId: goodsGroupId(source), reference: goodsText(r.reference), deliveredOn: r.deliveredOn as string,
+    recordedAt: r.recordedAt as string, recordedUtcOffsetMinutes, lines, restockOriginal: source}};
+}
+
 export class WorkspacePurchaseProjectionService {
   constructor(private readonly db: Firestore, private readonly realm: Realm,
     private readonly source?: FinalPlacementSource, private readonly coupons?: PurchaseCouponCommitter,
@@ -1740,6 +1838,142 @@ export class WorkspacePurchaseProjectionService {
     if (!["evaluation", "production"].includes(realm)) fail("service_unavailable", 503);
   }
   private root() {return this.db.collection("workspacePurchaseProjections").doc(this.realm);}
+
+  private async goodsOriginal(tx: Transaction, actor: string, store: string, reference: PurchaseReference): Promise<GoodsSource> {
+    const doc = await tx.get(this.root().collection('purchases').doc(reference.purchaseId));
+    if (!doc.exists) fail('not_found', 404);
+    const aggregate = validateAggregate(doc.data(), reference.purchaseId, this.realm), purchaser = aggregatePurchaser(aggregate);
+    if (purchaser?.kind !== 'store' || purchaser.storeId !== store) fail('not_found', 404);
+    await requirePurchasingBuyer(this.db, tx, aggregate, actor);
+    const order = aggregate.orders.find(order => order.storeId === reference.storeId && order.orderId === reference.orderId);
+    if (!order || order.originalFingerprint !== reference.originalFingerprint || aggregate.sourceRevision !== reference.sourceRevision) fail('not_found', 404);
+    return {schemaVersion: 1, realm: this.realm, accountScope: actor, buyingStoreId: store, reference,
+      lines: order.original.lines.map(line => ({lineId: line.lineId, quantityMilli: line.quantityMilli,
+        quantityUnit: line.quantityUnit})).sort((a,b) => compare(a.lineId,b.lineId))};
+  }
+
+  private goodsGroup(value: unknown, source: GoodsSource): GoodsGroup | null {
+    if (value === undefined) return null;
+    const r = exact(value, ['schemaVersion', 'realm', 'buyingStoreId', 'groupId', 'source', 'supplierId', 'revision', 'lines', 'integrity']);
+    const {integrity, ...body} = r;
+    if (integrity !== integrityHash(body) || r.schemaVersion !== 1 || r.realm !== this.realm ||
+        r.buyingStoreId !== source.buyingStoreId || r.groupId !== goodsGroupId(source) ||
+        integrityHash(r.source) !== integrityHash(source)) fail('conflict', 409);
+    const lines = array(r.lines, 100).map(raw => {
+      const l = exact(raw, ['lineId', 'deliveredMilli', 'acceptedMilli', 'damagedMilli', 'mapping']);
+      const mapping = goodsMapping(exact(l.mapping, ['productId', 'productLabel', 'purchaseUnit', 'stockUnit', 'unitsPerPack', 'expectedMilli']) as GoodsMapping);
+      const lineId = id(l.lineId), expected = source.lines.find(line => line.lineId === lineId);
+      const deliveredMilli = integer(l.deliveredMilli, 2147483647, 1), acceptedMilli = integer(l.acceptedMilli, 2147483647),
+        damagedMilli = integer(l.damagedMilli, 2147483647);
+      if (!expected || mapping.expectedMilli !== expected.quantityMilli || mapping.purchaseUnit !== expected.quantityUnit ||
+          deliveredMilli !== acceptedMilli + damagedMilli || deliveredMilli > expected.quantityMilli ||
+          acceptedMilli * mapping.unitsPerPack % 1000 !== 0) fail('conflict', 409);
+      return {lineId, deliveredMilli, acceptedMilli, damagedMilli, mapping};
+    });
+    unique(lines.map(line => line.lineId));
+    return {schemaVersion: 1, realm: this.realm, buyingStoreId: source.buyingStoreId, groupId: goodsGroupId(source),
+      source, supplierId: goodsText(r.supplierId), revision: integer(r.revision, Number.MAX_SAFE_INTEGER, 1), lines, integrity: integrity as string};
+  }
+
+  async readBuyerGoodsReceiving(actor: string, body: Readonly<Record<string, unknown>>) {
+    id(actor); const r = exact(body, ['schemaVersion', 'buyingStoreId', 'reference']);
+    if (r.schemaVersion !== 1) fail();
+    const store = id(r.buyingStoreId), reference = goodsReference(r.reference);
+    return this.db.runTransaction(async tx => {
+      const source = await this.goodsOriginal(tx, actor, store, reference);
+      const saved = await tx.get(this.root().collection('goodsReceiving').doc(goodsGroupId(source)));
+      const group = this.goodsGroup(saved.data(), source);
+      return {schemaVersion: 1, realm: this.realm, viewerUserId: actor, buyingStoreId: store, group};
+    });
+  }
+
+  async recordBuyerGoodsArrival(actor: string, body: Readonly<Record<string, unknown>>) {
+    return this.goodsArrival(actor, body, 'record');
+  }
+  async reconcileBuyerGoodsArrival(actor: string, body: Readonly<Record<string, unknown>>) {
+    return this.goodsArrival(actor, body, 'read');
+  }
+  async closeBuyerGoodsArrival(actor: string, body: Readonly<Record<string, unknown>>) {
+    return this.goodsArrival(actor, body, 'close');
+  }
+  private async goodsArrival(actor: string, body: Readonly<Record<string, unknown>>, action: 'record' | 'read' | 'close') {
+    id(actor); const command = goodsCommand(body, this.realm, actor), receipt = command.receipt;
+    const commandFingerprint = integrityHash(command), receiptFingerprint = integrityHash(receipt);
+    const entry = this.root().collection('goodsArrivals').doc(digest([command.buyingStoreId, receipt.id]));
+    const groupEntry = this.root().collection('goodsReceiving').doc(receipt.expectedDeliveryId);
+    return this.db.runTransaction(async tx => {
+      const source = await this.goodsOriginal(tx, actor, command.buyingStoreId, receipt.restockOriginal.reference);
+      if (integrityHash(source) !== integrityHash(receipt.restockOriginal)) fail('conflict', 409);
+      const stored = await tx.get(entry), storedGroup = await tx.get(groupEntry);
+      const group = this.goodsGroup(storedGroup.data(), source);
+      const result = (proof: GoodsProof | GoodsClosure | null, latest: GoodsGroup | null) => ({schemaVersion: 1, realm: this.realm,
+        viewerUserId: actor, buyingStoreId: command.buyingStoreId,
+        state: proof ? ('outcome' in proof ? 'closed' : 'recorded') : 'not_found', proof, group: latest});
+      if (stored.exists) {
+        if (stored.data()?.outcome === 'closed') {
+          const proof = exact(stored.data(), ['schemaVersion', 'realm', 'buyingStoreId', 'operationId', 'report', 'supplierId',
+            'receipt', 'commandFingerprint', 'receiptFingerprint', 'outcome', 'closedAt', 'integrity']);
+          const {integrity, ...saved} = proof;
+          if (proof.schemaVersion !== 1 || proof.realm !== this.realm || proof.buyingStoreId !== command.buyingStoreId ||
+              proof.operationId !== receipt.id || proof.report !== 'owner_reported' || proof.supplierId !== command.supplierId ||
+              proof.commandFingerprint !== commandFingerprint || proof.receiptFingerprint !== receiptFingerprint ||
+              integrityHash(proof.receipt) !== receiptFingerprint || integrity !== integrityHash(saved) || proof.outcome !== 'closed' ||
+              typeof proof.closedAt !== 'string' || !Number.isFinite(Date.parse(proof.closedAt)) ||
+              new Date(proof.closedAt).toISOString() !== proof.closedAt) fail('conflict', 409);
+          return result(proof as GoodsClosure, group);
+        }
+        const proof = exact(stored.data(), ['schemaVersion', 'realm', 'buyingStoreId', 'operationId', 'report', 'supplierId',
+          'receipt', 'commandFingerprint', 'receiptFingerprint', 'groupRevision', 'recordedAt', 'integrity']);
+        const {integrity, ...saved} = proof;
+        if (!group || proof.schemaVersion !== 1 || proof.realm !== this.realm || proof.buyingStoreId !== command.buyingStoreId ||
+            proof.operationId !== receipt.id || proof.report !== 'owner_reported' || proof.supplierId !== command.supplierId ||
+            proof.commandFingerprint !== commandFingerprint || proof.receiptFingerprint !== receiptFingerprint ||
+            integrityHash(proof.receipt) !== receiptFingerprint || integrity !== integrityHash(saved) ||
+            typeof proof.recordedAt !== 'string' || !Number.isFinite(Date.parse(proof.recordedAt)) ||
+            integer(proof.groupRevision, Number.MAX_SAFE_INTEGER, 1) > group.revision ||
+            group.supplierId !== command.supplierId || receipt.lines.some(line => {
+              const total = group.lines.find(total => total.lineId === line.sourceLineId);
+              return !total || integrityHash(total.mapping) !== integrityHash(goodsMapping(line)) ||
+                total.deliveredMilli < line.deliveredMilli || total.acceptedMilli < line.acceptedMilli ||
+                total.damagedMilli < line.damagedMilli;
+            })) fail('conflict', 409);
+        return result(proof as GoodsProof, group);
+      }
+      if (action === 'read') return result(null, group);
+      if (action === 'close') {
+        // Same arbitration key as record: neither a lost reply nor a delayed
+        // old request can turn a closed operation into a physical arrival.
+        const saved = {schemaVersion: 1 as const, realm: this.realm, buyingStoreId: command.buyingStoreId,
+          operationId: receipt.id, report: 'owner_reported' as const, supplierId: command.supplierId, receipt,
+          commandFingerprint, receiptFingerprint, outcome: 'closed' as const, closedAt: new Date().toISOString()};
+        const proof: GoodsClosure = {...saved, integrity: integrityHash(saved)};
+        tx.create(entry, proof);
+        return result(proof, group);
+      }
+      if (group && group.supplierId !== command.supplierId) fail('conflict', 409);
+      const totals = new Map((group?.lines ?? []).map(line => [line.lineId, line]));
+      for (const line of receipt.lines) {
+        const previous = totals.get(line.sourceLineId), mapping = goodsMapping(line);
+        if (previous && integrityHash(previous.mapping) !== integrityHash(mapping)) fail('conflict', 409);
+        const deliveredMilli = (previous?.deliveredMilli ?? 0) + line.deliveredMilli;
+        if (deliveredMilli > line.expectedMilli) fail('conflict', 409);
+        totals.set(line.sourceLineId, {lineId: line.sourceLineId, deliveredMilli,
+          acceptedMilli: (previous?.acceptedMilli ?? 0) + line.acceptedMilli,
+          damagedMilli: (previous?.damagedMilli ?? 0) + line.damagedMilli, mapping});
+      }
+      const next = {schemaVersion: 1 as const, realm: this.realm, buyingStoreId: command.buyingStoreId,
+        groupId: receipt.expectedDeliveryId, source, supplierId: command.supplierId,
+        revision: integer((group?.revision ?? 0) + 1, Number.MAX_SAFE_INTEGER, 1),
+        lines: [...totals.values()].sort((a,b) => compare(a.lineId,b.lineId))};
+      const nextGroup: GoodsGroup = {...next, integrity: integrityHash(next)};
+      const saved = {schemaVersion: 1 as const, realm: this.realm, buyingStoreId: command.buyingStoreId,
+        operationId: receipt.id, report: 'owner_reported' as const, supplierId: command.supplierId, receipt,
+        commandFingerprint, receiptFingerprint, groupRevision: next.revision, recordedAt: new Date().toISOString()};
+      const proof: GoodsProof = {...saved, integrity: integrityHash(saved)};
+      tx.create(entry, proof); tx.set(groupEntry, nextGroup);
+      return result(proof, nextGroup);
+    });
+  }
 
   async materialize(reference: string): Promise<{purchaseId: string; buyerId: string}> {
     id(reference);

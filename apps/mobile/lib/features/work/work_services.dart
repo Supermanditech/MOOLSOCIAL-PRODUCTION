@@ -1874,6 +1874,14 @@ abstract interface class WorkPurchaseEntryRevisionGuard {
   });
 }
 
+/// Uses the same queue as review cancellation. No HTTP call belongs in this lock.
+abstract interface class WorkPurchaseRestockArrivalGuard {
+  Future<WorkspacePurchaseEntryBook?> retainRestockArrival(WorkspaceGoodsArrivalCommand command, {
+    required bool qa, required int expectedRevision, required bool Function() isCurrent,
+    WorkspaceGoodsArrivalResult? recorded, WorkspaceGoodsArrivalResult? closed, bool requestClosure = false,
+  });
+}
+
 /// Validate separate authoritative ledger state while holding the purchase queue,
 /// then append the immutable allocation review without queue re-entry.
 abstract interface class WorkPurchaseBillGoodsReviewGuard {
@@ -2306,7 +2314,7 @@ class WorkPurchaseInvoiceSuggestions {
 class SecureWorkPurchaseEntryStore
     implements WorkPurchaseEntryStore, WorkPurchaseEntryRevisionGuard, WorkPurchaseReceiptReviewAbandonment,
       WorkPurchaseBillGoodsReviewGuard, WorkPurchaseBillGoodsReviewAbandonment,
-      WorkPurchaseGoodsReceiptReviewGuard {
+      WorkPurchaseGoodsReceiptReviewGuard, WorkPurchaseRestockArrivalGuard {
   SecureWorkPurchaseEntryStore({required this.accountScope, FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
   final String? Function() accountScope;
@@ -2364,6 +2372,59 @@ class SecureWorkPurchaseEntryStore
     await _save(directory, expectedRevision: expectedRevision);
   }
   @override
+  Future<WorkspacePurchaseEntryBook?> retainRestockArrival(WorkspaceGoodsArrivalCommand command, {
+    required bool qa, required int expectedRevision, required bool Function() isCurrent,
+    WorkspaceGoodsArrivalResult? recorded, WorkspaceGoodsArrivalResult? closed, bool requestClosure = false,
+  }) {
+    final source = command.receipt.restockOriginal!, account = source.accountScope, store = source.buyingStoreId;
+    if (source.realm != (qa ? 'evaluation' : 'production')) return Future.value(null);
+    final key = _key(account, store, qa);
+    return _serial(key, () async {
+      final old = await _read(account, store, qa);
+      if (old == null || !isCurrent()) return null;
+      final review = old.goodsReceiptDrafts.where((r) => r.receipt.id == command.receipt.id).singleOrNull;
+      if (review == null || review.supplierId != command.supplierId ||
+          jsonEncode(review.receipt.toJson()) != jsonEncode(command.receipt.toJson()) ||
+          old.goodsReceiptCancellations.any((c) => c.receiptId == command.receipt.id)) { return null; }
+      final previous = old.restockGoodsAttempts.where((a) => a.command.receipt.id == command.receipt.id).singleOrNull;
+      if (previous != null && previous.command.fingerprint != command.fingerprint) return null;
+      if (recorded != null && (!recorded.recorded || recorded.command.fingerprint != command.fingerprint || previous == null)) return null;
+      if (closed != null && (!closed.closed || closed.command.fingerprint != command.fingerprint || previous == null)) return null;
+      if (recorded != null && closed != null || requestClosure && (previous == null || recorded != null || closed != null)) return null;
+      if (previous?.recorded != null) {
+        return closed == null && (recorded == null || jsonEncode(previous!.recorded!.proof!.toJson()) ==
+          jsonEncode(recorded.proof!.toJson())) ? old : null;
+      }
+      if (previous?.closed != null) {
+        return recorded == null && (closed == null || jsonEncode(previous!.closed!.closure!.toJson()) ==
+          jsonEncode(closed.closure!.toJson())) ? old : null;
+      }
+      if (previous != null && recorded == null && closed == null &&
+          (!requestClosure || previous.closeRequestedRevision != null)) { return old; }
+      if (old.revision != expectedRevision ||
+          previous == null && old.restockGoodsAttempts.length >= 1000) { return null; }
+      final attempt = WorkspaceRestockGoodsAttempt(command: command, revision: previous?.revision ?? old.revision + 1,
+        recorded: recorded, recordedRevision: recorded == null ? null : old.revision + 1,
+        closeRequestedRevision: previous?.closeRequestedRevision ?? (requestClosure ? old.revision + 1 : null),
+        closed: closed, closedRevision: closed == null ? null : old.revision + 1);
+      final attempts = previous == null ? [...old.restockGoodsAttempts, attempt]
+        : [for (final a in old.restockGoodsAttempts) if (a.command.receipt.id == command.receipt.id) attempt else a];
+      final next = WorkspacePurchaseEntryBook.fromJson({...old.toJson(), 'revision': old.revision + 1,
+        'restockGoodsAttempts': attempts.map((a) => a.toJson()).toList()});
+      final bytes = jsonEncode(next.toJson());
+      if (utf8.encode(bytes).length > 10 * 1024 * 1024) throw const WorkGatewayException('Purchase storage is full. Saved records are kept.');
+      _check(account, store);
+      if (!isCurrent()) return null;
+      try { await _storage.write(key: key, value: bytes); }
+      on Object {
+        _check(account, store);
+        if (await _storage.read(key: key) != bytes) rethrow;
+      }
+      _check(account, store);
+      return isCurrent() ? next : null;
+    });
+  }
+  @override
   Future<bool> saveReviewedBillGoods(WorkspacePurchaseEntryBook book, {
     required int expectedRevision, required Future<bool> Function() verifyCurrent,
   }) => _save(book, expectedRevision: expectedRevision, verifyCurrent: verifyCurrent);
@@ -2386,6 +2447,10 @@ class SecureWorkPurchaseEntryStore
       if (previous != null && jsonEncode(previous.toJson()) == bytes) return true;
       if (previous?.revision != expectedRevision || frozen.revision != (expectedRevision ?? 0) + 1) {
         throw const WorkGatewayException('Your purchase draft changed. Reopen Purchases before saving again.');
+      }
+      if (jsonEncode(frozen.restockGoodsAttempts.map((a) => a.toJson()).toList()) !=
+          jsonEncode((previous?.restockGoodsAttempts ?? const <WorkspaceRestockGoodsAttempt>[]).map((a) => a.toJson()).toList())) {
+        throw const WorkGatewayException('Keep receiving attempts and confirmations unchanged. Recover the original delivery.');
       }
       for (final copy in previous?.copies ?? const <WorkspacePurchaseSavedCopy>[]) {
         final retained = frozen.copies.where((c) => c.id == copy.id).firstOrNull;
@@ -2507,7 +2572,8 @@ class SecureWorkPurchaseEntryStore
       profiles: old.profiles, draft: old.draft, copies: old.copies,
       openingRecords: old.openingRecords, goodsReceiptDrafts: old.goodsReceiptDrafts,
       goodsReceiptCancellations: old.goodsReceiptCancellations, billGoodsReviews: old.billGoodsReviews,
-      billGoodsCancellations: [...old.billGoodsCancellations, cancellation]).toJson());
+      billGoodsCancellations: [...old.billGoodsCancellations, cancellation],
+      restockGoodsAttempts: old.restockGoodsAttempts).toJson());
     final bytes = jsonEncode(next.toJson());
     if (utf8.encode(bytes).length > 10 * 1024 * 1024) {
       throw const WorkGatewayException('Purchase storage is full. Saved records are kept.');
@@ -2533,6 +2599,7 @@ extension _PurchaseReviewCancellation on SecureWorkPurchaseEntryStore {
   }) => _serial(_key(account, store, qa), () async {
     final old = await _read(account, store, qa);
     if (old == null || !cancellation.valid) return null;
+    if (old.restockGoodsAttempts.any((a) => a.command.receipt.id == cancellation.receiptId)) return null;
     final previous = old.goodsReceiptCancellations.where((c) => c.receiptId == cancellation.receiptId).firstOrNull;
     final review = old.goodsReceiptDrafts.where((r) => r.receipt.id == cancellation.receiptId).firstOrNull;
     if (previous != null) {
@@ -2553,7 +2620,7 @@ extension _PurchaseReviewCancellation on SecureWorkPurchaseEntryStore {
       openingRecords: old.openingRecords, goodsReceiptDrafts: old.goodsReceiptDrafts,
       goodsReceiptCancellations: [...old.goodsReceiptCancellations, cancellation],
       billGoodsReviews: old.billGoodsReviews,
-      billGoodsCancellations: old.billGoodsCancellations).toJson());
+      billGoodsCancellations: old.billGoodsCancellations, restockGoodsAttempts: old.restockGoodsAttempts).toJson());
     final bytes = jsonEncode(next.toJson());
     if (utf8.encode(bytes).length > 10 * 1024 * 1024) {
       throw const WorkGatewayException('Purchase storage is full. Saved records are kept.');
@@ -2594,7 +2661,19 @@ abstract interface class WorkInventoryReceiptProjectionGuard {
 
 /// Encrypted local inventory, deliberately separate from financial journals.
 /// No deletion/migration fallback: corrupt or newer records stay recoverable.
-class SecureWorkInventoryStore implements WorkInventoryStore, WorkInventoryReceiptProjectionGuard {
+abstract interface class WorkInventoryRestockProjectionGuard {
+  Future<bool> withRestockInventory(String account, String store, {required bool qa,
+    required int expectedRevision, required Future<bool> Function(WorkspaceSavedInventory previous, WorkspaceLedgerCheckpoint? journal) action});
+  Future<WorkspaceSavedInventory?> adoptRestockBaseline(WorkspaceSavedInventory inventory, {
+    required int? expectedRevision, required bool ownerConfirmed, required bool Function() isCurrent,
+  });
+  Future<WorkspaceSavedInventory?> projectRestockArrival(WorkspaceGoodsArrivalProof proof, {
+    required bool qa, required int expectedRevision, required bool Function() isCurrent,
+    required Future<bool> Function(WorkspaceSavedInventory previous) verifyBaseline,
+  });
+}
+
+class SecureWorkInventoryStore implements WorkInventoryStore, WorkInventoryReceiptProjectionGuard, WorkInventoryRestockProjectionGuard {
   SecureWorkInventoryStore({
     required this.accountScope,
     FlutterSecureStorage? storage,
@@ -2669,6 +2748,44 @@ class SecureWorkInventoryStore implements WorkInventoryStore, WorkInventoryRecei
     final key = _key(frozen.account, frozen.store, frozen.qa);
     await _serial(key, () => _saveUnderGuard(frozen, bytes, expectedRevision));
   }
+  @override
+  Future<bool> withRestockInventory(String account, String store, {required bool qa,
+    required int expectedRevision, required Future<bool> Function(WorkspaceSavedInventory previous, WorkspaceLedgerCheckpoint? journal) action}) =>
+    _serial(_key(account, store, qa), () async {
+      final previous = await _read(account, store, qa);
+      if (previous == null || previous.revision != expectedRevision) return false;
+      final journal = await SecureWorkLedgerCheckpointStore(accountScope: accountScope, storage: _storage).read(account, store);
+      if (!previous.preservesCommittedStock(journal)) return false;
+      final result = await action(previous, journal);
+      _check(account, store);
+      return result;
+    });
+
+  @override
+  Future<WorkspaceSavedInventory?> adoptRestockBaseline(WorkspaceSavedInventory inventory, {
+    required int? expectedRevision, required bool ownerConfirmed, required bool Function() isCurrent,
+  }) {
+    final frozen = WorkspaceSavedInventory.fromJson(jsonDecode(jsonEncode(inventory.toJson())));
+    return _serial(_key(frozen.account, frozen.store, frozen.qa), () async {
+      final previous = await _read(frozen.account, frozen.store, frozen.qa);
+      if (!isCurrent() || previous?.revision != expectedRevision ||
+          previous == null && !ownerConfirmed || frozen.products.isEmpty ||
+          !frozen.products.any((p) => p.stockMode == WorkspaceStockMode.exactQuantity)) { return null; }
+      final fingerprint = WorkspaceRestockStockBaseline.fingerprint(frozen);
+      if (previous != null && WorkspaceRestockStockBaseline.fingerprint(previous) != fingerprint) return null;
+      if (previous?.restockBaseline != null) return previous;
+      final at = DateTime.now().toUtc();
+      final next = WorkspaceSavedInventory.fromJson(WorkspaceSavedInventory(account: frozen.account, store: frozen.store, qa: frozen.qa,
+        revision: (expectedRevision ?? 0) + 1, savedAt: at, products: frozen.products, movements: frozen.movements,
+        variantFamilies: frozen.variantFamilies, reviewedCatalogueLinks: frozen.reviewedCatalogueLinks,
+        manualReceiptCheckpointRevision: frozen.manualReceiptCheckpointRevision, restockProjections: frozen.restockProjections,
+        restockBaseline: WorkspaceRestockStockBaseline(realm: frozen.qa ? 'evaluation' : 'production',
+          basis: previous == null ? 'owner_confirmed' : 'saved_stock', retainedAt: at, contentFingerprint: fingerprint)).toJson());
+      if (!isCurrent()) return null;
+      await _saveUnderGuard(next, jsonEncode(next.toJson()), expectedRevision, restockBaselineAdoption: true, isCurrent: isCurrent);
+      return isCurrent() ? next : null;
+    });
+  }
 
   @override
   Future<bool> projectReceipt(String account, String store, {
@@ -2701,12 +2818,72 @@ class SecureWorkInventoryStore implements WorkInventoryStore, WorkInventoryRecei
     return true;
   });
 
+  @override
+  Future<WorkspaceSavedInventory?> projectRestockArrival(WorkspaceGoodsArrivalProof proof, {
+    required bool qa, required int expectedRevision, required bool Function() isCurrent,
+    required Future<bool> Function(WorkspaceSavedInventory previous) verifyBaseline,
+  }) {
+    final command = proof.command, source = command.receipt.restockOriginal!;
+    if (source.realm != (qa ? 'evaluation' : 'production')) return Future.value(null);
+    return _serial(_key(source.accountScope, source.buyingStoreId, qa), () async {
+      final previous = await _read(source.accountScope, source.buyingStoreId, qa);
+      if (previous == null || !isCurrent()) return null; // Never assume an empty Stock baseline.
+      final existing = previous.restockProjections.where((p) => p.command.receipt.id == command.receipt.id).singleOrNull;
+      if (existing != null) {
+        if (!existing.matches(proof)) throw const WorkGatewayException('Receiving Stock proof changed. Recover the original delivery.');
+        return previous;
+      }
+      if (previous.revision != expectedRevision || previous.restockProjections.length >= 1000 ||
+          !await verifyBaseline(previous) || !isCurrent()) { return null; }
+      final projection = WorkspaceRestockStockProjection.fromProof(proof, DateTime.now().toUtc());
+      final deltas = <String, int>{};
+      for (final line in command.receipt.lines) {
+        final product = previous.products.where((p) => p.id == line.productId).singleOrNull;
+        if (product == null || product.stockMode != WorkspaceStockMode.exactQuantity || product.pack != line.stockUnit) return null;
+        deltas.update(line.productId, (delta) => delta + line.newStockUnits, ifAbsent: () => line.newStockUnits);
+      }
+      final products = <WorkspaceCatalogueItem>[];
+      for (final product in previous.products) {
+        final delta = deltas[product.id];
+        if (delta == null) { products.add(product); continue; }
+        final stock = product.stock + delta;
+        if (stock < 0 || stock > 2147483647) return null;
+        products.add(product.copyWith(stock: stock));
+      }
+      final previousJson = previous.toJson();
+      final next = WorkspaceSavedInventory.fromJson({...previousJson, 'version': 6,
+        'baseVersion': previousJson['version'] == 6 ? previousJson['baseVersion'] : previousJson['version'],
+        'revision': previous.revision + 1,
+        'savedAt': projection.appliedAt.toUtc().toIso8601String(), 'products': products.map((p) => p.toInventoryJson()).toList(),
+        'restockProjections': [...previous.restockProjections, projection].map((p) => p.toJson()).toList(),
+        'movements': [
+          for (final line in command.receipt.lines)
+            if (projection.movementFor(line) case final movement?) {'id': movement.id, 'productId': movement.productId,
+              'productLabel': movement.productLabel, 'kind': movement.kind.name, 'quantityDelta': movement.quantityDelta,
+              'reason': movement.reason, 'occurredAt': movement.occurredAt.toUtc().toIso8601String(),
+              'referenceKind': movement.referenceKind!.name, 'referenceId': movement.referenceId},
+          ...previousJson['movements'] as List,
+        ]});
+      if (!isCurrent()) return null;
+      await _saveUnderGuard(next, jsonEncode(next.toJson()), previous.revision, restockProjection: true, isCurrent: isCurrent);
+      return isCurrent() ? next : null;
+    });
+  }
+
   Future<void> _saveUnderGuard(WorkspaceSavedInventory frozen, String bytes,
-      int? expectedRevision, {bool receiptProjection = false}) async {
+      int? expectedRevision, {bool receiptProjection = false, bool restockProjection = false,
+        bool restockBaselineAdoption = false, bool Function()? isCurrent}) async {
       final key = _key(frozen.account, frozen.store, frozen.qa);
       _check(frozen.account, frozen.store);
       final previous = await _read(frozen.account, frozen.store, frozen.qa);
       if (previous != null && jsonEncode(previous.toJson()) == bytes) return;
+      if (!restockBaselineAdoption && jsonEncode(frozen.restockBaseline?.toJson()) != jsonEncode(previous?.restockBaseline?.toJson())) {
+        throw const WorkGatewayException('Keep the saved receiving Stock baseline. Recover the original Store Stock.');
+      }
+      if (!restockProjection && jsonEncode(frozen.restockProjections.map((p) => p.toJson()).toList()) !=
+          jsonEncode((previous?.restockProjections ?? const <WorkspaceRestockStockProjection>[]).map((p) => p.toJson()).toList())) {
+        throw const WorkGatewayException('Keep saved receiving Stock proofs. Recover the original delivery.');
+      }
       if ((!receiptProjection && previous?.manualReceiptCheckpointRevision !=
           frozen.manualReceiptCheckpointRevision) ||
           (receiptProjection && previous?.manualReceiptCheckpointRevision != null &&
@@ -2743,11 +2920,12 @@ class SecureWorkInventoryStore implements WorkInventoryStore, WorkInventoryRecei
         final receiptProducts = {
           for (final movement in [...previous.movements, ...frozen.movements])
             if (movement.referenceKind == WorkspaceStockReferenceKind.manualSupplierReceipt ||
-                movement.referenceKind == WorkspaceStockReferenceKind.manualSupplierReturn)
+                movement.referenceKind == WorkspaceStockReferenceKind.manualSupplierReturn ||
+                movement.referenceKind == WorkspaceStockReferenceKind.restockGoodsArrival)
               movement.productId,
         };
         if (receiptProducts.isNotEmpty || previous.manualReceiptCheckpointRevision != null ||
-            frozen.manualReceiptCheckpointRevision != null) {
+            frozen.manualReceiptCheckpointRevision != null || previous.restockProjections.isNotEmpty || frozen.restockProjections.isNotEmpty) {
           final nextMovements = {for (final m in frozen.movements) m.id: m};
           if (previous.movements.any((m) => nextMovements[m.id]?.contentIdentity != m.contentIdentity)) {
             throw const WorkGatewayException('Supplier receipt stock history must be kept. Reopen Stock.');
@@ -2800,6 +2978,32 @@ class SecureWorkInventoryStore implements WorkInventoryStore, WorkInventoryRecei
         }
         }
       }
+      if (frozen.restockProjections.isNotEmpty || frozen.restockBaseline != null) {
+        if (utf8.encode(bytes).length > 10 * 1024 * 1024) {
+          throw const WorkGatewayException('Stock recovery storage is full. Saved records are kept.');
+        }
+        final ledger = await SecureWorkLedgerCheckpointStore(accountScope: accountScope, storage: _storage).read(frozen.account, frozen.store);
+        if (!frozen.preservesCommittedStock(ledger)) {
+          throw const WorkGatewayException('Recover saved supplier records before updating receiving Stock.');
+        }
+        final allocated = <String, int>{}, originals = {for (final m in frozen.movements) m.id: m};
+        final receipts = [for (final p in frozen.restockProjections) p.command.receipt,
+          for (final supplier in ledger?.supplierLedgers.values ?? const <WorkspaceSupplierLedger>[])
+            ...supplier.goodsReceipts.values];
+        for (final receipt in receipts) {
+          for (final line in receipt.lines) {
+            for (final entry in line.priorStockUnits.entries) {
+              final quantity = (allocated[entry.key] ?? 0) + entry.value;
+              if (originals[entry.key] == null || quantity > originals[entry.key]!.quantityDelta) {
+                throw const WorkGatewayException('Earlier Stock entry is already linked to another delivery. Recover its original records.');
+              }
+              allocated[entry.key] = quantity;
+            }
+          }
+        }
+      }
+      _check(frozen.account, frozen.store);
+      if (isCurrent?.call() == false) throw const WorkGatewayException('Receiving scope changed before saving Stock.');
       try {
         await _storage.write(key: key, value: bytes);
       } on Object {

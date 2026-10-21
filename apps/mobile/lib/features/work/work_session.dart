@@ -23,6 +23,7 @@ enum WorkspaceGoodsReceiptSaveResult {
   saved,
   stockRecoveryPending,
   statusUnknown,
+  closed,
 }
 
 /// Store packing capability, separate from the sealed consumer collection API.
@@ -500,6 +501,14 @@ class _StoreOperationalData {
   bool inventoryLoaded = false;
   int? inventoryRevision;
   int? inventoryReceiptCheckpointRevision;
+  List<WorkspaceRestockStockProjection> inventoryRestockProjections = const [];
+  WorkspaceRestockStockBaseline? inventoryRestockBaseline;
+  (String, String, bool)? inventoryRestockBaselineOwner;
+  bool inventoryRestockBaselineMissing = false;
+  bool inventoryRestockRecoveryPending = false;
+  WorkspaceSavedInventory? inventoryRestockConflict;
+  final restockReceiving = <String, WorkspaceGoodsReceivingRead>{};
+  Map<String, int> restockPriorAllocations = const {};
   int inventoryMutations = 0;
   String? inventoryError;
   Future<bool>? inventoryLoad;
@@ -723,12 +732,15 @@ class WorkSession extends ChangeNotifier {
   final WorkGateway gateway;
   final WorkOrderPendingStore Function(String account, String store)? operationalPendingStoreFactory;
   AuthenticatedWorkspaceOrderIdentityGateway? _originalPurchaseReader;
+  Object _restockReceivingEpoch = Object();
   String originalPurchaseRealm = '';
   AuthenticatedWorkspaceOrderIdentityGateway? get originalPurchaseReader =>
       !_disposed && _originalPurchaseReader?.isCurrent == true ? _originalPurchaseReader : null;
   void bindOriginalPurchaseReader(AuthenticatedWorkspaceOrderIdentityGateway? reader, String realm) {
     if (_disposed || identical(reader, _originalPurchaseReader) && realm == originalPurchaseRealm) return;
+    _restockReceivingEpoch = Object();
     for (final data in {..._storeDataById.values, _storeData}) {
+      data.restockReceiving.clear();
       final operations = data.orderOperations;
       if (operations?.gateway is WorkspaceOperationalOrderCommandGateway) {
         if (!operations!.isDisposed) operations.dispose();
@@ -1128,27 +1140,7 @@ class WorkSession extends ChangeNotifier {
   Future<bool> _stockCheckpointMatchesCommittedLedger(_StoreOperationalData data, WorkspaceSavedInventory saved) async {
     final journal = data.ledgerCheckpointStore ?? SecureWorkLedgerCheckpointStore(accountScope: () => _disposed ? null : _contactAccountScope);
     final checkpoint = await journal.read(saved.account, saved.store).timeout(const Duration(seconds: 10));
-    if (checkpoint == null) return true;
-    if (!checkpoint.valid || checkpoint.pendingReturn != null || checkpoint.pendingRefund != null) return false;
-    final ledger = checkpoint.inventory;
-    if (ledger == null) return true;
-    final quantities = ledger.quantities;
-    if (quantities == null || ledger.accountScope != saved.account || ledger.workspaceId != saved.store) return false;
-    final movements = {for (final movement in saved.movements) movement.id: movement};
-    final known = {for (final movement in ledger.movements) movement.id};
-    if (ledger.movements.any((movement) => movements[movement.id]?.contentIdentity != movement.contentIdentity)) return false;
-    final tails = saved.movements.where((movement) => !known.contains(movement.id)).toList(growable: false);
-    // Independent manual Stock updates may follow the ledger. An uncommitted
-    // order/return/receipt tail cannot stand in for a committed business result.
-    if (tails.any((movement) => movement.referenceKind != null ||
-        !{WorkspaceStockMovementKind.openingStock, WorkspaceStockMovementKind.adjustment,
-          WorkspaceStockMovementKind.goodsReceived, WorkspaceStockMovementKind.damageOrExpiry}.contains(movement.kind))) { return false; }
-    for (final item in saved.products.where((item) => item.stockMode == WorkspaceStockMode.exactQuantity)) {
-      final quantity = quantities[item.id];
-      if (quantity != null && item.stock != quantity + tails.where((movement) => movement.productId == item.id)
-          .fold<int>(0, (sum, movement) => sum + movement.quantityDelta)) { return false; }
-    }
-    return true;
+    return saved.preservesCommittedStock(checkpoint);
   }
   void _queueCommittedLedgerStock(_StoreOperationalData data, {required bool changed}) {
     if (changed && workspaceStoreStockConnectionConfigured && localInventoryEnabled && identical(data, _storeData) &&
@@ -2011,6 +2003,8 @@ class WorkSession extends ChangeNotifier {
   // persists edited stock in the QA namespace, never as production inventory.
   bool get localInventoryEnabled =>
       inventoryStore != null ||
+      (_storeData.inventoryRestockBaselineOwner != null &&
+        _storeData.inventoryRestockBaselineOwner == (_contactAccountScope, activeWorkspace?.id, !_productionSession)) ||
       (!_productionSession &&
           kDebugMode &&
           const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
@@ -2062,6 +2056,7 @@ class WorkSession extends ChangeNotifier {
         final saved = await _supplierStorage.read(key.$1, key.$2, qa: key.$3);
         if (_supplierKey != key) return false;
         _supplierDirectories[key] = saved;
+        _updateRestockRecovery(_storeData, key);
         _supplierNeedsReload.remove(key);
         _supplierErrors.remove(key);
         _supplierValidationErrors.remove(key);
@@ -2162,7 +2157,8 @@ class WorkSession extends ChangeNotifier {
       goodsReceiptDrafts: old?.goodsReceiptDrafts ?? const [],
       goodsReceiptCancellations: old?.goodsReceiptCancellations ?? const [],
       billGoodsReviews: old?.billGoodsReviews ?? const [],
-      billGoodsCancellations: old?.billGoodsCancellations ?? const []);
+      billGoodsCancellations: old?.billGoodsCancellations ?? const [],
+      restockGoodsAttempts: old?.restockGoodsAttempts ?? const []);
     _supplierWrites.add(key);
     _supplierErrors.remove(key);
     _supplierValidationErrors.remove(key);
@@ -2397,6 +2393,188 @@ class WorkSession extends ChangeNotifier {
     }
   }
 
+  bool workspaceGoodsReceiptUsesServer(WorkspaceSupplierGoodsReceipt receipt) =>
+    receipt.restockOriginal != null && receipt.recordedUtcOffsetMinutes != null;
+  bool workspaceRestockUsesLegacyReceipts(WorkspaceRestockPurchaseOriginal source) =>
+    workspaceGoodsReceiptDrafts.any((r) => r.receipt.expectedDeliveryId == source.deliveryGroupId &&
+      r.receipt.restockOriginal != null && !workspaceGoodsReceiptUsesServer(r.receipt) &&
+      !workspaceGoodsReceiptCancellations.any((c) => c.receiptId == r.receipt.id)) ||
+    _supplierLedgerCheckpointEntries(_storeData).values.any((ledger) => ledger.goodsReceipts.values.any((r) =>
+      r.expectedDeliveryId == source.deliveryGroupId && r.restockOriginal != null && !workspaceGoodsReceiptUsesServer(r)));
+  bool workspaceServerReceivingFor(WorkspaceRestockPurchaseOriginal? source) {
+    final key = _supplierKey, reader = originalPurchaseReader;
+    return source != null && key != null && source.accountScope == key.$1 && source.buyingStoreId == key.$2 &&
+      source.realm == (key.$3 ? 'evaluation' : 'production') && source.realm == originalPurchaseRealm &&
+      reader != null && reader.isCurrent && reader.accountUserId == key.$1 && _supplierStorage is WorkPurchaseRestockArrivalGuard &&
+      _inventoryStorage is WorkInventoryRestockProjectionGuard;
+  }
+  WorkspaceGoodsReceivingRead? workspaceRestockReceiving(WorkspaceRestockPurchaseOriginal source) {
+    if (!workspaceServerReceivingFor(source)) return null;
+    final value = _storeData.restockReceiving[source.deliveryGroupId];
+    return value != null && jsonEncode(value.original.toJson()) == jsonEncode(source.toJson()) ? value : null;
+  }
+  WorkspaceRestockGoodsAttempt? workspaceRestockAttempt(String receiptId) =>
+    _supplierDirectories[_supplierKey]?.restockGoodsAttempts.where((a) => a.command.receipt.id == receiptId).singleOrNull;
+  bool workspaceRestockStockApplied(String receiptId) {
+    final proof = workspaceRestockAttempt(receiptId)?.recorded?.proof;
+    return proof != null && _storeData.inventoryRestockProjections.any((p) => p.command.receipt.id == receiptId && p.matches(proof));
+  }
+  void _updateRestockRecovery(_StoreOperationalData data, (String, String, bool) key) {
+    final book = _supplierDirectories[key];
+    data.inventoryRestockRecoveryPending = book?.restockGoodsAttempts.any((a) => a.closed == null && (a.recorded?.proof == null ||
+      !data.inventoryRestockProjections.any((p) => p.command.receipt.id == a.command.receipt.id && p.matches(a.recorded!.proof!)))) ?? false;
+  }
+  bool workspaceGoodsReceiptCanCancel(WorkspaceSupplierGoodsReceipt receipt) => workspaceGoodsReceiptUsesServer(receipt)
+    ? workspaceServerReceivingFor(receipt.restockOriginal) && _supplierStorage is WorkPurchaseReceiptReviewAbandonment &&
+      workspaceRestockAttempt(receipt.id) == null : workspaceGoodsReceiptCancellationAvailable;
+  bool get workspaceRestockBaselineMissing => _storeData.inventoryRestockBaselineMissing;
+  WorkspaceSavedInventory? get workspaceRestockStockConflict => _storeData.inventoryRestockConflict;
+
+  WorkspaceSavedInventory _restockInventorySnapshot(_StoreOperationalData data, (String, String, bool) key) =>
+    WorkspaceSavedInventory(account: key.$1, store: key.$2, qa: key.$3, revision: data.inventoryRevision ?? 1,
+      savedAt: DateTime.now().toUtc(), products: data.workspaceCatalogueItems, movements: data.workspaceStockMovements,
+      variantFamilies: data.variantFamilies, reviewedCatalogueLinks: data.reviewedCatalogueLinks,
+      manualReceiptCheckpointRevision: data.inventoryReceiptCheckpointRevision, restockProjections: data.inventoryRestockProjections,
+      restockBaseline: data.inventoryRestockBaseline);
+  String _restockInventorySignature(_StoreOperationalData data, (String, String, bool) key) => jsonEncode([
+    WorkspaceRestockStockBaseline.fingerprint(_restockInventorySnapshot(data, key)), data.inventoryRevision,
+    data.inventoryReceiptCheckpointRevision, data.inventoryRestockProjections.map((p) => p.toJson()).toList(),
+    data.inventoryRestockBaseline?.toJson()]);
+  void _useRestockInventory(_StoreOperationalData data, WorkspaceSavedInventory saved) {
+    data.workspaceCatalogueItems..clear()..addAll(saved.products);
+    data.workspaceStockMovements..clear()..addAll(saved.movements);
+    data.variantFamilies..clear()..addAll(saved.variantFamilies);
+    data.reviewedCatalogueLinks..clear()..addAll(saved.reviewedCatalogueLinks);
+    data.inventoryRevision = saved.revision; data.inventoryReceiptCheckpointRevision = saved.manualReceiptCheckpointRevision;
+    data.inventoryRestockProjections = saved.restockProjections; data.inventoryRestockBaseline = saved.restockBaseline;
+    data.inventoryRestockBaselineOwner = (saved.account, saved.store, saved.qa);
+    data.inventoryRestockBaselineMissing = false; data.inventoryRestockConflict = null;
+    data.inventoryLoaded = true; data.inventoryError = null; data.inventoryMutations++;
+    _syncRetailerProductSummary();
+  }
+  Future<bool> _recoverAdoptedRestockStock(_StoreOperationalData data) async {
+    final account = _contactAccountScope, store = activeWorkspace?.id, navigation = navigationScopeRevision;
+    if (_disposed || account == null || store == null) return false;
+    final key = (account, store, !_productionSession), signature = _restockInventorySignature(data, (account, store, !_productionSession));
+    bool scoped() => !_disposed && identical(data, _storeData) && _isStoreScopeCurrent(data, store, account) && navigationScopeRevision == navigation;
+    bool current() => scoped() && _restockInventorySignature(data, key) == signature;
+    try {
+      final saved = await _inventoryStorage.read(account, store, qa: key.$3);
+      if (!current()) return false;
+      if (saved == null || saved.restockBaseline == null && saved.restockProjections.isEmpty) return true;
+      if ((data.workspaceCatalogueItems.isNotEmpty || data.workspaceStockMovements.isNotEmpty) &&
+          WorkspaceRestockStockBaseline.fingerprint(saved) != WorkspaceRestockStockBaseline.fingerprint(_restockInventorySnapshot(data, key))) {
+        data.inventoryRestockConflict = saved;
+        data.inventoryError = 'Saved receiving Stock differs from this view. Recover its saved quantities before editing.';
+        return false;
+      }
+      data.inventoryRestockRecoveryPending = true;
+      _useRestockInventory(data, saved);
+      final restored = _restockInventorySignature(data, key);
+      final ready = await loadWorkspaceSuppliers(retry: true);
+      if (!scoped() || _restockInventorySignature(data, key) != restored) return false;
+      if (!ready) { data.inventoryRestockRecoveryPending = true; return false; }
+      _updateRestockRecovery(data, key); notifyListeners(); return true;
+    } on Object {
+      if (current()) data.inventoryError = 'Saved receiving Stock could not be checked. Retry without clearing Store data.';
+      return false;
+    }
+  }
+
+  /// No financial recovery or automatic resubmission. A missing baseline requires
+  /// the owner to confirm the displayed Stock, even for a known server receipt.
+  Future<bool> recoverWorkspaceRestockReceiving(WorkspaceRestockPurchaseOriginal source, {
+    WorkspaceSavedInventory? reviewedSavedStock, String? reviewedStockSignature}) async {
+    if (!workspaceServerReceivingFor(source)) return false;
+    if ((reviewedSavedStock == null) != (reviewedStockSignature == null)) return false;
+    final reviewedSavedBytes = reviewedSavedStock == null ? null : jsonEncode(reviewedSavedStock.toJson());
+    final data = _storeData, key = _supplierKey!, reader = originalPurchaseReader!, epoch = _restockReceivingEpoch,
+      navigation = navigationScopeRevision;
+    bool current() => !_disposed && identical(data, _storeData) && _supplierKey == key &&
+      identical(originalPurchaseReader, reader) && identical(_restockReceivingEpoch, epoch) &&
+      navigationScopeRevision == navigation && workspaceServerReceivingFor(source);
+    bool approvedViewCurrent() => current() &&
+      (reviewedStockSignature == null || _restockInventorySignature(data, key) == reviewedStockSignature);
+    try {
+      if (!approvedViewCurrent() || !await data.inventoryWrites || !approvedViewCurrent() ||
+          !await loadWorkspaceSuppliers(retry: true) || !approvedViewCurrent() ||
+          !await _restockReceivingOriginalCurrent(source) || !approvedViewCurrent()) { return false; }
+      final read = await AuthenticatedWorkspaceOrderOperationsGateway(reader).readBuyerGoodsReceiving(source);
+      if (!approvedViewCurrent() || read == null) return false;
+      data.restockReceiving[source.deliveryGroupId] = read;
+      final signature = _restockInventorySignature(data, key);
+      bool unchanged() => approvedViewCurrent() && _restockInventorySignature(data, key) == signature;
+      final saved = await _inventoryStorage.read(key.$1, key.$2, qa: key.$3);
+      if (!unchanged()) return false;
+      if (reviewedSavedStock != null && jsonEncode(saved?.toJson()) != reviewedSavedBytes) {
+        data.inventoryRestockConflict = saved;
+        data.inventoryError = 'Saved Stock changed. Review its quantities again before recovering.';
+        notifyListeners(); return false;
+      }
+      if (saved == null) {
+        data.inventoryRestockBaselineMissing = true;
+        data.inventoryError = 'Confirm the current Stock quantities before adding this delivery.';
+        notifyListeners(); return false;
+      }
+      if (reviewedSavedStock == null && (data.workspaceCatalogueItems.isNotEmpty || data.workspaceStockMovements.isNotEmpty) &&
+          WorkspaceRestockStockBaseline.fingerprint(saved) != WorkspaceRestockStockBaseline.fingerprint(_restockInventorySnapshot(data, key))) {
+        data.inventoryRestockConflict = saved;
+        data.inventoryError = 'Saved Stock differs from this view. Review and recover its saved quantities before receiving.';
+        notifyListeners(); return false;
+      }
+      final adopted = await (_inventoryStorage as WorkInventoryRestockProjectionGuard).adoptRestockBaseline(saved,
+        expectedRevision: saved.revision, ownerConfirmed: false, isCurrent: unchanged);
+      if (!unchanged() || adopted == null) return false;
+      _useRestockInventory(data, adopted);
+      _updateRestockRecovery(data, key);
+      final verified = await (_inventoryStorage as WorkInventoryRestockProjectionGuard).withRestockInventory(key.$1, key.$2,
+        qa: key.$3, expectedRevision: adopted.revision, action: (stock, journal) async {
+          if (!current()) return false;
+          data.restockPriorAllocations = _restockPriorAllocations(stock, journal, includeProjections: false);
+          return true;
+        });
+      if (current()) notifyListeners();
+      return current() && verified;
+    } on Object {
+      if (current()) { data.inventoryError = 'Receiving records need recovery. Saved Stock and receipt identities are kept.'; notifyListeners(); }
+      return false;
+    }
+  }
+  Future<bool> confirmWorkspaceRestockStockBaseline(WorkspaceRestockPurchaseOriginal source, String reviewedSignature) async {
+    if (!workspaceServerReceivingFor(source) || workspaceGoodsReceiptBusy || workspaceSupplierSaving ||
+        !_storeData.inventoryRestockBaselineMissing || _storeData.workspaceCatalogueItems.isEmpty) { return false; }
+    final data = _storeData, key = _supplierKey!, reader = originalPurchaseReader!, epoch = _restockReceivingEpoch,
+      navigation = navigationScopeRevision, snapshot = _restockInventorySnapshot(_storeData, _supplierKey!);
+    bool current() => !_disposed && identical(data, _storeData) && _supplierKey == key && identical(originalPurchaseReader, reader) &&
+      identical(_restockReceivingEpoch, epoch) && navigationScopeRevision == navigation && workspaceServerReceivingFor(source) &&
+      _restockInventorySignature(data, key) == reviewedSignature;
+    if (!current()) return false;
+    data.inventoryReceiptBusy = true; notifyListeners();
+    try {
+      if (!await data.inventoryWrites || !current() || !await _restockReceivingOriginalCurrent(source) || !current()) return false;
+      final saved = await (_inventoryStorage as WorkInventoryRestockProjectionGuard).adoptRestockBaseline(snapshot,
+        expectedRevision: null, ownerConfirmed: true, isCurrent: current);
+      if (!current() || saved == null) return false;
+      _useRestockInventory(data, saved); return true;
+    } on Object {
+      if (current()) data.inventoryError = 'Stock confirmation could not be verified. Recover saved Stock before trying again.';
+      return false;
+    } finally { data.inventoryReceiptBusy = false; if (!_disposed && identical(data, _storeData)) notifyListeners(); }
+  }
+  String? get workspaceRestockStockReviewSignature => _supplierKey == null ? null : _restockInventorySignature(_storeData, _supplierKey!);
+  Map<String, int> _restockPriorAllocations(WorkspaceSavedInventory stock, WorkspaceLedgerCheckpoint? journal, {bool includeProjections = true}) {
+    final allocated = <String, int>{};
+    for (final receipt in [if (includeProjections) for (final p in stock.restockProjections) p.command.receipt,
+      for (final supplier in journal?.supplierLedgers.values ?? const <WorkspaceSupplierLedger>[]) ...supplier.goodsReceipts.values]) {
+      for (final line in receipt.lines) {
+        for (final entry in line.priorStockUnits.entries) {
+          allocated.update(entry.key, (value) => value + entry.value, ifAbsent: () => entry.value);
+        }
+      }
+    }
+    return allocated;
+  }
+
   Future<bool> _restockReceivingOriginalCurrent(WorkspaceRestockPurchaseOriginal? source) async {
     if (source == null) return true;
     final reader = originalPurchaseReader, realm = originalPurchaseRealm, scope = _supplierKey;
@@ -2416,6 +2594,226 @@ class WorkSession extends ChangeNotifier {
       source.lines[line.lineId]?.quantityUnit == line.quantityUnit);
   }
 
+  Future<bool> _saveServerGoodsReceiptReview(WorkspaceSupplierGoodsReceipt receipt, {required String supplierId,
+    required (String, String, bool) scope, required int expectedRevision}) async {
+    if (_supplierKey != scope || !workspaceServerReceivingFor(receipt.restockOriginal) || workspaceSupplierSaving ||
+        workspaceGoodsReceiptBusy || _supplierStorage is! WorkPurchaseGoodsReceiptReviewGuard) { return false; }
+    final source = receipt.restockOriginal!, data = _storeData, key = scope, reader = originalPurchaseReader!,
+      epoch = _restockReceivingEpoch, navigation = navigationScopeRevision;
+    bool current() => !_disposed && identical(data, _storeData) && _supplierKey == key && identical(originalPurchaseReader, reader) &&
+      identical(_restockReceivingEpoch, epoch) && navigationScopeRevision == navigation && workspaceServerReceivingFor(source);
+    var ownsLease = false;
+    try {
+      WorkspaceGoodsArrivalCommand(supplierId: supplierId, receipt: receipt); // Strict new-command admission, never legacy relabelling.
+      if (!await recoverWorkspaceRestockReceiving(source) || !current()) return false;
+      if (workspaceRestockUsesLegacyReceipts(source)) {
+        _supplierValidationErrors[key] = 'Earlier arrivals for this purchase use the saved local receiving record. Continue that original record; it cannot be relabelled as a new server receipt.';
+        return false;
+      }
+      final old = _supplierDirectories[key], read = workspaceRestockReceiving(source);
+      if (old == null || read == null || !old.profiles.any((p) => p.id == supplierId)) return false;
+      final previous = old.goodsReceiptDrafts.where((r) => r.receipt.id == receipt.id).singleOrNull;
+      if (previous != null) {
+        return !old.goodsReceiptCancellations.any((c) => c.receiptId == receipt.id) &&
+          previous.supplierId == supplierId && jsonEncode(previous.receipt.toJson()) == jsonEncode(receipt.toJson());
+      }
+      if (old.revision != expectedRevision || old.goodsReceiptDrafts.length >= 1000 || data.inventoryRestockRecoveryPending) return false;
+      final group = read.group;
+      if (group != null && (group.supplierId != supplierId || receipt.lines.any((line) {
+        final total = group.lines.where((total) => total.sourceLineId == line.sourceLineId).singleOrNull;
+        return total != null && (total.mappingIdentity != line.mappingIdentity || total.deliveredMilli + line.deliveredMilli > line.expectedMilli!);
+      }))) { return false; }
+      final review = WorkspaceSupplierGoodsReceiptDraft(supplierId: supplierId, revision: old.revision + 1, receipt: receipt);
+      final next = WorkspacePurchaseEntryBook.fromJson({...old.toJson(), 'revision': old.revision + 1,
+        'goodsReceiptDrafts': [...old.goodsReceiptDrafts, review].map((r) => r.toJson()).toList()});
+      final signature = _restockInventorySignature(data, key), stockRevision = data.inventoryRevision;
+      if (stockRevision == null) return false;
+      if (workspaceSupplierSaving || workspaceGoodsReceiptBusy) return false;
+      _supplierWrites.add(key); data.inventoryReceiptBusy = true; ownsLease = true; notifyListeners();
+      final saved = await (_supplierStorage as WorkPurchaseGoodsReceiptReviewGuard).saveReviewedGoodsReceipt(next,
+        expectedRevision: old.revision, withVerifiedStock: (persist) =>
+          (_inventoryStorage as WorkInventoryRestockProjectionGuard).withRestockInventory(key.$1, key.$2, qa: key.$3,
+            expectedRevision: stockRevision, action: (stock, journal) async {
+              if (!current() || _restockInventorySignature(data, key) != signature) return false;
+              for (final prior in old.goodsReceiptDrafts.where((r) => r.supplierId == supplierId &&
+                  !old.goodsReceiptCancellations.any((c) => c.receiptId == r.receipt.id))) {
+                if (workspaceGoodsReceiptUsesServer(prior.receipt)) {
+                  final attempt = old.restockGoodsAttempts.where((a) => a.command.receipt.id == prior.receipt.id).singleOrNull;
+                  if (attempt?.closed != null) continue;
+                  final proof = attempt?.recorded?.proof;
+                  if (proof == null || !stock.restockProjections.any((p) => p.command.receipt.id == prior.receipt.id && p.matches(proof))) return false;
+                } else if (jsonEncode(journal?.supplierLedgers[supplierId]?.goodsReceipts[prior.receipt.id]?.toJson()) !=
+                    jsonEncode(prior.receipt.toJson())) { return false; }
+              }
+              return current() && await persist();
+            }));
+      if (!current()) { _supplierNeedsReload.add(key); return false; }
+      if (saved) { _supplierDirectories[key] = next; _supplierErrors.remove(key); _supplierValidationErrors.remove(key); }
+      else { _supplierValidationErrors[key] = 'Resume the previous delivery and recover its Stock before saving another arrival.'; }
+      return saved;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (current()) _supplierErrors[key] = 'Receiving review status is unverified. Recover Purchases before replacing these details.';
+      return false;
+    } finally {
+      if (ownsLease) { _supplierWrites.remove(key); data.inventoryReceiptBusy = false; if (current()) notifyListeners(); }
+    }
+  }
+
+  Future<WorkspaceGoodsReceiptSaveResult> checkWorkspaceRestockGoodsReceipt(WorkspaceSupplierGoodsReceipt receipt, {
+    required String supplierId, required (String, String, bool) scope}) => _confirmServerGoodsReceipt(receipt,
+      supplierId: supplierId, scope: scope, expectedRevision: workspacePurchaseEntryRevision ?? 0, checkOnly: true);
+  Future<WorkspaceGoodsReceiptSaveResult> closeWorkspaceRestockGoodsReceipt(WorkspaceSupplierGoodsReceipt receipt, {
+    required String supplierId, required (String, String, bool) scope}) => _confirmServerGoodsReceipt(receipt,
+      supplierId: supplierId, scope: scope, expectedRevision: workspacePurchaseEntryRevision ?? 0, requestClosure: true);
+  Future<WorkspaceGoodsReceiptSaveResult> _confirmServerGoodsReceipt(WorkspaceSupplierGoodsReceipt receipt, {
+    required String supplierId, required (String, String, bool) scope, required int expectedRevision,
+    bool checkOnly = false, bool requestClosure = false}) async {
+    final data = _storeData, key = _supplierKey;
+    var attempted = workspaceRestockAttempt(receipt.id) != null, recorded = workspaceRestockAttempt(receipt.id)?.recorded != null;
+    WorkspaceGoodsReceiptSaveResult unresolved() => recorded ? WorkspaceGoodsReceiptSaveResult.stockRecoveryPending
+      : attempted ? WorkspaceGoodsReceiptSaveResult.statusUnknown : WorkspaceGoodsReceiptSaveResult.notPosted;
+    if (key == null || key != scope || !workspaceServerReceivingFor(receipt.restockOriginal) || workspaceGoodsReceiptBusy ||
+        workspaceSupplierSaving || _supplierStorage is! WorkPurchaseRestockArrivalGuard) { return unresolved(); }
+    final source = receipt.restockOriginal!, reader = originalPurchaseReader!, epoch = _restockReceivingEpoch,
+      navigation = navigationScopeRevision;
+    bool current() => !_disposed && identical(data, _storeData) && _supplierKey == key && identical(originalPurchaseReader, reader) &&
+      identical(_restockReceivingEpoch, epoch) && navigationScopeRevision == navigation && workspaceServerReceivingFor(source);
+    var ownsLease = false;
+    try {
+      final command = WorkspaceGoodsArrivalCommand(supplierId: supplierId, receipt: receipt);
+      if (!await loadWorkspaceSuppliers(retry: true) || !current()) return unresolved();
+      var book = _supplierDirectories[key];
+      final review = book?.goodsReceiptDrafts.where((r) => r.receipt.id == receipt.id).singleOrNull;
+      var attempt = book?.restockGoodsAttempts.where((a) => a.command.receipt.id == receipt.id).singleOrNull;
+      attempted = attempt != null; recorded = attempt?.recorded != null;
+      if (book == null || review == null || review.supplierId != supplierId ||
+          jsonEncode(review.receipt.toJson()) != jsonEncode(receipt.toJson()) ||
+          book.goodsReceiptCancellations.any((c) => c.receiptId == receipt.id) ||
+          attempt != null && attempt.command.fingerprint != command.fingerprint) { return unresolved(); }
+      if (attempt?.closed != null) {
+        _updateRestockRecovery(data, key);
+        return WorkspaceGoodsReceiptSaveResult.closed;
+      }
+      if ((checkOnly || requestClosure) && attempt == null) return WorkspaceGoodsReceiptSaveResult.notPosted;
+      if (!attempted && (book.revision != expectedRevision || !await recoverWorkspaceRestockReceiving(source) || !current())) return unresolved();
+      if (!attempted) {
+        final read = workspaceRestockReceiving(source), group = workspaceRestockReceiving(source)?.group;
+        if (read == null || group != null && (group.supplierId != supplierId || receipt.lines.any((line) {
+          final total = group.lines.where((total) => total.sourceLineId == line.sourceLineId).singleOrNull;
+          return total != null && (total.mappingIdentity != line.mappingIdentity ||
+            total.deliveredMilli + line.deliveredMilli > line.expectedMilli!);
+        }))) {
+          _supplierValidationErrors[key] = 'Receiving quantities or mappings changed. Review the saved arrivals before sending these goods.';
+          return WorkspaceGoodsReceiptSaveResult.notPosted;
+        }
+      }
+      if (workspaceSupplierSaving || workspaceGoodsReceiptBusy) return unresolved();
+      _supplierWrites.add(key); data.inventoryReceiptBusy = true; ownsLease = true; notifyListeners();
+      final closing = !recorded && (requestClosure || attempt?.closeRequestedRevision != null);
+      if ((!closing && !await data.inventoryWrites) || !current() || !await _restockReceivingOriginalCurrent(source) || !current()) return unresolved();
+      if (closing && attempt?.closeRequestedRevision == null) {
+        final retained = await (_supplierStorage as WorkPurchaseRestockArrivalGuard).retainRestockArrival(command,
+          qa: key.$3, expectedRevision: book.revision, isCurrent: current, requestClosure: true);
+        if (retained == null || !current()) return unresolved();
+        book = retained; _supplierDirectories[key] = retained;
+        attempt = retained.restockGoodsAttempts.where((a) => a.command.receipt.id == receipt.id).single;
+        data.inventoryRestockRecoveryPending = true;
+      }
+      if (attempt == null) {
+        final signature = _restockInventorySignature(data, key), revision = data.inventoryRevision;
+        if (revision == null) return unresolved();
+        final baseline = await (_inventoryStorage as WorkInventoryRestockProjectionGuard).withRestockInventory(key.$1, key.$2,
+          qa: key.$3, expectedRevision: revision, action: (stock, journal) async {
+            if (!current() || _restockInventorySignature(data, key) != signature) return false;
+            final allocated = _restockPriorAllocations(stock, journal), byId = {for (final m in stock.movements) m.id: m};
+            final additions = <String, int>{};
+            for (final line in receipt.lines) {
+              final product = stock.products.where((p) => p.id == line.productId).singleOrNull;
+              if (product == null || product.stockMode != WorkspaceStockMode.exactQuantity || product.pack != line.stockUnit) return false;
+              additions.update(line.productId, (value) => value + line.newStockUnits, ifAbsent: () => line.newStockUnits);
+              for (final entry in line.priorStockUnits.entries) {
+                final original = byId[entry.key], used = (allocated[entry.key] ?? 0) + entry.value;
+                if (original == null || original.productId != line.productId || original.referenceKind != null || original.referenceId != null ||
+                    !{WorkspaceStockMovementKind.openingStock, WorkspaceStockMovementKind.goodsReceived}.contains(original.kind) ||
+                    original.occurredAt.isAfter(receipt.recordedAt) || used > original.quantityDelta) { return false; }
+                allocated[entry.key] = used;
+              }
+            }
+            return stock.products.every((p) => p.stock + (additions[p.id] ?? 0) <= 2147483647);
+          });
+        if (!baseline || !current()) return unresolved();
+        attempted = true; data.inventoryRestockRecoveryPending = true;
+        final retained = await (_supplierStorage as WorkPurchaseRestockArrivalGuard).retainRestockArrival(command,
+          qa: key.$3, expectedRevision: book.revision, isCurrent: current);
+        // A save may have reached native storage before an exception/retirement.
+        attempted = true;
+        if (retained == null || !current()) return unresolved();
+        book = retained; _supplierDirectories[key] = retained; data.inventoryRestockRecoveryPending = true;
+      }
+      final gateway = AuthenticatedWorkspaceOrderOperationsGateway(reader);
+      WorkspaceGoodsArrivalResult? result;
+      if (attempt != null) {
+        result = await gateway.reconcileBuyerGoodsArrival(command);
+        if (!current()) return unresolved();
+        if (result != null && !result.recorded && !result.closed && !checkOnly && !recorded) {
+          result = closing ? await gateway.closeBuyerGoodsArrival(command) : await gateway.recordBuyerGoodsArrival(command);
+        }
+      } else { result = await gateway.recordBuyerGoodsArrival(command); }
+      if (current() && result?.closed == true) {
+        final retained = await (_supplierStorage as WorkPurchaseRestockArrivalGuard).retainRestockArrival(command,
+          qa: key.$3, expectedRevision: book.revision, isCurrent: current, closed: result);
+        if (retained == null || !current()) { data.inventoryRestockRecoveryPending = true; return unresolved(); }
+        _supplierDirectories[key] = retained;
+        data.restockReceiving[source.deliveryGroupId] = WorkspaceGoodsReceivingRead.fromResult(result!);
+        _updateRestockRecovery(data, key);
+        _supplierErrors.remove(key); _supplierValidationErrors.remove(key); _supplierNeedsReload.remove(key);
+        return WorkspaceGoodsReceiptSaveResult.closed;
+      }
+      if (!current() || result == null || !result.recorded) {
+        data.inventoryRestockRecoveryPending = true;
+        if (current()) _supplierErrors[key] = 'Receiving status is unverified. Keep this delivery identity and check or retry the original receipt.';
+        return unresolved();
+      }
+      recorded = true; data.restockReceiving[source.deliveryGroupId] = WorkspaceGoodsReceivingRead.fromResult(result);
+      final retained = await (_supplierStorage as WorkPurchaseRestockArrivalGuard).retainRestockArrival(command,
+        qa: key.$3, expectedRevision: book.revision, isCurrent: current, recorded: result);
+      if (retained == null || !current()) { data.inventoryRestockRecoveryPending = true; return unresolved(); }
+      _supplierDirectories[key] = retained;
+      final signature = _restockInventorySignature(data, key), revision = data.inventoryRevision;
+      final saved = await _inventoryStorage.read(key.$1, key.$2, qa: key.$3);
+      if (!current() || _restockInventorySignature(data, key) != signature) return unresolved();
+      if (saved == null || revision == null) {
+        data.inventoryRestockBaselineMissing = saved == null; data.inventoryRestockRecoveryPending = true;
+        data.inventoryError = 'Goods are recorded. Recover or confirm current Stock before applying this receipt.';
+        return unresolved();
+      }
+      final projected = await (_inventoryStorage as WorkInventoryRestockProjectionGuard).projectRestockArrival(result.proof!,
+        qa: key.$3, expectedRevision: revision, isCurrent: () => current() && _restockInventorySignature(data, key) == signature,
+        verifyBaseline: (previous) async => current() && _restockInventorySignature(data, key) == signature &&
+          WorkspaceRestockStockBaseline.fingerprint(previous) == WorkspaceRestockStockBaseline.fingerprint(_restockInventorySnapshot(data, key)));
+      if (projected == null || !current() || _restockInventorySignature(data, key) != signature) {
+        data.inventoryRestockRecoveryPending = true;
+        data.inventoryError = 'Goods are recorded. Recover the saved Stock projection before adding these goods again.';
+        return unresolved();
+      }
+      _useRestockInventory(data, projected); _updateRestockRecovery(data, key);
+      _supplierErrors.remove(key); _supplierValidationErrors.remove(key); _supplierNeedsReload.remove(key);
+      _queueStoreStockReport(data, projected);
+      return WorkspaceGoodsReceiptSaveResult.saved;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (current()) {
+        data.inventoryRestockRecoveryPending = attempted;
+        _supplierErrors[key] = recorded ? 'Goods are recorded. Recover their Stock projection; do not enter another receipt.'
+          : 'Receiving status needs recovery. Keep the original delivery identity.';
+      }
+      return unresolved();
+    } finally {
+      if (ownsLease) { _supplierWrites.remove(key); data.inventoryReceiptBusy = false; if (current()) notifyListeners(); }
+    }
+  }
+
   /// Review-only receiving uses the financial journal as its single authority.
   /// The standalone Stock copy is projected under the shared inventory queue.
   /// An uncertain reply is never described as a definite unposted receipt.
@@ -2427,6 +2825,9 @@ class WorkSession extends ChangeNotifier {
     required int expectedSupplierRevision,
     bool requireSavedReview = false,
   }) async {
+    if (workspaceGoodsReceiptUsesServer(receipt)) {
+      return _confirmServerGoodsReceipt(receipt, supplierId: supplierId, scope: scope, expectedRevision: expectedPurchaseRevision);
+    }
     final data = _storeData;
     final key = _supplierKey;
     if (key == null || key != scope || !receipt.valid ||
@@ -2518,6 +2919,23 @@ class WorkSession extends ChangeNotifier {
                     return refuseProjection('Match each receipt item to its saved Stock product and pack before receiving it.');
                   }
                 }
+                // The financial journal cannot see allocations retained by
+                // authenticated receiving. Check both while owning Stock's
+                // queue, before committing another manual attribution.
+                final allocated = _restockPriorAllocations(previous, journal);
+                final priorMovements = {for (final movement in previous.movements) movement.id: movement};
+                for (final line in frozen.lines) {
+                  for (final entry in line.priorStockUnits.entries) {
+                    final movement = priorMovements[entry.key], used = (allocated[entry.key] ?? 0) + entry.value;
+                    if (movement == null || movement.productId != line.productId || movement.referenceKind != null ||
+                        movement.referenceId != null || movement.occurredAt.isAfter(frozen.recordedAt) ||
+                        !{WorkspaceStockMovementKind.openingStock, WorkspaceStockMovementKind.goodsReceived}.contains(movement.kind) ||
+                        used > movement.quantityDelta) {
+                      return refuseProjection('Earlier Stock is already linked or unavailable. Check its remaining quantity before receiving these goods.');
+                    }
+                    allocated[entry.key] = used;
+                  }
+                }
                 final nextLedger = ledger.receiveGoods(frozen, expectedRevision: expectedSupplierRevision);
                 final baseline = _captureLedgerInventory(data);
                 final inventory = baseline?.post([
@@ -2589,7 +3007,8 @@ class WorkSession extends ChangeNotifier {
                 revision: previous.revision + 1, savedAt: DateTime.now().toUtc(),
                 variantFamilies: previous.variantFamilies, reviewedCatalogueLinks: previous.reviewedCatalogueLinks,
                 products: products, movements: movements,
-                manualReceiptCheckpointRevision: saved.revision);
+                manualReceiptCheckpointRevision: saved.revision, restockProjections: previous.restockProjections,
+                restockBaseline: previous.restockBaseline);
               return projected;
             });
       // Durable receipt evidence is independent of later bill-book revisions.
@@ -2633,6 +3052,8 @@ class WorkSession extends ChangeNotifier {
       data.workspaceStockMovements..clear()..addAll(projected!.movements);
       data.inventoryRevision = projected!.revision;
       data.inventoryReceiptCheckpointRevision = projected!.manualReceiptCheckpointRevision;
+      data.inventoryRestockProjections = projected!.restockProjections;
+      data.inventoryRestockBaseline = projected!.restockBaseline;
       data.inventoryMutations++;
       data.inventoryError = null;
       data.inventoryReceiptRecoveryPending = false;
@@ -2806,7 +3227,8 @@ class WorkSession extends ChangeNotifier {
             projected = WorkspaceSavedInventory(account: key.$1, store: key.$2, qa: key.$3,
               revision: previous.revision + 1, savedAt: DateTime.now().toUtc(), products: products,
               variantFamilies: previous.variantFamilies, reviewedCatalogueLinks: previous.reviewedCatalogueLinks,
-              movements: movements, manualReceiptCheckpointRevision: saved.revision);
+              movements: movements, manualReceiptCheckpointRevision: saved.revision, restockProjections: previous.restockProjections,
+              restockBaseline: previous.restockBaseline);
           }
           return projected;
         });
@@ -2824,6 +3246,8 @@ class WorkSession extends ChangeNotifier {
       data.workspaceStockMovements..clear()..addAll(projected!.movements);
       data.inventoryRevision = projected!.revision;
       data.inventoryReceiptCheckpointRevision = projected!.manualReceiptCheckpointRevision;
+      data.inventoryRestockProjections = projected!.restockProjections;
+      data.inventoryRestockBaseline = projected!.restockBaseline;
       data.inventoryMutations++;
       data.inventoryReceiptRecoveryPending = false;
       data.inventoryError = null;
@@ -3001,6 +3425,7 @@ class WorkSession extends ChangeNotifier {
           goodsReceiptCancellations: old.goodsReceiptCancellations,
           billGoodsReviews: old.billGoodsReviews,
           billGoodsCancellations: old.billGoodsCancellations,
+          restockGoodsAttempts: old.restockGoodsAttempts,
         ).toJson(),
       );
     } on Object {
@@ -3046,6 +3471,11 @@ class WorkSession extends ChangeNotifier {
     required String supplierId, required (String, String, bool) scope,
     required int expectedRevision, required DateTime cancelledAt, required String reason,
   }) async {
+    final review = workspaceGoodsReceiptDrafts.where((r) => r.receipt.id == receiptId).singleOrNull;
+    if (review != null && workspaceGoodsReceiptUsesServer(review.receipt)) {
+      return _abandonServerGoodsReceiptReview(review.receipt, supplierId: supplierId, scope: scope,
+        expectedRevision: expectedRevision, cancelledAt: cancelledAt, reason: reason);
+    }
     final key = _supplierKey;
     final data = _storeData;
     if (key == null || key != scope || !key.$3 || _productionSession ||
@@ -3087,12 +3517,45 @@ class WorkSession extends ChangeNotifier {
     }
   }
 
+  Future<bool> _abandonServerGoodsReceiptReview(WorkspaceSupplierGoodsReceipt receipt, {
+    required String supplierId, required (String, String, bool) scope, required int expectedRevision,
+    required DateTime cancelledAt, required String reason}) async {
+    final key = _supplierKey, data = _storeData;
+    if (key == null || key != scope || !workspaceGoodsReceiptCanCancel(receipt) || workspaceSupplierSaving ||
+        workspaceGoodsReceiptBusy || workspaceSupplierRecoveryRequired || _supplierStorage is! WorkPurchaseReceiptReviewAbandonment) { return false; }
+    final reader = originalPurchaseReader, epoch = _restockReceivingEpoch, navigation = navigationScopeRevision;
+    bool current() => !_disposed && identical(data, _storeData) && _supplierKey == key && identical(originalPurchaseReader, reader) &&
+      identical(_restockReceivingEpoch, epoch) && navigationScopeRevision == navigation;
+    _supplierWrites.add(key); notifyListeners();
+    try {
+      final saved = await (_supplierStorage as WorkPurchaseReceiptReviewAbandonment).abandonReviewedReceipt(key.$1, key.$2,
+        qa: key.$3, expectedRevision: expectedRevision,
+        cancellation: WorkspaceGoodsReceiptReviewCancellation(receiptId: receipt.id, supplierId: supplierId,
+          revision: expectedRevision + 1, cancelledAt: cancelledAt, reason: reason),
+        verifyUncommitted: (review) async => current() && review.supplierId == supplierId &&
+          jsonEncode(review.receipt.toJson()) == jsonEncode(receipt.toJson()));
+      if (!current()) { _supplierNeedsReload.add(key); return false; }
+      if (saved == null) {
+        _supplierValidationErrors[key] = 'This receipt may already have been sent. Check the original receipt; cancellation cannot replace an attempt.';
+        return false;
+      }
+      _supplierDirectories[key] = saved; _supplierErrors.remove(key); _supplierValidationErrors.remove(key); return true;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (current()) _supplierErrors[key] = 'Cancellation status needs recovery. Keep this receipt identity until Purchases can be checked.';
+      return false;
+    } finally { _supplierWrites.remove(key); if (current()) notifyListeners(); }
+  }
+
   /// Freeze a receiving review before any Stock or accounting commit. An
   /// uncertain save must be recovered from this book before posting the receipt.
   Future<bool> saveWorkspaceGoodsReceiptDraft(WorkspaceSupplierGoodsReceipt receipt, {
     required String supplierId, required (String, String, bool) scope,
     required int expectedRevision,
   }) async {
+    if (workspaceGoodsReceiptUsesServer(receipt)) {
+      return _saveServerGoodsReceiptReview(receipt, supplierId: supplierId, scope: scope, expectedRevision: expectedRevision);
+    }
     final key = _supplierKey;
     final old = _supplierDirectories[key];
     if (key == null || key != scope || !key.$3 || _productionSession ||
@@ -3122,7 +3585,7 @@ class WorkSession extends ChangeNotifier {
       openingRecords: old.openingRecords, goodsReceiptDrafts: [...old.goodsReceiptDrafts, review],
       goodsReceiptCancellations: old.goodsReceiptCancellations,
       billGoodsReviews: old.billGoodsReviews,
-      billGoodsCancellations: old.billGoodsCancellations).toJson());
+      billGoodsCancellations: old.billGoodsCancellations, restockGoodsAttempts: old.restockGoodsAttempts).toJson());
     _supplierWrites.add(key);
     _supplierErrors.remove(key);
     _supplierValidationErrors.remove(key);
@@ -3155,8 +3618,27 @@ class WorkSession extends ChangeNotifier {
         // the durable review write inside both queues; never re-enter either.
         final savedReview = await (_supplierStorage as WorkPurchaseGoodsReceiptReviewGuard)
           .saveReviewedGoodsReceipt(next, expectedRevision: old.revision,
-            withVerifiedStock: (persist) => (_inventoryStorage as WorkInventoryReceiptProjectionGuard)
-              .projectReceipt(key.$1, key.$2, qa: key.$3, expectedRevision: inventory.revision,
+            withVerifiedStock: (persist) {
+              if (previousReviews.any((review) => workspaceGoodsReceiptUsesServer(review.receipt))) {
+                if (_inventoryStorage is! WorkInventoryRestockProjectionGuard) return Future.value(false);
+                return (_inventoryStorage as WorkInventoryRestockProjectionGuard).withRestockInventory(key.$1, key.$2,
+                  qa: key.$3, expectedRevision: inventory.revision, action: (savedStock, journal) async {
+                    if (_disposed || _supplierKey != key || !identical(old, _supplierDirectories[key])) return false;
+                    for (final review in previousReviews) {
+                      if (workspaceGoodsReceiptUsesServer(review.receipt)) {
+                        final attempt = old.restockGoodsAttempts.where((attempt) => attempt.command.receipt.id == review.receipt.id).singleOrNull;
+                        if (attempt?.closed != null) continue;
+                        final proof = attempt?.recorded?.proof;
+                        if (proof == null || !savedStock.restockProjections.any((projection) =>
+                            projection.command.receipt.id == review.receipt.id && projection.matches(proof))) { return false; }
+                      } else if (jsonEncode(journal?.supplierLedgers[supplierId]?.goodsReceipts[review.receipt.id]?.toJson()) !=
+                          jsonEncode(review.receipt.toJson())) { return false; }
+                    }
+                    return await persist();
+                  });
+              }
+              return (_inventoryStorage as WorkInventoryReceiptProjectionGuard)
+                .projectReceipt(key.$1, key.$2, qa: key.$3, expectedRevision: inventory.revision,
                 commit: (savedStock) async {
                   final journal = await _storeData.ledgerCheckpointStore?.read(key.$1, key.$2);
                   if (_disposed || _supplierKey != key || !identical(old, _supplierDirectories[key])) return null;
@@ -3189,7 +3671,8 @@ class WorkSession extends ChangeNotifier {
                   }
                   if (!await persist()) return null;
                   return savedStock; // Exact bytes/marker retained, no Stock write.
-                }));
+                });
+            });
         if (!savedReview) return false;
       } else {
         await _supplierStorage.save(next, expectedRevision: old.revision);
@@ -3347,7 +3830,7 @@ class WorkSession extends ChangeNotifier {
         openingRecords: old.openingRecords, goodsReceiptDrafts: old.goodsReceiptDrafts,
         goodsReceiptCancellations: old.goodsReceiptCancellations,
         billGoodsReviews: [...old.billGoodsReviews, review],
-        billGoodsCancellations: old.billGoodsCancellations).toJson());
+        billGoodsCancellations: old.billGoodsCancellations, restockGoodsAttempts: old.restockGoodsAttempts).toJson());
       final guard = _supplierStorage as WorkPurchaseBillGoodsReviewGuard;
       final saved = await guard.saveReviewedBillGoods(next, expectedRevision: old.revision,
         verifyCurrent: () async {
@@ -3395,7 +3878,7 @@ class WorkSession extends ChangeNotifier {
   bool get workspaceInventoryLoaded => _storeData.inventoryLoaded;
   Future<bool> get workspaceInventorySaved => _storeData.inventoryWrites;
   bool get workspaceGoodsReceiptBusy => _storeData.inventoryReceiptBusy;
-  bool get workspaceGoodsReceiptRecoveryPending => _storeData.inventoryReceiptRecoveryPending;
+  bool get workspaceGoodsReceiptRecoveryPending => _storeData.inventoryReceiptRecoveryPending || _storeData.inventoryRestockRecoveryPending;
   bool get workspaceSupplierRecoveryRequired => _supplierKey != null && _supplierNeedsReload.contains(_supplierKey);
   bool get workspaceGoodsReceiptCancellationAvailable => workspaceSupplierOpeningConfirmationAvailable &&
       _supplierStorage is WorkPurchaseReceiptReviewAbandonment;
@@ -3406,14 +3889,25 @@ class WorkSession extends ChangeNotifier {
   /// Display-only capacity from original saved entry evidence, never on-hand.
   /// The authoritative receipt checkpoint revalidates every allocation on save.
   Map<WorkspaceStockMovement, int> workspaceReceiptPriorStock(String productId) {
-    if (!_storeData.ledgerRecovered || _storeData.inventoryReceiptRecoveryPending) return const {};
-    final allocated = <String, int>{};
+    if ((!_storeData.ledgerRecovered && _storeData.inventoryRestockBaselineOwner != _supplierKey) || workspaceGoodsReceiptRecoveryPending) return const {};
+    final manual = <String, int>{};
     for (final ledger in _supplierLedgerCheckpointEntries(_storeData).values) {
       for (final receipt in ledger.goodsReceipts.values) {
         for (final line in receipt.lines) {
           for (final entry in line.priorStockUnits.entries) {
-            allocated.update(entry.key, (value) => value + entry.value, ifAbsent: () => entry.value);
+            manual.update(entry.key, (value) => value + entry.value, ifAbsent: () => entry.value);
           }
+        }
+      }
+    }
+    final allocated = Map<String, int>.of(_storeData.restockPriorAllocations);
+    for (final entry in manual.entries) {
+      if (entry.value > (allocated[entry.key] ?? 0)) allocated[entry.key] = entry.value;
+    }
+    for (final projection in _storeData.inventoryRestockProjections) {
+      for (final line in projection.command.receipt.lines) {
+        for (final entry in line.priorStockUnits.entries) {
+          allocated.update(entry.key, (value) => value + entry.value, ifAbsent: () => entry.value);
         }
       }
     }
@@ -3426,8 +3920,13 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool _stockEditAvailable() {
-    if (!_storeData.inventoryReceiptBusy && !_storeData.inventoryReceiptRecoveryPending) return true;
-    showError(_storeData.inventoryReceiptRecoveryPending
+    if (_storeData.inventoryRestockConflict != null) {
+      showError('Saved receiving Stock differs from this view. Review and recover its quantities before editing.');
+      return false;
+    }
+    if (!_storeData.inventoryReceiptBusy && !workspaceGoodsReceiptRecoveryPending &&
+        !(_storeData.inventoryLoad != null && !_storeData.inventoryLoaded)) { return true; }
+    showError(workspaceGoodsReceiptRecoveryPending
       ? 'Goods receipt needs Stock recovery. Your entries are kept; reopen the receipt before changing Stock.'
       : 'Goods receipt is being saved. Your entries are kept; try again when it finishes.');
     return false;
@@ -3438,7 +3937,10 @@ class WorkSession extends ChangeNotifier {
     final account = _contactAccountScope;
     final store = activeWorkspace?.id;
     if (!localInventoryEnabled) {
-      return Future.value(true);
+      if (data.inventoryLoad != null) return data.inventoryLoad!;
+      final operation = _recoverAdoptedRestockStock(data);
+      data.inventoryLoad = operation;
+      return operation.whenComplete(() { if (identical(data.inventoryLoad, operation)) data.inventoryLoad = null; });
     }
     if (data.inventoryLoaded) return Future.value(true);
     if (data.inventoryLoad != null) return data.inventoryLoad!;
@@ -3490,6 +3992,15 @@ class WorkSession extends ChangeNotifier {
           data.workspaceStockMovements.addAll(saved.movements);
           data.inventoryRevision = saved.revision;
           data.inventoryReceiptCheckpointRevision = saved.manualReceiptCheckpointRevision;
+          data.inventoryRestockProjections = saved.restockProjections;
+          data.inventoryRestockBaseline = saved.restockBaseline;
+          if (saved.restockBaseline != null || saved.restockProjections.isNotEmpty) {
+            data.inventoryRestockBaselineOwner = (account, store, !_productionSession);
+            data.inventoryRestockRecoveryPending = true;
+            if (!await loadWorkspaceSuppliers(retry: true) || !_isStoreScopeCurrent(data, store, account) ||
+                generation != data.inventoryMutations) { return false; }
+            _updateRestockRecovery(data, (account, store, !_productionSession));
+          }
           if (!_productionSession && data.ledgerCheckpointStore != null) {
             final journal = await data.ledgerCheckpointStore!.read(account, store);
             if (!_isStoreScopeCurrent(data, store, account) || generation != data.inventoryMutations) return false;
@@ -3564,6 +4075,8 @@ class WorkSession extends ChangeNotifier {
     final movements = List<WorkspaceStockMovement>.of(
       data.workspaceStockMovements,
     );
+    final restockProjections = List<WorkspaceRestockStockProjection>.of(data.inventoryRestockProjections);
+    final restockBaseline = data.inventoryRestockBaseline;
     final at = DateTime.now().toUtc();
     data.inventoryWrites = data.inventoryWrites.then((previousSucceeded) async {
       if (!previousSucceeded || !_isStoreScopeCurrent(data, store, account)) {
@@ -3595,6 +4108,8 @@ class WorkSession extends ChangeNotifier {
           products: frozenProducts,
           movements: movements,
           manualReceiptCheckpointRevision: data.inventoryReceiptCheckpointRevision,
+          restockProjections: restockProjections,
+          restockBaseline: restockBaseline,
         );
         await _inventoryStorage.save(
           snapshot,
@@ -3845,8 +4360,12 @@ class WorkSession extends ChangeNotifier {
 
   WorkspaceLedgerFormKey? supplierReceivingInputFormKey(String supplierId) {
     final scope = workspaceSupplierScope;
+    final reader = originalPurchaseReader;
+    final serverReceiving = scope != null && reader != null && reader.isCurrent && reader.accountUserId == scope.$1 &&
+      originalPurchaseRealm == (scope.$3 ? 'evaluation' : 'production') &&
+      _supplierStorage is WorkPurchaseRestockArrivalGuard && _inventoryStorage is WorkInventoryRestockProjectionGuard;
     if (scope == null || !workspaceSuppliersLoaded ||
-        !workspaceSupplierOpeningConfirmationAvailable ||
+        !(workspaceSupplierOpeningConfirmationAvailable || serverReceiving) ||
         !workspaceSuppliers.any((supplier) => supplier.id == supplierId)) {
       return null;
     }
@@ -13583,6 +14102,9 @@ class WorkSession extends ChangeNotifier {
     _recordWorkspaceActivity('${product.title} quantity updated.');
     showNotice('${product.title} quantity is now $nextQuantity.');
     _persistOperationalState('stock-adjusted');
+    if (_storeData.inventoryRestockBaselineOwner != null && _storeData.inventoryRestockBaselineOwner == _supplierKey) {
+      _queueInventorySave();
+    }
     notifyListeners();
     return true;
   }

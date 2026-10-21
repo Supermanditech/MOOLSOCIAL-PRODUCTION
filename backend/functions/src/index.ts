@@ -2997,6 +2997,7 @@ export const moolSocialWorkspace = onRequest(
       const productStarsOperation = ["readBuyerProductStars", "submitBuyerProductStars", "reconcileBuyerProductStars", "listStoreProductStars"].includes(operation);
       const operationalCommand = operation === "submitStoreOrderCommand";
       const operationalReconcile = operation === "reconcileStoreOrderCommand";
+      const goodsArrivalOperation = ['recordBuyerGoodsArrival', 'reconcileBuyerGoodsArrival', 'readBuyerGoodsReceiving', 'closeBuyerGoodsArrival'].includes(operation);
       const ownerUserId = await verifySocialInvocation(
         request.headers,
         {
@@ -3007,13 +3008,14 @@ export const moolSocialWorkspace = onRequest(
             ),
           verifyIdToken: async (token) => {
             const verified = await getAuth().verifyIdToken(token);
-            if (purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
+            if (purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || goodsArrivalOperation || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
               requireDefaultPurchaseTenant(verified.firebase?.tenant);
             }
             return verified;
           },
         },
-        mutation || orderMutation || operationalCommand || operation === "submitBuyerProductStars",
+        mutation || orderMutation || operationalCommand || operation === "submitBuyerProductStars" ||
+          operation === 'recordBuyerGoodsArrival' || operation === 'closeBuyerGoodsArrival',
         true,
       );
       if (!ownerUserId) {
@@ -3094,6 +3096,14 @@ export const moolSocialWorkspace = onRequest(
           operation === "readBuyerOperationalOrder" ? "buyer" : "seller", catalogueBody)
         : operationalCommand || operationalReconcile
           ? await workspaceOrderOperationsService().command(ownerUserId, catalogueBody, operationalReconcile)
+        : operation === 'recordBuyerGoodsArrival'
+        ? await workspacePurchaseProjectionService().recordBuyerGoodsArrival(ownerUserId, catalogueBody)
+        : operation === 'reconcileBuyerGoodsArrival'
+        ? await workspacePurchaseProjectionService().reconcileBuyerGoodsArrival(ownerUserId, catalogueBody)
+        : operation === 'closeBuyerGoodsArrival'
+        ? await workspacePurchaseProjectionService().closeBuyerGoodsArrival(ownerUserId, catalogueBody)
+        : operation === 'readBuyerGoodsReceiving'
+        ? await workspacePurchaseProjectionService().readBuyerGoodsReceiving(ownerUserId, catalogueBody)
         : operation === "listBuyerPurchaseReferences"
         ? await workspacePurchaseProjectionService().listBuyer(ownerUserId, catalogueBody)
         : operation === "listStorePurchaseReferences"

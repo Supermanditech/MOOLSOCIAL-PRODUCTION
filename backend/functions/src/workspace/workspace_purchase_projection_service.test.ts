@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {createHash, randomUUID} from "node:crypto";
 import {execFile} from "node:child_process";
-import {readFileSync} from "node:fs";
+import {readFileSync, writeFileSync} from "node:fs";
 import {dirname, resolve} from "node:path";
 import {promisify} from "node:util";
 import test from "node:test";
@@ -1066,6 +1066,240 @@ function purchaserReceipt(kind: 'personal' | 'store' = 'store') {
   }
   return value;
 }
+
+test('LF-RESTOCK-ARRIVAL existing purchase service owns private physical report and recovery', () => {
+  for (const method of ['recordBuyerGoodsArrival', 'reconcileBuyerGoodsArrival', 'readBuyerGoodsReceiving', 'closeBuyerGoodsArrival']) {
+    assert.equal(typeof Reflect.get(WorkspacePurchaseProjectionService.prototype, method), 'function', method);
+  }
+});
+
+test('LF-RESTOCK-ARRIVAL transactional partials retries current ownership and private readback', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST, timeout: 60000,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-arrival-${randomUUID().slice(0,8)}`}, `arrival-${randomUUID()}`),
+    db = purchaseTestFirestore(app), input = purchaserReceipt(), actor = input.buyerUserId;
+  const profile = {schemaVersion: 1, caseId: 'buying-case', workspaceId: 'buying-store', ownerUserId: actor,
+    familyId: 'products-trade', profileId: 'retailer-grocery', status: 'live', shopEnabled: false};
+  const service = () => new WorkspacePurchaseProjectionService(db, 'evaluation') as any;
+  try {
+    for (const store of input.stores) await db.collection('workspaceProfiles').doc(store.caseId).set({schemaVersion: 1,
+      caseId: store.caseId, workspaceId: store.storeId, ownerUserId: store.ownerUserId, familyId: 'products-trade',
+      profileId: 'wholesaler', status: 'live', shopEnabled: true});
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    const writer = new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => input});
+    // Materialization requires an enabled purchasing Store; historical receiving does not require new public sales.
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({shopEnabled: true});
+    const made = await writer.materialize('arrival-placement');
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({shopEnabled: false});
+    const original = (await service().readBuyer(actor, {purchaseId: made.purchaseId, buyingStoreId: profile.workspaceId}))
+      .orders.find((order: any) => order.storeId === input.stores[0].storeId);
+    const orderedLine = original.original.lines.find((line: any) => line.skuId === input.stores[0].lines[0].skuId &&
+      line.verifiedPackId === input.stores[0].lines[0].verifiedPackId);
+    assert.equal(orderedLine.quantityMilli, 1000); assert.equal(orderedLine.quantityUnit, 'pack');
+    const reference = {purchaseId: made.purchaseId, storeId: original.storeId, orderId: original.orderId,
+      originalFingerprint: original.originalFingerprint, sourceRevision: input.revision};
+    const groupId = `restock-${createHash('sha256').update(JSON.stringify(['evaluation', profile.workspaceId,
+      made.purchaseId, original.storeId, original.orderId])).digest('hex')}`;
+    const source = {schemaVersion: 1, realm: 'evaluation', accountScope: actor, buyingStoreId: profile.workspaceId,
+      reference, lines: original.original.lines.map((line: any) => ({lineId: line.lineId,
+        quantityMilli: line.quantityMilli, quantityUnit: line.quantityUnit}))};
+    const command = (id: string, deliveredMilli: number) => ({schemaVersion: 1, buyingStoreId: profile.workspaceId,
+      supplierId: 'host-local-supplier', receipt: {id, expectedDeliveryId: groupId, reference: 'HOST physical arrival',
+        deliveredOn: '2026-10-01', recordedAt: '2026-10-21T12:00:00.000Z', recordedUtcOffsetMinutes: 0, restockOriginal: structuredClone(source),
+        lines: [{sourceLineId: orderedLine.lineId, productId: 'host-stock-product', productLabel: 'HOST saved Stock',
+          purchaseUnit: orderedLine.quantityUnit, stockUnit: 'piece', unitsPerPack: 10,
+          deliveredMilli, acceptedMilli: deliveredMilli, damagedMilli: 0, shortMilli: 0,
+          expectedMilli: orderedLine.quantityMilli, priorStockUnits: {}}]}});
+    const read = {schemaVersion: 1, buyingStoreId: profile.workspaceId, reference};
+    assert.equal((await service().readBuyerGoodsReceiving(actor, read)).group, null);
+    const unrecorded = command('host-closed-before-record', 600);
+    const closed = await service().closeBuyerGoodsArrival(actor, unrecorded);
+    assert.equal(closed.state, 'closed'); assert.equal(closed.proof.outcome, 'closed');
+    assert.equal(closed.group, null);
+    assert.deepEqual((await service().closeBuyerGoodsArrival(actor, unrecorded)).proof, closed.proof);
+    assert.deepEqual((await service().reconcileBuyerGoodsArrival(actor, unrecorded)).proof, closed.proof);
+    assert.deepEqual((await service().recordBuyerGoodsArrival(actor, unrecorded)).proof, closed.proof,
+      'A delayed record must lose to the immutable closure fence.');
+    assert.equal((await service().readBuyerGoodsReceiving(actor, read)).group, null);
+    const changedClosed = structuredClone(unrecorded); changedClosed.receipt.reference = 'HOST changed closure';
+    for (const method of ['recordBuyerGoodsArrival', 'closeBuyerGoodsArrival', 'reconcileBuyerGoodsArrival']) {
+      await assert.rejects(service()[method](actor, changedClosed), rejectsCode('conflict'));
+    }
+    await assert.rejects(service().closeBuyerGoodsArrival('other-buyer', unrecorded));
+    const a = command('host-arrival-one', 600), b = command('host-arrival-two', 600);
+    for (const mutate of [
+      (v: any) => {v.receipt.restockOriginal.accountScope = 'other-buyer';},
+      (v: any) => {v.receipt.restockOriginal.realm = 'production';},
+      (v: any) => {v.receipt.restockOriginal.lines[0].quantityMilli = 2000; v.receipt.lines[0].expectedMilli = 2000;},
+      (v: any) => {v.receipt.restockOriginal.lines = [];},
+      (v: any) => {v.receipt.paid = true;},
+      (v: any) => {v.receipt.lines[0].deliveredMilli = 1.5;},
+      (v: any) => {v.receipt.lines[0].unitsPerPack = 3;},
+      (v: any) => {v.receipt.lines[0].priorStockUnits = {'host-unverified-stock-entry': 7};},
+      (v: any) => {v.receipt.deliveredOn = '2099-01-01';},
+      (v: any) => {v.receipt.expectedDeliveryId = 'host-other-group';},
+      (v: any) => {v.receipt.recordedAt = '2026-02-30T12:00:00.000Z';},
+      (v: any) => {v.receipt.recordedAt = '2026-10-19T12:00:00.000Z'; v.receipt.deliveredOn = '2026-10-21';},
+      (v: any) => {delete v.receipt.recordedUtcOffsetMinutes;},
+      (v: any) => {v.receipt.recordedUtcOffsetMinutes = 841;},
+      (v: any) => {v.receipt.recordedUtcOffsetMinutes = -721;},
+      (v: any) => {v.receipt.lines[0].lotDetails = {schemaVersion: 1, batch: 'HOST\x7fLOT', manufacturedLabel: '', expiryLabel: '', mrpMinor: null};},
+      (v: any) => {v.supplierId = 'HOST\x7fSUPPLIER';},
+      (v: any) => {v.receipt.reference = 'HOST\x7fREFERENCE';},
+      (v: any) => {v.receipt.lines[0].productLabel = 'HOST\x7fPRODUCT';},
+      (v: any) => {v.receipt.recordedAt = '2026-10-21T12:00:00.123000Z';},
+    ]) {
+      const bad = structuredClone(a); mutate(bad);
+      await assert.rejects(service().recordBuyerGoodsArrival(actor, bad));
+    }
+    assert.equal((await service().readBuyerGoodsReceiving(actor, read)).group, null);
+    assert.equal((await service().reconcileBuyerGoodsArrival(actor, a)).state, 'not_found');
+    const concurrent = await Promise.allSettled([service().recordBuyerGoodsArrival(actor, a), service().recordBuyerGoodsArrival(actor, b)]);
+    assert.equal(concurrent.filter(r => r.status === 'fulfilled').length, 1);
+    const loser = concurrent.find(r => r.status === 'rejected') as PromiseRejectedResult;
+    assert.equal(rejectsCode('conflict')(loser.reason), true, 'A transport failure must not masquerade as cumulative protection.');
+    const winner = concurrent[0].status === 'fulfilled' ? a : b;
+    const saved = await service().reconcileBuyerGoodsArrival(actor, winner);
+    assert.equal(saved.state, 'recorded'); assert.equal(saved.proof.report, 'owner_reported');
+    assert.deepEqual((await service().recordBuyerGoodsArrival(actor, winner)).proof, saved.proof);
+    assert.deepEqual((await service().closeBuyerGoodsArrival(actor, winner)).proof, saved.proof,
+      'A recorded winner cannot be reversed by closing.');
+    const changed = structuredClone(winner); changed.receipt.lines[0]!.deliveredMilli = 500; changed.receipt.lines[0]!.acceptedMilli = 500;
+    await assert.rejects(service().recordBuyerGoodsArrival(actor, changed), rejectsCode('conflict'));
+    await assert.rejects(service().reconcileBuyerGoodsArrival(actor, changed), rejectsCode('conflict'));
+    const otherSupplier = command('host-arrival-other-supplier', 400); otherSupplier.supplierId = 'host-other-supplier';
+    await assert.rejects(service().recordBuyerGoodsArrival(actor, otherSupplier), rejectsCode('conflict'));
+    const otherMapping = command('host-arrival-other-mapping', 400); otherMapping.receipt.lines[0]!.productId = 'host-other-product';
+    await assert.rejects(service().recordBuyerGoodsArrival(actor, otherMapping), rejectsCode('conflict'));
+    const remaining = command('host-arrival-remaining', 400);
+    // The reporting day is local to the frozen report, including across device timezone changes.
+    remaining.receipt.recordedAt = '2026-10-20T20:00:00.123456Z';
+    remaining.receipt.recordedUtcOffsetMinutes = 330;
+    remaining.receipt.deliveredOn = '2026-10-21';
+    const last = await service().recordBuyerGoodsArrival(actor, remaining);
+    assert.equal(last.proof.receipt.recordedUtcOffsetMinutes, 330);
+    assert.equal(last.proof.receipt.recordedAt, remaining.receipt.recordedAt);
+    assert.equal(last.group.lines[0].deliveredMilli, 1000);
+    await assert.rejects(service().recordBuyerGoodsArrival(actor, command('host-arrival-overrun', 100)), rejectsCode('conflict'));
+    const readback = await service().readBuyerGoodsReceiving(actor, read);
+    assert.equal(readback.group.lines.length, 1);
+    assert.equal(readback.group.revision, 2); assert.equal(readback.group.lines[0].acceptedMilli, 1000);
+    assert.equal(readback.group.lines[0].mapping.productId, 'host-stock-product');
+    for (const refused of [otherSupplier, otherMapping, command('host-arrival-overrun', 100)]) {
+      const resolution = await service().closeBuyerGoodsArrival(actor, refused);
+      assert.equal(resolution.state, 'closed'); assert.deepEqual(resolution.group, readback.group);
+      assert.equal((await service().recordBuyerGoodsArrival(actor, refused)).state, 'closed');
+      assert.deepEqual((await service().readBuyerGoodsReceiving(actor, read)).group, readback.group,
+        'Closure after business rejection must not alter any cumulative quantities or revision.');
+    }
+    // A valid integrity checksum alone cannot make a corrupted cumulative projection contain the receipt.
+    const groupDoc = db.collection('workspacePurchaseProjections').doc('evaluation').collection('goodsReceiving').doc(groupId);
+    const canonical = (v: any): any => Array.isArray(v) ? v.map(canonical) : v && typeof v === 'object'
+      ? Object.fromEntries(Object.keys(v).sort().map(key => [key, canonical(v[key])])) : v;
+    for (const mutate of [
+      (v: any) => {v.supplierId = 'host-corrupt-supplier';},
+      (v: any) => {v.lines[0].mapping.productId = 'host-corrupt-product';},
+      (v: any) => {v.lines[0].deliveredMilli = 100; v.lines[0].acceptedMilli = 100;},
+    ]) {
+      const {integrity: _integrity, ...bad} = structuredClone(readback.group); mutate(bad);
+      await groupDoc.set({...bad, integrity: createHash('sha256').update(JSON.stringify(canonical(bad))).digest('hex')});
+      await assert.rejects(service().reconcileBuyerGoodsArrival(actor, winner), rejectsCode('conflict'));
+    }
+    await groupDoc.set(readback.group);
+    assert.deepEqual((await service().reconcileBuyerGoodsArrival(actor, winner)).proof, saved.proof);
+    // A fully damaged arrival still needs durable identity, even though local Stock adds zero.
+    const otherOriginal = (await service().readBuyer(actor, {purchaseId: made.purchaseId, buyingStoreId: profile.workspaceId}))
+      .orders.find((order: any) => order.storeId !== original.storeId);
+    assert.equal(otherOriginal.original.lines.length, 1);
+    const zero = command(winner.receipt.id, 1000), otherReference = {...reference,
+      storeId: otherOriginal.storeId, orderId: otherOriginal.orderId, originalFingerprint: otherOriginal.originalFingerprint};
+    zero.receipt.restockOriginal.reference = otherReference;
+    zero.receipt.restockOriginal.lines = otherOriginal.original.lines.map((line: any) => ({lineId: line.lineId,
+      quantityMilli: line.quantityMilli, quantityUnit: line.quantityUnit}));
+    zero.receipt.lines[0]!.sourceLineId = otherOriginal.original.lines[0].lineId;
+    zero.receipt.lines[0]!.expectedMilli = otherOriginal.original.lines[0].quantityMilli;
+    zero.receipt.lines[0]!.purchaseUnit = otherOriginal.original.lines[0].quantityUnit;
+    assert.equal(otherOriginal.original.lines[0].quantityMilli, 1000);
+    zero.receipt.lines[0]!.acceptedMilli = 0; zero.receipt.lines[0]!.damagedMilli = 1000;
+    zero.receipt.expectedDeliveryId = `restock-${createHash('sha256').update(JSON.stringify(['evaluation', profile.workspaceId,
+      made.purchaseId, otherOriginal.storeId, otherOriginal.orderId])).digest('hex')}`;
+    await assert.rejects(service().recordBuyerGoodsArrival(actor, zero), rejectsCode('conflict'));
+    zero.receipt.id = 'host-all-damaged-arrival';
+    const damaged = await service().recordBuyerGoodsArrival(actor, zero);
+    assert.equal(damaged.proof.receipt.lines[0].acceptedMilli, 0);
+    assert.equal(damaged.group.lines[0].damagedMilli, 1000);
+    assert.deepEqual((await service().reconcileBuyerGoodsArrival(actor, zero)).proof, damaged.proof);
+    // Lifetime accepted units can exceed one arrival/current-on-hand's bound.
+    const largeInput = purchaserReceipt(); largeInput.receiptId = 'host-large-purchase';
+    const largeStore = largeInput.stores[0], largeLine = largeStore.lines[0], priorAmount = largeLine.lineTotalMinor;
+    largeLine.quantityMilli = 3000000; largeLine.lineTotalMinor = largeLine.unitPriceMinor * 3000;
+    largeStore.totals.itemsMinor += largeLine.lineTotalMinor - priorAmount;
+    largeStore.totals.totalMinor += largeLine.lineTotalMinor - priorAmount;
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({shopEnabled: true});
+    const largeMade = await new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => largeInput}).materialize('host-large-placement');
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({shopEnabled: false});
+    const largeOriginal = (await service().readBuyer(actor, {purchaseId: largeMade.purchaseId, buyingStoreId: profile.workspaceId}))
+      .orders.find((order: any) => order.storeId === largeStore.storeId);
+    const largeOrderedLine = largeOriginal.original.lines.find((line: any) => line.skuId === largeLine.skuId &&
+      line.verifiedPackId === largeLine.verifiedPackId);
+    assert.equal(largeOrderedLine.quantityMilli, 3000000);
+    const large = command('host-large-arrival-one', 1500000);
+    large.receipt.restockOriginal.reference = {purchaseId: largeMade.purchaseId, storeId: largeOriginal.storeId,
+      orderId: largeOriginal.orderId, originalFingerprint: largeOriginal.originalFingerprint, sourceRevision: largeInput.revision};
+    large.receipt.restockOriginal.lines = largeOriginal.original.lines.map((line: any) => ({lineId: line.lineId,
+      quantityMilli: line.quantityMilli, quantityUnit: line.quantityUnit}));
+    large.receipt.expectedDeliveryId = `restock-${createHash('sha256').update(JSON.stringify(['evaluation', profile.workspaceId,
+      largeMade.purchaseId, largeOriginal.storeId, largeOriginal.orderId])).digest('hex')}`;
+    large.receipt.lines[0]!.sourceLineId = largeOrderedLine.lineId;
+    large.receipt.lines[0]!.purchaseUnit = largeOrderedLine.quantityUnit;
+    large.receipt.lines[0]!.expectedMilli = 3000000; large.receipt.lines[0]!.unitsPerPack = 1000000;
+    // Public buying is enabled only for placement; historical arrival stays available afterwards.
+    await service().recordBuyerGoodsArrival(actor, large);
+    const largeSecond = structuredClone(large); largeSecond.receipt.id = 'host-large-arrival-two';
+    const largeResult = await service().recordBuyerGoodsArrival(actor, largeSecond);
+    assert.equal(largeResult.group.lines.length, 1);
+    assert.equal(largeResult.group.lines[0].acceptedMilli * largeResult.group.lines[0].mapping.unitsPerPack / 1000, 3000000000);
+    const alternate = original.original.lines.find((line: any) => line.lineId !== orderedLine.lineId);
+    assert.ok(alternate, 'The race uses a different actual ordered SKU within the full original.');
+    let recordedRaces = 0;
+    for (let race = 0; race < 5; race++) {
+      const raced = command(`host-close-record-race-${race}`, 100), line = raced.receipt.lines[0]!;
+      line.sourceLineId = alternate.lineId; line.expectedMilli = alternate.quantityMilli;
+      line.purchaseUnit = alternate.quantityUnit; line.productId = 'host-stock-other-original-line';
+      const pair = await Promise.all([service().recordBuyerGoodsArrival(actor, raced), service().closeBuyerGoodsArrival(actor, raced)]);
+      assert.equal(pair[0].state, pair[1].state); assert.deepEqual(pair[0].proof, pair[1].proof);
+      if (pair[0].state === 'recorded') recordedRaces++;
+      else assert.equal(pair[0].state, 'closed');
+      assert.deepEqual((await service().reconcileBuyerGoodsArrival(actor, raced)).proof, pair[0].proof);
+    }
+    const racedGroup = (await service().readBuyerGoodsReceiving(actor, read)).group;
+    assert.equal(racedGroup.revision, 2 + recordedRaces);
+    assert.equal(racedGroup.lines.find((line: any) => line.lineId === orderedLine.lineId).deliveredMilli, 1000);
+    assert.equal(racedGroup.lines.find((line: any) => line.lineId === alternate.lineId)?.deliveredMilli ?? 0, recordedRaces * 100);
+    if (process.env.LF_RESTOCK_ARRIVAL_EXPORT) {
+      writeFileSync(process.env.LF_RESTOCK_ARRIVAL_EXPORT, JSON.stringify({schemaVersion: 1,
+        evidence: 'isolated_firestore_emulator_owner_report', command: remaining,
+        response: await service().reconcileBuyerGoodsArrival(actor, remaining),
+        cumulative: {command: largeSecond, response: largeResult},
+        closure: {command: unrecorded, response: await service().reconcileBuyerGoodsArrival(actor, unrecorded)}}), 'utf8');
+    }
+    for (const body of [{...read, buyingStoreId: 'other-store'}, {...read, reference: {...reference, originalFingerprint: 'b'.repeat(64)}}]) {
+      await assert.rejects(service().readBuyerGoodsReceiving(actor, body));
+    }
+    await assert.rejects(service().readBuyerGoodsReceiving('other-buyer', read), rejectsCode('not_found'));
+    const supplierView = await service().readStore(input.stores[0].ownerUserId, {purchaseId: made.purchaseId,
+      storeId: original.storeId, orderId: original.orderId});
+    assert.equal(JSON.stringify(supplierView).includes('host-stock-product'), false);
+    assert.equal(JSON.stringify(supplierView).includes('host-local-supplier'), false);
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({status: 'suspended'});
+    for (const action of [() => service().recordBuyerGoodsArrival(actor, winner),
+      () => service().closeBuyerGoodsArrival(actor, winner), () => service().closeBuyerGoodsArrival(actor, unrecorded),
+      () => service().reconcileBuyerGoodsArrival(actor, winner), () => service().readBuyerGoodsReceiving(actor, read)]) {
+      await assert.rejects(action(), rejectsCode('not_found'));
+    }
+  } finally { await db.terminate(); await deleteApp(app); }
+});
 
 test('LF-PURCHASER trusted receipt freezes one explicit purchaser without changing legacy facts', () => {
   for (const kind of ['personal', 'store'] as const) {

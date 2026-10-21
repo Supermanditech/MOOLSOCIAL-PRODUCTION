@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/work/work_order_identity_gateway.dart';
 import 'package:moolsocial/features/work/work_customer_feedback.dart';
+import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -219,7 +220,180 @@ void connectPurchaseFixture(Transport wire, bool Function() completed, {Map<Stri
   };
 }
 
+// Physical-report contract fixtures only; no courier, payment or native Stock authority.
+String restockIntegrity(Object? value) {
+  Object? canonical(Object? v) => v is List ? v.map(canonical).toList() : v is Map
+    ? {for (final key in v.keys.cast<String>().toList()..sort()) key: canonical(v[key])} : v;
+  return sha256.convert(utf8.encode(jsonEncode(canonical(value)))).toString();
+}
+WorkspaceGoodsArrivalCommand restockArrivalCommand({String account = 'buyer-1', String realm = 'evaluation'}) {
+  final original = WorkspaceRestockPurchaseOriginal.fromJson({'schemaVersion': 1, 'realm': realm,
+    'accountScope': account, 'buyingStoreId': 'buying-store', 'reference': {'purchaseId': 'purchase-arrival',
+      'storeId': 'supplier-store', 'orderId': 'order-arrival', 'originalFingerprint': 'a' * 64, 'sourceRevision': 'placement-arrival'},
+    'lines': [{'lineId': 'line-arrival', 'quantityMilli': 1000, 'quantityUnit': 'pack'}]});
+  return WorkspaceGoodsArrivalCommand(supplierId: 'host-local-supplier', receipt: WorkspaceSupplierGoodsReceipt(
+    id: 'host-arrival', expectedDeliveryId: original.deliveryGroupId, reference: 'HOST arrival', deliveredOn: '2026-10-21',
+    recordedAt: DateTime.parse('2026-10-20T20:00:00.123456Z'), recordedUtcOffsetMinutes: 330, restockOriginal: original,
+    lines: [WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'line-arrival', productId: 'host-local-stock',
+      productLabel: 'HOST Stock item', purchaseUnit: 'pack', stockUnit: 'piece', unitsPerPack: 10,
+      deliveredMilli: 600, acceptedMilli: 500, damagedMilli: 100, shortMilli: 0, expectedMilli: 1000)]));
+}
+Map<String, dynamic> restockArrivalResponse(WorkspaceGoodsArrivalCommand command, {bool recorded = true}) {
+  final source = command.receipt.restockOriginal!;
+  final group = <String, dynamic>{'schemaVersion': 1, 'realm': source.realm, 'buyingStoreId': source.buyingStoreId,
+    'groupId': source.deliveryGroupId, 'source': source.toJson(), 'supplierId': command.supplierId, 'revision': 1,
+    'lines': [for (final line in command.receipt.lines) {'lineId': line.sourceLineId, 'deliveredMilli': line.deliveredMilli,
+      'acceptedMilli': line.acceptedMilli, 'damagedMilli': line.damagedMilli, 'mapping': {
+        for (final key in ['productId', 'productLabel', 'purchaseUnit', 'stockUnit', 'unitsPerPack', 'expectedMilli']) key: line.toJson()[key]}}]};
+  group['integrity'] = restockIntegrity(group);
+  final proof = <String, dynamic>{'schemaVersion': 1, 'realm': source.realm, 'buyingStoreId': source.buyingStoreId,
+    'operationId': command.receipt.id, 'report': 'owner_reported', 'supplierId': command.supplierId, 'receipt': command.receipt.toJson(),
+    'commandFingerprint': command.fingerprint, 'receiptFingerprint': command.receiptFingerprint, 'groupRevision': 1,
+    'recordedAt': '2026-10-21T12:00:00.000Z'};
+  proof['integrity'] = restockIntegrity(proof);
+  return {'schemaVersion': 1, 'realm': source.realm, 'viewerUserId': source.accountScope,
+    'buyingStoreId': source.buyingStoreId, 'state': recorded ? 'recorded' : 'not_found',
+    'proof': recorded ? proof : null, 'group': recorded ? group : null};
+}
+
+Map<String, dynamic> restockClosureResponse(WorkspaceGoodsArrivalCommand command, {Map<String, dynamic>? group}) {
+  final raw = restockArrivalResponse(command), proof = raw['proof'] as Map<String, dynamic>;
+  proof.remove('groupRevision'); proof.remove('recordedAt'); proof.remove('integrity');
+  proof['outcome'] = 'closed'; proof['closedAt'] = '2026-10-21T12:01:00.000Z';
+  proof['integrity'] = restockIntegrity(proof);
+  return {...raw, 'state': 'closed', 'proof': proof, 'group': group};
+}
+
 void main() {
+  test('LF-RESTOCK-CLOSE actual emulator closure survives strict client roundtrip', () async {
+    final raw = jsonDecode(File(Platform.environment['LF_RESTOCK_ARRIVAL_EXPORT']!).readAsStringSync()) as Map;
+    final closure = raw['closure'] as Map, command = WorkspaceGoodsArrivalCommand.fromJson(closure['command']);
+    final wire = Transport()..data = Map<String, dynamic>.from(closure['response'] as Map);
+    final gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, account: command.receipt.restockOriginal!.accountScope));
+    final result = await gateway.reconcileBuyerGoodsArrival(command);
+    expect(result?.closed, isTrue); expect(result!.recorded, isFalse); expect(result.proof, isNull);
+    expect(WorkspaceGoodsArrivalResult.fromJson(result.toJson(), command).toJson(), wire.data);
+  }, skip: Platform.environment['LF_RESTOCK_ARRIVAL_EXPORT'] == null);
+  test('LF-RESTOCK-CLOSE explicit close uses limited-use token and delayed record preserves closure', () async {
+    final command = restockArrivalCommand(), wire = Transport()..data = restockClosureResponse(restockArrivalCommand());
+    final identity = projectionGateway(wire), gateway = AuthenticatedWorkspaceOrderOperationsGateway(identity);
+    final closed = await gateway.closeBuyerGoodsArrival(command);
+    expect(closed?.closed, isTrue); expect(closed!.closure!.command.fingerprint, command.fingerprint);
+    expect(wire.sent, {'operation': 'closeBuyerGoodsArrival', ...command.toJson()});
+    expect((identity.credentials as Credentials).modes.last, SocialAppCheckTokenMode.limitedUse);
+    expect((await gateway.recordBuyerGoodsArrival(command))!.closure!.toJson(), closed.closure!.toJson());
+    expect((await gateway.reconcileBuyerGoodsArrival(command))!.closure!.toJson(), closed.closure!.toJson());
+    expect((identity.credentials as Credentials).modes.last, SocialAppCheckTokenMode.standard);
+    wire.data = restockArrivalResponse(command);
+    expect((await gateway.closeBuyerGoodsArrival(command))!.recorded, isTrue, reason: 'A record winner cannot be reversed.');
+    wire.data = restockArrivalResponse(command, recorded: false);
+    expect(await gateway.closeBuyerGoodsArrival(command), isNull, reason: 'Not found is not an acknowledged close.');
+  });
+  for (final fault in ['owner', 'realm', 'store', 'operation', 'supplier', 'command', 'receipt', 'outcome', 'time', 'extra', 'integrity']) {
+    test('LF-RESTOCK-CLOSE rejects changed closure $fault', () async {
+      final command = restockArrivalCommand(), raw = restockClosureResponse(restockArrivalCommand());
+      final proof = raw['proof'] as Map<String, dynamic>;
+      switch (fault) {
+        case 'owner': raw['viewerUserId'] = 'other-buyer';
+        case 'realm': proof['realm'] = 'production';
+        case 'store': proof['buyingStoreId'] = 'other-store';
+        case 'operation': proof['operationId'] = 'other-receipt';
+        case 'supplier': proof['supplierId'] = 'other-supplier';
+        case 'command': proof['commandFingerprint'] = 'b' * 64;
+        case 'receipt': proof['receipt']['reference'] = 'changed';
+        case 'outcome': proof['outcome'] = 'recorded';
+        case 'time': proof['closedAt'] = '2026-02-30T12:01:00.000Z';
+        case 'extra': proof['stockReversed'] = true;
+        case 'integrity': proof['integrity'] = 'b' * 64;
+      }
+      if (fault != 'integrity') { proof.remove('integrity'); proof['integrity'] = restockIntegrity(proof); }
+      final wire = Transport()..data = raw;
+      expect(await AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire)).reconcileBuyerGoodsArrival(command), isNull);
+    });
+  }
+  test('LF-RESTOCK-WIRE accepts actual emulator-produced receipt including reporting date and cumulative proof', () async {
+    final evidence = jsonDecode(File(Platform.environment['LF_RESTOCK_ARRIVAL_EXPORT']!).readAsStringSync()) as Map<String, dynamic>;
+    expect(evidence['schemaVersion'], 1); expect(evidence['evidence'], 'isolated_firestore_emulator_owner_report');
+    final command = WorkspaceGoodsArrivalCommand.fromJson(evidence['command']);
+    final wire = Transport()..data = Map<String, dynamic>.from(evidence['response'] as Map);
+    final gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, account: command.receipt.restockOriginal!.accountScope));
+    final recovered = await gateway.reconcileBuyerGoodsArrival(command);
+    expect(recovered?.recorded, isTrue); expect(recovered!.proof!.toJson(), wire.data['proof']);
+    expect(recovered.group!.includes(command), isTrue); expect(recovered.proof!.groupRevision, 2);
+    expect(command.receipt.recordedUtcOffsetMinutes, 330); expect(command.receipt.deliveredOn, '2026-10-21');
+    expect(WorkspaceGoodsArrivalResult.fromJson(recovered.toJson(), command).toJson(), recovered.toJson());
+  }, skip: Platform.environment['LF_RESTOCK_ARRIVAL_EXPORT'] == null);
+  test('LF-RESTOCK-WIRE cumulative server reports are independent of one arrival Stock delta limit', () async {
+    final evidence = jsonDecode(File(Platform.environment['LF_RESTOCK_ARRIVAL_EXPORT']!).readAsStringSync()) as Map<String, dynamic>;
+    final raw = evidence['cumulative'] as Map, command = WorkspaceGoodsArrivalCommand.fromJson(raw['command']);
+    final wire = Transport()..data = Map<String, dynamic>.from(raw['response'] as Map);
+    final gateway = AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire, account: command.receipt.restockOriginal!.accountScope));
+    expect(command.receipt.lines.single.acceptedStockUnits, 1500000000);
+    final result = await gateway.reconcileBuyerGoodsArrival(command);
+    expect(result?.recorded, isTrue);
+    expect(result!.group!.lines.single.acceptedStockUnits, 3000000000);
+  }, skip: Platform.environment['LF_RESTOCK_ARRIVAL_EXPORT'] == null);
+  test('LF-RESTOCK-WIRE frozen command uses limited-use record and standard exact reconciliation', () async {
+    final command = restockArrivalCommand(), wire = Transport()..data = restockArrivalResponse(restockArrivalCommand());
+    final identity = projectionGateway(wire), gateway = AuthenticatedWorkspaceOrderOperationsGateway(identity);
+    expect(WorkspaceGoodsArrivalCommand.fromJson(command.toJson()).fingerprint, command.fingerprint);
+    final leaked = command.toJson(); (leaked['receipt'] as Map)['reference'] = 'changed';
+    expect(command.toJson()['receipt'], command.receipt.toJson());
+    final recorded = await gateway.recordBuyerGoodsArrival(command);
+    expect(recorded?.recorded, isTrue); expect(recorded!.proof!.command.fingerprint, command.fingerprint);
+    expect(recorded.group!.lines.single.acceptedStockUnits, 5);
+    expect(wire.sent, {'operation': 'recordBuyerGoodsArrival', ...command.toJson()});
+    expect((identity.credentials as Credentials).modes.last, SocialAppCheckTokenMode.limitedUse);
+    expect((await gateway.reconcileBuyerGoodsArrival(command))!.proof!.toJson(), recorded.proof!.toJson());
+    expect(wire.sent, {'operation': 'reconcileBuyerGoodsArrival', ...command.toJson()});
+    expect((identity.credentials as Credentials).modes.last, SocialAppCheckTokenMode.standard);
+    final read = Map<String, dynamic>.of(wire.data)..remove('state')..remove('proof'); wire.data = read;
+    expect((await gateway.readBuyerGoodsReceiving(command.receipt.restockOriginal!))!.group!.includes(command), isTrue);
+    wire.data = restockArrivalResponse(command, recorded: false);
+    expect((await gateway.reconcileBuyerGoodsArrival(command))!.recorded, isFalse);
+    expect(await gateway.recordBuyerGoodsArrival(command), isNull);
+    wire.fail = true;
+    final before = wire.calls; expect(await gateway.recordBuyerGoodsArrival(command), isNull);
+    expect(wire.calls, before + 1, reason: 'Unknown reply cannot automatically create or retry an operation.');
+  });
+  for (final fault in ['owner', 'realm', 'store', 'extra', 'group-supplier', 'mapping', 'counts', 'proof-operation',
+    'proof-command', 'proof-receipt', 'group-revision', 'integrity', 'payment']) {
+    test('LF-RESTOCK-WIRE rejects changed $fault even with recalculated checksums', () async {
+      final command = restockArrivalCommand(), raw = restockArrivalResponse(restockArrivalCommand());
+      final group = raw['group'] as Map<String, dynamic>, proof = raw['proof'] as Map<String, dynamic>;
+      switch (fault) {
+        case 'owner': raw['viewerUserId'] = 'other-buyer';
+        case 'realm': raw['realm'] = 'production';
+        case 'store': raw['buyingStoreId'] = 'other-store';
+        case 'extra': raw['courierVerified'] = true;
+        case 'group-supplier': group['supplierId'] = 'other-supplier';
+        case 'mapping': group['lines'][0]['mapping']['productId'] = 'other-stock';
+        case 'counts': group['lines'][0]['deliveredMilli'] = 100; group['lines'][0]['acceptedMilli'] = 0;
+        case 'proof-operation': proof['operationId'] = 'other-arrival';
+        case 'proof-command': proof['commandFingerprint'] = 'b' * 64;
+        case 'proof-receipt': proof['receipt']['reference'] = 'changed reference';
+        case 'group-revision': proof['groupRevision'] = 2;
+        case 'integrity': proof['integrity'] = 'b' * 64;
+        case 'payment': proof['paid'] = true;
+      }
+      group.remove('integrity'); group['integrity'] = restockIntegrity(group);
+      if (fault != 'integrity') {proof.remove('integrity'); proof['integrity'] = restockIntegrity(proof);}
+      final wire = Transport()..data = raw;
+      expect(await AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire)).reconcileBuyerGoodsArrival(command), isNull);
+      expect(wire.calls, 1);
+    });
+  }
+  test('LF-RESTOCK-WIRE retired account blocks dispatch and late replies', () async {
+    final command = restockArrivalCommand(), wire = Transport()..data = restockArrivalResponse(restockArrivalCommand());
+    Object? lifetime = Object(); final identity = projectionGateway(wire, lifetime: () => lifetime);
+    final gateway = AuthenticatedWorkspaceOrderOperationsGateway(identity);
+    expect(await gateway.recordBuyerGoodsArrival(restockArrivalCommand(account: 'other-buyer')), isNull);
+    expect(wire.calls, 0);
+    wire.pending = Completer<void>(); final pending = gateway.recordBuyerGoodsArrival(command);
+    await Future<void>.delayed(Duration.zero); lifetime = null; wire.pending!.complete();
+    expect(await pending, isNull);
+    final before = wire.calls; expect(await gateway.reconcileBuyerGoodsArrival(command), isNull); expect(wire.calls, before);
+  });
   const storeStarsContext = BuyV2ProcurementContext(accountId: 'buyer-1', storeId: 'buying-store',
     purpose: BuyV2ProcurementPurpose.restock, originOperationId: 'host-stars-origin');
   test('LF-STARS-STORE actual persisted completion and original recovery cross shared client', () async {

@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 import 'work_publication_data.dart';
-import 'work_order_identity_gateway.dart' show WorkspaceOperationalOrderSnapshot, WorkspaceOrderIdentityRole;
+import 'work_order_identity_gateway.dart' show WorkspaceOperationalOrderSnapshot, WorkspaceOrderIdentityRole,
+  WorkspaceGoodsArrivalCommand, WorkspaceGoodsArrivalResult, WorkspaceGoodsArrivalProof;
 export 'work_publication_data.dart';
 
 /// Read-only report boundaries; these never authorize a stock or ledger write.
@@ -3426,17 +3427,22 @@ class WorkspaceSupplierGoodsReceipt {
   WorkspaceSupplierGoodsReceipt({required this.id, required this.expectedDeliveryId,
     required this.reference, required this.deliveredOn, required this.recordedAt,
     required List<WorkspaceSupplierGoodsReceiptLine> lines,
-    this.restockOriginal,
+    this.restockOriginal, this.recordedUtcOffsetMinutes,
   }) : lines = List.unmodifiable(lines);
   final String id, expectedDeliveryId, reference, deliveredOn;
   final DateTime recordedAt;
+  /// Frozen reporting calendar basis. Absent on legacy local financial receipts.
+  final int? recordedUtcOffsetMinutes;
   final List<WorkspaceSupplierGoodsReceiptLine> lines;
   final WorkspaceRestockPurchaseOriginal? restockOriginal;
   bool get valid {
     final day = DateTime.tryParse(deliveredOn);
-    final local = recordedAt.toLocal();
+    final offset = recordedUtcOffsetMinutes;
+    final local = offset == null ? recordedAt.toLocal()
+      : recordedAt.toUtc().add(Duration(minutes: offset));
     return [id, expectedDeliveryId, reference].every((v) =>
         v.trim().isNotEmpty && v.length <= 240) &&
+      (offset == null || offset >= -720 && offset <= 840) &&
       RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(deliveredOn) && day != null &&
       day.toIso8601String().substring(0, 10) == deliveredOn &&
       !DateTime.utc(day.year, day.month, day.day).isAfter(
@@ -3458,19 +3464,22 @@ class WorkspaceSupplierGoodsReceipt {
   Map<String, Object?> toJson() => {'id': id, 'expectedDeliveryId': expectedDeliveryId,
     'reference': reference, 'deliveredOn': deliveredOn,
     'recordedAt': recordedAt.toUtc().toIso8601String(),
+    if (recordedUtcOffsetMinutes != null) 'recordedUtcOffsetMinutes': recordedUtcOffsetMinutes,
     'lines': lines.map((line) => line.toJson()).toList(),
     if (restockOriginal != null) 'restockOriginal': restockOriginal!.toJson()};
   static WorkspaceSupplierGoodsReceipt fromJson(Object? raw) {
     const keys = {'id', 'expectedDeliveryId', 'reference', 'deliveredOn', 'recordedAt', 'lines'};
+    const optional = {'restockOriginal', 'recordedUtcOffsetMinutes'};
     if (raw is! Map || !keys.every(raw.containsKey) ||
-        raw.length != keys.length + (raw.containsKey('restockOriginal') ? 1 : 0) ||
-        !raw.keys.every((key) => keys.contains(key) || key == 'restockOriginal')) {
+        !raw.keys.every((key) => keys.contains(key) || optional.contains(key)) ||
+        (raw.containsKey('recordedUtcOffsetMinutes') && raw['recordedUtcOffsetMinutes'] is! int)) {
       throw const FormatException('Invalid supplier delivery');
     }
     final result = WorkspaceSupplierGoodsReceipt(id: raw['id'] as String,
       expectedDeliveryId: raw['expectedDeliveryId'] as String,
       reference: raw['reference'] as String, deliveredOn: raw['deliveredOn'] as String,
       recordedAt: DateTime.parse(raw['recordedAt'] as String),
+      recordedUtcOffsetMinutes: raw['recordedUtcOffsetMinutes'] as int?,
       restockOriginal: raw.containsKey('restockOriginal') ? WorkspaceRestockPurchaseOriginal.fromJson(raw['restockOriginal']) : null,
       lines: [for (final line in raw['lines'] as List)
         WorkspaceSupplierGoodsReceiptLine.fromJson(line)]);
@@ -7378,7 +7387,7 @@ enum WorkspaceStockMovementKind {
   supplierReturn,
 }
 
-enum WorkspaceStockReferenceKind { order, supplierReceipt, manualSupplierReceipt, manualSupplierReturn }
+enum WorkspaceStockReferenceKind { order, supplierReceipt, manualSupplierReceipt, manualSupplierReturn, restockGoodsArrival }
 
 typedef WorkspaceLedgerFormKey = ({
   String account,
@@ -9817,6 +9826,51 @@ class WorkspaceBillGoodsReviewCancellation {
   }
 }
 
+/// A retained command may already be in flight. Missing server readback never
+/// converts it back into a cancellable review. Stock has its own atomic marker.
+class WorkspaceRestockGoodsAttempt {
+  const WorkspaceRestockGoodsAttempt({required this.command, required this.revision, this.recorded, this.recordedRevision,
+    this.closeRequestedRevision, this.closed, this.closedRevision});
+  final WorkspaceGoodsArrivalCommand command;
+  final int revision;
+  final WorkspaceGoodsArrivalResult? recorded;
+  final int? recordedRevision;
+  final int? closeRequestedRevision, closedRevision;
+  final WorkspaceGoodsArrivalResult? closed;
+  bool get valid {
+    if (revision <= 0 || revision > 2147483647 || recorded != null && closed != null) return false;
+    if (closeRequestedRevision != null && (closeRequestedRevision! <= revision || closeRequestedRevision! > 2147483647)) return false;
+    bool terminal(WorkspaceGoodsArrivalResult? result, int? at, bool isClosed) => result == null ? at == null
+      : (isClosed ? result.closed : result.recorded) && result.command.fingerprint == command.fingerprint &&
+        at != null && at > (closeRequestedRevision ?? revision) && at <= 2147483647;
+    return terminal(recorded, recordedRevision, false) && terminal(closed, closedRevision, true);
+  }
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'revision': revision, 'command': command.toJson(),
+    if (recorded != null) 'recorded': recorded!.toJson(), if (recordedRevision != null) 'recordedRevision': recordedRevision,
+    if (closeRequestedRevision != null) 'closeRequestedRevision': closeRequestedRevision,
+    if (closed != null) 'closed': closed!.toJson(), if (closedRevision != null) 'closedRevision': closedRevision};
+  static WorkspaceRestockGoodsAttempt fromJson(Object? raw) {
+    const keys = {'schemaVersion', 'revision', 'command'};
+    if (raw is! Map || !keys.every(raw.containsKey) || raw['schemaVersion'] is! int || raw['schemaVersion'] != 1 ||
+        !raw.keys.every((key) => keys.contains(key) || const {'recorded', 'recordedRevision', 'closeRequestedRevision', 'closed', 'closedRevision'}.contains(key)) ||
+        raw['revision'] is! int || raw.containsKey('recorded') != raw.containsKey('recordedRevision') ||
+        raw.containsKey('recorded') && (raw['recorded'] == null || raw['recordedRevision'] is! int) ||
+        raw.containsKey('closed') != raw.containsKey('closedRevision') ||
+        raw.containsKey('closed') && (raw['closed'] == null || raw['closedRevision'] is! int) ||
+        raw.containsKey('closeRequestedRevision') && raw['closeRequestedRevision'] is! int) {
+      throw const FormatException('Receiving attempt needs recovery.');
+    }
+    final command = WorkspaceGoodsArrivalCommand.fromJson(raw['command']);
+    final result = WorkspaceRestockGoodsAttempt(command: command, revision: raw['revision'] as int,
+      recorded: raw.containsKey('recorded') ? WorkspaceGoodsArrivalResult.fromJson(raw['recorded'], command) : null,
+      recordedRevision: raw['recordedRevision'] as int?, closeRequestedRevision: raw['closeRequestedRevision'] as int?,
+      closed: raw.containsKey('closed') ? WorkspaceGoodsArrivalResult.fromJson(raw['closed'], command) : null,
+      closedRevision: raw['closedRevision'] as int?);
+    if (!result.valid) throw const FormatException('Receiving attempt needs recovery.');
+    return result;
+  }
+}
+
 class WorkspacePurchaseEntryBook {
   WorkspacePurchaseEntryBook({
     required this.account,
@@ -9831,13 +9885,15 @@ class WorkspacePurchaseEntryBook {
     List<WorkspaceGoodsReceiptReviewCancellation> goodsReceiptCancellations = const [],
     List<WorkspaceSupplierBillGoodsReview> billGoodsReviews = const [],
     List<WorkspaceBillGoodsReviewCancellation> billGoodsCancellations = const [],
+    List<WorkspaceRestockGoodsAttempt> restockGoodsAttempts = const [],
   }) : profiles = List.unmodifiable(profiles),
        copies = List.unmodifiable(copies),
        openingRecords = List.unmodifiable(openingRecords),
        goodsReceiptDrafts = List.unmodifiable(goodsReceiptDrafts),
        goodsReceiptCancellations = List.unmodifiable(goodsReceiptCancellations),
        billGoodsReviews = List.unmodifiable(billGoodsReviews),
-       billGoodsCancellations = List.unmodifiable(billGoodsCancellations);
+       billGoodsCancellations = List.unmodifiable(billGoodsCancellations),
+       restockGoodsAttempts = List.unmodifiable(restockGoodsAttempts);
   final String account, store;
   final bool qa;
   final int revision;
@@ -9849,6 +9905,7 @@ class WorkspacePurchaseEntryBook {
   final List<WorkspaceGoodsReceiptReviewCancellation> goodsReceiptCancellations;
   final List<WorkspaceSupplierBillGoodsReview> billGoodsReviews;
   final List<WorkspaceBillGoodsReviewCancellation> billGoodsCancellations;
+  final List<WorkspaceRestockGoodsAttempt> restockGoodsAttempts;
   WorkspaceSupplierOpeningRecord? openingRecordFor(String supplierId) =>
       openingRecords.where((r) => r.supplierId == supplierId).lastOrNull;
 
@@ -9912,6 +9969,8 @@ class WorkspacePurchaseEntryBook {
       'billGoodsReviews': billGoodsReviews.map((r) => r.toJson()).toList(),
     if (billGoodsCancellations.isNotEmpty)
       'billGoodsCancellations': billGoodsCancellations.map((r) => r.toJson()).toList(),
+    if (restockGoodsAttempts.isNotEmpty)
+      'restockGoodsAttempts': restockGoodsAttempts.map((r) => r.toJson()).toList(),
   };
   static WorkspacePurchaseEntryBook fromJson(Object? raw) {
     const keys = {
@@ -9928,11 +9987,12 @@ class WorkspacePurchaseEntryBook {
       'goodsReceiptCancellations',
       'billGoodsReviews',
       'billGoodsCancellations',
+      'restockGoodsAttempts',
     };
     try {
       if (raw is! Map ||
           !keys
-              .difference({'copies', 'openingRecords', 'goodsReceiptDrafts', 'goodsReceiptCancellations', 'billGoodsReviews', 'billGoodsCancellations'})
+              .difference({'copies', 'openingRecords', 'goodsReceiptDrafts', 'goodsReceiptCancellations', 'billGoodsReviews', 'billGoodsCancellations', 'restockGoodsAttempts'})
               .every(raw.containsKey) ||
           !raw.keys.every(keys.contains) ||
           raw['version'] != 1 ||
@@ -9955,7 +10015,9 @@ class WorkspacePurchaseEntryBook {
               (raw['billGoodsReviews'] as List).length > 1000)) ||
           (raw.containsKey('billGoodsCancellations') &&
             (raw['billGoodsCancellations'] is! List ||
-              (raw['billGoodsCancellations'] as List).length > 1000))) {
+              (raw['billGoodsCancellations'] as List).length > 1000)) ||
+          (raw.containsKey('restockGoodsAttempts') &&
+            (raw['restockGoodsAttempts'] is! List || (raw['restockGoodsAttempts'] as List).length > 1000))) {
         throw const FormatException('Invalid supplier directory');
       }
       final result = WorkspacePurchaseEntryBook(
@@ -9986,6 +10048,8 @@ class WorkspacePurchaseEntryBook {
           WorkspaceSupplierBillGoodsReview.fromJson(r)],
         billGoodsCancellations: [for (final r in (raw['billGoodsCancellations'] as List? ?? const []))
           WorkspaceBillGoodsReviewCancellation.fromJson(r)],
+        restockGoodsAttempts: [for (final r in (raw['restockGoodsAttempts'] as List? ?? const []))
+          WorkspaceRestockGoodsAttempt.fromJson(r)],
       );
       final ids = <String>{};
       final copyIds = <String>{};
@@ -10064,6 +10128,23 @@ class WorkspacePurchaseEntryBook {
           throw const FormatException('Invalid receiving review relationship');
         }
         receiptRevision = review.revision;
+      }
+      final attemptIds = <String>{};
+      var attemptRevision = 0;
+      for (final attempt in result.restockGoodsAttempts) {
+        final command = attempt.command, original = command.receipt.restockOriginal!;
+        final review = result.goodsReceiptDrafts.where((r) => r.receipt.id == command.receipt.id).singleOrNull;
+        if (!attempt.valid || !attemptIds.add(command.receipt.id) || attempt.revision <= attemptRevision ||
+            attempt.revision > result.revision || (attempt.recordedRevision ?? 0) > result.revision ||
+            (attempt.closedRevision ?? 0) > result.revision || (attempt.closeRequestedRevision ?? 0) > result.revision ||
+            original.accountScope != result.account || original.buyingStoreId != result.store ||
+            original.realm != (result.qa ? 'evaluation' : 'production') || review == null ||
+            review.supplierId != command.supplierId || review.revision >= attempt.revision ||
+            jsonEncode(review.receipt.toJson()) != jsonEncode(command.receipt.toJson()) ||
+            result.goodsReceiptCancellations.any((c) => c.receiptId == command.receipt.id)) {
+          throw const FormatException('Invalid receiving attempt relationship');
+        }
+        attemptRevision = attempt.revision;
       }
       final allocationIds = <String>{};
       var allocationRevision = 0;
@@ -10397,6 +10478,73 @@ class WorkspaceReviewedCatalogueLink {
       (submissionRevision != previous.submissionRevision || submissionFingerprint == previous.submissionFingerprint && authoredSha256 == previous.authoredSha256));
 }
 
+/// Exactly-once local projection of a server-retained owner report. This is not
+/// a financial checkpoint or an assertion of global/sellable inventory.
+class WorkspaceRestockStockProjection {
+  const WorkspaceRestockStockProjection({required this.command, required this.proofIntegrity,
+    required this.groupRevision, required this.appliedAt});
+  factory WorkspaceRestockStockProjection.fromProof(WorkspaceGoodsArrivalProof proof, DateTime appliedAt) =>
+    WorkspaceRestockStockProjection(command: proof.command, proofIntegrity: proof.integrity,
+      groupRevision: proof.groupRevision, appliedAt: appliedAt);
+  final WorkspaceGoodsArrivalCommand command;
+  final String proofIntegrity;
+  final int groupRevision;
+  final DateTime appliedAt;
+  bool get valid => RegExp(r'^[a-f0-9]{64}$').hasMatch(proofIntegrity) && groupRevision > 0 && groupRevision <= 9007199254740991;
+  bool matches(WorkspaceGoodsArrivalProof proof) => command.fingerprint == proof.command.fingerprint &&
+    proofIntegrity == proof.integrity && groupRevision == proof.groupRevision;
+  String referenceFor(WorkspaceSupplierGoodsReceiptLine line) => jsonEncode([
+    command.receipt.restockOriginal!.realm, command.receipt.restockOriginal!.buyingStoreId, command.receipt.id, line.sourceLineId]);
+  WorkspaceStockMovement? movementFor(WorkspaceSupplierGoodsReceiptLine line) => line.newStockUnits <= 0 ? null
+    : WorkspaceStockMovement(id: jsonEncode(['restock-goods-arrival', referenceFor(line)]), productId: line.productId,
+      productLabel: line.productLabel, kind: WorkspaceStockMovementKind.goodsReceived, quantityDelta: line.newStockUnits,
+      reason: 'Purchased goods ${command.receipt.reference}', occurredAt: command.receipt.recordedAt,
+      referenceKind: WorkspaceStockReferenceKind.restockGoodsArrival, referenceId: referenceFor(line));
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'command': command.toJson(), 'proofIntegrity': proofIntegrity,
+    'groupRevision': groupRevision, 'appliedAt': appliedAt.toUtc().toIso8601String()};
+  static WorkspaceRestockStockProjection fromJson(Object? raw) {
+    const keys = {'schemaVersion', 'command', 'proofIntegrity', 'groupRevision', 'appliedAt'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) || raw['schemaVersion'] is! int ||
+        raw['schemaVersion'] != 1 || raw['proofIntegrity'] is! String || raw['groupRevision'] is! int || raw['appliedAt'] is! String) {
+      throw const FormatException('Receiving Stock projection needs recovery.');
+    }
+    final result = WorkspaceRestockStockProjection(command: WorkspaceGoodsArrivalCommand.fromJson(raw['command']),
+      proofIntegrity: raw['proofIntegrity'] as String, groupRevision: raw['groupRevision'] as int,
+      appliedAt: DateTime.parse(raw['appliedAt'] as String));
+    if (!result.valid || result.appliedAt.toUtc().toIso8601String() != raw['appliedAt']) {
+      throw const FormatException('Receiving Stock projection needs recovery.');
+    }
+    return result;
+  }
+}
+
+/// Explicitly adopted device Stock. It does not assert complete server Stock.
+class WorkspaceRestockStockBaseline {
+  const WorkspaceRestockStockBaseline({required this.realm, required this.basis, required this.retainedAt, required this.contentFingerprint});
+  final String realm, basis, contentFingerprint;
+  final DateTime retainedAt;
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'realm': realm, 'basis': basis,
+    'retainedAt': retainedAt.toUtc().toIso8601String(), 'contentFingerprint': contentFingerprint};
+  static String fingerprint(WorkspaceSavedInventory inventory) {
+    final raw = inventory.toJson();
+    return sha256.convert(utf8.encode(jsonEncode([inventory.account, inventory.store, inventory.qa,
+      raw['products'], raw['movements'], raw['variantFamilies'] ?? [], raw['reviewedCatalogueLinks'] ?? []]))).toString();
+  }
+  static WorkspaceRestockStockBaseline fromJson(Object? raw) {
+    const keys = {'schemaVersion', 'realm', 'basis', 'retainedAt', 'contentFingerprint'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) || raw['schemaVersion'] is! int ||
+        raw['schemaVersion'] != 1 || !const ['evaluation', 'production'].contains(raw['realm']) ||
+        !const ['saved_stock', 'owner_confirmed'].contains(raw['basis']) || raw['retainedAt'] is! String ||
+        raw['contentFingerprint'] is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(raw['contentFingerprint'] as String)) {
+      throw const FormatException('Receiving Stock baseline needs recovery.');
+    }
+    final at = DateTime.parse(raw['retainedAt'] as String);
+    if (at.toUtc().toIso8601String() != raw['retainedAt']) throw const FormatException('Receiving Stock baseline date changed.');
+    return WorkspaceRestockStockBaseline(realm: raw['realm'] as String, basis: raw['basis'] as String,
+      retainedAt: at, contentFingerprint: raw['contentFingerprint'] as String);
+  }
+}
+
 /// Device-owned inventory only. QA data cannot be restored into production.
 /// This checkpoint carries no invoice, payment, publication or backend authority.
 class WorkspaceSavedInventory {
@@ -10411,7 +10559,10 @@ class WorkspaceSavedInventory {
     List<WorkspaceVariantFamily> variantFamilies = const [],
     List<WorkspaceReviewedCatalogueLink> reviewedCatalogueLinks = const [],
     this.manualReceiptCheckpointRevision,
-  }) : reviewedCatalogueLinks = List.unmodifiable(reviewedCatalogueLinks), variantFamilies = List.unmodifiable(variantFamilies),
+    List<WorkspaceRestockStockProjection> restockProjections = const [],
+    this.restockBaseline,
+  }) : restockProjections = List.unmodifiable(restockProjections),
+       reviewedCatalogueLinks = List.unmodifiable(reviewedCatalogueLinks), variantFamilies = List.unmodifiable(variantFamilies),
        products = List.unmodifiable(products),
        movements = List.unmodifiable(movements);
   final String account, store;
@@ -10425,10 +10576,41 @@ class WorkspaceSavedInventory {
   /// Last authoritative manual-receipt checkpoint projected here. Retained even
   /// when all goods were already in Stock or damaged and no movement was added.
   final int? manualReceiptCheckpointRevision;
+  final List<WorkspaceRestockStockProjection> restockProjections;
+  final WorkspaceRestockStockBaseline? restockBaseline;
+  int get _baseVersion => reviewedCatalogueLinks.isNotEmpty ? 5 : variantFamilies.isNotEmpty ? 4
+    : products.any((p) => p.usesMinorAmounts) ? 3 : products.any((p) => p.stockEntry != null) ? 2 : 1;
+
+  /// Reconcile only retained local journal facts. Missing finance is not zero
+  /// dues; this check creates neither a balance nor an inventory opening.
+  bool preservesCommittedStock(WorkspaceLedgerCheckpoint? checkpoint) {
+    if (checkpoint == null) return manualReceiptCheckpointRevision == null;
+    if (!checkpoint.valid || checkpoint.finance.accountScope != account || checkpoint.finance.workspaceId != store ||
+        checkpoint.pendingReturn != null || checkpoint.pendingRefund != null) { return false; }
+    final ledger = checkpoint.inventory;
+    if (manualReceiptCheckpointRevision == null && checkpoint.supplierLedgers.values.any((supplier) => supplier.goodsReceipts.isNotEmpty)) return false;
+    if (manualReceiptCheckpointRevision != null && (manualReceiptCheckpointRevision! > checkpoint.revision ||
+        !checkpoint.supplierLedgers.values.any((supplier) => supplier.goodsReceipts.isNotEmpty))) { return false; }
+    if (ledger == null) return manualReceiptCheckpointRevision == null;
+    final quantities = ledger.quantities;
+    if (quantities == null || ledger.accountScope != account || ledger.workspaceId != store) return false;
+    final byId = {for (final movement in movements) movement.id: movement};
+    final known = ledger.movements.map((m) => m.id).toSet();
+    if (ledger.movements.any((m) => byId[m.id]?.contentIdentity != m.contentIdentity)) return false;
+    final owned = {for (final movement in restockProjections.expand((projection) =>
+      projection.command.receipt.lines.map(projection.movementFor)).whereType<WorkspaceStockMovement>()) movement.id: movement};
+    final tails = movements.where((m) => !known.contains(m.id)).toList();
+    if (tails.any((m) => m.referenceKind == WorkspaceStockReferenceKind.restockGoodsArrival
+      ? owned[m.id]?.contentIdentity != m.contentIdentity
+      : m.referenceKind != null || !{WorkspaceStockMovementKind.openingStock, WorkspaceStockMovementKind.adjustment,
+          WorkspaceStockMovementKind.goodsReceived, WorkspaceStockMovementKind.damageOrExpiry}.contains(m.kind))) { return false; }
+    return products.where((p) => p.stockMode == WorkspaceStockMode.exactQuantity).every((p) => quantities[p.id] == null ||
+      p.stock == quantities[p.id]! + tails.where((m) => m.productId == p.id).fold<int>(0, (sum, m) => sum + m.quantityDelta));
+  }
 
   Map<String, Object?> toJson() => {
-    'version': reviewedCatalogueLinks.isNotEmpty ? 5 : variantFamilies.isNotEmpty ? 4 : products.any((p) => p.usesMinorAmounts) ? 3
-        : products.any((p) => p.stockEntry != null) ? 2 : 1,
+    'version': restockProjections.isNotEmpty || restockBaseline != null ? 6 : _baseVersion,
+    if (restockProjections.isNotEmpty || restockBaseline != null) 'baseVersion': _baseVersion,
     if (variantFamilies.isNotEmpty || reviewedCatalogueLinks.isNotEmpty) 'variantFamilies': variantFamilies.map((f) => f.toJson()).toList(),
     if (reviewedCatalogueLinks.isNotEmpty) 'reviewedCatalogueLinks': reviewedCatalogueLinks.map((link) => link.toJson()).toList(),
     'account': account,
@@ -10438,6 +10620,8 @@ class WorkspaceSavedInventory {
     'savedAt': savedAt.toUtc().toIso8601String(),
     if (manualReceiptCheckpointRevision != null)
       'manualReceiptCheckpointRevision': manualReceiptCheckpointRevision,
+    if (restockProjections.isNotEmpty) 'restockProjections': restockProjections.map((p) => p.toJson()).toList(),
+    if (restockBaseline != null) 'restockBaseline': restockBaseline!.toJson(),
     'products': products.map((p) => p.toInventoryJson()).toList(),
     'movements': [
       for (final m in movements)
@@ -10460,21 +10644,28 @@ class WorkspaceSavedInventory {
       'Saved inventory needs recovery. Its data has been kept.',
     );
     try {
-      if (raw is! Map ||
-          !const [1, 2, 3, 4, 5].contains(raw['version']) ||
+      if (raw is! Map) throw invalid;
+      final version = raw['version'] == 6 ? raw['baseVersion'] : raw['version'];
+      if (!const [1, 2, 3, 4, 5, 6].contains(raw['version']) ||
+          (raw['version'] == 6 ? raw['version'] is! int || version is! int || !const [1, 2, 3, 4, 5].contains(version) ||
+            !raw.containsKey('restockProjections') && !raw.containsKey('restockBaseline')
+            : raw.containsKey('restockProjections') || raw.containsKey('restockBaseline') || raw.containsKey('baseVersion')) ||
           raw['products'] is! List ||
           raw['movements'] is! List ||
-          (const {4, 5}.contains(raw['version']) ? raw['version'] is! int || raw['variantFamilies'] is! List
+          (const {4, 5}.contains(version) ? version is! int || raw['variantFamilies'] is! List
             : raw.containsKey('variantFamilies')) ||
-          (raw['version'] == 5 ? raw['reviewedCatalogueLinks'] is! List || (raw['reviewedCatalogueLinks'] as List).isEmpty
+          (version == 5 ? raw['reviewedCatalogueLinks'] is! List || (raw['reviewedCatalogueLinks'] as List).isEmpty
             : raw.containsKey('reviewedCatalogueLinks'))) {
         throw invalid;
       }
       if ((raw['products'] as List).length > 10000) throw invalid;
+      if (raw.containsKey('restockProjections') &&
+          (raw['restockProjections'] is! List || (raw['restockProjections'] as List).isEmpty ||
+           (raw['restockProjections'] as List).length > 1000)) { throw invalid; }
       final result = WorkspaceSavedInventory(
-        reviewedCatalogueLinks: raw['version'] == 5
+        reviewedCatalogueLinks: version == 5
           ? [for (final link in raw['reviewedCatalogueLinks'] as List) WorkspaceReviewedCatalogueLink.fromJson(link)] : const [],
-        variantFamilies: const {4, 5}.contains(raw['version'])
+        variantFamilies: const {4, 5}.contains(version)
           ? [for (final f in raw['variantFamilies'] as List) WorkspaceVariantFamily.fromJson(f)] : const [],
         account: raw['account'] as String,
         store: raw['store'] as String,
@@ -10482,6 +10673,8 @@ class WorkspaceSavedInventory {
         revision: raw['revision'] as int,
         savedAt: DateTime.parse(raw['savedAt'] as String),
         manualReceiptCheckpointRevision: raw['manualReceiptCheckpointRevision'] as int?,
+        restockProjections: [for (final p in (raw['restockProjections'] as List? ?? const [])) WorkspaceRestockStockProjection.fromJson(p)],
+        restockBaseline: raw.containsKey('restockBaseline') ? WorkspaceRestockStockBaseline.fromJson(raw['restockBaseline']) : null,
         products: [
           for (final p in raw['products'] as List)
             WorkspaceCatalogueItem.fromInventoryJson(p),
@@ -10510,10 +10703,11 @@ class WorkspaceSavedInventory {
       final ids = <String>{};
       final movements = <String>{};
       if (result.account.trim().isEmpty ||
-          raw['version'] != (result.reviewedCatalogueLinks.isNotEmpty ? 5 : result.variantFamilies.isNotEmpty ? 4 : result.products.any((p) => p.usesMinorAmounts) ? 3
-              : result.products.any((p) => p.stockEntry != null) ? 2 : 1) ||
+          version != result._baseVersion ||
           result.store.trim().isEmpty ||
           result.revision < 1 ||
+          (result.restockBaseline != null && (result.restockBaseline!.realm != (result.qa ? 'evaluation' : 'production') ||
+            result.restockBaseline!.retainedAt.isAfter(result.savedAt))) ||
           (raw.containsKey('manualReceiptCheckpointRevision') &&
               raw['manualReceiptCheckpointRevision'] == null) ||
           (result.manualReceiptCheckpointRevision == null &&
@@ -10541,6 +10735,30 @@ class WorkspaceSavedInventory {
         throw invalid;
       }
       WorkspaceVariantFamily.validateInventory(result.variantFamilies, result.products);
+      final operations = <String>{}, receivingMovements = <String>{}, priorAllocations = <String, int>{};
+      final byId = {for (final m in result.movements) m.id: m};
+      for (final projection in result.restockProjections) {
+        final command = projection.command, source = command.receipt.restockOriginal!;
+        if (source.accountScope != result.account || source.buyingStoreId != result.store || source.realm != (result.qa ? 'evaluation' : 'production') ||
+            !operations.add(command.receipt.id) || projection.appliedAt.isAfter(result.savedAt)) { throw invalid; }
+        for (final line in command.receipt.lines) {
+          final product = result.products.where((p) => p.id == line.productId).singleOrNull;
+          if (product == null || product.pack != line.stockUnit || product.stockMode != WorkspaceStockMode.exactQuantity) throw invalid;
+          final movement = projection.movementFor(line);
+          if (movement != null && (!receivingMovements.add(movement.id) || byId[movement.id]?.contentIdentity != movement.contentIdentity)) throw invalid;
+          for (final entry in line.priorStockUnits.entries) {
+            final original = byId[entry.key];
+            if (original == null || original.productId != line.productId || original.referenceKind != null || original.referenceId != null ||
+                !{WorkspaceStockMovementKind.openingStock, WorkspaceStockMovementKind.goodsReceived}.contains(original.kind) ||
+                original.quantityDelta <= 0 || original.occurredAt.isAfter(command.receipt.recordedAt)) { throw invalid; }
+            final allocated = (priorAllocations[entry.key] ?? 0) + entry.value;
+            if (allocated > original.quantityDelta) throw invalid;
+            priorAllocations[entry.key] = allocated;
+          }
+        }
+      }
+      if (result.movements.any((m) => m.referenceKind == WorkspaceStockReferenceKind.restockGoodsArrival &&
+          !receivingMovements.contains(m.id))) { throw invalid; }
       final linked = <String>{};
       if (result.reviewedCatalogueLinks.length > result.products.length || result.reviewedCatalogueLinks.any((link) =>
           link.storeId != result.store || link.realm != (result.qa ? 'evaluation' : 'production') ||

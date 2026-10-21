@@ -17613,6 +17613,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   int? _bookRevision;
   WorkspaceSupplierGoodsReceipt? _frozen;
   WorkspaceRestockPurchaseOriginal? _restockOriginal;
+  WorkspaceRestockPurchaseOriginal? _stockRecoverySource;
   WorkspaceGoodsReceiptReviewCancellation? _cancelAttempt;
   WorkspaceGoodsReceiptSaveResult? _postResult;
   _LedgerFormAutosave? _draft;
@@ -17625,7 +17626,19 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   WorkSession get session => widget.session;
   bool get _current => mounted && _scope != null && _scope == session.workspaceSupplierScope;
   WorkspaceSupplierLedger? get _ledger => _supplierId == null ? null : session.workspaceSupplierLedger(_supplierId!);
-  bool get _committed => _frozen != null && _ledger?.goodsReceipts.containsKey(_frozen!.id) == true;
+  bool _receiptRecorded(WorkspaceSupplierGoodsReceipt receipt) => session.workspaceGoodsReceiptUsesServer(receipt)
+    ? session.workspaceRestockAttempt(receipt.id)?.recorded != null : _ledger?.goodsReceipts.containsKey(receipt.id) == true;
+  bool _receiptResolved(WorkspaceSupplierGoodsReceipt receipt) => _receiptRecorded(receipt) || session.workspaceRestockAttempt(receipt.id)?.closed != null;
+  bool get _closed => _frozen != null && session.workspaceRestockAttempt(_frozen!.id)?.closed != null;
+  bool get _closing => _frozen != null && session.workspaceRestockAttempt(_frozen!.id)?.closeRequestedRevision != null && !_closed && !_committed;
+  bool get _serverReceiving => _frozen != null ? session.workspaceGoodsReceiptUsesServer(_frozen!)
+    : (_restockOriginal ?? widget.initialRestockOriginal) != null &&
+      !session.workspaceRestockUsesLegacyReceipts((_restockOriginal ?? widget.initialRestockOriginal)!);
+  WorkspaceGoodsReceivingGroup? get _serverGroup {
+    final source = _restockOriginal ?? widget.initialRestockOriginal;
+    return source == null ? null : session.workspaceRestockReceiving(source)?.group;
+  }
+  bool get _committed => _frozen != null && _receiptRecorded(_frozen!);
   bool get _billContextValid => widget.initialBill == null ||
     (_supplierId == widget.initialBill!.supplier.id && session.workspacePurchaseCopies.any((copy) =>
       copy.id == widget.initialBill!.id && copy.revision == widget.initialBill!.revision &&
@@ -17636,6 +17649,12 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     session.workspaceSupplierRecoveryError == null && !session.workspaceSupplierRecoveryRequired && !session.workspaceGoodsReceiptRecoveryPending &&
     _postResult != WorkspaceGoodsReceiptSaveResult.statusUnknown;
   bool get _hasPendingArrival {
+    if (_serverReceiving) {
+      final source = _restockOriginal;
+      if (source == null || session.workspaceRestockReceiving(source) == null) return false;
+      return source.lines.entries.any((entry) => (_serverGroup?.lines.where((line) => line.sourceLineId == entry.key)
+        .singleOrNull?.deliveredMilli ?? 0) < entry.value.quantityMilli);
+    }
     final group = _ledger?.goodsReceipts.values.where((r) => r.expectedDeliveryId == _groupId).toList() ?? [];
     final expected = <String, int?>{for (final receipt in group) for (final line in receipt.lines) line.sourceLineId: line.expectedMilli,
       if (_restockOriginal case final source?) for (final line in source.lines.entries) line.key: line.value.quantityMilli};
@@ -17686,7 +17705,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     if (reviewed != null) { _restore(reviewed.receipt); return; }
     if (fields.isNotEmpty && !session.workspaceGoodsReceiptCancellations.any((c) => c.receiptId == arrival)) {
       if (_ledger?.goodsReceipts.containsKey(arrival) == true ||
-          reviews.any((r) => _ledger?.goodsReceipts.containsKey(r.receipt.id) != true)) {
+          reviews.any((r) => !_receiptResolved(r.receipt))) {
         throw StateError('Saved receipt review unavailable');
       }
       final values = jsonDecode(fields['input']!) as List;
@@ -17735,7 +17754,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       final requested = widget.initialRestockOriginal;
       final matching = requested == null ? null : reviews.where((r) =>
         jsonEncode(r.receipt.restockOriginal?.toJson()) == jsonEncode(requested.toJson())).lastOrNull;
-      final unfinished = reviews.where((r) => _ledger?.goodsReceipts.containsKey(r.receipt.id) != true).lastOrNull;
+      final unfinished = reviews.where((r) => !_receiptResolved(r.receipt)).lastOrNull;
       if (matching != null) { _restore(matching.receipt); }
       else if (unfinished != null || requested == null) { _restore((unfinished ?? reviews.last).receipt); }
       else { _newArrival(); }
@@ -17791,22 +17810,78 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         : 'Delivery draft discarded. Recover saved goods status before continuing.');
     }
   }
-  Future<void> _recover() async {
+  Future<void> _recover({WorkspaceSavedInventory? reviewedSavedStock, String? reviewedStockSignature}) async {
     if (mounted) setState(() { _busy = true; _error = null; });
-    final ready = await session.loadWorkspaceSuppliers(retry: true) &&
-      await session.loadWorkspaceInventory(retry: true) && await session.recoverCustomerLedger();
+    var ready = await session.loadWorkspaceSuppliers(retry: true);
+    if (!_current) return;
+    final supplier = _supplierId ?? widget.initialSupplierId;
+    final saved = session.workspaceGoodsReceiptDrafts.where((r) => r.supplierId == supplier).lastOrNull?.receipt;
+    final source = _frozen?.restockOriginal ?? _restockOriginal ?? saved?.restockOriginal ?? widget.initialRestockOriginal;
+    _stockRecoverySource = source;
+    final server = _frozen != null ? session.workspaceGoodsReceiptUsesServer(_frozen!)
+      : source != null && !session.workspaceRestockUsesLegacyReceipts(source);
+    if (ready && server) {
+      ready = await session.recoverWorkspaceRestockReceiving(source!,
+        reviewedSavedStock: reviewedSavedStock, reviewedStockSignature: reviewedStockSignature);
+      if (_current && ready && _frozen != null && session.workspaceRestockAttempt(_frozen!.id) != null) {
+        _postResult = await session.checkWorkspaceRestockGoodsReceipt(_frozen!, supplierId: _supplierId!, scope: _scope!);
+      }
+    } else if (ready) {
+      ready = await session.loadWorkspaceInventory(retry: true) &&
+        (source == null && !session.customerCollectionAvailable ||
+          supplier == null && session.workspaceGoodsReceiptDrafts.any((r) => session.workspaceGoodsReceiptUsesServer(r.receipt)) ||
+          await session.recoverCustomerLedger());
+    }
     if (!_current) return;
     _bookRevision = session.workspacePurchaseEntryRevision;
     if (ready && _frozen != null) {
       _reviewVerified = session.workspaceGoodsReceiptDrafts.any((r) => r.supplierId == _supplierId &&
         jsonEncode(r.receipt.toJson()) == jsonEncode(_frozen!.toJson()));
-      _postResult = _committed ? session.workspaceGoodsReceiptRecoveryPending
+      _postResult = _closed ? WorkspaceGoodsReceiptSaveResult.closed : _committed ? session.workspaceGoodsReceiptRecoveryPending
         ? WorkspaceGoodsReceiptSaveResult.stockRecoveryPending : WorkspaceGoodsReceiptSaveResult.saved
-        : WorkspaceGoodsReceiptSaveResult.notPosted;
+        : session.workspaceRestockAttempt(_frozen!.id) != null ? WorkspaceGoodsReceiptSaveResult.statusUnknown
+          : WorkspaceGoodsReceiptSaveResult.notPosted;
     }
     setState(() { _busy = false; _loaded = ready; if (!ready) _error = 'Saved receiving status is unavailable. Retry without clearing Store data.'; });
     if (ready && _supplierId != null && _arrivalId.isEmpty && _draft?.ready == true) _resumeSupplierInput(const {});
     if (ready && _supplierId == null && widget.initialSupplierId != null) await _chooseSupplier(widget.initialSupplierId!);
+  }
+  Future<void> _reviewStockBaseline() async {
+    final source = _stockRecoverySource, signature = session.workspaceRestockStockReviewSignature;
+    final saved = session.workspaceRestockStockConflict;
+    if (!_current || _busy || source == null || signature == null) return;
+    final products = (saved?.products ?? session.workspaceCatalogueItems)
+      .where((product) => product.stockMode == WorkspaceStockMode.exactQuantity).toList();
+    if (products.isEmpty) {
+      setState(() => _error = 'Save the Stock items and their current quantities before receiving this delivery.');
+      return;
+    }
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text(saved == null ? 'Confirm current Stock' : 'Recover saved Stock'),
+      titleTextStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MoolColors.navy),
+      contentTextStyle: const TextStyle(fontSize: 12, color: MoolColors.ink),
+      content: SizedBox(width: double.maxFinite, child: SingleChildScrollView(child: Column(
+        mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(saved == null ? 'Check these quantities before adding this delivery. Include goods already received; link their earlier Stock entries when applicable.'
+            : 'These saved quantities will replace the Stock view on this device. Check them before continuing.'),
+          const SizedBox(height: 8),
+          for (final product in products) Padding(padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text('${product.title} · ${product.stock} ${product.pack}')),
+        ]))),
+      titlePadding: const EdgeInsets.fromLTRB(16, 12, 16, 8), contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      actionsPadding: const EdgeInsets.all(8), actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Go back')),
+        TextButton(key: const Key('work-receive-stock-baseline-confirm'),
+          onPressed: () => Navigator.pop(context, true), child: Text(saved == null ? 'Confirm quantities' : 'Use saved Stock')),
+      ]));
+    if (confirmed != true || !_current || session.workspaceRestockStockReviewSignature != signature ||
+        jsonEncode(session.workspaceRestockStockConflict?.toJson()) != jsonEncode(saved?.toJson())) { return; }
+    if (saved != null) { await _recover(reviewedSavedStock: saved, reviewedStockSignature: signature); return; }
+    setState(() { _busy = true; _error = null; });
+    final retained = await session.confirmWorkspaceRestockStockBaseline(source, signature);
+    if (!_current) return;
+    setState(() { _busy = false; if (!retained) _error = 'Stock confirmation needs recovery. Check saved quantities before trying again.'; });
+    if (retained) await _recover();
   }
   void _restore(WorkspaceSupplierGoodsReceipt receipt) {
     for (final line in _lines) { line.dispose(); }
@@ -17820,6 +17895,12 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     if (_supplierId == id) return;
     if (_busy) { _supplierPicker.currentState?.didChange(_supplierId); return; }
     final requested = widget.initialRestockOriginal;
+    final serverSupplier = requested == null ? null : session.workspaceRestockReceiving(requested)?.group?.supplierId;
+    if (serverSupplier != null && serverSupplier != id) {
+      setState(() => _error = 'This purchase is linked to another saved supplier. Keep that supplier for the next arrival.');
+      _supplierPicker.currentState?.didChange(_supplierId);
+      return;
+    }
     final linked = requested == null ? null : session.workspaceSuppliers.where((supplier) =>
       session.workspaceSupplierLedger(supplier.id)?.goodsReceipts.values.any((receipt) =>
         receipt.expectedDeliveryId == requested.deliveryGroupId) == true).singleOrNull;
@@ -17847,15 +17928,38 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       on Object { _draft!.ready = false; _error = 'Saved delivery input needs recovery. Do not re-enter these goods.'; }
     }
     setState(() => _busy = false);
+    if (_restockOriginal != null) await _recover();
+  }
+  Future<void> _startArrival({bool selected = false}) async {
+    final previous = selected ? null : _frozen;
+    final source = selected ? widget.initialRestockOriginal : previous?.restockOriginal;
+    if (!_current || _busy || !_savedStatusResolved) return;
+    if (source != null && !session.workspaceRestockUsesLegacyReceipts(source)) {
+      setState(() { _busy = true; _error = null; });
+      final ready = await session.recoverWorkspaceRestockReceiving(source);
+      if (!_current) return;
+      setState(() { _busy = false; _loaded = ready; _bookRevision = session.workspacePurchaseEntryRevision;
+        if (!ready) _error = 'Recover this purchase’s receiving status before starting another arrival.'; });
+      if (!ready) return;
+    }
+    setState(() => _newArrival(previous: previous));
   }
   void _newArrival({WorkspaceSupplierGoodsReceipt? previous}) {
     final source = previous != null ? previous.restockOriginal : widget.initialRestockOriginal;
     final groupId = source?.deliveryGroupId ?? previous?.expectedDeliveryId;
+    final server = source != null && !session.workspaceRestockUsesLegacyReceipts(source);
+    final serverRead = source == null ? null : session.workspaceRestockReceiving(source);
+    if (server && (serverRead == null || session.workspaceGoodsReceiptRecoveryPending)) {
+      _error = 'Recover this purchase’s receiving status before starting another arrival.';
+      return;
+    }
+    final serverGroup = serverRead?.group;
     final receipts = _ledger?.goodsReceipts.values.where((receipt) => receipt.expectedDeliveryId == groupId).toList() ??
       const <WorkspaceSupplierGoodsReceipt>[];
-    if (source != null && receipts.isNotEmpty && source.lines.entries.every((entry) =>
-        receipts.expand((receipt) => receipt.lines).where((line) => line.sourceLineId == entry.key)
-          .fold<int>(0, (sum, line) => sum + line.deliveredMilli) >= entry.value.quantityMilli)) {
+    if (source != null && source.lines.entries.every((entry) => (server
+        ? serverGroup?.lines.where((line) => line.sourceLineId == entry.key).singleOrNull?.deliveredMilli ?? 0
+        : receipts.expand((receipt) => receipt.lines).where((line) => line.sourceLineId == entry.key)
+          .fold<int>(0, (sum, line) => sum + line.deliveredMilli)) >= entry.value.quantityMilli)) {
       _error = 'All ordered quantities for this purchase are already recorded. Saved goods are kept.';
       return;
     }
@@ -17863,7 +17967,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     for (final line in _lines) { line.dispose(); }
     _lines.clear();
     _restockOriginal = source;
-    if (previous != null || receipts.isNotEmpty) {
+    if (!server && (previous != null || receipts.isNotEmpty)) {
       final inherited = <String, WorkspaceSupplierGoodsReceiptLine>{
         for (final receipt in receipts) for (final line in receipt.lines) line.sourceLineId: line,
         if (previous != null) for (final line in previous.lines) line.sourceLineId: line,
@@ -17885,6 +17989,12 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         line.unit.text = entry.value.quantityUnit;
         line.expected.text = _ReceivingLineInput._quantity(entry.value.quantityMilli);
         line.factor.clear();
+        final mapping = serverGroup?.lines.where((line) => line.sourceLineId == entry.key).singleOrNull;
+        if (mapping != null) {
+          line.productId = mapping.productId;
+          line.factor.text = '${mapping.unitsPerPack}';
+          line.arrives = mapping.deliveredMilli < mapping.expectedMilli;
+        }
         _lines.add(line);
       }
     }
@@ -17921,15 +18031,19 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       final lot = WorkspaceReceivingLotDetails(batch: input.batch.text.trim(),
         manufacturedLabel: input.manufactured.text.trim(), expiryLabel: input.expiry.text.trim(), mrpMinor: mrp);
       if (!lot.isEmpty && !lot.valid) return null;
+      final mapping = _serverReceiving ? _serverGroup?.lines.where((line) => line.sourceLineId == input.id).singleOrNull : null;
       values.add(WorkspaceSupplierGoodsReceiptLine(sourceLineId: input.id, productId: product.id,
-        productLabel: input.original?.productId == product.id ? input.original!.productLabel : product.title,
+        productLabel: mapping?.productId == product.id ? mapping!.productLabel
+          : input.original?.productId == product.id ? input.original!.productLabel : product.title,
         purchaseUnit: input.unit.text.trim(), stockUnit: product.pack,
         unitsPerPack: factor, deliveredMilli: delivered, acceptedMilli: delivered - damage,
         damagedMilli: damage, shortMilli: short, expectedMilli: expected, priorStockUnits: prior,
         lotDetails: lot.isEmpty ? null : lot));
     }
+    final recordedAt = DateTime.now();
     final receipt = WorkspaceSupplierGoodsReceipt(id: _arrivalId, expectedDeliveryId: _groupId,
-      reference: _reference.text.trim(), deliveredOn: _day.text.trim(), recordedAt: DateTime.now().toUtc(), lines: values,
+      reference: _reference.text.trim(), deliveredOn: _day.text.trim(), recordedAt: recordedAt.toUtc(), lines: values,
+      recordedUtcOffsetMinutes: !_serverReceiving ? null : recordedAt.timeZoneOffset.inMinutes,
       restockOriginal: _restockOriginal);
     return receipt.valid ? receipt : null;
   }
@@ -17955,13 +18069,14 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       if (!saved) _error = session.workspaceSupplierError ?? 'Review status needs recovery. Keep this delivery reference and retry recovery.'; });
   }
   Future<void> _post() async {
-    if (!_current || !_loaded || !_reviewVerified || _frozen == null || _ledger == null || _bookRevision == null) return;
+    if (!_current || !_loaded || !_reviewVerified || _frozen == null || (!_serverReceiving && _ledger == null) || _bookRevision == null) return;
     setState(() { _busy = true; _error = null; });
     final result = await session.confirmWorkspaceSupplierGoodsReceipt(_frozen!, supplierId: _supplierId!,
-      scope: _scope!, expectedPurchaseRevision: _bookRevision!, expectedSupplierRevision: _ledger!.revision,
+      scope: _scope!, expectedPurchaseRevision: _bookRevision!, expectedSupplierRevision: _ledger?.revision ?? 0,
       requireSavedReview: true);
     if (!_current) return;
-    setState(() { _busy = false; _postResult = result; _notice = result == WorkspaceGoodsReceiptSaveResult.saved
+    setState(() { _busy = false; _postResult = result; _bookRevision = session.workspacePurchaseEntryRevision;
+      _notice = result == WorkspaceGoodsReceiptSaveResult.saved
       ? 'Goods recorded. Supplier bill and payment are separate.' : null;
       if (result != WorkspaceGoodsReceiptSaveResult.saved) _error = session.workspaceSupplierError ?? 'Receiving status needs recovery. Do not add these goods again.'; });
   }
@@ -17976,6 +18091,36 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     if (!_current) return;
     setState(() { _busy = false; _bookRevision = session.workspacePurchaseEntryRevision;
       if (!saved) _error = session.workspaceSupplierError ?? 'Cancellation is unverified. Retry recovery before replacing this review.'; });
+  }
+  Future<void> _closeUnrecordedReceipt() async {
+    final receipt = _frozen, supplier = _supplierId;
+    if (!_current || _busy || receipt == null || supplier == null || !_serverReceiving || _committed || _closed ||
+        session.workspaceRestockAttempt(receipt.id) == null) { return; }
+    if (!_closing) {
+      final close = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Close this receiving attempt?'),
+        content: const Text('If the goods were already recorded, their receipt and Stock recovery will be kept. Otherwise this attempt will close without adding Stock. Wait for confirmation before entering corrected details. Your purchase and payments stay unchanged.'),
+        titleTextStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MoolColors.navy),
+        contentTextStyle: const TextStyle(fontSize: 12, color: MoolColors.ink),
+        titlePadding: const EdgeInsets.fromLTRB(16, 12, 16, 8), contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        actionsPadding: const EdgeInsets.all(8), actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep receipt')),
+          TextButton(key: const Key('work-receive-close-attempt-confirm'),
+            onPressed: () => Navigator.pop(context, true), child: const Text('Close unrecorded receipt')),
+        ]));
+      if (close != true || !_current || _frozen != receipt || _supplierId != supplier || _committed || _closed) return;
+    }
+    setState(() { _busy = true; _error = null; });
+    final result = await session.closeWorkspaceRestockGoodsReceipt(receipt, supplierId: supplier, scope: _scope!);
+    if (!_current) return;
+    setState(() {
+      _busy = false; _postResult = result; _bookRevision = session.workspacePurchaseEntryRevision;
+      _notice = result == WorkspaceGoodsReceiptSaveResult.closed ? 'Receiving attempt closed. Stock is unchanged.'
+        : result == WorkspaceGoodsReceiptSaveResult.saved ? 'Goods were already recorded. Their receipt is kept and Stock is recovered.' : null;
+      if (result != WorkspaceGoodsReceiptSaveResult.closed && result != WorkspaceGoodsReceiptSaveResult.saved) {
+        _error = session.workspaceSupplierError ?? 'Closing status is unverified. Recover or retry closing this receipt before entering another arrival.';
+      }
+    });
   }
   Future<bool> confirmLeave() {
     final active = _leaveDecision;
@@ -18108,15 +18253,15 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     }
     // WorkPageScaffold owns system Back; parent and local actions share confirmLeave.
     return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
-        _receivingHeader(_committed && !_conflict ? 'Goods received' : 'Receive goods'),
+        _receivingHeader(_closed ? 'Receiving attempt closed' : _committed && !_conflict ? 'Goods received' : 'Receive goods'),
         if (widget.initialRestockOriginal case final requested?) ...[
           Text('Purchase ${requested.reference['orderId']}', key: const Key('work-receive-order-context'),
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
           if (_showingOtherDelivery) ...[
             const Text('This supplier has another saved delivery. Its details are kept; the selected purchase has not been started.',
               key: Key('work-receive-other-delivery'), style: TextStyle(fontSize: 12, color: MoolColors.ink)),
-            if (_savedStatusResolved && (_committed || _cancelled)) TextButton(
-              key: const Key('work-receive-start-selected-order'), onPressed: _busy ? null : () => setState(() => _newArrival()),
+            if (_savedStatusResolved && (_committed || _cancelled || _closed)) TextButton(
+              key: const Key('work-receive-start-selected-order'), onPressed: _busy ? null : () => _startArrival(selected: true),
               child: const Text('Start receiving selected purchase')),
           ] else const Text('Match the supplier and saved Stock items. Confirm only the quantities actually received.',
             style: TextStyle(fontSize: 12, color: MoolColors.ink)),
@@ -18136,16 +18281,23 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         if (!_committed || _conflict) const Text('Record goods with or without a supplier bill. Link earlier Stock entries instead of adding them again.',
           style: TextStyle(fontSize: 12, color: MoolColors.ink)),
         if (!_loaded) TextButton(onPressed: _busy ? null : _recover, child: const Text('Retry saved records')),
-        if (_loaded && session.workspaceSuppliers.isEmpty)
+        if (_stockRecoverySource != null && (session.workspaceRestockBaselineMissing || session.workspaceRestockStockConflict != null)) ...[
+          Text(session.workspaceRestockStockConflict != null ? 'Saved Stock differs from this view. Review the saved quantities before receiving.'
+            : 'Confirm current Stock quantities before adding this delivery.', style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+          TextButton(key: const Key('work-receive-stock-baseline'), onPressed: _busy ? null : _reviewStockBaseline,
+            child: Text(session.workspaceRestockStockConflict != null ? 'Review saved Stock' : 'Review current Stock')),
+        ],
+        if (session.workspaceSuppliersLoaded && session.workspaceSuppliers.isEmpty)
           const Text('First save the supplier through Record purchase → Supplier → Save draft. A bill is not required.'),
-        if (_loaded && (!_committed || _conflict)) KeyedSubtree(key: const Key('work-receive-supplier'), child: DropdownButtonFormField<String>(key: _supplierPicker, initialValue: _supplierId,
+        if (session.workspaceSuppliersLoaded && (!_committed || _conflict)) KeyedSubtree(key: const Key('work-receive-supplier'), child: DropdownButtonFormField<String>(key: _supplierPicker, initialValue: _supplierId,
           isExpanded: true, style: const TextStyle(fontSize: 13, color: MoolColors.ink),
           decoration: const InputDecoration(labelText: 'Supplier', filled: false,
             floatingLabelBehavior: FloatingLabelBehavior.always, labelStyle: TextStyle(fontSize: 12, color: MoolColors.ink),
             contentPadding: EdgeInsets.symmetric(vertical: 8), enabledBorder: UnderlineInputBorder(),
             focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: MoolColors.navy))),
           items: [for (final p in session.workspaceSuppliers) DropdownMenuItem(value: p.id, child: Text(p.name))],
-          onChanged: editable && bill == null ? (value) { if (value != null) unawaited(_chooseSupplier(value)); } : null)),
+          onChanged: !_busy && !_discarding && _frozen == null && (editable || _supplierId == null) && bill == null
+            ? (value) { if (value != null) unawaited(_chooseSupplier(value)); } : null)),
         if (_supplierId != null) ...[
           if (_frozen == null) ...[
             Text(_draft?.error ?? (_draft?.busy == true ? 'Saving delivery input…'
@@ -18162,7 +18314,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
               Text(_error!, key: const Key('work-receive-error'), style: const TextStyle(fontSize: 12, color: Color(0xffa52a2a))),
           ],
           if (_committed && !_conflict) ...[
-            Text(session.workspaceSuppliers.where((p) => p.id == _supplierId).singleOrNull?.name ?? _ledger!.supplierName,
+            Text(session.workspaceSuppliers.where((p) => p.id == _supplierId).singleOrNull?.name ?? _ledger?.supplierName ?? 'Saved supplier',
               key: const Key('work-receive-saved-supplier'),
               style: const TextStyle(fontSize: 14, color: MoolColors.ink, fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
@@ -18172,12 +18324,14 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           ] else Wrap(spacing: 12, runSpacing: 12, children: [
             _field('Delivery reference', _reference, 'work-receive-reference', number: false),
             _field('Received date · YYYY-MM-DD', _day, 'work-receive-date', number: false)]),
-          if (_ledger?.openingRecord == null) const Text('Confirm this supplier’s Opening dues before recording goods. Choose zero only when there are no earlier dues or advances.',
+          if (!_serverReceiving && _ledger?.openingRecord == null) const Text('Confirm this supplier’s Opening dues before recording goods. Choose zero only when there are no earlier dues or advances.',
             style: TextStyle(fontSize: 12, color: MoolColors.ink)),
           for (final (index, line) in _lines.indexed) _lineView(line, index),
           if (editable && _restockOriginal == null) TextButton.icon(key: const Key('work-receive-add-line'), onPressed: _lines.length >= 100 ? null : () => setState(() {
             _lines.add(_ReceivingLineInput(session.newWorkspaceDeliveryLineId())); _saveInput(); }), icon: const Icon(Icons.add, size: 18), label: const Text('Add item')),
           if (_frozen != null) Text(_conflict ? 'Receipt and cancellation conflict · recover saved records'
+            : _closed ? 'Closed without recording · Stock unchanged'
+            : _closing ? 'Closing receipt · verify before entering another arrival'
             : _postResult == WorkspaceGoodsReceiptSaveResult.statusUnknown ? 'Receiving status unverified · recover before retrying'
             : _postResult == WorkspaceGoodsReceiptSaveResult.stockRecoveryPending ? 'Goods recorded · Stock recovery pending'
             : _cancelled ? 'Review cancelled · goods history kept'
@@ -18188,20 +18342,26 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
             if (_frozen == null) TextButton(key: const Key('work-receive-review'), onPressed: editable ? _review : null, child: const Text('Review & save goods details')),
             if (_frozen != null && !_reviewVerified && !_cancelled) TextButton(key: const Key('work-receive-retry-review'),
               onPressed: _busy ? null : _review, child: const Text('Retry this exact review save')),
-            if (_frozen != null && !_cancelled && _reviewVerified &&
+            if (_frozen != null && !_cancelled && !_closed && !_closing && _reviewVerified &&
                 (!_committed || session.workspaceGoodsReceiptRecoveryPending || _error != null)) TextButton(key: const Key('work-receive-confirm'),
-              onPressed: _busy || !_loaded || !session.workspaceSupplierOpeningConfirmationAvailable || _ledger?.openingRecord == null ? null : _post,
-              child: Text(_committed ? 'Verify / recover Stock' : 'Confirm goods received')),
-            if (_frozen != null && !_committed && !_cancelled && _reviewVerified && session.workspaceGoodsReceiptCancellationAvailable) TextButton(key: const Key('work-receive-cancel'),
+              onPressed: _busy || !_loaded || (!_serverReceiving &&
+                (!session.workspaceSupplierOpeningConfirmationAvailable || _ledger?.openingRecord == null)) ? null : _post,
+              child: Text(_committed ? 'Verify / recover Stock'
+                : _serverReceiving && session.workspaceRestockAttempt(_frozen!.id) != null ? 'Retry this receiving receipt' : 'Confirm goods received')),
+            if (_frozen != null && !_committed && !_cancelled && _reviewVerified && session.workspaceGoodsReceiptCanCancel(_frozen!)) TextButton(key: const Key('work-receive-cancel'),
               onPressed: _busy ? null : _cancel, child: const Text('Cancel review to correct')),
+            if (_serverReceiving && _frozen != null && !_committed && !_closed && _reviewVerified &&
+                session.workspaceRestockAttempt(_frozen!.id) != null)
+              TextButton(key: const Key('work-receive-close-attempt'), onPressed: _busy ? null : _closeUnrecordedReceipt,
+                child: Text(_closing ? 'Retry closing receipt' : 'Close unrecorded receipt')),
             if (_frozen != null && (!_committed || !_savedStatusResolved))
               TextButton(onPressed: _busy ? null : _recover, child: const Text('Recover saved status')),
-            if (_savedStatusResolved && _frozen != null && (_cancelled || (_committed && _hasPendingArrival)))
-              TextButton(key: const Key('work-receive-next'), onPressed: _busy ? null : () => setState(() => _newArrival(previous: _frozen)),
-                child: Text(_cancelled ? 'Correct goods details' : 'Next arrival for this delivery')),
+            if (_savedStatusResolved && _frozen != null && (_cancelled || _closed || (_committed && _hasPendingArrival)))
+              TextButton(key: const Key('work-receive-next'), onPressed: _busy ? null : _startArrival,
+                child: Text(_cancelled || _closed ? 'Correct goods details' : 'Next arrival for this delivery')),
             // A return recovery lock must not hide the route to its retained
             // request. Posting still uses the scoped authoritative native guard.
-            if (_loaded && _reviewVerified && !_conflict && _committed)
+            if (!_serverReceiving && _loaded && _reviewVerified && !_conflict && _committed)
               TextButton.icon(key: const Key('work-receive-return-goods'),
                 onPressed: _busy || session.supplierGoodsReturnFormKey(_supplierId!, _frozen!.id) == null
                   ? null : () => _showSupplierGoodsReturn(context, session, _supplierId!, _frozen!),
@@ -18218,7 +18378,9 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   }
   Widget _lineView(_ReceivingLineInput line, int index) {
     final product = session.workspaceCatalogueItems.where((p) => p.id == line.productId).singleOrNull;
-    final inherited = _ledger?.goodsReceipts.values.any((r) => r.expectedDeliveryId == _groupId && r.lines.any((l) => l.sourceLineId == line.id)) ?? false;
+    final serverLine = _serverReceiving ? _serverGroup?.lines.where((saved) => saved.sourceLineId == line.id).singleOrNull : null;
+    final inherited = serverLine != null ||
+      (_ledger?.goodsReceipts.values.any((r) => r.expectedDeliveryId == _groupId && r.lines.any((l) => l.sourceLineId == line.id)) ?? false);
     final prior = session.workspaceReceiptPriorStock(line.productId);
     for (final entry in prior.entries) { line.prior.putIfAbsent(entry.key.id, TextEditingController.new); }
     final delivered = _ReceivingLineInput.milli(line.delivered.text), damage = _ReceivingLineInput.milli(line.damaged.text);
@@ -18227,9 +18389,9 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     final stock = accepted == null || factor == null || accepted < 0 || accepted * factor % 1000 != 0 ? null : accepted * factor ~/ 1000;
     final linked = line.prior.values.fold<int>(0, (sum, c) => sum + (int.tryParse(c.text) ?? 0));
     final expected = _ReceivingLineInput.milli(line.expected.text);
-    final earlier = _ledger?.goodsReceipts.values.where((r) => r.expectedDeliveryId == _groupId)
+    final earlier = serverLine?.deliveredMilli ?? _ledger?.goodsReceipts.values.where((r) => r.expectedDeliveryId == _groupId)
       .expand((r) => r.lines).where((l) => l.sourceLineId == line.id).fold<int>(0, (sum, l) => sum + l.deliveredMilli) ?? 0;
-    final saved = _committed ? _frozen!.lines.where((l) => l.sourceLineId == line.id).singleOrNull : null;
+    final saved = _committed || _closed ? _frozen!.lines.where((l) => l.sourceLineId == line.id).singleOrNull : null;
     if (saved != null && !_conflict) {
       Widget figure(String label, String value) => Row(children: [
         Expanded(child: Text(label, style: const TextStyle(fontSize: 13, color: MoolColors.ink))),
@@ -18239,17 +18401,18 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       return Padding(key: ValueKey(('receiving-line', line.id)), padding: const EdgeInsets.symmetric(vertical: 10),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('${index + 1}. ${saved.productLabel}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MoolColors.navy)),
-          Text('This arrival · ${saved.purchaseUnit}', style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+          Text('${_closed ? 'Closed review' : 'This arrival'} · ${saved.purchaseUnit}', style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
           const SizedBox(height: 6),
           figure('Delivered', qty(saved.deliveredMilli)),
           figure('Accepted', qty(saved.acceptedMilli)),
           if (saved.damagedMilli > 0) figure('Damaged · not added to Stock', qty(saved.damagedMilli)),
           if (saved.shortMilli > 0) figure('Short in this arrival', qty(saved.shortMilli)),
-          if (saved.linkedStockUnits > 0) figure('Already in Stock · linked', '${saved.linkedStockUnits}'),
-          figure('${session.workspaceGoodsReceiptRecoveryPending ? 'Awaiting Stock recovery' : 'Added to Stock'} · ${saved.stockUnit}', '${saved.newStockUnits}'),
+          if (saved.linkedStockUnits > 0) figure(_closed ? 'Reviewed earlier Stock link' : 'Already in Stock · linked', '${saved.linkedStockUnits}'),
+          figure('${_closed ? 'Stock unchanged' : session.workspaceGoodsReceiptRecoveryPending ? 'Awaiting Stock recovery' : 'Added to Stock'} · ${saved.stockUnit}',
+            '${_closed ? 0 : saved.newStockUnits}'),
           if (saved.lotDetails != null) ...[
             const SizedBox(height: 6),
-            const Text('Recorded from this arrival · private', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            Text(_closed ? 'Reviewed pack details · private' : 'Recorded from this arrival · private', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
             for (final label in saved.lotDetails!.labels) Text(label, style: const TextStyle(fontSize: 12)),
           ],
           const SizedBox(height: 6),

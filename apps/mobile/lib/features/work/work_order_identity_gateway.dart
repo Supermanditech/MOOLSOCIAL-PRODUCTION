@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart';
 import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
 import 'work_customer_feedback.dart';
+import 'work_models.dart' show WorkspaceRestockPurchaseOriginal, WorkspaceSupplierGoodsReceipt;
 
 enum WorkspaceOrderIdentityState { linked, unlinked, unavailable }
 
@@ -781,6 +782,39 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
     }
   }
 
+  /// Purchaser-reported physical arrivals, independent of operational completion
+  /// and money. The caller must durably retain the exact command before record.
+  Future<WorkspaceGoodsReceivingRead?> readBuyerGoodsReceiving(WorkspaceRestockPurchaseOriginal original) async {
+    if (!isCurrent || original.accountScope != identity.accountUserId) return null;
+    final raw = await _call('readBuyerGoodsReceiving', {'schemaVersion': 1,
+      'buyingStoreId': original.buyingStoreId, 'reference': original.reference});
+    if (raw == null || !isCurrent) return null;
+    try {
+      final r = _exactMap(raw, const ['schemaVersion', 'realm', 'viewerUserId', 'buyingStoreId', 'group']);
+      _goodsScope(r, original);
+      return WorkspaceGoodsReceivingRead._(original, r['group'] == null ? null
+        : WorkspaceGoodsReceivingGroup._decode(r['group'], original));
+    } on Object { return null; }
+  }
+
+  Future<WorkspaceGoodsArrivalResult?> recordBuyerGoodsArrival(WorkspaceGoodsArrivalCommand command) =>
+    _goodsArrival(command, reconcile: false);
+  Future<WorkspaceGoodsArrivalResult?> reconcileBuyerGoodsArrival(WorkspaceGoodsArrivalCommand command) =>
+    _goodsArrival(command, reconcile: true);
+  Future<WorkspaceGoodsArrivalResult?> closeBuyerGoodsArrival(WorkspaceGoodsArrivalCommand command) =>
+    _goodsArrival(command, reconcile: false, close: true);
+  Future<WorkspaceGoodsArrivalResult?> _goodsArrival(WorkspaceGoodsArrivalCommand command, {required bool reconcile, bool close = false}) async {
+    final original = command.receipt.restockOriginal!;
+    if (!isCurrent || original.accountScope != identity.accountUserId) return null;
+    final raw = await _call(close ? 'closeBuyerGoodsArrival' : reconcile ? 'reconcileBuyerGoodsArrival' : 'recordBuyerGoodsArrival',
+      command.toJson(), mutation: !reconcile);
+    if (raw == null || !isCurrent) return null;
+    try {
+      final result = WorkspaceGoodsArrivalResult.fromJson(raw, command);
+      return result.recorded || result.closed || reconcile ? result : null;
+    } on Object { return null; }
+  }
+
   DateTime _date(Object? value) {
     if (value is! String || value.length != 24) throw const FormatException();
     final parsed = DateTime.parse(value);
@@ -1325,6 +1359,204 @@ class WorkspacePurchaseReferencePage {
   final String coverage;
   final List<WorkspacePurchaseReference> references;
   final String? nextCursor;
+}
+
+Object? _goodsCanonical(Object? value) => value is List ? value.map(_goodsCanonical).toList()
+  : value is Map ? {for (final key in value.keys.cast<String>().toList()..sort()) key: _goodsCanonical(value[key])} : value;
+String _goodsFingerprint(Object? value) => sha256.convert(utf8.encode(jsonEncode(_goodsCanonical(value)))).toString();
+bool _goodsText(String value, [int max = 240]) => value.isNotEmpty && value == value.trim() && value.length <= max &&
+  !RegExp(r'[\x00-\x1f\x7f]').hasMatch(value);
+bool _goodsInt(Object? value, {int min = 0, int max = 2147483647}) => value is int && value >= min && value <= max;
+void _goodsScope(Map<String, dynamic> r, WorkspaceRestockPurchaseOriginal original) {
+  if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['realm'] != original.realm ||
+      r['viewerUserId'] != original.accountScope || r['buyingStoreId'] != original.buyingStoreId) {
+    throw const FormatException('Receiving scope changed.');
+  }
+}
+Map<String, dynamic> _goodsChecked(Object? raw, List<String> keys) {
+  final r = _exactMap(raw, [...keys, 'integrity']), body = Map<String, dynamic>.of(r)..remove('integrity');
+  if (r['integrity'] != _goodsFingerprint(body)) throw const FormatException('Receiving record needs recovery.');
+  return r;
+}
+
+/// Immutable operation; storage/recovery owns this identity before any dispatch.
+class WorkspaceGoodsArrivalCommand {
+  WorkspaceGoodsArrivalCommand._(this.supplierId, this.receipt, this._bytes);
+  factory WorkspaceGoodsArrivalCommand({required String supplierId, required WorkspaceSupplierGoodsReceipt receipt}) {
+    final frozen = WorkspaceSupplierGoodsReceipt.fromJson(receipt.toJson()), source = frozen.restockOriginal;
+    if (source == null || frozen.recordedUtcOffsetMinutes == null || frozen.lines.length > 100 || !_goodsText(supplierId) ||
+        ![frozen.id, frozen.expectedDeliveryId, frozen.reference].every(_goodsText) || frozen.lines.any((line) =>
+          ![line.productId, line.productLabel, line.purchaseUnit, line.stockUnit].every(_goodsText) ||
+          line.priorStockUnits.keys.any((key) => !_goodsText(key, 512)))) {
+      throw const FormatException('Review the original purchase and reporting date before receiving.');
+    }
+    final bytes = jsonEncode({'schemaVersion': 1, 'buyingStoreId': source.buyingStoreId,
+      'supplierId': supplierId, 'receipt': frozen.toJson()});
+    if (utf8.encode(bytes).length > 60 * 1024) throw const FormatException('Receiving report is too large.');
+    return WorkspaceGoodsArrivalCommand._(supplierId, frozen, bytes);
+  }
+  final String supplierId, _bytes;
+  final WorkspaceSupplierGoodsReceipt receipt;
+  String get fingerprint => _goodsFingerprint(toJson());
+  String get receiptFingerprint => _goodsFingerprint(receipt.toJson());
+  Map<String, Object?> toJson() => Map<String, Object?>.from(jsonDecode(_bytes) as Map);
+  static WorkspaceGoodsArrivalCommand fromJson(Object? raw) {
+    final r = _exactMap(raw, const ['schemaVersion', 'buyingStoreId', 'supplierId', 'receipt']);
+    final result = WorkspaceGoodsArrivalCommand(supplierId: r['supplierId'] as String,
+      receipt: WorkspaceSupplierGoodsReceipt.fromJson(r['receipt']));
+    if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 ||
+        r['buyingStoreId'] != result.receipt.restockOriginal!.buyingStoreId ||
+        _goodsFingerprint(r) != result.fingerprint) { throw const FormatException('Receiving command changed.'); }
+    return result;
+  }
+}
+
+class WorkspaceGoodsReceivingRead {
+  const WorkspaceGoodsReceivingRead._(this.original, this.group);
+  factory WorkspaceGoodsReceivingRead.fromResult(WorkspaceGoodsArrivalResult result) =>
+    WorkspaceGoodsReceivingRead._(result.command.receipt.restockOriginal!, result.group);
+  final WorkspaceRestockPurchaseOriginal original;
+  final WorkspaceGoodsReceivingGroup? group;
+}
+
+/// Cumulative quantities are bounded by the ordered amount, not one arrival's
+/// Stock delta. Goods can have been sold between two physical arrivals.
+class WorkspaceGoodsReceivingLine {
+  WorkspaceGoodsReceivingLine._(Map<String, dynamic> line, Map<String, dynamic> mapping)
+    : sourceLineId = line['lineId'] as String, deliveredMilli = line['deliveredMilli'] as int,
+      acceptedMilli = line['acceptedMilli'] as int, damagedMilli = line['damagedMilli'] as int,
+      productId = mapping['productId'] as String, productLabel = mapping['productLabel'] as String,
+      purchaseUnit = mapping['purchaseUnit'] as String, stockUnit = mapping['stockUnit'] as String,
+      unitsPerPack = mapping['unitsPerPack'] as int, expectedMilli = mapping['expectedMilli'] as int;
+  final String sourceLineId, productId, productLabel, purchaseUnit, stockUnit;
+  final int deliveredMilli, acceptedMilli, damagedMilli, unitsPerPack, expectedMilli;
+  int get acceptedStockUnits => acceptedMilli * unitsPerPack ~/ 1000;
+  Object get mappingIdentity => (productId, productLabel, purchaseUnit, stockUnit, unitsPerPack, expectedMilli);
+  static WorkspaceGoodsReceivingLine _decode(Object? raw) {
+    final line = _exactMap(raw, const ['lineId', 'deliveredMilli', 'acceptedMilli', 'damagedMilli', 'mapping']);
+    final mapping = _exactMap(line['mapping'], const ['productId', 'productLabel', 'purchaseUnit', 'stockUnit', 'unitsPerPack', 'expectedMilli']);
+    if (!_id(line['lineId']) || !['productId', 'productLabel', 'purchaseUnit', 'stockUnit'].every((key) =>
+        mapping[key] is String && _goodsText(mapping[key] as String)) ||
+        !_goodsInt(line['deliveredMilli'], min: 1) || !_goodsInt(line['acceptedMilli']) || !_goodsInt(line['damagedMilli']) ||
+        !_goodsInt(mapping['expectedMilli'], min: 1) || !_goodsInt(mapping['unitsPerPack'], min: 1, max: 1000000)) {
+      throw const FormatException('Receiving totals changed.');
+    }
+    final result = WorkspaceGoodsReceivingLine._(line, mapping);
+    if (result.deliveredMilli != result.acceptedMilli + result.damagedMilli || result.deliveredMilli > result.expectedMilli ||
+        result.acceptedMilli * result.unitsPerPack % 1000 != 0) { throw const FormatException('Receiving totals changed.'); }
+    return result;
+  }
+}
+
+/// Server cumulative physical reports; not current on-hand or sellable Stock.
+class WorkspaceGoodsReceivingGroup {
+  WorkspaceGoodsReceivingGroup._(this.original, this.supplierId, this.revision, List<WorkspaceGoodsReceivingLine> lines,
+    this._bytes) : lines = List.unmodifiable(lines);
+  final WorkspaceRestockPurchaseOriginal original;
+  final String supplierId, _bytes;
+  final int revision;
+  final List<WorkspaceGoodsReceivingLine> lines;
+  Map<String, Object?> toJson() => Map<String, Object?>.from(jsonDecode(_bytes) as Map);
+  static WorkspaceGoodsReceivingGroup _decode(Object? raw, WorkspaceRestockPurchaseOriginal original) {
+    final r = _goodsChecked(raw, const ['schemaVersion', 'realm', 'buyingStoreId', 'groupId', 'source', 'supplierId', 'revision', 'lines']);
+    if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['realm'] != original.realm ||
+        r['buyingStoreId'] != original.buyingStoreId || r['groupId'] != original.deliveryGroupId ||
+        _goodsFingerprint(r['source']) != _goodsFingerprint(original.toJson()) || r['supplierId'] is! String ||
+        !_goodsText(r['supplierId'] as String) || !_goodsInt(r['revision'], min: 1, max: 9007199254740991) ||
+        r['lines'] is! List || (r['lines'] as List).isEmpty || (r['lines'] as List).length > 100) {
+      throw const FormatException('Receiving group changed.');
+    }
+    final lines = <WorkspaceGoodsReceivingLine>[];
+    for (final rawLine in r['lines'] as List) {
+      final line = WorkspaceGoodsReceivingLine._decode(rawLine);
+      final expected = original.lines[line.sourceLineId];
+      if (expected == null || expected.quantityMilli != line.expectedMilli || expected.quantityUnit != line.purchaseUnit ||
+          ![line.productId, line.productLabel, line.purchaseUnit, line.stockUnit].every(_goodsText) ||
+          lines.any((previous) => previous.sourceLineId == line.sourceLineId)) { throw const FormatException('Receiving line changed.'); }
+      lines.add(line);
+    }
+    return WorkspaceGoodsReceivingGroup._(original, r['supplierId'] as String, r['revision'] as int, lines, jsonEncode(r));
+  }
+  bool includes(WorkspaceGoodsArrivalCommand command) => supplierId == command.supplierId &&
+    _goodsFingerprint(original.toJson()) == _goodsFingerprint(command.receipt.restockOriginal!.toJson()) &&
+    command.receipt.lines.every((line) => lines.any((total) => total.sourceLineId == line.sourceLineId &&
+      total.mappingIdentity == line.mappingIdentity && total.deliveredMilli >= line.deliveredMilli &&
+      total.acceptedMilli >= line.acceptedMilli && total.damagedMilli >= line.damagedMilli));
+}
+
+class WorkspaceGoodsArrivalProof {
+  WorkspaceGoodsArrivalProof._(this.command, this.groupRevision, this.recordedAt, this.integrity, this._bytes);
+  final WorkspaceGoodsArrivalCommand command;
+  final int groupRevision;
+  final DateTime recordedAt;
+  final String integrity, _bytes;
+  Map<String, Object?> toJson() => Map<String, Object?>.from(jsonDecode(_bytes) as Map);
+  static WorkspaceGoodsArrivalProof _decode(Object? raw, WorkspaceGoodsArrivalCommand command, WorkspaceGoodsReceivingGroup group) {
+    final r = _goodsChecked(raw, const ['schemaVersion', 'realm', 'buyingStoreId', 'operationId', 'report', 'supplierId',
+      'receipt', 'commandFingerprint', 'receiptFingerprint', 'groupRevision', 'recordedAt']);
+    final original = command.receipt.restockOriginal!;
+    if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['realm'] != original.realm ||
+        r['buyingStoreId'] != original.buyingStoreId || r['operationId'] != command.receipt.id || r['report'] != 'owner_reported' ||
+        r['supplierId'] != command.supplierId || r['commandFingerprint'] != command.fingerprint ||
+        r['receiptFingerprint'] != command.receiptFingerprint || _goodsFingerprint(r['receipt']) != command.receiptFingerprint ||
+        !_goodsInt(r['groupRevision'], min: 1, max: group.revision) || !group.includes(command) || r['recordedAt'] is! String) {
+      throw const FormatException('Receiving proof changed.');
+    }
+    final recordedAt = DateTime.parse(r['recordedAt'] as String);
+    if (recordedAt.toUtc().toIso8601String() != r['recordedAt']) throw const FormatException('Receiving proof date changed.');
+    return WorkspaceGoodsArrivalProof._(command, r['groupRevision'] as int, recordedAt, r['integrity'] as String, jsonEncode(r));
+  }
+}
+
+/// A server fence closes one immutable receiving attempt; it never reverses
+/// goods, changes Stock, cancels the purchase or authorises a financial refund.
+class WorkspaceGoodsArrivalClosure {
+  WorkspaceGoodsArrivalClosure._(this.command, this.closedAt, this.integrity, this._bytes);
+  final WorkspaceGoodsArrivalCommand command;
+  final DateTime closedAt;
+  final String integrity, _bytes;
+  Map<String, Object?> toJson() => Map<String, Object?>.from(jsonDecode(_bytes) as Map);
+  static WorkspaceGoodsArrivalClosure _decode(Object? raw, WorkspaceGoodsArrivalCommand command) {
+    final r = _goodsChecked(raw, const ['schemaVersion', 'realm', 'buyingStoreId', 'operationId', 'report', 'supplierId',
+      'receipt', 'commandFingerprint', 'receiptFingerprint', 'outcome', 'closedAt']);
+    final original = command.receipt.restockOriginal!;
+    if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['realm'] != original.realm ||
+        r['buyingStoreId'] != original.buyingStoreId || r['operationId'] != command.receipt.id ||
+        r['report'] != 'owner_reported' || r['supplierId'] != command.supplierId || r['outcome'] != 'closed' ||
+        r['commandFingerprint'] != command.fingerprint || r['receiptFingerprint'] != command.receiptFingerprint ||
+        _goodsFingerprint(r['receipt']) != command.receiptFingerprint || r['closedAt'] is! String) {
+      throw const FormatException('Receiving closure changed.');
+    }
+    final closedAt = DateTime.parse(r['closedAt'] as String);
+    if (closedAt.toUtc().toIso8601String() != r['closedAt']) throw const FormatException('Receiving closure date changed.');
+    return WorkspaceGoodsArrivalClosure._(command, closedAt, r['integrity'] as String, jsonEncode(r));
+  }
+}
+
+class WorkspaceGoodsArrivalResult {
+  const WorkspaceGoodsArrivalResult._(this.command, this.proof, this.group, [this.closure]);
+  final WorkspaceGoodsArrivalCommand command;
+  final WorkspaceGoodsArrivalProof? proof;
+  final WorkspaceGoodsReceivingGroup? group;
+  final WorkspaceGoodsArrivalClosure? closure;
+  bool get recorded => proof != null;
+  bool get closed => closure != null;
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'realm': command.receipt.restockOriginal!.realm,
+    'viewerUserId': command.receipt.restockOriginal!.accountScope, 'buyingStoreId': command.receipt.restockOriginal!.buyingStoreId,
+    'state': recorded ? 'recorded' : closed ? 'closed' : 'not_found',
+    'proof': proof?.toJson() ?? closure?.toJson(), 'group': group?.toJson()};
+  static WorkspaceGoodsArrivalResult fromJson(Object? raw, WorkspaceGoodsArrivalCommand command) {
+    final original = command.receipt.restockOriginal!;
+    final r = _exactMap(raw, const ['schemaVersion', 'realm', 'viewerUserId', 'buyingStoreId', 'state', 'proof', 'group']);
+    _goodsScope(r, original);
+    final group = r['group'] == null ? null : WorkspaceGoodsReceivingGroup._decode(r['group'], original);
+    if (r['state'] == 'not_found' && r['proof'] == null) return WorkspaceGoodsArrivalResult._(command, null, group);
+    if (r['state'] == 'closed') {
+      return WorkspaceGoodsArrivalResult._(command, null, group, WorkspaceGoodsArrivalClosure._decode(r['proof'], command));
+    }
+    if (r['state'] != 'recorded' || group == null) throw const FormatException('Receiving result needs recovery.');
+    return WorkspaceGoodsArrivalResult._(command, WorkspaceGoodsArrivalProof._decode(r['proof'], command, group), group);
+  }
 }
 
 /// Explicit configuration only. Review/guest/unsupported tenants never acquire
