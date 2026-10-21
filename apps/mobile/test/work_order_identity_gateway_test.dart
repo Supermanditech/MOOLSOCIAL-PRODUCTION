@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/work/work_order_identity_gateway.dart';
 import 'package:moolsocial/features/work/work_customer_feedback.dart';
 import 'package:moolsocial/features/work/work_models.dart';
+import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -19,6 +21,60 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/features/work/widgets/workspace_purchase_originals.dart';
 
 // Isolated contract fixtures; no native storage, real order or provider calls.
+class DeviceSourceFixture extends ChangeNotifier implements WorkspacePurchasedUnitSource {
+  DeviceSourceFixture({this.accountUserId = 'owner-1'});
+  @override final String accountUserId;
+  @override bool isCurrent = true;
+  @override Object? lifetime = Object();
+  bool owner = true, complete = true;
+  int revision = 0;
+  DateTime expiresAt = DateTime.now().toUtc().add(const Duration(minutes: 5));
+  List<WorkspacePurchasedUnitRow> rows = [];
+  final requests = <WorkspacePurchasedLineTarget>[];
+  final _grants = <WorkspacePurchasedUnitOwnerAccess>{};
+  FutureOr<WorkspacePurchasedUnitsRead?> Function(WorkspacePurchasedLineTarget)? respond;
+  @override bool ownerAccessCurrent(WorkspacePurchasedUnitOwnerAccess access) => isCurrent && owner &&
+    _grants.contains(access) && access.ownerAccountId == accountUserId && access.expiresAt == expiresAt;
+  @override Future<WorkspacePurchasedUnitsRead?> read(WorkspacePurchasedLineTarget target) async {
+    requests.add(target);
+    if (respond != null) return await respond!(target);
+    final access = owner && target.role == WorkspaceOrderIdentityRole.seller ? WorkspacePurchasedUnitOwnerAccess(
+      ownerAccountId: accountUserId, storeId: target.reference.storeId, targetBinding: target.binding, expiresAt: expiresAt) : null;
+    if (access != null) _grants.add(access);
+    return WorkspacePurchasedUnitsRead(target: target, revision: revision, rows: rows, complete: complete,
+      observedAt: DateTime.utc(2026, 10, 1), ownerAccess: access);
+  }
+  void revokeOwner() { owner = false; notifyListeners(); }
+  void rotateLifetime() { lifetime = Object(); _grants.clear(); notifyListeners(); }
+}
+
+class DeviceDraftFixture implements WorkPurchasedUnitDraftStore {
+  WorkspacePurchasedUnitDraft? saved;
+  bool failNextSave = false;
+  Completer<void>? holdNextSave;
+  int reads = 0;
+  final writes = <WorkspacePurchasedUnitDraft>[];
+  @override Future<WorkspacePurchasedUnitDraft?> read(WorkspacePurchasedUnitDraftKey key) async { reads++; return saved; }
+  @override Future<void> save(WorkspacePurchasedUnitDraft draft, {required int? expectedRevision}) async {
+    final held = holdNextSave; holdNextSave = null; await held?.future;
+    if (failNextSave) { failNextSave = false; throw StateError('HOST private save unavailable'); }
+    if (saved?.revision != expectedRevision) throw StateError('HOST private conflict');
+    saved = draft; writes.add(draft);
+  }
+}
+
+class DeviceNativeStorageFixture extends FlutterSecureStorage {
+  final values = <String, String>{};
+  final writes = <String>[];
+  Completer<void>? holdNextWrite;
+  @override Future<String?> read({required String key, AppleOptions? iOptions, AndroidOptions? aOptions,
+    LinuxOptions? lOptions, WebOptions? webOptions, AppleOptions? mOptions, WindowsOptions? wOptions}) async => values[key];
+  @override Future<void> write({required String key, required String? value, AppleOptions? iOptions, AndroidOptions? aOptions,
+    LinuxOptions? lOptions, WebOptions? webOptions, AppleOptions? mOptions, WindowsOptions? wOptions}) async {
+    final held = holdNextWrite; holdNextWrite = null; writes.add(value!); await held?.future; values[key] = value;
+  }
+}
+
 class WarrantyReaderFixture implements WorkspacePurchasedWarrantyReader {
   WarrantyReaderFixture({this.accountUserId = 'buyer-1'});
   @override final String accountUserId;
@@ -291,6 +347,271 @@ Map<String, dynamic> restockClosureResponse(WorkspaceGoodsArrivalCommand command
 }
 
 void main() {
+  testWidgets('PF08 DEVICE original device details are unavailable without a private source', (tester) async {
+    final data = purchaseResponse(), refs = referenceResponse(), order = data['orders'][0];
+    final wire = Transport()..respond = (body) => switch (body['operation']) {
+      'listBuyerPurchaseReferences' => refs, 'readBuyerPurchaseProjection' => data,
+      _ => throw StateError('No unit or mutation service in isolated host fixture'),
+    };
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchaseOriginals(
+      gateway: projectionGateway(wire), role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation')))));
+    await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('original-order-${order['orderId']}'))); await tester.pumpAndSettle();
+    final device = find.text('Device details'); expect(device, findsOneWidget);
+    await tester.ensureVisible(device); await tester.tap(device); await tester.pumpAndSettle();
+    expect(find.text('Device details for this purchase are unavailable.'), findsOneWidget);
+    expect(find.text('Add device'), findsNothing); expect(find.byType(TextField), findsNothing);
+    expect(wire.requests, hasLength(2));
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('PF08 DEVICE owner manually enters actual devices and restores private draft scale=$scale', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DeviceSourceFixture();
+      final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+      final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+      final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+      final originalBytes = jsonEncode(line.toJson());
+      Widget host() => MaterialApp(home: MediaQuery(data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+        child: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(gateway: gateway,
+          role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference, line: line)))));
+      Future<void> tapText(String text) async {
+        final control = find.text(text); await tester.ensureVisible(control); await tester.pumpAndSettle();
+        await tester.tap(control); await tester.pumpAndSettle();
+      }
+      await tester.pumpWidget(host()); await tester.pumpAndSettle();
+      await tapText('Device details'); await tapText('Prepare device details');
+      expect(find.byType(TextFormField), findsNothing, reason: 'Original pack quantity must never generate device rows.');
+      await tapText('Add device'); expect(find.byType(TextFormField), findsNWidgets(3));
+      for (final (index, value) in [(0, 'HOST-SERIAL-ONE '), (1, '111111111111111'), (2, '222222222222222')]) {
+        final field = find.byType(TextFormField).at(index); await tester.ensureVisible(field); await tester.pumpAndSettle();
+        await tester.enterText(field, value); FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      }
+      await tapText('Add device'); expect(find.byType(TextFormField), findsNWidgets(6));
+      final second = find.byType(TextFormField).at(3); await tester.ensureVisible(second); await tester.pumpAndSettle();
+      await tester.enterText(second, 'HOST-SERIAL-TWO'); FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      expect(find.text('Saved on this device · not shared'), findsOneWidget);
+      expect(source.rows, isEmpty, reason: 'Private draft input is not the published supplier record.');
+      final saved = await const FlutterSecureStorage().readAll(); expect(saved.keys.single, contains('purchased-unit-draft.v1'));
+      final raw = jsonDecode(saved.values.single) as Map;
+      expect(raw['rows'], hasLength(2)); expect(raw['rows'][0]['serial'], 'HOST-SERIAL-ONE ');
+      expect(raw['rows'][0]['imei1'], '111111111111111'); expect(raw['rows'][0]['imei2'], '222222222222222');
+      expect(jsonEncode(line.toJson()), originalBytes);
+      await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+      await tester.pumpWidget(host()); await tester.pumpAndSettle();
+      await tapText('Device details'); await tapText('Prepare device details');
+      expect(find.byType(TextFormField), findsNWidgets(6));
+      expect(tester.widget<TextField>(find.byType(TextField).at(0)).controller!.text, 'HOST-SERIAL-ONE ');
+      expect(tester.widget<TextField>(find.byType(TextField).at(1)).controller!.text, '111111111111111');
+      expect(tester.widget<TextField>(find.byType(TextField).at(2)).controller!.text, '222222222222222');
+      final remove = find.byTooltip('Remove device 1'); await tester.ensureVisible(remove); await tester.pumpAndSettle();
+      await tester.tap(remove); await tester.pumpAndSettle(); expect(find.byType(TextFormField), findsNWidgets(3));
+      final beforeRevocation = await const FlutterSecureStorage().readAll();
+      source.revokeOwner(); await tester.pumpAndSettle();
+      expect(find.byType(TextFormField), findsNothing); expect(find.text('Add device'), findsNothing);
+      expect(await const FlutterSecureStorage().readAll(), beforeRevocation);
+      expect(source.rows, isEmpty); expect(jsonEncode(line.toJson()), originalBytes);
+      expect(wire.requests.every((r) => r['operation'] == 'readStorePurchaseProjection'), isTrue);
+      expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+    });
+  }
+  for (final mode in ['buyer', 'no-owner', 'expired', 'partial']) {
+    testWidgets('PF08 DEVICE $mode cannot edit supplier records or read its private draft', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({'HOST-other-private-key': 'KEEP'});
+      final role = mode == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller;
+      final account = role == WorkspaceOrderIdentityRole.buyer ? 'buyer-1' : 'owner-1';
+      final wire = Transport()..data = purchaseResponse(role: role.name), source = DeviceSourceFixture(accountUserId: account)
+        ..owner = mode != 'no-owner' ..complete = mode != 'partial' ..revision = 1
+        ..rows = [const WorkspacePurchasedUnitRow(id: 'source-unit-1', serial: 'HOST-PUBLISHED-SERIAL')];
+      if (mode == 'expired') source.expiresAt = DateTime.now().toUtc().subtract(const Duration(seconds: 1));
+      final gateway = projectionGateway(wire, account: account, purchasedUnitSource: source);
+      final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: role.name)['references'][0]);
+      final line = (await gateway.readReferencedOrder(role: role, realm: 'evaluation', reference: reference))!.lines.single;
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+        gateway: gateway, role: role, realm: 'evaluation', reference: reference, line: line)))));
+      await tester.tap(find.text('Device details')); await tester.pumpAndSettle();
+      expect(find.text('Serial: HOST-PUBLISHED-SERIAL'), findsOneWidget);
+      expect(find.text('Prepare device details'), findsNothing); expect(find.byType(TextFormField), findsNothing);
+      expect(await const FlutterSecureStorage().readAll(), {'HOST-other-private-key': 'KEEP'});
+      expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+    });
+  }
+
+  testWidgets('PF08 DEVICE recovery shows both copies and retires captured choices', (tester) async {
+    final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DeviceSourceFixture(), drafts = DeviceDraftFixture();
+    final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference, line: line, draftStore: drafts)))));
+    Future<void> tapText(String label) async {
+      await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+      await tester.tap(find.text(label)); await tester.pumpAndSettle();
+    }
+    VoidCallback callback(String label) => tester.widget<TextButton>(find.widgetWithText(TextButton, label)).onPressed!;
+    Future<void> unsaved(String text) async {
+      drafts.failNextSave = true;
+      final field = find.byType(TextFormField).first; await tester.ensureVisible(field); await tester.pumpAndSettle();
+      await tester.enterText(field, text); FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    }
+    await tapText('Device details'); await tapText('Prepare device details'); await tapText('Add device');
+    await unsaved('HOST-KEPT-FIRST'); final oldRecover = callback('Recover private draft');
+    await tapText('Recover private draft');
+    expect(find.text('Your kept edits'), findsOneWidget); expect(find.text('Saved on this device'), findsOneWidget);
+    expect(find.text('Serial: HOST-KEPT-FIRST'), findsOneWidget); expect(find.text('Serial: Not entered'), findsOneWidget);
+    final oldSaved = callback('Use saved draft'), oldKept = callback('Save kept edits');
+    await tapText('Save kept edits'); expect(drafts.saved!.rows.single.serial, 'HOST-KEPT-FIRST');
+    await unsaved('HOST-KEPT-SECOND'); await tapText('Recover private draft');
+    expect(find.text('Serial: HOST-KEPT-SECOND'), findsOneWidget); expect(find.text('Serial: HOST-KEPT-FIRST'), findsOneWidget);
+    final reads = drafts.reads, writes = drafts.writes.length;
+    oldRecover(); oldSaved(); oldKept(); await tester.pumpAndSettle();
+    expect(drafts.reads, reads); expect(drafts.writes, hasLength(writes));
+    expect(find.text('Use saved draft'), findsOneWidget); expect(find.text('Serial: HOST-KEPT-SECOND'), findsOneWidget);
+    final currentRecoverChoice = callback('Save kept edits');
+    await tapText('Device details'); currentRecoverChoice(); oldRecover(); await tester.pumpAndSettle();
+    expect(drafts.reads, reads); expect(drafts.writes, hasLength(writes));
+    await tapText('Device details'); await tapText('Recover private draft'); await tapText('Use saved draft');
+    expect(tester.widget<TextField>(find.byType(TextField).first).controller!.text, 'HOST-KEPT-FIRST');
+    expect(source.rows, isEmpty); expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+
+  testWidgets('PF08 DEVICE notifying lifetime change retires edits and restores only saved copy', (tester) async {
+    final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DeviceSourceFixture(), drafts = DeviceDraftFixture();
+    final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference, line: line, draftStore: drafts)))));
+    Future<void> tapText(String label) async {
+      await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+      await tester.tap(find.text(label)); await tester.pumpAndSettle();
+    }
+    await tapText('Device details'); await tapText('Prepare device details'); await tapText('Add device');
+    final saved = drafts.saved!.toJson(); drafts.failNextSave = true;
+    await tester.enterText(find.byType(TextFormField).first, 'HOST-UNSAVED-OLD-LIFETIME');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    final oldRecover = tester.widget<TextButton>(find.widgetWithText(TextButton, 'Recover private draft')).onPressed!;
+    source.rotateLifetime(); await tester.pumpAndSettle();
+    expect(find.byType(TextFormField), findsNothing); expect(drafts.saved!.toJson(), saved);
+    final reads = drafts.reads; oldRecover(); await tester.pumpAndSettle(); expect(drafts.reads, reads);
+    await tapText('Device details'); await tapText('Prepare device details');
+    expect(find.byType(TextFormField), findsNWidgets(3));
+    expect(tester.widget<TextField>(find.byType(TextField).first).controller!.text, isEmpty);
+    expect(find.textContaining('HOST-UNSAVED-OLD-LIFETIME'), findsNothing);
+    expect(drafts.saved!.toJson(), saved); expect(source.requests, hasLength(2));
+    oldRecover(); await tester.pumpAndSettle(); expect(drafts.reads, reads + 1);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+
+  for (final access in ['current', 'revoked', 'new-lifetime']) {
+  testWidgets('PF08 DEVICE latest accepted typing after disposal respects $access owner access', (tester) async {
+    final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DeviceSourceFixture(), drafts = DeviceDraftFixture();
+    final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+    Widget host() => MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference, line: line, draftStore: drafts))));
+    Future<void> tapText(String label) async {
+      await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+      await tester.tap(find.text(label)); await tester.pumpAndSettle();
+    }
+    await tester.pumpWidget(host()); await tapText('Device details'); await tapText('Prepare device details'); await tapText('Add device');
+    final held = Completer<void>(); drafts.holdNextSave = held;
+    await tester.enterText(find.byType(TextFormField).first, 'H'); await tester.pump();
+    await tester.enterText(find.byType(TextFormField).first, 'HOST-COMPLETE');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    expect(drafts.saved!.rows.single.serial, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+    if (access == 'revoked') source.revokeOwner();
+    if (access == 'new-lifetime') source.rotateLifetime();
+    held.complete(); await tester.pumpAndSettle();
+    final expected = access == 'current' ? 'HOST-COMPLETE' : 'H';
+    expect(drafts.saved!.rows.single.serial, expected);
+    expect(drafts.writes, hasLength(access == 'current' ? 3 : 2), reason: 'Revocation or a new lifetime cannot dispatch the coalesced remainder.');
+    await tester.pumpWidget(host()); await tapText('Device details');
+    if (access == 'revoked') {
+      expect(find.text('Prepare device details'), findsNothing); expect(find.byType(TextFormField), findsNothing);
+    } else {
+      await tapText('Prepare device details');
+      expect(tester.widget<TextField>(find.byType(TextField).first).controller!.text, expected);
+    }
+    expect(source.rows, isEmpty);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+  }
+
+  for (final close in [true, false]) {
+  testWidgets('PF08 DEVICE actual native settlement preserves latest edits beyond UI deadline close=$close', (tester) async {
+    final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DeviceSourceFixture(), native = DeviceNativeStorageFixture();
+    final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+    final target = WorkspacePurchasedLineTarget(accountUserId: 'owner-1', role: WorkspaceOrderIdentityRole.seller,
+      realm: 'evaluation', reference: reference, line: line);
+    final key = WorkspacePurchasedUnitDraftKey(account: 'owner-1', realm: 'evaluation', store: reference.storeId, binding: target.binding);
+    final store = SecureWorkPurchasedUnitDraftStore(accountScope: () => 'owner-1', targetScope: () => key.identity, storage: native);
+    Widget host() => MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference, line: line, draftStore: store))));
+    Future<void> tapText(String label) async {
+      await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+      await tester.tap(find.text(label)); await tester.pumpAndSettle();
+    }
+    await tester.pumpWidget(host()); await tapText('Device details'); await tapText('Prepare device details'); await tapText('Add device');
+    final held = Completer<void>(); native.holdNextWrite = held;
+    await tester.enterText(find.byType(TextFormField).first, 'H'); await tester.pump();
+    await tester.enterText(find.byType(TextFormField).first, 'HOST-COMPLETE');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    if (close) await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 11)); await tester.pumpAndSettle();
+    if (!close) {
+      expect(find.text('Private draft save is still pending. Your edits are kept while the saved result is checked.'), findsOneWidget);
+      expect(tester.widget<TextFormField>(find.byType(TextFormField).first).enabled, isFalse);
+      expect(find.text('Saved on this device · not shared'), findsNothing);
+    }
+    expect(native.writes, hasLength(2)); held.complete(); await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpWidget(host());
+    await tapText('Device details'); await tapText('Prepare device details');
+    expect(tester.widget<TextField>(find.byType(TextField).first).controller!.text, 'HOST-COMPLETE');
+    expect((await store.read(key))!.rows.single.serial, 'HOST-COMPLETE'); expect(native.writes, hasLength(3));
+    expect(source.rows, isEmpty); expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+  }
+
+  testWidgets('PF08 DEVICE foreign draft is never displayed or overwritten', (tester) async {
+    final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DeviceSourceFixture(), drafts = DeviceDraftFixture();
+    final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+    drafts.saved = WorkspacePurchasedUnitDraft(key: WorkspacePurchasedUnitDraftKey(account: 'outside-owner', realm: 'evaluation',
+      store: 'outside-store', binding: 'b' * 64), revision: 1, publishedRevision: 0,
+      rows: const [WorkspacePurchasedUnitRow(id: 'foreign-row', serial: 'HOST-PRIVATE-OUTSIDE')]);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference, line: line, draftStore: drafts)))));
+    await tester.tap(find.text('Device details')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Prepare device details')); await tester.pumpAndSettle();
+    expect(find.textContaining('HOST-PRIVATE-OUTSIDE'), findsNothing); expect(find.byType(TextFormField), findsNothing);
+    expect(find.text('Recover private draft'), findsOneWidget); expect(drafts.writes, isEmpty);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+
+  testWidgets('PF08 DEVICE partial empty source does not claim confirmed absence', (tester) async {
+    final wire = Transport()..data = purchaseResponse(), source = DeviceSourceFixture(accountUserId: 'buyer-1')..complete = false;
+    final gateway = projectionGateway(wire, purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse()['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference))!.lines.single;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference, line: line)))));
+    await tester.tap(find.text('Device details')); await tester.pumpAndSettle();
+    expect(find.text('No device identifiers were returned in this partial view.'), findsOneWidget);
+    expect(find.text('No device identifiers were supplied for this purchase.'), findsNothing);
+    expect(find.text('Prepare device details'), findsNothing); expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+
   testWidgets('PF07 WARRANTY original line opens unavailable details without a service', (tester) async {
     final data = purchaseResponse(), refs = referenceResponse(), order = data['orders'][0];
     final wire = Transport()..respond = (body) => switch (body['operation']) {
@@ -3339,6 +3660,7 @@ AuthenticatedWorkspaceOrderIdentityGateway projectionGateway(
   String account = 'buyer-1',
   Object? Function()? lifetime,
   WorkspacePurchasedWarrantyReader? purchasedWarrantyReader,
+  WorkspacePurchasedUnitSource? purchasedUnitSource,
 }) => AuthenticatedWorkspaceOrderIdentityGateway(
   endpoint: Uri.parse(
     'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace',
@@ -3348,6 +3670,7 @@ AuthenticatedWorkspaceOrderIdentityGateway projectionGateway(
   credentials: Credentials(),
   transport: wire,
   purchasedWarrantyReader: purchasedWarrantyReader,
+  purchasedUnitSource: purchasedUnitSource,
 );
 
 WorkspacePurchaseReference operationalReference() {

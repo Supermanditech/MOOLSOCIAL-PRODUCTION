@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/rendering.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:flutter/services.dart' show FontLoader, rootBundle;
@@ -521,7 +522,7 @@ void main() {
   }
   for (final scenario in [(1.0, 'delivery'), (2.0, 'delivery'), (1.0, 'collection'), (1.0, 'attribution'), (2.0, 'attribution'), (1.0, 'variant'), (2.0, 'variant'), (1.0, 'scheduled'), (2.0, 'scheduled'),
     (1.0, 'context'), (2.0, 'context'), (1.0, 'context-partial'), (2.0, 'context-partial'),
-    (1.0, 'gst'), (2.0, 'gst'), (1.0, 'gst-unknown'), (2.0, 'gst-unknown')]) {
+    (1.0, 'gst'), (2.0, 'gst'), (1.0, 'gst-unknown'), (2.0, 'gst-unknown'), (1.0, 'devices'), (2.0, 'devices')]) {
   testWidgets('configured Store feed supports exact facts ${scenario.$2} scale ${scenario.$1}', (tester) async {
     await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
     tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
@@ -530,6 +531,12 @@ void main() {
       : scenario.$2 == 'variant' ? fixtures.variantOperationalResponse(role: 'seller')
       : scenario.$2 == 'attribution' ? fixtures.attributedOperationalResponse(role: 'seller')
       : fixtures.operationalResponse(role: 'seller');
+    final devices = scenario.$2 == 'devices' ? fixtures.DeviceSourceFixture() : null;
+    final deviceOriginal = devices == null ? null : fixtures.purchaseResponse(role: 'seller');
+    if (devices != null) {
+      FlutterSecureStorage.setMockInitialValues({});
+      addTearDown(devices.dispose);
+    }
     if (scenario.$2.startsWith('context')) {
       final facts = fixtures.fulfilmentPurchaseResponse(role: 'seller'), original = facts['orders'][0];
       if (scenario.$2 == 'context-partial') {
@@ -552,6 +559,7 @@ void main() {
     raw['fulfilmentDeadline'] = now.add(const Duration(hours: 2)).toIso8601String();
     final wire = fixtures.Transport();
     wire.respond = (body) {
+      if (devices != null && body['operation'] == 'readStorePurchaseProjection') return deviceOriginal!;
       if (body['operation'] == 'listStorePurchaseReferences') {
         final refs = fixtures.referenceResponse(role: 'seller')..['storeId'] = 'store-one';
         refs['references'][0]['originalFingerprint'] = raw['originalFingerprint'];
@@ -573,7 +581,7 @@ void main() {
       ..workspaceId = 'store-one'
       ..retailerSetupSaved = true
       ..reviewStage = WorkReviewStage.live;
-    work.bindOriginalPurchaseReader(fixtures.projectionGateway(wire, account: 'owner-1'), 'evaluation');
+    work.bindOriginalPurchaseReader(fixtures.projectionGateway(wire, account: 'owner-1', purchasedUnitSource: devices), 'evaluation');
     final procurement = BuyV2Session(core: BuySession(), reviewDataEnabled: false);
     final router = GoRouter(initialLocation: '/app/work/workspace/dashboard', routes: [
       GoRoute(path: '/app/work/workspace/dashboard', builder: (context, state) => WorkWorkspaceDashboardScreen(
@@ -587,7 +595,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('work-operational-order-order-v2')), findsOneWidget);
     expect(find.text('Saved online orders · partial coverage'), findsOneWidget);
-    if (scenario.$2 == 'delivery') {
+    if (devices != null) {
+      Future<void> tapText(String label) async {
+        await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+        await tester.tap(find.text(label)); await tester.pumpAndSettle();
+      }
+      await tester.ensureVisible(find.byKey(const Key('work-operational-accept-order-v2')));
+      await tester.tap(find.byKey(const Key('work-operational-accept-order-v2'))); await tester.pumpAndSettle();
+      expect(work.workspaceOrders.single.stage, 'Preparing');
+      await tapText('Device details'); await tapText('Prepare device details'); await tapText('Add device');
+      expect(find.byType(TextFormField), findsNWidgets(3));
+      expect(devices.requests, hasLength(1)); expect(devices.requests.single.role, WorkspaceOrderIdentityRole.seller);
+      expect(devices.requests.single.reference.storeId, 'store-one');
+      expect(find.text('Saved on this device · not shared'), findsOneWidget);
+      expect(devices.rows, isEmpty); expect(work.workspacePackingComplete, isFalse);
+      final native = await const FlutterSecureStorage().readAll();
+      expect(native.keys.single, contains('purchased-unit-draft.v1'));
+      final oldAdd = tester.widget<TextButton>(find.widgetWithText(TextButton, 'Add device')).onPressed!;
+      final oldField = tester.widget<TextFormField>(find.byType(TextFormField).first).onChanged!;
+      work.bindOriginalPurchaseReader(null, 'evaluation');
+      oldAdd(); oldField('HOST-RETIRED-PACKING'); await tester.pumpAndSettle();
+      expect(await const FlutterSecureStorage().readAll(), native); expect(devices.requests, hasLength(1));
+      expect(find.byType(TextFormField), findsNothing); expect(devices.rows, isEmpty);
+      expect(work.workspaceInvoices, isEmpty); expect(work.workspaceStockMovements, isEmpty);
+      expect(journal.entries, isEmpty); expect(tester.takeException(), isNull);
+      return;
+    } else if (scenario.$2 == 'delivery') {
     await tester.ensureVisible(find.byKey(const Key('work-operational-accept-order-v2')));
     await tester.tap(find.byKey(const Key('work-operational-accept-order-v2'))); await tester.pumpAndSettle();
     expect(work.workspaceOrders.single.stage, 'Preparing');

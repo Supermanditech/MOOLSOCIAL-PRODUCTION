@@ -255,6 +255,7 @@ class WorkProcurementController extends ChangeNotifier {
     return AuthenticatedWorkspaceOrderIdentityGateway(endpoint: source.endpoint,
       accountUserId: context.accountId, credentials: source.credentials, transport: source.transport,
       purchasedWarrantyReader: source.purchasedWarrantyReader,
+      purchasedUnitSource: source.purchasedUnitSource,
       lifetime: () => lifetime == _catalogueLifetime && scopeCurrent && source.isCurrent &&
         identical(originalPurchaseReader?.call(), source) && originalPurchaseRealm?.call() == realm &&
         _identity.value?.customerStateOwnerScope == context.customerStateOwnerScope ? token : null);
@@ -1152,6 +1153,11 @@ abstract interface class WorkIssueDraftStore {
   Future<void> save(WorkspaceIssueDraft draft);
 }
 
+abstract interface class WorkPurchasedUnitDraftStore {
+  Future<WorkspacePurchasedUnitDraft?> read(WorkspacePurchasedUnitDraftKey key);
+  Future<void> save(WorkspacePurchasedUnitDraft draft, {required int? expectedRevision});
+}
+
 abstract interface class WorkLedgerFormDraftStore {
   Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key);
   Future<void> save(
@@ -1663,6 +1669,67 @@ class SecureWorkIssueDraftStore implements WorkIssueDraftStore {
         'Sign in again to check your saved response.',
       );
     }
+  }
+}
+
+/// Private device drafts have their own encrypted namespace, never a financial
+/// ledger, published supplier record, buyer report or original-order payload.
+class SecureWorkPurchasedUnitDraftStore implements WorkPurchasedUnitDraftStore {
+  SecureWorkPurchasedUnitDraftStore({required this.accountScope, required this.targetScope, FlutterSecureStorage? storage})
+    : _storage = storage ?? const FlutterSecureStorage();
+  final String? Function() accountScope, targetScope;
+  final FlutterSecureStorage _storage;
+  static final _tails = <String, Future<void>>{};
+  String _key(WorkspacePurchasedUnitDraftKey key) => 'moolsocial.workspace.purchased-unit-draft.v1.'
+    '${[key.account, key.realm, key.store, key.binding].map(Uri.encodeComponent).join('/')}';
+  void _check(WorkspacePurchasedUnitDraftKey key) {
+    if (!key.valid || key.account != accountScope() || key.identity != targetScope()) {
+      throw const WorkGatewayException('Device draft access has changed. Your saved draft is kept.');
+    }
+  }
+  Future<T> _serial<T>(String key, Future<T> Function() action) {
+    final result = (_tails[key] ?? Future<void>.value()).then((_) => action());
+    final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _tails[key] = tail;
+    unawaited(tail.then((_) { if (identical(_tails[key], tail)) _tails.remove(key); }));
+    return result;
+  }
+  Future<WorkspacePurchasedUnitDraft?> _read(WorkspacePurchasedUnitDraftKey key) async {
+    _check(key);
+    final raw = await _storage.read(key: _key(key)).timeout(const Duration(seconds: 10));
+    _check(key);
+    if (raw == null) return null;
+    try {
+      if (utf8.encode(raw).length > 1024 * 1024) throw const FormatException();
+      final draft = WorkspacePurchasedUnitDraft.fromJson(jsonDecode(raw));
+      if (draft.key.identity != key.identity) throw const FormatException();
+      return draft;
+    } on Object {
+      throw const WorkGatewayException('Saved device draft needs recovery. Its data has been kept unchanged.');
+    }
+  }
+  @override Future<WorkspacePurchasedUnitDraft?> read(WorkspacePurchasedUnitDraftKey key) =>
+    _serial(_key(key), () => _read(key)).timeout(const Duration(seconds: 10));
+  @override Future<void> save(WorkspacePurchasedUnitDraft draft, {required int? expectedRevision}) {
+    final bytes = jsonEncode(draft.toJson());
+    if (utf8.encode(bytes).length > 1024 * 1024) {
+      return Future<void>.error(const WorkGatewayException('Device draft is too large to save. Your previous saved draft is kept.'));
+    }
+    final frozen = WorkspacePurchasedUnitDraft.fromJson(jsonDecode(bytes));
+    return _serial(_key(frozen.key), () async {
+      _check(frozen.key);
+      final previous = await _read(frozen.key);
+      if (previous != null && jsonEncode(previous.toJson()) == bytes) return;
+      if (previous?.revision != expectedRevision || frozen.revision != (expectedRevision ?? 0) + 1) {
+        throw const WorkGatewayException('Your device draft changed. Recover the saved draft before editing.');
+      }
+      _check(frozen.key);
+      // Completion means actual native settlement. The editor bounds its UI
+      // waiting separately so accepted coalesced edits can finish after exit.
+      // Recovery cannot overtake an uncertain write and then overwrite it.
+      await _storage.write(key: _key(frozen.key), value: bytes);
+      _check(frozen.key);
+    });
   }
 }
 

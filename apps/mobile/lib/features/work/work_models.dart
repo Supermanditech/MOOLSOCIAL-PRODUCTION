@@ -218,6 +218,73 @@ enum WorkspaceIssueResponse {
   };
 }
 
+/// One actual device. IDs are opaque printed values, not verified identities.
+/// Draft row IDs are local UI identities; published IDs must come from the source.
+class WorkspacePurchasedUnitRow {
+  const WorkspacePurchasedUnitRow({required this.id, this.serial = '', this.imei1 = '', this.imei2 = ''});
+  final String id, serial, imei1, imei2;
+  bool get validDraft => id.isNotEmpty && id == id.trim() && id.length <= 120 &&
+    [id, serial, imei1, imei2].every((v) => v.length <= 240 && !RegExp(r'[\x00-\x1f\x7f]').hasMatch(v));
+  bool get ready => validDraft && [serial, imei1, imei2].any((v) => v.isNotEmpty) &&
+    [serial, imei1, imei2].every((v) => v == v.trim());
+  List<String> get labels => [if (serial.isNotEmpty) 'Serial: $serial', if (imei1.isNotEmpty) 'IMEI 1: $imei1', if (imei2.isNotEmpty) 'IMEI 2: $imei2'];
+  Map<String, Object?> toJson() => {'id': id, 'serial': serial, 'imei1': imei1, 'imei2': imei2};
+  static WorkspacePurchasedUnitRow fromJson(Object? raw) {
+    const keys = {'id', 'serial', 'imei1', 'imei2'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) || !raw.values.every((v) => v is String)) {
+      throw const FormatException('Device draft needs recovery.');
+    }
+    final row = WorkspacePurchasedUnitRow(id: raw['id'], serial: raw['serial'], imei1: raw['imei1'], imei2: raw['imei2']);
+    if (!row.validDraft) throw const FormatException('Device draft needs recovery.');
+    return row;
+  }
+}
+
+/// [binding] includes the complete immutable purchase reference, line and actor.
+/// It is not a Store-owner grant, stock allocation or public catalogue identity.
+class WorkspacePurchasedUnitDraftKey {
+  const WorkspacePurchasedUnitDraftKey({required this.account, required this.realm, required this.store, required this.binding});
+  final String account, realm, store, binding;
+  bool get valid => [account, store].every((v) => v.isNotEmpty && v == v.trim() && v.length <= 240 &&
+    !RegExp(r'[\x00-\x1f\x7f]').hasMatch(v)) && const ['evaluation', 'production'].contains(realm) && RegExp(r'^[a-f0-9]{64}$').hasMatch(binding);
+  String get identity => jsonEncode([account, realm, store, binding]);
+  Map<String, Object?> toJson() => {'account': account, 'realm': realm, 'store': store, 'binding': binding};
+  static WorkspacePurchasedUnitDraftKey fromJson(Object? raw) {
+    const keys = {'account', 'realm', 'store', 'binding'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) || !raw.values.every((v) => v is String)) {
+      throw const FormatException('Device draft scope needs recovery.');
+    }
+    final key = WorkspacePurchasedUnitDraftKey(account: raw['account'], realm: raw['realm'], store: raw['store'], binding: raw['binding']);
+    if (!key.valid) throw const FormatException('Device draft scope needs recovery.');
+    return key;
+  }
+}
+
+/// Private unsent input. Partial identifiers are retained without making them
+/// published supplier facts or rewriting the purchased original.
+class WorkspacePurchasedUnitDraft {
+  WorkspacePurchasedUnitDraft({required this.key, required this.revision, required this.publishedRevision,
+    required List<WorkspacePurchasedUnitRow> rows}) : rows = List.unmodifiable(rows);
+  final WorkspacePurchasedUnitDraftKey key;
+  final int revision, publishedRevision;
+  final List<WorkspacePurchasedUnitRow> rows;
+  bool get valid => key.valid && revision > 0 && revision <= 2147483647 && publishedRevision >= 0 &&
+    publishedRevision <= 2147483647 && rows.length <= 1000 && rows.every((r) => r.validDraft) && rows.map((r) => r.id).toSet().length == rows.length;
+  Map<String, Object?> toJson() => {'version': 1, 'key': key.toJson(), 'revision': revision,
+    'publishedRevision': publishedRevision, 'rows': rows.map((r) => r.toJson()).toList()};
+  static WorkspacePurchasedUnitDraft fromJson(Object? raw) {
+    const keys = {'version', 'key', 'revision', 'publishedRevision', 'rows'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) || raw['version'] is! int || raw['version'] != 1 ||
+        raw['revision'] is! int || raw['publishedRevision'] is! int || raw['rows'] is! List || (raw['rows'] as List).length > 1000) {
+      throw const FormatException('Device draft needs recovery.');
+    }
+    final draft = WorkspacePurchasedUnitDraft(key: WorkspacePurchasedUnitDraftKey.fromJson(raw['key']), revision: raw['revision'],
+      publishedRevision: raw['publishedRevision'], rows: [for (final r in raw['rows']) WorkspacePurchasedUnitRow.fromJson(r)]);
+    if (!draft.valid) throw const FormatException('Device draft needs recovery.');
+    return draft;
+  }
+}
+
 typedef WorkspaceIssueDraftKey = ({
   String account,
   String store,

@@ -30934,7 +30934,9 @@ class _LiveOrderTicket extends StatelessWidget {
   Widget _operationalTicket(BuildContext context) {
     final exact = order.operational!;
     final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+    final scopeRevision = session.navigationScopeRevision;
     bool current() => context.mounted && storeId == (session.activeWorkspace?.id ?? session.workspaceId) &&
+        scopeRevision == session.navigationScopeRevision &&
         exact.reference.storeId == storeId &&
         exact.viewerUserId == (session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope) &&
         identical(session.workspaceOrders.where((row) => row.id == order.id).firstOrNull?.operational, exact);
@@ -30964,7 +30966,7 @@ class _LiveOrderTicket extends StatelessWidget {
           if (detailed) _ExactOrderInformation(order: order, showItems: lines.isEmpty),
           if (lines.isNotEmpty) ...[
             Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text('$packed/${lines.length} lines packed')),
-            for (final line in lines)
+            for (final line in lines) ...[
               CheckboxListTile(key: Key('work-operational-pack-${line.id}'),
                 contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.trailing,
                 value: line.packed, title: Text('${line.label} · ${line.quantityLabel}'),
@@ -30975,6 +30977,12 @@ class _LiveOrderTicket extends StatelessWidget {
                   session.setWorkspaceOrderPackingLine(storeId: storeId, orderId: order.id,
                     lineId: line.id, quantity: line.quantity, packed: value == true, expectedOperational: exact);
                 }),
+              if (session.originalPurchaseReader case final reader? when reader.isCurrent && reader.accountUserId == exact.viewerUserId)
+                WorkspacePurchasedUnitsForLine(key: ValueKey(('packing-units', exact, reader, scopeRevision, line.id)),
+                  gateway: reader, role: WorkspaceOrderIdentityRole.seller, realm: session.originalPurchaseRealm,
+                  reference: exact.reference, line: originals[line.id]!,
+                  inputCurrent: () => current() && exact.stage == 'Preparing' && session.workspaceOrderOperationState(order.id) == null),
+            ],
           ],
           if (exact.stage == 'Ready') const Text('Delivery confirmation is not connected. Ready does not mean delivered.',
             style: TextStyle(color: MoolColors.muted, fontSize: 12)),

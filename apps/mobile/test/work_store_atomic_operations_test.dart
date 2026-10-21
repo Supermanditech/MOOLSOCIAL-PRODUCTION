@@ -596,6 +596,110 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  group('PF08 DEVICE private draft', () {
+    final key = WorkspacePurchasedUnitDraftKey(account: 'account-A', realm: 'evaluation', store: 'store-A', binding: 'a' * 64);
+    WorkspacePurchasedUnitDraft draft({int revision = 1, String serial = 'HOST-PARTIAL '}) => WorkspacePurchasedUnitDraft(
+      key: key, revision: revision, publishedRevision: 0, rows: [WorkspacePurchasedUnitRow(id: 'local-device-1', serial: serial,
+        imei1: '123', imei2: '456')]);
+    test('partial per-device identifiers survive encrypted restart and strict legacy boundaries', () async {
+      final native = _OrderJournalStorage();
+      SecureWorkPurchasedUnitDraftStore create() => SecureWorkPurchasedUnitDraftStore(accountScope: () => key.account,
+        targetScope: () => key.identity, storage: native);
+      final saved = draft(); expect(saved.rows.single.ready, isFalse); expect(saved.valid, isTrue);
+      await create().save(saved, expectedRevision: null);
+      expect((await create().read(key))!.toJson(), saved.toJson());
+      expect(native.values.keys.single, contains('purchased-unit-draft.v1'));
+      for (final bad in [
+        {...saved.toJson(), 'version': 99}, {...saved.toJson(), 'version': 1.0}, {...saved.toJson(), 'outside': true},
+        {...saved.toJson(), 'rows': [saved.rows.single.toJson(), saved.rows.single.toJson()]},
+        {...saved.toJson(), 'rows': [{...saved.rows.single.toJson(), 'serial': 123}]},
+      ]) {
+        expect(() => WorkspacePurchasedUnitDraft.fromJson(bad), throwsFormatException);
+      }
+    });
+    test('unreadable saved bytes are never replaced by a fresh draft', () async {
+      final native = _OrderJournalStorage();
+      final writer = SecureWorkPurchasedUnitDraftStore(accountScope: () => key.account, targetScope: () => key.identity, storage: native);
+      await writer.save(draft(), expectedRevision: null);
+      final storageKey = native.values.keys.single;
+      final raw = jsonDecode(native.values[storageKey]!) as Map<String, dynamic>..['version'] = 99;
+      native.values[storageKey] = jsonEncode(raw); final before = native.values[storageKey], writes = native.writes.length;
+      expect(writer.read(key), throwsA(isA<WorkGatewayException>()));
+      await expectLater(writer.save(draft(revision: 2), expectedRevision: 1), throwsA(isA<WorkGatewayException>()));
+      expect(native.values[storageKey], before); expect(native.writes.length, writes);
+    });
+    test('oversized multibyte draft cannot replace restorable saved bytes', () async {
+      final native = _OrderJournalStorage();
+      final scoped = SecureWorkPurchasedUnitDraftStore(accountScope: () => key.account, targetScope: () => key.identity, storage: native);
+      await scoped.save(draft(), expectedRevision: null);
+      final before = Map.of(native.values), writes = native.writes.length, printed = '界' * 240;
+      final oversized = WorkspacePurchasedUnitDraft(key: key, revision: 2, publishedRevision: 0,
+        rows: [for (var i = 0; i < 1000; i++) WorkspacePurchasedUnitRow(id: 'device-$i', serial: printed, imei1: printed, imei2: printed)]);
+      expect(oversized.valid, isTrue); expect(utf8.encode(jsonEncode(oversized.toJson())).length, greaterThan(1024 * 1024));
+      await expectLater(scoped.save(oversized, expectedRevision: 1), throwsA(isA<WorkGatewayException>()));
+      expect(native.values, before); expect(native.writes.length, writes);
+      expect((await scoped.read(key))!.toJson(), draft().toJson());
+    });
+    for (final change in ['account', 'realm', 'store', 'binding']) {
+      test('rejects mismatched $change before opening or writing another namespace', () async {
+        final native = _OrderJournalStorage();
+        final scoped = SecureWorkPurchasedUnitDraftStore(accountScope: () => key.account, targetScope: () => key.identity, storage: native);
+        await scoped.save(draft(), expectedRevision: null); final before = Map.of(native.values);
+        final other = WorkspacePurchasedUnitDraftKey(account: change == 'account' ? 'account-B' : key.account,
+          realm: change == 'realm' ? 'production' : key.realm, store: change == 'store' ? 'store-B' : key.store,
+          binding: change == 'binding' ? 'b' * 64 : key.binding);
+        await expectLater(scoped.read(other), throwsA(isA<WorkGatewayException>()));
+        await expectLater(scoped.save(WorkspacePurchasedUnitDraft(key: other, revision: 1, publishedRevision: 0, rows: const []),
+          expectedRevision: null), throwsA(isA<WorkGatewayException>()));
+        expect(native.values, before);
+      });
+    }
+    test('concurrent local editors compare saved revision instead of overwriting', () async {
+      final native = _OrderJournalStorage();
+      SecureWorkPurchasedUnitDraftStore create() => SecureWorkPurchasedUnitDraftStore(accountScope: () => key.account,
+        targetScope: () => key.identity, storage: native);
+      await create().save(draft(), expectedRevision: null);
+      final results = await Future.wait([for (final serial in ['HOST-EDITOR-A', 'HOST-EDITOR-B'])
+        create().save(draft(revision: 2, serial: serial), expectedRevision: 1).then((_) => true, onError: (Object _) => false)]);
+      expect(results.where((saved) => saved), hasLength(1));
+      final actual = (await create().read(key))!; expect(actual.revision, 2);
+      expect(['HOST-EDITOR-A', 'HOST-EDITOR-B'], contains(actual.rows.single.serial));
+    });
+    test('lost native reply is checked from saved bytes, never called shared', () async {
+      final native = _OrderJournalStorage()..loseWriteResponseOnce = true;
+      final store = SecureWorkPurchasedUnitDraftStore(accountScope: () => key.account, targetScope: () => key.identity, storage: native);
+      await expectLater(store.save(draft(), expectedRevision: null), throwsA(anything));
+      expect((await store.read(key))!.toJson(), draft().toJson());
+      await store.save(draft(revision: 2, serial: 'HOST-NEXT'), expectedRevision: 1);
+      expect((await store.read(key))!.rows.single.serial, 'HOST-NEXT');
+    });
+    testWidgets('native settlement stays pending beyond UI deadline and recovery cannot overtake it', (tester) async {
+      final native = _OrderJournalStorage()..holdWrite = Completer<void>();
+      addTearDown(() { if (!native.holdWrite!.isCompleted) native.holdWrite!.complete(); });
+      final store = SecureWorkPurchasedUnitDraftStore(accountScope: () => key.account, targetScope: () => key.identity, storage: native);
+      var settled = false;
+      final saving = store.save(draft(), expectedRevision: null).then((_) { settled = true; });
+      await tester.pump(); expect(native.writes, hasLength(1));
+      await tester.pump(const Duration(seconds: 11)); expect(settled, isFalse);
+      var recovered = false;
+      final reading = store.read(key).then((value) { recovered = true; return value; });
+      await tester.pump(); expect(recovered, isFalse);
+      native.holdWrite!.complete(); await tester.pumpAndSettle();
+      await saving;
+      expect((await reading)!.toJson(), draft().toJson()); expect(native.writes, hasLength(1));
+    });
+    test('retired owner generation cannot finish a held read after account ABA', () async {
+      final native = _OrderJournalStorage(); String? scope = key.identity; var account = key.account;
+      final store = SecureWorkPurchasedUnitDraftStore(accountScope: () => account, targetScope: () => scope, storage: native);
+      await store.save(draft(), expectedRevision: null); final before = Map.of(native.values);
+      final entered = Completer<void>(), release = Completer<void>();
+      native.beforeRead = (_) { entered.complete(); return release.future; };
+      final reading = store.read(key); await entered.future;
+      account = 'account-B'; scope = null; account = key.account; release.complete();
+      await expectLater(reading, throwsA(isA<WorkGatewayException>())); expect(native.values, before);
+    });
+  });
+
   test('LF-GST shared SKU rate follows actual channel price without double adding', () {
     const gst = BuyV2SupplierGstRate(rateBasisPoints: 1800, basis: BuyV2SupplierTaxBasis.included);
     expect(gst.taxMinorForSubtotal(11800), 1800);

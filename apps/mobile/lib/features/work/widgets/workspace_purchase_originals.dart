@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../work_order_identity_gateway.dart';
 import '../work_catalogue_gateway.dart';
+import '../work_models.dart' show WorkspacePurchasedUnitRow, WorkspacePurchasedUnitDraft, WorkspacePurchasedUnitDraftKey;
+import '../work_services.dart' show WorkPurchasedUnitDraftStore, SecureWorkPurchasedUnitDraftStore;
 
 /// Shared quotation surface, deliberately separate from purchased orders.
 class WorkspaceBulkQuotes extends StatefulWidget {
@@ -774,6 +776,11 @@ class _WorkspacePurchaseOriginalsState
                                   gateway: widget.gateway, role: widget.role, realm: widget.realm,
                                   buyingStoreId: widget.buyingStoreId, reference: reference, line: line,
                                   inputCurrent: () => _current(generation) && identical(_details[reference.orderId], details)),
+                                WorkspacePurchasedUnitsForLine(
+                                  key: ValueKey(('units', widget.gateway, _generation, reference.originalFingerprint, line.lineId)),
+                                  gateway: widget.gateway, role: widget.role, realm: widget.realm,
+                                  buyingStoreId: widget.buyingStoreId, reference: reference, line: line,
+                                  inputCurrent: () => _current(generation) && identical(_details[reference.orderId], details)),
                                 _amount(line.lineTotalMinor),
                                 WorkspaceOriginalBenefitsForLine(original: details, lineId: line.lineId),
                                 if (widget.role == WorkspaceOrderIdentityRole.buyer &&
@@ -861,6 +868,303 @@ class _WorkspacePurchaseOriginalsState
       );
     },
   );
+}
+
+/// Private supplier draft and separately supplied device readback. Local saves
+/// never publish supplier records or submit buyer mismatch reports.
+class WorkspacePurchasedUnitsForLine extends StatefulWidget {
+  const WorkspacePurchasedUnitsForLine({super.key, required this.gateway, required this.role, required this.realm,
+    required this.reference, required this.line, this.buyingStoreId, this.inputCurrent, this.draftStore});
+  final AuthenticatedWorkspaceOrderIdentityGateway gateway;
+  final WorkspaceOrderIdentityRole role;
+  final String realm;
+  final String? buyingStoreId;
+  final WorkspacePurchaseReference reference;
+  final WorkspacePurchasedSkuLine line;
+  final bool Function()? inputCurrent;
+  final WorkPurchasedUnitDraftStore? draftStore;
+  @override State<WorkspacePurchasedUnitsForLine> createState() => _WorkspacePurchasedUnitsForLineState();
+}
+
+// Accepted private edits outlive their screen while a native write is pending.
+// This contains no supplier-published facts and cannot grant access to a Store.
+class _UnitDraftPendingEdits {
+  _UnitDraftPendingEdits(this.version, List<WorkspacePurchasedUnitRow> rows) : rows = List.unmodifiable(rows);
+  int version;
+  List<WorkspacePurchasedUnitRow> rows;
+  void offer(int nextVersion, List<WorkspacePurchasedUnitRow> nextRows) {
+    version = nextVersion; rows = List.unmodifiable(nextRows);
+  }
+}
+
+class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnitsForLine> with WidgetsBindingObserver {
+  final _storage = PageStorageBucket();
+  int _generation = 0, _draftVisit = 0, _editVersion = 0, _savedVersion = 0, _publishedRevision = 0;
+  bool _expanded = false, _loading = false, _unavailable = false, _editing = false, _draftLoading = false,
+    _draftReady = false, _saving = false, _recovery = false, _reviewCopy = false;
+  int? _localRevision;
+  WorkspacePurchasedUnitsRead? _record, _latest;
+  WorkspacePurchasedUnitDraft? _checkedCopy;
+  List<WorkspacePurchasedUnitRow> _rows = [];
+  WorkPurchasedUnitDraftStore? _privateStore;
+  Object _saveToken = Object();
+  _UnitDraftPendingEdits? _pendingEdits;
+  Timer? _expiry;
+  String _draftStatus = '';
+  bool _sourceEventQueued = false;
+  WorkspacePurchasedLineTarget get _target => WorkspacePurchasedLineTarget(accountUserId: widget.gateway.accountUserId,
+    role: widget.role, realm: widget.realm, reference: widget.reference, line: widget.line, buyingStoreId: widget.buyingStoreId);
+  Object get _identity => (widget.gateway, widget.gateway.purchasedUnitSource, widget.gateway.purchasedUnitSource?.lifetime, _target.binding, widget.draftStore);
+  late Object _owner = _identity;
+  bool _current(int visit) {
+    final source = widget.gateway.purchasedUnitSource;
+    return mounted && visit == _generation && _owner == _identity && widget.gateway.isCurrent && widget.inputCurrent?.call() != false &&
+      (source == null || source.isCurrent && source.lifetime != null && source.accountUserId == widget.gateway.accountUserId);
+  }
+  bool get _canEdit {
+    final access = _record?.ownerAccess, source = widget.gateway.purchasedUnitSource;
+    return _current(_generation) && !_loading && widget.role == WorkspaceOrderIdentityRole.seller &&
+      _record?.complete == true && access != null && source != null && source.ownerAccessCurrent(access) && access.allows(_target, DateTime.now().toUtc());
+  }
+  WorkspacePurchasedUnitDraftKey get _draftKey => WorkspacePurchasedUnitDraftKey(account: _target.accountUserId,
+    realm: _target.realm, store: _target.reference.storeId, binding: _target.binding);
+  WorkPurchasedUnitDraftStore get _store {
+    if (widget.draftStore case final supplied?) return supplied;
+    return _privateStore ??= (() {
+      final gateway = widget.gateway, source = gateway.purchasedUnitSource!, lifetime = source.lifetime,
+        access = _record!.ownerAccess!, target = _target, key = _draftKey;
+      bool authorised() => gateway.isCurrent && source.isCurrent && source.lifetime == lifetime &&
+        source.accountUserId == gateway.accountUserId && source.ownerAccessCurrent(access) && access.allows(target, DateTime.now().toUtc());
+      // A frozen, already requested private write may finish after its UI closes,
+      // only for this still-authorised principal and original namespace.
+      return SecureWorkPurchasedUnitDraftStore(accountScope: () => authorised() ? gateway.accountUserId : null,
+        targetScope: () => authorised() ? key.identity : null);
+    })();
+  }
+  void _sourceChanged() {
+    if (!mounted || _sourceEventQueued) return;
+    _sourceEventQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sourceEventQueued = false;
+      if (!mounted) return;
+      if (_owner != _identity) {
+        setState(_retireIdentity);
+        return;
+      }
+      setState(() {});
+      if (_current(_generation) && _expanded && !_loading) unawaited(_read());
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+  @override void initState() {
+    super.initState(); WidgetsBinding.instance.addObserver(this); widget.gateway.purchasedUnitSource?.addListener(_sourceChanged);
+  }
+  @override void didUpdateWidget(covariant WorkspacePurchasedUnitsForLine oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.gateway.purchasedUnitSource, widget.gateway.purchasedUnitSource)) {
+      oldWidget.gateway.purchasedUnitSource?.removeListener(_sourceChanged);
+      widget.gateway.purchasedUnitSource?.addListener(_sourceChanged);
+    }
+    if (_owner != _identity) _retireIdentity();
+  }
+  void _retireIdentity() {
+    _generation++; _draftVisit++; _owner = _identity; _expiry?.cancel(); _expanded = false; _loading = false; _unavailable = false;
+    _record = null; _latest = null; _rows = []; _checkedCopy = null; _privateStore = null; _draftReady = false; _editing = false;
+    _draftLoading = false; _saving = false; _saveToken = Object(); _pendingEdits = null; _recovery = false; _reviewCopy = false; _localRevision = null;
+    _editVersion = 0; _savedVersion = 0; _publishedRevision = 0; _draftStatus = '';
+  }
+  @override void dispose() {
+    _generation++; _draftVisit++; _expiry?.cancel(); widget.gateway.purchasedUnitSource?.removeListener(_sourceChanged);
+    WidgetsBinding.instance.removeObserver(this); super.dispose();
+  }
+  @override void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _current(_generation) && _expanded) unawaited(_read());
+  }
+  Future<void> _read() async {
+    final visit = _generation;
+    if (!_current(visit) || !_expanded || _loading) return;
+    setState(() { _loading = true; _unavailable = false; _record = null; });
+    final result = await widget.gateway.readPurchasedUnits(role: widget.role, realm: widget.realm, reference: widget.reference,
+      line: widget.line, buyingStoreId: widget.buyingStoreId, inputCurrent: () => _current(visit) && _expanded);
+    if (!_current(visit) || !_expanded) return;
+    final previous = _latest, accepted = result != null && (previous == null || result.revision > previous.revision ||
+      result.revision == previous.revision && result.fingerprint == previous.fingerprint);
+    setState(() { _loading = false; _unavailable = !accepted; _record = accepted ? result : null; if (accepted) _latest = result; _privateStore = null; });
+    _expiry?.cancel();
+    final deadline = _record?.ownerAccess?.expiresAt;
+    if (deadline != null && deadline.isAfter(DateTime.now().toUtc())) {
+      _expiry = Timer(deadline.difference(DateTime.now().toUtc()), () { if (_current(visit)) setState(() {}); });
+    }
+  }
+  String _rowBytes(List<WorkspacePurchasedUnitRow> rows) => jsonEncode(rows.map((r) => r.toJson()).toList());
+  Future<void> _loadDraft({bool recover = false}) async {
+    if (!_expanded || !_canEdit || _draftLoading || _saving) return;
+    final visit = _generation, draftVisit = ++_draftVisit, store = _store, key = _draftKey;
+    setState(() { _editing = true; _draftLoading = true; _draftStatus = 'Opening private draft…'; });
+    try {
+      final saved = await store.read(key);
+      if (!_current(visit) || !_expanded || draftVisit != _draftVisit) return;
+      if (saved != null && (!saved.valid || saved.key.identity != key.identity)) throw const FormatException();
+      if (!_canEdit) { setState(() { _recovery = true; _draftStatus = 'Draft access changed. Check the saved copy when access is restored.'; }); return; }
+      setState(() {
+        _localRevision = saved?.revision; _draftReady = true; _recovery = false;
+        if (recover && _editVersion != _savedVersion && _rowBytes(_rows) != _rowBytes(saved?.rows ?? const [])) {
+          _checkedCopy = saved; _reviewCopy = true; _draftStatus = 'Saved draft checked. Choose which copy to keep.';
+        } else {
+          _rows = List.of(saved?.rows ?? _record!.rows); _publishedRevision = saved?.publishedRevision ?? _record!.revision;
+          _savedVersion = _editVersion; _reviewCopy = false; _draftStatus = saved == null ? 'Private draft · not shared' : 'Saved on this device · not shared';
+        }
+      });
+    } on Object {
+      if (_current(visit) && _expanded && draftVisit == _draftVisit) setState(() { _recovery = true; _draftStatus = 'Private draft could not be checked. Saved data and your edits are kept.'; });
+    } finally { if (_current(visit) && draftVisit == _draftVisit) setState(() { _draftLoading = false; }); }
+  }
+  bool get _editable => _expanded && _canEdit && _editing && _draftReady && !_draftLoading && !_recovery && !_reviewCopy;
+  bool _draftActionCurrent(int visit, int draftVisit) => _current(visit) && _expanded && draftVisit == _draftVisit;
+  void _change(List<WorkspacePurchasedUnitRow> rows) {
+    if (!_editable || rows.length > 1000 || rows.any((r) => !r.validDraft)) return;
+    setState(() { _rows = List.of(rows); _editVersion++; _draftStatus = 'Saving private draft…'; });
+    if (_saving) _pendingEdits?.offer(_editVersion, _rows);
+    unawaited(_save());
+  }
+  Future<void> _save() async {
+    if (!_editable || _saving || _savedVersion == _editVersion) return;
+    final visit = _generation, owner = _owner, saveToken = _saveToken, store = _store, key = _draftKey;
+    final gateway = widget.gateway, source = gateway.purchasedUnitSource!, lifetime = source.lifetime,
+      access = _record!.ownerAccess!, target = _target, publishedRevision = _publishedRevision;
+    bool authorised() => gateway.isCurrent && source.isCurrent && source.lifetime == lifetime &&
+      source.accountUserId == gateway.accountUserId && source.ownerAccessCurrent(access) && access.allows(target, DateTime.now().toUtc());
+    final pending = _UnitDraftPendingEdits(_editVersion, _rows);
+    _pendingEdits = pending;
+    var localRevision = _localRevision, savedVersion = _savedVersion;
+    setState(() { _saving = true; });
+    final waiting = Timer(const Duration(seconds: 10), () {
+      if (_current(visit) && identical(pending, _pendingEdits) && _saving) {
+        setState(() {
+          _recovery = true;
+          _draftStatus = 'Private draft save is still pending. Your edits are kept while the saved result is checked.';
+        });
+      }
+    });
+    try {
+      while (authorised() && savedVersion != pending.version) {
+        final version = pending.version, expected = localRevision;
+        final next = WorkspacePurchasedUnitDraft(key: key, revision: (expected ?? 0) + 1,
+          publishedRevision: publishedRevision, rows: pending.rows);
+        await store.save(next, expectedRevision: expected);
+        localRevision = next.revision; savedVersion = version;
+        if (_current(visit) && owner == _owner) { _localRevision = localRevision; _savedVersion = savedVersion; }
+      }
+      if (_current(visit) && owner == _owner) {
+        setState(() {
+          _recovery = savedVersion != pending.version;
+          _draftStatus = !_recovery ? 'Saved on this device · not shared' : 'Your unsaved edits are kept here. Check the saved copy before continuing.';
+        });
+      }
+    } on Object {
+      if (_current(visit)) setState(() { _recovery = true; _draftStatus = 'Draft save needs recovery. Your edits are kept; check the saved copy before editing.'; });
+    } finally {
+      waiting.cancel();
+      if (mounted && identical(saveToken, _saveToken) && identical(pending, _pendingEdits)) {
+        setState(() { _saving = false; _pendingEdits = null; });
+      }
+    }
+  }
+  void _chooseCopy(bool kept, int visit, int draftVisit, WorkspacePurchasedUnitDraft? checkedCopy) {
+    if (!_draftActionCurrent(visit, draftVisit) || !identical(checkedCopy, _checkedCopy) || !_canEdit || !_reviewCopy || _saving) return;
+    setState(() {
+      _reviewCopy = false; _recovery = false;
+      if (!kept) { _rows = List.of(_checkedCopy?.rows ?? const []); _publishedRevision = _checkedCopy?.publishedRevision ?? _record!.revision; _savedVersion = _editVersion; }
+      else { _editVersion++; }
+      _draftVisit++; _draftStatus = kept ? 'Saving private draft…' : 'Saved on this device · not shared';
+    });
+    if (kept) unawaited(_save());
+  }
+  void _field(String id, String field, String value) {
+    final rows = [for (final row in _rows) row.id != id ? row : WorkspacePurchasedUnitRow(id: row.id,
+      serial: field == 'serial' ? value : row.serial, imei1: field == 'imei1' ? value : row.imei1, imei2: field == 'imei2' ? value : row.imei2)];
+    _change(rows);
+  }
+  @override Widget build(BuildContext context) {
+    final visit = _generation, draftVisit = _draftVisit, checkedCopy = _checkedCopy, record = _current(_generation) ? _record : null;
+    final canEdit = _canEdit, unavailable = !_current(_generation) || _unavailable;
+    return PageStorage(bucket: _storage, child: ExpansionTile(key: ValueKey(_owner), tilePadding: EdgeInsets.zero,
+      title: const Text('Device details', style: TextStyle(fontSize: 13)), onExpansionChanged: (open) {
+        if (!_current(visit)) return;
+        _expanded = open;
+        if (!open) {
+          if (_editing && (_saving || _editVersion != _savedVersion)) {
+            _recovery = true; _draftStatus = 'Check the saved private draft before continuing. Your edits are kept.';
+          }
+          _generation++; _loading = false; _unavailable = false;
+        }
+        final opening = _generation;
+        WidgetsBinding.instance.addPostFrameCallback((_) { if (_current(opening)) { setState(() {}); if (_expanded) unawaited(_read()); } });
+      }, children: [Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (_loading && !unavailable) const LinearProgressIndicator(minHeight: 2),
+        if (unavailable) ...[const Text('Device details for this purchase are unavailable.'),
+          Align(alignment: Alignment.centerLeft, child: TextButton(onPressed: () {
+            if (_current(visit) && _expanded && !_loading && _unavailable) unawaited(_read());
+          }, child: const Text('Retry device details')))],
+        if (record != null) ...[
+          const Text('Supplier device records · private'),
+          if (!record.complete) const Text('Only some device records are shown.'),
+          if (record.rows.isEmpty) Text(record.complete ? 'No device identifiers were supplied for this purchase.' : 'No device identifiers were returned in this partial view.'),
+          for (final row in record.rows) Padding(padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [for (final label in row.labels) Text(label)])),
+          if (widget.role == WorkspaceOrderIdentityRole.buyer && record.rows.isNotEmpty) const Text('Mismatch reporting is unavailable.'),
+          if (widget.role == WorkspaceOrderIdentityRole.seller) ...[
+            if (!canEdit) const Text('Device draft editing is unavailable. Saved private drafts are kept.'),
+            if (canEdit && !_editing) TextButton(onPressed: () { if (_draftActionCurrent(visit, draftVisit) && _canEdit && !_editing) unawaited(_loadDraft()); }, child: const Text('Prepare device details')),
+          ],
+        ],
+        if (canEdit && _editing) ...[
+          const Divider(height: 16), const Text('Private device draft'),
+          const Text('Add one row for each actual device. Serial and both IMEIs belong on the same row.'),
+          if (_draftStatus.isNotEmpty) Text(_draftStatus, key: const ValueKey('unit-draft-status')),
+          if (_draftLoading) const LinearProgressIndicator(minHeight: 2),
+          if (_recovery) TextButton(onPressed: _draftLoading || _saving ? null : () {
+            if (_draftActionCurrent(visit, draftVisit)) unawaited(_loadDraft(recover: true));
+          }, child: const Text('Recover private draft')),
+          if (_reviewCopy) ...[
+            const Text('Your kept edits'),
+            ..._copyReview(_rows),
+            const Text('Saved on this device'),
+            ..._copyReview(checkedCopy?.rows ?? const []),
+            Wrap(children: [TextButton(onPressed: () => _chooseCopy(false, visit, draftVisit, checkedCopy), child: const Text('Use saved draft')),
+              TextButton(onPressed: () => _chooseCopy(true, visit, draftVisit, checkedCopy), child: const Text('Save kept edits'))]),
+          ],
+          if (_draftReady && !_reviewCopy) ...[
+            if (_publishedRevision != record?.revision) const Text('Supplier records changed since this draft. Review them before sharing.'),
+            for (final (index, row) in _rows.indexed) Padding(padding: const EdgeInsets.only(top: 8), child: Column(
+              key: ValueKey(('unit-draft-row', _owner, _draftVisit, row.id)), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [Expanded(child: Text('Device ${index + 1}')), IconButton(tooltip: 'Remove device ${index + 1}',
+                  onPressed: !_editable ? null : () { if (_draftActionCurrent(visit, draftVisit)) _change(_rows.where((r) => r.id != row.id).toList()); }, icon: const Icon(Icons.remove_circle_outline))]),
+                for (final (field, label, value) in [('serial', 'Serial', row.serial), ('imei1', 'IMEI 1', row.imei1), ('imei2', 'IMEI 2', row.imei2)])
+                  TextFormField(key: ValueKey(('unit-input', row.id, field)), initialValue: value, enabled: _editable,
+                    maxLength: 240, decoration: InputDecoration(labelText: label, counterText: ''),
+                    onChanged: (value) { if (_draftActionCurrent(visit, draftVisit)) _field(row.id, field, value); }),
+                if (!row.ready) const Text('Enter at least one complete printed identifier before sharing.'),
+              ])),
+            Align(alignment: Alignment.centerLeft, child: TextButton(onPressed: !_editable || _rows.length >= 1000 ? null : () {
+              if (!_draftActionCurrent(visit, draftVisit)) return;
+              final id = 'device-${List.generate(16, (_) => math.Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
+              _change([..._rows, WorkspacePurchasedUnitRow(id: id)]);
+            }, child: const Text('Add device'))),
+            const Text('Sharing device details is unavailable. This draft is not shared with the buyer.'),
+          ],
+        ],
+      ])]));
+  }
+  Iterable<Widget> _copyReview(List<WorkspacePurchasedUnitRow> rows) sync* {
+    if (rows.isEmpty) yield const Text('No saved device rows.');
+    for (final (index, row) in rows.indexed) {
+      yield Text('Device ${index + 1}');
+      for (final (label, value) in [('Serial', row.serial), ('IMEI 1', row.imei1), ('IMEI 2', row.imei2)]) {
+        yield Text('$label: ${value.isEmpty ? 'Not entered' : value}');
+      }
+    }
+  }
 }
 
 /// Read-only recorded warranty supplement. Collapse/replacement retires pending

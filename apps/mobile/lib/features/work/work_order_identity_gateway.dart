@@ -7,7 +7,7 @@ import 'package:crypto/crypto.dart';
 import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
 import 'work_customer_feedback.dart';
-import 'work_models.dart' show WorkspaceRestockPurchaseOriginal, WorkspaceSupplierGoodsReceipt;
+import 'work_models.dart' show WorkspaceRestockPurchaseOriginal, WorkspaceSupplierGoodsReceipt, WorkspacePurchasedUnitRow;
 
 enum WorkspaceOrderIdentityState { linked, unlinked, unavailable }
 
@@ -105,6 +105,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
     required this.credentials,
     required this.transport,
     this.purchasedWarrantyReader,
+    this.purchasedUnitSource,
   }) : _ownerLifetime = lifetime() {
     if (endpoint.scheme != 'https' ||
         endpoint.host !=
@@ -126,6 +127,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
   final SocialContentTransport transport;
   /// Proposed frontend supplement only. No warranty endpoint is configured here.
   final WorkspacePurchasedWarrantyReader? purchasedWarrantyReader;
+  final WorkspacePurchasedUnitSource? purchasedUnitSource;
   bool get isCurrent => _ownerLifetime != null && lifetime() == _ownerLifetime;
 
   Future<WorkspacePurchasedWarrantyRead?> readPurchasedWarranty({
@@ -138,13 +140,33 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
   }) async {
     final reader = purchasedWarrantyReader;
     final readerLifetime = reader?.lifetime;
+    if (reader == null) return null;
+    return _readPurchasedLineSupplement<WorkspacePurchasedWarrantyRead>(role: role, realm: realm, reference: reference,
+      line: line, buyingStoreId: buyingStoreId, inputCurrent: inputCurrent,
+      sourceCurrent: () => reader.isCurrent && readerLifetime != null && reader.lifetime == readerLifetime && reader.accountUserId == accountUserId,
+      read: reader.read, valid: (result, target) => result.validFor(target));
+  }
+
+  Future<WorkspacePurchasedUnitsRead?> readPurchasedUnits({required WorkspaceOrderIdentityRole role, required String realm,
+    required WorkspacePurchaseReference reference, required WorkspacePurchasedSkuLine line, String? buyingStoreId, bool Function()? inputCurrent}) {
+    final source = purchasedUnitSource, owner = purchasedUnitSource?.lifetime;
+    if (source == null) return Future.value(null);
+    return _readPurchasedLineSupplement<WorkspacePurchasedUnitsRead>(role: role, realm: realm, reference: reference,
+      line: line, buyingStoreId: buyingStoreId, inputCurrent: inputCurrent,
+      sourceCurrent: () => source.isCurrent && owner != null && source.lifetime == owner && source.accountUserId == accountUserId,
+      read: source.read, valid: (result, target) => result.validFor(target));
+  }
+
+  Future<T?> _readPurchasedLineSupplement<T>({required WorkspaceOrderIdentityRole role, required String realm,
+    required WorkspacePurchaseReference reference, required WorkspacePurchasedSkuLine line, String? buyingStoreId,
+    bool Function()? inputCurrent, required bool Function() sourceCurrent,
+    required Future<T?> Function(WorkspacePurchasedLineTarget) read, required bool Function(T, WorkspacePurchasedLineTarget) valid}) async {
     var active = true;
-    bool current() => active && isCurrent && reader != null && reader.isCurrent && readerLifetime != null &&
-      reader.lifetime == readerLifetime && reader.accountUserId == accountUserId && inputCurrent?.call() != false;
+    bool current() => active && isCurrent && sourceCurrent() && inputCurrent?.call() != false;
     // Absence is unavailable, not an invented operation against the order API.
     if (!current() || !reference.valid) return null;
     try {
-      final target = WorkspacePurchasedWarrantyTarget(accountUserId: accountUserId, role: role, realm: realm,
+      final target = WorkspacePurchasedLineTarget(accountUserId: accountUserId, role: role, realm: realm,
         buyingStoreId: buyingStoreId, reference: reference, line: line);
       final result = await (() async {
         final original = await readReferencedOrder(role: role, realm: realm, reference: reference,
@@ -152,9 +174,9 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         if (!current() || original == null) return null;
         final savedLine = original.lines.where((candidate) => candidate.lineId == line.lineId).singleOrNull;
         if (savedLine == null || jsonEncode(savedLine.toJson()) != jsonEncode(line.toJson())) return null;
-        return reader!.read(target);
+        return read(target);
       })().timeout(const Duration(seconds: 15));
-      return current() && result?.validFor(target) == true ? result : null;
+      return current() && result != null && valid(result, target) ? result : null;
     } on Object { return null; }
     finally { active = false; }
   }
@@ -1410,8 +1432,8 @@ abstract interface class WorkspacePurchasedWarrantyReader {
   Future<WorkspacePurchasedWarrantyRead?> read(WorkspacePurchasedWarrantyTarget target);
 }
 
-class WorkspacePurchasedWarrantyTarget {
-  WorkspacePurchasedWarrantyTarget({required this.accountUserId, required this.role, required this.realm,
+class WorkspacePurchasedLineTarget {
+  WorkspacePurchasedLineTarget({required this.accountUserId, required this.role, required this.realm,
     required this.reference, required WorkspacePurchasedSkuLine line, this.buyingStoreId})
     : _lineFacts = jsonEncode(line.toJson());
   final String accountUserId, realm;
@@ -1421,6 +1443,46 @@ class WorkspacePurchasedWarrantyTarget {
   final String _lineFacts;
   Map<String, Object?> get lineFacts => (jsonDecode(_lineFacts) as Map).cast<String, Object?>();
   String get binding => _goodsFingerprint([accountUserId, role.name, realm, buyingStoreId, reference.toJson(), jsonDecode(_lineFacts)]);
+}
+
+typedef WorkspacePurchasedWarrantyTarget = WorkspacePurchasedLineTarget;
+
+/// Proposed private device reader; no device endpoint or write operation exists
+/// here. Source implementations must verify the authenticated purchase/owner.
+abstract interface class WorkspacePurchasedUnitSource {
+  String get accountUserId;
+  bool get isCurrent;
+  Object? get lifetime;
+  /// Notify when records, owner access or the authenticated lifetime changes.
+  void addListener(void Function() listener);
+  void removeListener(void Function() listener);
+  /// Must retire an expired/revoked owner grant even when the reader survives.
+  bool ownerAccessCurrent(WorkspacePurchasedUnitOwnerAccess access);
+  Future<WorkspacePurchasedUnitsRead?> read(WorkspacePurchasedLineTarget target);
+}
+
+class WorkspacePurchasedUnitOwnerAccess {
+  const WorkspacePurchasedUnitOwnerAccess({required this.ownerAccountId, required this.storeId, required this.targetBinding, required this.expiresAt});
+  final String ownerAccountId, storeId, targetBinding;
+  final DateTime expiresAt;
+  bool boundTo(WorkspacePurchasedLineTarget target) => target.role == WorkspaceOrderIdentityRole.seller &&
+    target.accountUserId == ownerAccountId && target.reference.storeId == storeId && target.binding == targetBinding;
+  bool allows(WorkspacePurchasedLineTarget target, DateTime now) => boundTo(target) && expiresAt.isAfter(now.toUtc());
+}
+
+class WorkspacePurchasedUnitsRead {
+  WorkspacePurchasedUnitsRead({required this.target, required this.revision, required List<WorkspacePurchasedUnitRow> rows,
+    required this.observedAt, this.ownerAccess, this.complete = false}) : rows = List.unmodifiable(rows);
+  final WorkspacePurchasedLineTarget target;
+  final int revision;
+  final List<WorkspacePurchasedUnitRow> rows;
+  final DateTime observedAt;
+  final WorkspacePurchasedUnitOwnerAccess? ownerAccess;
+  final bool complete;
+  String get fingerprint => _goodsFingerprint([target.binding, revision, rows.map((r) => r.toJson()).toList(), complete]);
+  bool validFor(WorkspacePurchasedLineTarget expected) => target.binding == expected.binding && revision >= 0 && revision <= 2147483647 &&
+    (revision > 0 || rows.isEmpty) && rows.length <= 1000 && rows.every((r) => r.ready) &&
+    rows.map((r) => r.id).toSet().length == rows.length && (ownerAccess == null || ownerAccess!.boundTo(expected));
 }
 
 /// Literal recorded terms only; no coverage decision or calculated expiry.
