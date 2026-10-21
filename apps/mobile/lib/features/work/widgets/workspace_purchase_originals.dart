@@ -769,6 +769,11 @@ class _WorkspacePurchaseOriginalsState
                                 WorkspaceOriginalCommodityPriceForLine(line: line),
                                 WorkspaceOriginalScheduledForLine(line: line),
                                 WorkspaceOriginalInstructionsForLine(original: details, lineId: line.lineId),
+                                WorkspaceOriginalWarrantyForLine(
+                                  key: ValueKey((widget.gateway, _generation, reference.originalFingerprint, line.lineId)),
+                                  gateway: widget.gateway, role: widget.role, realm: widget.realm,
+                                  buyingStoreId: widget.buyingStoreId, reference: reference, line: line,
+                                  inputCurrent: () => _current(generation) && identical(_details[reference.orderId], details)),
                                 _amount(line.lineTotalMinor),
                                 WorkspaceOriginalBenefitsForLine(original: details, lineId: line.lineId),
                                 if (widget.role == WorkspaceOrderIdentityRole.buyer &&
@@ -856,6 +861,102 @@ class _WorkspacePurchaseOriginalsState
       );
     },
   );
+}
+
+/// Read-only recorded warranty supplement. Collapse/replacement retires pending
+/// reads; nothing is persisted into the immutable order or payment originals.
+class WorkspaceOriginalWarrantyForLine extends StatefulWidget {
+  const WorkspaceOriginalWarrantyForLine({super.key, required this.gateway, required this.role, required this.realm,
+    required this.reference, required this.line, this.buyingStoreId, this.inputCurrent});
+  final AuthenticatedWorkspaceOrderIdentityGateway gateway;
+  final WorkspaceOrderIdentityRole role;
+  final String realm;
+  final String? buyingStoreId;
+  final WorkspacePurchaseReference reference;
+  final WorkspacePurchasedSkuLine line;
+  final bool Function()? inputCurrent;
+  @override State<WorkspaceOriginalWarrantyForLine> createState() => _WorkspaceOriginalWarrantyForLineState();
+}
+
+class _WorkspaceOriginalWarrantyForLineState extends State<WorkspaceOriginalWarrantyForLine> {
+  final _storage = PageStorageBucket();
+  int _generation = 0;
+  bool _expanded = false, _loading = false, _unavailable = false;
+  WorkspacePurchasedWarrantyRead? _record, _latest;
+  Object get _identity => (widget.gateway, widget.gateway.purchasedWarrantyReader, widget.gateway.purchasedWarrantyReader?.lifetime,
+    WorkspacePurchasedWarrantyTarget(accountUserId: widget.gateway.accountUserId, role: widget.role, realm: widget.realm,
+      buyingStoreId: widget.buyingStoreId, reference: widget.reference, line: widget.line).binding);
+  late Object _owner = _identity;
+  bool _current(int generation) {
+    final reader = widget.gateway.purchasedWarrantyReader;
+    return mounted && generation == _generation && _owner == _identity && widget.gateway.isCurrent &&
+      (reader == null || reader.isCurrent && reader.lifetime != null && reader.accountUserId == widget.gateway.accountUserId) &&
+      widget.inputCurrent?.call() != false;
+  }
+  @override void didUpdateWidget(covariant WorkspaceOriginalWarrantyForLine oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_owner != _identity) {
+      _generation++; _owner = _identity; _expanded = false; _loading = false; _unavailable = false; _record = null; _latest = null;
+    }
+  }
+  @override void dispose() { _generation++; super.dispose(); }
+  Future<void> _read() async {
+    final generation = _generation;
+    if (!_current(generation) || !_expanded || _loading) return;
+    setState(() { _loading = true; _unavailable = false; _record = null; });
+    final result = await widget.gateway.readPurchasedWarranty(role: widget.role, realm: widget.realm,
+      buyingStoreId: widget.buyingStoreId, reference: widget.reference, line: widget.line,
+      inputCurrent: () => _current(generation) && _expanded);
+    if (!_current(generation) || !_expanded) return;
+    final previous = _latest;
+    final accepted = result != null && (previous == null || result.revision > previous.revision ||
+      result.revision == previous.revision && result.fingerprint == previous.fingerprint);
+    setState(() {
+      _loading = false; _unavailable = !accepted; _record = accepted ? result : null;
+      if (accepted) _latest = result;
+    });
+  }
+  @override Widget build(BuildContext context) {
+    final generation = _generation, record = _current(_generation) ? _record : null;
+    final unavailable = !_current(_generation) || _unavailable;
+    final style = Theme.of(context).textTheme.bodySmall;
+    String date(DateTime at) => MaterialLocalizations.of(context).formatFullDate(at.toLocal());
+    return PageStorage(bucket: _storage, child: ExpansionTile(key: ValueKey(_owner), tilePadding: EdgeInsets.zero,
+      childrenPadding: const EdgeInsets.only(bottom: 8),
+      title: const Text('Warranty details', style: TextStyle(fontSize: 13)),
+      onExpansionChanged: (expanded) {
+        if (!_current(generation)) return;
+        _expanded = expanded;
+        if (!expanded) { _generation++; _loading = false; _unavailable = false; _record = null; }
+        final visit = _generation;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_current(visit)) return;
+          setState(() {});
+          if (_expanded) unawaited(_read());
+        });
+      },
+      children: [Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (_loading && !unavailable) const LinearProgressIndicator(minHeight: 2),
+        if (unavailable) ...[
+          const Text('Warranty details for this purchase are unavailable.'),
+          Align(alignment: Alignment.centerLeft, child: TextButton(onPressed: () {
+            if (_current(generation) && _expanded && !_loading && _unavailable) unawaited(_read());
+          }, child: const Text('Retry warranty details'))),
+        ],
+        if (record != null) ...[
+          Text('Recorded on ${date(record.recordedAt)}', style: style),
+          if (record.terms == null) const Text('No detailed warranty terms were supplied for this purchase.')
+          else ...[
+            for (final entry in WorkspacePurchasedWarrantyTerms.labels.entries)
+              if (record.terms!.fields[entry.key] case final value?) Text('${entry.value}: $value', style: style),
+            if (record.terms!.startedAt case final started?) Text('Recorded warranty start: ${date(started)}', style: style),
+            if (record.terms!.fields.containsKey('issuer') || record.terms!.fields.containsKey('contact') || record.terms!.fields.containsKey('service'))
+              const Text('For warranty support, use the issuer or service contact in these terms.')
+            else const Text('Warranty support contact was not supplied.'),
+          ],
+        ],
+      ])]));
+  }
 }
 
 /// Compact private order details, never an address/eligibility verification.

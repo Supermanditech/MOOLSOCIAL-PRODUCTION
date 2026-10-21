@@ -254,6 +254,7 @@ class WorkProcurementController extends ChangeNotifier {
     final lifetime = _catalogueLifetime, token = Object();
     return AuthenticatedWorkspaceOrderIdentityGateway(endpoint: source.endpoint,
       accountUserId: context.accountId, credentials: source.credentials, transport: source.transport,
+      purchasedWarrantyReader: source.purchasedWarrantyReader,
       lifetime: () => lifetime == _catalogueLifetime && scopeCurrent && source.isCurrent &&
         identical(originalPurchaseReader?.call(), source) && originalPurchaseRealm?.call() == realm &&
         _identity.value?.customerStateOwnerScope == context.customerStateOwnerScope ? token : null);

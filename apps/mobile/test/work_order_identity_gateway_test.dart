@@ -19,6 +19,32 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/features/work/widgets/workspace_purchase_originals.dart';
 
 // Isolated contract fixtures; no native storage, real order or provider calls.
+class WarrantyReaderFixture implements WorkspacePurchasedWarrantyReader {
+  WarrantyReaderFixture({this.accountUserId = 'buyer-1'});
+  @override final String accountUserId;
+  @override bool isCurrent = true;
+  @override Object? lifetime = Object();
+  final requests = <WorkspacePurchasedWarrantyTarget>[];
+  FutureOr<WorkspacePurchasedWarrantyRead?> Function(WorkspacePurchasedWarrantyTarget)? respond;
+  @override Future<WorkspacePurchasedWarrantyRead?> read(WorkspacePurchasedWarrantyTarget target) async {
+    requests.add(target); return await respond?.call(target);
+  }
+}
+
+WorkspacePurchasedWarrantyRead warrantyRead(WorkspacePurchasedWarrantyTarget target, {
+  int revision = 1, Map<String, String> fields = const {'issuer': 'HOST original issuer', 'duration': '12 months',
+    'startBasis': 'From issuer activation', 'coverage': 'Manufacturing defects', 'exclusions': 'Accidental damage',
+    'service': 'Contact the issuer', 'contact': 'Recorded service desk', 'reference': 'HOST-POLICY-A'}, bool noRecord = false,
+}) => WorkspacePurchasedWarrantyRead(target: target, revision: revision, recordedAt: DateTime.utc(2026, 10, 1),
+  terms: noRecord ? null : WorkspacePurchasedWarrantyTerms(fields: fields));
+
+WorkspacePurchasedSkuLine warrantyLine(Map<String, Object?> raw, {String? lineId, String? skuId}) => WorkspacePurchasedSkuLine(
+  lineId: lineId ?? raw['lineId'] as String, skuId: skuId ?? raw['skuId'] as String,
+  canonicalProductId: raw['canonicalProductId'] as String, verifiedPackId: raw['verifiedPackId'] as String,
+  offerId: raw['offerId'] as String, offerRevision: raw['offerRevision'] as String,
+  name: raw['name'] as String, packLabel: raw['packLabel'] as String, quantityMilli: raw['quantityMilli'] as int,
+  quantityUnit: raw['quantityUnit'] as String, unitPriceMinor: raw['unitPriceMinor'] as int, lineTotalMinor: raw['lineTotalMinor'] as int);
+
 Map<String, dynamic> response({String role = 'buyer'}) {
   final original = {
     'currency': 'INR',
@@ -265,6 +291,234 @@ Map<String, dynamic> restockClosureResponse(WorkspaceGoodsArrivalCommand command
 }
 
 void main() {
+  testWidgets('PF07 WARRANTY original line opens unavailable details without a service', (tester) async {
+    final data = purchaseResponse(), refs = referenceResponse(), order = data['orders'][0];
+    final wire = Transport()..respond = (body) => switch (body['operation']) {
+      'listBuyerPurchaseReferences' => refs,
+      'readBuyerPurchaseProjection' => data,
+      _ => throw StateError('No warranty/payment/operational service in this isolated fixture'),
+    };
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchaseOriginals(
+      gateway: projectionGateway(wire), role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation')))));
+    await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('original-order-${order['orderId']}'))); await tester.pumpAndSettle();
+    final warranty = find.text('Warranty details');
+    expect(warranty, findsOneWidget);
+    await tester.ensureVisible(warranty); await tester.tap(warranty); await tester.pumpAndSettle();
+    expect(find.text('Warranty details for this purchase are unavailable.'), findsOneWidget);
+    expect(wire.requests, hasLength(2), reason: 'An unconfigured supplement must not dispatch an invented backend operation.');
+  });
+
+  for (final fault in ['none', 'no-record', 'wrong-account', 'wrong-role', 'wrong-realm', 'wrong-buying-store',
+    'wrong-original', 'wrong-revision', 'wrong-line', 'wrong-sku', 'empty', 'unsupported', 'whitespace', 'control', 'too-long', 'zero-revision']) {
+    test('PF07 WARRANTY scoped supplement $fault', () async {
+      final data = purchaseResponse(), wire = Transport()..data = data, reader = WarrantyReaderFixture();
+      final gateway = projectionGateway(wire, purchasedWarrantyReader: reader), reference = operationalReference();
+      final original = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference))!;
+      final line = original.lines.single, before = jsonEncode(line.toJson());
+      reader.respond = (target) {
+        final changedReference = WorkspacePurchaseReference.fromJson({...target.reference.toJson(),
+          if (fault == 'wrong-original') 'originalFingerprint': 'f' * 64,
+          if (fault == 'wrong-revision') 'sourceRevision': 'another-source-revision'});
+        final resultTarget = WorkspacePurchasedWarrantyTarget(
+          accountUserId: fault == 'wrong-account' ? 'other-viewer' : target.accountUserId,
+          role: fault == 'wrong-role' ? WorkspaceOrderIdentityRole.seller : target.role,
+          realm: fault == 'wrong-realm' ? 'production' : target.realm,
+          buyingStoreId: fault == 'wrong-buying-store' ? 'other-buying-store' : target.buyingStoreId,
+          reference: changedReference, line: warrantyLine(target.lineFacts,
+            lineId: fault == 'wrong-line' ? 'other-line' : null, skuId: fault == 'wrong-sku' ? 'other-sku' : null));
+        return warrantyRead(resultTarget, revision: fault == 'zero-revision' ? 0 : 1, noRecord: fault == 'no-record',
+          fields: switch (fault) {
+            'empty' => const {}, 'unsupported' => const {'eligibility': 'approved'}, 'whitespace' => const {'issuer': ' '},
+            'control' => const {'issuer': 'bad\u0000value'}, 'too-long' => {'issuer': 'x' * 2001},
+            _ => const {'issuer': 'HOST original issuer', 'duration': '12 months', 'startBasis': 'From issuer activation'},
+          });
+      };
+      final result = await gateway.readPurchasedWarranty(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference, line: line);
+      expect(result != null, ['none', 'no-record'].contains(fault));
+      if (fault == 'none') {
+        expect(result!.terms!.fields['startBasis'], 'From issuer activation'); expect(result.terms!.startedAt, isNull);
+        final copy = result.target.lineFacts..['name'] = 'Changed outside target';
+        expect(copy['name'], 'Changed outside target'); expect(result.target.lineFacts['name'], line.name);
+        expect(() => result.terms!.fields['issuer'] = 'changed', throwsUnsupportedError);
+      }
+      if (fault == 'no-record') expect(result!.terms, isNull);
+      expect(jsonEncode(line.toJson()), before); expect(reader.requests, hasLength(1));
+      expect(wire.requests.every((request) => request['operation'] == 'readBuyerPurchaseProjection'), isTrue);
+    });
+  }
+  for (final fault in ['caller-retired', 'identity-retired', 'reader-retired', 'reader-lifetime-ABA']) {
+    test('PF07 WARRANTY $fault while original read is held prevents supplement dispatch', () async {
+      final wire = Transport()..data = purchaseResponse(), reader = WarrantyReaderFixture();
+      Object? identityLifetime = Object(); var active = true;
+      final gateway = projectionGateway(wire, lifetime: () => identityLifetime, purchasedWarrantyReader: reader), reference = operationalReference();
+      final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference))!.lines.single;
+      final entered = Completer<void>(), release = Completer<void>();
+      wire.beforePost = (_) { entered.complete(); return release.future; };
+      final reading = gateway.readPurchasedWarranty(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation',
+        reference: reference, line: line, inputCurrent: () => active);
+      await entered.future;
+      if (fault == 'caller-retired') active = false;
+      if (fault == 'identity-retired') identityLifetime = Object();
+      if (fault == 'reader-retired') reader.isCurrent = false;
+      if (fault == 'reader-lifetime-ABA') reader.lifetime = Object();
+      release.complete(); expect(await reading, isNull); expect(reader.requests, isEmpty);
+    });
+  }
+  test('PF07 WARRANTY changed original line cannot request a supplement', () async {
+    final wire = Transport()..data = purchaseResponse(), reader = WarrantyReaderFixture();
+    final gateway = projectionGateway(wire, purchasedWarrantyReader: reader), reference = operationalReference();
+    final original = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference))!;
+    final line = warrantyLine(original.lines.single.toJson(), skuId: 'different-sku');
+    expect(await gateway.readPurchasedWarranty(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference, line: line), isNull);
+    expect(reader.requests, isEmpty);
+  });
+
+  test('PF07 WARRANTY collapse while credentials held prevents late original HTTP', () async {
+    final data = purchaseResponse(), reference = operationalReference();
+    final line = (await projectionGateway(Transport()..data = data).readReferencedOrder(
+      role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference))!.lines.single;
+    final wire = Transport()..data = data, reader = WarrantyReaderFixture(), credentials = Credentials()..token = Completer<String>();
+    var active = true;
+    final gateway = AuthenticatedWorkspaceOrderIdentityGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      accountUserId: 'buyer-1', lifetime: () => 'host-active', credentials: credentials, transport: wire, purchasedWarrantyReader: reader);
+    final reading = gateway.readPurchasedWarranty(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation',
+      reference: reference, line: line, inputCurrent: () => active);
+    active = false; credentials.token!.complete('host-token');
+    expect(await reading, isNull); expect(wire.requests, isEmpty); expect(reader.requests, isEmpty);
+  });
+  testWidgets('PF07 WARRANTY reader retirement hides retained terms', (tester) async {
+    final wire = Transport()..data = purchaseResponse(), reader = WarrantyReaderFixture();
+    reader.respond = warrantyRead;
+    final gateway = projectionGateway(wire, purchasedWarrantyReader: reader), reference = operationalReference();
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference))!.lines.single;
+    Widget host() => MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspaceOriginalWarrantyForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference, line: line))));
+    await tester.pumpWidget(host()); await tester.pumpAndSettle();
+    await tester.tap(find.text('Warranty details')); await tester.pumpAndSettle();
+    expect(find.text('Warranty issuer: HOST original issuer'), findsOneWidget);
+    reader.isCurrent = false;
+    await tester.pumpWidget(host()); await tester.pumpAndSettle();
+    expect(find.text('Warranty issuer: HOST original issuer'), findsNothing);
+  });
+
+  testWidgets('PF07 WARRANTY timeout includes held credentials and retires later HTTP', (tester) async {
+    final data = purchaseResponse(), reference = operationalReference();
+    final line = (await projectionGateway(Transport()..data = data).readReferencedOrder(
+      role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference))!.lines.single;
+    final wire = Transport()..data = data, reader = WarrantyReaderFixture(), credentials = Credentials()..token = Completer<String>();
+    final gateway = AuthenticatedWorkspaceOrderIdentityGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'), accountUserId: 'buyer-1',
+      lifetime: () => 'host-active', credentials: credentials, transport: wire, purchasedWarrantyReader: reader);
+    final reading = gateway.readPurchasedWarranty(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference, line: line);
+    await tester.pump(const Duration(seconds: 16)); expect(await reading, isNull);
+    credentials.token!.complete('host-token'); await tester.pumpAndSettle();
+    expect(wire.requests, isEmpty); expect(reader.requests, isEmpty);
+  });
+
+  for (final role in WorkspaceOrderIdentityRole.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('PF07 WARRANTY shared original states ${role.name} scale=$scale', (tester) async {
+        tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+        final data = purchaseResponse(role: role.name), refs = referenceResponse(role: role.name), order = data['orders'][0];
+        final wire = Transport()..respond = (body) => switch (body['operation']) {
+          'listBuyerPurchaseReferences' || 'listStorePurchaseReferences' => refs,
+          'readBuyerPurchaseProjection' || 'readStorePurchaseProjection' => data,
+          _ => throw StateError('No business command in isolated warranty fixture'),
+        };
+        final reader = WarrantyReaderFixture(accountUserId: data['viewerUserId']), pending = Completer<WorkspacePurchasedWarrantyRead?>();
+        reader.respond = (_) => pending.future;
+        final gateway = projectionGateway(wire, account: data['viewerUserId'], purchasedWarrantyReader: reader);
+        Widget host() => MaterialApp(home: MediaQuery(data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+          child: Scaffold(body: SingleChildScrollView(child: WorkspacePurchaseOriginals(gateway: gateway, role: role,
+            realm: 'evaluation', storeId: role == WorkspaceOrderIdentityRole.seller ? order['storeId'] : null)))));
+        await tester.pumpWidget(host()); await tester.pumpAndSettle();
+        await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey('original-order-${order['orderId']}'))); await tester.pumpAndSettle();
+        final warranty = find.text('Warranty details'); await tester.ensureVisible(warranty); await tester.pumpAndSettle();
+        await tester.tap(warranty); await tester.pump(); await tester.pump(const Duration(milliseconds: 300));
+        expect(reader.requests, hasLength(1)); expect(find.byType(LinearProgressIndicator), findsOneWidget);
+        pending.complete(warrantyRead(reader.requests.single)); await tester.pumpAndSettle();
+        for (final label in ['Warranty issuer: HOST original issuer', 'Warranty duration: 12 months',
+          'Warranty start basis: From issuer activation', 'Warranty coverage: Manufacturing defects',
+          'Warranty exclusions: Accidental damage', 'Warranty contact: Recorded service desk', 'Warranty reference: HOST-POLICY-A']) {
+          final detail = find.text(label); await tester.ensureVisible(detail); await tester.pumpAndSettle();
+          expect(detail.hitTestable(), findsOneWidget); expect(tester.takeException(), isNull);
+        }
+        expect(find.textContaining('Recorded warranty start:'), findsNothing, reason: 'Start basis alone is not an activation date.');
+        Future<void> reopen() async {
+          await tester.ensureVisible(warranty); await tester.pumpAndSettle(); await tester.tap(warranty); await tester.pumpAndSettle();
+          await tester.tap(warranty); await tester.pumpAndSettle();
+        }
+        reader.respond = (target) => warrantyRead(target, revision: 2, noRecord: true);
+        await reopen(); expect(find.text('No detailed warranty terms were supplied for this purchase.'), findsOneWidget);
+        expect(find.text('Warranty issuer: HOST original issuer'), findsNothing);
+        reader.respond = (_) => throw StateError('HOST unavailable'); await reopen();
+        expect(find.text('Warranty details for this purchase are unavailable.'), findsOneWidget);
+        expect(find.text('No detailed warranty terms were supplied for this purchase.'), findsNothing);
+        final retry = find.text('Retry warranty details'); await tester.ensureVisible(retry); await tester.pumpAndSettle();
+        final retryButton = find.ancestor(of: retry, matching: find.byType(TextButton));
+        final staleRetry = tester.widget<TextButton>(retryButton).onPressed!;
+        reader.respond = (target) => warrantyRead(target, revision: 3);
+        await tester.tap(retry); await tester.pumpAndSettle();
+        expect(find.text('Warranty issuer: HOST original issuer'), findsOneWidget);
+        final count = reader.requests.length; staleRetry(); await tester.pumpAndSettle(); expect(reader.requests.length, count);
+        reader.respond = (target) => warrantyRead(target, revision: 2); await reopen();
+        expect(find.text('Warranty details for this purchase are unavailable.'), findsOneWidget, reason: 'Older terms cannot replace an observed revision.');
+        await tester.pumpWidget(const SizedBox.shrink());
+        reader.respond = warrantyRead; await tester.pumpWidget(host()); await tester.pumpAndSettle();
+        await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey('original-order-${order['orderId']}'))); await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Warranty details')); await tester.tap(find.text('Warranty details')); await tester.pumpAndSettle();
+        expect(reader.requests.length, count + 2, reason: 'A restarted view rereads rather than loading an old unbound supplement.');
+        expect(find.text('Warranty issuer: HOST original issuer'), findsOneWidget);
+        expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+
+  for (final retirement in ['collapse', 'collapse-reopen', 'account-ABA', 'realm-ABA', 'buying-store-ABA', 'reader-lifetime', 'dispose']) {
+    testWidgets('PF07 WARRANTY late supplement cannot cross $retirement', (tester) async {
+      final wire = Transport()..data = purchaseResponse(), reader = WarrantyReaderFixture(), pending = Completer<WorkspacePurchasedWarrantyRead?>();
+      final gateway = projectionGateway(wire, purchasedWarrantyReader: reader), reference = operationalReference();
+      final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference))!.lines.single;
+      var owner = gateway, realm = 'evaluation'; String? selector;
+      reader.respond = (_) => pending.future;
+      Widget host() => MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspaceOriginalWarrantyForLine(
+        key: const ValueKey('retained-warranty-host'), gateway: owner, role: WorkspaceOrderIdentityRole.buyer,
+        realm: realm, buyingStoreId: selector, reference: reference, line: line))));
+      await tester.pumpWidget(host()); await tester.pumpAndSettle();
+      await tester.tap(find.text('Warranty details')); await tester.pump(); await tester.pump(const Duration(milliseconds: 300));
+      expect(reader.requests, hasLength(1)); final oldTarget = reader.requests.single;
+      if (retirement.startsWith('collapse')) {
+        await tester.tap(find.text('Warranty details')); await tester.pumpAndSettle();
+      } else if (retirement == 'dispose') {
+        await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+      } else {
+        if (retirement == 'account-ABA') owner = projectionGateway(wire, account: 'another-account', purchasedWarrantyReader: reader);
+        if (retirement == 'realm-ABA') realm = 'production';
+        if (retirement == 'buying-store-ABA') selector = 'another-store';
+        if (retirement == 'reader-lifetime') reader.lifetime = Object();
+        await tester.pumpWidget(host()); await tester.pumpAndSettle();
+        owner = gateway; realm = 'evaluation'; selector = null;
+        await tester.pumpWidget(host()); await tester.pumpAndSettle();
+      }
+      reader.respond = warrantyRead;
+      if (retirement != 'collapse') {
+        if (retirement == 'dispose') { await tester.pumpWidget(host()); await tester.pumpAndSettle(); }
+        await tester.tap(find.text('Warranty details')); await tester.pumpAndSettle();
+        expect(find.text('Warranty issuer: HOST original issuer'), findsOneWidget);
+      }
+      pending.complete(warrantyRead(oldTarget, revision: 99, fields: const {'issuer': 'HOST late retired issuer'}));
+      await tester.pumpAndSettle();
+      expect(find.text('Warranty issuer: HOST late retired issuer'), findsNothing);
+      if (retirement != 'collapse') expect(find.text('Warranty issuer: HOST original issuer'), findsOneWidget);
+      expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   test('LF-RESTOCK-CLOSE actual emulator closure survives strict client roundtrip', () async {
     final raw = jsonDecode(File(Platform.environment['LF_RESTOCK_ARRIVAL_EXPORT']!).readAsStringSync()) as Map;
     final closure = raw['closure'] as Map, command = WorkspaceGoodsArrivalCommand.fromJson(closure['command']);
@@ -3084,6 +3338,7 @@ AuthenticatedWorkspaceOrderIdentityGateway projectionGateway(
   Transport wire, {
   String account = 'buyer-1',
   Object? Function()? lifetime,
+  WorkspacePurchasedWarrantyReader? purchasedWarrantyReader,
 }) => AuthenticatedWorkspaceOrderIdentityGateway(
   endpoint: Uri.parse(
     'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace',
@@ -3092,6 +3347,7 @@ AuthenticatedWorkspaceOrderIdentityGateway projectionGateway(
   lifetime: lifetime ?? () => 'fixed-host-lifetime',
   credentials: Credentials(),
   transport: wire,
+  purchasedWarrantyReader: purchasedWarrantyReader,
 );
 
 WorkspacePurchaseReference operationalReference() {

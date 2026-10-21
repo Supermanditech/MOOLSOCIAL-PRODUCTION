@@ -104,6 +104,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
     required this.lifetime,
     required this.credentials,
     required this.transport,
+    this.purchasedWarrantyReader,
   }) : _ownerLifetime = lifetime() {
     if (endpoint.scheme != 'https' ||
         endpoint.host !=
@@ -123,7 +124,40 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
   final Object? _ownerLifetime;
   final SocialContentCredentials credentials;
   final SocialContentTransport transport;
+  /// Proposed frontend supplement only. No warranty endpoint is configured here.
+  final WorkspacePurchasedWarrantyReader? purchasedWarrantyReader;
   bool get isCurrent => _ownerLifetime != null && lifetime() == _ownerLifetime;
+
+  Future<WorkspacePurchasedWarrantyRead?> readPurchasedWarranty({
+    required WorkspaceOrderIdentityRole role,
+    required String realm,
+    required WorkspacePurchaseReference reference,
+    required WorkspacePurchasedSkuLine line,
+    String? buyingStoreId,
+    bool Function()? inputCurrent,
+  }) async {
+    final reader = purchasedWarrantyReader;
+    final readerLifetime = reader?.lifetime;
+    var active = true;
+    bool current() => active && isCurrent && reader != null && reader.isCurrent && readerLifetime != null &&
+      reader.lifetime == readerLifetime && reader.accountUserId == accountUserId && inputCurrent?.call() != false;
+    // Absence is unavailable, not an invented operation against the order API.
+    if (!current() || !reference.valid) return null;
+    try {
+      final target = WorkspacePurchasedWarrantyTarget(accountUserId: accountUserId, role: role, realm: realm,
+        buyingStoreId: buyingStoreId, reference: reference, line: line);
+      final result = await (() async {
+        final original = await readReferencedOrder(role: role, realm: realm, reference: reference,
+          buyingStoreId: buyingStoreId, inputCurrent: current);
+        if (!current() || original == null) return null;
+        final savedLine = original.lines.where((candidate) => candidate.lineId == line.lineId).singleOrNull;
+        if (savedLine == null || jsonEncode(savedLine.toJson()) != jsonEncode(line.toJson())) return null;
+        return reader!.read(target);
+      })().timeout(const Duration(seconds: 15));
+      return current() && result?.validFor(target) == true ? result : null;
+    } on Object { return null; }
+    finally { active = false; }
+  }
 
   Future<WorkspacePurchaseReferencePage?> listPurchaseReferences({
     required WorkspaceOrderIdentityRole role,
@@ -271,12 +305,14 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
     required String realm,
     required WorkspacePurchaseReference reference,
     String? buyingStoreId,
+    bool Function()? inputCurrent,
   }) async {
     final result = await readPurchaseProjection(
       role: role,
       realm: realm,
       purchaseId: reference.purchaseId,
       buyingStoreId: buyingStoreId,
+      inputCurrent: inputCurrent,
       storeId: role == WorkspaceOrderIdentityRole.seller
           ? reference.storeId
           : null,
@@ -286,6 +322,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
     );
     if (result == null ||
         !isCurrent ||
+        inputCurrent?.call() == false ||
         result.sourceRevision != reference.sourceRevision) {
       return null;
     }
@@ -309,8 +346,9 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
     String? storeId,
     String? orderId,
     String? buyingStoreId,
+    bool Function()? inputCurrent,
   }) async {
-    bool current() => _ownerLifetime != null && lifetime() == _ownerLifetime;
+    bool current() => _ownerLifetime != null && lifetime() == _ownerLifetime && inputCurrent?.call() != false;
     if (!current() ||
         !['evaluation', 'production'].contains(realm) ||
         !_id(purchaseId) ||
@@ -1359,6 +1397,57 @@ class WorkspacePurchaseReferencePage {
   final String coverage;
   final List<WorkspacePurchaseReference> references;
   final String? nextCursor;
+}
+
+/// Frontend proposal for a separately authorised, purchase-bound warranty read.
+/// Implementations must authenticate the viewer and retire their lifetime on
+/// account changes. This interface supplies no backend operation or entitlement.
+abstract interface class WorkspacePurchasedWarrantyReader {
+  String get accountUserId;
+  bool get isCurrent;
+  /// Stable during this authenticated visit; changes even for account A-B-A.
+  Object? get lifetime;
+  Future<WorkspacePurchasedWarrantyRead?> read(WorkspacePurchasedWarrantyTarget target);
+}
+
+class WorkspacePurchasedWarrantyTarget {
+  WorkspacePurchasedWarrantyTarget({required this.accountUserId, required this.role, required this.realm,
+    required this.reference, required WorkspacePurchasedSkuLine line, this.buyingStoreId})
+    : _lineFacts = jsonEncode(line.toJson());
+  final String accountUserId, realm;
+  final WorkspaceOrderIdentityRole role;
+  final String? buyingStoreId;
+  final WorkspacePurchaseReference reference;
+  final String _lineFacts;
+  Map<String, Object?> get lineFacts => (jsonDecode(_lineFacts) as Map).cast<String, Object?>();
+  String get binding => _goodsFingerprint([accountUserId, role.name, realm, buyingStoreId, reference.toJson(), jsonDecode(_lineFacts)]);
+}
+
+/// Literal recorded terms only; no coverage decision or calculated expiry.
+class WorkspacePurchasedWarrantyTerms {
+  WorkspacePurchasedWarrantyTerms({required Map<String, String> fields, this.startedAt}) : fields = Map.unmodifiable(fields);
+  final Map<String, String> fields;
+  final DateTime? startedAt;
+  static const labels = <String, String>{'issuer': 'Warranty issuer', 'duration': 'Warranty duration',
+    'startBasis': 'Warranty start basis', 'coverage': 'Warranty coverage', 'exclusions': 'Warranty exclusions',
+    'service': 'Warranty service', 'contact': 'Warranty contact', 'reference': 'Warranty reference'};
+  bool get valid => fields.isNotEmpty && fields.keys.every(labels.containsKey) && fields.values.every((value) =>
+    value.isNotEmpty && value == value.trim() && value.length <= 2000 && !RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]').hasMatch(value)) &&
+    (startedAt == null || fields.containsKey('startBasis'));
+}
+
+class WorkspacePurchasedWarrantyRead {
+  const WorkspacePurchasedWarrantyRead({required this.target, required this.revision, required this.recordedAt, this.terms});
+  final WorkspacePurchasedWarrantyTarget target;
+  final int revision;
+  final DateTime recordedAt;
+  /// Null means the source explicitly returned no detailed terms for this line.
+  /// A failed/missing source must return an unavailable read, not this outcome.
+  final WorkspacePurchasedWarrantyTerms? terms;
+  String get fingerprint => _goodsFingerprint([target.binding, revision, recordedAt.toUtc().toIso8601String(),
+    terms?.fields, terms?.startedAt?.toUtc().toIso8601String()]);
+  bool validFor(WorkspacePurchasedWarrantyTarget expected) => target.binding == expected.binding &&
+    revision > 0 && revision <= 2147483647 && (terms == null || terms!.valid);
 }
 
 Object? _goodsCanonical(Object? value) => value is List ? value.map(_goodsCanonical).toList()

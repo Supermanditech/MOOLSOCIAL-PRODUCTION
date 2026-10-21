@@ -17610,7 +17610,7 @@ void main() {
       await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('original-order-order-v2'))); await tester.pumpAndSettle();
       Finder originalTile() => find.descendant(of: find.byKey(const ValueKey('original-order-order-v2')),
-        matching: find.byType(ExpansionTile));
+        matching: find.widgetWithText(ExpansionTile, 'Order order-v2'));
       final originalState = tester.state(originalTile());
       final receive = find.byKey(const ValueKey('purchase-receive-order-order-v2'));
       await reveal(tester, receive);

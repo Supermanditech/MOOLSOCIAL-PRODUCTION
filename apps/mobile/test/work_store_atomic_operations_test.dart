@@ -13874,6 +13874,39 @@ void main() {
       controller = create();
     });
     tearDown(() => controller.dispose());
+    test('PF07 WARRANTY Store procurement preserves optional reader and exact buyer selector', () async {
+      account = 'account-A'; store = 'store-A';
+      final data = identity_fixtures.purchaserPurchaseResponse();
+      data['viewerUserId'] = account; data['buyerId'] = account;
+      data['orders'][0]['original']['purchaser']['storeId'] = store;
+      identity_fixtures.rehashPurchaseOrder(data['orders'][0]);
+      final wire = identity_fixtures.Transport()..data = data;
+      final warranty = identity_fixtures.WarrantyReaderFixture(accountUserId: account)..respond = identity_fixtures.warrantyRead;
+      final source = identity_fixtures.projectionGateway(wire, account: account, purchasedWarrantyReader: warranty);
+      final original = (await source.readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: data['purchaseId'], buyingStoreId: store))!;
+      final order = original.orders.single, line = order.lines.single;
+      final reference = WorkspacePurchaseReference(purchaseId: original.purchaseId, storeId: order.storeId,
+        orderId: order.orderId, originalFingerprint: order.originalFingerprint, sourceRevision: original.sourceRevision);
+      controller.dispose();
+      controller = WorkProcurementController(currentAccountId: () => account, currentStoreId: () => store,
+        currentProfileId: () => profileId, storeApproved: () => approved, bookmarks: bookmarks,
+        originalPurchaseReader: () => source, originalPurchaseRealm: () => 'evaluation',
+        stateStoreFactory: (scope) => states.putIfAbsent(scope, () => _ProcurementCustomerState(scope)));
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), isTrue);
+      final scoped = controller.session!.purchaseReader!;
+      expect(scoped, isNot(same(source))); expect(scoped.purchasedWarrantyReader, same(warranty));
+      final result = await scoped.readPurchasedWarranty(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', reference: reference, line: line, buyingStoreId: store);
+      expect(result?.terms?.fields['issuer'], 'HOST original issuer'); expect(warranty.requests, hasLength(1));
+      expect(warranty.requests.single.buyingStoreId, store); expect(warranty.requests.single.accountUserId, account);
+      expect(wire.requests.every((request) => request['operation'] == 'readBuyerPurchaseProjection'), isTrue);
+      store = 'other-store'; controller.invalidateIfChanged();
+      expect(scoped.isCurrent, isFalse);
+      expect(await scoped.readPurchasedWarranty(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation',
+        reference: reference, line: line, buyingStoreId: 's'), isNull);
+      expect(warranty.requests, hasLength(1));
+    });
     test('RESTOCK-PURPOSE local choice survives restart without changing basket identity', () async {
       profileId = 'manufacturer';
       expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
