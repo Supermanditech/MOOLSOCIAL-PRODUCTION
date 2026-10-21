@@ -1328,11 +1328,11 @@ final class BuyV2SharedPreferencesCustomerStateStore
     BuyV2ProcurementDraftSnapshot draft,
   ) {
     final hasFamilies = draft.cartProducts.values.any((p) => p.variantFamilyId != null);
-    final hasTaxTerms = draft.cartProducts.values.any((p) => p.packTerms?.supplierTaxDeclaration != null || p.packTerms?.commodityPriceRevision != null);
+    final hasPackTerms = draft.cartProducts.values.any((p) => p.packTerms != null);
     final baseVersion = hasFamilies ? 3 : draft.cartProducts.values.any(_hasExactProductMoney) ? 2 : 1;
     return {
-    'version': hasTaxTerms ? 4 : baseVersion,
-    if (hasTaxTerms) 'baseVersion': baseVersion,
+    'version': hasPackTerms ? 4 : baseVersion,
+    if (hasPackTerms) 'baseVersion': baseVersion,
     'ownerScope': draft.ownerScope,
     if (draft.navigation case final navigation?)
       'navigation': _encodeProcurementNavigation(navigation),
@@ -1350,7 +1350,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
           'variant': entry.value.variant,
           'variantAttributes': _encodeVariantAttributes(entry.value),
           'pack': entry.value.pack,
-          if (hasTaxTerms) 'supplierTaxTerms': entry.value.packTerms?.toRetainedJson(),
+          if (hasPackTerms) 'supplierTaxTerms': entry.value.packTerms?.toRetainedJson(),
           ..._encodeRetainedProductMoney(entry.value),
           'unitPrice': entry.value.unitPrice,
           'seller': entry.value.seller,
@@ -2326,9 +2326,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
     ));
   }
   static Map<String, Object?> _encodePurchasedProduct(BuyV2Product product) => {
-    'version': product.packTerms?.supplierTaxDeclaration != null || product.packTerms?.commodityPriceRevision != null ? 4
+    'version': product.packTerms != null ? 4
       : product.variantFamilyId != null ? 3 : _hasExactProductMoney(product) ? 2 : 1,
-    if (product.packTerms?.supplierTaxDeclaration != null || product.packTerms?.commodityPriceRevision != null) ...{
+    if (product.packTerms != null) ...{
       'baseVersion': product.variantFamilyId != null ? 3 : _hasExactProductMoney(product) ? 2 : 1,
       'supplierTaxTerms': product.packTerms!.toRetainedJson(),
     },

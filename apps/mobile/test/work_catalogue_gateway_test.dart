@@ -1299,23 +1299,346 @@ void main() {
     purpose: BuyV2ProcurementPurpose.restock, originOperationId: 'host-procurement-origin');
   AuthenticatedWorkspaceCatalogueGateway boundRestockGateway(SocialContentTransport api, {
     bool Function()? current, DateTime Function()? clock, WorkspacePublicVariantSource? variants,
-    SocialContentCredentials? credentials,
+    SocialContentCredentials? credentials, bool stock = false,
   }) => AuthenticatedWorkspaceCatalogueGateway(
     endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
     credentials: credentials ?? Credentials(), transport: api, realm: 'evaluation', now: clock ?? () => at,
     productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
     storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
-    minorMoneyReadbackSupported: true, procurementReadbackSupported: true, reviewedVariants: variants)
+    minorMoneyReadbackSupported: true, procurementReadbackSupported: true, reviewedVariants: variants,
+    stockSnapshotsSupported: stock)
       .forStoreProcurement(restockContext, current: current ?? () => true);
   BuyV2CatalogueQuery restockQuery({BuyV2ProcurementContext? context = restockContext,
     BuyV2Destination destination = BuyV2Destination.wholesale}) => BuyV2CatalogueQuery(
       destination: destination, regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas, procurementContext: context);
+  Map<String, dynamic> restockStockPackets(bool bulk) {
+    final marker = bulk ? 'RESTOCK_BULK_SUPPLIER_STOCK_CAPTURE=' : 'RESTOCK_SUPPLIER_STOCK_CAPTURE=';
+    final line = File(Platform.environment['LF_RESTOCK_STOCK_LOG']!).readAsLinesSync()
+      .where((line) => line.startsWith(marker)).single;
+    return jsonDecode(line.substring(marker.length)) as Map<String, dynamic>;
+  }
+  Future<({WorkProcurementController controller, BuyV2Session session, BuyV2Product product,
+      _ExactMoneyHostPreferences preferences})> retainedSupplierStockSession(bool bulk,
+      Future<SocialContentResponse> Function(Map<String, dynamic> body) stockRead, {bool payment = false, bool disposeAtTearDown = true,
+      Future<void> Function(Map<String, dynamic> body)? beforeCatalogue}) async {
+    final packets = restockClientPackets(bulk: bulk);
+    final api = OwnerTransport((body) async {
+      if (body['operation'] == 'readPublicStoreStockSnapshot') return stockRead(body);
+      expect(body['operation'], 'readStoreProcurementCatalogue');
+      await beforeCatalogue?.call(body);
+      final request = Map<String, Object?>.of(body)..remove('operation');
+      final packet = packets.values.cast<Map<String, dynamic>>().where((entry) =>
+        _mediaHash(entry['request']) == _mediaHash(request)).single;
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': packet['response']}));
+    });
+    final gateway = boundRestockGateway(api, stock: true);
+    final source = WorkspacePublicDiscoverySource(gateway: gateway, current: () => true);
+    final BuyV2Product seed;
+    try { seed = (await source.loadProducts(restockQuery(), pageSize: 24)).items.single; }
+    finally { source.dispose(); }
+    final quantity = seed.minimumOrder + seed.quantityStep, total = seed.priceMinor * (seed.minimumOrder + seed.quantityStep);
+    final preferences = _ExactMoneyHostPreferences();
+    BuyV2SharedPreferencesCustomerStateStore state() => BuyV2SharedPreferencesCustomerStateStore(preferences,
+      ownerScope: restockContext.customerStateOwnerScope);
+    final original = BuyV2CheckoutGroupAttempt(request: BuyV2OrderPlacementRequest.minor(
+      lines: [BuyV2CartLine(product: seed, quantity: quantity)],
+      address: const BuyV2Address(id: 'host-restock-address', kind: BuyV2AddressKind.work,
+        label: 'Host Store', recipient: 'Host buyer', phone: '9000000000', line: 'Isolated Store address',
+        area: 'Host area', pinCode: '342003', landmark: ''),
+      procurementContext: restockContext, paymentMethod: 'UPI', totalMinor: total, amountDueNowMinor: 1,
+      idempotencyKey: 'host-restock-original', checkoutQuoteId: 'host-restock-frozen-quote'),
+      fulfilmentKeys: const {'host-restock-fulfilment'}, obligations: [BuyV2CheckoutFulfilmentObligation(
+        fulfilmentKey: 'host-restock-fulfilment', productIds: {seed.id}, totalMinor: total, dueNowMinor: 1)],
+      state: BuyV2CheckoutSubmissionState.paymentUnknown, paymentReference: 'host-restock-reference');
+    expect(await state().write(BuyV2CustomerStateSnapshot(cartQuantities: {seed.id: quantity},
+      procurementDraft: BuyV2ProcurementDraftSnapshot(ownerScope: restockContext.customerStateOwnerScope,
+        cartProducts: {seed.id: seed}),
+      legacyCheckoutAttempt: payment ? BuyV2LegacyCheckoutAttempt(ownerScope: restockContext.customerStateOwnerScope,
+        payment: original) : null)), isTrue);
+    final controller = WorkProcurementController(currentAccountId: () => restockContext.accountId,
+      currentStoreId: () => restockContext.storeId, storeApproved: () => true, catalogueGateway: gateway,
+      bookmarks: _HostProcurementBookmarks(), stateStoreFactory: (_) => state());
+    if (disposeAtTearDown) addTearDown(controller.dispose);
+    expect(await controller.open(purpose: restockContext.purpose, returnTo: 'stockStatement', exactContext: restockContext), isTrue);
+    final session = controller.session!;
+    final product = session.cartLines.single.product;
+    expect(product.quantityStep, seed.quantityStep, reason: 'A saved Bulk basket must preserve its pack increments.');
+    expect(product.packTerms?.toRetainedJson(), seed.packTerms?.toRetainedJson(),
+      reason: 'Saved pack/tier terms must not depend on whether the supplier declares GST.');
+    expect(product.procurementSupplierGrant!.approved, isFalse, reason: 'Saved Cart data must not restore purchasing permission.');
+    expect(session.findProduct(product.id)!.procurementSupplierGrant!.approved, isTrue,
+      reason: 'The actual current supplier readback is separate from retained Cart terms.');
+    expect(session.procurementUnavailableMessage, isNull);
+    expect(session.procurementEligibilityFor(session.findProduct(product.id)!, retainedProduct: product),
+      BuyV2ProcurementEligibility.eligible);
+    final owned = session.cataloguePageSource! as WorkspacePublicDiscoverySource;
+    expect(owned.displayedProduct(session.findProduct(product.id)!), isNotNull, reason: 'Current reviewed content must be displayed.');
+    expect(product.publicListingIdentity, session.findProduct(product.id)!.publicListingIdentity);
+    expect(session.quantityFor(product.id), quantity);
+    return (controller: controller, session: session, product: product, preferences: preferences);
+  }
   test('LF05-RESTOCK initial catalogue scope preserves existing consumer default', () {
     final core = BuySession();
     final session = BuyV2Session(core: core, reviewDataEnabled: false);
     addTearDown(core.dispose); addTearDown(session.dispose);
     expect(session.catalogueAreaScope, BuyV2CatalogueAreaScope.regional);
   });
+  for (final bulk in [false, true]) {
+    for (final retirement in ['none', 'account', 'store', 'approval', 'dispose']) {
+      test('LF11 RESTOCK actual supplier Stock reader bulk=$bulk retirement=$retirement', () async {
+        final packets = restockClientPackets(bulk: bulk);
+        final stock = restockStockPackets(bulk);
+        var account = restockContext.accountId, store = restockContext.storeId, approved = true;
+        var clock = at, stockCalls = 0, disposed = false;
+        final delayed = Completer<SocialContentResponse>();
+        SocialContentResponse stockResponse(String name) => SocialContentResponse(statusCode: 200,
+          body: jsonEncode({'ok': true, 'data': (stock[name] as Map)['response']}));
+        final api = OwnerTransport((body) async {
+          final request = Map<String, Object?>.of(body)..remove('operation');
+          if (body['operation'] == 'readPublicStoreStockSnapshot') {
+            stockCalls++;
+            expect(_mediaHash(request), _mediaHash((stock['minimum'] as Map)['request']));
+            return retirement == 'none' ? stockResponse('minimum') : delayed.future;
+          }
+          expect(body['operation'], 'readStoreProcurementCatalogue');
+          final packet = packets.values.cast<Map<String, dynamic>>().where((entry) =>
+            _mediaHash(entry['request']) == _mediaHash(request)).single;
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': packet['response']}));
+        });
+        final controller = WorkProcurementController(currentAccountId: () => account, currentStoreId: () => store,
+          storeApproved: () => approved, catalogueGateway: boundRestockGateway(api, stock: true, clock: () => clock),
+          bookmarks: _HostProcurementBookmarks(), stateStoreFactory: (scope) => _HostRetirableStateStore()..ownerScope = scope);
+        addTearDown(() { if (!disposed) controller.dispose(); });
+        expect(await controller.open(purpose: restockContext.purpose, returnTo: 'stockStatement', exactContext: restockContext), isTrue);
+        final session = controller.session!;
+        session.openDestination(BuyV2Destination.wholesale);
+        session.chooseWholesaleSaleType(bulk ? BuyV2WholesaleSaleType.bulk : BuyV2WholesaleSaleType.wholesale);
+        final pager = session.acquireCatalogueProducts('host-supplier-stock');
+        await pager.open(session.catalogueQuery());
+        final product = pager.page!.items.single;
+        expect(session.storeStockReader, isNotNull, reason: 'The configured Store session must reuse the shared Stock reader.');
+        expect(session.storeStockRequestIdentity(product), isNotNull);
+        expect(stockCalls, 0, reason: 'Synchronous getters must not dispatch reads.');
+        final reading = session.refreshStoreStock(product);
+        if (retirement != 'none') {
+          await Future<void>.delayed(Duration.zero);
+          expect(stockCalls, 1);
+          if (retirement == 'account') account = 'other-account';
+          if (retirement == 'store') store = 'other-store';
+          if (retirement == 'approval') approved = false;
+          if (retirement == 'dispose') { controller.dispose(); disposed = true; }
+          else { controller.invalidateIfChanged(); }
+          delayed.complete(stockResponse('minimum'));
+          expect(await reading, isFalse);
+          expect(session.storeStockFor(product), isNull);
+          expect(session.storeStockRequestIdentity(product), isNull);
+          expect(await session.refreshStoreStock(product), isFalse);
+          expect(stockCalls, 1);
+        } else {
+          expect(await reading, isTrue);
+          expect(session.storeStockFor(product)!.quantityAvailable, isTrue);
+          expect(session.storeStockLabelFor(product), 'Supplier reports stock for ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'}');
+          expect(session.productFactsFor(product).eligibility, isNull);
+          expect(session.addProduct(product.id), isFalse);
+          expect(session.availablePaymentMethods, isEmpty);
+          expect(session.cartLines, isEmpty);
+          expect(stockCalls, 1);
+          final identity = product.publicListingIdentity!, grant = product.procurementSupplierGrant!;
+          final wrongPack = product.copyWith(publicListingIdentity: BuyV2PublicListingIdentity(
+            listingId: identity.listingId, realm: identity.realm, storeId: identity.storeId, skuId: identity.skuId,
+            canonicalProductId: identity.canonicalProductId, verifiedPackId: 'different-pack', channel: identity.channel));
+          final wrongOffer = product.copyWith(procurementSupplierGrant: BuyV2ProcurementSupplierGrant(
+            workspaceId: grant.workspaceId, storeId: grant.storeId, role: grant.role, approved: grant.approved,
+            listingId: grant.listingId, productCanonicalId: grant.productCanonicalId, offerId: grant.offerId,
+            offerRevision: 'different-revision', channel: grant.channel, published: grant.published, validUntil: grant.validUntil));
+          for (final changed in [wrongPack, wrongOffer, product.copyWith(priceMinor: product.priceMinor + 1)]) {
+            expect(session.storeStockRequestIdentity(changed), isNull);
+            expect(session.storeStockFor(changed), isNull);
+            expect(await session.refreshStoreStock(changed), isFalse);
+          }
+          expect(stockCalls, 1, reason: 'Changed offer/pack/price cannot reuse another publication report.');
+          clock = at.add(const Duration(minutes: 5));
+          expect(session.storeStockFor(product), isNull);
+          expect(session.storeStockRequestIdentity(product), isNull);
+          expect(await session.refreshStoreStock(product), isFalse);
+          expect(stockCalls, 1);
+          session.releaseCatalogueProducts('host-supplier-stock');
+        }
+      }, skip: Platform.environment['LF_RESTOCK_STOCK_LOG'] == null);
+    }
+  }
+  for (final bulk in [false, true]) {
+    for (final withdrawn in [false, true]) {
+      test('LF11 RESTOCK supplier renewal retires held Stock bulk=$bulk withdrawn=$withdrawn', () async {
+        final stock = restockStockPackets(bulk), entered = Completer<void>(), stockEntered = Completer<void>();
+        final release = Completer<void>(), delayed = Completer<SocialContentResponse>();
+        var refreshing = false, reads = 0;
+        SocialContentResponse reply() => SocialContentResponse(statusCode: 200,
+          body: jsonEncode({'ok': true, 'data': stock['shortage']['response']}));
+        final fixture = await retainedSupplierStockSession(bulk, (_) async {
+          reads++; if (reads == 1) { stockEntered.complete(); return delayed.future; } return reply();
+        }, beforeCatalogue: (body) async {
+          final request = body['request'] as Map;
+          if (!refreshing || (request['query'] as Map?)?['listingIds'] == null) return;
+          if (!entered.isCompleted) entered.complete();
+          if (withdrawn) throw StateError('Isolated supplier read withdrawn');
+          await release.future;
+        });
+        final session = fixture.session, product = fixture.product;
+        final reading = session.refreshStoreStock(product);
+        await stockEntered.future;
+        refreshing = true;
+        final renewal = session.restoreCommerce();
+        await entered.future;
+        expect(session.procurementUnavailableMessage, isNotNull);
+        expect(session.storeStockRequestIdentity(product), isNull);
+        delayed.complete(reply());
+        expect(await reading, isFalse);
+        expect(session.storeStockFor(product), isNull);
+        release.complete();
+        await renewal;
+        if (withdrawn) {
+          expect(session.procurementUnavailableMessage, isNotNull);
+          expect(await session.refreshStoreStock(product), isFalse);
+          expect(reads, 1);
+        } else {
+          expect(session.procurementUnavailableMessage, isNull);
+          expect(await session.refreshStoreStock(product), isTrue);
+          expect(reads, 2);
+        }
+        expect(session.quantityFor(product.id), product.minimumOrder + product.quantityStep);
+        expect(session.cartLines.single.product.priceMinor, product.priceMinor);
+        expect(session.availablePaymentMethods, isEmpty);
+      }, skip: Platform.environment['LF_RESTOCK_STOCK_LOG'] == null);
+    }
+    for (final outcome in ['shortage', 'unknown', 'mismatch', 'withdrawn', 'payment']) {
+      test('LF11 RESTOCK retained supplier Stock bulk=$bulk outcome=$outcome', () async {
+        final stock = restockStockPackets(bulk), quantities = <int>[];
+        var unknown = false;
+        final fixture = await retainedSupplierStockSession(bulk, (body) async {
+          quantities.add(body['requestedPacks'] as int);
+          if (outcome == 'withdrawn') {
+            return SocialContentResponse(statusCode: 409, body: jsonEncode({'ok': false, 'error': {'code': 'invalid_state'}}));
+          }
+          final name = outcome == 'mismatch' ? 'mismatch' : outcome == 'unknown' || unknown ? 'expired' :
+            body['requestedPacks'] == (stock['minimum'] as Map)['request']['requestedPacks'] ? 'minimum' : 'shortage';
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': (stock[name] as Map)['response']}));
+        }, payment: outcome == 'payment');
+        final session = fixture.session, product = fixture.product;
+        final before = Map.of(fixture.preferences.values), original = session.legacyCheckoutAttempt;
+        final initialQuantity = session.quantityFor(product.id);
+        expect(await session.refreshStoreStock(product), outcome == 'shortage' || outcome == 'payment');
+        expect(quantities, [initialQuantity]);
+        expect(session.quantityFor(product.id), initialQuantity);
+        expect(fixture.preferences.values, before, reason: 'A report must not rewrite retained purchasing state.');
+        expect(session.legacyCheckoutAttempt, same(original));
+        expect(session.availablePaymentMethods, isEmpty);
+        expect(session.productFactsFor(product).eligibility, isNull);
+        if (outcome == 'payment') {
+          expect(session.cartChangesBlocked, isTrue);
+          expect(session.checkoutRequiresResolution, isTrue);
+          expect(original!.payment.request.procurementContext!.customerStateOwnerScope, restockContext.customerStateOwnerScope);
+          expect(original.payment.request.idempotencyKey, 'host-restock-original');
+          expect(original.payment.paymentReference, 'host-restock-reference');
+          expect(original.payment.request.amountDueNowMinor, 1);
+          expect(original.payment.request.totalMinor, product.priceMinor * initialQuantity);
+          expect(original.payment.request.lines.single.product.packTerms!.toRetainedJson(), product.packTerms!.toRetainedJson());
+          expect(session.addProduct(product.id), isFalse);
+          expect(fixture.preferences.values, before);
+        } else if (outcome == 'shortage') {
+          expect(session.storeStockLabelFor(product), 'Supplier cannot confirm stock for this quantity');
+          expect(session.productFactsFor(product).orderabilityLabel, 'Stock unavailable for this quantity');
+          session.decrease(product.id);
+          expect(session.quantityFor(product.id), product.minimumOrder);
+          expect(session.storeStockFor(product), isNull, reason: 'A shortage for another quantity is not the current report.');
+          expect(await session.refreshStoreStock(product), isTrue);
+          expect(session.storeStockFor(product)!.quantityAvailable, isTrue);
+          expect(quantities, [initialQuantity, product.minimumOrder]);
+          expect(session.addProduct(product.id), isFalse, reason: 'Positive reports must not supply operational eligibility.');
+          unknown = true;
+          expect(await session.refreshStoreStock(product, force: true), isFalse);
+          expect(session.storeStockFor(product), isNull);
+          expect(session.storeStockLabelFor(product), isNull);
+          expect(session.quantityFor(product.id), product.minimumOrder);
+        } else {
+          expect(session.storeStockFor(product), isNull);
+          expect(session.storeStockLabelFor(product), isNull);
+          expect(session.addProduct(product.id), isFalse);
+        }
+      }, skip: Platform.environment['LF_RESTOCK_STOCK_LOG'] == null);
+    }
+  }
+  for (final bulk in [false, true]) {
+    test('LF11 RESTOCK saved ordinary pack terms coexist with legacy rows bulk=$bulk', () async {
+      final fixture = await retainedSupplierStockSession(bulk, (_) async => throw StateError('No Stock read expected'));
+      final selected = fixture.product, preferences = _ExactMoneyHostPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: restockContext.customerStateOwnerScope);
+      expect(selected.packTerms!.supplierTaxDeclaration, isNull);
+      expect(selected.packTerms!.commodityPriceRevision, isNull);
+      expect(await store.write(BuyV2CustomerStateSnapshot(procurementDraft: BuyV2ProcurementDraftSnapshot(
+        ownerScope: restockContext.customerStateOwnerScope, cartProducts: {selected.id: selected, product.id: product}))), isTrue);
+      final rows = (await store.read())!.procurementDraft!.cartProducts;
+      expect(rows[selected.id]!.packTerms!.toRetainedJson(), selected.packTerms!.toRetainedJson());
+      expect(rows[product.id]!.packTerms, isNull);
+      expect(rows[selected.id]!.priceMinor, selected.priceMinor);
+      expect(rows.values.every((p) => p.procurementSupplierGrant?.approved == false), isTrue);
+      final key = preferences.values.keys.single;
+      final raw = jsonDecode(preferences.values[key]!) as Map<String, dynamic>, draft = raw['procurementDraft'] as Map;
+      expect(draft['version'], 4);
+      // Old formats never contained pack terms. Reading them must not invent
+      // historical increments, tiers, expiry or purchasing permission.
+      draft['version'] = draft.remove('baseVersion');
+      for (final row in (draft['cartProducts'] as Map).values.cast<Map>()) { row.remove('supplierTaxTerms'); }
+      final legacyBytes = jsonEncode(raw); preferences.values[key] = legacyBytes;
+      final legacy = (await store.read())!.procurementDraft!.cartProducts;
+      expect(legacy[selected.id]!.packTerms, isNull);
+      expect(legacy[selected.id]!.priceMinor, selected.priceMinor);
+      expect(legacy.values.every((p) => p.procurementSupplierGrant?.approved == false), isTrue);
+      expect(preferences.values[key], legacyBytes);
+    }, skip: Platform.environment['LF_RESTOCK_STOCK_LOG'] == null);
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF11 RESTOCK compact product and Cart supplier Stock bulk=$bulk scale=$scale', (tester) async {
+        tester.view.physicalSize = const Size(320, 800); tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final stock = restockStockPackets(bulk), quantities = <int>[];
+        final fixture = await retainedSupplierStockSession(bulk, (body) async {
+          quantities.add(body['requestedPacks'] as int);
+          final name = body['requestedPacks'] == stock['minimum']['request']['requestedPacks'] ? 'minimum' : 'shortage';
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': stock[name]['response']}));
+        }, disposeAtTearDown: false);
+        final session = fixture.session, product = fixture.product;
+        expect(session.openProduct(product.id), isTrue);
+        Widget frame(Widget Function() body) => MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+          MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+          home: Scaffold(body: AnimatedBuilder(animation: session, builder: (context, _) => body())));
+        await tester.pumpWidget(frame(() => BuyV2ProductView(session: session)));
+        await tester.pumpAndSettle();
+        final quantity = product.minimumOrder + product.quantityStep;
+        expect(quantities, [quantity]);
+        final label = find.text('Supplier cannot confirm stock for this quantity');
+        await tester.scrollUntilVisible(label, 220, scrollable: find.descendant(
+          of: find.byKey(PageStorageKey('buy-product-${product.id}')), matching: find.byType(Scrollable)).first);
+        await tester.ensureVisible(label); await tester.pumpAndSettle();
+        expect(label, findsOneWidget); expect(find.text('Stock'), findsOneWidget);
+        session.openCart();
+        await tester.pumpWidget(frame(() => BuyV2CartView(session: session, onBrowseMore: () {})));
+        await tester.pumpAndSettle();
+        expect(quantities, [quantity], reason: 'Fresh exact product/Cart reads share one result.');
+        final row = find.byKey(ValueKey('buy-cart-stock-${product.id}'));
+        await tester.ensureVisible(row); await tester.pumpAndSettle();
+        expect(label, findsOneWidget);
+        session.decrease(product.id); await tester.pumpAndSettle();
+        expect(quantities, [quantity, product.minimumOrder]);
+        expect(find.text('Supplier reports stock for ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'}'), findsOneWidget);
+        expect(session.quantityFor(product.id), product.minimumOrder);
+        expect(session.productFactsFor(product).eligibility, isNull);
+        expect(session.addProduct(product.id), isFalse);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        fixture.controller.dispose();
+      }, skip: Platform.environment['LF_RESTOCK_STOCK_LOG'] == null);
+    }
+  }
   for (final savedScope in BuyV2CatalogueAreaScope.values) {
     test('LF05-RESTOCK configured scope waits for saved $savedScope without initial writes', () async {
       final packets = restockClientPackets(bulk: true);

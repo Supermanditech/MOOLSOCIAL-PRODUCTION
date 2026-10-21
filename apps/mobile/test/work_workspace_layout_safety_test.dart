@@ -32492,13 +32492,21 @@ void main() {
         expect(tester.getSize(header).height, lessThanOrEqualTo(70));
         for (final key in [
           'work-dashboard-search',
-          'work-dashboard-profile',
           'work-dashboard-workspace-switcher',
         ]) {
           expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
         }
         final content = find.byKey(const Key('work-orders-destination'));
         expect(tester.getSize(content).height, greaterThanOrEqualTo(160));
+        expect(find.byKey(const Key('work-dashboard-profile')), findsNothing);
+        await tester.tap(find.byKey(const Key('work-store-home')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-dashboard-profile')).hitTestable(),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const Key('work-store-orders')));
+        await tester.pumpAndSettle();
         final invoicesBefore = List.of(work.workspaceInvoices);
         await openCounterSaleFromSales(tester);
         // This unstarted sale opens customer entry, not the items/review stage.
@@ -33056,8 +33064,17 @@ void main() {
           ..clear()
           ..addAll(originals);
         expect(work.workspaceStockMovements.map((m) => m.id), movementIds);
-        // Recovery uses the original frozen attempt, not a new import.
-        await tester.tap(find.byKey(const Key('work-import-save')));
+        // A Store change permanently retires the old review, even on return.
+        if (scenario == 'store changed') {
+          expect(await review.saveProducts(rows), contains('Your store changed'));
+          expect(storage.saveAttempts, attemptsBefore);
+          await tester.pageBack();
+          await tester.pumpAndSettle();
+          expect(await work.retryWorkspaceInventorySave(), isTrue);
+        } else {
+          // Recovery uses the original frozen attempt, not a new import.
+          await tester.tap(find.byKey(const Key('work-import-save')));
+        }
         await tester.pumpAndSettle();
         expect(find.byType(StoreProductImportReviewScreen), findsNothing);
         expect(storage.saveAttempts, attemptsBefore + 1);
@@ -33658,7 +33675,12 @@ void main() {
       headers.containsAll(WorkspaceProductImport.packFieldLabels.keys),
       isTrue,
     );
-    expect(headers, hasLength(48));
+    expect(headers, hasLength(56));
+    expect(headers, containsAll([
+      'retailTaxAmount', 'retailTaxBasis', 'wholesaleTaxAmount',
+      'wholesaleTaxBasis', 'gstPercent', 'gstBasis',
+      'priceChangesFrequently', 'priceValidityMinutes',
+    ]));
     expect(headers, containsAll(['manufacturerAddress', 'packerAddress', 'importerAddress',
       'productGroup', 'shareGroupContent', 'option:Colour', 'option:Storage']));
     expect(headers, containsAll(WorkspaceSellingInputs.labels.keys));
@@ -42784,6 +42806,22 @@ void main() {
         work.workspaceOrderQuantities.values.where((q) => q > 0),
         hasLength(itemCount),
       );
+      final itemScroll = find
+          .descendant(
+            of: find.byKey(const Key('work-review-items-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final firstReviewItem = find.byKey(
+        ValueKey('work-review-item-${products.first.id}'),
+      );
+      await tester.scrollUntilVisible(
+        firstReviewItem,
+        140,
+        scrollable: itemScroll,
+        maxScrolls: 100,
+      );
+      await tester.pumpAndSettle();
       expectFullTitleFits(reviewSummary, products.first.title);
       expect(save.hitTestable(), findsOneWidget);
       final saveBounds = tester.getRect(save);
@@ -42804,12 +42842,6 @@ void main() {
         tester,
         'counter-compact-fifty-review-top-$caseId',
       );
-      final itemScroll = find
-          .descendant(
-            of: find.byKey(const Key('work-review-items-list')),
-            matching: find.byType(Scrollable),
-          )
-          .first;
       final lastReviewItem = find.byKey(
         ValueKey('work-review-item-${products.last.id}'),
       );
@@ -42840,6 +42872,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Review bill · $itemCount items'), findsOneWidget);
       expect(find.byKey(const Key('work-review-items-list')), findsOneWidget);
+      await tester.scrollUntilVisible(
+        firstReviewItem,
+        140,
+        scrollable: itemScroll,
+        maxScrolls: 100,
+      );
+      await tester.pumpAndSettle();
       expectFullTitleFits(reviewSummary, products.first.title);
       expect(work.workspaceOrderTotal, expectedTotal);
       if (scale > 1.3) {
@@ -45291,9 +45330,14 @@ void main() {
         textScale: 1,
         bottomInset: 34,
       );
-      await tester.tap(find.byKey(const Key('work-store-orders')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+      final profile = action.$1 == 'work-dashboard-profile';
+      if (!profile) {
+        await tester.tap(find.byKey(const Key('work-store-orders')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+      } else {
+        expect(find.byKey(const Key('work-store-operating-board')), findsOneWidget);
+      }
       expect(find.byKey(Key(action.$1)).hitTestable(), findsOneWidget);
       await tester.tap(find.byKey(Key(action.$1)));
       await tester.pumpAndSettle();
@@ -45304,7 +45348,7 @@ void main() {
       expect(
         find.byKey(
           Key(
-            action.$1 == 'work-dashboard-alerts'
+            profile || action.$1 == 'work-dashboard-alerts'
                 ? 'work-workspace-dashboard'
                 : 'work-orders-destination',
           ),
@@ -47059,7 +47103,14 @@ void main() {
     expect(work.workspaceAcceptingOrders, isFalse);
     expect(work.workspaceReopensAt, 'Tomorrow at 8:00 AM');
     expect(work.workspaceVisibleToCustomers, isTrue);
-    expect(work.workspaceActivity.first.message, contains('paused'));
+    expect(
+      work.workspaceActivity.first.message,
+      'Store pause preference saved until Tomorrow at 8:00 AM.',
+    );
+    expect(
+      work.noticeMessage,
+      'Store pause applied in this session. Public sync is pending.',
+    );
     final activity = List.of(work.workspaceActivity);
     await openStoreSettings(tester);
     expect(tester.widget<ChoiceChip>(tomorrow).selected, isTrue);
@@ -47091,7 +47142,7 @@ void main() {
     verifyCurrentTomorrowPauseDiscard,
   );
   testWidgets(
-    'current Store qualification H23 availability saves customer-facing state and Back discards draft',
+    'current Store qualification H23 availability saves local preference and Back discards draft',
     verifyCurrentTomorrowPauseDiscard,
   );
 
@@ -53626,6 +53677,9 @@ void main() {
       expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-operating-board')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
       final picker = find.byKey(const Key('work-dashboard-workspace-switcher'));
       await tester.tap(picker);
@@ -54858,17 +54912,36 @@ void main() {
   });
 
   testWidgets(
-    'phone order keeps customer product payment and Mool delivery truth in one flow',
+    'retained Phone order keeps customer product payment and Mool delivery truth in one flow',
     (tester) async {
-      // Labelled host journey through actual Orders, not runtime acceptance.
-      final work = liveStore();
+      // Labelled retained Phone journal; no live Phone source picker is claimed.
+      final contact = _ContactDraftFixtureStore();
+      final journal = _CounterDraftFixtureStore();
+      final work = WorkSession(contactDraftStore: contact, counterDraftStore: journal)
+        ..seedVerifiedWorkspace()
+        ..retailerSetupSaved = true
+        ..reviewStage = WorkReviewStage.live;
+      journal.value = WorkspaceCounterDraft(
+        account: contact.accountScope,
+        store: work.activeWorkspace!.id,
+        id: 'HOST-RETAINED-PHONE-DELIVERY',
+        revision: 1,
+        stage: WorkspaceCounterDraftStage.editing,
+        customer: '9829012345',
+        source: 'Phone',
+        fulfilment: 'At the shop',
+        payment: 'Cash',
+        address: '',
+        lines: const [],
+      );
       final orders = List<WorkspaceOrderRecord>.of(work.workspaceOrders);
       final stock = work.workspaceCatalogueItems
           .map((item) => (item.id, item.stock))
           .toList();
       final balance = work.workspaceSettlementBalance;
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-      await openExistingDeliveryDraft(tester);
+      await openCounterSaleFromSales(tester);
+      await enterSaleCustomer(tester, '9829012345');
       expect(work.workspaceOrderCustomer, '9829012345');
       expect(work.workspaceOrderSource, 'Phone');
       await addCounterProduct(
@@ -57235,9 +57308,11 @@ void main() {
       await openCounterSaleFromSales(tester);
       if (state == 'submitting' || state == 'read-failure') {
         expect(
-          find.byKey(const Key('work-sales-home')),
+          find.byKey(const Key('work-counter-draft-recovery')),
           findsOneWidget,
         );
+        expect(find.byKey(const Key('work-sale-customer-sheet')), findsNothing);
+        expect(find.byKey(const Key('work-order-review')), findsNothing);
         expect(
           find.byKey(const Key('work-operational-order-source')),
           findsNothing,
@@ -57458,6 +57533,11 @@ void main() {
         switch (changed) {
           case 'account':
             contact.accountScope = 'host-other-account';
+            expect(await work.recoverWorkspaceAccount(accountReady: true), isTrue);
+            work.notifyListeners();
+            await tester.pumpAndSettle();
+            expect(work.workspaceAccountRecoveryPending, isFalse);
+            expect(work.workspaceAccountCurrent(accountReady: true), isTrue);
           // Host late projection; ordinary selection is blocked during submit.
           case 'selection':
             work.currentWorkspaceOrderId = 'SALE-1042';
@@ -57484,6 +57564,12 @@ void main() {
         expect(saved.stage, 'Confirmed');
         expect(booking.requests, isEmpty);
         expect(work.workspaceInvoices, isEmpty);
+        if (changed == 'account') {
+          expect(work.activeWorkspace, isNull);
+          expect(work.workspaceOrders, isEmpty);
+          expect(work.workspaceAccountRecoveryPending, isFalse);
+          expect(find.text('Restoring your Workspace'), findsNothing);
+        }
         expect(tester.takeException(), isNull);
       },
     );
@@ -60317,6 +60403,9 @@ void main() {
         );
       }
       if (changed == 'selection') work.currentWorkspaceOrderId = 'SALE-1042';
+      final retainedOrders = List.of(work.workspaceOrders);
+      final retainedStock = List.of(work.workspaceCatalogueItems);
+      final retainedInvoices = List.of(work.workspaceInvoices);
       final records = jsonEncode(
         work.workspaceOrders.map((item) => item.toLedgerJson()).toList(),
       );
@@ -60374,21 +60463,33 @@ void main() {
         }
         expect(find.byKey(const Key('work-focused-order-id')), findsNothing);
       }
-      expect(work.currentWorkspaceOrderId, selected);
-      expect(work.workspaceDeliveryAssignment, same(assignment));
+      expect(work.currentWorkspaceOrderId, changed == 'account' ? null : selected);
+      expect(
+        work.workspaceDeliveryAssignment,
+        changed == 'account' ? isNull : same(assignment),
+      );
+      if (changed == 'account') {
+        expect(work.activeWorkspace, isNull);
+        expect(work.workspaceOrders, isEmpty);
+        expect(work.workspaceCatalogueItems, isEmpty);
+        expect(work.workspaceInvoices, isEmpty);
+      }
       expect(
         jsonEncode(
-          work.workspaceOrders.map((item) => item.toLedgerJson()).toList(),
+          (changed == 'account' ? retainedOrders : work.workspaceOrders)
+              .map((item) => item.toLedgerJson()).toList(),
         ),
         records,
       );
       expect(
-        work.workspaceCatalogueItems.map((item) => (item.id, item.stock)),
+        (changed == 'account' ? retainedStock : work.workspaceCatalogueItems)
+            .map((item) => (item.id, item.stock)),
         orderedEquals(stock),
       );
       expect(
         jsonEncode(
-          work.workspaceInvoices.map((item) => item.toLedgerJson()).toList(),
+          (changed == 'account' ? retainedInvoices : work.workspaceInvoices)
+              .map((item) => item.toLedgerJson()).toList(),
         ),
         invoices,
       );
@@ -64461,7 +64562,8 @@ void main() {
           isTrue,
         );
         await tester.pumpAndSettle();
-        for (final change in ['account', 'store']) {
+        // Account reconciliation retires all Store data; exercise it last.
+        for (final change in ['store', 'account']) {
           await tester.tap(find.byKey(const Key('work-group-offer-switch')));
           await tester.pumpAndSettle();
           final retainedChoice = tester
@@ -64507,9 +64609,21 @@ void main() {
             ),
             findsNothing,
           );
+          final selection = work.selectedWorkspaceGroupOfferId;
+          final offers = work.workspaceGroupOffers.map((offer) => offer.id).toList();
+          if (change == 'account') {
+            expect(work.activeWorkspace, isNull);
+            expect(selection, isNull);
+            expect(offers, isEmpty);
+          } else {
+            expect(work.activeWorkspace!.id, newStore);
+            expect(selection, 'offer-0');
+            expect(work.workspaceGroupOffers.every((offer) => offer.workspaceId == newStore), isTrue);
+          }
           retainedChoice();
           await tester.pumpAndSettle();
-          expect(work.selectedWorkspaceGroupOfferId, 'offer-0');
+          expect(work.selectedWorkspaceGroupOfferId, selection);
+          expect(work.workspaceGroupOffers.map((offer) => offer.id), offers);
           expect(
             find.byKey(const Key('work-group-chooser-scope-changed')),
             findsOneWidget,
@@ -65935,7 +66049,7 @@ void main() {
     expect(work.workspacePaidRequirementReference, isNull);
   });
 
-  testWidgets('Grow shows live Store outcomes before its first actions', (
+  testWidgets('Grow shows recorded Store outcomes before its first actions', (
     tester,
   ) async {
     final work = liveStore()..workspaceVisibleToCustomers = true;
@@ -65970,7 +66084,9 @@ void main() {
 
     expect(find.text('Grow repeat business'), findsOneWidget);
     expect(find.text('Repeat'), findsOneWidget);
-    expect(find.text('Offers live'), findsOneWidget);
+    expect(find.text('Offers recorded'), findsOneWidget);
+    expect(find.textContaining('public publication is not confirmed'), findsOneWidget);
+    expect(find.text('Offers live'), findsNothing);
     expect(find.text('Requirements'), findsOneWidget);
     expect(find.text('Public'), findsOneWidget);
     for (final keyName in const [
@@ -67616,7 +67732,7 @@ void main() {
         reason: 'Changing the guide is not a delete command for hidden edits or original details');
       await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-product-guided-Model code')), findsNothing);
-      expect(find.text('Saved details stay in Specifications. Choose Electronics or Appliances for guided fields.'), findsOneWidget);
+      expect(find.text('Choose a guide above to add optional product details. Existing specifications are kept.'), findsOneWidget);
       await chooseGuide('Electronics');
       for (final entry in electronics.entries) {
         expect(tester.widget<TextField>(find.byKey(Key('work-product-guided-${entry.key}'))).controller!.text, entry.value);
@@ -69678,7 +69794,10 @@ void main() {
           expect(work.currentWorkspaceOrderId, replacementOrder);
         }
       }
-      expect(work.workspaceInvoices, hasLength(1));
+      expect(
+        work.workspaceInvoices,
+        interruption == 'account' ? isEmpty : hasLength(1),
+      );
       expect(jsonEncode(invoice.toLedgerJson()), invoiceBefore);
       expect(
         financeBefore.payments
@@ -69689,9 +69808,12 @@ void main() {
       expect(financeFacts(financeBefore), oldFinanceFacts);
       if (interruption == 'account') {
         expect(work.workspaceFinance, isNull);
+        expect(work.activeWorkspace, isNull);
+        expect(work.workspaceCatalogueItems, isEmpty);
         expect(find.byKey(const Key('collection-confirm')), findsNothing);
+      } else {
+        expect(stockFacts(), stockBefore);
       }
-      expect(stockFacts(), stockBefore);
       expect(tester.takeException(), isNull);
       restorePhotos();
     });

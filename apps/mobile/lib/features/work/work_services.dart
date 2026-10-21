@@ -130,6 +130,7 @@ class WorkProcurementController extends ChangeNotifier {
     final purchaseSource = originalPurchaseReader?.call(), purchaseRealm = originalPurchaseRealm?.call();
     _purchaseSource = purchaseSource; _purchaseSourceRealm = purchaseRealm;
     final purchases = context == null ? null : _scopedPurchases(context, purchaseSource, purchaseRealm);
+    final catalogue = _ownedCatalogueSource;
     return BuyV2Session(
       core: BuySession(),
       procurementIdentity: identity,
@@ -142,6 +143,10 @@ class WorkProcurementController extends ChangeNotifier {
       cataloguePageSource: _ownedCatalogueSource ?? review,
       variantFamilySource: _ownedCatalogueSource,
       productContentAdapter: _ownedCatalogueSource,
+      storeStockReader: bound?.stockSnapshotsSupported == true && catalogue != null
+          ? WorkspacePublicStockReader(gateway: bound!, displayed: catalogue.displayedProduct,
+              current: () => catalogue.active, now: bound.now)
+          : null,
       catalogueNow: bound?.now ?? DateTime.now,
       initialCatalogueRegionId: review == null ? null : 'jodhpur',
       initialCatalogueAreaScope: bound == null ? BuyV2CatalogueAreaScope.regional : BuyV2CatalogueAreaScope.allAreas,

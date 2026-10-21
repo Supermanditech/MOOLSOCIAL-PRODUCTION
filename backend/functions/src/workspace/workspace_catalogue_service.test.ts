@@ -4077,6 +4077,41 @@ test(`LF05-RESTOCK persisted ${trade} supplier publication reaches scoped browsi
     assert.equal(resolved.catalogue.items[0].channel, trade);
     assert.equal(resolved.catalogue.items[0].listing.items[0].channels[0].minimumOrder, value.channels[0]!.minimumOrder);
     console.log((trade === 'bulk' ? 'RESTOCK_BULK_CLIENT_CAPTURE=' : 'RESTOCK_CLIENT_CAPTURE=') + JSON.stringify(clientPackets));
+    // Supplier-reported Stock is shared across buying contexts, never a hold.
+    const binding = {skuId: value.skuId, skuRevision: 1,
+      canonicalProductId: value.canonicalProductId, verifiedPackId: value.verifiedPackId};
+    const stockScope = {stockSnapshotVersion: 1, storeId: 'store-one', binding};
+    const minimum = value.channels[0]!.minimumOrder, step = value.channels[0]!.quantityStep;
+    const stockCommand = {...stockScope, expectedRevision: 0, idempotencyKey: `restock-${trade}-stock`,
+      source: {inventoryRevision: 1, savedAt: at, mode: 'exact_quantity', quantityPacks: minimum, available: true}};
+    const skuBeforeStock = JSON.stringify((await root.collection('stores').doc('store-one').collection('skus').doc(value.skuId).get()).data());
+    const ownerStock = await service().handleStoreStock('owner-one', 'publishStoreStockSnapshot', stockCommand) as any;
+    assert.equal(ownerStock.state, 'reported');
+    assert.equal(ownerStock.orderingAvailable, false); assert.equal(ownerStock.reservationConfirmed, false);
+    assert.deepEqual(await service().handleStoreStock('owner-one', 'reconcileStoreStockSnapshot', stockCommand), ownerStock);
+    const stockPackets: Record<string, {request: object; response: any}> = {};
+    for (const [name, requestedPacks] of [['minimum', minimum], ['shortage', minimum + step]] as const) {
+      const stockRequest = {...stockScope, requestedPacks};
+      const response = await service().handleStoreStock(context.accountId, 'readPublicStoreStockSnapshot', stockRequest) as any;
+      stockPackets[name] = {request: stockRequest, response};
+      assert.equal(response.state, 'reported');
+      assert.equal(response.stock.quantityAvailable, name === 'minimum');
+      assert.equal(response.orderingAvailable, false); assert.equal(response.reservationConfirmed, false);
+      for (const field of ['quantityPacks', 'inventoryRevision', 'ownerUserId', 'integrity', 'purchaseCost', 'movements']) {
+        assert.equal(JSON.stringify(response).includes(field), false);
+      }
+    }
+    const mismatchedStock = {...stockScope, binding: {...binding, skuRevision: 2}, requestedPacks: minimum};
+    stockPackets.mismatch = {request: mismatchedStock,
+      response: await service().handleStoreStock(context.accountId, 'readPublicStoreStockSnapshot', mismatchedStock)};
+    assert.equal(stockPackets.mismatch.response.state, 'unknown');
+    const expiredAt = new Date(Date.parse(at) + 5 * 60 * 1000 + 1);
+    const expiredService = new WorkspaceCatalogueService(new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => expiredAt),
+      catalogueIdentity, () => expiredAt);
+    stockPackets.expired = {request: {...stockScope, requestedPacks: minimum}, response: await expiredService.handleStoreStock(
+      context.accountId, 'readPublicStoreStockSnapshot', {...stockScope, requestedPacks: minimum})};
+    assert.equal(stockPackets.expired.response.state, 'unknown');
+    assert.equal(JSON.stringify((await root.collection('stores').doc('store-one').collection('skus').doc(value.skuId).get()).data()), skuBeforeStock);
     const participant = producerParticipant('store-one', 'grocery', 'wholesaler');
     const revoked = applySupplyParticipantCommand(participant, {type: 'revoke_capability',
       actor: {actorId: 'capability-reviewer', tenantId: 'tenant-one', scopes: ['supply.capability.review']},
@@ -4091,6 +4126,9 @@ test(`LF05-RESTOCK persisted ${trade} supplier publication reaches scoped browsi
     await db.collection('workspaceProfiles').doc(profile.caseId).update({status: 'suspended'});
     const withdrawn = await service().readStoreProcurement(context.accountId, request) as any;
     assert.equal(withdrawn.catalogue.page.totalCount, 0); assert.deepEqual(withdrawn.supplierGrants, []);
+    await assert.rejects(service().handleStoreStock(context.accountId, 'readPublicStoreStockSnapshot',
+      {...stockScope, requestedPacks: minimum}), {code: 'invalid_state', httpStatus: 409});
+    console.log((trade === 'bulk' ? 'RESTOCK_BULK_SUPPLIER_STOCK_CAPTURE=' : 'RESTOCK_SUPPLIER_STOCK_CAPTURE=') + JSON.stringify(stockPackets));
     await db.collection('workspaceProfiles').doc('buying-case').update({ownerUserId: 'different-buyer'});
     await assert.rejects(service().readStoreProcurement(context.accountId, request), {code: 'not_found'});
     assert.equal((await db.collection('retailerOrders').limit(1).get()).empty, true, 'Browsing creates no order.');

@@ -14005,32 +14005,53 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   int _storeStockPacks(BuyV2Product product) => math.max(product.minimumOrder, quantityFor(product.id));
-  String? storeStockRequestIdentity(BuyV2Product product) => _collectionDisposed || isStoreProcurement
-    ? null : storeStockReader?.requestIdentity(product, _storeStockPacks(product));
-  WorkspacePublicStockResult? storeStockFor(BuyV2Product product) => _collectionDisposed || isStoreProcurement
-    ? null : storeStockReader?.snapshotFor(product, _storeStockPacks(product));
+  BuyV2Product? _storeStockProduct(BuyV2Product product) {
+    if (_collectionDisposed) return null;
+    if (!isStoreProcurement) return product;
+    if (procurementUnavailableMessage != null) return null;
+    final latest = _currentProcurementProduct(product.id);
+    // Saved Cart terms carry identity, never a purchasing grant. Require a
+    // matching current supplier read without rewriting the retained agreement.
+    return latest != null && product.publicListingIdentity != null &&
+        product.hasValidPublicListingIdentity && latest.hasValidPublicListingIdentity &&
+        product.publicListingIdentity == latest.publicListingIdentity && procurementEligibilityFor(latest,
+          retainedProduct: identical(latest, product) ? null : product) == BuyV2ProcurementEligibility.eligible
+      ? latest : null;
+  }
+  String? storeStockRequestIdentity(BuyV2Product product) {
+    final selected = _storeStockProduct(product);
+    return selected == null ? null : storeStockReader?.requestIdentity(selected, _storeStockPacks(product));
+  }
+  WorkspacePublicStockResult? storeStockFor(BuyV2Product product) {
+    final selected = _storeStockProduct(product);
+    return selected == null ? null : storeStockReader?.snapshotFor(selected, _storeStockPacks(product));
+  }
   String? storeStockLabelFor(BuyV2Product product) {
     final value = storeStockFor(product);
     if (value == null) return null;
-    if (value.available == false) return 'Store reports out of stock';
-    if (value.quantityAvailable == false) return 'Store cannot confirm stock for this quantity';
-    if (value.quantityAvailable == null) return 'Store reports stock · quantity unconfirmed';
+    final seller = isStoreProcurement ? 'Supplier' : 'Store';
+    if (value.available == false) return '$seller reports out of stock';
+    if (value.quantityAvailable == false) return '$seller cannot confirm stock for this quantity';
+    if (value.quantityAvailable == null) return '$seller reports stock · quantity unconfirmed';
     final packs = value.query.requestedPacks;
-    return 'Store reports stock for $packs ${packs == 1 ? 'pack' : 'packs'}';
+    return '$seller reports stock for $packs ${packs == 1 ? 'pack' : 'packs'}';
   }
   Future<bool> refreshStoreStock(BuyV2Product product, {bool force = false, bool Function()? current}) {
-    final source = storeStockReader, key = storeStockRequestIdentity(product), packs = _storeStockPacks(product);
-    if (source == null || key == null || current?.call() == false) return Future.value(false);
-    return source.refresh(product, packs, force: force, requestCurrent: () => !_collectionDisposed &&
+    final source = storeStockReader, selected = _storeStockProduct(product),
+        key = storeStockRequestIdentity(product), packs = _storeStockPacks(product);
+    if (source == null || selected == null || key == null || current?.call() == false) return Future.value(false);
+    return source.refresh(selected, packs, force: force, requestCurrent: () => !_collectionDisposed &&
       (current?.call() ?? true) && storeStockRequestIdentity(product) == key);
   }
   bool _storeReportedShortage(BuyV2Product product) {
     final value = storeStockFor(product);
     return value?.available == false || value?.quantityAvailable == false;
   }
-  bool _stockRequestHasShortage(BuyV2OrderPlacementRequest request) => !isStoreProcurement &&
+  bool _stockRequestHasShortage(BuyV2OrderPlacementRequest request) =>
     request.lines.any((line) {
-      final value = storeStockReader?.snapshotFor(line.product, line.quantity);
+      final selected = _storeStockProduct(line.product);
+      if (selected == null) return false;
+      final value = storeStockReader?.snapshotFor(selected, line.quantity);
       return value?.available == false || value?.quantityAvailable == false;
     });
   void _onStoreStockChanged() {
