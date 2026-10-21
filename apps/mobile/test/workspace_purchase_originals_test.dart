@@ -44,6 +44,106 @@ class _OrderPending implements WorkOrderPendingStore {
 }
 
 void main() {
+  for (final action in ['expand-list', 'retry-list', 'more', 'expand-order', 'retry-details', 'update']) {
+    for (final changed in ['reader', 'store', 'account', 'realm', 'role', 'closed', 'retired', 'current']) {
+      testWidgets('LF-ORIGINAL-ACTION retained $action scope=$changed', (tester) async {
+        Object? lifetime = Object();
+        var unavailable = true;
+        final refs = fixtures.purchaserReferenceResponse(), details = fixtures.purchaserPurchaseResponse();
+        final operational = fixtures.operationalResponse()..['original'] = details['orders'][0]['original']
+          ..['originalFingerprint'] = details['orders'][0]['originalFingerprint']
+          ..['originalFactsVersion'] = details['orders'][0]['factsVersion'];
+        final completion = fixtures.completionResponse()..['originalFingerprint'] = details['orders'][0]['originalFingerprint'];
+        if (action == 'more') refs['nextCursor'] = 'host-original-next';
+        final old = fixtures.Transport()..respond = (body) {
+          if (unavailable && (action == 'retry-list' && body['operation'] == 'listBuyerPurchaseReferences' ||
+              action == 'retry-details' && body['operation'] == 'readBuyerPurchaseProjection')) {
+            throw StateError('Isolated original read unavailable');
+          }
+          return switch (body['operation']) {
+            'listBuyerPurchaseReferences' => refs,
+            'readBuyerPurchaseProjection' => details,
+            'readBuyerOperationalOrder' => operational,
+            'readBuyerOrderCompletion' => completion,
+            _ => throw StateError('Unexpected isolated original-history operation'),
+          };
+        };
+        final gateway = fixtures.projectionGateway(old, lifetime: () => lifetime);
+        Widget page(AuthenticatedWorkspaceOrderIdentityGateway reader, {String realm = 'evaluation',
+          String? buyingStoreId = 'buying-store', WorkspaceOrderIdentityRole role = WorkspaceOrderIdentityRole.buyer}) =>
+          MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchaseOriginals(
+            gateway: reader, realm: realm, role: role, buyingStoreId: buyingStoreId,
+            storeId: role == WorkspaceOrderIdentityRole.seller ? 'store-one' : null))));
+        await tester.pumpWidget(page(gateway)); await tester.pumpAndSettle();
+        late VoidCallback retained;
+        final heading = find.byType(ExpansionTile).first;
+        if (action == 'expand-list') {
+          final callback = tester.widget<ExpansionTile>(heading).onExpansionChanged!;
+          retained = () => callback(true);
+        } else {
+          await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+          if (action == 'retry-list' || action == 'more') {
+            retained = tester.widget<TextButton>(find.widgetWithText(TextButton,
+              action == 'more' ? 'Load more purchase details' : 'Retry')).onPressed!;
+          } else {
+            final order = find.byKey(const ValueKey('original-order-order-v2'));
+            if (action == 'expand-order') {
+              final callback = tester.widget<ExpansionTile>(find.descendant(of: order,
+                matching: find.byType(ExpansionTile))).onExpansionChanged!;
+              retained = () => callback(true);
+            } else {
+              await tester.tap(order); await tester.pumpAndSettle();
+              retained = tester.widget<TextButton>(find.widgetWithText(TextButton,
+                action == 'retry-details' ? 'Details unavailable · retry' : 'Check order update')).onPressed!;
+            }
+          }
+        }
+        if (changed == 'current') {
+          unavailable = false;
+          final release = Completer<void>(), before = old.calls;
+          old.beforePost = (_) => release.future;
+          if (action == 'expand-list') await tester.tap(find.text('Saved purchase details'));
+          if (action == 'expand-order') await tester.tap(find.byKey(const ValueKey('original-order-order-v2')));
+          retained(); retained(); tester.binding.scheduleFrame(); await tester.pump();
+          expect(old.calls, before + (action == 'update' ? 2 : 1), reason: 'Current actions work without duplicate in-flight reads.');
+          if (action == 'more') {
+            expect(old.sent!['cursor'], 'host-original-next'); refs['nextCursor'] = null;
+          }
+          release.complete(); await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('original-order-order-v2')), findsOneWidget);
+          if (action == 'expand-order' || action == 'retry-details' || action == 'update') {
+            expect(find.text(details['orders'][0]['original']['lines'][0]['name']), findsOneWidget);
+          }
+          if (action == 'update') expect(find.byKey(const ValueKey('purchase-order-completion-order-v2')), findsOneWidget);
+          final settled = old.calls;
+          if (action != 'update') {
+            retained(); tester.binding.scheduleFrame(); await tester.pumpAndSettle();
+            expect(old.calls, settled, reason: 'Resolved retries and exhausted continuation do not restart discovery.');
+          }
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+          return;
+        }
+        final fresh = fixtures.Transport()..respond = old.respond;
+        switch (changed) {
+          case 'closed': await tester.pumpWidget(const SizedBox.shrink());
+          case 'retired': lifetime = null;
+          case 'reader': await tester.pumpWidget(page(fixtures.projectionGateway(fresh)));
+          case 'account': await tester.pumpWidget(page(fixtures.projectionGateway(fresh, account: 'other-buyer')));
+          case 'store': await tester.pumpWidget(page(gateway, buyingStoreId: 'other-buying-store'));
+          case 'realm': await tester.pumpWidget(page(gateway, realm: 'production'));
+          case 'role': await tester.pumpWidget(page(gateway, role: WorkspaceOrderIdentityRole.seller, buyingStoreId: null));
+        }
+        await tester.pumpAndSettle();
+        final oldCalls = old.calls, freshCalls = fresh.calls;
+        retained(); tester.binding.scheduleFrame(); await tester.pumpAndSettle();
+        expect(old.calls, oldCalls, reason: 'Retired controls must not read through either owner.');
+        expect(fresh.calls, freshCalls);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
   for (final scale in [1.0, 2.0]) {
     testWidgets('LF-PURCHASER Store originals use separate buyer selector and compact immutable attribution scale=$scale', (tester) async {
       tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1; addTearDown(tester.view.reset);

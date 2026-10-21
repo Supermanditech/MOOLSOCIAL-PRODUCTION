@@ -430,7 +430,7 @@ class _WorkspacePurchaseOriginalsState
 
   Future<void> _load({bool more = false}) async {
     final generation = _generation;
-    if (!widget.gateway.isCurrent) return;
+    if (!_current(generation) || _loading || more && _cursor == null) return;
     _loaded = true;
     _retryMore = more;
     if (mounted) {
@@ -477,7 +477,7 @@ class _WorkspacePurchaseOriginalsState
   }
 
   Future<void> _open(WorkspacePurchaseReference reference) async {
-    if (_pending.contains(reference.orderId) ||
+    if (!_current(_generation) || _pending.contains(reference.orderId) ||
         _details.containsKey(reference.orderId)) {
       return;
     }
@@ -510,7 +510,7 @@ class _WorkspacePurchaseOriginalsState
   }
 
   Future<void> _checkUpdate(WorkspacePurchaseReference reference) async {
-    if (!widget.gateway.isCurrent ||
+    if (!_current(_generation) ||
         _updatePending.contains(reference.orderId)) {
       return;
     }
@@ -550,6 +550,7 @@ class _WorkspacePurchaseOriginalsState
   }
 
   Widget _orderUpdate(WorkspacePurchaseReference reference) {
+    final generation = _generation;
     final update = _updates[reference.orderId];
     final completion = _completions[reference.orderId];
     final loading = _updatePending.contains(reference.orderId);
@@ -583,7 +584,9 @@ class _WorkspacePurchaseOriginalsState
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: TextButton(
-            onPressed: loading ? null : () => _checkUpdate(reference),
+            onPressed: loading ? null : () {
+              if (_current(generation)) unawaited(_checkUpdate(reference));
+            },
             child: Text(
               loading
                   ? 'Checking order update…'
@@ -617,6 +620,7 @@ class _WorkspacePurchaseOriginalsState
 
   @override
   Widget build(BuildContext context) {
+    final generation = _generation;
     if (!widget.gateway.isCurrent) return const SizedBox.shrink();
     return Material(
       type: MaterialType.transparency,
@@ -634,8 +638,7 @@ class _WorkspacePurchaseOriginalsState
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
         onExpansionChanged: (expanded) {
-          final generation = _generation;
-          if (expanded && !_loaded) {
+          if (_current(generation) && expanded && !_loaded) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (_current(generation) && !_loaded) unawaited(_load());
             });
@@ -662,7 +665,9 @@ class _WorkspacePurchaseOriginalsState
                     TextButton(
                       onPressed: _loading
                           ? null
-                          : () => _load(more: _retryMore),
+                          : () {
+                              if (_current(generation) && _unavailable) unawaited(_load(more: _retryMore));
+                            },
                       child: const Text('Retry'),
                     ),
                   ],
@@ -694,8 +699,7 @@ class _WorkspacePurchaseOriginalsState
                     ),
                     subtitle: const Text('View original items and total'),
                     onExpansionChanged: (expanded) {
-                      final generation = _generation;
-                      if (expanded) {
+                      if (_current(generation) && expanded) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (_current(generation)) unawaited(_open(reference));
                         });
@@ -706,7 +710,9 @@ class _WorkspacePurchaseOriginalsState
                         const LinearProgressIndicator(minHeight: 2),
                       if (_failed.contains(reference.orderId))
                         TextButton(
-                          onPressed: () => _open(reference),
+                          onPressed: () {
+                            if (_current(generation)) unawaited(_open(reference));
+                          },
                           child: const Text('Details unavailable · retry'),
                         ),
                       if (_details[reference.orderId] case final details?) ...[
@@ -789,7 +795,9 @@ class _WorkspacePurchaseOriginalsState
                 ),
               if (_cursor != null && !_loading)
                 TextButton(
-                  onPressed: () => _load(more: true),
+                  onPressed: () {
+                    if (_current(generation)) unawaited(_load(more: true));
+                  },
                   child: const Text('Load more purchase details'),
                 ),
             ],
