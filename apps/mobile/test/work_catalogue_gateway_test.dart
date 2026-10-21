@@ -1328,6 +1328,75 @@ void main() {
   }
   const restockContext = BuyV2ProcurementContext(accountId: 'buyer-one', storeId: 'buying-store',
     purpose: BuyV2ProcurementPurpose.restock, originOperationId: 'host-procurement-origin');
+  for (final storeBuyer in [false, true]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final state in [BuyV2CheckoutSubmissionState.idle, BuyV2CheckoutSubmissionState.confirmed]) {
+        testWidgets('LF-RECOVERY original hold explains legacy state=${state.name} store=$storeBuyer scale=$scale', (tester) async {
+          // Isolated saved-original fixture; no native payment or supplier feed.
+          tester.view.physicalSize = const Size(320, 568); tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+          final preferences = _ExactMoneyHostPreferences();
+          final owner = storeBuyer ? restockContext.customerStateOwnerScope : 'host-original-owner';
+          BuyV2SharedPreferencesCustomerStateStore saved() => BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: owner);
+          expect(await saved().write(BuyV2CustomerStateSnapshot(selectedPayment: 'Bank transfer',
+            checkoutSubmissionState: state.name, checkoutIdempotencyKey: 'host-original-key',
+            paymentReference: 'host-original-reference')), isTrue);
+          final identity = ValueNotifier<BuyV2ProcurementContext?>(storeBuyer ? restockContext : null);
+          final core = BuySession(), commerce = _HostExactOrderCommerce()
+            ..reconciliation = const BuyV2OrderPlacementResult(outcome: BuyV2OrderPlacementOutcome.paymentUnknown,
+              customerMessage: 'Host original remains unresolved');
+          final session = BuyV2Session(core: core, reviewDataEnabled: false, commerceAdapter: commerce,
+            procurementIdentity: storeBuyer ? identity : null, customerStateStore: saved());
+          await session.restoreCustomerState();
+          expect(session.checkoutRequiresResolution, isTrue); expect(session.checkoutRecoveryAmountKnown, isFalse);
+          expect(session.checkoutSubmissionState, state); expect(session.selectedPayment, 'Bank transfer');
+          final before = Map.of(preferences.values);
+          session.checkoutStep = BuyV2CheckoutStep.payment;
+          final gst = BuyV2GstInvoiceController();
+          await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+            MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+            home: Scaffold(body: BuyV2CheckoutView(session: session, gstInvoiceController: gst))));
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(find.text('Original payment needs checking'), 120,
+            scrollable: find.descendant(of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+              matching: find.byType(Scrollable)).first);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(find.text('Original payment needs checking'), findsOneWidget);
+          expect(find.text('Do not pay again. Get order help for this payment.'), findsOneWidget);
+          expect(find.text('Check payment'), findsOneWidget);
+          expect(session.checkoutSubmissionState, state); expect(session.selectedPayment, 'Bank transfer');
+          expect(preferences.values, before); expect(commerce.placementCalls, 0); expect(commerce.reconciliationCalls, 0);
+          expect(session.choosePayment('UPI'), isFalse); expect(await session.submitOrder(), isFalse);
+          await tester.tap(find.text('Check payment'));
+          await tester.pumpAndSettle();
+          expect(commerce.reconciliationCalls, 1); expect(commerce.placementCalls, 0);
+          final retained = (await saved().read())!;
+          expect(retained.checkoutIdempotencyKey, 'host-original-key');
+          expect(retained.paymentReference, 'host-original-reference');
+          expect(retained.selectedPayment, 'Bank transfer');
+          await tester.pumpWidget(const SizedBox.shrink());
+          gst.dispose(); session.dispose(); core.dispose(); identity.dispose();
+        });
+      }
+    }
+  }
+  testWidgets('LF-RECOVERY ordinary idle preference has no original warning', (tester) async {
+    final preferences = _ExactMoneyHostPreferences();
+    final saved = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-preference-only');
+    expect(await saved.write(const BuyV2CustomerStateSnapshot(selectedPayment: 'UPI', checkoutSubmissionState: 'idle')), isTrue);
+    final core = BuySession();
+    final session = BuyV2Session(core: core, reviewDataEnabled: false, customerStateStore: saved);
+    await session.restoreCustomerState(); session.checkoutStep = BuyV2CheckoutStep.payment;
+    final gst = BuyV2GstInvoiceController();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+      home: Scaffold(body: BuyV2CheckoutView(session: session, gstInvoiceController: gst))));
+    await tester.pumpAndSettle();
+    expect(session.checkoutRequiresResolution, isFalse);
+    expect(find.text('Original payment needs checking'), findsNothing);
+    expect(find.text('Check payment'), findsNothing); expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink()); gst.dispose(); session.dispose(); core.dispose();
+  });
   AuthenticatedWorkspaceCatalogueGateway boundRestockGateway(SocialContentTransport api, {
     bool Function()? current, DateTime Function()? clock, WorkspacePublicVariantSource? variants,
     SocialContentCredentials? credentials, bool stock = false,
@@ -7575,9 +7644,11 @@ void main() {
   for (final scenario in [
     (name: 'manufacturer', types: ['manufacturer'], seller: 'manufacturer', supported: true, accepted: true),
     (name: 'manufacturer rejects wholesaler', types: ['manufacturer'], seller: 'wholesaler', supported: true, accepted: false),
-    (name: 'retailer', types: ['manufacturer', 'wholesaler', 'distributor'], seller: 'wholesaler', supported: true, accepted: true),
-    (name: 'retailer rejects retailer', types: ['manufacturer', 'wholesaler', 'distributor'], seller: 'retailer-grocery', supported: true, accepted: false),
+    (name: 'retailer', types: ['manufacturer', 'wholesaler', 'distributor', 'sub-distributor'], seller: 'wholesaler', supported: true, accepted: true),
+    (name: 'retailer rejects retailer', types: ['manufacturer', 'wholesaler', 'distributor', 'sub-distributor'], seller: 'retailer-grocery', supported: true, accepted: false),
     (name: 'distributor', types: ['manufacturer', 'wholesaler'], seller: 'manufacturer', supported: true, accepted: true),
+    (name: 'sub-distributor', types: ['manufacturer', 'distributor'], seller: 'manufacturer', supported: true, accepted: true),
+    (name: 'sub-distributor rejects wholesaler', types: ['manufacturer', 'distributor'], seller: 'wholesaler', supported: true, accepted: false),
     (name: 'unsupported source', types: ['manufacturer'], seller: 'manufacturer', supported: false, accepted: false),
     (name: 'unknown distributor publication', types: ['distributor'], seller: 'distributor', supported: true, accepted: false),
   ]) {
@@ -7681,6 +7752,72 @@ void main() {
     expect(fresh.totalCount, 1); expect(source.publicRestockProductCurrent(fresh.items.single), true);
     expect(session.procurementUnavailableMessage, isNotNull, reason: 'No buyer access provider is configured.');
   });
+  for (final channel in BuyV2OfferClass.values) {
+    test('RESTOCK-PUBLIC public ${channel.name} ignores Store sourcing policy', () async {
+      for (final seller in ['retailer-grocery', 'wholesaler', 'manufacturer']) {
+        var policyReads = 0;
+        final requests = <Map<String, Object?>>[];
+        final gateway = AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: Credentials(), realm: 'production', now: () => at,
+          productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+          storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+          minorMoneyReadbackSupported: true, publicSupplierTypeFilterSupported: true,
+          publicRestockSupplierTypes: () { policyReads++; throw StateError('Public shopping must not read Store sourcing policy'); },
+          transport: OwnerTransport((body) async {
+            requests.add(body); expect(body['operation'], 'readPublicCatalogueDiscovery');
+            expect((body['query'] as Map).containsKey('supplierTypes'), false);
+            expect(body.containsKey('context'), false);
+            final data = discoveryData(body), listing = (data['items'] as List).single['listing'] as Map<String, dynamic>;
+            data['supplierPublishersVersion'] = 1; listing['supplierPublishersVersion'] = 1;
+            (listing['publicStore'] as Map)['profileId'] = seller;
+            final item = row(listing);
+            item['channels'] = [{...(item['channels'] as List).single as Map,
+              'kind': channel.name, 'minimumOrder': channel == BuyV2OfferClass.retail ? 1 : 10}];
+            item['listings'] = [publicIdentity(channel: channel).toJson()];
+            (data['items'] as List).single['channel'] = channel.name;
+            return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+          }));
+        // Creating a Store-bound copy cannot change the ordinary public gateway.
+        gateway.forStoreProcurement(restockContext, current: () => true, publicCatalogue: true,
+          supplierTypes: () => const ['manufacturer', 'wholesaler', 'distributor', 'sub-distributor']);
+        final source = WorkspacePublicDiscoverySource(gateway: gateway, current: () => true);
+        BuyV2CatalogueQuery query({String? storeId}) => BuyV2CatalogueQuery(
+          destination: channel == BuyV2OfferClass.retail ? BuyV2Destination.shop : BuyV2Destination.wholesale,
+          regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas, storeId: storeId,
+          wholesaleSaleType: channel == BuyV2OfferClass.retail ? null : channel == BuyV2OfferClass.bulk
+            ? BuyV2WholesaleSaleType.bulk : BuyV2WholesaleSaleType.wholesale);
+        try {
+          final products = await source.loadProducts(query(), pageSize: 40);
+          expect(products.totalCount, 1); expect(products.items.single.offerClass, channel);
+          expect(products.items.single.procurementSupplierGrant, isNull);
+          expect((await source.loadStores(query(), pageSize: 40)).totalCount, 1);
+          expect((await source.loadProducts(query(storeId: 'store-one'), pageSize: 40)).items, hasLength(1));
+          expect(requests, hasLength(3)); expect(policyReads, 0);
+        } finally { source.dispose(); }
+      }
+    });
+  }
+  for (final mode in BuyV2ShopSaleType.values) {
+    test('RESTOCK-PUBLIC public delivery $mode keeps existing unavailable-provider boundary', () async {
+      var calls = 0, policyReads = 0;
+      final gateway = AuthenticatedWorkspaceCatalogueGateway(
+        endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), realm: 'production', now: () => at,
+        productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+        storeClassificationReadbackSupported: true,
+        publicSupplierTypeFilterSupported: true,
+        publicRestockSupplierTypes: () { policyReads++; return const ['manufacturer']; },
+        transport: OwnerTransport((_) async { calls++; throw StateError('No delivery-filter service configured'); }));
+      final source = WorkspacePublicDiscoverySource(gateway: gateway, current: () => true);
+      try {
+        final query = BuyV2CatalogueQuery(destination: BuyV2Destination.shop, regionId: null,
+          areaScope: BuyV2CatalogueAreaScope.allAreas, shopSaleType: mode);
+        await expectLater(source.loadProducts(query, pageSize: 40), throwsFormatException);
+        expect(query.shopSaleType, mode); expect(policyReads, 0); expect(calls, 0);
+      } finally { source.dispose(); }
+    });
+  }
   test('LF-DISCOVERY client products Store preview and content use exact public identity and paise', () async {
     final requests = <Map<String, Object?>>[];
     final connection = discoveryGateway(OwnerTransport((body) async {

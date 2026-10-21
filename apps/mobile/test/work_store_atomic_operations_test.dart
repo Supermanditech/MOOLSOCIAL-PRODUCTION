@@ -14195,16 +14195,22 @@ void main() {
     });
     test('RESTOCK-PUBLIC supplier-type defaults reuse the same Store basket', () async {
       const expected = {
-        'retailer-grocery': ['manufacturer', 'wholesaler', 'distributor'],
-        'retailer-speciality': ['manufacturer', 'wholesaler', 'distributor'],
+        'retailer-grocery': ['manufacturer', 'wholesaler', 'distributor', 'sub-distributor'],
+        'retailer-speciality': ['manufacturer', 'wholesaler', 'distributor', 'sub-distributor'],
         'manufacturer': ['manufacturer'], 'wholesaler': ['manufacturer'],
-        'distributor': ['manufacturer', 'wholesaler'], 'sub-distributor': ['manufacturer', 'wholesaler'],
+        'distributor': ['manufacturer', 'wholesaler'], 'sub-distributor': ['manufacturer', 'distributor'],
       };
       expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
       final opened = controller.session!, scope = opened.customerStateStore!.ownerScope;
       for (final entry in expected.entries) {
         profileId = entry.key; controller.invalidateIfChanged();
         expect(controller.restockSupplierTypes, entry.value);
+        if (entry.key == 'sub-distributor') {
+          expect(controller.restockSupplierTypesLabel, 'Manufacturers, Distributors');
+        }
+        if (entry.key == 'retailer-grocery') {
+          expect(controller.restockSupplierTypesLabel, 'Manufacturers, Wholesalers, Distributors, Sub-distributors');
+        }
         expect(controller.restockSupplierFilterConnected, false);
         expect(controller.session, same(opened)); expect(opened.customerStateStore!.ownerScope, scope);
         expect(controller.restockRestrictionMessage, isNull);

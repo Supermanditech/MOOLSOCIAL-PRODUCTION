@@ -94,13 +94,15 @@ class WorkProcurementController extends ChangeNotifier {
   int get restockPolicyRevision => _restockPolicyGeneration.value;
   List<String> get restockSupplierTypes => switch (currentProfileId?.call()) {
     'manufacturer' || 'wholesaler' => const ['manufacturer'],
-    'distributor' || 'sub-distributor' => const ['manufacturer', 'wholesaler'],
-    'retailer-grocery' || 'retailer-speciality' => const ['manufacturer', 'wholesaler', 'distributor'],
+    'distributor' => const ['manufacturer', 'wholesaler'],
+    'sub-distributor' => const ['manufacturer', 'distributor'],
+    'retailer-grocery' || 'retailer-speciality' => const ['manufacturer', 'wholesaler', 'distributor', 'sub-distributor'],
     _ => const [],
   };
   String get restockSupplierTypesLabel => restockSupplierTypes.isEmpty ? 'All public supplier types' :
     restockSupplierTypes.map((type) => switch (type) {
-      'manufacturer' => 'Manufacturers', 'wholesaler' => 'Wholesalers', _ => 'Distributors',
+      'manufacturer' => 'Manufacturers', 'wholesaler' => 'Wholesalers',
+      'sub-distributor' => 'Sub-distributors', _ => 'Distributors',
     }).join(', ');
   bool get restockSupplierFilterConnected => restockSupplierTypes.isEmpty ||
       catalogueGateway?.publicSupplierTypeFilterSupported == true;

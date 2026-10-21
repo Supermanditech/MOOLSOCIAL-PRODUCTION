@@ -11718,8 +11718,9 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (!session.collectionCheckoutSelected &&
-            session.checkoutSubmissionState !=
-                BuyV2CheckoutSubmissionState.idle)
+            (session.checkoutSubmissionState !=
+                    BuyV2CheckoutSubmissionState.idle ||
+                session.checkoutRequiresResolution))
           _CheckoutPaymentStateRow(
             session: session,
             hasPaymentHandoff: widget.hasPaymentHandoff,
@@ -12134,7 +12135,10 @@ class _CheckoutPaymentStateRow extends StatelessWidget {
         state == BuyV2CheckoutSubmissionState.paymentActionRequired &&
         session.paymentActionUri != null &&
         !hasPaymentHandoff;
-    final content = session.checkoutRecoveryBlocked
+    final originalNeedsChecking = session.checkoutRecoveryBlocked ||
+        (session.checkoutRequiresResolution &&
+            !session.checkoutRecoveryAmountKnown);
+    final content = originalNeedsChecking
         ? (
             Icons.help_outline_rounded,
             'Original payment needs checking',
@@ -12201,6 +12205,7 @@ class _CheckoutPaymentStateRow extends StatelessWidget {
             ),
           };
     final attention =
+        originalNeedsChecking ||
         handoffUnavailable ||
         state == BuyV2CheckoutSubmissionState.paymentPending ||
         state == BuyV2CheckoutSubmissionState.paymentUnknown ||

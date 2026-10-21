@@ -5011,7 +5011,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     if (!_publicRestockCatalogue) return const [];
     final types = publicRestockSupplierTypes?.call() ?? const <String>[];
     if (types.toSet().length != types.length || types.any((type) =>
-        !const {'manufacturer', 'wholesaler', 'distributor'}.contains(type))) {
+        !const {'manufacturer', 'wholesaler', 'distributor', 'sub-distributor'}.contains(type))) {
       throw const FormatException();
     }
     return List<String>.of(types)..sort();

@@ -56457,7 +56457,7 @@ void main() {
       await tester.tap(find.byKey(const Key('work-quick-buy'))); await tester.pumpAndSettle();
       expect(controller.session, same(original));
       expect(original.customerStateStore!.ownerScope, scope);
-      for (final profile in ['wholesaler', 'retailer-grocery', 'unknown']) {
+      for (final profile in ['wholesaler', 'retailer-grocery', 'distributor', 'sub-distributor', 'unknown']) {
         final revision = controller.restockPolicyRevision;
         work.activeWorkspace = WorkWorkspace(id: old.id, name: old.name, profileLabel: profile,
           profileId: profile, area: old.area, verified: true);
@@ -56468,6 +56468,26 @@ void main() {
         expect(controller.restockRestrictionMessage, isNull);
         expect(controller.session, same(original));
         expect(original.customerStateStore!.ownerScope, scope);
+        if (['distributor', 'sub-distributor', 'unknown'].contains(profile)) {
+          expect(filter, findsNothing,
+            reason: 'A synthetic profile must not create a registered Store capability.');
+          continue;
+        }
+        expect(filter, findsOneWidget,
+          reason: 'profile=$profile view=${original.view} destination=${original.destination}');
+        await tester.tap(filter); await tester.pumpAndSettle();
+        expect(find.text(controller.restockSupplierTypesLabel), findsOneWidget);
+        if (root != null && profile == 'retailer-grocery') {
+          final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(const Key('store-review-root')));
+          await tester.runAsync(() async {
+            final file = File('$root/public-restock-retailer-types-$compact.png');
+            if (await file.exists()) throw StateError('Preserve earlier host evidence');
+            await file.parent.create(recursive: true); final image = await boundary.toImage(pixelRatio: 1);
+            try { final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+              await file.writeAsBytes(bytes!.buffer.asUint8List()); } finally { image.dispose(); }
+          });
+        }
+        await tester.ensureVisible(closeFilter); await tester.tap(closeFilter); await tester.pumpAndSettle();
       }
       expect(tester.takeException(), isNull);
     });
