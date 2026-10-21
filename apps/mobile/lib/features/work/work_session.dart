@@ -5660,11 +5660,48 @@ class WorkSession extends ChangeNotifier {
     _StoreOperationalData data,
     WorkspaceIssueRecord issue,
   ) {
+    if (issue.purchaseContext case final context?) {
+      final original = _canonicalIssueOriginals[issue.draftKey];
+      return _caseAuthorityCurrent(_canonicalIssueAuthority[issue.draftKey]) && original != null &&
+        context.realm == originalPurchaseRealm && original.storeId == context.reference.storeId && original.orderId == context.reference.orderId &&
+        original.originalFingerprint == context.reference.originalFingerprint && context.lineIds.every((id) => original.lines.any((line) => line.lineId == id));
+    }
     if (issue.target == WorkspaceIssueTarget.supplierShipment) {
       return data.purchaseAccountScope == issue.accountScope &&
           data.purchases.containsKey(issue.referenceId);
     }
     return data.workspaceOrders.any((order) => order.id == issue.referenceId);
+  }
+
+  final _canonicalIssueOriginals = <WorkspaceIssueDraftKey, WorkspacePurchaseOrder>{};
+  final _canonicalIssueAuthority = <WorkspaceIssueDraftKey, bool Function()>{};
+  bool workspaceIssueStale(WorkspaceIssueRecord issue) => issue.purchaseContext == null ? workspaceIssuesStale : !_issueIsCurrent(issue);
+  WorkspacePurchaseOrder? workspaceIssueOriginal(WorkspaceIssueRecord issue) => _issueIsCurrent(issue) ? _canonicalIssueOriginals[issue.draftKey] : null;
+  WorkspaceIssueRecord? workspaceCurrentIssue(WorkspaceIssueRecord issue) {
+    final current = _storeData.issues[issue.cacheId];
+    return current != null && _issueIsCurrent(current) ? current : null;
+  }
+
+  /// Admit an authoritative canonical case without creating a local sale/order,
+  /// quantity conversion, case state or case feed revision.
+  bool admitWorkspacePurchaseIssue({required WorkspaceIssueRecord issue, required WorkspacePurchasedLineTarget target,
+    required WorkspacePurchaseOrder original, required bool Function() ownerCurrent}) {
+    final context = issue.purchaseContext;
+    if (_disposed || !_caseAuthorityCurrent(ownerCurrent) || context == null || !issue.valid || target.role != WorkspaceOrderIdentityRole.seller || target.buyingStoreId != null ||
+      target.accountUserId != _contactAccountScope || issue.accountScope != _contactAccountScope || issue.workspaceId != activeWorkspace?.id ||
+      context.realm != originalPurchaseRealm || context.realm != target.realm || jsonEncode(context.reference.toJson()) != jsonEncode(target.reference.toJson()) ||
+      original.storeId != context.reference.storeId || original.orderId != context.reference.orderId || original.originalFingerprint != context.reference.originalFingerprint ||
+      !context.lineIds.contains(target.lineFacts['lineId']) || !context.lineIds.every((id) => original.lines.any((line) => line.lineId == id)) ||
+      !original.lines.any((line) => jsonEncode(line.toJson()) == jsonEncode(target.lineFacts))) { return false; }
+    final previous = _storeData.issueAccountScope == issue.accountScope ? _storeData.issueHistory[issue.cacheId] : null;
+    if (previous != null && (previous.referenceId != issue.referenceId || previous.target != issue.target || previous.kind != issue.kind ||
+      previous.purchaseContext == null || !context.sameOriginal(previous.purchaseContext!) || issue.revision < previous.revision ||
+      issue.updatedAt.isBefore(previous.updatedAt) || issue.revision == previous.revision && !issue.sameRevisionContent(previous))) { return false; }
+    if (_storeData.issueAccountScope != issue.accountScope) { _storeData.issues.clear(); _storeData.issueHistory.clear(); }
+    _storeData.issueAccountScope = issue.accountScope;
+    _canonicalIssueOriginals[issue.draftKey] = original; _canonicalIssueAuthority[issue.draftKey] = ownerCurrent;
+    _storeData.issues[issue.cacheId] = issue; _storeData.issueHistory[issue.cacheId] = issue;
+    notifyListeners(); return true;
   }
 
   /// Linked case facts only. No case event may execute a financial, inventory,
@@ -5687,7 +5724,7 @@ class WorkSession extends ChangeNotifier {
         feedRevision <= 0 ||
         (data.issueAccountScope == accountScope &&
             feedRevision <= data.issueFeedRevision) ||
-        records.map((issue) => issue.id).toSet().length != records.length) {
+        records.map((issue) => issue.cacheId).toSet().length != records.length) {
       return false;
     }
     for (final issue in records) {
@@ -5697,7 +5734,9 @@ class WorkSession extends ChangeNotifier {
           !_issueReferenceExists(data, issue)) {
         return false;
       }
-      if (issue.target == WorkspaceIssueTarget.customerOrder) {
+      if (issue.purchaseContext != null) {
+        // Canonical cases enter through the verified original/owner admission.
+      } else if (issue.target == WorkspaceIssueTarget.customerOrder) {
         final order = data.workspaceOrders.firstWhere(
           (o) => o.id == issue.referenceId,
         );
@@ -5733,7 +5772,7 @@ class WorkSession extends ChangeNotifier {
         }
       }
       final previous = data.issueAccountScope == accountScope
-          ? data.issueHistory[issue.id]
+          ? data.issueHistory[issue.cacheId]
           : null;
       if (previous != null &&
           (previous.referenceId != issue.referenceId ||
@@ -5752,7 +5791,7 @@ class WorkSession extends ChangeNotifier {
     data.issuesStale = false;
     data.issues
       ..clear()
-      ..addEntries(records.map((issue) => MapEntry(issue.id, issue)));
+      ..addEntries(records.map((issue) => MapEntry(issue.cacheId, issue)));
     data.issueHistory.addAll(data.issues);
     if (identical(data, _storeData)) notifyListeners();
     return true;
@@ -5825,7 +5864,9 @@ class WorkSession extends ChangeNotifier {
                 saved.command.key != key ||
                 saved.command.draft.referenceId != issue.referenceId ||
                 saved.command.draft.target != issue.target ||
-                saved.command.kind != issue.kind)) {
+                saved.command.kind != issue.kind ||
+                (issue.purchaseContext == null ? saved.command.purchaseContext != null : saved.command.purchaseContext == null ||
+                  !issue.purchaseContext!.sameOriginal(saved.command.purchaseContext!) || saved.command.sourceCaseId != issue.id))) {
           throw const FormatException('Case response identity mismatch');
         }
         if (saved != null) _issueResponses[key] = saved;
@@ -5847,14 +5888,14 @@ class WorkSession extends ChangeNotifier {
   bool workspaceIssueCanSend(WorkspaceIssueRecord issue) {
     final draft = workspaceIssueDraft(issue);
     final saved = workspaceIssueResponse(issue);
-    if (issueCommandGateway == null ||
+    if (!_issueGatewayAvailable(issue) ||
         !_issueIsCurrent(issue) ||
         !workspaceIssueDraftLoaded(issue) ||
         !workspaceIssueResponseLoaded(issue) ||
         workspaceIssueResponseLocksDraft(issue) ||
-        workspaceIssuesStale ||
-        issue.revision != _storeData.issues[issue.id]?.revision ||
-        !issue.sameRevisionContent(_storeData.issues[issue.id]!) ||
+        workspaceIssueStale(issue) ||
+        issue.revision != _storeData.issues[issue.cacheId]?.revision ||
+        !issue.sameRevisionContent(_storeData.issues[issue.cacheId]!) ||
         issue.state != WorkspaceIssueState.retailerReview ||
         draft == null ||
         !draft.valid ||
@@ -5896,9 +5937,9 @@ class WorkSession extends ChangeNotifier {
     try {
       await _issueDraftWrites[key];
       if (!_issueIsCurrent(issue) ||
-          workspaceIssuesStale ||
-          issue.revision != _storeData.issues[issue.id]?.revision ||
-          !issue.sameRevisionContent(_storeData.issues[issue.id]!) ||
+          workspaceIssueStale(issue) ||
+          issue.revision != _storeData.issues[issue.cacheId]?.revision ||
+          !issue.sameRevisionContent(_storeData.issues[issue.cacheId]!) ||
           jsonEncode(_issueDrafts[key]?.toJson()) !=
               jsonEncode(expectedDraft.toJson())) {
         return false;
@@ -5910,6 +5951,8 @@ class WorkSession extends ChangeNotifier {
         draft: expectedDraft,
         kind: issue.kind,
         lines: issue.lines,
+        purchaseContext: issue.purchaseContext,
+        sourceCaseId: issue.purchaseContext == null ? null : issue.id,
       );
       if (!command.valid) return false;
       _issueResponses[key] = WorkIssueSubmission(command);
@@ -5926,7 +5969,7 @@ class WorkSession extends ChangeNotifier {
     bool retrySend = false,
   }) async {
     final saved = workspaceIssueResponse(issue);
-    if (issueCommandGateway == null ||
+    if (!_issueGatewayAvailable(issue) ||
         !_issueIsCurrent(issue) ||
         saved?.pending != true ||
         workspaceIssueResponseBusy(issue) ||
@@ -5954,7 +5997,10 @@ class WorkSession extends ChangeNotifier {
     required bool submit,
   }) async {
     final key = command.key;
+    final authority = _canonicalIssueAuthority[key];
+    bool current() => issue.purchaseContext == null || _issueIsCurrent(issue) && _caseAuthorityCurrent(authority);
     if (key.account != _contactAccountScope || _disposed) return false;
+    if (!current()) return false;
     if (submit) {
       final pending = WorkIssueSubmission(command);
       try {
@@ -5965,7 +6011,7 @@ class WorkSession extends ChangeNotifier {
             : 'Could not save response status. Check status before trying again.';
         return false;
       }
-      if (key.account != _contactAccountScope || _disposed) return false;
+      if (key.account != _contactAccountScope || _disposed || !current()) return false;
       _issueResponses[key] = pending;
       _issueNotDispatched.remove(key);
     }
@@ -5979,7 +6025,7 @@ class WorkSession extends ChangeNotifier {
                   ? issueCommandGateway!.submitIssueResponse(command)
                   : issueCommandGateway!.reconcileIssueResponse(command))
               .timeout(const Duration(seconds: 20));
-      if (_disposed || key.account != _contactAccountScope) return false;
+      if (_disposed || key.account != _contactAccountScope || !current()) return false;
       if (!reply.matches(command)) {
         _issueResponseMessages[key] =
             'Response status could not be verified. Check status before trying again.';
@@ -5988,7 +6034,7 @@ class WorkSession extends ChangeNotifier {
       final result = WorkIssueSubmission(command, reply);
       // Persist the authoritative receipt before unlocking another response.
       await _issueCommandStorage.save(result);
-      if (_disposed || key.account != _contactAccountScope) return false;
+      if (_disposed || key.account != _contactAccountScope || !current()) return false;
       _issueResponses[key] = result;
       _issueResponseMessages.remove(key);
       return reply.state == WorkIssueReplyState.applied;
@@ -5999,13 +6045,18 @@ class WorkSession extends ChangeNotifier {
     }
   }
 
+  bool _caseAuthorityCurrent(bool Function()? authority) { try { return authority?.call() == true; } on Object { return false; } }
+  bool _issueGatewayAvailable(WorkspaceIssueRecord issue) => issueCommandGateway != null &&
+    (issue.purchaseContext == null || issueCommandGateway is WorkCanonicalIssueCommandGateway);
+  bool workspaceIssueSendingAvailable(WorkspaceIssueRecord issue) => _issueGatewayAvailable(issue);
   bool _issueIsCurrent(WorkspaceIssueRecord issue) =>
       !_disposed &&
       issue.accountScope == _contactAccountScope &&
       issue.workspaceId == activeWorkspace?.id &&
       _storeData.issueAccountScope == issue.accountScope &&
-      _storeData.issues[issue.id]?.referenceId == issue.referenceId &&
-      _storeData.issues[issue.id]?.target == issue.target;
+      _storeData.issues[issue.cacheId]?.referenceId == issue.referenceId &&
+      _storeData.issues[issue.cacheId]?.target == issue.target &&
+      (issue.purchaseContext == null || _issueReferenceExists(_storeData, issue));
 
   WorkspaceIssueDraft? workspaceIssueDraft(WorkspaceIssueRecord issue) =>
       _issueIsCurrent(issue) ? _issueDrafts[issue.draftKey] : null;
@@ -6063,7 +6114,7 @@ class WorkSession extends ChangeNotifier {
     if (!_issueIsCurrent(issue) ||
         !workspaceIssueDraftLoaded(issue) ||
         workspaceIssueResponseLocksDraft(issue) ||
-        issue.revision != _storeData.issues[issue.id]?.revision ||
+        issue.revision != _storeData.issues[issue.cacheId]?.revision ||
         issue.state != WorkspaceIssueState.retailerReview ||
         !WorkspaceIssueDraft.acceptsNote(note) ||
         (response != null && !issue.permittedResponses.contains(response))) {

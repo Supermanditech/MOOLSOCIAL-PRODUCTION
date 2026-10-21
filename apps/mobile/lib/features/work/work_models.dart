@@ -7,7 +7,7 @@ import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 import 'work_publication_data.dart';
 import 'work_order_identity_gateway.dart' show WorkspaceOperationalOrderSnapshot, WorkspaceOrderIdentityRole,
-  WorkspaceGoodsArrivalCommand, WorkspaceGoodsArrivalResult, WorkspaceGoodsArrivalProof;
+  WorkspaceGoodsArrivalCommand, WorkspaceGoodsArrivalResult, WorkspaceGoodsArrivalProof, WorkspacePurchaseReference;
 export 'work_publication_data.dart';
 
 /// Read-only report boundaries; these never authorize a stock or ledger write.
@@ -472,7 +472,8 @@ enum WorkspaceIssueKind {
   wrongItem,
   damagedItem,
   packingShortage,
-  substitution;
+  substitution,
+  deviceMismatch;
 
   String get label => switch (this) {
     returnRequest => 'Return requested',
@@ -481,6 +482,7 @@ enum WorkspaceIssueKind {
     damagedItem => 'Damaged item',
     packingShortage => 'Packing shortage',
     substitution => 'Replacement request',
+    deviceMismatch => 'Device details reported',
   };
 }
 
@@ -528,6 +530,31 @@ class WorkspaceIssueLine {
       (lineId, productId, name, pack, orderedQuantity, affectedQuantity);
 }
 
+/// Exact purchased order/line scope, never a conversion to legacy Stock units.
+class WorkspaceIssuePurchaseContext {
+  WorkspaceIssuePurchaseContext({required this.realm, required this.reference, required List<String> lineIds}) : lineIds = List.unmodifiable(lineIds);
+  final String realm;
+  final WorkspacePurchaseReference reference;
+  final List<String> lineIds;
+  bool get valid => const ['evaluation', 'production'].contains(realm) && reference.valid && lineIds.isNotEmpty && lineIds.length <= 1000 &&
+    lineIds.toSet().length == lineIds.length && lineIds.every((id) => id.isNotEmpty && id == id.trim() && id.length <= 240 && !RegExp(r'[\x00-\x1f\x7f]').hasMatch(id));
+  WorkspaceIssueDraftKey responseKey(String account, String store, String caseId) => (account: account, store: store,
+    caseId: 'purchase-v2-${sha256.convert(utf8.encode(jsonEncode([2, realm, reference.toJson(), caseId])))}');
+  String get fingerprint => sha256.convert(utf8.encode(jsonEncode(toJson()))).toString();
+  bool sameOriginal(WorkspaceIssuePurchaseContext other) => realm == other.realm && jsonEncode(reference.toJson()) == jsonEncode(other.reference.toJson());
+  Map<String, Object?> toJson() => {'version': 1, 'realm': realm, 'reference': reference.toJson(), 'lineIds': lineIds};
+  static WorkspaceIssuePurchaseContext fromJson(Object? raw) {
+    const keys = {'version', 'realm', 'reference', 'lineIds'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) || raw['version'] is! int || raw['version'] != 1 ||
+      raw['realm'] is! String || raw['lineIds'] is! List || (raw['lineIds'] as List).length > 1000 || !(raw['lineIds'] as List).every((id) => id is String)) {
+      throw const FormatException('Purchase case context needs recovery.');
+    }
+    final context = WorkspaceIssuePurchaseContext(realm: raw['realm'], reference: WorkspacePurchaseReference.fromJson(raw['reference']), lineIds: (raw['lineIds'] as List).cast<String>());
+    if (!context.valid) throw const FormatException('Purchase case context needs recovery.');
+    return context;
+  }
+}
+
 /// Read-only case projection. A resolved case does not itself authorise a
 /// refund, stock posting, substitution, receipt or customer collection.
 class WorkspaceIssueRecord {
@@ -546,6 +573,7 @@ class WorkspaceIssueRecord {
     required List<WorkspaceIssueLine> lines,
     List<WorkspaceIssueResponse> permittedResponses = const [],
     this.resolution,
+    this.purchaseContext,
   }) : lines = List.unmodifiable(lines),
        permittedResponses = List.unmodifiable(permittedResponses);
 
@@ -558,8 +586,10 @@ class WorkspaceIssueRecord {
   final List<WorkspaceIssueLine> lines;
   final List<WorkspaceIssueResponse> permittedResponses;
   final String? resolution;
+  final WorkspaceIssuePurchaseContext? purchaseContext;
   WorkspaceIssueDraftKey get draftKey =>
-      (account: accountScope, store: workspaceId, caseId: id);
+      purchaseContext?.responseKey(accountScope, workspaceId, id) ?? (account: accountScope, store: workspaceId, caseId: id);
+  String get cacheId => purchaseContext == null ? id : draftKey.caseId;
   bool get valid =>
       [
         accountScope,
@@ -570,8 +600,9 @@ class WorkspaceIssueRecord {
         nextStep,
       ].every((s) => s.trim().isNotEmpty) &&
       revision > 0 &&
-      lines.isNotEmpty &&
-      lines.every((line) => line.valid) &&
+      (purchaseContext == null ? kind != WorkspaceIssueKind.deviceMismatch && lines.isNotEmpty && lines.every((line) => line.valid) :
+        purchaseContext!.valid && target == WorkspaceIssueTarget.customerOrder && referenceId == purchaseContext!.reference.orderId &&
+          workspaceId == purchaseContext!.reference.storeId && lines.isEmpty) &&
       lines.map((line) => line.lineId).toSet().length == lines.length &&
       permittedResponses.toSet().length == permittedResponses.length &&
       (state == WorkspaceIssueState.retailerReview ||
@@ -590,6 +621,7 @@ class WorkspaceIssueRecord {
     reason,
     nextStep,
     resolution,
+    purchaseContext?.fingerprint,
   );
   bool sameRevisionContent(WorkspaceIssueRecord other) =>
       _revisionData == other._revisionData &&

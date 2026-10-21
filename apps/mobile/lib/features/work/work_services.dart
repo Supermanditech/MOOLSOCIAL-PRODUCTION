@@ -3371,11 +3371,15 @@ class WorkIssueCommand {
     required this.draft,
     required this.kind,
     required List<WorkspaceIssueLine> lines,
+    this.purchaseContext,
+    this.sourceCaseId,
   }) : lines = List.unmodifiable(lines);
   final String operationId;
   final WorkspaceIssueDraft draft;
   final WorkspaceIssueKind kind;
   final List<WorkspaceIssueLine> lines;
+  final WorkspaceIssuePurchaseContext? purchaseContext;
+  final String? sourceCaseId;
   WorkspaceIssueDraftKey get key => draft.key;
   bool get valid =>
       draft.valid &&
@@ -3383,12 +3387,15 @@ class WorkIssueCommand {
       RegExp(r'^STORE-ISSUE-[A-Za-z0-9_-]{22,64}$').hasMatch(operationId) &&
       (draft.response == WorkspaceIssueResponse.acceptRequest ||
           draft.note.trim().isNotEmpty) &&
-      lines.isNotEmpty &&
-      lines.every((line) => line.valid) &&
+      (purchaseContext == null ? sourceCaseId == null && kind != WorkspaceIssueKind.deviceMismatch && lines.isNotEmpty && lines.every((line) => line.valid) :
+        purchaseContext!.valid && sourceCaseId != null && sourceCaseId!.isNotEmpty && sourceCaseId == sourceCaseId!.trim() && sourceCaseId!.length <= 240 &&
+        !RegExp(r'[\x00-\x1f\x7f]').hasMatch(sourceCaseId!) &&
+        draft.target == WorkspaceIssueTarget.customerOrder && draft.referenceId == purchaseContext!.reference.orderId &&
+        key.store == purchaseContext!.reference.storeId && key == purchaseContext!.responseKey(key.account, key.store, sourceCaseId!) && lines.isEmpty) &&
       lines.map((line) => line.lineId).toSet().length == lines.length;
 
   Map<String, Object?> toJson() => {
-    'version': 1,
+    'version': purchaseContext == null ? 1 : 2,
     'operationId': operationId,
     'draft': draft.toJson(),
     'kind': kind.name,
@@ -3403,15 +3410,16 @@ class WorkIssueCommand {
           'affectedQuantity': line.affectedQuantity,
         },
     ],
+    if (purchaseContext != null) ...{'purchaseContext': purchaseContext!.toJson(), 'sourceCaseId': sourceCaseId},
   };
 
-  /// SHA-256 over UTF-8 JSON in the exact V1 field order above. Not a credential.
+  /// SHA-256 over UTF-8 JSON. Legacy V1 field order/bytes remain unchanged.
   String get digest =>
       crypto.sha256.convert(utf8.encode(jsonEncode(toJson()))).toString();
 
   static WorkIssueCommand? fromJson(Object? value) {
     if (value is! Map ||
-        value['version'] != 1 ||
+        !const [1, 2].contains(value['version']) ||
         value['operationId'] is! String ||
         value['lines'] is! List) {
       return null;
@@ -3421,6 +3429,12 @@ class WorkIssueCommand {
         .where((k) => k.name == value['kind'])
         .firstOrNull;
     if (draft == null || kind == null) return null;
+    WorkspaceIssuePurchaseContext? context;
+    if (value['version'] == 2) {
+      const keys = {'version', 'operationId', 'draft', 'kind', 'lines', 'purchaseContext', 'sourceCaseId'};
+      if (value['version'] is! int || value.length != keys.length || !value.keys.every(keys.contains) || value['sourceCaseId'] is! String) return null;
+      try { context = WorkspaceIssuePurchaseContext.fromJson(value['purchaseContext']); } on Object { return null; }
+    } else if (value.containsKey('purchaseContext') || value.containsKey('sourceCaseId')) { return null; }
     final lines = <WorkspaceIssueLine>[];
     for (final line in value['lines'] as List) {
       if (line is! Map ||
@@ -3448,6 +3462,8 @@ class WorkIssueCommand {
       draft: draft,
       kind: kind,
       lines: lines,
+      purchaseContext: context,
+      sourceCaseId: context == null ? null : value['sourceCaseId'],
     );
     return command.valid ? command : null;
   }
@@ -3562,6 +3578,10 @@ abstract interface class WorkIssueCommandGateway {
   Future<WorkIssueReply> submitIssueResponse(WorkIssueCommand command);
   Future<WorkIssueReply> reconcileIssueResponse(WorkIssueCommand command);
 }
+
+/// Explicit opt-in to the proposed V2 canonical purchase case payload. Legacy
+/// V1 gateways are never sent an unrecognised command or converted quantities.
+abstract interface class WorkCanonicalIssueCommandGateway implements WorkIssueCommandGateway {}
 
 abstract interface class WorkIssueCommandStore {
   Future<WorkIssueSubmission?> read(WorkspaceIssueDraftKey key);

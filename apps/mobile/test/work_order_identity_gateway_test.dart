@@ -49,6 +49,51 @@ class DeviceSourceFixture extends ChangeNotifier implements WorkspacePurchasedUn
   void rotateLifetime() { lifetime = Object(); _grants.clear(); notifyListeners(); }
 }
 
+// Accepted statements/cases supplied by a host-only source, never runtime data.
+class DeviceInboxFixture extends DeviceSourceFixture implements WorkspaceReceivedDeviceReportSource {
+  DeviceInboxFixture({super.accountUserId});
+  int feedRevision = 1;
+  bool withCase = true, reportComplete = true;
+  String? nextCursor;
+  final cursors = <String?>[];
+  void reportsChanged() => notifyListeners();
+  FutureOr<WorkspaceReceivedDeviceReports?> Function(WorkspacePurchasedLineTarget, String?)? respondReports;
+  WorkspaceIssueRecord caseFor(WorkspacePurchasedLineTarget target, {int revision = 1, String? realm, List<String>? lineIds}) => WorkspaceIssueRecord(
+    accountScope: target.accountUserId, workspaceId: target.reference.storeId, id: 'HOST-DEVICE-CASE', referenceId: target.reference.orderId,
+    target: WorkspaceIssueTarget.customerOrder, kind: WorkspaceIssueKind.deviceMismatch, state: WorkspaceIssueState.retailerReview,
+    revision: revision, updatedAt: DateTime.utc(2026, 10, 21, 9, revision), reason: 'HOST buyer reported a different serial.',
+    nextStep: 'Review the buyer statement and provide details.', lines: const [], permittedResponses: const [WorkspaceIssueResponse.provideDetails],
+    purchaseContext: WorkspaceIssuePurchaseContext(realm: realm ?? target.realm, reference: target.reference, lineIds: lineIds ?? [target.lineFacts['lineId'] as String]));
+  WorkspaceReceivedDeviceReport reportFor(WorkspacePurchasedLineTarget target, {String id = 'HOST-REPORT-1', String note = 'HOST different device\nPrinted serial differs.', WorkspaceIssueRecord? issue}) =>
+    WorkspaceReceivedDeviceReport(id: id, note: note, recordedAt: DateTime.utc(2026, 10, 21, 9), deviceRevision: 1,
+      deviceFingerprint: 'a' * 64, commandFingerprint: 'b' * 64,
+      rows: const [WorkspacePurchasedUnitRow(id: 'HOST-DEVICE', serial: 'HOST-PACKED-SERIAL', imei1: '11111', imei2: '22222')],
+      supportCase: issue ?? (withCase ? caseFor(target) : null));
+  Future<WorkspaceReceivedDeviceReports> page(WorkspacePurchasedLineTarget target, {List<WorkspaceReceivedDeviceReport>? reports,
+    int? revision, bool? complete, String? cursor, WorkspacePurchaseOrder? original}) async {
+    final access = (await super.read(target))!.ownerAccess!;
+    return WorkspaceReceivedDeviceReports(target: target, revision: revision ?? feedRevision, ownerAccess: access, original: original,
+      reports: reports ?? [reportFor(target)], complete: complete ?? reportComplete, nextCursor: cursor ?? nextCursor);
+  }
+  @override Future<WorkspaceReceivedDeviceReports?> readReceivedReports(WorkspacePurchasedLineTarget target, {String? cursor}) async {
+    cursors.add(cursor); return respondReports == null ? page(target) : await respondReports!(target, cursor);
+  }
+}
+
+class DeviceCaseGatewayFixture implements WorkCanonicalIssueCommandGateway {
+  final submitted = <WorkIssueCommand>[], checked = <WorkIssueCommand>[];
+  Future<WorkIssueReply> Function(WorkIssueCommand)? onSubmit, onCheck;
+  WorkIssueReply reply(WorkIssueCommand command, {WorkIssueReplyState state = WorkIssueReplyState.applied}) => WorkIssueReply(
+    key: command.key, operationId: command.operationId, commandDigest: command.digest, state: state,
+    revision: state == WorkIssueReplyState.applied ? command.draft.expectedRevision + 1 : null);
+  @override Future<WorkIssueReply> submitIssueResponse(WorkIssueCommand command) async {
+    submitted.add(command); return onSubmit == null ? reply(command) : onSubmit!(command);
+  }
+  @override Future<WorkIssueReply> reconcileIssueResponse(WorkIssueCommand command) async {
+    checked.add(command); return onCheck == null ? reply(command) : onCheck!(command);
+  }
+}
+
 class DeviceDraftFixture implements WorkPurchasedUnitDraftStore {
   WorkspacePurchasedUnitDraft? saved;
   bool failNextSave = false;
@@ -405,6 +450,122 @@ Map<String, dynamic> restockClosureResponse(WorkspaceGoodsArrivalCommand command
 }
 
 void main() {
+  for (final scenario in ['current', 'not-owner', 'expired', 'wrong-realm', 'wrong-line', 'retired', 'original']) {
+    test('PF08 INBOX private accepted reports exact owner scope=$scenario', () async {
+      final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DeviceInboxFixture();
+      final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+      final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+      final original = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!;
+      final line = original.lines.single;
+      if (scenario == 'not-owner') source.owner = false;
+      if (scenario == 'expired') source.expiresAt = DateTime.utc(2020);
+      if (scenario == 'retired') source.isCurrent = false;
+      source.respondReports = (target, _) => source.page(target, original: scenario == 'original' ? WorkspacePurchaseOrder(
+        storeId: 'OUTSIDE-STORE', orderId: 'OUTSIDE-ORDER', originalFingerprint: 'f' * 64, lines: [], totals: {'totalMinor': 1}) : null,
+        reports: [source.reportFor(target, issue: source.caseFor(target, realm: scenario == 'wrong-realm' ? 'production' : null,
+          lineIds: scenario == 'wrong-line' ? ['outside-line'] : null))]);
+      final result = await gateway.readReceivedDeviceReports(realm: 'evaluation', reference: reference, line: line);
+      if (const ['current', 'original'].contains(scenario)) {
+        expect(result!.original!.originalFingerprint, original.originalFingerprint); expect(result.original, isNot(same(original)));
+        expect(result.original!.storeId, original.storeId); expect(result.original!.totals, original.totals);
+        expect(result.reports.single.note, contains('\n')); expect(result.reports.single.supportCase!.lines, isEmpty);
+        final handoff = WorkspaceDeviceCaseHandoff(gateway: gateway, source: source, target: result.target,
+          original: result.original!, issue: result.reports.single.supportCase!, ownerAccess: result.ownerAccess);
+        expect(handoff.current, isTrue); source.revokeOwner(); source.restoreOwner(); expect(handoff.current, isFalse);
+      } else { expect(result, isNull); }
+      source.dispose();
+    });
+  }
+  for (final scenario in ['revoke', 'collapse', 'lifetime', 'timeout']) {
+    testWidgets('PF08 INBOX held accepted report read retires $scenario', (tester) async {
+      final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DeviceInboxFixture();
+      final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+      final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+      final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+      final held = Completer<WorkspaceReceivedDeviceReports?>(); WorkspaceReceivedDeviceReports? reply;
+      source.respondReports = (target, _) async { reply = await source.page(target); return held.future; };
+      var current = true;
+      final pending = gateway.readReceivedDeviceReports(realm: 'evaluation', reference: reference, line: line, inputCurrent: () => current);
+      await tester.pump(); expect(reply, isNotNull);
+      if (scenario == 'revoke') { source.revokeOwner(); source.restoreOwner(); }
+      if (scenario == 'collapse') current = false;
+      if (scenario == 'lifetime') source.rotateLifetime();
+      if (scenario == 'timeout') await tester.pump(const Duration(seconds: 16));
+      held.complete(reply); await tester.pump(); expect(await pending, isNull); source.dispose();
+    });
+  }
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('PF08 INBOX compact read-only pages case handoff and revoke scale=$scale', (tester) async {
+      tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DeviceInboxFixture();
+      final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+      final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+      final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+      source.respondReports = (target, cursor) => source.page(target, reports: [source.reportFor(target, id: cursor == null ? 'HOST-REPORT-1' : 'HOST-REPORT-2')],
+        complete: cursor != null, cursor: cursor == null ? 'HOST-NEXT' : null);
+      final opened = <WorkspaceDeviceCaseHandoff>[];
+      await tester.pumpWidget(MaterialApp(home: MediaQuery(data: MediaQueryData(textScaler: TextScaler.linear(scale)), child: Scaffold(
+        body: SingleChildScrollView(child: WorkspaceReceivedDeviceReportPanel(gateway: gateway, realm: 'evaluation', reference: reference, line: line,
+          onOpenCase: (handoff) async { opened.add(handoff); return true; }))))));
+      Future<void> tapText(String text) async { final finder = find.text(text).first; await tester.ensureVisible(finder); await tester.pumpAndSettle();
+        expect(finder.hitTestable(), findsOneWidget); await tester.tap(finder); await tester.pumpAndSettle(); }
+      await tapText('Buyer device reports'); expect(find.text('Partial report history.'), findsOneWidget);
+      expect(find.byType(TextField), findsNothing); await tapText('Review linked case'); expect(opened.single.current, isTrue);
+      await tapText('More reports'); expect(source.cursors, [null, 'HOST-NEXT']); expect(find.text('Report HOST-REPORT-2'), findsOneWidget);
+      source.revokeOwner(); await tester.pumpAndSettle(); expect(find.textContaining('HOST-PACKED-SERIAL'), findsNothing);
+      expect(opened.single.current, isFalse); expect(find.text('Review linked case'), findsNothing);
+      expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+    });
+  }
+  testWidgets('PF08 INBOX private cached reports expire during a held refresh', (tester) async {
+    final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DeviceInboxFixture();
+    source.expiresAt = DateTime.now().toUtc().add(const Duration(seconds: 2));
+    final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspaceReceivedDeviceReportPanel(
+      gateway: gateway, realm: 'evaluation', reference: reference, line: line)))));
+    await tester.tap(find.text('Buyer device reports')); await tester.pumpAndSettle(); expect(find.textContaining('HOST-PACKED-SERIAL'), findsOneWidget);
+    final held = Completer<WorkspaceReceivedDeviceReports?>();
+    source.respondReports = (_, _) => held.future;
+    await tester.ensureVisible(find.text('Refresh reports')); await tester.tap(find.text('Refresh reports')); await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.textContaining('HOST-PACKED-SERIAL'), findsNothing); expect(find.text('Store owner access expired. Refresh reports.'), findsOneWidget);
+    held.complete(null); await tester.pumpAndSettle(); expect(find.textContaining('HOST-PACKED-SERIAL'), findsNothing);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+  for (final scenario in ['altered', 'regression', 'case-regression', 'duplicate-page', 'unavailable', 'empty', 'partial', 'missing-case']) {
+    testWidgets('PF08 INBOX refresh truth and highwater $scenario', (tester) async {
+      final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DeviceInboxFixture();
+      final gateway = projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+      final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: 'seller')['references'][0]);
+      final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!.lines.single;
+      if (scenario == 'missing-case') source.withCase = false;
+      if (scenario == 'duplicate-page') { source.reportComplete = false; source.nextCursor = 'HOST-NEXT'; }
+      if (const ['empty', 'partial'].contains(scenario)) source.respondReports = (t, _) => source.page(t, reports: [], complete: scenario == 'empty');
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspaceReceivedDeviceReportPanel(
+        gateway: gateway, realm: 'evaluation', reference: reference, line: line, onOpenCase: (_) async => true)))));
+      Future<void> tapText(String text) async { await tester.ensureVisible(find.text(text)); await tester.tap(find.text(text)); await tester.pumpAndSettle(); }
+      await tapText('Buyer device reports');
+      if (scenario == 'empty') { expect(find.text('No buyer device reports recorded.'), findsOneWidget); }
+      else if (scenario == 'partial') { expect(find.text('No reports returned. Coverage is incomplete.'), findsOneWidget); }
+      else if (scenario == 'missing-case') { expect(find.text('Support case not connected.'), findsOneWidget); expect(find.text('Review linked case'), findsNothing); }
+      else {
+        source.respondReports = (target, _) => scenario == 'unavailable' ? null : source.page(target,
+          revision: scenario == 'regression' ? 0 : 2, reports: [source.reportFor(target,
+            note: scenario == 'altered' ? 'HOST silently changed statement' : 'HOST different device\nPrinted serial differs.',
+            issue: source.caseFor(target, revision: scenario == 'case-regression' ? 0 : 1))]);
+        await tapText(scenario == 'duplicate-page' ? 'More reports' : 'Refresh reports');
+        expect(find.text(scenario == 'unavailable' || scenario == 'case-regression' || scenario == 'regression'
+          ? 'Current buyer device reports could not be verified. Try again.' : 'Reports changed. Refresh before continuing.'), findsOneWidget);
+        expect(find.text('HOST silently changed statement'), findsNothing);
+        expect(tester.widget<TextButton>(find.widgetWithText(TextButton, 'Review linked case')).onPressed, isNull);
+      }
+      expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+    });
+  }
+
   testWidgets('PF08 DEVICE original device details are unavailable without a private source', (tester) async {
     final data = purchaseResponse(), refs = referenceResponse(), order = data['orders'][0];
     final wire = Transport()..respond = (body) => switch (body['operation']) {

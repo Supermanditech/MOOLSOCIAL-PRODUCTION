@@ -9012,6 +9012,37 @@ class _OrderDecisionButtons extends StatelessWidget {
   );
 }
 
+class _DeviceCaseSourceListenable implements Listenable {
+  const _DeviceCaseSourceListenable(this.source);
+  final WorkspaceReceivedDeviceReportSource source;
+  @override void addListener(VoidCallback listener) => source.addListener(listener);
+  @override void removeListener(VoidCallback listener) => source.removeListener(listener);
+}
+
+Future<bool> _openReceivedDeviceCase(BuildContext context, WorkSession session, WorkspaceDeviceCaseHandoff handoff) async {
+  if (!context.mounted || !handoff.current) return false;
+  final navigation = session.navigationScopeRevision, reader = session.originalPurchaseReader;
+  bool ownerCurrent() => handoff.current && session.navigationScopeRevision == navigation &&
+    identical(session.originalPurchaseReader, reader) && identical(reader, handoff.gateway) &&
+    session.activeWorkspace?.id == handoff.target.reference.storeId && session.originalPurchaseRealm == handoff.target.realm;
+  if (!ownerCurrent() || !session.admitWorkspacePurchaseIssue(issue: handoff.issue, target: handoff.target,
+    original: handoff.original, ownerCurrent: ownerCurrent)) { return false; }
+  await showDialog<void>(context: context, builder: (dialogContext) => AnimatedBuilder(
+    animation: Listenable.merge([session, _DeviceCaseSourceListenable(handoff.source)]),
+    builder: (context, _) => _OrderDeadlineBoundary(deadline: handoff.ownerAccess.expiresAt, builder: (_) {
+      final issue = ownerCurrent() ? session.workspaceCurrentIssue(handoff.issue) : null;
+      return AlertDialog(key: const Key('work-device-report-case'), scrollable: true,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        title: const Text('Buyer device report', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        content: issue == null ? const Text('Current Store owner access is unavailable. Reopen the report after access is restored.') :
+          _StoreIssueReview(key: ValueKey(issue.draftKey), issue: issue, session: session, initiallyExpanded: true),
+        actions: [TextButton(onPressed: () {
+          if (dialogContext.mounted && ModalRoute.of(dialogContext)?.isCurrent == true) Navigator.of(dialogContext).pop();
+        }, child: const Text('Done'))]);
+    })));
+  return true;
+}
+
 class _StoreIssueReviews extends StatelessWidget {
   const _StoreIssueReviews({
     required this.session,
@@ -9042,7 +9073,7 @@ class _StoreIssueReviews extends StatelessWidget {
           ),
         for (final issue in records)
           _StoreIssueReview(
-            key: ValueKey((issue.accountScope, issue.workspaceId, issue.id)),
+            key: ValueKey(issue.draftKey),
             issue: issue,
             session: session,
             initiallyExpanded: initiallyExpanded,
@@ -9115,6 +9146,7 @@ class _StoreIssueReviewState extends State<_StoreIssueReview> {
           ),
           if (_expanded) ...[
             const SizedBox(height: 8),
+            if (widget.session.workspaceIssueStale(issue)) const Text('Current case status is unavailable.'),
             Text(
               'Case ${issue.id}',
               style: const TextStyle(fontSize: 11, color: MoolColors.muted),
@@ -9135,6 +9167,10 @@ class _StoreIssueReviewState extends State<_StoreIssueReview> {
                   ],
                 ),
               ),
+            if (issue.purchaseContext case final purchase?)
+              for (final line in widget.session.workspaceIssueOriginal(issue)?.lines ?? <WorkspacePurchasedSkuLine>[])
+                if (purchase.lineIds.contains(line.lineId)) Padding(padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text('${line.name} · ${line.packLabel}', style: const TextStyle(fontWeight: FontWeight.w700))),
             Text(issue.reason, key: Key('work-issue-reason-${issue.id}')),
             const SizedBox(height: 8),
             if (issue.resolution?.isNotEmpty == true)
@@ -9309,7 +9345,7 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
       final changed = draft != null && draft.expectedRevision != issue.revision;
       final available =
           issue.state == WorkspaceIssueState.retailerReview &&
-          !session.workspaceIssuesStale &&
+          !session.workspaceIssueStale(issue) &&
           loaded &&
           !changed &&
           !locked;
@@ -9359,7 +9395,7 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
                     key: Key('work-issue-review-update-${issue.id}'),
                     onPressed:
                         issue.state == WorkspaceIssueState.retailerReview &&
-                            !session.workspaceIssuesStale &&
+                            !session.workspaceIssueStale(issue) &&
                             !locked
                         ? () => save(choice, reviewed: true)
                         : null,
@@ -9465,7 +9501,7 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
                       ? 'Your response has not been recorded. Retry when ready.'
                       : 'Your response is awaiting confirmation. Check its status.',
                 ),
-              if (session.issueCommandGateway == null)
+              if (!session.workspaceIssueSendingAvailable(issue))
                 const Text(
                   'Sending is unavailable.',
                   style: TextStyle(fontSize: 12),
@@ -30059,7 +30095,8 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
       if (showOriginals) WorkspacePurchaseOriginals(
         key: ValueKey(('store-originals',originalReader,storeId,session.originalPurchaseRealm)),
         gateway: originalReader, role: WorkspaceOrderIdentityRole.seller,
-        realm: session.originalPurchaseRealm, storeId: storeId),
+        realm: session.originalPurchaseRealm, storeId: storeId,
+        onOpenDeviceCase: (handoff) => _openReceivedDeviceCase(context, session, handoff)),
     ]);
     _scheduleFilterMetrics();
     final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0 ||
@@ -30981,6 +31018,7 @@ class _LiveOrderTicket extends StatelessWidget {
                 WorkspacePurchasedUnitsForLine(key: ValueKey(('packing-units', exact, reader, scopeRevision, line.id)),
                   gateway: reader, role: WorkspaceOrderIdentityRole.seller, realm: session.originalPurchaseRealm,
                   reference: exact.reference, line: originals[line.id]!,
+                  onOpenDeviceCase: (handoff) => _openReceivedDeviceCase(context, session, handoff),
                   inputCurrent: () => current() && exact.stage == 'Preparing' && session.workspaceOrderOperationState(order.id) == null),
             ],
           ],

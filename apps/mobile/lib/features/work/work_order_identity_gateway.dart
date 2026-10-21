@@ -8,7 +8,7 @@ import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
 import 'work_customer_feedback.dart';
 import 'work_models.dart' show WorkspaceRestockPurchaseOriginal, WorkspaceSupplierGoodsReceipt, WorkspacePurchasedUnitRow,
-  WorkspacePurchasedUnitPublishCommand, WorkspacePurchasedUnitMismatchCommand;
+  WorkspacePurchasedUnitPublishCommand, WorkspacePurchasedUnitMismatchCommand, WorkspaceIssueRecord;
 
 enum WorkspaceOrderIdentityState { linked, unlinked, unavailable }
 
@@ -211,9 +211,32 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
       }, valid: (reply, target) => authorised() && reply.validFor(command, target));
   }
 
+  Future<WorkspaceReceivedDeviceReports?> readReceivedDeviceReports({required String realm, required WorkspacePurchaseReference reference,
+    required WorkspacePurchasedSkuLine line, String? cursor, bool Function()? inputCurrent}) {
+    final source = purchasedUnitSource, lifetime = purchasedUnitSource?.lifetime;
+    if (source is! WorkspaceReceivedDeviceReportSource || cursor != null && (cursor.isEmpty || cursor.length > 512)) return Future.value(null);
+    WorkspacePurchaseOrder? original;
+    WorkspacePurchasedUnitOwnerAccess? grant;
+    return _readPurchasedLineSupplement<WorkspaceReceivedDeviceReports>(role: WorkspaceOrderIdentityRole.seller, realm: realm,
+      reference: reference, line: line, inputCurrent: inputCurrent, onOriginal: (value) => original = value,
+      sourceCurrent: () => source.isCurrent && lifetime != null && source.lifetime == lifetime && source.accountUserId == accountUserId,
+      read: (target, current) async {
+        final access = await source.read(target);
+        if (!current() || access == null || !access.validFor(target)) return null;
+        grant = access.ownerAccess;
+        if (grant == null || !source.ownerAccessCurrent(grant!) || !grant!.allows(target, DateTime.now().toUtc())) return null;
+        final result = await source.readReceivedReports(target, cursor: cursor);
+        if (!current() || result == null || !source.ownerAccessCurrent(grant!) || !grant!.allows(target, DateTime.now().toUtc())) return null;
+        return WorkspaceReceivedDeviceReports(target: result.target, revision: result.revision, ownerAccess: result.ownerAccess,
+          original: original, reports: result.reports, complete: result.complete, nextCursor: result.nextCursor);
+      }, valid: (result, target) => original != null && result.validFor(target, original!) &&
+        source.ownerAccessCurrent(result.ownerAccess) && result.ownerAccess.allows(target, DateTime.now().toUtc()) &&
+        source.ownerAccessCurrent(grant!) && grant!.allows(target, DateTime.now().toUtc()));
+  }
+
   Future<T?> _readPurchasedLineSupplement<T>({required WorkspaceOrderIdentityRole role, required String realm,
     required WorkspacePurchaseReference reference, required WorkspacePurchasedSkuLine line, String? buyingStoreId,
-    bool Function()? inputCurrent, required bool Function() sourceCurrent,
+    bool Function()? inputCurrent, void Function(WorkspacePurchaseOrder)? onOriginal, required bool Function() sourceCurrent,
     required Future<T?> Function(WorkspacePurchasedLineTarget, bool Function()) read, required bool Function(T, WorkspacePurchasedLineTarget) valid}) async {
     var active = true;
     bool current() => active && isCurrent && sourceCurrent() && inputCurrent?.call() != false;
@@ -228,6 +251,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         if (!current() || original == null) return null;
         final savedLine = original.lines.where((candidate) => candidate.lineId == line.lineId).singleOrNull;
         if (savedLine == null || jsonEncode(savedLine.toJson()) != jsonEncode(line.toJson())) return null;
+        onOriginal?.call(original);
         return read(target, current);
       })().timeout(const Duration(seconds: 15));
       return current() && result != null && valid(result, target) ? result : null;
@@ -1520,6 +1544,79 @@ abstract interface class WorkspacePurchasedUnitSource {
 abstract interface class WorkspacePurchasedUnitPublisher implements WorkspacePurchasedUnitSource {
   Future<WorkspacePurchasedUnitPublishReply?> share(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitPublishCommand command);
   Future<WorkspacePurchasedUnitPublishReply?> checkSharing(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitPublishCommand command);
+}
+
+/// Accepted buyer statements only; never the buyer's private report draft.
+abstract interface class WorkspaceReceivedDeviceReportSource implements WorkspacePurchasedUnitSource {
+  Future<WorkspaceReceivedDeviceReports?> readReceivedReports(WorkspacePurchasedLineTarget target, {String? cursor});
+}
+
+/// Exact owner-authorised handoff to the existing Store case response UI.
+/// Contains an existing source case, never a request to create a local case.
+class WorkspaceDeviceCaseHandoff {
+  WorkspaceDeviceCaseHandoff({required this.gateway, required this.source, required this.target,
+    required this.original, required this.issue, required this.ownerAccess}) : lifetime = source.lifetime;
+  final AuthenticatedWorkspaceOrderIdentityGateway gateway;
+  final WorkspaceReceivedDeviceReportSource source;
+  final WorkspacePurchasedLineTarget target;
+  final WorkspacePurchaseOrder original;
+  final WorkspaceIssueRecord issue;
+  final WorkspacePurchasedUnitOwnerAccess ownerAccess;
+  final Object? lifetime;
+  bool get current {
+    try {
+      final context = issue.purchaseContext;
+      return gateway.isCurrent && gateway.accountUserId == target.accountUserId && identical(gateway.purchasedUnitSource, source) &&
+        source.isCurrent && source.accountUserId == target.accountUserId && lifetime != null && source.lifetime == lifetime &&
+        source.ownerAccessCurrent(ownerAccess) && ownerAccess.allows(target, DateTime.now().toUtc()) &&
+        issue.valid && issue.accountScope == target.accountUserId && issue.workspaceId == target.reference.storeId && context != null &&
+        context.realm == target.realm && jsonEncode(context.reference.toJson()) == jsonEncode(target.reference.toJson()) &&
+        context.lineIds.contains(target.lineFacts['lineId']) && context.lineIds.every((id) => original.lines.any((line) => line.lineId == id)) &&
+        original.storeId == target.reference.storeId && original.orderId == target.reference.orderId &&
+        original.originalFingerprint == target.reference.originalFingerprint &&
+        original.lines.any((line) => jsonEncode(line.toJson()) == jsonEncode(target.lineFacts));
+    } on Object { return false; }
+  }
+}
+
+class WorkspaceReceivedDeviceReport {
+  WorkspaceReceivedDeviceReport({required this.id, required this.note, required this.recordedAt, required this.deviceRevision,
+    required this.deviceFingerprint, required this.commandFingerprint, required List<WorkspacePurchasedUnitRow> rows, this.supportCase}) : rows = List.unmodifiable(rows);
+  final String id, note, deviceFingerprint, commandFingerprint;
+  final int deviceRevision;
+  final DateTime recordedAt;
+  final List<WorkspacePurchasedUnitRow> rows;
+  final WorkspaceIssueRecord? supportCase;
+  String get fingerprint => _goodsFingerprint([id, note, recordedAt.toUtc().toIso8601String(), deviceRevision, deviceFingerprint,
+    commandFingerprint, rows.map((r) => r.toJson()).toList()]);
+  bool validFor(WorkspacePurchasedLineTarget target, WorkspacePurchaseOrder original) {
+    final context = supportCase?.purchaseContext;
+    return _purchaseText(id) && !RegExp(r'[\x7f]').hasMatch(id) && note.isNotEmpty && note == note.trim() && note.length <= 2000 &&
+      !RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]').hasMatch(note) && deviceRevision > 0 && deviceRevision <= 2147483647 &&
+      RegExp(r'^[a-f0-9]{64}$').hasMatch(deviceFingerprint) && RegExp(r'^[a-f0-9]{64}$').hasMatch(commandFingerprint) &&
+      rows.isNotEmpty && rows.length <= 1000 && rows.every((r) => r.ready) && rows.map((r) => r.id).toSet().length == rows.length &&
+      (supportCase == null || supportCase!.valid && supportCase!.accountScope == target.accountUserId && supportCase!.workspaceId == target.reference.storeId &&
+        context != null && context.realm == target.realm && jsonEncode(context.reference.toJson()) == jsonEncode(target.reference.toJson()) &&
+        context.lineIds.contains(target.lineFacts['lineId']) && context.lineIds.every((id) => original.lines.any((line) => line.lineId == id)));
+  }
+}
+
+class WorkspaceReceivedDeviceReports {
+  WorkspaceReceivedDeviceReports({required this.target, required this.revision, required this.ownerAccess,
+    this.original, required List<WorkspaceReceivedDeviceReport> reports, this.complete = false, this.nextCursor}) : reports = List.unmodifiable(reports);
+  final WorkspacePurchasedLineTarget target;
+  final WorkspacePurchasedUnitOwnerAccess ownerAccess;
+  /// Filled by the gateway's existing authenticated original read, never trusted
+  /// from a report-source payload.
+  final WorkspacePurchaseOrder? original;
+  final int revision;
+  final List<WorkspaceReceivedDeviceReport> reports;
+  final bool complete;
+  final String? nextCursor;
+  bool validFor(WorkspacePurchasedLineTarget expected, WorkspacePurchaseOrder verified) => expected.role == WorkspaceOrderIdentityRole.seller &&
+    target.binding == expected.binding && ownerAccess.boundTo(expected) && revision >= 0 && revision <= 2147483647 && (revision > 0 || reports.isEmpty) &&
+    reports.length <= 50 && reports.map((r) => r.id).toSet().length == reports.length && reports.every((r) => r.validFor(expected, verified)) &&
+    (nextCursor == null || nextCursor!.isNotEmpty && nextCursor!.length <= 512) && (!complete || nextCursor == null);
 }
 
 enum WorkspacePurchasedUnitPublishState { applied, pending, closed }

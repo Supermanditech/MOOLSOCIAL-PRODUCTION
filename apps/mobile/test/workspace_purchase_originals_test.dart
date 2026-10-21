@@ -522,7 +522,7 @@ void main() {
   }
   for (final scenario in [(1.0, 'delivery'), (2.0, 'delivery'), (1.0, 'collection'), (1.0, 'attribution'), (2.0, 'attribution'), (1.0, 'variant'), (2.0, 'variant'), (1.0, 'scheduled'), (2.0, 'scheduled'),
     (1.0, 'context'), (2.0, 'context'), (1.0, 'context-partial'), (2.0, 'context-partial'),
-    (1.0, 'gst'), (2.0, 'gst'), (1.0, 'gst-unknown'), (2.0, 'gst-unknown'), (1.0, 'devices'), (2.0, 'devices')]) {
+    (1.0, 'gst'), (2.0, 'gst'), (1.0, 'gst-unknown'), (2.0, 'gst-unknown'), (1.0, 'devices'), (2.0, 'devices'), (1.0, 'reports'), (2.0, 'reports')]) {
   testWidgets('configured Store feed supports exact facts ${scenario.$2} scale ${scenario.$1}', (tester) async {
     await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
     tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
@@ -532,10 +532,14 @@ void main() {
       : scenario.$2 == 'attribution' ? fixtures.attributedOperationalResponse(role: 'seller')
       : fixtures.operationalResponse(role: 'seller');
     final devices = scenario.$2 == 'devices' ? fixtures.DevicePublisherFixture() : null;
-    final deviceOriginal = devices == null ? null : fixtures.purchaseResponse(role: 'seller');
-    if (devices != null) {
+    final inbox = scenario.$2 == 'reports' ? fixtures.DeviceInboxFixture() : null;
+    final source = inbox ?? devices;
+    final caseGateway = inbox == null ? null : (fixtures.DeviceCaseGatewayFixture()
+      ..onSubmit = (_) => Future.error(TimeoutException('HOST case response lost')));
+    final deviceOriginal = source == null ? null : fixtures.purchaseResponse(role: 'seller');
+    if (source != null) {
       FlutterSecureStorage.setMockInitialValues({});
-      addTearDown(devices.dispose);
+      addTearDown(source.dispose);
     }
     if (scenario.$2.startsWith('context')) {
       final facts = fixtures.fulfilmentPurchaseResponse(role: 'seller'), original = facts['orders'][0];
@@ -559,7 +563,7 @@ void main() {
     raw['fulfilmentDeadline'] = now.add(const Duration(hours: 2)).toIso8601String();
     final wire = fixtures.Transport();
     wire.respond = (body) {
-      if (devices != null && body['operation'] == 'readStorePurchaseProjection') return deviceOriginal!;
+      if (source != null && body['operation'] == 'readStorePurchaseProjection') return deviceOriginal!;
       if (body['operation'] == 'listStorePurchaseReferences') {
         final refs = fixtures.referenceResponse(role: 'seller')..['storeId'] = 'store-one';
         refs['references'][0]['originalFingerprint'] = raw['originalFingerprint'];
@@ -574,14 +578,14 @@ void main() {
       return raw;
     };
     final journal = _OrderPending();
-    final work = WorkSession(contactDraftStore: _OrderAccount(), operationalPendingStoreFactory: (_, _) => journal)
+    final work = WorkSession(contactDraftStore: _OrderAccount(), operationalPendingStoreFactory: (_, _) => journal, issueCommandGateway: caseGateway)
       ..seedVerifiedWorkspace()
       ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Store', profileLabel: 'Grocery / Kirana Shop',
         profileId: 'retailer-grocery', area: 'Jodhpur', verified: true)
       ..workspaceId = 'store-one'
       ..retailerSetupSaved = true
       ..reviewStage = WorkReviewStage.live;
-    work.bindOriginalPurchaseReader(fixtures.projectionGateway(wire, account: 'owner-1', purchasedUnitSource: devices), 'evaluation');
+    work.bindOriginalPurchaseReader(fixtures.projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source), 'evaluation');
     final procurement = BuyV2Session(core: BuySession(), reviewDataEnabled: false);
     final router = GoRouter(initialLocation: '/app/work/workspace/dashboard', routes: [
       GoRoute(path: '/app/work/workspace/dashboard', builder: (context, state) => WorkWorkspaceDashboardScreen(
@@ -595,7 +599,61 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('work-operational-order-order-v2')), findsOneWidget);
     expect(find.text('Saved online orders · partial coverage'), findsOneWidget);
-    if (devices != null) {
+    if (inbox != null) {
+      Future<void> tapText(String label) async {
+        final finder = find.text(label).last; await tester.ensureVisible(finder); await tester.pumpAndSettle();
+        expect(finder.hitTestable(), findsOneWidget); await tester.tap(finder); await tester.pumpAndSettle();
+      }
+      await tester.ensureVisible(find.byKey(const Key('work-operational-accept-order-v2')));
+      await tester.tap(find.byKey(const Key('work-operational-accept-order-v2'))); await tester.pumpAndSettle();
+      await tapText('Device details'); await tapText('Buyer device reports'); await tapText('Review linked case');
+      final modal = find.byKey(const Key('work-device-report-case'));
+      expect(modal, findsOneWidget); expect(find.descendant(of: modal, matching: find.text('Device details reported')), findsOneWidget);
+      expect(find.descendant(of: modal, matching: find.textContaining('ordered affected')), findsNothing);
+      Future<void> captureCase(String suffix) async {
+        const root = String.fromEnvironment('LF_DEVICE_INBOX_CAPTURE_ROOT'); if (root.isEmpty) { return; }
+        final boundary = capture.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+        await tester.runAsync(() async {
+          final directory = Directory(root); await directory.create(recursive: true);
+          final file = File('$root/host-device-case-${scenario.$1}-$suffix.png'); expect(await file.exists(), isFalse);
+          final image = await boundary.toImage(); final bytes = await image.toByteData(format: ui.ImageByteFormat.png); image.dispose();
+          await file.writeAsBytes(bytes!.buffer.asUint8List());
+        });
+      }
+      await captureCase('top');
+      final liveIssue = inbox.caseFor(inbox.requests.last);
+      expect(work.workspaceIssueStale(liveIssue), isFalse); expect(work.workspaceIssueDraftLoaded(liveIssue), isTrue);
+      expect(work.workspaceIssueResponseLoaded(liveIssue), isTrue);
+      final dropdown = find.descendant(of: modal, matching: find.byType(DropdownButtonFormField<WorkspaceIssueResponse>));
+      await tester.ensureVisible(dropdown); await tester.pumpAndSettle();
+      expect(tester.widget<DropdownButtonFormField<WorkspaceIssueResponse>>(dropdown).onChanged, isNotNull);
+      expect(dropdown.hitTestable(), findsOneWidget); await tester.tap(dropdown); await tester.pumpAndSettle(); await tapText('Send details');
+      final field = find.byKey(const Key('work-issue-response-note-HOST-DEVICE-CASE'));
+      await tester.ensureVisible(field); await tester.enterText(field, 'HOST packing checked');
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      await captureCase('response');
+      await tapText('Done'); await tapText('Review linked case');
+      expect(tester.widget<TextField>(field).controller!.text, 'HOST packing checked');
+      await tapText('Send response'); expect(caseGateway!.submitted, hasLength(1));
+      final command = caseGateway.submitted.single;
+      expect(command.sourceCaseId, 'HOST-DEVICE-CASE'); expect(command.purchaseContext!.realm, 'evaluation'); expect(command.lines, isEmpty);
+      expect(find.text('Response status is uncertain. Check status before trying again.'), findsOneWidget);
+      await tapText('Done'); await tapText('Review linked case'); await tapText('Check status');
+      expect(caseGateway.checked.single.operationId, command.operationId); expect(caseGateway.checked.single.digest, command.digest);
+      expect(caseGateway.submitted, hasLength(1)); expect(find.text('Response sent. Waiting for the case update.'), findsOneWidget);
+      if (scenario.$1 == 1) { inbox.revokeOwner(); }
+      else {
+        final originalStore = work.activeWorkspace;
+        work.activeWorkspace = null; work.activeWorkspace = originalStore;
+        inbox.reportsChanged();
+      }
+      await tester.pumpAndSettle();
+      expect(find.text('Current Store owner access is unavailable. Reopen the report after access is restored.'), findsOneWidget);
+      expect(find.byKey(const Key('work-issue-response-note-HOST-DEVICE-CASE')), findsNothing);
+      await tapText('Done'); expect(work.workspaceInvoices, isEmpty); expect(work.workspaceStockMovements, isEmpty);
+      expect(work.workspaceOrders.single.quantities, isEmpty); expect(journal.entries, isEmpty); expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink()); return;
+    } else if (devices != null) {
       Future<void> tapText(String label) async {
         await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
         await tester.tap(find.text(label)); await tester.pumpAndSettle();

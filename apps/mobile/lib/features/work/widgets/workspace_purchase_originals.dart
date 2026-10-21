@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../work_order_identity_gateway.dart';
 import '../work_catalogue_gateway.dart';
 import '../work_models.dart' show WorkspacePurchasedUnitRow, WorkspacePurchasedUnitDraft, WorkspacePurchasedUnitDraftKey, WorkspacePurchasedUnitPublishCommand,
-  WorkspacePurchasedUnitMismatchDraft, WorkspacePurchasedUnitMismatchCommand;
+  WorkspacePurchasedUnitMismatchDraft, WorkspacePurchasedUnitMismatchCommand, WorkspaceIssueRecord;
 import '../work_services.dart' show WorkPurchasedUnitDraftStore, SecureWorkPurchasedUnitDraftStore;
 
 /// Shared quotation surface, deliberately separate from purchased orders.
@@ -376,6 +376,7 @@ class WorkspacePurchaseOriginals extends StatefulWidget {
     this.buyingStoreId,
     this.onRatePurchasedItem,
     this.onReceivePurchasedOrder,
+    this.onOpenDeviceCase,
   });
   final AuthenticatedWorkspaceOrderIdentityGateway gateway;
   final WorkspaceOrderIdentityRole role;
@@ -387,6 +388,7 @@ class WorkspacePurchaseOriginals extends StatefulWidget {
   final void Function(WorkspacePurchaseReference, WorkspacePurchaseOrder, WorkspacePurchasedSkuLine)? onRatePurchasedItem;
   /// Store owner confirms physical arrival separately from delivery updates.
   final void Function(WorkspacePurchaseReference, WorkspacePurchaseOrder)? onReceivePurchasedOrder;
+  final Future<bool> Function(WorkspaceDeviceCaseHandoff)? onOpenDeviceCase;
   @override
   State<WorkspacePurchaseOriginals> createState() =>
       _WorkspacePurchaseOriginalsState();
@@ -781,6 +783,7 @@ class _WorkspacePurchaseOriginalsState
                                   key: ValueKey(('units', widget.gateway, _generation, reference.originalFingerprint, line.lineId)),
                                   gateway: widget.gateway, role: widget.role, realm: widget.realm,
                                   buyingStoreId: widget.buyingStoreId, reference: reference, line: line,
+                                  onOpenDeviceCase: widget.onOpenDeviceCase,
                                   inputCurrent: () => _current(generation) && identical(_details[reference.orderId], details)),
                                 _amount(line.lineTotalMinor),
                                 WorkspaceOriginalBenefitsForLine(original: details, lineId: line.lineId),
@@ -871,11 +874,157 @@ class _WorkspacePurchaseOriginalsState
   );
 }
 
+/// Read-only accepted buyer statements, available only to the supplier owner.
+class WorkspaceReceivedDeviceReportPanel extends StatefulWidget {
+  const WorkspaceReceivedDeviceReportPanel({super.key, required this.gateway, required this.realm,
+    required this.reference, required this.line, this.inputCurrent, this.onOpenCase});
+  final AuthenticatedWorkspaceOrderIdentityGateway gateway;
+  final String realm;
+  final WorkspacePurchaseReference reference;
+  final WorkspacePurchasedSkuLine line;
+  final bool Function()? inputCurrent;
+  final Future<bool> Function(WorkspaceDeviceCaseHandoff)? onOpenCase;
+  @override State<WorkspaceReceivedDeviceReportPanel> createState() => _WorkspaceReceivedDeviceReportPanelState();
+}
+
+class _WorkspaceReceivedDeviceReportPanelState extends State<WorkspaceReceivedDeviceReportPanel> with WidgetsBindingObserver {
+  WorkspaceReceivedDeviceReportSource? _source;
+  Object? _lifetime;
+  WorkspaceReceivedDeviceReports? _record;
+  final _reports = <String, WorkspaceReceivedDeviceReport>{};
+  final _history = <String, String>{};
+  final _cases = <String, WorkspaceIssueRecord>{};
+  final _pages = <String?, String>{};
+  int _generation = 0, _revision = -1;
+  bool _open = false, _loading = false, _acting = false;
+  String? _error;
+  Timer? _expiry;
+  WorkspacePurchasedLineTarget get _target => WorkspacePurchasedLineTarget(accountUserId: widget.gateway.accountUserId,
+    role: WorkspaceOrderIdentityRole.seller, realm: widget.realm, reference: widget.reference, line: widget.line);
+  bool _current(int visit) {
+    try { return mounted && visit == _generation && widget.inputCurrent?.call() != false && widget.gateway.isCurrent &&
+      _source != null && identical(widget.gateway.purchasedUnitSource, _source) && _source!.isCurrent &&
+      _source!.accountUserId == widget.gateway.accountUserId && _lifetime != null && _source!.lifetime == _lifetime; }
+    on Object { return false; }
+  }
+  bool get _authorised {
+    try { final grant = _record?.ownerAccess;
+      return _current(_generation) && grant != null && _source!.ownerAccessCurrent(grant) && grant.allows(_target, DateTime.now().toUtc()); }
+    on Object { return false; }
+  }
+  @override void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); _bind(); }
+  void _bind() {
+    final source = widget.gateway.purchasedUnitSource;
+    _source = source is WorkspaceReceivedDeviceReportSource ? source : null;
+    _lifetime = _source?.lifetime; _source?.addListener(_changed);
+  }
+  void _retire({bool identity = false}) {
+    _generation++; _expiry?.cancel(); _record = null; _reports.clear(); _loading = false; _acting = false;
+    if (identity) { _history.clear(); _cases.clear(); _pages.clear(); _revision = -1; }
+  }
+  void _changed() {
+    if (!mounted) return;
+    final identity = _source?.lifetime != _lifetime;
+    setState(() { _retire(identity: identity); _lifetime = _source?.lifetime; _error = 'Reports need a current owner check.'; });
+    if (_open) unawaited(_load());
+  }
+  @override void didChangeAppLifecycleState(AppLifecycleState state) { if (state == AppLifecycleState.resumed && _open) _changed(); }
+  @override void didUpdateWidget(covariant WorkspaceReceivedDeviceReportPanel old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.gateway, widget.gateway) || old.realm != widget.realm ||
+      jsonEncode(old.reference.toJson()) != jsonEncode(widget.reference.toJson()) || jsonEncode(old.line.toJson()) != jsonEncode(widget.line.toJson()) ||
+      !identical(widget.gateway.purchasedUnitSource, _source) || _source?.lifetime != _lifetime) {
+      _source?.removeListener(_changed); _retire(identity: true); _bind(); _error = null;
+      if (_open) unawaited(_load());
+    }
+  }
+  @override void dispose() { _source?.removeListener(_changed); _retire(); WidgetsBinding.instance.removeObserver(this); super.dispose(); }
+  Future<void> _load({bool more = false}) async {
+    if (_loading || !_open) return;
+    if (!_current(_generation)) { setState(() { _retire(); _error = 'Buyer device reports are unavailable. Store owner access is required.'; }); return; }
+    final cursor = more ? _record?.nextCursor : null;
+    if (more && (cursor == null || !_authorised || _error != null)) return;
+    final visit = ++_generation;
+    setState(() { _loading = true; _error = null; });
+    final result = await widget.gateway.readReceivedDeviceReports(realm: widget.realm, reference: widget.reference,
+      line: widget.line, cursor: cursor, inputCurrent: () => _open && _current(visit));
+    if (!_current(visit) || !_open) return;
+    String? error;
+    if (result == null || result.original == null) { error = 'Current buyer device reports could not be verified. Try again.'; }
+    else {
+      final signature = jsonEncode([result.reports.map((r) => [r.id, r.fingerprint, r.supportCase?.revision,
+        r.supportCase?.updatedAt.toUtc().toIso8601String(), r.supportCase?.purchaseContext?.fingerprint]).toList(), result.complete, result.nextCursor]);
+      if (result.revision < _revision || more && result.revision != _revision || result.revision == _revision && _pages[cursor] != null && _pages[cursor] != signature ||
+        result.nextCursor != null && (result.nextCursor == cursor || more && _pages.containsKey(result.nextCursor))) {
+        error = 'Reports changed. Refresh before continuing.';
+      }
+      for (final report in result.reports) {
+        final previous = report.supportCase == null ? null : _cases[report.supportCase!.cacheId];
+        if (_history[report.id] != null && _history[report.id] != report.fingerprint || more && _reports.containsKey(report.id) ||
+          previous != null && (report.supportCase!.revision < previous.revision || report.supportCase!.updatedAt.isBefore(previous.updatedAt) ||
+            report.supportCase!.revision == previous.revision && !report.supportCase!.sameRevisionContent(previous))) {
+          error = 'Reports changed. Refresh before continuing.';
+        }
+      }
+      if (error == null) {
+        if (!more) _reports.clear();
+        if (result.revision != _revision) _pages.clear();
+        _pages[cursor] = signature; _revision = result.revision; _record = result;
+        for (final report in result.reports) {
+          _reports[report.id] = report; _history[report.id] = report.fingerprint;
+          if (report.supportCase case final issue?) { _cases[issue.cacheId] = issue; }
+        }
+        _expiry?.cancel();
+        final remaining = result.ownerAccess.expiresAt.difference(DateTime.now().toUtc());
+        _expiry = Timer(remaining.isNegative ? Duration.zero : remaining, () {
+          if (mounted && identical(_record, result)) setState(() { _retire(); _error = 'Store owner access expired. Refresh reports.'; });
+        });
+      }
+    }
+    setState(() { _loading = false; _error = error; if (!_authorised) { _record = null; _reports.clear(); } });
+  }
+  Future<void> _openCase(WorkspaceReceivedDeviceReport report) async {
+    if (_acting || _loading || _error != null || !_authorised || widget.onOpenCase == null || report.supportCase == null) return;
+    final visit = _generation, record = _record!;
+    final handoff = WorkspaceDeviceCaseHandoff(gateway: widget.gateway, source: _source!, target: record.target,
+      original: record.original!, issue: report.supportCase!, ownerAccess: record.ownerAccess);
+    if (!handoff.current) return;
+    setState(() => _acting = true);
+    try { await widget.onOpenCase!(handoff); }
+    on Object { if (_current(visit)) setState(() => _error = 'The linked case could not be opened. Refresh reports.'); }
+    finally { if (_current(visit)) setState(() => _acting = false); }
+  }
+  @override Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    Align(alignment: Alignment.centerLeft, child: TextButton(onPressed: () {
+      setState(() { _open = !_open; if (!_open) _retire(); }); if (_open) unawaited(_load());
+    }, child: Text(_open ? 'Close buyer device reports' : 'Buyer device reports'))),
+    if (_open) ...[
+      if (_loading) const Text('Checking buyer device reports…'),
+      if (_error != null) Text(_error!),
+      if (_authorised) ...[
+        if (_reports.isEmpty && !_loading) Text(_record!.complete ? 'No buyer device reports recorded.' : 'No reports returned. Coverage is incomplete.'),
+        if (!_record!.complete && _reports.isNotEmpty) const Text('Partial report history.'),
+        for (final report in _reports.values) Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Report ${report.id}', style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text('Recorded ${report.recordedAt.toLocal()}'), Text(report.note),
+            for (final row in report.rows) Text(row.labels.join(' · ')),
+            if (report.supportCase == null) const Text('Support case not connected.')
+            else if (widget.onOpenCase == null) const Text('Case review is unavailable here.')
+            else Align(alignment: Alignment.centerRight, child: TextButton(onPressed: _acting || _loading || _error != null ? null : () => _openCase(report), child: const Text('Review linked case'))),
+          ])),
+        if (_record!.nextCursor != null && _error == null) TextButton(onPressed: _loading || _acting ? null : () => _load(more: true), child: const Text('More reports')),
+      ],
+      TextButton(onPressed: _loading || _acting ? null : () => _load(), child: const Text('Refresh reports')),
+    ],
+  ]);
+}
+
 /// Private supplier draft and separately supplied device readback. Local saves
 /// never publish supplier records or submit buyer mismatch reports.
 class WorkspacePurchasedUnitsForLine extends StatefulWidget {
   const WorkspacePurchasedUnitsForLine({super.key, required this.gateway, required this.role, required this.realm,
-    required this.reference, required this.line, this.buyingStoreId, this.inputCurrent, this.draftStore});
+    required this.reference, required this.line, this.buyingStoreId, this.inputCurrent, this.draftStore, this.onOpenDeviceCase});
   final AuthenticatedWorkspaceOrderIdentityGateway gateway;
   final WorkspaceOrderIdentityRole role;
   final String realm;
@@ -884,6 +1033,7 @@ class WorkspacePurchasedUnitsForLine extends StatefulWidget {
   final WorkspacePurchasedSkuLine line;
   final bool Function()? inputCurrent;
   final WorkPurchasedUnitDraftStore? draftStore;
+  final Future<bool> Function(WorkspaceDeviceCaseHandoff)? onOpenDeviceCase;
   @override State<WorkspacePurchasedUnitsForLine> createState() => _WorkspacePurchasedUnitsForLineState();
 }
 
@@ -1322,6 +1472,9 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
             if (canEdit && !_editing) TextButton(onPressed: () { if (_draftActionCurrent(visit, draftVisit) && _canEdit && !_editing) unawaited(_loadDraft()); }, child: const Text('Prepare device details')),
           ],
         ],
+        if (widget.role == WorkspaceOrderIdentityRole.seller) WorkspaceReceivedDeviceReportPanel(
+          key: ValueKey(('received-device-reports', _owner)), gateway: widget.gateway, realm: widget.realm,
+          reference: widget.reference, line: widget.line, inputCurrent: () => _current(visit) && _expanded, onOpenCase: widget.onOpenDeviceCase),
         if (_canDraft && _editing) ...[
           const Divider(height: 16), Text(widget.role == WorkspaceOrderIdentityRole.buyer ? 'Private mismatch report' : 'Private device draft'),
           if (widget.role == WorkspaceOrderIdentityRole.seller) const Text('Add one row for each actual device. Serial and both IMEIs belong on the same row.'),

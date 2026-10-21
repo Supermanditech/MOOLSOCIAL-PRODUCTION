@@ -596,6 +596,117 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  group('PF08 INBOX canonical case response', () {
+    Future<({identity_fixtures.DeviceInboxFixture source, AuthenticatedWorkspaceOrderIdentityGateway reader,
+      WorkspaceReceivedDeviceReports record, WorkspaceDeviceCaseHandoff handoff})> readCase() async {
+      final source = identity_fixtures.DeviceInboxFixture();
+      final wire = identity_fixtures.Transport()..data = identity_fixtures.purchaseResponse(role: 'seller');
+      final reader = identity_fixtures.projectionGateway(wire, account: 'owner-1', purchasedUnitSource: source);
+      final reference = WorkspacePurchaseReference.fromJson(identity_fixtures.referenceResponse(role: 'seller')['references'][0]);
+      final original = (await reader.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: reference))!;
+      final record = (await reader.readReceivedDeviceReports(realm: 'evaluation', reference: reference, line: original.lines.single))!;
+      return (source: source, reader: reader, record: record, handoff: WorkspaceDeviceCaseHandoff(gateway: reader, source: source, target: record.target,
+        original: record.original!, issue: record.reports.single.supportCase!, ownerAccess: record.ownerAccess));
+    }
+    WorkSession make(AuthenticatedWorkspaceOrderIdentityGateway reader, WorkIssueCommandGateway gateway,
+      _OrderJournalStorage drafts, _OrderJournalStorage journal) {
+      final account = _CommandAccountStore('owner-1');
+      final work = WorkSession(contactDraftStore: account, pendingProofStore: account,
+        issueDraftStore: SecureWorkIssueDraftStore(accountScope: () => account.accountScope, storage: drafts),
+        issueCommandStore: SecureWorkIssueCommandStore(accountScope: () => account.accountScope, storage: journal), issueCommandGateway: gateway)
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host supplier', profileId: 'retailer-grocery',
+          profileLabel: 'Grocery', area: 'Jodhpur', verified: true);
+      work.bindOriginalPurchaseReader(reader, 'evaluation'); return work;
+    }
+    bool admit(WorkSession work, WorkspaceDeviceCaseHandoff handoff, {bool Function()? current}) => work.admitWorkspacePurchaseIssue(
+      issue: handoff.issue, target: handoff.target, original: handoff.original, ownerCurrent: current ?? () => handoff.current);
+    Future<void> prepare(WorkSession work, WorkspaceIssueRecord issue) async {
+      await work.loadWorkspaceIssueDraft(issue); await work.loadWorkspaceIssueResponse(issue);
+      await work.saveWorkspaceIssueDraft(issue, response: WorkspaceIssueResponse.provideDetails, note: 'HOST checked packed serial.');
+    }
+    test('exact source case needs owner and canonical gateway, no inferred order or quantity', () async {
+      final f = await readCase(); addTearDown(f.source.dispose);
+      final work = make(f.reader, _IssueCommandGateway(), _OrderJournalStorage(), _OrderJournalStorage()); addTearDown(work.dispose);
+      expect(admit(work, f.handoff, current: () => throw StateError('HOST unavailable owner')), isFalse);
+      expect(work.applyWorkspaceIssues(accountScope: 'owner-1', storeId: 'store-one', feedRevision: 1, records: [f.handoff.issue]), isFalse);
+      expect(admit(work, f.handoff), isTrue); final issue = f.handoff.issue;
+      expect(work.workspaceOrders, isEmpty); expect(issue.lines, isEmpty); expect(work.workspaceIssueOriginal(issue), same(f.handoff.original));
+      expect(work.workspaceInvoices, isEmpty); expect(work.workspaceStockMovements, isEmpty);
+      await prepare(work, issue); expect(work.workspaceIssueCanSend(issue), isFalse);
+      final wrong = f.source.caseFor(f.record.target, realm: 'production');
+      expect(work.admitWorkspacePurchaseIssue(issue: wrong, target: f.record.target, original: f.record.original!, ownerCurrent: () => true), isFalse);
+      final changed = f.source.caseFor(f.record.target, revision: 2);
+      expect(work.admitWorkspacePurchaseIssue(issue: changed, target: f.record.target, original: f.record.original!, ownerCurrent: () => f.handoff.current), isTrue);
+      expect(admit(work, f.handoff), isFalse); expect(work.workspaceCurrentIssue(issue), same(changed));
+      f.source.revokeOwner(); expect(work.workspaceCurrentIssue(issue), isNull); expect(work.workspaceIssueStale(issue), isTrue);
+    });
+    test('canonical v2 codec binds realm source case and private key while legacy v1 bytes stay unchanged', () async {
+      final f = await readCase(); addTearDown(f.source.dispose);
+      final issue = f.handoff.issue, context = f.handoff.issue.purchaseContext!;
+      final draft = WorkspaceIssueDraft(key: issue.draftKey, target: issue.target, referenceId: issue.referenceId,
+        expectedRevision: issue.revision, response: WorkspaceIssueResponse.provideDetails, note: 'HOST response');
+      final command = WorkIssueCommand(operationId: 'STORE-ISSUE-${'x' * 22}', draft: draft, kind: issue.kind, lines: [],
+        purchaseContext: context, sourceCaseId: issue.id);
+      expect(command.valid, isTrue); expect(command.toJson()['version'], 2); expect(WorkIssueCommand.fromJson(command.toJson())!.digest, command.digest);
+      expect(command.key.caseId, isNot(issue.id)); expect(command.sourceCaseId, issue.id);
+      expect(WorkspaceIssuePurchaseContext(realm: 'production', reference: context.reference, lineIds: context.lineIds)
+        .responseKey(issue.accountScope, issue.workspaceId, issue.id), isNot(command.key));
+      for (final corrupt in [<String, Object?>{...command.toJson(), 'version': 1}, {...command.toJson(), 'version': 2.0},
+        {...command.toJson(), 'extra': true}, {...command.toJson(), 'sourceCaseId': 'bad\ncase'},
+        {...command.toJson(), 'purchaseContext': {...context.toJson(), 'lineIds': ['line-one', 'line-one']}}]) {
+        expect(WorkIssueCommand.fromJson(corrupt), isNull);
+      }
+      final legacyIssue = WorkspaceIssueRecord(accountScope: 'owner-1', workspaceId: 'store-one', id: 'HOST-LEGACY',
+        referenceId: 'ORDER-A', target: WorkspaceIssueTarget.customerOrder, kind: WorkspaceIssueKind.returnRequest,
+        state: WorkspaceIssueState.retailerReview, revision: 1, updatedAt: DateTime.utc(2026), reason: 'HOST legacy case', nextStep: 'Review',
+        lines: const [WorkspaceIssueLine(lineId: 'line-one', productId: 'product', name: 'Host product', pack: '1 pack', orderedQuantity: 2, affectedQuantity: 1)]);
+      final legacyDraft = WorkspaceIssueDraft(key: legacyIssue.draftKey, target: legacyIssue.target, referenceId: legacyIssue.referenceId,
+        expectedRevision: legacyIssue.revision, response: WorkspaceIssueResponse.provideDetails, note: 'HOST response');
+      final legacy = WorkIssueCommand(operationId: command.operationId, draft: legacyDraft, kind: legacyIssue.kind, lines: legacyIssue.lines);
+      final expected = {'version': 1, 'operationId': command.operationId, 'draft': legacyDraft.toJson(), 'kind': legacyIssue.kind.name,
+        'lines': [for (final line in legacyIssue.lines) {'lineId': line.lineId, 'productId': line.productId, 'name': line.name, 'pack': line.pack,
+          'orderedQuantity': line.orderedQuantity, 'affectedQuantity': line.affectedQuantity}]};
+      expect(jsonEncode(legacy.toJson()), jsonEncode(expected)); expect(WorkIssueCommand.fromJson(expected)!.digest, legacy.digest);
+    });
+    test('unknown response restores same canonical operation and checks without resending', () async {
+      final f = await readCase(); addTearDown(f.source.dispose);
+      final gateway = identity_fixtures.DeviceCaseGatewayFixture()..onSubmit = (_) => Future.error(TimeoutException('HOST lost reply'));
+      final drafts = _OrderJournalStorage(), journal = _OrderJournalStorage();
+      final first = make(f.reader, gateway, drafts, journal); final issue = f.handoff.issue;
+      expect(admit(first, f.handoff), isTrue); await prepare(first, issue);
+      expect(await first.sendWorkspaceIssueResponse(issue, expectedDraft: first.workspaceIssueDraft(issue)!), isFalse);
+      final original = gateway.submitted.single; expect(original.toJson()['version'], 2); expect(original.lines, isEmpty);
+      expect(first.workspaceIssueResponseLocksDraft(issue), isTrue); first.dispose();
+      final next = make(f.reader, gateway, drafts, journal); addTearDown(next.dispose); expect(admit(next, f.handoff), isTrue);
+      await prepare(next, issue); expect(next.workspaceIssueResponse(issue)!.command.digest, original.digest);
+      expect(next.workspaceIssueCanSend(issue), isFalse); expect(await next.checkWorkspaceIssueResponse(issue), isTrue);
+      expect(gateway.submitted, hasLength(1)); expect(gateway.checked.single.operationId, original.operationId);
+      expect(gateway.checked.single.digest, original.digest); expect(next.workspaceCurrentIssue(issue)!.state, WorkspaceIssueState.retailerReview);
+      expect(next.workspaceOrders, isEmpty); expect(next.workspaceInvoices, isEmpty); expect(next.workspaceStockMovements, isEmpty);
+    });
+    for (final heldAt in ['journal', 'reply']) {
+      test('captured owner retires canonical $heldAt action through revoke and regrant', () async {
+        final f = await readCase(); addTearDown(f.source.dispose);
+        final gateway = identity_fixtures.DeviceCaseGatewayFixture(), drafts = _OrderJournalStorage(), journal = _OrderJournalStorage();
+        final work = make(f.reader, gateway, drafts, journal); addTearDown(work.dispose); final issue = f.handoff.issue;
+        expect(admit(work, f.handoff), isTrue); await prepare(work, issue);
+        final held = Completer<void>();
+        if (heldAt == 'journal') { journal.holdWrite = held; }
+        else { gateway.onSubmit = (command) async { await held.future; return gateway.reply(command); }; }
+        final pending = work.sendWorkspaceIssueResponse(issue, expectedDraft: work.workspaceIssueDraft(issue)!);
+        await _drainOrderJournal(); expect(gateway.submitted.length, heldAt == 'journal' ? 0 : 1);
+        f.source.revokeOwner(); f.source.restoreOwner(); held.complete(); expect(await pending, isFalse);
+        expect(gateway.submitted.length, heldAt == 'journal' ? 0 : 1); expect(work.workspaceIssueResponse(issue), isNull);
+        final fresh = (await f.reader.readReceivedDeviceReports(realm: 'evaluation', reference: f.record.target.reference, line: f.record.original!.lines.single))!;
+        final handoff = WorkspaceDeviceCaseHandoff(gateway: f.reader, source: f.source, target: fresh.target, original: fresh.original!,
+          issue: fresh.reports.single.supportCase!, ownerAccess: fresh.ownerAccess);
+        final next = make(f.reader, gateway, drafts, journal); addTearDown(next.dispose); expect(admit(next, handoff), isTrue);
+        await prepare(next, issue); expect(next.workspaceIssueResponseLocksDraft(issue), isTrue);
+        expect(await next.checkWorkspaceIssueResponse(issue), isTrue); expect(gateway.submitted.length, heldAt == 'journal' ? 0 : 1);
+        expect(gateway.checked, hasLength(1)); expect(next.workspaceInvoices, isEmpty); expect(next.workspaceStockMovements, isEmpty);
+      });
+    }
+  });
   group('PF08 DEVICE private draft', () {
     final key = WorkspacePurchasedUnitDraftKey(account: 'account-A', realm: 'evaluation', store: 'store-A', binding: 'a' * 64);
     WorkspacePurchasedUnitDraft draft({int revision = 1, String serial = 'HOST-PARTIAL '}) => WorkspacePurchasedUnitDraft(
