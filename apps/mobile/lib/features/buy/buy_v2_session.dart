@@ -14067,6 +14067,8 @@ class BuyV2Session extends ChangeNotifier {
     if (value.available == false) return '$seller reports out of stock';
     if (value.quantityAvailable == false) return '$seller cannot confirm stock for this quantity';
     if (value.quantityAvailable == null) return '$seller reports stock · quantity unconfirmed';
+    final count = value.availablePacks;
+    if (count != null) return '$seller reports $count ${count == 1 ? 'pack' : 'packs'} available';
     final packs = value.query.requestedPacks;
     return '$seller reports stock for $packs ${packs == 1 ? 'pack' : 'packs'}';
   }

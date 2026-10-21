@@ -751,6 +751,175 @@ test('LF11 Stock HTTP source admission is explicit, disabled by default and sepa
   assert.match(index, /catalogueOperation[\s\S]*?requireDefaultPurchaseTenant\(verified\.firebase\?\.tenant\)/u);
   assert.match(index, /stockOperation !== undefined\s*\? await workspaceCatalogueService\(\)\.handleStoreStock\(ownerUserId, operation, catalogueBody\)/u);
 });
+test('STOCK-PRIVACY HTTP uses matching activation, tenant authentication and mutation AppCheck', () => {
+  const index = readFileSync(`${__dirname}/../../src/index.ts`, 'utf8');
+  const start = index.indexOf('export const moolSocialWorkspace = onRequest('), end = index.indexOf('function workspaceOrderOperationsService', start);
+  const route = index.slice(start, end);
+  assert.match(route, /stockVisibilityOperation !== undefined \|\| stockOperation === "public" && body.stockSnapshotVersion === 2/u);
+  assert.ok(route.includes('process.env.MOOLSOCIAL_STOCK_QUANTITY_VISIBILITY_V1 !== "true"'));
+  assert.ok(route.indexOf('process.env.MOOLSOCIAL_STOCK_QUANTITY_VISIBILITY_V1') < route.indexOf('await verifySocialInvocation('));
+  const mutation = route.slice(route.indexOf('const mutation ='), route.indexOf('const supplierPolicyOperation'));
+  assert.ok(mutation.includes('stockVisibilityOperation === "save"')); assert.ok(mutation.includes('stockVisibilityOperation === "close"'));
+  assert.ok(!mutation.includes('stockVisibilityOperation === "read"')); assert.ok(!mutation.includes('stockVisibilityOperation === "reconcile"'));
+  assert.ok(route.slice(route.indexOf('const catalogueOperation ='), route.indexOf('const orderMutation =')).includes('stockVisibilityOperation !== undefined'));
+  assert.ok(route.includes('requireDefaultPurchaseTenant(verified.firebase?.tenant)'));
+  assert.ok(route.includes('consume ? { consume: true } : undefined'));
+  assert.ok(route.includes('handleStockVisibility(ownerUserId, operation, catalogueBody)'));
+});
+
+test('STOCK-PRIVACY explicit disclosure, stale hide, replay and owner-bound public counts', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-lf-privacy-${randomUUID().slice(0, 8)}`}, `privacy-${randomUUID()}`), db = getFirestore(app);
+  const root = db.collection('workspaceCatalogues').doc('evaluation'), store = root.collection('stores').doc('store-one');
+  let clock = at;
+  const repo = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(clock));
+  const service = () => new WorkspaceCatalogueService(repo(), catalogueIdentity, () => new Date(clock));
+  const binding = {skuId: 'sku-one', skuRevision: 1, canonicalProductId: input().canonicalProductId, verifiedPackId: input().verifiedPackId};
+  const report = {stockSnapshotVersion: 1, storeId: 'store-one', binding, expectedRevision: 0, idempotencyKey: 'privacy-stock',
+    source: {inventoryRevision: 12, savedAt: at, mode: 'exact_quantity', quantityPacks: 700, available: true}};
+  const query = {stockSnapshotVersion: 2, storeId: 'store-one', binding, requestedPacks: 1};
+  const scope = {stockVisibilityVersion: 1, storeId: 'store-one', skuId: 'sku-one'};
+  const visibility = (operation: string, body: object = scope, owner = 'owner-one') =>
+    (service() as any).handleStockVisibility(owner, operation, body) as Promise<any>;
+  const read = (body = query) => service().handleStoreStock('buyer-one', 'readPublicStoreStockSnapshot', body) as Promise<any>;
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    await root.collection('participants').doc('store-one').set(producerParticipant());
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    const value = input(), commands = productionCommands(value);
+    for (let i = 0; i < commands.length; i++) await repo().produceCatalogue([0, 2, 4].includes(i)
+      ? 'reviewer-one' : 'owner-one', catalogueIdentity, commands[i]!);
+    await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: value, expectedRevision: 0, idempotencyKey: 'privacy-bind'});
+    await service().handleStoreStock('owner-one', 'publishStoreStockSnapshot', report);
+    const initial = await visibility('readStoreStockVisibility');
+    assert.equal(initial.visible, false); assert.equal(initial.revision, 0);
+    assert.deepEqual(initial.enableSource, {binding, stockRevision: 1});
+    const privateRead = await read();
+    assert.equal(privateRead.stock.quantityPublic, false);
+    assert.equal(Object.hasOwn(privateRead.stock, 'availablePacks'), false);
+    const enable = {...scope, expectedRevision: 0, idempotencyKey: 'privacy-enable', visible: true,
+      binding, stockRevision: 1};
+    const enabled = await visibility('saveStoreStockVisibility', enable);
+    assert.equal(enabled.state, 'saved'); assert.equal(enabled.revision, 1);
+    const publicRead = await read();
+    assert.equal(publicRead.stock.availablePacks, 700);
+    const legacy = await read({...query, stockSnapshotVersion: 1});
+    assert.equal(Object.hasOwn(legacy.stock, 'availablePacks'), false);
+    assert.equal(Object.hasOwn(legacy.stock, 'quantityPublic'), false);
+    assert.equal(legacy.orderingAvailable, false); assert.equal(legacy.reservationConfirmed, false);
+    await assert.rejects(visibility('saveStoreStockVisibility', enable, 'other-owner'), {code: 'forbidden'});
+    await assert.rejects(visibility('saveStoreStockVisibility', {...enable, visible: false, binding: null, stockRevision: null}), {code: 'conflict'});
+    const oldStock = (await store.collection('stockSnapshots').doc('sku-one').get()).data();
+    clock = '2026-10-16T12:06:00.000Z';
+    await store.collection('skus').doc('sku-one').update({publicListing: false});
+    const hide = {...scope, expectedRevision: 1, idempotencyKey: 'privacy-hide', visible: false, binding: null, stockRevision: null};
+    const hidden = await visibility('saveStoreStockVisibility', hide);
+    assert.equal(hidden.state, 'saved'); assert.equal(hidden.revision, 2);
+    assert.deepEqual((await store.collection('stockSnapshots').doc('sku-one').get()).data(), oldStock,
+      'Hiding never refreshes quantity, timestamps or stock revision.');
+    assert.deepEqual(await visibility('reconcileStoreStockVisibility', enable), enabled);
+    assert.equal((await visibility('readStoreStockVisibility')).visible, false, 'Old receipt cannot re-enable disclosure.');
+    await assert.rejects(visibility('saveStoreStockVisibility', {...enable, idempotencyKey: 'late-enable'}), {code: 'conflict'});
+    assert.equal((await read()).stock, null);
+    await store.collection('skus').doc('sku-one').update({publicListing: true});
+    report.source.savedAt = clock;
+    report.source.inventoryRevision = 13;
+    await service().handleStoreStock('owner-one', 'publishStoreStockSnapshot', {...report, expectedRevision: 1,
+      idempotencyKey: 'privacy-fresh-checkpoint'});
+    const afterHide = await read();
+    assert.equal(afterHide.stock.visibilityRevision, 2);
+    assert.equal(afterHide.stock.quantityPublic, false);
+    assert.equal(Object.hasOwn(afterHide.stock, 'availablePacks'), false);
+    console.log('STOCK_PRIVACY_PACKETS=' + JSON.stringify({scope, binding, enable, initial, privateRead, enabled, publicRead, legacy, hidden, afterHide}));
+    const again = {...enable, expectedRevision: 2, stockRevision: 2, idempotencyKey: 'privacy-again'};
+    await visibility('saveStoreStockVisibility', again);
+    await service().handleStoreStock('owner-one', 'publishStoreStockSnapshot', {...report, expectedRevision: 2,
+      idempotencyKey: 'privacy-less-stock', source: {...report.source, inventoryRevision: 13, quantityPacks: 600}});
+    assert.equal((await read()).stock.availablePacks, 600, 'Normal same-binding updates preserve explicit opt-in.');
+    await service().handleStoreStock('owner-one', 'publishStoreStockSnapshot', {...report, expectedRevision: 3,
+      idempotencyKey: 'privacy-availability', source: {...report.source, inventoryRevision: 14, mode: 'availability_only', quantityPacks: null}});
+    assert.equal((await read()).stock.quantityPublic, false);
+    assert.equal(Object.hasOwn((await read()).stock, 'availablePacks'), false);
+    await service().handleStoreStock('owner-one', 'publishStoreStockSnapshot', {...report, expectedRevision: 4,
+      idempotencyKey: 'privacy-restored-count', source: {...report.source, inventoryRevision: 15}});
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({ownerUserId: 'new-owner'});
+    assert.equal((await read()).stock, null);
+    const newOwner = await visibility('readStoreStockVisibility', scope, 'new-owner');
+    assert.equal(newOwner.visible, false); assert.equal(newOwner.enableSource, null);
+    assert.equal((await visibility('saveStoreStockVisibility', {...hide, expectedRevision: 3,
+      idempotencyKey: 'new-owner-hide'}, 'new-owner')).revision, 4);
+    await assert.rejects(visibility('reconcileStoreStockVisibility', again), {code: 'forbidden'});
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({ownerUserId: 'owner-one'});
+    const cancel = {...enable, expectedRevision: 4, stockRevision: 5, idempotencyKey: 'cancel-before-enable'};
+    assert.equal((await visibility('closeStoreStockVisibility', cancel)).state, 'closed');
+    assert.equal((await visibility('saveStoreStockVisibility', cancel)).state, 'closed');
+    assert.equal((await visibility('readStoreStockVisibility')).revision, 4);
+    for (let i = 0; i < 5; i++) {
+      const head = await visibility('readStoreStockVisibility');
+      const race = {...enable, expectedRevision: head.revision, stockRevision: 5, idempotencyKey: `privacy-race-${i}`};
+      const results = await Promise.all([visibility('saveStoreStockVisibility', race), visibility('closeStoreStockVisibility', race)]);
+      assert.deepEqual(results[0], results[1], 'Record versus close has one immutable winner.');
+      assert.ok(['saved', 'closed'].includes(results[0].state));
+      const after = await visibility('readStoreStockVisibility');
+      assert.equal(after.effectiveVisible, results[0].state === 'saved');
+      await visibility('saveStoreStockVisibility', {...hide, expectedRevision: after.revision, idempotencyKey: `privacy-race-hide-${i}`});
+    }
+    const beforeRebind = await visibility('readStoreStockVisibility');
+    await visibility('saveStoreStockVisibility', {...enable, expectedRevision: beforeRebind.revision,
+      stockRevision: 5, idempotencyKey: 'privacy-before-rebind'});
+    await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku: value, expectedRevision: 1, idempotencyKey: 'privacy-rebind'});
+    const newBinding = {...binding, skuRevision: 2};
+    await service().handleStoreStock('owner-one', 'publishStoreStockSnapshot', {...report, binding: newBinding,
+      expectedRevision: 5, idempotencyKey: 'privacy-rebound-stock'});
+    const rebound = await read({...query, binding: newBinding});
+    assert.equal(rebound.stock.quantityPublic, false);
+    assert.equal(Object.hasOwn(rebound.stock, 'availablePacks'), false, 'New reviewed binding needs renewed opt-in.');
+    assert.equal((await visibility('readStoreStockVisibility')).effectiveVisible, false);
+    const delayed = repo(), originalSource = delayed.publicCatalogueSource.bind(delayed);
+    delayed.publicCatalogueSource = async (...args) => {
+      const source = await originalSource(...args); clock = '2026-10-16T12:11:00.000Z'; return source;
+    };
+    const delayedService = () => new WorkspaceCatalogueService(delayed, catalogueIdentity, () => new Date(clock));
+    assert.equal(((await delayedService().handleStockVisibility('owner-one', 'readStoreStockVisibility', scope)) as any).enableSource, null,
+      'A report expiring during awaited public admission cannot remain eligible.');
+    const finalHead = await visibility('readStoreStockVisibility');
+    clock = '2026-10-16T12:10:59.000Z';
+    await assert.rejects(delayedService().handleStockVisibility('owner-one', 'saveStoreStockVisibility', {...enable,
+      expectedRevision: finalHead.revision, binding: newBinding, stockRevision: 6, idempotencyKey: 'privacy-expired-during-admission'}), {code: 'stale_snapshot'});
+  } finally { await deleteApp(app); }
+});
+
+test('STOCK-PRIVACY probing budget is atomic, bounded and shared across quantity and protocol changes', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  const app = initializeApp({projectId: `demo-lf-probing-${randomUUID().slice(0, 8)}`}, `probing-${randomUUID()}`), db = getFirestore(app);
+  let clock = at;
+  const service = new WorkspaceCatalogueService(new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(clock)),
+    catalogueIdentity, () => new Date(clock));
+  const query = {stockSnapshotVersion: 1, storeId: 'store-one', requestedPacks: 1,
+    binding: {skuId: 'sku-one', skuRevision: 1, canonicalProductId: input().canonicalProductId, verifiedPackId: input().verifiedPackId}};
+  const read = (body = query, actor = 'buyer-probing') => service.handleStoreStock(actor, 'readPublicStoreStockSnapshot', body) as Promise<any>;
+  try {
+    // Consume 25 sequentially, then race the last five admissions.
+    for (let i = 0; i < 25; i++) assert.equal((await read({...query, stockSnapshotVersion: i % 2 + 1, requestedPacks: i + 1})).stock, null);
+    const racing = await Promise.allSettled(Array.from({length: 6}, (_, i) => read({...query, requestedPacks: 100 + i})));
+    assert.equal(racing.filter(result => result.status === 'fulfilled').length, 5);
+    const rejected = racing.filter(result => result.status === 'rejected') as PromiseRejectedResult[];
+    assert.equal(rejected.length, 1); assert.equal(rejected[0]!.reason.code, 'rate_limited');
+    assert.equal(rejected[0]!.reason.httpStatus, 429);
+    await assert.rejects(read({...query, stockSnapshotVersion: 2, binding: {...query.binding, skuRevision: 99}}), {code: 'rate_limited'});
+    assert.equal((await read(query, 'another-buyer')).state, 'unknown');
+    assert.equal((await read({...query, binding: {...query.binding, skuId: 'another-sku'}})).state, 'unknown');
+    clock = '2026-10-16T12:01:00.000Z';
+    assert.equal((await read()).state, 'unknown');
+    const budgets = await db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc('store-one').collection('stockReadBudgets').get();
+    assert.equal(budgets.size, 3, 'One bounded document per reader/SKU, never one per request.');
+  } finally { await deleteApp(app); }
+});
+
 test('LF11 actual Store checkpoint publication, original recovery and private-count public quantity checks', {
   skip: !process.env.FIRESTORE_EMULATOR_HOST,
 }, async () => {
@@ -917,9 +1086,9 @@ test('LF-BULK HTTP dispatch keeps reads and recovery authenticated, namespace fe
   for (const operation of ['requestBulkSupplierQuote', 'offerBulkSupplierQuote', 'acceptBulkSupplierQuote', 'withdrawBulkSupplierQuote',
     'readBulkSupplierQuote', 'listBuyerBulkSupplierQuotes', 'listStoreBulkSupplierQuotes', 'reconcileBulkSupplierQuote']) {
     const action = bulkSupplierQuoteOperation(operation); assert.ok(action);
-    const writes: boolean = new Function('operation', 'variantFamilyOperation', 'productSubmissionOperation', 'stockOperation',
+    const writes: boolean = new Function('operation', 'variantFamilyOperation', 'productSubmissionOperation', 'stockOperation', 'stockVisibilityOperation',
       'catalogueProductionAction', 'bulkQuoteAction',
-      `const commodityPriceMutation = ${commodityMutation}; return ${mutation}`)(operation, undefined, undefined, undefined, undefined, action);
+      `const commodityPriceMutation = ${commodityMutation}; return ${mutation}`)(operation, undefined, undefined, undefined, undefined, undefined, action);
     assert.equal(writes, ['request', 'offer', 'accept', 'withdraw'].includes(action));
     const verify = new Function('getAuth', 'requireDefaultPurchaseTenant', ...flags, `return async(token) => {${callback}}`)(
       () => ({verifyIdToken: async (token: object) => token}), requireDefaultPurchaseTenant,

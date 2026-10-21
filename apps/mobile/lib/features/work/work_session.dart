@@ -636,6 +636,7 @@ class WorkSession extends ChangeNotifier {
     this.variantFamilyJournalFactory,
     this.productSubmissionJournalFactory,
     this.storeStockJournalFactory,
+    this.stockVisibilityJournalFactory,
     this.productMediaJournalFactory,
     this.supplierPolicyGateway,
     this.supplierPolicyRealm,
@@ -706,6 +707,7 @@ class WorkSession extends ChangeNotifier {
     this.variantFamilyJournalFactory,
     this.productSubmissionJournalFactory,
     this.storeStockJournalFactory,
+    this.stockVisibilityJournalFactory,
     this.productMediaJournalFactory,
     this.supplierPolicyGateway,
     this.supplierPolicyRealm,
@@ -1133,6 +1135,26 @@ class WorkSession extends ChangeNotifier {
   final WorkspaceProductSubmissionJournal Function(WorkspaceProductSubmissionScope scope)? productSubmissionJournalFactory;
   final WorkspaceStoreStockJournal Function(WorkspaceStoreStockScope scope)? storeStockJournalFactory;
   final _storeStockControllers = <WorkspaceStoreStockScope, WorkspaceStoreStockController>{};
+  final WorkspaceStockVisibilityJournal Function(WorkspaceStoreStockScope scope)? stockVisibilityJournalFactory;
+  final _stockVisibilityControllers = <WorkspaceStoreStockScope, WorkspaceStockVisibilityController>{};
+  WorkspaceStockVisibilityController? workspaceStockVisibility(String skuId) {
+    final source = catalogueGateway, account = _contactAccountScope, store = activeWorkspace?.id;
+    if (_disposed || !workspaceStoreStockConnectionConfigured || source is! WorkspaceStockVisibilityGateway ||
+        !(source as WorkspaceStockVisibilityGateway).stockQuantityVisibilitySupported || account == null || store == null ||
+        !workspaceCatalogueItems.any((item) => item.id == skuId)) { return null; }
+    final WorkspaceStockVisibilityGateway owner = source is AuthenticatedWorkspaceCatalogueGateway
+      ? source.forOwnerAccount(account) : source as WorkspaceStockVisibilityGateway;
+    final scope = (account: account, store: store, realm: owner.realm, sku: skuId);
+    if (scope.realm != (_productionSession ? 'production' : 'evaluation')) return null;
+    final prior = _stockVisibilityControllers[scope];
+    if (prior != null && !prior.active) {
+      _stockVisibilityControllers.remove(scope); prior.removeListener(notifyListeners); prior.dispose();
+    }
+    return _stockVisibilityControllers.putIfAbsent(scope, () => WorkspaceStockVisibilityController(scope: scope,
+      gateway: owner, journal: stockVisibilityJournalFactory?.call(scope) ?? SecureWorkStockVisibilityJournal(),
+      context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store ? null : publicationPreferencesContext)
+      ..addListener(notifyListeners));
+  }
   Future<void> get workspaceStoreStockReportsSettled async { await _storeData.storeStockWrites; }
   bool get workspaceStoreStockConnectionConfigured => catalogueGateway is WorkspaceStoreStockOwnerGateway &&
       (catalogueGateway as WorkspaceStoreStockOwnerGateway).stockSnapshotsSupported &&
@@ -14174,6 +14196,8 @@ class WorkSession extends ChangeNotifier {
     _productSubmissions.clear();
     for (final report in _storeStockControllers.values) { report.dispose(); }
     _storeStockControllers.clear();
+    for (final visibility in _stockVisibilityControllers.values) { visibility.removeListener(notifyListeners); visibility.dispose(); }
+    _stockVisibilityControllers.clear();
     for (final media in _productMedia.values) {media.dispose();}
     _productMedia.clear();
     for (final reader in _catalogueReadbacks.values) { reader.dispose(); }

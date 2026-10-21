@@ -135,6 +135,7 @@ import {
   storeProductSubmissionOperation,
   catalogueProductionOperation,
   storeStockOperation,
+  storeStockVisibilityOperation,
   GoogleCloudStoreProductMediaObjects,
   parsePublicProductMediaPath,
   deliverPublicProductMediaResponse,
@@ -2936,8 +2937,13 @@ export const moolSocialWorkspace = onRequest(
         throw new WorkspaceProfileError("service_unavailable", "Catalogue operations are not connected.", 503);
       }
       const stockOperation = storeStockOperation(operation);
+      const stockVisibilityOperation = storeStockVisibilityOperation(operation);
       if (stockOperation !== undefined && process.env.MOOLSOCIAL_STORE_STOCK_V1 !== 'true') {
         throw new WorkspaceProfileError('service_unavailable', 'Store Stock reporting is unavailable.', 503);
+      }
+      if ((stockVisibilityOperation !== undefined || stockOperation === "public" && body.stockSnapshotVersion === 2) &&
+          (process.env.MOOLSOCIAL_STORE_STOCK_V1 !== "true" || process.env.MOOLSOCIAL_STOCK_QUANTITY_VISIBILITY_V1 !== "true")) {
+        throw new WorkspaceProfileError("service_unavailable", "Quantity visibility is not connected.", 503);
       }
       const productMediaOperation = ["prepareStoreProductMedia", "confirmStoreProductMedia", "readStoreProductMedia"].includes(operation);
       const storePresentationOperation = ['recordPublicStorePresentation', 'readStorePublicPresentations'].includes(operation);
@@ -2969,7 +2975,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "saveRetailerProduct" ||
         operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || commodityPriceMutation ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStoreCoupon" || operation === "saveStorePublicDetails" ||
-        variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || stockOperation === "save" || catalogueProductionAction !== undefined ||
+        variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || stockOperation === "save" || stockVisibilityOperation === "save" || stockVisibilityOperation === "close" || catalogueProductionAction !== undefined ||
         ['request', 'offer', 'accept', 'withdraw'].includes(bulkQuoteAction ?? '') ||
         operation === "prepareStoreProductMedia" || operation === "confirmStoreProductMedia" || operation === 'recordPublicProductPresentation' || operation === 'recordPublicStorePresentation' || operation === 'recordPublicCartAddition' || operation === 'recordPublicCheckoutEntry';
       const supplierPolicyOperation = ["readStoreSupplierPolicy", "saveStoreSupplierPolicy",
@@ -2981,7 +2987,7 @@ export const moolSocialWorkspace = onRequest(
         'confirmStoreCommodityPrice', 'readStoreCommodityPrice', 'reconcileStoreCommodityPrice',
         'requestPublicCommodityPriceRefresh',
         "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue", "readPublicCatalogueDiscovery",
-        "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined || productMediaOperation || stockOperation !== undefined || catalogueProductionAction !== undefined;
+        "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined || productMediaOperation || stockOperation !== undefined || stockVisibilityOperation !== undefined || catalogueProductionAction !== undefined;
       const orderMutation = operation === "acceptRetailerOrder" ||
         operation === "packRetailerOrder" ||
         operation === "requestRetailerDelivery" ||
@@ -3046,6 +3052,8 @@ export const moolSocialWorkspace = onRequest(
         ? await workspaceCatalogueService().readStoreProcurement(ownerUserId, catalogueBody)
         : bulkQuoteAction !== undefined
         ? await workspaceBulkQuoteService().handleOperation(ownerUserId, bulkQuoteAction, catalogueBody)
+        : stockVisibilityOperation !== undefined
+        ? await workspaceCatalogueService().handleStockVisibility(ownerUserId, operation, catalogueBody)
         : stockOperation !== undefined
         ? await workspaceCatalogueService().handleStoreStock(ownerUserId, operation, catalogueBody)
         : operation === 'recordPublicCartAddition'

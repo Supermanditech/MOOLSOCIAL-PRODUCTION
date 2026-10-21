@@ -41,6 +41,63 @@ import '../work_services.dart';
 import '../work_catalogue_gateway.dart';
 import '../work_session.dart';
 
+/// Compact, server-confirmed disclosure control. It never edits Stock quantity.
+class StoreStockQuantityVisibility extends StatefulWidget {
+  const StoreStockQuantityVisibility({super.key, required this.controller});
+  final WorkspaceStockVisibilityController controller;
+  @override State<StoreStockQuantityVisibility> createState() => _StoreStockQuantityVisibilityState();
+}
+class _StoreStockQuantityVisibilityState extends State<StoreStockQuantityVisibility> {
+  void _load() => WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (mounted && widget.controller.active) unawaited(widget.controller.load());
+  });
+  @override void initState() { super.initState(); _load(); }
+  @override void didUpdateWidget(covariant StoreStockQuantityVisibility oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) _load();
+  }
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: widget.controller, builder: (context, _) {
+    final controller = widget.controller, head = controller.head, pending = controller.pending;
+    bool current() => mounted && identical(widget.controller, controller) && controller.active;
+    final confirmed = head != null && pending == null;
+    final status = pending != null
+      ? pending.closing ? 'Cancellation pending · visibility is unconfirmed.' : 'Change pending · visibility is unconfirmed.'
+      : head == null ? 'Check the saved public visibility setting.'
+      : !head.visible ? 'Exact quantity is private. Buyers can check their selected quantity.'
+      : head.effectiveVisible ? 'Current available quantity is shown publicly.'
+      : head.enableSource != null ? 'Quantity is hidden for the changed product. Confirm public display again.'
+      : 'Enabled, but quantity is hidden while current exact Stock or publication is unconfirmed.';
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SwitchListTile.adaptive(
+        key: const Key('work-product-public-stock-quantity'), contentPadding: EdgeInsets.zero, dense: true,
+        title: const Text('Show available quantity publicly'), subtitle: Text(status),
+        value: head?.visible ?? false,
+        onChanged: controller.supported && !controller.busy && confirmed && (head.visible || head.enableSource != null)
+          ? (value) { if (current()) unawaited(controller.setVisible(value)); } : null,
+      ),
+      if (controller.busy) const LinearProgressIndicator(minHeight: 2),
+      if (controller.error != null) Text(controller.error!, style: Theme.of(context).textTheme.bodySmall),
+      Wrap(spacing: 8, children: [
+        TextButton(key: const Key('work-product-public-stock-check'),
+          onPressed: controller.supported && !controller.busy ? () { if (current()) unawaited(controller.load()); } : null,
+          child: const Text('Check visibility')),
+        if (confirmed && head.visible && !head.effectiveVisible && head.enableSource != null)
+          TextButton(key: const Key('work-product-public-stock-reconfirm'),
+            onPressed: controller.supported && !controller.busy ? () { if (current()) unawaited(controller.setVisible(true)); } : null,
+            child: const Text('Confirm public display')),
+        if (pending != null) ...[
+          TextButton(key: const Key('work-product-public-stock-retry'),
+            onPressed: controller.supported && !controller.busy ? () { if (current()) unawaited(controller.retry()); } : null,
+            child: Text(pending.closing ? 'Retry cancellation' : 'Retry change')),
+          if (!pending.closing) TextButton(key: const Key('work-product-public-stock-cancel'),
+            onPressed: controller.supported && !controller.busy ? () { if (current()) unawaited(controller.cancelPending()); } : null,
+            child: const Text('Cancel pending change')),
+        ],
+      ]),
+    ]);
+  });
+}
+
 // Historical receiving exceptions are not proof of another required delivery,
 // outstanding adjustment, payment, or currently reusable credit.
 @visibleForTesting
@@ -27630,6 +27687,9 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                 numeric: true,
                               ),
                             ]),
+                            if (_wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null)
+                              if (widget.session.workspaceStockVisibility(widget.product.id) case final visibility?)
+                                StoreStockQuantityVisibility(controller: visibility),
                             if (widget.purchaseScope == null && widget.importRow == null &&
                                 _stockMode ==
                                     WorkspaceStockMode.availabilityOnly)

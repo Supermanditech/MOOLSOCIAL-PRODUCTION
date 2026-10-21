@@ -982,21 +982,227 @@ class WorkspaceStoreStockController {
   void dispose() { _closed = true; }
 }
 
+/// Disclosure is independent of the private Stock quantity and its reporting mode.
+class WorkspaceStockVisibilityHead {
+  WorkspaceStockVisibilityHead._(this._encoded);
+  final String _encoded;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  int get revision => toJson()['revision'] as int;
+  bool get visible => toJson()['visible'] as bool;
+  bool get effectiveVisible => toJson()['effectiveVisible'] as bool;
+  Map<String, dynamic>? get enableSource => toJson()['enableSource'] == null ? null : _map(toJson()['enableSource']);
+  static WorkspaceStockVisibilityHead decode(Object? raw, WorkspaceStoreStockScope scope) {
+    _stockScope(scope);
+    final r = _map(raw);
+    _keys(r, ['schemaVersion', 'stockVisibilityVersion', 'realm', 'storeId', 'skuId', 'state',
+      'revision', 'visible', 'effectiveVisible', 'enableSource']);
+    final revision = _int(r['revision'], 0, 1000000000);
+    if (r['schemaVersion'] != 1 || r['stockVisibilityVersion'] != 1 || r['realm'] != scope.realm ||
+        r['storeId'] != scope.store || r['skuId'] != scope.sku || r['state'] != 'ready' ||
+        r['visible'] is! bool || r['effectiveVisible'] is! bool ||
+        r['visible'] == true && revision == 0 || r['effectiveVisible'] == true && r['visible'] != true) {
+      throw const FormatException();
+    }
+    if (r['enableSource'] != null) {
+      final source = _map(r['enableSource']); _keys(source, ['binding', 'stockRevision']);
+      if (_stockBinding(source['binding'])['skuId'] != scope.sku) throw const FormatException();
+      _int(source['stockRevision'], 1, 1000000000);
+    } else if (r['effectiveVisible'] == true) { throw const FormatException(); }
+    return WorkspaceStockVisibilityHead._(jsonEncode(_sorted(r)));
+  }
+}
+
+class WorkspaceStockVisibilityIntent {
+  WorkspaceStockVisibilityIntent({required this.scope, required this.expectedRevision, required this.idempotencyKey,
+    required this.visible, Map<String, dynamic>? binding, this.stockRevision, this.closing = false})
+    : _binding = binding == null ? null : jsonEncode(_sorted(_stockBinding(binding))) {
+    _stockScope(scope); _int(expectedRevision, 0, 999999999); _id(idempotencyKey);
+    if (visible) {
+      if (this.binding?['skuId'] != scope.sku) throw const FormatException();
+      _int(stockRevision, 1, 1000000000);
+    } else if (binding != null || stockRevision != null) { throw const FormatException(); }
+  }
+  final WorkspaceStoreStockScope scope;
+  final int expectedRevision;
+  final String idempotencyKey;
+  final bool visible, closing;
+  final String? _binding;
+  final int? stockRevision;
+  Map<String, dynamic>? get binding => _binding == null ? null : _map(jsonDecode(_binding));
+  Map<String, Object?> get body => {'stockVisibilityVersion': 1, 'storeId': scope.store, 'skuId': scope.sku,
+    'expectedRevision': expectedRevision, 'idempotencyKey': idempotencyKey, 'visible': visible,
+    'binding': binding, 'stockRevision': stockRevision};
+  String get serverFingerprint => _catalogueHash({'realm': scope.realm, 'owner': scope.account, 'request': body});
+  WorkspaceStockVisibilityIntent forClosure() => WorkspaceStockVisibilityIntent(scope: scope, expectedRevision: expectedRevision,
+    idempotencyKey: idempotencyKey, visible: visible, binding: binding, stockRevision: stockRevision, closing: true);
+  Map<String, Object?> toJson() => {'version': 1, 'scope': {'account': scope.account, 'store': scope.store,
+    'realm': scope.realm, 'sku': scope.sku}, 'request': body, 'closing': closing};
+  static WorkspaceStockVisibilityIntent fromJson(Object? raw) {
+    final r = _map(raw); _keys(r, ['version', 'scope', 'request', 'closing']);
+    final s = _map(r['scope']); _keys(s, ['account', 'store', 'realm', 'sku']);
+    final b = _map(r['request']); _keys(b, ['stockVisibilityVersion', 'storeId', 'skuId', 'expectedRevision',
+      'idempotencyKey', 'visible', 'binding', 'stockRevision']);
+    if (r['version'] != 1 || b['stockVisibilityVersion'] != 1 || r['closing'] is! bool || b['visible'] is! bool ||
+        b['storeId'] != s['store'] || b['skuId'] != s['sku']) { throw const FormatException(); }
+    return WorkspaceStockVisibilityIntent(scope: (account: _id(s['account']), store: _id(s['store']), realm: _string(s['realm']), sku: _id(s['sku'])),
+      expectedRevision: _int(b['expectedRevision'], 0, 999999999), idempotencyKey: _id(b['idempotencyKey']), visible: b['visible'] as bool,
+      binding: b['binding'] == null ? null : _stockBinding(b['binding']), stockRevision: b['stockRevision'] == null ? null : _int(b['stockRevision'], 1, 1000000000),
+      closing: r['closing'] as bool);
+  }
+}
+enum WorkspaceStockVisibilityWriteState { saved, closed, notFound, notSent, unknown }
+class WorkspaceStockVisibilityWriteResult {
+  const WorkspaceStockVisibilityWriteResult(this.state, {this.fingerprint, this.revision, this.visible});
+  final WorkspaceStockVisibilityWriteState state;
+  final String? fingerprint;
+  final int? revision;
+  final bool? visible;
+  static WorkspaceStockVisibilityWriteResult decode(Object? raw, WorkspaceStockVisibilityIntent original, {bool reconcile = false}) {
+    final r = _map(raw), s = original.scope;
+    _keys(r, ['schemaVersion', 'stockVisibilityVersion', 'realm', 'storeId', 'skuId', 'state',
+      'idempotencyKey', 'fingerprint', 'revision', 'visible']);
+    if (r['schemaVersion'] != 1 || r['stockVisibilityVersion'] != 1 || r['realm'] != s.realm ||
+        r['storeId'] != s.store || r['skuId'] != s.sku || r['idempotencyKey'] != original.idempotencyKey ||
+        r['fingerprint'] != original.serverFingerprint ||
+        !{'saved', 'closed', if (reconcile) 'not_found'}.contains(r['state'])) { throw const FormatException(); }
+    if (r['state'] == 'saved') {
+      if (r['revision'] is! int || r['revision'] != original.expectedRevision + 1 || r['visible'] != original.visible) throw const FormatException();
+    } else if (r['revision'] != null || r['visible'] != null) { throw const FormatException(); }
+    return WorkspaceStockVisibilityWriteResult(r['state'] == 'saved' ? WorkspaceStockVisibilityWriteState.saved :
+      r['state'] == 'closed' ? WorkspaceStockVisibilityWriteState.closed : WorkspaceStockVisibilityWriteState.notFound,
+      fingerprint: original.serverFingerprint, revision: r['revision'] as int?, visible: r['visible'] as bool?);
+  }
+}
+abstract interface class WorkspaceStockVisibilityGateway {
+  String get realm;
+  bool get stockQuantityVisibilitySupported;
+  Future<WorkspaceStockVisibilityHead> readStockVisibility(WorkspaceStoreStockScope scope, {required bool Function() current});
+  Future<WorkspaceStockVisibilityWriteResult> writeStockVisibility(WorkspaceStockVisibilityIntent original,
+    {required bool Function() current, bool reconcile = false});
+}
+abstract interface class WorkspaceStockVisibilityJournal {
+  Future<WorkspaceStockVisibilityIntent?> readPending(WorkspaceStoreStockScope scope);
+  Future<void> savePending(WorkspaceStockVisibilityIntent original);
+  Future<void> removePending(WorkspaceStockVisibilityIntent original);
+}
+
+/// Unknown sends retain their original. Cancellation is itself durable and
+/// arbitrates on that same server receipt before a replacement is permitted.
+class WorkspaceStockVisibilityController extends ChangeNotifier {
+  WorkspaceStockVisibilityController({required this.scope, required this.gateway, required this.journal, required this.context})
+    : _lifetime = context() { _stockScope(scope); if (scope.realm != gateway.realm) throw const FormatException(); }
+  final WorkspaceStoreStockScope scope;
+  final WorkspaceStockVisibilityGateway gateway;
+  final WorkspaceStockVisibilityJournal journal;
+  final Object? Function() context;
+  final Object? _lifetime;
+  bool _closed = false, busy = false;
+  WorkspaceStockVisibilityHead? head;
+  WorkspaceStockVisibilityIntent? pending;
+  String? error;
+  int _revision = -1;
+  bool? _visibleAtRevision;
+  bool get active => !_closed && _lifetime != null && context() == _lifetime;
+  bool get supported => active && gateway.stockQuantityVisibilitySupported;
+  void _notify() { if (active) notifyListeners(); }
+  Future<void> _readHead() async {
+    final result = await gateway.readStockVisibility(scope, current: () => active).timeout(const Duration(seconds: 25));
+    if (!active) return;
+    final verified = WorkspaceStockVisibilityHead.decode(result.toJson(), scope);
+    if (verified.revision < _revision || verified.revision == _revision && verified.visible != _visibleAtRevision) {
+      throw const FormatException('Check the latest visibility setting.');
+    }
+    _revision = verified.revision; _visibleAtRevision = verified.visible; head = verified;
+  }
+  Future<void> _restore() async {
+    var saved = await journal.readPending(scope).timeout(const Duration(seconds: 10));
+    if (!active) return;
+    if (saved != null && (saved.scope != scope || pending != null && saved.serverFingerprint != pending!.serverFingerprint)) {
+      throw const FormatException();
+    }
+    if (pending != null && (saved == null || pending!.closing && !saved.closing)) {
+      await journal.savePending(pending!).timeout(const Duration(seconds: 10)); saved = pending;
+    }
+    if (active) pending = saved;
+  }
+  Future<bool> _send({bool reconcile = false}) async {
+    final original = pending!;
+    final result = await gateway.writeStockVisibility(original, current: () => active, reconcile: reconcile && !original.closing)
+      .timeout(const Duration(seconds: 25));
+    if (!active) return false;
+    if (result.fingerprint != original.serverFingerprint ||
+        result.state == WorkspaceStockVisibilityWriteState.saved &&
+          (result.revision != original.expectedRevision + 1 || result.visible != original.visible) ||
+        result.state == WorkspaceStockVisibilityWriteState.closed && (result.revision != null || result.visible != null)) { return false; }
+    if (!{WorkspaceStockVisibilityWriteState.saved, WorkspaceStockVisibilityWriteState.closed}.contains(result.state)) return false;
+    await journal.removePending(original).timeout(const Duration(seconds: 10));
+    if (!active) return false;
+    pending = null;
+    // A receipt describes a historical command, never the current public state.
+    await _readHead();
+    return true;
+  }
+  Future<bool> _run(Future<bool> Function() operation) async {
+    if (!supported || busy) return false;
+    busy = true; error = null; _notify();
+    try {
+      final ok = await operation();
+      if (active && !ok) error ??= 'Visibility change is unconfirmed. Check again or cancel the pending change.';
+      return ok;
+    } catch (_) {
+      if (active) { head = null; error = 'Could not confirm public quantity visibility. Keep the pending change for recovery.'; }
+      return false;
+    } finally { busy = false; _notify(); }
+  }
+  Future<bool> load() => _run(() async {
+    await _restore(); if (!active) return false;
+    if (pending != null && !await _send(reconcile: true)) { await _readHead(); return false; }
+    if (pending == null) await _readHead();
+    return active;
+  });
+  Future<bool> setVisible(bool visible) => _run(() async {
+    await _restore(); if (!active || pending != null) return false;
+    await _readHead(); if (!active) return false;
+    if (head!.visible == visible && (!visible || head!.effectiveVisible)) return true;
+    final source = head!.enableSource;
+    if (visible && source == null) { error = 'Save and sync current exact Stock for this published product first.'; return false; }
+    final original = WorkspaceStockVisibilityIntent(scope: scope, expectedRevision: head!.revision,
+      idempotencyKey: 'visibility-${List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join()}',
+      visible: visible, binding: visible ? _map(source!['binding']) : null, stockRevision: visible ? source!['stockRevision'] as int : null);
+    pending = original;
+    await journal.savePending(original).timeout(const Duration(seconds: 10));
+    return active && await _send();
+  });
+  Future<bool> retry() => _run(() async {
+    await _restore(); if (!active) return false;
+    if (pending == null) { await _readHead(); return active; }
+    return _send();
+  });
+  Future<bool> cancelPending() => _run(() async {
+    await _restore(); if (!active || pending == null) return false;
+    pending = pending!.forClosure();
+    await journal.savePending(pending!).timeout(const Duration(seconds: 10));
+    return active && await _send();
+  });
+  @override void dispose() { _closed = true; super.dispose(); }
+}
+
 class WorkspacePublicStockQuery {
   WorkspacePublicStockQuery({required this.realm, required this.storeId, required Map<String, dynamic> binding,
-      required this.requestedPacks}) : _binding = jsonEncode(_sorted(_stockBinding(binding))) {
+      required this.requestedPacks, this.version = 1}) : _binding = jsonEncode(_sorted(_stockBinding(binding))) {
     _id(storeId); _int(requestedPacks, 1, 1000000000);
+    _int(version, 1, 2);
     if (!{'production', 'evaluation'}.contains(realm)) throw const FormatException();
   }
   final String realm, storeId, _binding;
-  final int requestedPacks;
+  final int requestedPacks, version;
   Map<String, dynamic> get binding => _map(jsonDecode(_binding));
-  Map<String, Object?> get body => {'stockSnapshotVersion': 1, 'storeId': storeId, 'binding': binding, 'requestedPacks': requestedPacks};
+  Map<String, Object?> get body => {'stockSnapshotVersion': version, 'storeId': storeId, 'binding': binding, 'requestedPacks': requestedPacks};
   String get identity => jsonEncode(_sorted({'realm': realm, ...body}));
-  factory WorkspacePublicStockQuery.fromEntry(WorkspacePublicCatalogueEntry entry, int requestedPacks) {
+  factory WorkspacePublicStockQuery.fromEntry(WorkspacePublicCatalogueEntry entry, int requestedPacks, {int version = 1}) {
     final listing = entry.product.publicListingIdentity;
     if (listing == null || !listing.matches(entry.product)) throw const FormatException();
-    return WorkspacePublicStockQuery(realm: listing.realm, storeId: listing.storeId, requestedPacks: requestedPacks,
+    return WorkspacePublicStockQuery(realm: listing.realm, storeId: listing.storeId, requestedPacks: requestedPacks, version: version,
       binding: {'skuId': listing.skuId, 'skuRevision': _int(entry.readback.skuRevision, 1, 1000000000),
         'canonicalProductId': listing.canonicalProductId, 'verifiedPackId': listing.verifiedPackId});
   }
@@ -1010,6 +1216,7 @@ class WorkspacePublicStockResult {
   String get state => toJson()['state'] as String;
   bool? get available => toJson()['stock']?['available'] as bool?;
   bool? get quantityAvailable => toJson()['stock']?['quantityAvailable'] as bool?;
+  int? get availablePacks => toJson()['stock']?['availablePacks'] as int?;
   DateTime? get validUntil => toJson()['stock'] == null ? null : _stockTime(toJson()['stock']['validUntil']);
   bool freshAt(DateTime now) => state == 'reported' && validUntil!.isAfter(now.toUtc()) &&
     !_stockTime(toJson()['observedAt']).isAfter(now.toUtc());
@@ -1017,7 +1224,7 @@ class WorkspacePublicStockResult {
     final r = _map(raw); _keys(r, ['schemaVersion', 'stockSnapshotVersion', 'realm', 'storeId', 'binding', 'state',
       'observedAt', 'requestedPacks', 'stock', 'orderingAvailable', 'reservationConfirmed']);
     final observedAt = _stockTime(r['observedAt']); now = now.toUtc();
-    if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['stockSnapshotVersion'] is! int || r['stockSnapshotVersion'] != 1 ||
+    if (r['schemaVersion'] is! int || r['schemaVersion'] != 1 || r['stockSnapshotVersion'] is! int || r['stockSnapshotVersion'] != query.version ||
         r['realm'] != query.realm || r['storeId'] != query.storeId || r['requestedPacks'] is! int || r['requestedPacks'] != query.requestedPacks ||
         _catalogueHash(_stockBinding(r['binding'])) != _catalogueHash(query.binding) || observedAt.isAfter(now) ||
         r['orderingAvailable'] != false || r['reservationConfirmed'] != false || !{'unknown', 'reported'}.contains(r['state'])) {
@@ -1026,13 +1233,23 @@ class WorkspacePublicStockResult {
     if (r['state'] == 'unknown') {
       if (r['stock'] != null) throw const FormatException();
     } else {
-      final s = _map(r['stock']); _keys(s, ['source', 'reportedAt', 'savedAt', 'validUntil', 'reportRevision', 'available', 'quantityAvailable']);
+      final s = _map(r['stock']); _keys(s, ['source', 'reportedAt', 'savedAt', 'validUntil', 'reportRevision', 'available', 'quantityAvailable',
+        if (query.version == 2) ...['visibilityRevision', 'quantityPublic', if (s['quantityPublic'] == true) 'availablePacks']]);
       final reportedAt = _stockTime(s['reportedAt']), savedAt = _stockTime(s['savedAt']), until = _stockTime(s['validUntil']);
       _int(s['reportRevision'], 1, 1000000000);
       if (s['source'] != 'selling_store_checkpoint' || savedAt.isAfter(reportedAt) || reportedAt.isAfter(observedAt) ||
           until != savedAt.add(const Duration(minutes: 5)) || !until.isAfter(now) || s['available'] is! bool ||
           s['quantityAvailable'] != null && s['quantityAvailable'] is! bool || s['available'] == false && s['quantityAvailable'] != false) {
         throw const FormatException();
+      }
+      if (query.version == 2) {
+        _int(s['visibilityRevision'], 0, 1000000000);
+        if (s['quantityPublic'] is! bool) throw const FormatException();
+        if (s['quantityPublic'] == true) {
+          final count = _int(s['availablePacks'], 0, 1000000000);
+          if (s['visibilityRevision'] == 0 || s['quantityAvailable'] == null || s['available'] == false && count != 0 ||
+              s['quantityAvailable'] != (s['available'] == true && count >= query.requestedPacks)) { throw const FormatException(); }
+        }
       }
     }
     return WorkspacePublicStockResult._(query, jsonEncode(_sorted(r)));
@@ -1042,6 +1259,9 @@ abstract interface class WorkspaceStoreStockPublicGateway {
   String get realm;
   bool get stockSnapshotsSupported;
   Future<WorkspacePublicStockResult> readPublicStoreStock(WorkspacePublicStockQuery query, {required bool Function() current});
+}
+abstract interface class WorkspaceStockQuantityPublicGateway implements WorkspaceStoreStockPublicGateway {
+  bool get stockQuantityVisibilitySupported;
 }
 
 /// Session-owned, explicit quantity reads. Synchronous getters never dispatch;
@@ -1057,7 +1277,7 @@ class WorkspacePublicStockReader extends ChangeNotifier {
   final _tokens = <String, Object>{};
   final _loads = <String, ({String key, Object token, bool Function() current, Future<bool> result})>{};
   final _expiry = <String, Timer>{};
-  final _highWater = <String, ({int revision, String source})>{};
+  final _highWater = <String, ({int revision, int visibility, String source, String? disclosure})>{};
   final _bindingEpoch = <String, int>{};
   final _waiting = <Completer<void>>[];
   int _runningReads = 0;
@@ -1084,7 +1304,8 @@ class WorkspacePublicStockReader extends ChangeNotifier {
           content.content.productId != product.id || content.content.observedAt == null ||
           content.content.observedAt!.isAfter(clock) || content.validUntil?.isAfter(clock) != true ||
           identity == null || identity.realm != gateway.realm || !identity.matches(product)) { return null; }
-      return WorkspacePublicStockQuery.fromEntry(WorkspacePublicCatalogueEntry(product: product, readback: content), packs);
+      return WorkspacePublicStockQuery.fromEntry(WorkspacePublicCatalogueEntry(product: product, readback: content), packs,
+        version: gateway is WorkspaceStockQuantityPublicGateway && (gateway as WorkspaceStockQuantityPublicGateway).stockQuantityVisibilitySupported ? 2 : 1);
     } catch (_) { return null; }
   }
   String? requestIdentity(BuyV2Product product, int packs) => _query(product, packs)?.identity;
@@ -1093,11 +1314,25 @@ class WorkspacePublicStockReader extends ChangeNotifier {
     return query != null && value?.query.identity == query.identity && value!.freshAt(now()) ? value : null;
   }
   String _bindingKey(WorkspacePublicStockQuery query) => _catalogueHash([query.realm, query.storeId, query.binding]);
-  void _dropBinding(WorkspacePublicStockQuery query, {bool retirePending = false}) {
+  void _dropBinding(WorkspacePublicStockQuery query, {bool retirePending = false, bool preserveShortage = false}) {
     final binding = _bindingKey(query);
     if (retirePending) { _bindingEpoch[binding] = (_bindingEpoch[binding] ?? 0) + 1; }
     for (final id in _results.keys.where((id) => _bindingKey(_results[id]!.query) == binding).toList()) {
-      _results.remove(id); _expiry.remove(id)?.cancel();
+      final prior = _results.remove(id)!; _expiry.remove(id)?.cancel();
+      // A throttled/unavailable check is not fresh evidence of replenishment.
+      // Retain only the still-fresh negative result, stripping any public count.
+      if (preserveShortage && prior.freshAt(now()) && (prior.available == false || prior.quantityAvailable == false)) {
+        final raw = prior.toJson(), body = _map(raw['stock']);
+        if (prior.query.version == 2) { body.remove('availablePacks'); body['quantityPublic'] = false; }
+        raw['stock'] = body;
+        final retained = WorkspacePublicStockResult.decode(raw, prior.query, now());
+        _results[id] = retained;
+        _expiry[id] = Timer(retained.validUntil!.difference(now().toUtc()), () {
+          if (_closed || !identical(_results[id], retained)) return;
+          _results.remove(id); _expiry.remove(id);
+          if (active) notifyListeners();
+        });
+      }
     }
   }
   Future<bool> refresh(BuyV2Product product, int packs, {bool force = false, bool Function()? requestCurrent}) {
@@ -1125,15 +1360,28 @@ class WorkspacePublicStockReader extends ChangeNotifier {
         final value = await _read(query, valid).timeout(const Duration(seconds: 25));
         if (!valid()) return false;
         final verified = WorkspacePublicStockResult.decode(value.toJson(), query, now());
-        if (verified.state != 'reported') { _dropBinding(query, retirePending: true); return false; }
+        if (verified.state != 'reported') { _dropBinding(query, retirePending: true, preserveShortage: true); return false; }
         final body = verified.toJson()['stock'] as Map<String, dynamic>;
-        final revision = body['reportRevision'] as int, source = _catalogueHash(Map<String, dynamic>.of(body)..remove('quantityAvailable'));
+        final revision = body['reportRevision'] as int, visibility = body['visibilityRevision'] as int? ?? 0;
+        final source = _catalogueHash(Map<String, dynamic>.of(body)..remove('quantityAvailable')..remove('visibilityRevision')..remove('quantityPublic')..remove('availablePacks'));
+        final disclosure = _catalogueHash([body['quantityPublic'], body['availablePacks']]);
         final key = _bindingKey(query), previousHead = _highWater[key];
-        if (previousHead != null && (revision < previousHead.revision || revision == previousHead.revision && source != previousHead.source)) {
+        if (previousHead != null && revision == previousHead.revision &&
+            (source != previousHead.source || visibility == previousHead.visibility && previousHead.disclosure != null && disclosure != previousHead.disclosure)) {
           _dropBinding(query, retirePending: true); return false;
         }
-        if (previousHead == null || revision > previousHead.revision) _dropBinding(query);
-        _highWater[key] = (revision: revision, source: source);
+        // Each authority advances independently, even when the other half of a
+        // delayed response is old. Otherwise a later mixed reply could revive
+        // a count after a newer hide was already observed.
+        final nextRevision = max(revision, previousHead?.revision ?? 0), nextVisibility = max(visibility, previousHead?.visibility ?? 0);
+        _highWater[key] = (revision: nextRevision, visibility: nextVisibility,
+          source: previousHead == null || revision >= previousHead.revision ? source : previousHead.source,
+          disclosure: revision == nextRevision && visibility == nextVisibility ? disclosure :
+            nextRevision == previousHead?.revision && nextVisibility == previousHead?.visibility ? previousHead?.disclosure : null);
+        if (revision < nextRevision || visibility < nextVisibility) {
+          _dropBinding(query, retirePending: true); return false;
+        }
+        if (previousHead == null || revision > previousHead.revision || visibility > previousHead.visibility) _dropBinding(query);
         final contentExpiry = displayed(product)!.validUntil!;
         final until = verified.validUntil!.isBefore(contentExpiry) ? verified.validUntil! : contentExpiry;
         final remaining = until.difference(now().toUtc());
@@ -1146,7 +1394,7 @@ class WorkspacePublicStockReader extends ChangeNotifier {
         });
         return true;
       } catch (_) {
-        if (valid()) _dropBinding(query, retirePending: true);
+        if (valid()) _dropBinding(query, retirePending: true, preserveShortage: true);
         return false;
       } finally {
         reading = false;
@@ -4431,6 +4679,7 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
     commodityPriceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_COMMODITY_PRICE_V1'),
     procurementReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROCUREMENT_V1'),
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
+    stockQuantityVisibilitySupported: const bool.fromEnvironment('MOOLSOCIAL_STOCK_QUANTITY_VISIBILITY_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     storeCouponTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V1'),
     storeCouponEligibilitySupported: const bool.fromEnvironment(
@@ -4497,6 +4746,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
     reviewedProductSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_REVIEW_V1'),
     reviewedProductMediaSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_MEDIA_REVIEW_V1'),
     stockSnapshotsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_STOCK_V1'),
+    stockQuantityVisibilitySupported: const bool.fromEnvironment('MOOLSOCIAL_STOCK_QUANTITY_VISIBILITY_V1'),
     procurementReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROCUREMENT_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     storeCouponTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V1'),
@@ -4657,7 +4907,8 @@ WorkspaceCatalogueContentResult _limitCatalogueValidity(WorkspaceCatalogueConten
 class AuthenticatedWorkspaceCatalogueGateway
     implements WorkspaceCatalogueGateway, WorkspaceCatalogueOwnerGateway, WorkspacePublicProductGateway, WorkspaceCommodityPriceGateway,
       WorkspacePublicDetailsOwnerGateway, WorkspaceVariantFamilyOwnerGateway, WorkspaceProductSubmissionOwnerGateway,
-      WorkspaceReviewedProductSubmissionGateway, WorkspaceProductMediaGateway, WorkspaceStoreStockOwnerGateway, WorkspaceStoreStockPublicGateway {
+      WorkspaceReviewedProductSubmissionGateway, WorkspaceProductMediaGateway, WorkspaceStoreStockOwnerGateway,
+      WorkspaceStockQuantityPublicGateway, WorkspaceStockVisibilityGateway {
   AuthenticatedWorkspaceCatalogueGateway({
     required this.endpoint,
     required this.credentials,
@@ -4684,6 +4935,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.storeCouponTermsSupported = false,
     this.storeCouponEligibilitySupported = false,
     this.stockSnapshotsSupported = false,
+    this.stockQuantityVisibilitySupported = false,
     this.procurementReadbackSupported = false,
     this.procurementContext,
     this.procurementCurrent,
@@ -4736,6 +4988,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   @override
   final bool stockSnapshotsSupported;
   @override
+  final bool stockQuantityVisibilitySupported;
+  @override
   bool get variantFamilySubmissionSupported => reviewedFamilyReadbackSupported;
   final WorkspacePublicVariantSource? _reviewedVariantsOverride;
   late final WorkspacePublicVariantSource? reviewedVariants = _reviewedVariantsOverride ??
@@ -4777,6 +5031,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       storeCouponTermsSupported: storeCouponTermsSupported,
       storeCouponEligibilitySupported: storeCouponEligibilitySupported,
       stockSnapshotsSupported: stockSnapshotsSupported,
+      stockQuantityVisibilitySupported: stockQuantityVisibilitySupported,
       procurementReadbackSupported: procurementReadbackSupported,
       procurementContext: procurementContext ?? this.procurementContext,
       procurementCurrent: procurementCurrent ?? this.procurementCurrent,
@@ -4853,9 +5108,42 @@ class AuthenticatedWorkspaceCatalogueGateway
 
   bool _stockOwner(WorkspaceStoreStockScope scope, bool Function() current) => current() && stockSnapshotsSupported &&
     scope.realm == realm && ownerAccountId == scope.account;
+  bool _visibilityOwner(WorkspaceStoreStockScope scope, bool Function() current) =>
+    stockQuantityVisibilitySupported && _stockOwner(scope, current);
+  @override
+  Future<WorkspaceStockVisibilityHead> readStockVisibility(WorkspaceStoreStockScope scope, {required bool Function() current}) async {
+    _stockScope(scope);
+    bool valid() => _visibilityOwner(scope, current);
+    if (!valid()) throw const FormatException('Quantity visibility is not connected.');
+    final response = await _ownerRequest({'operation': 'readStoreStockVisibility', 'stockVisibilityVersion': 1,
+      'storeId': scope.store, 'skuId': scope.sku}, valid, mutation: false);
+    if (!valid() || response?.statusCode != 200) throw const FormatException();
+    final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
+    if (envelope['ok'] != true) throw const FormatException();
+    return WorkspaceStockVisibilityHead.decode(envelope['data'], scope);
+  }
+  @override
+  Future<WorkspaceStockVisibilityWriteResult> writeStockVisibility(WorkspaceStockVisibilityIntent original,
+      {required bool Function() current, bool reconcile = false}) async {
+    var dispatched = false;
+    try {
+      original = WorkspaceStockVisibilityIntent.fromJson(original.toJson());
+      bool valid() => _visibilityOwner(original.scope, current);
+      if (!valid()) return const WorkspaceStockVisibilityWriteResult(WorkspaceStockVisibilityWriteState.notSent);
+      final operation = original.closing ? 'closeStoreStockVisibility' : reconcile ? 'reconcileStoreStockVisibility' : 'saveStoreStockVisibility';
+      final response = await _ownerRequest({'operation': operation, ...original.body}, valid,
+        mutation: original.closing || !reconcile, onDispatch: () => dispatched = true);
+      if (!valid() || response?.statusCode != 200) throw const FormatException();
+      final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
+      if (envelope['ok'] != true) throw const FormatException();
+      return WorkspaceStockVisibilityWriteResult.decode(envelope['data'], original, reconcile: reconcile && !original.closing);
+    } catch (_) {
+      return WorkspaceStockVisibilityWriteResult(dispatched ? WorkspaceStockVisibilityWriteState.unknown : WorkspaceStockVisibilityWriteState.notSent);
+    }
+  }
   @override
   Future<WorkspacePublicStockResult> readPublicStoreStock(WorkspacePublicStockQuery query, {required bool Function() current}) async {
-    bool valid() => current() && stockSnapshotsSupported && query.realm == realm;
+    bool valid() => current() && stockSnapshotsSupported && query.realm == realm && (query.version == 1 || stockQuantityVisibilitySupported);
     if (!valid()) throw const FormatException('Stock information is unavailable.');
     final response = await _ownerRequest({'operation': 'readPublicStoreStockSnapshot', ...query.body}, valid, mutation: false);
     if (!valid() || response?.statusCode != 200) throw const FormatException();

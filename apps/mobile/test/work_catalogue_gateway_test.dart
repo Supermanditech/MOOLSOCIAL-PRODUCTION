@@ -1281,6 +1281,15 @@ class _StockOwner implements WorkspaceStoreStockOwnerGateway {
     return write == null ? const WorkspaceStoreStockWriteResult(WorkspaceStoreStockWriteState.unknown) : await write!(original, reconcile);
   }
 }
+class _StockPrivacyCatalogue extends _StockSessionCatalogue implements WorkspaceStockVisibilityGateway {
+  _StockPrivacyCatalogue(super.stockOwner, this.visibility);
+  final WorkspaceStockVisibilityGateway visibility;
+  @override bool get stockQuantityVisibilitySupported => visibility.stockQuantityVisibilitySupported;
+  @override Future<WorkspaceStockVisibilityHead> readStockVisibility(WorkspaceStoreStockScope scope, {required bool Function() current}) =>
+    visibility.readStockVisibility(scope, current: current);
+  @override Future<WorkspaceStockVisibilityWriteResult> writeStockVisibility(WorkspaceStockVisibilityIntent original,
+      {required bool Function() current, bool reconcile = false}) => visibility.writeStockVisibility(original, current: current, reconcile: reconcile);
+}
 class _StockSessionCatalogue extends SessionCatalogue implements WorkspaceStoreStockOwnerGateway {
   _StockSessionCatalogue(this.stockOwner);
   final _StockOwner stockOwner;
@@ -3634,17 +3643,288 @@ void main() {
       'idempotencyKey': original.idempotencyKey, 'orderingAvailable': false, 'reservationConfirmed': false,
       if (state == 'expired') ...{'expiredAt': until, 'settledAt': until, 'originalFingerprint': original.serverFingerprint}};
   }
-  AuthenticatedWorkspaceCatalogueGateway stockGateway(SocialContentTransport transport, {Credentials? credentials, bool enabled = true,
+  AuthenticatedWorkspaceCatalogueGateway stockGateway(SocialContentTransport transport, {Credentials? credentials, bool enabled = true, bool privacy = false,
       String account = 'owner-one', DateTime Function()? clock}) => AuthenticatedWorkspaceCatalogueGateway(
     endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
     credentials: credentials ?? Credentials(), transport: transport, realm: 'evaluation', ownerAccountId: account,
-    stockSnapshotsSupported: enabled, now: clock ?? () => at);
+    stockSnapshotsSupported: enabled, stockQuantityVisibilitySupported: privacy, now: clock ?? () => at);
   Map<String, dynamic> publicStockReply(WorkspacePublicStockQuery query, {bool unknown = false}) => {
     'schemaVersion': 1, 'stockSnapshotVersion': 1, 'realm': query.realm, 'storeId': query.storeId, 'binding': query.binding,
     'state': unknown ? 'unknown' : 'reported', 'observedAt': at.toIso8601String(), 'requestedPacks': query.requestedPacks,
     'orderingAvailable': false, 'reservationConfirmed': false, 'stock': unknown ? null : <String, dynamic>{
       'source': 'selling_store_checkpoint', 'reportedAt': at.toIso8601String(), 'savedAt': at.toIso8601String(),
       'validUntil': at.add(const Duration(minutes: 5)).toIso8601String(), 'reportRevision': 1, 'available': true, 'quantityAvailable': true}};
+  test('STOCK-PRIVACY v2 accepts explicit public counts and rejects private or legacy count injection', () {
+    final binding = stockOriginal().input.binding;
+    final query = WorkspacePublicStockQuery(realm: 'evaluation', storeId: 'store-one', binding: binding, requestedPacks: 3, version: 2);
+    Map<String, dynamic> packet({required bool visible, int? count}) {
+      final result = publicStockReply(query)..['stockSnapshotVersion'] = 2;
+      (result['stock'] as Map<String, dynamic>).addAll({'visibilityRevision': 4, 'quantityPublic': visible,
+        if (count != null) 'availablePacks': count});
+      return result;
+    }
+    expect(WorkspacePublicStockResult.decode(packet(visible: false), query, at).availablePacks, isNull);
+    expect(WorkspacePublicStockResult.decode(packet(visible: true, count: 7), query, at).availablePacks, 7);
+    expect(() => WorkspacePublicStockResult.decode(packet(visible: false, count: 7), query, at), throwsFormatException);
+    expect(() => WorkspacePublicStockResult.decode(packet(visible: true), query, at), throwsFormatException);
+    final noConsent = packet(visible: true, count: 7); (noConsent['stock'] as Map)['visibilityRevision'] = 0;
+    expect(() => WorkspacePublicStockResult.decode(noConsent, query, at), throwsFormatException);
+    final legacy = WorkspacePublicStockQuery(realm: 'evaluation', storeId: 'store-one', binding: binding, requestedPacks: 3);
+    expect(() => WorkspacePublicStockResult.decode(packet(visible: true, count: 7), legacy, at), throwsFormatException);
+    final stale = packet(visible: true, count: 7);
+    expect(() => WorkspacePublicStockResult.decode(stale, query, at.add(const Duration(minutes: 5))), throwsFormatException);
+  });
+  test('STOCK-PRIVACY owner command and encrypted journal preserve closure intent across restart', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    var account = stockScope.account;
+    SecureWorkStockVisibilityJournal fresh() => SecureWorkStockVisibilityJournal(currentAccount: () => account);
+    final original = WorkspaceStockVisibilityIntent(scope: stockScope, expectedRevision: 0, idempotencyKey: 'privacy-original',
+      visible: true, binding: stockOriginal().input.binding, stockRevision: 1);
+    await fresh().savePending(original);
+    final restored = (await fresh().readPending(stockScope))!;
+    expect(restored.serverFingerprint, original.serverFingerprint);
+    final closing = restored.forClosure();
+    expect(closing.serverFingerprint, original.serverFingerprint);
+    await fresh().savePending(closing);
+    expect((await fresh().readPending(stockScope))!.closing, isTrue);
+    await expectLater(fresh().savePending(original), throwsFormatException);
+    expect(await fresh().readPending((account: account, store: 'other-store', realm: 'evaluation', sku: 'sku-one')), isNull);
+    expect(await fresh().readPending((account: account, store: 'store-one', realm: 'production', sku: 'sku-one')), isNull);
+    account = 'other-account';
+    await expectLater(fresh().readPending(stockScope), throwsA(isA<WorkGatewayException>()));
+    account = stockScope.account;
+    await fresh().removePending(closing);
+    expect(await fresh().readPending(stockScope), isNull);
+  });
+
+  test('STOCK-PRIVACY physical journal tail preserves cancellation after caller timeout and rejects stale removal', () async {
+    final storage = _DelayedDetailsStorage();
+    final original = WorkspaceStockVisibilityIntent(scope: stockScope, expectedRevision: 0, idempotencyKey: 'delayed-privacy',
+      visible: true, binding: stockOriginal().input.binding, stockRevision: 1);
+    SecureWorkStockVisibilityJournal fresh() => SecureWorkStockVisibilityJournal(storage: storage, currentAccount: () => stockScope.account);
+    final save = fresh().savePending(original); await storage.entered.future;
+    await expectLater(save.timeout(const Duration(milliseconds: 1)), throwsA(isA<TimeoutException>()));
+    final close = fresh().savePending(original.forClosure()); await Future<void>.delayed(Duration.zero); expect(storage.writes, 1);
+    storage.release.complete(); await save; await close;
+    expect((await fresh().readPending(stockScope))!.closing, true);
+    await expectLater(fresh().removePending(original), throwsFormatException);
+    expect((await fresh().readPending(stockScope))!.closing, true);
+  });
+  Map<String, dynamic> visibilityHead({int revision = 0, bool visible = false, bool? effective, bool source = true}) => {
+    'schemaVersion': 1, 'stockVisibilityVersion': 1, 'realm': stockScope.realm, 'storeId': stockScope.store, 'skuId': stockScope.sku,
+    'state': 'ready', 'revision': revision, 'visible': visible, 'effectiveVisible': effective ?? visible,
+    'enableSource': source ? {'binding': stockOriginal().input.binding, 'stockRevision': 1} : null};
+  Map<String, dynamic> visibilityAck(WorkspaceStockVisibilityIntent original, {String state = 'saved'}) => {
+    'schemaVersion': 1, 'stockVisibilityVersion': 1, 'realm': original.scope.realm, 'storeId': original.scope.store, 'skuId': original.scope.sku,
+    'state': state, 'idempotencyKey': original.idempotencyKey, 'fingerprint': original.serverFingerprint,
+    'revision': state == 'saved' ? original.expectedRevision + 1 : null, 'visible': state == 'saved' ? original.visible : null};
+  WorkspaceStockVisibilityIntent visibilityOriginal(Map<String, Object?> body) => WorkspaceStockVisibilityIntent.fromJson({
+    'version': 1, 'scope': {'account': stockScope.account, 'store': stockScope.store, 'realm': stockScope.realm, 'sku': stockScope.sku},
+    'request': {...body}..remove('operation'), 'closing': body['operation'] == 'closeStoreStockVisibility'});
+  SocialContentResponse visibilityResponse(Map<String, dynamic> data) => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+  test('STOCK-PRIVACY authenticated gateway gates protocol, pins owner and uses mutation tokens only for save or close', () async {
+    final original = WorkspaceStockVisibilityIntent(scope: stockScope, expectedRevision: 0, idempotencyKey: 'visibility-one',
+      visible: true, binding: stockOriginal().input.binding, stockRevision: 1);
+    final transport = Transport(visibilityAck(original)), credentials = Credentials();
+    final api = stockGateway(transport, privacy: true, credentials: credentials);
+    expect(api.forOwnerAccount(stockScope.account).stockQuantityVisibilitySupported, true);
+    expect((await api.writeStockVisibility(original, current: () => true)).state, WorkspaceStockVisibilityWriteState.saved);
+    expect(transport.sent!['operation'], 'saveStoreStockVisibility'); expect(credentials.modes.last, SocialAppCheckTokenMode.limitedUse);
+    expect((await api.writeStockVisibility(original, current: () => true, reconcile: true)).state, WorkspaceStockVisibilityWriteState.saved);
+    expect(transport.sent!['operation'], 'reconcileStoreStockVisibility'); expect(credentials.modes.last, SocialAppCheckTokenMode.standard);
+    transport.data = visibilityAck(original, state: 'closed');
+    expect((await api.writeStockVisibility(original.forClosure(), current: () => true, reconcile: true)).state, WorkspaceStockVisibilityWriteState.closed);
+    expect(transport.sent!['operation'], 'closeStoreStockVisibility'); expect(credentials.modes.last, SocialAppCheckTokenMode.limitedUse);
+    transport.data = visibilityHead();
+    expect((await api.readStockVisibility(stockScope, current: () => true)).visible, false);
+    expect(credentials.modes.last, SocialAppCheckTokenMode.standard);
+    for (final blocked in [stockGateway(transport), stockGateway(transport, enabled: false, privacy: true), stockGateway(transport, privacy: true, account: 'other-owner')]) {
+      expect((await blocked.writeStockVisibility(original, current: () => true)).state, WorkspaceStockVisibilityWriteState.notSent);
+    }
+    transport.data = visibilityAck(original)..['fingerprint'] = '0' * 64;
+    expect((await api.writeStockVisibility(original, current: () => true)).state, WorkspaceStockVisibilityWriteState.unknown);
+    final v2 = WorkspacePublicStockQuery(realm: 'evaluation', storeId: stockScope.store, binding: original.binding!, requestedPacks: 1, version: 2);
+    await expectLater(stockGateway(transport).readPublicStoreStock(v2, current: () => true), throwsFormatException);
+  });
+  test('STOCK-PRIVACY actual Firestore packets reach strict Dart readers without changing legacy bytes', () {
+    // Actual loopback Firestore capture from backend affected run v5, 21 October.
+    // Isolated evaluation identities only; timestamps and payloads are unmodified.
+    final capture = jsonDecode(r'''{"enable":{"stockVisibilityVersion":1,"storeId":"store-one","skuId":"sku-one","expectedRevision":0,"idempotencyKey":"privacy-enable","visible":true,"binding":{"skuId":"sku-one","skuRevision":1,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one"},"stockRevision":1},"initial":{"schemaVersion":1,"stockVisibilityVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":0,"visible":false,"effectiveVisible":false,"enableSource":{"binding":{"skuId":"sku-one","skuRevision":1,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one"},"stockRevision":1}},"privateRead":{"schemaVersion":1,"stockSnapshotVersion":2,"realm":"evaluation","storeId":"store-one","binding":{"skuId":"sku-one","skuRevision":1,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one"},"state":"reported","observedAt":"2026-10-16T12:00:00.000Z","requestedPacks":1,"stock":{"source":"selling_store_checkpoint","reportedAt":"2026-10-16T12:00:00.000Z","savedAt":"2026-10-16T12:00:00.000Z","validUntil":"2026-10-16T12:05:00.000Z","reportRevision":1,"available":true,"quantityAvailable":true,"visibilityRevision":0,"quantityPublic":false},"orderingAvailable":false,"reservationConfirmed":false},"publicRead":{"schemaVersion":1,"stockSnapshotVersion":2,"realm":"evaluation","storeId":"store-one","binding":{"skuId":"sku-one","skuRevision":1,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one"},"state":"reported","observedAt":"2026-10-16T12:00:00.000Z","requestedPacks":1,"stock":{"source":"selling_store_checkpoint","reportedAt":"2026-10-16T12:00:00.000Z","savedAt":"2026-10-16T12:00:00.000Z","validUntil":"2026-10-16T12:05:00.000Z","reportRevision":1,"available":true,"quantityAvailable":true,"visibilityRevision":1,"quantityPublic":true,"availablePacks":700},"orderingAvailable":false,"reservationConfirmed":false},"legacy":{"schemaVersion":1,"stockSnapshotVersion":1,"realm":"evaluation","storeId":"store-one","binding":{"skuId":"sku-one","skuRevision":1,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one"},"state":"reported","observedAt":"2026-10-16T12:00:00.000Z","requestedPacks":1,"stock":{"source":"selling_store_checkpoint","reportedAt":"2026-10-16T12:00:00.000Z","savedAt":"2026-10-16T12:00:00.000Z","validUntil":"2026-10-16T12:05:00.000Z","reportRevision":1,"available":true,"quantityAvailable":true},"orderingAvailable":false,"reservationConfirmed":false},"enabled":{"schemaVersion":1,"stockVisibilityVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"saved","idempotencyKey":"privacy-enable","fingerprint":"3349D4777987712911395E24FAC7D6BB6E76B28623A900CF3AF2140D1E9A83D4","revision":1,"visible":true}}''') as Map<String, dynamic>;
+    final initial = WorkspaceStockVisibilityHead.decode(capture['initial'], stockScope);
+    expect(initial.visible, false); expect(initial.enableSource!['stockRevision'], 1);
+    final enable = Map<String, dynamic>.from(capture['enable'] as Map);
+    final original = WorkspaceStockVisibilityIntent(scope: stockScope, expectedRevision: enable['expectedRevision'] as int,
+      idempotencyKey: enable['idempotencyKey'] as String, visible: true, binding: Map<String, dynamic>.from(enable['binding'] as Map), stockRevision: 1);
+    expect(WorkspaceStockVisibilityWriteResult.decode(capture['enabled'], original).state, WorkspaceStockVisibilityWriteState.saved);
+    for (final key in ['privateRead', 'publicRead', 'legacy']) {
+      final raw = Map<String, dynamic>.from(capture[key] as Map), before = jsonEncode(raw);
+      final query = WorkspacePublicStockQuery(realm: 'evaluation', storeId: stockScope.store, binding: original.binding!,
+        requestedPacks: 1, version: raw['stockSnapshotVersion'] as int);
+      expect(WorkspacePublicStockResult.decode(raw, query, at).availablePacks, key == 'publicRead' ? 700 : null);
+      expect(jsonEncode(raw), before);
+    }
+  });
+  test('STOCK-PRIVACY unknown enable survives restart, reconciles without resend, and durable close fences later retry', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    var currentHead = visibilityHead(), loseClose = true;
+    final calls = <String>[], originals = <String>[];
+    final transport = OwnerTransport((body) async {
+      final operation = body['operation'] as String; calls.add(operation);
+      if (operation == 'readStoreStockVisibility') return visibilityResponse(currentHead);
+      final original = visibilityOriginal(body); originals.add(original.serverFingerprint);
+      if (operation == 'saveStoreStockVisibility') throw StateError('host lost response');
+      if (operation == 'reconcileStoreStockVisibility') return visibilityResponse(visibilityAck(original, state: 'not_found'));
+      if (loseClose) throw StateError('host close response lost');
+      return visibilityResponse(visibilityAck(original, state: 'closed'));
+    });
+    final lifetime = Object();
+    WorkspaceStockVisibilityController fresh() => WorkspaceStockVisibilityController(scope: stockScope,
+      gateway: stockGateway(transport, privacy: true), journal: SecureWorkStockVisibilityJournal(currentAccount: () => stockScope.account), context: () => lifetime);
+    var controller = fresh(); expect(await controller.load(), true); expect(await controller.setVisible(true), false);
+    final fingerprint = controller.pending!.serverFingerprint;
+    expect(controller.head!.visible, false); expect(controller.pending, isNotNull); controller.dispose(); controller = fresh();
+    expect(await controller.load(), false); expect(controller.pending!.serverFingerprint, fingerprint);
+    expect(calls.where((c) => c == 'saveStoreStockVisibility').length, 1, reason: 'not_found never automatically resends an enable');
+    expect(await controller.cancelPending(), false); expect(controller.pending!.closing, true);
+    controller.dispose(); loseClose = false; controller = fresh();
+    expect(await controller.load(), true); expect(controller.pending, isNull); expect(controller.head!.visible, false);
+    expect(calls.lastWhere((c) => c != 'readStoreStockVisibility'), 'closeStoreStockVisibility');
+    expect(originals.toSet(), {fingerprint}); controller.dispose();
+  });
+  test('STOCK-PRIVACY historical saved receipt never replaces newer head; stale Stock does not prevent hiding', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final original = WorkspaceStockVisibilityIntent(scope: stockScope, expectedRevision: 0, idempotencyKey: 'old-enable',
+      visible: true, binding: stockOriginal().input.binding, stockRevision: 1);
+    final journal = SecureWorkStockVisibilityJournal(currentAccount: () => stockScope.account);
+    await journal.savePending(original);
+    var currentHead = visibilityHead(revision: 2, source: false);
+    final transport = OwnerTransport((body) async {
+      if (body['operation'] == 'readStoreStockVisibility') return visibilityResponse(currentHead);
+      final command = visibilityOriginal(body);
+      if (body['operation'] == 'reconcileStoreStockVisibility') return visibilityResponse(visibilityAck(command));
+      expect(command.visible, false); expect(command.binding, isNull); expect(command.stockRevision, isNull);
+      currentHead = visibilityHead(revision: command.expectedRevision + 1, source: false);
+      return visibilityResponse(visibilityAck(command));
+    });
+    final controller = WorkspaceStockVisibilityController(scope: stockScope, gateway: stockGateway(transport, privacy: true), journal: journal, context: () => 'host');
+    addTearDown(controller.dispose);
+    expect(await controller.load(), true); expect(controller.head!.revision, 2); expect(controller.head!.visible, false);
+    currentHead = visibilityHead(revision: 3, visible: true, effective: false, source: false);
+    expect(await controller.load(), true); expect(await controller.setVisible(false), true);
+    expect(controller.head!.revision, 4); expect(controller.head!.visible, false);
+  });
+  testWidgets('STOCK-PRIVACY compact Store control shows confirmed state, pending recovery and cancellation without touching quantity', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    var currentHead = visibilityHead(), fail = false, calls = 0;
+    final transport = OwnerTransport((body) async {
+      calls++;
+      if (body['operation'] == 'readStoreStockVisibility') return visibilityResponse(currentHead);
+      final original = visibilityOriginal(body);
+      if (body['operation'] == 'closeStoreStockVisibility') return visibilityResponse(visibilityAck(original, state: 'closed'));
+      if (fail) throw StateError('host offline');
+      currentHead = visibilityHead(revision: original.expectedRevision + 1, visible: original.visible);
+      return visibilityResponse(visibilityAck(original));
+    });
+    final controller = WorkspaceStockVisibilityController(scope: stockScope, gateway: stockGateway(transport, privacy: true),
+      journal: SecureWorkStockVisibilityJournal(currentAccount: () => stockScope.account), context: () => 'host');
+    addTearDown(controller.dispose); tester.view.physicalSize = const Size(360, 720); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Scaffold(body: StoreStockQuantityVisibility(controller: controller))));
+    await tester.pumpAndSettle();
+    final toggle = find.byKey(const Key('work-product-public-stock-quantity'));
+    expect(tester.widget<SwitchListTile>(toggle).value, false);
+    final retainedSwitch = tester.widget<SwitchListTile>(toggle).onChanged!;
+    await tester.tap(toggle); await tester.pumpAndSettle();
+    expect(tester.widget<SwitchListTile>(toggle).value, true); expect(find.text('Current available quantity is shown publicly.'), findsOneWidget);
+    fail = true; await tester.tap(toggle); await tester.pumpAndSettle();
+    expect(find.text('Change pending · visibility is unconfirmed.'), findsOneWidget);
+    expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
+    final retainedRetry = tester.widget<TextButton>(find.byKey(const Key('work-product-public-stock-retry'))).onPressed!;
+    final retainedCancel = tester.widget<TextButton>(find.byKey(const Key('work-product-public-stock-cancel'))).onPressed!;
+    final retainedCheck = tester.widget<TextButton>(find.byKey(const Key('work-product-public-stock-check'))).onPressed!;
+    await tester.tap(find.byKey(const Key('work-product-public-stock-cancel'))); await tester.pumpAndSettle();
+    expect(controller.pending, isNull); expect(tester.widget<SwitchListTile>(toggle).value, true, reason: 'Cancelling a lost hide is not a confirmed hide');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    final before = calls;
+    retainedSwitch(false); retainedRetry(); retainedCancel(); retainedCheck(); await tester.pump();
+    expect(calls, before, reason: 'Disposed editor callbacks must not touch the cached controller or journal');
+  });
+  testWidgets('STOCK-PRIVACY changed product requires renewed consent and retained callbacks cannot affect replacement', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({}); var calls = 0;
+    final changed = visibilityHead(revision: 4, visible: true, effective: false);
+    ((changed['enableSource'] as Map)['binding'] as Map)['skuRevision'] = 2;
+    var currentHead = changed;
+    final transport = OwnerTransport((body) async {
+      calls++;
+      if (body['operation'] == 'readStoreStockVisibility') return visibilityResponse(currentHead);
+      final original = visibilityOriginal(body);
+      expect(original.visible, true); expect(original.binding!['skuRevision'], 2);
+      currentHead = visibilityHead(revision: 5, visible: true);
+      return visibilityResponse(visibilityAck(original));
+    });
+    WorkspaceStockVisibilityController fresh() => WorkspaceStockVisibilityController(scope: stockScope,
+      gateway: stockGateway(transport, privacy: true), journal: SecureWorkStockVisibilityJournal(currentAccount: () => stockScope.account), context: () => 'host');
+    final first = fresh(), second = fresh(); addTearDown(first.dispose); addTearDown(second.dispose);
+    Widget view(WorkspaceStockVisibilityController controller) => MaterialApp(home: Scaffold(body: StoreStockQuantityVisibility(controller: controller)));
+    await tester.pumpWidget(view(first)); await tester.pumpAndSettle();
+    final reconfirm = find.byKey(const Key('work-product-public-stock-reconfirm'));
+    final retained = tester.widget<TextButton>(reconfirm).onPressed!;
+    final oldSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('work-product-public-stock-quantity'))).onChanged!;
+    await tester.tap(reconfirm); await tester.pumpAndSettle(); expect(first.head!.effectiveVisible, true);
+    await tester.pumpWidget(view(second)); await tester.pumpAndSettle(); final before = calls;
+    retained(); oldSwitch(false); await tester.pump(); expect(calls, before);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('STOCK-PRIVACY existing saved Stock editor includes the compact canonical control and preserves seven packs', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final account = ListingAccount(), stock = _StockOwner()..stockSnapshotsSupported = false;
+    final source = _StockPrivacyCatalogue(stock, stockGateway(OwnerTransport((body) async {
+      expect(body['operation'], 'readStoreStockVisibility'); return visibilityResponse(visibilityHead());
+    }), privacy: true));
+    final inventory = SecureWorkInventoryStore(accountScope: () => account.owner);
+    await inventory.save(WorkspaceSavedInventory.fromJson({...stockCheckpoint().toJson(), 'revision': 1}), expectedRevision: null);
+    final work = WorkSession(contactDraftStore: account, inventoryStore: inventory, catalogueGateway: source,
+      stockVisibilityJournalFactory: (_) => SecureWorkStockVisibilityJournal(currentAccount: () => account.owner))
+      ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jaipur', verified: true)
+      ..workspaceId = 'store-one';
+    expect(await work.loadWorkspaceInventory(), true); stock.stockSnapshotsSupported = true;
+    await openListingEditor(tester, work, size: const Size(320, 740), theme: MoolTheme.light());
+    final control = find.byKey(const Key('work-product-public-stock-quantity'));
+    await tester.ensureVisible(control); await tester.pumpAndSettle();
+    expect(tester.widget<SwitchListTile>(control).value, false);
+    expect(tester.widget<SwitchListTile>(control).onChanged, isNotNull);
+    expect(find.text('Exact quantity is private. Buyers can check their selected quantity.'), findsOneWidget);
+    expect(work.workspaceCatalogueItems.single.stock, 7);
+    expect((await inventory.read(account.owner, 'store-one', qa: true))!.products.single.stock, 7);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
+  });
+  test('STOCK-PRIVACY WorkSession retires an old Store controller across Store ABA and ignores its held read', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    final account = ListingAccount(), stock = _StockOwner()..stockSnapshotsSupported = false;
+    final entered = Completer<void>(), held = Completer<SocialContentResponse>();
+    final source = _StockPrivacyCatalogue(stock, stockGateway(OwnerTransport((_) {
+      if (!entered.isCompleted) entered.complete(); return held.future;
+    }), privacy: true));
+    final inventory = SecureWorkInventoryStore(accountScope: () => account.owner);
+    await inventory.save(WorkspaceSavedInventory.fromJson({...stockCheckpoint().toJson(), 'revision': 1}), expectedRevision: null);
+    const home = WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+    final work = WorkSession(contactDraftStore: account, inventoryStore: inventory, catalogueGateway: source,
+      stockVisibilityJournalFactory: (_) => SecureWorkStockVisibilityJournal(currentAccount: () => account.owner))..activeWorkspace = home ..workspaceId = 'store-one';
+    addTearDown(work.dispose); expect(await work.loadWorkspaceInventory(), true); stock.stockSnapshotsSupported = true;
+    final original = work.workspaceStockVisibility('sku-one')!;
+    expect(identical(work.workspaceStockVisibility('sku-one'), original), true);
+    final loading = original.load(); await entered.future.timeout(const Duration(seconds: 5));
+    work.activeWorkspace = const WorkWorkspace(id: 'other-store', name: 'Other', profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+    work.publicationPreferencesContext;
+    work.activeWorkspace = home; work.publicationPreferencesContext;
+    held.complete(visibilityResponse(visibilityHead())); expect(await loading, false);
+    expect(original.active, false); expect(original.head, isNull);
+    expect(identical(work.workspaceStockVisibility('sku-one'), original), false);
+    expect(work.workspaceCatalogueItems.single.stock, 7);
+  });
+
   test('LF11 Stock gateway is disabled for legacy connections', () {
     expect((gateway(Transport(page())) as dynamic).stockSnapshotsSupported, isFalse);
   });
@@ -8523,10 +8803,11 @@ void main() {
     expect(() => factoryEntry(data), throwsFormatException);
   });
   WorkspacePublicStockQuery stockPublicQuery(Map<String, Object?> body) => WorkspacePublicStockQuery(realm: 'production',
-    storeId: body['storeId'] as String, binding: Map<String, dynamic>.from(body['binding'] as Map), requestedPacks: body['requestedPacks'] as int);
-  AuthenticatedWorkspaceCatalogueGateway publicStockApi(OwnerTransport transport, {DateTime Function()? clock, bool enabled = true, bool discovery = false}) =>
+    storeId: body['storeId'] as String, binding: Map<String, dynamic>.from(body['binding'] as Map), requestedPacks: body['requestedPacks'] as int,
+    version: body['stockSnapshotVersion'] as int);
+  AuthenticatedWorkspaceCatalogueGateway publicStockApi(OwnerTransport transport, {DateTime Function()? clock, bool enabled = true, bool discovery = false, bool privacy = false}) =>
     AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
-      credentials: Credentials(), transport: transport, realm: 'production', stockSnapshotsSupported: enabled, now: clock ?? () => at,
+      credentials: Credentials(), transport: transport, realm: 'production', stockSnapshotsSupported: enabled, stockQuantityVisibilitySupported: privacy, now: clock ?? () => at,
       productFactsReadbackSupported: discovery, unbrandedProduceReadbackSupported: discovery, storeClassificationReadbackSupported: discovery);
   SocialContentResponse stockPublicResponse(WorkspacePublicStockQuery query, {int revision = 1, bool unknown = false,
     bool available = true, bool? quantityAvailable = true}) {
@@ -8534,6 +8815,62 @@ void main() {
     if (!unknown) { (data['stock'] as Map<String, dynamic>).addAll({'reportRevision': revision, 'available': available, 'quantityAvailable': quantityAvailable}); }
     return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
   }
+  SocialContentResponse privacyPublicResponse(WorkspacePublicStockQuery query, {required int stock, required int visibility,
+    required bool visible, int count = 7}) {
+    final data = publicStockReply(query)..['stockSnapshotVersion'] = 2;
+    (data['stock'] as Map<String, dynamic>).addAll({'reportRevision': stock, 'visibilityRevision': visibility, 'quantityPublic': visible,
+      'quantityAvailable': count >= query.requestedPacks, if (visible) 'availablePacks': count});
+    return visibilityResponse(data);
+  }
+  test('STOCK-PRIVACY cache keeps independent Stock and visibility highwaters across mixed delayed revisions', () async {
+    final entry = factoryEntry(publicPage());
+    for (final privacyFirst in [true, false]) {
+      var stock = privacyFirst ? 2 : 3, visibility = privacyFirst ? 2 : 1, visible = !privacyFirst;
+      final transport = OwnerTransport((body) async => privacyPublicResponse(stockPublicQuery(body), stock: stock, visibility: visibility, visible: visible));
+      final reader = WorkspacePublicStockReader(gateway: publicStockApi(transport, privacy: true), displayed: (_) => entry.readback, current: () => true, now: () => at);
+      addTearDown(reader.dispose);
+      expect(reader.requestIdentity(entry.product, 1), isNotNull);
+      final query = WorkspacePublicStockQuery.fromEntry(entry, 1, version: 2);
+      expect((await publicStockApi(transport, privacy: true).readPublicStoreStock(query, current: () => true)).state, 'reported');
+      expect(await reader.refresh(entry.product, 1), true);
+      stock = privacyFirst ? 3 : 2; visibility = privacyFirst ? 1 : 2; visible = privacyFirst;
+      expect(await reader.refresh(entry.product, 2), false); expect(reader.snapshotFor(entry.product, 1), isNull);
+      stock = 4; visibility = 1; visible = true;
+      expect(await reader.refresh(entry.product, 1), false, reason: 'New Stock must never revive an observed older privacy revision');
+      stock = 3; visibility = 2; visible = false;
+      expect(await reader.refresh(entry.product, 2), false, reason: 'Privacy revision must not reset the independent Stock highwater');
+      stock = 4;
+      expect(await reader.refresh(entry.product, 2), true); expect(reader.snapshotFor(entry.product, 2)!.availablePacks, isNull);
+    }
+  });
+  test('STOCK-PRIVACY held Retail count cannot restore disclosure after Wholesale observes a hide', () async {
+    final page = publicPage(trade: true), retail = factoryEntry(page), trade = factoryEntry(page, channel: BuyV2OfferClass.wholesale);
+    final held = Completer<SocialContentResponse>();
+    final transport = OwnerTransport((body) async => body['requestedPacks'] == 1 ? held.future :
+      privacyPublicResponse(stockPublicQuery(body), stock: 1, visibility: 2, visible: false, count: 1000));
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(transport, privacy: true),
+      displayed: (p) => p.id == retail.product.id ? retail.readback : trade.readback, current: () => true, now: () => at);
+    addTearDown(reader.dispose);
+    final old = reader.refresh(retail.product, 1); await Future<void>.delayed(Duration.zero);
+    expect(await reader.refresh(trade.product, trade.product.minimumOrder), true);
+    held.complete(privacyPublicResponse(WorkspacePublicStockQuery.fromEntry(retail, 1, version: 2), stock: 2, visibility: 1, visible: true));
+    expect(await old, false); expect(reader.snapshotFor(retail.product, 1), isNull);
+    expect(reader.snapshotFor(trade.product, trade.product.minimumOrder), isNull, reason: 'A mixed stale reply clears all sibling counts');
+  });
+
+  test('STOCK-PRIVACY throttled checks strip counts and retain a fresh shortage until actual expiry', () async {
+    final entry = factoryEntry(publicPage()); var fail = false, clock = at;
+    final transport = OwnerTransport((body) async => fail ? const SocialContentResponse(statusCode: 429, body: '{"ok":false}') :
+      privacyPublicResponse(stockPublicQuery(body), stock: 1, visibility: 1, visible: true, count: 2));
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(transport, privacy: true, clock: () => clock),
+      displayed: (_) => entry.readback, current: () => true, now: () => clock);
+    addTearDown(reader.dispose);
+    expect(await reader.refresh(entry.product, 3), true); expect(reader.snapshotFor(entry.product, 3)!.availablePacks, 2);
+    fail = true; expect(await reader.refresh(entry.product, 3, force: true), false);
+    expect(reader.snapshotFor(entry.product, 3)!.quantityAvailable, false); expect(reader.snapshotFor(entry.product, 3)!.availablePacks, isNull);
+    clock = at.add(const Duration(minutes: 5)); expect(reader.snapshotFor(entry.product, 3), isNull);
+  });
+
   test('LF11 public Stock cache getters never read and identical explicit queries coalesce', () async {
     final entry = factoryEntry(publicPage()), response = Completer<SocialContentResponse>();
     final transport = OwnerTransport((_) => response.future);
@@ -10356,6 +10693,22 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink()); close();
     });
   }
+  test('STOCK-PRIVACY shared product and Cart labels expose only opted-in counts and never change saved Cart terms', () async {
+    final entry = factoryEntry(publicPage()); var visible = true, revision = 1;
+    final reader = WorkspacePublicStockReader(gateway: publicStockApi(OwnerTransport((body) async =>
+      privacyPublicResponse(stockPublicQuery(body), stock: 1, visibility: revision, visible: visible)), privacy: true),
+      displayed: (_) => entry.readback, current: () => true, now: () => at);
+    final facts = _HostOperationalFacts((p) => const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false).snapshotFor(p));
+    final session = await benefitSession(_HostMinorBenefits(), [entry.product], facts: facts, stockReader: reader, reviewDataEnabled: false);
+    expect(await session.refreshStoreStock(entry.product), true); expect(session.storeStockLabelFor(entry.product), 'Store reports 7 packs available');
+    enableHostStockEligibility(session, entry.product, facts); expect(session.addProduct(entry.product.id), true);
+    final before = session.cartLines.single.totalMinor;
+    visible = false; revision = 2; expect(await session.refreshStoreStock(entry.product, force: true), true);
+    expect(session.storeStockLabelFor(entry.product), 'Store reports stock for 1 pack');
+    expect(session.storeStockFor(entry.product)!.availablePacks, isNull); expect(session.cartLines.single.quantity, 1);
+    expect(session.cartLines.single.totalMinor, before);
+  });
+
   test('LF11 Stock session positive is not eligibility and fresh negative preserves Cart without a replacement payment', () async {
     final entry = factoryEntry(publicPage()); var short = false, revision = 1;
     final reader = WorkspacePublicStockReader(gateway: publicStockApi(OwnerTransport((body) async =>
