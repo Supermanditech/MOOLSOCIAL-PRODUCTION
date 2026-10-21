@@ -56477,10 +56477,15 @@ void main() {
           reason: 'profile=$profile view=${original.view} destination=${original.destination}');
         await tester.tap(filter); await tester.pumpAndSettle();
         expect(find.text(controller.restockSupplierTypesLabel), findsOneWidget);
-        if (root != null && profile == 'retailer-grocery') {
+        if (profile == 'wholesaler') {
+          expect(find.text('Sourcing classification pending'), findsOneWidget);
+          expect(find.textContaining('Your Store profile combines wholesaler and distributor.'), findsOneWidget);
+          expect(find.text('Prepared buying rules'), findsOneWidget);
+        }
+        if (root != null && ['retailer-grocery', 'wholesaler'].contains(profile)) {
           final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(const Key('store-review-root')));
           await tester.runAsync(() async {
-            final file = File('$root/public-restock-retailer-types-$compact.png');
+            final file = File('$root/public-restock-$profile-types-$compact.png');
             if (await file.exists()) throw StateError('Preserve earlier host evidence');
             await file.parent.create(recursive: true); final image = await boundary.toImage(pixelRatio: 1);
             try { final bytes = await image.toByteData(format: ui.ImageByteFormat.png);

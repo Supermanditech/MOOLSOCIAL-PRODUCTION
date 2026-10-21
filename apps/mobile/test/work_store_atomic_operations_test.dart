@@ -14205,8 +14205,9 @@ void main() {
       for (final entry in expected.entries) {
         profileId = entry.key; controller.invalidateIfChanged();
         expect(controller.restockSupplierTypes, entry.value);
-        if (entry.key == 'sub-distributor') {
-          expect(controller.restockSupplierTypesLabel, 'Manufacturers, Distributors');
+        if (['wholesaler', 'distributor', 'sub-distributor'].contains(entry.key)) {
+          expect(controller.restockSupplierClassificationResolved, false);
+          expect(controller.restockSupplierTypesLabel, 'Sourcing classification pending');
         }
         if (entry.key == 'retailer-grocery') {
           expect(controller.restockSupplierTypesLabel, 'Manufacturers, Wholesalers, Distributors, Sub-distributors');

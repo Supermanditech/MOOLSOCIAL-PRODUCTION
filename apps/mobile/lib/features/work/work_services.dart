@@ -99,13 +99,32 @@ class WorkProcurementController extends ChangeNotifier {
     'retailer-grocery' || 'retailer-speciality' => const ['manufacturer', 'wholesaler', 'distributor', 'sub-distributor'],
     _ => const [],
   };
-  String get restockSupplierTypesLabel => restockSupplierTypes.isEmpty ? 'All public supplier types' :
+  // The registered wholesaler profile is labelled Wholesaler / Distributor;
+  // descriptive businessType preferences do not resolve that source ambiguity.
+  bool get restockSupplierClassificationResolved => const [
+    'manufacturer', 'retailer-grocery', 'retailer-speciality',
+  ].contains(currentProfileId?.call());
+  String? get restockSupplierClassificationMessage => restockSupplierClassificationResolved ? null :
+    currentProfileId?.call() == 'wholesaler'
+      ? 'Your Store profile combines wholesaler and distributor. Its sourcing classification needs confirmation. Your Store basket is kept.'
+      : 'Your Store sourcing classification could not be confirmed. Your Store basket is kept.';
+  String get restockSupplierTypesLabel => !restockSupplierClassificationResolved ? 'Sourcing classification pending' :
     restockSupplierTypes.map((type) => switch (type) {
       'manufacturer' => 'Manufacturers', 'wholesaler' => 'Wholesalers',
       'sub-distributor' => 'Sub-distributors', _ => 'Distributors',
     }).join(', ');
-  bool get restockSupplierFilterConnected => restockSupplierTypes.isEmpty ||
-      catalogueGateway?.publicSupplierTypeFilterSupported == true;
+  bool get restockSupplierFilterConnected => restockSupplierClassificationResolved &&
+      catalogueGateway?.publicRestockSupplierTypesReadable(restockSupplierTypes) == true;
+  List<String> _requestedRestockSupplierTypes() {
+    final issue = restockSupplierClassificationMessage;
+    if (issue != null) {
+      throw FormatException(issue);
+    }
+    if (!restockSupplierFilterConnected) {
+      throw const FormatException('Supplier filtering is not connected for these Store types. Your Store basket is kept.');
+    }
+    return restockSupplierTypes;
+  }
   WorkRestockPurchasePurpose? get restockPurpose =>
     bookmark?.uiProfileId == currentProfileId?.call() ? bookmark?.restockPurpose : null;
   List<WorkRestockPurchasePurpose> get restockPurposeOptions => switch (currentProfileId?.call()) {
@@ -205,7 +224,7 @@ class WorkProcurementController extends ChangeNotifier {
       try {
         bound = catalogueGateway!.forStoreProcurement(context, current: current,
           publicCatalogue: context.purpose == BuyV2ProcurementPurpose.restock,
-          supplierTypes: () => restockSupplierTypes);
+          supplierTypes: _requestedRestockSupplierTypes);
         _ownedCatalogueSource = WorkspacePublicDiscoverySource(gateway: bound, current: current,
           requestGeneration: _restockPolicyGeneration);
       } on Object {

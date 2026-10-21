@@ -7710,6 +7710,46 @@ void main() {
       source.dispose(); disposed = true;
     });
   }
+  test('RESTOCK-PUBLIC generic filter flag does not qualify unsupported publisher readback', () {
+    final gateway = AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: Transport(page()), realm: 'production', now: () => at,
+      productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+      storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+      minorMoneyReadbackSupported: true, publicSupplierTypeFilterSupported: true);
+    expect(gateway.publicRestockSupplierTypesReadable(['manufacturer']), true);
+    expect(gateway.publicRestockSupplierTypesReadable(['manufacturer', 'wholesaler']), true);
+    expect(gateway.publicRestockSupplierTypesReadable(['manufacturer', 'distributor']), false);
+    expect(gateway.publicRestockSupplierTypesReadable(['manufacturer', 'wholesaler', 'distributor', 'sub-distributor']), false);
+    expect(gateway.publicRestockSupplierTypesReadable([]), false);
+  });
+  for (final profile in ['wholesaler', 'distributor', 'sub-distributor', 'unknown', 'retailer-grocery']) {
+    test('RESTOCK-PUBLIC unready Store sourcing $profile cannot dispatch a guessed filter', () async {
+      var calls = 0;
+      final gateway = AuthenticatedWorkspaceCatalogueGateway(
+        endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), realm: 'production', now: () => at,
+        productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+        storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+        minorMoneyReadbackSupported: true, publicSupplierTypeFilterSupported: true,
+        transport: OwnerTransport((_) async { calls++; throw StateError('Host source must not receive a guessed filter'); }));
+      final controller = WorkProcurementController(currentAccountId: () => restockContext.accountId,
+        currentStoreId: () => restockContext.storeId, currentProfileId: () => profile, storeApproved: () => true,
+        catalogueGateway: gateway, bookmarks: _HostProcurementBookmarks(),
+        stateStoreFactory: (scope) => _HostRetirableStateStore()..ownerScope = scope);
+      try {
+        expect(await controller.open(purpose: restockContext.purpose, returnTo: 'stockStatement', exactContext: restockContext), true);
+        final original = controller.session!, source = original.cataloguePageSource! as WorkspacePublicDiscoverySource;
+        expect(controller.restockSupplierFilterConnected, false);
+        expect(controller.restockSupplierTypesLabel, profile == 'retailer-grocery'
+          ? 'Manufacturers, Wholesalers, Distributors, Sub-distributors' : 'Sourcing classification pending');
+        await expectLater(source.loadProducts(restockQuery(), pageSize: 40), throwsFormatException);
+        expect(calls, 0); expect(controller.session, same(original));
+        expect(original.customerStateStore!.ownerScope, restockContext.customerStateOwnerScope);
+        expect(controller.restockRestrictionMessage, isNull, reason: 'Original purchase recovery is independent of a new catalogue filter.');
+      } finally { controller.dispose(); }
+    });
+  }
   test('RESTOCK-PUBLIC pending pages retire across Store profile ABA without replacing basket', () async {
     var profile = 'manufacturer', hold = true;
     final dispatched = Completer<void>(), reply = Completer<void>();

@@ -3540,8 +3540,9 @@ class _StoreRestockSupplierFilter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final types = controller.restockSupplierTypes, names = controller.restockSupplierTypesLabel;
-    final status = controller.restockSupplierFilterConnected ? 'The catalogue requests these supplier types. Check each product before buying.' :
-      'Supplier filter awaiting connection. Matching results cannot be confirmed yet.';
+    final status = controller.restockSupplierClassificationMessage ??
+      (controller.restockSupplierFilterConnected ? 'The catalogue requests these supplier types. Check each product before buying.' :
+        'Supplier filter awaiting connection. Matching results cannot be confirmed yet.');
     return Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: TextButton(
       key: const Key('work-restock-supplier-types'),
       style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
@@ -3550,6 +3551,11 @@ class _StoreRestockSupplierFilter extends StatelessWidget {
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Supplier types', style: Theme.of(sheetContext).textTheme.titleMedium),
             const SizedBox(height: 12), Text(names), const SizedBox(height: 12), Text(status),
+            if (!controller.restockSupplierClassificationResolved && types.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Text('Prepared buying rules'),
+              const Text('Wholesaler: Manufacturers.\nDistributor: Manufacturers and wholesalers.\nSub-distributor: Manufacturers and distributors.'),
+            ],
             const SizedBox(height: 12), TextButton(key: const Key('work-restock-supplier-types-close'),
               onPressed: () {
                 if (sheetContext.mounted && ModalRoute.of(sheetContext)?.isCurrent == true) {
@@ -3558,7 +3564,8 @@ class _StoreRestockSupplierFilter extends StatelessWidget {
               }, child: const Text('Close')),
           ])))),
       child: Row(children: [const Icon(Icons.filter_alt_outlined, size: 18), const SizedBox(width: 8),
-        Expanded(child: Text(!controller.restockSupplierFilterConnected ? 'Supplier defaults' :
+        Expanded(child: Text(!controller.restockSupplierClassificationResolved ? 'Sourcing pending' :
+          !controller.restockSupplierFilterConnected ? 'Supplier defaults' :
           types.length == 1 ? names : 'Supplier types (${types.isEmpty ? 'all' : types.length})',
           maxLines: 1, overflow: TextOverflow.ellipsis)), const SizedBox(width: 8), const Icon(Icons.info_outline, size: 18)]),
     ));

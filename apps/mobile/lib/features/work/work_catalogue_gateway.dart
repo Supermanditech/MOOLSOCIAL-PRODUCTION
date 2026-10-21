@@ -5006,6 +5006,10 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool _publicRestockCatalogue;
   /// Proposed matching public-query contract; never enabled by a local profile.
   final bool publicSupplierTypeFilterSupported;
+  /// Query support alone does not add publisher classifications to the decoder.
+  bool publicRestockSupplierTypesReadable(Iterable<String> types) =>
+      publicRestockReadbackSupported && publicSupplierTypeFilterSupported &&
+      types.isNotEmpty && types.every(const {'manufacturer', 'wholesaler'}.contains);
   final List<String> Function()? publicRestockSupplierTypes;
   List<String> get _restockSupplierTypes {
     if (!_publicRestockCatalogue) return const [];
