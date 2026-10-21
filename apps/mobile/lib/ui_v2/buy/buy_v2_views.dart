@@ -40,22 +40,20 @@ import 'buy_v2_store_address.dart';
 typedef BuyV2LiveDeliveryMapBuilder =
     Widget Function(BuildContext context, BuyV2LiveDeliverySnapshot snapshot);
 
-Future<void> _showBulkQuotes(BuildContext context, BuyV2Session session, {String? requestStore}) async {
+Future<void> _showBulkQuotes(BuildContext context, BuyV2Session session) async {
   final access = session.bulkQuotes;
   if (access?.active != true) return;
   try {
     var selected = false;
-    final request = requestStore == null ? null : session.prepareBulkQuoteRequest(requestStore);
     await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true, showDragHandle: true,
       builder: (sheet) => SizedBox(height: MediaQuery.sizeOf(sheet).height * .92,
-        child: WorkspaceBulkQuotes(access: access!, request: request?.original, requestLines: request?.products ?? const [],
-          inputCurrent: request?.current, onClose: () => Navigator.pop(sheet),
+        child: WorkspaceBulkQuotes(access: access!, onClose: () => Navigator.pop(sheet),
           onUseForCart: (quote) async { final saved = await session.chooseSupplierQuote(quote); selected = saved; return saved; })));
     if (selected && access!.active) session.openCart();
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Refresh the selected Bulk product details before requesting a quote.')));
+        content: Text('The saved supplier agreements could not be opened. Your Cart is kept.')));
     }
   }
 }
@@ -3758,7 +3756,7 @@ class _ProductPriceExtrasState extends State<_ProductPriceExtras>
                   _ProductInfoRow(label: 'Supplier GST',
                     value: _supplierGstDisclosure(product.packTerms,
                       facts.stale ? null : _supplierGstForPack(product.packTerms,
-                        product.requiresSupplierQuote ? null : facts.priceMinor))),
+                        facts.priceMinor))),
                   BuyV2PriceFreshness(product: product, now: widget.session.catalogueNow,
                     onRequestRefresh: () => widget.session.requestCommodityPriceRefresh(product)),
                   if (hasTiers) ...[
@@ -4814,7 +4812,7 @@ class _WholesaleTradeDecisionPanelState
         : null;
     final taxAndInvoice = terms?.supplierTaxDeclaration != null
         ? '${_supplierGstDisclosure(terms, facts.stale ? null : _supplierGstForPack(terms,
-            product.requiresSupplierQuote ? null : facts.priceMinor))} · Invoice not confirmed'
+            facts.priceMinor))} · Invoice not confirmed'
         : taxIncluded == null
         ? 'Tax and invoice not confirmed'
         : '${taxIncluded ? 'Tax included' : 'Tax excluded'} · Invoice not confirmed';
@@ -8659,13 +8657,9 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
             }), onTap: () {
               if (mounted && identical(widget.session, quoteOwner)) _showBulkQuotes(context, quoteOwner);
             }))),
-      if (session.bulkQuotes?.active == true && !session.isStoreProcurement)
-        for (final store in session.bulkQuoteRequestStores) Padding(padding: const EdgeInsets.only(bottom: 6),
-          child: OutlinedButton.icon(key: ValueKey('buy-bulk-request-$store'),
-            onPressed: session.cartChangesBlocked ? null : () => _showBulkQuotes(context, session, requestStore: store),
-            icon: const Icon(Icons.request_quote_outlined),
-            label: Text('Request Bulk quote · ${session.cartLines.firstWhere((line) => line.product.storeId == store).product.seller.trim().isEmpty ? 'Store' : session.cartLines.firstWhere((line) => line.product.storeId == store).product.seller}'))),
-      if (lines.any((line) => line.product.packTerms?.commodityPriceRevision != null))
+      if (lines.any((line) => !session.usesRetainedSupplierAgreement(line.product) &&
+          (line.product.packTerms?.commodityPriceRevision != null ||
+          line.product.destination == BuyV2Destination.wholesale && line.product.publicListingIdentity != null)))
         TextButton.icon(key: const Key('buy-cart-refresh-commodity-prices'),
           onPressed: session.cartChangesBlocked ? null : session.refreshCommodityPricesInCart,
           icon: const Icon(Icons.price_check), label: const Text('Check current supplier prices')),
@@ -8861,7 +8855,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
           final compactAccessible =
               constraints.maxWidth < 350 && textScale > 1.2;
           final priceUnavailable = session.scopedProcurementPricesUnavailable || session.hasSupplierQuoteProducts &&
-            session.cartLines.any((l) => l.product.requiresSupplierQuote && session.agreedUnitPriceFor(l) == null) ||
+            session.cartLines.any((l) => session.usesRetainedSupplierAgreement(l.product) && session.agreedUnitPriceFor(l) == null) ||
             !session.checkoutRequiresResolution && lines.any((l) => l.product.packTerms?.commodityPriceRevision != null &&
               l.product.packTerms?.pricingCurrentAt(session.catalogueNow()) != true);
           final freightIncluded = lines.every(
@@ -13987,8 +13981,8 @@ class BuyV2OrdersView extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
         children: [
           if (session.bulkQuotes?.active == true) ListTile(key: const ValueKey('buy-orders-bulk-quotes'),
-            leading: const Icon(Icons.request_quote_outlined), title: const Text('Bulk quotes'),
-            subtitle: const Text('Requests and agreed product prices — separate from orders'),
+            leading: const Icon(Icons.history_outlined), title: const Text('Past supplier agreements'),
+            subtitle: const Text('Review saved agreements and unresolved requests'),
             trailing: const Icon(Icons.chevron_right_rounded), onTap: () => _showBulkQuotes(context, session)),
           if (session.purchaseReader case final reader? when reader.isCurrent && session.query.trim().isEmpty)
             WorkspacePurchaseOriginals(key: ValueKey(('buyer-originals',reader,session.purchaseRealm,session.procurementContext?.storeId)),
@@ -24896,7 +24890,7 @@ class _CartLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final product = line.product;
     final agreed = session.agreedUnitPriceFor(line);
-    final publishedBulk = !session.isStoreProcurement && product.requiresSupplierQuote;
+    final publishedBulk = session.usesRetainedSupplierAgreement(product);
     final priceUnavailable = publishedBulk && agreed == null || product.packTerms?.commodityPriceRevision != null &&
       product.packTerms?.pricingCurrentAt(session.catalogueNow()) != true || session.procurementRetainedPriceUnavailable(
       product,

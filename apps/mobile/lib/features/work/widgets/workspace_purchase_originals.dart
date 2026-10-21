@@ -208,7 +208,7 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
         if (quote.state == 'accepted') const Padding(padding: EdgeInsets.symmetric(vertical: 8),
           child: Text('Prices agreed. This is not a placed order. Final tax, delivery charges and permitted payment terms must be confirmed before ordering.')),
         if (quote.accepted && quote.validUntil?.isAfter(access.gateway.gateway.now().toUtc()) != true && widget.onUseForCart != null)
-          const Text('This quote has expired. Request a fresh quote from the supplier.'),
+          const Text('This saved agreement has expired. Remove it from Cart if selected, then review the current listed prices.'),
       ] else if (presentation != null) ...[
         for (final row in presentation['lines'] as List) ListTile(contentPadding: EdgeInsets.zero,
           title: Text(row['name'] as String), subtitle: Text([if (row['variant'] != null) row['variant'] as String,

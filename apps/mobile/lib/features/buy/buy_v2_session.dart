@@ -3479,7 +3479,17 @@ class BuyV2Session extends ChangeNotifier {
   ]);
   List<BuyV2SupplierQuoteSelection> get selectedSupplierQuotes => _supplierSelectionsFor(cartLines);
   List<BuyV2SupplierQuoteSelection> get _selectedCheckoutSupplierQuotes => _supplierSelectionsFor(checkoutLines);
-  bool _requiresSupplierQuote(BuyV2Product product) => product.requiresSupplierQuote;
+  // The product predicate remains a legacy agreement-matching rule. Ordinary
+  // new Bulk purchases use listed prices; only a retained agreement binds Cart.
+  bool usesRetainedSupplierAgreement(BuyV2Product product) {
+    final agreement = _supplierQuoteSelections[product.storeId];
+    return !isStoreProcurement && agreement != null && (product.requiresSupplierQuote ||
+      agreement.lines.any((line) => line['productId'] == product.id));
+  }
+  bool _requiresSupplierQuote(BuyV2Product product) => usesRetainedSupplierAgreement(product);
+  bool _usesListedTradePrice(BuyV2Product product) => !usesRetainedSupplierAgreement(product) &&
+    product.destination == BuyV2Destination.wholesale &&
+    const {BuyV2OfferClass.wholesale, BuyV2OfferClass.bulk}.contains(product.publicListingIdentity?.channel);
   bool get hasSupplierQuoteProducts => !isStoreProcurement && cartLines.any((l) => _requiresSupplierQuote(l.product));
   bool supplierQuoteCurrentForCart(BuyV2SupplierQuoteSelection quote) => _supplierQuoteCurrent(quote, cartLines);
   int? agreedUnitPriceFor(BuyV2CartLine line, {bool checkout = false}) {
@@ -3517,7 +3527,7 @@ class BuyV2Session extends ChangeNotifier {
       return quote.lines.every((f) {
         final product = items.singleWhere((l) => l.product.id == f['productId']).product,
           facts = source.displayedProduct(product);
-        return _requiresSupplierQuote(product) && facts != null && facts.validUntil?.isAfter(catalogueNow()) == true &&
+        return product.requiresSupplierQuote && facts != null && facts.validUntil?.isAfter(catalogueNow()) == true &&
           facts.content.observedAt != null && !facts.content.observedAt!.isAfter(catalogueNow()) &&
           facts.skuRevision == f['skuRevision'] && facts.content.state == BuyV2ProductContentState.ready;
       });
@@ -3635,15 +3645,14 @@ class BuyV2Session extends ChangeNotifier {
         !access!.active || cartChangesBlocked) { return false; }
     _armSupplierQuoteExpiry(); _invalidateCheckoutQuote(); _invalidateCommercialPaymentTerms(); notifyListeners(); return true;
   }
-  Set<String> get bulkQuoteRequestStores => bulkQuotes?.active != true || isStoreProcurement ? {} :
-    {for (final line in cartLines) if (_requiresSupplierQuote(line.product) && line.product.storeId != null) line.product.storeId!};
+  Set<String> get bulkQuoteRequestStores => const {};
   List<({WorkspacePublicCatalogueEntry entry, int quantity})> _bulkQuoteSelections(String store) {
     final source = cataloguePageSource, access = bulkQuotes;
     if (_collectionDisposed || isStoreProcurement || cartChangesBlocked || access?.active != true ||
       source is! WorkspacePublicDiscoverySource || !source.active) {
       throw const FormatException();
     }
-    final selected = cartLines.where((line) => line.product.storeId == store && _requiresSupplierQuote(line.product)).toList();
+    final selected = cartLines.where((line) => line.product.storeId == store && line.product.requiresSupplierQuote).toList();
     if (selected.isEmpty) throw const FormatException();
     final now = access!.gateway.gateway.now().toUtc();
     return [for (final line in selected) (
@@ -3658,16 +3667,7 @@ class BuyV2Session extends ChangeNotifier {
   }
   ({WorkspaceBulkQuoteIntent original, List<({String name, String pack, String? variant, int quantity})> products,
     bool Function() current}) prepareBulkQuoteRequest(String store) {
-    final access = bulkQuotes!, selections = _bulkQuoteSelections(store);
-    String signature(List<({WorkspacePublicCatalogueEntry entry, int quantity})> rows) => jsonEncode([
-      for (final row in rows) [row.entry.product.publicListingIdentity?.toJson(), row.entry.readback.skuRevision, row.quantity]]);
-    final original = access.requestIntent(selections), frozen = signature(selections);
-    return (original: original, products: List.unmodifiable([for (final row in selections)
-      (name: row.entry.product.customerTitle, pack: row.entry.product.pack, variant: row.entry.product.variant, quantity: row.quantity)]),
-      current: () {
-        try { return identical(bulkQuotes, access) && access.active && signature(_bulkQuoteSelections(store)) == frozen; }
-        catch (_) { return false; }
-      });
+    throw const FormatException('Use the listed product prices in Cart. New supplier quote requests are unavailable.');
   }
   final WorkspaceProductPresentationGateway? productPresentations;
   /// Owned by this session; never shared across authenticated lifetimes.
@@ -6689,10 +6689,10 @@ class BuyV2Session extends ChangeNotifier {
   Object? _scheduledCartSave;
   Completer<void>? _scheduledCartSettlement;
 
-  bool get checkoutBusy =>
+  bool get checkoutBusy => _checkoutPreflightBusy || _checkoutCommandBusy;
+  bool get _checkoutCommandBusy =>
       _scheduledCartSave != null ||
       _paymentCompletionSaving ||
-      _checkoutPreflightBusy ||
       (collectionCheckout?.busy ?? false) ||
       checkoutSubmissionState == BuyV2CheckoutSubmissionState.submitting;
 
@@ -12052,7 +12052,8 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool get checkoutQuoteEnabled => checkoutQuoteAdapter != null;
-  DateTime get _checkoutQuoteNow => _checkoutStoreCouponSelections.isEmpty && !_supplierQuoteRequired ? DateTime.now() : catalogueNow();
+  DateTime get _checkoutQuoteNow => _checkoutStoreCouponSelections.isEmpty && !_supplierQuoteRequired && !_listedTradeQuoteRequired
+    ? DateTime.now() : catalogueNow();
 
   // Keep original references authoritative while eligibility is refreshing or
   // unavailable. Collection has its own independent quote/commitment lifecycle.
@@ -12062,7 +12063,9 @@ class BuyV2Session extends ChangeNotifier {
         _cartBenefitSelectionKey(destination, BuyV2CartBenefitKind.coupon)));
   bool get _supplierTaxQuoteRequired => checkoutLines.any((line) => line.product.packTerms?.supplierTaxDeclaration != null);
   bool get _commodityQuoteRequired => checkoutLines.any((line) => line.product.packTerms?.commodityPriceRevision != null);
-  bool get checkoutQuoteRequired => checkoutQuoteEnabled || _liveCouponQuoteRequired || _supplierQuoteRequired || _supplierTaxQuoteRequired || _commodityQuoteRequired;
+  bool get _listedTradeQuoteRequired => checkoutLines.any((line) => _usesListedTradePrice(line.product));
+  bool get checkoutQuoteRequired => checkoutQuoteEnabled || _liveCouponQuoteRequired || _supplierQuoteRequired ||
+    _supplierTaxQuoteRequired || _commodityQuoteRequired || _listedTradeQuoteRequired;
 
   bool get checkoutQuoteBusy =>
       checkoutQuoteLoadState == BuyV2CommerceLoadState.loading;
@@ -12070,7 +12073,8 @@ class BuyV2Session extends ChangeNotifier {
   bool get checkoutQuoteReviewRequired {
     if (_storeCouponSelectionNeedsReview || supplierQuoteReviewRequired) return true;
     if (!checkoutQuoteEnabled) {
-      return _liveCouponQuoteRequired || _supplierQuoteRequired || _supplierTaxQuoteRequired || _commodityQuoteRequired || checkoutLines.any((line) => line.scheduledFulfilment != null);
+      return _liveCouponQuoteRequired || _supplierQuoteRequired || _supplierTaxQuoteRequired || _commodityQuoteRequired ||
+        _listedTradeQuoteRequired || checkoutLines.any((line) => line.scheduledFulfilment != null);
     }
     final quote = _checkoutQuote;
     return checkoutQuoteLoadState != BuyV2CommerceLoadState.ready ||
@@ -12115,7 +12119,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners(); return false;
     }
     if (adapter == null) {
-      if (_commodityQuoteRequired) {
+      if (_commodityQuoteRequired || _listedTradeQuoteRequired) {
         _invalidateCheckoutQuote(); _invalidateCommercialPaymentTerms();
         checkoutQuoteLoadState = BuyV2CommerceLoadState.unavailable;
         checkoutQuoteMessage = 'Final charges, payment terms and delivery need confirmation. Your Cart and supplier prices are kept.';
@@ -12282,8 +12286,9 @@ class BuyV2Session extends ChangeNotifier {
       for (final group in groups) {
         for (final line in group.lines) {
           final terms = line.product.packTerms;
-          if (terms?.supplierTaxDeclaration != null &&
-              (!terms!.pricingCurrentAt(catalogueNow()) ||
+          final listedPrice = _usesListedTradePrice(line.product);
+          if ((terms?.supplierTaxDeclaration != null || listedPrice) &&
+              (terms == null || !terms.pricingCurrentAt(catalogueNow()) || listedPrice && quote.evaluatedAt.isAfter(catalogueNow()) ||
                 terms.priceValidUntil != null && quote.validUntil.isAfter(terms.priceValidUntil!) ||
                 terms.priceObservedAt != null && quote.evaluatedAt.isBefore(terms.priceObservedAt!))) {
             return false;
@@ -12422,8 +12427,9 @@ class BuyV2Session extends ChangeNotifier {
   bool _supplierTaxInputsCurrent(BuyV2OrderPlacementRequest request) => request.lines.every((line) {
     final live = findProduct(line.product.id), original = line.product.packTerms;
     final terms = live?.packTerms;
-    if (original?.supplierTaxDeclaration == null && terms?.supplierTaxDeclaration == null &&
-        original?.commodityPriceRevision == null && terms?.commodityPriceRevision == null) return true;
+    if (!_usesListedTradePrice(line.product) && (live == null || !_usesListedTradePrice(live)) &&
+        original?.supplierTaxDeclaration == null && terms?.supplierTaxDeclaration == null &&
+        original?.commodityPriceRevision == null && terms?.commodityPriceRevision == null) { return true; }
     if (live == null || !live.hasValidPackTerms || terms == null || !terms.pricingCurrentAt(catalogueNow())) return false;
     List<Object?> identity(BuyV2PackTerms? value) => [value?.supplierTaxDeclaration,
       value?.revision, value?.priceObservedAt?.toUtc().toIso8601String(), value?.priceValidUntil?.toUtc().toIso8601String()];
@@ -12459,11 +12465,11 @@ class BuyV2Session extends ChangeNotifier {
     if (!checkoutQuoteEnabled) {
       _checkoutQuoteRequestSequence += 1;
       _checkoutQuote = null; _checkoutQuoteFingerprint = null;
-      checkoutQuoteLoadState = _liveCouponQuoteRequired || _supplierQuoteRequired || _supplierTaxQuoteRequired || _commodityQuoteRequired
+      checkoutQuoteLoadState = _liveCouponQuoteRequired || _supplierQuoteRequired || _supplierTaxQuoteRequired || _commodityQuoteRequired || _listedTradeQuoteRequired
           ? BuyV2CommerceLoadState.unavailable : BuyV2CommerceLoadState.ready;
       checkoutQuoteMessage = _supplierQuoteRequired
           ? 'Bulk needs a confirmed Checkout total for the accepted supplier quote. Your Cart is unchanged.'
-          : _commodityQuoteRequired
+          : _commodityQuoteRequired || _listedTradeQuoteRequired
               ? 'Final charges, payment terms and delivery need confirmation. Your Cart and supplier prices are kept.'
           : _liveCouponQuoteRequired
               ? 'Coupon savings need a confirmed Checkout total. Your Cart is unchanged.' : null;
@@ -16798,12 +16804,13 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool get cartChangesBlocked =>
+  bool get cartChangesBlocked => _cartChangesBlocked();
+  bool _cartChangesBlocked({bool allowCheckoutPreflight = false}) =>
       (customerStateRecoveryPending &&
           (!_customerStateSnapshotLoaded || !_customerStateRestoreInFlight)) ||
       !procurementScopeCurrent ||
       checkoutRequiresResolution ||
-      checkoutBusy;
+      _checkoutCommandBusy || (_checkoutPreflightBusy && !allowCheckoutPreflight);
 
   bool _holdCartForPaymentResolution() {
     if (!cartChangesBlocked) return false;
@@ -18238,27 +18245,34 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners(); return recorded;
   }
   Future<bool> refreshCommodityPricesInCart() => _refreshCommodityCartPrices(cartLines);
-  Future<bool> _refreshCommodityCartPrices(List<BuyV2CartLine> lines) async {
-    final selected = lines.where((line) => line.product.packTerms?.commodityPriceRevision != null).toList();
+  Future<bool> _refreshCommodityCartPrices(List<BuyV2CartLine> lines, {bool duringCheckoutPreflight = false}) async {
+    final selected = lines.where((line) => !usesRetainedSupplierAgreement(line.product) &&
+      (line.product.packTerms?.commodityPriceRevision != null || _usesListedTradePrice(line.product))).toList();
     if (selected.isEmpty) return true;
-    if (_commodityPriceRevalidationBusy || checkoutRequiresResolution || cartChangesBlocked) return false;
+    bool cartAvailable() => duringCheckoutPreflight
+      ? _checkoutPreflightBusy && !_cartChangesBlocked(allowCheckoutPreflight: true) : !cartChangesBlocked;
+    if (_commodityPriceRevalidationBusy || checkoutRequiresResolution || !cartAvailable()) return false;
     final identity = collectionIdentity?.value, procurement = _procurementEpoch;
-    String signature() => jsonEncode([for (final line in cartLines) [line.product.id, line.quantity, line.product.packTerms?.toRetainedJson()]]);
+    String signature() => jsonEncode([
+      [for (final line in cartLines) [line.product.id, line.quantity, line.product.packTerms?.toRetainedJson()]],
+      [for (final store in _supplierQuoteSelections.keys.toList()..sort())
+        [store, _supplierQuoteSelections[store]!.quoteBinding]],
+    ]);
     final before = signature();
     bool current() => !_collectionDisposed && identity == collectionIdentity?.value && procurement == _procurementEpoch &&
-      !checkoutRequiresResolution && !cartChangesBlocked && signature() == before;
+      !checkoutRequiresResolution && cartAvailable() && signature() == before;
     _commodityPriceRevalidationBusy = true;
     try {
       final products = await _resolvePersistedCatalogueProducts(selected.map((line) => line.product.id).toSet(), refreshKnown: true)
         .timeout(const Duration(seconds: 25));
-      if (!current()) return false;
+      if (!current()) { return false; }
       final changes = <BuyV2PriceChange>[];
       for (final line in selected) {
         final next = products[line.product.id], prior = line.product.packTerms;
         final terms = next?.packTerms;
-        if (next == null || terms?.commodityPriceRevision == null || !terms!.pricingCurrentAt(catalogueNow()) ||
+        if (next == null || prior == null || terms == null || !terms.pricingCurrentAt(catalogueNow()) ||
             next.publicListingIdentity != line.product.publicListingIdentity ||
-            terms.commodityPriceRevision! < prior!.commodityPriceRevision! ||
+            prior.commodityPriceRevision != null && (terms.commodityPriceRevision == null || terms.commodityPriceRevision! < prior.commodityPriceRevision!) ||
             next.minimumOrder != line.product.minimumOrder || next.quantityStep != line.product.quantityStep ||
             terms.sellUnit != prior.sellUnit || terms.containedUnits != prior.containedUnits ||
             terms.netContentMilli != prior.netContentMilli || terms.contentUnit != prior.contentUnit) {
@@ -18267,8 +18281,8 @@ class BuyV2Session extends ChangeNotifier {
         }
         final previous = prior.priceMinorForQuantity(line.quantity, line.product.priceMinor),
           amount = terms.priceMinorForQuantity(line.quantity, next.priceMinor);
-        if (previous != amount) changes.add((productId: next.id, title: next.title,
-          previousPriceMinor: previous, currentPriceMinor: amount));
+        if (previous != amount) { changes.add((productId: next.id, title: next.title,
+          previousPriceMinor: previous, currentPriceMinor: amount)); }
       }
       // Validate the whole response before changing any saved basket line.
       for (final line in selected) {
@@ -18417,7 +18431,7 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
     }
-    if (!await _refreshCommodityCartPrices(lines)) return false;
+    if (!await _refreshCommodityCartPrices(lines, duringCheckoutPreflight: true)) return false;
     if (_collectionDisposed || procurementEpoch != _procurementEpoch) return false;
     lines = checkoutLines;
     if (!_refreshCheckoutFactsForProduction(lines)) return false;
@@ -19209,7 +19223,8 @@ class BuyV2Session extends ChangeNotifier {
         _syncCheckoutGroupState(); _checkoutIdempotencyKey = null;
         notice = stockChanged ? 'Stock changed. Review the affected products before payment.'
           : !policiesCurrent ? 'Store policy changed. Review Checkout before payment.'
-          : !taxCurrent ? 'Supplier GST changed. Review Checkout before payment.'
+          : !taxCurrent ? (_supplierTaxQuoteRequired ? 'Supplier GST changed. Review Checkout before payment.'
+            : 'Supplier prices changed. Review Checkout before payment.')
           : agreementChanged ? 'Order agreement changed. Review Checkout before payment.'
           : 'Scheduled delivery changed before payment. Review Checkout.';
         _persistCustomerState(); notifyListeners(); return false;
