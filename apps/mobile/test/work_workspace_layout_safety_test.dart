@@ -1390,6 +1390,7 @@ class _LedgerCheckpointFixtureStore implements WorkLedgerCheckpointStore {
 
 class _StorePurchaseBookmarks implements WorkProcurementBookmarkStore {
   WorkProcurementBookmark? value;
+  int writes = 0;
   bool failInactive = false;
   Completer<bool>? pendingInactive;
   int inactiveWrites = 0;
@@ -1400,6 +1401,7 @@ class _StorePurchaseBookmarks implements WorkProcurementBookmarkStore {
       : null;
   @override
   Future<bool> save(WorkProcurementBookmark bookmark) async {
+    writes++;
     if (!bookmark.active) {
       inactiveWrites++;
       if (failInactive) return false;
@@ -4259,6 +4261,7 @@ void main() {
       final controller = WorkProcurementController(
         currentAccountId: () => account,
         currentStoreId: () => store,
+        currentProfileId: () => 'retailer-grocery',
         storeApproved: () => true,
         reviewCatalogueAllowed: () => true,
         bookmarks: bookmarks,
@@ -56329,6 +56332,111 @@ void main() {
   );
 
   for (final compact in [false, true]) {
+    testWidgets('RESTOCK-PURPOSE compact manufacturer choice and unavailable suppliers $compact', (tester) async {
+      final work = WorkSession(gateway: const UnavailableWorkGateway(), catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(
+        endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: catalogue_fixture.Credentials(), transport: catalogue_fixture.OwnerTransport((_) async =>
+          throw StateError('Isolated host fixture: supplier connection unavailable')),
+        realm: 'evaluation', supplierPublishersVersionSupported: true))
+        ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+      final old = work.activeWorkspace!;
+      work.activeWorkspace = WorkWorkspace(id: old.id, name: old.name, profileLabel: 'Manufacturer',
+        profileId: 'manufacturer', area: old.area, verified: true);
+      final bookmarks = _StorePurchaseBookmarks();
+      final controller = WorkProcurementController(currentAccountId: () => 'purpose-host',
+        currentStoreId: () => work.activeWorkspace?.id, currentProfileId: () => work.activeWorkspace?.profileId,
+        storeApproved: () => work.activeWorkspace?.verified == true,
+        bookmarks: bookmarks, stateStoreFactory: _StorePurchaseState.new);
+      await mount(tester, route: '/app/work/workspace/dashboard?section=dashboard', work: work,
+        procurementFactory: () => controller, viewport: compact ? const Size(320, 568) : const Size(360, 800),
+        textScale: compact ? 2 : 1.4, consumerStateStore: _StorePurchaseState('purpose-consumer'));
+      await reveal(tester, find.byKey(const Key('work-quick-buy')));
+      await tester.tap(find.byKey(const Key('work-quick-buy'))); await tester.pumpAndSettle();
+      var original = controller.session!;
+      final scope = original.customerStateStore!.ownerScope;
+      Future<void> capturePurpose(String state) async {
+        final root = Platform.environment['LF_RESTOCK_PURPOSE_CAPTURE_ROOT']; if (root == null) return;
+        final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(const Key('store-review-root')));
+        await tester.runAsync(() async {
+          final file = File('$root/purpose-$state-$compact.png');
+          if (await file.exists()) throw StateError('Preserve earlier host evidence');
+          await file.parent.create(recursive: true); final image = await boundary.toImage(pixelRatio: 1);
+          try { final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+            await file.writeAsBytes(bytes!.buffer.asUint8List()); } finally { image.dispose(); }
+        });
+      }
+      expect(find.byKey(const Key('work-restock-purpose')), findsOneWidget);
+      final staleOpen = tester.widget<TextButton>(find.byKey(const Key('work-restock-purpose'))).onPressed!;
+      await tester.tap(find.byKey(const Key('work-restock-purpose'))); await tester.pumpAndSettle();
+      final staleChoice = tester.widget<ListTile>(find.byKey(const ValueKey('work-restock-purpose-rawMaterials'))).onTap!;
+      final staleClose = tester.widget<TextButton>(find.widgetWithText(TextButton, 'Close')).onPressed!;
+      final writes = bookmarks.writes;
+      staleClose(); await tester.pumpAndSettle(); staleChoice(); await tester.pumpAndSettle();
+      expect(bookmarks.writes, writes, reason: 'Closed sheet callback cannot save.');
+      await tester.tap(find.byKey(const Key('work-restock-purpose'))); await tester.pumpAndSettle();
+      staleClose(); await tester.pumpAndSettle();
+      expect(find.text('Purchase purpose'), findsOneWidget, reason: 'Old Close cannot pop a successor sheet.');
+      final beforeAba = tester.widget<ListTile>(find.byKey(const ValueKey('work-restock-purpose-rawMaterials'))).onTap!;
+      work.activeWorkspace = WorkWorkspace(id: old.id, name: old.name, profileLabel: 'Retailer',
+        profileId: 'retailer-grocery', area: old.area, verified: true); controller.invalidateIfChanged();
+      work.activeWorkspace = WorkWorkspace(id: old.id, name: old.name, profileLabel: 'Manufacturer',
+        profileId: 'manufacturer', area: old.area, verified: true); controller.invalidateIfChanged();
+      await tester.pumpAndSettle(); beforeAba(); staleOpen(); await tester.pumpAndSettle();
+      expect(bookmarks.writes, writes, reason: 'Profile ABA cannot revive a captured choice.');
+      expect(find.text('Purchase purpose'), findsOneWidget, reason: 'Stale opening cannot stack another sheet.');
+      work.activeWorkspace = WorkWorkspace(id: old.id, name: old.name, profileLabel: 'Unconfirmed',
+        area: old.area, verified: true); controller.invalidateIfChanged(); work.notifyListeners(); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-restock-purpose')), findsNothing);
+      await tester.tap(find.widgetWithText(TextButton, 'Close')); await tester.pumpAndSettle();
+      expect(find.text('Purchase purpose'), findsNothing, reason: 'Close remains usable after launcher removal.');
+      work.activeWorkspace = WorkWorkspace(id: old.id, name: old.name, profileLabel: 'Manufacturer',
+        profileId: 'manufacturer', area: old.area, verified: true); controller.invalidateIfChanged(); work.notifyListeners(); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-restock-purpose')), findsOneWidget,
+        reason: 'scope=${controller.scopeCurrent};active=${controller.bookmark?.active};destination=${controller.session?.destination};view=${controller.session?.view};options=${controller.restockPurposeOptions.length}');
+      await tester.tap(find.byKey(const Key('work-restock-purpose'))); await tester.pumpAndSettle();
+      final beforeReplacement = tester.widget<ListTile>(find.byKey(const ValueKey('work-restock-purpose-rawMaterials'))).onTap!;
+      controller.invalidate();
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
+      controller.session!.openDestination(BuyV2Destination.wholesale);
+      await tester.pumpAndSettle(); final replacementWrites = bookmarks.writes;
+      beforeReplacement(); await tester.pumpAndSettle();
+      expect(bookmarks.writes, replacementWrites, reason: 'A replaced session cannot receive the old modal choice.');
+      original = controller.session!; expect(original.customerStateStore!.ownerScope, scope);
+      await tester.tap(find.widgetWithText(TextButton, 'Close')); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-restock-purpose'))); await tester.pumpAndSettle();
+      expect(find.text('Finished goods for resale require a verified resale role.'), findsOneWidget);
+      await capturePurpose('chooser');
+      await tester.tap(find.byKey(const ValueKey('work-restock-purpose-rawMaterials'))); await tester.pumpAndSettle();
+      expect(controller.restockPurpose, WorkRestockPurchasePurpose.rawMaterials);
+      expect(controller.session, same(original)); expect(original.customerStateStore!.ownerScope, scope);
+      expect(find.textContaining('Supplier eligibility for raw materials'), findsOneWidget);
+      expect(find.text('Buying for ${old.name}'), findsOneWidget);
+      expect(find.byKey(const Key('work-dashboard-inline-search-band')), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5)); await tester.pumpAndSettle();
+      await capturePurpose('selected');
+      await tester.ensureVisible(find.text('Try again')); await tester.pumpAndSettle();
+      await tester.tap(find.text('Try again')); await tester.pumpAndSettle();
+      expect(controller.restockPurpose, WorkRestockPurchasePurpose.rawMaterials);
+      await tester.ensureVisible(find.text('Back to Store')); await tester.pumpAndSettle();
+      await tester.tap(find.text('Back to Store')); await tester.pumpAndSettle();
+      await reveal(tester, find.byKey(const Key('work-quick-buy')));
+      await tester.tap(find.byKey(const Key('work-quick-buy'))); await tester.pumpAndSettle();
+      expect(controller.restockPurpose, WorkRestockPurchasePurpose.rawMaterials);
+      expect(controller.session, same(original)); expect(original.customerStateStore!.ownerScope, scope);
+      // A verified profile change keeps the same Store basket; a stale local
+      // choice must have an explicit recovery action even for a fixed role.
+      work.activeWorkspace = WorkWorkspace(id: old.id, name: old.name, profileLabel: 'Retailer',
+        profileId: 'retailer-grocery', area: old.area, verified: true);
+      controller.invalidateIfChanged(); work.notifyListeners(); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-restock-purpose')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-restock-purpose'))); await tester.pumpAndSettle();
+      expect(find.text('Finished goods for resale require a verified resale role.'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('work-restock-purpose-resale'))); await tester.pumpAndSettle();
+      expect(controller.restockPurpose, WorkRestockPurchasePurpose.resale);
+      expect(controller.session, same(original)); expect(original.customerStateStore!.ownerScope, scope);
+      expect(find.byKey(const Key('work-restock-purpose')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
     testWidgets(
       'RESTOCK02 existing test Store renders scoped catalogue $compact',
       (tester) async {
@@ -56343,6 +56451,7 @@ void main() {
         final reviewOwner = WorkProcurementController(
           currentAccountId: () => account,
           currentStoreId: () => work.activeWorkspace?.id,
+          currentProfileId: () => work.activeWorkspace?.profileId,
           storeApproved: () => work.activeWorkspace?.verified == true,
           reviewCatalogueAllowed: () => true,
           bookmarks: bookmarks,

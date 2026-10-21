@@ -860,6 +860,7 @@ class _WorkWorkspaceDashboardScreenState
                 ? session.contactDraftStore?.accountScope
                 : null,
             currentStoreId: () => session.activeWorkspace?.id,
+            currentProfileId: () => session.activeWorkspace?.profileId,
             storeApproved: () => session.activeWorkspace?.verified == true,
             reviewCatalogueAllowed: () => session.canLoadStoreReviewSeed,
             catalogueGateway: session.catalogueGateway is AuthenticatedWorkspaceCatalogueGateway
@@ -2011,7 +2012,7 @@ class _WorkWorkspaceDashboardScreenState
             onDismiss: session.dismissWorkspaceAlert,
           ),
           _WorkspaceControlView.procurement => AnimatedBuilder(
-            animation: _activeProcurement,
+            animation: Listenable.merge([_activeProcurement, ?_storeProcurement]),
             builder: (context, _) {
               if (_trackedPurchase != null && !_trackingPurchaseAvailable) {
                 return ListView(
@@ -2041,7 +2042,15 @@ class _WorkWorkspaceDashboardScreenState
                 onExit: _leaveProcurement,
                 onDestinationChanged: _handleProcurementDestinationChanged,
               );
-              return surface;
+              return Column(children: [
+                if (_storeProcurement case final controller? when
+                    _activeProcurement.view == BuyV2View.catalogue &&
+                    _activeProcurement.destination == BuyV2Destination.wholesale &&
+                    controller.restockPurposeOptions.isNotEmpty &&
+                    (controller.restockPurpose == null || controller.restockPurposeOptions.length > 1))
+                  _StoreRestockPurposeControl(controller: controller),
+                Expanded(child: surface),
+              ]);
             },
           ),
           _WorkspaceControlView.operation when _focusedFinance != null =>
@@ -3514,6 +3523,73 @@ enum _WorkspaceControlView {
   alerts,
   procurement,
   operation,
+}
+
+class _StoreRestockPurposeControl extends StatelessWidget {
+  const _StoreRestockPurposeControl({required this.controller});
+  final WorkProcurementController controller;
+
+  Future<void> _choose(BuildContext context) async {
+    if (!context.mounted || !controller.scopeCurrent || controller.bookmark?.active != true) return;
+    final opened = controller.session, revision = controller.restockPolicyRevision;
+    await showModalBottomSheet<void>(context: context, isScrollControlled: true,
+      backgroundColor: const Color(0xFFF8FAFF), builder: (sheetContext) {
+        bool routeCurrent() => sheetContext.mounted && ModalRoute.of(sheetContext)?.isCurrent == true;
+        bool purchaseCurrent() => context.mounted && routeCurrent() && controller.scopeCurrent && controller.bookmark?.active == true &&
+          identical(controller.session, opened) && controller.restockPolicyRevision == revision;
+        return AnimatedBuilder(animation: controller, builder: (context, _) => SafeArea(
+          child: SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(
+            mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const Text('Purchase purpose', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: MoolColors.navy)),
+              const SizedBox(height: 8),
+              for (final choice in controller.restockPurposeOptions)
+                ListTile(key: ValueKey('work-restock-purpose-${choice.name}'), dense: true,
+                  contentPadding: EdgeInsets.zero, title: Text(choice.label),
+                  trailing: controller.restockPurpose == choice ? const Icon(Icons.check_rounded) : null,
+                  enabled: !controller.restockChoiceBusy,
+                  onTap: () async {
+                    if (!purchaseCurrent()) return;
+                    final saved = await controller.selectRestockPurpose(choice);
+                    if (saved && sheetContext.mounted && routeCurrent() && identical(controller.session, opened) &&
+                        controller.restockPolicyRevision == revision + 1) {
+                      Navigator.of(sheetContext).pop();
+                    }
+                  }),
+              const SizedBox(height: 8),
+              if (controller.restockPurposeOptions.isEmpty)
+                const Text('Your Store profile changed. Reopen this purchase to choose its purpose.', style: TextStyle(fontSize: 12))
+              else if (!controller.restockPurposeOptions.contains(WorkRestockPurchasePurpose.resale))
+                const Text('Finished goods for resale require a verified resale role.', style: TextStyle(fontSize: 12)),
+              if (controller.restockChoiceBusy) const LinearProgressIndicator(semanticsLabel: 'Saving purchase purpose'),
+              if (controller.restockChoiceMessage case final message?) Padding(padding: const EdgeInsets.only(top: 8),
+                child: Text(message, style: const TextStyle(fontSize: 12))),
+              Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () {
+                if (routeCurrent()) Navigator.of(sheetContext).pop();
+              },
+                child: const Text('Close'))),
+            ])),
+        ));
+      });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final opened = controller.session, revision = controller.restockPolicyRevision;
+    return Material(color: const Color(0xFFF8FAFF),
+    child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: TextButton.icon(key: const Key('work-restock-purpose'),
+        style: TextButton.styleFrom(alignment: Alignment.centerLeft,
+          minimumSize: const Size(double.infinity, 44), foregroundColor: MoolColors.navy),
+        onPressed: controller.restockChoiceBusy ? null : () {
+          if (context.mounted && identical(controller.session, opened) && controller.restockPolicyRevision == revision) {
+            unawaited(_choose(context));
+          }
+        },
+        icon: const Icon(Icons.inventory_2_outlined, size: 18),
+        label: Text(controller.restockPurpose?.label ?? 'Choose purchase purpose',
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)))),
+  );
+  }
 }
 
 class _StoreProcurementSurface extends StatefulWidget {

@@ -75,13 +75,18 @@ class _HostOperationalFacts implements BuyV2ProductFactsAdapter {
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) => reply(product);
 }
 class _HostExactOrderCommerce implements BuyV2CommerceAdapter {
+  BuyV2ProcurementBuyerGrant? storeGrant;
+  Future<BuyV2CommerceSnapshot>? heldRefresh;
   List<BuyV2Order> records = [];
   BuyV2Order? refreshedOrder;
   late BuyV2OrderPlacementResult reconciliation;
   int reconciliationCalls = 0, placementCalls = 0;
   @override
-  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
-    state: BuyV2CommerceLoadState.ready, orders: records);
+  Future<BuyV2CommerceSnapshot> refresh() async {
+    if (heldRefresh case final held?) return await held;
+    return BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready, orders: records,
+      paymentMethods: storeGrant == null ? const {} : const {'UPI'}, procurementBuyerGrant: storeGrant);
+  }
   @override
   Future<BuyV2OrderRefreshResult> refreshOrder({required String orderId}) async => BuyV2OrderRefreshResult(
     state: BuyV2CommerceLoadState.ready, customerMessage: 'Host refresh', order: refreshedOrder);
@@ -1379,7 +1384,7 @@ void main() {
       legacyCheckoutAttempt: payment ? BuyV2LegacyCheckoutAttempt(ownerScope: restockContext.customerStateOwnerScope,
         payment: original) : null)), isTrue);
     final controller = WorkProcurementController(currentAccountId: () => restockContext.accountId,
-      currentStoreId: () => restockContext.storeId, storeApproved: () => true, catalogueGateway: gateway,
+      currentStoreId: () => restockContext.storeId, currentProfileId: () => 'retailer-grocery', storeApproved: () => true, catalogueGateway: gateway,
       bookmarks: _HostProcurementBookmarks(), stateStoreFactory: (_) => state());
     if (disposeAtTearDown) addTearDown(controller.dispose);
     expect(await controller.open(purpose: restockContext.purpose, returnTo: 'stockStatement', exactContext: restockContext), isTrue);
@@ -1429,6 +1434,7 @@ void main() {
           return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': packet['response']}));
         });
         final controller = WorkProcurementController(currentAccountId: () => account, currentStoreId: () => store,
+          currentProfileId: () => 'retailer-grocery',
           storeApproved: () => approved, catalogueGateway: boundRestockGateway(api, stock: true, clock: () => clock),
           bookmarks: _HostProcurementBookmarks(), stateStoreFactory: (scope) => _HostRetirableStateStore()..ownerScope = scope);
         addTearDown(() { if (!disposed) controller.dispose(); });
@@ -1675,7 +1681,7 @@ void main() {
       addTearDown(() { if (!gate.isCompleted) gate.complete(null); });
       final state = _HostRetirableStateStore()..ownerScope = restockContext.customerStateOwnerScope..heldRead = gate.future;
       final controller = WorkProcurementController(currentAccountId: () => restockContext.accountId,
-        currentStoreId: () => restockContext.storeId, storeApproved: () => true, catalogueGateway: boundRestockGateway(api),
+        currentStoreId: () => restockContext.storeId, currentProfileId: () => 'retailer-grocery', storeApproved: () => true, catalogueGateway: boundRestockGateway(api),
         bookmarks: _HostProcurementBookmarks(), stateStoreFactory: (_) => state);
       addTearDown(controller.dispose);
       final opened = controller.open(purpose: restockContext.purpose, returnTo: 'stockStatement', exactContext: restockContext);
@@ -1715,7 +1721,7 @@ void main() {
       });
       final state = _HostRetirableStateStore()..ownerScope = restockContext.customerStateOwnerScope;
       final controller = WorkProcurementController(currentAccountId: () => restockContext.accountId,
-        currentStoreId: () => restockContext.storeId, storeApproved: () => true, catalogueGateway: boundRestockGateway(api),
+        currentStoreId: () => restockContext.storeId, currentProfileId: () => 'retailer-grocery', storeApproved: () => true, catalogueGateway: boundRestockGateway(api),
         bookmarks: _HostProcurementBookmarks(), stateStoreFactory: (_) => state);
       addTearDown(controller.dispose);
       expect(await controller.open(purpose: restockContext.purpose, returnTo: 'stockStatement', exactContext: restockContext), isTrue);
@@ -1920,7 +1926,7 @@ void main() {
       });
       final base = boundRestockGateway(api);
       final controller = WorkProcurementController(currentAccountId: () => account, currentStoreId: () => store,
-        storeApproved: () => approved, catalogueGateway: base, bookmarks: _HostProcurementBookmarks(),
+        currentProfileId: () => 'retailer-grocery', storeApproved: () => approved, catalogueGateway: base, bookmarks: _HostProcurementBookmarks(),
         stateStoreFactory: (scope) => _HostRetirableStateStore()..ownerScope = scope);
       var disposed = false;
       addTearDown(() { if (!disposed) controller.dispose(); });
@@ -9035,6 +9041,30 @@ void main() {
     {BuyV2OfferClass channel = BuyV2OfferClass.retail}) =>
       WorkspacePublicCatalogueEntry.fromResponse(data, storeId: 'store-one',
         realm: 'production', channel: channel, now: at, supplierTaxReadbackSupported: true);
+  test('RESTOCK-PURPOSE retired content credentials cannot block or clear a fresh-generation read', () async {
+    final oldCredentials = Completer<void>(), freshStarted = Completer<void>(), freshReply = Completer<void>();
+    final credentials = _FirstAnalyticsCredentialsHeld(oldCredentials.future), generation = ValueNotifier<int>(0);
+    final api = OwnerTransport((_) async {
+      freshStarted.complete(); await freshReply.future;
+      return const SocialContentResponse(statusCode: 503, body: '{}');
+    });
+    final source = WorkspacePublicDiscoverySource(gateway: AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: credentials, transport: api, realm: 'production', now: () => at,
+      productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+      storeClassificationReadbackSupported: true), current: () => true, requestGeneration: generation);
+    addTearDown(source.dispose); addTearDown(generation.dispose);
+    final selected = factoryEntry(publicPage()).product;
+    source.snapshotFor(selected); expect(credentials.reads, 1);
+    generation.value++; generation.value++;
+    source.snapshotFor(selected); await freshStarted.future;
+    expect(api.calls, 1, reason: 'Fresh content must not wait for retired credentials.');
+    oldCredentials.complete(); await Future<void>.delayed(Duration.zero);
+    source.snapshotFor(selected); await Future<void>.delayed(Duration.zero);
+    expect(api.calls, 1, reason: 'Retired finally must not release the newer busy lease.');
+    freshReply.complete(); await Future<void>.delayed(Duration.zero);
+    expect(source.displayedProduct(selected), isNull);
+  });
   test('LF-GST reviewed public rate uses actual tier subtotal and included tax only once', () {
     final data = publicPage(trade: true)..['supplierTaxReadbackVersion'] = 1;
     for (final channel in row(data)['channels'] as List) {
@@ -10630,18 +10660,21 @@ void main() {
       BuyV2CommercialPaymentTermsAdapter? termsAdapter, BuyV2TipPolicy tipPolicy = const BuyV2DisabledTipPolicy(),
       BuyV2CustomerStateStore? customerStateStore, BuyV2CommerceAdapter? commerceAdapter, bool reviewDataEnabled = true,
       WorkspacePublicStockReader? stockReader, WorkspaceProductPresentationGateway? presentations,
+      ValueNotifier<BuyV2ProcurementContext?>? procurementIdentity, String? Function()? procurementRestriction,
       DateTime Function()? clock, bool disposeAtTearDown = true}) async {
     final core = BuySession(), source = _ExactMoneyHostCatalogue()..rows.addAll(values);
     final session = BuyV2Session(core: core, cataloguePageSource: source, reviewDataEnabled: reviewDataEnabled, catalogueNow: clock ?? () => at,
       productFactsAdapter: facts ?? const BuyV2CatalogueProductFactsAdapter(), cartBenefitsAdapter: adapter,
       checkoutQuoteAdapter: quoteAdapter, commercialPaymentTermsAdapter: termsAdapter, tipPolicy: tipPolicy,
-      customerStateStore: customerStateStore, commerceAdapter: commerceAdapter, storeStockReader: stockReader, productPresentations: presentations);
+      customerStateStore: customerStateStore, commerceAdapter: commerceAdapter, storeStockReader: stockReader, productPresentations: presentations,
+      procurementIdentity: procurementIdentity, procurementRestriction: procurementRestriction);
     addTearDown(core.dispose); if (disposeAtTearDown) addTearDown(session.dispose);
     if (customerStateStore != null) await session.restoreCustomerState(restoreBrowsing: false);
+    if (procurementIdentity != null) await session.restoreCommerce();
     final pager = session.acquireCatalogueProducts('host-paise-benefits');
     addTearDown(() => session.releaseCatalogueProducts('host-paise-benefits'));
     await pager.open(BuyV2CatalogueQuery(destination: values.first.destination, regionId: 'host-region',
-      areaScope: BuyV2CatalogueAreaScope.allAreas));
+      areaScope: BuyV2CatalogueAreaScope.allAreas, procurementContext: procurementIdentity?.value));
     expect(pager.page?.items.length, values.length, reason: pager.message);
     return session;
   }
@@ -10714,10 +10747,11 @@ void main() {
       of: find.byKey(PageStorageKey('buy-product-${selected.id}')), matching: find.byType(Scrollable)).first);
     await tester.ensureVisible(control); await tester.pumpAndSettle();
   }
-  void enableHostStockEligibility(BuyV2Session session, BuyV2Product selected, _HostOperationalFacts adapter) {
+  void enableHostStockEligibility(BuyV2Session session, BuyV2Product selected, _HostOperationalFacts adapter, {bool deliveryEstimate = false}) {
     adapter.reply = (p) => BuyV2ProductFactsSnapshot(productId: p.id, priceMinor: p.priceMinor,
       deliveryPromise: 'Host confirmed delivery', partner: p.seller, orderabilityLabel: 'Available to add',
       sourceId: 'host-stock-consumer-facts', observedAt: at, storeOperatingState: BuyV2StoreOperatingState.open,
+      promisedByLabel: deliveryEstimate ? 'Host delivery tomorrow, 2–4 PM' : null,
       eligibility: BuyV2OfferEligibility(productId: selected.id, storeId: selected.storeId!,
         sourceRevision: 'host-stock-eligibility', customerLocationKey: session.eligibilityLocationKey,
         observedAt: at, expiresAt: at.add(const Duration(minutes: 15)), offerClass: selected.offerClass!,
@@ -11353,11 +11387,13 @@ void main() {
     _HostPlacement adapter, {bool grouped = false, int price = 1025, int quantity = 1, int fee = 0,
     int? mrp, bool withTerms = false, void Function(String key, String value)? beforeSet,
     Future<void> Function(String key, String value)? beforeWrite,
+    BuyV2ProcurementContext? procurement, String? Function()? restriction,
     WorkspacePublicCatalogueEntry? stockEntry, WorkspacePublicStockReader? stockReader, BuyV2PackTerms? packTerms}) async {
     final quote = _HostMinorQuote()..reply = ((groups, tips) async {
       final value = _hostExactQuote(groups, tips, fee: fee).quote!;
       return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready, quote: BuyV2CheckoutQuote.minor(
-        id: value.id, sourceId: value.sourceId, evaluatedAt: value.evaluatedAt, validUntil: value.validUntil,
+        id: value.id, sourceId: value.sourceId, evaluatedAt: procurement == null ? value.evaluatedAt : at,
+        validUntil: procurement == null ? value.validUntil : at.add(const Duration(minutes: 1)),
         lines: value.lines, totalMinor: value.totalMinor,
         supplierTaxBindings: {for (final group in groups) for (final line in group.lines)
           if (line.product.packTerms?.supplierTaxDeclaration != null) line.product.id:
@@ -11367,20 +11403,108 @@ void main() {
           totalMinor: value.totalMinor, amountDueNowMinor: value.totalMinor)]));
     });
     final preferences = _ExactMoneyHostPreferences(beforeSet: beforeSet, beforeWrite: beforeWrite);
-    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-placement');
-    final value = (stockEntry?.product ?? product).copyWith(priceMinor: price, mrpMinor: mrp ?? 28000,
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: procurement?.customerStateOwnerScope ?? 'host-placement');
+    final identity = procurement == null ? null : ValueNotifier<BuyV2ProcurementContext?>(procurement);
+    if (identity != null) { addTearDown(identity.dispose); }
+    if (procurement != null) {
+      adapter.storeGrant = BuyV2ProcurementBuyerGrant(accountId: procurement.accountId,
+        storeId: procurement.storeId, approved: true, validUntil: at.add(const Duration(minutes: 5)));
+    }
+    var value = (stockEntry?.product ?? product).copyWith(priceMinor: price, mrpMinor: mrp ?? 28000,
       packTerms: packTerms, deliveryPromise: 'Host-only fulfilment');
+    if (procurement != null) {
+      value = value.copyWith(procurementSupplierGrant: BuyV2ProcurementSupplierGrant(
+        workspaceId: 'host-supplier-workspace', storeId: value.storeId!, role: BuyV2SupplierWorkspaceRole.manufacturer,
+        approved: true, listingId: value.id, productCanonicalId: value.canonicalId, offerId: 'host-supplier-offer',
+        offerRevision: value.packTerms!.revision, channel: BuyV2SupplierListingChannel.wholesale,
+        published: true, validUntil: at.add(const Duration(minutes: 5))));
+    }
     final facts = stockEntry == null ? null : _HostOperationalFacts((p) => const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false).snapshotFor(p));
     final session = await benefitSession(_HostMinorBenefits(), [value], quoteAdapter: quote,
-      customerStateStore: store, commerceAdapter: adapter, stockReader: stockReader, facts: facts, termsAdapter: !withTerms ? null :
-        (_HostMinorTerms()..reply = ((groups, totals) async => _hostExactRetailTerms(groups, totals))));
-    if (facts != null) { enableHostStockEligibility(session, value, facts); }
+      customerStateStore: store, commerceAdapter: adapter, stockReader: stockReader, facts: facts,
+      reviewDataEnabled: procurement == null, procurementIdentity: identity, procurementRestriction: restriction, termsAdapter: !withTerms ? null :
+        (_HostMinorTerms()..reply = ((groups, totals) async => procurement == null ? _hostExactRetailTerms(groups, totals) :
+          BuyV2CommercialPaymentTermsSnapshot(state: BuyV2CommerceLoadState.ready, terms: [for (final group in groups)
+            BuyV2CommercialPaymentTerm.minor(id: 'host-wholesale-advance', fulfilmentKey: group.key,
+              destination: group.destination, supplierName: group.partner, kind: BuyV2CommercialPaymentTermKind.wholesaleAdvance,
+              orderTotalMinor: totals[group.key]!, amountDueNowMinor: totals[group.key]!, balanceDueMinor: 0,
+              balanceDueLabel: 'No balance', sourceId: 'host-wholesale-terms', acceptedPaymentMethods: const {'UPI'},
+              upiTransactionLimitMinor: totals[group.key]!) ]))));
+    if (facts != null) { enableHostStockEligibility(session, value, facts, deliveryEstimate: procurement != null); }
     expect(session.addProduct(value.id), isTrue); expect(session.setCartQuantity(value.id, '$quantity'), isTrue);
     session.addAddress(frozenAddress); session.openCart(); expect(session.openCheckout(), isTrue);
-    expect(await session.refreshCheckoutQuote(), isTrue);
+    expect(await session.refreshCheckoutQuote(), isTrue, reason: session.checkoutQuoteMessage);
+    if (procurement != null && withTerms) {
+      await session.refreshCommercialPaymentTerms();
+      expect(session.commercialPaymentTermsLoadState, BuyV2CommerceLoadState.ready, reason: session.commercialPaymentTermsMessage);
+      final term = session.commercialPaymentTermsFor(session.checkoutFulfilmentGroups.single.key).single;
+      expect(session.chooseCommercialPaymentTerm(term), true);
+    }
     return (session: session, preferences: preferences);
   }
   for (final grouped in [false, true]) {
+    if (!grouped) {
+    test('RESTOCK-PURPOSE changed during original save prevents first dispatch grouped=$grouped', () async {
+      final entry = factoryEntry(publicPage(trade: true), channel: BuyV2OfferClass.wholesale);
+      final adapter = _HostMinorGroupedPlacement(); String? restriction; var intercepted = false;
+      late BuyV2Session session;
+      final fixture = await placementFixture(adapter, grouped: grouped, stockEntry: entry, withTerms: true,
+        procurement: restockContext, price: entry.product.priceMinor, quantity: entry.product.minimumOrder,
+        restriction: () => restriction, beforeWrite: (_, saved) async {
+          final state = jsonDecode(saved) as Map;
+          if (!intercepted && (state['legacyCheckoutAttempt'] != null || state['checkoutPaymentAttempt'] != null)) {
+            intercepted = true; restriction = 'Supplier eligibility is unconfirmed.'; session.refreshProcurementPolicy();
+          }
+        });
+      session = fixture.session;
+      expect(await session.submitOrder(), false); expect(intercepted, true, reason: session.notice);
+      expect(adapter.minorSingle, isEmpty); expect(adapter.minorGroups, isEmpty);
+      expect(session.notice, contains('eligibility changed'));
+      expect(session.cartLines.single.quantity, entry.product.minimumOrder);
+    });
+    test('RESTOCK-PURPOSE changed after dispatch keeps original recovery grouped=$grouped', () async {
+      final entry = factoryEntry(publicPage(trade: true), channel: BuyV2OfferClass.wholesale);
+      final adapter = _HostMinorGroupedPlacement(); String? restriction;
+      final fixture = await placementFixture(adapter, grouped: grouped, stockEntry: entry, withTerms: true,
+        procurement: restockContext, price: entry.product.priceMinor, quantity: entry.product.minimumOrder,
+        restriction: () => restriction), session = fixture.session;
+      expect(await session.submitOrder(), false);
+      final originals = grouped ? adapter.minorGroups : adapter.minorSingle;
+      expect(originals, hasLength(1), reason: session.notice); final original = originals.single;
+      String savedRequestHash() {
+        final saved = jsonDecode(fixture.preferences.values.values.single) as Map;
+        return _mediaHash(((saved['legacyCheckoutAttempt'] as Map)['payment'] as Map)['request']);
+      }
+      final frozenHash = savedRequestHash(), frozen = session.legacyCheckoutAttempt!.payment.request;
+      final pendingRefresh = Completer<BuyV2CommerceSnapshot>(); adapter.heldRefresh = pendingRefresh.future;
+      final refreshing = session.restoreCommerce(); expect(session.commerceLoadState, BuyV2CommerceLoadState.loading);
+      restriction = 'Supplier eligibility is unconfirmed.'; session.refreshProcurementPolicy();
+      expect(session.commerceLoadState, BuyV2CommerceLoadState.unavailable);
+      pendingRefresh.complete(BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+        procurementAccessOnly: true, procurementBuyerGrant: adapter.storeGrant));
+      await refreshing; expect(session.commerceLoadState, BuyV2CommerceLoadState.unavailable);
+      expect(session.openCheckout(), true, reason: 'The original payment must remain accessible.');
+      expect(session.legacyCheckoutAttempt!.payment.request, same(frozen));
+      expect(savedRequestHash(), frozenHash);
+      adapter.reconciliation = BuyV2OrderPlacementResult(outcome: BuyV2OrderPlacementOutcome.paymentUnknown,
+        customerMessage: 'Isolated original unconfirmed', paymentReference: 'host-placement-reference',
+        checkoutAttemptId: original.checkoutAttemptId, paymentGroupId: original.paymentGroupId, idempotencyKey: original.idempotencyKey);
+      expect(await session.reconcilePayment(), false);
+      expect(adapter.reconciled, [(key: original.idempotencyKey, reference: 'host-placement-reference')]);
+      expect(originals, hasLength(1)); expect(session.checkoutRequiresResolution, true);
+    });
+    } else {
+      test('RESTOCK-PURPOSE unsupported Store payment groups retain Cart without dispatch', () async {
+        final entry = factoryEntry(publicPage(trade: true), channel: BuyV2OfferClass.wholesale);
+        final adapter = _HostMinorGroupedPlacement();
+        final fixture = await placementFixture(adapter, grouped: true, stockEntry: entry, withTerms: true,
+          procurement: restockContext, price: entry.product.priceMinor, quantity: entry.product.minimumOrder);
+        expect(await fixture.session.submitOrder(), false);
+        expect(adapter.minorGroups, isEmpty); expect(adapter.minorSingle, isEmpty);
+        expect(fixture.session.notice, contains('Payment groups changed'));
+        expect(fixture.session.cartLines.single.quantity, entry.product.minimumOrder);
+      });
+    }
     test('LF-GST rate change during original save blocks first dispatch grouped=$grouped', () async {
       final adapter = _HostMinorGroupedPlacement();
       var intercepted = false;

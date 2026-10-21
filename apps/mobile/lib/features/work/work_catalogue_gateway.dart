@@ -4345,14 +4345,23 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
     implements BuyV2CataloguePageSource, BuyV2VariantFamilySource,
       BuyV2ProductContentAdapter, BuyV2StorePublishedOffersSource, BuyV2PublishedCatalogueSource, BuyV2StoreCouponSource,
         BuyV2SupplierQuoteCouponEligibilitySource {
-  WorkspacePublicDiscoverySource({required this.gateway, required this.current}) {
+  WorkspacePublicDiscoverySource({required this.gateway, required this.current, this.requestGeneration}) {
     if (!gateway.productFactsReadbackSupported || !gateway.unbrandedProduceReadbackSupported ||
         !gateway.storeClassificationReadbackSupported) { throw ArgumentError('Matching discovery contracts are required.'); }
-    _readback = WorkspaceCatalogueReadback(gateway: gateway, context: () => active ? this : null, now: gateway.now);
+    _readback = WorkspaceCatalogueReadback(gateway: gateway, context: () => active ? _admissionOwner : null, now: gateway.now);
     _readback.addListener(_changed);
+    requestGeneration?.addListener(_retireAdmissions);
   }
   final AuthenticatedWorkspaceCatalogueGateway gateway;
   final bool Function() current;
+  final ValueListenable<int>? requestGeneration;
+  Object _admissionOwner = Object();
+  void _retireAdmissions() {
+    _admissionOwner = Object();
+    _stores.clear();
+    _readback._retireAdmissions(_admissionOwner);
+    if (!_closed) notifyListeners();
+  }
   late final WorkspaceCatalogueReadback _readback;
   final _stores = <String, WorkspaceStoreCatalogueSource>{};
   final _offerHeads = <String, ({int revision, DateTime observed, String copy})>{};
@@ -4363,8 +4372,11 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   Iterable<String> get observedProductIds => _readback.observedProductIds;
   WorkspaceCatalogueContentResult? displayedProduct(BuyV2Product product) => active ? _readback.displayedProduct(product) : null;
   void _changed() { if (active) notifyListeners(); }
-  WorkspaceStoreCatalogueSource _store(String storeId) => _stores.putIfAbsent(_id(storeId), () =>
-    WorkspaceStoreCatalogueSource(gateway: gateway, storeId: storeId, current: () => active, contentReadback: _readback));
+  WorkspaceStoreCatalogueSource _store(String storeId) => _stores.putIfAbsent(_id(storeId), () {
+    final owner = _admissionOwner;
+    return WorkspaceStoreCatalogueSource(gateway: gateway, storeId: storeId,
+      current: () => active && identical(owner, _admissionOwner), contentReadback: _readback);
+  });
 
   Map<String, Object?> _query(BuyV2CatalogueQuery query, Set<String> ids) {
     if (query.areaScope != BuyV2CatalogueAreaScope.allAreas ||
@@ -4385,7 +4397,8 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   Future<({BuyV2CataloguePage<BuyV2Product> products, List<BuyV2StoreListing> stores})> _load(
     BuyV2CatalogueQuery query, {required int pageSize, String? cursor, String kind = 'products',
     Set<String> ids = const {}, bool Function()? requestCurrent}) async {
-    bool valid() => active && (requestCurrent?.call() ?? true);
+    final owner = _admissionOwner;
+    bool valid() => active && identical(owner, _admissionOwner) && (requestCurrent?.call() ?? true);
     if (!valid() || pageSize < 1 || pageSize > 50) throw const FormatException();
     final requested = _query(query, ids);
     final response = await gateway._ownerRequest({'operation': 'readPublicCatalogueDiscovery',
@@ -4447,7 +4460,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
     final entries = gateway._procurementEntries(response, enriched);
     if (!admissionCurrent()) throw const FormatException();
     for (final admission in admissions) { admission(); }
-    for (final entry in entries) { _readback.admitPublicEntry(entry, expectedContext: this); }
+    for (final entry in entries) { _readback.admitPublicEntry(entry, expectedContext: owner); }
     final products = entries.map((entry) => entry.product).toList(growable: false);
     final stores = <BuyV2StoreListing>[];
     if (kind == 'stores') { for (final product in products) {
@@ -4474,7 +4487,8 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   Future<BuyV2CataloguePage<BuyV2PublishedCatalogueOffer>> loadOffers(BuyV2CatalogueQuery query,
       {String? cursor, required int pageSize}) async {
     var reading = true;
-    bool valid() => reading && active;
+    final owner = _admissionOwner;
+    bool valid() => reading && active && identical(owner, _admissionOwner);
     try {
       if (!valid() || !gateway.promotionDiscoverySupported || !query.offersOnly || pageSize < 1 || pageSize > 50 ||
           query.areaScope != BuyV2CatalogueAreaScope.allAreas || query.destination != BuyV2Destination.shop ||
@@ -4579,7 +4593,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
       for (final entry in enriched) { _checkPromotionPrice(_offerPrices[entry.product.id], entry.readback); }
       for (final entry in enriched) { _offerPrices[entry.product.id] = entry.readback; }
       for (final admit in admissions) { admit(); }
-      for (final entry in enriched) { _readback.admitPublicEntry(entry, expectedContext: this); }
+      for (final entry in enriched) { _readback.admitPublicEntry(entry, expectedContext: owner); }
       _offerHeads.addAll(heads); _offerCopies.addAll(copies);
       while (_offerCopies.length > 500) { _offerCopies.remove(_offerCopies.keys.first); }
       while (_offerHeads.length > 500) { _offerHeads.remove(_offerHeads.keys.first); }
@@ -4596,6 +4610,8 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   }
   @override
   Future<List<BuyV2Product>> resolveProducts(Set<String> productIds, {bool Function()? requestCurrent}) async {
+    final owner = _admissionOwner;
+    bool valid() => active && identical(owner, _admissionOwner) && (requestCurrent?.call() ?? true);
     if (productIds.isEmpty) return const [];
     if (productIds.length > 50 || productIds.any((id) => !RegExp(r'^listing-[a-f0-9]{64}$').hasMatch(id))) throw const FormatException();
     final results = <BuyV2Product>[];
@@ -4603,15 +4619,16 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
         ? [BuyV2Destination.shop, BuyV2Destination.wholesale] : [BuyV2Destination.wholesale]) {
       results.addAll((await _load(BuyV2CatalogueQuery(destination: destination, regionId: null,
         areaScope: BuyV2CatalogueAreaScope.allAreas, procurementContext: gateway.procurementContext),
-        pageSize: 50, ids: productIds, requestCurrent: requestCurrent)).products.items);
+        pageSize: 50, ids: productIds, requestCurrent: valid)).products.items);
     }
-    if (!active || requestCurrent?.call() == false) throw const FormatException();
+    if (!valid()) throw const FormatException();
     return List.unmodifiable(results);
   }
   @override
   Future<BuyV2VariantFamilySnapshot> loadVariantFamily(BuyV2Product selected, BuyV2CatalogueQuery context) {
     var reading = true;
-    bool valid() => reading && active;
+    final owner = _admissionOwner;
+    bool valid() => reading && active && identical(owner, _admissionOwner);
     return gateway._readReviewedFamily(selected, context, valid, (ids) => resolveProducts(ids, requestCurrent: valid))
       .whenComplete(() => reading = false);
   }
@@ -4626,17 +4643,23 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
     required BuyV2PublishedStoreCoupon coupon,
     required List<BuyV2CartLine> lines,
     required bool Function() current,
-  }) => gateway.evaluateStoreCoupon(
+  }) {
+    final owner = _admissionOwner;
+    return gateway.evaluateStoreCoupon(
     coupon: coupon,
     lines: lines,
-    current: () => storeCouponEligibilityActive && current(),
+    current: () => identical(owner, _admissionOwner) && storeCouponEligibilityActive && current(),
   );
+  }
   @override
   Future<BuyV2StoreCouponEligibility> evaluateStoreCouponWithSupplierQuote({
     required BuyV2PublishedStoreCoupon coupon, required List<BuyV2CartLine> lines,
     required BuyV2SupplierQuoteSelection supplierQuote, required bool Function() current,
-  }) => gateway.evaluateStoreCoupon(coupon: coupon, lines: lines, supplierQuote: supplierQuote,
-    current: () => storeCouponEligibilityActive && current());
+  }) {
+    final owner = _admissionOwner;
+    return gateway.evaluateStoreCoupon(coupon: coupon, lines: lines, supplierQuote: supplierQuote,
+      current: () => identical(owner, _admissionOwner) && storeCouponEligibilityActive && current());
+  }
   @override Future<List<BuyV2PublishedStoreCoupon>> loadStoreCoupons({required String storeId}) =>
     _store(storeId).loadStoreCoupons(storeId: storeId);
   @override
@@ -4652,6 +4675,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   @override
   void dispose() {
     _closed = true;
+    requestGeneration?.removeListener(_retireAdmissions);
     _readback.removeListener(_changed);
     _readback.dispose();
     super.dispose();
@@ -5920,7 +5944,7 @@ class AuthenticatedWorkspaceCatalogueGateway
   }
 
   @override
-  Future<WorkspaceCatalogueContentResult> read(BuyV2Product product) async {
+  Future<WorkspaceCatalogueContentResult> read(BuyV2Product product, {bool Function()? current}) async {
     final policyRequired = policyResolutionRequired || product.publicListingIdentity != null;
     try {
       if (product.brand.isEmpty && !unbrandedProduceReadbackSupported) throw const FormatException();
@@ -5948,7 +5972,7 @@ class AuthenticatedWorkspaceCatalogueGateway
         },
         'storeId': product.storeId,
         'skuId': product.sourceSkuId,
-      }, () => _procurementScopeCurrent, mutation: false);
+      }, () => _procurementScopeCurrent && (current?.call() ?? true), mutation: false);
       if (response == null || response.statusCode != 200 || !_responseCurrent(response)) throw const FormatException();
       final envelope = _map(jsonDecode(response.body));
       if (envelope['ok'] != true) throw const FormatException();
@@ -6119,7 +6143,7 @@ class WorkspaceCatalogueReadback extends ChangeNotifier
   final Map<String, ({int revision, String? fingerprint})> _policyHighWater = {};
   final Map<String, Object> _owners = {};
   final Map<String, String> _inputs = {};
-  final Set<String> _busy = {};
+  final Map<String, Object> _busy = {};
   final Map<String, Timer> _expiry = {};
   bool _closed = false;
   Object? _lifetime;
@@ -6186,9 +6210,13 @@ class WorkspaceCatalogueReadback extends ChangeNotifier
     _prepareOwner(owner);
     final input = _input(product);
     if (input == null) { notifyListeners(); return; }
-    if (!_busy.add(key)) return;
+    if (_busy[key] == owner) return;
+    _busy[key] = owner;
     try {
-      final result = await gateway.read(product);
+      final source = gateway;
+      final result = source is AuthenticatedWorkspaceCatalogueGateway
+          ? await source.read(product, current: () => !_closed && context() == owner)
+          : await source.read(product);
       if (_closed || context() != owner) return;
       _admitResult(product, result, owner);
     } catch (_) {
@@ -6203,7 +6231,7 @@ class WorkspaceCatalogueReadback extends ChangeNotifier
         notifyListeners();
       }
     } finally {
-      _busy.remove(key);
+      if (_busy[key] == owner) _busy.remove(key);
     }
   }
 
@@ -6235,6 +6263,16 @@ class WorkspaceCatalogueReadback extends ChangeNotifier
       _inputs.clear();
       _lifetime = owner;
     }
+  }
+
+  // A changed local buying purpose retires admissions, not the same supplier's
+  // price/policy high-water marks. Retired reads cannot hold a new busy lease.
+  void _retireAdmissions(Object owner) {
+    for (final timer in _expiry.values) { timer.cancel(); }
+    _expiry.clear();
+    _results.clear(); _owners.clear(); _inputs.clear();
+    _busy.clear();
+    _lifetime = owner;
   }
 
   void _admitResult(BuyV2Product product, WorkspaceCatalogueContentResult result, Object owner) {

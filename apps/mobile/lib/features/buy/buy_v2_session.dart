@@ -3708,6 +3708,7 @@ class BuyV2Session extends ChangeNotifier {
     this.tipPolicy = const BuyV2DisabledTipPolicy(),
     this.savedProductsStore,
     this.procurementIdentity,
+    this.procurementRestriction,
     BuyV2CustomerStateStore? customerStateStore,
     this.pendingAccountState,
     BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore,
@@ -3927,6 +3928,8 @@ class BuyV2Session extends ChangeNotifier {
   /// Changing identity never converts this session's retained cart. The wrapper
   /// must use another existing Buy session for a different operation.
   final ValueListenable<BuyV2ProcurementContext?>? procurementIdentity;
+  final String? Function()? procurementRestriction;
+  int _procurementPolicyRevision = 0;
   final BuyV2ProcurementContext? procurementContext;
   BuyV2ProcurementBuyerGrant? _procurementBuyerGrant;
   int _procurementEpoch = 0;
@@ -3953,6 +3956,8 @@ class BuyV2Session extends ChangeNotifier {
     if (!procurementScopeCurrent) {
       return 'Return to your Store and reopen this purchase. Your Cart is retained.';
     }
+    final restriction = _localProcurementRestriction;
+    if (restriction != null) return restriction;
     if (_procurementOffersRefreshing) {
       return 'Checking current supplier offers. Your Cart is retained.';
     }
@@ -3966,6 +3971,35 @@ class BuyV2Session extends ChangeNotifier {
       return 'Store purchasing approval could not be confirmed. Try again.';
     }
     return null;
+  }
+
+  String? get _localProcurementRestriction {
+    try { return procurementRestriction?.call(); }
+    on Object { return 'Your Store purchase eligibility could not be confirmed. Your Cart is retained.'; }
+  }
+
+  /// A local purpose/profile change retires new buying admissions without
+  /// replacing the session, its basket or an already dispatched payment.
+  void refreshProcurementPolicy() {
+    if (!isStoreProcurement || _collectionDisposed) return;
+    _procurementPolicyRevision++;
+    _commerceRefreshSequence++;
+    _procurementOfferRefreshSequence = null;
+    for (final lease in _catalogueProductPagers.values) { lease.pager._invalidate(); }
+    for (final lease in _catalogueStorePagers.values) { lease.pager._invalidate(); }
+    for (final lease in _catalogueOfferPagers.values) { lease.pager._invalidate(); }
+    _variantFamilyEpoch++;
+    _variantFamily = null; _variantFamilyRequestProduct = null;
+    _variantFamilyRequestProductId = null; _variantFamilyContextKey = null;
+    _variantFamilyLoading = false; _variantFamilyMessage = null;
+    _openedStorePromotion = null;
+    _pagedStores.clear(); _pagedProducts.clear();
+    if (!cartChangesBlocked) { _invalidateCheckoutQuote(); _invalidateCommercialPaymentTerms(); }
+    if (commerceLoadState == BuyV2CommerceLoadState.loading) {
+      commerceLoadState = BuyV2CommerceLoadState.unavailable;
+      commerceMessage = _localProcurementRestriction ?? 'Store purchasing needs a refresh. Your Cart is retained.';
+    }
+    notifyListeners();
   }
 
   void _onProcurementIdentityChanged() {
@@ -3989,7 +4023,7 @@ class BuyV2Session extends ChangeNotifier {
     if (!isStoreProcurement) {
       return BuyV2ProcurementEligibility.notRequested;
     }
-    if (!procurementScopeCurrent) {
+    if (!procurementScopeCurrent || _localProcurementRestriction != null) {
       return BuyV2ProcurementEligibility.contextUnavailable;
     }
     final active = procurementIdentity!.value!;
@@ -4324,9 +4358,10 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
-  bool _allowProcurementLines(Iterable<BuyV2CartLine> lines) {
+  bool _allowProcurementLines(Iterable<BuyV2CartLine> lines, {bool allowExistingCommitment = false}) {
     if (_holdCheckoutForCustomerRecovery()) return false;
     if (!isStoreProcurement) return true;
+    if (allowExistingCommitment && checkoutRequiresResolution && procurementScopeCurrent) return true;
     final unavailable = procurementUnavailableMessage;
     if (unavailable != null) {
       notice = unavailable;
@@ -4570,6 +4605,7 @@ class BuyV2Session extends ChangeNotifier {
   }) async {
     if (_collectionDisposed) throw StateError('Buy session disposed');
     final procurementEpoch = _procurementEpoch;
+    final policyRevision = _procurementPolicyRevision;
     if (_catalogueActiveRequests >= 2) {
       final slot = Completer<void>();
       _catalogueRequestQueue.add(slot);
@@ -4581,12 +4617,15 @@ class BuyV2Session extends ChangeNotifier {
       if (_collectionDisposed ||
           !procurementScopeCurrent ||
           procurementEpoch != _procurementEpoch ||
+          policyRevision != _procurementPolicyRevision ||
+          _localProcurementRestriction != null ||
           (isCurrent != null && !isCurrent())) {
         throw StateError('Catalogue request is obsolete');
       }
       final result = await action();
       if (isStoreProcurement &&
-          (!procurementScopeCurrent || procurementEpoch != _procurementEpoch)) {
+          (!procurementScopeCurrent || procurementEpoch != _procurementEpoch ||
+              policyRevision != _procurementPolicyRevision || _localProcurementRestriction != null)) {
         throw StateError('Store purchase request is obsolete');
       }
       return result;
@@ -14925,7 +14964,7 @@ class BuyV2Session extends ChangeNotifier {
       _holdCartForPaymentResolution();
       return false;
     }
-    if (!_allowProcurementLines(cartLines)) return false;
+    if (!_allowProcurementLines(cartLines, allowExistingCommitment: true)) return false;
     if (!checkoutRequiresResolution) {
       for (final line in cartLines.where(
         (line) => line.product.packTerms != null,
@@ -18398,6 +18437,7 @@ class BuyV2Session extends ChangeNotifier {
     final consentedAmountMinor = checkoutPaymentAmountMinor;
     final consentedPaymentPlan = _checkoutPaymentPlanConsent();
     final procurementEpoch = _procurementEpoch;
+    final policyRevision = _procurementPolicyRevision;
     final previous = _navigationSurfaceIdentity;
     var lines = checkoutLines;
     if (lines.isEmpty) {
@@ -18644,7 +18684,9 @@ class BuyV2Session extends ChangeNotifier {
         termsAgreement != _checkoutTermsAgreement(termKeys) ||
         (originalQuote != null && (request.checkoutQuoteId != originalQuote.id ||
           !catalogueNow().isBefore(originalQuote.validUntil)));
-    if (!retained || stockChanged || !policiesCurrent || !_supplierTaxInputsCurrent(request) || !_supplierQuoteInputsCurrent(request) ||
+    final admissionChanged = isStoreProcurement &&
+        (policyRevision != _procurementPolicyRevision || _localProcurementRestriction != null);
+    if (!retained || admissionChanged || stockChanged || !policiesCurrent || !_supplierTaxInputsCurrent(request) || !_supplierQuoteInputsCurrent(request) ||
         agreementChanged ||
         (request.lines.any((line) => line.scheduledFulfilment != null) &&
           (!_selectedScheduledInputsCurrent(request) || checkoutQuoteReviewRequired || originalQuote == null)) ||
@@ -18659,7 +18701,8 @@ class BuyV2Session extends ChangeNotifier {
       _checkoutIdempotencyKey = null;
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.failed;
       notice = retained
-          ? stockChanged ? 'Stock changed. Review the affected products before payment.'
+          ? admissionChanged ? 'Your Store purchase eligibility changed. Review this purchase before payment.'
+            : stockChanged ? 'Stock changed. Review the affected products before payment.'
             : !policiesCurrent ? 'Store policy changed. Review Checkout before payment.'
             : request.lines.any((line) => line.scheduledFulfilment != null)
               ? 'Scheduled delivery changed. Review Checkout before payment.'
@@ -19118,7 +19161,12 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     while (group != null) {
+      final policyRevision = _procurementPolicyRevision;
       final request = group.request;
+      if (isStoreProcurement && _localProcurementRestriction != null) {
+        notice = _localProcurementRestriction;
+        notifyListeners(); return false;
+      }
       if (!_checkoutSupplierPoliciesCurrent(lines: request.lines, presentFailure: false)) {
         notice = 'Store policy changed. Review remaining checkout. Completed orders are kept.';
         notifyListeners();
@@ -19217,11 +19265,14 @@ class BuyV2Session extends ChangeNotifier {
           quoteAgreement != _checkoutQuoteAgreement(_checkoutQuote) ||
           termsAgreement != _checkoutTermsAgreement(group.fulfilmentKeys);
       final taxCurrent = _supplierTaxInputsCurrent(request);
-      if (stockChanged || !policiesCurrent || agreementChanged || !taxCurrent || !_supplierQuoteInputsCurrent(request) ||
+      final admissionChanged = isStoreProcurement &&
+          (policyRevision != _procurementPolicyRevision || _localProcurementRestriction != null);
+      if (admissionChanged || stockChanged || !policiesCurrent || agreementChanged || !taxCurrent || !_supplierQuoteInputsCurrent(request) ||
           request.lines.any((line) => line.scheduledFulfilment != null) && !_selectedScheduledInputsCurrent(request)) {
         checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
         _syncCheckoutGroupState(); _checkoutIdempotencyKey = null;
-        notice = stockChanged ? 'Stock changed. Review the affected products before payment.'
+        notice = admissionChanged ? 'Your Store purchase eligibility changed. Review this purchase before payment.'
+          : stockChanged ? 'Stock changed. Review the affected products before payment.'
           : !policiesCurrent ? 'Store policy changed. Review Checkout before payment.'
           : !taxCurrent ? (_supplierTaxQuoteRequired ? 'Supplier GST changed. Review Checkout before payment.'
             : 'Supplier prices changed. Review Checkout before payment.')

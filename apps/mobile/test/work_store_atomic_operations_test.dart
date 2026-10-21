@@ -47,6 +47,7 @@ class _LostCollectionGateway extends StoreReviewCustomerCollectionGateway {
 class _ProcurementBookmarks implements WorkProcurementBookmarkStore {
   final values = <String, WorkProcurementBookmark>{};
   Completer<void>? holdRead;
+  Completer<void>? holdSave;
   bool failRead = false, failSave = false;
   int saveAttempts = 0;
   @override
@@ -62,6 +63,8 @@ class _ProcurementBookmarks implements WorkProcurementBookmarkStore {
   @override
   Future<bool> save(WorkProcurementBookmark bookmark) async {
     saveAttempts++;
+    final held = holdSave; holdSave = null;
+    await held?.future;
     if (failSave) return false;
     values[jsonEncode([bookmark.context.accountId, bookmark.context.storeId])] =
         bookmark;
@@ -13742,6 +13745,7 @@ void main() {
   );
   group('Store procurement controller', () {
     late String account, store;
+    var profileId = 'retailer-grocery';
     var approved = true;
     late _ProcurementBookmarks bookmarks;
     late WorkProcurementController controller;
@@ -13749,6 +13753,7 @@ void main() {
     WorkProcurementController create() => WorkProcurementController(
       currentAccountId: () => account,
       currentStoreId: () => store,
+      currentProfileId: () => profileId,
       storeApproved: () => approved,
       bookmarks: bookmarks,
       stateStoreFactory: (scope) =>
@@ -13764,11 +13769,87 @@ void main() {
       account = 'a';
       store = 's';
       approved = true;
+      profileId = 'retailer-grocery';
       states.clear();
       bookmarks = _ProcurementBookmarks();
       controller = create();
     });
     tearDown(() => controller.dispose());
+    test('RESTOCK-PURPOSE local choice survives restart without changing basket identity', () async {
+      profileId = 'manufacturer';
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
+      final opened = controller.session!, scope = opened.customerStateStore!.ownerScope;
+      expect(controller.restockPurpose, isNull);
+      expect(await controller.selectRestockPurpose(WorkRestockPurchasePurpose.rawMaterials), true);
+      expect(controller.session, same(opened));
+      expect(controller.bookmark!.context.customerStateOwnerScope, scope);
+      expect(controller.restockRestrictionMessage, contains('eligibility'));
+      controller.dispose(); controller = create();
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard', restoreOnly: true), true);
+      expect(controller.restockPurpose, WorkRestockPurchasePurpose.rawMaterials);
+      expect(controller.bookmark!.context.customerStateOwnerScope, scope);
+      expect(controller.bookmark!.toJson()['purpose'], 'restock');
+    });
+    test('RESTOCK-PURPOSE failed save retains confirmed choice and missing resale role cannot be selected', () async {
+      profileId = 'manufacturer';
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
+      expect(await controller.selectRestockPurpose(WorkRestockPurchasePurpose.rawMaterials), true);
+      final opened = controller.session!, before = controller.bookmark!.toJson();
+      bookmarks.failSave = true;
+      expect(await controller.selectRestockPurpose(WorkRestockPurchasePurpose.packaging), false);
+      expect(controller.restockPurpose, WorkRestockPurchasePurpose.rawMaterials);
+      expect(controller.bookmark!.toJson(), before); expect(controller.session, same(opened));
+      bookmarks.failSave = false;
+      expect(await controller.selectRestockPurpose(WorkRestockPurchasePurpose.resale), false);
+      expect(controller.restockPurposeOptions, isNot(contains(WorkRestockPurchasePurpose.resale)));
+      expect(await controller.selectRestockPurpose(WorkRestockPurchasePurpose.equipment), true);
+    });
+    test('RESTOCK-PURPOSE profile ABA retires purchasing policy without replacing its session', () async {
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
+      final opened = controller.session!, revision = controller.restockPolicyRevision;
+      expect(controller.restockRestrictionMessage, isNull);
+      profileId = 'manufacturer'; controller.invalidateIfChanged();
+      expect(controller.restockRestrictionMessage, isNotNull);
+      profileId = 'retailer-grocery'; controller.invalidateIfChanged();
+      expect(controller.restockPolicyRevision, greaterThan(revision + 1));
+      expect(controller.session, same(opened));
+      expect(controller.bookmark!.context.customerStateOwnerScope, opened.customerStateStore!.ownerScope);
+    });
+    test('RESTOCK-PURPOSE leaving during held choice restores prior saved choice and retains session', () async {
+      profileId = 'manufacturer';
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
+      expect(await controller.selectRestockPurpose(WorkRestockPurchasePurpose.rawMaterials), true);
+      final original = controller.session!, before = controller.bookmark!.toJson();
+      final held = Completer<void>(); bookmarks.holdSave = held;
+      final choosing = controller.selectRestockPurpose(WorkRestockPurchasePurpose.packaging);
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.restockChoiceBusy, true);
+      final leaving = controller.leave();
+      held.complete(); expect(await choosing, false); expect(await leaving, true);
+      expect(controller.session, same(original)); expect(controller.bookmark!.active, false);
+      expect(controller.bookmark!.uiPurpose, before['uiPurpose']);
+      expect((await bookmarks.read(account, store))!.uiPurpose, before['uiPurpose']);
+      expect(await controller.selectRestockPurpose(WorkRestockPurchasePurpose.equipment), false);
+    });
+    test('RESTOCK-PURPOSE choice queued behind leave cannot reactivate saved visit', () async {
+      profileId = 'manufacturer';
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
+      final held = Completer<void>(); bookmarks.holdSave = held;
+      final leaving = controller.leave(); await Future<void>.delayed(Duration.zero);
+      final choosing = controller.selectRestockPurpose(WorkRestockPurchasePurpose.packaging);
+      held.complete(); expect(await leaving, true); expect(await choosing, false);
+      expect((await bookmarks.read(account, store))!.active, false);
+      expect(controller.restockPurpose, isNull); expect(controller.restockChoiceBusy, false);
+    });
+    test('RESTOCK-PURPOSE repeated opens retire profile ABA without replacing basket', () async {
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
+      final original = controller.session!, revision = controller.restockPolicyRevision;
+      profileId = 'manufacturer';
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
+      profileId = 'retailer-grocery';
+      expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard'), true);
+      expect(controller.restockPolicyRevision, revision + 2); expect(controller.session, same(original));
+    });
     for (final failure in ['approval', 'identity', 'read', 'write']) {
       test('opening failure guidance preserves saved purchase $failure', () async {
         expect(await controller.open(purpose: BuyV2ProcurementPurpose.restock,
@@ -14100,6 +14181,14 @@ void main() {
         bookmark.context.customerStateOwnerScope,
       );
       expect(restored.returnTo, 'stockStatement');
+    });
+    test('RESTOCK-PURPOSE unknown local choice stays recoverable and never changes server purpose', () {
+      final value = {...bookmark.toJson(), 'version': 2, 'uiProfileId': 'manufacturer', 'uiPurpose': 'future-use'};
+      final restored = WorkProcurementBookmark.decode(value, accountId: 'account-a', storeId: 'store-a');
+      expect(restored, isNotNull); expect(restored!.restockPurpose, isNull);
+      expect(restored.toJson()['uiPurpose'], 'future-use');
+      expect(restored.context.customerStateOwnerScope, bookmark.context.customerStateOwnerScope);
+      expect(restored.toJson()['purpose'], 'restock');
     });
     for (final entry in <String, Object?>{
       'accountId': 'other-account',

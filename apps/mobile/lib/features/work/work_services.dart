@@ -35,6 +35,16 @@ typedef WorkProcurementSessionFactory =
       BuyV2CustomerStateStore stateStore,
     );
 
+/// A saved local purchase choice, never a server purpose or capability grant.
+enum WorkRestockPurchasePurpose {
+  resale('Finished goods for resale'),
+  rawMaterials('Raw materials & components'),
+  packaging('Packaging'),
+  equipment('Equipment');
+  const WorkRestockPurchasePurpose(this.label);
+  final String label;
+}
+
 /// Owns Store sessions, never the consumer Shop session. Purchase grants remain
 /// the responsibility of the injected commerce adapter, not this controller.
 class WorkProcurementController extends ChangeNotifier {
@@ -42,6 +52,7 @@ class WorkProcurementController extends ChangeNotifier {
     required this.currentAccountId,
     required this.currentStoreId,
     required this.storeApproved,
+    this.currentProfileId,
     this.bookmarks = const SecureWorkProcurementBookmarkStore(),
     this.reviewCatalogueAllowed,
     this.catalogueGateway,
@@ -54,6 +65,7 @@ class WorkProcurementController extends ChangeNotifier {
        _stateStoreFactory = stateStoreFactory ?? _newStateStore;
 
   final String? Function() currentAccountId, currentStoreId;
+  final String? Function()? currentProfileId;
   final bool Function() storeApproved;
   final WorkProcurementBookmarkStore bookmarks;
   final bool Function()? reviewCatalogueAllowed;
@@ -74,6 +86,84 @@ class WorkProcurementController extends ChangeNotifier {
   int _epoch = 0;
   bool _disposed = false;
   Future<void> _writes = Future<void>.value();
+  final _restockPolicyGeneration = ValueNotifier<int>(0);
+  String? _observedProfileId;
+  int _choiceOperation = 0;
+  bool restockChoiceBusy = false;
+  String? restockChoiceMessage;
+  int get restockPolicyRevision => _restockPolicyGeneration.value;
+  WorkRestockPurchasePurpose? get restockPurpose =>
+    bookmark?.uiProfileId == currentProfileId?.call() ? bookmark?.restockPurpose : null;
+  List<WorkRestockPurchasePurpose> get restockPurposeOptions => switch (currentProfileId?.call()) {
+    'retailer-grocery' || 'retailer-speciality' || 'wholesaler' => const [WorkRestockPurchasePurpose.resale],
+    'manufacturer' => const [WorkRestockPurchasePurpose.rawMaterials, WorkRestockPurchasePurpose.packaging,
+      WorkRestockPurchasePurpose.equipment],
+    _ => const [],
+  };
+  String? get restockRestrictionMessage {
+    if (restockChoiceBusy) return 'Saving your purchase purpose. Your basket is kept.';
+    final profile = currentProfileId?.call(), choice = restockPurpose;
+    if (profile == null || restockPurposeOptions.isEmpty) {
+      return 'Your Store profile could not be confirmed for this purchase. Your basket is kept.';
+    }
+    if (choice == null || !restockPurposeOptions.contains(choice)) {
+      return 'Choose the purpose of this Store purchase. Your basket is kept.';
+    }
+    if (profile == 'wholesaler') {
+      return 'Upstream supplier eligibility for your Store has not been confirmed. Other wholesalers are excluded. Your basket is kept.';
+    }
+    if (profile == 'manufacturer') {
+      return 'Supplier eligibility for ${choice.label.toLowerCase()} has not been confirmed. Your basket is kept.';
+    }
+    return null;
+  }
+
+  void _refreshRestockPolicy() {
+    _restockPolicyGeneration.value++;
+    session?.refreshProcurementPolicy();
+  }
+
+  Future<bool> selectRestockPurpose(WorkRestockPurchasePurpose choice) async {
+    final before = bookmark, opened = session, profile = currentProfileId?.call();
+    if (_disposed || restockChoiceBusy || !scopeCurrent || before == null || !before.active || opened == null ||
+        !restockPurposeOptions.contains(choice)) { return false; }
+    if (restockPurpose == choice) return true;
+    if (opened.checkoutBusy || opened.checkoutRequiresResolution || opened.customerStateRecoveryPending ||
+        restockPurpose != null && opened.cartLines.isNotEmpty) {
+      restockChoiceMessage = 'Finish or recover this Store purchase before changing its purpose.';
+      notifyListeners(); return false;
+    }
+    final epoch = _epoch, generation = restockPolicyRevision, operation = ++_choiceOperation;
+    bool current() => !_disposed && operation == _choiceOperation && epoch == _epoch &&
+      generation == restockPolicyRevision && scopeCurrent && identical(session, opened) &&
+      currentProfileId?.call() == profile && bookmark?.active == true &&
+      bookmark?.context.customerStateOwnerScope == before.context.customerStateOwnerScope;
+    restockChoiceBusy = true; restockChoiceMessage = null; notifyListeners();
+    try {
+      final saved = await _write(() async {
+        if (!current() || opened.checkoutBusy || opened.checkoutRequiresResolution || opened.customerStateRecoveryPending ||
+            restockPurpose != null && opened.cartLines.isNotEmpty) { return false; }
+        final latest = bookmark!, chosen = WorkProcurementBookmark(context: latest.context, returnTo: latest.returnTo,
+          active: latest.active, uiPurpose: choice.name, uiProfileId: profile);
+        if (!await bookmarks.save(chosen)) return false;
+        if (!current() || opened.checkoutBusy || opened.checkoutRequiresResolution || opened.customerStateRecoveryPending ||
+            restockPurpose != null && opened.cartLines.isNotEmpty) {
+          // The serialized rollback also precedes a queued leave/open write.
+          await bookmarks.save(latest);
+          return false;
+        }
+        // Activation follows confirmed persistence; no basket, scope or original is rewritten.
+        bookmark = chosen; _epoch++; _refreshRestockPolicy();
+        return true;
+      });
+      if (!saved && !_disposed && operation == _choiceOperation) {
+        restockChoiceMessage = 'Saving this purchase purpose could not be confirmed. Reopen Buy stock to check the saved choice. Your basket is kept.';
+      }
+      return saved;
+    } finally {
+      if (!_disposed && operation == _choiceOperation) { restockChoiceBusy = false; notifyListeners(); }
+    }
+  }
 
   static BuyV2CustomerStateStore _newStateStore(String scope) =>
       BuyV2SharedPreferencesCustomerStateStore(
@@ -92,11 +182,12 @@ class WorkProcurementController extends ChangeNotifier {
     AuthenticatedWorkspaceCatalogueGateway? bound;
     if (configured && context != null) {
       final lifetime = _catalogueLifetime;
-      bool current() => lifetime == _catalogueLifetime && scopeCurrent &&
+      bool current() => lifetime == _catalogueLifetime && scopeCurrent && restockRestrictionMessage == null &&
           identity.value?.customerStateOwnerScope == context.customerStateOwnerScope;
       try {
         bound = catalogueGateway!.forStoreProcurement(context, current: current);
-        _ownedCatalogueSource = WorkspacePublicDiscoverySource(gateway: bound, current: current);
+        _ownedCatalogueSource = WorkspacePublicDiscoverySource(gateway: bound, current: current,
+          requestGeneration: _restockPolicyGeneration);
       } on Object {
         // A configured source never falls back to evaluation catalogue grants.
         bound = null;
@@ -121,7 +212,7 @@ class WorkProcurementController extends ChangeNotifier {
         ? _StoreReviewProcurementCatalogue(
             context,
             current: () =>
-                scopeCurrent &&
+                scopeCurrent && restockRestrictionMessage == null &&
                 identity.value?.customerStateOwnerScope ==
                     context.customerStateOwnerScope &&
                 reviewCatalogueAllowed?.call() == true,
@@ -134,6 +225,7 @@ class WorkProcurementController extends ChangeNotifier {
     return BuyV2Session(
       core: BuySession(),
       procurementIdentity: identity,
+      procurementRestriction: () => restockRestrictionMessage,
       customerStateStore: stateStore,
       reviewDataEnabled: false,
       purchaseReader: purchases,
@@ -199,6 +291,11 @@ class WorkProcurementController extends ChangeNotifier {
     if (bookmark != null && !scopeCurrent) {
       invalidate();
     } else {
+      final profile = currentProfileId?.call();
+      if (bookmark != null && _observedProfileId != profile) {
+        _observedProfileId = profile; _epoch++; _refreshRestockPolicy();
+        notifyListeners();
+      }
       _refreshPurchaseReader();
     }
   }
@@ -241,7 +338,7 @@ class WorkProcurementController extends ChangeNotifier {
     bool restoreOnly = false,
     BuyV2ProcurementContext? exactContext,
   }) async {
-    final account = currentAccountId(), store = currentStoreId();
+    final account = currentAccountId(), store = currentStoreId(), profile = currentProfileId?.call();
     openFailureMessage = null;
     if (_disposed ||
         !storeApproved() ||
@@ -269,7 +366,7 @@ class WorkProcurementController extends ChangeNotifier {
         epoch == _epoch &&
         storeApproved() &&
         currentAccountId() == account &&
-        currentStoreId() == store;
+        currentStoreId() == store && currentProfileId?.call() == profile;
     WorkProcurementBookmark? previous;
     try {
       previous = await bookmarks.read(account, store);
@@ -282,13 +379,15 @@ class WorkProcurementController extends ChangeNotifier {
     }
     if (!current()) return false;
     if (restoreOnly && (previous == null || !previous.active)) return false;
-    final chosen = exactContext != null
-        ? WorkProcurementBookmark(context: exactContext, returnTo: returnTo)
+    var chosen = exactContext != null
+        ? WorkProcurementBookmark(context: exactContext, returnTo: returnTo,
+            uiPurpose: previous?.uiPurpose, uiProfileId: previous?.uiProfileId)
         : previous != null &&
               (restoreOnly || previous.context.purpose == purpose)
         ? WorkProcurementBookmark(
             context: previous.context,
             returnTo: restoreOnly ? previous.returnTo : returnTo,
+            uiPurpose: previous.uiPurpose, uiProfileId: previous.uiProfileId,
           )
         : WorkProcurementBookmark(
             context: BuyV2ProcurementContext(
@@ -309,7 +408,14 @@ class WorkProcurementController extends ChangeNotifier {
                   ).join(),
             ),
             returnTo: returnTo,
+            uiPurpose: previous?.uiPurpose, uiProfileId: previous?.uiProfileId,
           );
+    // Fixed resale profiles need no new hurdle; unknown/future choices are never defaulted.
+    if (chosen.uiPurpose == null && chosen.uiProfileId == null &&
+        const ['retailer-grocery', 'retailer-speciality', 'wholesaler'].contains(profile)) {
+      chosen = WorkProcurementBookmark(context: chosen.context, returnTo: chosen.returnTo,
+        active: chosen.active, uiPurpose: WorkRestockPurchasePurpose.resale.name, uiProfileId: profile);
+    }
     if (!await _write(() async => current() && await bookmarks.save(chosen)) ||
         !current()) {
       if (current()) {
@@ -322,6 +428,9 @@ class WorkProcurementController extends ChangeNotifier {
         bookmark!.context.customerStateOwnerScope ==
             chosen.context.customerStateOwnerScope) {
       bookmark = chosen;
+      final profileChanged = _observedProfileId != profile;
+      _observedProfileId = profile;
+      if (profileChanged) _refreshRestockPolicy();
       _refreshPurchaseReader();
       notifyListeners();
       return true;
@@ -329,6 +438,7 @@ class WorkProcurementController extends ChangeNotifier {
     _identity.value = null;
     _disposeSession();
     bookmark = chosen;
+    _observedProfileId = profile;
     _identity.value = chosen.context;
     final opened = (_sessionFactory ?? _newSession)(
       _identity,
@@ -348,14 +458,19 @@ class WorkProcurementController extends ChangeNotifier {
     final value = bookmark;
     if (value == null || !scopeCurrent) return false;
     final epoch = ++_epoch;
-    final inactive = WorkProcurementBookmark(
-      context: value.context,
-      returnTo: value.returnTo,
-      active: false,
-    );
-    final saved = await _write(() => bookmarks.save(inactive));
+    _choiceOperation++;
+    restockChoiceBusy = false;
+    WorkProcurementBookmark? inactive;
+    final saved = await _write(() async {
+      if (_disposed || epoch != _epoch || !scopeCurrent) return false;
+      final latest = bookmark!;
+      inactive = WorkProcurementBookmark(context: latest.context, returnTo: latest.returnTo,
+        active: false, uiPurpose: latest.uiPurpose, uiProfileId: latest.uiProfileId);
+      if (!await bookmarks.save(inactive!) || _disposed || epoch != _epoch || !scopeCurrent) return false;
+      bookmark = inactive;
+      return true;
+    });
     if (!saved || _disposed || epoch != _epoch || !scopeCurrent) return false;
-    bookmark = inactive;
     return true;
   }
 
@@ -364,6 +479,7 @@ class WorkProcurementController extends ChangeNotifier {
     _disposed = true;
     invalidate();
     _identity.dispose();
+    _restockPolicyGeneration.dispose();
     super.dispose();
   }
 }
@@ -703,10 +819,15 @@ class WorkProcurementBookmark {
     required this.context,
     required this.returnTo,
     this.active = true,
+    this.uiPurpose,
+    this.uiProfileId,
   });
   final BuyV2ProcurementContext context;
   final String returnTo;
   final bool active;
+  final Object? uiPurpose, uiProfileId;
+  WorkRestockPurchasePurpose? get restockPurpose => WorkRestockPurchasePurpose.values
+    .where((choice) => choice.name == uiPurpose).firstOrNull;
   static const returnDestinations = {
     'dashboard',
     'stockStatement',
@@ -716,13 +837,14 @@ class WorkProcurementBookmark {
   };
 
   Map<String, Object?> toJson() => {
-    'version': 1,
+    'version': uiPurpose == null && uiProfileId == null ? 1 : 2,
     'active': active,
     'accountId': context.accountId,
     'storeId': context.storeId,
     'purpose': context.purpose.name,
     'originOperationId': context.originOperationId,
     'returnTo': returnTo,
+    if (uiPurpose != null || uiProfileId != null) ...{'uiPurpose': uiPurpose, 'uiProfileId': uiProfileId},
   };
 
   static WorkProcurementBookmark? decode(
@@ -730,7 +852,7 @@ class WorkProcurementBookmark {
     required String accountId,
     required String storeId,
   }) {
-    if (value['version'] != 1 ||
+    if (!(value['version'] == 1 || value['version'] == 2 && value.containsKey('uiPurpose') && value.containsKey('uiProfileId')) ||
         value['active'] is! bool ||
         value['accountId'] != accountId ||
         value['storeId'] != storeId ||
@@ -758,6 +880,8 @@ class WorkProcurementBookmark {
       context: context,
       returnTo: value['returnTo'] as String,
       active: value['active'] as bool,
+      uiPurpose: value['version'] == 2 ? value['uiPurpose'] : null,
+      uiProfileId: value['version'] == 2 ? value['uiProfileId'] : null,
     );
   }
 }
