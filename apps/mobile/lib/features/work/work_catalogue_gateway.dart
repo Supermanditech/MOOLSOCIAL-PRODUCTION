@@ -3895,8 +3895,8 @@ class WorkspaceProductPresentationGateway {
   Future<WorkspaceAnalyticsSnapshot> readAnalytics(WorkspaceAnalyticsRequest request) async {
     if (!current() || !request.valid || request.accountScope != gateway.ownerAccountId) throw const FormatException();
     // One deadline covers credentials and every source, leaving time to return
-    // verified activity before Work's outer 30-second deadline. A stalled later
-    // source must not erase facts already read or dispatch after this read ends.
+    // verified activity before Work's outer 30-second deadline. Independent
+    // reads start together so an early stall cannot starve a healthy feed.
     var expired = false;
     final deadline = Completer<void>();
     final timer = Timer(const Duration(seconds: 28), () { expired = true; deadline.complete(); });
@@ -3918,29 +3918,33 @@ class WorkspaceProductPresentationGateway {
       if (!storePresentationsEnabled && !cartAdditionsEnabled && !discoverySourcesEnabled && !checkoutEntriesEnabled && productPresentationsEnabled) {
         return await bounded((permitted) => _readProductAnalytics(request, permitted: permitted));
       }
-      final results = <WorkspaceAnalyticsSnapshot>[];
-      Future<void> collect(Future<WorkspaceAnalyticsSnapshot> Function(bool Function()) source) async {
-        if (expired || !current()) return;
-        try { results.add(await bounded(source)); }
-        on Object { /* Each unavailable source stays unknown; retain other verified activity. */ }
+      final reads = <Future<WorkspaceAnalyticsSnapshot?>>[];
+      Future<WorkspaceAnalyticsSnapshot?> collect(Future<WorkspaceAnalyticsSnapshot> Function(bool Function()) source) async {
+        if (expired || !current()) return null;
+        try { return await bounded(source); }
+        on Object { return null; /* Retain other verified activity. */ }
       }
       if (productPresentationsEnabled) {
-        await collect((permitted) => _readProductAnalytics(request, permitted: permitted));
+        reads.add(collect((permitted) => _readProductAnalytics(request, permitted: permitted)));
       }
       if (storePresentationsEnabled && current()) {
-        await collect((permitted) => _readStoreAnalytics(request, permitted: permitted));
+        reads.add(collect((permitted) => _readStoreAnalytics(request, permitted: permitted)));
       }
       if (cartAdditionsEnabled && current()) {
-        await collect((permitted) => _readProductAnalytics(request, cart: true, permitted: permitted));
+        reads.add(collect((permitted) => _readProductAnalytics(request, cart: true, permitted: permitted)));
       }
       if (productPresentationsEnabled && discoverySourcesEnabled && current()) {
-        await collect((permitted) => _readProductAnalytics(request, discovery: true, permitted: permitted));
+        reads.add(collect((permitted) => _readProductAnalytics(request, discovery: true, permitted: permitted)));
       }
       if (checkoutEntriesEnabled && current()) {
-        await collect((permitted) => _readStoreAnalytics(request, checkout: true, permitted: permitted));
+        reads.add(collect((permitted) => _readStoreAnalytics(request, checkout: true, permitted: permitted)));
       }
+      // Future.wait retains configured source order, regardless of response
+      // order. Each read catches its own failure and closes its lifetime.
+      final results = await Future.wait(reads);
       if (!current()) throw const FormatException();
-      final verified = results.where((r) => r.state == WorkspaceAnalyticsState.verified && r.usableFor(request, gateway.now().toUtc())).toList();
+      final verified = results.whereType<WorkspaceAnalyticsSnapshot>()
+        .where((r) => r.state == WorkspaceAnalyticsState.verified && r.usableFor(request, gateway.now().toUtc())).toList();
       if (verified.isEmpty) {
         return WorkspaceAnalyticsSnapshot(request: request, state: WorkspaceAnalyticsState.unavailable,
           coverage: WorkspaceAnalyticsCoverage.unknown, source: 'Recorded public activity', metrics: const []);

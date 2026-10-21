@@ -606,6 +606,15 @@ class AnalyticsHeldCredentials extends Credentials {
     return super.firebaseIdToken();
   }
 }
+class _FirstAnalyticsCredentialsHeld extends Credentials {
+  _FirstAnalyticsCredentialsHeld(this.release);
+  final Future<void> release;
+  int reads = 0;
+  @override Future<String> firebaseIdToken() async {
+    if (++reads == 1) await release;
+    return super.firebaseIdToken();
+  }
+}
 // Private-media host fixtures. No native provider injection or publication/commerce acceptance.
 String _mediaHash(Object? value) {
   Object? sorted(Object? item) => item is Map ? {for (final key in (item.keys.cast<String>().toList()..sort())) key: sorted(item[key])}
@@ -5011,6 +5020,137 @@ void main() {
     expect((await gateway.writeProductSubmission(original, current: () => true, reconcile: true)).state, WorkspaceProductSubmissionWriteState.notFound);
     expect((await gateway.writeProductSubmission(original, current: () => true)).state, WorkspaceProductSubmissionWriteState.unknown);
   });
+  SocialContentResponse analyticsStageFixture(Map<String, Object?> body, WorkspaceAnalyticsRequest request,
+      {bool malformed = false}) {
+    final checkout = body['operation'] == 'readStoreCheckoutEntries';
+    final data = Map<String, Object?>.from(body)..remove('operation');
+    data.addAll({'realm': 'evaluation', 'observedAt': at.toIso8601String(),
+      'source': checkout ? 'Reported signed-in Checkout entries' : 'Recorded signed-in Store visits',
+      'state': 'ready', 'coverage': 'signed_in_partial',
+      'collectionStartedAt': request.start.toIso8601String(),
+      'coveredFrom': request.start.toIso8601String(), 'coveredUntil': at.toIso8601String(),
+      'count': malformed ? -1 : checkout ? 2 : 3, 'visitors': 2});
+    return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+  }
+  for (final retire in [false, true]) {
+    testWidgets('LF14-INDEPENDENT early stalled activity cannot starve Checkout retire=$retire', (tester) async {
+      // Isolated transport timing fixture. Counts are not native activity or
+      // evidence of a completed order/conversion.
+      final stalled = Completer<SocialContentResponse>(), operations = <Object?>[];
+      var live = true;
+      final request = WorkspaceAnalyticsRequest(accountScope: 'owner-one', storeId: 'store-one',
+        start: at.subtract(const Duration(hours: 1)), end: at);
+      final credentials = Credentials();
+      final reporter = WorkspaceProductPresentationGateway(current: () => live, displayed: (_) => null,
+        storePresentationsEnabled: true, cartAdditionsEnabled: true, discoverySourcesEnabled: true, checkoutEntriesEnabled: true,
+        gateway: AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: credentials, realm: 'evaluation', ownerAccountId: 'owner-one', now: () => at,
+          transport: OwnerTransport((body) async {
+            operations.add(body['operation']);
+            final checkout = body['operation'] == 'readStoreCheckoutEntries';
+            if (!checkout && body['operation'] != 'readStorePublicPresentations') return stalled.future;
+            return analyticsStageFixture(body, request);
+          })));
+      final work = WorkSession(contactDraftStore: ListingAccount())
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileId: 'retailer-grocery',
+          profileLabel: 'Grocery', area: 'Jaipur', verified: true)..workspaceId = 'store-one';
+      work.bindProductPresentationReader(reporter);
+      WorkspaceAnalyticsSnapshot? snapshot;
+      final pending = work.readWorkspaceAnalytics(request).then((value) => snapshot = value);
+      try {
+        await tester.pump();
+        expect(operations, ['readStoreProductPresentations', 'readStorePublicPresentations',
+          'readStoreCartAdditions', 'readStoreProductPresentations', 'readStoreCheckoutEntries'],
+          reason: 'Independent healthy feeds must start before an early source times out.');
+        expect(credentials.modes, everyElement(SocialAppCheckTokenMode.standard));
+        if (retire) {
+          live = false;
+          work.activeWorkspace = const WorkWorkspace(id: 'store-two', name: 'Other Store', profileId: 'retailer-grocery',
+            profileLabel: 'Grocery', area: 'Jaipur', verified: true);
+          work.workspaceId = 'store-two';
+        }
+        await tester.pump(const Duration(seconds: 29));
+        expect(snapshot, isNotNull);
+        expect(snapshot!.state, retire ? WorkspaceAnalyticsState.unavailable : WorkspaceAnalyticsState.verified);
+        expect({for (final metric in snapshot!.metrics) metric.id: metric.value}, retire ? isEmpty :
+          {'store-views': 3, 'visits': 3, 'visitors': 2, 'journey-store': 2, 'journey-checkout': 2});
+        if (!retire) {
+          expect(snapshot!.coverage, WorkspaceAnalyticsCoverage.partial);
+          expect(snapshot!.metrics.every((metric) => metric.cohortId == null), isTrue);
+        }
+        final returned = snapshot;
+        stalled.complete(const SocialContentResponse(statusCode: 503, body: '{}'));
+        await tester.pump();
+        expect(snapshot, same(returned)); expect(operations, hasLength(5));
+      } finally {
+        if (!stalled.isCompleted) stalled.complete(const SocialContentResponse(statusCode: 503, body: '{}'));
+        await tester.pump(const Duration(seconds: 40)); await pending; work.dispose();
+      }
+    });
+  }
+  for (final malformed in [false, true]) {
+    testWidgets('LF14-INDEPENDENT reversed completion preserves source order malformed=$malformed', (tester) async {
+      final store = Completer<SocialContentResponse>(), checkout = Completer<SocialContentResponse>();
+      final bodies = <String, Map<String, Object?>>{};
+      final request = WorkspaceAnalyticsRequest(accountScope: 'owner-one', storeId: 'store-one',
+        start: at.subtract(const Duration(hours: 1)), end: at);
+      final reporter = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => null,
+        productPresentationsEnabled: false, storePresentationsEnabled: true, checkoutEntriesEnabled: true,
+        gateway: AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: Credentials(), realm: 'evaluation', ownerAccountId: 'owner-one', now: () => at,
+          transport: OwnerTransport((body) {
+            final operation = body['operation'] as String; bodies[operation] = body;
+            return operation == 'readStoreCheckoutEntries' ? checkout.future : store.future;
+          })));
+      WorkspaceAnalyticsSnapshot? snapshot;
+      final pending = reporter.readAnalytics(request).then((value) => snapshot = value);
+      try {
+        await tester.pump(); expect(bodies, hasLength(2));
+        checkout.complete(analyticsStageFixture(bodies['readStoreCheckoutEntries']!, request));
+        await tester.pump(); expect(snapshot, isNull);
+        store.complete(analyticsStageFixture(bodies['readStorePublicPresentations']!, request, malformed: malformed));
+        await tester.pump(); await pending;
+        expect(snapshot!.state, WorkspaceAnalyticsState.verified);
+        expect(snapshot!.metrics.map((metric) => metric.id), malformed ? ['journey-checkout'] :
+          ['store-views', 'visits', 'visitors', 'journey-store', 'journey-checkout']);
+        expect(snapshot!.coverage, WorkspaceAnalyticsCoverage.partial);
+      } finally {
+        if (!store.isCompleted) store.complete(const SocialContentResponse(statusCode: 503, body: '{}'));
+        if (!checkout.isCompleted) checkout.complete(const SocialContentResponse(statusCode: 503, body: '{}'));
+        await tester.pump(const Duration(seconds: 40)); await pending;
+      }
+    });
+  }
+  testWidgets('LF14-INDEPENDENT first held credentials cannot starve later feeds or dispatch after deadline', (tester) async {
+    final release = Completer<void>(), operations = <Object?>[];
+    final credentials = _FirstAnalyticsCredentialsHeld(release.future);
+    final request = WorkspaceAnalyticsRequest(accountScope: 'owner-one', storeId: 'store-one',
+      start: at.subtract(const Duration(hours: 1)), end: at);
+    final reporter = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => null,
+      storePresentationsEnabled: true, checkoutEntriesEnabled: true,
+      gateway: AuthenticatedWorkspaceCatalogueGateway(
+        endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: credentials, realm: 'evaluation', ownerAccountId: 'owner-one', now: () => at,
+        transport: OwnerTransport((body) async {
+          operations.add(body['operation']); return analyticsStageFixture(body, request);
+        })));
+    WorkspaceAnalyticsSnapshot? snapshot;
+    final pending = reporter.readAnalytics(request).then((value) => snapshot = value);
+    try {
+      await tester.pump(); expect(credentials.reads, 3);
+      expect(operations, ['readStorePublicPresentations', 'readStoreCheckoutEntries']);
+      await tester.pump(const Duration(seconds: 29)); await pending;
+      expect(snapshot!.metrics.map((metric) => metric.id), contains('journey-checkout'));
+      expect(snapshot!.metrics.any((metric) => metric.id == 'product-views'), false);
+      release.complete(); await tester.pump();
+      expect(operations, ['readStorePublicPresentations', 'readStoreCheckoutEntries']);
+    } finally {
+      if (!release.isCompleted) release.complete();
+      await tester.pump(const Duration(seconds: 40)); await pending;
+    }
+  });
   final checkoutLog = Platform.environment['LF14_CHECKOUT_LOG'];
   if (checkoutLog != null) {
     Map<String, dynamic> checkoutCapture() {
@@ -5401,13 +5541,14 @@ void main() {
       try {
         await tester.pump();
         await tester.pump(const Duration(seconds: 20));
-        expect(operations, ['readStoreProductPresentations', 'readStorePublicPresentations', 'readStoreCartAdditions']);
+        expect(operations, ['readStoreProductPresentations', 'readStorePublicPresentations', 'readStoreCartAdditions',
+          'readStoreProductPresentations', 'readStoreCheckoutEntries']);
         await tester.pump(const Duration(seconds: 9));
         expect(snapshot, isNotNull, reason: 'Return known data before the outer 30-second deadline.');
         expect(snapshot!.state, WorkspaceAnalyticsState.verified);
         expect(snapshot!.metrics.single.id, 'product-views'); expect(snapshot!.metrics.single.value, 1);
         expect(snapshot!.breakdowns.single.id, 'most-viewed-products');
-        expect(operations, hasLength(3), reason: 'Expired reads must not start discovery or Checkout requests.');
+        expect(operations, hasLength(5), reason: 'All reads started before the deadline; no late dispatch is allowed.');
       } finally {
         stalled.complete(const SocialContentResponse(statusCode: 503, body: '{}'));
         await tester.pump(const Duration(seconds: 40)); await pending; work.dispose();

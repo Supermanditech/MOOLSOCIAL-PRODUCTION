@@ -6248,7 +6248,8 @@ void main() {
             .map((p) => p.toInventoryJson())
             .toList();
         expect(work.localInventoryEnabled, isFalse);
-        expect(await work.loadWorkspaceInventory(), isTrue);
+        // This fixture has no account-scoped Stock source to recover.
+        expect(await work.loadWorkspaceInventory(), isFalse);
         expect(work.workspaceInventoryLoaded, isFalse);
         await mount(
           tester,
