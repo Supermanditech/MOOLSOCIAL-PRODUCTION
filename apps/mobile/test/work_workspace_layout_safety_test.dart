@@ -4839,6 +4839,9 @@ void main() {
 
   for (final (authenticated, reviewOnly) in [(false, true), (true, false)]) {
     testWidgets('LF-LAUNCH actual router settles Workspace recovery auth=$authenticated review=$reviewOnly', (tester) async {
+      // Dashboard recovery also reads adopted Stock when general local inventory
+      // is disabled. Mock its native boundary before creating the session.
+      FlutterSecureStorage.setMockInitialValues({});
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(412, 915);
       addTearDown(tester.view.reset);
@@ -4863,6 +4866,11 @@ void main() {
       // not spend minutes waiting for the intentional loading indicator.
       for (var frame = 0; frame < 12; frame++) {
         await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      if (!storeReviewRuntime) {
+        expect(work.localInventoryEnabled, isFalse);
+        expect(work.workspaceInventoryLoaded, isFalse);
       }
       expect(find.byKey(const Key('work-account-recovery')), findsNothing);
       expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
