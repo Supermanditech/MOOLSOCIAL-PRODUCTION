@@ -44,7 +44,8 @@ class DeviceSourceFixture extends ChangeNotifier implements WorkspacePurchasedUn
     return WorkspacePurchasedUnitsRead(target: target, revision: revision, rows: rows, complete: complete,
       observedAt: DateTime.utc(2026, 10, 1), ownerAccess: access);
   }
-  void revokeOwner() { owner = false; notifyListeners(); }
+  void revokeOwner() { owner = false; _grants.clear(); notifyListeners(); }
+  void restoreOwner() { owner = true; notifyListeners(); }
   void rotateLifetime() { lifetime = Object(); _grants.clear(); notifyListeners(); }
 }
 
@@ -83,6 +84,41 @@ class DevicePublisherFixture extends DeviceSourceFixture implements WorkspacePur
   @override Future<WorkspacePurchasedUnitPublishReply?> checkSharing(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitPublishCommand command) async {
     checks.add(command); return onCheck == null ? apply(target, command) : await onCheck!(target, command);
   }
+}
+
+class DeviceReporterFixture extends DeviceSourceFixture implements WorkspacePurchasedUnitReporter {
+  DeviceReporterFixture({super.accountUserId = 'buyer-1'}) {
+    revision = 1; rows = const [WorkspacePurchasedUnitRow(id: 'supplier-device-A', serial: 'HOST-SUPPLIER-SERIAL', imei1: '111111', imei2: '222222')];
+  }
+  bool permit = true;
+  final _reportGrants = <WorkspacePurchasedUnitReportAccess>{};
+  final reports = <WorkspacePurchasedUnitMismatchCommand>[], checks = <WorkspacePurchasedUnitMismatchCommand>[];
+  FutureOr<WorkspacePurchasedUnitReportReply?> Function(WorkspacePurchasedLineTarget, WorkspacePurchasedUnitMismatchCommand)? onReport, onCheck;
+  Future<void> Function()? beforeRead;
+  @override bool reportAccessCurrent(WorkspacePurchasedUnitReportAccess access) => isCurrent && permit && _reportGrants.contains(access) &&
+    access.accountUserId == accountUserId && access.expiresAt == expiresAt;
+  @override Future<WorkspacePurchasedUnitsRead?> read(WorkspacePurchasedLineTarget target) async {
+    await beforeRead?.call(); final read = await super.read(target); if (read == null) return null;
+    final access = permit && target.role == WorkspaceOrderIdentityRole.buyer ? WorkspacePurchasedUnitReportAccess(
+      accountUserId: accountUserId, targetBinding: target.binding, expiresAt: expiresAt) : null;
+    if (access != null) _reportGrants.add(access);
+    return WorkspacePurchasedUnitsRead(target: read.target, revision: read.revision, rows: read.rows, observedAt: read.observedAt,
+      ownerAccess: read.ownerAccess, reportAccess: access, complete: read.complete);
+  }
+  WorkspacePurchasedUnitReportReply reply(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitMismatchCommand command,
+    {WorkspacePurchasedUnitPublishState state = WorkspacePurchasedUnitPublishState.applied, String? operationId}) => WorkspacePurchasedUnitReportReply(
+      operationId: operationId ?? command.operationId, commandFingerprint: command.fingerprint, targetBinding: target.binding, state: state,
+      reportId: state == WorkspacePurchasedUnitPublishState.applied ? 'HOST-REPORT-1' : null,
+      recordedAt: state == WorkspacePurchasedUnitPublishState.applied ? DateTime.utc(2026, 10, 21, 9) : null);
+  @override Future<WorkspacePurchasedUnitReportReply?> reportMismatch(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitMismatchCommand command) async {
+    reports.add(command); return onReport == null ? reply(target, command) : await onReport!(target, command);
+  }
+  @override Future<WorkspacePurchasedUnitReportReply?> checkMismatch(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitMismatchCommand command) async {
+    checks.add(command); return onCheck == null ? reply(target, command) : await onCheck!(target, command);
+  }
+  void revokeReporting() { permit = false; _reportGrants.clear(); notifyListeners(); }
+  void restoreReporting() { permit = true; notifyListeners(); }
+  void updateDevices(List<WorkspacePurchasedUnitRow> nextRows) { rows = List.of(nextRows); revision++; notifyListeners(); }
 }
 
 class DeviceNativeStorageFixture extends FlutterSecureStorage {
@@ -802,6 +838,282 @@ void main() {
     await tapText('Keep this draft against updated records'); expect(drafts.saved!.publishedRevision, 1);
     expect(source.rows.single.serial, 'HOST-OTHER-PANEL'); expect(source.shares, isEmpty);
     expect(tester.widget<TextButton>(find.widgetWithText(TextButton, 'Review and share device details')).onPressed, isNotNull);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+
+  for (final scale in [1.0, 2.0]) {
+  testWidgets('PF08 REPORT buyer saves reviews sends and restores recorded receipt without supplier edits scale=$scale', (tester) async {
+    tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    FlutterSecureStorage.setMockInitialValues({});
+    final wire = Transport()..data = purchaseResponse(), source = DeviceReporterFixture();
+    final gateway = projectionGateway(wire, purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse()['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference))!.lines.single;
+    final supplier = jsonEncode(source.rows.map((r) => r.toJson()).toList()), original = jsonEncode(line.toJson());
+    source.onReport = (target, command) async {
+      final saved = WorkspacePurchasedUnitDraft.fromJson(jsonDecode((await const FlutterSecureStorage().readAll()).values.single));
+      expect(saved.report!.pending!.toJson(), command.toJson());
+      expect(command.rows.single.toJson(), source.rows.single.toJson()); expect(command.note, 'HOST different device received');
+      return source.reply(target, command);
+    };
+    Widget host() => MaterialApp(home: MediaQuery(data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+      child: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference, line: line)))));
+    Future<void> tapText(String label) async {
+      await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+      await tester.tap(find.text(label)); await tester.pumpAndSettle();
+    }
+    await tester.pumpWidget(host()); await tapText('Device details'); await tapText('Report a device mismatch');
+    expect(find.text('Add device'), findsNothing); expect(find.byType(TextFormField), findsOneWidget);
+    expect(tester.widget<TextButton>(find.widgetWithText(TextButton, 'Review device report')).onPressed, isNull);
+    await tester.ensureVisible(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+    expect(find.byType(CheckboxListTile).hitTestable(), findsOneWidget);
+    await tester.tap(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byType(TextFormField)); await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), 'HOST different device received  ');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpWidget(host());
+    await tapText('Device details'); await tapText('Report a device mismatch');
+    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, 'HOST different device received  ');
+    expect(tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value, isTrue);
+    await tapText('Review device report'); expect(source.reports, isEmpty);
+    await tapText('Back to report'); await tapText('Review device report'); await tapText('Send device report');
+    expect(source.reports, hasLength(1)); expect(source.checks, isEmpty);
+    expect(find.text('Report reference: HOST-REPORT-1'), findsOneWidget); expect(find.text('Send device report'), findsNothing);
+    final saved = WorkspacePurchasedUnitDraft.fromJson(jsonDecode((await const FlutterSecureStorage().readAll()).values.single));
+    expect(saved.toJson()['version'], 3); expect(saved.report!.recorded, isTrue); expect(saved.report!.pending!.toJson(), source.reports.single.toJson());
+    await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpWidget(host());
+    await tapText('Device details'); await tapText('Report a device mismatch');
+    expect(find.text('Report reference: HOST-REPORT-1'), findsOneWidget); expect(find.byType(TextFormField), findsNothing);
+    expect(source.reports, hasLength(1)); expect(source.checks, isEmpty);
+    expect(jsonEncode(source.rows.map((r) => r.toJson()).toList()), supplier); expect(jsonEncode(line.toJson()), original);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+  }
+
+  for (final outcome in ['pending', 'closed', 'wrong-proof', 'lost-response', 'cleanup-failure']) {
+  testWidgets('PF08 REPORT $outcome keeps original intent and checks after restart', (tester) async {
+    final wire = Transport()..data = purchaseResponse(), source = DeviceReporterFixture(), drafts = DeviceDraftFixture();
+    final gateway = projectionGateway(wire, purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse()['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference))!.lines.single;
+    final supplier = jsonEncode(source.rows.map((r) => r.toJson()).toList());
+    source.onReport = (target, command) {
+      expect(drafts.saved!.report!.pending!.toJson(), command.toJson());
+      if (outcome == 'lost-response') return null;
+      if (outcome == 'cleanup-failure') { drafts.failNextSave = true; return source.reply(target, command); }
+      return source.reply(target, command, state: outcome == 'closed' ? WorkspacePurchasedUnitPublishState.closed : WorkspacePurchasedUnitPublishState.pending,
+        operationId: outcome == 'wrong-proof' ? 'f' * 32 : null);
+    };
+    Widget host() => MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference, line: line, draftStore: drafts))));
+    Future<void> tapText(String label) async {
+      await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+      await tester.tap(find.text(label)); await tester.pumpAndSettle();
+    }
+    await tester.pumpWidget(host()); await tapText('Device details'); await tapText('Report a device mismatch');
+    await tester.tap(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), 'HOST incorrect identifier'); FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tapText('Review device report'); await tapText('Send device report');
+    expect(source.reports, hasLength(1));
+    if (outcome == 'closed') {
+      expect(drafts.saved!.report!.pending, isNull); expect(drafts.saved!.report!.recorded, isFalse);
+      expect(find.text('Report not sent. Your private draft is kept.'), findsOneWidget);
+    } else {
+      final original = drafts.saved!.report!.pending!;
+      expect(find.text('Report reference: HOST-REPORT-1'), findsNothing); expect(find.byType(TextFormField), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpWidget(host());
+      await tapText('Device details'); await tapText('Report a device mismatch');
+      expect(drafts.saved!.report!.pending!.toJson(), original.toJson()); expect(source.reports, hasLength(1));
+      await tapText('Check report status'); expect(source.checks.single.toJson(), original.toJson());
+      expect(drafts.saved!.report!.recorded, isTrue); expect(find.text('Report reference: HOST-REPORT-1'), findsOneWidget);
+      expect(source.reports, hasLength(1));
+    }
+    expect(jsonEncode(source.rows.map((r) => r.toJson()).toList()), supplier);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+  }
+
+  for (final mode in ['no-lease', 'expired', 'partial', 'supplier']) {
+  testWidgets('PF08 REPORT $mode cannot open buyer private report or mutate identifiers', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({'HOST-private-other-account': 'KEEP'});
+    final role = mode == 'supplier' ? WorkspaceOrderIdentityRole.seller : WorkspaceOrderIdentityRole.buyer;
+    final account = role == WorkspaceOrderIdentityRole.seller ? 'owner-1' : 'buyer-1';
+    final wire = Transport()..data = purchaseResponse(role: role.name), source = DeviceReporterFixture(accountUserId: account)
+      ..permit = mode != 'no-lease' ..complete = mode != 'partial';
+    if (mode == 'expired') source.expiresAt = DateTime.now().toUtc().subtract(const Duration(seconds: 1));
+    final gateway = projectionGateway(wire, account: account, purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: role.name)['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: role, realm: 'evaluation', reference: reference))!.lines.single;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: role, realm: 'evaluation', reference: reference, line: line)))));
+    await tester.tap(find.text('Device details')); await tester.pumpAndSettle();
+    expect(find.text('Report a device mismatch'), findsNothing); expect(find.byType(TextFormField), findsNothing);
+    expect(find.text('Serial: HOST-SUPPLIER-SERIAL'), findsOneWidget); expect(source.reports, isEmpty); expect(source.checks, isEmpty);
+    expect(await const FlutterSecureStorage().readAll(), {'HOST-private-other-account': 'KEEP'});
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+  }
+
+  testWidgets('PF08 REPORT native save keeps latest coalesced note after deadline and disposal', (tester) async {
+    final wire = Transport()..data = purchaseResponse(), source = DeviceReporterFixture(), native = DeviceNativeStorageFixture();
+    final gateway = projectionGateway(wire, purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse()['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference))!.lines.single;
+    final target = WorkspacePurchasedLineTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference, line: line);
+    final key = WorkspacePurchasedUnitDraftKey(account: 'buyer-1', realm: 'evaluation', store: reference.storeId, binding: target.binding);
+    final store = SecureWorkPurchasedUnitDraftStore(accountScope: () => 'buyer-1', targetScope: () => key.identity, storage: native);
+    Widget host() => MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference, line: line, draftStore: store))));
+    Future<void> tapText(String label) async {
+      await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+      await tester.tap(find.text(label)); await tester.pumpAndSettle();
+    }
+    await tester.pumpWidget(host()); await tapText('Device details'); await tapText('Report a device mismatch');
+    await tester.tap(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+    final held = Completer<void>(); native.holdNextWrite = held;
+    await tester.enterText(find.byType(TextFormField), 'H'); await tester.pump();
+    await tester.enterText(find.byType(TextFormField), 'HOST complete report note'); FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink()); await tester.pump(const Duration(seconds: 11));
+    held.complete(); await tester.pumpAndSettle();
+    expect((await store.read(key))!.report!.note, 'HOST complete report note');
+    await tester.pumpWidget(host()); await tapText('Device details'); await tapText('Report a device mismatch');
+    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, 'HOST complete report note');
+    expect(source.reports, isEmpty); expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+
+  for (final owner in [true, false]) {
+  testWidgets('PF08 REPORT original ${owner ? 'owner' : 'buyer'} lease retires held preflight through revoke regrant', (tester) async {
+    final role = owner ? WorkspaceOrderIdentityRole.seller : WorkspaceOrderIdentityRole.buyer, account = owner ? 'owner-1' : 'buyer-1';
+    final wire = Transport()..data = purchaseResponse(role: role.name);
+    final DeviceSourceFixture source = owner ? DevicePublisherFixture() : DeviceReporterFixture();
+    final drafts = DeviceDraftFixture(), gateway = projectionGateway(wire, account: account, purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse(role: role.name)['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: role, realm: 'evaluation', reference: reference))!.lines.single;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: role, realm: 'evaluation', reference: reference, line: line, draftStore: drafts)))));
+    Future<void> tapText(String label) async {
+      await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+      await tester.tap(find.text(label)); await tester.pumpAndSettle();
+    }
+    await tapText('Device details'); await tapText(owner ? 'Prepare device details' : 'Report a device mismatch');
+    if (owner) { await tapText('Add device'); } else { await tester.tap(find.byType(CheckboxListTile)); await tester.pumpAndSettle(); }
+    final field = find.byType(TextFormField).first; await tester.ensureVisible(field); await tester.pumpAndSettle();
+    await tester.enterText(field, 'HOST unchanged intent'); FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tapText(owner ? 'Review and share device details' : 'Review device report');
+    final held = Completer<void>(), entered = Completer<void>();
+    Future<void> beforeRead() { if (!entered.isCompleted) entered.complete(); return held.future; }
+    if (source case DevicePublisherFixture publisher) {
+      publisher.beforeRead = beforeRead; publisher.onCheck = (target, command) => publisher.reply(target, command, WorkspacePurchasedUnitPublishState.closed);
+    } else if (source case DeviceReporterFixture reporter) {
+      reporter.beforeRead = beforeRead; reporter.onCheck = (target, command) => reporter.reply(target, command, state: WorkspacePurchasedUnitPublishState.closed);
+    }
+    final button = find.widgetWithText(FilledButton, owner ? 'Share device details' : 'Send device report');
+    await tester.ensureVisible(button); await tester.pumpAndSettle(); final oldSend = tester.widget<FilledButton>(button).onPressed!;
+    await tester.tap(button); await tester.pump(); expect(entered.isCompleted, isTrue);
+    if (source case DeviceReporterFixture reporter) { reporter.revokeReporting(); } else { source.revokeOwner(); }
+    await tester.pump();
+    if (source case DeviceReporterFixture reporter) { reporter.restoreReporting(); reporter.beforeRead = null; }
+    else if (source case DevicePublisherFixture publisher) { publisher.restoreOwner(); publisher.beforeRead = null; }
+    held.complete(); await tester.pumpAndSettle();
+    if (source case DevicePublisherFixture publisher) { expect(publisher.shares, isEmpty); expect(drafts.saved!.pending, isNotNull); }
+    else if (source case DeviceReporterFixture reporter) { expect(reporter.reports, isEmpty); expect(drafts.saved!.report!.pending, isNotNull); }
+    await tapText(owner ? 'Check sharing status' : 'Check report status'); oldSend(); await tester.pumpAndSettle();
+    if (source case DevicePublisherFixture publisher) { expect(publisher.shares, isEmpty); expect(publisher.checks, hasLength(1)); }
+    else if (source case DeviceReporterFixture reporter) { expect(reporter.reports, isEmpty); expect(reporter.checks, hasLength(1)); }
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+  }
+
+  testWidgets('PF08 REPORT Store purchase selector and delayed source cannot escape exact original binding', (tester) async {
+    final data = purchaserPurchaseResponse(), wire = Transport()..data = purchaserPurchaseResponse(), source = DeviceReporterFixture();
+    final gateway = projectionGateway(wire, purchasedUnitSource: source);
+    final rawReference = Map<String, dynamic>.from(referenceResponse()['references'][0]); rawReference['originalFingerprint'] = data['orders'][0]['originalFingerprint'];
+    final reference = WorkspacePurchaseReference.fromJson(rawReference);
+    final original = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference, buyingStoreId: 'buying-store'))!;
+    final target = WorkspacePurchasedLineTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation',
+      reference: reference, line: original.lines.single, buyingStoreId: 'buying-store');
+    final read = (await source.read(target))!, command = WorkspacePurchasedUnitMismatchCommand(key: WorkspacePurchasedUnitDraftKey(account: 'buyer-1',
+      realm: 'evaluation', store: reference.storeId, binding: target.binding), operationId: 'a' * 32, sourceRevision: read.revision,
+      sourceFingerprint: read.fingerprint, note: 'HOST observed mismatch', rows: read.rows);
+    expect(await gateway.reportPurchasedUnitMismatch(command: command, realm: 'evaluation', reference: reference, line: original.lines.single,
+      buyingStoreId: 'other-store', reconcile: false), isNull); expect(source.reports, isEmpty);
+    final held = Completer<void>(); source.beforeRead = () => held.future;
+    final pending = gateway.reportPurchasedUnitMismatch(command: command, realm: 'evaluation', reference: reference, line: original.lines.single,
+      buyingStoreId: 'buying-store', reconcile: false);
+    await tester.pump(); await tester.pump(const Duration(seconds: 16)); expect(await pending, isNull);
+    held.complete(); await tester.pumpAndSettle(); expect(source.reports, isEmpty);
+    source.beforeRead = null;
+    final receipt = await gateway.reportPurchasedUnitMismatch(command: command, realm: 'evaluation', reference: reference, line: original.lines.single,
+      buyingStoreId: 'buying-store', reconcile: false);
+    expect(receipt!.reportId, 'HOST-REPORT-1'); expect(source.reports.single.toJson(), command.toJson());
+    expect(wire.requests.last['buyingStoreId'], 'buying-store');
+    source.dispose();
+  });
+
+  testWidgets('PF08 REPORT changed supplier records retire review and require explicit fresh selection', (tester) async {
+    final wire = Transport()..data = purchaseResponse(), source = DeviceReporterFixture(), drafts = DeviceDraftFixture();
+    final gateway = projectionGateway(wire, purchasedUnitSource: source);
+    final reference = WorkspacePurchaseReference.fromJson(referenceResponse()['references'][0]);
+    final line = (await gateway.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference))!.lines.single;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchasedUnitsForLine(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference, line: line, draftStore: drafts)))));
+    Future<void> tapText(String label) async {
+      await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+      await tester.tap(find.text(label)); await tester.pumpAndSettle();
+    }
+    await tapText('Device details'); await tapText('Report a device mismatch');
+    await tester.tap(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), 'HOST mismatch observation');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle(); await tapText('Review device report');
+    final oldSend = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Send device report')).onPressed!;
+    source.updateDevices(const [WorkspacePurchasedUnitRow(id: 'supplier-device-A', serial: 'HOST-UPDATED-RECORD')]); await tester.pumpAndSettle();
+    expect(find.text('Send device report'), findsNothing); oldSend(); await tester.pumpAndSettle(); expect(source.reports, isEmpty);
+    expect(drafts.saved!.publishedRevision, 1); await tapText('Review latest supplier records');
+    expect(drafts.saved!.publishedRevision, 2); expect(drafts.saved!.report!.selected, isEmpty);
+    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, 'HOST mismatch observation');
+    await tester.ensureVisible(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+    await tester.tap(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+    await tapText('Review device report'); await tapText('Send device report');
+    expect(source.reports.single.sourceRevision, 2); expect(source.reports.single.rows.single.serial, 'HOST-UPDATED-RECORD');
+    expect(source.rows.single.serial, 'HOST-UPDATED-RECORD'); expect(drafts.saved!.report!.recorded, isTrue);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
+  });
+
+  testWidgets('PF08 REPORT saved purchase consumer restores and checks its genuine report intent', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final data = purchaseResponse(), refs = referenceResponse(), source = DeviceReporterFixture();
+    final wire = Transport()..respond = (body) => switch (body['operation']) {
+      'listBuyerPurchaseReferences' => refs, 'readBuyerPurchaseProjection' => data,
+      _ => throw StateError('HOST no device report HTTP operation'),
+    };
+    source.onReport = (target, command) => source.reply(target, command, state: WorkspacePurchasedUnitPublishState.pending);
+    final gateway = projectionGateway(wire, purchasedUnitSource: source);
+    Widget host() => MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspacePurchaseOriginals(
+      gateway: gateway, role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation'))));
+    Future<void> tapText(String label) async {
+      await tester.ensureVisible(find.text(label)); await tester.pumpAndSettle();
+      await tester.tap(find.text(label)); await tester.pumpAndSettle();
+    }
+    Future<void> open() async {
+      await tapText('Saved purchase details');
+      await tester.tap(find.byKey(const ValueKey('original-order-order-v2'))); await tester.pumpAndSettle();
+      await tapText('Device details'); await tapText('Report a device mismatch');
+    }
+    await tester.pumpWidget(host()); await open();
+    await tester.ensureVisible(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+    await tester.tap(find.byType(CheckboxListTile)); await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), 'HOST different physical device');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tapText('Review device report'); await tapText('Send device report');
+    final command = source.reports.single;
+    await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpWidget(host()); await open();
+    expect(source.reports, hasLength(1)); await tapText('Check report status');
+    expect(source.checks.single.toJson(), command.toJson()); expect(source.reports, hasLength(1));
+    expect(find.text('Report reference: HOST-REPORT-1'), findsOneWidget);
+    expect(wire.requests.every((r) => ['listBuyerPurchaseReferences', 'readBuyerPurchaseProjection'].contains(r['operation'])), isTrue);
     expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink()); source.dispose();
   });
 

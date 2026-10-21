@@ -8,7 +8,7 @@ import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
 import 'work_customer_feedback.dart';
 import 'work_models.dart' show WorkspaceRestockPurchaseOriginal, WorkspaceSupplierGoodsReceipt, WorkspacePurchasedUnitRow,
-  WorkspacePurchasedUnitPublishCommand;
+  WorkspacePurchasedUnitPublishCommand, WorkspacePurchasedUnitMismatchCommand;
 
 enum WorkspaceOrderIdentityState { linked, unlinked, unavailable }
 
@@ -182,6 +182,32 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         grant = fresh.ownerAccess;
         if (!authorised()) return null;
         return reconcile ? source.checkSharing(target, command) : source.share(target, command);
+      }, valid: (reply, target) => authorised() && reply.validFor(command, target));
+  }
+
+  Future<WorkspacePurchasedUnitReportReply?> reportPurchasedUnitMismatch({required WorkspacePurchasedUnitMismatchCommand command,
+    required String realm, required WorkspacePurchaseReference reference, required WorkspacePurchasedSkuLine line,
+    String? buyingStoreId, required bool reconcile, bool Function()? inputCurrent}) {
+    final source = purchasedUnitSource, lifetime = purchasedUnitSource?.lifetime;
+    if (source is! WorkspacePurchasedUnitReporter || !command.valid) return Future.value(null);
+    final target = WorkspacePurchasedLineTarget(accountUserId: accountUserId, role: WorkspaceOrderIdentityRole.buyer,
+      realm: realm, reference: reference, line: line, buyingStoreId: buyingStoreId);
+    WorkspacePurchasedUnitReportAccess? grant;
+    bool authorised() => grant != null && source.reportAccessCurrent(grant!) && grant!.allows(target, DateTime.now().toUtc());
+    return _readPurchasedLineSupplement<WorkspacePurchasedUnitReportReply>(role: WorkspaceOrderIdentityRole.buyer,
+      realm: realm, reference: reference, line: line, buyingStoreId: buyingStoreId, inputCurrent: inputCurrent,
+      sourceCurrent: () => source.isCurrent && lifetime != null && source.lifetime == lifetime && source.accountUserId == accountUserId,
+      read: (target, current) async {
+        if (command.key.account != accountUserId || command.key.realm != realm || command.key.store != reference.storeId || command.key.binding != target.binding) return null;
+        final fresh = await source.read(target);
+        if (!current() || fresh == null || !fresh.validFor(target) || !fresh.complete || !reconcile &&
+          (fresh.revision != command.sourceRevision || fresh.fingerprint != command.sourceFingerprint ||
+            !command.rows.every((row) => fresh.rows.any((r) => jsonEncode(r.toJson()) == jsonEncode(row.toJson()))))) {
+          return null;
+        }
+        grant = fresh.reportAccess;
+        if (!authorised()) return null;
+        return reconcile ? source.checkMismatch(target, command) : source.reportMismatch(target, command);
       }, valid: (reply, target) => authorised() && reply.validFor(command, target));
   }
 
@@ -1498,6 +1524,41 @@ abstract interface class WorkspacePurchasedUnitPublisher implements WorkspacePur
 
 enum WorkspacePurchasedUnitPublishState { applied, pending, closed }
 
+/// Purchase-linked reporting grants no supplier editing or publishing rights.
+class WorkspacePurchasedUnitReportAccess {
+  const WorkspacePurchasedUnitReportAccess({required this.accountUserId, required this.targetBinding, required this.expiresAt});
+  final String accountUserId, targetBinding;
+  final DateTime expiresAt;
+  bool boundTo(WorkspacePurchasedLineTarget target) => target.role == WorkspaceOrderIdentityRole.buyer &&
+    accountUserId == target.accountUserId && targetBinding == target.binding;
+  bool allows(WorkspacePurchasedLineTarget target, DateTime now) => boundTo(target) && expiresAt.isAfter(now.toUtc());
+}
+
+abstract interface class WorkspacePurchasedUnitReporter implements WorkspacePurchasedUnitSource {
+  /// Retire revoked/expired grants permanently and notify listeners even if this
+  /// source object survives. A renewed grant cannot revive an old submission.
+  bool reportAccessCurrent(WorkspacePurchasedUnitReportAccess access);
+  Future<WorkspacePurchasedUnitReportReply?> reportMismatch(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitMismatchCommand command);
+  Future<WorkspacePurchasedUnitReportReply?> checkMismatch(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitMismatchCommand command);
+}
+
+/// A recorded report is not a resolution, accepted return, refund or replacement.
+/// Closed guarantees never recorded now or later; missing/not-found is pending.
+class WorkspacePurchasedUnitReportReply {
+  const WorkspacePurchasedUnitReportReply({required this.operationId, required this.commandFingerprint, required this.targetBinding,
+    required this.state, this.reportId, this.recordedAt});
+  final String operationId, commandFingerprint, targetBinding;
+  final WorkspacePurchasedUnitPublishState state;
+  final String? reportId;
+  final DateTime? recordedAt;
+  bool validFor(WorkspacePurchasedUnitMismatchCommand command, WorkspacePurchasedLineTarget target) =>
+    command.valid && target.role == WorkspaceOrderIdentityRole.buyer && targetBinding == target.binding && command.key.binding == target.binding &&
+    command.key.account == target.accountUserId && command.key.realm == target.realm && command.key.store == target.reference.storeId &&
+    operationId == command.operationId && commandFingerprint == command.fingerprint &&
+    (state == WorkspacePurchasedUnitPublishState.applied ? reportId != null && reportId!.isNotEmpty && reportId == reportId!.trim() &&
+      reportId!.length <= 240 && !RegExp(r'[\x00-\x1f\x7f]').hasMatch(reportId!) && recordedAt != null : reportId == null && recordedAt == null);
+}
+
 class WorkspacePurchasedUnitPublishReply {
   const WorkspacePurchasedUnitPublishReply({required this.operationId, required this.commandFingerprint,
     required this.targetBinding, required this.state, this.record});
@@ -1526,17 +1587,19 @@ class WorkspacePurchasedUnitOwnerAccess {
 
 class WorkspacePurchasedUnitsRead {
   WorkspacePurchasedUnitsRead({required this.target, required this.revision, required List<WorkspacePurchasedUnitRow> rows,
-    required this.observedAt, this.ownerAccess, this.complete = false}) : rows = List.unmodifiable(rows);
+    required this.observedAt, this.ownerAccess, this.reportAccess, this.complete = false}) : rows = List.unmodifiable(rows);
   final WorkspacePurchasedLineTarget target;
   final int revision;
   final List<WorkspacePurchasedUnitRow> rows;
   final DateTime observedAt;
   final WorkspacePurchasedUnitOwnerAccess? ownerAccess;
+  final WorkspacePurchasedUnitReportAccess? reportAccess;
   final bool complete;
   String get fingerprint => _goodsFingerprint([target.binding, revision, rows.map((r) => r.toJson()).toList(), complete]);
   bool validFor(WorkspacePurchasedLineTarget expected) => target.binding == expected.binding && revision >= 0 && revision <= 2147483647 &&
     (revision > 0 || rows.isEmpty) && rows.length <= 1000 && rows.every((r) => r.ready) &&
-    rows.map((r) => r.id).toSet().length == rows.length && (ownerAccess == null || ownerAccess!.boundTo(expected));
+    rows.map((r) => r.id).toSet().length == rows.length && (ownerAccess == null || ownerAccess!.boundTo(expected)) &&
+    (reportAccess == null || reportAccess!.boundTo(expected));
 }
 
 /// Literal recorded terms only; no coverage decision or calculated expiry.

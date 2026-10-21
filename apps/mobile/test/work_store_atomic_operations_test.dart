@@ -601,6 +601,41 @@ void main() {
     WorkspacePurchasedUnitDraft draft({int revision = 1, String serial = 'HOST-PARTIAL '}) => WorkspacePurchasedUnitDraft(
       key: key, revision: revision, publishedRevision: 0, rows: [WorkspacePurchasedUnitRow(id: 'local-device-1', serial: serial,
         imei1: '123', imei2: '456')]);
+    test('PF08 REPORT encrypted partial input original intent and recorded receipt survive restart without corrupt overwrite', () async {
+      final native = _OrderJournalStorage(), rows = [const WorkspacePurchasedUnitRow(id: 'supplier-unit', serial: 'HOST-SERIAL', imei1: '111', imei2: '222')];
+      SecureWorkPurchasedUnitDraftStore create() => SecureWorkPurchasedUnitDraftStore(accountScope: () => key.account,
+        targetScope: () => key.identity, storage: native);
+      final input = WorkspacePurchasedUnitMismatchDraft(sourceFingerprint: 'b' * 64, note: ' HOST mismatch\n', selected: const ['supplier-unit']);
+      final saved = WorkspacePurchasedUnitDraft(key: key, revision: 1, publishedRevision: 2, rows: rows, report: input);
+      await create().save(saved, expectedRevision: null);
+      expect((await create().read(key))!.toJson(), saved.toJson()); expect(saved.toJson()['version'], 3);
+      final command = WorkspacePurchasedUnitMismatchCommand(key: key, operationId: 'c' * 32, sourceRevision: 2,
+        sourceFingerprint: input.sourceFingerprint, note: input.note.trim(), rows: rows);
+      final pending = WorkspacePurchasedUnitDraft(key: key, revision: 2, publishedRevision: 2, rows: rows,
+        report: WorkspacePurchasedUnitMismatchDraft(sourceFingerprint: input.sourceFingerprint, note: input.note, selected: input.selected, pending: command));
+      await create().save(pending, expectedRevision: 1);
+      expect((await create().read(key))!.report!.pending!.toJson(), command.toJson());
+      final received = WorkspacePurchasedUnitDraft(key: key, revision: 3, publishedRevision: 2, rows: rows,
+        report: WorkspacePurchasedUnitMismatchDraft(sourceFingerprint: input.sourceFingerprint, note: input.note, selected: input.selected, pending: command,
+          reportId: 'HOST-REPORT-REFERENCE', recordedAt: DateTime.utc(2026, 10, 21)));
+      await create().save(received, expectedRevision: 2);
+      expect((await create().read(key))!.report!.recorded, isTrue);
+      expect((await create().read(key))!.report!.pending!.toJson(), command.toJson());
+      for (final bad in [{...command.toJson(), 'note': 'CHANGED'}, {...command.toJson(), 'sourceRevision': 2.0}, {...command.toJson(), 'outside': true}]) {
+        expect(() => WorkspacePurchasedUnitMismatchCommand.fromJson(bad), throwsFormatException);
+      }
+      for (final report in [{...input.toJson(), 'selected': ['outside-device']}, {...received.report!.toJson(), 'reportId': null},
+        {...received.report!.toJson(), 'recordedAt': 'not-a-date'}]) {
+        expect(() => WorkspacePurchasedUnitDraft.fromJson({...received.toJson(), 'report': report}), throwsFormatException);
+      }
+      final storageKey = native.values.keys.single, raw = jsonDecode(native.values.values.single) as Map<String, dynamic>;
+      ((raw['report'] as Map)['pending'] as Map)['fingerprint'] = 'f' * 64; native.values[storageKey] = jsonEncode(raw);
+      final retained = Map.of(native.values), writes = native.writes.length;
+      await expectLater(create().read(key), throwsA(isA<WorkGatewayException>()));
+      await expectLater(create().save(WorkspacePurchasedUnitDraft(key: key, revision: 4, publishedRevision: 2, rows: rows, report: input),
+        expectedRevision: 3), throwsA(isA<WorkGatewayException>()));
+      expect(native.values, retained); expect(native.writes, hasLength(writes));
+    });
     test('PF08 SHARE original pending payload survives native restart and rejects tampered journal bytes', () async {
       final native = _OrderJournalStorage();
       SecureWorkPurchasedUnitDraftStore create() => SecureWorkPurchasedUnitDraftStore(accountScope: () => key.account,

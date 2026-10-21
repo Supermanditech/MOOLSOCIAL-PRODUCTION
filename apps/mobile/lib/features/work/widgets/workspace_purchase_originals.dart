@@ -4,7 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../work_order_identity_gateway.dart';
 import '../work_catalogue_gateway.dart';
-import '../work_models.dart' show WorkspacePurchasedUnitRow, WorkspacePurchasedUnitDraft, WorkspacePurchasedUnitDraftKey, WorkspacePurchasedUnitPublishCommand;
+import '../work_models.dart' show WorkspacePurchasedUnitRow, WorkspacePurchasedUnitDraft, WorkspacePurchasedUnitDraftKey, WorkspacePurchasedUnitPublishCommand,
+  WorkspacePurchasedUnitMismatchDraft, WorkspacePurchasedUnitMismatchCommand;
 import '../work_services.dart' show WorkPurchasedUnitDraftStore, SecureWorkPurchasedUnitDraftStore;
 
 /// Shared quotation surface, deliberately separate from purchased orders.
@@ -889,13 +890,19 @@ class WorkspacePurchasedUnitsForLine extends StatefulWidget {
 // Accepted private edits outlive their screen while a native write is pending.
 // This contains no supplier-published facts and cannot grant access to a Store.
 class _UnitDraftPendingEdits {
-  _UnitDraftPendingEdits(this.version, List<WorkspacePurchasedUnitRow> rows) : rows = List.unmodifiable(rows);
+  _UnitDraftPendingEdits(this.version, List<WorkspacePurchasedUnitRow> rows, this.report) : rows = List.unmodifiable(rows);
   int version;
   List<WorkspacePurchasedUnitRow> rows;
-  void offer(int nextVersion, List<WorkspacePurchasedUnitRow> nextRows) {
-    version = nextVersion; rows = List.unmodifiable(nextRows);
+  WorkspacePurchasedUnitMismatchDraft? report;
+  void offer(int nextVersion, List<WorkspacePurchasedUnitRow> nextRows, WorkspacePurchasedUnitMismatchDraft? nextReport) {
+    version = nextVersion; rows = List.unmodifiable(nextRows); report = nextReport;
   }
 }
+
+bool _deviceDraftAccess(WorkspacePurchasedUnitSource source, WorkspacePurchasedLineTarget target,
+  WorkspacePurchasedUnitOwnerAccess? owner, WorkspacePurchasedUnitReportAccess? buyer) =>
+  target.role == WorkspaceOrderIdentityRole.seller ? owner != null && source.ownerAccessCurrent(owner) && owner.allows(target, DateTime.now().toUtc()) :
+    source is WorkspacePurchasedUnitReporter && buyer != null && source.reportAccessCurrent(buyer) && buyer.allows(target, DateTime.now().toUtc());
 
 class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnitsForLine> with WidgetsBindingObserver {
   final _storage = PageStorageBucket();
@@ -910,7 +917,9 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
   Object _saveToken = Object();
   _UnitDraftPendingEdits? _pendingEdits;
   WorkspacePurchasedUnitPublishCommand? _command, _reviewCommand;
-  (List<WorkspacePurchasedUnitRow>, int)? _keptSharingEdits;
+  (List<WorkspacePurchasedUnitRow>, int, WorkspacePurchasedUnitMismatchDraft?)? _keptSharingEdits;
+  WorkspacePurchasedUnitMismatchDraft? _report;
+  WorkspacePurchasedUnitMismatchCommand? _reportReview;
   bool _sharing = false;
   Object _shareToken = Object();
   Timer? _expiry;
@@ -930,15 +939,21 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
     return _current(_generation) && !_loading && widget.role == WorkspaceOrderIdentityRole.seller &&
       _record?.complete == true && access != null && source != null && source.ownerAccessCurrent(access) && access.allows(_target, DateTime.now().toUtc());
   }
+  bool get _canReport {
+    final source = widget.gateway.purchasedUnitSource;
+    return _current(_generation) && !_loading && widget.role == WorkspaceOrderIdentityRole.buyer && _record?.complete == true &&
+      source != null && _deviceDraftAccess(source, _target, null, _record?.reportAccess);
+  }
+  bool get _canDraft => _canEdit || _canReport;
   WorkspacePurchasedUnitDraftKey get _draftKey => WorkspacePurchasedUnitDraftKey(account: _target.accountUserId,
     realm: _target.realm, store: _target.reference.storeId, binding: _target.binding);
   WorkPurchasedUnitDraftStore get _store {
     if (widget.draftStore case final supplied?) return supplied;
     return _privateStore ??= (() {
       final gateway = widget.gateway, source = gateway.purchasedUnitSource!, lifetime = source.lifetime,
-        access = _record!.ownerAccess!, target = _target, key = _draftKey;
+        access = _record!.ownerAccess, reportAccess = _record!.reportAccess, target = _target, key = _draftKey;
       bool authorised() => gateway.isCurrent && source.isCurrent && source.lifetime == lifetime &&
-        source.accountUserId == gateway.accountUserId && source.ownerAccessCurrent(access) && access.allows(target, DateTime.now().toUtc());
+        source.accountUserId == gateway.accountUserId && _deviceDraftAccess(source, target, access, reportAccess);
       // A frozen, already requested private write may finish after its UI closes,
       // only for this still-authorised principal and original namespace.
       return SecureWorkPurchasedUnitDraftStore(accountScope: () => authorised() ? gateway.accountUserId : null,
@@ -976,7 +991,7 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
     _record = null; _latest = null; _rows = []; _checkedCopy = null; _privateStore = null; _draftReady = false; _editing = false;
     _draftLoading = false; _saving = false; _saveToken = Object(); _pendingEdits = null; _recovery = false; _reviewCopy = false; _localRevision = null;
     _editVersion = 0; _savedVersion = 0; _publishedRevision = 0; _draftStatus = '';
-    _command = null; _reviewCommand = null; _sharing = false; _shareToken = Object(); _keptSharingEdits = null;
+    _command = null; _reviewCommand = null; _sharing = false; _shareToken = Object(); _keptSharingEdits = null; _report = null; _reportReview = null;
   }
   @override void dispose() {
     _generation++; _draftVisit++; _expiry?.cancel(); widget.gateway.purchasedUnitSource?.removeListener(_sourceChanged);
@@ -994,38 +1009,50 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
     if (!_current(visit) || !_expanded) return;
     final previous = _latest, accepted = result != null && (previous == null || result.revision > previous.revision ||
       result.revision == previous.revision && result.fingerprint == previous.fingerprint);
-    setState(() { _loading = false; _unavailable = !accepted; _record = accepted ? result : null; if (accepted) _latest = result; _privateStore = null; });
+    setState(() {
+      _loading = false; _unavailable = !accepted; _record = accepted ? result : null; _privateStore = null;
+      if (accepted) {
+        _latest = result;
+        if (_reviewCommand != null && _reviewCommand!.expectedRevision != result.revision ||
+          _reportReview != null && _reportReview!.sourceFingerprint != result.fingerprint) {
+          _reviewCommand = null; _reportReview = null; _draftStatus = 'Supplier device records changed. Review the latest records before continuing.';
+        }
+      }
+    });
     _expiry?.cancel();
-    final deadline = _record?.ownerAccess?.expiresAt;
+    final deadline = _record?.ownerAccess?.expiresAt ?? _record?.reportAccess?.expiresAt;
     if (deadline != null && deadline.isAfter(DateTime.now().toUtc())) {
       _expiry = Timer(deadline.difference(DateTime.now().toUtc()), () { if (_current(visit)) setState(() {}); });
     }
   }
   String _rowBytes(List<WorkspacePurchasedUnitRow> rows) => jsonEncode(rows.map((r) => r.toJson()).toList());
+  String _draftBytes(List<WorkspacePurchasedUnitRow> rows, WorkspacePurchasedUnitMismatchDraft? report) => jsonEncode([_rowBytes(rows), report?.toJson()]);
   Future<void> _loadDraft({bool recover = false}) async {
-    if (!_expanded || !_canEdit || _draftLoading || _saving || _sharing) return;
+    if (!_expanded || !_canDraft || _draftLoading || _saving || _sharing) return;
     final visit = _generation, draftVisit = ++_draftVisit, store = _store, key = _draftKey;
     setState(() { _editing = true; _draftLoading = true; _draftStatus = 'Opening private draft…'; });
     try {
       final saved = await store.read(key);
       if (!_current(visit) || !_expanded || draftVisit != _draftVisit) return;
       if (saved != null && (!saved.valid || saved.key.identity != key.identity)) throw const FormatException();
-      if (!_canEdit) { setState(() { _recovery = true; _draftStatus = 'Draft access changed. Check the saved copy when access is restored.'; }); return; }
+      if (saved != null && (widget.role == WorkspaceOrderIdentityRole.buyer) != (saved.report != null)) throw const FormatException();
+      if (!_canDraft) { setState(() { _recovery = true; _draftStatus = 'Draft access changed. Check the saved copy when access is restored.'; }); return; }
       setState(() {
-        _localRevision = saved?.revision; _draftReady = true; _recovery = false; _command = saved?.pending; _reviewCommand = null;
-        if (_command != null) {
-          if (_editVersion != _savedVersion && _rowBytes(_rows) != _rowBytes(saved!.rows)) {
-            _keptSharingEdits ??= (List.unmodifiable(_rows), _publishedRevision);
+        _localRevision = saved?.revision; _draftReady = true; _recovery = false; _command = saved?.pending; _reviewCommand = null; _reportReview = null;
+        if (_command != null || saved?.report?.pending != null) {
+          if (_editVersion != _savedVersion && _draftBytes(_rows, _report) != _draftBytes(saved!.rows, saved.report)) {
+            _keptSharingEdits ??= (List.unmodifiable(_rows), _publishedRevision, _report);
           }
-          _rows = List.of(saved!.rows); _publishedRevision = saved.publishedRevision; _savedVersion = _editVersion;
-          _reviewCopy = false; _draftStatus = 'Sharing result needs checking. Your saved request is kept.';
+          _rows = List.of(saved!.rows); _report = saved.report; _publishedRevision = saved.publishedRevision; _savedVersion = _editVersion;
+          _reviewCopy = false; _draftStatus = _report?.recorded == true ? 'Report recorded. Reference: ${_report!.reportId}' : 'Result needs checking. Your saved request is kept.';
         } else if (_keptSharingEdits case final kept?) {
-          _rows = List.of(kept.$1); _publishedRevision = kept.$2; _checkedCopy = saved;
+          _rows = List.of(kept.$1); _publishedRevision = kept.$2; _report = kept.$3; _checkedCopy = saved;
           _reviewCopy = true; _editVersion++; _keptSharingEdits = null; _draftStatus = 'Sharing checked. Choose between your kept edits and the saved draft.';
-        } else if (recover && _editVersion != _savedVersion && _rowBytes(_rows) != _rowBytes(saved?.rows ?? const [])) {
+        } else if (recover && _editVersion != _savedVersion && _draftBytes(_rows, _report) != _draftBytes(saved?.rows ?? const [], saved?.report)) {
           _checkedCopy = saved; _reviewCopy = true; _draftStatus = 'Saved draft checked. Choose which copy to keep.';
         } else {
           _rows = List.of(saved?.rows ?? _record!.rows); _publishedRevision = saved?.publishedRevision ?? _record!.revision;
+          _report = saved?.report ?? (widget.role == WorkspaceOrderIdentityRole.buyer ? WorkspacePurchasedUnitMismatchDraft(sourceFingerprint: _record!.fingerprint) : null);
           _savedVersion = _editVersion; _reviewCopy = false; _draftStatus = saved == null ? 'Private draft · not shared' : 'Saved on this device · not shared';
         }
       });
@@ -1034,25 +1061,25 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
       if (_current(visit) && _expanded && draftVisit == _draftVisit) setState(() { _recovery = true; _draftStatus = 'Private draft could not be checked. Saved data and your edits are kept.'; });
     } finally { if (_current(visit) && draftVisit == _draftVisit) setState(() { _draftLoading = false; }); }
   }
-  bool get _editable => _expanded && _canEdit && _editing && _draftReady && !_draftLoading && !_recovery && !_reviewCopy &&
-    !_sharing && _command == null && _reviewCommand == null;
-  bool get _shareReady => _editable && !_saving && _editVersion == _savedVersion && _localRevision != null &&
+  bool get _editable => _expanded && _canDraft && _editing && _draftReady && !_draftLoading && !_recovery && !_reviewCopy &&
+    !_sharing && _command == null && _reviewCommand == null && _report?.pending == null && _reportReview == null;
+  bool get _shareReady => widget.role == WorkspaceOrderIdentityRole.seller && _editable && !_saving && _editVersion == _savedVersion && _localRevision != null &&
     _publishedRevision == _record?.revision && _rows.every((r) => r.ready) && widget.gateway.purchasedUnitSource is WorkspacePurchasedUnitPublisher;
   bool _draftActionCurrent(int visit, int draftVisit) => _current(visit) && _expanded && draftVisit == _draftVisit;
-  void _change(List<WorkspacePurchasedUnitRow> rows) {
+  void _change(List<WorkspacePurchasedUnitRow> rows, {WorkspacePurchasedUnitMismatchDraft? report}) {
     if (!_editable || rows.length > 1000 || rows.any((r) => !r.validDraft)) return;
-    setState(() { _rows = List.of(rows); _editVersion++; _draftStatus = 'Saving private draft…'; });
-    if (_saving) _pendingEdits?.offer(_editVersion, _rows);
+    setState(() { _rows = List.of(rows); _report = report ?? _report; _editVersion++; _draftStatus = 'Saving private draft…'; });
+    if (_saving) _pendingEdits?.offer(_editVersion, _rows, _report);
     unawaited(_save());
   }
   Future<void> _save() async {
     if (!_editable || _saving || _savedVersion == _editVersion) return;
     final visit = _generation, owner = _owner, saveToken = _saveToken, store = _store, key = _draftKey;
     final gateway = widget.gateway, source = gateway.purchasedUnitSource!, lifetime = source.lifetime,
-      access = _record!.ownerAccess!, target = _target, publishedRevision = _publishedRevision;
+      access = _record!.ownerAccess, reportAccess = _record!.reportAccess, target = _target, publishedRevision = _publishedRevision;
     bool authorised() => gateway.isCurrent && source.isCurrent && source.lifetime == lifetime &&
-      source.accountUserId == gateway.accountUserId && source.ownerAccessCurrent(access) && access.allows(target, DateTime.now().toUtc());
-    final pending = _UnitDraftPendingEdits(_editVersion, _rows);
+      source.accountUserId == gateway.accountUserId && _deviceDraftAccess(source, target, access, reportAccess);
+    final pending = _UnitDraftPendingEdits(_editVersion, _rows, _report);
     _pendingEdits = pending;
     var localRevision = _localRevision, savedVersion = _savedVersion;
     setState(() { _saving = true; });
@@ -1068,7 +1095,7 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
       while (authorised() && savedVersion != pending.version) {
         final version = pending.version, expected = localRevision;
         final next = WorkspacePurchasedUnitDraft(key: key, revision: (expected ?? 0) + 1,
-          publishedRevision: publishedRevision, rows: pending.rows);
+          publishedRevision: publishedRevision, rows: pending.rows, report: pending.report);
         await store.save(next, expectedRevision: expected);
         localRevision = next.revision; savedVersion = version;
         if (_current(visit) && owner == _owner) { _localRevision = localRevision; _savedVersion = savedVersion; }
@@ -1089,16 +1116,21 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
     }
   }
   void _chooseCopy(bool kept, int visit, int draftVisit, WorkspacePurchasedUnitDraft? checkedCopy) {
-    if (!_draftActionCurrent(visit, draftVisit) || !identical(checkedCopy, _checkedCopy) || !_canEdit || !_reviewCopy || _saving) return;
+    if (!_draftActionCurrent(visit, draftVisit) || !identical(checkedCopy, _checkedCopy) || !_canDraft || !_reviewCopy || _saving) return;
     setState(() {
       _reviewCopy = false; _recovery = false;
-      if (!kept) { _rows = List.of(_checkedCopy?.rows ?? const []); _publishedRevision = _checkedCopy?.publishedRevision ?? _record!.revision; _savedVersion = _editVersion; }
+      if (!kept) {
+        _rows = List.of(_checkedCopy?.rows ?? (widget.role == WorkspaceOrderIdentityRole.buyer ? _record!.rows : const []));
+        _report = _checkedCopy?.report ?? (widget.role == WorkspaceOrderIdentityRole.buyer ? WorkspacePurchasedUnitMismatchDraft(sourceFingerprint: _record!.fingerprint) : null);
+        _publishedRevision = _checkedCopy?.publishedRevision ?? _record!.revision; _savedVersion = _editVersion;
+      }
       else { _editVersion++; }
       _draftVisit++; _draftStatus = kept ? 'Saving private draft…' : 'Saved on this device · not shared';
     });
     if (kept) unawaited(_save());
   }
   void _field(String id, String field, String value) {
+    if (!_canEdit) return;
     final rows = [for (final row in _rows) row.id != id ? row : WorkspacePurchasedUnitRow(id: row.id,
       serial: field == 'serial' ? value : row.serial, imei1: field == 'imei1' ? value : row.imei1, imei2: field == 'imei2' ? value : row.imei2)];
     _change(rows);
@@ -1110,10 +1142,89 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
       expectedRevision: _publishedRevision, rows: _rows); });
   }
   void _rebaseDraft(int visit, int draftVisit, WorkspacePurchasedUnitsRead record, bool useSupplier) {
-    if (!_draftActionCurrent(visit, draftVisit) || !_editable || _saving || !identical(record, _record)) return;
+    if (!_draftActionCurrent(visit, draftVisit) || !_canEdit || !_editable || _saving || !identical(record, _record)) return;
     _publishedRevision = record.revision;
     _draftVisit++;
     _change(useSupplier ? record.rows : _rows);
+  }
+  bool get _reportReady => _canReport && _editable && !_saving && _editVersion == _savedVersion && _localRevision != null &&
+    _report != null && _report!.selected.isNotEmpty && _report!.note.trim().isNotEmpty &&
+    _publishedRevision == _record?.revision && _report!.sourceFingerprint == _record?.fingerprint;
+  void _changeReport({String? note, List<String>? selected}) {
+    if (!_canReport || !_editable || _report == null) return;
+    final report = WorkspacePurchasedUnitMismatchDraft(sourceFingerprint: _report!.sourceFingerprint,
+      note: note ?? _report!.note, selected: selected ?? _report!.selected);
+    if (!report.validFor(_draftKey, _publishedRevision, _rows)) return;
+    _change(_rows, report: report);
+  }
+  void _latestReportSource(int visit, int draftVisit, WorkspacePurchasedUnitsRead record) {
+    if (!_draftActionCurrent(visit, draftVisit) || !_canReport || !_editable || _saving || !identical(record, _record)) return;
+    _publishedRevision = record.revision; _draftVisit++;
+    _change(record.rows, report: WorkspacePurchasedUnitMismatchDraft(sourceFingerprint: record.fingerprint, note: _report?.note ?? ''));
+  }
+  void _reviewMismatch(int visit, int draftVisit) {
+    if (!_draftActionCurrent(visit, draftVisit) || !_reportReady) return;
+    final command = WorkspacePurchasedUnitMismatchCommand(key: _draftKey, operationId: _operationId(), sourceRevision: _publishedRevision,
+      sourceFingerprint: _report!.sourceFingerprint, note: _report!.note.trim(), rows: _rows.where((r) => _report!.selected.contains(r.id)).toList());
+    if (command.valid) setState(() { _reportReview = command; });
+  }
+  Future<void> _sendMismatch(WorkspacePurchasedUnitMismatchCommand command, {required bool reconcile}) async {
+    if (!_expanded || !_canReport || _sharing || _saving || _draftLoading || _report == null || _report!.recorded) return;
+    if (reconcile ? _report!.pending?.fingerprint != command.fingerprint : _reportReview?.fingerprint != command.fingerprint ||
+      _report!.pending != null || _editVersion != _savedVersion || _publishedRevision != _record?.revision || _report!.sourceFingerprint != _record?.fingerprint) {
+      return;
+    }
+    final visit = _generation, draftVisit = _draftVisit, store = _store, key = _draftKey, token = _shareToken,
+      source = widget.gateway.purchasedUnitSource!, lease = _record!.reportAccess!, target = _target;
+    bool current() => _draftActionCurrent(visit, draftVisit) && _deviceDraftAccess(source, target, null, lease);
+    setState(() {
+      _sharing = true; _reportReview = null;
+      _report = WorkspacePurchasedUnitMismatchDraft(sourceFingerprint: _report!.sourceFingerprint, note: _report!.note, selected: _report!.selected, pending: command);
+      _draftStatus = 'Checking device report…';
+    });
+    try {
+      if (!reconcile) {
+        final pending = WorkspacePurchasedUnitDraft(key: key, revision: (_localRevision ?? 0) + 1,
+          publishedRevision: _publishedRevision, rows: _rows, report: _report);
+        await store.save(pending, expectedRevision: _localRevision).timeout(const Duration(seconds: 10));
+        if (!current()) return;
+        _localRevision = pending.revision;
+      } else {
+        final saved = await store.read(key).timeout(const Duration(seconds: 10));
+        if (!current()) return;
+        if (saved == null || !saved.valid || saved.key.identity != key.identity || saved.report?.pending?.fingerprint != command.fingerprint || saved.report!.recorded) {
+          setState(() { _recovery = true; _draftStatus = 'Check the saved private report before continuing.'; }); return;
+        }
+        _localRevision = saved.revision;
+      }
+      if (!current() || !_canReport) return;
+      final reply = await widget.gateway.reportPurchasedUnitMismatch(command: command, realm: widget.realm, reference: widget.reference,
+        line: widget.line, buyingStoreId: widget.buyingStoreId, reconcile: reconcile, inputCurrent: current);
+      if (!current()) return;
+      if (reply == null || reply.state == WorkspacePurchasedUnitPublishState.pending) {
+        setState(() { _draftStatus = 'Report result needs checking. Your saved request is kept.'; }); return;
+      }
+      final recorded = reply.state == WorkspacePurchasedUnitPublishState.applied;
+      final report = WorkspacePurchasedUnitMismatchDraft(sourceFingerprint: _report!.sourceFingerprint, note: _report!.note, selected: _report!.selected,
+        pending: recorded ? command : null, reportId: reply.reportId, recordedAt: reply.recordedAt?.toUtc());
+      final resolved = WorkspacePurchasedUnitDraft(key: key, revision: _localRevision! + 1, publishedRevision: _publishedRevision, rows: _rows, report: report);
+      await store.save(resolved, expectedRevision: _localRevision).timeout(const Duration(seconds: 10));
+      if (!current()) return;
+      setState(() {
+        _localRevision = resolved.revision; _report = report; _recovery = false; _draftVisit++; _savedVersion = _editVersion;
+        _draftStatus = recorded ? 'Report recorded. Reference: ${reply.reportId}' : 'Report not sent. Your private draft is kept.';
+        if (!recorded) {
+          if (_keptSharingEdits case final kept?) {
+            _rows = List.of(kept.$1); _publishedRevision = kept.$2; _report = kept.$3; _checkedCopy = resolved;
+            _reviewCopy = true; _editVersion++; _keptSharingEdits = null; _draftStatus = 'Choose between your kept edits and the saved report draft.';
+          }
+        }
+      });
+    } on Object {
+      if (current()) setState(() { _recovery = true; _draftStatus = 'Report result needs checking. Recover the saved draft before continuing.'; });
+    } finally {
+      if (mounted && identical(token, _shareToken)) setState(() { _sharing = false; });
+    }
   }
   Future<void> _share(WorkspacePurchasedUnitPublishCommand command, {required bool reconcile}) async {
     if (!_expanded || !_canEdit || _sharing || _saving || _draftLoading || widget.gateway.purchasedUnitSource is! WorkspacePurchasedUnitPublisher) return;
@@ -1121,8 +1232,9 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
       _command != null || _editVersion != _savedVersion || _publishedRevision != _record?.revision || _rowBytes(_rows) != _rowBytes(command.rows)) {
       return;
     }
-    final visit = _generation, draftVisit = _draftVisit, store = _store, key = _draftKey, shareToken = _shareToken;
-    bool current() => _draftActionCurrent(visit, draftVisit);
+    final visit = _generation, draftVisit = _draftVisit, store = _store, key = _draftKey, shareToken = _shareToken,
+      source = widget.gateway.purchasedUnitSource!, lease = _record!.ownerAccess!, target = _target;
+    bool current() => _draftActionCurrent(visit, draftVisit) && _deviceDraftAccess(source, target, lease, null);
     setState(() { _sharing = true; _command = command; _reviewCommand = null; _draftStatus = 'Checking device sharing…'; });
     try {
       if (!reconcile) {
@@ -1161,7 +1273,7 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
         if (record != null && (_latest == null || record.revision > _latest!.revision)) { _record = record; _latest = record; }
         _draftStatus = record == null ? 'Not shared. Your private draft is kept.' : 'Device details shared with the buyer.';
         if (_keptSharingEdits case final kept?) {
-          _rows = List.of(kept.$1); _publishedRevision = kept.$2; _checkedCopy = resolved;
+          _rows = List.of(kept.$1); _publishedRevision = kept.$2; _report = kept.$3; _checkedCopy = resolved;
           _reviewCopy = true; _editVersion++; _keptSharingEdits = null; _draftStatus = 'Sharing checked. Choose between your kept edits and the saved draft.';
         }
       });
@@ -1199,15 +1311,20 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
           if (record.rows.isEmpty) Text(record.complete ? 'No device identifiers were supplied for this purchase.' : 'No device identifiers were returned in this partial view.'),
           for (final row in record.rows) Padding(padding: const EdgeInsets.symmetric(vertical: 6),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [for (final label in row.labels) Text(label)])),
-          if (widget.role == WorkspaceOrderIdentityRole.buyer && record.rows.isNotEmpty) const Text('Mismatch reporting is unavailable.'),
+          if (widget.role == WorkspaceOrderIdentityRole.buyer) ...[
+            if (!_canReport) const Text('Mismatch reporting is unavailable.'),
+            if (_canReport && !_editing) TextButton(onPressed: () {
+              if (_draftActionCurrent(visit, draftVisit) && _canReport && !_editing) unawaited(_loadDraft());
+            }, child: const Text('Report a device mismatch')),
+          ],
           if (widget.role == WorkspaceOrderIdentityRole.seller) ...[
             if (!canEdit) const Text('Device draft editing is unavailable. Saved private drafts are kept.'),
             if (canEdit && !_editing) TextButton(onPressed: () { if (_draftActionCurrent(visit, draftVisit) && _canEdit && !_editing) unawaited(_loadDraft()); }, child: const Text('Prepare device details')),
           ],
         ],
-        if (canEdit && _editing) ...[
-          const Divider(height: 16), const Text('Private device draft'),
-          const Text('Add one row for each actual device. Serial and both IMEIs belong on the same row.'),
+        if (_canDraft && _editing) ...[
+          const Divider(height: 16), Text(widget.role == WorkspaceOrderIdentityRole.buyer ? 'Private mismatch report' : 'Private device draft'),
+          if (widget.role == WorkspaceOrderIdentityRole.seller) const Text('Add one row for each actual device. Serial and both IMEIs belong on the same row.'),
           if (_draftStatus.isNotEmpty) Text(_draftStatus, key: const ValueKey('unit-draft-status')),
           if (_draftLoading || _sharing) const LinearProgressIndicator(minHeight: 2),
           if (_recovery) TextButton(onPressed: _draftLoading || _saving || _sharing ? null : () {
@@ -1215,13 +1332,15 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
           }, child: const Text('Recover private draft')),
           if (_reviewCopy) ...[
             const Text('Your kept edits'),
-            ..._copyReview(_rows),
+            ..._copyReview(_rows, report: _report),
             const Text('Saved on this device'),
-            ..._copyReview(checkedCopy?.rows ?? const []),
+            ..._copyReview(checkedCopy?.rows ?? const [], report: checkedCopy?.report),
             Wrap(children: [TextButton(onPressed: () => _chooseCopy(false, visit, draftVisit, checkedCopy), child: const Text('Use saved draft')),
               TextButton(onPressed: () => _chooseCopy(true, visit, draftVisit, checkedCopy), child: const Text('Save kept edits'))]),
           ],
           if (_draftReady && !_reviewCopy) ...[
+            if (widget.role == WorkspaceOrderIdentityRole.buyer) _reportBody(context, visit, draftVisit, record)
+            else ...[
             if (_publishedRevision != record?.revision) ...[
               const Text('Supplier records changed. Compare the supplier records above with your draft before sharing.'),
               if (record != null && _editable && !_saving) Wrap(children: [
@@ -1264,11 +1383,67 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
                   if (_draftActionCurrent(visit, draftVisit) && identical(review, _reviewCommand)) unawaited(_share(review, reconcile: false));
                 }, child: const Text('Share device details'))]),
             ] else TextButton(onPressed: !_shareReady ? null : () => _reviewSharing(visit, draftVisit), child: const Text('Review and share device details')),
+            ],
           ],
         ],
       ])]));
   }
-  Iterable<Widget> _copyReview(List<WorkspacePurchasedUnitRow> rows) sync* {
+  Widget _reportBody(BuildContext context, int visit, int draftVisit, WorkspacePurchasedUnitsRead? record) {
+    final report = _report, review = _reportReview;
+    if (report == null) return const Text('Private report is unavailable. Recover the saved draft before continuing.');
+    if (report.recorded) {
+      final at = report.recordedAt!.toLocal(), local = MaterialLocalizations.of(context);
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('Report reference: ${report.reportId}'), Text('Recorded ${local.formatMediumDate(at)} ${local.formatTimeOfDay(TimeOfDay.fromDateTime(at))}'),
+        ..._copyReview(_rows.where((r) => report.selected.contains(r.id)).toList()), SelectableText(report.note.trim()),
+        if (_keptSharingEdits?.$3 case final kept?) ...[const Text('Unsaved report note kept on this screen'), SelectableText(kept.note)],
+      ]);
+    }
+    if (report.pending case final pending?) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Editing is locked until this report is checked.'), ..._copyReview(pending.rows), Text(pending.note),
+        TextButton(onPressed: _sharing || _recovery ? null : () {
+          if (_draftActionCurrent(visit, draftVisit) && identical(pending, _report?.pending)) unawaited(_sendMismatch(pending, reconcile: true));
+        }, child: const Text('Check report status')),
+      ]);
+    }
+    if (review != null) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Review your device mismatch report'), const Text('This report will be shared privately with the supplier for this purchase.'),
+        ..._copyReview(review.rows), Text(review.note),
+        Wrap(children: [TextButton(onPressed: () {
+          if (_draftActionCurrent(visit, draftVisit) && identical(review, _reportReview)) setState(() { _reportReview = null; });
+        }, child: const Text('Back to report')),
+          FilledButton(onPressed: () {
+            if (_draftActionCurrent(visit, draftVisit) && identical(review, _reportReview)) unawaited(_sendMismatch(review, reconcile: false));
+          }, child: const Text('Send device report'))]),
+      ]);
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const Text('Select the supplier-recorded devices that differ from what you received.'),
+      if (record != null && (_publishedRevision != record.revision || report.sourceFingerprint != record.fingerprint)) ...[
+        const Text('Supplier device records changed. Review the latest records and select the affected devices again.'),
+        TextButton(onPressed: !_editable || _saving ? null : () => _latestReportSource(visit, draftVisit, record), child: const Text('Review latest supplier records')),
+      ],
+      for (final (index, row) in _rows.indexed) CheckboxListTile(key: ValueKey(('mismatch-device', row.id)), contentPadding: EdgeInsets.zero,
+        dense: true, controlAffinity: ListTileControlAffinity.leading, title: Text('Device ${index + 1}'), subtitle: Text(row.labels.join('\n')),
+        value: report.selected.contains(row.id), onChanged: !_editable ? null : (selected) {
+          if (!_draftActionCurrent(visit, draftVisit)) return;
+          final ids = {...report.selected}; if (selected == true) { ids.add(row.id); } else { ids.remove(row.id); }
+          _changeReport(selected: _rows.where((r) => ids.contains(r.id)).map((r) => r.id).toList());
+        }),
+      TextFormField(key: ValueKey(('mismatch-note', _owner, _draftVisit)), initialValue: report.note, enabled: _editable,
+        minLines: 2, maxLines: 4, maxLength: 2000, decoration: const InputDecoration(labelText: 'Describe the mismatch'),
+        onChanged: (note) { if (_draftActionCurrent(visit, draftVisit)) _changeReport(note: note); }),
+      const Text('Select a device and describe what differs before sending.'),
+      TextButton(onPressed: !_reportReady ? null : () => _reviewMismatch(visit, draftVisit), child: const Text('Review device report')),
+    ]);
+  }
+  Iterable<Widget> _copyReview(List<WorkspacePurchasedUnitRow> rows, {WorkspacePurchasedUnitMismatchDraft? report}) sync* {
+    if (report != null) {
+      yield Text(report.note.isEmpty ? 'No report description saved.' : report.note);
+      yield Text('${report.selected.length} selected devices');
+    }
     if (rows.isEmpty) yield const Text('No saved device rows.');
     for (final (index, row) in rows.indexed) {
       yield Text('Device ${index + 1}');

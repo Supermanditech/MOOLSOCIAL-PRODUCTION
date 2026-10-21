@@ -288,29 +288,96 @@ class WorkspacePurchasedUnitPublishCommand {
   }
 }
 
+/// An observation about existing supplier rows, never an edit to those rows.
+class WorkspacePurchasedUnitMismatchCommand {
+  WorkspacePurchasedUnitMismatchCommand({required this.key, required this.operationId, required this.sourceRevision,
+    required this.sourceFingerprint, required this.note, required List<WorkspacePurchasedUnitRow> rows}) : rows = List.unmodifiable(rows);
+  final WorkspacePurchasedUnitDraftKey key;
+  final String operationId, sourceFingerprint, note;
+  final int sourceRevision;
+  final List<WorkspacePurchasedUnitRow> rows;
+  bool get valid => key.valid && RegExp(r'^[a-f0-9]{32}$').hasMatch(operationId) && sourceRevision > 0 && sourceRevision <= 2147483647 &&
+    RegExp(r'^[a-f0-9]{64}$').hasMatch(sourceFingerprint) && note.isNotEmpty && note == note.trim() && _noteValid(note) &&
+    rows.isNotEmpty && rows.length <= 1000 && rows.every((r) => r.ready) && rows.map((r) => r.id).toSet().length == rows.length;
+  static bool _noteValid(String note) => note.length <= 2000 && !RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]').hasMatch(note);
+  String get fingerprint => sha256.convert(utf8.encode(jsonEncode([1, key.toJson(), operationId, sourceRevision, sourceFingerprint,
+    note, rows.map((r) => r.toJson()).toList()]))).toString();
+  Map<String, Object?> toJson() => {'version': 1, 'key': key.toJson(), 'operationId': operationId, 'sourceRevision': sourceRevision,
+    'sourceFingerprint': sourceFingerprint, 'note': note, 'rows': rows.map((r) => r.toJson()).toList(), 'fingerprint': fingerprint};
+  static WorkspacePurchasedUnitMismatchCommand fromJson(Object? raw) {
+    const keys = {'version', 'key', 'operationId', 'sourceRevision', 'sourceFingerprint', 'note', 'rows', 'fingerprint'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) || raw['version'] is! int || raw['version'] != 1 ||
+      raw['operationId'] is! String || raw['sourceRevision'] is! int || raw['sourceFingerprint'] is! String || raw['note'] is! String ||
+      raw['rows'] is! List || (raw['rows'] as List).length > 1000) {
+      throw const FormatException('Saved device report needs recovery.');
+    }
+    final command = WorkspacePurchasedUnitMismatchCommand(key: WorkspacePurchasedUnitDraftKey.fromJson(raw['key']), operationId: raw['operationId'],
+      sourceRevision: raw['sourceRevision'], sourceFingerprint: raw['sourceFingerprint'], note: raw['note'],
+      rows: [for (final row in raw['rows']) WorkspacePurchasedUnitRow.fromJson(row)]);
+    if (!command.valid || raw['fingerprint'] != command.fingerprint) throw const FormatException('Saved device report needs recovery.');
+    return command;
+  }
+}
+
+class WorkspacePurchasedUnitMismatchDraft {
+  WorkspacePurchasedUnitMismatchDraft({required this.sourceFingerprint, this.note = '', List<String> selected = const [], this.pending, this.reportId, this.recordedAt})
+    : selected = List.unmodifiable(selected);
+  final String sourceFingerprint, note;
+  final List<String> selected;
+  final WorkspacePurchasedUnitMismatchCommand? pending;
+  final String? reportId;
+  final DateTime? recordedAt;
+  bool get recorded => reportId != null;
+  bool validFor(WorkspacePurchasedUnitDraftKey key, int revision, List<WorkspacePurchasedUnitRow> rows) =>
+    RegExp(r'^[a-f0-9]{64}$').hasMatch(sourceFingerprint) && WorkspacePurchasedUnitMismatchCommand._noteValid(note) &&
+    rows.every((r) => r.ready) && selected.length == selected.toSet().length && selected.every((id) => rows.any((r) => r.id == id)) &&
+    (pending == null || pending!.valid && pending!.key.identity == key.identity && pending!.sourceRevision == revision &&
+      pending!.sourceFingerprint == sourceFingerprint && pending!.note == note.trim() &&
+      jsonEncode(pending!.rows.map((r) => r.toJson()).toList()) == jsonEncode(rows.where((r) => selected.contains(r.id)).map((r) => r.toJson()).toList())) &&
+    (reportId == null ? recordedAt == null : pending != null && reportId!.isNotEmpty && reportId == reportId!.trim() && reportId!.length <= 240 &&
+      !RegExp(r'[\x00-\x1f\x7f]').hasMatch(reportId!) && recordedAt != null);
+  Map<String, Object?> toJson() => {'version': 1, 'sourceFingerprint': sourceFingerprint, 'note': note, 'selected': selected, 'pending': pending?.toJson(),
+    'reportId': reportId, 'recordedAt': recordedAt?.toUtc().toIso8601String()};
+  static WorkspacePurchasedUnitMismatchDraft fromJson(Object? raw) {
+    const keys = {'version', 'sourceFingerprint', 'note', 'selected', 'pending', 'reportId', 'recordedAt'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) || raw['version'] is! int || raw['version'] != 1 ||
+      raw['sourceFingerprint'] is! String || raw['note'] is! String || raw['selected'] is! List || (raw['selected'] as List).length > 1000 ||
+      !(raw['selected'] as List).every((v) => v is String) || raw['reportId'] != null && raw['reportId'] is! String ||
+      raw['recordedAt'] != null && (raw['recordedAt'] is! String || DateTime.tryParse(raw['recordedAt'])?.toUtc().toIso8601String() != raw['recordedAt'])) {
+      throw const FormatException('Private device report needs recovery.');
+    }
+    return WorkspacePurchasedUnitMismatchDraft(sourceFingerprint: raw['sourceFingerprint'], note: raw['note'], selected: (raw['selected'] as List).cast<String>(),
+      pending: raw['pending'] == null ? null : WorkspacePurchasedUnitMismatchCommand.fromJson(raw['pending']),
+      reportId: raw['reportId'], recordedAt: raw['recordedAt'] == null ? null : DateTime.parse(raw['recordedAt']));
+  }
+}
+
 /// Private input and its unresolved original command, never a supplier result.
 class WorkspacePurchasedUnitDraft {
   WorkspacePurchasedUnitDraft({required this.key, required this.revision, required this.publishedRevision,
-    required List<WorkspacePurchasedUnitRow> rows, this.pending}) : rows = List.unmodifiable(rows);
+    required List<WorkspacePurchasedUnitRow> rows, this.pending, this.report}) : rows = List.unmodifiable(rows);
   final WorkspacePurchasedUnitDraftKey key;
   final int revision, publishedRevision;
   final List<WorkspacePurchasedUnitRow> rows;
   final WorkspacePurchasedUnitPublishCommand? pending;
+  final WorkspacePurchasedUnitMismatchDraft? report;
   bool get valid => key.valid && revision > 0 && revision <= 2147483647 && publishedRevision >= 0 &&
     publishedRevision <= 2147483647 && rows.length <= 1000 && rows.every((r) => r.validDraft) && rows.map((r) => r.id).toSet().length == rows.length &&
     (pending == null || pending!.valid && pending!.key.identity == key.identity && pending!.expectedRevision == publishedRevision &&
-      jsonEncode(pending!.rows.map((r) => r.toJson()).toList()) == jsonEncode(rows.map((r) => r.toJson()).toList()));
-  Map<String, Object?> toJson() => {'version': pending == null ? 1 : 2, 'key': key.toJson(), 'revision': revision,
-    'publishedRevision': publishedRevision, 'rows': rows.map((r) => r.toJson()).toList(), if (pending != null) 'pending': pending!.toJson()};
+      jsonEncode(pending!.rows.map((r) => r.toJson()).toList()) == jsonEncode(rows.map((r) => r.toJson()).toList())) &&
+    (report == null || pending == null && report!.validFor(key, publishedRevision, rows));
+  Map<String, Object?> toJson() => {'version': report != null ? 3 : pending == null ? 1 : 2, 'key': key.toJson(), 'revision': revision,
+    'publishedRevision': publishedRevision, 'rows': rows.map((r) => r.toJson()).toList(), if (pending != null) 'pending': pending!.toJson(), if (report != null) 'report': report!.toJson()};
   static WorkspacePurchasedUnitDraft fromJson(Object? raw) {
-    final keys = {'version', 'key', 'revision', 'publishedRevision', 'rows', if (raw is Map && raw['version'] == 2) 'pending'};
-    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) || raw['version'] is! int || !const [1, 2].contains(raw['version']) ||
+    final keys = {'version', 'key', 'revision', 'publishedRevision', 'rows', if (raw is Map && raw['version'] == 2) 'pending', if (raw is Map && raw['version'] == 3) 'report'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) || raw['version'] is! int || !const [1, 2, 3].contains(raw['version']) ||
         raw['revision'] is! int || raw['publishedRevision'] is! int || raw['rows'] is! List || (raw['rows'] as List).length > 1000) {
       throw const FormatException('Device draft needs recovery.');
     }
     final draft = WorkspacePurchasedUnitDraft(key: WorkspacePurchasedUnitDraftKey.fromJson(raw['key']), revision: raw['revision'],
       publishedRevision: raw['publishedRevision'], rows: [for (final r in raw['rows']) WorkspacePurchasedUnitRow.fromJson(r)],
-      pending: raw['version'] == 2 ? WorkspacePurchasedUnitPublishCommand.fromJson(raw['pending']) : null);
+      pending: raw['version'] == 2 ? WorkspacePurchasedUnitPublishCommand.fromJson(raw['pending']) : null,
+      report: raw['version'] == 3 ? WorkspacePurchasedUnitMismatchDraft.fromJson(raw['report']) : null);
     if (!draft.valid) throw const FormatException('Device draft needs recovery.');
     return draft;
   }
