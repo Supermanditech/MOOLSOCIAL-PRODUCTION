@@ -1,4 +1,216 @@
+import 'dart:convert';
+
 import 'buy_v2_catalogue_data.dart';
+
+/// Shared owner/public configuration, never a computed eligibility or saving.
+enum BuyV2StoreOfferKind {
+  billDiscount, productDiscount, quantityPrice, nextPurchase,
+  buyerDiscount, dealerIntro, extraQuantity;
+
+  String get label => switch (this) {
+    billDiscount => 'Bill discount', productDiscount => 'Product discount',
+    quantityPrice => 'Quantity pricing', nextPurchase => 'Next-purchase coupon',
+    buyerDiscount => 'Selected buyers', dealerIntro => 'First business order',
+    extraQuantity => 'Extra quantity',
+  };
+  String get guide => switch (this) {
+    billDiscount => 'A saving above your minimum purchase amount.',
+    productDiscount => 'A saving on the exact products you select.',
+    quantityPrice => 'Publish prices for quantities of one selling SKU.',
+    nextPurchase => 'Reward a buyer’s next eligible purchase from this Store.',
+    buyerDiscount => 'Offer a saving to selected customer records.',
+    dealerIntro => 'An introductory saving for an eligible new business buyer.',
+    extraQuantity => 'Specify the purchased and additional product quantities.',
+  };
+}
+
+String _storeOfferText(Object? value, int maximum, {bool id = false}) {
+  if (value is! String || value.isEmpty || value != value.trim() || value.length > maximum ||
+      RegExp(r'[\x00-\x1f]').hasMatch(value) ||
+      id && !RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$').hasMatch(value)) {
+    throw const FormatException('Check the offer identity and product details.');
+  }
+  return value;
+}
+
+Map _storeOfferMap(Object? raw, Set<String> keys) {
+  if (raw is! Map || raw.length != keys.length || raw.keys.any((key) => !keys.contains(key))) {
+    throw const FormatException('Offer details need a compatible app version.');
+  }
+  return raw;
+}
+
+/// A private selection may lack published identities. Only source-issued exact
+/// listing identities can make it match a public SKU; names are never authority.
+class BuyV2StoreOfferSku {
+  BuyV2StoreOfferSku({required this.storeId, required this.skuId, required this.title,
+    required this.sellUnit, Iterable<BuyV2PublicListingIdentity> listings = const []})
+    : listings = List.unmodifiable(listings) {
+    _storeOfferText(storeId, 128, id: true); _storeOfferText(skuId, 128, id: true);
+    _storeOfferText(title, 240); _storeOfferText(sellUnit, 240);
+    if (this.listings.length > 3 || this.listings.any((listing) => !listing.valid ||
+        listing.storeId != storeId || listing.skuId != skuId) ||
+        this.listings.map((listing) => listing.channel).toSet().length != this.listings.length) {
+      throw const FormatException('Refresh the selected selling SKU.');
+    }
+  }
+  final String storeId, skuId, title, sellUnit;
+  final List<BuyV2PublicListingIdentity> listings;
+  Map<String, Object?> toJson() => {'storeId': storeId, 'skuId': skuId,
+    'title': title, 'sellUnit': sellUnit, 'listings': listings.map((value) => value.toJson()).toList()};
+  factory BuyV2StoreOfferSku.fromJson(Object? raw) {
+    final row = _storeOfferMap(raw, {'storeId', 'skuId', 'title', 'sellUnit', 'listings'});
+    if (row['listings'] is! List) throw const FormatException('Check the product listing.');
+    final listings = <BuyV2PublicListingIdentity>[];
+    for (final value in row['listings'] as List) {
+      final identity = BuyV2PublicListingIdentity.fromJson(value);
+      if (identity == null) throw const FormatException('Check the product listing.');
+      listings.add(identity);
+    }
+    return BuyV2StoreOfferSku(storeId: _storeOfferText(row['storeId'], 128, id: true),
+      skuId: _storeOfferText(row['skuId'], 128, id: true), title: _storeOfferText(row['title'], 240),
+      sellUnit: _storeOfferText(row['sellUnit'], 240), listings: listings);
+  }
+  bool matches(BuyV2Product product) => product.hasValidPublicListingIdentity &&
+    product.publicListingIdentity != null && product.storeId == storeId &&
+    product.sourceSkuId == skuId && product.pack == sellUnit && listings.contains(product.publicListingIdentity);
+}
+
+class BuyV2StoreOfferTier {
+  const BuyV2StoreOfferTier({required this.minimumQuantity, required this.priceMinor});
+  final int minimumQuantity, priceMinor;
+  Map<String, int> toJson() => {'minimumQuantity': minimumQuantity, 'priceMinor': priceMinor};
+  factory BuyV2StoreOfferTier.fromJson(Object? raw) {
+    final row = _storeOfferMap(raw, {'minimumQuantity', 'priceMinor'});
+    if (row['minimumQuantity'] is! int || row['priceMinor'] is! int) throw const FormatException('Check the price slabs.');
+    return BuyV2StoreOfferTier(minimumQuantity: row['minimumQuantity'] as int, priceMinor: row['priceMinor'] as int);
+  }
+}
+
+/// Proposed structured terms. No customer IDs/history, evaluated savings,
+/// stock commitment or public-publishing status belongs in this projection.
+class BuyV2StoreOfferTerms {
+  BuyV2StoreOfferTerms({required this.storeId, required this.kind,
+    Iterable<BuyV2StoreOfferSku> skus = const [], required Iterable<String> channels,
+    this.discountKind, this.discountValue, this.minimumSpendMinor = 0, this.maximumSavingMinor,
+    Iterable<BuyV2StoreOfferTier> tiers = const [], this.buyQuantity,
+    this.rewardSku, this.rewardQuantity, this.nextPurchaseDays})
+    : skus = List.unmodifiable(skus), channels = Set.unmodifiable(channels), tiers = List.unmodifiable(tiers) {
+    _storeOfferText(storeId, 128, id: true);
+    if (this.skus.length > 1000 || this.skus.any((sku) => sku.storeId != storeId) ||
+        this.skus.map((sku) => sku.skuId).toSet().length != this.skus.length ||
+        this.channels.isEmpty || this.channels.any((channel) => !{'retail', 'wholesale', 'bulk'}.contains(channel)) ||
+        minimumSpendMinor < 0 || minimumSpendMinor > 9000000000000) {
+      throw const FormatException('Choose products and selling modes from this Store.');
+    }
+    if (hasMonetaryDiscount) {
+      if (!{'flat', 'percentage'}.contains(discountKind) || discountValue == null || discountValue! <= 0 ||
+          discountValue! > (discountKind == 'percentage' ? 10000 : 9000000000000) ||
+          maximumSavingMinor == null || maximumSavingMinor! <= 0 || maximumSavingMinor! > 9000000000000 ||
+          discountKind == 'flat' && maximumSavingMinor != discountValue || this.tiers.isNotEmpty ||
+          buyQuantity != null || rewardSku != null || rewardQuantity != null) {
+        throw const FormatException('Check the saving, maximum saving and offer type.');
+      }
+      if (kind == BuyV2StoreOfferKind.productDiscount && this.skus.isEmpty) {
+        throw const FormatException('Select the eligible selling SKUs.');
+      }
+    } else {
+      if (discountKind != null || discountValue != null || maximumSavingMinor != null || this.skus.length != 1) {
+        throw const FormatException('Choose one selling SKU and its quantity rules.');
+      }
+      if (kind == BuyV2StoreOfferKind.quantityPrice) {
+        if (this.tiers.isEmpty || this.tiers.length > 100 || buyQuantity != null || rewardSku != null || rewardQuantity != null) {
+          throw const FormatException('Add quantity and price slabs for this selling unit.');
+        }
+        var previous = 0;
+        for (final tier in this.tiers) {
+          if (tier.minimumQuantity <= previous || tier.minimumQuantity > 1000000000 ||
+              tier.priceMinor <= 0 || tier.priceMinor > 9000000000000) {
+            throw const FormatException('Use increasing quantity thresholds and valid unit prices.');
+          }
+          previous = tier.minimumQuantity;
+        }
+      } else if (this.tiers.isNotEmpty || buyQuantity == null || buyQuantity! <= 0 || buyQuantity! > 1000000000 ||
+          rewardSku == null || rewardSku!.storeId != storeId || rewardQuantity == null ||
+          rewardQuantity! <= 0 || rewardQuantity! > 1000000000) {
+        throw const FormatException('Select the purchased and additional quantities from this Store.');
+      }
+    }
+    if (kind == BuyV2StoreOfferKind.nextPurchase
+        ? nextPurchaseDays == null || nextPurchaseDays! < 1 || nextPurchaseDays! > 365
+        : nextPurchaseDays != null) {
+      throw const FormatException('Check the next-purchase validity window.');
+    }
+  }
+  final String storeId;
+  final BuyV2StoreOfferKind kind;
+  final List<BuyV2StoreOfferSku> skus;
+  final Set<String> channels;
+  final String? discountKind;
+  final int? discountValue, maximumSavingMinor, buyQuantity, rewardQuantity, nextPurchaseDays;
+  final int minimumSpendMinor;
+  final List<BuyV2StoreOfferTier> tiers;
+  final BuyV2StoreOfferSku? rewardSku;
+  bool get hasMonetaryDiscount => kind != BuyV2StoreOfferKind.quantityPrice && kind != BuyV2StoreOfferKind.extraQuantity;
+  static String amount(int minor) => '${minor ~/ 100}${minor % 100 == 0 ? '' : '.${(minor % 100).toString().padLeft(2, '0')}'}';
+  String get savingLabel => switch (kind) {
+    BuyV2StoreOfferKind.quantityPrice => '${tiers.length} quantity price ${tiers.length == 1 ? 'slab' : 'slabs'}',
+    BuyV2StoreOfferKind.extraQuantity => 'Buy $buyQuantity · Get $rewardQuantity extra',
+    _ => discountKind == 'flat' ? '₹${amount(discountValue!)} off'
+      : '${amount(discountValue!)}% off · up to ₹${amount(maximumSavingMinor!)}',
+  };
+  String get scopeLabel => skus.isEmpty ? 'Eligible Store products' : skus.length == 1
+    ? '${skus.single.title} · ${skus.single.sellUnit}' : '${skus.length} selected SKUs';
+  List<String> get conditions => List.unmodifiable([
+    scopeLabel,
+    'One promotional offer per supplier in this Cart. Offers cannot be combined.',
+    [for (final value in ['retail', 'wholesale', 'bulk']) if (channels.contains(value))
+      value == 'retail' ? 'Retail' : value == 'wholesale' ? 'Wholesale' : 'Bulk'].join(' · '),
+    if (minimumSpendMinor > 0) 'Minimum eligible purchase ₹${amount(minimumSpendMinor)}',
+    if (kind == BuyV2StoreOfferKind.quantityPrice)
+      for (final tier in tiers) '${tier.minimumQuantity}+ × ${skus.single.sellUnit}: ₹${amount(tier.priceMinor)} per selling unit',
+    if (kind == BuyV2StoreOfferKind.nextPurchase)
+      'Next eligible purchase within $nextPurchaseDays days of a qualifying completed purchase.',
+    if (kind == BuyV2StoreOfferKind.buyerDiscount) 'For approved buyers. Eligibility is checked for the signed-in buyer.',
+    if (kind == BuyV2StoreOfferKind.dealerIntro) 'For an eligible business buyer’s first order from this Store.',
+    if (kind == BuyV2StoreOfferKind.extraQuantity)
+      'Buy $buyQuantity × ${skus.single.sellUnit}; additional $rewardQuantity × ${rewardSku!.title} (${rewardSku!.sellUnit}).',
+    if (kind == BuyV2StoreOfferKind.extraQuantity)
+      'One scheme per order. Additional units do not qualify for another reward.',
+  ]);
+  bool appliesTo(BuyV2Product product) => product.hasValidPublicListingIdentity && product.publicListingIdentity?.valid == true &&
+    product.storeId == storeId && channels.contains(product.publicListingIdentity!.channel.name) &&
+    (skus.isEmpty || skus.any((sku) => sku.matches(product)));
+  String get fingerprint => jsonEncode(toJson());
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'storeId': storeId, 'kind': kind.name,
+    'skus': skus.map((sku) => sku.toJson()).toList(), 'channels': channels.toList()..sort(),
+    'discountKind': discountKind, 'discountValue': discountValue, 'minimumSpendMinor': minimumSpendMinor,
+    'maximumSavingMinor': maximumSavingMinor, 'tiers': tiers.map((tier) => tier.toJson()).toList(),
+    'buyQuantity': buyQuantity, 'rewardSku': rewardSku?.toJson(), 'rewardQuantity': rewardQuantity,
+    'nextPurchaseDays': nextPurchaseDays};
+  factory BuyV2StoreOfferTerms.fromJson(Object? raw) {
+    final row = _storeOfferMap(raw, {'schemaVersion', 'storeId', 'kind', 'skus', 'channels',
+      'discountKind', 'discountValue', 'minimumSpendMinor', 'maximumSavingMinor', 'tiers',
+      'buyQuantity', 'rewardSku', 'rewardQuantity', 'nextPurchaseDays'});
+    if (row['schemaVersion'] != 1 || row['schemaVersion'] is! int || row['skus'] is! List ||
+        row['channels'] is! List || (row['channels'] as List).any((value) => value is! String) ||
+        (row['channels'] as List).toSet().length != (row['channels'] as List).length || row['tiers'] is! List ||
+        row['minimumSpendMinor'] is! int || row['discountKind'] != null && row['discountKind'] is! String ||
+        ['discountValue', 'maximumSavingMinor', 'buyQuantity', 'rewardQuantity', 'nextPurchaseDays']
+          .any((key) => row[key] != null && row[key] is! int)) {
+      throw const FormatException('Check the structured offer fields.');
+    }
+    final kinds = BuyV2StoreOfferKind.values.where((kind) => kind.name == row['kind']);
+    if (kinds.length != 1) throw const FormatException('Check the offer type.');
+    return BuyV2StoreOfferTerms(storeId: _storeOfferText(row['storeId'], 128, id: true), kind: kinds.single,
+      skus: (row['skus'] as List).map(BuyV2StoreOfferSku.fromJson), channels: (row['channels'] as List).cast<String>(),
+      discountKind: row['discountKind'] as String?, discountValue: row['discountValue'] as int?,
+      minimumSpendMinor: row['minimumSpendMinor'] as int, maximumSavingMinor: row['maximumSavingMinor'] as int?,
+      tiers: (row['tiers'] as List).map(BuyV2StoreOfferTier.fromJson), buyQuantity: row['buyQuantity'] as int?,
+      rewardSku: row['rewardSku'] == null ? null : BuyV2StoreOfferSku.fromJson(row['rewardSku']),
+      rewardQuantity: row['rewardQuantity'] as int?, nextPurchaseDays: row['nextPurchaseDays'] as int?);
+  }
+}
 
 /// Canonical INR paise. A present minor amount never falls back to legacy
 /// whole rupees. BigInt intermediates prevent native multiplication overflow.

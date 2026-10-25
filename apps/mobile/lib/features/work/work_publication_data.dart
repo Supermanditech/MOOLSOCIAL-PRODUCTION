@@ -101,7 +101,7 @@ class WorkspaceProductContent {
   static const electronicsGuideLabels = [
     'Model code', 'RAM', 'Storage capacity', 'Display', 'Processor',
     'Operating system', 'Compatibility', 'Ports & connectivity',
-    'Battery capacity', 'Power rating', 'Dimensions', 'Weight', 'In the box',
+    'Battery capacity', 'Power rating', 'Dimensions', 'Weight', 'In the box', 'Condition',
   ];
   static const applianceGuideLabels = [
     'Model code', 'Capacity', 'Dimensions', 'Weight', 'Power rating',
@@ -170,6 +170,7 @@ class WorkspaceProductContent {
     'Dimensions' => 'Copy dimensions and units for this exact model.',
     'Weight' => 'Copy weight and unit for this exact model.',
     'In the box' => 'Copy included items, not optional accessories.',
+    'Condition' => 'Describe the condition of the exact item you are offering. Do not assume it is new. Use this SKU’s content exceptions if its condition differs from the group.',
     'Capacity' => 'Copy the manufacturer capacity and unit for this exact model.',
     'Electrical supply' => 'Copy the printed voltage, frequency and supply requirements; do not infer.',
     'Energy label' => 'Copy supplied energy-rating details and their rating period; do not estimate.',

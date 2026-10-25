@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -13,6 +15,7 @@ import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_publication.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'fixtures/store_public_handoff_v1.dart';
 
 // Host-only accepted-source fixture. No production provider or runtime seed.
@@ -124,7 +127,8 @@ void main() {
       'model code: Host model\nStorage: Keep dry\nUnknown source field: Retain'});
     const values = {'Model code': 'Host model revised', 'RAM': '8 GB',
       'Storage capacity': '256 GB', 'Compatibility': 'Host supplied standard',
-      'In the box': 'Host listed items', 'Form or material': 'Host material'};
+      'In the box': 'Host listed items', 'Form or material': 'Host material',
+      'Condition': 'HOST supplier states sealed and unused'};
     final changed = original.withGuidedDetails(values);
     expect(changed.specifications['model code'], values['Model code']);
     expect(changed.specifications.containsKey('Model code'), isFalse);
@@ -148,7 +152,7 @@ void main() {
       'model code': 'Original', for (var i = 0; i < 29; i++) 'Host $i': 'Retain'});
     expect(full.withGuidedDetails({'Model code': 'Revised'}).specifications.length, 30);
     expect(() => full.withGuidedDetails({'RAM': '8 GB'}), throwsFormatException);
-    expect(WorkspaceProductContent.electronicsGuideLabels.toSet().length, 13);
+    expect(WorkspaceProductContent.electronicsGuideLabels, contains('Condition'));
     for (final label in [...WorkspaceProductContent.electronicsGuideLabels,
       'Form or material', 'Intended surface', 'Skin or hair type', 'Age or size guidance']) {
       expect(WorkspaceProductContent.guidedHintForLabel(label), isNotEmpty);
@@ -218,7 +222,8 @@ void main() {
   test('CONTENT-GUIDE optional cucumber Catalogue manual and CSV paths need no family or phone dimensions', () {
     final cucumber = workspaceMasterCatalogue.first.copyWith(title: 'Host cucumber', brand: '', variant: '',
       categoryId: 'fruits-vegetables', pack: '1 kg', content: const WorkspaceProductContent(),
-      sellingPriceMinor: 4025, purchasePriceMinor: 3000, stock: 0, publicListing: false);
+      sellingPriceMinor: 4025, purchasePriceMinor: 3000, stock: 0, publicListing: false,
+      deliveryPromise: 'HOST supplier delivery within two business days');
     expect(cucumber.variantMembership, isNull);
     expect(cucumber.content.isEmpty, isTrue);
     final roundtrip = WorkspaceCatalogueItem.fromInventoryJson(cucumber.toInventoryJson());
@@ -230,7 +235,26 @@ void main() {
       expect(row.issue, isNull); expect(row.product!.variantMembership, isNull);
       expect(row.product!.content.isEmpty, isTrue); expect(row.product!.sellingPriceMinor, 4025);
       expect(row.product!.publicListing, isFalse);
+      expect(row.product!.deliveryPromise,
+        catalogue.isEmpty ? isEmpty : cucumber.deliveryPromise);
+      final restored = WorkspaceCatalogueItem.fromInventoryJson(row.product!.toInventoryJson());
+      expect(restored.deliveryPromise, row.product!.deliveryPromise);
+      final deliveryIssues = WorkspacePublicationContract.productIssues(restored,
+        storeId: 'host-store', storeName: 'Host Store')
+        .where((issue) => issue.field.endsWith(':deliveryPromise'));
+      expect(deliveryIssues, catalogue.isEmpty ? isNotEmpty : isEmpty);
     }
+    final explicit = WorkspaceProductImport.parse(
+      csv.replaceFirst('sku\n', 'sku,deliveryPromise\n')
+        .replaceFirst('HOST-CUCUMBER\n', 'HOST-CUCUMBER,HOST supplier delivery next day\n'),
+      catalogue: [], owned: []).rows.single;
+    expect(explicit.issue, isNull);
+    expect(explicit.product!.deliveryPromise, 'HOST supplier delivery next day');
+    expect(workspaceProductValuesIssue(
+      title: 'Host cucumber', brand: '', category: 'fruits-vegetables',
+      pack: '1 kg', sku: 'HOST-CUCUMBER', purchase: 3000, selling: 4025,
+      stock: 0, mrp: null, lowStockThreshold: 0, minimumOrder: 1,
+      delivery: ''), isNull);
     const withoutBrandColumn = 'title,pack,categoryId,purchasePrice,sellingPrice,stock,sku\n'
       'Host cucumber,1 kg,fruits-vegetables,30,40.25,0,HOST-CUCUMBER\n';
     final noBrand = WorkspaceProductImport.parse(withoutBrandColumn, catalogue: [], owned: []).rows.single;
@@ -316,6 +340,60 @@ void main() {
     expect(recovered.products.map((p) => p.id), ['host-a', 'host-b']);
     expect(recovered.products.every((p) => !p.publicListing), isTrue);
   });
+
+  test('PF05 condition stays with its exact SKU without a New default', () {
+    const condition = 'HOST supplier states sealed and unused';
+    final a = memberProduct('host-a', 'pink', '128');
+    final b = memberProduct('host-b', 'blue', '512', shared: false).copyWith(
+      content: const WorkspaceProductContent().withGuidedDetails({'Condition': condition}));
+    final recovered = WorkspaceSavedInventory.fromJson(jsonDecode(jsonEncode(familyInventory([a, b]).toJson())));
+    expect(recovered.products.first.content.specifications.containsKey('Condition'), isFalse);
+    final exact = recovered.products.last;
+    expect(exact.id, b.id); expect(exact.sku, b.sku);
+    expect(exact.variantMembership!.useSharedContent, isFalse);
+    expect(exact.content.specifications['Condition'], condition);
+    expect(exact.content.withGuidedDetails({'Condition': ' '}).specifications.containsKey('Condition'), isFalse);
+    expect(exact.publicListing, isFalse);
+    expect(a.content.specifications.containsKey('Condition'), isFalse);
+    expect(const WorkspaceProductContent().withGuidedDetails({'Condition': ''}).isEmpty, isTrue);
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('PF05 public condition renders only supplied details scale=$scale', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      for (final condition in [null, ' ', 'HOST supplier states sealed and unused']) {
+        final core = BuySession();
+        final source = _Lf05PolicySource(BuyV2ProductContentSnapshot(
+          productId: 'w-tomato', state: BuyV2ProductContentState.ready,
+          sourceId: 'host-pf05-readback-fixture', specifications: [
+            if (condition != null) BuyV2ProductSpecification(label: 'Condition', value: condition),
+          ]));
+        final session = BuyV2Session(core: core, reviewDataEnabled: true, productContentAdapter: source);
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+          home: BuyV2Screen(key: ValueKey(condition), session: session,
+            initialDestination: BuyV2Destination.wholesale, productId: 'w-tomato')));
+        await tester.pumpAndSettle();
+        if (condition?.trim().isNotEmpty == true) {
+          final supplied = find.text(condition!);
+          expect(supplied, findsOneWidget);
+          await tester.ensureVisible(supplied); await tester.pumpAndSettle();
+          expect(supplied.hitTestable(), findsOneWidget);
+          expect(find.text('Condition'), findsOneWidget);
+        } else {
+          expect(find.text('Condition'), findsNothing);
+        }
+        expect(find.text('New'), findsNothing);
+        expect(session.itemCount, 0);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+        session.dispose(); core.dispose();
+      }
+    });
+  }
 
   test('CONTENT-GUIDE CSV shared clear requires explicit SKU exception', () {
     final family = ownerFamily().copyWith(content: const WorkspaceProductContent(specifications: {'Storage': 'Shared source'}));
@@ -1406,7 +1484,7 @@ void main() {
   final content = WorkspaceProductContent.parse({
     'description': 'A pack for everyday cooking.\nStore in a cool, dry place.',
     'highlights': 'Sealed pack\nLabelled net quantity',
-    'specifications': 'Container: Pouch\nStorage: Cool: dry place',
+    'specifications': 'Container: Pouch\nStorage: Cool: dry place\nCondition: HOST supplier states sealed and unused',
   });
   test(
     'CONTENT shared parser retains real copy, optional blank and explicit clear',

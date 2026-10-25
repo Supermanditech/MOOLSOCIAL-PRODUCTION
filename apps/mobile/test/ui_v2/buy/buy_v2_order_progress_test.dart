@@ -79,6 +79,8 @@ class _R669DeliveryCommerce implements BuyV2CommerceAdapter {
     String destination,
     String promise, {
     BuyV2OrderStatus status = BuyV2OrderStatus.preparing,
+    bool invoiceAvailable = true,
+    BuyV2TaxInvoiceState? taxInvoiceState,
   }) => BuyV2Order(
     id: id,
     destination: product.destination,
@@ -91,6 +93,8 @@ class _R669DeliveryCommerce implements BuyV2CommerceAdapter {
     destinationLabel: destination,
     progress: status == BuyV2OrderStatus.delivered ? 1 : .4,
     status: status,
+    invoiceAvailable: invoiceAvailable,
+    taxInvoiceState: taxInvoiceState,
     purchaseId: product.destination == BuyV2Destination.wholesale
         ? 'purchase-bulk'
         : 'purchase-split',
@@ -1801,6 +1805,53 @@ BuyV2ProductAcceptanceSnapshot _t14Acceptance(
 }
 
 void main() {
+  for (final invoiceState in [null, BuyV2TaxInvoiceState.pending, BuyV2TaxInvoiceState.unavailable]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF12 unavailable invoice does not invent preparation $invoiceState scale=$scale', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 568);
+        addTearDown(tester.view.reset);
+        final preferences = _SupplyCachePreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-invoice-buyer');
+        final commerce = _R669DeliveryCommerce();
+        final original = commerce.make('invoice-unavailable', BuyV2Catalogue.products.first,
+          'Host delivery address', 'Recorded delivery estimate', invoiceAvailable: false, taxInvoiceState: invoiceState);
+        commerce.records = [original];
+        expect(await store.write(BuyV2CustomerStateSnapshot(orders: [original])), isTrue);
+        final core = BuySession();
+        final session = BuyV2Session(core: core, commerceAdapter: commerce,
+          customerStateStore: store, reviewDataEnabled: false);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        await session.restoreCustomerState();
+        await session.restoreCommerce();
+        await session.retainedAccountState();
+        session.openTracking(original.id);
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(scale)), child: child!),
+          home: Scaffold(body: BuyV2TrackingView(session: session, onOpenOrderHelp: (_) {}))));
+        await tester.pumpAndSettle();
+        final notice = find.byKey(ValueKey('buy-tracking-invoice-pending-${original.id}'));
+        await tester.scrollUntilVisible(notice, 220, maxScrolls: 40,
+          scrollable: find.descendant(of: find.byType(BuyV2TrackingView), matching: find.byType(Scrollable)).first);
+        await tester.pumpAndSettle();
+        final expected = invoiceState == BuyV2TaxInvoiceState.pending
+          ? 'Invoice is being prepared. Refresh this order for the latest update.'
+          : 'Invoice details are not available. Refresh this order to check again.';
+        expect(find.descendant(of: notice, matching: find.text(expected)), findsOneWidget);
+        expect(find.byKey(ValueKey('buy-tracking-invoice-${original.id}')), findsNothing);
+        await session.retainedAccountState();
+        final retained = (await store.read())!.orders.singleWhere((order) => order.id == original.id);
+        expect(retained.taxInvoiceState, invoiceState);
+        expect(retained.invoiceAvailable, isFalse);
+        expect(retained.total, original.total);
+        expect(retained.status, original.status);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   test(
     'T14 acceptance cold pending keeps original receipt for reconciliation',
     () async {
@@ -2411,6 +2462,117 @@ void main() {
       home: BuyV2Screen(session: session, deliveryArrivalSound: sound),
     ),
   );
+
+  for (final scale in [1.0, 2.0]) {
+    for (final recorded in [false, true]) {
+      testWidgets('ORDERTERMS01 saved policies and current references stay distinct $scale recorded=$recorded', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 806);
+        addTearDown(tester.view.reset);
+        final current = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-tomato');
+        expect(current.returnPolicy, isNotEmpty);
+        const savedTerms = 'Original sealed-pack return terms';
+        final frozen = current.copyWith(
+          purchaseProtection: const BuyV2PurchaseProtection(summary: savedTerms));
+        final commerce = _R669DeliveryCommerce();
+        final order = recorded
+          ? commerce.make('host-recorded-terms', frozen, 'Home', current.deliveryPromise,
+              status: BuyV2OrderStatus.delivered)
+          : BuyV2Order(id: 'host-missing-lines', destination: current.destination,
+              title: 'Host legacy order', itemSummary: '1 product', total: current.price,
+              partner: current.seller, partnerType: current.partnerRole,
+              promise: current.deliveryPromise, destinationLabel: 'Home', progress: 1,
+              status: BuyV2OrderStatus.delivered, productIds: [current.id]);
+        commerce.records = [order];
+        final core = BuySession();
+        final session = BuyV2Session(core: core, commerceAdapter: commerce, reviewDataEnabled: false);
+        addTearDown(core.dispose); addTearDown(session.dispose);
+        await session.restoreCommerce();
+        await tester.pumpWidget(app(session, scale)); await tester.pumpAndSettle();
+        expect(session.openOrderItems(order.id), isTrue); await tester.pumpAndSettle();
+        final items = find.byKey(ValueKey('buy-order-items-${order.id}'));
+        expect(items, findsOneWidget);
+        final disclosure = find.byKey(ValueKey('buy-order-original-items-unavailable-${order.id}'))
+          .evaluate().isNotEmpty;
+        final heading = find.text(recorded ? 'Items in this order' : 'Product links').evaluate().isNotEmpty;
+        final policy = find.byKey(ValueKey('buy-order-item-policy-${current.id}'));
+        final row = find.byKey(ValueKey('buy-order-product-${current.id}'));
+        await tester.scrollUntilVisible(row, 120, scrollable:
+          find.descendant(of: items, matching: find.byType(Scrollable)).first);
+        await tester.pumpAndSettle();
+        expect(policy, recorded ? findsOneWidget : findsNothing,
+          reason: 'Current catalogue terms cannot become a missing original purchase policy.');
+        if (recorded) {
+          expect(find.text('After delivery · $savedTerms'), findsOneWidget);
+          expect(heading, isTrue);
+        } else {
+          expect(heading, isTrue);
+          expect(disclosure, isTrue);
+          expect(find.descendant(of: row, matching: find.text('View current product details')), findsOneWidget);
+        }
+        expect(session.orders.single, same(order));
+        expect(session.cartLines, isEmpty);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    for (final recorded in [false, true]) {
+      testWidgets('ORDERTERMS02 resolution distinguishes order-linked references $scale recorded=$recorded', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 806);
+        addTearDown(tester.view.reset);
+        final product = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-tomato');
+        final commerce = _R669DeliveryCommerce();
+        final order = recorded
+          ? commerce.make('host-resolution-recorded', product, 'Home', product.deliveryPromise,
+              status: BuyV2OrderStatus.delivered)
+          : BuyV2Order(id: 'host-resolution-references', destination: product.destination,
+              title: 'Host legacy order', itemSummary: '1 product', total: product.price,
+              partner: product.seller, partnerType: product.partnerRole,
+              promise: product.deliveryPromise, destinationLabel: 'Home', progress: 1,
+              status: BuyV2OrderStatus.delivered, productIds: [product.id]);
+        commerce.records = [order];
+        final core = BuySession();
+        final session = BuyV2Session(core: core, commerceAdapter: commerce,
+          reviewDataEnabled: false,
+          orderResolutionAdapter: const BuyV2UiReviewOrderResolutionAdapter());
+        addTearDown(core.dispose); addTearDown(session.dispose);
+        await session.restoreCommerce();
+        await tester.pumpWidget(app(session, scale)); await tester.pumpAndSettle();
+        unawaited(showBuyV2OrderResolutionSheet(
+          tester.element(find.byType(BuyV2Screen)), session: session, order: order,
+          onOpenSupport: () => fail('Viewing references must not send or contact anyone.')));
+        await tester.pumpAndSettle();
+        final refund = find.byKey(const ValueKey('buy-order-resolution-refund'));
+        await tester.ensureVisible(refund); await tester.pumpAndSettle();
+        await tester.tap(refund); await tester.pumpAndSettle();
+        final heading = find.text(recorded ? 'Purchased-item eligibility' : 'Current product references');
+        expect(heading, findsOneWidget,
+          reason: 'Current catalogue references cannot be labelled purchased item details.');
+        await tester.ensureVisible(heading); await tester.pumpAndSettle();
+        expect(find.text('Saved item details are unavailable. These references show current product information; eligibility cannot be confirmed.'),
+          recorded ? findsNothing : findsOneWidget);
+        final item = find.byKey(ValueKey('buy-order-resolution-item-${product.id}'));
+        await tester.ensureVisible(item); await tester.pumpAndSettle();
+        expect(tester.widget<Checkbox>(item).onChanged, isNull);
+        expect(find.byKey(const ValueKey('buy-order-resolution-submit')), findsNothing);
+        expect(find.textContaining('Policy window:'), findsNothing);
+        final support = find.byKey(const ValueKey('buy-order-resolution-support-instead'));
+        await tester.ensureVisible(support); await tester.pumpAndSettle();
+        expect(tester.getSize(support).height, greaterThanOrEqualTo(44));
+        await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('buy-order-resolution-sheet')), findsNothing);
+        expect(session.orders.single, same(order));
+        expect(session.cartLines, isEmpty);
+        expect(session.orderResolutionResultFor(order.id), isNull);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
 
   for (final scale in [1.0, 2.0]) {
     testWidgets('T14 acceptance receipt review cancel and confirm at $scale', (

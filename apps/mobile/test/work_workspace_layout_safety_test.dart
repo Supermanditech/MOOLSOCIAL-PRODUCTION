@@ -6,7 +6,7 @@ import 'dart:ui' as ui;
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:file_picker/file_picker.dart';
 import 'package:excel_community/excel_community.dart' as xls;
-import 'package:flutter/foundation.dart' show debugPrintSynchronously;
+import 'package:flutter/foundation.dart' show debugPrintSynchronously, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -14,8 +14,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart'
     show FlutterSecureStorage;
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart' show SharedPreferences;
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/types.dart';
+import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:go_router/go_router.dart';
@@ -32,6 +35,8 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
+import 'package:moolsocial/features/work/work_document_preview.dart';
+import 'package:moolsocial/features/work/work_publication.dart';
 import 'package:moolsocial/features/work/work_stock_export.dart';
 import 'package:moolsocial/features/work/work_downloads.dart';
 import 'package:moolsocial/shared/commerce/commerce_downloads.dart';
@@ -49,6 +54,7 @@ import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/features/work/widgets/work_widgets.dart';
 import 'package:moolsocial/features/work/widgets/store_settings_widgets.dart';
+import 'package:moolsocial/features/work/widgets/store_publication_settings.dart';
 import 'package:moolsocial/features/work/widgets/store_product_thumbnail.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
 import 'package:moolsocial/features/work/screens/store_add_product_sheet.dart';
@@ -1048,6 +1054,13 @@ final class _EntryImageFile extends PlatformFile {
   Stream<Uint8List> readAsByteStream() => _file.openRead();
 }
 
+class _ReceivingDocumentPicker implements WorkProofPicker {
+  _ReceivingDocumentPicker(this.pickNext);
+  final Future<WorkPickedProof?> Function(WorkProofSource) pickNext;
+  @override
+  Future<WorkPickedProof?> pick(WorkProofSource source) => pickNext(source);
+}
+
 class _EntryFilePicker extends FilePickerPlatform {
   int calls = 0;
   FileType? selectedType;
@@ -1164,6 +1177,34 @@ class _PurchaseScanReviewFixture extends WorkPurchaseInvoiceCapture {
   }
 }
 
+class _PaymentCopyReviewFixture extends _PurchaseScanReviewFixture {
+  _PaymentCopyReviewFixture(super.bytes);
+  Completer<void>? holdCapture;
+  bool failCapture = false;
+  @override
+  Future<WorkspacePurchaseInvoiceAttachment?> captureForDraft((String, String, bool) scope,
+      String draftId, WorkProofSource source, {
+      required bool Function(WorkspacePurchaseInvoiceAttachment) canRetain}) async {
+    final copy = await capture(scope, draftId, source);
+    if (copy != null && !canRetain(copy)) throw const WorkGatewayException('HOST draft limit or scope changed');
+    return copy;
+  }
+  @override
+  Future<WorkspacePurchaseInvoiceAttachment?> capture((String, String, bool) scope,
+      String draftId, WorkProofSource source) async {
+    await holdCapture?.future;
+    if (failCapture) throw const WorkGatewayException('HOST copy capture unavailable');
+    return WorkspacePurchaseInvoiceAttachment(owner: owner(scope, draftId),
+      digest: crypto.sha256.convert(bytes).toString(), fileName: 'HOST-payment-copy.png',
+      contentType: 'image/png', byteLength: bytes.length, source: source.name);
+  }
+  @override
+  Future<WorkspacePurchaseInvoiceAttachment> scan((String, String, bool) scope,
+      String draftId, WorkspacePurchaseInvoiceAttachment attachment) async => attachment
+    .withText('xyz: 123').withExtractedFields([WorkspacePurchaseAdditionalField(
+      id: 'HOST-xyz', label: 'xyz', value: '123', section: 'receipt', sourceDigest: attachment.digest, sourcePage: 1)]);
+}
+
 class _InvoiceDeliveryFixtureStore
     implements WorkInvoiceDeliveryPreferenceStore {
   final values = <String, WorkspaceInvoiceDeliveryPreference>{};
@@ -1214,10 +1255,31 @@ class _AnalyticsInventoryFixtureStore implements WorkInventoryStore {
   }
 }
 
+// Isolated host inventory for purchase-editor routing and persistence checks.
+// It never shares the platform secure-storage queue with another test.
+class _PurchaseInventoryFixtureStore implements WorkInventoryStore {
+  final values = <(String, String, bool), String>{};
+  @override
+  Future<WorkspaceSavedInventory?> read(String account, String store, {required bool qa}) async {
+    final value = values[(account, store, qa)];
+    return value == null ? null : WorkspaceSavedInventory.fromJson(jsonDecode(value));
+  }
+  @override
+  Future<void> save(WorkspaceSavedInventory inventory, {required int? expectedRevision}) async {
+    final key = (inventory.account, inventory.store, inventory.qa);
+    final previous = await read(key.$1, key.$2, qa: key.$3);
+    if (previous?.revision != expectedRevision) throw StateError('Host inventory revision changed');
+    values[key] = jsonEncode(inventory.toJson());
+  }
+}
+
 class _InventoryWriteFailureFixture implements WorkInventoryStore {
   _InventoryWriteFailureFixture(this.delegate);
   final WorkInventoryStore delegate;
   bool failSave = false;
+  bool failRead = false;
+  Completer<void>? holdRead;
+  int readAttempts = 0;
   Completer<void>? holdSave;
   int saveAttempts = 0;
   @override
@@ -1225,7 +1287,12 @@ class _InventoryWriteFailureFixture implements WorkInventoryStore {
     String account,
     String store, {
     required bool qa,
-  }) => delegate.read(account, store, qa: qa);
+  }) async {
+    readAttempts++;
+    await holdRead?.future;
+    if (failRead) throw StateError('Test-only inventory read failure');
+    return delegate.read(account, store, qa: qa);
+  }
   @override
   Future<void> save(
     WorkspaceSavedInventory inventory, {
@@ -1304,9 +1371,11 @@ class _HeldSupplierMoneyDraftStore extends SecureWorkLedgerFormDraftStore {
         storage: const FlutterSecureStorage(),
       );
   Completer<void>? nextRead;
+  Completer<void>? nextSave;
   WorkspaceLedgerFormKey? shortageSnapshotKey;
   Completer<void>? shortageSnapshotCaptured, shortageSnapshotRelease;
   bool failMoneyRead = false;
+  bool failCopySave = false;
   bool failShortageRead = false;
   String frozenAllocationFailure = 'none';
   @override
@@ -1314,6 +1383,12 @@ class _HeldSupplierMoneyDraftStore extends SecureWorkLedgerFormDraftStore {
     WorkspaceLedgerFormDraft draft, {
     required int? expectedRevision,
   }) async {
+    final saveGate = nextSave;
+    nextSave = null;
+    await saveGate?.future;
+    if (failCopySave && draft.fields.containsKey('supportingCopies')) {
+      throw StateError('HOST copy input save unavailable');
+    }
     if (frozenAllocationFailure == 'draft-save' &&
         (draft.supplierAllocationIntent != null ||
             draft.supplierCreditIntent != null ||
@@ -1420,6 +1495,21 @@ class _StorePurchaseBookmarks implements WorkProcurementBookmarkStore {
   }
 }
 
+final class _PreviewPreferencesProbe extends InMemorySharedPreferencesAsync {
+  _PreviewPreferencesProbe() : super.withData({rootKey: 'retained-personal-state'});
+  static const rootKey = 'moolsocial.buy.customer-state.device-review:buy.v1';
+  int rootReads = 0;
+  int rootWrites = 0;
+  @override Future<String?> getString(String key, SharedPreferencesOptions options) {
+    if (key == rootKey) rootReads++;
+    return super.getString(key, options);
+  }
+  @override Future<bool> setString(String key, String value, SharedPreferencesOptions options) {
+    if (key == rootKey) rootWrites++;
+    return super.setString(key, value, options);
+  }
+}
+
 class _StorePurchaseState implements BuyV2CustomerStateStore {
   _StorePurchaseState(this.ownerScope);
   @override
@@ -1431,6 +1521,20 @@ class _StorePurchaseState implements BuyV2CustomerStateStore {
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
     value = snapshot;
     return true;
+  }
+}
+
+class _StorePurchasePersonalInvoiceProfiles implements BuyV2GstInvoiceProfileStore {
+  int reads = 0, writes = 0;
+  @override String get ownerScope => 'personal-profile-owner';
+  @override Future<BuyV2GstInvoiceProfileSnapshot?> read() async {
+    reads++;
+    return const BuyV2GstInvoiceProfileSnapshot(profiles: [BuyV2GstInvoiceProfileRecord(
+      id: 'gst-profile-1', legalName: 'Personal account business',
+      gstin: '08ABCDE1234F1Z5', billingAddress: 'Personal account billing address')]);
+  }
+  @override Future<bool> write(BuyV2GstInvoiceProfileSnapshot snapshot) async {
+    writes++; return true;
   }
 }
 
@@ -1785,6 +1889,7 @@ class _StorePaymentTermsProbe implements BuyV2CommercialPaymentTermsAdapter {
     required Map<String, int> quotedTotalsByFulfilmentKey,
   }) async => BuyV2CommercialPaymentTermsSnapshot(
     state: BuyV2CommerceLoadState.ready,
+    assignedTermIdsByFulfilmentKey: {for (final group in groups) group.key: 'probe'},
     terms: [
       for (final group in groups)
         BuyV2CommercialPaymentTerm(
@@ -2091,7 +2196,565 @@ Future<void> _captureAnalyticsFixture(WidgetTester tester, String name) async {
   }
 }
 
+
+// Separate developer-tool entry only. Normal main.dart never imports this file.
+// Real native binding; all persistence is replaced before creating any owners.
+Future<void> runNativeStoreRestockPreview({Future<void> Function()? publicBuyReference}) async {
+  if (!kDebugMode || !Platform.isAndroid ||
+      !const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') ||
+      !const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')) {
+    throw StateError('Native frontend preview requires the isolated debug review runtime');
+  }
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  if (binding is TestWidgetsFlutterBinding) {
+    throw StateError('Native review cannot use a test widget binding');
+  }
+  FlutterSecureStorage.setMockInitialValues({});
+  SharedPreferences.setMockInitialValues({});
+  SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+  if (publicBuyReference != null) {
+    await publicBuyReference();
+    return;
+  }
+  final preview = await _NativeRestockPreview.create();
+  runApp(preview.app);
+}
+
+// Read fixtures can supply layouts; every execution method stays unavailable.
+final class _NativeRestockReadOnlyCommerce extends BuyV2UnavailableCommerceAdapter
+    implements BuyV2MinorOrderPlacementAdapter {
+  _NativeRestockReadOnlyCommerce(this.source);
+  final BuyV2CommerceAdapter source;
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() => source.refresh();
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrderMinor(BuyV2OrderPlacementRequest request) =>
+      placeOrder(request);
+}
+
+class _NativeRestockPreview {
+  _NativeRestockPreview(this.work, this.controller, this.reviewOwner,
+      this.personal, this.personalState, this.cores);
+  final WorkSession work;
+  final WorkProcurementController controller, reviewOwner;
+  final BuyV2Session personal;
+  final _StorePurchaseState personalState;
+  final List<BuySession> cores;
+  GoRouter? _router;
+  bool _dashboardBuilt = false;
+
+  static Future<_NativeRestockPreview> create({DateTime Function()? now}) async {
+    const account = 'native-frontend-preview-only';
+    final seed = StoreReviewSeed(accountScope: account, orderCount: 12, now: DateTime.now());
+    final contact = _ContactDraftFixtureStore()..accountScope = account;
+    final work = WorkSession(contactDraftStore: contact,
+      pendingProofStore: _ContactDraftFixtureStore()..accountScope = account,
+      proofPicker: ReviewWorkProofPicker())
+      ..seedVerifiedWorkspace()
+      ..retailerSetupSaved = true
+      ..reviewStage = WorkReviewStage.live
+      ..workspaceStoreState = WorkspaceStoreState.open
+      ..activeWorkspace = WorkWorkspace(id: seed.storeId, name: 'TEST Restock preview',
+        profileLabel: seed.workspace.profileLabel, profileId: seed.workspace.profileId,
+        area: 'Frontend preview only', verified: true);
+    work.saveWorkspacePublicationDetails(const WorkspaceStorePublicationDetails(
+      legalName: 'TEST Restock Buyer', street: '12 TEST Market Road',
+      city: 'Jodhpur', state: 'Rajasthan', pinCode: '342001',
+      billingAddress: '45 TEST Billing Road, Jodhpur 342001'), expectedStoreId: seed.storeId);
+    final bookmarks = _StorePurchaseBookmarks();
+    final reviewOwner = WorkProcurementController(
+      currentAccountId: () => account, currentStoreId: () => work.activeWorkspace?.id,
+      currentProfileId: () => work.activeWorkspace?.profileId,
+      storeApproved: () => work.activeWorkspace?.verified == true,
+      reviewCatalogueAllowed: () => true, bookmarks: bookmarks,
+      stateStoreFactory: _StorePurchaseState.new);
+    if (!await reviewOwner.open(purpose: BuyV2ProcurementPurpose.restock, returnTo: 'dashboard')) {
+      throw StateError('Isolated Restock read fixtures unavailable');
+    }
+    final read = reviewOwner.session!;
+    final cores = <BuySession>[];
+    BuySession newCore() { final core = BuySession(); cores.add(core); return core; }
+    final controller = WorkProcurementController(
+      currentAccountId: () => account, currentStoreId: () => work.activeWorkspace?.id,
+      currentProfileId: () => work.activeWorkspace?.profileId,
+      storeApproved: () => work.activeWorkspace?.verified == true,
+      bookmarks: bookmarks, stateStoreFactory: _StorePurchaseState.new,
+      sessionFactory: (identity, state) => BuyV2Session(core: newCore(),
+        procurementIdentity: identity, customerStateStore: state,
+        reviewDataEnabled: false, catalogueNow: now ?? DateTime.now,
+        commerceAdapter: _NativeRestockReadOnlyCommerce(read.commerceAdapter),
+        commercialPaymentTermsAdapter: read.commercialPaymentTermsAdapter,
+        cataloguePageSource: read.cataloguePageSource,
+        productFactsAdapter: _StorePurchaseOrderReadyFacts(),
+        initialCatalogueRegionId: 'jodhpur'));
+    final personalState = _StorePurchaseState('native-frontend-preview-personal-only');
+    final personal = BuyV2Session(core: newCore(), customerStateStore: personalState,
+      reviewDataEnabled: false, commerceAdapter: const BuyV2UnavailableCommerceAdapter());
+    return _NativeRestockPreview(work, controller, reviewOwner, personal, personalState, cores);
+  }
+
+  Widget get app {
+    final router = _router ??= GoRouter(initialLocation: '/app/work/workspace/dashboard', routes: [
+      GoRoute(path: '/app/work/workspace/dashboard', builder: (_, _) {
+        _dashboardBuilt = true;
+        return WorkWorkspaceDashboardScreen(
+        session: work, procurementSession: personal, useStoreProcurement: true,
+        procurementControllerFactory: () => controller, accountAuthenticated: true,
+        initialSection: 'dashboard'); }),
+    ]);
+    return MaterialApp.router(theme: MoolTheme.light(), routerConfig: router,
+      debugShowCheckedModeBanner: false,
+      builder: (context, child) => Material(child: SafeArea(bottom: false, child: Column(children: [
+        Container(key: const Key('native-restock-preview-notice'), width: double.infinity,
+          color: const Color(0xFFFFF0CD), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: const Text('TEST PREVIEW · No orders/payments',
+            textScaler: TextScaler.noScaling,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+        Expanded(child: MediaQuery(
+          data: MediaQuery.of(context).removePadding(removeTop: true),
+          child: child!)),
+      ]))));
+  }
+
+  void dispose() {
+    _router?.dispose();
+    if (!_dashboardBuilt) controller.dispose(); // Mounted dashboard owns its controller.
+    reviewOwner.dispose(); personal.dispose();
+    work.dispose(); for (final core in cores) { core.dispose(); }
+  }
+}
+
 void main() {
+  group('PAYMENTCOPY private input copies', () {
+    for (final source in WorkspaceSupplierMoneySourceKind.values) {
+      test('ALLOCATIONCOPY exact ${source.name} input copies freeze and archive', () async {
+        FlutterSecureStorage.setMockInitialValues({});
+        final intent = WorkspaceSupplierMoneyAllocationIntent(operationId: 'HOST-allocation-copy-operation',
+          accountScope: 'review-draft-account', workspaceId: 'HOST-copy-store', supplierId: 'HOST-copy-supplier',
+          sourceKind: source, sourceId: 'HOST-allocation-source', openingId: 'HOST-allocation-opening', openingRevision: 2,
+          billId: 'HOST-allocation-target', copyId: 'HOST-allocation-target-copy', copyRevision: 3,
+          amountMinor: 1000, requestedAt: DateTime.utc(2026, 10, 3, 12),
+          sourceCopyId: source == WorkspaceSupplierMoneySourceKind.manualBillSurplus ? 'HOST-source-copy' : null,
+          sourceCopyRevision: source == WorkspaceSupplierMoneySourceKind.manualBillSurplus ? 1 : null);
+        expect(intent.valid, isTrue);
+        final key = (account:intent.accountScope,store:intent.workspaceId,customer:intent.supplierId,
+          invoice:intent.billId,order:'allocation-copy:${intent.copyId}',kind:'supplierAllocation',ledgerRevision:intent.copyRevision);
+        final empty = WorkspaceSupplierMoneyCopies(key: key, qa: true);
+        expect(empty.captureId, jsonEncode(['supplier-allocation-draft', key.customer, key.invoice, key.order, key.ledgerRevision]));
+        final copies = empty.withActive([WorkspacePurchaseInvoiceAttachment(owner: empty.owner,
+          digest: List.filled(64, 'd').join(), fileName: 'HOST-allocation-advice.png', contentType: 'image/png',
+          byteLength: 100, source: 'upload', documentDetails: const {'type': 'paymentAdvice'})]);
+        final fields = {'amount': '10', 'sourceKind': source.name, 'sourceId': intent.sourceId,
+          'supportingCopies': jsonEncode(copies.toJson())};
+        final input = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: fields);
+        expect(input.valid, isTrue);
+        expect(WorkspaceLedgerFormDraft.fromJson(input.toJson())!.supplierSupportingCopies!.toJson(), copies.toJson());
+        expect(WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {...fields}..remove('supportingCopies')).valid, isTrue);
+        expect(copies.withActive([copies.active.single.withDocumentDetails({})]).valid, isTrue);
+        expect(copies.withActive([copies.active.single.withDocumentDetails({'type': 'supplierCreditNote'})]).valid, isFalse);
+        expect(WorkspaceSupplierMoneyCopies.fromJson({...copies.toJson(), 'qa': false}, key), isNull);
+        for (final other in [
+          (account:key.account,store:key.store,customer:'other-supplier',invoice:key.invoice,order:key.order,kind:key.kind,ledgerRevision:key.ledgerRevision),
+          (account:key.account,store:key.store,customer:key.customer,invoice:'other-bill',order:key.order,kind:key.kind,ledgerRevision:key.ledgerRevision),
+          (account:key.account,store:key.store,customer:key.customer,invoice:key.invoice,order:'${key.order}-other-copy',kind:key.kind,ledgerRevision:key.ledgerRevision),
+          (account:key.account,store:key.store,customer:key.customer,invoice:key.invoice,order:key.order,kind:key.kind,ledgerRevision:key.ledgerRevision+1),
+        ]) { expect(WorkspaceSupplierMoneyCopies.fromJson(copies.toJson(), other), isNull); }
+        final changedSource = WorkspaceLedgerFormDraft(key:key,revision:2,
+          fields:{...fields,'sourceKind':'accountPayment','sourceId':'another-before-freeze-source'});
+        expect(changedSource.valid,isTrue);
+        expect(changedSource.supplierSupportingCopies!.toJson(),copies.toJson(),
+          reason:'Changing an unfrozen source cannot relabel an earlier original.');
+        final frozen = WorkspaceLedgerFormDraft(key:key,revision:2,
+          fields:{...fields,'attempt':jsonEncode(intent.intentToJson())});
+        expect(frozen.valid,isTrue);
+        expect(frozen.supplierAllocationIntent!.intentToJson(),intent.intentToJson());
+        expect(intent.intentToJson().containsKey('supportingCopies'),isFalse);
+        final store = SecureWorkLedgerFormDraftStore(accountScope:()=>key.account);
+        await store.save(input,expectedRevision:null); await store.save(frozen,expectedRevision:1);
+        await expectLater(store.save(WorkspaceLedgerFormDraft(key:key,revision:3,
+          fields:{...frozen.fields}..remove('supportingCopies')),expectedRevision:2),throwsA(isA<WorkGatewayException>()));
+        final resetFields = {'amount':'','sourceKind':'','sourceId':''};
+        await expectLater(store.resetConfirmedSupplierAllocationDraft(
+          WorkspaceLedgerFormDraft(key:key,revision:3,fields:resetFields),expectedRevision:2,
+          verifyCommitted:(_)async=>true),throwsA(isA<WorkGatewayException>()));
+        final archive = WorkspaceSupplierMoneyCopies(key:key,qa:true,previous:[
+          WorkspaceSupplierMoneyCopyGroup(operation:intent.operationId,reference:'Allocation draft',date:'',copies:copies.active)]);
+        expect(archive.toJson(), copies.archiveAllocation(intent).toJson());
+        final wrongIntent = WorkspaceSupplierMoneyAllocationIntent.fromJson({...intent.intentToJson(), 'billId':'other-bill'});
+        expect(() => copies.archiveAllocation(wrongIntent), throwsFormatException);
+        final next = WorkspaceLedgerFormDraft(key:key,revision:3,
+          fields:{...resetFields,'supportingCopies':jsonEncode(archive.toJson())});
+        await expectLater(store.resetConfirmedSupplierAllocationDraft(next,expectedRevision:2,
+          verifyCommitted:(saved)async { expect(saved.sourceId,intent.sourceId); return false; }),throwsA(isA<WorkGatewayException>()));
+        expect((await store.read(key))!.toJson(),frozen.toJson());
+        await store.resetConfirmedSupplierAllocationDraft(next,expectedRevision:2,
+          verifyCommitted:(saved)async { expect(saved.intentToJson(),intent.intentToJson()); return true; });
+        expect((await SecureWorkLedgerFormDraftStore(accountScope:()=>key.account).read(key))!.supplierSupportingCopies!.toJson(),archive.toJson());
+        await expectLater(store.save(WorkspaceLedgerFormDraft(key:key,revision:4,fields:resetFields),
+          expectedRevision:3),throwsA(isA<WorkGatewayException>()));
+        FlutterSecureStorage.setMockInitialValues({});
+        final legacy = WorkspaceLedgerFormDraft(key:key,revision:1,fields:{...frozen.fields}..remove('supportingCopies'));
+        await store.save(legacy,expectedRevision:null);
+        await expectLater(store.resetConfirmedSupplierAllocationDraft(
+          WorkspaceLedgerFormDraft(key:key,revision:2,fields:next.fields),expectedRevision:1,
+          verifyCommitted:(_)async=>true),throwsA(isA<WorkGatewayException>()));
+        expect((await store.read(key))!.toJson(),legacy.toJson());
+        await store.resetConfirmedSupplierAllocationDraft(
+          WorkspaceLedgerFormDraft(key:key,revision:2,fields:resetFields),expectedRevision:1,
+          verifyCommitted:(_)async=>true);
+        expect((await store.read(key))!.supplierAllocationCopies,isNull);
+      });
+    }
+    for (final source in WorkspaceSupplierRefundSourceKind.values) {
+      test('REFUNDCOPY exact ${source.name} originals freeze and survive verified reset', () async {
+        FlutterSecureStorage.setMockInitialValues({});
+        final intent = WorkspaceSupplierRefundIntent(operationId: 'HOST-refund-copy-operation',
+          accountScope: 'review-draft-account', workspaceId: 'HOST-copy-store', supplierId: 'HOST-copy-supplier',
+          qa: true, sourceKind: source, sourceId: 'HOST-refund-source',
+          openingId: 'HOST-refund-opening', openingRevision: 2,
+          copyId: source == WorkspaceSupplierRefundSourceKind.manualBillSurplus ? 'HOST-refund-copy' : null,
+          copyRevision: source == WorkspaceSupplierRefundSourceKind.manualBillSurplus ? 3 : null,
+          reference: 'HOST-refund-reference', occurredOn: '2026-10-03', paymentMethod: 'Cash',
+          amountMinor: 1000, requestedAt: DateTime.utc(2026, 10, 3, 12));
+        expect(intent.valid, isTrue);
+        final key = intent.formKey;
+        final empty = WorkspaceSupplierMoneyCopies(key: key, qa: true);
+        expect(empty.captureId, jsonEncode(['supplier-refund-draft', key.customer, key.invoice, key.order, key.ledgerRevision]));
+        final copies = empty.withActive([WorkspacePurchaseInvoiceAttachment(owner: empty.owner,
+          digest: List.filled(64, 'c').join(), fileName: 'HOST-refund-receipt.png', contentType: 'image/png',
+          byteLength: 100, source: 'upload', documentDetails: const {'type': 'paymentReceipt'})]);
+        expect(copies.valid, isTrue);
+        expect(copies.withActive([copies.active.single.withDocumentDetails({})]).valid, isTrue);
+        expect(copies.withActive([copies.active.single.withDocumentDetails({'type': 'supplierCreditNote'})]).valid, isFalse);
+        final fields = {'amount': '10', 'reference': intent.reference, 'channel': 'Cash',
+          'occurredOn': '03/10/2026', 'sourceKind': source.name, 'sourceId': intent.sourceId,
+          'supportingCopies': jsonEncode(copies.toJson())};
+        final input = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: fields);
+        expect(input.valid, isTrue);
+        expect(WorkspaceLedgerFormDraft.fromJson(input.toJson())!.supplierSupportingCopies!.toJson(), copies.toJson());
+        expect(WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {...fields}..remove('supportingCopies')).valid, isTrue);
+        for (final other in [
+          (account:key.account,store:key.store,customer:'other-supplier',invoice:key.invoice,order:key.order,kind:key.kind,ledgerRevision:key.ledgerRevision),
+          (account:key.account,store:key.store,customer:key.customer,invoice:'other-source',order:key.order,kind:key.kind,ledgerRevision:key.ledgerRevision),
+          (account:key.account,store:key.store,customer:key.customer,invoice:key.invoice,order:'${key.order}-other-copy',kind:key.kind,ledgerRevision:key.ledgerRevision),
+          (account:key.account,store:key.store,customer:key.customer,invoice:key.invoice,order:key.order,kind:key.kind,ledgerRevision:key.ledgerRevision+1),
+        ]) { expect(WorkspaceSupplierMoneyCopies.fromJson(copies.toJson(), other), isNull); }
+        expect(WorkspaceSupplierMoneyCopies.fromJson({...copies.toJson(), 'qa': false}, key), isNull);
+        final wrongMode = WorkspaceSupplierMoneyCopies(key: key, qa: false);
+        expect(wrongMode.valid, isFalse, reason: 'Even empty copies must agree with the refund namespace mode.');
+        final store = SecureWorkLedgerFormDraftStore(accountScope: () => key.account);
+        final frozen = WorkspaceLedgerFormDraft(key: key, revision: 2,
+          fields: {...fields, 'occurredOn': intent.occurredOn, 'attempt': jsonEncode(intent.toJson())});
+        expect(frozen.valid, isTrue);
+        expect(frozen.supplierRefundIntent!.toJson(), intent.toJson());
+        expect(intent.toJson().containsKey('supportingCopies'), isFalse);
+        await store.save(input, expectedRevision: null); await store.save(frozen, expectedRevision: 1);
+        await expectLater(store.save(WorkspaceLedgerFormDraft(key: key, revision: 3,
+          fields: {...frozen.fields}..remove('supportingCopies')), expectedRevision: 2), throwsA(isA<WorkGatewayException>()));
+        await expectLater(store.resetConfirmedSupplierRefundDraft(
+          WorkspaceLedgerFormDraft(key: key, revision: 3, fields: const {}), expectedRevision: 2,
+          verifyCommitted: (_) async => true), throwsA(isA<WorkGatewayException>()));
+        final archive = WorkspaceSupplierMoneyCopies(key: key, qa: true, previous: [
+          WorkspaceSupplierMoneyCopyGroup(operation: intent.operationId, reference: intent.reference,
+            date: intent.occurredOn, copies: copies.active)]);
+        expect(copies.archiveRefund(intent).toJson(), archive.toJson());
+        for (final change in [
+          {'sourceId': 'another-source'}, {'qa': false},
+          {source == WorkspaceSupplierRefundSourceKind.manualBillSurplus ? 'copyRevision' : 'openingRevision': 4},
+        ]) {
+          final otherIntent = WorkspaceSupplierRefundIntent.fromJson({...intent.toJson(), ...change});
+          expect(() => copies.archiveRefund(otherIntent), throwsFormatException);
+        }
+        final next = WorkspaceLedgerFormDraft(key: key, revision: 3,
+          fields: {'supportingCopies': jsonEncode(archive.toJson())});
+        await expectLater(store.resetConfirmedSupplierRefundDraft(next, expectedRevision: 2,
+          verifyCommitted: (_) async => false), throwsA(isA<WorkGatewayException>()));
+        expect((await store.read(key))!.toJson(), frozen.toJson());
+        await store.resetConfirmedSupplierRefundDraft(next, expectedRevision: 2,
+          verifyCommitted: (saved) async { expect(saved.toJson(), intent.toJson()); return true; });
+        final recovered = (await SecureWorkLedgerFormDraftStore(accountScope: () => key.account).read(key))!;
+        expect(recovered.supplierRefundIntent, isNull);
+        expect(recovered.supplierSupportingCopies!.toJson(), archive.toJson());
+        await expectLater(store.save(WorkspaceLedgerFormDraft(key: key, revision: 4, fields: const {}),
+          expectedRevision: 3), throwsA(isA<WorkGatewayException>()));
+      });
+    }
+    const creditKey = (account: 'review-draft-account', store: 'HOST-copy-store',
+      customer: 'HOST-copy-supplier', invoice: 'HOST-credit-bill',
+      order: 'credit-copy:HOST-credit-copy', kind: 'supplierCredit', ledgerRevision: 1);
+    WorkspaceSupplierMoneyCopies creditCopies() {
+      final empty = WorkspaceSupplierMoneyCopies(key: creditKey, qa: true);
+      return empty.withActive([WorkspacePurchaseInvoiceAttachment(owner: empty.owner,
+        digest: List.filled(64, 'b').join(), fileName: 'HOST-credit-note.png', contentType: 'image/png',
+        byteLength: 100, source: 'upload', documentDetails: const {'type': 'supplierCreditNote'})]);
+    }
+    test('CREDITCOPY credit documents use a separate exact draft owner', () {
+      final value = creditCopies();
+      expect(value.captureId, jsonEncode(['supplier-credit-draft', creditKey.customer,
+        creditKey.invoice, creditKey.order, creditKey.ledgerRevision]));
+      expect(value.valid, isTrue);
+      expect(value.withActive([value.active.single.withDocumentDetails({})]).valid, isTrue);
+      expect(value.withActive([value.active.single.withDocumentDetails({'type': 'paymentReceipt'})]).valid, isFalse);
+      final wrongSupplier = (account: creditKey.account, store: creditKey.store,
+        customer: 'another-supplier', invoice: creditKey.invoice, order: creditKey.order,
+        kind: creditKey.kind, ledgerRevision: creditKey.ledgerRevision);
+      expect(WorkspaceSupplierMoneyCopies.fromJson(value.toJson(), wrongSupplier), isNull);
+    });
+    test('CREDITCOPY optional original metadata round trips separately from goods supports', () {
+      final fields = {'reference': '', 'amount': '', 'reason': '', 'occurredOn': '',
+        'supports': '[]', 'supportingCopies': jsonEncode(creditCopies().toJson())};
+      final input = WorkspaceLedgerFormDraft(key: creditKey, revision: 1, fields: fields);
+      expect(input.valid, isTrue);
+      expect(WorkspaceLedgerFormDraft.fromJson(input.toJson())!.fields, fields);
+      expect(WorkspaceLedgerFormDraft(key: creditKey, revision: 1,
+        fields: {...fields}..remove('supportingCopies')).valid, isTrue,
+        reason: 'Earlier credit inputs remain valid without copy metadata.');
+    });
+    test('CREDITTYPE private classification preserves partial tax input and rejects malformed metadata', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final store = SecureWorkLedgerFormDraftStore(accountScope: () => creditKey.account);
+      final rows = [{for (final key in WorkspaceSupplierCreditDocumentInput.taxFields) key: '',
+        'rate': '5', 'taxable': '0', 'cgst': '1.', 'sgst': '1.25'}];
+      final input = WorkspaceSupplierCreditDocumentInput(treatment: 'gst', reasonCode: 'tax', taxRows: rows);
+      final draft = WorkspaceLedgerFormDraft(key: creditKey, revision: 1,
+        fields: {'documentInput': jsonEncode(input.toJson())});
+      expect(draft.valid, isTrue);
+      await store.save(draft, expectedRevision: null);
+      final recovered = (await store.read(creditKey))!;
+      expect(recovered.supplierCreditDocumentInput!.toJson(), input.toJson());
+      expect(recovered.supplierCreditIntent, isNull);
+      expect(WorkspaceLedgerFormDraft(key: creditKey, revision: 1, fields: {}).supplierCreditDocumentInput, isNull);
+      final tooLarge = WorkspaceSupplierCreditDocumentInput(treatment: 'gst',
+        taxRows: List.generate(100, (_) => {for (final field in WorkspaceSupplierCreditDocumentInput.taxFields)
+          field: List.filled(100, '1').join()}));
+      expect(jsonEncode(tooLarge.toJson()).length, greaterThan(65536));
+      expect(tooLarge.valid, isFalse, reason: 'The document and its storage use the same aggregate limit.');
+      for (final invalid in [
+        {...input.toJson(), 'version': 2},
+        {...input.toJson(), 'treatment': 'assumed-gst'},
+        {...input.toJson(), 'reasonCode': 'made-up'},
+        {...input.toJson(), 'taxRows': [{'taxable': 123}]},
+        {...input.toJson(), 'extra': true},
+      ]) {
+        final next = WorkspaceLedgerFormDraft(key: creditKey, revision: 2,
+          fields: {'documentInput': jsonEncode(invalid)});
+        expect(next.valid, isFalse);
+        await expectLater(store.save(next, expectedRevision: 1), throwsA(isA<WorkGatewayException>()));
+        expect((await store.read(creditKey))!.toJson(), recovered.toJson());
+      }
+    });
+    test('CREDITPARTICULARS printed document details recover without a financial intent', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final store = SecureWorkLedgerFormDraftStore(accountScope: () => creditKey.account);
+      final legacy = WorkspaceSupplierCreditDocumentInput(treatment: 'gst', reasonCode: 'tax');
+      expect(legacy.toJson()['version'], 1);
+      final printed = <String, String>{'supplierName': 'HOST Supplier as printed',
+        'buyerName': 'HOST Buyer as printed', 'invoiceReferences': 'HOST-1 / 01/10/2026\nHOST-2 / 02/10/2026',
+        'signatureDetails': 'Signed on original page 2', 'irn': 'HOST-REFERENCE'};
+      final raw = {...legacy.toJson(), 'version': 2, 'particulars': printed};
+      final draft = WorkspaceLedgerFormDraft(key: creditKey, revision: 1,
+        fields: {'documentInput': jsonEncode(raw)});
+      expect(draft.valid, isTrue, reason: 'Printed particulars are recoverable private input.');
+      await store.save(draft, expectedRevision: null);
+      final saved = (await store.read(creditKey))!;
+      expect(saved.supplierCreditDocumentInput!.toJson(), raw);
+      expect(saved.supplierCreditIntent, isNull);
+      expect(() => saved.supplierCreditDocumentInput!.particulars['irn'] = 'changed', throwsUnsupportedError);
+      expect(WorkspaceSupplierCreditDocumentInput.fromJson(legacy.toJson()).toJson(), legacy.toJson());
+      for (final invalid in [
+        {...raw, 'particulars': {'assumedPaid': 'yes'}},
+        {...raw, 'particulars': {'buyerName': 123}},
+        {...raw, 'particulars': {'supplierName': List.filled(257, 'x').join()}},
+        {...raw, 'extra': true},
+        {...legacy.toJson(), 'particulars': printed},
+      ]) {
+        expect(WorkspaceLedgerFormDraft(key: creditKey, revision: 2,
+          fields: {'documentInput': jsonEncode(invalid)}).valid, isFalse);
+      }
+    });
+    test('CREDITPARTICULARS amount comparison never treats missing printed tax as zero', () {
+      Map<String, String> row(String taxable) => {'rate': '5', 'taxable': taxable,
+        'cgst': '1.25', 'sgst': '1.25', 'igst': '0', 'cess': '0'};
+      final complete = WorkspaceSupplierCreditDocumentInput(treatment: 'gst', taxRows: [row('50'), row('0')]);
+      expect(complete.printedTotalMinor, 5500);
+      expect(WorkspaceSupplierCreditDocumentInput(treatment: 'gst',
+        taxRows: [{...row('50'), 'igst': ''}]).printedTotalMinor, isNull);
+      expect(WorkspaceSupplierCreditDocumentInput(treatment: 'commercial', taxRows: complete.taxRows).printedTotalMinor, isNull);
+      expect(WorkspaceSupplierCreditDocumentInput(treatment: 'gst',
+        taxRows: [{...row('50'), 'sgst': '1.'}]).printedTotalMinor, isNull);
+    });
+    test('CREDITCOPY frozen originals survive guarded reset without changing financial intent', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final store = SecureWorkLedgerFormDraftStore(accountScope: () => creditKey.account);
+      final intent = WorkspaceSupplierCreditIntent(operationId: 'HOST-credit-operation',
+        accountScope: creditKey.account, workspaceId: creditKey.store, supplierId: creditKey.customer,
+        billId: creditKey.invoice, copyId: 'HOST-credit-copy', copyRevision: creditKey.ledgerRevision,
+        openingId: 'HOST-credit-opening', openingRevision: 1, reference: 'HOST-CN-01',
+        occurredOn: '2026-10-03', reason: 'Damaged goods', amountMinor: 1000,
+        requestedAt: DateTime.utc(2026, 10, 3, 12), supports: const [WorkspaceSupplierCreditSupport(
+          kind: WorkspaceSupplierCreditSupportKind.arrivalDamage, receiptId: 'HOST-receipt',
+          receiptLineId: 'HOST-line', billLineIndex: 0, quantityMilli: 500)]);
+      expect(intent.valid, isTrue);
+      final resetFields = {'reference': '', 'amount': '', 'reason': '', 'occurredOn': '', 'supports': '[]'};
+      final editable = WorkspaceLedgerFormDraft(key: creditKey, revision: 1,
+        fields: {...resetFields, 'supportingCopies': jsonEncode(creditCopies().toJson())});
+      final frozen = WorkspaceLedgerFormDraft(key: creditKey, revision: 2, fields: {
+        'reference': intent.reference, 'amount': '10', 'reason': intent.reason, 'occurredOn': intent.occurredOn,
+        'supports': jsonEncode(intent.supports.map((s) => s.toJson()).toList()),
+        'attempt': jsonEncode(intent.toJson()), 'supportingCopies': jsonEncode(creditCopies().toJson())});
+      expect(frozen.valid, isTrue);
+      expect(frozen.supplierCreditIntent!.toJson(), intent.toJson());
+      expect(intent.toJson().containsKey('supportingCopies'), isFalse);
+      await store.save(editable, expectedRevision: null);
+      await store.save(frozen, expectedRevision: 1);
+      await expectLater(store.save(WorkspaceLedgerFormDraft(key: creditKey, revision: 3,
+        fields: {...frozen.fields}..remove('supportingCopies')), expectedRevision: 2),
+        throwsA(isA<WorkGatewayException>()));
+      await expectLater(store.resetConfirmedSupplierCreditDraft(
+        WorkspaceLedgerFormDraft(key: creditKey, revision: 3, fields: resetFields),
+        expectedRevision: 2, verifyCommitted: (_) async => true), throwsA(isA<WorkGatewayException>()));
+      final archive = creditCopies().archiveCredit(intent);
+      final next = WorkspaceLedgerFormDraft(key: creditKey, revision: 3,
+        fields: {...resetFields, 'supportingCopies': jsonEncode(archive.toJson())});
+      await expectLater(store.resetConfirmedSupplierCreditDraft(next, expectedRevision: 2,
+        verifyCommitted: (_) async => false), throwsA(isA<WorkGatewayException>()));
+      expect((await store.read(creditKey))!.toJson(), frozen.toJson());
+      await store.resetConfirmedSupplierCreditDraft(next, expectedRevision: 2,
+        verifyCommitted: (saved) async { expect(saved.toJson(), intent.toJson()); return true; });
+      final recovered = (await SecureWorkLedgerFormDraftStore(accountScope: () => creditKey.account).read(creditKey))!;
+      expect(recovered.supplierCreditIntent, isNull);
+      expect(recovered.supplierCreditCopies!.active, isEmpty);
+      expect(recovered.supplierCreditCopies!.previous.single.operation, intent.operationId);
+      expect(recovered.supplierCreditCopies!.previous.single.copies.single.digest, creditCopies().active.single.digest);
+      await expectLater(store.save(WorkspaceLedgerFormDraft(key: creditKey, revision: 4,
+        fields: resetFields), expectedRevision: 3), throwsA(isA<WorkGatewayException>()));
+      await store.save(WorkspaceLedgerFormDraft(key: creditKey, revision: 4,
+        fields: {...next.fields, 'amount': '5'}), expectedRevision: 3);
+      expect((await store.read(creditKey))!.supplierCreditCopies!.toJson(), archive.toJson());
+    });
+    const key = (account: 'review-draft-account', store: 'HOST-copy-store',
+      customer: 'HOST-copy-supplier', invoice: 'HOST-copy-opening',
+      order: 'account-advance:HOST-copy-opening', kind: 'supplierMoney', ledgerRevision: 1);
+    WorkspaceSupplierMoneyCopies copies() {
+      final empty = WorkspaceSupplierMoneyCopies(key: key, qa: true);
+      return empty.withActive([WorkspacePurchaseInvoiceAttachment(owner: empty.owner,
+        digest: List.filled(64, 'a').join(), fileName: 'HOST-receipt.png', contentType: 'image/png',
+        byteLength: 100, source: 'upload', documentDetails: const {'type': 'paymentReceipt'})]);
+    }
+    WorkspaceSupplierMoneyAttempt attempt() => WorkspaceSupplierMoneyAttempt(expectedRevision: 1,
+      entry: WorkspaceSupplierLedgerEntry(operationId: 'HOST-copy-operation', reference: 'HOST-copy-reference',
+        origin: WorkspaceSupplierEntryOrigin.supplierAccount, kind: WorkspaceSupplierEntryKind.advance,
+        amountMinor: 10000, paymentMethod: 'Cash', postedAt: DateTime.utc(2026, 10, 3),
+        moneyReview: const WorkspaceSupplierMoneyReview(occurredOn: '2026-10-03',
+          openingId: 'HOST-copy-opening', openingRevision: 1, notIncludedInOpening: true)));
+    Map<String, String> fields({bool frozen = false}) => {
+      'amount': '100', 'channel': 'Cash', 'reference': 'HOST-copy-reference',
+      'occurredOn': '2026-10-03', 'notIncludedInOpening': 'true',
+      'supportingCopies': jsonEncode(copies().toJson()),
+      if (frozen) 'attempt': jsonEncode(attempt().toJson()),
+    };
+    test('round trip, full owner and applicable document validation', () {
+      final input = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: fields());
+      expect(input.valid, isTrue);
+      expect(WorkspaceLedgerFormDraft.fromJson(input.toJson())!.supplierMoneyCopies!.toJson(), copies().toJson());
+      expect(WorkspaceLedgerFormDraft(key: key, revision: 1, fields: const {}).valid, isTrue,
+        reason: 'Existing payment inputs need no copy metadata.');
+      for (final change in [
+        {...copies().toJson(), 'unexpected': true},
+        {...copies().toJson(), 'qa': false},
+        {...copies().toJson(), 'active': [copies().active.single.withDocumentDetails({'type': 'supplierInvoice'}).toJson()]},
+      ]) {
+        expect(WorkspaceLedgerFormDraft(key: key, revision: 1,
+          fields: {...fields(), 'supportingCopies': jsonEncode(change)}).valid, isFalse);
+      }
+      final other = (account: key.account, store: key.store, customer: 'different-supplier',
+        invoice: key.invoice, order: key.order, kind: key.kind, ledgerRevision: key.ledgerRevision);
+      expect(WorkspaceLedgerFormDraft(key: other, revision: 1, fields: fields()).valid, isFalse);
+      expect(copies().withActive(List.filled(4, copies().active.single)).valid, isFalse);
+      expect(copies().withActive([copies().active.single.withDocumentDetails({})]).valid, isTrue,
+        reason: 'Optional classification must not prevent retaining the original copy.');
+    });
+    test('rejected draft candidate never publishes its private original', () async {
+      const scope = ('HOST-capture-account', 'HOST-capture-store', true);
+      var storageRequests = 0;
+      final capture = WorkPurchaseInvoiceCapture(currentScope: () => scope,
+        supportDirectory: () async { storageRequests++; throw StateError('No file should be published'); },
+        picker: _ReceivingDocumentPicker((_) async => WorkPickedProof(
+          fileName: 'HOST-copy.pdf', contentType: 'application/pdf',
+          bytes: Uint8List.fromList('%PDF-HOST ISOLATED FIXTURE'.codeUnits))));
+      await expectLater(capture.captureForDraft(scope, 'HOST-payment-input', WorkProofSource.upload,
+        canRetain: (_) => false), throwsA(isA<WorkGatewayException>()));
+      expect(storageRequests, 0);
+    });
+    test('unchanged scope tuple still rechecks stale draft before file publication', () async {
+      const scope = ('HOST-capture-account', 'HOST-capture-store', true);
+      final directory = await Directory.systemTemp.createTemp('mool-payment-copy-');
+      final bytes = Uint8List.fromList('%PDF-HOST ISOLATED FIXTURE'.codeUnits);
+      var stale = false, checks = 0;
+      WorkPurchaseInvoiceCapture service({bool retireDuringPreparation = false}) => WorkPurchaseInvoiceCapture(
+        currentScope: () => scope,
+        supportDirectory: () async { if (retireDuringPreparation) stale = true; return directory; },
+        picker: _ReceivingDocumentPicker((_) async => WorkPickedProof(
+          fileName: 'HOST-copy.pdf', contentType: 'application/pdf', bytes: bytes)));
+      try {
+        await expectLater(service(retireDuringPreparation: true).captureForDraft(scope, 'HOST-payment-input',
+          WorkProofSource.upload, canRetain: (_) { checks++; return !stale; }), throwsA(isA<WorkGatewayException>()));
+        expect(checks, greaterThan(1));
+        expect(await directory.list(recursive: true).where((e) => e is File).toList(), isEmpty);
+        final captured = (await service().captureForDraft(scope, 'HOST-payment-input', WorkProofSource.upload,
+          canRetain: (_) => true))!;
+        expect(await service().read(scope, 'HOST-payment-input', captured), bytes,
+          reason: 'A fresh capture service can reopen the same verified private original.');
+        await expectLater(service().captureForDraft(scope, 'HOST-payment-input', WorkProofSource.upload,
+          canRetain: (_) => false), throwsA(isA<WorkGatewayException>()));
+        expect(await service().read(scope, 'HOST-payment-input', captured), bytes,
+          reason: 'Rejected replacement must not remove the earlier original.');
+      } finally {
+        final resolved = await directory.resolveSymbolicLinks();
+        final root = await Directory.systemTemp.resolveSymbolicLinks();
+        if (!resolved.toLowerCase().startsWith('${root.toLowerCase()}${Platform.pathSeparator}mool-payment-copy-')) {
+          throw StateError('Refuse cleanup outside this isolated test directory');
+        }
+        await directory.delete(recursive: true);
+      }
+    });
+    test('frozen copy metadata survives verified reset and cannot be dropped', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      SecureWorkLedgerFormDraftStore owner([String account = 'review-draft-account']) =>
+        SecureWorkLedgerFormDraftStore(accountScope: () => account);
+      final editable = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: fields());
+      final frozen = WorkspaceLedgerFormDraft(key: key, revision: 2, fields: fields(frozen: true));
+      expect(frozen.valid, isTrue);
+      await owner().save(editable, expectedRevision: null);
+      await owner().save(frozen, expectedRevision: 1);
+      await expectLater(owner().save(WorkspaceLedgerFormDraft(key: key, revision: 3,
+        fields: {...frozen.fields}..remove('supportingCopies')), expectedRevision: 2), throwsA(isA<WorkGatewayException>()));
+      var verified = 0;
+      final resetFields = {'amount': '', 'reference': '', 'channel': 'Cash',
+        'occurredOn': '2026-10-24', 'notIncludedInOpening': 'false'};
+      await expectLater(owner().resetConfirmedSupplierMoneyDraft(
+        WorkspaceLedgerFormDraft(key: key, revision: 3, fields: resetFields), expectedRevision: 2,
+        verifyCommitted: (_) async { verified++; return true; }), throwsA(isA<WorkGatewayException>()));
+      expect((await owner().read(key))!.toJson(), frozen.toJson());
+      final archive = copies().archive(attempt());
+      final next = WorkspaceLedgerFormDraft(key: key, revision: 3,
+        fields: {...resetFields, 'supportingCopies': jsonEncode(archive.toJson())});
+      await owner().resetConfirmedSupplierMoneyDraft(next, expectedRevision: 2,
+        verifyCommitted: (entry) async { verified++; expect(entry.toJson(), attempt().entry.toJson()); return true; });
+      final recovered = (await owner().read(key))!;
+      expect(recovered.supplierMoneyAttempt, isNull);
+      expect(recovered.supplierMoneyCopies!.active, isEmpty);
+      expect(recovered.supplierMoneyCopies!.previous.single.copies.single.digest, copies().active.single.digest);
+      expect(recovered.supplierMoneyCopies!.previous.single.operation, attempt().entry.operationId);
+      await expectLater(owner().save(WorkspaceLedgerFormDraft(key: key, revision: 4,
+        fields: resetFields), expectedRevision: 3), throwsA(isA<WorkGatewayException>()));
+      await owner().save(WorkspaceLedgerFormDraft(key: key, revision: 4,
+        fields: {...next.fields, 'amount': '25'}), expectedRevision: 3);
+      expect((await owner().read(key))!.supplierMoneyCopies!.toJson(), archive.toJson());
+      expect(verified, 2);
+      await expectLater(owner('other-account').read(key), throwsA(isA<WorkGatewayException>()));
+    });
+  });
   group('TECHNICALCAPTURE dispatch and render synthetic unit fixtures', () {
     Map<String, String> currentValues([String profile = 'workspace_capture']) =>
         {
@@ -4236,11 +4899,15 @@ void main() {
   const storeReviewRuntime =
       bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
       bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+  // Every host case needs a defined storage platform before the dashboard can
+  // start recovery. Installing it only in later cases can leave an earlier
+  // native-channel read queued across fake-async test boundaries. Individual
+  // cases seed saved values or failure adapters after this setup.
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
   if (storeReviewRuntime) {
     // Native transport substitutes only: exercise the real runtime bindings.
     // These host tests do not qualify encrypted Android storage or real stock.
     setUp(() {
-      FlutterSecureStorage.setMockInitialValues({});
       final previous = SharedPreferencesAsyncPlatform.instance;
       SharedPreferencesAsyncPlatform.instance =
           InMemorySharedPreferencesAsync.empty();
@@ -4403,13 +5070,16 @@ void main() {
   WorkSession liveStore({
     ReviewWorkGateway? gateway,
     WorkspaceAnalyticsReader? analyticsReader,
+    WorkPendingProofStore? contactDraftStore,
+    WorkPendingProofStore Function(String storeId)? offerDraftStoreFactory,
   }) =>
       WorkSession(
           gateway: gateway,
           analyticsReader: analyticsReader,
-          contactDraftStore: analyticsReader == null
+          offerDraftStoreFactory: offerDraftStoreFactory,
+          contactDraftStore: contactDraftStore ?? (analyticsReader == null
               ? null
-              : _ContactDraftFixtureStore(),
+              : _ContactDraftFixtureStore()),
         )
         ..seedVerifiedWorkspace()
         ..retailerSetupSaved = true
@@ -5255,6 +5925,72 @@ void main() {
   });
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets('VARIANTKEYBOARD01 focused options survive dialog resize $scale', (tester) async {
+      final work = storeViewFixture();
+      final product = work.workspaceCatalogueItems.first;
+      final before = jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+      final families = jsonEncode(work.workspaceVariantFamilies.map((f) => f.toJson()).toList());
+      final movements = work.workspaceStockMovements.length;
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 806), textScale: scale, openHomeActions: false);
+      tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 44);
+      tester.view.padding = const FakeViewPadding(top: 41, bottom: 44);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      final edit = find.byKey(Key('work-catalogue-edit-${product.id}'));
+      await tester.ensureVisible(edit); await tester.pumpAndSettle();
+      await tester.tap(edit); await tester.pumpAndSettle();
+      final section = find.byKey(const Key('work-product-variant-family-section'));
+      await tester.ensureVisible(section); await tester.pumpAndSettle();
+      await tester.tap(section); await tester.pumpAndSettle();
+      final create = find.byKey(const Key('work-product-create-family'));
+      await tester.ensureVisible(create); await tester.pumpAndSettle();
+      await tester.tap(create); await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Use these options'));
+      await tester.pumpAndSettle();
+      expect(find.text('Use unique dimension names and non-empty, unique options.'), findsOneWidget);
+      final options = find.byWidgetPredicate((w) => w is TextFormField &&
+        w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('family-options-'));
+      await tester.ensureVisible(options); await tester.pumpAndSettle();
+      await tester.showKeyboard(options);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      tester.view.padding = const FakeViewPadding(top: 41);
+      await tester.pumpAndSettle();
+      final scroll = find.ancestor(of: options, matching: find.byType(Scrollable)).first;
+      final inputRect = tester.getRect(options), viewportRect = tester.getRect(scroll);
+      final visible = inputRect.intersect(viewportRect);
+      expect(visible.height, greaterThanOrEqualTo(48),
+        reason: 'The focused input needs a usable area after the dialog keyboard animation.');
+      if (inputRect.height <= viewportRect.height) {
+        expect(inputRect.top, greaterThanOrEqualTo(viewportRect.top - .1));
+        expect(inputRect.bottom, lessThanOrEqualTo(viewportRect.bottom + .1),
+          reason: 'An input that fits must be fully revealed: $inputRect in $viewportRect');
+      }
+      final editable = tester.state<EditableTextState>(
+        find.descendant(of: options, matching: find.byType(EditableText))).renderEditable;
+      final caret = editable.getLocalRectForCaret(const TextPosition(offset: 0))
+        .shift(editable.localToGlobal(Offset.zero));
+      expect(caret.top, greaterThanOrEqualTo(viewportRect.top - .1));
+      expect(caret.bottom, lessThanOrEqualTo(viewportRect.bottom + .1),
+        reason: 'The caret must remain inside the usable dialog viewport.');
+      expect(tester.takeException(), isNull);
+      tester.testTextInput.hide(); tester.view.resetViewInsets();
+      tester.view.padding = const FakeViewPadding(top: 41, bottom: 44);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-product-cancel')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-dashboard-catalogue-screen')), findsOneWidget);
+      expect(jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), before);
+      expect(jsonEncode(work.workspaceVariantFamilies.map((f) => f.toJson()).toList()), families);
+      expect(work.workspaceStockMovements.length, movements);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
     testWidgets('LF03 owner editor retains staged options and unrelated drafts at scale $scale', (tester) async {
       final work = liveStore();
       work.workspaceCatalogueItems.clear();
@@ -5453,6 +6189,15 @@ void main() {
       await tester.tap(find.byKey(const Key('work-feedback-back')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+      await tester.tap(entry); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-customer-feedback')), findsOneWidget);
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-orders-destination')), findsOneWidget,
+        reason: 'Android Back must return from feedback to customer orders.');
+      expect(find.byKey(const Key('work-customer-feedback')), findsNothing);
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-operating-board')), findsOneWidget,
+        reason: 'Back from orders must retain the existing overview return.');
       expect(work.workspaceCatalogueItems, orderedEquals(products));
       expect(work.workspaceOrders, orderedEquals(orders));
       expect(work.workspaceInvoices, orderedEquals(invoices));
@@ -6843,6 +7588,36 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  for (final width in [320.0, 360.0]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('ANALYTICS HEADER long period keeps title separate $width $scale',
+          (tester) async {
+        final work = await analyticsSavedStockFixture(empty: true);
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+            viewport: Size(width, 800), textScale: scale, openHomeActions: false);
+        final picker = find.byKey(const Key('store-analytics-period-picker'));
+        await tester.tap(picker);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Last 30 days').last);
+        await tester.pumpAndSettle();
+        final title = tester.getRect(find.text('Store overview'));
+        final period = tester.getRect(picker);
+        expect(title.right + 8 <= period.left || title.bottom + 4 <= period.top,
+            isTrue, reason: 'The title and reporting controls need clear separation');
+        expect(find.text('Last 30 days'), findsOneWidget);
+        for (final control in [picker, find.byTooltip('Download analytics PDF'),
+            find.byTooltip('Refresh analytics')]) {
+          expect(control.hitTestable(), findsOneWidget);
+          expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
+          expect(tester.getRect(control).right, lessThanOrEqualTo(width));
+        }
+        expect(tester.takeException(), isNull);
+        await _captureAnalyticsFixture(tester, 'bounded-f7-header-$width-$scale');
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+
   testWidgets('ANALYTICS STRONG enlarged header preserves complete title', (
     tester,
   ) async {
@@ -7499,6 +8274,72 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('ANALYTICSBACK01 Android Back collapses reports before leaving Store $scale', (tester) async {
+      var reads = 0;
+      final work = liveStore(analyticsReader: (request) async {
+        reads++;
+        return WorkspaceAnalyticsSnapshot(request: request,
+          state: WorkspaceAnalyticsState.unavailable,
+          coverage: WorkspaceAnalyticsCoverage.unknown,
+          source: 'Host navigation fixture', metrics: const []);
+      });
+      final before = jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+      final movements = work.workspaceStockMovements.length;
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 806), textScale: scale, openHomeActions: false);
+      expect(reads, 1);
+      final board = find.byKey(const Key('work-store-operating-board'));
+      for (final report in ['public', 'journey', 'supply', 'receiving', 'orders', 'stock', 'sales', 'money']) {
+        final summary = find.byKey(Key('store-analytics-$report'));
+        await tester.ensureVisible(summary); await tester.pumpAndSettle();
+        final position = tester.state<ScrollableState>(find.descendant(
+          of: board, matching: find.byType(Scrollable)).first).position;
+        final offset = position.pixels;
+        await tester.tap(summary); await tester.pumpAndSettle();
+        expect(find.byKey(Key('store-analytics-detail-$report')), findsOneWidget);
+        if (report == 'public') {
+          final period = find.byKey(const Key('store-analytics-period-picker'));
+          await tester.ensureVisible(period); await tester.pumpAndSettle();
+          await tester.tap(period); await tester.pumpAndSettle();
+          expect(find.text('Last 7 days'), findsOneWidget);
+          await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+          expect(find.text('Last 7 days'), findsNothing);
+          expect(find.byKey(Key('store-analytics-detail-$report')), findsOneWidget,
+            reason: 'The period menu must close before the report.');
+          await tester.tap(find.byKey(const Key('mool-home-launcher')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('mool-navigator-family-buy')), findsOneWidget);
+          await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('mool-navigator-family-buy')), findsNothing);
+          expect(find.byKey(Key('store-analytics-detail-$report')), findsOneWidget,
+            reason: 'The Mool menu must close before the report.');
+        }
+        await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+        expect(find.byType(WorkWorkspaceDashboardScreen), findsOneWidget,
+          reason: 'Back from $report must stay inside Store.');
+        expect(find.byKey(Key('store-analytics-detail-$report')), findsNothing);
+        expect(position.pixels, closeTo(offset.clamp(0, position.maxScrollExtent), .1),
+          reason: 'Back must restore the same summary scroll position.');
+        expect(reads, 1, reason: 'Closing a report must not start another data request.');
+      }
+      expect(jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), before);
+      expect(work.workspaceStockMovements.length, movements);
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-store-home')));
+      await tester.pumpAndSettle();
+      for (final report in ['public', 'journey', 'supply', 'receiving', 'orders', 'stock', 'sales', 'money']) {
+        expect(find.byKey(Key('store-analytics-detail-$report')), findsNothing,
+          reason: 'Returning to Store must retain the collapsed overview.');
+      }
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      expect(find.byType(WorkWorkspaceDashboardScreen), findsNothing,
+        reason: 'Back from the overview must keep the existing route behavior.');
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets(
     'ANALYTICS POLISH paired cards have boundaries and a clear selected detail',
@@ -10117,7 +10958,40 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> revealPurchaseAction(WidgetTester tester, Finder action) async {
+  Future<void> openBillActions(WidgetTester tester) async {
+    final savedCopy = find.byKey(const Key('work-purchase-saved-copy'));
+    if (savedCopy.evaluate().isNotEmpty) {
+      tester.state<ScrollableState>(find.descendant(of: savedCopy,
+        matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
+          widget.axisDirection == AxisDirection.down)).first).position.jumpTo(0);
+      await tester.pumpAndSettle();
+    }
+    // Applicable bill actions are now permanently visible; only return to the top.
+  }
+
+  Future<void> openBillSection(WidgetTester tester, String label) async {
+    await openBillActions(tester);
+    final panel = find.byKey(Key(label == 'Payment' ? 'work-purchase-payment-toggle'
+      : label == 'Goods' ? 'work-bill-goods-open' : 'work-purchase-adjustment-actions'));
+    if (panel.evaluate().isEmpty) return;
+    if (label == 'Goods') {
+      final states = tester.widgetList<Semantics>(find.descendant(of: panel, matching: find.byType(Semantics)));
+      if (states.any((state) => state.properties.expanded == true)) return;
+    } else {
+      final disclosures = find.descendant(of: panel, matching: find.byType(Expansible));
+      if (disclosures.evaluate().isEmpty) return; // Flat actions are already visible.
+      final disclosure = tester.widget<Expansible>(disclosures.first);
+      if (disclosure.controller.isExpanded) return;
+    }
+    await tester.ensureVisible(panel);
+    await tester.pumpAndSettle();
+    await tester.tap(label == 'Goods' ? panel : find.descendant(of: panel, matching: find.text(label == 'Adjustments' ? 'Credit notes & refunds' : label)));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openBillPayment(WidgetTester tester) => openBillSection(tester, 'Payment');
+
+  Future<void> revealPurchaseAction(WidgetTester tester, Finder action, {Finder? tapArea}) async {
     final viewport = find.byKey(const Key('purchase-action-category-scroll'));
     double obstructionTop(Rect bounds) {
       final group = find
@@ -10203,8 +11077,15 @@ void main() {
       await tester.pumpAndSettle();
     }
     expect(action.hitTestable(), findsOneWidget);
-    expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+    // A tall tile may exceed the viewport while its full title remains tappable.
+    // Measure the enclosing touch area, retaining title visibility checks below.
+    expect(tester.getSize(tapArea ?? action).height, greaterThanOrEqualTo(48));
     final bounds = tester.getRect(viewport), target = tester.getRect(action);
+    if (tapArea != null) {
+      final visibleArea = tester.getRect(tapArea).intersect(Rect.fromLTRB(
+        bounds.left, obstructionTop(bounds), bounds.right, bounds.bottom));
+      expect(visibleArea.height, greaterThanOrEqualTo(48));
+    }
     expect(
       target.top,
       greaterThanOrEqualTo(obstructionTop(bounds) - .1),
@@ -10524,7 +11405,7 @@ void main() {
   }
 
   // Automated fixtures only, never runtime purchase acceptance data.
-  WorkSession manualPurchaseFixture(_PurchaseEntryFixtureStore entry) =>
+  WorkSession manualPurchaseFixture(_PurchaseEntryFixtureStore entry, {WorkInventoryStore? inventory}) =>
       storeViewFixture(
         null,
         _ContactDraftFixtureStore(),
@@ -10536,7 +11417,195 @@ void main() {
         null,
         null,
         entry,
+        null,
+        inventory,
       );
+
+  testWidgets('P01-HISTORY 1000 saved bills open only the selected invoice', (tester) async {
+    // Host-only history metadata; no records are injected into the phone.
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1);
+    await openPurchaseList(tester);
+    final scope = work.workspaceSupplierScope!;
+    final at = DateTime.utc(2026, 10, 22, 12);
+    final supplier = WorkspaceSupplierProfile(id: 'history-supplier', name: 'History supplier',
+      createdAt: at, updatedAt: at);
+    final copies = [for (var i = 0; i < 1000; i++)
+      WorkspacePurchaseSavedCopy(id: 'history-copy-$i', storeName: 'Evaluation Store',
+        revision: 1, savedAt: at.subtract(Duration(minutes: i)), supplier: supplier,
+        labels: const {}, draft: WorkspacePurchaseEntryDraft(id: 'history-draft-$i',
+          supplierId: supplier.id, invoiceReference: 'HOST-HISTORY-${i.toString().padLeft(4, '0')}',
+          invoiceDate: '22/10/2026', createdAt: at, updatedAt: at,
+          details: {'invoiceTotal': '${i + 1}'}, goods: [
+            {'name': 'History item $i', 'pack': '1 kg', 'quantity': '1', 'cost': '${i + 1}', 'productId': ''},
+          ])),
+    ];
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 1, profiles: [supplier], copies: copies);
+    await work.loadWorkspaceSuppliers(retry: true);
+    await tester.pumpAndSettle();
+    final before = jsonEncode(entry.value!.toJson());
+    expect(work.workspacePurchaseCopies, hasLength(1000));
+    expect(tester.getTopLeft(find.byKey(const ValueKey('work-purchase-copy-history-copy-0'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('work-purchase-copy-history-copy-1'))).dy));
+    expect(find.byWidgetPredicate((widget) => widget is InkWell && widget.key is ValueKey<String> &&
+      (widget.key! as ValueKey<String>).value.startsWith('work-purchase-copy-')).evaluate().length,
+      lessThan(50), reason: 'History renders a bounded set of visible rows, not 1000 invoice pages.');
+    for (final index in [999, 0]) {
+      final reference = 'HOST-HISTORY-${index.toString().padLeft(4, '0')}';
+      await tester.enterText(find.byKey(const Key('work-purchase-search')), reference);
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      final selected = find.byKey(ValueKey('work-purchase-copy-history-copy-$index'));
+      await tester.ensureVisible(selected);
+      await tester.pumpAndSettle();
+      await tester.tap(selected);
+      await tester.pumpAndSettle();
+      expect(find.descendant(of: find.byKey(const Key('work-purchase-bill-identity')),
+        matching: find.text('Bill $reference')), findsOneWidget);
+      expect(find.byKey(const Key('purchase-review-zoom')), findsOneWidget);
+      expect(find.byKey(const Key('purchase-recorded-copy-provenance')), findsOneWidget);
+      expect(find.text(storePurchaseMissingValueLegend), findsOneWidget);
+      expect(find.text('No supplier invoice copy attached.'), findsOneWidget);
+      expect(find.byKey(const Key('purchase-recorded-type-unconfirmed')), findsOneWidget);
+      expect(find.byKey(const Key('work-purchase-document-section')), findsOneWidget);
+      expect(find.byKey(const Key('work-purchase-bill-actions-panel')), findsOneWidget,
+        reason: 'Applicable actions and document tools are visible without opening a menu.');
+      expect(tester.getSize(find.byKey(const Key('purchase-review-zoom'))).height,
+        greaterThan(tester.getSize(find.byKey(const Key('work-purchase-saved-copy'))).height / 2),
+        reason: 'The invoice uses the area below the compact bill header.');
+      void expectCompleteInvoiceFit() {
+        final viewer = find.byKey(const Key('purchase-review-zoom'));
+        final transform = tester.widget<InteractiveViewer>(viewer).transformationController!.value;
+        final sheet = tester.getSize(find.byKey(const Key('purchase-review-paper')));
+        final viewport = tester.getSize(viewer);
+        final fitted = MatrixUtils.transformRect(transform, Offset.zero & sheet);
+        expect(sheet.width, 760);
+        expect(fitted.left, greaterThanOrEqualTo(-.01));
+        expect(fitted.top, greaterThanOrEqualTo(-.01));
+        expect(fitted.right, lessThanOrEqualTo(viewport.width + .01));
+        expect(fitted.bottom, lessThanOrEqualTo(viewport.height + .01),
+          reason: 'The exact selected invoice fits in full, including its bottom and table columns.');
+      }
+      void expectInvoiceWidth({bool atTop = true}) {
+        final viewer = find.byKey(const Key('purchase-review-zoom'));
+        final transform = tester.widget<InteractiveViewer>(viewer).transformationController!.value;
+        final sheet = tester.getSize(find.byKey(const Key('purchase-review-paper')));
+        final viewport = tester.getSize(viewer);
+        final fitted = MatrixUtils.transformRect(transform, Offset.zero & sheet);
+        expect(fitted.left, closeTo(0, .01));
+        if (atTop) expect(fitted.top, closeTo(0, .01));
+        expect(fitted.width, closeTo(viewport.width, .01),
+          reason: 'The inline invoice uses the full available width instead of a narrow whole-page thumbnail.');
+      }
+      expectInvoiceWidth();
+      final widthViewer = find.byKey(const Key('purchase-review-zoom'));
+      final widthSheet = tester.getSize(find.byKey(const Key('purchase-review-paper')));
+      final widthViewport = tester.getSize(widthViewer);
+      expect(widthViewer.hitTestable(), findsOneWidget, reason: 'Pan start must be inside the reader: '
+        'reader=${tester.getRect(widthViewer)} parent=${tester.getRect(find.byKey(const Key('work-purchase-saved-copy')))}');
+      Future<void> panWidthPage(double direction) async {
+        final gesture = await tester.startGesture(tester.getCenter(widthViewer));
+        for (var step = 0; step < 12; step++) {
+          await gesture.moveBy(Offset(0, direction * 8));
+          await tester.pump(const Duration(milliseconds: 24));
+        }
+        await tester.pump(const Duration(milliseconds: 200));
+        await gesture.up();
+        await tester.pumpAndSettle();
+      }
+      await panWidthPage(-1);
+      final widthTransform = tester.widget<InteractiveViewer>(widthViewer).transformationController!.value;
+      final bottomAtWidth = MatrixUtils.transformRect(widthTransform, Offset.zero & widthSheet);
+      expect(bottomAtWidth.bottom, lessThanOrEqualTo(widthViewport.height + .1),
+        reason: 'The footer and invoice totals remain reachable at full inline width: '
+          'page=$widthSheet viewport=$widthViewport transformed=$bottomAtWidth');
+      await panWidthPage(1);
+      expect(find.text('Goods & payment details'), findsNothing);
+      expect(find.byKey(const ValueKey('purchase-review-voucher-reference')), findsNothing);
+      await openBillActions(tester);
+      final fullscreen = find.byKey(const Key('purchase-preview-full-screen'));
+      final inlineBeforeFullscreen = tester.widget<InteractiveViewer>(widthViewer)
+        .transformationController!.value.clone();
+      await tester.ensureVisible(fullscreen);
+      await tester.pumpAndSettle();
+      await tester.tap(fullscreen);
+      await tester.pumpAndSettle();
+      expect(find.text('Recorded purchase copy'), findsOneWidget);
+      expect(find.byKey(const Key('purchase-recorded-copy-provenance')), findsOneWidget);
+      expectCompleteInvoiceFit();
+      await tester.tap(find.byKey(const Key('purchase-full-screen-close')));
+      await tester.pumpAndSettle();
+      expectInvoiceWidth(atTop: false);
+      expect(tester.widget<InteractiveViewer>(widthViewer).transformationController!.value.storage,
+        orderedEquals(inlineBeforeFullscreen.storage),
+        reason: 'Closing full screen restores the exact inline pan and zoom.');
+      await openBillActions(tester);
+      final zoomAction = find.byKey(const Key('purchase-review-zoom-in'));
+      await tester.ensureVisible(zoomAction);
+      await tester.pumpAndSettle();
+      await tester.tap(zoomAction);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-purchase-bill-actions-panel')), findsOneWidget);
+      final zoomedScale = tester.widget<InteractiveViewer>(find.byKey(
+        const Key('purchase-review-zoom'))).transformationController!.value.getMaxScaleOnAxis();
+      final viewport = tester.getSize(find.byKey(const Key('purchase-review-zoom')));
+      final sheet = tester.getSize(find.byKey(const Key('purchase-review-paper')));
+      expect(zoomedScale, greaterThan(viewport.width / sheet.width < viewport.height / sheet.height
+        ? viewport.width / sheet.width : viewport.height / sheet.height),
+        reason: 'Zoom magnifies the visible invoice while the action grid remains available.');
+      await openBillActions(tester);
+      expect(tester.widget<InteractiveViewer>(find.byKey(const Key('purchase-review-zoom')))
+        .transformationController!.value.getMaxScaleOnAxis(), closeTo(zoomedScale, .001),
+        reason: 'Opening the action list must not overwrite the explicit zoom.');
+      await tester.tap(zoomAction);
+      await tester.pumpAndSettle();
+      final twiceZoomedScale = tester.widget<InteractiveViewer>(find.byKey(
+        const Key('purchase-review-zoom'))).transformationController!.value.getMaxScaleOnAxis();
+      expect(twiceZoomedScale, greaterThan(zoomedScale),
+        reason: 'A second Zoom press increases the current scale rather than resetting to fit first.');
+      final zoomedViewer = find.byKey(const Key('purchase-review-zoom'));
+      final beforePan = tester.widget<InteractiveViewer>(zoomedViewer).transformationController!.value.storage[13];
+      await tester.drag(zoomedViewer, const Offset(0, -100));
+      await tester.pumpAndSettle();
+      expect(tester.widget<InteractiveViewer>(zoomedViewer).transformationController!.value.storage[13],
+        lessThan(beforePan), reason: 'The widened/zoomed invoice can be panned vertically to its remaining content.');
+
+      final fitAction = find.byKey(const Key('purchase-review-fit'));
+      await tester.ensureVisible(fitAction);
+      await tester.pumpAndSettle();
+      await tester.tap(fitAction);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-purchase-bill-actions-panel')), findsOneWidget);
+      expectCompleteInvoiceFit();
+      await openBillActions(tester);
+      expect(find.byKey(const Key('work-purchase-bill-actions-toggle')), findsNothing,
+        reason: 'No extra Actions tap is needed to reveal the permanent grid.');
+      expect(find.byKey(const Key('work-purchase-bill-actions-panel')), findsOneWidget);
+      expectCompleteInvoiceFit();
+      final invoiceHeight = tester.getSize(find.byKey(const Key('purchase-review-zoom'))).height;
+      expect(invoiceHeight,
+        greaterThan(tester.getSize(find.byKey(const Key('work-purchase-saved-copy'))).height / 2));
+      final scroll = tester.state<ScrollableState>(find.descendant(
+        of: find.byKey(const Key('work-purchase-saved-copy')),
+        matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
+          widget.axisDirection == AxisDirection.down)).first);
+      scroll.position.jumpTo(scroll.position.maxScrollExtent.clamp(0.0, 30.0));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(find.byKey(const Key('purchase-review-zoom'))).height,
+        closeTo(invoiceHeight, .01), reason: 'Scrolling does not resize the invoice viewport.');
+      await tester.ensureVisible(find.byKey(const Key('work-purchase-copy-close')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-purchase-copy-close')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-search'))).controller!.text,
+        reference, reason: 'Returning preserves the history selection rather than opening another bill.');
+    }
+    expect(jsonEncode(entry.value!.toJson()), before);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   Future<void> revealPurchaseInput(
     WidgetTester tester,
@@ -10667,6 +11736,46 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final geometry in [(const Size(360,806),1.0),(const Size(320,568),2.0),(const Size(806,360),1.6)]) {
+    testWidgets('SUPPLIERPAYPURPOSE compact context and no-write cancellation $geometry', (tester) async {
+      final entry=_PurchaseEntryFixtureStore();
+      final work=manualPurchaseFixture(entry);
+      await mount(tester,route:'/app/work/workspace/dashboard',work:work,viewport:geometry.$1,textScale:geometry.$2);
+      await openPurchaseList(tester);
+      final scope=work.workspaceSupplierScope!;
+      final at=DateTime.utc(2026,10,23);
+      final supplier=WorkspaceSupplierProfile(id:'host-payment-purpose',
+        name:geometry.$2==2 ? 'HOST supplier with a long registered trading name and branch retained in full' : 'HOST payment supplier',
+        createdAt:at,updatedAt:at);
+      entry.value=WorkspacePurchaseEntryBook(account:scope.$1,store:scope.$2,qa:scope.$3,revision:1,profiles:[supplier]);
+      expect(await work.loadWorkspaceSuppliers(retry:true),isTrue); await tester.pumpAndSettle();
+      final before=jsonEncode(entry.value!.toJson());
+      await tester.tap(find.byKey(const Key('work-purchase-action-centre-open'))); await tester.pumpAndSettle();
+      await expandPurchaseActionCategory(tester,'Money paid, credit & refunds');
+      final action=find.byKey(const Key('purchase-action-money'));
+      await revealPurchaseAction(tester,action); await tester.tap(action); await tester.pumpAndSettle();
+      await tester.tap(find.text(supplier.name)); await tester.pumpAndSettle();
+      final sheet=find.byKey(const Key('supplier-payment-purpose-sheet'));
+      expect(sheet,findsOneWidget);
+      expect(find.text('Record supplier payment'),findsOneWidget);
+      expect(find.descendant(of:sheet,matching:find.text(supplier.name)),findsOneWidget);
+      if(geometry.$2==1) expect(tester.getSize(sheet).height,lessThan(420));
+      for(final purpose in ['bill','advance','account']) {
+        final option=find.byKey(ValueKey('supplier-payment-purpose-$purpose'));
+        await tester.ensureVisible(option); await tester.pumpAndSettle();
+        expect(option.hitTestable(),findsOneWidget);
+        expect(tester.getSize(option).height,greaterThanOrEqualTo(48));
+        expect(tester.getRect(option).right,lessThanOrEqualTo(geometry.$1.width));
+      }
+      final close=find.byKey(const Key('supplier-payment-purpose-close'));
+      expect(close.hitTestable(),findsOneWidget);
+      await tester.tap(close); await tester.pumpAndSettle();
+      expect(sheet,findsNothing); expect(jsonEncode(entry.value!.toJson()),before);
+      expect(find.byKey(const Key('work-purchase-action-centre-open')),findsOneWidget);
+      expect(tester.takeException(),isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
   testWidgets(
     'P01-AC01 action centre exposes purpose-specific routes without posting',
     (tester) async {
@@ -11184,6 +12293,32 @@ void main() {
           find.descendant(of: row, matching: find.textContaining('Revision')),
           findsNothing,
         );
+        final search = find.byKey(const Key('work-purchase-search'));
+        final registerPosition = tester.state<ScrollableState>(find.ancestor(
+          of: row, matching: find.byType(Scrollable)).first).position;
+        registerPosition.jumpTo(0);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(search);
+        await tester.enterText(search, 'unmatched manual bill');
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pumpAndSettle();
+        expect(find.text('No matching purchases'), findsOneWidget);
+        expect(find.text('No linked supplier deliveries'), findsNothing);
+        final reset = find.byKey(const Key('work-purchase-reset'));
+        await tester.ensureVisible(reset);
+        await tester.pumpAndSettle();
+        expect(reset.hitTestable(), findsOneWidget);
+        await tester.tap(reset);
+        await tester.pumpAndSettle();
+        registerPosition.jumpTo(0);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(search).controller!.text, isEmpty);
+        await tester.scrollUntilVisible(row, 80, scrollable: find.descendant(
+          of: find.byKey(const Key('purchase-action-category-scroll')),
+          matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
+            widget.axisDirection == AxisDirection.down)).first);
+        await tester.pumpAndSettle();
+        expect(row, findsOneWidget);
         final name = find.descendant(
           of: row,
           matching: find.text(supplier.name),
@@ -12603,48 +13738,16 @@ void main() {
     );
     await tester.pumpAndSettle();
     // This fixture supplies a purchase book, not a recovered accounting journal.
+    await openBillActions(tester);
     expect(work.workspaceInvoiceHistoryLoaded, isFalse);
-    expect(find.text('No system voucher assigned'), findsOneWidget);
+    expect(find.text('No system voucher assigned'), findsNothing);
     expect(find.text('Supplier account status unavailable'), findsWidgets);
     expect(find.byKey(const Key('work-purchase-draft-save')), findsNothing);
-    final savedGoodsStatus = find.byKey(
-      const ValueKey('purchase-review-receiptStatus'),
-    );
-    final savedScroll = find
-        .descendant(
-          of: find.byKey(const Key('work-purchase-saved-copy')),
-          matching: find.byWidgetPredicate(
-            (widget) =>
-                widget is Scrollable &&
-                widget.axisDirection == AxisDirection.down,
-          ),
-        )
-        .first;
-    await tester.scrollUntilVisible(
-      savedGoodsStatus,
-      80,
-      scrollable: savedScroll,
-    );
-    await tester.pumpAndSettle();
-    expect(
-      find.descendant(
-        of: savedGoodsStatus,
-        matching: find.text('Goods status when copy saved'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: savedGoodsStatus,
-        matching: find.text('Already added to Stock'),
-      ),
-      findsOneWidget,
-    );
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('purchase-recorded-download')),
-      -80,
-      scrollable: savedScroll,
-    );
+    expect(find.text('Goods & payment details'), findsNothing);
+    expect(find.byKey(const ValueKey('purchase-review-receiptStatus')), findsNothing);
+    expect(copy.draft.details['receiptStatus'], 'Already added to Stock',
+      reason: 'Removing redundant screen observations must preserve the immutable saved fields.');
+    await tester.ensureVisible(find.byKey(const Key('purchase-recorded-download')));
     await tester.pumpAndSettle();
     Future<void> download() async {
       await tester.runAsync(() async {
@@ -12687,7 +13790,7 @@ void main() {
     final downloadControl = find.byKey(const Key('purchase-recorded-download'));
     await revealPurchaseInput(tester, downloadControl);
     final downloadCallback = tester
-        .widget<IconButton>(downloadControl)
+        .widget<TextButton>(downloadControl)
         .onPressed;
     expect(downloadCallback, isNotNull);
     await tester.runAsync(() async {
@@ -13330,7 +14433,11 @@ void main() {
           createdAt: at,
           updatedAt: at,
           details: {
-            'documentTitle': 'TAX INVOICE',
+            'documentTitle': view.$1 == 800.0 ? 'BILL OF SUPPLY' : 'TAX INVOICE',
+            if (view.$1 == 800.0) ...{
+              'documentType': 'Bill of supply', 'billOfSupplyReason': 'Composition scheme',
+              'printedDeclaration': 'Composition taxable person, not eligible to collect tax on supplies',
+            },
             'documentCopy': 'ORIGINAL FOR RECIPIENT',
             'buyerName': 'Fixture buyer',
             'buyerAddress': 'Billing address',
@@ -13421,7 +14528,14 @@ void main() {
       );
       expect(table.children.length, 2);
       expect(table.children.first.children.length, 9);
-      expect(find.text('TAX INVOICE'), findsOneWidget);
+      expect(find.text(view.$1 == 800.0 ? 'BILL OF SUPPLY' : 'TAX INVOICE'), findsOneWidget);
+      if (view.$1 == 800.0) {
+        final declaration = find.byKey(const ValueKey('purchase-review-printedDeclaration'));
+        expect(declaration, findsOneWidget);
+        expect(tester.getTopLeft(declaration).dy,
+          lessThan(tester.getTopLeft(find.byKey(const Key('purchase-review-paper-header'))).dy),
+          reason: 'The actual supplier composition declaration is at the top, without duplicating it below.');
+      }
       expect(find.text('Original note'), findsOneWidget);
       expect(find.text('Original terms'), findsOneWidget);
       expect(
@@ -13654,9 +14768,11 @@ void main() {
         );
         expect(
           find.byKey(Key('work-purchase-read-${attachment.digest}')),
-          pdf ? findsNothing : findsOneWidget,
-          reason: 'An unsupported PDF must not offer photo extraction.',
+          findsOneWidget,
+          reason: 'Images and PDFs both use the implemented source-text reader; neither changes the original copy.',
         );
+        expect(find.descendant(of: find.byKey(Key('work-purchase-read-${attachment.digest}')),
+          matching: find.text(pdf ? 'Read PDF text' : 'Try reading photo')), findsOneWidget);
         if (viewport.height > 500) {
           expect(
             find.byKey(const Key('purchase-original-zoom')).hitTestable(),
@@ -14537,8 +15653,8 @@ void main() {
       await purchaseRegisterAction(tester, 'work-purchase-opening'),
     );
     await tester.pumpAndSettle();
-    await revealOpening(tester, find.byType(DropdownButtonFormField<String>));
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await revealOpening(tester, find.byKey(const Key('work-opening-supplier-picker')));
+    await tester.tap(find.byKey(const Key('work-opening-supplier-picker')));
     await tester.pumpAndSettle();
     await tester.tap(find.text(name).last);
     await tester.pumpAndSettle();
@@ -14550,6 +15666,7 @@ void main() {
     bool inventory = false,
     WorkInventoryStore? inventoryStore,
     WorkLedgerFormDraftStore? moneyStore,
+    WorkPurchaseInvoiceCapture? capture,
   }) {
     final account = _ContactDraftFixtureStore();
     final work = inventory
@@ -14564,7 +15681,7 @@ void main() {
             null,
             null,
             entry,
-            null,
+            capture,
             inventoryStore ??
                 SecureWorkInventoryStore(
                   accountScope: () => account.accountScope,
@@ -14583,7 +15700,7 @@ void main() {
             null,
             null,
             entry,
-            null,
+            capture,
             null,
             moneyStore,
           );
@@ -14620,6 +15737,346 @@ void main() {
     return work;
   }
 
+  for (final scenario in [(1.0, 'normal'), (2.0, 'normal'), (1.0, 'capture-failure'), (1.0, 'scope-change'), (1.0, 'save-failure')]) {
+    final scale = scenario.$1;
+    testWidgets('PAYMENTCOPYUI scoped copy scan edit reopen without financial posting $scenario', (tester) async {
+      final bytes = (await tester.runAsync(_catalogueTestPhoto))!;
+      final capture = _PaymentCopyReviewFixture(bytes);
+      final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
+      final forms = _HeldSupplierMoneyDraftStore();
+      final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms, capture: capture);
+      final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc().subtract(const Duration(minutes: 5));
+      final day = at.toLocal().toIso8601String().substring(0, 10);
+      final supplier = WorkspaceSupplierProfile(id: 'HOST-copy-supplier', name: 'HOST Copy supplier', createdAt: at, updatedAt: at);
+      final opening = WorkspaceSupplierOpeningRecord(id: 'HOST-copy-opening', basisId: 'HOST-copy-basis',
+        account: scope.$1, store: scope.$2, qa: scope.$3, supplierId: supplier.id, revision: 1,
+        asOfDate: day, savedAt: at, amountMinor: 0, supplierCredit: false, sourceNote: 'HOST confirmed zero');
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 1, profiles: [supplier], openingRecords: [opening]);
+      expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope,
+        expectedRevision: 1, confirmedAt: at.add(const Duration(seconds: 1))), isTrue);
+      if (scenario.$2 == 'normal') {
+        final inputKey = work.supplierMoneyFormKey(supplier.id, advance: true)!;
+        final empty = WorkspaceSupplierMoneyCopies(key: inputKey, qa: scope.$3);
+        final original = WorkspacePurchaseInvoiceAttachment(owner: empty.owner,
+          digest: crypto.sha256.convert(bytes).toString(), fileName: 'HOST-previous-copy.png',
+          contentType: 'image/png', byteLength: bytes.length, source: 'upload',
+          documentDetails: const {'type': 'paymentReceipt'});
+        final prior = WorkspaceSupplierMoneyCopies(key: inputKey, qa: scope.$3, previous: [
+          WorkspaceSupplierMoneyCopyGroup(operation: 'HOST-prior-draft-only', reference: 'HOST previous draft',
+            date: day, copies: [original])]);
+        await forms.save(WorkspaceLedgerFormDraft(key: inputKey, revision: 1,
+          fields: {'amount': '', 'channel': 'Bank transfer', 'reference': '', 'occurredOn': day,
+            'notIncludedInOpening': 'false', 'supportingCopies': jsonEncode(prior.toJson())}), expectedRevision: null);
+      }
+      final financialBefore = jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson());
+      final writesBefore = checkpoint.saveAttempts;
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 806), textScale: scale);
+      await openPurchaseList(tester);
+      Future<void> open() async {
+        await tester.tap(find.byKey(const Key('work-purchase-action-centre-open'))); await tester.pumpAndSettle();
+        await expandPurchaseActionCategory(tester, 'Money paid, credit & refunds');
+        final action = find.byKey(const Key('purchase-action-money'));
+        await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey('work-supplier-choice-${supplier.id}'))); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('supplier-payment-purpose-advance'))); await tester.pumpAndSettle();
+        final panel = find.byKey(const Key('supplier-payment-supporting-copies'));
+        await tester.ensureVisible(panel); await tester.pumpAndSettle();
+        await tester.tap(find.descendant(of: panel, matching: find.text('Supporting copies · optional'))); await tester.pumpAndSettle();
+      }
+      await open();
+      if (scale == 2.0) {
+        final type = find.byKey(const Key('supplier-payment-copy-type'));
+        await tester.ensureVisible(type); await tester.pumpAndSettle();
+        await tester.tap(type); await tester.pumpAndSettle();
+        final unclassified = find.text('Leave type unselected');
+        await tester.scrollUntilVisible(unclassified, 160,
+          scrollable: find.descendant(of: find.byKey(const Key('trade-document-options')),
+            matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
+              widget.axisDirection == AxisDirection.down)), maxScrolls: 12);
+        await tester.pumpAndSettle();
+        await tester.tap(unclassified); await tester.pumpAndSettle();
+      }
+      final camera = find.byKey(const Key('supplier-payment-copy-camera'));
+      await tester.ensureVisible(camera); await tester.pumpAndSettle();
+      if (scenario.$2 == 'capture-failure') capture.failCapture = true;
+      if (scenario.$2 == 'save-failure') forms.failCopySave = true;
+      if (scenario.$2 == 'scope-change') capture.holdCapture = Completer<void>();
+      if (scenario.$2 == 'scope-change') {
+        await tester.tap(camera); await tester.pump(); await tester.pump();
+        expect(tester.widget<TextButton>(find.byKey(const Key('supplier-money-close'))).onPressed, isNull);
+        work.activeWorkspace = null; work.notifyListeners();
+        await tester.pump(); await tester.pump();
+        expect(tester.widget<TextButton>(find.byKey(const Key('supplier-money-close'))).onPressed, isNotNull,
+          reason: 'Removing a copy panel must release only its own busy lease.');
+        capture.holdCapture!.complete(); await tester.pumpAndSettle();
+        expect(checkpoint.saveAttempts, writesBefore);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        return;
+      }
+      await tester.tap(camera); await tester.pumpAndSettle();
+      final key = work.supplierMoneyFormKey(supplier.id, advance: true)!;
+      if (scenario.$2 == 'save-failure') {
+        expect(await forms.read(key), isNull);
+        expect(find.text('Copy details are not saved yet. Retry saving the payment input before leaving.'), findsOneWidget);
+        forms.failCopySave = false;
+        final retry = find.text('Retry saving input');
+        await tester.ensureVisible(retry); await tester.pumpAndSettle();
+        await tester.tap(retry); await tester.pumpAndSettle();
+        expect((await forms.read(key))!.supplierMoneyCopies!.active, hasLength(1));
+        expect(find.text('Copy details are not saved yet. Retry saving the payment input before leaving.'), findsNothing);
+      }
+      if (scenario.$2 == 'capture-failure') {
+        expect(find.text('HOST copy capture unavailable'), findsOneWidget);
+        expect((await forms.read(key))?.supplierMoneyCopies, isNull);
+        expect(tester.widget<TextButton>(find.byKey(const Key('supplier-money-close'))).onPressed, isNotNull);
+        expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()), financialBefore);
+        expect(checkpoint.saveAttempts, writesBefore);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        return;
+      }
+      var saved = (await forms.read(key))!;
+      expect(saved.supplierMoneyCopies?.active, hasLength(1), reason:
+        tester.widgetList<Text>(find.byType(Text)).map((t) => t.data).whereType<String>().join(' | '));
+      expect(saved.supplierMoneyCopies!.active.single.owner, saved.supplierMoneyCopies!.owner);
+      expect(saved.supplierMoneyCopies!.active.single.documentDetails['type'], scale == 2.0 ? null : 'paymentReceipt');
+      final digest = saved.supplierMoneyCopies!.active.single.digest;
+      final copy = find.byKey(ValueKey('supplier-payment-copy-$digest'));
+      final read = find.descendant(of: copy, matching: find.text('Read text'));
+      await tester.ensureVisible(read); await tester.pumpAndSettle(); await tester.tap(read); await tester.pumpAndSettle();
+      saved = (await forms.read(key))!;
+      expect(saved.supplierMoneyCopies!.active.single.extractedFields.single.value, '123');
+      final fields = find.descendant(of: copy, matching: find.text('Printed fields · 1'));
+      await tester.ensureVisible(fields); await tester.pumpAndSettle(); await tester.tap(fields); await tester.pumpAndSettle();
+      expect(find.text('Copy fields'), findsOneWidget);
+      expect(find.text('123'), findsOneWidget);
+      final value = find.byKey(const Key('work-receive-field-value-HOST-xyz'));
+      await tester.ensureVisible(value); await tester.pumpAndSettle();
+      await tester.enterText(value, '124');
+      await tester.tap(find.byKey(const Key('work-receive-fields-keep'))); await tester.pumpAndSettle();
+      final corrected = (await forms.read(key))!.supplierMoneyCopies!.active.single;
+      expect(corrected.extractedFields.single.value, '124');
+      expect(corrected.digest, digest);
+      expect(corrected.detectedText, 'xyz: 123', reason: 'Owner corrections do not rewrite the recognised original.');
+      await tester.tap(find.byKey(const Key('supplier-money-close'))); await tester.pumpAndSettle();
+      await open();
+      expect(find.byKey(ValueKey('supplier-payment-copy-$digest')), findsOneWidget);
+      expect((await forms.read(key))!.supplierMoneyCopies!.active.single.digest, digest);
+      expect((await forms.read(key))!.supplierMoneyCopies!.active.single.extractedFields.single.value, '124');
+      expect((await forms.read(key))!.supplierMoneyAttempt, isNull);
+      if (scenario.$2 == 'normal') {
+        final previous = find.byKey(const Key('supplier-payment-previous-copies'));
+        await tester.ensureVisible(previous); await tester.pumpAndSettle();
+        await tester.tap(find.descendant(of: previous, matching: find.text('Previous draft copies'))); await tester.pumpAndSettle();
+        final prior = find.byKey(ValueKey('supplier-payment-copy-previous-$digest'));
+        expect(prior, findsOneWidget);
+        expect(find.descendant(of: prior, matching: find.text('Remove')), findsNothing);
+        expect(find.descendant(of: prior, matching: find.text('Read text')), findsNothing);
+        expect((await forms.read(key))!.supplierMoneyCopies!.previous.single.reference, 'HOST previous draft');
+      }
+      expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()), financialBefore);
+      expect(checkpoint.saveAttempts, writesBefore);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for(final geometry in [(const Size(360,806),1.0),(const Size(320,568),2.0),(const Size(806,360),1.6)]) {
+    testWidgets('SUPPLIERBILLPICKER search accepted bills and cancel without writes $geometry', (tester) async {
+      addTearDown(tester.view.resetViewInsets);
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry=_OpeningPostingFixtureStore(), checkpoint=_LedgerCheckpointFixtureStore();
+      final work=postingOpeningFixture(entry,checkpoint,moneyStore:_HeldSupplierMoneyDraftStore());
+      final scope=work.workspaceSupplierScope!, at=DateTime.now().toUtc().subtract(const Duration(minutes:5));
+      final day=at.toLocal().toIso8601String().substring(0,10);
+      final printedDay='${day.substring(8)}/${day.substring(5,7)}/${day.substring(0,4)}';
+      final supplier=WorkspaceSupplierProfile(id:'host-bill-picker',name:geometry.$2==2
+        ? 'HOST supplier with a long registered trading name and branch retained in full' : 'HOST bill supplier',createdAt:at,updatedAt:at);
+      final copies=[for(var i=0;i<3;i++) WorkspacePurchaseSavedCopy(id:'host-picker-copy-$i',storeName:'HOST Store',revision:1,
+        savedAt:at.add(Duration(seconds:i)),supplier:supplier,labels:const {},draft:WorkspacePurchaseEntryDraft(
+          id:'host-picker-draft-$i',supplierId:supplier.id,invoiceReference:['HOST-OLD-01','HOST-NEW-02','HOST-UNCONFIRMED'][i],
+          invoiceDate:printedDay,createdAt:at,updatedAt:at,details:{'invoiceTotal':i==1?'1234.50':'100'},
+          goods:const [{'productId':'','name':'HOST flour','pack':'1 kg','quantity':'1','cost':'100'}]))];
+      final otherSupplier=WorkspaceSupplierProfile(id:'host-other-bill-supplier',name:'HOST Other supplier',createdAt:at,updatedAt:at);
+      final otherCopy=WorkspacePurchaseSavedCopy(id:'host-other-bill-copy',storeName:'HOST Store',revision:1,
+        savedAt:at.add(const Duration(seconds:4)),supplier:otherSupplier,labels:const {},draft:WorkspacePurchaseEntryDraft(
+          id:'host-other-bill-draft',supplierId:otherSupplier.id,invoiceReference:'HOST-NEW-02',invoiceDate:printedDay,
+          createdAt:at,updatedAt:at,details:const {'invoiceTotal':'222'},
+          goods:const [{'productId':'','name':'HOST sugar','pack':'1 kg','quantity':'1','cost':'222'}]));
+      final opening=WorkspaceSupplierOpeningRecord(id:'host-picker-opening',basisId:'host-picker-basis',account:scope.$1,store:scope.$2,
+        qa:scope.$3,supplierId:supplier.id,revision:1,asOfDate:day,savedAt:at,amountMinor:0,supplierCredit:false,sourceNote:'HOST confirmed zero',
+        bills:[for(final copy in copies) WorkspaceOpeningBillLink(copyId:copy.id,copyRevision:1,draftId:copy.draft.id,inclusion:WorkspaceOpeningBillInclusion.excluded)]);
+      final otherOpening=WorkspaceSupplierOpeningRecord(id:'host-other-opening',basisId:'host-other-basis',account:scope.$1,store:scope.$2,
+        qa:scope.$3,supplierId:otherSupplier.id,revision:1,asOfDate:day,savedAt:at,amountMinor:0,supplierCredit:false,
+        sourceNote:'HOST other confirmed zero',bills:[WorkspaceOpeningBillLink(copyId:otherCopy.id,copyRevision:1,
+          draftId:otherCopy.draft.id,inclusion:WorkspaceOpeningBillInclusion.excluded)]);
+      entry.value=WorkspacePurchaseEntryBook(account:scope.$1,store:scope.$2,qa:scope.$3,revision:1,
+        profiles:[supplier,otherSupplier],copies:[...copies,otherCopy],openingRecords:[opening,otherOpening]);
+      expect(await work.loadWorkspaceSuppliers(retry:true),isTrue);
+      expect(await work.confirmWorkspaceSupplierOpeningRecord(opening,scope:scope,expectedRevision:1,confirmedAt:at.add(const Duration(seconds:3))),isTrue);
+      for(final copy in copies.take(2)) {
+        expect(await work.confirmWorkspacePurchaseBill(copy,scope:scope,expectedPurchaseRevision:entry.value!.revision,
+          expectedLedgerRevision:work.workspaceSupplierLedger(supplier.id)!.revision,openingTreatment:WorkspaceOpeningBillInclusion.excluded,
+          confirmedAt:at.add(const Duration(seconds:4))),isTrue);
+      }
+      expect(await work.confirmWorkspaceSupplierOpeningRecord(otherOpening,scope:scope,expectedRevision:entry.value!.revision,
+        confirmedAt:at.add(const Duration(seconds:5))),isTrue);
+      expect(await work.confirmWorkspacePurchaseBill(otherCopy,scope:scope,expectedPurchaseRevision:entry.value!.revision,
+        expectedLedgerRevision:work.workspaceSupplierLedger(otherSupplier.id)!.revision,
+        openingTreatment:WorkspaceOpeningBillInclusion.excluded,confirmedAt:at.add(const Duration(seconds:6))),isTrue);
+      final before=jsonEncode(entry.value!.toJson()), ledgerBefore=jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson());
+      final otherLedgerBefore=jsonEncode(work.workspaceSupplierLedger(otherSupplier.id)!.toJson());
+      await mount(tester,route:'/app/work/workspace/dashboard',work:work,viewport:geometry.$1,textScale:geometry.$2);
+      await openPurchaseList(tester);
+      await tester.tap(find.byKey(const Key('work-purchase-action-centre-open'))); await tester.pumpAndSettle();
+      await expandPurchaseActionCategory(tester,'Money paid, credit & refunds');
+      final action=find.byKey(const Key('purchase-action-money')); await revealPurchaseAction(tester,action);
+      await tester.tap(action); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey('work-supplier-choice-${supplier.id}'))); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('supplier-payment-purpose-bill'))); await tester.pumpAndSettle();
+      final picker=find.byKey(const Key('supplier-payment-bill-selector'));
+      expect(picker,findsOneWidget); expect(find.descendant(of:picker,matching:find.text(supplier.name)),findsOneWidget);
+      expect(find.text('Choose the supplier bill you have paid.'), findsOneWidget);
+      expect(find.descendant(of:picker,matching:find.textContaining('Revision ')),findsNothing);
+      expect(find.descendant(of:picker,matching:find.text('HOST-UNCONFIRMED')),findsNothing);
+      final search=find.byKey(const Key('supplier-payment-bill-search'));
+      expect(search.hitTestable(),findsOneWidget);
+      for(final query in ['new-02','₹1,234.50',printedDay]) {
+        await tester.enterText(search,query); await tester.pumpAndSettle();
+        expect(find.descendant(of:picker,matching:find.text('HOST-NEW-02')),findsOneWidget);
+      }
+      await tester.enterText(search,'does-not-exist'); await tester.pumpAndSettle();
+      expect(find.descendant(of:picker,matching:find.text('No matching bills')),findsOneWidget);
+      await tester.tap(find.descendant(of:picker,matching:find.byTooltip('Clear bill search'))); await tester.pumpAndSettle();
+      final newest=find.byKey(const ValueKey('supplier-payment-bill-host-picker-copy-1'));
+      final older=find.byKey(const ValueKey('supplier-payment-bill-host-picker-copy-0'));
+      expect(tester.getRect(newest).top,lessThan(tester.getRect(older).top));
+      expect(find.descendant(of:picker,matching:find.text('Bill total ₹1,234.50')),findsOneWidget);
+      tester.view.viewInsets=const FakeViewPadding(bottom:240);
+      await tester.pumpAndSettle();
+      expect(search.hitTestable(),findsOneWidget);
+      expect(find.byKey(const Key('supplier-payment-bill-close')).hitTestable(),findsOneWidget);
+      expect(tester.takeException(),isNull);
+      tester.view.resetViewInsets(); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('supplier-payment-bill-close')).hitTestable(),findsOneWidget);
+      await tester.tap(find.byKey(const Key('supplier-payment-bill-close'))); await tester.pumpAndSettle();
+      expect(picker,findsNothing); expect(jsonEncode(entry.value!.toJson()),before);
+      expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()),ledgerBefore);
+      for (final purpose in ['bill', 'advance', 'account']) {
+        await tester.tap(find.byKey(const Key('work-purchase-action-centre-open'))); await tester.pumpAndSettle();
+        await expandPurchaseActionCategory(tester,'Money paid, credit & refunds');
+        final again=find.byKey(const Key('purchase-action-money')); await revealPurchaseAction(tester,again);
+        await tester.tap(again); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey('work-supplier-choice-${supplier.id}'))); await tester.pumpAndSettle();
+        final purposeChoice = find.byKey(ValueKey('supplier-payment-purpose-$purpose'));
+        await Scrollable.ensureVisible(tester.element(purposeChoice), alignment: .5); await tester.pumpAndSettle();
+        expect(purposeChoice.hitTestable(), findsOneWidget);
+        await tester.tap(purposeChoice); await tester.pumpAndSettle();
+        if (purpose == 'bill') {
+          await tester.enterText(search,'new-02'); await tester.pumpAndSettle();
+          await tester.tap(newest); await tester.pumpAndSettle();
+          expect(find.byKey(const Key('supplier-money-bill-reference')), findsOneWidget);
+          expect(find.text('Bill HOST-NEW-02'), findsOneWidget);
+        } else {
+          expect(find.byKey(const Key('supplier-money-bill-reference')), findsNothing);
+        }
+        expect(picker,findsNothing); expect(find.byKey(const Key('supplier-payment-amount')),findsOneWidget);
+        expect(find.text(purpose == 'bill' ? 'Record a payment already made against this bill.'
+          : purpose == 'advance' ? 'Record an advance already paid; apply it to a bill later.'
+          : 'Record money already paid without linking it to a bill.'), findsOneWidget);
+        expect(find.textContaining('Evaluation record'), findsNothing);
+        expect(find.byKey(const Key('supplier-money-supplier')), findsOneWidget);
+        expect(find.byKey(const Key('supplier-money-hide-keyboard')), findsNothing);
+        final paid = find.byKey(const Key('supplier-payment-amount'));
+        final method = find.byKey(const ValueKey('supplier-payment-method-Bank transfer'));
+        final paidRect = tester.getRect(paid), methodRect = tester.getRect(method);
+        expect(paidRect.height, greaterThanOrEqualTo(48));
+        expect(methodRect.height, greaterThanOrEqualTo(48));
+        expect(tester.widget<TextField>(paid).enabled, isTrue,
+          reason: 'Editable payment assertions require successful draft recovery.');
+        if (geometry.$2 == 2) {
+          expect(methodRect.top, greaterThanOrEqualTo(paidRect.bottom + 7));
+        } else {
+          expect(methodRect.top, closeTo(paidRect.top, .1));
+          expect(methodRect.left, greaterThanOrEqualTo(paidRect.right + 7));
+        }
+        await tester.ensureVisible(paid); await tester.tap(paid); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('supplier-money-hide-keyboard')).hitTestable(), findsOneWidget,
+          reason: 'Floating keyboards retain dismissal even with zero bottom inset.');
+        tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+        await tester.pumpAndSettle();
+        final close = find.byKey(const Key('supplier-money-close'));
+        expect(close.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.byKey(const Key('supplier-money-hide-keyboard'))); await tester.pumpAndSettle();
+        expect(tester.testTextInput.isVisible, isFalse);
+        tester.view.resetViewInsets(); await tester.pumpAndSettle();
+        await tester.ensureVisible(find.byKey(const Key('supplier-money-submit'))); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('supplier-money-submit')).hitTestable(), findsOneWidget);
+        await tester.tap(close); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('supplier-money-supplier')), findsNothing);
+        expect(jsonEncode(entry.value!.toJson()), before);
+        expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()),ledgerBefore);
+      }
+      await tester.tap(find.byKey(const Key('work-purchase-action-centre-open'))); await tester.pumpAndSettle();
+      await expandPurchaseActionCategory(tester,'Money paid, credit & refunds');
+      for (final billAction in ['allocate', 'credit']) {
+      final globalAction=find.byKey(ValueKey('purchase-action-$billAction'));
+      final globalTitle=find.descendant(of:globalAction, matching:find.text(
+        billAction == 'allocate' ? 'Use existing payment or credit' : 'Record supplier credit note'));
+      await revealPurchaseAction(tester,globalTitle,tapArea:globalAction);
+      await tester.tap(globalTitle); await tester.pumpAndSettle();
+      expect(picker,findsOneWidget);
+      expect(find.text(billAction == 'allocate'
+        ? 'Choose the bill for an existing payment, advance or bill credit.'
+        : 'Choose the bill covered by your supplier’s credit note.'), findsOneWidget);
+      final results=find.byKey(const Key('supplier-payment-bill-results'));
+      expect(find.descendant(of:picker,matching:find.textContaining('Revision ')),findsNothing);
+      expect(find.descendant(of:picker,matching:find.text('HOST-UNCONFIRMED')),findsNothing);
+      await tester.enterText(search,'HOST-NEW-02'); await tester.pumpAndSettle();
+      expect(find.descendant(of:results,matching:find.text('HOST-NEW-02')),findsNWidgets(2));
+      expect(find.descendant(of:picker,matching:find.text(supplier.name)),findsOneWidget);
+      expect(find.descendant(of:picker,matching:find.text(otherSupplier.name)),findsOneWidget);
+      final otherRow=find.byKey(ValueKey('supplier-payment-bill-${otherCopy.id}'));
+      expect(tester.getRect(otherRow).top,lessThan(tester.getRect(newest).top));
+      await tester.enterText(search,'Other supplier'); await tester.pumpAndSettle();
+      expect(find.descendant(of:results,matching:find.text('HOST-NEW-02')),findsOneWidget);
+      expect(find.descendant(of:picker,matching:find.text('Bill total ₹222')),findsOneWidget);
+      tester.view.viewInsets=const FakeViewPadding(bottom:240); await tester.pumpAndSettle();
+      expect(search.hitTestable(),findsOneWidget);
+      expect(find.byKey(const Key('supplier-payment-bill-close')).hitTestable(),findsOneWidget);
+      expect(tester.takeException(),isNull);
+      tester.view.resetViewInsets(); await tester.pumpAndSettle();
+      await tester.ensureVisible(otherRow); await tester.pumpAndSettle();
+      expect(otherRow.hitTestable(),findsOneWidget); await tester.tap(otherRow); await tester.pumpAndSettle();
+      if (billAction == 'allocate') {
+        expect(tester.widget<Text>(find.byKey(const Key('supplier-allocation-supplier'))).data,otherSupplier.name);
+        expect(tester.widget<Text>(find.byKey(const Key('supplier-allocation-bill'))).data,'Bill HOST-NEW-02');
+      } else {
+        expect(find.byKey(const Key('supplier-credit-reference')),findsOneWidget);
+        expect(tester.widget<Text>(find.byKey(const Key('supplier-credit-supplier'))).data,otherSupplier.name);
+        expect(tester.widget<Text>(find.byKey(const Key('supplier-credit-bill'))).data,'Bill HOST-NEW-02');
+        expect(find.byKey(const Key('supplier-allocation-supplier')),findsNothing);
+      }
+      final formClose=find.byKey(ValueKey('supplier-${billAction == 'allocate' ? 'allocation' : 'credit'}-close'));
+      await tester.ensureVisible(formClose); await tester.pumpAndSettle();
+      expect(formClose.hitTestable(),findsOneWidget);
+      await tester.tap(formClose); await tester.pumpAndSettle();
+      expect(jsonEncode(entry.value!.toJson()),before);
+      expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()),ledgerBefore);
+      expect(jsonEncode(work.workspaceSupplierLedger(otherSupplier.id)!.toJson()),otherLedgerBefore);
+      if (billAction == 'allocate') {
+        await tester.tap(find.byKey(const Key('work-purchase-action-centre-open'))); await tester.pumpAndSettle();
+        await expandPurchaseActionCategory(tester,'Money paid, credit & refunds');
+      }
+      }
+      expect(tester.takeException(),isNull); await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
   testWidgets('P01-AC01 inline load closed before recovery stays closed', (
     tester,
   ) async {
@@ -14699,9 +16156,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final hasReference in [false, true]) {
+  for (final scenario in [(false, 1.0), (true, 1.0), (true, 2.0)]) {
+    final (hasReference, scale) = scenario;
     testWidgets(
-      'P01-AC01 receiving continuation ignores automatic date $hasReference',
+      'P01-AC01 receiving continuation ignores automatic date $hasReference $scale',
       (tester) async {
         // Host-only fixtures; no device acceptance or backend evidence.
         FlutterSecureStorage.setMockInitialValues({});
@@ -14728,9 +16186,12 @@ void main() {
           store: scope.$2,
           qa: scope.$3,
           revision: 1,
-          profiles: [supplier],
+          profiles: [supplier, WorkspaceSupplierProfile(id: 'ac01-no-draft',
+            name: 'Unrelated supplier without a receiving draft', phone: '', address: '', gstin: '',
+            createdAt: at, updatedAt: at)],
         );
-        await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: const Size(360, 800), textScale: scale);
         await openPurchaseList(tester);
         await forms.save(
           WorkspaceLedgerFormDraft(
@@ -14760,6 +16221,7 @@ void main() {
           expectedRevision: null,
         );
         final before = jsonEncode(entry.value!.toJson());
+        final savedForms = Map.of(forms.drafts);
         await tester.tap(
           find.byKey(const Key('work-purchase-action-centre-open')),
         );
@@ -14769,10 +16231,273 @@ void main() {
           find.byKey(const Key('purchase-action-continue-receive')),
           hasReference ? findsOneWidget : findsNothing,
         );
+        if (hasReference) {
+          await tester.tap(find.byKey(const Key('purchase-action-continue-receive')));
+          await tester.pumpAndSettle();
+          final search = find.byKey(const Key('work-supplier-search'));
+          expect(search, findsOneWidget);
+          expect(find.text('Choose the supplier for the delivery entry you want to continue.'), findsOneWidget);
+          expect(find.byKey(const Key('work-supplier-add')), findsNothing,
+            reason: 'A newly added supplier cannot have an existing receiving draft.');
+          expect(find.byKey(const ValueKey('work-supplier-choice-ac01-no-draft')), findsNothing);
+          expect(find.byKey(ValueKey('work-supplier-choice-${supplier.id}')), findsOneWidget);
+          await tester.enterText(search, 'no-match'); await tester.pumpAndSettle();
+          expect(find.text('No matching supplier.'), findsOneWidget);
+          await tester.enterText(search, supplier.name); await tester.pumpAndSettle();
+          expect(find.byKey(ValueKey('work-supplier-choice-${supplier.id}')), findsOneWidget);
+          tester.testTextInput.hide();
+          await tester.tap(find.byTooltip('Close supplier list')); await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-purchase-action-centre-open')), findsOneWidget);
+          expect(forms.drafts, equals(savedForms));
+          await tester.tap(find.byKey(const Key('work-purchase-action-centre-open')));
+          await tester.pumpAndSettle();
+          await expandPurchaseActionCategory(tester, 'Goods received & returns');
+          await tester.tap(find.byKey(const Key('purchase-action-continue-receive')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(ValueKey('work-supplier-choice-${supplier.id}')));
+          await tester.pumpAndSettle();
+          expect(find.byWidgetPredicate((w) => w is TextField &&
+            w.controller?.text == 'Unfinished delivery'), findsOneWidget);
+          expect(forms.drafts, equals(savedForms));
+          final closeReceiving = find.descendant(of: find.byKey(const Key('work-receive-header')),
+            matching: find.text('Close'));
+          await tester.tap(closeReceiving); await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-purchase-action-centre-open')), findsOneWidget);
+          expect(forms.drafts, equals(savedForms),
+            reason: 'Closing an unchanged receiving draft must not rewrite its revision or fields.');
+        }
         expect(jsonEncode(entry.value!.toJson()), before);
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('OPENINGAMOUNTLAYOUT discoverable empty amount and full direction $scale', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore();
+      final checkpoint = _LedgerCheckpointFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 800), textScale: scale);
+      await saveOpeningSupplier(tester);
+      final original = jsonEncode(entry.value!.toJson());
+      final known = find.ancestor(of: find.text('Starting amount'),
+        matching: find.byType(DropdownButtonFormField<bool>));
+      await revealOpening(tester, known); await tester.tap(known); await tester.pumpAndSettle();
+      await tester.tap(find.text('Amount confirmed').last); await tester.pumpAndSettle();
+      final amount = find.byKey(const Key('work-opening-amount'));
+      await revealOpening(tester, amount);
+      final direction = find.ancestor(of: find.text('Who owes this amount?'),
+        matching: find.byType(DropdownButtonFormField<bool>));
+      await revealOpening(tester, direction); await tester.tap(direction); await tester.pumpAndSettle();
+      const longChoice = 'Supplier owes you / credit available';
+      await tester.tap(find.text(longChoice).last); await tester.pumpAndSettle();
+      final selected = find.descendant(of: direction, matching: find.text(longChoice)).first;
+      expect(tester.renderObject<RenderParagraph>(selected).didExceedMaxLines, isFalse);
+      expect(tester.getRect(direction).inflate(1).contains(tester.getRect(selected).bottomRight),
+        isTrue, reason: 'The full balance-direction choice must fit at enlarged text.');
+      await revealOpening(tester, amount, delta: -120);
+      final editor = tester.widget<TextField>(amount);
+      expect(editor.controller!.text, isEmpty, reason: 'Unknown amount must never become a prefilled zero.');
+      expect(editor.readOnly, isFalse);
+      expect(editor.keyboardType, const TextInputType.numberWithOptions(decimal: true));
+      expect(editor.decoration!.hintText, 'Enter opening amount');
+      final border = editor.decoration!.border ?? Theme.of(tester.element(amount)).inputDecorationTheme.border;
+      expect(border, isA<OutlineInputBorder>(), reason: 'Money entry must be visibly identifiable as an input.');
+      final formScroll = tester.state<ScrollableState>(find.descendant(
+        of: find.byKey(const Key('work-opening-dues-form')),
+        matching: find.byType(Scrollable)).first).position;
+      expect(amount, findsOneWidget);
+      final amountTop = tester.getRect(amount).top + formScroll.pixels;
+      final amountBottom = tester.getRect(amount).bottom + formScroll.pixels;
+      await revealOpening(tester, known, delta: -120);
+      expect(known, findsOneWidget);
+      expect(amountTop - (tester.getRect(known).bottom + formScroll.pixels), greaterThanOrEqualTo(12));
+      await revealOpening(tester, direction);
+      expect(direction, findsOneWidget);
+      expect(tester.getRect(direction).top + formScroll.pixels - amountBottom, greaterThanOrEqualTo(12));
+      expect(jsonEncode(entry.value!.toJson()), original);
+      expect(checkpoint.saveAttempts, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('OPENINGBILLLAYOUT supporting bill gap and complete choice $scale', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore();
+      final checkpoint = _LedgerCheckpointFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint);
+      final scope = work.workspaceSupplierScope!;
+      final at = DateTime.utc(2026, 10, 23);
+      final supplier = WorkspaceSupplierProfile(id: 'opening-bill-supplier',
+        name: 'HOST opening bill supplier', createdAt: at, updatedAt: at);
+      final bill = WorkspacePurchaseEntryDraft(id: 'opening-bill-draft',
+        supplierId: supplier.id, invoiceReference: 'HOST-OPENING-BILL-12345',
+        invoiceDate: '30/09/2026', createdAt: at, updatedAt: at,
+        goods: const [{'name': 'HOST tea', 'pack': '1 kg', 'quantity': '2', 'cost': '50'}],
+        details: const {'invoiceTotal': '100'});
+      final copy = WorkspacePurchaseSavedCopy(id: 'opening-bill-copy', storeName: 'HOST Store',
+        revision: 1, savedAt: at, supplier: supplier, draft: bill, labels: const {});
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 1, profiles: [supplier], copies: [copy]);
+      final original = jsonEncode(entry.value!.toJson());
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 800), textScale: scale);
+      await openPurchaseList(tester);
+      final action = await purchaseRegisterAction(tester, 'work-purchase-opening');
+      await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+      final supplierPicker = find.byKey(const Key('work-opening-supplier-picker'));
+      await revealOpening(tester, supplierPicker); await tester.tap(supplierPicker); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('work-supplier-choice-opening-bill-supplier')));
+      await tester.pumpAndSettle();
+      final field = find.byType(DropdownButtonFormField<WorkspaceOpeningBillInclusion>);
+      await revealOpening(tester, field);
+      final guidance = find.text('Check each bill. Included means already counted in this starting amount; bill totals are not added again.');
+      expect(tester.getRect(field).top - tester.getRect(guidance).bottom,
+        greaterThanOrEqualTo(12), reason: 'The bill label needs separation from its explanation.');
+      final choice = find.descendant(of: field, matching: find.text('Inclusion not confirmed')).first;
+      expect(tester.renderObject<RenderParagraph>(choice).didExceedMaxLines, isFalse);
+      expect(tester.getRect(field).inflate(1).contains(tester.getRect(choice).bottomRight), isTrue,
+        reason: 'The complete selected choice must fit inside its field at enlarged text.');
+      expect(tester.widget<DropdownButtonFormField<WorkspaceOpeningBillInclusion>>(field).initialValue,
+        WorkspaceOpeningBillInclusion.unknown);
+      expect(jsonEncode(entry.value!.toJson()), original);
+      expect(checkpoint.saveAttempts, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('OPENINGRECORDLAYOUT full saved version and separated labels $scale', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore();
+      final checkpoint = _LedgerCheckpointFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 800), textScale: scale);
+      await saveOpeningSupplier(tester);
+      final date = find.byKey(const Key('work-opening-date'));
+      await revealOpening(tester, date); await tester.enterText(date, '2026-10-02');
+      final note = find.byKey(const Key('work-opening-note'));
+      await revealOpening(tester, note); await tester.enterText(note, 'Supplier opening statement');
+      final save = find.byKey(const Key('work-opening-save'));
+      await revealOpening(tester, save); await tester.tap(save); await tester.pumpAndSettle();
+      final record = entry.value!.openingRecords.single;
+      final original = jsonEncode(entry.value!.toJson());
+      final version = find.byType(DropdownButtonFormField<int>);
+      await revealOpening(tester, version, delta: -120);
+      final label = find.descendant(of: version, matching: find.text(
+        '2026-10-02 · Amount unknown · v${record.revision}')).first;
+      expect(tester.renderObject<RenderParagraph>(label).didExceedMaxLines, isFalse,
+        reason: 'The selected revision must remain visible, including enlarged text.');
+      expect(tester.getRect(version).inflate(1).contains(tester.getRect(label).bottomRight),
+        isTrue, reason: 'Wrapped version text must fit inside its field, not clip in an ancestor.');
+      final supplier = find.byKey(const Key('work-opening-supplier-picker'));
+      await revealOpening(tester, supplier, delta: -120);
+      expect(tester.getRect(version).top - tester.getRect(supplier).bottom,
+        greaterThanOrEqualTo(12), reason: 'Floating labels need separation from the previous field.');
+      final guidance = find.text('Save the starting amount, check supporting bills, then confirm the balance in the supplier account. Saving alone does not change dues, Stock or payments.');
+      await revealOpening(tester, guidance, delta: -120);
+      expect(tester.getRect(supplier).top - tester.getRect(guidance).bottom,
+        greaterThanOrEqualTo(12), reason: 'Supplier label must not crowd the preceding guidance.');
+      expect(jsonEncode(entry.value!.toJson()), original);
+      expect(record.amountMinor, isNull);
+      expect(checkpoint.saveAttempts, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('OPENINGSUPPLIERRECOVERY shared directory refresh failure and retry', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _OpeningPostingFixtureStore();
+    final checkpoint = _LedgerCheckpointFixtureStore();
+    final work = postingOpeningFixture(entry, checkpoint);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    expect(work.workspaceSuppliersLoaded, isTrue);
+    final action = await purchaseRegisterAction(tester, 'work-purchase-opening');
+    await revealPurchaseAction(tester, action);
+    await tester.tap(action); await tester.pumpAndSettle();
+    entry.failRead = true;
+    final picker = find.byKey(const Key('work-opening-supplier-picker'));
+    await revealOpening(tester, picker); await tester.tap(picker); await tester.pumpAndSettle();
+    expect(find.text('Select supplier'), findsOneWidget);
+    expect(find.byKey(const Key('work-supplier-retry')), findsOneWidget);
+    entry.failRead = false;
+    await tester.tap(find.byKey(const Key('work-supplier-retry'))); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-supplier-search')), findsOneWidget);
+    expect(work.workspaceSuppliersLoaded, isTrue);
+    expect(checkpoint.saveAttempts, 0);
+    expect(entry.value, isNull);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('OPENINGSUPPLIERSEARCH search cancel and dirty selection $scale', (tester) async {
+      // Shared selector must remain reachable independently of directory preload.
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore();
+      final checkpoint = _LedgerCheckpointFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint);
+      final scope = work.workspaceSupplierScope!;
+      final at = DateTime.utc(2026, 10, 23);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 1, profiles: List.generate(100, (i) => WorkspaceSupplierProfile(
+          id: 'opening-search-$i', name: 'Opening supplier $i',
+          phone: i == 99 ? '9876543210' : '', gstin: i == 99 ? '08ABCDE1234F1Z5' : '',
+          createdAt: at, updatedAt: at)));
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 800), textScale: scale);
+      await openPurchaseList(tester);
+      final action = await purchaseRegisterAction(tester, 'work-purchase-opening');
+      await revealPurchaseAction(tester, action);
+      await tester.tap(action); await tester.pumpAndSettle();
+      Future<void> openSelector() async {
+        await revealOpening(tester, find.byKey(const Key('work-opening-supplier-picker')), delta: -120);
+        await tester.tap(find.byKey(const Key('work-opening-supplier-picker'))); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-supplier-search')), findsOneWidget);
+      }
+      await openSelector();
+      final search = find.byKey(const Key('work-supplier-search'));
+      for (final query in ['Opening supplier 99', '98765 43210', '08abcde1234f1z5']) {
+        await tester.enterText(search, query); await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('work-supplier-choice-opening-search-99')), findsOneWidget);
+      }
+      await tester.tap(find.byKey(const ValueKey('work-supplier-choice-opening-search-99')));
+      await tester.pumpAndSettle();
+      final note = find.byKey(const Key('work-opening-note'));
+      await revealOpening(tester, note); await tester.enterText(note, 'Keep this unsaved evidence');
+      await openSelector();
+      await tester.tap(find.byTooltip('Close supplier list')); await tester.pumpAndSettle();
+      await revealOpening(tester, note);
+      expect(tester.widget<TextField>(note).controller!.text, 'Keep this unsaved evidence');
+      await openSelector();
+      await tester.enterText(search, 'Opening supplier 0'); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('work-supplier-choice-opening-search-0')));
+      await tester.pumpAndSettle();
+      expect(find.text('Leave opening dues?'), findsOneWidget);
+      await tester.tap(find.text('Keep editing')); await tester.pumpAndSettle();
+      await revealOpening(tester, note);
+      expect(tester.widget<TextField>(note).controller!.text, 'Keep this unsaved evidence');
+      await openSelector();
+      await tester.enterText(search, 'Opening supplier 0'); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('work-supplier-choice-opening-search-0')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Discard changes')); await tester.pumpAndSettle();
+      await revealOpening(tester, find.text('Opening supplier 0'));
+      await revealOpening(tester, note);
+      expect(tester.widget<TextField>(note).controller!.text, isEmpty);
+      expect(checkpoint.saveAttempts, 0);
+      expect(entry.value!.revision, 1);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 
   for (final display in [const Size(320, 568), const Size(915, 412)]) {
@@ -14888,7 +16613,7 @@ void main() {
           await revealPurchaseAction(tester, action);
           await tester.tap(action);
           await tester.pumpAndSettle();
-          final picker = find.byType(DropdownButtonFormField<String>);
+          final picker = find.byKey(const Key('work-opening-supplier-picker'));
           await revealOpening(tester, picker);
           await tester.tap(picker);
           await tester.pumpAndSettle();
@@ -15010,33 +16735,47 @@ void main() {
         },
       );
     }
+    for (final refundScale in display.width < 500 ? [1.0, 1.4, 2.0] : [2.0]) {
     testWidgets(
-      'PURCHASEREFUNDUI opening advance saved request remains reachable $display',
+      'PURCHASEREFUNDUI opening advance saved request remains reachable $display scale=$refundScale',
       (tester) async {
+        String localPrintedDay() {
+          final today=DateTime.now();
+          return '${today.day.toString().padLeft(2,'0')}/${today.month.toString().padLeft(2,'0')}/${today.year}';
+        }
         // Automated UI fixtures only; never injected into phone acceptance storage.
         FlutterSecureStorage.setMockInitialValues({});
         final entry = _OpeningPostingFixtureStore(),
             checkpoint = _LedgerCheckpointFixtureStore();
-        final forms = SecureWorkLedgerFormDraftStore(
-          accountScope: () => 'review-draft-account',
-        );
+        final forms = _HeldSupplierMoneyDraftStore();
+        final copyCapture = _PaymentCopyReviewFixture((await tester.runAsync(_catalogueTestPhoto))!);
         final work = postingOpeningFixture(
           entry,
           checkpoint,
           moneyStore: forms,
+          capture: copyCapture,
         );
         final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
         expect(scope.$1, 'review-draft-account');
         final day = at.toIso8601String().substring(0, 10);
         final supplier = WorkspaceSupplierProfile(
           id: 'refund-ui-supplier',
-          name: 'Evaluation refund supplier',
+          name: display.width < 500 && refundScale == 2
+            ? 'HOST refund supplier with a long registered trading name and branch retained in full'
+            : 'Evaluation refund supplier',
           phone: '',
           address: '',
           gstin: '',
           createdAt: at,
           updatedAt: at,
         );
+        final printedDay='${day.substring(8)}/${day.substring(5,7)}/${day.substring(0,4)}';
+        final savedBills=[for (final suffix in ['A','B']) WorkspacePurchaseSavedCopy(
+          id:'host-refund-copy-$suffix',storeName:'HOST Store',revision:1,savedAt:at,supplier:supplier,labels:const {},
+          draft:WorkspacePurchaseEntryDraft(id:'host-refund-bill-$suffix',supplierId:supplier.id,
+            invoiceReference:'HOST-REFUND-BILL-$suffix',invoiceDate:printedDay,createdAt:at,updatedAt:at,
+            details:const {'invoiceTotal':'100'},goods:const [
+              {'productId':'','name':'HOST refund goods','pack':'1 kg','quantity':'1','cost':'100'}]))];
         final opening = WorkspaceSupplierOpeningRecord(
           id: 'refund-ui-opening',
           basisId: 'refund-ui-basis',
@@ -15050,7 +16789,8 @@ void main() {
           amountMinor: 10000,
           supplierCredit: true,
           sourceNote: 'HOST advance confirmed',
-          bills: const [],
+          bills: [for (final copy in savedBills) WorkspaceOpeningBillLink(copyId:copy.id,
+            copyRevision:copy.revision,draftId:copy.draft.id,inclusion:WorkspaceOpeningBillInclusion.excluded)],
         );
         entry.value = WorkspacePurchaseEntryBook(
           account: scope.$1,
@@ -15058,6 +16798,7 @@ void main() {
           qa: scope.$3,
           revision: 2,
           profiles: [supplier],
+          copies: savedBills,
           openingRecords: [opening],
         );
         expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
@@ -15073,12 +16814,13 @@ void main() {
         final stock = work.workspaceCatalogueItems
             .map((p) => (p.id, p.stock))
             .toList();
+        expect(work.workspaceSupplierLedger(supplier.id)!.purchaseBills,isEmpty);
         await mount(
           tester,
           route: '/app/work/workspace/dashboard',
           work: work,
           viewport: display,
-          textScale: display.width > 500 ? 2 : 1.4,
+          textScale: refundScale,
         );
         await openPurchaseList(tester);
         final openingAction = await purchaseRegisterAction(
@@ -15088,7 +16830,7 @@ void main() {
         await revealPurchaseAction(tester, openingAction);
         await tester.tap(openingAction);
         await tester.pumpAndSettle();
-        final picker = find.byType(DropdownButtonFormField<String>);
+        final picker = find.byKey(const Key('work-opening-supplier-picker'));
         await revealOpening(tester, picker);
         await tester.tap(picker);
         await tester.pumpAndSettle();
@@ -15139,6 +16881,55 @@ void main() {
         await revealOpening(tester, refundAction);
         await tester.tap(refundAction);
         await tester.pumpAndSettle();
+        final sourcePicker=find.byKey(const Key('supplier-refund-source-selector'));
+        final sourceSearch=find.byKey(const Key('supplier-refund-source-search'));
+        final sourceClose=find.byKey(const Key('supplier-refund-source-close'));
+        final beforeSourceBook=jsonEncode(entry.value!.toJson());
+        final beforeSourceLedger=jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson());
+        expect(sourcePicker,findsOneWidget);
+        expect(find.descendant(of:sourcePicker,matching:find.text(supplier.name)),findsOneWidget);
+        await tester.enterText(sourceSearch,'HOST-REFUND-BILL-B'); await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('supplier-refund-source-2')),findsOneWidget);
+        expect(find.byKey(const ValueKey('supplier-refund-source-0')),findsNothing);
+        await tester.enterText(sourceSearch,'ZZ-NOMATCH'); await tester.pumpAndSettle();
+        expect(find.text('No matching sources'),findsOneWidget);
+        await tester.tap(find.byTooltip('Clear source search')); await tester.pumpAndSettle();
+        await tester.enterText(sourceSearch,printedDay); await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('supplier-refund-source-0')),findsOneWidget);
+        tester.view.viewInsets=FakeViewPadding(bottom:display.width>500?160:240); await tester.pumpAndSettle();
+        expect(sourceSearch.hitTestable(),findsOneWidget); expect(sourceClose.hitTestable(),findsOneWidget);
+        final sourceResults=find.byKey(const Key('supplier-refund-source-results'));
+        expect(tester.getSize(sourceResults).height,greaterThanOrEqualTo(48),
+          reason:'Supplier context and guidance must leave a usable source-results viewport.');
+        if (display.width < 500 && refundScale == 2) {
+          final originalSource=find.byKey(const ValueKey('supplier-refund-source-0'));
+          await tester.scrollUntilVisible(originalSource,60,scrollable:find.descendant(of:sourceResults,
+            matching:find.byType(Scrollable)).first); await tester.pumpAndSettle();
+          await tester.ensureVisible(originalSource); await tester.pumpAndSettle();
+          expect(originalSource.hitTestable(),findsOneWidget);
+          expect(tester.getRect(originalSource).top,greaterThanOrEqualTo(tester.getRect(sourceResults).top-.1));
+          expect(tester.getRect(originalSource).bottom,lessThanOrEqualTo(tester.getRect(sourceResults).bottom+.1));
+          expect(sourceClose.hitTestable(),findsOneWidget);
+        }
+        expect(tester.takeException(),isNull);
+        await tester.tap(sourceClose); await tester.pumpAndSettle();
+        tester.view.resetViewInsets(); await tester.pumpAndSettle();
+        expect(jsonEncode(entry.value!.toJson()),beforeSourceBook);
+        expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()),beforeSourceLedger);
+        await revealOpening(tester,refundAction); await tester.tap(refundAction); await tester.pumpAndSettle();
+        await tester.enterText(sourceSearch,'HOST-REFUND-BILL-B'); await tester.pumpAndSettle();
+        final beforeFreshDay=localPrintedDay();
+        await tester.tap(find.byKey(const ValueKey('supplier-refund-source-2'))); await tester.pumpAndSettle();
+        expect(tester.widget<Text>(find.byKey(const Key('supplier-refund-supplier'))).data,supplier.name);
+        expect(tester.widget<Text>(find.byKey(const Key('supplier-refund-source'))).data,'Bill HOST-REFUND-BILL-B · $printedDay');
+        expect(tester.widget<TextField>(find.byKey(const Key('supplier-refund-date'))).controller!.text,
+          isIn([beforeFreshDay,localPrintedDay()]),reason:'A fresh receipt defaults to local today, not the UTC calendar day.');
+        final selectedBillClose=find.byKey(const Key('supplier-refund-close'));
+        await tester.ensureVisible(selectedBillClose); await tester.pumpAndSettle();
+        await tester.tap(selectedBillClose); await tester.pumpAndSettle();
+        expect(jsonEncode(entry.value!.toJson()),beforeSourceBook);
+        expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()),beforeSourceLedger);
+        await revealOpening(tester,refundAction); await tester.tap(refundAction); await tester.pumpAndSettle();
         await tester.tap(
           find.byKey(const ValueKey('supplier-refund-source-0')),
         );
@@ -15157,15 +16948,69 @@ void main() {
           await tester.pumpAndSettle();
           await tester.enterText(target, text);
           await tester.pumpAndSettle();
+          expect(tester.getSize(target).height,greaterThanOrEqualTo(48));
+          expect(find.byKey(const Key('supplier-refund-hide-keyboard')).hitTestable(),findsOneWidget,
+            reason:'Every refund editor retains floating-keyboard dismissal.');
         }
 
-        expect(find.text('Available to receive ₹100'), findsOneWidget);
+        expect(find.text('Available credit ₹100'), findsOneWidget);
+        final refundKey = (account: scope.$1, store: scope.$2, customer: supplier.id, invoice: opening.id,
+          order: 'supplier-refund:${scope.$3 ? 'qa' : 'live'}:openingAdvance:account',
+          kind: 'supplierRefund', ledgerRevision: opening.revision);
+        final copyPanel = find.byKey(const Key('supplier-refund-supporting-copies'));
+        final beforeCopyLedger = jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson());
+        final beforeCopyWrites = checkpoint.saveAttempts;
+        await tap(find.descendant(of: copyPanel, matching: find.text('Supporting copies · optional')));
+        await tap(find.byKey(const Key('supplier-refund-copy-type')));
+        final copyTypes = find.byKey(const Key('trade-document-options'));
+        final typeScroll = find.descendant(of: copyTypes, matching: find.byType(Scrollable)).first;
+        for (final label in ['Payment receipt / collection voucher', 'Payment advice / remittance advice', 'Supplier GST refund voucher']) {
+          final option = find.descendant(of: copyTypes, matching: find.text(label));
+          await tester.scrollUntilVisible(option, 120, scrollable: typeScroll);
+          await tester.pumpAndSettle();
+          expect(option.hitTestable(), findsOneWidget);
+        }
+        expect(find.descendant(of: copyTypes, matching: find.text('Supplier credit note')), findsNothing);
+        await tester.scrollUntilVisible(find.byKey(const Key('trade-document-unclassified')), 120, scrollable: typeScroll);
+        await tester.pumpAndSettle();
+        await tap(find.byKey(const Key('trade-document-unclassified')));
+        if (refundScale == 1.4) forms.failCopySave = true;
+        await tap(find.byKey(const Key('supplier-refund-copy-camera')));
+        if (forms.failCopySave) {
+          expect((await forms.read(refundKey))?.supplierSupportingCopies, isNull);
+          expect(find.text('Copy details are not saved yet. Retry saving the refund input before leaving.'), findsOneWidget);
+          forms.failCopySave = false;
+          await tap(find.byKey(const Key('supplier-refund-retry-save')));
+          expect(find.text('Copy details are not saved yet. Retry saving the refund input before leaving.'), findsNothing);
+        }
+        final refundOriginal = (await forms.read(refundKey))!.supplierSupportingCopies!.active.single;
+        expect(refundOriginal.documentDetails.containsKey('type'), isFalse);
+        final originalRow = find.byKey(ValueKey('supplier-refund-copy-${refundOriginal.digest}'));
+        await tap(find.descendant(of: originalRow, matching: find.text('Read text')));
+        expect((await forms.read(refundKey))!.supplierSupportingCopies!.active.single.extractedFields.single.value, '123');
+        await tap(find.descendant(of: originalRow, matching: find.text('Printed fields · 1')));
+        final printedField = find.byKey(const Key('work-receive-field-value-HOST-xyz'));
+        await tester.ensureVisible(printedField); await tester.pumpAndSettle();
+        await tester.enterText(printedField, '124'); await tester.pumpAndSettle();
+        await tap(find.byKey(const Key('work-receive-fields-keep')));
+        final correctedCopy = (await forms.read(refundKey))!.supplierSupportingCopies!.active.single;
+        expect(correctedCopy.digest, refundOriginal.digest);
+        expect(correctedCopy.detectedText, 'xyz: 123');
+        expect(correctedCopy.extractedFields.single.value, '124');
+        expect((await forms.read(refundKey))!.supplierRefundIntent, isNull);
+        expect(checkpoint.saveAttempts, beforeCopyWrites);
+        expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()), beforeCopyLedger);
+        await tap(find.byKey(const Key('supplier-refund-close')));
+        await revealOpening(tester, refundAction); await tester.tap(refundAction); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('supplier-refund-source-0'))); await tester.pumpAndSettle();
+        expect((await forms.read(refundKey))!.supplierSupportingCopies!.active.single.extractedFields.single.value, '124');
         final method = display.width > 500 ? 'UPI' : 'Cash';
         if (method != 'Cash') {
           await tap(find.byKey(const ValueKey('supplier-refund-method-Cash')));
           await tester.tap(find.text(method).last);
           await tester.pumpAndSettle();
         }
+        await enter('supplier-refund-date', printedDay);
         await enter('supplier-refund-amount', '100');
         await enter('supplier-refund-reference', 'HOST-REFUND-RECEIVED');
         tester.view.viewInsets = FakeViewPadding(
@@ -15178,15 +17023,57 @@ void main() {
         expect(
           tester.getRect(reference).bottom,
           lessThanOrEqualTo(display.height - (display.width > 500 ? 160 : 240)),
+          reason: 'Refund reference ${tester.getRect(reference)}; body ${tester.getRect(find.ancestor(of:reference,matching:find.byType(SingleChildScrollView)).first)}; insets ${MediaQuery.viewInsetsOf(tester.element(reference))}',
         );
+        final fixedClose=find.byKey(const Key('supplier-refund-close'));
+        expect(fixedClose.hitTestable(),findsOneWidget);
+        expect(tester.getRect(fixedClose).bottom,lessThanOrEqualTo(display.height-(display.width>500?160:240)));
+        await tester.tap(reference);
+        tester.testTextInput.updateEditingValue(const TextEditingValue(text:'HOST-REFUND-RECEIVED',
+          selection:TextSelection(baseOffset:0,extentOffset:4)));
+        await tester.pumpAndSettle();
+        final referenceEditor=tester.state<EditableTextState>(find.descendant(of:reference,matching:find.byType(EditableText)));
+        referenceEditor.showToolbar(); await tester.pumpAndSettle();
+        final referenceController=tester.widget<TextField>(reference).controller!;
+        final selectedReference=referenceController.selection;
+        expect(selectedReference.textInside(referenceController.text),'HOST');
+        final scrolling=Scrollable.of(tester.element(reference)).position;
+        final beforeScroll=scrolling.pixels;
+        await tester.drag(find.ancestor(of:reference,matching:find.byType(SingleChildScrollView)).first,
+          Offset(0,beforeScroll>scrolling.minScrollExtent?80:-80)); await tester.pumpAndSettle();
+        expect(scrolling.pixels,isNot(beforeScroll));
+        expect(find.byType(AdaptiveTextSelectionToolbar),findsNothing);
+        expect(referenceController.text,'HOST-REFUND-RECEIVED'); expect(referenceController.selection,selectedReference);
+        expect(fixedClose.hitTestable(),findsOneWidget);
+        await tester.tap(find.byKey(const Key('supplier-refund-hide-keyboard'))); await tester.pumpAndSettle();
+        expect(tester.testTextInput.isVisible,isFalse);
         tester.view.viewInsets = const FakeViewPadding();
         await tester.pumpAndSettle();
+        expect(find.byKey(const Key('supplier-refund-hide-keyboard')),findsNothing);
         await tap(find.byKey(const Key('supplier-refund-submit')));
         final ledger = work.workspaceSupplierLedger(supplier.id)!;
         expect(ledger.refunds, hasLength(1));
         expect(ledger.creditMinor, 0);
         expect(ledger.entries.single.kind, WorkspaceSupplierEntryKind.refund);
         expect(ledger.entries.single.paymentMethod, method);
+        final refundVoucherCopy = refundOriginal.withDocumentDetails({'type': 'supplierRefundVoucher',
+          'reference': 'HOST-RV-1', 'date': printedDay});
+        final refundCopies = WorkspaceSupplierMoneyCopies(key: refundKey, qa: scope.$3, active: [refundVoucherCopy]);
+        expect(refundCopies.valid, isTrue);
+        expect(WorkspaceSupplierMoneyCopies.fromJson(refundCopies.toJson(), refundKey)!.active.single.documentDetails['type'],
+          'supplierRefundVoucher');
+        final paymentKey = (account: refundKey.account, store: refundKey.store, customer: refundKey.customer,
+          invoice: refundKey.invoice, order: refundKey.order, kind: 'supplierMoney', ledgerRevision: refundKey.ledgerRevision);
+        final paymentCopies = WorkspaceSupplierMoneyCopies(key: paymentKey, qa: scope.$3);
+        expect(paymentCopies.withActive([WorkspacePurchaseInvoiceAttachment(owner: paymentCopies.owner,
+          digest: refundVoucherCopy.digest, fileName: refundVoucherCopy.fileName, contentType: refundVoucherCopy.contentType,
+          byteLength: refundVoucherCopy.byteLength, source: refundVoucherCopy.source,
+          documentDetails: refundVoucherCopy.documentDetails)]).valid, isFalse,
+          reason: 'Refund-voucher classification belongs to refund inputs, not unrelated payment drafts.');
+        expect((await forms.read(refundKey))!.supplierSupportingCopies!.active.single.digest, refundOriginal.digest);
+        await tap(find.descendant(of: copyPanel, matching: find.text('Supporting copies · optional')));
+        expect(find.byKey(const Key('supplier-refund-copy-camera')), findsNothing);
+        expect(find.text('Copies are read-only with this saved refund request.'), findsOneWidget);
         for (final key in [
           'supplier-refund-amount',
           'supplier-refund-date',
@@ -15197,7 +17084,16 @@ void main() {
           expect(field.readOnly, isTrue);
           expect(field.onChanged, isNull);
         }
-        expect(find.text('Received by · $method'), findsOneWidget);
+        expect(find.text('Refund mode · $method'), findsOneWidget);
+        expect(tester.widget<TextField>(find.byKey(const Key('supplier-refund-date'))).controller!.text,printedDay);
+        final savedDate=find.byKey(const Key('supplier-refund-date'));
+        await tester.ensureVisible(savedDate); await tester.pumpAndSettle();
+        expect(tester.state<EditableTextState>(find.descendant(of:savedDate,matching:find.byType(EditableText)))
+          .renderEditable.maxScrollExtent,lessThanOrEqualTo(.1),
+          reason:'The entire recorded receipt date must fit inside the editable text viewport. Field ${tester.getRect(savedDate)}; editable ${tester.getRect(find.descendant(of:savedDate,matching:find.byType(EditableText)))}; style ${tester.widget<EditableText>(find.descendant(of:savedDate,matching:find.byType(EditableText))).style}');
+        await tester.tap(savedDate); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('supplier-refund-hide-keyboard')),findsNothing,
+          reason:'Selectable read-only fields do not open a keyboard or expose its dismiss control.');
         expect(
           work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(),
           stock,
@@ -15226,29 +17122,65 @@ void main() {
           work.workspaceSupplierLedger(supplier.id)!.refunds,
           hasLength(1),
         );
-        expect(find.text('Received by · $method'), findsOneWidget);
+        expect(find.text('Refund mode · $method'), findsOneWidget);
+        expect(tester.widget<TextField>(find.byKey(const Key('supplier-refund-date'))).controller!.text,printedDay,
+          reason:'Reopening a confirmed refund preserves its recorded receipt date.');
+        final beforeResetDay=localPrintedDay();
         await tap(find.byKey(const Key('supplier-refund-submit')));
         final newAmount = tester.widget<TextField>(
           find.byKey(const Key('supplier-refund-amount')),
         );
         expect(newAmount.controller!.text, isEmpty);
         expect(newAmount.readOnly, isFalse);
+        expect(tester.widget<TextField>(find.byKey(const Key('supplier-refund-date'))).controller!.text,
+          isIn([beforeResetDay,localPrintedDay()]),reason:'Record another refund starts with local today.');
         expect(
           find.byKey(const ValueKey('supplier-refund-method-Cash')),
           findsOneWidget,
         );
         expect(find.text('Refund recorded · ₹100'), findsNothing);
-        expect(
-          work.workspaceSupplierLedger(supplier.id)!.refunds,
-          hasLength(1),
-        );
+        final archivedCopies = (await forms.read(refundKey))!.supplierSupportingCopies!;
+        expect(archivedCopies.active, isEmpty);
+        expect(archivedCopies.previous.single.operation, ledger.refunds.values.single.intent.operationId);
+        expect(archivedCopies.previous.single.copies.single.extractedFields.single.value, '124');
+        expect(work.workspaceSupplierLedger(supplier.id)!.refunds, hasLength(1));
+        await tap(find.descendant(of: copyPanel, matching: find.text('Supporting copies · optional')));
+        await tap(find.byKey(const Key('supplier-refund-previous-copies')));
+        final previousRow = find.byKey(ValueKey('supplier-refund-copy-previous-${refundOriginal.digest}'));
+        expect(find.descendant(of: previousRow, matching: find.text('Read text')), findsNothing);
+        expect(find.descendant(of: previousRow, matching: find.text('Remove')), findsNothing);
+        await tap(find.descendant(of: previousRow, matching: find.text('View copy')));
+        expect(find.widgetWithText(AppBar, 'Supporting copy'), findsOneWidget);
+        final originalViewer = find.byType(InteractiveViewer);
+        expect(originalViewer, findsOneWidget);
+        final originalImage = tester.widget<Image>(find.descendant(of: originalViewer, matching: find.byType(Image)));
+        expect((originalImage.image as MemoryImage).bytes, orderedEquals(copyCapture.bytes));
+        expect(find.text('Retry copy'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+        if (refundScale == 1.0) {
+          final originalDraft = (await forms.read(refundKey))!.toJson();
+          final beforeStaleWrites = checkpoint.saveAttempts;
+          copyCapture.holdCapture = Completer<void>();
+          await tester.ensureVisible(find.byKey(const Key('supplier-refund-copy-camera')));
+          await tester.tap(find.byKey(const Key('supplier-refund-copy-camera'))); await tester.pump();
+          final originalStore = work.activeWorkspace!;
+          work.activateWorkspace(WorkWorkspace(id: 'HOST-other-refund-store', name: 'HOST other Store',
+            profileId: originalStore.profileId, profileLabel: originalStore.profileLabel,
+            area: originalStore.area, verified: true));
+          await tester.pump(); copyCapture.holdCapture!.complete(); await tester.pumpAndSettle();
+          expect(tester.widget<TextButton>(find.byKey(const Key('supplier-refund-close'))).onPressed, isNotNull);
+          expect((await forms.read(refundKey))!.toJson(), originalDraft);
+          expect(checkpoint.saveAttempts, beforeStaleWrites);
+        }
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       },
     );
+    }
   }
 
-  for (final display in [const Size(320, 568), const Size(915, 412)]) {
+  for (final display in [const Size(360, 800), const Size(320, 568), const Size(915, 412), const Size(320, 800)]) {
     for (final failure in [
       'none',
       'before-save',
@@ -15265,12 +17197,15 @@ void main() {
               checkpoint = _LedgerCheckpointFixtureStore();
           final inventory = _ReceivingProjectionFailureFixture(),
               form = _HeldSupplierMoneyDraftStore();
+          final copyCapture = failure == 'none'
+            ? _PaymentCopyReviewFixture((await tester.runAsync(_catalogueTestPhoto))!) : null;
           final work = postingOpeningFixture(
             entry,
             checkpoint,
             inventory: true,
             inventoryStore: inventory,
             moneyStore: form,
+            capture: copyCapture,
           );
           final scope = work.workspaceSupplierScope!,
               at = DateTime.now().toUtc();
@@ -15462,7 +17397,7 @@ void main() {
             route: '/app/work/workspace/dashboard',
             work: work,
             viewport: display,
-            textScale: display.width > 500 ? 2 : 1.4,
+            textScale: display.width == 360 ? 1 : display.width > 500 || display.height == 800 ? 2 : 1.4,
           );
           await openPurchaseList(tester);
           final row = find.byKey(ValueKey('work-purchase-copy-${copy.id}'));
@@ -15495,16 +17430,49 @@ void main() {
                 .map((t) => t.data)
                 .join(' | '),
           );
+          await openBillActions(tester);
           final action = find.byKey(const Key('work-purchase-record-credit'));
+          expect(find.text('Purchase bill'), findsOneWidget);
+          expect(find.byKey(const Key('work-purchase-bill-identity')), findsOneWidget);
+          expect(find.descendant(
+            of: find.byKey(const Key('work-purchase-bill-identity')),
+            matching: find.text(supplier.name)), findsOneWidget);
+          final adjustments = find.byKey(const Key('work-purchase-bill-action-grid'));
+          if (display.width == 360) {
+            expect(tester.getTopLeft(adjustments).dy - tester.getBottomLeft(
+              find.byKey(const Key('work-purchase-bill-identity'))).dy, lessThanOrEqualTo(220),
+              reason: 'The collapsed task rows stay together without scattered action lanes.');
+          }
+          await openBillPayment(tester);
+          final recordPayment = find.byKey(const Key('work-purchase-record-payment'));
+          if (recordPayment.evaluate().isNotEmpty) {
+            await tester.ensureVisible(recordPayment);
+            await tester.pumpAndSettle();
+            final grid = tester.getRect(find.byKey(const Key('work-purchase-bill-action-grid')));
+            final record = tester.getRect(recordPayment);
+            final allocation = tester.getRect(find.byKey(const Key('work-purchase-allocate-money')));
+            expect(record.width, closeTo(allocation.width, .01), reason: 'Action cells have equal widths.');
+            expect(record.height, closeTo(allocation.height, .01), reason: 'Buttons share their row height.');
+            expect(record.left, closeTo(grid.left, .01));
+            expect(record.top, closeTo(allocation.top, .01));
+            final scale = MediaQuery.textScalerOf(tester.element(recordPayment)).scale(1);
+            final columns = grid.width >= 320 && scale <= 1.25 ? 3 : grid.width >= 220 ? 2 : 1;
+            expect(record.width, closeTo((grid.width - (columns - 1) * 4) / columns, .01));
+
+          }
+          await tester.ensureVisible(adjustments);
+          await tester.pumpAndSettle();
+          await openBillSection(tester, 'Adjustments');
+          await tester.pumpAndSettle();
           expect(
-            find.byKey(const Key('work-purchase-adjustment-actions')),
+            find.byKey(const Key('work-purchase-bill-action-grid')),
             findsOneWidget,
           );
           expect(
             find.ancestor(
               of: action,
               matching: find.byKey(
-                const Key('work-purchase-adjustment-actions'),
+                const Key('work-purchase-bill-action-grid'),
               ),
             ),
             findsOneWidget,
@@ -15515,12 +17483,14 @@ void main() {
             'work-purchase-record-credit',
             'work-purchase-record-supplier-refund',
           ]) {
+            await openBillSection(tester, key == 'work-purchase-allocate-money' ? 'Payment'
+              : key == 'work-purchase-review-shortage' ? 'Goods' : 'Adjustments');
             final button = find.byKey(Key(key));
             if (button.evaluate().isEmpty) continue;
             await tester.ensureVisible(button);
             await tester.pumpAndSettle();
             final viewport = tester.getRect(
-              find.byKey(const Key('work-purchase-adjustment-scroll')),
+              find.byKey(const Key('work-purchase-saved-copy')),
             );
             final bounds = tester.getRect(button);
             expect(
@@ -15531,6 +17501,9 @@ void main() {
             expect(bounds.left, greaterThanOrEqualTo(viewport.left - .01));
             expect(bounds.right, lessThanOrEqualTo(viewport.right + .01));
             expect(button.hitTestable(), findsOneWidget);
+            expect(find.ancestor(of: button,
+              matching: find.byKey(const Key('work-purchase-bill-actions-panel'))), findsOneWidget);
+
           }
           expect(
             tester.takeException(),
@@ -15538,6 +17511,7 @@ void main() {
             reason:
                 'Each adjustment action must be fully reachable without overflow',
           );
+          await openBillSection(tester, 'Adjustments');
           if (action.evaluate().isEmpty) {
             final scroll = find
                 .descendant(
@@ -15549,9 +17523,16 @@ void main() {
             await tester.pumpAndSettle();
           }
           Future<void> tapVisible(Finder target) async {
-            await tester.ensureVisible(target);
+            await Scrollable.ensureVisible(tester.element(target), alignment: .5);
             await tester.pumpAndSettle();
-            expect(target.hitTestable(), findsOneWidget);
+            expect(target.hitTestable(), findsOneWidget, reason: jsonEncode({
+              'target': tester.getRect(target).toString(),
+              'savedViewport': find.byKey(const Key('work-purchase-saved-copy')).evaluate().isEmpty ? null
+                : tester.getRect(find.byKey(const Key('work-purchase-saved-copy'))).toString(),
+              'actions': find.byKey(const Key('work-purchase-bill-actions-toggle')).evaluate().isEmpty ? null
+                : tester.getRect(find.byKey(const Key('work-purchase-bill-actions-toggle'))).toString(),
+              'routeCurrent': ModalRoute.of(tester.element(target))?.isCurrent,
+            }));
             await tester.tap(target);
             await tester.pumpAndSettle();
           }
@@ -15565,13 +17546,222 @@ void main() {
             greaterThanOrEqualTo(28),
           );
           expect(find.text('Credit note date'), findsOneWidget);
-          expect(find.text('Amount credited (₹)'), findsOneWidget);
+          expect(find.text('Total credit amount (₹)'), findsOneWidget);
+          expect(find.text('Record supplier credit note'), findsOneWidget);
           Future<void> enter(String key, String value) async {
             final target = find.byKey(Key(key));
-            await tester.ensureVisible(target);
+            await Scrollable.ensureVisible(tester.element(target), alignment: .5);
             await tester.pumpAndSettle();
             await tester.enterText(target, value);
             await tester.pumpAndSettle();
+            expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
+            expect(find.byKey(const Key('supplier-credit-hide-keyboard')).hitTestable(), findsOneWidget,
+              reason: 'Every credit-note editor retains floating-keyboard dismissal.');
+          }
+
+          final copyKey = work.supplierCreditFormKey(copy)!;
+          Future<void> chooseCredit(String key, String label) async {
+            await tapVisible(find.byKey(Key(key)));
+            await tapVisible(find.text(label).last);
+          }
+          if (failure == 'none') {
+            final ledgerBeforeTypes = jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson());
+            final writesBeforeTypes = checkpoint.saveAttempts;
+            expect(tester.widget<DropdownButtonFormField<String>>(
+              find.byKey(const Key('supplier-credit-type'))).initialValue, isNull);
+            expect(find.byKey(const Key('supplier-credit-tax-0-rate')), findsNothing);
+            await chooseCredit('supplier-credit-type', 'GST credit note');
+            await chooseCredit('supplier-credit-reason-type', 'Tax correction');
+            expect(find.text('GST adjusted'), findsOneWidget);
+            expect(find.text('Goods credited'), findsNothing);
+            final detailsTitle = find.text('Parties & document details');
+            await tapVisible(detailsTitle);
+            expect(find.textContaining('Linked purchase: HOST-CREDIT-BILL'), findsOneWidget);
+            final particularsSemantics = tester.ensureSemantics();
+            try {
+              expect(tester.getSemantics(find.byKey(const Key('supplier-credit-detail-supplierName')))
+                .getSemanticsData().label, contains('Supplier legal name'));
+            } finally { particularsSemantics.dispose(); }
+            await _captureAnalyticsFixture(tester, 'credit-particulars-${display.width.toInt()}x${display.height.toInt()}-top');
+            final printedDetails = <String, String>{'supplierName': 'HOST Supplier legal name',
+              'buyerGstinUin': 'HOST-RECIPIENT', 'invoiceReferences': 'HOST-CREDIT-BILL / $day\nHOST-SECOND / $day',
+              'signatureDetails': 'Signed on the supplied original', 'irn': 'HOST-IRN-PRINTED'};
+            for (final detail in printedDetails.entries) {
+              await enter('supplier-credit-detail-${detail.key}', detail.value);
+            }
+            await _captureAnalyticsFixture(tester, 'credit-particulars-${display.width.toInt()}x${display.height.toInt()}-lower');
+            await tapVisible(detailsTitle);
+            await enter('supplier-credit-tax-0-rate', '5');
+            await enter('supplier-credit-tax-0-taxable', '0');
+            await enter('supplier-credit-tax-0-cgst', '1.25');
+            await enter('supplier-credit-tax-0-sgst', '1.25');
+            await tapVisible(find.byKey(const Key('supplier-credit-add-tax-rate')));
+            await enter('supplier-credit-tax-1-rate', '12');
+            await enter('supplier-credit-tax-1-taxable', '10');
+            await enter('supplier-credit-tax-1-igst', '1.20');
+            for (final key in ['0-igst', '0-cess', '1-cgst', '1-sgst', '1-cess']) {
+              await enter('supplier-credit-tax-$key', '0');
+            }
+            await enter('supplier-credit-amount', '13.69');
+            expect(find.byKey(const Key('supplier-credit-total-mismatch')), findsOneWidget);
+            await enter('supplier-credit-amount', '13.70');
+            expect(find.byKey(const Key('supplier-credit-entered-total')), findsOneWidget);
+            expect(find.byKey(const Key('supplier-credit-total-mismatch')), findsNothing);
+            await tapVisible(find.byKey(const Key('supplier-credit-submit')));
+            expect(find.text('Draft saved · not applied to your supplier account.'), findsOneWidget);
+            var typed = (await form.read(copyKey))!;
+            expect(typed.supplierCreditDocumentInput!.treatment, 'gst');
+            expect(typed.supplierCreditDocumentInput!.reasonCode, 'tax');
+            expect(typed.supplierCreditDocumentInput!.taxRows, hasLength(2));
+            expect(typed.supplierCreditDocumentInput!.particulars, printedDetails);
+            expect(typed.supplierCreditIntent, isNull);
+            final retainedTax = typed.supplierCreditDocumentInput!.taxRows;
+            await chooseCredit('supplier-credit-type', 'Commercial credit note');
+            expect(find.text('GST unchanged'), findsOneWidget);
+            expect(find.byKey(const Key('supplier-credit-tax-0-rate')), findsNothing);
+            await tapVisible(find.byKey(const Key('supplier-credit-submit')));
+            typed = (await form.read(copyKey))!;
+            expect(typed.supplierCreditDocumentInput!.taxRows, retainedTax,
+              reason: 'Changing type must retain inactive entered taxes.');
+            expect(typed.supplierCreditDocumentInput!.treatment, 'commercial');
+            await tapVisible(find.byKey(const Key('supplier-credit-close')));
+            await tapVisible(action);
+            expect(find.text('GST unchanged'), findsOneWidget);
+            if (find.byKey(const Key('supplier-credit-detail-irn')).evaluate().isEmpty) {
+              await tapVisible(detailsTitle);
+            }
+            expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-detail-irn'))).controller!.text,
+              'HOST-IRN-PRINTED', reason: 'Printed details recover without posting or rewriting the linked bill.');
+            await chooseCredit('supplier-credit-type', 'GST credit note');
+            expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-tax-0-taxable'))).controller!.text, '0');
+            expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-tax-1-igst'))).controller!.text, '1.20');
+            await chooseCredit('supplier-credit-type', 'Commercial credit note');
+            if (display.width == 360) {
+              final beforeOversize = (await form.read(copyKey))!;
+              await enter('supplier-credit-reference', List.filled(513, 'x').join());
+              expect(find.byKey(const Key('supplier-credit-input-error')), findsOneWidget);
+              expect((await form.read(copyKey))!.toJson(), beforeOversize.toJson(),
+                reason: 'Invalid snapshots must not enter or poison autosave.');
+              await tapVisible(find.byKey(const Key('supplier-credit-close')));
+              expect(find.byKey(const Key('supplier-credit-reference')), findsOneWidget,
+                reason: 'Unsaved oversized local input must not be silently closed.');
+              await enter('supplier-credit-reference', 'HOST-CORRECTED');
+              expect(find.byKey(const Key('supplier-credit-input-error')), findsNothing);
+              FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+              final saveButton = find.byKey(const Key('supplier-credit-submit'));
+              await tester.ensureVisible(saveButton); await tester.pumpAndSettle();
+              form.nextSave = Completer<void>(); final holdSave = form.nextSave!;
+              tester.widget<FilledButton>(saveButton).onPressed!(); await tester.pump();
+              expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-reference'))).enabled, isFalse);
+              expect(tester.widget<TextButton>(find.byKey(const Key('supplier-credit-close'))).onPressed, isNull);
+              holdSave.complete(); await tester.pumpAndSettle();
+              expect(find.text('Draft saved · not applied to your supplier account.'), findsOneWidget);
+              expect((await form.read(copyKey))!.fields['reference'], 'HOST-CORRECTED');
+              await enter('supplier-credit-reference', 'HOST-NEWER-INPUT');
+              expect(find.byKey(const Key('supplier-credit-draft-status')), findsNothing,
+                reason: 'An acknowledgement must not describe a newer edit.');
+            }
+            expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()), ledgerBeforeTypes);
+            expect(checkpoint.saveAttempts, writesBeforeTypes,
+              reason: 'Both classified types save private input, never the amount-only financial command.');
+            if (display.width == 360) {
+              final poisoned = WorkspaceLedgerFormDraft(key: copyKey, revision: typed.revision + 1,
+                fields: {...typed.fields, 'documentInput': '{"version":1,"treatment":"gst","taxRows":[]}'});
+              expect(poisoned.valid, isFalse, reason: 'Malformed metadata cannot become an empty valid classification.');
+            }
+          }
+          await chooseCredit('supplier-credit-reason-type', 'Damage / quality issue');
+          if (failure == 'none') {
+            final ledgerBefore = jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson());
+            final writesBefore = checkpoint.saveAttempts;
+            final panel = find.byKey(const Key('supplier-credit-supporting-copies'));
+            await tapVisible(find.descendant(of: panel, matching: find.text('Supporting copies · optional')));
+            await tapVisible(find.byKey(const Key('supplier-credit-copy-type')));
+            final documentOptions = find.byKey(const Key('trade-document-options'));
+            final documentSearch = find.byKey(const Key('trade-document-search'));
+            await tester.enterText(documentSearch, 'HOST-no-matching-document');
+            tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+            // The keyboard covers the navigation inset; viewPadding retains
+            // 44, while effective padding is max(viewPadding - viewInsets, 0).
+            tester.view.padding = const FakeViewPadding(top: 28);
+            await tester.pumpAndSettle();
+            expect(find.text('No matching document type'), findsOneWidget);
+            expect(find.text('Cancel').hitTestable(), findsOneWidget);
+            expect(tester.takeException(), isNull);
+            await tester.enterText(documentSearch, '');
+            tester.view.resetViewInsets(); FocusManager.instance.primaryFocus?.unfocus();
+            tester.view.padding = const FakeViewPadding(top: 28, bottom: 44);
+            await tester.pumpAndSettle();
+            expect(find.descendant(of: documentOptions, matching: find.text('Supplier credit note')), findsOneWidget);
+            expect(find.descendant(of: documentOptions, matching: find.text('Payment advice / remittance advice')), findsNothing);
+            expect(find.descendant(of: documentOptions, matching: find.text('Supplier GST debit note')), findsNothing);
+            if (display.width == 360) {
+              final lastOption = find.byKey(const Key('trade-document-unclassified'));
+              expect(tester.getRect(lastOption).bottom, lessThanOrEqualTo(display.height - 44),
+                reason: 'The compact picker keeps its final action above the system navigation inset.');
+              expect(lastOption.hitTestable(), findsOneWidget);
+              expect(tester.getRect(find.byType(BottomSheet).last).bottom - tester.getRect(lastOption).bottom,
+                lessThanOrEqualTo(44 + MoolMetrics.minimumTapTarget),
+                reason: 'The tail contains only navigation and exported-target clearance.');
+              // Android can export the nested sheet below its usable semantics
+              // viewport even when effective bottom padding is zero.
+              tester.view.viewPadding = const FakeViewPadding(top: 41);
+              tester.view.padding = const FakeViewPadding(top: 41);
+              await tester.pumpAndSettle();
+              expect(tester.getRect(lastOption).bottom,
+                lessThanOrEqualTo(display.height - MoolMetrics.minimumTapTarget),
+                reason: 'The final action must retain the existing Android exported-target clearance.');
+              expect(lastOption.hitTestable(), findsOneWidget);
+              tester.view.viewPadding = const FakeViewPadding(top: 28, bottom: 44);
+              tester.view.padding = const FakeViewPadding(top: 28, bottom: 44);
+              await tester.pumpAndSettle();
+            }
+            if (display.height == 800 && display.width == 320) {
+              final unclassified = find.text('Leave type unselected');
+              await tester.scrollUntilVisible(unclassified, 160, maxScrolls: 12,
+                scrollable: find.descendant(of: documentOptions,
+                  matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
+                    widget.axisDirection == AxisDirection.down)));
+              await tester.pumpAndSettle();
+              await tapVisible(unclassified);
+            } else {
+              await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+            }
+            final camera = find.byKey(const Key('supplier-credit-copy-camera'));
+            await tester.ensureVisible(camera); await tester.pumpAndSettle();
+            expect(tester.getSize(camera).height, greaterThanOrEqualTo(48));
+            if (display.width == 320 && display.height == 568) {
+              form.failCopySave = true;
+            }
+            await tapVisible(camera);
+            if (form.failCopySave) {
+              expect((await form.read(copyKey))?.supplierCreditCopies, isNull);
+              expect(find.text('Copy details are not saved yet. Retry saving the credit-note input before leaving.'), findsOneWidget);
+              form.failCopySave = false;
+              await tapVisible(find.byKey(const Key('supplier-credit-retry-save')));
+              expect((await form.read(copyKey))!.supplierCreditCopies!.active, hasLength(1));
+              expect(find.text('Copy details are not saved yet. Retry saving the credit-note input before leaving.'), findsNothing);
+            }
+            var saved = (await form.read(copyKey))!;
+            final original = saved.supplierCreditCopies!.active.single;
+            expect(original.documentDetails['type'], display.height == 800 && display.width == 320 ? null : 'supplierCreditNote');
+            expect(saved.supplierCreditIntent, isNull);
+            final originalRow = find.byKey(ValueKey('supplier-credit-copy-${original.digest}'));
+            await tapVisible(find.descendant(of: originalRow, matching: find.text('Read text')));
+            saved = (await form.read(copyKey))!;
+            expect(saved.supplierCreditCopies!.active.single.extractedFields.single.value, '123');
+            await tapVisible(find.descendant(of: originalRow, matching: find.text('Printed fields · 1')));
+            final printedValue = find.byKey(const Key('work-receive-field-value-HOST-xyz'));
+            await tester.ensureVisible(printedValue); await tester.pumpAndSettle();
+            await tester.enterText(printedValue, '124');
+            await tapVisible(find.byKey(const Key('work-receive-fields-keep')));
+            expect((await form.read(copyKey))!.supplierCreditCopies!.active.single.digest, original.digest);
+            expect((await form.read(copyKey))!.supplierCreditCopies!.active.single.detectedText, 'xyz: 123');
+            await tapVisible(find.byKey(const Key('supplier-credit-close')));
+            await tapVisible(action);
+            expect((await form.read(copyKey))!.supplierCreditCopies!.active.single.extractedFields.single.value, '124');
+            expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()), ledgerBefore);
+            expect(checkpoint.saveAttempts, writesBefore, reason: 'Capturing and correcting copies cannot post credit or money.');
           }
 
           await enter('supplier-credit-reference', '  HOST-CN-UI  ');
@@ -15597,6 +17787,9 @@ void main() {
           await tester.ensureVisible(qty);
           await tester.enterText(qty, '2');
           await tester.pumpAndSettle();
+          expect(tester.getSize(qty).height, greaterThanOrEqualTo(48));
+          expect(find.byKey(const Key('supplier-credit-hide-keyboard')).hitTestable(), findsOneWidget,
+            reason: 'Dynamically selected credited quantity belongs to this sheet focus scope.');
           final submit = find.byKey(const Key('supplier-credit-submit'));
           expect(find.text('Credited qty'), findsOneWidget);
           final keyboardHeight = display.width > 500 ? 160.0 : 260.0;
@@ -15616,15 +17809,38 @@ void main() {
             lessThanOrEqualTo(display.height - keyboardHeight),
           );
           final creditClose = find.byKey(const Key('supplier-credit-close'));
-          await tester.ensureVisible(creditClose);
-          await tester.pumpAndSettle();
           expect(creditClose.hitTestable(), findsOneWidget);
           expect(tester.getRect(creditClose).top, greaterThanOrEqualTo(28));
+          expect(tester.getRect(creditClose).bottom, lessThanOrEqualTo(display.height - keyboardHeight));
+          if (failure == 'none') {
+            await tester.ensureVisible(qty); await tester.pumpAndSettle();
+            await tester.tap(qty);
+            tester.testTextInput.updateEditingValue(const TextEditingValue(
+              text: '2', selection: TextSelection(baseOffset: 0, extentOffset: 1)));
+            await tester.pumpAndSettle();
+            final editor = tester.state<EditableTextState>(find.descendant(of: qty, matching: find.byType(EditableText)));
+            editor.showToolbar(); await tester.pumpAndSettle();
+            final controller = tester.widget<TextField>(qty).controller!;
+            final selection = controller.selection;
+            expect(selection.textInside(controller.text), '2');
+            final scrolling = Scrollable.of(tester.element(qty)).position;
+            final beforeScroll = scrolling.pixels;
+            final scroller = find.ancestor(of: qty, matching: find.byType(SingleChildScrollView)).first;
+            await tester.drag(scroller, Offset(0, beforeScroll > scrolling.minScrollExtent ? 80 : -80));
+            await tester.pumpAndSettle();
+            expect(scrolling.pixels, isNot(beforeScroll));
+            expect(find.byType(AdaptiveTextSelectionToolbar), findsNothing);
+            expect(controller.text, '2'); expect(controller.selection, selection);
+            expect(creditClose.hitTestable(), findsOneWidget);
+          }
+          await tester.tap(find.byKey(const Key('supplier-credit-hide-keyboard'))); await tester.pumpAndSettle();
+          expect(tester.testTextInput.isVisible, isFalse);
           expect(tester.widget<TextField>(qty).controller!.text, '2');
           expect(tester.takeException(), isNull);
           tester.view.viewInsets = FakeViewPadding.zero;
           FocusManager.instance.primaryFocus?.unfocus();
           await tester.pumpAndSettle();
+          expect(find.byKey(const Key('supplier-credit-hide-keyboard')), findsNothing);
           await tapVisible(submit);
           expect(
             work.workspaceSupplierLedger(supplier.id)!.creditNotes,
@@ -15664,19 +17880,53 @@ void main() {
           await enter('supplier-credit-amount', '25');
           FocusManager.instance.primaryFocus?.unfocus();
           await tester.pumpAndSettle();
+          // Upgrade fixture only: reconstruct an older saved request with its
+          // exact original contract. New classified input never invokes it.
+          final priorInput = (await form.read(copyKey))!;
+          final legacyIntent = WorkspaceSupplierCreditIntent(operationId: work.newWorkspaceSupplierCreditId(),
+            accountScope: scope.$1, workspaceId: scope.$2, supplierId: supplier.id,
+            billId: bill.id, copyId: copy.id, copyRevision: copy.revision,
+            openingId: opening.id, openingRevision: opening.revision, reference: 'HOST-CN-UI',
+            occurredOn: day, reason: 'Damaged goods', amountMinor: 2500,
+            requestedAt: DateTime.now().toUtc(), supports: [WorkspaceSupplierCreditSupport.fromJson({
+              ...work.workspaceSupplierLedger(supplier.id)!.availableCreditSupports(bill.id).single.$1.toJson(),
+              'quantityMilli': 500})]);
+          final legacyDraft = WorkspaceLedgerFormDraft(key: copyKey, revision: priorInput.revision + 1,
+            fields: {'reference': legacyIntent.reference, 'amount': '25.00', 'reason': legacyIntent.reason,
+              'occurredOn': day, 'supports': jsonEncode(legacyIntent.supports.map((s) => s.toJson()).toList()),
+              'attempt': jsonEncode(legacyIntent.toJson()),
+              if (priorInput.fields['supportingCopies'] != null) 'supportingCopies': priorInput.fields['supportingCopies']!});
+          expect(WorkspaceLedgerFormDraft(key: copyKey, revision: legacyDraft.revision,
+            fields: {...legacyDraft.fields, 'documentInput': jsonEncode(WorkspaceSupplierCreditDocumentInput(treatment: 'gst').toJson())}).valid,
+            isFalse, reason: 'A new classification cannot silently enter an old financial request.');
+          form.frozenAllocationFailure = failure.startsWith('draft-') ? failure : 'none';
+          if (failure.startsWith('draft-')) {
+            await expectLater(form.save(legacyDraft, expectedRevision: priorInput.revision), throwsStateError);
+            expect(work.workspaceSupplierLedger(supplier.id)!.creditNotes, isEmpty);
+            final afterInterruptedSave = (await form.read(copyKey))!;
+            expect(afterInterruptedSave.toJson(),
+              failure == 'draft-save' ? priorInput.toJson() : legacyDraft.toJson());
+            form.frozenAllocationFailure = 'none';
+            if (failure == 'draft-save') {
+              await form.save(legacyDraft, expectedRevision: priorInput.revision);
+            }
+          } else {
+            await form.save(legacyDraft, expectedRevision: priorInput.revision);
+          }
+          await tapVisible(find.byKey(const Key('supplier-credit-recover')));
+          expect(find.text('GST treatment not recorded'), findsOneWidget);
+          expect(find.byKey(const Key('supplier-credit-type')), findsNothing);
           checkpoint.creditFailure = failure.startsWith('draft-')
               ? 'none'
               : failure;
-          form.frozenAllocationFailure = failure.startsWith('draft-')
-              ? failure
-              : 'none';
+          form.frozenAllocationFailure = 'none';
           await tester.ensureVisible(submit);
           await tester.pumpAndSettle();
           final callback = tester.widget<FilledButton>(submit).onPressed!;
           callback();
           callback();
           await tester.pumpAndSettle();
-          if (failure == 'before-save' || failure.startsWith('draft-')) {
+          if (failure == 'before-save') {
             expect(
               work.workspaceSupplierLedger(supplier.id)!.creditNotes,
               isEmpty,
@@ -15710,7 +17960,22 @@ void main() {
             isEmpty,
           );
           expect(find.text('Record another credit note'), findsOneWidget);
+          if (failure == 'none') {
+            expect((await form.read(copyKey))!.supplierCreditCopies!.active, hasLength(1));
+            expect(find.byKey(const Key('supplier-credit-copy-camera')), findsNothing,
+              reason: 'Copy edits freeze with the credit request.');
+          }
           await tapVisible(find.byKey(const Key('supplier-credit-close')));
+          if (failure == 'none') {
+            final savedCopy = find.byKey(const Key('work-purchase-saved-copy'));
+            tester.state<ScrollableState>(find.descendant(of: savedCopy,
+              matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down)).first).position.jumpTo(0);
+            await tester.pumpAndSettle();
+            expect(find.byKey(const Key('work-purchase-bill-actions-panel')), findsOneWidget,
+              reason: 'Returning preserves the expanded action list for this bill.');
+            expect(find.byKey(const Key('work-purchase-bill-action-grid')), findsOneWidget);
+          }
           await tapVisible(action);
           expect(find.text('Record another credit note'), findsOneWidget);
           expect(
@@ -15736,6 +18001,29 @@ void main() {
             work.workspaceSupplierLedger(supplier.id)!.creditNotes,
             hasLength(1),
           );
+          if (failure == 'none') {
+            final archived = (await form.read(copyKey))!.supplierCreditCopies!;
+            expect(archived.active, isEmpty);
+            expect(archived.previous.single.operation, proof.operationId);
+            expect(archived.previous.single.copies.single.extractedFields.single.value, '124');
+            if (display.width == 360) {
+              final beforeStale = (await form.read(copyKey))!.toJson();
+              final writesBeforeStale = checkpoint.saveAttempts;
+              final panel = find.byKey(const Key('supplier-credit-supporting-copies'));
+              if (find.byKey(const Key('supplier-credit-copy-camera')).evaluate().isEmpty) {
+                await tapVisible(find.descendant(of: panel, matching: find.text('Supporting copies · optional')));
+              }
+              copyCapture!.holdCapture = Completer<void>();
+              await tester.ensureVisible(find.byKey(const Key('supplier-credit-copy-camera'))); await tester.pumpAndSettle();
+              await tester.tap(find.byKey(const Key('supplier-credit-copy-camera'))); await tester.pump(); await tester.pump();
+              expect(tester.widget<TextButton>(find.byKey(const Key('supplier-credit-close'))).onPressed, isNull);
+              work.activeWorkspace = null; work.notifyListeners(); await tester.pump(); await tester.pump();
+              copyCapture.holdCapture!.complete(); await tester.pumpAndSettle();
+              expect((await form.read(copyKey))!.toJson(), beforeStale);
+              expect(checkpoint.saveAttempts, writesBeforeStale);
+              expect(tester.widget<TextButton>(find.byKey(const Key('supplier-credit-close'))).onPressed, isNotNull);
+            }
+          }
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox.shrink());
         },
@@ -15979,7 +18267,7 @@ void main() {
             await tester.pumpAndSettle();
           }
           Future<void> tapVisible(Finder target) async {
-            await tester.ensureVisible(target);
+            await Scrollable.ensureVisible(tester.element(target), alignment: .5);
             await tester.pumpAndSettle();
             expect(target.hitTestable(), findsOneWidget);
             await tester.tap(target);
@@ -15996,25 +18284,31 @@ void main() {
           );
           final action = find.byKey(const Key('work-purchase-review-shortage'));
           if (failure == 'none') {
+            await openBillPayment(tester);
+            final adjustments = find.byKey(const Key('work-purchase-bill-action-grid'));
+            await tester.ensureVisible(adjustments);
+            await tester.pumpAndSettle();
+            await openBillSection(tester, 'Adjustments');
+            await tester.pumpAndSettle();
             final rail = find.byKey(
-              const Key('work-purchase-adjustment-scroll'),
+              const Key('work-purchase-bill-action-grid'),
             );
             expect(rail, findsOneWidget);
             expect(
-              tester.widget<SingleChildScrollView>(rail).scrollDirection,
-              Axis.horizontal,
+              tester.widgetList<Row>(find.descendant(of: rail, matching: find.byType(Row))).first.crossAxisAlignment,
+              CrossAxisAlignment.stretch,
             );
             expect(
               find.byKey(const Key('work-purchase-adjustment-scroll-hint')),
-              findsOneWidget,
+              findsNothing,
             );
             await tester.ensureVisible(rail);
-            await tester.pumpAndSettle();
-            await tester.drag(rail, const Offset(-1800, 0));
             await tester.pumpAndSettle();
             final lastAction = find.byKey(
               const Key('work-purchase-record-supplier-refund'),
             );
+            await tester.ensureVisible(lastAction);
+            await tester.pumpAndSettle();
             expect(lastAction.hitTestable(), findsOneWidget);
             expect(tester.getSize(lastAction).height, greaterThanOrEqualTo(48));
             await tester.tap(lastAction);
@@ -16028,19 +18322,19 @@ void main() {
               work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(),
               stock,
             );
-            await tester.ensureVisible(rail);
-            await tester.pumpAndSettle();
-            await tester.drag(rail, const Offset(1800, 0));
-            await tester.pumpAndSettle();
             final firstAction = find.byKey(
               const Key('work-purchase-allocate-money'),
             );
+            await openBillPayment(tester);
+            await tester.ensureVisible(firstAction);
+            await tester.pumpAndSettle();
             expect(firstAction.hitTestable(), findsOneWidget);
             expect(
               tester.getSize(firstAction).height,
               greaterThanOrEqualTo(48),
             );
           }
+          await openBillSection(tester, 'Goods');
           if (failure == 'stale-absence-no-shortage') {
             expect(form.shortageSnapshotCaptured!.isCompleted, isTrue);
             // Host-only intervening draft write. No fixture enters OPPO storage.
@@ -16080,7 +18374,10 @@ void main() {
               find.byKey(const Key('supplier-shortage-submit')),
               findsNothing,
             );
-            await tapVisible(find.widgetWithText(TextButton, 'Close'));
+            await tapVisible(find.byElementPredicate((element) => element.widget is TextButton &&
+              (element.widget as TextButton).child is Text &&
+              ((element.widget as TextButton).child as Text).data == 'Close' &&
+              ModalRoute.of(element)?.isCurrent == true));
             await tester.scrollUntilVisible(action, 120, scrollable: scroll);
             await tester.pumpAndSettle();
             expect(
@@ -16166,7 +18463,10 @@ void main() {
           await tapVisible(action);
           if (failure == 'none') {
             expect(
-              tester.getSize(find.widgetWithText(TextButton, 'Close')).height,
+              tester.getSize(find.byElementPredicate((element) => element.widget is TextButton &&
+              (element.widget as TextButton).child is Text &&
+              ((element.widget as TextButton).child as Text).data == 'Close' &&
+              ModalRoute.of(element)?.isCurrent == true)).height,
               greaterThanOrEqualTo(48),
             );
           }
@@ -16196,7 +18496,10 @@ void main() {
               );
               expect(saved!.fields['quantityMilli'], 'input:0.');
               expect(saved.fields['deliveryId'], receipt.expectedDeliveryId);
-              await tapVisible(find.widgetWithText(TextButton, 'Close'));
+              await tapVisible(find.byElementPredicate((element) => element.widget is TextButton &&
+              (element.widget as TextButton).child is Text &&
+              ((element.widget as TextButton).child as Text).data == 'Close' &&
+              ModalRoute.of(element)?.isCurrent == true));
               await tapVisible(action);
               expect(find.text('Saved missing qty: 0.'), findsOneWidget);
             }
@@ -16239,7 +18542,10 @@ void main() {
               work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(),
               stock,
             );
-            await tapVisible(find.widgetWithText(TextButton, 'Close'));
+            await tapVisible(find.byElementPredicate((element) => element.widget is TextButton &&
+              (element.widget as TextButton).child is Text &&
+              ((element.widget as TextButton).child as Text).data == 'Close' &&
+              ModalRoute.of(element)?.isCurrent == true));
             expect(
               find.byKey(const Key('work-purchase-saved-copy')),
               findsOneWidget,
@@ -16266,7 +18572,10 @@ void main() {
           await tester.pumpAndSettle();
           FocusManager.instance.primaryFocus?.unfocus();
           await tester.pumpAndSettle();
-          await tapVisible(find.widgetWithText(TextButton, 'Close'));
+          await tapVisible(find.byElementPredicate((element) => element.widget is TextButton &&
+              (element.widget as TextButton).child is Text &&
+              ((element.widget as TextButton).child as Text).data == 'Close' &&
+              ModalRoute.of(element)?.isCurrent == true));
           await tapVisible(action);
           expect(tester.widget<TextField>(qty).controller!.text, '0.');
           expect(tester.widget<TextField>(qty).enabled, isTrue);
@@ -16291,7 +18600,10 @@ void main() {
               checkpoint.value!.supplierLedgers[supplier.id]!.shortageClaims,
               isEmpty,
             );
-            await tapVisible(find.widgetWithText(TextButton, 'Close'));
+            await tapVisible(find.byElementPredicate((element) => element.widget is TextButton &&
+              (element.widget as TextButton).child is Text &&
+              ((element.widget as TextButton).child as Text).data == 'Close' &&
+              ModalRoute.of(element)?.isCurrent == true));
             checkpoint.creditFailure = 'none';
             expect(
               find.byKey(const Key('work-purchase-saved-copy')),
@@ -16355,7 +18667,10 @@ void main() {
             work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(),
             stock,
           );
-          await tapVisible(find.widgetWithText(TextButton, 'Close'));
+          await tapVisible(find.byElementPredicate((element) => element.widget is TextButton &&
+              (element.widget as TextButton).child is Text &&
+              ((element.widget as TextButton).child as Text).data == 'Close' &&
+              ModalRoute.of(element)?.isCurrent == true));
           await tapVisible(action);
           expect(
             find.text('Shortage recorded · no credit or refund applied'),
@@ -16419,7 +18734,7 @@ void main() {
     }
   }
 
-  for (final display in [const Size(320, 568), const Size(915, 412)]) {
+  for (final display in [const Size(320, 568), const Size(915, 412), const Size(360, 800), const Size(320, 800)]) {
     for (final failure in [
       'none',
       'before-save',
@@ -16429,19 +18744,29 @@ void main() {
       'identical-sources',
       'held-recovery',
       'no-sources',
+      'copy-scope',
     ]) {
+      if (display.height == 800 && failure != 'none' && !(display.width == 360 && failure == 'copy-scope')) continue;
+      if (display.height != 800 && failure == 'copy-scope') continue;
       testWidgets(
         'PURCHASEALLOCUI saved bill source selection and recovery $display failure=$failure',
         (tester) async {
+          addTearDown(tester.view.resetViewInsets);
+          addTearDown(tester.view.resetPadding);
+          addTearDown(tester.view.resetViewPadding);
           // Host UI fixture only. Actual OPPO acceptance remains separate.
           FlutterSecureStorage.setMockInitialValues({});
           final entry = _OpeningPostingFixtureStore();
           final checkpoint = _LedgerCheckpointFixtureStore();
           final moneyStore = _HeldSupplierMoneyDraftStore();
+          final copyChecks = failure == 'none' || failure == 'copy-scope';
+          final photo = copyChecks ? (await tester.runAsync(_catalogueTestPhoto))! : null;
+          final capture = photo == null ? null : _PaymentCopyReviewFixture(photo);
           final work = postingOpeningFixture(
             entry,
             checkpoint,
             moneyStore: moneyStore,
+            capture: capture,
           );
           final scope = work.workspaceSupplierScope!,
               at = DateTime.now().toUtc();
@@ -16603,7 +18928,7 @@ void main() {
             route: '/app/work/workspace/dashboard',
             work: work,
             viewport: display,
-            textScale: display.width > 500 ? 2 : 1.4,
+            textScale: display.height == 800 ? display.width == 320 ? 2 : 1 : display.width > 500 ? 2 : 1.4,
           );
           await openPurchaseList(tester);
           Future<void> openCopy() async {
@@ -16640,6 +18965,7 @@ void main() {
           }
 
           Future<void> openAllocation() async {
+            await openBillPayment(tester);
             final action = find.byKey(
               const Key('work-purchase-allocate-money'),
             );
@@ -16671,6 +18997,73 @@ void main() {
 
           await openCopy();
           await openAllocation();
+          expect(find.text('Apply a recorded payment, advance or credit to this bill.'), findsOneWidget);
+          expect(find.textContaining('No new payment or Stock change'), findsNothing);
+          final copyKey = work.supplierAllocationFormKey(copy)!;
+          String? copyDigest;
+          Future<void> expandCopies() async {
+            final panel = find.byKey(const Key('supplier-allocation-supporting-copies'));
+            expect(panel, findsOneWidget);
+            await revealAllocation(find.descendant(of: panel, matching: find.text('Supporting copies · optional')));
+            await tester.tap(find.descendant(of: panel, matching: find.text('Supporting copies · optional')));
+            await tester.pumpAndSettle();
+          }
+          if (copyChecks) {
+            final writes = checkpoint.saveAttempts;
+            final originalLedger = jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson());
+            await expandCopies();
+            final camera = find.byKey(const Key('supplier-allocation-copy-camera'));
+            await revealAllocation(camera);
+            if (failure == 'copy-scope') {
+              capture!.holdCapture = Completer<void>();
+              await tester.tap(camera); await tester.pump(); await tester.pump();
+              final close = find.byKey(const Key('supplier-allocation-close'));
+              expect(tester.widget<TextButton>(close).onPressed, isNull);
+              work.activeWorkspace = null; work.notifyListeners(); await tester.pump(); await tester.pump();
+              expect(tester.widget<TextButton>(close).onPressed, isNotNull);
+              capture.holdCapture!.complete(); await tester.pumpAndSettle();
+              expect(checkpoint.saveAttempts, writes);
+              expect(await moneyStore.read(copyKey), isNull);
+              expect(tester.takeException(), isNull);
+              await tester.pumpWidget(const SizedBox.shrink()); return;
+            }
+            await tester.tap(camera); await tester.pumpAndSettle();
+            var saved = (await moneyStore.read(copyKey))!.supplierAllocationCopies!;
+            expect(saved.active.single.documentDetails['type'], 'paymentAdvice');
+            copyDigest = saved.active.single.digest;
+            final row = find.byKey(ValueKey('supplier-allocation-copy-$copyDigest'));
+            final read = find.descendant(of: row, matching: find.text('Read text'));
+            await revealAllocation(read); await tester.tap(read); await tester.pumpAndSettle();
+            saved = (await moneyStore.read(copyKey))!.supplierAllocationCopies!;
+            expect(saved.active.single.extractedFields.single.value, '123');
+            final fields = find.descendant(of: row, matching: find.text('Printed fields · 1'));
+            await revealAllocation(fields); await tester.tap(fields); await tester.pumpAndSettle();
+            final value = find.byKey(const Key('work-receive-field-value-HOST-xyz'));
+            await tester.ensureVisible(value); await tester.pumpAndSettle(); await tester.enterText(value, '124');
+            final failedRecovery = display == const Size(360, 800);
+            if (failedRecovery) moneyStore.failCopySave = true;
+            await tester.tap(find.byKey(const Key('work-receive-fields-keep'))); await tester.pumpAndSettle();
+            final recover = find.byKey(const Key('supplier-allocation-recover'));
+            if (failedRecovery) {
+              expect((await moneyStore.read(copyKey))!.supplierAllocationCopies!.active.single.extractedFields.single.value, '123');
+              await revealAllocation(recover); await tester.tap(recover); await tester.pumpAndSettle();
+              expect(tester.widget<TextButton>(find.byKey(const Key('supplier-allocation-close'))).onPressed, isNull);
+              moneyStore.failCopySave = false;
+              await revealAllocation(recover); await tester.tap(recover); await tester.pumpAndSettle();
+            }
+            final corrected = (await moneyStore.read(copyKey))!.supplierAllocationCopies!.active.single;
+            expect(corrected.extractedFields.single.value, '124',
+              reason: 'Recovery must replay the whole pending snapshot, not overwrite it with earlier saved copies.');
+            expect(corrected.detectedText, 'xyz: 123'); expect(corrected.digest, copyDigest);
+            await tester.tap(find.byKey(const Key('supplier-allocation-close'))); await tester.pumpAndSettle();
+            await openAllocation(); await expandCopies();
+            expect(find.byKey(ValueKey('supplier-allocation-copy-$copyDigest')), findsOneWidget);
+            await revealAllocation(find.descendant(of: find.byKey(ValueKey('supplier-allocation-copy-$copyDigest')),
+              matching: find.text('Printed fields · 1')));
+            await _captureAnalyticsFixture(tester, 'allocation-copies-editable-${display.width.toInt()}-${display.height.toInt()}');
+            expect(checkpoint.saveAttempts, writes);
+            expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()), originalLedger);
+          }
           if (failure == 'no-sources') {
             final ledgerBefore = jsonEncode(
               work.workspaceSupplierLedger(supplier.id)!.toJson(),
@@ -16722,7 +19115,7 @@ void main() {
           await revealAllocation(amount);
           expect(
             tester.widget<TextField>(amount).decoration!.labelText,
-            'Amount (₹)',
+            'Apply amount (₹)',
           );
           expect(
             tester.getSize(amount).width,
@@ -16730,7 +19123,60 @@ void main() {
             reason:
                 'Keep the numeric field compact in portrait and enlarged landscape.',
           );
+          expect(tester.getSize(amount).height, greaterThanOrEqualTo(48));
+          if (failure == 'none') {
+            final close = find.byKey(const Key('supplier-allocation-close'));
+            final hide = find.byKey(const Key('supplier-allocation-hide-keyboard'));
+            expect(hide, findsNothing);
+            await tester.tap(amount); await tester.pumpAndSettle();
+            expect(hide.hitTestable(), findsOneWidget,
+              reason: 'Floating keyboard dismissal must work without bottom insets.');
+            tester.view.padding = const FakeViewPadding(top: 28, bottom: 16);
+            tester.view.viewPadding = const FakeViewPadding(top: 28, bottom: 16);
+            tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+            await tester.pumpAndSettle();
+            await revealAllocation(find.byKey(const Key('supplier-allocation-recover')));
+            expect(close.hitTestable(), findsOneWidget,
+              reason: 'Close remains reachable after scrolling to lower controls with keyboard open.');
+            expect(tester.getRect(close).top, greaterThanOrEqualTo(28));
+            expect(tester.getRect(close).bottom, lessThanOrEqualTo(display.height - 240));
+            expect(hide.hitTestable(), findsOneWidget);
+            await tester.tap(hide); await tester.pumpAndSettle();
+            expect(tester.testTextInput.isVisible, isFalse);
+            tester.view.resetViewInsets(); tester.view.resetPadding(); tester.view.resetViewPadding();
+            await tester.pumpAndSettle();
+            expect(hide, findsNothing); expect(tester.takeException(), isNull);
+            await revealAllocation(amount);
+          }
           await tester.enterText(amount, '100');
+          if (failure == 'none') {
+            tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+            await tester.pumpAndSettle(); await revealAllocation(amount);
+            await tester.tap(amount);
+            tester.testTextInput.updateEditingValue(const TextEditingValue(
+              text: '100', selection: TextSelection(baseOffset: 0, extentOffset: 3)));
+            await tester.pumpAndSettle();
+            await revealAllocation(amount);
+            tester.state<EditableTextState>(find.descendant(of: amount,
+              matching: find.byType(EditableText))).showToolbar();
+            await tester.pumpAndSettle();
+            final amountController = tester.widget<TextField>(amount).controller!;
+            final selectedAmount = amountController.selection;
+            expect(selectedAmount.isValid, isTrue);
+            expect(selectedAmount.textInside(amountController.text), '100');
+            final scrolling = Scrollable.of(tester.element(amount)).position;
+            final beforeScroll = scrolling.pixels;
+            final scroller = find.ancestor(of: amount, matching: find.byType(SingleChildScrollView)).first;
+            await tester.drag(scroller, Offset(0, beforeScroll > scrolling.minScrollExtent ? 120 : -120));
+            await tester.pumpAndSettle();
+            expect(scrolling.pixels, isNot(beforeScroll));
+            expect(find.byType(AdaptiveTextSelectionToolbar), findsNothing,
+              reason: 'Amount selection menus must not follow a scrolling field over fixed sheet controls.');
+            expect(amountController.text, '100');
+            expect(amountController.selection, selectedAmount);
+            expect(find.byKey(const Key('supplier-allocation-close')).hitTestable(), findsOneWidget);
+            tester.view.resetViewInsets(); await tester.pumpAndSettle();
+          }
           FocusManager.instance.primaryFocus?.unfocus();
           await tester.pumpAndSettle();
           final submit = find.byKey(const Key('supplier-allocation-submit'));
@@ -16807,6 +19253,10 @@ void main() {
             stock,
           );
           expect(find.text('Link another amount'), findsOneWidget);
+          if (copyChecks) {
+            expect(find.byKey(const Key('supplier-allocation-copy-camera')), findsNothing);
+            expect((await moneyStore.read(copyKey))!.supplierAllocationCopies!.active.single.digest, copyDigest);
+          }
           final close = find.byKey(const Key('supplier-allocation-close'));
           await revealAllocation(close);
           await tester.tap(close);
@@ -16875,6 +19325,27 @@ void main() {
               work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(),
               stock,
             );
+            final archived = (await moneyStore.read(copyKey))!.supplierAllocationCopies!;
+            expect(archived.active, isEmpty);
+            expect(archived.previous.single.operation, linked.billMoneyAllocations.keys.single);
+            expect(archived.previous.single.reference, 'Allocation draft');
+            expect(archived.previous.single.date, isEmpty);
+            expect(archived.previous.single.copies.single.digest, copyDigest);
+            await expandCopies();
+            final previous = find.byKey(const Key('supplier-allocation-previous-copies'));
+            await revealAllocation(find.descendant(of: previous, matching: find.text('Previous draft copies')));
+            await tester.tap(find.descendant(of: previous, matching: find.text('Previous draft copies'))); await tester.pumpAndSettle();
+            final old = find.byKey(ValueKey('supplier-allocation-copy-previous-$copyDigest'));
+            expect(find.descendant(of: old, matching: find.text('Read text')), findsNothing);
+            final view = find.descendant(of: old, matching: find.text('View copy'));
+            await revealAllocation(view);
+            await _captureAnalyticsFixture(tester, 'allocation-copies-archived-${display.width.toInt()}-${display.height.toInt()}');
+            await tester.tap(view); await tester.pumpAndSettle();
+            expect(find.widgetWithText(AppBar, 'Supporting copy'), findsOneWidget);
+            final image = tester.widgetList<Image>(find.descendant(of: find.byType(InteractiveViewer), matching: find.byType(Image)))
+              .single.image as MemoryImage;
+            expect(image.bytes, photo); expect(find.text('Retry copy'), findsNothing);
+            await tester.pageBack(); await tester.pumpAndSettle();
           }
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox.shrink());
@@ -16883,6 +19354,278 @@ void main() {
     }
   }
 
+  for (final display in [(const Size(360, 800), 1.0), (const Size(320, 640), 2.0), (const Size(800, 360), 2.0)]) {
+    testWidgets('RECEIVEPOSUI compact receipt dates controls and neutral quantities ${display.$1} ${display.$2}', (tester) async {
+      // Host-only receipt fixtures; no native Stock/account posting evidence.
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
+      final forms = _LedgerFormFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+      final scope = work.workspaceSupplierScope!, at = DateTime.utc(2026, 10, 22);
+      final supplier = WorkspaceSupplierProfile(id: 'host-pos-receipt', name: 'HOST receipt supplier', createdAt: at, updatedAt: at);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1, profiles: [supplier]);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work, viewport: display.$1, textScale: display.$2);
+      await openPurchaseList(tester);
+      final action = await purchaseRegisterAction(tester, 'work-purchase-receive-goods');
+      await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-receive-supplier'))); await tester.pumpAndSettle();
+      await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+      final scroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')), matching: find.byType(Scrollable)).first;
+      Future<void> reveal(String key) async {
+        if (find.byKey(Key(key)).evaluate().isEmpty && tester.state<ScrollableState>(scroll).position.pixels > 0) {
+          tester.state<ScrollableState>(scroll).position.jumpTo(0);
+          await tester.pumpAndSettle();
+        }
+        await tester.scrollUntilVisible(find.byKey(Key(key)), 110, scrollable: scroll); await tester.pumpAndSettle();
+      }
+      await reveal('work-receive-reference');
+      expect(find.text('Receipt / challan no.'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('work-receive-reference')), 'HOST CH-2201');
+      await reveal('work-receive-date');
+      await tester.enterText(find.byKey(const Key('work-receive-date')), '31/02/2026'); await tester.pumpAndSettle();
+      expect(find.text('Enter a valid date (DD/MM/YYYY)'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('work-receive-date')), '20/10/2026'); await tester.pumpAndSettle();
+      expect(find.text('Enter a valid date (DD/MM/YYYY)'), findsNothing);
+      await reveal('work-receive-find-0');
+      await tester.tap(find.byKey(const Key('work-receive-find-0'))); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-receive-stock-search')), findsOneWidget);
+      tester.view.viewInsets = FakeViewPadding(bottom: display.$1.height * .4);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'Stock search must fit narrow/enlarged/landscape with keyboard.');
+      Navigator.of(tester.element(find.byKey(const Key('work-receive-stock-search')))).pop();
+      await tester.pumpAndSettle();
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pumpAndSettle();
+      await tester.drag(find.byKey(const Key('work-goods-receiving')), const Offset(0, 1000)); await tester.pumpAndSettle();
+      await reveal('work-receive-date');
+      final date = tester.widget<TextField>(find.byKey(const Key('work-receive-date')));
+      if (display.$2 == 1) {
+        expect(tester.getSize(find.byKey(const Key('work-receive-date'))).width,
+          tester.getSize(find.byKey(const Key('work-receive-reference'))).width);
+        final before = Map<String, String>.of(forms.drafts[work.supplierReceivingInputFormKey(supplier.id)!]!.fields);
+        await reveal('work-receive-add-product');
+        await tester.tap(find.byKey(const Key('work-receive-add-product'))); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-add-product-entry')), findsOneWidget);
+        await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
+        expect(forms.drafts[work.supplierReceivingInputFormKey(supplier.id)!]!.fields, before);
+        await reveal('work-receive-opening-balance');
+        await tester.tap(find.byKey(const Key('work-receive-opening-balance'))); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-opening-dues-form')), findsOneWidget);
+        expect(find.text(supplier.name), findsWidgets);
+        await tester.enterText(find.byKey(const Key('work-opening-date')), '2026-10-01'); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-opening-close'))); await tester.pumpAndSettle();
+        await tester.tap(find.text('Discard changes')); await tester.pumpAndSettle();
+        expect(find.text('Leave opening dues?'), findsNothing, reason: 'An approved Close must not prompt for discard twice.');
+        expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
+        expect(forms.drafts[work.supplierReceivingInputFormKey(supplier.id)!]!.fields, before);
+        expect(work.workspaceSupplierOpeningRecords, isEmpty);
+      }
+      await reveal('work-receive-review');
+      expect(find.text('Review receipt'), findsOneWidget);
+      expect(find.text('Check conversion: accepted goods must equal whole Stock units.'), findsNothing);
+      expect(find.text('Pending qty: expected quantity not entered'), findsNothing);
+      final header = find.byKey(const Key('work-receive-header'));
+      expect(header.hitTestable(), findsOneWidget, reason: 'Close/header must remain visible after scrolling to the final action.');
+      tester.view.viewInsets = FakeViewPadding(bottom: display.$1.height * .4);
+      await tester.pumpAndSettle();
+      expect(header.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull, reason: 'Pinned controls must fit with keyboard and enlarged text.');
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pumpAndSettle();
+      await reveal('work-receive-lot-0');
+      await tester.tap(find.descendant(of: find.byKey(const Key('work-receive-lot-0')),
+        matching: find.text('Batch & pack details · optional'))); await tester.pumpAndSettle();
+      for (final key in ['work-receive-batch-0', 'work-receive-manufactured-0', 'work-receive-expiry-0', 'work-receive-mrp-0']) {
+        await reveal(key);
+        final bounds = tester.getRect(find.byKey(Key(key)));
+        expect(bounds.left, greaterThanOrEqualTo(0));
+        expect(bounds.right, lessThanOrEqualTo(display.$1.width));
+        expect(tester.takeException(), isNull);
+      }
+      expect(date.controller!.text, '20/10/2026');
+      final draft = forms.drafts[work.supplierReceivingInputFormKey(supplier.id)!]!;
+      expect((jsonDecode(draft.fields['input']!) as List)[1], '2026-10-20', reason: 'Display date cannot rewrite ISO persistence.');
+      expect(entry.value!.goodsReceiptDrafts, isEmpty); expect(checkpoint.saveAttempts, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+  for (final display in [(const Size(360, 800), 1.0), (const Size(320, 640), 2.0), (const Size(800, 360), 2.0)]) {
+    testWidgets('SUPPLIERDIRECTORYUI searchable long list and standalone add ${display.$1} ${display.$2}', (tester) async {
+      // Isolated automated fixtures, not physical Store supplier acceptance.
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore();
+      final work = postingOpeningFixture(entry, _LedgerCheckpointFixtureStore());
+      final scope = work.workspaceSupplierScope!;
+      final at = DateTime.utc(2026, 10, 22);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 1, profiles: List.generate(1000, (i) => WorkspaceSupplierProfile(id: 'host-supplier-$i',
+          name: 'Host supplier $i', phone: i == 999 ? '9876543210' : '',
+          gstin: i == 999 ? '08ABCDE1234F1Z5' : '', createdAt: at, updatedAt: at)));
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: display.$1, textScale: display.$2);
+      await openPurchaseList(tester);
+      final action = await purchaseRegisterAction(tester, 'work-purchase-receive-goods');
+      await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+      final picker = find.byKey(const Key('work-receive-supplier'));
+      await tester.ensureVisible(picker); await tester.tap(picker); await tester.pumpAndSettle();
+      expect(find.byType(ListTile).evaluate().length, lessThan(100), reason: 'Long directory must build visible rows lazily.');
+      final search = find.byKey(const Key('work-supplier-search'));
+      for (final query in ['Host supplier 999', '98765 43210', '08abcde1234f1z5']) {
+        await tester.enterText(search, query); await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('work-supplier-choice-host-supplier-999')), findsOneWidget);
+      }
+      tester.view.viewInsets = FakeViewPadding(bottom: display.$1.height * .45);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'Search must fit with enlarged text and the keyboard.');
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pumpAndSettle();
+      await tester.enterText(search, 'not a supplier'); await tester.pumpAndSettle();
+      expect(find.text('No matching supplier.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-supplier-add'))); await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('work-add-supplier-name')), 'HOST first-time outside supplier');
+      await tester.enterText(find.byKey(const Key('work-add-supplier-address')), 'Jodhpur, Rajasthan 342001');
+      final save = find.byKey(const Key('work-add-supplier-save'));
+      await tester.scrollUntilVisible(save, 120, scrollable: find.descendant(
+        of: find.byKey(const Key('work-add-supplier-form')), matching: find.byType(Scrollable)).first);
+      await tester.tap(save); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-supplier-search')), findsNothing);
+      expect(find.text('HOST first-time outside supplier'), findsOneWidget);
+      expect(work.workspacePurchaseEntryDraft, isNull);
+      expect(work.workspaceSuppliers, hasLength(1001));
+      expect(work.workspaceGoodsReceiptDrafts, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+  for (final display in [(const Size(360, 800), 1.0), (const Size(320, 640), 2.0)]) {
+    testWidgets('SUPPLIERDIRECTORYSHARED bill add select preserves invoice draft ${display.$2}', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore(), ledger = _LedgerCheckpointFixtureStore();
+      final work = postingOpeningFixture(entry, ledger);
+      final stock = jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: display.$1, textScale: display.$2);
+      await openPurchaseList(tester);
+      await openPurchaseEntryFromList(tester);
+      await expandPurchasePrimarySections(tester);
+      for (final e in {'reference': 'HOST retained bill', 'item-0': 'HOST rice', 'quantity-0': '12', 'cost-0': '45.50'}.entries) {
+        final input = find.byKey(Key('work-purchase-${e.key}'));
+        await revealPurchaseInput(tester, input); await tester.enterText(input, e.value);
+      }
+      final picker = find.byKey(const Key('work-purchase-select-supplier'));
+      await revealPurchaseInput(tester, picker, delta: -140);
+      await tester.tap(picker); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-supplier-search')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-supplier-add'))); await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('work-add-supplier-name')), 'HOST outside bill supplier');
+      await tester.enterText(find.byKey(const Key('work-add-supplier-address')), 'Jodhpur, Rajasthan 342001');
+      final save = find.byKey(const Key('work-add-supplier-save'));
+      await tester.scrollUntilVisible(save, 120, scrollable: find.descendant(
+        of: find.byKey(const Key('work-add-supplier-form')), matching: find.byType(Scrollable)).first);
+      await tester.tap(save); await tester.pumpAndSettle();
+      expect(work.workspacePurchaseEntryDraft, isNull, reason: 'Adding a contact cannot create a bill.');
+      expect(entry.value!.profiles.single.name, 'HOST outside bill supplier');
+      final supplierId = entry.value!.profiles.single.id;
+      final identity = find.byKey(const Key('work-purchase-supplier-name'));
+      expect(tester.widget<TextField>(identity).controller!.text, 'HOST outside bill supplier');
+      await revealPurchaseInput(tester, picker, delta: -140);
+      expect(picker.hitTestable(), findsOneWidget);
+      await tester.tap(picker); await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Close supplier list')); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(identity).controller!.text, 'HOST outside bill supplier');
+      for (final e in {'reference': 'HOST retained bill', 'item-0': 'HOST rice', 'quantity-0': '12', 'cost-0': '45.50'}.entries) {
+        final input = find.byKey(Key('work-purchase-${e.key}'));
+        await revealPurchaseInput(tester, input);
+        expect(tester.widget<TextField>(input).controller!.text, e.value);
+      }
+      final saveDraft = find.byKey(const Key('work-purchase-draft-save'));
+      await revealPurchaseInput(tester, saveDraft); await tester.tap(saveDraft); await tester.pumpAndSettle();
+      expect(entry.value!.draft!.supplierId, supplierId);
+      expect(entry.value!.draft!.invoiceReference, 'HOST retained bill');
+      expect(entry.value!.draft!.goods.single['quantity'], '12');
+      expect(entry.value!.draft!.goods.single['cost'], '45.50');
+      expect(jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), stock);
+      expect(ledger.saveAttempts, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+    testWidgets('SUPPLIERDIRECTORYSHARED money search keeps eligibility ${display.$2}', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore(), ledger = _LedgerCheckpointFixtureStore();
+      final work = postingOpeningFixture(entry, ledger);
+      final scope = work.workspaceSupplierScope!, at = DateTime.utc(2026, 10, 23);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 1, profiles: List.generate(1000, (i) => WorkspaceSupplierProfile(id: 'shared-$i',
+          name: 'HOST shared supplier $i', phone: i == 999 ? '9876543210' : '', createdAt: at, updatedAt: at)));
+      final before = jsonEncode(entry.value!.toJson());
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: display.$1, textScale: display.$2);
+      await openPurchaseList(tester);
+      await tester.tap(find.byKey(const Key('work-purchase-action-centre-open'))); await tester.pumpAndSettle();
+      await expandPurchaseActionCategory(tester, 'Money paid, credit & refunds');
+      final action = find.byKey(const Key('purchase-action-money'));
+      await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+      final search = find.byKey(const Key('work-supplier-search'));
+      expect(search, findsOneWidget);
+      await tester.enterText(search, '98765 43210'); await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('work-supplier-choice-shared-999')), findsOneWidget);
+      expect(find.byType(ListTile).evaluate().length, lessThan(100));
+      tester.view.viewInsets = FakeViewPadding(bottom: 240); await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      tester.view.viewInsets = FakeViewPadding.zero; await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('work-supplier-choice-shared-999'))); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('supplier-payment-purpose-bill'))); await tester.pumpAndSettle();
+      expect(find.text('No confirmed supplier bills available.'), findsOneWidget,
+        reason: 'A selected contact must not authorise payment against a nonexistent bill.');
+      expect(jsonEncode(entry.value!.toJson()), before);
+      expect(ledger.saveAttempts, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('SUPPLIERDIRECTORYUI invalid fields cancel and uncertain save recovery', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _OpeningPostingFixtureStore();
+    final work = postingOpeningFixture(entry, _LedgerCheckpointFixtureStore());
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1);
+    await openPurchaseList(tester);
+    final action = await purchaseRegisterAction(tester, 'work-purchase-receive-goods');
+    await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-receive-supplier'))); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-supplier-add'))); await tester.pumpAndSettle();
+    final save = find.byKey(const Key('work-add-supplier-save'));
+    await tester.tap(save); await tester.pumpAndSettle();
+    expect(find.text('Enter the supplier name.'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('work-add-supplier-name')), 'HOST unsaved supplier');
+    await tester.enterText(find.byKey(const Key('work-add-supplier-gstin')), 'wrong');
+    await tester.tap(save); await tester.pumpAndSettle();
+    expect(find.text('Enter the 15-character GSTIN as on the bill.'), findsOneWidget);
+    await tester.tap(find.byTooltip('Back to suppliers')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Keep editing')); await tester.pumpAndSettle();
+    expect(tester.widget<TextFormField>(find.byKey(const Key('work-add-supplier-name'))).controller!.text, 'HOST unsaved supplier');
+    await tester.enterText(find.byKey(const Key('work-add-supplier-gstin')), '');
+    entry.failSave = true;
+    await tester.tap(save); await tester.pumpAndSettle();
+    expect(find.text('Check saved supplier'), findsOneWidget);
+    entry.failRead = true;
+    await tester.tap(find.byTooltip('Back to suppliers')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Leave entry')); await tester.pumpAndSettle();
+    expect(find.text('Supplier list could not be opened. Saved details are kept.'), findsOneWidget);
+    expect(find.byKey(const Key('work-supplier-add')), findsNothing,
+      reason: 'Uncertain storage must recover before another identity can be added.');
+    entry.failRead = false; entry.failSave = false;
+    await tester.tap(find.byKey(const Key('work-supplier-retry'))); await tester.pumpAndSettle();
+    expect(find.text('No suppliers yet. Add your first supplier.'), findsOneWidget);
+    expect(work.workspaceSuppliers, isEmpty);
+    expect(work.workspacePurchaseEntryDraft, isNull);
+    await tester.tap(find.byTooltip('Close supplier list')); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   for (final variant in ['portrait', 'landscape', 'large-text']) {
     testWidgets(
       'PURCHASERECEIVEUI saved review accessible without supplier bill $variant',
@@ -16978,7 +19721,7 @@ void main() {
         final status = find.byKey(const Key('work-receive-status'));
         await tester.scrollUntilVisible(status, 120, scrollable: scroll);
         await tester.pumpAndSettle();
-        expect(find.text('Saved review · not yet received'), findsOneWidget);
+        expect(find.text('Receipt reviewed · Stock unchanged'), findsOneWidget);
         expect(
           entry.value!.copies,
           isEmpty,
@@ -16992,6 +19735,15 @@ void main() {
           reason:
               'Unknown opening account must not be auto-confirmed to receive.',
         );
+        if (variant == 'portrait') {
+          final bookBeforeSetup = entry.value!.toJson();
+          final setup = find.byKey(const Key('work-receive-opening-balance'));
+          await tester.ensureVisible(setup); await tester.tap(setup); await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-opening-dues-form')), findsOneWidget);
+          await tester.tap(find.byKey(const Key('work-opening-close'))); await tester.pumpAndSettle();
+          expect(find.text('Receipt reviewed · Stock unchanged'), findsOneWidget);
+          expect(entry.value!.toJson(), bookBeforeSetup, reason: 'Opening setup cancellation cannot replace the frozen review.');
+        }
         final delivered = find.byKey(const Key('work-receive-delivered-0'));
         await tester.ensureVisible(delivered);
         await tester.pumpAndSettle();
@@ -17435,8 +20187,490 @@ void main() {
     );
   }
 
-  for (final mode in ['normal', 'large-text', 'unrelated', 'save-failure', 'scoped-reader', 'reader-retires', 'navigation-leave-return', 'review', 'server-confirm', 'server-reply', 'server-large-text', 'server-stock-history', 'server-stock-history-large-text', 'server-baseline', 'server-conflict', 'server-partial', 'server-close', 'server-close-reply', 'server-close-recorded', 'server-close-large-text', 'partial', 'completed', 'partial-other-draft', 'completed-other-draft']) {
+  for (final display in [(const Size(360, 800), 1.0), (const Size(320, 568), 2.0)]) {
+    testWidgets('RECEIVESEARCH direct product selector searches and keeps search visible $display', (tester) async {
+      final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore(), forms = _LedgerFormFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+      final scope = work.workspaceSupplierScope!, at = DateTime.utc(2026, 10, 23);
+      final supplier = WorkspaceSupplierProfile(id: 'host-search-supplier', name: 'HOST search supplier', createdAt: at, updatedAt: at);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1, profiles: [supplier]);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work, viewport: display.$1, textScale: display.$2);
+      await openPurchaseList(tester);
+      final products = List.generate(81, (i) => WorkspaceCatalogueItem(
+        id: 'host-search-$i', canonicalId: 'host-search-$i', categoryId: 'grocery', brand: 'HOST',
+        title: 'HOST Search product ${i.toString().padLeft(3, '0')}', variant: '', pack: '1 kg',
+        sku: 'RECV-${i.toString().padLeft(3, '0')}', barcode: '900000000${i.toString().padLeft(3, '0')}',
+        purchasePrice: 10, sellingPrice: 12, unitPrice: '₹12/kg', stock: 2,
+        deliveryPromise: '', origin: 'HOST fixture', visualLabel: '', visualKind: 'grocery',
+        stockMode: i == 80 ? WorkspaceStockMode.availabilityOnly : WorkspaceStockMode.exactQuantity));
+      work.workspaceCatalogueItems..clear()..addAll(products);
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-receive-goods')); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-receive-supplier'))); await tester.pumpAndSettle();
+      await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+      final receivingScroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')), matching: find.byType(Scrollable)).first;
+      final selector = find.byKey(const Key('work-receive-product-0'));
+      await tester.scrollUntilVisible(selector, 200, scrollable: receivingScroll); await tester.pumpAndSettle();
+      await tester.tap(selector); await tester.pumpAndSettle();
+      final search = find.byKey(const Key('work-receive-stock-search'));
+      expect(search.hitTestable(), findsOneWidget, reason: 'The product field itself must open a searchable selector.');
+      final searchTop = tester.getTopLeft(search).dy;
+      await tester.drag(find.byKey(const Key('work-receive-stock-results')), const Offset(0, -700)); await tester.pumpAndSettle();
+      expect(search.hitTestable(), findsOneWidget);
+      expect(tester.getTopLeft(search).dy, closeTo(searchTop, 1));
+      Future<void> query(String value) async { await tester.enterText(search, value); await tester.pumpAndSettle(); }
+      await query('product 073');
+      expect(find.byKey(const ValueKey('work-receive-stock-option-host-search-73')), findsOneWidget);
+      await query('recv-073');
+      expect(find.byKey(const ValueKey('work-receive-stock-option-host-search-73')), findsOneWidget);
+      await query('900000000073');
+      expect(find.byKey(const ValueKey('work-receive-stock-option-host-search-73')), findsOneWidget);
+      await query('not in stock catalogue');
+      expect(find.text('No matching Stock product'), findsOneWidget);
+      await tester.tap(find.byTooltip('Clear search')); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(search).controller!.text, isEmpty);
+      await query('RECV-080');
+      expect(find.text('No matching Stock product'), findsOneWidget, reason: 'Availability-only products cannot become quantity Stock.');
+      await query('RECV-073');
+      await tester.tap(find.byKey(const ValueKey('work-receive-stock-option-host-search-73'))); await tester.pumpAndSettle();
+      expect(find.descendant(of: selector, matching: find.text('${products[73].title} · 1 kg')), findsOneWidget);
+      final quantity = find.byKey(const Key('work-receive-delivered-0'));
+      await tester.scrollUntilVisible(quantity, 150, scrollable: receivingScroll); await tester.pumpAndSettle();
+      await tester.enterText(quantity, '7'); FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 80))); await tester.pumpAndSettle();
+      final before = Map<String, String>.of(forms.drafts[work.supplierReceivingInputFormKey(supplier.id)!]!.fields);
+      await tester.scrollUntilVisible(selector, -150, scrollable: receivingScroll); await tester.pumpAndSettle();
+      await tester.tap(selector); await tester.pumpAndSettle();
+      await query('RECV-005');
+      addTearDown(() {
+        tester.view.padding = FakeViewPadding.zero;
+        tester.view.viewPadding = FakeViewPadding.zero;
+        tester.view.viewInsets = FakeViewPadding.zero;
+      });
+      tester.view.padding = const FakeViewPadding(top: 24);
+      tester.view.viewPadding = const FakeViewPadding(top: 24);
+      tester.view.viewInsets = FakeViewPadding(bottom: display.$1.height * .4);
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(find.byType(BottomSheet)).dy, greaterThanOrEqualTo(24),
+        reason: 'The modal and its drag handle must stay below the status bar with the keyboard open.');
+      expect(search.hitTestable(), findsOneWidget);
+      expect(tester.widget<TextField>(search).controller!.text, 'RECV-005');
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const Key('work-receive-stock-close'))); await tester.pumpAndSettle();
+      expect(forms.drafts[work.supplierReceivingInputFormKey(supplier.id)!]!.fields, before,
+        reason: 'Searching and closing must not change selected identity, quantity or saved draft.');
+      expect(entry.value!.goodsReceiptDrafts, isEmpty);
+      expect(work.workspaceCatalogueItems.map((p) => p.stock), everyElement(2));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('RECEIVECAPTURE documents scanner review and restart preserve quantities', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    late WorkSession work;
+    late Directory temporary;
+    late Uint8List png;
+    await tester.runAsync(() async {
+      temporary = await Directory.systemTemp.createTemp('mool-receipt-test-');
+      final recorder = ui.PictureRecorder();
+      ui.Canvas(recorder).drawColor(const Color(0xffeeccaa), ui.BlendMode.src);
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(2, 2);
+      png = (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+      image.dispose(); picture.dispose();
+    });
+    addTearDown(() async { if (await temporary.exists()) await temporary.delete(recursive: true); });
+    final sources = <WorkProofSource>[];
+    var cancelled = false;
+    var recognizedCopies = 0;
+    final capture = WorkPurchaseInvoiceCapture(currentScope: () => work.workspaceSupplierScope,
+      supportDirectory: () async => temporary,
+      recognize: (_) async {
+        recognizedCopies++;
+        return 'Invoice No: COPY-77\nReceived qty: 999\nxyz: 123\naaaab = 456\nUnclear printed line';
+      },
+      picker: _ReceivingDocumentPicker((source) async {
+        sources.add(source);
+        if (cancelled) return null;
+        return WorkPickedProof(fileName: source == WorkProofSource.upload ? 'HOST-challan.pdf' : 'HOST-challan.png',
+          contentType: source == WorkProofSource.upload ? 'application/pdf' : 'image/png',
+          bytes: source == WorkProofSource.upload ? Uint8List.fromList('%PDF-1.4\nHOST FIXTURE ONLY'.codeUnits) : png);
+      }));
+    final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore(), forms = _LedgerFormFixtureStore();
+    work = postingOpeningFixture(entry, checkpoint, moneyStore: forms, capture: capture);
+    final scope = work.workspaceSupplierScope!, at = DateTime.utc(2026, 10, 22);
+    final supplier = WorkspaceSupplierProfile(id: 'host-copy-supplier', name: 'HOST copy supplier', createdAt: at, updatedAt: at);
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1, profiles: [supplier]);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1);
+    await openPurchaseList(tester);
+    Future<void> openReceiving() async {
+      final action = await purchaseRegisterAction(tester, 'work-purchase-receive-goods');
+      await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-receive-supplier'))); await tester.pumpAndSettle();
+      await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+    }
+    await openReceiving();
+    Future<void> field(String key, {double delta = 140}) async {
+      final scroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')), matching: find.byType(Scrollable)).first;
+      await tester.scrollUntilVisible(find.byKey(Key(key)), delta, scrollable: scroll); await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(Key(key))); await tester.pumpAndSettle();
+    }
+    await field('work-receive-reference'); await tester.enterText(find.byKey(const Key('work-receive-reference')), 'HOST-DC-77');
+    Future<void> waitForCapture() async {
+      for (var i = 0; i < 50; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+        await tester.pumpAndSettle();
+        if (tester.widget<TextButton>(find.byKey(const Key('work-receive-copy-camera'))).onPressed != null) return;
+      }
+      fail('Capture/draft save did not finish; do not tap a disabled next source.');
+    }
+    await field('work-receive-copy-type');
+    await tester.tap(find.byKey(const Key('work-receive-copy-type'))); await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('trade-document-search')), 'challan');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trade-document-option-deliveryChallan'))); await tester.pumpAndSettle();
+    for (final source in [WorkProofSource.camera, WorkProofSource.gallery, WorkProofSource.upload]) {
+      await field('work-receive-copy-${source.name}');
+      await tester.runAsync(() async {
+        await tester.tap(find.byKey(Key('work-receive-copy-${source.name}')));
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+      }); await tester.pumpAndSettle();
+      await waitForCapture();
+    }
+    final savedFields = forms.drafts[work.supplierReceivingInputFormKey(supplier.id)!]!.fields;
+    final docs = (jsonDecode(savedFields['documents']!) as List).map(WorkspacePurchaseInvoiceAttachment.fromJson).toList();
+    expect(docs.length, 2, reason: 'Same camera/gallery bytes must not duplicate a copy.');
+    expect(sources, [WorkProofSource.camera, WorkProofSource.gallery, WorkProofSource.upload]);
+    expect(docs.every((a) => a.owner == WorkspaceSupplierGoodsReceiptDraft.documentOwner(scope, supplier.id, savedFields['arrivalId']!)), isTrue);
+    expect(docs.every((a) => a.documentDetails['type'] == 'deliveryChallan'), isTrue);
+    await field('work-receive-copy-details-${docs.first.digest}', delta: -140);
+    await tester.tap(find.byKey(Key('work-receive-copy-details-${docs.first.digest}'))); await tester.pumpAndSettle();
+    for (final value in {'title': 'Delivery challan', 'reference': 'PRINTED-DC-77', 'date': '22/10/2026'}.entries) {
+      await tester.ensureVisible(find.byKey(Key('trade-document-${value.key}')));
+      await tester.enterText(find.byKey(Key('trade-document-${value.key}')), value.value);
+    }
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('trade-document-keep')));
+    await tester.runAsync(() async { await tester.tap(find.byKey(const Key('trade-document-keep'))); await Future<void>.delayed(const Duration(milliseconds: 150)); });
+    await tester.pumpAndSettle(); await waitForCapture();
+    cancelled = true;
+    await field('work-receive-copy-gallery', delta: -140);
+    await tester.runAsync(() async { await tester.tap(find.byKey(const Key('work-receive-copy-gallery'))); await Future<void>.delayed(const Duration(milliseconds: 50)); });
+    await tester.pumpAndSettle();
+    await waitForCapture();
+    expect(jsonDecode(forms.drafts[work.supplierReceivingInputFormKey(supplier.id)!]!.fields['documents']!) as List, hasLength(2));
+    final readImage = find.byKey(Key('work-receive-copy-read-${docs.first.digest}'));
+    await tester.scrollUntilVisible(readImage, 100,
+      scrollable: find.descendant(of: find.byKey(const Key('work-goods-receiving')), matching: find.byType(Scrollable)).first);
+    await Scrollable.ensureVisible(tester.element(readImage), alignment: .5); await tester.pumpAndSettle();
+    expect(readImage.hitTestable(), findsOneWidget);
+    expect(tester.widget<TextButton>(readImage).onPressed, isNotNull,
+      reason: 'The cancelled picker must finish before the next document action.');
+    await tester.runAsync(() async { await tester.tap(readImage); await Future<void>.delayed(const Duration(milliseconds: 100)); });
+    await tester.pumpAndSettle();
+    await waitForCapture();
+    expect(recognizedCopies, 1, reason: 'The intended OCR callback must finish before opening text review.');
+    await tester.tap(find.text('Review text')); await tester.pumpAndSettle();
+    expect(find.textContaining('Received qty: 999'), findsOneWidget);
+    await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
+    await waitForCapture();
+    WorkspacePurchaseInvoiceAttachment readCopy() => (jsonDecode(forms.drafts[work.supplierReceivingInputFormKey(supplier.id)!]!.fields['documents']!) as List)
+      .map(WorkspacePurchaseInvoiceAttachment.fromJson).singleWhere((a) => a.digest == docs.first.digest);
+    final xyz = readCopy().extractedFields.singleWhere((f) => f.label == 'xyz');
+    final removed = readCopy().extractedFields.singleWhere((f) => f.label == 'aaaab');
+    expect(xyz.value, '123'); expect(xyz.reviewed, isFalse); expect(xyz.sourceDigest, docs.first.digest);
+    expect(readCopy().extractedFields.any((f) => f.label == 'aaaab' && f.value == '456'), isTrue);
+    expect(readCopy().extractedFields.any((f) => f.label == 'Printed text' && f.value == 'Unclear printed line'), isTrue);
+    await field('work-receive-copy-fields-${docs.first.digest}', delta: -100);
+    await tester.tap(find.byKey(Key('work-receive-copy-fields-${docs.first.digest}'))); await tester.pumpAndSettle();
+    for (var i = 0; i < 40 && find.byKey(const Key('work-receive-fields-list')).evaluate().isEmpty; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 25)));
+      await tester.pumpAndSettle();
+    }
+    expect(find.byKey(const Key('work-receive-fields-list')), findsOneWidget,
+      reason: 'The existing draft flush must finish before the editor is opened.');
+    final capturePrefix = Platform.environment['MOOLSOCIAL_RECEIVE_FIELDS_CAPTURE'];
+    Future<void> captureFields(String suffix) async {
+      if (capturePrefix == null) return;
+      RenderObject? render = tester.renderObject(find.ancestor(
+        of: find.byKey(const Key('work-receive-fields-list')), matching: find.byType(Scaffold)).first);
+      while (render != null && render is! RenderRepaintBoundary) { render = render.parent; }
+      expect(render, isA<RenderRepaintBoundary>());
+      final boundary = render! as RenderRepaintBoundary;
+      expect(boundary.size.width, tester.view.physicalSize.width);
+      expect(boundary.size.height, tester.view.physicalSize.height);
+      await tester.runAsync(() async {
+        final file = File('$capturePrefix-$suffix.png');
+        if (await file.exists()) throw StateError('Do not overwrite retained host visual evidence.');
+        final image = await boundary.toImage(pixelRatio: 1);
+        try { final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+          await file.writeAsBytes(bytes, flush: true);
+        } finally { image.dispose(); }
+      });
+    }
+    await captureFields('normal');
+    for (final layout in [const Size(320, 640), const Size(800, 360)]) {
+      tester.view.physicalSize = layout;
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+      await tester.pumpAndSettle();
+      final fieldsScroll = find.descendant(of: find.byKey(const Key('work-receive-fields-list')), matching: find.byType(Scrollable)).first;
+      tester.state<ScrollableState>(fieldsScroll).position.jumpTo(0); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-receive-fields-keep')).hitTestable(), findsOneWidget);
+      await tester.scrollUntilVisible(find.byKey(Key('work-receive-field-value-${xyz.id}')), 100,
+        scrollable: find.descendant(of: find.byKey(const Key('work-receive-fields-list')), matching: find.byType(Scrollable)).first);
+      await tester.ensureVisible(find.byKey(Key('work-receive-field-value-${xyz.id}'))); await tester.pumpAndSettle();
+      expect(find.byKey(Key('work-receive-field-value-${xyz.id}')).hitTestable(), findsOneWidget,
+        reason: 'The actual extra value must be reachable above the keyboard, not only the toolbar.');
+      expect(tester.takeException(), isNull, reason: 'Printed-field editing must remain usable with large text and keyboard.');
+      await captureFields(layout.width == 320 ? 'narrow-large-keyboard' : 'landscape-large-keyboard');
+    }
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.viewInsets = const FakeViewPadding();
+    tester.platformDispatcher.textScaleFactorTestValue = 1;
+    await tester.pumpAndSettle();
+    tester.state<ScrollableState>(find.descendant(of: find.byKey(const Key('work-receive-fields-list')),
+      matching: find.byType(Scrollable)).first).position.jumpTo(0); await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(Key('work-receive-field-value-${xyz.id}')), 150,
+      scrollable: find.descendant(of: find.byKey(const Key('work-receive-fields-list')), matching: find.byType(Scrollable)).first);
+    await tester.enterText(find.byKey(Key('work-receive-field-value-${xyz.id}')), '124');
+    await tester.ensureVisible(find.byKey(Key('work-receive-field-check-${xyz.id}')));
+    await tester.tap(find.byKey(Key('work-receive-field-check-${xyz.id}'))); await tester.pumpAndSettle();
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tester.pageBack(); await tester.pumpAndSettle();
+    expect(find.text('Discard field changes?'), findsOneWidget);
+    await tester.tap(find.text('Keep editing')); await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(Key('work-receive-field-value-${xyz.id}'))).controller!.text, '124');
+    await tester.scrollUntilVisible(find.byKey(Key('work-receive-field-${removed.id}')), 100,
+      scrollable: find.descendant(of: find.byKey(const Key('work-receive-fields-list')), matching: find.byType(Scrollable)).first);
+    await tester.tap(find.descendant(of: find.byKey(Key('work-receive-field-${removed.id}')),
+      matching: find.byTooltip('Remove printed field'))); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-receive-fields-keep'))); await tester.pumpAndSettle();
+    await waitForCapture();
+    expect(readCopy().extractedFields.singleWhere((f) => f.id == xyz.id).value, '124');
+    expect(readCopy().extractedFields.singleWhere((f) => f.id == xyz.id).reviewed, isTrue);
+    expect(recognizedCopies, 1);
+    await field('work-receive-copy-camera', delta: -140);
+    await tester.ensureVisible(readImage); await tester.pumpAndSettle();
+    expect(readImage.hitTestable(), findsOneWidget);
+    await tester.runAsync(() async { await tester.tap(readImage); await Future<void>.delayed(const Duration(milliseconds: 100)); });
+    await tester.pumpAndSettle(); await waitForCapture();
+    expect(recognizedCopies, 2, reason: 'The second OCR invocation must occur; an ignored tap is not rescan evidence.');
+    expect(readCopy().extractedFields.singleWhere((f) => f.id == xyz.id).value, '124', reason: 'Rescanning the same original must not overwrite owner corrections.');
+    expect(readCopy().extractedFields.where((f) => f.id == xyz.id), hasLength(1));
+    expect(readCopy().extractedFields.any((f) => f.id == removed.id), isFalse,
+      reason: 'Explicitly removed printed fields must remain removed after rescan.');
+    expect(readCopy().dismissedFieldIds, contains(removed.id));
+    await field('work-receive-delivered-0');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-receive-delivered-0'))).controller!.text, isEmpty);
+    final product = work.workspaceCatalogueItems.first;
+    work.workspaceCatalogueItems[0] = product.copyWith(barcode: '00123450007');
+    final stock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+    await field('work-receive-scanner-0', delta: -140);
+    await tester.tap(find.byKey(const Key('work-receive-scanner-0'))); await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-receive-stock-search')), '00123450007');
+    await tester.testTextInput.receiveAction(TextInputAction.done); await tester.pumpAndSettle();
+    await field('work-receive-product-0', delta: -140);
+    expect(find.descendant(of: find.byKey(const Key('work-receive-product-0')),
+      matching: find.text('${product.title} · ${product.pack}')), findsOneWidget);
+    await field('work-receive-delivered-0');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-receive-delivered-0'))).controller!.text, isEmpty);
+    await tester.enterText(find.byKey(const Key('work-receive-delivered-0')), '1');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    // Capture runs in real async. Yield that same zone for its retained autosave
+    // Future chain before asserting persistence of subsequent fake-async input.
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 80)));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-receive-delivered-0'))).controller!.text, '1', reason: 'Quantity must be entered before testing restart.');
+    expect((jsonDecode(forms.drafts[work.supplierReceivingInputFormKey(supplier.id)!]!.fields['input']!) as List)[2][6], '1',
+      reason: 'Autosave must retain the entered quantity before closing.');
+    await tester.tap(find.descendant(of: find.byKey(const Key('work-receive-header')), matching: find.text('Close'))); await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+    work = postingOpeningFixture(entry, checkpoint, moneyStore: forms, capture: capture);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await openReceiving();
+    expect(forms.drafts[work.supplierReceivingInputFormKey(supplier.id)!]!.fields['documents'], isNotEmpty);
+    await field('work-receive-delivered-0');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-receive-delivered-0'))).controller!.text, '1');
+    await field('work-receive-review');
+    await tester.runAsync(() async { await tester.tap(find.byKey(const Key('work-receive-review'))); await Future<void>.delayed(const Duration(milliseconds: 150)); });
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 40 && entry.value!.goodsReceiptDrafts.isEmpty; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pumpAndSettle();
+    }
+    expect(entry.value!.goodsReceiptDrafts, hasLength(1), reason: 'Review must finish saving its local copies before acceptance.');
+    expect(entry.value!.goodsReceiptDrafts.single.documents, hasLength(2));
+    final frozenCopy = entry.value!.goodsReceiptDrafts.single.documents.singleWhere((a) => a.digest == docs.first.digest);
+    expect(frozenCopy.extractedFields.singleWhere((f) => f.id == xyz.id).value, '124');
+    expect(frozenCopy.extractedFields.singleWhere((f) => f.id == xyz.id).reviewed, isTrue);
+    expect(frozenCopy.documentDetails, {'type': 'deliveryChallan', 'title': 'Delivery challan', 'reference': 'PRINTED-DC-77', 'date': '22/10/2026'});
+    expect(forms.drafts[work.supplierReceivingInputFormKey(supplier.id)!]!.fields['copyType'], 'deliveryChallan');
+    await field('work-receive-copy-fields-${docs.first.digest}', delta: -140);
+    await tester.tap(find.byKey(Key('work-receive-copy-fields-${docs.first.digest}'))); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-receive-fields-keep')), findsNothing,
+      reason: 'Frozen receipt copies must not offer editable saved facts.');
+    await tester.scrollUntilVisible(find.byKey(Key('work-receive-field-value-${xyz.id}')), 140,
+      scrollable: find.descendant(of: find.byKey(const Key('work-receive-fields-list')), matching: find.byType(Scrollable)).first);
+    expect(tester.widget<TextField>(find.byKey(Key('work-receive-field-value-${xyz.id}'))).readOnly, isTrue);
+    expect(entry.value!.goodsReceiptDrafts.single.receipt.lines.single.deliveredMilli, 1000);
+    expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
+    expect(work.workspaceSupplierOpeningRecords, isEmpty);
+    // Scope changes redact the document and cannot save into another Store.
+    work.activeWorkspace = null; work.showNotice('Store closed'); await tester.pumpAndSettle();
+    expect(find.byKey(Key('work-receive-field-value-${xyz.id}')), findsNothing);
+    expect(find.byKey(const Key('work-receive-fields-keep')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('PHYSICALSCAN extra xyz fields survive attachment recovery without changing legacy JSON', () {
+    final digest = List.filled(64, 'a').join();
+    final legacy = WorkspacePurchaseInvoiceAttachment(owner: 'host-owner', digest: digest,
+      fileName: 'HOST-copy.png', contentType: 'image/png', byteLength: 20, source: 'camera',
+      detectedText: 'xyz: 123\naaaab: 456');
+    expect(WorkspacePurchaseInvoiceAttachment.fromJson(legacy.toJson()).toJson(), legacy.toJson());
+    final printed = WorkspacePurchaseAdditionalField(id: 'scan-xyz', label: 'xyz', value: '123',
+      section: 'receipt', sourceDigest: digest, sourcePage: 1, reviewed: false);
+    final withFields = {...legacy.toJson(), 'extractedFields': {
+      'version': 1, 'fields': [printed.toJson()], 'overflow': false,
+    }};
+    final restored = WorkspacePurchaseInvoiceAttachment.fromJson(withFields);
+    expect(restored.toJson(), withFields, reason: 'Extra printed fields must be structured saved data, not only an image or OCR string.');
+    expect(legacy.toJson().containsKey('extractedFields'), isFalse);
+    expect(() => WorkspacePurchaseInvoiceAttachment.fromJson({...legacy.toJson(), 'extractedFields': {
+      'version': 1, 'fields': [WorkspacePurchaseAdditionalField(id: 'foreign', label: 'xyz', value: '123',
+        section: 'receipt', sourceDigest: List.filled(64, 'b').join(), sourcePage: 1).toJson()], 'overflow': false,
+    }}), throwsFormatException);
+    final dismissed = restored.withExtractedFields([], dismissed: ['scan-xyz']);
+    expect(WorkspacePurchaseInvoiceAttachment.fromJson(dismissed.toJson()).dismissedFieldIds, ['scan-xyz']);
+    expect(restored.withExtractedFields(restored.extractedFields, dismissed: ['scan-xyz']).valid, isFalse);
+    final largeCopies = [for (var index = 0; index < 3; index++) WorkspacePurchaseInvoiceAttachment(
+      owner: 'host-owner', digest: List.filled(64, '$index').join(), fileName: 'HOST-$index.png',
+      contentType: 'image/png', byteLength: 20, source: 'camera', detectedText: '\u0001' * 60000,
+      extractedFields: [for (var field = 0; field < 4; field++) WorkspacePurchaseAdditionalField(
+        id: 'scan-$field', label: 'xyz$field', value: '\u0001' * 4000, section: 'receipt',
+        sourceDigest: List.filled(64, '$index').join(), sourcePage: 1)])];
+    expect(largeCopies.every((a) => a.valid), isTrue);
+    expect(WorkspaceSupplierGoodsReceiptDraft.validDocuments(largeCopies), isFalse,
+      reason: 'The combined serialized budget must reject oversized metadata before the editor is dismissed.');
+  });
+
+  testWidgets('PHYSICALSCAN PDF page fields preserve originals provenance and atomic failure', (tester) async {
+    await tester.runAsync(() async {
+      final directory = await Directory.systemTemp.createTemp('mool-host-pdf-fields-');
+      try {
+        const scope = ('host-account', 'host-store', true);
+        (String, String, bool)? active = scope;
+        final png = await _catalogueTestPhoto();
+        final bytes = Uint8List.fromList('%PDF-1.4\nHOST CONTRACT FIXTURE ONLY'.codeUnits);
+        final texts = ['xyz: 123\nInvoice total: 100', 'xyz: 456\nInvoice total: 200\nExtra heading = ABC'];
+        var pageCount = 2, rendered = 0, recognized = 0;
+        bool failSecond = false, retire = false;
+        final capture = WorkPurchaseInvoiceCapture(currentScope: () => active, supportDirectory: () async => directory,
+          picker: _ReceivingDocumentPicker((_) async => WorkPickedProof(fileName: 'HOST-original.pdf', contentType: 'application/pdf', bytes: bytes)),
+          renderPdfPage: (_, page) async {
+            rendered++;
+            if (failSecond && page == 1) throw const WorkPdfPreviewException('HOST page failed');
+            return WorkPdfPage(bytes: png, index: page, pageCount: pageCount, width: 2, height: 2);
+          }, recognize: (path) async {
+            expect(await File(path).readAsBytes(), png);
+            final text = texts[recognized++ % 2];
+            if (retire) active = null;
+            return text;
+          });
+        final original = (await capture.capture(scope, 'pdf-arrival', WorkProofSource.upload))!;
+        final scanned = await capture.scan(scope, 'pdf-arrival', original);
+        expect(rendered, 2); expect(recognized, 2);
+        expect(scanned.recognizedTextPages, texts);
+        expect(scanned.extractedFields.where((f) => f.label == 'xyz').map((f) => (f.value, f.sourcePage)), [('123', 1), ('456', 2)]);
+        expect(scanned.extractedFields.every((f) => f.sourceDigest == original.digest), isTrue);
+        final restored = WorkspacePurchaseInvoiceAttachment.fromJson(scanned.toJson());
+        expect(restored.recognizedTextPages, texts);
+        final suggestions = WorkPurchaseInvoiceSuggestions.fromAttachment(restored);
+        expect(suggestions.fields.containsKey('invoiceTotal'), isFalse, reason: 'Conflicting page totals must not be chosen by page order.');
+        expect(suggestions.additionalFields.where((f) => f.label == 'Invoice total').map((f) => (f.value, f.sourcePage)), [('100', 1), ('200', 2)]);
+        expect(suggestions.additionalFields.any((f) => f.label == 'Extra heading' && f.value == 'ABC' && f.sourcePage == 2), isTrue);
+        final fields = scanned.extractedFields.map((f) => f.label == 'xyz' && f.sourcePage == 2
+          ? WorkspacePurchaseAdditionalField(id: f.id, label: f.label, value: '457', section: f.section,
+            sourceDigest: f.sourceDigest, sourcePage: f.sourcePage, reviewed: true) : f).toList();
+        final corrected = scanned.withExtractedFields(fields);
+        final reread = await capture.scan(scope, 'pdf-arrival', corrected);
+        expect(reread.extractedFields.singleWhere((f) => f.label == 'xyz' && f.sourcePage == 2).value, '457');
+        expect(reread.extractedFields.singleWhere((f) => f.label == 'xyz' && f.sourcePage == 2).reviewed, isTrue);
+        final retained = jsonEncode(corrected.toJson());
+        failSecond = true;
+        await expectLater(capture.scan(scope, 'pdf-arrival', corrected), throwsA(isA<WorkGatewayException>()));
+        expect(jsonEncode(corrected.toJson()), retained);
+        failSecond = false; pageCount = 21; recognized = 0;
+        await expectLater(capture.scan(scope, 'pdf-arrival', corrected), throwsA(isA<WorkGatewayException>()));
+        expect(recognized, 0, reason: 'Reject a too-long document before OCR, without partial success.');
+        pageCount = 2; retire = true;
+        await expectLater(capture.scan(scope, 'pdf-arrival', corrected), throwsA(isA<WorkGatewayException>()));
+        active = scope;
+        expect(await capture.read(scope, 'pdf-arrival', original), bytes);
+        expect((await directory.list(recursive: true).toList()).whereType<File>().where((f) => f.path.endsWith('.png')), isEmpty,
+          reason: 'Only transient rendered pages are cleaned; original remains readable.');
+      } finally { await directory.delete(recursive: true); }
+    });
+  });
+
+  test('PHYSICALSCAN original labels and ambiguous text remain structured without invented business values', () {
+    final read = WorkDocumentPrintedFields.read('xyz: 123\naaaab = 456\nbbaaaa  789\nlot\tA-7\nAdditional heading:\nPrinted next-line value\nUnclear text\nxyz: 123');
+    expect(read.fields.map((f) => (f.label, f.value)), [
+      ('xyz', '123'), ('aaaab', '456'), ('bbaaaa', '789'), ('lot', 'A-7'),
+      ('Additional heading', 'Printed next-line value'), ('Printed text', 'Unclear text'), ('xyz', '123'),
+    ]);
+    expect(read.fields.map((f) => f.id).toSet(), hasLength(read.fields.length));
+    expect(read.fields.every((f) => !f.reviewed && f.valid), isTrue);
+    final invoice = WorkPurchaseInvoiceSuggestions.parse('Invoice No: SOURCE-1\nxyz = 123\nAdditional heading:\nPrinted value\nUnclear text');
+    expect(invoice.fields['invoiceReference'], 'SOURCE-1');
+    expect(invoice.additionalFields.map((f) => (f.label, f.value)), containsAll([
+      ('xyz', '123'), ('Additional heading', 'Printed value'), ('Printed text', 'Unclear text'),
+    ]));
+    final long = WorkDocumentPrintedFields.read('Long note: ${'a' * 4500}');
+    expect(long.fields.map((f) => f.value).join(), 'a' * 4500);
+    expect(long.fields.every((f) => f.valid), isTrue);
+    final overflow = WorkDocumentPrintedFields.read(List.generate(201, (i) => 'xyz$i: $i').join('\n'));
+    expect(overflow.fields, hasLength(200)); expect(overflow.overflow, isTrue);
+  });
+
+  test('RECEIVECAPTURE local documents preserve legacy and receipt payload', () {
+    final receipt = WorkspaceSupplierGoodsReceipt(id: 'arrival-doc', expectedDeliveryId: 'delivery-doc',
+      reference: 'DC-7', deliveredOn: '2026-10-20', recordedAt: DateTime.utc(2026, 10, 20), lines: [
+        WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'line-doc', productId: 'stock-doc', productLabel: 'Rice',
+          purchaseUnit: 'Pack', stockUnit: 'Pack', unitsPerPack: 1, deliveredMilli: 1000,
+          acceptedMilli: 1000, damagedMilli: 0, shortMilli: 0)]);
+    final old = WorkspaceSupplierGoodsReceiptDraft(supplierId: 'supplier-doc', revision: 1, receipt: receipt);
+    final payload = jsonEncode(receipt.toJson());
+    expect(old.toJson().containsKey('documents'), isFalse);
+    expect(WorkspaceSupplierGoodsReceiptDraft.fromJson(old.toJson()).documents, isEmpty);
+    final owner = WorkspaceSupplierGoodsReceiptDraft.documentOwner(('account-doc', 'store-doc', true), 'supplier-doc', receipt.id);
+    final attachment = WorkspacePurchaseInvoiceAttachment(owner: owner, digest: 'a' * 64,
+      fileName: 'challan.pdf', contentType: 'application/pdf', byteLength: 100, source: 'upload',
+      documentDetails: const {'type': 'deliveryChallan', 'reference': 'DC-7'});
+    final reviewed = WorkspaceSupplierGoodsReceiptDraft(supplierId: 'supplier-doc', revision: 1,
+      receipt: receipt, documents: [attachment]);
+    expect(reviewed.valid, isTrue);
+    expect(WorkspaceSupplierGoodsReceiptDraft.fromJson(reviewed.toJson()).documents.single.digest, attachment.digest);
+    expect(WorkspaceSupplierGoodsReceiptDraft.fromJson(reviewed.toJson()).documents.single.documentDetails,
+      attachment.documentDetails);
+    expect(jsonEncode(reviewed.receipt.toJson()), payload, reason: 'Local evidence must not alter posting identity.');
+    expect(WorkspaceSupplierGoodsReceiptDraft(supplierId: 'supplier-doc', revision: 1,
+      receipt: receipt, documents: [attachment, attachment]).valid, isFalse);
+    final key = (account: 'account-doc', store: 'store-doc', customer: 'supplier-doc',
+      invoice: 'receiving-input', order: 'receiving-input:qa', kind: 'supplierReceivingInput', ledgerRevision: 1);
+    final fields = {'arrivalId': receipt.id, 'groupId': receipt.expectedDeliveryId,
+      'input': jsonEncode(['DC-7', '2026-10-20', ['line-doc', '', true, '', '1', '', '', '0', '0', <String,String>{}]]),
+      'documents': jsonEncode([attachment.toJson()])};
+    expect(WorkspaceLedgerFormDraft(key: key, revision: 1, fields: fields).valid, isTrue);
+    expect(WorkspaceLedgerFormDraft(key: (account: 'another', store: key.store, customer: key.customer,
+      invoice: key.invoice, order: key.order, kind: key.kind, ledgerRevision: 1), revision: 1, fields: fields).valid, isFalse);
+  });
+
+  for (final mode in ['normal', 'large-text', 'unrelated', 'save-failure', 'scoped-reader', 'scoped-reader-large-text', 'reader-retires', 'navigation-leave-return', 'review', 'server-confirm', 'server-reply', 'server-large-text', 'server-stock-history', 'server-stock-history-large-text', 'server-baseline', 'server-conflict', 'server-partial', 'server-close', 'server-close-reply', 'server-close-recorded', 'server-close-large-text', 'partial', 'completed', 'partial-other-draft', 'completed-other-draft']) {
     testWidgets('LF-RESTOCK-EDITOR original to existing receiving preserves draft and host $mode', (tester) async {
+      final scopedReader = mode.startsWith('scoped-reader');
       // Isolated host evaluation; never device data or production authority.
       FlutterSecureStorage.setMockInitialValues({});
       final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore(), forms = _LedgerFormFixtureStore();
@@ -17590,7 +20824,7 @@ void main() {
         currentStoreId: () => work.activeWorkspace?.id, storeApproved: () => true,
         originalPurchaseReader: () => work.originalPurchaseReader, originalPurchaseRealm: () => work.originalPurchaseRealm,
         bookmarks: _StorePurchaseBookmarks(), stateStoreFactory: (id) => states.putIfAbsent(id, () => _StorePurchaseState(id)),
-        sessionFactory: mode == 'scoped-reader' ? null : (identity, state) {
+        sessionFactory: scopedReader ? null : (identity, state) {
           final core = BuySession(); addTearDown(core.dispose);
           return BuyV2Session(core: core, procurementIdentity: identity, customerStateStore: state,
             purchaseReader: reader, purchaseRealm: 'evaluation', reviewDataEnabled: false,
@@ -17604,7 +20838,7 @@ void main() {
       await reveal(tester, find.byKey(const Key('work-quick-buy')));
       await tester.tap(find.byKey(const Key('work-quick-buy'))); await tester.pumpAndSettle();
       final buy = controller.session!;
-      if (mode != 'scoped-reader') expect(buy.addProduct(buy.visibleProducts.first.id), isTrue);
+      if (!scopedReader) expect(buy.addProduct(buy.visibleProducts.first.id), isTrue);
       final cartBefore = buy.itemCount;
       buy.openOrders(); await tester.pumpAndSettle();
       await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
@@ -17634,8 +20868,62 @@ void main() {
           'groupId': 'host-other-group', 'input': jsonEncode(['Keep unrelated draft', '2026-10-01',
             ['host-other-line', '', true, '', '1', '', '', '0', '0', <String, String>{}]])});
       }
+      final scopedSemantics = scopedReader ? tester.ensureSemantics() : null;
+      try {
+      final buyingRender = tester.renderObject(find.byKey(const ValueKey('work-store-procurement-buy-host')));
+      List<SemanticsNode> exposedNodes() {
+        final nodes = <SemanticsNode>[];
+        void visit(SemanticsNode node) {
+          nodes.add(node); node.visitChildren((child) { visit(child); return true; });
+        }
+        visit(buyingRender.owner!.semanticsOwner!.rootSemanticsNode!);
+        return nodes;
+      }
+      String? receiveLabel;
+      Set<String> storeControls = {};
+      final receivePoint = tester.getCenter(receive);
+      if (scopedReader) {
+        final list = tester.widget<ListView>(find.byKey(const PageStorageKey('buy-orders')));
+        expect(list.semanticChildCount, isNull, reason: 'Sections are not a count of individual orders.');
+        expect((list.childrenDelegate as SliverChildListDelegate).addSemanticIndexes, isFalse);
+        final status = find.byKey(const ValueKey('buy-orders-unavailable'));
+        await reveal(tester, status);
+        expect(exposedNodes().any((node) => node.getSemanticsData().label.contains('Orders could not refresh')), isTrue);
+        final retry = tester.getSemantics(find.byKey(const ValueKey('buy-orders-retry'))).getSemanticsData();
+        expect(retry.hasAction(ui.SemanticsAction.tap), isTrue);
+        expect(retry.label, contains('Try again'));
+        await reveal(tester, receive);
+        receiveLabel = tester.getSemantics(receive).getSemanticsData().label;
+        expect(receiveLabel, isNotEmpty);
+        final actions = exposedNodes().where((node) => node.getSemanticsData().hasAction(ui.SemanticsAction.tap))
+          .map((node) => node.getSemanticsData().label).toSet();
+        storeControls = actions.where((label) => label == 'Open Stock' || label == 'Open Store').toSet();
+        expect(storeControls, isNotEmpty, reason: 'The surrounding Store navigation remains available.');
+      }
       await tester.tap(receive); await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'Opening receiving must retire covered Buy geometry without an accessibility exception.');
       expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
+      if (scopedReader) {
+        final nodes = exposedNodes();
+        final labels = nodes.map((node) => node.getSemanticsData().label).toSet();
+        final actions = nodes.where((node) => node.getSemanticsData().hasAction(ui.SemanticsAction.tap))
+          .map((node) => node.getSemanticsData().label).toSet();
+        expect(actions, isNot(contains(receiveLabel)), reason: 'Covered Buy actions leave accessibility traversal.');
+        expect(labels.any((label) => label.contains('Orders could not refresh')), isFalse);
+        expect(labels, containsAll(storeControls));
+        expect(tester.hitTestOnBinding(receivePoint).path.any((entry) => identical(entry.target, buyingRender)), isFalse);
+        final receiving = find.byKey(const Key('work-goods-receiving'));
+        final surfaceFinder = find.ancestor(of: receiving, matching: find.byType(Material)).first;
+        expect(tester.getRect(surfaceFinder), tester.getRect(find.byKey(const Key('work-store-procurement-screen'))));
+        final surface = tester.widget<Material>(surfaceFinder);
+        expect(surface.color!.a, 1);
+        for (var i = 0; i < 24; i++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab); await tester.pump();
+          expect(FocusManager.instance.primaryFocus?.context?.findAncestorWidgetOfExactType<BuyV2Screen>(), isNull,
+            reason: 'Keyboard focus must not enter a covered buying control.');
+        }
+        FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      }
       if (mode == 'server-baseline' || mode == 'server-conflict') {
         final baseline = find.byKey(const Key('work-receive-stock-baseline'));
         await reveal(tester, baseline); await tester.tap(baseline); await tester.pumpAndSettle();
@@ -17647,8 +20935,13 @@ void main() {
           (await inventory.read(scope.$1, scope.$2, qa: scope.$3))!.products.first.stock);
       }
       final picker = find.byKey(const Key('work-receive-supplier'));
-      await tester.tap(picker); await tester.pumpAndSettle();
-      await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+      if (picker.evaluate().isNotEmpty) {
+        await tester.tap(picker); await tester.pumpAndSettle();
+        await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+      } else {
+        expect(find.byKey(const Key('work-receive-saved-supplier')), findsOneWidget);
+        expect(find.text(supplier.name), findsOneWidget, reason: 'Source-confirmed supplier must retain its exact saved identity.');
+      }
       final key = work.supplierReceivingInputFormKey(supplier.id)!;
       Future<void> receivingField(String key, {double delta = 140}) async {
         final scroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')), matching: find.byType(Scrollable)).first;
@@ -17676,7 +20969,7 @@ void main() {
             await tester.tap(find.byKey(const Key('work-receive-next'))); await tester.pumpAndSettle();
           }
           await receivingField('work-receive-product-0', delta: -140);
-          expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const Key('work-receive-product-0'))).onChanged, isNull);
+          expect(tester.widget<InkWell>(find.byKey(const Key('work-receive-product-0'))).onTap, isNull);
           await receivingField('work-receive-factor-0');
           expect(tester.widget<TextField>(find.byKey(const Key('work-receive-factor-0'))).controller!.text, '2');
           expect(tester.widget<TextField>(find.byKey(const Key('work-receive-factor-0'))).enabled, isFalse);
@@ -17909,6 +21202,11 @@ void main() {
       expect(controller.session, same(buy)); expect(buy.itemCount, cartBefore);
       expect(tester.state(originalTile()), same(originalState));
       expect(find.byKey(const ValueKey('purchase-receive-order-order-v2')), findsOneWidget);
+      if (scopedReader) {
+        await reveal(tester, receive);
+        final restored = tester.getSemantics(receive).getSemanticsData();
+        expect(restored.label, receiveLabel); expect(restored.hasAction(ui.SemanticsAction.tap), isTrue);
+      }
       if (mode != 'unrelated') {
         expect(jsonDecode(forms.drafts[key]!.fields['input']!)[0], 'HOST actual arrival input');
         await reveal(tester, receive); await tester.tap(receive); await tester.pumpAndSettle();
@@ -17938,7 +21236,7 @@ void main() {
         expect(forms.drafts[key]!.fields, savedInput);
         expect(find.byKey(const Key('work-receive-order-context')), findsOneWidget);
         if (mode == 'review') {
-          await receivingField('work-receive-status'); expect(find.text('Saved review · not yet received'), findsOneWidget);
+          await receivingField('work-receive-status'); expect(find.text('Receipt reviewed · Stock unchanged'), findsOneWidget);
         } else {
           await receivingField('work-receive-expected-0');
           expect(tester.widget<TextField>(find.byKey(const Key('work-receive-expected-0'))).enabled, isFalse);
@@ -17946,6 +21244,9 @@ void main() {
       }
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
+      } finally {
+        scopedSemantics?.dispose();
+      }
     });
   }
 
@@ -18184,7 +21485,7 @@ void main() {
       await tester.pumpAndSettle();
       final form = find.descendant(
         of: supplierPicker,
-        matching: find.byType(DropdownButtonFormField<String>),
+        matching: find.byType(FormField<String>),
       );
       expect(
         tester.state<FormFieldState<String>>(form).value,
@@ -18844,8 +22145,8 @@ void main() {
         expect(
           find.text(
             variant == 'unknown-expected'
-                ? 'Total delivered 3 · expected quantity not entered'
-                : 'Total delivered 3 of 3 · pending 0',
+                ? 'Total received 3 · expected quantity not entered'
+                : 'Total received 3 of 3 · pending 0',
           ),
           findsOneWidget,
         );
@@ -19083,7 +22384,8 @@ void main() {
           savedAt: at,
           supplier: supplier,
           draft: draft,
-          labels: const {},
+          labels: recoveryCase == 'settled-retained'
+              ? const {'freeQuantity': 'Printed bonus units'} : const {},
         );
         final opening = WorkspaceSupplierOpeningRecord(
           id: 'matching-ui-opening',
@@ -19361,6 +22663,7 @@ void main() {
           expect(target.hitTestable(), findsOneWidget);
         }
 
+        var checkedOriginalCaption = false;
         Future<void> openCopy() async {
           final row = find.byKey(ValueKey('work-purchase-copy-${copy.id}'));
           for (
@@ -19378,12 +22681,16 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(row);
           await tester.pumpAndSettle();
+          if (recoveryCase == 'settled-retained' && !checkedOriginalCaption) {
+            expect(find.text('Printed bonus units'), findsOneWidget,
+              reason: 'The saved invoice caption wins without mounting its item editor.');
+            checkedOriginalCaption = true;
+          }
+          await openBillActions(tester);
           final match = find.byKey(const Key('work-bill-goods-open'));
           await reveal(match);
-          if (find
-              .descendant(of: match, matching: find.byIcon(Icons.expand_less))
-              .evaluate()
-              .isEmpty) {
+          if (!tester.widgetList<Semantics>(find.descendant(of: match,
+              matching: find.byType(Semantics))).any((state) => state.properties.expanded == true)) {
             await tester.tap(match);
             await tester.pumpAndSettle();
           }
@@ -19430,15 +22737,15 @@ void main() {
                   .text,
               '1',
             );
-            final picker = tester.widget<DropdownButtonFormField<String>>(
+            final picker = tester.widget<FormField<String>>(
               find.descendant(
                 of: find.byKey(const Key('work-receive-supplier')),
-                matching: find.byType(DropdownButtonFormField<String>),
+                matching: find.byType(FormField<String>),
               ),
             );
             expect(
-              picker.onChanged,
-              isNull,
+              picker.enabled,
+              isFalse,
               reason: 'The initiating bill must retain its supplier.',
             );
           } else {
@@ -19489,6 +22796,7 @@ void main() {
             stock,
           );
           final reopenedMatch = find.byKey(const Key('work-bill-goods-open'));
+          await openBillActions(tester);
           await reveal(reopenedMatch);
           await tester.tap(reopenedMatch);
           await tester.pumpAndSettle();
@@ -19505,7 +22813,7 @@ void main() {
                   find.byKey(const Key('work-purchase-goods-status')),
                 )
                 .data,
-            'Goods · matching status unavailable',
+            'Reconciliation status unavailable',
           );
         }
         final item = find
@@ -19642,7 +22950,7 @@ void main() {
           expect(tester.widget<TextButton>(save).onPressed, isNull);
           expect(
             find.text(
-              'Invoice quantity is unclear. Check the supplier bill before matching; it is not treated as zero.',
+              'Invoice quantity is unclear. Check the supplier bill before reconciliation; it is not treated as zero.',
             ),
             findsOneWidget,
           );
@@ -19751,11 +23059,20 @@ void main() {
                 .text,
             '2',
           );
+          final actionsToggle = find.byKey(const Key('purchase-review-fit'));
+          await reveal(actionsToggle);
+          await tester.tap(actionsToggle);
+          await tester.pumpAndSettle();
+          expect(find.text('Leave goods reconciliation?'), findsOneWidget);
+          await tester.tap(find.text('Keep editing'));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-purchase-bill-actions-panel')), findsOneWidget,
+            reason: 'Fit cannot hide unsaved reconciliation quantities; actions remain visible.');
           final close = find.byKey(const Key('work-purchase-copy-close'));
           await reveal(close);
           await tester.tap(close);
           await tester.pumpAndSettle();
-          expect(find.text('Leave goods match?'), findsOneWidget);
+          expect(find.text('Leave goods reconciliation?'), findsOneWidget);
           await tester.tap(find.text('Keep editing'));
           await tester.pumpAndSettle();
           expect(
@@ -19933,7 +23250,7 @@ void main() {
             reason:
                 'Cached fully matched ledger does not prove that review status loaded.',
           );
-          expect(find.text('View received goods'), findsNothing);
+          expect(find.text('Fully reconciled'), findsNothing);
           expect(
             find.byKey(const Key('work-bill-goods-confirm')),
             findsNothing,
@@ -19961,7 +23278,7 @@ void main() {
         expect(
           find.descendant(
             of: summary,
-            matching: find.text('Invoiced: 2 · Free: 0 · Unit: $billPack'),
+            matching: find.text('Invoice qty: 2 · Free qty: 0 · Unit: $billPack'),
           ),
           findsOneWidget,
         );
@@ -19969,7 +23286,7 @@ void main() {
           find.descendant(
             of: summary,
             matching: find.text(
-              'Accepted: 2 · Damaged: 0 · Unit: ${product.pack}',
+              'Accepted qty: 2 · Damaged qty: 0 · Unit: ${product.pack}',
             ),
           ),
           findsOneWidget,
@@ -19978,7 +23295,7 @@ void main() {
           find.descendant(
             of: summary,
             matching: find.text(
-              'Receipt: ${duplicateReceipt == null ? receipt.reference : receiptLabel}',
+              'Receipt ref: ${duplicateReceipt == null ? receipt.reference : receiptLabel}',
             ),
           ),
           findsOneWidget,
@@ -20035,9 +23352,10 @@ void main() {
         );
         expect(find.byKey(const Key('work-bill-goods-save')), findsNothing);
         expect(
-          find.text('View received goods'),
+          find.text('Fully reconciled'),
           freeText == '1' ? findsNothing : findsOneWidget,
         );
+        await openBillPayment(tester);
         expect(
           find.byKey(const Key('work-purchase-record-payment')),
           findsOneWidget,
@@ -20045,6 +23363,7 @@ void main() {
               'Goods matching must not hide the unpaid bill payment action.',
         );
         if (freeText == '1') {
+          await openBillSection(tester, 'Goods');
           final linkedLedger = jsonEncode(
             work.workspaceSupplierLedger(supplier.id)!.toJson(),
           );
@@ -20113,7 +23432,7 @@ void main() {
           await tester.tap(paymentAction);
           await tester.pumpAndSettle();
           Future<void> revealMoney(Finder target) async {
-            await tester.ensureVisible(target);
+            await Scrollable.ensureVisible(tester.element(target), alignment: .5);
             await tester.pumpAndSettle();
             expect(target.hitTestable(), findsOneWidget);
           }
@@ -20616,6 +23935,7 @@ void main() {
       await tester.tap(selectedRow);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-purchase-saved-copy')), findsOneWidget);
+      await openBillActions(tester);
       final confirm = find.byKey(const Key('work-purchase-bill-confirm'));
       if (['unknown', 'other-revision'].contains(mode)) {
         expect(confirm, findsNothing);
@@ -20742,7 +24062,7 @@ void main() {
                 '${work.workspaceSupplierError} / ${find.byKey(const Key('work-purchase-bill-notice')).evaluate().map((e) => (e.widget as Text).data).join()}',
           );
           expect(
-            find.text('Bill confirmed in supplier account'),
+            find.text('Posted to supplier ledger'),
             findsOneWidget,
           );
           expect(
@@ -20751,7 +24071,7 @@ void main() {
                   find.byKey(const Key('work-purchase-bill-notice')),
                 )
                 .data,
-            'Bill confirmed in supplier account. Confirming the bill does not change Stock or record a payment.',
+            'Posted to supplier ledger. Confirming the bill does not change Stock or record a payment.',
             reason:
                 'Confirmation describes its own effects, not whether goods have been recorded or matched.',
           );
@@ -20777,6 +24097,7 @@ void main() {
             );
           }
           if (mode.startsWith('read-only')) {
+            await openBillPayment(tester);
             expect(
               find.byKey(const Key('work-purchase-record-payment')),
               findsNothing,
@@ -20791,15 +24112,18 @@ void main() {
                     find.byKey(const Key('work-purchase-payment-status')),
                   )
                   .data,
-              'Bill due ₹100',
+              'Bill outstanding ₹100',
             );
           }
-          final billAccount = find.text('Supplier account');
+          final billAccount = find.text('Supplier ledger');
           await tester.ensureVisible(billAccount);
           await tester.pumpAndSettle();
           await tester.tap(billAccount);
           await tester.pumpAndSettle();
           expect(find.text('Entries linked to this bill'), findsOneWidget);
+          expect(tester.getTopLeft(find.text('Entries linked to this bill')).dx,
+            closeTo(tester.getTopLeft(find.byKey(const Key('work-purchase-bill-actions-panel'))).dx, .01),
+            reason: 'Expanded ledger detail retains its readable full-width body below the compact tab.');
           expect(
             find.byKey(const Key('supplier-ledger-starting-balance')),
             findsNothing,
@@ -20816,7 +24140,7 @@ void main() {
           await tester.tap(match);
           await tester.pumpAndSettle();
           final unmapped = find.text(
-            'This accepted bill has no saved product links. Do not guess matches by item name; review the product mapping first.',
+            'This posted bill has no saved product links. Review the product mapping before reconciling quantities.',
           );
           if (unmapped.evaluate().isEmpty) {
             await tester.scrollUntilVisible(
@@ -21109,6 +24433,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(entry.value!.openingRecords.single.amountMinor, isNull);
       expect(entry.value!.openingRecords.single.bills, isEmpty);
+      await revealOpening(tester, find.byKey(const Key('work-opening-posting-status')), delta: -120);
       expect(
         find.text('Supplier account status unavailable'),
         findsOneWidget,
@@ -21163,8 +24488,8 @@ void main() {
         await purchaseRegisterAction(tester, 'work-purchase-opening'),
       );
       await tester.pumpAndSettle();
-      await revealOpening(tester, find.byType(DropdownButtonFormField<String>));
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await revealOpening(tester, find.byKey(const Key('work-opening-supplier-picker')));
+      await tester.tap(find.byKey(const Key('work-opening-supplier-picker')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Evaluation opening supplier').last);
       await tester.pumpAndSettle();
@@ -21331,7 +24656,7 @@ void main() {
         await purchaseRegisterAction(tester, 'work-purchase-opening'),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byKey(const Key('work-opening-supplier-picker')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Evaluation supplier A').last);
       await tester.pumpAndSettle();
@@ -21347,22 +24672,19 @@ void main() {
       );
       await revealOpening(
         tester,
-        find.byType(DropdownButtonFormField<String>),
+        find.byKey(const Key('work-opening-supplier-picker')),
         delta: -120,
       );
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byKey(const Key('work-opening-supplier-picker')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Evaluation supplier B').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Keep editing'));
       await tester.pumpAndSettle();
       expect(
-        tester
-            .widget<DropdownButtonFormField<String>>(
-              find.byType(DropdownButtonFormField<String>),
-            )
-            .initialValue,
-        'test-A',
+        find.descendant(of: find.byKey(const Key('work-opening-supplier-picker')),
+          matching: find.text('Evaluation supplier A')),
+        findsOneWidget,
       );
       expect(
         tester
@@ -22141,7 +25463,7 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('work-purchase-documentType')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tax invoice').last);
+    await tester.tap(find.text('GST tax invoice').last);
     await tester.pumpAndSettle();
     expect(
       find.text('Check invoice number: up to 16 letters, digits, / or -.'),
@@ -22614,7 +25936,8 @@ void main() {
     'P05-MATCH editor saves zero-stock product and exact draft linkage',
     (tester) async {
       final entry = _PurchaseEntryFixtureStore();
-      final work = manualPurchaseFixture(entry);
+      final inventory = _PurchaseInventoryFixtureStore();
+      final work = manualPurchaseFixture(entry, inventory: inventory);
       final products = List.of(work.workspaceCatalogueItems);
       final finance = work.workspaceFinance;
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
@@ -22671,6 +25994,10 @@ void main() {
       expect(product.stock, 0);
       expect(product.available, isFalse);
       expect(product.publicListing, isFalse);
+      final scope = work.workspaceSupplierScope!;
+      final persisted = await inventory.read(scope.$1, scope.$2, qa: scope.$3);
+      expect(persisted!.products.singleWhere((p) => p.id == product.id).toInventoryJson(),
+        product.toInventoryJson(), reason: 'Return only after the exact zero-Stock product is saved.');
       expect(
         work.workspaceCatalogueItems.where((p) => p.id != product.id),
         orderedEquals(products),
@@ -22805,16 +26132,29 @@ void main() {
             .byWidgetPredicate(
               (w) =>
                   w is TextField &&
-                  w.decoration?.labelText == 'Heading on bill',
+                  w.decoration?.labelText == 'Field name as printed',
             )
             .last;
         final content = find
             .byWidgetPredicate(
               (w) =>
                   w is TextField &&
-                  w.decoration?.labelText == 'Details on bill',
+                  w.decoration?.labelText == 'Value as printed',
             )
             .last;
+        final example = switch (owner.split('-').first) {
+          'supplier' => ('Supplier code', 'SUP-104'),
+          'buyer' => ('Customer code', 'CUST-104'),
+          'items' => ('Grade', 'A'),
+          'tax' => ('Exempt amount', '250.00'),
+          'receipt' => ('LR number', 'LR-104'),
+          'payment' => ('Credit period', '30 days'),
+          _ => ('Dispatch reference', 'DSP-104'),
+        };
+        expect(tester.widget<TextField>(name).decoration!.hintText, 'e.g. ${example.$1}');
+        expect(tester.widget<TextField>(content).decoration!.hintText, 'e.g. ${example.$2}');
+        expect(tester.widget<TextField>(name).controller!.text, isEmpty);
+        expect(tester.widget<TextField>(content).controller!.text, isEmpty);
         await revealPurchaseInput(tester, name);
         await tester.enterText(name, label);
         await revealPurchaseInput(tester, content);
@@ -22993,7 +26333,7 @@ void main() {
         await open('work-purchase-extra-invoice-all-all');
         await open('work-purchase-add-extra-invoice-all-all');
         final value = find.byWidgetPredicate(
-          (w) => w is TextField && w.decoration?.labelText == 'Details on bill',
+          (w) => w is TextField && w.decoration?.labelText == 'Value as printed',
         );
         await revealPurchaseInput(tester, value);
         await tester.enterText(value, 'Long printed detail ' * 15);
@@ -23045,10 +26385,10 @@ void main() {
         await tester.pumpAndSettle();
       }
       final name = find.byWidgetPredicate(
-        (w) => w is TextField && w.decoration?.labelText == 'Heading on bill',
+        (w) => w is TextField && w.decoration?.labelText == 'Field name as printed',
       );
       final value = find.byWidgetPredicate(
-        (w) => w is TextField && w.decoration?.labelText == 'Details on bill',
+        (w) => w is TextField && w.decoration?.labelText == 'Value as printed',
       );
       await revealPurchaseInput(tester, name);
       await tester.enterText(name, 'Long field');
@@ -23219,10 +26559,10 @@ void main() {
   test(
     'P05-R11-C02 supplier headings preserve source titles and do not infer tax status',
     () {
-      expect(storePurchaseDocumentTypeLabel('GST invoice'), 'Tax invoice');
+      expect(storePurchaseDocumentTypeLabel('GST invoice'), 'GST tax invoice');
       expect(
         storePurchaseDocumentTypeLabel('Other bill'),
-        'Other supplier bill',
+        'Other supplier invoice',
       );
       expect(
         storePurchaseDocumentTypeLabel('Source-specific document'),
@@ -23232,6 +26572,8 @@ void main() {
         ('GST invoice', 'TAX INVOICE'),
         ('Tax invoice', 'TAX INVOICE'),
         ('Bill of supply', 'BILL OF SUPPLY'),
+        ('Invoice-cum-bill of supply', 'INVOICE-CUM-BILL OF SUPPLY'),
+        ('Non-GST purchase bill', 'SUPPLIER BILL'),
         ('Other bill', 'SUPPLIER INVOICE'),
         ('', 'SUPPLIER INVOICE'),
       ]) {
@@ -23356,18 +26698,18 @@ void main() {
               )
               .decoration!
               .labelText,
-          'Supplier invoice No.',
+          'Supplier invoice number',
         );
         final choice = tester.widget<DropdownButtonFormField<String>>(
           find.byKey(const Key('work-purchase-documentType')),
         );
         expect(choice.initialValue, type);
-        expect(choice.decoration.labelText, 'Supplier document type');
+        expect(choice.decoration.labelText, 'Document type');
         if (type == 'GST invoice') {
           expect(
             find.descendant(
               of: find.byKey(const Key('work-purchase-documentType')),
-              matching: find.text('Tax invoice'),
+              matching: find.text('GST tax invoice'),
             ),
             findsWidgets,
           );
@@ -23751,6 +27093,37 @@ void main() {
     );
   }
 
+  test('P05-OFFICIAL recorded invoice provenance and type checks preserve unknown source facts', () {
+    final at = DateTime.utc(2026, 10, 24);
+    final draft = WorkspacePurchaseEntryDraft(id: 'host-official-record', supplierId: 'host-official-supplier',
+      invoiceReference: 'HOST-1', invoiceDate: '24/10/2026', createdAt: at, updatedAt: at,
+      goods: const [], details: const {'documentType': 'Other bill', 'taxTreatment': 'No tax'});
+    final before = jsonEncode(draft.toJson());
+    expect(storePurchaseOriginalAvailability(draft), 'No supplier invoice copy attached.');
+    for (final (details, expected) in [
+      (<String, String>{}, 'Supplier invoice copy attached separately.'),
+      ({'type': 'supplierInvoice'}, 'Supplier invoice copy attached separately.'),
+      ({'title': 'Supplier letter', 'reference': 'REF-1'}, 'No supplier invoice copy attached.'),
+      ({'type': 'paymentReceipt'}, 'No supplier invoice copy attached.'),
+    ]) {
+      final attached = WorkspacePurchaseEntryDraft(id: draft.id, supplierId: draft.supplierId,
+        invoiceReference: draft.invoiceReference, invoiceDate: draft.invoiceDate,
+        createdAt: at, updatedAt: at, goods: const [], attachments: [WorkspacePurchaseInvoiceAttachment(
+          owner: 'HOST-original-owner', digest: List.filled(64, 'a').join(), fileName: 'HOST-copy.png',
+          contentType: 'image/png', byteLength: 100, source: 'upload', documentDetails: details)]);
+      expect(storePurchaseOriginalAvailability(attached), expected);
+    }
+    expect(storePurchaseUnconfirmedDocumentGuide('Other bill'), isNotNull);
+    expect(storePurchaseUnconfirmedDocumentGuide(''), isNotNull);
+    for (final type in ['GST invoice', 'Tax invoice', 'Bill of supply', 'Invoice-cum-bill of supply', 'Non-GST purchase bill']) {
+      expect(storePurchaseUnconfirmedDocumentGuide(type), isNull);
+    }
+    expect(storePurchaseCopyDetailLabel('taxTreatment', 'GST type', isSavedCopy: true), 'GST treatment recorded');
+    expect(WorkspacePurchaseEntryDraft.reviewInvoiceFormat('INVALID NUMBER OVER 16', '31/02/2026', 'Tax invoice'), hasLength(2));
+    expect(jsonEncode(draft.toJson()), before);
+    expect(StorePurchaseAccountingSnapshot.unavailable.copyExplanation, isNot(contains('Supplier copy kept separately')));
+  });
+
   test('P05-R12-C05 PDF text continuations preserve separators and words', () {
     for (final source in [
       '',
@@ -24035,8 +27408,500 @@ void main() {
     },
   );
 
+  test('P05-DOC supporting copy details survive read and field editing without changing the original', () {
+    final original = WorkspacePurchaseInvoiceAttachment(owner: 'host-private-owner', digest: 'a' * 64,
+      fileName: 'challan.jpg', contentType: 'image/jpeg', byteLength: 100, source: 'camera');
+    final legacy = original.toJson();
+    final raw = {...legacy, 'documentDetails': {'version': 1, 'type': 'deliveryChallan',
+      'title': 'DELIVERY CHALLAN', 'reference': 'DC/23', 'date': '23/10/2026'}};
+    final restored = WorkspacePurchaseInvoiceAttachment.fromJson(raw);
+    expect(restored.toJson(), raw);
+    expect(restored.withText('Package count: 4').toJson()['documentDetails'], raw['documentDetails']);
+    expect(restored.withExtractedFields(const []).toJson()['documentDetails'], raw['documentDetails']);
+    expect(WorkspacePurchaseInvoiceAttachment.fromJson(legacy).toJson(), legacy);
+    expect(restored.owner, original.owner);
+    expect(restored.digest, original.digest);
+    expect(storeTradeDocumentGuidance.keys.toSet(), WorkspacePurchaseInvoiceAttachment.documentTypes);
+    for (final malformed in [
+      {'version': 2, 'type': 'deliveryChallan'},
+      {'version': 1, 'type': 'inventedType'},
+      {'version': 1, 'type': 'deliveryChallan', 'reference': 12},
+      {'version': 1, 'type': 'deliveryChallan', 'extra': 'Unrecognised'},
+      {'version': 1, 'type': 'deliveryChallan', 'reference': 'a' * 121},
+    ]) {
+      expect(() => WorkspacePurchaseInvoiceAttachment.fromJson({...legacy, 'documentDetails': malformed}), throwsFormatException);
+    }
+  });
+
+  test('TRADELINES purchase and receiving retain every item beyond old count caps', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    FlutterSecureStorage.setMockInitialValues({});
+    final at = DateTime.utc(2026, 10, 23);
+    final goods = List.generate(241, (i) => <String, String>{'productId': '', 'name': 'Host item $i',
+      'pack': 'Pack', 'quantity': '1', 'cost': '10'});
+    final draft = WorkspacePurchaseEntryDraft(id: 'host-many-items', supplierId: 'host-supplier',
+      invoiceReference: 'HOST-241', invoiceDate: '23/10/2026', createdAt: at, updatedAt: at, goods: goods);
+    expect(draft.valid, isTrue);
+    expect(WorkspacePurchaseEntryDraft.fromJson(jsonDecode(jsonEncode(draft.toJson()))).goods, goods);
+    final receipt = WorkspaceSupplierGoodsReceipt(id: 'host-arrival', expectedDeliveryId: 'host-delivery',
+      reference: 'HOST-241', deliveredOn: '2026-10-23', recordedAt: at,
+      lines: List.generate(241, (i) => WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'host-line-$i',
+        productId: 'host-stock-$i', productLabel: 'Host item $i', purchaseUnit: 'Pack', stockUnit: 'Pack',
+        unitsPerPack: 1, deliveredMilli: 1000, acceptedMilli: 1000, damagedMilli: 0, shortMilli: 0)));
+    expect(receipt.valid, isTrue);
+    expect(WorkspaceSupplierGoodsReceipt.fromJson(jsonDecode(jsonEncode(receipt.toJson()))).lines.map((l) => l.sourceLineId),
+      receipt.lines.map((l) => l.sourceLineId));
+    final key = (account: 'account-doc', store: 'store-doc', customer: 'host-supplier', invoice: 'receiving-input',
+      order: 'receiving-input:qa', kind: 'supplierReceivingInput', ledgerRevision: 1);
+    final input = jsonEncode(['HOST-241', '2026-10-23', for (var i = 0; i < 241; i++)
+      ['host-line-$i', '', true, 'Pack', '1', '', '1', '0', '0', <String, String>{}]]);
+    final fields = {'arrivalId': receipt.id, 'groupId': receipt.expectedDeliveryId, 'input': input};
+    expect(WorkspaceLedgerFormDraft(key: key, revision: 1, fields: fields).valid, isTrue);
+    final tooLarge = jsonEncode(['HOST-LARGE', '2026-10-23', for (var i = 0; i < 1000; i++)
+      ['host-line-$i', '', true, 'P' * 500, '1', '', '1', '0', '0', <String, String>{}]]);
+    expect(WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {...fields, 'input': tooLarge}).valid, isFalse);
+    expect((jsonDecode(tooLarge) as List).length, 1002, reason: 'Capacity rejection must not truncate the supplied input.');
+    final text = 'Item | Qty | Rate\n${List.generate(241, (i) => 'Host item $i | 1 | 10').join('\n')}';
+    expect(WorkPurchaseInvoiceSuggestions.parse(text).goods.length, 241);
+    final supplier = WorkspaceSupplierProfile(id: 'host-supplier', name: 'Host many-item supplier', createdAt: at, updatedAt: at);
+    final copy = WorkspacePurchaseSavedCopy(id: 'host-copy', storeName: 'Host Store', revision: 1,
+      savedAt: at, supplier: supplier, draft: draft, labels: const {});
+    final book = WorkspacePurchaseEntryBook(account: key.account, store: key.store, qa: true, revision: 1,
+      profiles: [supplier], draft: draft, copies: [copy], goodsReceiptDrafts: [
+        WorkspaceSupplierGoodsReceiptDraft(supplierId: supplier.id, revision: 1, receipt: receipt)]);
+    final store = SecureWorkPurchaseEntryStore(accountScope: () => key.account, storage: const FlutterSecureStorage());
+    await store.save(book, expectedRevision: null);
+    final restored = (await store.read(key.account, key.store, qa: true))!;
+    expect(restored.draft!.goods, goods);
+    expect(restored.copies.single.draft.goods, goods);
+    expect(restored.goodsReceiptDrafts.single.receipt.lines.map((line) => line.sourceLineId),
+      receipt.lines.map((line) => line.sourceLineId));
+    final pdf = await generateStorePurchaseRecordedCopy(draft: restored.draft!, supplier: supplier,
+      storeName: 'Host Store', storeId: key.store, revision: 1, labels: const {});
+    expect(ascii.decode(pdf.take(5).toList()), '%PDF-');
+  });
+
+  testWidgets('TRADELINES purchase adds beyond200 saves and reopens every row', (tester) async {
+    final entry = _PurchaseEntryFixtureStore(), work = manualPurchaseFixture(entry);
+    final scope = work.workspaceSupplierScope!, at = DateTime.utc(2026, 10, 23);
+    final supplier = WorkspaceSupplierProfile(id: 'host-many-bill-supplier', name: 'Host many bill supplier', createdAt: at, updatedAt: at);
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1,
+      profiles: [supplier], draft: WorkspacePurchaseEntryDraft(id: 'host-many-bill', supplierId: supplier.id,
+        invoiceReference: 'HOST-MANY-BILL', invoiceDate: '23/10/2026', createdAt: at, updatedAt: at,
+        goods: List.generate(201, (i) => {'productId': '', 'name': 'Host original $i', 'pack': 'Pack', 'quantity': '1', 'cost': '10'})));
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await usePurchaseControl(tester, 'work-purchase-record');
+    final add = find.byKey(const Key('work-purchase-add-line'));
+    expect(add.hitTestable(), findsOneWidget);
+    await tester.tap(add); await tester.pumpAndSettle();
+    final last = find.byKey(const Key('work-purchase-item-201'));
+    expect(last.hitTestable(), findsOneWidget, reason: 'A new manual bill item must be revealed.');
+    await tester.enterText(last, 'x' * 201);
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await usePurchaseControl(tester, 'work-purchase-draft-save');
+    expect(find.byKey(const Key('work-purchase-entry-error')).hitTestable(), findsOneWidget,
+      reason: 'A large form must build and reveal its save error.');
+    expect(entry.value!.draft!.goods, hasLength(201), reason: 'Invalid edit must not replace saved data.');
+    final editScroll = find.descendant(of: find.byKey(const Key('work-record-purchase')),
+      matching: find.byType(Scrollable)).first;
+    await tester.scrollUntilVisible(last, -400, scrollable: editScroll, maxScrolls: 300);
+    await tester.pumpAndSettle();
+    await tester.enterText(last, 'Host added manually');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await usePurchaseControl(tester, 'work-purchase-draft-save');
+    expect(entry.value!.draft!.goods, hasLength(202));
+    expect(entry.value!.draft!.goods.first['name'], 'Host original 0');
+    expect(entry.value!.draft!.goods[200]['name'], 'Host original 200');
+    expect(entry.value!.draft!.goods.last['name'], 'Host added manually');
+    expect(entry.value!.copies, isEmpty);
+    await usePurchaseControl(tester, 'work-purchase-record');
+    await usePurchaseControl(tester, 'work-purchase-items-section');
+    // Reopened items are lazy: reveal the saved last row before inspecting it.
+    final itemScroll = find.descendant(of: find.byKey(const Key('work-record-purchase')),
+      matching: find.byType(Scrollable)).first;
+    await tester.scrollUntilVisible(last, 4000, scrollable: itemScroll, maxScrolls: 300);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(last).controller!.text, 'Host added manually');
+    expect(add.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('TRADELINES purchase retains edits across lazy rendering boundary both ways', (tester) async {
+    final entry = _PurchaseEntryFixtureStore(), work = manualPurchaseFixture(entry);
+    final scope = work.workspaceSupplierScope!, at = DateTime.utc(2026, 10, 23);
+    final supplier = WorkspaceSupplierProfile(id: 'host-boundary-supplier', name: 'Host boundary supplier', createdAt: at, updatedAt: at);
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1,
+      profiles: [supplier], draft: WorkspacePurchaseEntryDraft(id: 'host-boundary-bill', supplierId: supplier.id,
+        invoiceReference: 'HOST-BOUNDARY', invoiceDate: '23/10/2026', createdAt: at, updatedAt: at,
+        goods: List.generate(20, (i) => {'productId': '', 'name': 'Original $i', 'pack': 'Pack', 'quantity': '1', 'cost': '10'})));
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await usePurchaseControl(tester, 'work-purchase-record');
+    await usePurchaseControl(tester, 'work-purchase-items-section');
+    final previous = find.byKey(const Key('work-purchase-item-19'));
+    await revealPurchaseInput(tester, previous, delta: 2000);
+    await tester.enterText(previous, 'Edited before adding');
+    final add = find.byKey(const Key('work-purchase-add-line'));
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tester.tap(add); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-item-20')).hitTestable(), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-purchase-remove-item-20'))); await tester.pumpAndSettle();
+    await usePurchaseControl(tester, 'work-purchase-draft-save');
+    expect(entry.value!.draft!.goods, hasLength(20));
+    expect(entry.value!.draft!.goods.last['name'], 'Edited before adding');
+    expect(entry.value!.draft!.goods.first['name'], 'Original 0');
+    expect(entry.value!.copies, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final display in [(const Size(360, 800), 1.0), (const Size(320, 568), 2.0)]) {
+    testWidgets('TRADELINES receiving Add item stays reachable and restores growing draft $display', (tester) async {
+      final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore(), forms = _LedgerFormFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+      final scope = work.workspaceSupplierScope!, at = DateTime.utc(2026, 10, 23);
+      final supplier = WorkspaceSupplierProfile(id: 'host-growing-supplier', name: 'Host growing supplier', createdAt: at, updatedAt: at);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1, profiles: [supplier]);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work, viewport: display.$1, textScale: display.$2);
+      await openPurchaseList(tester);
+      final key = work.supplierReceivingInputFormKey(supplier.id)!;
+      forms.drafts[key] = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {
+        'arrivalId': 'host-growing-arrival', 'groupId': 'host-growing-delivery',
+        'input': jsonEncode(['HOST-GROWING', '2026-10-23',
+          ['host-original-1', '', true, '', '1', '', '2', '0', '0', <String, String>{}],
+          ['host-original-2', '', true, '', '1', '', '3', '0', '0', <String, String>{}]])});
+      Future<void> open() async {
+        await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-receive-goods')); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-receive-supplier'))); await tester.pumpAndSettle();
+        await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+      }
+      await open();
+      final add = find.byKey(const Key('work-receive-add-line'));
+      for (var i = 0; i < 4; i++) {
+        expect(add.hitTestable(), findsOneWidget, reason: 'Add must stay reachable without scrolling past every item.');
+        expect(tester.getSize(add).height, greaterThanOrEqualTo(48));
+        await tester.tap(add); await tester.pumpAndSettle();
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 60))); await tester.pumpAndSettle();
+        expect(find.text('Item ${i + 3}').hitTestable(), findsOneWidget, reason: 'Reveal the newly added row.');
+        expect(tester.takeException(), isNull);
+      }
+      final rows = jsonDecode(forms.drafts[key]!.fields['input']!) as List;
+      expect(rows, hasLength(8));
+      expect((rows[2] as List)[0], 'host-original-1'); expect((rows[2] as List)[6], '2');
+      expect((rows[3] as List)[0], 'host-original-2'); expect((rows[3] as List)[6], '3');
+      expect(rows.skip(2).map((r) => (r as List)[0]).toSet(), hasLength(6));
+      await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
+      await open();
+      expect(add.hitTestable(), findsOneWidget);
+      expect(jsonDecode(forms.drafts[key]!.fields['input']!) as List, rows);
+      expect(entry.value!.goodsReceiptDrafts, isEmpty); expect(work.workspacePurchases, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final details in [const {'type': 'deliveryChallan'}, const {'reference': 'UNCLASSIFIED-77'}]) {
+    testWidgets('B2BDOC supporting copy cannot fill bill after scan reopen or cancelled edit $details', (tester) async {
+      final bytes = (await tester.runAsync(_catalogueTestPhoto))!;
+      final entry = _PurchaseEntryFixtureStore(), capture = _PurchaseScanReviewFixture(bytes);
+      final work = storeViewFixture(null, _ContactDraftFixtureStore(), null, null, null, null, null, null, null, entry, capture);
+      final scope = work.workspaceSupplierScope!, at = DateTime.utc(2026, 10, 23), digest = 'b' * 64;
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1,
+        profiles: [WorkspaceSupplierProfile(id: 'host-doc-supplier', name: 'Host document supplier', createdAt: at, updatedAt: at)],
+        draft: WorkspacePurchaseEntryDraft(id: 'draft-fixture', supplierId: 'host-doc-supplier',
+          invoiceReference: 'ORIGINAL-BILL-77', invoiceDate: '', createdAt: at, updatedAt: at,
+          goods: const [{'productId': '', 'name': 'Original item', 'pack': '1 kg', 'quantity': '2', 'cost': '50'}],
+          attachments: [WorkspacePurchaseInvoiceAttachment(owner: jsonEncode([scope.$1, scope.$2, scope.$3, 'draft-fixture']),
+            digest: digest, fileName: 'Host supporting copy.png', contentType: 'image/png', byteLength: bytes.length,
+            source: 'upload', documentDetails: details)]));
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await openPurchaseList(tester);
+      Future<void> open() async {
+        await usePurchaseControl(tester, 'work-purchase-record');
+        await usePurchaseControl(tester, 'work-purchase-document-$digest');
+      }
+      await open();
+      for (var reopen = 0; reopen < 2; reopen++) {
+        await usePurchaseControl(tester, 'work-purchase-read-$digest');
+        expect(find.byKey(Key('work-purchase-use-$digest')), findsNothing);
+        expect(find.byKey(Key('work-purchase-support-fields-$digest')), findsOneWidget);
+        expect(find.textContaining('Check the bill number, items and amounts against the supplier invoice.'), findsOneWidget);
+        await usePurchaseControl(tester, 'work-purchase-draft-save');
+        expect(entry.value!.draft!.invoiceReference, 'ORIGINAL-BILL-77');
+        expect(entry.value!.draft!.goods.single['name'], 'Original item');
+        expect(entry.value!.draft!.additionalFields, isEmpty);
+        expect(entry.value!.draft!.attachments.single.documentDetails, details);
+        expect(entry.value!.copies, isEmpty);
+        await open();
+      }
+      await usePurchaseControl(tester, 'work-purchase-copy-details-$digest');
+      await tester.enterText(find.byKey(const Key('trade-document-reference')), 'UNSAVED-CHANGE');
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel').last); await tester.pumpAndSettle();
+      await usePurchaseControl(tester, 'work-purchase-draft-save');
+      expect(entry.value!.draft!.attachments.single.documentDetails, details);
+      await open();
+      await usePurchaseControl(tester, 'work-purchase-copy-details-$digest');
+      work.activeWorkspace = null; work.notifyListeners(); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('trade-document-keep')), findsNothing);
+      expect(find.text('Host supporting copy.png'), findsNothing);
+      expect(find.byKey(const Key('trade-document-reference')), findsNothing);
+      expect(entry.value!.draft!.attachments.single.documentDetails, details);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final display in [(const Size(360, 800), 1.0), (const Size(320, 568), 2.0)]) {
+    testWidgets('B2BDOC receiving purpose selector filters and preserves draft $display', (tester) async {
+      final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore(), forms = _LedgerFormFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+      final scope = work.workspaceSupplierScope!, at = DateTime.utc(2026, 10, 23);
+      final supplier = WorkspaceSupplierProfile(id: 'host-purpose-supplier', name: 'Host purpose supplier', createdAt: at, updatedAt: at);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1, profiles: [supplier]);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work, viewport: display.$1, textScale: display.$2);
+      await openPurchaseList(tester);
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-receive-goods')); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-receive-supplier'))); await tester.pumpAndSettle();
+      await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+      final field = find.byKey(const Key('work-receive-copy-type'));
+      final scroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')), matching: find.byType(Scrollable)).first;
+      await tester.scrollUntilVisible(field, 100, scrollable: scroll);
+      await Scrollable.ensureVisible(tester.element(field), alignment: .5); await tester.pumpAndSettle();
+      expect(tester.getSize(field).height, greaterThanOrEqualTo(48),
+        reason: 'The compact document selector must retain its touch target.');
+      expect(field.hitTestable(), findsOneWidget);
+      await tester.tap(field); await tester.pumpAndSettle();
+      final search = find.byKey(const Key('trade-document-search'));
+      await tester.enterText(search, 'Bilty');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('trade-document-option-paymentAdvice')), findsNothing);
+      final option = find.byKey(const ValueKey('trade-document-option-transportReceipt'));
+      final pickerScroll = find.descendant(of: find.byKey(const Key('trade-document-options')), matching: find.byType(Scrollable)).first;
+      await tester.scrollUntilVisible(option, 60, scrollable: pickerScroll);
+      expect(tester.takeException(), isNull);
+      tester.view.viewInsets = const FakeViewPadding();
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      await tester.ensureVisible(option);
+      await tester.tap(option); await tester.pumpAndSettle();
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pumpAndSettle();
+      final key = work.supplierReceivingInputFormKey(supplier.id)!;
+      expect(forms.drafts[key]!.fields['copyType'], 'transportReceipt');
+      expect(entry.value!.goodsReceiptDrafts, isEmpty);
+      expect(work.workspacePurchases, isEmpty);
+      await tester.ensureVisible(field); await tester.tap(field); await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel').last); await tester.pumpAndSettle();
+      expect(forms.drafts[key]!.fields['copyType'], 'transportReceipt');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final display in [(const Size(360, 800), 1.0), (const Size(320, 568), 2.0)]) {
+  testWidgets('P05-DOC supplier document selector offers clear bill use cases $display', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry),
+      viewport: display.$1, textScale: display.$2);
+    await openPurchaseList(tester);
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
+    await tester.pumpAndSettle();
+    await usePurchaseControl(tester, 'work-purchase-invoice-section');
+    await usePurchaseControl(tester, 'work-purchase-documentType');
+    for (final raw in ['GST invoice', 'Bill of supply', 'Invoice-cum-bill of supply', 'Non-GST purchase bill', 'Other bill']) {
+      final option = find.byKey(ValueKey('purchase-document-option-$raw'));
+      await tester.scrollUntilVisible(option, 80, scrollable: find.byType(Scrollable).last);
+      expect(option, findsOneWidget);
+      await tester.ensureVisible(option);
+      await tester.pumpAndSettle();
+      expect(find.descendant(of: option, matching: find.text(storePurchaseDocumentTypeUseCase(raw))), findsOneWidget);
+      for (final paragraph in find.descendant(of: option, matching: find.byType(RichText)).evaluate()) {
+        expect((paragraph.renderObject! as RenderParagraph).didExceedMaxLines, isFalse, reason: raw);
+      }
+    }
+    final combined = find.byKey(const ValueKey('purchase-document-option-Invoice-cum-bill of supply'));
+    await tester.scrollUntilVisible(combined, -80, scrollable: find.byType(Scrollable).last);
+    await Scrollable.ensureVisible(tester.element(combined), alignment: .5);
+    await tester.pumpAndSettle();
+    await tester.tap(combined);
+    await tester.pumpAndSettle();
+    expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const Key('work-purchase-documentType'))).initialValue,
+      'Invoice-cum-bill of supply');
+    expect(find.byKey(const Key('work-purchase-combined-buyer-check')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  }
+
+  testWidgets('P05-DOC document changes retain tax facts and payment state', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry));
+    await openPurchaseList(tester);
+    await usePurchaseControl(tester, 'work-purchase-record');
+    await usePurchaseControl(tester, 'work-purchase-invoice-section');
+    Future<void> choose(String key, String value) async {
+      await usePurchaseControl(tester, 'work-purchase-$key');
+      final option = key == 'documentType' ? find.byKey(ValueKey('purchase-document-option-$value')) : find.text(value).last;
+      await tester.ensureVisible(option);
+      await tester.tap(option);
+      await tester.pumpAndSettle();
+    }
+    await choose('documentType', 'Bill of supply');
+    expect(find.byKey(const Key('work-purchase-billOfSupplyReason')), findsOneWidget);
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-documentTitle'))).decoration!.hintText, 'Bill of supply');
+    expect(find.byKey(const Key('work-purchase-irn')), findsNothing);
+    await usePurchaseControl(tester, 'work-purchase-tax-details');
+    expect(find.byKey(const Key('work-purchase-taxableValue')), findsNothing);
+    await choose('billOfSupplyReason', 'Composition scheme');
+    expect(find.textContaining('Copy the supplier’s composition declaration'), findsOneWidget);
+    await choose('documentType', 'GST invoice');
+    final taxable = find.byKey(const Key('work-purchase-taxableValue'));
+    await revealPurchaseInput(tester, taxable);
+    await tester.enterText(taxable, '123.45');
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    await choose('documentType', 'Non-GST purchase bill');
+    expect(find.byKey(const Key('work-purchase-document-tax-conflict')), findsOneWidget);
+    expect(tester.widget<TextField>(taxable).controller!.text, '123.45');
+    await usePurchaseControl(tester, 'work-purchase-payment-details');
+    expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const Key('work-purchase-paymentStatus'))).initialValue, '');
+    await choose('documentType', 'Invoice-cum-bill of supply');
+    expect(find.byKey(const Key('work-purchase-exemptValue')), findsOneWidget);
+    expect(tester.widget<TextField>(taxable).controller!.text, '123.45');
+    await choose('supplyNature', 'Services');
+    await usePurchaseControl(tester, 'work-purchase-items-section');
+    expect(find.byKey(const Key('work-purchase-pack-0')), findsNothing);
+    expect(find.byKey(const Key('work-purchase-quantity-0')), findsNothing);
+    await usePurchaseControl(tester, 'work-purchase-receipt-details');
+    expect(find.byKey(const Key('work-purchase-receiptStatus')), findsNothing);
+    await usePurchaseControl(tester, 'work-purchase-show-all-fields');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-quantity-0'))).controller!.text, '');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-pack-0'))).controller!.text, '');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  test('P05-DOC document profiles retain optional raw facts through recovery', () {
+    final at = DateTime.utc(2026, 10, 23);
+    for (final type in ['GST invoice', 'Bill of supply', 'Invoice-cum-bill of supply', 'Non-GST purchase bill', 'Other bill']) {
+      final draft = WorkspacePurchaseEntryDraft(id: 'host-document', supplierId: 'host-supplier',
+        invoiceReference: 'A-23/10', invoiceDate: '23/10/2026', createdAt: at, updatedAt: at,
+        goods: const [], details: {'documentType': type, 'billOfSupplyReason': 'Exempt supply',
+          'supplyNature': 'Services', 'buyerRegistration': 'Unregistered', 'exemptValue': '123.45',
+          'paymentStatus': 'On credit', 'irn': 'Original text retained'});
+      final restored = WorkspacePurchaseEntryDraft.fromJson(jsonDecode(jsonEncode(draft.toJson())));
+      expect(restored.details, draft.details);
+      expect(storePurchaseDocumentTypeLabel(restored.details['documentType']!), isNotEmpty);
+      expect(storePurchaseSupplierDocumentHeading(title: 'Original supplier title', type: type), 'Original supplier title');
+    }
+    for (final type in ['GST invoice', 'Bill of supply', 'Invoice-cum-bill of supply']) {
+      expect(WorkspacePurchaseEntryDraft.reviewInvoiceFormat('ABCDEFGHIJKLMNOPQ', '31/02/2026', type), isNotEmpty);
+    }
+    expect(WorkspacePurchaseEntryDraft.reviewAmounts({'exemptValue': 'not an amount'}), isNotEmpty);
+  });
+
+  testWidgets('P05-DOC restored non-GST service draft keeps conflicting original fields reviewable', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    final scope = work.workspaceSupplierScope!;
+    final at = DateTime.utc(2026, 10, 23);
+    final draft = WorkspacePurchaseEntryDraft(id: 'host-restored-original', supplierId: 'host-original-supplier',
+      invoiceReference: 'SOURCE/23', invoiceDate: '23/10/2026', createdAt: at, updatedAt: at,
+      goods: const [{'name': 'Original description', 'productId': '', 'pack': 'Original unit',
+        'quantity': '2', 'cost': '500', 'gstRate': '18', 'receivedQuantity': '1'}],
+      details: const {'documentType': 'Non-GST purchase bill', 'supplyNature': 'Services',
+        'irn': 'Original reference to review', 'taxableValue': '1000', 'totalTax': '180',
+        'paymentStatus': 'On credit', 'receiptStatus': 'Awaiting delivery'});
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 1, profiles: [WorkspaceSupplierProfile(id: draft.supplierId, name: 'Host original supplier',
+        createdAt: at, updatedAt: at)], draft: draft);
+    final before = jsonEncode(entry.value!.toJson());
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await usePurchaseControl(tester, 'work-purchase-record');
+    await usePurchaseControl(tester, 'work-purchase-invoice-section');
+    expect(find.byKey(const Key('work-purchase-document-tax-conflict')), findsOneWidget);
+    expect(find.byKey(const Key('work-purchase-document-reference-check')), findsOneWidget);
+    await usePurchaseControl(tester, 'work-purchase-original-evidence');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-irn'))).controller!.text, draft.details['irn']);
+    await usePurchaseControl(tester, 'work-purchase-items-section');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-quantity-0'))).controller!.text, '2');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-pack-0'))).controller!.text, 'Original unit');
+    expect(find.byKey(const Key('work-purchase-stock-search-0')), findsNothing);
+    await usePurchaseControl(tester, 'work-purchase-receipt-details');
+    expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const Key('work-purchase-receiptStatus'))).initialValue, 'Awaiting delivery');
+    await usePurchaseControl(tester, 'work-purchase-payment-details');
+    expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const Key('work-purchase-paymentStatus'))).initialValue, 'On credit');
+    expect(jsonEncode(entry.value!.toJson()), before);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('P05-DOC service original saves reopens and exports without invented quantities', (tester) async {
+    final picker = _PurchaseOriginalSaveFixture();
+    final originalPicker = FilePickerPlatform.instance;
+    FilePickerPlatform.instance = picker;
+    addTearDown(() => FilePickerPlatform.instance = originalPicker);
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await usePurchaseControl(tester, 'work-purchase-record');
+    await expandPurchasePrimarySections(tester);
+    for (final field in {'supplier-name': 'Host service supplier', 'reference': 'SERVICE/23',
+        'date': '23/10/2026', 'item-0': 'Maintenance service'}.entries) {
+      final input = find.byKey(Key('work-purchase-${field.key}'));
+      await revealPurchaseInput(tester, input);
+      await tester.enterText(input, field.value);
+    }
+    tester.testTextInput.hide();
+    await usePurchaseControl(tester, 'work-purchase-documentType');
+    await tester.tap(find.byKey(const ValueKey('purchase-document-option-Non-GST purchase bill')));
+    await tester.pumpAndSettle();
+    await usePurchaseControl(tester, 'work-purchase-supplyNature');
+    await tester.tap(find.text('Services').last);
+    await tester.pumpAndSettle();
+    final amount = find.byKey(const Key('work-purchase-lineTotal-0'));
+    await revealPurchaseInput(tester, amount);
+    await tester.enterText(amount, '500.00');
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    await usePurchaseControl(tester, 'work-purchase-draft-save');
+    final saved = entry.value!.draft!;
+    expect(saved.details['supplyNature'], 'Services');
+    expect(saved.goods.single['pack'], '');
+    expect(saved.goods.single['quantity'], '');
+    expect(saved.goods.single['lineTotal'], '500.00');
+    expect(work.workspacePurchases, isEmpty);
+    await usePurchaseControl(tester, 'work-purchase-record');
+    await usePurchaseControl(tester, 'work-purchase-items-section');
+    expect(find.byKey(const Key('work-purchase-pack-0')), findsNothing);
+    expect(find.byKey(const Key('work-purchase-quantity-0')), findsNothing);
+    expect(tester.widget<TextField>(amount).controller!.text, '500.00');
+    await usePurchaseControl(tester, 'work-purchase-preview');
+    final download = find.byKey(const Key('purchase-recorded-download'));
+    await revealPurchaseInput(tester, download);
+    await tester.runAsync(() async {
+      await tester.tap(download);
+      for (var i = 0; i < 40 && picker.bytes == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+      }
+    });
+    await tester.pumpAndSettle();
+    expect(ascii.decode(picker.bytes!.take(4).toList()), '%PDF');
+    expect(entry.value!.draft!.goods, saved.goods);
+    expect(entry.value!.draft!.details, saved.details);
+    expect(work.workspacePurchases, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final display in [(const Size(360, 800), 1.0), (const Size(320, 568), 2.0)]) {
   testWidgets(
-    'P05-R09-C04 full invoice wording contract keeps field meanings and source values',
+    'P05-R09-C04 full invoice wording contract keeps field meanings and source values $display',
     (tester) async {
       final entry = _PurchaseEntryFixtureStore();
       final work = manualPurchaseFixture(entry);
@@ -24079,11 +27944,17 @@ void main() {
           },
         ),
       );
-      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: display.$1, textScale: display.$2);
       await openPurchaseList(tester);
       await tester.tap(
         await purchaseRegisterAction(tester, 'work-purchase-record'),
       );
+      await tester.pumpAndSettle();
+      await usePurchaseControl(tester, 'work-purchase-invoice-section');
+      await usePurchaseControl(tester, 'work-purchase-show-all-fields');
+      await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-invoice-section')));
+      await tester.tap(find.byKey(const Key('work-purchase-invoice-section')));
       await tester.pumpAndSettle();
       await expandPurchasePrimarySections(tester);
       for (final suffix in [
@@ -24112,6 +27983,7 @@ void main() {
       final components = find.byKey(const Key('purchase-tax-components-0'));
       await revealPurchaseInput(tester, components);
       expect(tester.widget(components), isA<Column>());
+      final clippedLabels = <String>[];
       void expectLabel(String key, String label) {
         final target = find.byKey(Key(key));
         expect(target, findsOneWidget, reason: key);
@@ -24129,75 +28001,83 @@ void main() {
                   )
                   .decoration;
         expect(decoration.labelText, label, reason: key);
+        final labelText = find.descendant(of: target, matching: find.text(label)).first;
+        if (tester.renderObject<RenderParagraph>(labelText).didExceedMaxLines) {
+          clippedLabels.add('$key: $label');
+        }
       }
 
       final details = {
-        'documentType': 'Supplier document type',
+        'documentType': 'Document type',
+        'supplyNature': 'Supply on bill',
+        'billOfSupplyReason': 'Bill of supply basis',
+        'buyerRegistration': 'Buyer GST status',
+        'exemptValue': 'Exempt value ₹',
         'placeOfSupply': 'Place of supply',
-        'placeOfSupplyCode': 'State code',
-        'buyerName': 'Billed to / business name',
+        'placeOfSupplyCode': 'Supply State code',
+        'buyerName': 'Buyer name on invoice',
         'buyerAddress': 'Billing address',
-        'buyerGstin': 'Your GSTIN',
-        'buyerUin': 'UIN, only if printed',
-        'buyerPhone': 'Mobile / phone',
-        'buyerEmail': 'Email',
+        'buyerGstin': 'Buyer GSTIN',
+        'buyerUin': 'Buyer UIN (if printed)',
+        'buyerPhone': 'Buyer phone',
+        'buyerEmail': 'Buyer email',
         'buyerState': 'Billing State',
-        'buyerStateCode': 'State code',
-        'deliveryAddress': 'Address, if different from billing',
-        'deliveryState': 'Shipping State',
-        'deliveryStateCode': 'State code',
-        'priceBasis': 'Rates include GST?',
+        'buyerStateCode': 'Billing State code',
+        'deliveryAddress': 'Ship-to address',
+        'deliveryState': 'Ship-to State',
+        'deliveryStateCode': 'Ship-to State code',
+        'priceBasis': 'Item rate basis',
         'taxTreatment': 'GST type',
-        'reverseCharge': 'Reverse charge shown?',
+        'reverseCharge': 'Reverse charge',
         'billDiscount': 'Bill discount ₹',
-        'freight': 'Transport charges ₹',
+        'freight': 'Freight ₹',
         'otherCharges': 'Other charges ₹',
         'roundOff': 'Round off ₹',
         'taxableValue': 'Taxable value ₹',
         'supplyValue': 'Subtotal ₹',
         'cgst': 'CGST ₹',
-        'sgst': 'Earlier SGST / UTGST ₹',
+        'sgst': 'SGST/UTGST ₹',
         'sgstAmount': 'SGST ₹',
         'utgst': 'UTGST ₹',
         'igst': 'IGST ₹',
         'cess': 'Cess ₹',
         'invoiceTotal': 'Invoice total ₹',
-        'receiptStatus': 'Goods status',
-        'receivedDate': 'Received date',
-        'expectedDeliveryDate': 'Expected delivery date',
+        'receiptStatus': 'Goods receipt status',
+        'receivedDate': 'Receipt date',
+        'expectedDeliveryDate': 'Delivery due',
         'shippingTerms': 'Delivery / shipping terms',
         'paymentStatus': 'Payment status',
         'paidAmount': 'Amount paid ₹',
         'paymentMethod': 'Payment mode',
-        'paymentReference': 'Payment reference',
+        'paymentReference': 'Payment reference / UTR',
         'paymentDate': 'Payment date',
-        'dueDate': 'Pay by date',
+        'dueDate': 'Due date',
         'paymentTerms': 'Payment / credit terms',
-        'notes': 'Notes',
+        'notes': 'Purchase narration',
         'eInvoiceStatus': 'E-invoice details',
         'irn': 'IRN',
-        'ackNumber': 'Acknowledgement No.',
-        'ackDate': 'Acknowledgement date',
+        'ackNumber': 'Ack. number',
+        'ackDate': 'Ack. date',
         'qrStatus': 'E-invoice QR',
         'signatureStatus': 'Signature on invoice',
         'eInvoiceDeclaration': 'Supplier declaration',
-        'supplierEmail': 'Email',
-        'poReference': 'Purchase order No.',
+        'supplierEmail': 'Supplier email',
+        'poReference': 'Purchase order number',
         'documentCopy': 'Invoice copy type',
-        'totalTax': 'Total GST / tax ₹',
-        'amountPayable': 'Amount payable ₹',
+        'totalTax': 'Total tax ₹',
+        'amountPayable': 'Payable ₹',
         'amountInWords': 'Amount in words',
-        'bankName': 'Bank name',
-        'bankAccount': 'Account number',
+        'bankName': 'Supplier bank name',
+        'bankAccount': 'Supplier account number',
         'bankIfsc': 'IFSC',
         'bankBranch': 'Branch',
-        'upiType': 'UPI app / type',
-        'upiId': 'UPI ID',
-        'paymentQrStatus': 'Payment QR',
+        'upiType': 'Supplier UPI app',
+        'upiId': 'Supplier UPI ID',
+        'paymentQrStatus': 'Supplier payment QR',
         'terms': 'Terms & conditions',
-        'signatory': 'Signed by (name)',
-        'documentTitle': 'Invoice heading',
-        'originalInvoiceDate': 'Date as shown on bill',
+        'signatory': 'Signatory name',
+        'documentTitle': 'Document title',
+        'originalInvoiceDate': 'Date exactly as printed',
         'printedTotalItems': 'Total items',
         'printedTotalQuantity': 'Total quantity',
         'printedTaxRate': 'Total GST %',
@@ -24205,47 +28085,75 @@ void main() {
         'printedSgstRate': 'SGST %',
         'printedUtgstRate': 'UTGST %',
         'printedIgstRate': 'IGST %',
-        'printedPaymentMark': 'Payment note on supplier bill',
-        'printedFooter': 'Note at bottom of bill',
-        'printedSignatoryLabel': 'Text below signature',
-        'printedCompanyLabel': 'Business name near signature',
-        'printedDeclaration': 'Signature note on bill',
+        'printedPaymentMark': 'Printed payment remark',
+        'printedFooter': 'Invoice footer text',
+        'printedSignatoryLabel': 'Signature caption',
+        'printedCompanyLabel': 'Signatory business name',
+        'printedDeclaration': 'Printed declaration',
       };
       expect(details.keys.toSet(), WorkspacePurchaseEntryDraft.detailKeys);
       for (final field in details.entries) {
         expectLabel('work-purchase-${field.key}', field.value);
       }
+      final clippedHints = <String>[];
+      for (final field in tester.widgetList<TextField>(find.byType(TextField))) {
+        final key = field.key;
+        if (key is! ValueKey<String> ||
+            !(key.value.startsWith('work-purchase-') ||
+                key.value.startsWith('purchase-extra-') ||
+                key.value.startsWith('purchase-tax-'))) {
+          continue;
+        }
+        expect(field.decoration?.hintText, isNotNull, reason: key.value);
+        expect(field.decoration!.hintText, isNotEmpty, reason: key.value);
+        final hintText = find.descendant(of: find.byKey(key),
+          matching: find.text(field.decoration!.hintText!)).first;
+        if (tester.renderObject<RenderParagraph>(hintText).didExceedMaxLines) {
+          clippedHints.add('${key.value}: ${field.decoration!.hintText}');
+        }
+      }
+      expect(clippedHints, isEmpty, reason: 'Entry hints must remain readable at $display');
+      final extraName = tester.widget<TextField>(find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == 'Field name as printed',
+      ));
+      final extraValue = tester.widget<TextField>(find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == 'Value as printed',
+      ));
+      expect(extraName.decoration!.hintText, 'e.g. Dispatch reference');
+      expect(extraValue.decoration!.hintText, 'e.g. DSP-104');
+      expect(extraName.controller!.text, isEmpty);
+      expect(extraValue.controller!.text, isEmpty);
       for (final field in {
-        'supplier-name': 'Supplier name or phone',
-        'supplier-phone': 'Mobile / phone',
+        'supplier-name': 'Supplier name',
+        'supplier-phone': 'Supplier phone',
         'supplier-address': 'Supplier address',
         'supplier-gstin': 'Supplier GSTIN',
-        'reference': 'Supplier invoice No.',
+        'reference': 'Supplier invoice number',
         'date': 'Invoice date',
-        'item-0': 'Item / description',
-        'pack-0': 'Pack / unit',
-        'quantity-0': 'Qty',
-        'cost-0': 'Rate ₹',
+        'item-0': 'Item name on invoice',
+        'pack-0': 'Unit on invoice',
+        'quantity-0': 'Billed qty',
+        'cost-0': 'Rate / unit ₹',
         'stock-search-0': 'Find saved product',
       }.entries) {
         expectLabel('work-purchase-${field.key}', field.value);
       }
       final goods = {
         'hsn': 'HSN / SAC',
-        'barcode': 'Barcode / item code',
+        'barcode': 'Item code / barcode',
         'freeQuantity': 'Free qty',
         'batch': 'Batch No.',
         'expiry': 'Expiry date',
         'mrp': 'MRP ₹',
         'sellingPrice': 'Selling price ₹',
-        'discount': 'Discount ₹',
+        'discount': 'Item discount ₹',
         'gstRate': 'GST %',
         'cess': 'Cess ₹',
         'lineTotal': 'Item amount ₹',
         'receivedQuantity': 'Received qty',
         'damagedQuantity': 'Damaged qty',
         'shortQuantity': 'Short qty',
-        'unitCode': 'Unit code on bill',
+        'unitCode': 'Unit code on invoice',
         'taxableValue': 'Taxable value ₹',
         'cgstRate': 'CGST %',
         'cgst': 'CGST ₹',
@@ -24258,14 +28166,14 @@ void main() {
         'cessRate': 'Cess %',
         'specifications': 'Model / specifications',
         'taxAmount': 'Tax amount ₹',
-        'printedSerial': 'S No. / item No.',
+        'printedSerial': 'Invoice line no.',
       };
       expect(goods.keys.toSet(), WorkspacePurchaseEntryDraft.goodsExtraKeys);
       for (final field in goods.entries) {
         expectLabel('work-purchase-${field.key}-0', field.value);
       }
       final tax = {
-        'label': 'Row heading',
+        'label': 'Tax row description',
         'hsn': 'HSN / SAC',
         'taxableValue': 'Taxable value ₹',
         'cgstRate': 'CGST %',
@@ -24288,6 +28196,7 @@ void main() {
           field.value,
         );
       }
+      expect(clippedLabels, isEmpty, reason: 'All field labels must remain readable at $display');
       expect(find.text('Check billed-to & delivery'), findsOneWidget);
       expect(
         find.text('Fill blank fields'),
@@ -24296,13 +28205,13 @@ void main() {
       );
       expect(
         find.byWidgetPredicate(
-          (w) => w is TextField && w.decoration?.labelText == 'Heading on bill',
+          (w) => w is TextField && w.decoration?.labelText == 'Field name as printed',
         ),
         findsOneWidget,
       );
       expect(
         find.byWidgetPredicate(
-          (w) => w is TextField && w.decoration?.labelText == 'Details on bill',
+          (w) => w is TextField && w.decoration?.labelText == 'Value as printed',
         ),
         findsOneWidget,
       );
@@ -24355,6 +28264,7 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+  }
 
   for (final enteredItems in [false, true]) {
     testWidgets(
@@ -24446,7 +28356,7 @@ void main() {
         await tap('work-purchase-document-$digest');
         await tap('work-purchase-read-$digest');
         final extra = find.byWidgetPredicate(
-          (w) => w is TextField && w.decoration?.labelText == 'Details on bill',
+          (w) => w is TextField && w.decoration?.labelText == 'Value as printed',
         );
         expect(
           extra,
@@ -24550,6 +28460,22 @@ void main() {
           ),
           containsAll([('Retailer correction', null, null), ('SUP-01', 0, 0)]),
         );
+        // Saving returns to the register. Reopen that saved draft before
+        // testing a removal; do not tap a control on the retired editor.
+        final removedId = entry.value!.draft!.additionalFields.first.id;
+        await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record')); await tester.pumpAndSettle();
+        await tap('work-purchase-document-$digest');
+        capture.fail = false;
+        await tap('work-purchase-read-$digest');
+        final removePrinted = find.byKey(Key('purchase-extra-remove-$removedId'));
+        await revealPurchaseInput(tester, removePrinted, delta: -80);
+        await tester.tap(removePrinted); await tester.pumpAndSettle();
+        capture.fail = false;
+        await tap('work-purchase-read-$digest');
+        expect(extra, findsOneWidget, reason: 'An explicitly removed invoice field must not return on rescan.');
+        await tap('work-purchase-draft-save');
+        expect(entry.value!.draft!.additionalFields, hasLength(1));
+        expect(entry.value!.draft!.attachments.single.dismissedFieldIds, isNotEmpty);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       },
@@ -24798,7 +28724,7 @@ void main() {
         findsOneWidget,
       );
       final unknown = find.byWidgetPredicate(
-        (w) => w is TextField && w.decoration?.labelText == 'Details on bill',
+        (w) => w is TextField && w.decoration?.labelText == 'Value as printed',
       );
       expect(
         unknown,
@@ -26678,8 +30604,8 @@ void main() {
         await tester.pumpAndSettle();
         for (final entry in [
           ('work-quick-add-products', 'Add products'),
-          ('work-quick-buy', 'Buy stock'),
-          ('work-incoming-purchases', 'Purchases'),
+          ('work-quick-buy', 'Restock'),
+          ('work-incoming-purchases', 'Purchase register'),
         ]) {
           final action = find.byKey(Key(entry.$1));
           await reveal(tester, action);
@@ -31961,8 +35887,8 @@ void main() {
         'dashboard-actions-top-${display.$1}-${display.$3}',
       );
       final expected = [
-        ('work-quick-buy', 'Buy stock'),
-        ('work-incoming-purchases', 'Purchases'),
+        ('work-quick-buy', 'Restock'),
+        ('work-incoming-purchases', 'Purchase register'),
         ('work-quick-group-buy', 'Buy together'),
         ('work-quick-add-products', 'Add products'),
       ];
@@ -32689,10 +36615,69 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    for (final keyboard in [false, true]) {
+      testWidgets('PRODUCTFOOTER01 native editor actions fit exported bounds $scale keyboard=$keyboard', (tester) async {
+        final work = storeViewFixture();
+        final product = work.workspaceCatalogueItems.first;
+        final before = jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+        final movements = work.workspaceStockMovements.length;
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: const Size(360, 806), textScale: scale, openHomeActions: false);
+        tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 44);
+        tester.view.padding = const FakeViewPadding(top: 41, bottom: 44);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
+        final edit = find.byKey(Key('work-catalogue-edit-${product.id}'));
+        await tester.ensureVisible(edit); await tester.pumpAndSettle();
+        await tester.tap(edit); await tester.pumpAndSettle();
+        if (keyboard) {
+          await tester.showKeyboard(find.byKey(const Key('work-product-title')));
+          tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+          tester.view.padding = const FakeViewPadding(top: 41);
+          await tester.pumpAndSettle();
+        }
+        final save = find.byKey(const Key('work-product-save'));
+        final cancel = find.byKey(const Key('work-product-cancel'));
+        // OPPO's exported app window excludes its top and bottom system areas.
+        final exportedBottom = keyboard ? 506.0 : 721.0;
+        for (final control in [save, cancel]) {
+          expect(control.hitTestable(), findsOneWidget);
+          expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
+          expect(tester.getBottomRight(control).dy, lessThanOrEqualTo(exportedBottom),
+            reason: 'The complete editor action must fit inside the exported Android window.');
+        }
+        expect(tester.takeException(), isNull);
+        await tester.tap(cancel);
+        tester.testTextInput.hide(); tester.view.resetViewInsets();
+        tester.view.padding = const FakeViewPadding(top: 41, bottom: 44);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-dashboard-catalogue-screen')), findsOneWidget);
+        expect(jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), before);
+        expect(work.workspaceStockMovements.length, movements);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('ADDENTRY03 manual keyboard keeps save and cancel reachable', (
     tester,
   ) async {
-    final work = storeViewFixture()..workspaceCatalogueItems.clear();
+    // A known empty Store is editable; an uninitialised empty snapshot correctly
+    // stays in recovery and cannot open Add products.
+    FlutterSecureStorage.setMockInitialValues({});
+    final account = _ContactDraftFixtureStore();
+    final work = WorkSession(
+      contactDraftStore: account,
+      inventoryStore: SecureWorkInventoryStore(accountScope: () => account.accountScope),
+    )..seedVerifiedWorkspace()
+      ..workspaceCatalogueItems.clear()
+      ..retailerSetupSaved = true
+      ..reviewStage = WorkReviewStage.live
+      ..initialWorkspaceStateLoaded = true;
+    expect(await work.loadWorkspaceInventory(), isTrue);
+    expect(work.workspaceInventoryLoaded, isTrue);
+    expect(work.workspaceCatalogueItems, isEmpty);
     await mount(
       tester,
       route: '/app/work/workspace/dashboard',
@@ -38308,7 +42293,8 @@ void main() {
   testWidgets('STOCK14 empty stock never contains master suggestions', (
     tester,
   ) async {
-    final work = storeViewFixture()..workspaceCatalogueItems.clear();
+    final work = await analyticsSavedStockFixture(empty: true);
+    expect(work.workspaceInventoryLoaded, isTrue);
     await mount(
       tester,
       route: '/app/work/workspace/dashboard',
@@ -56427,15 +60413,15 @@ void main() {
       expect(find.byKey(const Key('work-restock-purpose')), findsNothing);
       expect(find.text('Purchase purpose'), findsNothing);
       final filter = find.byKey(const Key('work-restock-supplier-types'));
-      expect(filter, findsOneWidget); expect(tester.getSize(filter).height, greaterThanOrEqualTo(48));
-      await tester.tap(filter); await tester.pumpAndSettle();
-      expect(find.text('Supplier types'), findsOneWidget);
-      expect(find.textContaining('Supplier filter awaiting connection.'), findsOneWidget);
-      final closeFilter = find.byKey(const Key('work-restock-supplier-types-close'));
-      await tester.ensureVisible(closeFilter); await tester.tap(closeFilter); await tester.pumpAndSettle();
-      expect(find.text('Supplier types'), findsNothing);
-      expect(find.text('Buying for ${old.name}'), findsOneWidget);
-      expect(find.byKey(const Key('work-dashboard-inline-search-band')), findsOneWidget);
+      // Founder removed the duplicate Store header and supplier-type control.
+      // Buying identity and source restrictions still belong to the session.
+      expect(filter, findsNothing);
+      expect(find.byKey(const Key('work-store-full-name')), findsNothing);
+      expect(original.procurementContext!.storeId, old.id);
+      expect(controller.restockSupplierTypes, ['manufacturer']);
+      expect(controller.restockSupplierFilterConnected, isFalse);
+      expect(find.byKey(const Key('work-dashboard-inline-search-band')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-search-band')), findsOneWidget);
       expect(controller.restockRestrictionMessage, isNull);
       expect(original.procurementUnavailableMessage, isNotNull,
         reason: 'No actual buyer service is configured in this isolated host.');
@@ -56451,8 +60437,7 @@ void main() {
             await file.writeAsBytes(bytes!.buffer.asUint8List()); } finally { image.dispose(); }
         });
       }
-      await tester.ensureVisible(find.text('Back to Store')); await tester.pumpAndSettle();
-      await tester.tap(find.text('Back to Store')); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-restock-back'))); await tester.pumpAndSettle();
       await reveal(tester, find.byKey(const Key('work-quick-buy')));
       await tester.tap(find.byKey(const Key('work-quick-buy'))); await tester.pumpAndSettle();
       expect(controller.session, same(original));
@@ -56468,19 +60453,21 @@ void main() {
         expect(controller.restockRestrictionMessage, isNull);
         expect(controller.session, same(original));
         expect(original.customerStateStore!.ownerScope, scope);
-        if (['distributor', 'sub-distributor', 'unknown'].contains(profile)) {
-          expect(filter, findsNothing,
-            reason: 'A synthetic profile must not create a registered Store capability.');
-          continue;
-        }
-        expect(filter, findsOneWidget,
-          reason: 'profile=$profile view=${original.view} destination=${original.destination}');
-        await tester.tap(filter); await tester.pumpAndSettle();
-        expect(find.text(controller.restockSupplierTypesLabel), findsOneWidget);
+        expect(filter, findsNothing,
+          reason: 'The approved shared catalogue has no duplicate supplier-type header.');
+        expect(original.procurementContext!.storeId, old.id);
+        expect(controller.restockSupplierFilterConnected, isFalse,
+          reason: 'A profile label cannot create an actual source capability.');
         if (profile == 'wholesaler') {
-          expect(find.text('Sourcing classification pending'), findsOneWidget);
-          expect(find.textContaining('Your Store profile combines wholesaler and distributor.'), findsOneWidget);
-          expect(find.text('Prepared buying rules'), findsOneWidget);
+          expect(controller.restockSupplierClassificationResolved, isFalse);
+          expect(controller.restockSupplierClassificationMessage,
+            contains('Your Store profile combines wholesaler and distributor.'));
+        } else if (profile == 'retailer-grocery') {
+          expect(controller.restockSupplierTypes,
+            ['manufacturer', 'wholesaler', 'distributor', 'sub-distributor']);
+          expect(controller.restockSupplierClassificationResolved, isTrue);
+        } else {
+          expect(controller.restockSupplierClassificationResolved, isFalse);
         }
         if (root != null && ['retailer-grocery', 'wholesaler'].contains(profile)) {
           final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(const Key('store-review-root')));
@@ -56492,12 +60479,12 @@ void main() {
               await file.writeAsBytes(bytes!.buffer.asUint8List()); } finally { image.dispose(); }
           });
         }
-        await tester.ensureVisible(closeFilter); await tester.tap(closeFilter); await tester.pumpAndSettle();
       }
       expect(tester.takeException(), isNull);
     });
+    for (final retireBilling in [false, true]) {
     testWidgets(
-      'RESTOCK02 existing test Store renders scoped catalogue $compact',
+      'RESTOCK02 existing test Store renders scoped catalogue $compact retirement=$retireBilling',
       (tester) async {
         const account = 'restock-render-account';
         final seed = StoreReviewSeed(
@@ -56505,7 +60492,16 @@ void main() {
           orderCount: 1000,
           now: DateTime.now(),
         );
-        final work = liveStore()..activeWorkspace = seed.workspace;
+        final billingOwner = _ContactDraftFixtureStore()..accountScope = account;
+        final personalProfiles = _StorePurchasePersonalInvoiceProfiles();
+        final work = liveStore(contactDraftStore: billingOwner)
+          ..activeWorkspace = seed.workspace;
+        expect(work.saveWorkspacePublicationDetails(
+          const WorkspaceStorePublicationDetails(
+            legalName: 'TEST Restock Buyer', street: '12 TEST Market Road',
+            city: 'Jodhpur', state: 'Rajasthan', pinCode: '342001',
+            billingAddress: '45 TEST Billing Road, Jodhpur 342001',
+          ), expectedStoreId: seed.storeId), isTrue);
         final bookmarks = _StorePurchaseBookmarks();
         final reviewOwner = WorkProcurementController(
           currentAccountId: () => account,
@@ -56530,6 +60526,7 @@ void main() {
             addTearDown(core.dispose);
             return BuyV2Session(core: core, procurementIdentity: identity, customerStateStore: state,
               reviewDataEnabled: false, commerceAdapter: reviewSession.commerceAdapter,
+              gstInvoiceProfileStore: personalProfiles,
               commercialPaymentTermsAdapter: reviewSession.commercialPaymentTermsAdapter,
               cataloguePageSource: reviewSession.cataloguePageSource,
               productFactsAdapter: _StorePurchaseOrderReadyFacts(),
@@ -56557,11 +60554,23 @@ void main() {
         );
         expect(
           find.byKey(const Key('work-dashboard-inline-search-band')),
-          findsOneWidget,
+          findsNothing,
         );
-        expect(find.byKey(const Key('work-dashboard-scan')), findsOneWidget);
-        expect(find.text('Buying for ${seed.workspace.name}'), findsOneWidget);
+        expect(find.byKey(const Key('work-dashboard-scan')), findsNothing);
+        expect(find.byKey(const ValueKey('buy-search-band')), findsOneWidget);
+        expect(find.byKey(const ValueKey('buy-restock-back')), findsOneWidget);
+        expect(controller.session!.procurementContext!.storeId, seed.workspace.id);
         expect(controller.usesReviewCatalogue, enabled);
+        if (enabled) {
+          final identitySemantics = tester.ensureSemantics();
+          try {
+            expect(find.byKey(const Key('work-procurement-buyer-caption')), findsNothing);
+            expect(find.byKey(const Key('work-store-full-name')), findsNothing);
+            expect(tester.getSize(find.byKey(const ValueKey('buy-search-band'))).height,
+              lessThanOrEqualTo((compact ? 568 : 800) * .3),
+              reason: 'One shared search header leaves room for SKUs at enlarged text.');
+          } finally { identitySemantics.dispose(); }
+        }
         expect(
           controller.session!.procurementUnavailableMessage,
           enabled ? isNull : isNotNull,
@@ -56623,27 +60632,37 @@ void main() {
         }
         await tester.pumpAndSettle();
         await tester.pump(const Duration(seconds: 5));
-        await captureStoreView(
+        // Isolated host review frames; never native or live supplier evidence.
+        if (!retireBilling) {
+          await _captureAnalyticsFixture(tester, 'restock-sku-grid-${compact ? 'compact' : 'normal'}');
+        }
+        if (!retireBilling) {
+          await captureStoreView(
           tester,
           'restock-layout-${compact ? 'compact' : 'normal'}',
         );
+        }
         if (enabled) {
           await tester.tap(find.byKey(const ValueKey('buy-category-picker')));
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
-          await captureStoreView(
+          if (!retireBilling) {
+            await captureStoreView(
             tester,
             'restock-categories-${compact ? 'compact' : 'normal'}',
           );
+          }
           await tester.tap(find.byKey(const ValueKey('buy-category-close')));
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
-          await captureStoreView(
+          if (!retireBilling) {
+            await captureStoreView(
             tester,
             'restock-filters-${compact ? 'compact' : 'normal'}',
           );
+          }
           await tester.tap(
             find.byKey(const ValueKey('buy-discovery-refinement-close')),
           );
@@ -56653,10 +60672,15 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
-          await captureStoreView(
+          if (!retireBilling) {
+            await _captureAnalyticsFixture(tester, 'restock-bulk-grid-${compact ? 'compact' : 'normal'}');
+          }
+          if (!retireBilling) {
+            await captureStoreView(
             tester,
             'restock-bulk-${compact ? 'compact' : 'normal'}',
           );
+          }
           controller.session!.chooseWholesaleSaleType(
             BuyV2WholesaleSaleType.wholesale,
           );
@@ -56669,10 +60693,12 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
-          await captureStoreView(
+          if (!retireBilling) {
+            await captureStoreView(
             tester,
             'restock-product-${compact ? 'compact' : 'normal'}',
           );
+          }
           controller.session!.closeProduct();
           await tester.pumpAndSettle();
           controller.session!.openCart(scope: BuyV2CartScope.wholesale);
@@ -56683,26 +60709,144 @@ void main() {
             reason: 'Embedded Store cart must fit before search opens',
           );
           expect(find.text('Shop'), findsNothing);
-          expect(find.text('Wholesale / Bulk'), findsOneWidget);
-          await captureStoreView(
+          expect(find.text('Wholesale / Bulk'), findsNothing,
+            reason: 'Founder approved one compact Store Cart header without the channel strip.');
+          expect(find.byKey(const ValueKey('buy-cart-heading')), findsOneWidget);
+          expect(find.byKey(const ValueKey('buy-compact-cart-indicator')), findsOneWidget,
+            reason: 'Store reuses the approved fixed footer Cart.');
+          expect(find.byKey(const ValueKey('buy-mini-cart-transparent-overlay')), findsNothing,
+            reason: 'A redundant floating Cart must not cover the Cart action bar.');
+          if (!retireBilling) {
+            await _captureAnalyticsFixture(tester, 'restock-cart-${compact ? 'compact' : 'normal'}');
+          }
+          if (!retireBilling) {
+            await captureStoreView(
             tester,
             'restock-cart-${compact ? 'compact' : 'normal'}',
           );
+          }
           final purchase = controller.session!;
-          expect(purchase.openCheckout(), isTrue);
+          final checkout = find.widgetWithText(FilledButton, 'Checkout');
+          if (checkout.evaluate().isEmpty) {
+            await tester.scrollUntilVisible(checkout, 220, maxScrolls: 40,
+              scrollable: find.descendant(of: find.byKey(PageStorageKey('buy-cart-${purchase.cartScope.name}')),
+                matching: find.byType(Scrollable)).first);
+          }
+          await tester.ensureVisible(checkout); await tester.pumpAndSettle();
+          expect(checkout.hitTestable(), findsOneWidget);
+          expect(tester.getRect(checkout).overlaps(tester.getRect(
+            find.byKey(const ValueKey('buy-compact-cart-indicator')))), isFalse,
+            reason: 'The fixed footer Cart must leave Checkout fully reachable.');
+          if (!retireBilling) {
+            await _captureAnalyticsFixture(tester, 'restock-cart-checkout-${compact ? 'compact' : 'normal'}');
+          }
+          await tester.tap(checkout); await tester.pumpAndSettle();
+          expect(purchase.view, BuyV2View.checkout);
+          expect(find.byKey(const ValueKey('buy-compact-cart-indicator')), findsOneWidget);
+          expect(find.byKey(const ValueKey('buy-mini-cart-transparent-overlay')), findsNothing);
+          final billingCard = find.byKey(const Key('work-procurement-billing-details'));
+          await tester.scrollUntilVisible(billingCard, 180, maxScrolls: 30,
+            scrollable: find.descendant(
+              of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+              matching: find.byType(Scrollable)).first);
+          await tester.pumpAndSettle();
+          expect(find.text('Personal purchase'), findsNothing,
+            reason: 'Store procurement must not present the personal invoice selector.');
+          expect(find.byKey(const Key('work-procurement-billing-details')), findsOneWidget);
+          expect(find.text('TEST Restock Buyer'), findsOneWidget);
+          expect(find.text('45 TEST Billing Road, Jodhpur 342001'), findsOneWidget);
+          expect(personalProfiles.reads, 0);
+          purchase.refreshGstProfile();
+          await tester.pumpAndSettle();
+          expect(personalProfiles.reads, 0);
+          expect(personalProfiles.writes, 0);
+          final billingEdit = find.byKey(const Key('work-procurement-billing-edit'));
+          await reveal(tester, billingEdit);
+          await tester.tap(billingEdit);
+          await tester.pumpAndSettle();
+          expect(find.byType(StorePublicationSettings), findsOneWidget);
+          await reveal(tester, find.text('Address & invoicing'));
+          await tester.tap(find.text('Address & invoicing'));
+          await tester.pumpAndSettle();
+          await reveal(tester, find.byKey(const Key('work-publication-legalName')));
+          await tester.enterText(find.byKey(const Key('work-publication-legalName')),
+            'TEST Owner Billing Name');
+          await reveal(tester, find.byKey(const Key('work-publication-billingAddress')));
+          await tester.enterText(find.byKey(const Key('work-publication-billingAddress')),
+            '67 TEST Owner Billing Road, Jodhpur 342001');
+          await reveal(tester, find.byKey(const Key('work-publication-save-address')));
+          await tester.tap(find.byKey(const Key('work-publication-save-address')));
+          await tester.pumpAndSettle();
+          expect(work.workspacePublicationDetails.legalName, 'TEST Owner Billing Name');
+          expect(work.workspacePublicationDetails.billingAddress,
+            '67 TEST Owner Billing Road, Jodhpur 342001');
+          await tester.tap(find.byKey(const Key('work-procurement-billing-close')));
+          await tester.pumpAndSettle();
+          expect(purchase.view, BuyV2View.checkout);
+          expect(purchase.itemCount, 2);
+          expect(find.text('TEST Owner Billing Name'), findsOneWidget);
+          final savedBilling = work.workspacePublicationDetails;
+          expect(work.saveWorkspacePublicationDetails(WorkspaceStorePublicationDetails.fromJson({
+            ...savedBilling.toJson(), 'legalName': '', 'billingAddress': '',
+            'street': '', 'city': '', 'state': '', 'pinCode': '',
+          }), expectedStoreId: seed.storeId), isTrue);
+          await tester.pumpAndSettle();
+          expect(find.text('Add the Store’s legal business name and billing address.'), findsOneWidget);
+          expect(find.text('TEST Owner Billing Name'), findsNothing);
+          expect(work.saveWorkspacePublicationDetails(savedBilling,
+            expectedStoreId: seed.storeId), isTrue);
+          await tester.pumpAndSettle();
+          final oldEdit = tester.widget<TextButton>(billingEdit).onPressed!;
+          if (retireBilling) {
+            await reveal(tester, billingEdit);
+            await tester.tap(billingEdit);
+            await tester.pumpAndSettle();
+            expect(find.byType(StorePublicationSettings), findsOneWidget);
+            billingOwner.accountScope = 'other-billing-account';
+            work.notifyListeners();
+            await tester.pumpAndSettle();
+            oldEdit();
+            await tester.pumpAndSettle();
+            expect(find.byType(StorePublicationSettings), findsNothing);
+            expect(find.text('TEST Owner Billing Name'), findsNothing);
+            billingOwner.accountScope = account;
+            work.notifyListeners();
+            await tester.pumpAndSettle();
+            expect(find.byType(StorePublicationSettings), findsNothing,
+              reason: 'A retired billing editor must not revive after account ABA.');
+            await tester.tap(find.byKey(const Key('work-procurement-billing-close')));
+            await tester.pumpAndSettle();
+            expect(purchase.itemCount, 2);
+            expect(tester.takeException(), isNull);
+            return;
+          }
+          await reveal(tester, find.byKey(const Key('work-procurement-billing-details')));
+          if (!retireBilling) {
+            await _captureAnalyticsFixture(tester, 'restock-billing-${compact ? 'compact' : 'normal'}');
+          }
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
-          await captureStoreView(
+          if (!retireBilling) {
+            await _captureAnalyticsFixture(tester, 'restock-address-${compact ? 'compact' : 'normal'}');
+          }
+          if (!retireBilling) {
+            await captureStoreView(
             tester,
             'restock-address-${compact ? 'compact' : 'normal'}',
           );
+          }
           expect(purchase.continueCheckoutFromAddress(), isTrue);
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
-          await captureStoreView(
+          if (!retireBilling) {
+            await _captureAnalyticsFixture(tester, 'restock-payment-${compact ? 'compact' : 'normal'}');
+          }
+          if (!retireBilling) {
+            await captureStoreView(
             tester,
             'restock-payment-${compact ? 'compact' : 'normal'}',
           );
+          }
           expect(purchase.choosePayment('UPI'), isTrue);
           await purchase.refreshCommercialPaymentTerms();
           await tester.pumpAndSettle();
@@ -56725,31 +60869,46 @@ void main() {
           expect(purchase.continueCheckoutFromPayment(), isTrue);
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
-          await captureStoreView(
+          expect(purchase.checkoutAmountDueNow, 0);
+          expect(purchase.checkoutBalanceDue, purchase.checkoutPayableTotal);
+          expect(find.descendant(of: find.byKey(const ValueKey('buy-checkout-action-bar')),
+            matching: find.text('Due now')), findsOneWidget,
+            reason: 'Zero due now must not look like a free order.');
+          if (!retireBilling) {
+            await _captureAnalyticsFixture(tester, 'restock-review-${compact ? 'compact' : 'normal'}');
+          }
+          if (!retireBilling) {
+            await captureStoreView(
             tester,
             'restock-review-${compact ? 'compact' : 'normal'}',
           );
+          }
           final termTile = find.byKey(
-            ValueKey('store-payment-selector-${group.key}-${advance.id}'),
+            ValueKey('buy-payment-term-summary-${group.key}'),
           );
           await reveal(tester,
             find.byKey(const ValueKey('buy-checkout-payment-terms')),
           );
           await tester.pumpAndSettle();
-          await captureStoreView(
+          if (!retireBilling) {
+            await _captureAnalyticsFixture(tester, 'restock-terms-${compact ? 'compact' : 'normal'}');
+          }
+          if (!retireBilling) {
+            await captureStoreView(
             tester,
             'restock-terms-${compact ? 'compact' : 'normal'}',
           );
+          }
           await reveal(tester, termTile);
-          await tester.tap(termTile);
-          await tester.pumpAndSettle();
-          await captureStoreView(
-            tester,
-            'restock-selector-open-${compact ? 'compact' : 'normal'}',
-          );
-          await tester.tap(find.text('Pay in full').last);
-          await tester.pumpAndSettle();
-          expect(purchase.checkoutAmountDueNow, purchase.checkoutPayableTotal);
+          expect(termTile, findsOneWidget);
+          expect(find.text('Choose terms'), findsNothing);
+          final unassigned = terms.firstWhere((term) =>
+            term.kind == BuyV2CommercialPaymentTermKind.wholesaleAdvance);
+          expect(purchase.chooseCommercialPaymentTerm(unassigned), isFalse,
+            reason: 'Buyer cannot replace the supplier-assigned arrangement.');
+          expect(purchase.checkoutAmountDueNow, 0);
+          expect(find.descendant(of: find.byKey(const ValueKey('buy-checkout-action-bar')),
+            matching: find.text('Due now')), findsOneWidget);
           expect(purchase.chooseCommercialPaymentTerm(advance), isTrue);
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
@@ -56764,16 +60923,20 @@ void main() {
             originalOrders,
           );
           expect(tester.takeException(), isNull);
-          await captureStoreView(
+          if (!retireBilling) {
+            await captureStoreView(
             tester,
             'restock-supplier-unavailable-${compact ? 'compact' : 'normal'}',
           );
+          }
           controller.session!.openOrders();
           await tester.pumpAndSettle();
-          await captureStoreView(
+          if (!retireBilling) {
+            await captureStoreView(
             tester,
             'restock-orders-${compact ? 'compact' : 'normal'}',
           );
+          }
           expect(
             find.byKey(const ValueKey('buy-promotion-orders-shop')),
             findsNothing,
@@ -56783,10 +60946,15 @@ void main() {
             findsNothing,
           );
           expect(tester.takeException(), isNull);
-          await tester.tap(find.byKey(const Key('work-dashboard-search')));
+          // Orders no longer carries the removed duplicate Store search.
+          // Its public field searches orders. Select Wholesale before testing
+          // product search, without changing either public search behaviour.
+          controller.session!.openDestination(BuyV2Destination.wholesale);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('buy-search-control')));
           await tester.pumpAndSettle();
           await tester.enterText(
-            find.byKey(const Key('work-dashboard-search-field')),
+            find.byKey(const ValueKey('buy-search-field')),
             'sunflower',
           );
           await tester.pumpAndSettle();
@@ -56794,9 +60962,912 @@ void main() {
           expect(controller.session!.destination, BuyV2Destination.wholesale);
           expect(controller.session!.query, 'sunflower');
           expect(tester.takeException(), isNull);
+          oldEdit();
+          await tester.pumpAndSettle();
+          expect(find.byType(StorePublicationSettings), findsNothing,
+            reason: 'An earlier checkout callback cannot open after leaving its visit.');
         }
       },
     );
+    }
+  }
+
+
+  test('NATIVEPREVIEW00 rejects host entry before replacing persistence', () async {
+    final before = SharedPreferencesAsyncPlatform.instance;
+    await expectLater(runNativeStoreRestockPreview(), throwsStateError);
+    expect(identical(SharedPreferencesAsyncPlatform.instance, before), isTrue);
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('RESTOCKPRODUCT02 public and Store product content match $scale', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({});
+      final previous = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+      addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final preview = await _NativeRestockPreview.create();
+      final publicCore = BuySession();
+      final public = BuyV2Session(core: publicCore, reviewDataEnabled: true);
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+        public.dispose(); publicCore.dispose(); preview.dispose();
+      });
+      expect(await preview.controller.open(purpose: BuyV2ProcurementPurpose.restock,
+        returnTo: 'catalogue'), isTrue);
+      final store = preview.controller.session!;
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+        home: BuyV2Screen(session: store, initialDestination: BuyV2Destination.wholesale)));
+      await tester.pumpAndSettle();
+      final product = tester.widget<BuyV2ProductCard>(find.byType(BuyV2ProductCard).first).product;
+      expect(product.customerTitle, 'Fresh tomatoes');
+      public.openDestination(BuyV2Destination.wholesale);
+      Future<({Size size, BoxDecoration decoration})> measureCard(BuyV2Session session) async {
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.quantityFor(product.id), 0);
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Scaffold(
+          body: BuyV2ThemeScope(
+            spec: BuyV2ThemeSpec.resolve(BuyV2Destination.wholesale, BuyV2View.catalogue),
+            refinedCommerce: true,
+            child: Align(alignment: Alignment.topLeft, child: SizedBox(width: 160,
+              child: BuyV2ProductCard(session: session, product: product, compact: true)))))));
+        await tester.pumpAndSettle();
+        final card = find.byType(BuyV2ProductCard);
+        final ink = tester.widget<InkWell>(find.byKey(ValueKey('buy-product-${product.id}')));
+        final result = (size: tester.getSize(card),
+          decoration: (ink.child! as Container).decoration! as BoxDecoration);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+        return result;
+      }
+      final publicCard = await measureCard(public);
+      final storeCard = await measureCard(store);
+      expect(storeCard.size, publicCard.size,
+        reason: 'Identical product/facts use the same full public card geometry in Store.');
+      expect(storeCard.decoration, publicCard.decoration,
+        reason: 'Store must not introduce a separate catalogue card skin.');
+      expect(store.openProduct(product.id), isTrue);
+      expect(public.openProduct('w-tomato'), isTrue);
+      Future<({List<double> geometry, BoxDecoration decoration})> measure(BuyV2Session session) async {
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+          home: Scaffold(body: BuyV2ProductView(session: session))));
+        await tester.pumpAndSettle();
+        final p = session.selectedProduct!;
+        expect(session.addProduct(p.id), isTrue);
+        await tester.pumpAndSettle();
+        final hero = find.byKey(ValueKey('buy-product-purchase-hero-${p.id}'));
+        final title = find.byKey(ValueKey('buy-product-title-${p.id}'));
+        final price = find.byKey(ValueKey('buy-product-hero-price-${p.id}'));
+        final gallery = find.byKey(ValueKey('buy-product-packshot-${p.id}'));
+        final pack = find.byKey(ValueKey('buy-product-pack-summary-${p.id}'));
+        final bounds = tester.getRect(hero);
+        final result = (geometry: [bounds.width, bounds.height,
+          tester.getRect(title).top - bounds.top, tester.getRect(price).top - bounds.top,
+          tester.getRect(pack).top - bounds.top, tester.getSize(gallery).height],
+          decoration: tester.widget<Container>(hero).decoration! as BoxDecoration);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+        return result;
+      }
+      final reference = await measure(public);
+      final actual = await measure(store);
+      expect(actual.geometry.length, reference.geometry.length);
+      for (var i = 0; i < actual.geometry.length; i++) {
+        expect(actual.geometry[i], closeTo(reference.geometry[i], .1),
+          reason: 'Store reuses public gallery/title/price/pack geometry at text scale $scale (metric $i).');
+      }
+      expect(actual.decoration, reference.decoration,
+        reason: 'Store product content uses the actual public card, without a separate skin.');
+      expect(store.quantityFor(product.id), product.minimumOrder);
+      expect(preview.personalState.value, isNull);
+    }, skip: !(const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+      const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')));
+
+    testWidgets('RESTOCKPUBLIC01 Store buying reuses public Wholesale Bulk presentation $scale', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({});
+      final previous = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+      addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = scale == 1 ? const Size(360, 800) : const Size(320, 568);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final preview = await _NativeRestockPreview.create();
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+        preview.dispose();
+      });
+      final core = BuySession();
+      final public = BuyV2Session(core: core, reviewDataEnabled: true,
+        cataloguePageSource: BuyV2DevelopmentCatalogueSource(
+          destination: BuyV2Destination.wholesale, providerCount: 24, skusPerStore: 24),
+        initialCatalogueRegionId: 'jodhpur');
+      addTearDown(public.dispose); addTearDown(core.dispose);
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: BuyV2Screen(
+        session: public, initialDestination: BuyV2Destination.wholesale)));
+      await tester.pumpAndSettle();
+      final publicGeometry = <BuyV2WholesaleSaleType, List<double>>{};
+      final publicCardText = <BuyV2WholesaleSaleType, List<String>>{};
+      Future<void> checkSharedChrome(BuyV2Session session, {required bool store}) async {
+        final grid = find.byType(BuyV2PagedProductCatalogue);
+        expect(grid, findsOneWidget);
+        expect(BuyV2ThemeScope.refinedOf(tester.element(grid)), isTrue,
+          reason: 'Restock must use the existing public shopping theme.');
+        final retainedSearch = find.byKey(const ValueKey('buy-search-band'), skipOffstage: false);
+        expect(retainedSearch, findsOneWidget);
+        await tester.ensureVisible(retainedSearch); await tester.pumpAndSettle();
+        final search = find.byKey(const ValueKey('buy-search-band'));
+        expect(search, findsOneWidget,
+          reason: jsonEncode({'requirement': 'Use the same reachable public search.', 'store': store,
+            'viewport': MediaQuery.sizeOf(tester.element(grid)).toString(),
+            'retainedSearch': find.byKey(const ValueKey('buy-search-band'), skipOffstage: false).evaluate().length,
+            'nestedOffsets': tester.stateList<NestedScrollViewState>(find.byType(NestedScrollView))
+              .map((s) => s.outerController.hasClients ? s.outerController.offset : null).toList()}));
+        final toolbar = find.byKey(const ValueKey('buy-catalogue-toolbar'));
+        expect(toolbar, findsOneWidget);
+        expect(find.ancestor(of: toolbar, matching:
+          find.byKey(const ValueKey('buy-paged-scroll-catalogue-wholesale'))), findsNothing,
+          reason: 'The public category/mode/filter row stays above the product scroll.');
+        expect(find.byKey(const ValueKey('store-catalogue-count-catalogue-wholesale')), findsNothing);
+        final cards = find.byType(BuyV2ProductCard);
+        expect(cards, findsWidgets, reason: jsonEncode({
+          'store': store, 'mode': session.wholesaleSaleType.name,
+          'query': session.catalogueQuery().key,
+          'visible': tester.widgetList<Text>(find.byType(Text)).map((t) => t.data ?? '')
+            .where((t) => t.isNotEmpty).take(18)
+            .map((t) => t.length > 120 ? t.substring(0, 120) : t).toList(),
+        }));
+        final card = cards.first;
+        final product = tester.widget<BuyV2ProductCard>(card).product;
+        final sourcePromise = session.productFactsFor(product).deliveryPromise;
+        if (session.wholesaleSaleType == BuyV2WholesaleSaleType.wholesale) {
+          expect(sourcePromise, 'Delivery time confirmed at checkout',
+            reason: 'The paired fixture must exercise the missing-schedule case.');
+        }
+        if (sourcePromise == 'Delivery time confirmed at checkout') {
+          expect(find.descendant(of: card, matching:
+            find.text('Delivery time confirmed at checkout')), findsNothing,
+            reason: 'A missing schedule cannot become a promise on the visible SKU card.');
+          final missingSchedule = find.descendant(of: card, matching:
+            find.text('Delivery schedule unavailable'));
+          expect(missingSchedule, findsWidgets);
+          expect(tester.widget<Text>(missingSchedule.first).style?.color, BuyV2Colors.muted,
+            reason: 'An unconfirmed schedule must not use positive delivery styling.');
+          expect(session.productFactsFor(product).deliveryPromise, sourcePromise,
+            reason: 'Presentation must not rewrite the supplier source.');
+        } else if (sourcePromise.startsWith('Dispatch')) {
+          expect(find.descendant(of: card, matching: find.text(sourcePromise)), findsWidgets,
+            reason: 'Keep an actual supplied dispatch estimate.');
+        }
+        final packshot = find.descendant(of: card,
+          matching: find.byKey(ValueKey('buy-grid-packshot-${product.id}')));
+        final price = find.descendant(of: card,
+          matching: find.byKey(ValueKey('buy-price-highlight-${product.id}')));
+        final geometry = [tester.getSize(card).width,
+          tester.getSize(packshot).width, tester.getSize(packshot).height,
+          tester.getSize(price).height];
+        final cardText = tester.widgetList<Text>(find.descendant(of: card,
+          matching: find.byType(Text))).map((text) => text.data ?? '').toList();
+        if (store) {
+          final reference = publicGeometry[session.wholesaleSaleType]!;
+          for (var i = 0; i < geometry.length; i++) {
+            expect(geometry[i], closeTo(reference[i], .1),
+              reason: 'Store must reuse public card width and image/price geometry (metric $i); '
+                'full-card height is compared separately with identical product text. '
+                '${jsonEncode({'public': publicCardText[session.wholesaleSaleType], 'store': cardText})}');
+          }
+          expect(tester.getSize(search).height, lessThanOrEqualTo(56));
+          expect(find.byKey(const ValueKey('buy-restock-back')).hitTestable(), findsOneWidget);
+          expect(find.byKey(const ValueKey('buy-change-location')), findsNothing);
+          expect(find.byKey(const ValueKey('buy-open-account')), findsNothing);
+          expect(tester.getRect(search).top,
+            closeTo(tester.getRect(find.byKey(const Key('native-restock-preview-notice'))).bottom, 1),
+            reason: 'Search replaces the Store-name header with no reserved blank toolbar.');
+        } else {
+          publicGeometry[session.wholesaleSaleType] = geometry;
+          publicCardText[session.wholesaleSaleType] = cardText;
+        }
+        final deliveryAddress = session.selectedAddressId;
+        final location = find.byKey(const ValueKey('buy-change-location'));
+        if (store) {
+          expect(location, findsNothing);
+          expect(session.selectedAddressId, deliveryAddress);
+          return;
+        }
+        expect(location.hitTestable(), findsOneWidget);
+        await tester.tap(location);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('buy-catalogue-area-list')), findsOneWidget,
+          reason: 'Restock uses the public sourcing-area control without editing Store delivery details.');
+        await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+        expect(session.selectedAddressId, deliveryAddress);
+        expect(tester.takeException(), isNull);
+      }
+      for (final type in [BuyV2WholesaleSaleType.wholesale, BuyV2WholesaleSaleType.bulk]) {
+        final mode = find.byKey(ValueKey('buy-wholesale-sale-type-${type.name}'));
+        await tester.ensureVisible(mode); await tester.tap(mode); await tester.pumpAndSettle();
+        expect(public.wholesaleSaleType, type);
+        await checkSharedChrome(public, store: false);
+      }
+      await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+      await tester.pumpWidget(preview.app); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
+      final inventory = jsonEncode(preview.work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+      final actions = find.byKey(const Key('work-home-actions-toggle'));
+      if (actions.evaluate().isNotEmpty) {
+        await tester.ensureVisible(actions); await tester.tap(actions); await tester.pumpAndSettle();
+      }
+      final restock = find.byKey(const Key('work-quick-buy'));
+      await reveal(tester, restock); await tester.tap(restock); await tester.pumpAndSettle();
+      final purchase = preview.controller.session!;
+      expect(purchase.isStoreProcurement, isTrue);
+      expect(purchase.procurementContext?.purpose, BuyV2ProcurementPurpose.restock);
+      expect(find.byKey(const Key('work-procurement-buyer-caption')), findsNothing);
+      expect(find.byKey(const Key('work-dashboard-inline-search-band')), findsNothing,
+        reason: 'Restock has one shared public search, without Store operational search or scan utilities.');
+      final supplierInfo = find.byKey(const Key('work-restock-supplier-types'));
+      expect(supplierInfo, findsNothing);
+      for (final type in [BuyV2WholesaleSaleType.wholesale, BuyV2WholesaleSaleType.bulk]) {
+        final mode = find.byKey(ValueKey('buy-wholesale-sale-type-${type.name}'));
+        await tester.ensureVisible(mode); await tester.tap(mode); await tester.pumpAndSettle();
+        expect(purchase.wholesaleSaleType, type);
+        await checkSharedChrome(purchase, store: true);
+      }
+      expect(purchase.cartLines, isEmpty);
+      expect(public.cartLines, isEmpty);
+      expect(preview.personalState.value, isNull);
+      expect(jsonEncode(preview.work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), inventory);
+      await tester.tap(find.byKey(const ValueKey('buy-restock-back'))); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-dashboard-catalogue-screen')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }, skip: !(const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+      const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')));
+  }
+
+  for (final fromStock in [false, true]) {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('NATIVEPREVIEW01 isolated Store Cart Checkout and unavailable execution $scale stockEntry=${fromStock ? 'explicit' : 'contextual'}', (tester) async {
+      final originalErrorHandler = FlutterError.onError;
+      FlutterError.onError = (details) {
+        if (details.exceptionAsString().contains('RenderFlex overflowed')) {
+          debugPrint(details.toString());
+        }
+        originalErrorHandler?.call(details);
+      };
+      addTearDown(() => FlutterError.onError = originalErrorHandler);
+      FlutterSecureStorage.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({});
+      final previous = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+      addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = scale == 1 ? const Size(360, 800) : const Size(320, 568);
+      tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 24);
+      tester.view.padding = const FakeViewPadding(top: 41, bottom: 24);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      var clockOffset = Duration.zero;
+      final preview = await _NativeRestockPreview.create(
+        now: () => DateTime.now().add(clockOffset));
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+        preview.dispose();
+      });
+      await tester.pumpWidget(preview.app); await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'Preview dashboard layout');
+      final notice = find.byKey(const Key('native-restock-preview-notice'));
+      expect(notice, findsOneWidget);
+      if (fromStock) {
+        await tester.tap(find.byKey(const Key('work-store-stock')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-dashboard-catalogue-screen')), findsOneWidget);
+      }
+      final actions = find.byKey(const Key('work-home-actions-toggle'));
+      if (actions.evaluate().isNotEmpty) {
+        await tester.ensureVisible(actions); await tester.tap(actions); await tester.pumpAndSettle();
+      }
+      final restock = find.byKey(const Key('work-quick-buy'));
+      await reveal(tester, restock);
+      expect(find.byKey(const Key('work-dashboard-catalogue-screen')), findsOneWidget);
+      await tester.tap(restock);
+      await tester.pump(const Duration(milliseconds: 700)); await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'Preview catalogue layout');
+      expect(preview.controller.bookmark!.returnTo, 'catalogue');
+      final bookmark = preview.controller.bookmark!;
+      expect(WorkProcurementBookmark.decode(
+        Map<String, Object?>.from(jsonDecode(jsonEncode(bookmark.toJson())) as Map),
+        accountId: bookmark.context.accountId, storeId: bookmark.context.storeId)?.returnTo,
+        'catalogue');
+      final purchase = preview.controller.session!;
+      expect(purchase.procurementContext?.accountId, 'native-frontend-preview-only');
+      expect(purchase.commerceAdapter, isA<_NativeRestockReadOnlyCommerce>());
+      expect(preview.personalState.value, isNull);
+      expect(purchase.visibleProducts, isNotEmpty,
+        reason: '${purchase.commerceLoadState}: ${purchase.procurementUnavailableMessage}');
+      if (fromStock) {
+        await tester.tap(find.byKey(const ValueKey('buy-wholesale-sale-type-bulk')));
+        await tester.pumpAndSettle();
+        expect(purchase.wholesaleSaleType, BuyV2WholesaleSaleType.bulk);
+        purchase.updateQuery('Premium basmati rice');
+        await tester.pumpAndSettle();
+      }
+      final product = tester.widget<BuyV2ProductCard>(find.byType(BuyV2ProductCard).first).product;
+      final add = find.byKey(ValueKey('buy-add-${product.id}'));
+      expect(add, findsOneWidget, reason: jsonEncode({
+        'view': purchase.view.name, 'destination': purchase.destination.name, 'expected': product.id,
+        'cards': tester.widgetList<BuyV2ProductCard>(find.byType(BuyV2ProductCard)).take(4).map((c) => c.product.id).toList(),
+        'text': tester.widgetList<Text>(find.byType(Text)).map((t) => t.data ?? '').where((t) => t.isNotEmpty)
+          .take(18).map((t) => t.length > 100 ? t.substring(0,100) : t).toList(),
+      }));
+      await tester.ensureVisible(add); await tester.pumpAndSettle();
+      expect(add.hitTestable(), findsOneWidget);
+      await tester.tap(add); await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'Preview catalogue after add');
+      expect(purchase.quantityFor(product.id), product.minimumOrder);
+      expect(purchase.openCheckout(), isTrue,
+        reason: 'The first ${purchase.wholesaleSaleType.name} fixture purchase has current reads.');
+      purchase.goBack(); await tester.pumpAndSettle();
+      expect(purchase.view, BuyV2View.cart);
+      final retainedRows = purchase.cartLines.map((line) =>
+        (line.product.id, line.product.pack, line.product.priceMinor, line.quantity)).toList();
+      final retainedAddress = purchase.selectedAddressId;
+      await purchase.retryCommerce(); await tester.pumpAndSettle();
+      expect(purchase.cartLines.map((line) =>
+        (line.product.id, line.product.pack, line.product.priceMinor, line.quantity)),
+        orderedEquals(retainedRows));
+      expect(purchase.selectedAddressId, retainedAddress);
+      expect(purchase.openCheckout(), isTrue,
+        reason: 'A fixture refresh must renew the retained ${purchase.wholesaleSaleType.name} offer, including Bulk products outside its first Wholesale page.');
+      purchase.goBack(); purchase.goBack(); await tester.pumpAndSettle();
+      expect(purchase.view, BuyV2View.catalogue);
+      Future<void> storeChrome(String step) async {
+        final backCandidates = [
+          find.byKey(const ValueKey('buy-restock-back')),
+          find.byKey(ValueKey('buy-product-return-hit-${product.id}')),
+          find.byKey(const ValueKey('buy-paged-store-close')),
+          find.byKey(const ValueKey('buy-cart-back')),
+          find.byKey(const Key('work-back')),
+        ];
+        final visibleBack = backCandidates.where((candidate) => candidate.hitTestable().evaluate().isNotEmpty).toList();
+        expect(visibleBack, isNotEmpty, reason: jsonEncode({
+          'step': step, 'view': purchase.view.name,
+          'product': purchase.selectedProduct?.id,
+          'backCounts': backCandidates.map((candidate) => candidate.evaluate().length).toList(),
+          'visibleText': tester.widgetList<Text>(find.byType(Text)).map((text) => text.data ?? '').where((text) => text.isNotEmpty).take(14).toList(),
+        }));
+        final back = visibleBack.first;
+        expect(back.hitTestable(), findsOneWidget,
+          reason: 'The current Store purchase surface has a reachable Back at $step.');
+        for (final key in ['work-store-home', 'work-store-orders', 'work-store-sell', 'work-store-stock']) {
+          final action = find.byKey(Key(key));
+          await tester.ensureVisible(action); await tester.pumpAndSettle();
+          expect(action.hitTestable(), findsOneWidget,
+            reason: 'Every Store rail action stays reachable beside the fixed public Cart at $step.');
+        }
+        expect(find.byKey(const ValueKey('buy-local-navigation-scroll-region')), findsNothing,
+          reason: 'An embedded purchase does not add a public Shop rail at $step.');
+      }
+      expect(purchase.openProduct(product.id), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-back')), findsNothing,
+        reason: 'Restock product details use one Back control, without a second Store toolbar.');
+      expect(find.byKey(const Key('work-restock-supplier-types')), findsNothing);
+      final sharedProductGallery = find.byKey(ValueKey('buy-product-packshot-${product.id}'));
+      expect(MediaQuery.sizeOf(tester.element(sharedProductGallery)).height,
+        tester.view.physicalSize.height / tester.view.devicePixelRatio,
+        reason: 'Store wiring must preserve the public device viewport for responsive product sizing.');
+      final productShare = find.byKey(ValueKey('buy-product-action-share-${product.id}'));
+      final productSave = find.byKey(ValueKey('buy-product-action-save-${product.id}'));
+      final productCart = find.byKey(const ValueKey('buy-compact-cart-indicator'));
+      expect(productCart, findsOneWidget);
+      expect(tester.getSize(productCart), const Size(44, 44));
+      expect(tester.getRect(productCart).top,
+        greaterThanOrEqualTo(tester.getRect(find.byKey(PageStorageKey('buy-product-${product.id}'))).bottom),
+        reason: 'Store reuses the current public fixed footer Cart; no header/floating Cart or extra bottom band.');
+      expect(find.ancestor(of: productCart, matching: find.byType(BuyV2ProductView)), findsNothing);
+      for (final action in [productSave, productShare]) {
+        expect(action.hitTestable(), findsOneWidget,
+          reason: 'Product actions remain reachable beside the retained Store Cart.');
+        expect(tester.getRect(action).overlaps(tester.getRect(productCart)), isFalse,
+          reason: 'The floating Store Cart must not cover product Save or Share.');
+      }
+      final supplier = find.byKey(ValueKey('buy-wholesale-store-action-${product.id}'));
+      final copySupplier = find.byKey(ValueKey('buy-product-copy-store-${product.id}'));
+      final productScroll = find.descendant(
+        of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+        matching: find.byType(Scrollable)).first;
+      await tester.scrollUntilVisible(copySupplier, 100, maxScrolls: 40,
+        scrollable: productScroll);
+      await tester.ensureVisible(copySupplier); await tester.pumpAndSettle();
+      expect(copySupplier.hitTestable(), findsOneWidget);
+      expect(find.text('Price confirmation unavailable'), findsNothing,
+        reason: 'Restock must not substitute its own price-information copy.');
+      expect(find.text('Payment terms'), findsWidgets,
+        reason: 'Restock uses the same neutral public payment-information entry.');
+      expect(find.text('Cash on Delivery'), findsNothing);
+      final continuationCards = find.byWidgetPredicate((widget) => widget is Semantics &&
+        widget.key is ValueKey<String> && (widget.key! as ValueKey<String>).value.startsWith('buy-product-continuation-'));
+      expect(continuationCards, findsWidgets);
+      for (final card in continuationCards.evaluate()) {
+        expect(find.descendant(of: find.byWidget(card.widget), matching:
+          find.byWidgetPredicate((widget) => widget is Text && (widget.data ?? '').startsWith('Supplier: '))),
+          findsNothing, reason: 'Restock must not add separate recommendation sections to the public presentation.');
+      }
+      expect(tester.getRect(copySupplier).overlaps(tester.getRect(productCart)), isFalse,
+        reason: 'The entire supplier Copy target must remain clear of Cart.');
+      final quickActions = find.byKey(ValueKey('buy-product-quick-actions-${product.id}'));
+      expect(find.descendant(of: quickActions, matching: find.byType(SingleChildScrollView)), findsOneWidget,
+        reason: 'Store uses the existing public product-actions row.');
+      await tester.scrollUntilVisible(supplier, 160, maxScrolls: 40,
+        scrollable: find.descendant(
+          of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+          matching: find.byType(Scrollable)).first);
+      await tester.ensureVisible(supplier); await tester.pumpAndSettle();
+      expect(tester.getRect(supplier).overlaps(tester.getRect(productCart)), isFalse,
+        reason: 'Visit supplier must remain clear of the Store Cart after scrolling.');
+      final paymentInfo = find.byKey(ValueKey('buy-product-assurance-payment-${product.id}'));
+      await tester.ensureVisible(paymentInfo); await tester.pumpAndSettle();
+      expect(paymentInfo.hitTestable(), findsOneWidget);
+      expect(find.ancestor(of: paymentInfo, matching: find.byType(SingleChildScrollView)), findsOneWidget,
+        reason: 'Store uses the existing public assurance row.');
+      await tester.tap(paymentInfo); await tester.pumpAndSettle();
+      expect(find.text('Review payment terms and available methods at checkout.'), findsOneWidget);
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      await tester.ensureVisible(supplier); await tester.pumpAndSettle();
+      await tester.tap(supplier); await tester.pumpAndSettle();
+      await storeChrome('supplier catalogue');
+      final supplierCardLabels = tester.widgetList<Semantics>(find.byType(Semantics))
+        .map((node) => node.properties.label ?? '')
+        .where((label) => label.startsWith('${product.customerTitle},')).toList();
+      expect(supplierCardLabels, isNotEmpty);
+      expect(supplierCardLabels, everyElement(contains('Delivery schedule unavailable')),
+        reason: 'Supplier cards announce the same unavailable delivery facts as their visible labels.');
+      expect(supplierCardLabels, everyElement(isNot(contains('Delivery time confirmed at checkout'))));
+      final supplierProduct = find.text(product.title).first;
+      await tester.ensureVisible(supplierProduct); await tester.pumpAndSettle();
+      await tester.tap(supplierProduct); await tester.pumpAndSettle();
+      expect(purchase.view, BuyV2View.product);
+      await storeChrome('supplier product');
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      final supplierCart = find.byKey(const ValueKey('buy-store-cart-bar'));
+      expect(supplierCart.hitTestable(), findsOneWidget);
+      await tester.tap(supplierCart); await tester.pumpAndSettle();
+      expect(purchase.view, BuyV2View.cart);
+      await storeChrome('supplier Cart');
+      expect(purchase.quantityFor(product.id), product.minimumOrder);
+      expect(preview.personalState.value, isNull);
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      await storeChrome('return to supplier');
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      await storeChrome('return to original product');
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      expect(purchase.view, BuyV2View.catalogue);
+      await storeChrome('return to Restock catalogue');
+      purchase.openCart(scope: BuyV2CartScope.wholesale); await tester.pumpAndSettle();
+      expect(notice, findsOneWidget);
+      expect(tester.takeException(), isNull, reason: 'Preview Cart layout');
+      expect(find.byKey(const Key('work-back')), findsNothing,
+        reason: 'Restock Cart must not duplicate the Store-name header and Back control.');
+      expect(find.byKey(const Key('work-procurement-buyer-caption')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-cart-scope-bar')), findsNothing,
+        reason: 'A Store basket has no second Shop or Wholesale/Bulk selection strip.');
+      final cartHeading = find.byKey(const ValueKey('buy-cart-heading'));
+      await tester.ensureVisible(cartHeading); await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-cart-back')).hitTestable(), findsOneWidget);
+      final firstCartRow = find.byKey(ValueKey('buy-cart-row-${product.id}'));
+      expect(tester.getRect(firstCartRow).top,
+        lessThanOrEqualTo(tester.getRect(cartHeading).bottom + 12),
+        reason: 'The first product follows the one shared Cart header without a redundant mode band.');
+      final supplierName = tester.widget<Text>(find.byKey(ValueKey('buy-cart-supplier-name-${product.id}')));
+      expect(supplierName.data, product.customerSeller(purchase.productFactsFor(product).partner));
+      expect(supplierName.maxLines, 1,
+        reason: 'Supplier identity remains as one subtle line rather than a large Store-name header.');
+      expect(tester.widget<Semantics>(find.byKey(ValueKey('buy-cart-product-summary-${product.id}')))
+        .properties.label, contains('Supplier: ${supplierName.data}'),
+        reason: 'The full supplier identity remains accessible when the visible line is shortened.');
+      final checkout = find.widgetWithText(FilledButton, 'Checkout');
+      if (find.byKey(const ValueKey('buy-cart-landscape-scroll-owner')).evaluate().isNotEmpty) {
+        final explore = find.byKey(const ValueKey('buy-cart-explore-header'));
+        final scrollable = find.descendant(
+          of: find.byKey(PageStorageKey('buy-cart-${purchase.cartScope.name}')),
+          matching: find.byType(Scrollable)).first;
+        for (var step = 0; step < 80 && checkout.hitTestable().evaluate().isEmpty; step++) {
+          expect(explore.hitTestable(), findsNothing,
+            reason: 'Compact Cart checkout must be reachable before product recommendations.');
+          await tester.drag(scrollable, const Offset(0, -100));
+          await tester.pumpAndSettle();
+        }
+        expect(checkout.hitTestable(), findsOneWidget,
+          reason: 'The primary Cart action remains reachable in the short viewport.');
+      }
+      await tester.scrollUntilVisible(checkout, 180, maxScrolls: 40,
+        scrollable: find.descendant(of: find.byKey(PageStorageKey('buy-cart-${purchase.cartScope.name}')),
+          matching: find.byType(Scrollable)).first);
+      await tester.ensureVisible(checkout); await tester.pumpAndSettle();
+      expect(checkout.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull, reason: 'Preview Cart scrolled layout');
+      if (scale == 1) {
+        final retainedCartScroll = find.descendant(
+          of: find.byKey(PageStorageKey('buy-cart-${purchase.cartScope.name}')),
+          matching: find.byType(Scrollable)).first;
+        final position = tester.state<ScrollableState>(retainedCartScroll).position;
+        position.jumpTo(position.maxScrollExtent); await tester.pumpAndSettle();
+        expect(checkout.hitTestable(), findsOneWidget);
+      }
+      clockOffset = const Duration(minutes: 16);
+      await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const ValueKey('buy-cart-notice-viewport')), findsOneWidget,
+        reason: 'Store Cart must explain why Checkout was blocked.');
+      expect(find.descendant(
+        of: find.byKey(const ValueKey('buy-cart-notice-viewport')),
+        matching: find.text(purchase.notice!)), findsOneWidget);
+      expect(purchase.quantityFor(product.id), product.minimumOrder);
+      expect(purchase.view, BuyV2View.cart);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      final availabilityRetry = find.byKey(const ValueKey('buy-cart-procurement-retry'));
+      if (scale == 1) {
+        expect(availabilityRetry.hitTestable(), findsOneWidget,
+          reason: 'Checkout rejection must reveal recovery even when the Cart was scrolled to recommendations.');
+        final recoveryText = find.descendant(
+          of: find.byKey(const ValueKey('buy-cart-procurement-recovery')),
+          matching: find.text(purchase.procurementCheckoutUnavailableMessage!));
+        final visibleCart = find.descendant(
+          of: find.byKey(PageStorageKey('buy-cart-${purchase.cartScope.name}')),
+          matching: find.byType(Scrollable)).first;
+        expect(tester.getRect(recoveryText).top,
+          greaterThanOrEqualTo(tester.getRect(visibleCart).top),
+          reason: 'The complete recovery text stays visible after the transient notice disappears.');
+      }
+      final cartScroll = find.descendant(
+        of: find.byKey(PageStorageKey('buy-cart-${purchase.cartScope.name}')),
+        matching: find.byType(Scrollable)).first;
+      await tester.scrollUntilVisible(availabilityRetry, -120,
+        maxScrolls: 80, scrollable: cartScroll);
+      await tester.ensureVisible(availabilityRetry); await tester.pumpAndSettle();
+      expect(availabilityRetry.hitTestable(), findsOneWidget,
+        reason: 'Expired Store purchasing needs an actionable retry after the transient notice expires.');
+      expect(purchase.quantityFor(product.id), product.minimumOrder);
+      clockOffset = Duration.zero;
+      await tester.tap(availabilityRetry); await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-cart-procurement-recovery')), findsNothing);
+      expect(purchase.view, BuyV2View.cart,
+        reason: 'Refreshing availability must not place an order or advance Checkout.');
+      await tester.scrollUntilVisible(checkout, 120, maxScrolls: 80, scrollable: cartScroll);
+      await tester.ensureVisible(checkout); await tester.pumpAndSettle();
+      await tester.tap(checkout); await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'Preview Checkout layout');
+      expect(purchase.view, BuyV2View.checkout);
+      expect(notice, findsOneWidget);
+      expect(preview.personalState.value, isNull);
+      expect(find.byKey(const Key('work-back')), findsNothing,
+        reason: 'Checkout must not restore the duplicate buying-Store header.');
+      expect(find.byKey(const ValueKey('buy-checkout-heading')), findsNothing,
+        reason: 'Restock must reuse the refined public Checkout header without an extra heading.');
+      expect(find.byKey(const ValueKey('buy-checkout-return-cart')).hitTestable(), findsOneWidget);
+      expect(purchase.checkoutPaymentTermsReviewRequired, isFalse);
+      final actionBar = find.byKey(const ValueKey('buy-checkout-action-bar'));
+      expect(find.descendant(of: actionBar, matching: find.text('Due now')), findsOneWidget);
+      expect(find.descendant(of: actionBar, matching: find.text('₹0')), findsOneWidget);
+      expect(find.text('Choose terms'), findsNothing);
+      expect(find.byKey(const ValueKey('buy-checkout-collection-choice')), findsNothing,
+        reason: 'The first Restock purchase path requires delivery; it must not offer a new collection purchase.');
+      expect(purchase.collectionCheckoutSelected, isFalse);
+      final checkoutScroll = find.descendant(
+        of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+        matching: find.byType(Scrollable)).first;
+      final flexibility = find.byKey(ValueKey(
+        'store-payment-flexibility-info-${purchase.checkoutFulfilmentGroups.first.key}'));
+      await tester.scrollUntilVisible(flexibility, 120, maxScrolls: 80, scrollable: checkoutScroll);
+      await tester.ensureVisible(flexibility); await tester.pumpAndSettle();
+      final fixedTerm = find.text('Pay on delivery');
+      expect(fixedTerm, findsOneWidget);
+      expect(tester.renderObject<RenderParagraph>(fixedTerm).didExceedMaxLines, isFalse,
+        reason: 'Supplier-assigned terms must remain readable at the current text size.');
+      await tester.tap(flexibility); await tester.pumpAndSettle();
+      final flexibilityDetail = find.textContaining('Completing purchases and paying this supplier on time');
+      expect(flexibilityDetail, findsOneWidget);
+      for (final group in purchase.checkoutFulfilmentGroups) {
+        final term = purchase.commercialPaymentTermsFor(group.key).firstWhere(
+          (term) => term.kind == BuyV2CommercialPaymentTermKind.paymentOnDelivery);
+        expect(purchase.chooseCommercialPaymentTerm(term), isTrue);
+      }
+      await tester.pumpAndSettle();
+      expect(purchase.checkoutPaymentTermsReviewRequired, isFalse);
+      expect(purchase.checkoutAmountDueNowMinor, 0);
+      expect(purchase.checkoutPayableTotalMinor, greaterThan(0));
+      expect(find.descendant(of: actionBar, matching: find.text('Due now')), findsOneWidget);
+      expect(find.descendant(of: actionBar, matching: find.text('₹0')), findsOneWidget,
+        reason: 'After selection the footer restores the source-derived amount due, rather than the order total.');
+      expect(find.byKey(const ValueKey('buy-checkout-balance-due')), findsOneWidget);
+      await tester.drag(checkoutScroll, const Offset(0, -350)); await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      expect(purchase.view, BuyV2View.cart);
+      tester.platformDispatcher.textScaleFactorTestValue = scale == 1 ? 1.6 : 1.0;
+      await tester.pumpAndSettle();
+      // A smaller font can leave the retained offset below the primary action.
+      final reentryScroll = find.descendant(
+        of: find.byKey(PageStorageKey('buy-cart-${purchase.cartScope.name}')),
+        matching: find.byType(Scrollable)).first;
+      await tester.drag(reentryScroll, const Offset(0, 4000)); await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(checkout, 120, maxScrolls: 80,
+        scrollable: find.descendant(of: find.byKey(PageStorageKey('buy-cart-${purchase.cartScope.name}')),
+          matching: find.byType(Scrollable)).first);
+      await tester.ensureVisible(checkout); await tester.pumpAndSettle();
+      expect(checkout.hitTestable(), findsOneWidget);
+      await tester.tap(checkout); await tester.pumpAndSettle();
+      expect(purchase.view, BuyV2View.checkout);
+      expect(tester.takeException(), isNull, reason: 'Scrolled Checkout reopens after a text-size change.');
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'Checkout restores the original text size.');
+      await tester.drag(checkoutScroll, const Offset(0, 4000)); await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(flexibility, 120, maxScrolls: 80, scrollable: checkoutScroll);
+      await tester.pumpAndSettle();
+      expect(flexibilityDetail, findsOneWidget,
+        reason: 'Payment explanation expansion survives scroll, return and font changes.');
+      expect(tester.takeException(), isNull);
+      const address = BuyV2Address(id: 'preview-only-address', kind: BuyV2AddressKind.home,
+        label: 'TEST address', recipient: 'TEST buyer', phone: '0000000000',
+        line: 'TEST street', area: 'TEST area', pinCode: '342001', landmark: 'TEST');
+      final request = BuyV2OrderPlacementRequest(lines: purchase.cartLines, address: address,
+        paymentMethod: 'upi', total: 1, amountDueNow: 1, idempotencyKey: 'preview-only-no-execution');
+      expect((await purchase.commerceAdapter.placeOrder(request)).outcome,
+        BuyV2OrderPlacementOutcome.unavailable);
+      final minor = BuyV2OrderPlacementRequest.minor(lines: purchase.cartLines, address: address,
+        paymentMethod: 'upi', totalMinor: 100, amountDueNowMinor: 100,
+        idempotencyKey: 'preview-only-no-minor-execution');
+      expect((await (purchase.commerceAdapter as BuyV2MinorOrderPlacementAdapter).placeOrderMinor(minor)).outcome,
+        BuyV2OrderPlacementOutcome.unavailable);
+      expect(purchase.orders, isEmpty);
+      expect(preview.personalState.value, isNull);
+      expect(tester.takeException(), isNull);
+      final returnCart = find.byKey(const ValueKey('buy-checkout-return-cart'));
+      await tester.scrollUntilVisible(returnCart, -180, maxScrolls: 80, scrollable: checkoutScroll);
+      await tester.ensureVisible(returnCart); await tester.pumpAndSettle();
+      await tester.tap(returnCart); await tester.pumpAndSettle();
+      expect(purchase.view, BuyV2View.cart);
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      expect(purchase.view, BuyV2View.catalogue);
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-dashboard-catalogue-screen')), findsOneWidget);
+      expect(purchase.quantityFor(product.id), product.minimumOrder);
+      expect(preview.personalState.value, isNull);
+      final reopen = find.byKey(const Key('work-quick-buy'));
+      await reveal(tester, reopen); await tester.tap(reopen); await tester.pumpAndSettle();
+      expect(preview.controller.session, same(purchase));
+      expect(purchase.view, BuyV2View.catalogue,
+        reason: 'An explicit Restock tap starts public catalogue browsing, while the saved Store basket stays available.');
+      expect(find.byType(BuyV2PagedProductCatalogue), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-wholesale-sale-type-selector')), findsOneWidget);
+      expect(purchase.quantityFor(product.id), product.minimumOrder);
+      expect(preview.personalState.value, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-dashboard-catalogue-screen')), findsOneWidget,
+        reason: 'Back at the base Restock catalogue exits its local route stack to Store once.');
+      expect(purchase.quantityFor(product.id), product.minimumOrder);
+      expect(preview.personalState.value, isNull);
+      expect(tester.takeException(), isNull);
+      if (fromStock) {
+        await reveal(tester, reopen); await tester.tap(reopen); await tester.pumpAndSettle();
+        expect(purchase.openProduct(product.id), isTrue); await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(supplier, 160, maxScrolls: 40,
+          scrollable: find.descendant(
+            of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+            matching: find.byType(Scrollable)).first);
+        await tester.ensureVisible(supplier); await tester.pumpAndSettle();
+        await tester.tap(supplier); await tester.pumpAndSettle();
+        await storeChrome('supplier before Store removal');
+        preview.work.activeWorkspace = null;
+        preview.work.notifyWorkspaceCatalogueBrowsingChanged();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('buy-store-cart-bar')), findsNothing,
+          reason: 'A retired buying Store cannot retain an active covered supplier route.');
+        expect(purchase.procurementScopeCurrent, isFalse);
+        expect(preview.personalState.value, isNull);
+        expect(tester.takeException(), isNull);
+      }
+      await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+    }, skip: !(const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+      const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')));
+  }
+
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('STRUCTUREDOFFER05 Store home Coupons opens shared editor and returns $scale', (tester) async {
+      final work = liveStore(contactDraftStore: _ContactDraftFixtureStore(),
+        offerDraftStoreFactory: (_) => _ContactDraftFixtureStore());
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: scale == 1 ? const Size(360, 800) : const Size(320, 568),
+        textScale: scale, openHomeActions: false);
+      final inventory = jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+      final storeId = work.activeWorkspace!.id;
+      final entry = find.byKey(const Key('work-home-coupons'));
+      expect(entry.hitTestable(), findsOneWidget);
+      expect(find.byKey(const Key('work-home-business-finance')).hitTestable(), findsOneWidget);
+      expect(tester.getSize(entry).height, greaterThanOrEqualTo(48));
+      await tester.tap(entry); await tester.pumpAndSettle();
+      expect(find.byTooltip('Close coupons'), findsOneWidget);
+      final create = find.byKey(const Key('work-coupon-create'));
+      await tester.ensureVisible(create); await tester.tap(create); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-coupon-type')), findsOneWidget);
+      final name = find.byKey(const Key('work-coupon-name'));
+      await tester.scrollUntilVisible(name, 160, scrollable: find.descendant(
+        of: find.byKey(const Key('work-coupon-editor')), matching: find.byType(Scrollable)).first);
+      expect(name.hitTestable(), findsOneWidget);
+      await _captureAnalyticsFixture(tester, 'structured-coupons-home-$scale');
+      await tester.tap(find.byTooltip('Close coupon editor')); await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Close coupons')); await tester.pumpAndSettle();
+      expect(entry.hitTestable(), findsOneWidget);
+      expect(work.activeWorkspace!.id, storeId);
+      expect(jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), inventory);
+      expect(tester.takeException(), isNull);
+    });
+    testWidgets('FINANCE07 Store home opens finance directly and retains records $scale', (tester) async {
+      final work = liveStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: scale == 1 ? const Size(360, 800) : const Size(320, 568),
+        textScale: scale, openHomeActions: false);
+      final inventory = jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+      final entry = find.byKey(const Key('work-home-business-finance'));
+      expect(entry.hitTestable(), findsOneWidget,
+        reason: 'Finance must be visible on Store home without opening Operations.');
+      expect(tester.getSize(entry).height, greaterThanOrEqualTo(48));
+      await tester.tap(entry); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('business-finance-sheet')), findsOneWidget);
+      expect(find.text('For ${work.activeWorkspace!.name}'), findsOneWidget);
+      expect(find.byKey(const Key('store-analytics-detail-money')), findsNothing);
+      final firstChoice = find.byKey(const ValueKey('business-finance-purpose-Purchase / dealer finance'));
+      expect(tester.getRect(firstChoice).bottom,
+        lessThanOrEqualTo(tester.getRect(find.byKey(const Key('business-finance-footer'))).top + 1),
+        reason: 'The actual Store theme must show a complete first choice before scrolling.');
+      await _captureAnalyticsFixture(tester, 'finance-home-compact-$scale');
+      await tester.tap(find.byKey(const Key('business-finance-close')));
+      await tester.pumpAndSettle();
+      expect(entry.hitTestable(), findsOneWidget);
+      expect(jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), inventory);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('FINANCE03 Store Money uses shared enquiry without Stock edits $scale', (tester) async {
+      final work = liveStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: scale == 1 ? const Size(360, 800) : const Size(320, 568), textScale: scale);
+      final inventory = jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+      await openStoreTools(tester);
+      final statement = find.byKey(const Key('work-business-statement'));
+      await reveal(tester, statement);
+      await tester.tap(statement);
+      await tester.pumpAndSettle();
+      final money = find.byKey(const Key('work-statement-money'));
+      await reveal(tester, money);
+      await tester.tap(money);
+      await tester.pumpAndSettle();
+      final entry = find.byKey(const Key('work-business-finance-open'));
+      await reveal(tester, entry);
+      expect(entry, findsOneWidget);
+      await tester.tap(entry);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('business-finance-sheet')), findsOneWidget);
+      expect(find.text('For ${work.activeWorkspace!.name}'), findsOneWidget);
+      expect(find.byKey(const Key('business-finance-purpose-Invoice / bill discounting')), findsOneWidget);
+      expect(find.byKey(const Key('business-finance-purpose-Working capital (CC / OD)')), findsOneWidget);
+      expect(tester.widget<FilledButton>(find.byKey(const Key('business-finance-request'))).onPressed, isNull);
+      expect(find.byKey(const Key('business-finance-unavailable')), findsOneWidget);
+      await _captureAnalyticsFixture(tester,'business-finance-$scale');
+      await tester.tap(find.byKey(const Key('business-finance-close')));
+      await tester.pumpAndSettle();
+      expect(entry, findsOneWidget);
+      expect(jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), inventory);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    for (final failure in ['account', 'verification']) {
+      testWidgets('RESTOCK04 blocked entry remains actionable $failure $scale', (tester) async {
+        final work = liveStore();
+        final bookmarks = _StorePurchaseBookmarks();
+        final consumerState = _StorePurchaseState('blocked-entry-consumer');
+        final controller = WorkProcurementController(
+          currentAccountId: () => failure == 'account' ? null : 'entry-account',
+          currentStoreId: () => work.activeWorkspace?.id,
+          storeApproved: () => failure != 'verification',
+          bookmarks: bookmarks,
+          stateStoreFactory: _StorePurchaseState.new,
+        );
+        await mount(tester, route: '/app/work/workspace/dashboard?section=stock',
+          work: work, procurementFactory: () => controller,
+          consumerStateStore: consumerState, textScale: scale,
+          viewport: scale == 2 ? const Size(320, 568) : const Size(360, 800));
+        final inventory = jsonEncode(work.workspaceCatalogueItems
+          .map((item) => item.toInventoryJson()).toList());
+        final restock = find.byKey(const Key('work-quick-buy'));
+        await reveal(tester, restock);
+        await tester.tap(restock);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-error')), findsOneWidget);
+        expect(find.byKey(const Key('work-notice')), findsNothing);
+        expect(find.text(controller.openFailureMessage!), findsOneWidget);
+        await tester.pump(const Duration(seconds: 3));
+        expect(find.byKey(const Key('work-error')), findsOneWidget,
+          reason: 'An entry failure must not expire like a success notice.');
+        expect(find.byKey(const Key('work-store-procurement-screen')), findsNothing);
+        expect(controller.session, isNull);
+        expect(bookmarks.writes, 0);
+        expect(consumerState.value, isNull);
+        expect(jsonEncode(work.workspaceCatalogueItems
+          .map((item) => item.toInventoryJson()).toList()), inventory);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('RESTOCK03 Store invoice details exclude personal and frozen inputs $scale', (tester) async {
+      const context = BuyV2ProcurementContext(accountId: 'billing-view-account',
+        storeId: 'billing-view-store', purpose: BuyV2ProcurementPurpose.restock,
+        originOperationId: 'billing-view-operation');
+      final identity = ValueNotifier<BuyV2ProcurementContext?>(context);
+      final core = BuySession();
+      final buy = BuyV2Session(core: core, procurementIdentity: identity,
+        customerStateStore: _StorePurchaseState(context.customerStateOwnerScope),
+        reviewDataEnabled: false);
+      final controller = BuyV2GstInvoiceController();
+      addTearDown(controller.dispose); addTearDown(buy.dispose);
+      addTearDown(core.dispose); addTearDown(identity.dispose);
+      expect(await controller.save(destination: BuyV2Destination.wholesale,
+        legalName: 'Personal account business', gstin: '08ABCDE1234F1Z5',
+        billingAddress: 'Personal account billing address', remember: false), isTrue);
+      final personalDetails = controller.detailsFor(BuyV2Destination.wholesale);
+      var calls = 0;
+      Widget slot(BuildContext _) { calls++; return const Text('Current private Store billing input'); }
+      Future<void> show(WidgetBuilder? builder) async {
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+          home: MediaQuery(data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+            child: Scaffold(body: BuyV2CheckoutGstDetails(
+              destinations: const [BuyV2Destination.wholesale], controller: controller,
+              session: buy, storeInvoiceDetailsBuilder: builder)))));
+        await tester.pumpAndSettle();
+      }
+      await show(null);
+      expect(find.text('Personal purchase'), findsNothing);
+      expect(find.textContaining('Personal account'), findsNothing);
+      expect(find.byKey(const ValueKey('buy-store-invoice-details-unavailable')), findsOneWidget);
+      await show(slot);
+      expect(find.text('Current private Store billing input'), findsOneWidget);
+      final beforeRecovery = calls;
+      for (final state in [BuyV2CheckoutSubmissionState.submitting,
+        BuyV2CheckoutSubmissionState.paymentActionRequired, BuyV2CheckoutSubmissionState.paymentPending,
+        BuyV2CheckoutSubmissionState.paymentUnknown, BuyV2CheckoutSubmissionState.confirmed,
+        BuyV2CheckoutSubmissionState.failed]) {
+        buy.checkoutSubmissionState = state;
+        await show(slot);
+        expect(find.text('Current private Store billing input'), findsNothing);
+        expect(find.text('Billing details for this purchase are unavailable.'), findsOneWidget);
+      }
+      expect(calls, beforeRecovery);
+      buy.checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
+      identity.value = null;
+      await show(slot);
+      expect(calls, beforeRecovery);
+      expect(controller.detailsFor(BuyV2Destination.wholesale), same(personalDetails));
+      expect(controller.requestedFor(BuyV2Destination.wholesale), isTrue);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (final explicitDashboard in [false, true]) {
@@ -59380,15 +64451,15 @@ void main() {
     );
     expect(find.text('Wholesale and Bulk'), findsNothing);
     final storeName = find.byKey(const Key('work-store-full-name'));
-    expect(tester.widget<Text>(storeName).data, 'Buying for ${work.activeWorkspace!.name}');
-    expect(tester.widget<Text>(storeName).maxLines, isNull);
+    expect(tester.widget<Text>(storeName).data, work.activeWorkspace!.name);
+    expect(tester.widget<Text>(storeName).maxLines, 2);
     expect(
       find.byKey(const Key('work-dashboard-inline-header')),
       findsOneWidget,
     );
     expect(
-      tester.renderObject<RenderParagraph>(storeName).didExceedMaxLines,
-      isFalse,
+      tester.widget<Semantics>(find.byKey(const Key('work-procurement-buyer-context'))).properties.label,
+      contains('Buying for ${work.activeWorkspace!.name}'),
     );
 
     await tester.binding.handlePopRoute();
@@ -63536,6 +68607,267 @@ void main() {
     });
   }
 
+  for (final scale in [1.0, 2.0]) {
+    for (final savedProduct in [false, true]) {
+      testWidgets('STOCK-RECOVERY unknown is not empty saved=$savedProduct scale=$scale', (tester) async {
+        // Isolated real-storage frontend journey; no device data or provider feed.
+        FlutterSecureStorage.setMockInitialValues({});
+        final account = _ContactDraftFixtureStore();
+        final backing = SecureWorkInventoryStore(accountScope: () => account.accountScope);
+        final storage = _InventoryWriteFailureFixture(backing);
+        const store = WorkWorkspace(id: 'qa-stock-read-recovery', name: 'Evaluation Stock recovery',
+          profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery', area: 'Local QA', verified: true);
+        WorkSession fresh() => WorkSession(contactDraftStore: account, inventoryStore: storage)
+          ..selectedProfile = workProfiles.first..workspaceId = store.id..activeWorkspace = store
+          ..reviewStage = WorkReviewStage.live..initialWorkspaceStateLoaded = true..retailerSetupSaved = true;
+        final original = workspaceMasterCatalogue.first.copyWith(stock: 7,
+          purchasePrice: 20, sellingPrice: 30, publicListing: false);
+        if (savedProduct) {
+          final authoring = fresh();
+          expect(await authoring.loadWorkspaceInventory(), isTrue);
+          expect(authoring.addOrUpdateWorkspaceProduct(original), isTrue);
+          expect(await authoring.workspaceInventorySaved, isTrue);
+          authoring.dispose();
+        }
+        final before = await backing.read(account.accountScope, store.id, qa: true);
+        final savedCopy = before?.products.map((p) => p.toInventoryJson()).toList();
+        final writes = storage.saveAttempts;
+        storage.failRead = true;
+        final work = fresh();
+        expect(await work.loadWorkspaceInventory(), isFalse);
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: const Size(320, 568), textScale: scale);
+        await tester.tap(find.byKey(const Key('work-store-stock')));
+        await tester.pumpAndSettle();
+        const empty = 'No products saved yet. Open Quick actions → Add products to add your stock.';
+        expect(find.text(empty), findsNothing);
+        expect(find.text('Stock unavailable'), findsOneWidget);
+        expect(find.byKey(const Key('work-stock-recovery-panel')), findsOneWidget);
+        expect(find.text('Try again without clearing Store data.'), findsOneWidget);
+        expect(find.byKey(const Key('work-add-products-search')), findsNothing);
+        expect(find.byKey(const Key('work-add-products-scan')), findsNothing);
+        expect(find.byKey(const Key('work-stock-open-statement')), findsNothing);
+        expect(tester.widget<InkWell>(find.byKey(const Key('work-quick-add-products'))).onTap, isNull);
+        if (!savedProduct) await _captureAnalyticsFixture(tester, 'stock-recovery-unavailable-$scale');
+        final retry = find.text('Recover stock');
+        expect(retry, findsOneWidget);
+        expect(retry.hitTestable(), findsOneWidget);
+        final reads = storage.readAttempts;
+        await tester.tap(retry); await tester.pumpAndSettle();
+        expect(storage.readAttempts, reads + 1);
+        expect(work.workspaceInventoryLoaded, isFalse);
+        expect(storage.saveAttempts, writes);
+
+        if (savedProduct && scale == 1) {
+          // The disabled entry must not replace unreadable Stock.
+          await tester.tap(find.byKey(const Key('work-quick-add-products')));
+          await tester.pumpAndSettle();
+          expect(storage.saveAttempts, writes);
+          expect(work.workspaceCatalogueItems, isEmpty);
+          expect(find.byKey(const Key('work-add-product-entry')), findsNothing);
+        }
+        final purchases = find.byKey(const Key('work-incoming-purchases'));
+        await tester.ensureVisible(purchases); await tester.pumpAndSettle();
+        final viewport = tester.getRect(find.byKey(const Key('work-stock-entry-controls')));
+        final purchaseLabel = tester.getRect(find.descendant(of: purchases, matching: find.text('Purchase register')));
+        expect(purchaseLabel.left, greaterThanOrEqualTo(viewport.left));
+        expect(purchaseLabel.right, lessThanOrEqualTo(viewport.right));
+        expect(tester.widget<Semantics>(find.byKey(const Key('work-stock-action-pages'))).properties.label,
+          contains('Stock actions, page'));
+        if (!savedProduct) await _captureAnalyticsFixture(tester, 'stock-recovery-purchases-$scale');
+        expect((await backing.read(account.accountScope, store.id, qa: true))?.products
+          .map((p) => p.toInventoryJson()).toList(), savedCopy);
+        storage.failRead = false;
+        await tester.tap(find.text('Recover stock')); await tester.pumpAndSettle();
+        expect(work.workspaceInventoryLoaded, isTrue);
+        expect(work.workspaceInventoryError, isNull);
+        expect(find.text('Recover stock'), findsNothing);
+        expect(find.byKey(const Key('work-add-products-search')), findsOneWidget);
+        expect(tester.widget<InkWell>(find.byKey(const Key('work-quick-add-products'))).onTap, isNotNull);
+        if (savedProduct) {
+          expect(work.workspaceCatalogueItems.single.toInventoryJson(), original.toInventoryJson());
+          expect(find.text(empty), findsNothing);
+          expect(find.byKey(Key('work-catalogue-stock-${original.id}')), findsOneWidget);
+          await _captureAnalyticsFixture(tester, 'stock-recovery-restored-$scale');
+        } else {
+          expect(work.workspaceCatalogueItems, isEmpty);
+          expect(find.text(empty), findsOneWidget);
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+
+  testWidgets('STOCK-RECOVERY action pages stay whole after width and text changes', (tester) async {
+    final work = liveStore();
+    final original = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(320, 568), textScale: 1);
+    await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('work-incoming-purchases'))); await tester.pumpAndSettle();
+    final counter = find.byKey(const Key('work-stock-action-pages'));
+    final pagePattern = RegExp(r'page (\d+) of (\d+)');
+    final initialCounter = tester.widget<Semantics>(counter).properties.label!;
+    final initialPage = int.parse(pagePattern.firstMatch(initialCounter)!.group(1)!);
+    for (final display in [(480.0, 2.0), (320.0, 2.0), (320.0, 1.0)]) {
+      tester.view.physicalSize = Size(display.$1, 568);
+      tester.platformDispatcher.textScaleFactorTestValue = display.$2;
+      await tester.pumpAndSettle();
+      final viewport = tester.getRect(find.byKey(const Key('work-stock-entry-controls')));
+      var visible = 0;
+      for (final (key, label) in [
+        ('work-quick-add-products', 'Add products'), ('work-quick-buy', 'Restock'),
+        ('work-incoming-purchases', 'Purchase register'), ('work-quick-group-buy', 'Buy together'),
+      ]) {
+        final text = find.descendant(of: find.byKey(Key(key)), matching: find.text(label));
+        final bounds = tester.getRect(text);
+        if (!bounds.overlaps(viewport)) continue;
+        visible++;
+        expect(bounds.left, greaterThanOrEqualTo(viewport.left));
+        expect(bounds.right, lessThanOrEqualTo(viewport.right));
+        expect(bounds.top, greaterThanOrEqualTo(viewport.top));
+        expect(bounds.bottom, lessThanOrEqualTo(viewport.bottom));
+      }
+      expect(visible, greaterThan(0));
+      final settledCounter = tester.widget<Semantics>(counter).properties.label!;
+      final settledPage = pagePattern.firstMatch(settledCounter)!;
+      final count = int.parse(settledPage.group(2)!);
+      expect(int.parse(settledPage.group(1)!), initialPage > count ? count : initialPage,
+        reason: 'Retain the actual visible page ($initialCounter) after $display, within measured page count.');
+    }
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), original);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('STOCK-RECOVERY retained rows cannot bypass an unresolved inventory reader', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final account = _ContactDraftFixtureStore();
+    final storage = _InventoryWriteFailureFixture(
+      SecureWorkInventoryStore(accountScope: () => account.accountScope))..failRead = true;
+    final work = WorkSession(contactDraftStore: account, inventoryStore: storage)
+      ..selectedProfile = workProfiles.first..workspaceId = 'qa-stock-cached'
+      ..activeWorkspace = const WorkWorkspace(id: 'qa-stock-cached', name: 'Evaluation cached Stock',
+        profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery', area: 'Local QA', verified: true)
+      ..reviewStage = WorkReviewStage.live..initialWorkspaceStateLoaded = true..retailerSetupSaved = true;
+    // Isolated retained-cache fixture; these rows do not prove a successful read.
+    final retained = workspaceMasterCatalogue.first.copyWith(stock: 7, publicListing: false);
+    work.workspaceCatalogueItems.add(retained);
+    expect(await work.loadWorkspaceInventory(), isFalse);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
+    expect(find.text('Stock unavailable'), findsOneWidget);
+    expect(find.byKey(const Key('work-add-products-search')), findsNothing);
+    expect(find.byKey(Key('work-catalogue-stock-${retained.id}')), findsNothing);
+    expect(tester.widget<InkWell>(find.byKey(const Key('work-quick-add-products'))).onTap, isNull);
+    expect(work.workspaceCatalogueItems.single.toInventoryJson(), retained.toInventoryJson());
+    expect(storage.saveAttempts, 0);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final retire in ['store', 'aba']) {
+    testWidgets('STOCK-RECOVERY stale retry cannot save a replacement Store $retire', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final account = _ContactDraftFixtureStore();
+      final storage = _InventoryWriteFailureFixture(
+        SecureWorkInventoryStore(accountScope: () => account.accountScope))..failRead = true;
+      const original = WorkWorkspace(id: 'qa-stock-old-action', name: 'Evaluation original Stock',
+        profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery', area: 'Local QA', verified: true);
+      final work = WorkSession(contactDraftStore: account, inventoryStore: storage)
+        ..selectedProfile = workProfiles.first..workspaceId = original.id..activeWorkspace = original
+        ..reviewStage = WorkReviewStage.live..initialWorkspaceStateLoaded = true..retailerSetupSaved = true;
+      expect(await work.loadWorkspaceInventory(), isFalse);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
+      final held = tester.widget<FilledButton>(find.byKey(const Key('work-stock-recovery-action'))).onPressed!;
+      storage.failRead = false;
+      expect(await work.loadWorkspaceInventory(retry: true), isTrue);
+      // The old action starts with a cached successful read, then loses its scope
+      // before its awaited continuation could save the replacement Store.
+      held();
+      work.activeWorkspace = const WorkWorkspace(id: 'qa-stock-replacement', name: 'Evaluation replacement Stock',
+        profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery', area: 'Local QA', verified: true);
+      if (retire == 'aba') work.activeWorkspace = original;
+      work.dismissMessages(); await tester.pumpAndSettle();
+      expect(storage.saveAttempts, 0);
+      final reads = storage.readAttempts;
+      held(); await tester.pumpAndSettle();
+      expect(storage.readAttempts, reads);
+      expect(storage.saveAttempts, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('STOCK-RECOVERY failed save keeps loaded Stock and save retry', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final account = _ContactDraftFixtureStore();
+    final storage = _InventoryWriteFailureFixture(
+      SecureWorkInventoryStore(accountScope: () => account.accountScope));
+    final work = WorkSession(contactDraftStore: account, inventoryStore: storage)
+      ..selectedProfile = workProfiles.first..workspaceId = 'qa-stock-save-retry'
+      ..activeWorkspace = const WorkWorkspace(id: 'qa-stock-save-retry', name: 'Evaluation unsaved Stock',
+        profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery', area: 'Local QA', verified: true)
+      ..reviewStage = WorkReviewStage.live..initialWorkspaceStateLoaded = true..retailerSetupSaved = true;
+    expect(await work.loadWorkspaceInventory(), isTrue);
+    final original = workspaceMasterCatalogue.first.copyWith(stock: 3, publicListing: false);
+    expect(work.addOrUpdateWorkspaceProduct(original), isTrue);
+    expect(await work.workspaceInventorySaved, isTrue);
+    storage.failSave = true;
+    final changed = original.copyWith(stock: 4);
+    expect(work.addOrUpdateWorkspaceProduct(changed), isTrue);
+    expect(await work.workspaceInventorySaved, isFalse);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
+    expect(work.workspaceInventoryLoaded, isTrue);
+    expect(find.text('Retry stock save'), findsOneWidget);
+    expect(find.text('Retry stock recovery'), findsNothing);
+    expect(find.textContaining('No products saved yet'), findsNothing);
+    expect(find.byKey(Key('work-catalogue-stock-${original.id}')), findsOneWidget);
+    expect(work.workspaceCatalogueItems.single.stock, 4);
+    storage.failSave = false;
+    await tester.tap(find.text('Retry stock save')); await tester.pumpAndSettle();
+    expect(work.workspaceInventoryError, isNull);
+    expect((await storage.read(account.accountScope, work.activeWorkspace!.id, qa: true))!.products.single.stock, 4);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('STOCK-RECOVERY unresolved read is not an empty inventory', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final account = _ContactDraftFixtureStore();
+    final storage = _InventoryWriteFailureFixture(
+      SecureWorkInventoryStore(accountScope: () => account.accountScope))..holdRead = Completer<void>();
+    final work = WorkSession(contactDraftStore: account, inventoryStore: storage)
+      ..selectedProfile = workProfiles.first..workspaceId = 'qa-stock-unresolved'
+      ..activeWorkspace = const WorkWorkspace(id: 'qa-stock-unresolved', name: 'Evaluation pending Stock',
+        profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery', area: 'Local QA', verified: true)
+      ..reviewStage = WorkReviewStage.live..initialWorkspaceStateLoaded = true..retailerSetupSaved = true;
+    final loading = work.loadWorkspaceInventory();
+    addTearDown(() {
+      if (!storage.holdRead!.isCompleted) storage.holdRead!.complete();
+    });
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
+    expect(work.workspaceInventoryLoaded, isFalse);
+    expect(work.workspaceInventoryError, isNull);
+    expect(find.text('Stock not loaded'), findsOneWidget);
+    expect(find.byKey(const Key('work-add-products-search')), findsNothing);
+    expect(find.textContaining('No products saved yet'), findsNothing);
+    expect(storage.saveAttempts, 0);
+    await tester.tap(find.text('Load stock')); await tester.pump();
+    expect(find.text('Loading…'), findsOneWidget);
+    expect(tester.widget<FilledButton>(find.byKey(const Key('work-stock-recovery-action'))).onPressed, isNull);
+    expect(storage.readAttempts, 1);
+    storage.holdRead!.complete(); expect(await loading, isTrue);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('No products saved yet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets(
     'STOCK-AUDIT-10 failed inventory save retains edits and retries',
     (tester) async {
@@ -63916,6 +69248,129 @@ void main() {
         expect(find.text('Edit product'), findsOneWidget);
       }
       expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('STOCKWORDS common inventory headings preserve channel prices and optional MRP $scale', (tester) async {
+      // Host-only presentation cases; never injected into the OPPO Store.
+      final work = storeViewFixture(null,_ContactDraftFixtureStore(),
+        null,null,null,null,null,null,null,null,null,_PurchaseInventoryFixtureStore());
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      final seed = workspaceMasterCatalogue.take(4).toList();
+      final items = [
+        seed[0].copyWith(clearMrp: true, retailEnabled: true, clearWholesaleOffer: true, sellingPriceMinor: 2650),
+        seed[1].copyWith(clearMrp: true, retailEnabled: false, sellingPriceMinor: 99900,
+          wholesaleOffer: WorkspaceWholesaleOffer(priceMinor: 1825, minimumPacks: 10, enabled: true,
+            saleType: BuyV2WholesaleSaleType.wholesale)),
+        seed[2].copyWith(clearMrp: true, retailEnabled: false, sellingPriceMinor: 88800,
+          stockMode: WorkspaceStockMode.availabilityOnly, available: true,
+          wholesaleOffer: WorkspaceWholesaleOffer(priceMinor: 1775, minimumPacks: 100, enabled: true,
+            saleType: BuyV2WholesaleSaleType.bulk)),
+      ];
+      work.workspaceCatalogueItems..clear()..addAll(items);
+      final movements = work.workspaceStockMovements.toList();
+      final export = StoreStockSnapshot(storeId: work.activeWorkspace!.id,
+        storeName: 'HOST Stock wording', scope: 'Host-only test', generatedAt: DateTime.utc(2026, 10, 24), products: items);
+      expect(export.rows[1][StoreStockSnapshot.headers.indexOf('Retail price (INR)')], isNull);
+      expect(export.rows[1][StoreStockSnapshot.headers.indexOf('Trade price at minimum quantity (INR)')], '18.25');
+      expect(export.rows[2][StoreStockSnapshot.headers.indexOf('Qty on hand')], isNull);
+      expect(export.rows[2].last, contains('Bulk ₹17.75\nat min 100 packs'));
+      expect(StoreStockSnapshot.headers, contains('Low-stock alert'));
+      expect(StoreStockSnapshot.headers, isNot(contains('Reorder level')));
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 800), textScale: scale);
+      await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
+      expect(find.text('Item'), findsOneWidget);
+      expect(find.text('Qty on hand'), findsOneWidget);
+      expect(find.text('Sale prices'), findsOneWidget);
+      expect(find.text('Low-stock alert'), findsOneWidget);
+      expect(find.byKey(const Key('work-stock-heading-3')), findsNothing);
+      String price(int i) => tester.widgetList<Text>(find.descendant(
+        of: find.byKey(Key('work-catalogue-price-${items[i].id}')), matching: find.byType(Text)))
+        .map((text) => text.data ?? '').join(' ');
+      expect(price(0), contains('Retail ₹26.50'));
+      expect(price(1), contains('Wholesale ₹18.25 at min 10 packs'));
+      expect(price(1), isNot(contains('999')));
+      expect(price(2), contains('Bulk ₹17.75 at min 100 packs'));
+      expect(price(2), isNot(contains('888')));
+      expect(find.descendant(of: find.byKey(Key('work-catalogue-stock-${items[2].id}')),
+        matching: find.text('Available')), findsOneWidget);
+      expect(work.workspaceCatalogueItems, orderedEquals(items));
+      expect(work.workspaceStockMovements, orderedEquals(movements));
+      expect(tester.takeException(), isNull);
+      work.workspaceCatalogueItems[0] = items[0].copyWith(sellingPriceMinor: 2125,
+        wholesaleOffer: WorkspaceWholesaleOffer(priceMinor: 1525, minimumPacks: 12, enabled: true,
+          saleType: BuyV2WholesaleSaleType.wholesale));
+      work.notifyListeners(); await tester.pumpAndSettle();
+      expect(price(0), contains('Retail ₹21.25'));
+      expect(price(0), contains('Wholesale ₹15.25 at min 12 packs'));
+      work.workspaceCatalogueItems[1] = items[1].copyWith(mrpMinor: 5000);
+      work.notifyListeners(); await tester.pumpAndSettle();
+      expect(find.text('Pack MRP'), findsOneWidget);
+      expect(find.descendant(of: find.byKey(Key('work-catalogue-mrp-${items[0].id}')),
+        matching: find.text('—')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(Key('work-catalogue-mrp-${items[1].id}')),
+        matching: find.text('₹50')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+    testWidgets('STOCKSEM covered numeric cells leave accessibility traversal $scale', (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+      final work = liveStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 800), textScale: scale);
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      final original = work.workspaceCatalogueItems.first;
+      final inventory = work.workspaceCatalogueItems.toList();
+      final movements = work.workspaceStockMovements.toList();
+      final scroll = find.byKey(const Key('work-stock-horizontal'));
+      final controller = tester.widget<SingleChildScrollView>(scroll).controller!;
+      Finder cell(String field) => find.byKey(Key('work-catalogue-$field-${original.id}'));
+      final stock = cell('stock');
+      final selling = cell('price');
+      final purchase = cell('purchase');
+      final identity = cell('edit');
+      final identityX = tester.getTopLeft(identity).dx;
+      final stockId = tester.getSemantics(stock).id;
+      final headingId = tester.getSemantics(find.byKey(const Key('work-stock-heading-0'))).id;
+      Set<int> exposedIds() {
+        final ids = <int>{};
+        void visit(SemanticsNode node, bool hidden) {
+          final excluded = hidden || node.getSemanticsData().flagsCollection.isHidden;
+          if (!excluded) ids.add(node.id);
+          node.visitChildren((child) { visit(child, excluded); return true; });
+        }
+        final render = tester.renderObject(scroll);
+        visit(render.owner!.semanticsOwner!.rootSemanticsNode!, false);
+        return ids;
+      }
+      expect(exposedIds(), contains(stockId));
+      final stockWidth = tester.getSize(stock).width;
+      final sellingWidth = tester.getSize(selling).width;
+      controller.jumpTo(stockWidth + 20);
+      await tester.pumpAndSettle();
+      expect(exposedIds(), isNot(contains(stockId)),
+        reason: 'An opaque frozen identity must hide the covered Stock control.');
+      expect(exposedIds(), isNot(contains(headingId)));
+      final sellingId = tester.getSemantics(selling).id;
+      expect(exposedIds(), contains(sellingId));
+      expect(tester.getTopLeft(identity).dx, closeTo(identityX, .01));
+      controller.jumpTo(stockWidth + sellingWidth);
+      await tester.pumpAndSettle();
+      expect(exposedIds(), isNot(contains(sellingId)));
+      expect(exposedIds(), contains(tester.getSemantics(purchase).id));
+      expect(tester.getTopLeft(identity).dx, closeTo(identityX, .01));
+      controller.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(exposedIds(), contains(tester.getSemantics(stock).id));
+      expect(work.workspaceCatalogueItems, orderedEquals(inventory));
+      expect(work.workspaceStockMovements, orderedEquals(movements));
+      expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
     });
   }
 
@@ -66147,15 +71602,15 @@ void main() {
       const oilQuery = 'Fortune Sunflower Oil 1 L pouch';
       expect(find.text('Wholesale and Bulk'), findsNothing);
       final storeName = find.byKey(const Key('work-store-full-name'));
-      expect(tester.widget<Text>(storeName).data, 'Buying for ${work.activeWorkspace!.name}');
-      expect(tester.widget<Text>(storeName).maxLines, isNull);
+      expect(tester.widget<Text>(storeName).data, work.activeWorkspace!.name);
+      expect(tester.widget<Text>(storeName).maxLines, 2);
       expect(
         tester.renderObject<RenderParagraph>(storeName).textScaler.scale(1),
         scale,
       );
       expect(
-        tester.renderObject<RenderParagraph>(storeName).didExceedMaxLines,
-        isFalse,
+        tester.widget<Semantics>(find.byKey(const Key('work-procurement-buyer-context'))).properties.label,
+        contains('Buying for ${work.activeWorkspace!.name}'),
       );
       expect(find.byType(AppBar), findsOneWidget);
       expect(
@@ -68104,6 +73559,110 @@ void main() {
     });
   }
 
+  // HOST ONLY: compare the actual owner-submission serializer with the public
+  // projection. No server IDs, publication approval or native feed are invented.
+  for (final channel in [BuyV2OfferClass.retail, BuyV2OfferClass.wholesale, BuyV2OfferClass.bulk]) {
+    test('PUBLICPARITY Store submission and customer projection ${channel.name}', () {
+      final base = workspaceMasterCatalogue.first.copyWith(clearCataloguePhoto: true, clearPrivatePhoto: true);
+      const measure = WorkspacePackMeasure(unit: BuyV2ComparisonUnit.litre, quantityMilli: 1000);
+      final clock = DateTime.utc(2026, 10, 24);
+      final item = base.copyWith(packMeasure: measure,
+        stockEntry: WorkspaceStockEntry(method: WorkspaceStockEntryMethod.manual,
+          productId: base.id, sku: base.sku, pack: base.pack,
+          stockMode: WorkspaceStockMode.exactQuantity, quantity: base.stock,
+          purchasePriceMinor: base.purchasePriceMinor, recordedAt: clock, stockAsOf: clock,
+          packMeasure: measure),
+        content: const WorkspaceProductContent(description: 'HOST supplier description',
+          highlights: ['HOST exact pack'], specifications: {'Storage': 'HOST printed instructions'}),
+        composition: 'HOST ingredients', regulatoryNote: 'HOST printed safety text',
+        wholesaleOffer: channel == BuyV2OfferClass.retail ? null : WorkspaceWholesaleOffer(
+          enabled: true, priceMinor: 1825, minimumPacks: 10,
+          saleType: channel == BuyV2OfferClass.bulk ? BuyV2WholesaleSaleType.bulk : BuyV2WholesaleSaleType.wholesale));
+      final before = jsonEncode(item.toInventoryJson());
+      final input = WorkspaceProductSubmissionInput.fromSaved(item).toJson();
+      final authored = input['content'] as Map;
+      final terms = (input['channels'] as List).cast<Map>().singleWhere((value) => value['kind'] == channel.name);
+      final projected = item.toBuyPublicProduct(storeId: 'HOST-store', storeName: 'HOST Store',
+        channel: channel == BuyV2OfferClass.retail ? BuyV2Destination.shop : BuyV2Destination.wholesale);
+      final content = WorkspacePublicContentAdapter(storeId: 'HOST-store', item: item,
+        sourceId: 'HOST-submission-parity').snapshotFor(projected);
+      expect([projected.title, projected.brand, projected.variant, projected.categoryId],
+        [authored['title'], authored['brand'], authored['variant'], authored['categoryId']]);
+      expect(projected.pack, (input['pack'] as Map)['label']);
+      expect(projected.offerClass, channel);
+      expect([projected.priceMinor, projected.mrpMinor, projected.minimumOrder],
+        [terms['priceMinor'], terms['mrpMinor'], terms['minimumOrder']]);
+      expect(content.description, authored['description']);
+      expect(content.highlights, authored['highlights']);
+      expect([for (final value in content.specifications) {'label': value.label, 'value': value.value}], authored['specifications']);
+      expect(WorkspaceCatalogueProductFacts.fromProduct(projected).toJson(), authored['productFacts']);
+      expect(input.keys, isNot(contains('purchasePriceMinor')));
+      expect(input.keys, isNot(contains('stock')));
+      expect(jsonEncode(item.toInventoryJson()), before);
+    });
+  }
+  for (final trade in [null, BuyV2WholesaleSaleType.wholesale, BuyV2WholesaleSaleType.bulk]) {
+    testWidgets('PUBLICMAP preview inherits current Store context ${trade?.name ?? 'retail'}', (tester) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      addTearDown(work.dispose);
+      expect(work.saveWorkspacePublicationDetails(const WorkspaceStorePublicationDetails(
+        businessType: 'manufacturer', returnSummary: 'HOST Store return terms', returnWindowDays: 3,
+        street: 'HOST supplier road', city: 'Jodhpur', state: 'Rajasthan', pinCode: '342003')), isTrue);
+      final item = workspaceMasterCatalogue.first.copyWith(returnPolicy: '',
+        wholesaleOffer: trade == null ? null : WorkspaceWholesaleOffer(
+          priceMinor: 1825, minimumPacks: 10, enabled: true, saleType: trade),
+        content: const WorkspaceProductContent(description: 'HOST saved description',
+          specifications: {'Storage': 'HOST supplied storage'}));
+      work.workspaceCatalogueItems..clear()..add(item);
+      final before = jsonEncode(item.toInventoryJson());
+      final previous = SharedPreferencesAsyncPlatform.instance;
+      final probe = _PreviewPreferencesProbe();
+      SharedPreferencesAsyncPlatform.instance = probe;
+      addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home:
+        SavedStoreProductCustomerPreview(work: work, saved: item,
+          channel: trade == null ? BuyV2Destination.shop : BuyV2Destination.wholesale)));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final session = tester.widget<BuyV2Screen>(find.byType(BuyV2Screen)).session;
+      expect(session.selectedProduct!.sellerType, 'Manufacturer');
+      expect(session.marketplaceTrustFor(session.selectedProduct!).partnerLocation,
+        work.workspacePublicStoreDetails!.address);
+      // The original public provider leaves these legacy-only display strings
+      // empty. A draft must not preview content absent from submission/readback.
+      expect([session.selectedProduct!.badge, session.selectedProduct!.confirmedOn,
+        session.selectedProduct!.deliveryPromise, session.selectedProduct!.origin,
+        session.selectedProduct!.visualLabel, session.selectedProduct!.visualKind],
+        everyElement(isEmpty));
+      expect(session.selectedProduct!.returnPolicy, 'HOST Store return terms');
+      expect(session.selectedProduct!.offerClass, trade == null ? BuyV2OfferClass.retail
+        : trade == BuyV2WholesaleSaleType.bulk ? BuyV2OfferClass.bulk : BuyV2OfferClass.wholesale);
+      final content = session.productContentFor(session.selectedProduct!);
+      expect(content.description, item.content.description);
+      expect({for(final f in content.specifications) f.label:f.value}, item.content.specifications);
+      expect(work.saveWorkspacePublicationDetails(const WorkspaceStorePublicationDetails(
+        businessType: 'wholesaler', returnSummary: 'HOST changed Store terms')), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.text('The Store or saved product changed. Close this preview and reopen the product.'), findsOneWidget);
+      expect(await session.customerStateStore!.read(), isNull);
+      expect(session.marketplaceTrustFor(session.selectedProduct!).partnerLocation, isNull);
+      expect(jsonEncode(item.toInventoryJson()), before);
+      expect(probe.rootReads, 0); expect(probe.rootWrites, 0);
+    });
+  }
+  testWidgets('PUBLICMAP unsupported trade preview is a safe unavailable state', (tester) async {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore()); addTearDown(work.dispose);
+    final item = workspaceMasterCatalogue.first.copyWith(wholesaleOffer: WorkspaceWholesaleOffer(
+      priceMinor: 1825, minimumPacks: 10, incrementPacks: 5, enabled: true,
+      saleType: BuyV2WholesaleSaleType.bulk));
+    work.workspaceCatalogueItems..clear()..add(item);
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home:
+      SavedStoreProductCustomerPreview(work: work, saved: item, channel: BuyV2Destination.wholesale)));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Quantity prices need confirmation before this preview is available.'), findsOneWidget);
+    expect(find.byType(BuyV2Screen), findsNothing);
+  });
   testWidgets('CONTENT-GUIDE CSV guided clear survives save retry and storage restart', (tester) async {
     FlutterSecureStorage.setMockInitialValues({});
     final account = _ContactDraftFixtureStore();
@@ -68162,7 +73721,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
   testWidgets('CONTENT-GUIDE manual cucumber saves without brand variant or optional details', (tester) async {
-    final work = storeViewFixture(); work.workspaceCatalogueItems.clear();
+    final work = storeViewFixture(null,_ContactDraftFixtureStore(),
+      null,null,null,null,null,null,null,null,null,_PurchaseInventoryFixtureStore());
+    work.workspaceCatalogueItems.clear();
+    expect(await work.loadWorkspaceInventory(),isTrue);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work,
       viewport: const Size(320, 806), textScale: 2, bottomInset: 0);
     final add = find.byKey(const Key('work-quick-add-products'));
@@ -68189,6 +73751,8 @@ void main() {
     await show(pack); await tester.enterText(pack, '1 kg');
     expect(tester.widget<TextField>(find.byKey(const Key('work-product-brand'))).controller!.text, isEmpty);
     expect(find.text('Optional for loose fruit and vegetables'), findsOneWidget);
+    expect(tester.widget<TextField>(find.byKey(const Key('work-product-delivery'))).controller!.text, isEmpty);
+    expect(find.text('Required for public review. You can save private Stock without it.'), findsOneWidget);
     final save = find.byKey(const Key('work-product-save'));
     await show(save); await tester.tap(save); await tester.pumpAndSettle();
     final saved = work.workspaceCatalogueItems.single;
@@ -68196,17 +73760,34 @@ void main() {
     expect(saved.variantMembership, isNull); expect(saved.variant, isEmpty);
     expect(saved.content.isEmpty, isTrue); expect(saved.pack, '1 kg');
     expect(saved.sellingPriceMinor, 4025); expect(saved.publicListing, isFalse);
+    expect(saved.deliveryPromise, isEmpty);
+    expect(WorkspacePublicationContract.productIssues(saved,
+      storeId: work.activeWorkspace!.id, storeName: 'Host Store')
+      .map((issue) => issue.field), contains('${saved.id}:deliveryPromise'));
     expect(tester.takeException(), isNull);
   });
   for (final display in [360.0, 320.0]) {
     testWidgets('CONTENT-GUIDE category details reuse saved specifications $display', (tester) async {
-      final work = storeViewFixture();
+      final work = storeViewFixture(null,_ContactDraftFixtureStore(),
+        null,null,null,null,null,null,null,null,null,_PurchaseInventoryFixtureStore());
       work.workspaceCatalogueItems.clear();
+      expect(await work.loadWorkspaceInventory(),isTrue);
+      expect(work.localInventoryEnabled,isTrue);
+      expect(work.workspaceInventoryLoaded,isTrue);
+      expect(work.workspaceCatalogueItems,isEmpty);
       await mount(tester, route: '/app/work/workspace/dashboard', work: work,
         viewport: Size(display, 806), textScale: display == 320 ? 2 : 1, bottomInset: 0);
       final add = find.byKey(const Key('work-quick-add-products'));
       await reveal(tester, add); await tester.tap(add); await tester.pumpAndSettle();
-      await tester.tap(find.byKey(Key('work-catalogue-add-${workspaceMasterCatalogue.first.id}')));
+      expect(find.byKey(const Key('work-add-products-picker')),findsOneWidget,
+        reason:find.byType(Text).evaluate().map((e)=>(e.widget as Text).data).take(20).join(' / '));
+      final catalogueItem=workspaceMasterCatalogue.first;
+      expect(work.referenceCatalogue.any((p)=>p.id==catalogueItem.id),isTrue);
+      await tester.enterText(find.byKey(const Key('work-add-products-search')),catalogueItem.sku);
+      await tester.pumpAndSettle();
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      final choice=find.byKey(Key('work-catalogue-add-${catalogueItem.id}'));
+      await reveal(tester,choice); await tester.tap(choice);
       await tester.pumpAndSettle();
       Future<void> show(Finder finder) async {
         FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
@@ -68224,6 +73805,17 @@ void main() {
       final guide = find.byKey(const Key('work-product-guided-details'));
       expect(guide, findsOneWidget, reason: 'Owner needs named category inputs, not another repeated product form');
       await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
+      final guideCancel=find.byKey(const Key('work-product-guided-cancel'));
+      final guideApply=find.byKey(const Key('work-product-guided-apply'));
+      for (final action in [guideCancel,guideApply]) {
+        expect(tester.getSize(action).height,greaterThanOrEqualTo(48));
+        expect(tester.getSize(action).width,greaterThanOrEqualTo(48));
+      }
+      if (display == 360) {
+        expect(tester.getTopLeft(guideCancel).dy,tester.getTopLeft(guideApply).dy,
+          reason:'Short category actions fit one row at normal phone text size.');
+      }
+      await _captureAnalyticsFixture(tester,'category-guide-${display.toInt()}-top');
       final storage = find.byKey(const Key('work-product-guided-Storage'));
       expect(tester.widget<TextField>(storage).controller!.text, 'Dry');
       expect(find.byKey(const Key('work-product-guided-Preparation')), findsOneWidget);
@@ -68254,6 +73846,7 @@ void main() {
         reason: 'Focused label entry must stay inside the visible dialog after keyboard resize');
       expect(tester.getBottomRight(declarationEditor).dy, lessThanOrEqualTo(actionTop),
         reason: 'Focused label entry must not hide behind fixed dialog actions');
+      await _captureAnalyticsFixture(tester,'category-guide-${display.toInt()}-keyboard');
       expect(tester.widget<TextField>(declaration).controller!.text, isEmpty);
       tester.view.viewInsets = const FakeViewPadding();
       FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
@@ -68302,12 +73895,13 @@ void main() {
       expect(find.byKey(const Key('work-product-guided-Model code')), findsNothing);
       await tester.tap(detailGuide); await tester.pumpAndSettle();
       await tester.tap(find.text('Electronics').last); await tester.pumpAndSettle();
-      for (final label in ['Model code', 'RAM', 'Storage capacity', 'Compatibility', 'In the box']) {
+      for (final label in ['Model code', 'RAM', 'Storage capacity', 'Compatibility', 'In the box', 'Condition']) {
         final field = find.byKey(Key('work-product-guided-$label'));
         expect(field, findsOneWidget);
         expect(tester.widget<TextField>(field).controller!.text, isEmpty);
       }
-      const electronics = {'Model code': 'Host model', 'RAM': '8 GB', 'Storage capacity': '256 GB'};
+      const electronics = {'Model code': 'Host model', 'RAM': '8 GB', 'Storage capacity': '256 GB',
+        'Condition': 'HOST supplier states sealed and unused'};
       for (final entry in electronics.entries) {
         final field = find.byKey(Key('work-product-guided-${entry.key}'));
         await show(field); await tester.enterText(field, entry.value);
@@ -68316,6 +73910,28 @@ void main() {
         await show(detailGuide); await tester.tap(detailGuide); await tester.pumpAndSettle();
         await tester.tap(find.text(name).last); await tester.pumpAndSettle();
       }
+      final conditionField = find.byKey(const Key('work-product-guided-Condition'));
+      final conditionEditor = find.descendant(of: conditionField, matching: find.byType(EditableText));
+      await show(conditionField); await tester.tap(conditionEditor);
+      await tester.enterText(conditionEditor, 'TEST');
+      for (final inset in [80.0, 160.0, 240.0, 284.0]) {
+        tester.view.viewInsets = FakeViewPadding(bottom: inset);
+        await tester.pump(const Duration(milliseconds: 32));
+      }
+      await tester.pumpAndSettle();
+      await tester.enterText(conditionEditor, 'TEST supplier states sealed and unused');
+      await tester.pumpAndSettle();
+      final conditionCaption = find.text('Condition');
+      expect(tester.getTopLeft(conditionCaption).dy,
+        greaterThanOrEqualTo(tester.getTopLeft(find.byType(AlertDialog)).dy),
+        reason: 'Keep the field caption visible after the keyboard opens and the input wraps.');
+      expect(tester.getTopLeft(conditionEditor).dy,
+        greaterThanOrEqualTo(tester.getTopLeft(find.byType(AlertDialog)).dy));
+      expect(tester.getBottomRight(conditionEditor).dy,
+        lessThanOrEqualTo(tester.getTopLeft(find.byKey(const Key('work-product-guided-cancel'))).dy));
+      await tester.enterText(conditionEditor, electronics['Condition']!);
+      tester.view.viewInsets = const FakeViewPadding();
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
       await chooseGuide('Appliances');
       const applianceDetails = {'Capacity': 'Host supplied 7 kg',
         'Electrical supply': 'Host supplied 230 V, 50 Hz', 'Energy label': 'Host printed rating period',
@@ -68354,21 +73970,24 @@ void main() {
         reason: 'Changing the guide is not a delete command for hidden edits or original details');
       await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-product-guided-Model code')), findsNothing);
-      expect(find.text('Choose a guide above to add optional product details. Existing specifications are kept.'), findsOneWidget);
+      expect(find.text('Choose a guide above to add optional product details. Existing specifications are kept.'), findsNothing);
       await chooseGuide('Electronics');
       for (final entry in electronics.entries) {
         expect(tester.widget<TextField>(find.byKey(Key('work-product-guided-${entry.key}'))).controller!.text, entry.value);
       }
       final model = find.byKey(const Key('work-product-guided-Model code'));
       await show(model); await tester.enterText(model, '');
+      final condition = find.byKey(const Key('work-product-guided-Condition'));
+      await show(condition); await tester.enterText(condition, '');
       await chooseGuide('General');
       await show(apply); await tester.tap(apply); await tester.pumpAndSettle();
-      final clearedDetails = Map<String, String>.of(allDetails)..remove('Model code');
+      final clearedDetails = Map<String, String>.of(allDetails)..remove('Model code')..remove('Condition');
       expect(WorkspaceProductContent.parse({'specifications':
         tester.widget<TextField>(specs).controller!.text}).specifications, clearedDetails);
       await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
       await chooseGuide('Electronics');
       await show(model); await tester.enterText(model, 'Cancelled electronics edit');
+      await show(condition); await tester.enterText(condition, 'Cancelled condition edit');
       await chooseGuide('General');
       await show(cancel); await tester.tap(cancel); await tester.pumpAndSettle();
       expect(WorkspaceProductContent.parse({'specifications':
@@ -68380,6 +73999,50 @@ void main() {
       expect(saved.content.specifications, clearedDetails);
       expect(saved.catalogueFactsRequireReview, isTrue); expect(saved.publicListing, isFalse);
       expect(saved.stock, 0); expect(tester.takeException(), isNull);
+      // Host-only regression; OPPO acceptance uses the separately app-entered SKU.
+      final beforePreview = jsonEncode(saved.content.toJson());
+      final editSaved = find.byKey(Key('work-catalogue-edit-${saved.id}'));
+      await reveal(tester, editSaved); await tester.tap(editSaved); await tester.pumpAndSettle();
+      final preview = find.byKey(const Key('work-product-customer-preview'));
+      final priorPreferences = SharedPreferencesAsyncPlatform.instance;
+      final preferencesProbe = _PreviewPreferencesProbe();
+      SharedPreferencesAsyncPlatform.instance = preferencesProbe;
+      addTearDown(() => SharedPreferencesAsyncPlatform.instance = priorPreferences);
+      await show(preview); await tester.tap(preview); await tester.pumpAndSettle();
+      expect(find.text('Test preview · Not published · Ordering unavailable'), findsOneWidget);
+      final publicScreen = tester.widget<BuyV2Screen>(find.byType(BuyV2Screen));
+      expect(publicScreen.session.selectedProduct?.id, saved.id);
+      expect(publicScreen.session.selectedProduct?.priceMinor, saved.sellingPriceMinor);
+      expect(publicScreen.session.reviewDataEnabled, isFalse);
+      expect(publicScreen.session.customerStateStore!.ownerScope,
+        'saved-store-preview:${publicScreen.session.selectedProduct!.storeId}:${saved.id}');
+      expect(publicScreen.session.cartBenefitsAdapter, isA<BuyV2DisabledCartBenefitsAdapter>());
+      expect(publicScreen.session.commerceAdapter, isA<BuyV2UnavailableCommerceAdapter>());
+      expect(publicScreen.session.cartLines, isEmpty);
+      expect(publicScreen.session.addProduct(saved.id), isFalse);
+      expect(publicScreen.session.cartLines, isEmpty);
+      expect(publicScreen.session.productContentAdapter.snapshotFor(
+        publicScreen.session.selectedProduct!.copyWith(storeId: 'unrelated-store')).state,
+        BuyV2ProductContentState.unavailable);
+      final publicContent = publicScreen.session.productContentFor(publicScreen.session.selectedProduct!);
+      expect({for (final field in publicContent.specifications) field.label: field.value}, clearedDetails);
+      await tester.scrollUntilVisible(find.text('All details'), 300,
+        scrollable: find.descendant(of: find.byKey(PageStorageKey('buy-product-${saved.id}')),
+          matching: find.byType(Scrollable)).first);
+      await tester.pumpAndSettle();
+      expect(find.text('All details'), findsOneWidget);
+      for (final value in clearedDetails.values) { expect(find.text(value), findsWidgets); }
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byTooltip('Close customer preview')); await tester.pumpAndSettle();
+      expect(find.byType(BuyV2Screen), findsNothing);
+      expect(preferencesProbe.rootReads, 0, reason: 'Preview must not read personal state under device-review defines');
+      expect(preferencesProbe.rootWrites, 0, reason: 'Preview must not write personal state, including during disposal');
+      expect(await publicScreen.session.customerStateStore!.read(), isNull);
+      expect(await publicScreen.session.customerStateStore!.write(const BuyV2CustomerStateSnapshot()), isFalse);
+      expect(identical(work.workspaceCatalogueItems.single, saved), isTrue);
+      expect(jsonEncode(work.workspaceCatalogueItems.single.content.toJson()), beforePreview);
+      expect(work.workspaceCatalogueItems.single.publicListing, isFalse);
+      expect(tester.takeException(), isNull);
     });
     testWidgets(
       'CONTENT-MAP shared product copy validation and save $display',
@@ -72169,15 +77832,28 @@ void main() {
       }
 
       await openOffers();
+      await _captureAnalyticsFixture(tester,'store-offers-$scale-top');
       await enter('work-offer-title', 'Monthly basket saving');
       await enter(
         'work-offer-detail',
         'Save on selected essentials until Sunday.',
       );
       await enter('work-offer-order-cap', '27');
+      await _captureAnalyticsFixture(tester,'store-offers-$scale-limits');
       tester.testTextInput.hide();
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
+      final publishAction=find.byKey(const Key('work-offer-publish'));
+      await revealOfferField(publishAction);
+      for (final key in ['work-offer-save-draft','work-offer-publish']) {
+        final action=find.byKey(Key(key));
+        final icon=find.descendant(of:action,matching:find.byType(Icon));
+        final label=find.descendant(of:action,matching:find.byType(Text));
+        expect(tester.getSize(action).height,greaterThanOrEqualTo(48));
+        expect(tester.getRect(icon).overlaps(tester.getRect(label)),isFalse,
+          reason:'Offer action icons and labels remain separate at enlarged text.');
+      }
+      await _captureAnalyticsFixture(tester,'store-offers-$scale-footer');
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await openOffers();
@@ -72447,7 +78123,7 @@ void main() {
             )
             .first,
       );
-      expect(incomingSemantics.properties.label, 'Purchases');
+      expect(incomingSemantics.properties.label, 'Purchase register');
       expect(
         work.workspacePurchases.map((purchase) => purchase.shipmentId),
         unorderedEquals([for (var i = 0; i < 8; i++) 'SHIP-$i']),

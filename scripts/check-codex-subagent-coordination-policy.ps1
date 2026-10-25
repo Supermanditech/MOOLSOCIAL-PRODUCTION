@@ -7959,6 +7959,24 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     'scripts/test-cross-agent-incremental-ticket-gate.ps1',
     'docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.json')
   $allowedOwners=@($exactOwners)
+  if ($null -ne $Continuation.PSObject.Properties['supplierStatementReview20261023']) {
+    $statement = $Continuation.supplierStatementReview20261023
+    $statementOwners = @('apps/mobile/lib/features/work/work_downloads.dart',
+      'apps/mobile/test/work_downloads_test.dart')
+    if ($statement.state -cne 'founder_authorized_frontend_statement_defect_correction' -or
+        (@($statement.owners | Sort-Object) -join '|') -cne (@($statementOwners | Sort-Object) -join '|')) { return $false }
+    $allowedOwners += $statementOwners
+  }
+  # Exact founder-authorized REG4653 maintenance; never a directory grant.
+  if ($null -ne $Continuation.PSObject.Properties['runtimeRegressionGate']) {
+    $runtimeGate = $Continuation.runtimeRegressionGate
+    $runtimeGateOwners = @('config/codex-development-regression-registry.json',
+      'config/codex-subagent-coordination-policy.json', 'scripts/check-codex-development-regression-memory.ps1')
+    if ($runtimeGate.state -cne 'founder_authorized_mandatory_debug_runtime_gate' -or
+        $runtimeGate.regressionId -cne 'REG-20261023-4653-DEBUG-ATTACH-RUNTIME-CONTRACT-AND-FOUNDER-HANDOFF' -or
+        (@($runtimeGate.owners | Sort-Object) -join '|') -cne (@($runtimeGateOwners | Sort-Object) -join '|')) { return $false }
+    $allowedOwners += $runtimeGateOwners
+  }
   if ($null -ne $Continuation.PSObject.Properties['batch02Chat']) {
     $chat=$Continuation.batch02Chat
     $chatOwners=@('apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart',
@@ -7991,6 +8009,12 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     # Optional exact existing test owner; historical records remain compatible.
     if (@($facts.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart') {
       $factsOwners += 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart'
+    }
+    # F6: only the three founder-approved frontend maintenance tests.
+    foreach ($maintenanceOwner in @('apps/mobile/test/ui_v2/buy/buy_v2_marketplace_trust_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
+        'apps/mobile/test/work_supplier_policy_test.dart')) {
+      if (@($facts.owners) -ccontains $maintenanceOwner) { $factsOwners += $maintenanceOwner }
     }
     if (@($facts.owners) -ccontains 'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart') {
       $factsOwners += 'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart'
@@ -8038,6 +8062,21 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     # Founder-approved decoder dependency only; no directory/wildcard ownership.
     foreach ($decoderOwner in @('backend/functions/package.json', 'backend/functions/package-lock.json')) {
       if (@($facts.owners) -ccontains $decoderOwner) { $factsOwners += $decoderOwner }
+    }
+    # Literal founder amendments: isolated Cart connection and shared footer gap.
+    foreach ($frontendOwner in @('apps/mobile/lib/features/shared/social_content_gateway.dart',
+        'apps/mobile/lib/main.dart',
+        'apps/mobile/lib/features/journey01/review_journey_services.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart',
+        'apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart',
+        'apps/mobile/test/ui_v2/universal/mool_android_navigation_viewport_c28b_test.dart',
+        'apps/mobile/test/ui_v2/universal/mool_uniform_navigation_six_family_conformance_c27d_test.dart',
+        'apps/mobile/test/ui_v2/universal/mool_adaptive_accessibility_reachability_c25f_test.dart',
+        'apps/mobile/test/ui_v2/universal/mool_family_pair_navigation_conformance_c26d_test.dart',
+        'apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_footer_visual_compaction_c30d_test.dart',
+        'apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_youtube_native_home_dock_c29e_test.dart',
+        'apps/mobile/lib/ui_v2/social/social_v2_consumer.dart')) {
+      if (@($facts.owners) -ccontains $frontendOwner) { $factsOwners += $frontendOwner }
     }
     if ($null -ne $facts.PSObject.Properties['reviewedFamilyContractVersion']) {
       if ($facts.reviewedFamilyContractVersion -isnot [long] -and $facts.reviewedFamilyContractVersion -isnot [int] -or
@@ -8142,6 +8181,12 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
         @($export.owners) -ccontains 'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart') {
       $exportOwners += 'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart'
     }
+    # Existing primary owner, explicitly bound to LF12 supplier-document naming.
+    # Historical records without this owner remain valid; no prefix grant.
+    if ($null -ne $export.PSObject.Properties['owners'] -and
+        @($export.owners) -ccontains 'apps/mobile/lib/features/work/work_stock_export.dart') {
+      $exportOwners += 'apps/mobile/lib/features/work/work_stock_export.dart'
+    }
     foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
       if ($null -eq $export.PSObject.Properties[$key]) { return $false }
     }
@@ -8184,6 +8229,11 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
         $null -ne $recovery.PSObject.Properties['owners'] -and
         @($recovery.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart') {
       $recoveryOwners += 'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart'
+    }
+    if ($null -ne $recovery -and $recovery -is [pscustomobject] -and
+        $null -ne $recovery.PSObject.Properties['owners'] -and
+        @($recovery.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart') {
+      $recoveryOwners += 'apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart'
     }
     if ($null -eq $recovery -or $recovery -isnot [pscustomobject]) { return $false }
     foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
@@ -8508,9 +8558,23 @@ function Invoke-Lf01Admission {
       @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard'))) | Sort-Object -Unique
     Assert-Coordination ($ProductionTicketId -ceq 'LF-27' -and
       (Test-Lf27Batch01Continuation $record.frontendContinuation $continuationDelta)) 'Batch01 continuation exceeds its exact tickets, owners or frontend authority.'
+    if ($null -ne $record.frontendContinuation.PSObject.Properties['runtimeRegressionGate']) {
+      $owners += @($record.frontendContinuation.runtimeRegressionGate.owners)
+    }
+    if ($null -ne $record.frontendContinuation.PSObject.Properties['supplierStatementReview20261023']) {
+      $owners += @($record.frontendContinuation.supplierStatementReview20261023.owners | Where-Object { $_ -cnotin $owners })
+    }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Facts'] -and
         @($record.frontendContinuation.batch02Facts.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart') {
       $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart'
+    }
+    if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Facts']) {
+      foreach ($maintenanceOwner in @('apps/mobile/test/ui_v2/buy/buy_v2_marketplace_trust_test.dart',
+          'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
+          'apps/mobile/test/work_supplier_policy_test.dart')) {
+        if (@($record.frontendContinuation.batch02Facts.owners) -ccontains $maintenanceOwner -and
+            $maintenanceOwner -cnotin $owners) { $owners += $maintenanceOwner }
+      }
     }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Variants'] -and
         @($record.frontendContinuation.batch02Variants.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart') {
@@ -8539,6 +8603,21 @@ function Invoke-Lf01Admission {
           'backend/functions/src/commerce/catalogue_contract.test.ts')) {
         if (@($record.frontendContinuation.batch02Facts.owners) -ccontains $canonicalOwner) { $owners += $canonicalOwner }
       }
+      foreach ($frontendOwner in @('apps/mobile/lib/features/shared/social_content_gateway.dart',
+          'apps/mobile/lib/main.dart',
+          'apps/mobile/lib/features/journey01/review_journey_services.dart',
+          'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart',
+          'apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart',
+          'apps/mobile/test/ui_v2/universal/mool_android_navigation_viewport_c28b_test.dart',
+          'apps/mobile/test/ui_v2/universal/mool_uniform_navigation_six_family_conformance_c27d_test.dart',
+          'apps/mobile/test/ui_v2/universal/mool_adaptive_accessibility_reachability_c25f_test.dart',
+          'apps/mobile/test/ui_v2/universal/mool_family_pair_navigation_conformance_c26d_test.dart',
+          'apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_footer_visual_compaction_c30d_test.dart',
+          'apps/mobile/test/ui_v2/social/uaw_personal_mvp_social_youtube_native_home_dock_c29e_test.dart',
+          'apps/mobile/lib/ui_v2/social/social_v2_consumer.dart')) {
+        if (@($record.frontendContinuation.batch02Facts.owners) -ccontains $frontendOwner -and
+            $frontendOwner -cnotin $owners) { $owners += $frontendOwner }
+      }
     }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch04DocumentExport']) {
       $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart'
@@ -8552,6 +8631,13 @@ function Invoke-Lf01Admission {
     }
   }
   $admission = $record.ticket.frontendAdmission
+  $admittedOwners = @($admission.owners)
+  $runtimeRegressionAuthorized = $null -ne $record.PSObject.Properties['frontendContinuation'] -and
+    $null -ne $record.frontendContinuation.PSObject.Properties['runtimeRegressionGate']
+  if ($runtimeRegressionAuthorized) { $admittedOwners += @($record.frontendContinuation.runtimeRegressionGate.owners) }
+  if ($null -ne $record.frontendContinuation.PSObject.Properties['supplierStatementReview20261023']) {
+    $admittedOwners += @($record.frontendContinuation.supplierStatementReview20261023.owners | Where-Object { $_ -cnotin $admittedOwners })
+  }
   Assert-Coordination ($record.ticket.id -ceq $ProductionTicketId -and
     $admission.baselineHead -ceq $base -and $admission.branch -ceq $branch[0] -and
     $admission.worktreePath -ceq $root.Replace('\','/') -and
@@ -8560,7 +8646,7 @@ function Invoke-Lf01Admission {
     $admission.packageId -ceq 'com.moolsocial.app.runtime' -and
     $admission.reviewVersionName -ceq '1.0.0-r67.3' -and
     $admission.reviewVersionCode -eq 2026101303 -and
-    (@($admission.owners | Sort-Object) -join '|') -ceq
+    (@($admittedOwners | Sort-Object) -join '|') -ceq
     (@($owners | Sort-Object) -join '|')) 'LF-01 baseline, package or literal owner claim changed.'
   Assert-Coordination (-not $record.execution.backendWriteAuthorized -and
     -not $record.execution.buildAuthorized -and -not $record.execution.deviceInstallAuthorized -and
@@ -8568,6 +8654,18 @@ function Invoke-Lf01Admission {
   $policyOwner = 'config/codex-subagent-coordination-policy.json'
   $basePolicy = ((@(Get-OctoberCompatibilityGitLines @('show',"${base}:$policyOwner"))) -join "`n") | ConvertFrom-Json
   $livePolicy = Get-Content -Raw -LiteralPath (Join-Path $root $policyOwner) | ConvertFrom-Json
+  if ($runtimeRegressionAuthorized) {
+    # Only the explicitly registered new generation may move. Every historical
+    # policy field and every historical regression entry remains frozen.
+    $baseRegistry = ((@(Get-OctoberCompatibilityGitLines @('show', "${base}:config/codex-development-regression-registry.json"))) -join "`n") | ConvertFrom-Json
+    $extendedRegistry = Get-Content -Raw -LiteralPath (Join-Path $root 'config/codex-development-regression-registry.json') | ConvertFrom-Json
+    Assert-Coordination (@($extendedRegistry.entries).Count -eq @($baseRegistry.entries).Count + 1 -and
+      $extendedRegistry.entries[-1].id -ceq 'REG-20261023-4653-DEBUG-ATTACH-RUNTIME-CONTRACT-AND-FOUNDER-HANDOFF') 'Runtime regression amendment must append exactly REG4653.'
+    $extendedRegistry.entries = @($extendedRegistry.entries | Select-Object -SkipLast 1)
+    Assert-Coordination (($baseRegistry | ConvertTo-Json -Depth 100 -Compress) -ceq
+      ($extendedRegistry | ConvertTo-Json -Depth 100 -Compress)) 'Runtime regression amendment changed historical registry content.'
+    $basePolicy.registryBinding = $livePolicy.registryBinding
+  }
   Assert-Coordination (($basePolicy | ConvertTo-Json -Depth 100 -Compress) -ceq
     ($livePolicy | ConvertTo-Json -Depth 100 -Compress)) 'LF-01 cannot rewrite historical policy, ownership or bindings.'
   $registryOwner = Join-Path $root 'config/codex-development-regression-registry.json'

@@ -10,7 +10,6 @@ import 'package:moolsocial/features/shared/shared_session.dart';
 import 'package:moolsocial/ui_v2/social/screen04_universal_components.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_youtube_public_runtime.dart';
-import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -93,16 +92,16 @@ void main() {
         tester
             .getSize(
               find.byKey(
-                const Key('social-android-exported-semantics-clearance'),
+                const Key('moolsocial-compact-destination-rail'),
               ),
             )
             .height,
-        MoolLocalNavigationTokens.destinationRailHeight +
-            moolAndroidExportedSemanticsClearance(
-              viewPadding: const EdgeInsets.only(top: 41, bottom: 44),
-              platform: TargetPlatform.android,
-            ),
+        MoolLocalNavigationTokens.destinationRailHeight,
       );
+      expect(tester.getSize(find.ancestor(
+        of: find.byKey(const Key('moolsocial-compact-destination-rail')),
+        matching: find.byType(SafeArea)).first).height,
+        MoolLocalNavigationTokens.destinationRailHeight + 44);
       for (final key in const [
         Key('screen04-rail-videos'),
         Key('screen04-rail-shorts'),
@@ -168,10 +167,7 @@ void main() {
       await tester.tap(find.byKey(const Key('screen04-rail-create')));
       await tester.pumpAndSettle();
       expect(find.byType(Screen04Header), findsNothing);
-      expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
-      expect(find.byKey(const Key('screen04-context-tabs')), findsOneWidget);
-      await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
-      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('screen04-create-home')), findsNothing);
       expect(
         find.byKey(const Key('screen04-create-ownership-gateway')),
         findsNothing,

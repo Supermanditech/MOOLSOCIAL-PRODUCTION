@@ -238,6 +238,22 @@ class _D012StoreFactsAdapter implements BuyV2ProductFactsAdapter {
   }
 }
 
+// Isolated source states for delivery-status presentation, not live promises.
+class _ProductDeliveryCueFacts implements BuyV2ProductFactsAdapter {
+  const _ProductDeliveryCueFacts(this.mode);
+  final String mode;
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
+      const BuyV2CatalogueProductFactsAdapter().snapshotFor(product).copyWith(
+        deliveryPromise: mode == 'missing' ? 'Delivery time confirmed at checkout' : 'Delivery in 12 min',
+        orderabilityLabel: mode == 'checking' ? 'Checking availability' : 'Available now',
+        stale: mode == 'stale',
+        nextOpeningLabel: 'tomorrow at 9 AM',
+        storeOperatingState: mode == 'closed'
+            ? BuyV2StoreOperatingState.closed : BuyV2StoreOperatingState.open,
+      );
+}
+
 class _R5ScreenArrivalSound implements BuyV2DeliveryArrivalSound {
   @override
   Future<bool> prepare() async => true;
@@ -1119,9 +1135,422 @@ void main() {
     }
   }
 
+  Future<void> openFinanceCallbackFixture(WidgetTester tester, {
+    required ValueNotifier<bool> owner,
+    BuyV2FinanceCallbackSubmit? submit,
+    String name = 'Host owner', String number = '+919876543210',
+    Size viewport = const Size(360, 800), double scale = 1,
+  }) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = viewport;
+    tester.platformDispatcher.textScaleFactorTestValue = scale;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(
+      builder: (context) => Scaffold(body: TextButton(onPressed: () =>
+        showMoolBusinessFinanceSheet(context, scopeOwner: owner,
+          isCurrent: () => owner.value, storeName: 'Host finance Store',
+          origin: 'store', buyingStoreId: 'host-store', productIds: const ['host-sku'],
+          contactName: name, callbackNumber: number, onRequestCallback: submit),
+        child: const Text('Open finance'))))));
+    await tester.tap(find.text('Open finance'));
+    await tester.pumpAndSettle();
+  }
+
+  BuyV2FinanceCallbackReceipt financeReceipt(BuyV2FinanceCallbackRequest request,
+      {String? requestId}) {
+    final at = DateTime.utc(2026, 10, 24, 17);
+    return BuyV2FinanceCallbackReceipt(requestId: requestId ?? request.requestId,
+      reference: 'HOST-FIN-1', acceptedAt: at,
+      callbackDueAt: at.add(const Duration(minutes: 30)));
+  }
+
+  test('FINANCE06 curated discovery has ten distinct product families', () {
+    expect(BuyV2BusinessFinanceNeed.values, hasLength(10));
+    expect(BuyV2BusinessFinanceNeed.values.map((v) => v.id).toSet(), hasLength(10));
+    expect(BuyV2BusinessFinanceNeed.values.map((v) => v.label).toSet(), hasLength(10));
+  });
+
+  test('FINANCE06 legacy searches find one family without rewriting requests', () {
+    final originalIds = BuyV2BusinessFinanceNeed.legacyLabels.keys.toList();
+    for (final entry in BuyV2BusinessFinanceNeed.legacyLabels.entries) {
+      final results = BuyV2BusinessFinanceNeed.values.where((need) =>
+        need.searchText.contains(entry.value.toLowerCase()));
+      expect(results.map((need) => need.id),
+        [BuyV2BusinessFinanceNeed.legacyFamilies[entry.key]], reason: entry.value);
+      expect(BuyV2BusinessFinanceNeed.labelFor(entry.key), entry.value);
+    }
+    expect(BuyV2BusinessFinanceNeed.values.where((need) =>
+      need.searchText.contains('working capital')).map((need) => need.id), ['working-capital']);
+    for (final (query, family) in [('inventory finance', 'purchase'), ('supply chain finance', 'invoice-finance')]) {
+      expect(BuyV2BusinessFinanceNeed.values.where((need) =>
+        need.searchText.contains(query)).map((need) => need.id), [family]);
+    }
+    final original = BuyV2FinanceCallbackRequest(requestId: 'FIN-${'c' * 32}',
+      origin: 'store', buyingStoreId: 'host-store', contactName: 'Host owner',
+      callbackNumber: '+919876543210', purposeIds: originalIds);
+    expect(original.purposeIds, originalIds);
+    expect(() => original.purposeIds.clear(), throwsUnsupportedError);
+  });
+
+  for (final width in [320.0, 360.0]) {
+    testWidgets('FINANCE06 short enlarged viewport shows a complete first choice $width', (tester) async {
+      final owner = ValueNotifier(true); addTearDown(owner.dispose);
+      await openFinanceCallbackFixture(tester, owner: owner,
+        viewport: Size(width, 568), scale: 2);
+      final first = find.byKey(ValueKey('business-finance-purpose-${BuyV2BusinessFinanceNeed.values.first.label}'));
+      final footer = find.byKey(const Key('business-finance-footer'));
+      expect(tester.getRect(first).bottom, lessThanOrEqualTo(tester.getRect(footer).top + 1),
+        reason: 'A short enlarged screen must show one complete choice before scrolling.');
+      for (final key in ['business-finance-name', 'business-finance-number', 'business-finance-note']) {
+        final field = find.byKey(Key(key));
+        await tester.ensureVisible(field); await tester.pumpAndSettle();
+        expect(field.hitTestable(), findsOneWidget);
+      }
+      expect(tester.getSize(find.byKey(const Key('business-finance-close'))).height, greaterThanOrEqualTo(48));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('FINANCE06 compact header and footer retain usable form $width $scale', (tester) async {
+        final owner = ValueNotifier(true); addTearDown(owner.dispose);
+        await openFinanceCallbackFixture(tester, owner: owner,
+          viewport: Size(width, 800), scale: scale);
+        final body = find.byKey(const Key('business-finance-form-scroll'));
+        final first = find.byKey(ValueKey('business-finance-purpose-${BuyV2BusinessFinanceNeed.values.first.label}'));
+        expect(tester.getRect(first).top - tester.getRect(body).top,
+          lessThanOrEqualTo(scale == 1 ? 200 : 260),
+          reason: 'Context and service copy must not displace the product choices.');
+        expect(first.hitTestable(), findsOneWidget);
+        expect(find.text('For Host finance Store').hitTestable(), findsOneWidget);
+        final footer = find.byKey(const Key('business-finance-footer'));
+        expect(find.descendant(of: footer,
+          matching: find.byKey(const Key('business-finance-unavailable'))), findsOneWidget);
+        final button = find.byKey(const Key('business-finance-request'));
+        expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
+        final number = find.byKey(const Key('business-finance-number'));
+        await tester.ensureVisible(number);
+        await tester.showKeyboard(number);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+        await tester.pumpAndSettle();
+        final editable = find.descendant(of: number, matching: find.byType(EditableText));
+        await tester.ensureVisible(editable); await tester.pumpAndSettle();
+        expect(tester.getRect(editable).bottom, lessThanOrEqualTo(tester.getRect(footer).top + 1));
+        expect(tester.getRect(button).bottom, lessThanOrEqualTo(800 - 280));
+        tester.view.viewInsets = const FakeViewPadding();
+        FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+        final note = find.byKey(const Key('business-finance-note'));
+        await tester.ensureVisible(note); await tester.pumpAndSettle();
+        expect(tester.getRect(note).bottom, lessThanOrEqualTo(tester.getRect(footer).top + 1));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+
+  test('FINANCE05 handoff retains immutable scope and rejects unrelated receipts', () {
+    final purposes = ['working-capital', 'sales-invoice'], products = ['host-sku'];
+    final request = BuyV2FinanceCallbackRequest(requestId: 'FIN-${'a' * 32}',
+      origin: 'store', buyingStoreId: 'host-store', contactName: 'Host owner',
+      callbackNumber: '+919876543210', purposeIds: purposes, productIds: products);
+    purposes.clear(); products.clear();
+    expect(request.purposeIds, ['working-capital', 'sales-invoice']);
+    expect(request.productIds, ['host-sku']);
+    expect(() => request.productIds.clear(), throwsUnsupportedError);
+    expect(financeReceipt(request).matches(request), isTrue);
+    expect(financeReceipt(request, requestId: 'FIN-${'b' * 32}').matches(request), isFalse);
+    final at = DateTime.utc(2026, 10, 24, 17);
+    expect(BuyV2FinanceCallbackReceipt(requestId: request.requestId, reference: 'HOST-FIN-1',
+      acceptedAt: at, callbackDueAt: at.add(const Duration(minutes: 31))).matches(request), isFalse);
+  });
+
+  testWidgets('FINANCE05 validates then blocks duplicate taps until exact receipt', (tester) async {
+    final owner = ValueNotifier(true); addTearDown(owner.dispose);
+    final calls = <BuyV2FinanceCallbackRequest>[];
+    final pending = Completer<BuyV2FinanceCallbackReceipt>();
+    await openFinanceCallbackFixture(tester, owner: owner, name: '', number: '',
+      submit: (request) { calls.add(request); return pending.future; });
+    final button = find.byKey(const Key('business-finance-request'));
+    await tester.tap(button); await tester.pumpAndSettle();
+    expect(calls, isEmpty);
+    for (final (key, value) in [
+      ('business-finance-name', 'Host owner'),
+      ('business-finance-number', '(+91) 98765-43210'),
+    ]) {
+      final field = find.byKey(Key(key));
+      await tester.ensureVisible(field); await tester.enterText(field, value);
+    }
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tester.tap(button); await tester.pumpAndSettle();
+    expect(calls, hasLength(1));
+    expect(calls.single.origin, 'store');
+    expect(calls.single.buyingStoreId, 'host-store');
+    expect(calls.single.productIds, ['host-sku']);
+    expect(calls.single.callbackNumber, '+919876543210');
+    expect(tester.widget<FilledButton>(button).onPressed, isNull);
+    expect(tester.widget<TextFormField>(find.byKey(const Key('business-finance-name'))).enabled, isFalse);
+    await tester.tap(button); await tester.pump();
+    expect(calls, hasLength(1));
+    pending.complete(financeReceipt(calls.single)); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('business-finance-confirmed')), findsOneWidget);
+    expect(find.text('Reference: HOST-FIN-1'), findsOneWidget);
+    expect(find.text('Loan approved'), findsNothing);
+    expect(find.text('Done'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('FINANCE05 unknown result retries the same frozen enquiry', (tester) async {
+    final owner = ValueNotifier(true); addTearDown(owner.dispose);
+    final calls = <BuyV2FinanceCallbackRequest>[];
+    await openFinanceCallbackFixture(tester, owner: owner, submit: (request) async {
+      calls.add(request);
+      if (calls.length == 1) throw StateError('HOST lost response');
+      return financeReceipt(request);
+    });
+    final button = find.byKey(const Key('business-finance-request'));
+    await tester.tap(button); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('business-finance-submit-error')), findsOneWidget);
+    expect(find.byKey(const Key('business-finance-confirmed')), findsNothing);
+    expect(tester.widget<TextFormField>(find.byKey(const Key('business-finance-number'))).enabled, isFalse);
+    await tester.tap(button); await tester.pumpAndSettle();
+    expect(calls, hasLength(2));
+    expect(identical(calls[0], calls[1]), isTrue);
+    expect(find.byKey(const Key('business-finance-confirmed')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final ending in ['retired', 'disposed', 'wrong receipt']) {
+    testWidgets('FINANCE05 late response cannot confirm $ending', (tester) async {
+      final owner = ValueNotifier(true); addTearDown(owner.dispose);
+      final pending = Completer<BuyV2FinanceCallbackReceipt>();
+      late BuyV2FinanceCallbackRequest sent;
+      await openFinanceCallbackFixture(tester, owner: owner,
+        submit: (request) { sent = request; return pending.future; });
+      await tester.tap(find.byKey(const Key('business-finance-request')));
+      await tester.pumpAndSettle();
+      if (ending == 'retired') { owner.value = false; owner.value = true; }
+      if (ending == 'disposed') {
+        await tester.tap(find.byKey(const Key('business-finance-close')));
+        await tester.pumpAndSettle();
+      }
+      pending.complete(financeReceipt(sent,
+        requestId: ending == 'wrong receipt' ? 'FIN-${'b' * 32}' : null));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('business-finance-confirmed')), findsNothing);
+      if (ending == 'retired') {
+        expect(find.byKey(const Key('business-finance-owner-changed')), findsOneWidget);
+        expect(find.byKey(const Key('business-finance-buyer')), findsNothing);
+      }
+      if (ending == 'wrong receipt') expect(find.byKey(const Key('business-finance-submit-error')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('FINANCE04 referenced products are searchable and multi-select $scale', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 700);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final owner = ValueNotifier(true);
+      addTearDown(owner.dispose);
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(
+        builder: (context) => Scaffold(body: TextButton(onPressed: () =>
+          showMoolBusinessFinanceSheet(context, scopeOwner: owner,
+            isCurrent: () => owner.value, storeName: 'Host finance Store'),
+          child: const Text('Open finance'))))));
+      await tester.tap(find.text('Open finance'));
+      await tester.pumpAndSettle();
+      for (final label in const [
+        'Purchase / dealer finance', 'Purchase order finance', 'Invoice / bill discounting',
+        'Working capital (CC / OD)', 'Unsecured business loan',
+        'Loan against property', 'Machinery / equipment finance',
+        'Export finance', 'Import finance', 'Other finance requirement',
+      ]) {
+        expect(find.byKey(ValueKey('business-finance-purpose-$label')), findsOneWidget);
+      }
+      final search = find.byKey(const Key('business-finance-search'));
+      await tester.ensureVisible(search);
+      await tester.enterText(search, 'S2S');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('business-finance-purpose-Invoice / bill discounting')), findsOneWidget);
+      expect(find.byKey(const ValueKey('business-finance-purpose-Working capital (CC / OD)')), findsNothing);
+      await tester.enterText(search, 'no matching finance option');
+      await tester.pumpAndSettle();
+      expect(find.text('No finance options match your search.'), findsOneWidget);
+      await tester.enterText(search, '');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.check_box_outlined), findsOneWidget);
+      for (final label in ['Invoice / bill discounting', 'Working capital (CC / OD)']) {
+        final choice = find.byKey(ValueKey('business-finance-purpose-$label'));
+        await tester.ensureVisible(choice);
+        await tester.tap(choice);
+        await tester.pumpAndSettle();
+        expect(find.descendant(of: choice, matching: find.byIcon(Icons.check_box_outlined)), findsOneWidget);
+      }
+      expect(find.byIcon(Icons.check_box_outlined), findsNWidgets(3));
+      expect(tester.widget<FilledButton>(find.byKey(const Key('business-finance-request'))).onPressed, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('FINANCE01 product and Cart share private contact form $scale', (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 24);
+      tester.view.padding = const FakeViewPadding(top: 41, bottom: 24);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      const identity = AuthenticatedAccountIdentity(firebaseUserId: 'finance-test-owner',
+        firebaseProjectId: 'isolated-finance-test', displayName: 'Own buyer contact', phoneNumber: '+919876543210');
+      await tester.pumpWidget(app(session, textScale: scale,
+        safePadding: const EdgeInsets.only(top: 41, bottom: 24),
+        accountIdentity: identity, accountAuthenticated: true));
+      await tester.pumpAndSettle();
+      expect(session.openProduct('w-tomato'), isTrue);
+      expect(session.addProduct('w-tomato'), isTrue);
+      await tester.pumpAndSettle();
+      final quantity = session.itemCount, total = session.cartTotal;
+      Future<void> revealFinance(Finder target, String page) async {
+        await tester.scrollUntilVisible(target, 160, maxScrolls: 60,
+          scrollable: find.descendant(of: find.byKey(PageStorageKey(page)),
+            matching: find.byType(Scrollable)).first);
+        await tester.pumpAndSettle();
+      }
+      final productEntry = find.byKey(const Key('buy-product-finance-open'));
+      await revealFinance(productEntry, 'buy-product-w-tomato');
+      expect(find.byKey(const Key('buy-product-finance')), findsOneWidget);
+      await tester.tap(productEntry);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('business-finance-sheet')), findsOneWidget);
+      expect(tester.widget<TextFormField>(find.byKey(const Key('business-finance-name'))).controller!.text,
+        'Own buyer contact');
+      expect(tester.widget<TextFormField>(find.byKey(const Key('business-finance-number'))).controller!.text,
+        '+919876543210');
+      expect(find.byKey(const Key('business-finance-purpose-Invoice / bill discounting')), findsOneWidget);
+      expect(tester.widget<FilledButton>(find.byKey(const Key('business-finance-request'))).onPressed, isNull);
+      final requestBounds = tester.getRect(find.byKey(const Key('business-finance-request')));
+      expect(requestBounds.height, greaterThanOrEqualTo(48));
+      expect(requestBounds.bottom, lessThanOrEqualTo(700 - 41 - 24),
+        reason: 'The whole action stays inside Android exported accessibility bounds.');
+      for (final (key, label) in [
+        ('business-finance-name', 'Contact name'),
+        ('business-finance-number', 'Callback number'),
+        ('business-finance-note', 'Note (optional)'),
+      ]) {
+        await tester.ensureVisible(find.byKey(Key(key)));
+        await tester.showKeyboard(find.byKey(Key(key)));
+        await tester.pumpAndSettle();
+        final field = find.bySemanticsLabel(RegExp(RegExp.escape(label)));
+        expect(field, findsOneWidget);
+        expect(tester.getSemantics(field).getSemanticsData().hasAction(SemanticsAction.setText), isTrue,
+          reason: 'Named fields keep their accessible editing action.');
+      }
+      await tester.ensureVisible(find.byKey(const Key('business-finance-number')));
+      await tester.enterText(find.byKey(const Key('business-finance-number')), 'bad');
+      await tester.pumpAndSettle();
+      expect(find.text('Enter a valid callback number'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('business-finance-number')), '+919111111111');
+      await tester.pumpAndSettle();
+      expect(find.text('Enter a valid callback number'), findsNothing);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.tap(find.byKey(const Key('business-finance-close')));
+      await tester.pumpAndSettle();
+      expect(session.itemCount, quantity);
+      expect(session.cartTotal, total);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-cart-scope-bar')), findsOneWidget,
+        reason: 'Public Cart retains its existing Shop/Wholesale basket controls.');
+      final cartEntry = find.byKey(const Key('buy-cart-finance-open'));
+      await revealFinance(cartEntry, 'buy-cart-wholesale');
+      expect(cartEntry, findsOneWidget);
+      expect(find.byKey(const Key('buy-product-finance')), findsNothing);
+      await tester.tap(cartEntry);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextFormField>(find.byKey(const Key('business-finance-number'))).controller!.text,
+        '+919876543210', reason: 'An unsent alternate number is not persisted.');
+      const otherIdentity = AuthenticatedAccountIdentity(firebaseUserId: 'other-finance-owner',
+        firebaseProjectId: 'isolated-finance-test', displayName: 'Other buyer');
+      await tester.pumpWidget(app(session, textScale: scale,
+        safePadding: const EdgeInsets.only(top: 41, bottom: 24),
+        accountIdentity: otherIdentity, accountAuthenticated: true));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('business-finance-owner-changed')), findsOneWidget);
+      expect(find.byKey(const Key('business-finance-number')), findsNothing);
+      await tester.pumpWidget(app(session, textScale: scale,
+        safePadding: const EdgeInsets.only(top: 41, bottom: 24),
+        accountIdentity: identity, accountAuthenticated: true));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('business-finance-owner-changed')), findsOneWidget,
+        reason: 'An account return cannot revive a retired contact draft.');
+      expect(session.itemCount, quantity);
+      expect(session.cartTotal, total);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      } finally {
+        semantics.dispose();
+      }
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('PRODUCTSTATUS delivery cues reflect current source state $scale', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      for (final (mode, label) in [
+        ('missing', 'Delivery schedule unavailable'),
+        ('fresh', 'Delivery in 12 min'),
+        ('stale', 'Check delivery availability'),
+        ('checking', 'Checking delivery time'),
+        ('closed', 'Check delivery availability'),
+      ]) {
+        final core = BuySession();
+        final session = BuyV2Session(core: core, productFactsAdapter: _ProductDeliveryCueFacts(mode));
+        try {
+          await tester.pumpWidget(app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          expect(session.openProduct('w-tomato'), isTrue);
+          await tester.pumpAndSettle();
+          final copies = find.text(label);
+          final productScroll = find.descendant(
+            of: find.byKey(const PageStorageKey('buy-product-w-tomato')),
+            matching: find.byType(Scrollable)).first;
+          await tester.scrollUntilVisible(copies.first, 160, maxScrolls: 20, scrollable: productScroll);
+          await tester.pumpAndSettle();
+          expect(copies, findsWidgets, reason: mode);
+          final colours = tester.widgetList<Text>(copies).map((text) => text.style?.color).toList();
+          expect(colours, contains(mode == 'fresh' ? BuyV2Colors.green : BuyV2Colors.muted), reason: mode);
+          if (mode != 'fresh') expect(colours, isNot(contains(BuyV2Colors.green)), reason: mode);
+          expect(session.cartLines, isEmpty);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        } finally {
+          session.dispose(); core.dispose();
+        }
+      }
+    });
+  }
+
   for (final scale in [1.0, 2.0]) {
     testWidgets(
-      'T14 public delivery placeholder follows Store acceptance $scale',
+      'T14 public Product and Cart missing schedule stays unavailable $scale',
       (tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1;
@@ -1135,11 +1564,14 @@ void main() {
         await tester.pumpAndSettle();
         expect(session.openProduct('w-tomato'), isTrue);
         await tester.pumpAndSettle();
-        void checkPlaceholder() {
+        void checkPlaceholder([
+          String expected = 'Delivery schedule unavailable',
+        ]) {
           expect(
-            find.text('Delivery time confirmed after Store acceptance'),
+            find.text(expected),
             findsWidgets,
           );
+          expect(find.textContaining('after Store acceptance'), findsNothing);
           expect(
             find.text('Delivery time confirmed at checkout'),
             findsNothing,
@@ -1310,7 +1742,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Delivery time confirmed at checkout'), findsWidgets);
         expect(
-          find.text('Delivery time confirmed after Store acceptance'),
+          find.text('Delivery schedule unavailable'),
           findsNothing,
         );
         expect(
@@ -3549,8 +3981,8 @@ void main() {
 
       expect(
         searchBand.top,
-        viewport.safePadding.top,
-        reason: '${viewport.label} search starts at the safe-area top',
+        tester.getBottomLeft(find.byType(BuyV2DemoCatalogueLabel)).dy,
+        reason: '${viewport.label} search follows the review-data provenance label',
       );
 
       expect(
@@ -4302,8 +4734,10 @@ void main() {
         expect(searchBand, findsOneWidget, reason: destination.name);
         expect(
           tester.getTopLeft(searchBand).dy,
-          safePadding.top,
-          reason: '${destination.name} begins at the safe-area top',
+          find.byType(BuyV2DemoCatalogueLabel).evaluate().isEmpty
+              ? safePadding.top
+              : tester.getBottomLeft(find.byType(BuyV2DemoCatalogueLabel)).dy,
+          reason: '${destination.name} follows only the applicable provenance label',
         );
         final accountAction = find.byKey(const ValueKey('buy-open-account'));
         expect(accountAction, findsOneWidget, reason: destination.name);
@@ -5560,7 +5994,7 @@ void main() {
         final facts = base.copyWith(deliveryPromise: missing);
         expect(
           buyV2BuyerDeliveryPromise(facts, confirmAfterStoreAcceptance: true),
-          'Delivery time confirmed after Store acceptance',
+          'Delivery schedule unavailable',
         );
         expect(facts.deliveryPromise, missing);
       }
@@ -6747,7 +7181,7 @@ void main() {
       expect(find.byKey(const ValueKey('buy-change-location')), findsOneWidget);
       expect(
         tester.getTopLeft(find.byKey(const ValueKey('buy-search-band'))).dy,
-        0,
+        tester.getBottomLeft(find.byType(BuyV2DemoCatalogueLabel)).dy,
       );
 
       session.openCart();
@@ -10827,16 +11261,12 @@ void main() {
             } else {
               expect(
                 tester.getSize(content).height,
-                0,
-                reason: 'Duplicate-only content must take no vertical space.',
+                greaterThan(0),
+                reason: 'Supplied product origin and details must survive summary deduplication.',
               );
-              for (final heading in [
-                'Highlights',
-                'Specifications',
-                'Description',
-              ]) {
-                expect(inContent(heading), findsNothing);
-              }
+              expect(product.origin.trim(), isNotEmpty);
+              expect(inContent('Product origin'), findsOneWidget);
+              expect(inContent(product.origin.trim()), findsOneWidget);
             }
             expect(
               find.text('Product and pack information'),
@@ -12977,7 +13407,9 @@ void main() {
         final retainedQuantity = session.quantityFor('w-notebook');
         await tester.tap(card);
         await tester.pumpAndSettle();
-        expect(session.selectedProductId, product.id);
+        expect(session.selectedProductId, product.id,
+          reason: 'Search card open: blocked=${session.cartChangesBlocked}; '
+            'notice=${session.notice}; commerce=${session.commerceMessage}');
         expect(find.byType(BuyV2ProductView), findsOneWidget);
         if (entry.change == 'cart') {
           session.openCart();
@@ -14696,7 +15128,8 @@ void main() {
       expect(find.byKey(const ValueKey('buy-product-s-tomato')), findsNothing);
       expect(find.byKey(const ValueKey('buy-product-s-atta')), findsOneWidget);
       expect(find.textContaining('Delivery today'), findsNothing);
-      expect(find.textContaining('after Store acceptance'), findsWidgets);
+      expect(find.text('Delivery schedule unavailable'), findsWidgets);
+      expect(find.textContaining('after Store acceptance'), findsNothing);
       expect(find.textContaining('at checkout'), findsNothing);
 
       await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
@@ -14844,7 +15277,10 @@ void _expectCustomerFacingBuyCopy(
   )) {
     final value = text.data ?? text.textSpan?.toPlainText() ?? '';
     // The founder requires synthetic order fixtures to identify their provenance.
-    if (isolatedReview && value == 'Review data') continue;
+    if (isolatedReview && const {'Review data',
+      'Demo catalogue · Not live inventory'}.contains(value)) {
+      continue;
+    }
     copy.add(value);
   }
   for (final field in tester.widgetList<TextField>(

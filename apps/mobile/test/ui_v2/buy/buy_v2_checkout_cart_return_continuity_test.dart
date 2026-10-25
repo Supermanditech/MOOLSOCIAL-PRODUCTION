@@ -23,7 +23,7 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 import 'buy_v2_session_test.dart' show prepaidCommerceFixture;
-import 'buy_v2_qualified_provider_fixture.dart' show TestLegacyRecoveryCommerce;
+import 'buy_v2_qualified_provider_fixture.dart' show TestLegacyRecoveryCommerce, TestPaymentCommerce, QualifiedTestProductFacts;
 
 // These protected checkout images explicitly include two current deliveries.
 // Ordinary seed history remains inactive; provenance is tested independently.
@@ -81,6 +81,9 @@ class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
   int calls = 0;
   BuyV2CommerceLoadState state = BuyV2CommerceLoadState.ready;
   String? customerMessage;
+  String assignedTermId = 'wholesale-advance';
+  bool assignSupplierTerms = true;
+  String? Function(BuyV2FulfilmentGroup)? assignmentFor;
   BuyV2CommercialPaymentTerm Function(BuyV2CommercialPaymentTerm)? amend;
 
   @override
@@ -101,6 +104,12 @@ class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
         quotedTotalsByFulfilmentKey[group.key] ?? group.total;
     return BuyV2CommercialPaymentTermsSnapshot(
       state: state,
+      assignedTermIdsByFulfilmentKey: {
+        if (assignSupplierTerms)
+          for (final group in groups)
+            if (group.destination == BuyV2Destination.wholesale)
+              group.key: assignmentFor?.call(group) ?? assignedTermId,
+      },
       terms: [
         for (final group in groups)
           if (group.destination != BuyV2Destination.wholesale)
@@ -222,6 +231,15 @@ BuyV2CommercialPaymentTerm _amendPaymentTerm(
   annualPercentageRate: annualPercentageRate ?? term.annualPercentageRate,
   keyFactsUri: term.keyFactsUri,
 );
+
+class _AssignedSupplierFacts extends _DeliveryPromiseFactsAdapter {
+  _AssignedSupplierFacts(this.ids);
+  final Set<String> ids;
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
+      super.snapshotFor(product).copyWith(
+        eligibility: QualifiedTestProductFacts(ids).snapshotFor(product).eligibility);
+}
 
 class _CheckoutQuoteAdapter implements BuyV2CheckoutQuoteAdapter {
   Completer<void>? gate;
@@ -655,6 +673,35 @@ class _T08OrderSummarySession extends BuyV2Session {
 }
 
 void main() {
+  test('SUPPLIERTERMS01 supplier assignment applies without buyer choosing', () async {
+    final adapter = _PaymentTermsAdapter();
+    final session = BuyV2Session(core: BuySession(), commercialPaymentTermsAdapter: adapter);
+    addTearDown(session.dispose);
+    expect(session.addProduct('w-rice'), isTrue);
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    await session.refreshCommercialPaymentTerms();
+    final group = session.checkoutFulfilmentGroups.single;
+    expect(session.selectedCommercialPaymentTermFor(group.key)?.id, 'wholesale-advance');
+    final other = session.commercialPaymentTermsFor(group.key).firstWhere(
+      (term) => term.kind == BuyV2CommercialPaymentTermKind.supplierCredit);
+    expect(session.chooseCommercialPaymentTerm(other), isFalse,
+      reason: 'An offered credit option is not the supplier-assigned arrangement.');
+    expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+  });
+  test('SUPPLIERTERMS02 missing assignment cannot become buyer-selected credit', () async {
+    final adapter = _PaymentTermsAdapter()..assignSupplierTerms = false;
+    final session = BuyV2Session(core: BuySession(), commercialPaymentTermsAdapter: adapter);
+    addTearDown(session.dispose);
+    expect(session.addProduct('w-rice'), isTrue);
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    await session.refreshCommercialPaymentTerms();
+    final group = session.checkoutFulfilmentGroups.single;
+    expect(session.selectedCommercialPaymentTermFor(group.key), isNull);
+    expect(session.chooseCommercialPaymentTerm(session.commercialPaymentTermsFor(group.key).first), isFalse);
+    expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+  });
   for (final throwsReply in [false, true]) {
     test('LF mapped consumers ignore retired quote reply error=$throwsReply', () async {
       final core = BuySession();
@@ -768,7 +815,7 @@ void main() {
       customerStateStore: owner,
       collectionIdentity: identity,
       commerceAdapter: prepaidCommerceFixture(),
-      commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+      commercialPaymentTermsAdapter: _PaymentTermsAdapter()..assignedTermId = 'wholesale-booking-delivery',
       balancePaymentAdapter: adapter,
       productFactsAdapter: _DeliveryPromiseFactsAdapter(),
     );
@@ -2821,7 +2868,7 @@ void main() {
   test(
     'T03 saved address refresh changes consent only for affected supplier fees',
     () async {
-      final terms = _PaymentTermsAdapter();
+      final terms = _PaymentTermsAdapter()..assignedTermId = 'wholesale-booking-delivery';
       final quotes = _CheckoutQuoteAdapter();
       final session = BuyV2Session(
         core: BuySession(),
@@ -3135,7 +3182,7 @@ void main() {
         );
         final unavailable = find.descendant(
           of: delivery,
-          matching: find.text('Delivery time confirmed after Store acceptance'),
+          matching: find.text('Delivery schedule unavailable'),
         );
         await tester.scrollUntilVisible(
           unavailable,
@@ -4295,122 +4342,129 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'Retail advance and Wholesale terms retain exact payment schedule',
-    (tester) async {
+  for (final scale in [1.0, 1.6]) {
+    testWidgets('SUPPLIERTERMS03 ten suppliers retain separate read-only arrangements $scale', (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final adapter = _PaymentTermsAdapter();
-      final session = BuyV2Session(
-        core: BuySession(),
-        commercialPaymentTermsAdapter: adapter,
-        productFactsAdapter: _DeliveryPromiseFactsAdapter(),
-        commerceAdapter: prepaidCommerceFixture(),
-      );
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(() { tester.platformDispatcher.clearTextScaleFactorTestValue(); tester.binding.setSurfaceSize(null); });
+      final products = [for (var i = 0; i < 10; i++)
+        productFor(BuyV2Destination.wholesale).copyWith(id: 'test-supplier-rice-$i',
+          canonicalId: 'test-rice-$i',
+          storeId: 'test-supplier-$i', seller: 'TEST Supplier $i', offerClass: BuyV2OfferClass.wholesale)];
+      final commerce = TestPaymentCommerce()..snapshot = BuyV2CommerceSnapshot(
+        state: BuyV2CommerceLoadState.ready, products: products, paymentMethods: const {'UPI', 'Card'},
+        businessVerified: true, businessVerificationState: BuyV2BusinessVerificationState.verified,
+        selectedAddressId: 'test-ten-address', addresses: const [BuyV2Address(
+          id: 'test-ten-address', kind: BuyV2AddressKind.work, label: 'TEST receiving',
+          recipient: 'TEST Buyer', phone: '9000000001', line: 'TEST receiving address',
+          area: 'Jodhpur', pinCode: '342001', landmark: 'TEST')]);
+      final assigned = {for (var i = 0; i < 10; i++) 'TEST Supplier $i':
+        ['wholesale-advance', 'wholesale-booking-delivery', 'wholesale-credit-30'][i % 3]};
+      final adapter = _PaymentTermsAdapter()..assignmentFor = (group) => assigned[group.partner];
+      final session = BuyV2Session(core: BuySession(), commerceAdapter: commerce, reviewDataEnabled: false,
+        commercialPaymentTermsAdapter: adapter, productFactsAdapter: _AssignedSupplierFacts(products.map((p) => p.id).toSet()));
       addTearDown(session.dispose);
-      final shop = productFor(BuyV2Destination.shop);
-      final wholesale = productFor(BuyV2Destination.wholesale);
-      expect(session.addProduct(shop.id), isTrue);
-      expect(session.addProduct(wholesale.id), isTrue);
-      session.openCart();
+      await session.restoreCommerce();
+      for (final product in products) {
+        expect(session.findProduct(product.id)?.storeId, product.storeId);
+        expect(product.hasValidVariantFamilyIdentity, isTrue);
+        expect(product.hasValidPublicListingIdentity, isTrue);
+        expect(session.productFactsFor(product).stale, isFalse);
+        expect(session.deliveryOptionsFor(product), isNotEmpty);
+      }
+      for (final product in products) { expect(session.addProduct(product.id), isTrue, reason: session.notice); }
+      session.openCart(scope: BuyV2CartScope.wholesale);
       expect(session.openCheckout(), isTrue);
       advanceCheckoutToConfirm(session);
       await session.refreshCommercialPaymentTerms();
-
-      await tester.pumpWidget(app(session));
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('buy-checkout-payment-terms')),
-        findsOneWidget,
-      );
-      expect(find.text('Full advance'), findsWidgets);
-      expect(find.textContaining('Supplier credit · 30 days'), findsOneWidget);
-      expect(
-        find.textContaining('Partner Bank credit · 90 days'),
-        findsOneWidget,
-      );
-      expect(find.textContaining('Supplier credit · 90 days'), findsNothing);
+      expect(session.checkoutFulfilmentGroups.length, 10);
+      expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+      var expectedDue = 0, expectedBalance = 0;
+      for (final group in session.checkoutFulfilmentGroups) {
+        final term = session.selectedCommercialPaymentTermFor(group.key)!;
+        expect(term.id, assigned[group.partner]);
+        expect(term.supplierName, group.partner);
+        expectedDue += term.amountDueNowMinor; expectedBalance += term.balanceDueMinor;
+      }
+      expect(session.checkoutAmountDueNowMinor, expectedDue);
+      expect(session.checkoutBalanceDueMinor, expectedBalance);
+      expect(expectedDue + expectedBalance, session.checkoutPayableTotalMinor);
+      await tester.pumpWidget(app(session)); await tester.pumpAndSettle();
+      for (final group in session.checkoutFulfilmentGroups) {
+        expect(find.byKey(ValueKey('buy-payment-term-summary-${group.key}')), findsOneWidget);
+        expect(find.byKey(ValueKey('buy-payment-term-change-${group.key}')), findsNothing);
+      }
+      expect(find.byType(RadioGroup<String>), findsNothing);
+      expect(find.text('Choose terms'), findsNothing);
+      final last = session.checkoutFulfilmentGroups.last;
+      await tester.ensureVisible(find.byKey(ValueKey('buy-payment-term-summary-${last.key}')));
+      await tester.pumpAndSettle(); expect(tester.takeException(), isNull);
+      final missing = session.checkoutFulfilmentGroups[4];
+      assigned[missing.partner] = 'not-assigned-by-supplier';
+      await session.refreshCommercialPaymentTerms(); await tester.pumpAndSettle();
       expect(session.checkoutPaymentTermsReviewRequired, isTrue);
-
-      final booking = find.byKey(
-        const ValueKey('buy-payment-term-wholesale-booking-delivery'),
-      );
-      await tester.ensureVisible(booking);
-      await tester.tap(booking);
-      await tester.pumpAndSettle();
+      expect(session.selectedCommercialPaymentTermFor(missing.key), isNull);
+      expect(session.chooseCommercialPaymentTerm(session.commercialPaymentTermsFor(missing.key).first), isFalse);
+      for (final group in session.checkoutFulfilmentGroups.where((group) => group.key != missing.key)) {
+        expect(session.selectedCommercialPaymentTermFor(group.key)?.id, assigned[group.partner]);
+      }
+      expect(find.byKey(ValueKey('buy-payment-terms-empty-${missing.key}')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('buy-checkout-action-bar')),
+        matching: find.text('Order total')), findsOneWidget);
+    });
+  }
+  test('SUPPLIERTERMS04 material supplier revision requires acknowledgment across retries', () async {
+    final adapter = _PaymentTermsAdapter();
+    final session = BuyV2Session(core: BuySession(), commercialPaymentTermsAdapter: adapter);
+    addTearDown(session.dispose);
+    expect(session.addProduct(productFor(BuyV2Destination.wholesale).id), isTrue);
+    session.openCart(); expect(session.openCheckout(), isTrue);
+    await session.refreshCommercialPaymentTerms();
+    final key = session.checkoutFulfilmentGroups.single.key;
+    expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+    adapter.amend = (term) => _amendPaymentTerm(term, sourceId: 'supplier-policy-revision-2');
+    await session.refreshCommercialPaymentTerms();
+    expect(session.selectedCommercialPaymentTermFor(key), isNull);
+    expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+    await session.refreshCommercialPaymentTerms();
+    expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+    expect(session.chooseCommercialPaymentTerm(session.supplierAssignedPaymentTermFor(key)!), isTrue);
+    expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+  });
+  testWidgets(
+    'Retail advance and supplier-assigned Wholesale terms retain exact payment schedule',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final adapter = _PaymentTermsAdapter()..assignedTermId = 'wholesale-booking-delivery';
+      final session = BuyV2Session(core: BuySession(), commercialPaymentTermsAdapter: adapter,
+        productFactsAdapter: _DeliveryPromiseFactsAdapter(), commerceAdapter: prepaidCommerceFixture());
+      addTearDown(session.dispose);
+      expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
+      expect(session.addProduct(productFor(BuyV2Destination.wholesale).id), isTrue);
+      session.openCart(); expect(session.openCheckout(), isTrue);
+      advanceCheckoutToConfirm(session);
+      await session.refreshCommercialPaymentTerms();
+      await tester.pumpWidget(app(session)); await tester.pumpAndSettle();
       expect(session.checkoutPaymentTermsReviewRequired, isFalse);
       expect(session.checkoutBalanceDue, greaterThan(0));
-      expect(
-        find.byKey(const ValueKey('buy-checkout-amount-due-now')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('buy-checkout-balance-due')),
-        findsNothing,
-      );
-      final wholesaleGroup = session.checkoutFulfilmentGroups.firstWhere(
-        (group) => group.destination == BuyV2Destination.wholesale,
-      );
-      expect(
-        find.byKey(ValueKey('buy-payment-term-summary-${wholesaleGroup.key}')),
-        findsOneWidget,
-      );
-      expect(booking, findsNothing);
-      await Scrollable.ensureVisible(
-        tester.element(
-          find.byKey(const ValueKey('buy-checkout-payment-terms')),
-        ),
-        alignment: 0.15,
-      );
-      await tester.pump(const Duration(seconds: 6));
+      final group = session.checkoutFulfilmentGroups.firstWhere(
+        (group) => group.destination == BuyV2Destination.wholesale);
+      final summary = find.byKey(ValueKey('buy-payment-term-summary-${group.key}'));
+      await tester.ensureVisible(summary); await tester.pumpAndSettle();
+      expect(summary, findsOneWidget);
+      expect(find.byKey(ValueKey('buy-payment-term-change-${group.key}')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-payment-term-wholesale-booking-delivery')), findsNothing);
+      expect(find.textContaining('Supplier credit · 30 days'), findsNothing);
+      expect(find.textContaining('Partner Bank credit · 90 days'), findsNothing);
+      expect(session.chooseCommercialPaymentTerm(session.commercialPaymentTermsFor(group.key).firstWhere(
+        (term) => term.kind == BuyV2CommercialPaymentTermKind.supplierCredit)), isFalse);
+      expect(session.selectedCommercialPaymentTermFor(group.key)?.id, 'wholesale-booking-delivery');
+      expect(await _submitAndCompleteReviewPayment(session), isTrue);
       await tester.pumpAndSettle();
-      await captureR66Visual(tester, 'buy-t03-selected-terms');
-      final change = find.byKey(
-        ValueKey('buy-payment-term-change-${wholesaleGroup.key}'),
-      );
-      final changeStyle = tester.widget<TextButton>(change).style!;
-      expect(changeStyle.textStyle!.resolve({})!.fontFamily, 'Inter');
-      expect(
-        changeStyle.foregroundColor!.resolve({}),
-        BuyV2ActionStyle.primaryForeground,
-      );
-      expect(tester.getSize(change).height, greaterThanOrEqualTo(44));
-      await tester.ensureVisible(change);
-      await tester.pumpAndSettle();
-      await tester.tap(change);
-      await tester.pumpAndSettle();
-      expect(booking, findsOneWidget);
-      await Scrollable.ensureVisible(
-        tester.element(
-          find.byKey(const ValueKey('buy-checkout-payment-terms')),
-        ),
-        alignment: 0.15,
-      );
-      await tester.pumpAndSettle();
-      await captureR66Visual(tester, 'buy-t03-change-terms');
-      await tester.ensureVisible(booking);
-      await tester.pumpAndSettle();
-      await tester.tap(booking);
-      await tester.pumpAndSettle();
-
-      expect(
-        await _submitAndCompleteReviewPayment(session),
-        isTrue,
-        reason:
-            'notice=${session.notice}; state=${session.checkoutSubmissionState}; terms=${session.checkoutPaymentTermsReviewRequired}',
-      );
-      await tester.pumpAndSettle();
-      expect(session.view, BuyV2View.confirmation);
-      expect(
-        find.byKey(const ValueKey('buy-confirmation-payment-schedule')),
-        findsOneWidget,
-      );
-      final wholesaleOrder = session.confirmedOrders.firstWhere(
-        (order) => order.destination == BuyV2Destination.wholesale,
-      );
-      expect(wholesaleOrder.paymentTermLabel, contains('balance at delivery'));
-      expect(wholesaleOrder.amountPaidNow, greaterThan(0));
-      expect(wholesaleOrder.balanceDue, greaterThan(0));
+      final order = session.confirmedOrders.firstWhere((order) => order.destination == BuyV2Destination.wholesale);
+      expect(order.paymentTermLabel, contains('balance at delivery'));
+      expect(order.amountPaidNow, greaterThan(0)); expect(order.balanceDue, greaterThan(0));
       expect(tester.takeException(), isNull);
     },
   );
@@ -4487,7 +4541,7 @@ void main() {
             ValueKey('buy-checkout-confirm-delivery-${affected.key}'),
           ),
           matching: find.textContaining(
-            'Delivery time confirmed after Store acceptance',
+            'Delivery schedule unavailable',
           ),
         ),
         findsOneWidget,
@@ -4498,7 +4552,7 @@ void main() {
             ValueKey('buy-checkout-confirm-delivery-${unaffected.key}'),
           ),
           matching: find.textContaining(
-            'Delivery time confirmed after Store acceptance',
+            'Delivery schedule unavailable',
           ),
         ),
         findsNothing,
@@ -4522,7 +4576,9 @@ void main() {
     test(
       'T03 changed $change requires consent only for its supplier',
       () async {
-        final adapter = _PaymentTermsAdapter();
+        final adapter = _PaymentTermsAdapter()..assignedTermId = change == 'credit days'
+            ? 'wholesale-credit-30' : change == 'financier disclosure'
+              ? 'regulated-credit-90' : 'wholesale-booking-delivery';
         final session = BuyV2Session(
           core: BuySession(),
           commercialPaymentTermsAdapter: adapter,
@@ -5056,7 +5112,7 @@ void main() {
       commerceAdapter: prepaidCommerceFixture(),
       core: core,
       customerStateStore: owner,
-      commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+      commercialPaymentTermsAdapter: _PaymentTermsAdapter()..assignedTermId = 'wholesale-booking-delivery',
       balancePaymentAdapter: balanceAdapter,
       productFactsAdapter: _DeliveryPromiseFactsAdapter(),
     );
@@ -5119,7 +5175,7 @@ void main() {
         commerceAdapter: prepaidCommerceFixture(),
         core: core,
         customerStateStore: owner,
-        commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+        commercialPaymentTermsAdapter: _PaymentTermsAdapter()..assignedTermId = 'wholesale-booking-delivery',
         balancePaymentAdapter: balanceAdapter,
         productFactsAdapter: _DeliveryPromiseFactsAdapter(),
       );

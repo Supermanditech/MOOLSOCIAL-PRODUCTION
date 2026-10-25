@@ -108,7 +108,7 @@ void main() {
         find.textContaining(session.product('w-oil').seller),
         findsWidgets,
       );
-      expect(find.text('Store · Manufacturer'), findsOneWidget);
+      expect(find.text('Sold by · Manufacturer'), findsOneWidget);
       expect(find.textContaining('Surya Oils India'), findsWidgets);
       await tester.tap(supplier);
       await tester.pumpAndSettle();

@@ -295,6 +295,8 @@ class BuyV2Screen extends StatefulWidget {
     this.accountIdentity,
     this.accountAuthenticated = false,
     this.embeddedStore = false,
+    this.embeddedCartInNavigation = false,
+    this.financeStoreName,
     this.initialDestination = BuyV2Destination.shop,
     this.initialOffersActive = false,
     this.initialView = BuyV2View.catalogue,
@@ -312,6 +314,7 @@ class BuyV2Screen extends StatefulWidget {
     this.onDestinationChanged,
     this.onReceivePurchasedOrder,
     this.onEmbeddedSystemBack,
+    this.storeInvoiceDetailsBuilder,
     this.invoiceDownloader = saveBuyV2InvoiceToDevice,
     this.paymentHandoff,
     this.liveDeliveryMapBuilder,
@@ -324,6 +327,8 @@ class BuyV2Screen extends StatefulWidget {
   final AuthenticatedAccountIdentity? accountIdentity;
   final bool accountAuthenticated;
   final bool embeddedStore;
+  final bool embeddedCartInNavigation;
+  final String? financeStoreName;
   final BuyV2Destination initialDestination;
   final bool initialOffersActive;
   final BuyV2View initialView;
@@ -345,6 +350,8 @@ class BuyV2Screen extends StatefulWidget {
   final void Function(WorkspacePurchaseReference, WorkspacePurchaseOrder)? onReceivePurchasedOrder;
   /// A Store editor can cover Buy while keeping its basket/navigation mounted.
   final VoidCallback? onEmbeddedSystemBack;
+  /// Store-owned billing inputs; personal invoice profiles are kept separate.
+  final WidgetBuilder? storeInvoiceDetailsBuilder;
   final BuyV2InvoiceDownloader? invoiceDownloader;
   final BuyV2PaymentHandoff? paymentHandoff;
 
@@ -366,6 +373,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   Timer? _noticeTimer;
   Timer? _cartAcknowledgementTimer;
   bool _supplierPolicySheetOpen = false;
+  final _financeOwner = ValueNotifier<int>(0);
+  bool _financeSheetOpen = false;
   Timer? _quickTrackerCollapseTimer;
   final _quickTrackerPointers = <int>{};
   int _quickTrackerNavigationSequence = 0;
@@ -500,6 +509,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     if (oldWidget.session != widget.session ||
         oldWidget.accountIdentity != widget.accountIdentity ||
         oldWidget.accountAuthenticated != widget.accountAuthenticated) {
+      _financeOwner.value++;
       if (oldWidget.session.pendingSupplierPolicyAdd != null) {
         oldWidget.session.cancelSupplierPolicyAdd();
       }
@@ -578,18 +588,18 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     }
     for (final restore in <Future<void> Function()>[
       session.restoreSavedProducts,
-      session.restoreOrderAlerts,
+      () => session.restoreOrderAlerts(showNotice: false),
       session.restoreShoppingAlerts,
       session.refreshCartBenefits,
       session.refreshCheckoutQuote,
       session.refreshCommercialPaymentTerms,
-      gstController.restore,
+      if (!session.isStoreProcurement) gstController.restore,
     ]) {
       if (!current()) return;
       await restore();
     }
     if (!current()) return;
-    if (session.businessVerified) {
+    if (!session.isStoreProcurement && session.businessVerified) {
       gstController.applySavedBusinessProfile();
     }
   }
@@ -647,7 +657,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
 
   void _sessionChanged() {
     if (!mounted) return;
-    if (_gstProfileRevision != widget.session.gstProfileRevision &&
+    if (!widget.session.isStoreProcurement &&
+        _gstProfileRevision != widget.session.gstProfileRevision &&
         (!widget.session.cartChangesBlocked ||
             !_gstInvoiceController.ownerScopeCurrent)) {
       // Profile edits apply after payment recovery. An account change must still
@@ -906,6 +917,47 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     widget.accountIdentity,
     widget.accountAuthenticated,
   );
+
+  Future<void> _openFinance(BuyV2Session opened) async {
+    if (_financeSheetOpen) return;
+    final rootOwner = widget.session;
+    final epoch = _financeOwner.value;
+    final identity = widget.accountIdentity;
+    final authenticated = widget.accountAuthenticated;
+    final buyer = opened.collectionIdentity?.value;
+    final procurement = opened.procurementContext;
+    final owner = opened.customerStateStore?.ownerScope;
+    final view = opened.view, productId = opened.selectedProductId;
+    final ownContact = authenticated && identity?.firebasePrincipal != null ? identity : null;
+    bool current() => mounted && identical(widget.session, rootOwner) &&
+        _financeOwner.value == epoch && identical(widget.accountIdentity, identity) &&
+        widget.accountAuthenticated == authenticated &&
+        identical(opened.collectionIdentity?.value, buyer) &&
+        opened.procurementContext?.customerStateOwnerScope == procurement?.customerStateOwnerScope &&
+        opened.customerStateStore?.ownerScope == owner && opened.view == view &&
+        opened.selectedProductId == productId && opened.procurementScopeCurrent;
+    _financeSheetOpen = true;
+    try {
+      await showMoolBusinessFinanceSheet(context,
+        scopeOwner: Listenable.merge([opened, _financeOwner,
+          ?opened.collectionIdentity, ?opened.procurementIdentity]),
+        isCurrent: current,
+        storeName: opened.isStoreProcurement ? widget.financeStoreName ?? 'Your Store' : null,
+        contactName: ownContact?.displayName,
+        callbackNumber: ownContact?.phoneNumber,
+        origin: view == BuyV2View.product ? 'product' : 'cart',
+        buyingStoreId: procurement?.storeId,
+        productIds: view == BuyV2View.product && productId != null ? [productId]
+          : opened.cartLines.where((line) => line.product.destination == BuyV2Destination.wholesale)
+            .map((line) => line.product.id).toSet().toList(growable: false),
+        purchaseLabel: view == BuyV2View.product && opened.selectedProduct != null
+          ? '${opened.selectedProduct!.customerTitle} · ${opened.selectedProduct!.pack}'
+          : 'Wholesale / Bulk Cart',
+      );
+    } finally {
+      _financeSheetOpen = false;
+    }
+  }
 
   bool get _canSound =>
       mounted && _foreground && (ModalRoute.of(context)?.isCurrent ?? true);
@@ -1198,6 +1250,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _financeOwner.value++;
+    _financeOwner.dispose();
     _resetArrivalSound(dispose: true);
     _noticeTimer?.cancel();
     _cartAcknowledgementTimer?.cancel();
@@ -1212,8 +1266,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   bool _usesRefinedCommerce(BuyV2Session session) =>
-      !widget.embeddedStore &&
-      !session.isStoreProcurement &&
+      ((!widget.embeddedStore && !session.isStoreProcurement) ||
+          session.procurementContext?.purpose ==
+              BuyV2ProcurementPurpose.restock) &&
       session.destination != BuyV2Destination.medicine &&
       session.view != BuyV2View.account &&
       session.view != BuyV2View.assist;
@@ -1227,6 +1282,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     final embeddedCompactCart =
         widget.embeddedStore &&
+        !widget.embeddedCartInNavigation &&
         !keyboardVisible &&
         _usesFixedCart(session) &&
         _showsMiniCart(session);
@@ -1315,8 +1371,17 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                         child: _buildScreenLayout(
                           scrollHeader: shortLandscapeCatalogue,
                           header: [
+                            if (session.reviewDataEnabled &&
+                                const {
+                                  BuyV2View.catalogue,
+                                  BuyV2View.cart,
+                                  BuyV2View.checkout,
+                                }.contains(session.view))
+                              const BuyV2DemoCatalogueLabel(),
                             if (session.view == BuyV2View.catalogue &&
-                                !widget.embeddedStore)
+                                (!widget.embeddedStore ||
+                                    session.procurementContext?.purpose ==
+                                        BuyV2ProcurementPurpose.restock))
                               _BuySearchBand(
                                 session: session,
                                 offersActive: _offersActive,
@@ -1328,12 +1393,15 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                   _searchAutofocus = value;
                                 }),
                                 onLocation: () =>
-                                    session.isStoreProcurement ||
+                                    (session.isStoreProcurement &&
+                                        session.procurementContext?.purpose !=
+                                            BuyV2ProcurementPurpose.restock) ||
                                         session.destination ==
                                             BuyV2Destination.medicine
                                     ? showBuyV2AddressSheet(context, session)
                                     : showBuyV2CatalogueArea(context, session),
                                 onAccount: _openBuyProfile,
+                                onBack: _exitBuy,
                                 trailingAction: keyboardVisible
                                     ? _buildDeliveryControl(session, setState)
                                     : null,
@@ -1498,6 +1566,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
             ),
             floatingActionButton:
                 widget.embeddedStore &&
+                    !widget.embeddedCartInNavigation &&
                     !embeddedCompactCart &&
                     !keyboardVisible &&
                     (_miniCartParked || _usesFixedCart(session)) &&
@@ -2306,6 +2375,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
           _offersActive);
 
   bool _showsMiniCart(BuyV2Session session) =>
+      !(widget.embeddedStore &&
+          (session.view == BuyV2View.cart || session.view == BuyV2View.checkout)) &&
       (session.activeDockDestination == BuyV2Destination.medicine &&
                   !_offersActive
               ? session.countForDestination(BuyV2Destination.medicine)
@@ -2707,6 +2778,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                                       Positioned.fill(
                                                         child: BuyV2ProductView(
                                                           session: session,
+                                                          onOpenFinance: () => unawaited(_openFinance(session)),
                                                           bottomContentInset:
                                                               session.itemCount >
                                                                   0
@@ -2825,7 +2897,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                           )
                         : null,
                     bottomNavigationBar:
-                        showingProduct ||
+                        widget.embeddedStore ||
+                            showingProduct ||
                             MediaQuery.viewInsetsOf(context).bottom > 0
                         ? null
                         : _buildDestinationNavigation(
@@ -2998,6 +3071,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
           ? 'Checking approval and current supplier offers.'
           : message,
       loading: loading,
+      retryLabel: session.view == BuyV2View.product ? 'Refresh buying access' : 'Try again',
       onReturn: checkout
           ? () => session.openCart(scope: session.checkoutScope)
           : session.view == BuyV2View.product
@@ -3065,9 +3139,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       ),
       BuyV2View.product => BuyV2ProductView(
         session: session,
-        bottomContentInset: widget.embeddedStore && session.itemCount > 0
-            ? 76
-            : 0,
+        onOpenFinance: () => unawaited(_openFinance(session)),
         scrollController: _rootProductScrollController,
         aggregateCart: _offersActive,
         returnLabel:
@@ -3081,11 +3153,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       ),
       BuyV2View.cart => BuyV2CartView(
         session: session,
+        onOpenFinance: () => unawaited(_openFinance(session)),
         notice:
-            !widget.embeddedStore &&
+            _usesRefinedCommerce(session) &&
                 _storeProductRouteDepth == 0 &&
-                !session.isStoreProcurement &&
-                session.destination != BuyV2Destination.medicine &&
                 session.notice?.trim().isNotEmpty == true
             ? _BuyNotice(
                 key: ValueKey(session.notice),
@@ -3118,6 +3189,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         gstInvoiceController: _gstInvoiceController,
         keyboardVisible: MediaQuery.viewInsetsOf(context).bottom > 0,
         paymentHandoff: widget.resolvedPaymentHandoff,
+        storeInvoiceDetailsBuilder: widget.storeInvoiceDetailsBuilder,
       ),
       BuyV2View.confirmation => BuyV2ConfirmationView(
         session: session,
@@ -3550,6 +3622,7 @@ class _BuySearchBand extends StatelessWidget {
     required this.onOpenChanged,
     required this.onLocation,
     required this.onAccount,
+    this.onBack,
     this.trailingAction,
   });
 
@@ -3561,10 +3634,13 @@ class _BuySearchBand extends StatelessWidget {
   final ValueChanged<bool> onOpenChanged;
   final VoidCallback onLocation;
   final VoidCallback onAccount;
+  final VoidCallback? onBack;
   final Widget? trailingAction;
 
   @override
   Widget build(BuildContext context) {
+    final restock = session.destination == BuyV2Destination.wholesale &&
+        session.procurementContext?.purpose == BuyV2ProcurementPurpose.restock;
     final storeSearch =
         session.pagedCatalogueEnabled &&
         !offersActive &&
@@ -3646,14 +3722,23 @@ class _BuySearchBand extends StatelessWidget {
           curve: Curves.easeOutCubic,
           height: open
               ? (longQuery ? longQueryBandHeight : queryControlHeight + 12)
-              : 56,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              : restock ? 48 : 56,
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: restock ? 2 : 5),
           decoration: BoxDecoration(
             color: theme.canvas,
             border: const Border(bottom: BorderSide(color: BuyV2Colors.line)),
           ),
           child: Row(
             children: [
+              if (restock)
+                IconButton(
+                  key: const ValueKey('buy-restock-back'),
+                  tooltip: 'Back to Stock',
+                  onPressed: onBack,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 20, color: BuyV2Colors.navy),
+                ),
               Expanded(
                 child: AnimatedContainer(
                   key: const ValueKey('buy-search-control'),
@@ -3833,7 +3918,7 @@ class _BuySearchBand extends StatelessWidget {
                   ),
                 ),
               ),
-              if (!open) ...[
+              if (!open && !restock) ...[
                 const SizedBox(width: 6),
                 Material(
                   color: Colors.transparent,
@@ -3944,6 +4029,17 @@ class _BuyEmbeddedCompactCartOverlayState
     );
   }
 }
+
+/// Reuses the public fixed Cart control when an enclosing Store owns the rail.
+Widget buyV2CompactCartNavigation(BuyV2Session session) => ListenableBuilder(
+  listenable: session,
+  builder: (context, _) => _BuyMiniCartBar(
+    session: session,
+    compact: true,
+    initialPosition: null,
+    onPositionChanged: (_) {},
+  ),
+);
 
 class _BuyMiniCartBar extends StatefulWidget {
   const _BuyMiniCartBar({
@@ -4131,7 +4227,7 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
                           context,
                         ).clamp(maxScaleFactor: 1.3),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.shopping_cart_outlined,
                         color: Colors.white,
                         size: 21,

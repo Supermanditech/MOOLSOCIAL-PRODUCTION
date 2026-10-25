@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
@@ -256,7 +257,7 @@ void main() {
     expect(confirmed.voucher, 'No system voucher assigned');
     expect(confirmed.copyHeading, 'Purchase entry - Saved copy');
     expect(confirmed.copyExplanation,
-      'Supplier copy kept separately. Downloading this copy does not change stock, dues or payments.');
+      'Recorded purchase details, not the supplier original. Downloading does not change stock, dues or payments.');
     for (final snapshot in [confirmed, capture(), capture(recovered: false),
       capture(source: posted, displayed: copy(2))]) {
       expect(snapshot.copyHeading, isNot(contains('Not posted')),
@@ -391,24 +392,36 @@ void main() {
     expect(pageObjects.length, 1, reason: 'All ten rows fit; terminal spacing must not create a header/footer-only page.');
     expect(report.rows.length, 10);
   });
-  for (final size in [const Size(320, 568), const Size(915, 412)]) {
+  for (final size in [const Size(360, 800), const Size(320, 568), const Size(915, 412)]) {
     testWidgets('SUPPLIERSTATEMENTUI enlarged preview stale scope and unapplied dates $size', (tester) async {
       tester.view.physicalSize = size; tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
       final changes = ValueNotifier<int>(0); addTearDown(changes.dispose);
       var saves = 0;
-      await tester.pumpWidget(MaterialApp(home: MediaQuery(data: MediaQueryData(size: size,
-        textScaler: TextScaler.linear(size.width > 500 ? 2 : 1.4)), child: Scaffold(body: StoreSupplierStatementPanel(
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: MediaQuery(data: MediaQueryData(size: size,
+        textScaler: TextScaler.linear(size.width > 500 ? 2 : size.width == 360 ? 1 : 1.4)), child: Scaffold(body: StoreSupplierStatementPanel(
           statement: supplierStatementFixture(), isCurrent: () => true, changes: changes,
           saveFile: (bytes, name, format) async { saves++; return true; })))));
       await tester.pumpAndSettle();
-      expect(find.text('Opening -₹100.00 · Closing -₹60.00'), findsOneWidget);
+      expect(find.byKey(const Key('supplier-statement-header')), findsOneWidget);
+      expect(find.textContaining('Snapshot '), findsNothing);
+      final fromField = find.byKey(const Key('supplier-statement-from'));
+      final label = find.descendant(of: fromField, matching: find.text('From'));
+      expect(tester.getRect(label).top - tester.getRect(find.text('Evaluation records only')).bottom,
+        greaterThanOrEqualTo(8));
+      expect(find.byType(DataTable), findsNothing);
+      if(size.width==360) {
+        final applyRect=tester.getRect(find.byKey(const Key('supplier-statement-apply-dates')));
+        final datesRect=tester.getRect(fromField);
+        expect(applyRect.top,lessThan(datesRect.bottom),reason:'Apply must share the date row at normal phone width.');
+        expect(applyRect.bottom,greaterThan(datesRect.top));
+      }
       final download = find.byKey(const ValueKey('supplier-statement-download-csv'));
       await tester.ensureVisible(download); await tester.pumpAndSettle();
       expect(download.hitTestable(), findsOneWidget);
       await tester.enterText(find.byKey(const Key('supplier-statement-from')), '02/10/2026'); await tester.pumpAndSettle();
       expect(tester.widget<TextButton>(download).onPressed, isNull);
-      final apply = find.text('Apply dates'); await tester.ensureVisible(apply); await tester.pumpAndSettle();
+      final apply = find.byKey(const Key('supplier-statement-apply-dates')); await tester.ensureVisible(apply); await tester.pumpAndSettle();
       await tester.tap(apply); await tester.pumpAndSettle();
       expect(tester.widget<TextButton>(download).onPressed, isNotNull);
       await tester.ensureVisible(download); await tester.pumpAndSettle();
@@ -418,6 +431,120 @@ void main() {
       await tester.pumpAndSettle();
       expect(saves, 0); expect(find.text('Records changed. Close and reopen the statement.'), findsWidgets);
       expect(tester.takeException(), isNull);
+    });
+  }
+  testWidgets('SUPPLIERSTATEMENTCOMPACT long ledger lazy rows complete export and fixed identity', (tester) async {
+    tester.view.physicalSize=const Size(360,800); tester.view.devicePixelRatio=1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final base=supplierStatementFixture();
+    final source=base.ledger;
+    const longReference='HOST-LONG-0 / supplier branch purchase account reference / 012345678901234567890123456789012345678901234567890123456789';
+    const longDetails='Bank transfer / HOST UTR 012345678901234567890123456789 / supplier remittance reference retained in full';
+    final ledger=WorkspaceSupplierLedger(accountScope:source.accountScope, workspaceId:source.workspaceId,
+      supplierId:source.supplierId, supplierName:source.supplierName, revision:source.revision,
+      asOf:source.asOf, historyComplete:source.historyComplete, openingBalanceMinor:source.openingBalanceMinor,
+      openingRecord:source.openingRecord, entries:List.generate(1000,(i)=>WorkspaceSupplierLedgerEntry(
+        operationId:'HOST-LONG-$i', reference:i==0 ? longReference : 'HOST-LONG-$i', kind:WorkspaceSupplierEntryKind.payment,
+        origin:WorkspaceSupplierEntryOrigin.supplierAccount, amountMinor:100,
+        postedAt:DateTime.utc(2026,10,2).add(Duration(seconds:i)), paymentMethod:i==0 ? longDetails : 'Bank transfer')));
+    final snapshot=StoreSupplierStatement(source:ledger,storeName:base.storeName,from:base.from,until:base.until,
+      generatedAt:base.generatedAt,reviewOnly:true);
+    final changes=ValueNotifier<int>(0); addTearDown(changes.dispose);
+    await tester.pumpWidget(MaterialApp(theme:MoolTheme.light(),home:Scaffold(body:StoreSupplierStatementPanel(
+      statement:snapshot,isCurrent:()=>true,changes:changes)))); await tester.pumpAndSettle();
+    expect(snapshot.rows.length,1002);
+    expect(find.byWidgetPredicate((w)=>w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('supplier-statement-row-')).evaluate().length,lessThan(20));
+    expect(find.byKey(const ValueKey('supplier-statement-row-1001')),findsNothing);
+    final first=find.byKey(const ValueKey('supplier-statement-row-1'));
+    await tester.ensureVisible(first); await tester.pumpAndSettle();
+    for(final text in ['Payment recorded','02/10/2026',longReference,'−₹1.00',
+      '₹101.00','Credit',longDetails]) {
+      final field=find.descendant(of:first,matching:find.text(text));
+      expect(field,findsOneWidget);
+      expect(tester.getRect(field).left,greaterThanOrEqualTo(0));
+      expect(tester.getRect(field).right,lessThanOrEqualTo(360));
+    }
+    expect(tester.widget<Text>(find.descendant(of:first,matching:find.text('Credit'))).semanticsLabel,'Credit with supplier');
+    final bytes=await tester.runAsync(()=>snapshot.report.generate(StoreStockExportFormat.csv));
+    final csv=utf8.decode(bytes!);
+    expect(csv,contains('HOST-LONG-999')); expect(csv,contains('Closing balance'));
+    final scroll=tester.state<ScrollableState>(find.descendant(of:find.byKey(const Key('supplier-statement-scroll')),matching:find.byType(Scrollable)).first).position;
+    for(var i=0;i<5 && find.byKey(const ValueKey('supplier-statement-row-1001')).evaluate().isEmpty;i++){
+      scroll.jumpTo(scroll.maxScrollExtent); await tester.pumpAndSettle();
+    }
+    expect(find.byKey(const ValueKey('supplier-statement-row-1001')),findsOneWidget);
+    expect(find.text('Supplier ledger').hitTestable(),findsOneWidget);
+    expect(find.byKey(const Key('supplier-ledger-columns')).hitTestable(),findsOneWidget);
+    expect(find.text('Close').hitTestable(),findsOneWidget);
+    expect(tester.takeException(),isNull);
+  });
+  testWidgets('SUPPLIERSTATEMENTCOMPACT enlarged keyboard long identity and unknown balance', (tester) async {
+    const size=Size(320,568);
+    tester.view.physicalSize=size; tester.view.devicePixelRatio=1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final base=supplierStatementFixture(); final source=base.ledger;
+    const supplier='HOST registered supplier with a long trading name and branch address description retained for clear account identification';
+    final ledger=WorkspaceSupplierLedger(accountScope:source.accountScope,workspaceId:source.workspaceId,
+      supplierId:source.supplierId,supplierName:supplier,revision:source.revision,asOf:source.asOf,
+      entries:const [],historyComplete:false);
+    final snapshot=StoreSupplierStatement(source:ledger,storeName:base.storeName,from:base.from,until:base.until,
+      generatedAt:base.generatedAt,reviewOnly:true);
+    final changes=ValueNotifier<int>(0); addTearDown(changes.dispose);
+    await tester.pumpWidget(MaterialApp(theme:MoolTheme.light(),home:MediaQuery(
+      data:const MediaQueryData(size:size,textScaler:TextScaler.linear(2),viewInsets:EdgeInsets.only(bottom:240)),
+      child:Scaffold(body:StoreSupplierStatementPanel(statement:snapshot,isCurrent:()=>true,changes:changes)))));
+    await tester.pumpAndSettle();
+    expect(find.text(supplier),findsOneWidget);
+    final identity=find.byKey(const Key('supplier-statement-identity-scroll'));
+    expect(identity.hitTestable(),findsOneWidget);
+    await tester.drag(identity,const Offset(0,-240)); await tester.pumpAndSettle();
+    expect(find.text('Close').hitTestable(),findsOneWidget);
+    expect(tester.getRect(find.byKey(const Key('supplier-statement-header'))).bottom,lessThanOrEqualTo(328));
+    expect(find.text('Balance unavailable'),findsWidgets);
+    expect(find.text('Nil balance'),findsNothing);
+    expect(tester.takeException(),isNull);
+  });
+  testWidgets('SUPPLIERLEDGERDENSITY more room for entries without hiding references', (tester) async {
+    tester.view.physicalSize=const Size(360,800); tester.view.devicePixelRatio=1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final snapshot=supplierStatementFixture();
+    final changes=ValueNotifier<int>(0); addTearDown(changes.dispose);
+    await tester.pumpWidget(MaterialApp(theme:MoolTheme.light(),home:Scaffold(body:StoreSupplierStatementPanel(
+      statement:snapshot,isCurrent:()=>true,changes:changes)))); await tester.pumpAndSettle();
+    expect(tester.getRect(find.byKey(const Key('supplier-ledger-columns'))).top,lessThan(270),
+      reason:'Filters, balances and exports must leave room for ledger entries.');
+    final entry=find.byKey(const ValueKey('supplier-statement-row-1'));
+    expect(tester.getSize(entry).height,lessThan(82),reason:'A short reference and payment method must not create a tall card.');
+    expect(find.descendant(of:entry,matching:find.text('HOST-REFUND-40')),findsOneWidget);
+    expect(find.descendant(of:entry,matching:find.text('Bank transfer')),findsOneWidget);
+    expect(find.byKey(const ValueKey('supplier-statement-download-pdf')).hitTestable(),findsOneWidget);
+    expect(find.byKey(const ValueKey('supplier-statement-download-csv')).hitTestable(),findsOneWidget);
+    expect(tester.takeException(),isNull);
+  });
+  for(final openingAmount in [0,12345,999999999999]) {
+    testWidgets('SUPPLIERLEDGERFORMAT payable nil and large amount $openingAmount', (tester) async {
+      tester.view.physicalSize=const Size(360,800); tester.view.devicePixelRatio=1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      final opening=WorkspaceSupplierOpeningRecord(id:'HOST-opening',basisId:'HOST-basis',account:'review-account',
+        store:'review-store',qa:true,supplierId:'HOST-supplier',revision:1,asOfDate:'2026-10-01',
+        savedAt:DateTime.utc(2026,10,1),amountMinor:openingAmount,supplierCredit:false,sourceNote:'HOST opening',bills:const []);
+      final ledger=WorkspaceSupplierLedger.confirmedOpening(opening,accountScope:opening.account,
+        workspaceId:opening.store,supplierId:opening.supplierId,supplierName:'HOST supplier',qa:true,confirmedAt:opening.savedAt)!;
+      final snapshot=StoreSupplierStatement(source:ledger,storeName:'HOST Store',from:DateTime(2026,10,1),
+        until:DateTime(2026,10,4),generatedAt:DateTime.utc(2026,10,4),reviewOnly:true);
+      final original=jsonEncode(ledger.toJson());
+      final changes=ValueNotifier<int>(0); addTearDown(changes.dispose);
+      await tester.pumpWidget(MaterialApp(theme:MoolTheme.light(),home:Scaffold(body:StoreSupplierStatementPanel(
+        statement:snapshot,isCurrent:()=>true,changes:changes)))); await tester.pumpAndSettle();
+      expect(find.text('Supplier ledger'),findsOneWidget);
+      expect(find.text(openingAmount==0?'Nil balance':'Payable to supplier'),findsWidgets);
+      expect(find.descendant(of:find.byKey(const ValueKey('supplier-statement-row-0')),matching:find.text('—')),findsOneWidget);
+      if(openingAmount==999999999999) {
+        expect(find.byKey(const ValueKey('supplier-ledger-stacked-0')),findsOneWidget);
+      }
+      expect(jsonEncode(ledger.toJson()),original);
+      expect(snapshot.report.rows,snapshot.rows);
+      expect(tester.takeException(),isNull);
     });
   }
   test('PDFGROUP sections reject omitted fields duplicate or missing records', () {

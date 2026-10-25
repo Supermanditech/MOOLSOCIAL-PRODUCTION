@@ -81,7 +81,7 @@ void main() {
     );
     expect(find.text('Products'), findsNothing);
     expect(find.byKey(const Key('buy-local-tab-medicine')), findsNothing);
-    expect(find.byKey(const Key('buy-global-chat')), findsOneWidget);
+    expect(find.byKey(const Key('mool-global-chat')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('mool-compact-launcher')));
     await tester.pumpAndSettle();

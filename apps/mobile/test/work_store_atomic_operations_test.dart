@@ -1523,6 +1523,69 @@ void main() {
     await expectLater(owner().read('account-A', 'store-A', qa: true), throwsA(isA<WorkGatewayException>()));
     expect(await owner().read('other-account', 'store-A', qa: true), isNull);
   });
+  test('SUPPLIERDIRECTORY contact save preserves bill and retries without duplicates', () async {
+    final device = _OrderJournalStorage();
+    final account = _CommandAccountStore();
+    WorkSession fresh() => WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: account,
+      purchaseEntryStore: SecureWorkPurchaseEntryStore(accountScope: () => account.accountScope,
+        storage: device))..activeWorkspace = _commandStore;
+    final work = fresh();
+    addTearDown(work.dispose);
+    expect(await work.loadWorkspaceSuppliers(), isTrue);
+    final base = entryFixture();
+    final scope = work.workspaceSupplierScope!;
+    expect(await work.saveWorkspacePurchaseEntry(base.profiles.single, scope: scope,
+      draft: base.draft!, expectedRevision: null), isTrue);
+    final at = DateTime.utc(2026, 10, 22);
+    final supplier = WorkspaceSupplierProfile(id: work.newWorkspaceSupplierId(),
+      name: 'HOST new supplier', address: 'Industrial Area, Jodhpur, Rajasthan 342001',
+      phone: '9876543210', gstin: '08ABCDE1234F1Z5', createdAt: at, updatedAt: at);
+    final stock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+    device.loseWriteResponseOnce = true;
+    expect(await work.saveWorkspaceSupplierProfile(supplier, scope: scope, expectedRevision: 1), isTrue);
+    final writes = device.writes.length;
+    expect(await work.saveWorkspaceSupplierProfile(supplier, scope: scope, expectedRevision: 1), isTrue);
+    expect(device.writes.length, writes);
+    expect(work.workspaceSuppliers, hasLength(2));
+    expect(work.workspacePurchaseEntryDraft!.toJson(), base.draft!.toJson());
+    expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+    expect(work.workspacePurchases, isEmpty);
+    final restarted = fresh();
+    addTearDown(restarted.dispose);
+    expect(await restarted.loadWorkspaceSuppliers(), isTrue);
+    expect(restarted.workspaceSuppliers.last.toJson(), supplier.toJson());
+    expect(restarted.workspacePurchaseEntryDraft!.toJson(), base.draft!.toJson());
+    expect(await work.saveWorkspaceSupplierProfile(WorkspaceSupplierProfile(id: 'duplicate',
+      name: 'Same contact', phone: supplier.phone, createdAt: at, updatedAt: at),
+      scope: scope, expectedRevision: 2), isFalse);
+    expect(await work.saveWorkspaceSupplierProfile(WorkspaceSupplierProfile(id: 'foreign',
+      name: 'Foreign', createdAt: at, updatedAt: at),
+      scope: (scope.$1, 'other-store', scope.$3), expectedRevision: 2), isFalse);
+    expect(device.writes.length, writes);
+  });
+  test('SUPPLIERDIRECTORY first contact needs no dummy bill and failed save keeps identity', () async {
+    final device = _OrderJournalStorage();
+    final account = _CommandAccountStore();
+    final work = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: account,
+      purchaseEntryStore: SecureWorkPurchaseEntryStore(accountScope: () => account.accountScope,
+        storage: device))..activeWorkspace = _commandStore;
+    addTearDown(work.dispose);
+    expect(await work.loadWorkspaceSuppliers(), isTrue);
+    final scope = work.workspaceSupplierScope!;
+    final at = DateTime.utc(2026, 10, 22);
+    final supplier = WorkspaceSupplierProfile(id: work.newWorkspaceSupplierId(), name: 'HOST first supplier',
+      createdAt: at, updatedAt: at);
+    device.failWrite = true;
+    expect(await work.saveWorkspaceSupplierProfile(supplier, scope: scope, expectedRevision: null), isFalse);
+    expect(work.workspacePurchaseEntryDraft, isNull);
+    device.failWrite = false;
+    expect(await work.saveWorkspaceSupplierProfile(supplier, scope: scope, expectedRevision: null), isTrue);
+    expect(work.workspaceSuppliers.single.id, supplier.id);
+    expect(work.workspacePurchaseEntryRevision, 1);
+    expect(work.workspacePurchaseEntryDraft, isNull);
+    expect(work.workspaceSupplierOpeningRecords, isEmpty);
+    expect(work.workspaceGoodsReceiptDrafts, isEmpty);
+  });
   // R12 fixtures are automated evidence only, never runtime acceptance records.
   WorkspacePurchaseSavedCopy copyFixture({String id = 'reviewed-copy-A', int revision = 2}) {
     final book = entryFixture();
@@ -1553,6 +1616,41 @@ void main() {
       revision: revision, profiles: base.profiles, draft: base.draft,
       copies: copies ?? base.copies, openingRecords: records ?? [openingFixture()]);
   }
+  test('SUPPLIERDIRECTORY preserves reviewed history and rejects competing or retired scope writes', () async {
+    final device = _OrderJournalStorage();
+    final account = _CommandAccountStore();
+    final owner = SecureWorkPurchaseEntryStore(accountScope: () => account.accountScope, storage: device);
+    await owner.save(entryFixture(), expectedRevision: null);
+    await owner.save(copyBook(), expectedRevision: 1);
+    await owner.save(openingBook(), expectedRevision: 2);
+    final work = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: account,
+      purchaseEntryStore: owner)..activeWorkspace = _commandStore;
+    addTearDown(work.dispose);
+    expect(await work.loadWorkspaceSuppliers(), isTrue);
+    final scope = work.workspaceSupplierScope!;
+    final before = (await owner.read(scope.$1, scope.$2, qa: scope.$3))!.toJson();
+    final at = DateTime.utc(2026, 10, 22);
+    WorkspaceSupplierProfile profile(String id) => WorkspaceSupplierProfile(id: id,
+      name: 'HOST $id', createdAt: at, updatedAt: at);
+    device.holdWrite = Completer<void>();
+    final pending = work.saveWorkspaceSupplierProfile(profile('one'), scope: scope, expectedRevision: 3);
+    await Future<void>.delayed(Duration.zero);
+    expect(work.workspaceSupplierSaving, isTrue);
+    expect(await work.saveWorkspaceSupplierProfile(profile('two'), scope: scope, expectedRevision: 3), isFalse);
+    device.holdWrite!.complete();
+    expect(await pending, isTrue);
+    device.holdWrite = null;
+    final after = (await owner.read(scope.$1, scope.$2, qa: scope.$3))!.toJson();
+    for (final key in before.keys.where((k) => k != 'profiles' && k != 'revision')) {
+      expect(after[key], before[key], reason: 'Contact save must preserve $key exactly.');
+    }
+    expect(await work.saveWorkspaceSupplierProfile(profile('stale'), scope: scope, expectedRevision: 3), isFalse);
+    account.accountScope = 'other-account';
+    expect(await work.saveWorkspaceSupplierProfile(profile('foreign'), scope: scope, expectedRevision: 4), isFalse);
+    account.accountScope = scope.$1;
+    expect((await owner.read(scope.$1, scope.$2, qa: scope.$3))!.profiles.map((p) => p.id),
+      ['private-supplier-A', 'one']);
+  });
   test('P04 unknown is not zero and correction history keeps one supplier basis', () {
     expect(WorkspacePurchaseEntryBook.fromJson(entryFixture().toJson()).openingRecords, isEmpty);
     final unknown = openingFixture();
@@ -1873,16 +1971,22 @@ void main() {
       throwsStateError);
     expect((await owner.read('account-A', 'store-A', qa: true))!.draft!.invoiceReference, 'EVAL-P-001');
   });
-  test('P02 purchase entry rejects dangling supplier and posted or oversized drafts', () {
+  test('P02 purchase entry rejects dangling supplier and posted drafts but retains growing items', () {
     final raw = entryFixture().toJson();
     raw['profiles'] = [];
     expect(() => WorkspacePurchaseEntryBook.fromJson(raw), throwsFormatException);
     final posted = entryFixture().toJson();
     (posted['draft'] as Map)['stage'] = 'posted';
     expect(() => WorkspacePurchaseEntryBook.fromJson(posted), throwsFormatException);
-    final oversized = entryFixture().toJson();
-    (oversized['draft'] as Map)['goods'] = List.filled(201, entryFixture().draft!.goods.single);
-    expect(() => WorkspacePurchaseEntryBook.fromJson(oversized), throwsFormatException);
+    final growing = entryFixture().toJson();
+    (growing['draft'] as Map)['goods'] = List.generate(241,
+      (i) => {...entryFixture().draft!.goods.single, 'name': 'Original item $i'});
+    final restored = WorkspacePurchaseEntryBook.fromJson(growing);
+    expect(restored.draft!.goods, hasLength(241));
+    expect(restored.draft!.goods.last['name'], 'Original item 240');
+    final invalidRow = jsonDecode(jsonEncode(growing)) as Map<String, dynamic>;
+    ((invalidRow['draft'] as Map)['goods'] as List).last['unexpected'] = 'invalid';
+    expect(() => WorkspacePurchaseEntryBook.fromJson(invalidRow), throwsFormatException);
   });
   test('P05 detailed draft legacy compatibility scope and secure restart', () async {
     final legacy = entryFixture();
@@ -2048,12 +2152,14 @@ void main() {
     final restored=WorkspacePurchaseAdditionalField.fromJson(field.toJson());
     expect(restored.sourceItemIndex,2);
     expect(restored.itemIndex,isNull,reason:'Detected item position does not identify an entered item.');
-    for (final invalid in ['noSource','negative','large','wrongSection']) {
+    final laterSource = WorkspacePurchaseAdditionalField.fromJson({...field.toJson(), 'sourceItemIndex': 240});
+    expect(laterSource.sourceItemIndex, 240);
+    expect(laterSource.itemIndex, isNull);
+    for (final invalid in ['noSource','negative','wrongSection']) {
       final raw=field.toJson();
       switch(invalid) {
         case 'noSource': raw.remove('sourceDigest');
         case 'negative': raw['sourceItemIndex']=-1;
-        case 'large': raw['sourceItemIndex']=200;
         case 'wrongSection': raw['section']='invoice';
       }
       expect(()=>WorkspacePurchaseAdditionalField.fromJson(raw),throwsFormatException);
@@ -6505,9 +6611,12 @@ void main() {
       expect(support.valid, isTrue);
       expect(WorkspaceSupplierCreditSupport.fromJson(support.toJson()).toJson(),
         support.toJson());
+      final laterLine = WorkspaceSupplierCreditSupport.fromJson({...support.toJson(), 'billLineIndex': 240});
+      expect(laterLine.billLineIndex, 240);
+      expect(laterLine.quantityMilli, support.quantityMilli);
       for (final alteration in <Map<String, Object?>>[
         {'quantityMilli': 0}, {'quantityMilli': -1}, {'quantityMilli': 2147483648},
-        {'billLineIndex': -1}, {'billLineIndex': 200}, {'receiptId': ''},
+        {'billLineIndex': -1}, {'receiptId': ''},
         {'receiptLineId': ' line'}, {'extra': 'unreviewed'},
         {'returnOperationId': kind == WorkspaceSupplierCreditSupportKind.goodsReturned
           ? null : 'invented-return'},

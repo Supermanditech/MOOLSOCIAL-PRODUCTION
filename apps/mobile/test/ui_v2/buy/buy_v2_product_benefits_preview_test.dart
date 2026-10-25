@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -34,6 +35,226 @@ void main() {
     configuredTotalUses: 20, configuredUsesPerCustomer: 1,
     terms: BuyV2AdvertisedBenefitTerms(kind: 'flat', flatAmountMinor: 1050, flatBasis: 'per_order',
       maximumSavingMinor: 1050, minimumSpendMinor: 10000));
+  BuyV2PublishedStoreCoupon richCoupon(DateTime now, _PublishedCouponCommerce commerce,
+      {BuyV2StoreOfferKind kind = BuyV2StoreOfferKind.productDiscount}) {
+    final sku = BuyV2StoreOfferSku(storeId: commerce.store, skuId: commerce.identity.skuId,
+      title: commerce.product.title, sellUnit: commerce.product.pack, listings: [commerce.identity]);
+    final money = kind != BuyV2StoreOfferKind.quantityPrice && kind != BuyV2StoreOfferKind.extraQuantity;
+    return BuyV2PublishedStoreCoupon.offer(realm: 'evaluation', storeId: commerce.store,
+      couponId: 'host-rich-one', revision: 1, name: 'Host Holi offer', publisherName: 'Host Store',
+      publisherType: BuyV2OfferPublisherType.retailer,
+      sourceId: 'store-offer-v2:evaluation:${commerce.store}:host-rich-one:1', observedAt: now,
+      validFrom: now.subtract(const Duration(hours: 1)), validUntil: now.add(const Duration(hours: 1)),
+      configuredTotalUses: 50, configuredUsesPerCustomer: 1,
+      viewerAccountId: kind == BuyV2StoreOfferKind.buyerDiscount ? 'host-buyer-one' : null,
+      structuredTerms: BuyV2StoreOfferTerms(storeId: commerce.store, kind: kind, skus: [sku], channels: ['retail'],
+        discountKind: money ? 'flat' : null, discountValue: money ? 1000 : null,
+        maximumSavingMinor: money ? 1000 : null,
+        tiers: kind == BuyV2StoreOfferKind.quantityPrice ? [const BuyV2StoreOfferTier(minimumQuantity: 10, priceMinor: 6500)] : [],
+        buyQuantity: kind == BuyV2StoreOfferKind.extraQuantity ? 10 : null,
+        rewardSku: kind == BuyV2StoreOfferKind.extraQuantity ? sku : null,
+        rewardQuantity: kind == BuyV2StoreOfferKind.extraQuantity ? 1 : null,
+        nextPurchaseDays: kind == BuyV2StoreOfferKind.nextPurchase ? 30 : null));
+  }
+  test('STRUCTUREDOFFER06 public projection is allowlisted source-bound and unit-exact', () {
+    final now = DateTime.utc(2026, 10, 25), commerce = _PublishedCouponCommerce();
+    for (final kind in BuyV2StoreOfferKind.values) {
+      final coupon = richCoupon(now, commerce, kind: kind), raw = coupon.toOfferDisplayJson();
+      expect(coupon.isCurrent(now), isTrue);
+      expect(BuyV2PublishedStoreCoupon.decodeOfferDisplay(raw, now: now).termsFingerprint, coupon.termsFingerprint);
+      expect(jsonEncode(raw), isNot(contains('buyerReferences')));
+      expect(coupon.appliesTo(commerce.product, accountId: 'host-buyer-one'), isTrue);
+      expect(coupon.appliesTo(commerce.product.copyWith(pack: '5 litre'), accountId: 'host-buyer-one'), isFalse);
+      expect(coupon.appliesTo(_PublishedCouponCommerce(store: 'host-store-two').product, accountId: 'host-buyer-one'), isFalse);
+      expect(coupon.appliesTo(commerce.product.copyWith(offerClass: BuyV2OfferClass.wholesale), accountId: 'host-buyer-one'), isFalse);
+      for (final patch in [{'buyerReferences': ['private-one']}, {'currency': 'USD'}, {'schemaVersion': 3}]) {
+        expect(() => BuyV2PublishedStoreCoupon.decodeOfferDisplay({...raw, ...patch}, now: now), throwsFormatException);
+      }
+      expect(() => BuyV2PublishedStoreCoupon.decodeOfferDisplay(raw, now: now.add(const Duration(minutes: 1))), throwsFormatException);
+      if (kind == BuyV2StoreOfferKind.buyerDiscount) {
+        expect(coupon.appliesTo(commerce.product), isFalse);
+        expect(coupon.appliesTo(commerce.product, accountId: 'other-buyer'), isFalse);
+      }
+    }
+  });
+  test('STRUCTUREDOFFER06 mixed source capability isolates rich display and blocks legacy application', () async {
+    final now = DateTime.utc(2026, 10, 25), commerce = _PublishedCouponCommerce();
+    final source = _RichCouponSource()..values = [publishedCoupon(now), richCoupon(now, commerce)];
+    final core = BuySession(), session = BuyV2Session(core: core, reviewDataEnabled: false,
+      commerceAdapter: commerce, cataloguePageSource: source, catalogueNow: () => now);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    await session.restoreCommerce();
+    expect(await session.refreshPublishedStoreCoupons(commerce.product.id), isTrue);
+    expect(session.publishedStoreCouponsFor(commerce.product), hasLength(2));
+    expect(await session.chooseStoreCoupon(source.values.last), isFalse);
+    expect(session.scopedCouponSaving, 0); expect(session.selectedStoreCoupons, isEmpty);
+    source.structuredActive = false;
+    expect(session.publishedStoreCouponsFor(commerce.product), hasLength(1));
+    expect(await session.refreshPublishedStoreCoupons(commerce.product.id), isTrue);
+    expect(session.publishedStoreCouponsFor(commerce.product).single.structuredTerms, isNull);
+    source.structuredActive = true;
+    source.values = [richCoupon(now, commerce, kind: BuyV2StoreOfferKind.buyerDiscount)];
+    expect(await session.refreshPublishedStoreCoupons(commerce.product.id), isTrue);
+    expect(session.publishedStoreCouponsFor(commerce.product), isEmpty,
+      reason: 'A source result for another signed-in buyer must not reveal a private offer name.');
+  });
+  for (final kind in BuyV2StoreOfferKind.values.where((kind) => kind != BuyV2StoreOfferKind.buyerDiscount)) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('STRUCTUREDOFFER07 public shared terms ${kind.name} $scale', (tester) async {
+        tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset); addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        var now = DateTime.utc(2026, 10, 25);
+        final commerce = _PublishedCouponCommerce();
+        final source = _RichCouponSource()..values = [richCoupon(now, commerce, kind: kind)];
+        final core = BuySession(), session = BuyV2Session(core: core, reviewDataEnabled: false,
+          commerceAdapter: commerce, cataloguePageSource: source, catalogueNow: () => now);
+        addTearDown(core.dispose); addTearDown(session.dispose);
+        await session.restoreCommerce(); expect(session.openProduct(commerce.product.id), isTrue);
+        await tester.pumpWidget(app(session)); await tester.pumpAndSettle();
+        final tile = find.byKey(ValueKey('buy-published-store-coupon-${source.values.single.identity}'));
+        await tester.scrollUntilVisible(tile, 200, maxScrolls: 30, scrollable: find.descendant(
+          of: find.byKey(PageStorageKey('buy-product-${commerce.product.id}')), matching: find.byType(Scrollable)).first);
+        await tester.ensureVisible(find.text('Host Holi offer')); await tester.pumpAndSettle();
+        expect(find.text('Host Holi offer').hitTestable(), findsOneWidget);
+        await tester.tap(find.text('Host Holi offer'));
+        await tester.pumpAndSettle();
+        expect(find.text(source.values.single.structuredTerms!.savingLabel), findsWidgets);
+        expect(session.scopedCouponSaving, 0); expect(session.cartLines, isEmpty);
+        now = now.add(const Duration(minutes: 1));
+        await tester.pump(const Duration(minutes: 1)); await tester.pumpAndSettle();
+        expect(tile, findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('STRUCTUREDOFFER10 mixed Retail Wholesale Bulk Cart keeps supplier and SKU boundaries $scale', (tester) async {
+      tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset); addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      var now = DateTime.utc(2026, 10, 25);
+      final products = <BuyV2Product>[];
+      for (final (index, channel) in [BuyV2OfferClass.retail, BuyV2OfferClass.wholesale, BuyV2OfferClass.bulk].indexed) {
+        final identity = BuyV2PublicListingIdentity(listingId: 'listing-${'abc'[index] * 64}', realm: 'evaluation',
+          storeId: 'mixed-store-$index', skuId: 'mixed-sku-$index', canonicalProductId: 'mixed-product-$index',
+          verifiedPackId: 'mixed-pack-$index', channel: channel);
+        products.add(BuyV2Product(id: identity.listingId, canonicalId: identity.canonicalProductId,
+          publicListingIdentity: identity, storeId: identity.storeId, offerClass: channel,
+          destination: channel == BuyV2OfferClass.retail ? BuyV2Destination.shop : BuyV2Destination.wholesale,
+          categoryId: 'dairy', brand: 'Host', title: 'Host ${channel.name} milk', variant: 'Plain',
+          pack: '1 litre', priceMinor: 7050, unitPrice: '₹70.50/litre', badge: '', seller: 'Supplier $index',
+          sellerType: 'Host supplier', deliveryPromise: '', origin: '', confirmedOn: '', visualLabel: '', visualKind: 'milk'));
+      }
+      final first = products.first, unrelatedIdentity = BuyV2PublicListingIdentity(listingId: 'listing-${'f' * 64}',
+        realm: 'evaluation', storeId: first.storeId!, skuId: 'unrelated-sku', canonicalProductId: first.canonicalId,
+        verifiedPackId: 'unrelated-pack', channel: BuyV2OfferClass.retail);
+      final unrelated = first.copyWith(id: unrelatedIdentity.listingId, publicListingIdentity: unrelatedIdentity, title: 'Unrelated Store item');
+      final source = _MixedCouponSource();
+      source.values = [for (final product in products) BuyV2PublishedStoreCoupon.offer(realm: 'evaluation',
+        storeId: product.storeId!, couponId: 'mixed-offer', revision: 1, name: '${product.seller} Diwali offer',
+        publisherName: product.seller, publisherType: BuyV2OfferPublisherType.wholesaler,
+        sourceId: 'store-offer-v2:evaluation:${product.storeId}:mixed-offer:1', observedAt: now,
+        validFrom: now.subtract(const Duration(hours: 1)), validUntil: now.add(const Duration(hours: 1)),
+        configuredTotalUses: 50, configuredUsesPerCustomer: 1,
+        structuredTerms: BuyV2StoreOfferTerms(storeId: product.storeId!, kind: BuyV2StoreOfferKind.productDiscount,
+          channels: [product.offerClass!.name], skus: [BuyV2StoreOfferSku(storeId: product.storeId!,
+            skuId: product.sourceSkuId, title: product.title, sellUnit: product.pack, listings: [product.publicListingIdentity!])],
+          discountKind: 'flat', discountValue: 1000, maximumSavingMinor: 1000))];
+      final core = BuySession(); late final BuyV2Session session;
+      session = BuyV2Session(core: core, reviewDataEnabled: false, catalogueNow: () => now,
+        commerceAdapter: _MixedCouponCommerce([unrelated, ...products]), cataloguePageSource: source,
+        productFactsAdapter: _HostCouponFacts(() => now, () => session.eligibilityLocationKey));
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      await session.restoreCommerce(); expect(session.chooseAddress('host-home'), isTrue);
+      for (final product in [unrelated, ...products]) {
+        session.refreshProductFacts(product.id);
+        expect(session.addProduct(product.id), isTrue, reason: session.notice);
+      }
+      for (final product in products) { expect(await session.refreshPublishedStoreCoupons(product.id), isTrue); }
+      expect(session.cartLines, hasLength(4)); expect(session.cartStoreCoupons, hasLength(3));
+      expect(session.cartLines.map((line) => line.product.offerClass).toSet(),
+        {BuyV2OfferClass.retail, BuyV2OfferClass.wholesale, BuyV2OfferClass.bulk});
+      expect(session.publishedStoreCouponsFor(unrelated), isEmpty);
+      for (final product in products) {
+        final coupon = session.publishedStoreCouponsFor(product).single;
+        expect(coupon.storeId, product.storeId);
+        for (final other in products.where((other) => other != product)) {
+          expect(coupon.appliesTo(other), isFalse);
+        }
+      }
+      final before = buyV2StoreCouponCartInput(session.cartLines), total = session.scopedPayableTotalMinor;
+      session.openCart(); await tester.pumpWidget(app(session)); await tester.pumpAndSettle();
+      final scroll = find.descendant(of: find.byKey(const ValueKey('buy-cart-scroll')),
+        matching: find.byWidgetPredicate((widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down)).first;
+      final toggle = find.byKey(const ValueKey('buy-cart-coupons'));
+      await tester.scrollUntilVisible(toggle, 180, maxScrolls: 30, scrollable: scroll);
+      await tester.ensureVisible(toggle); await tester.pumpAndSettle();
+      if (find.byTooltip('Collapse coupons and offers').evaluate().isEmpty) {
+        await tester.tap(toggle); await tester.pumpAndSettle();
+      }
+      final all = find.text('View all 3 Store coupons');
+      await tester.scrollUntilVisible(all, 180, maxScrolls: 30, scrollable: scroll);
+      await tester.ensureVisible(all); await tester.pumpAndSettle(); await tester.tap(all); await tester.pumpAndSettle();
+      for (final coupon in source.values) {
+        expect(find.text(coupon.name), findsWidgets);
+        expect(await session.chooseStoreCoupon(coupon), isFalse);
+      }
+      expect(buyV2StoreCouponCartInput(session.cartLines), before); expect(session.scopedPayableTotalMinor, total);
+      expect(session.scopedCouponSavingMinor, 0); expect(session.selectedStoreCoupons, isEmpty);
+      now = now.add(const Duration(minutes: 1)); await tester.pump(const Duration(minutes: 1)); await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+  for (final kind in [BuyV2StoreOfferKind.productDiscount, BuyV2StoreOfferKind.extraQuantity]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('STRUCTUREDOFFER09 actual Cart keeps rich ${kind.name} scoped and unapplied $scale', (tester) async {
+        tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset); addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        var now = DateTime.utc(2026, 10, 25);
+        final commerce = _PublishedCouponCommerce(withAddress: true), source = _RichCouponSource();
+        source.values = [richCoupon(now, commerce, kind: kind)];
+        final core = BuySession(); late final BuyV2Session session;
+        session = BuyV2Session(core: core, reviewDataEnabled: false,
+          commerceAdapter: commerce, cataloguePageSource: source, catalogueNow: () => now,
+          productFactsAdapter: _HostCouponFacts(() => now, () => session.eligibilityLocationKey));
+        addTearDown(core.dispose); addTearDown(session.dispose);
+        await session.restoreCommerce();
+        expect(session.chooseAddress('host-home'), isTrue);
+        session.refreshProductFacts(commerce.product.id);
+        expect(session.addProduct(commerce.product.id), isTrue, reason: session.notice);
+        expect(await session.refreshPublishedStoreCoupons(commerce.product.id), isTrue);
+        final original = buyV2StoreCouponCartInput(session.cartLines), total = session.scopedPayableTotalMinor;
+        session.openCart(); await tester.pumpWidget(app(session)); await tester.pumpAndSettle();
+        final scroll = find.descendant(of: find.byKey(const ValueKey('buy-cart-scroll')),
+          matching: find.byWidgetPredicate((widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down)).first;
+        final panel = find.byKey(ValueKey('buy-cart-store-coupon-${source.values.single.identity}'));
+        if (panel.evaluate().isEmpty) {
+          final toggle = find.byKey(const ValueKey('buy-cart-coupons'));
+          await tester.scrollUntilVisible(toggle, 180, maxScrolls: 30, scrollable: scroll);
+          await tester.ensureVisible(toggle); await tester.pumpAndSettle();
+          if (find.byTooltip('Collapse coupons and offers').evaluate().isEmpty) {
+            await tester.tap(toggle); await tester.pumpAndSettle();
+          }
+        }
+        await tester.scrollUntilVisible(panel, 180, maxScrolls: 30, scrollable: scroll); await tester.pumpAndSettle();
+        expect(find.descendant(of: panel, matching: find.text('Host Holi offer')), findsOneWidget);
+        expect(find.descendant(of: panel, matching: find.textContaining('Host Store')), findsWidgets);
+        expect(find.descendant(of: panel, matching: find.textContaining('Applying this offer is not connected')), findsOneWidget);
+        final apply = find.descendant(of: panel, matching: find.widgetWithText(TextButton, 'Apply'));
+        expect(tester.widget<TextButton>(apply).onPressed, isNull);
+        expect(await session.chooseStoreCoupon(source.values.single), isFalse);
+        expect(buyV2StoreCouponCartInput(session.cartLines), original);
+        expect(session.scopedPayableTotalMinor, total); expect(session.selectedStoreCoupons, isEmpty);
+        expect(session.scopedCouponSavingMinor, 0);
+        now = now.add(const Duration(minutes: 1)); await tester.pump(const Duration(minutes: 1)); await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
   for (final scale in [1.0, 2.0]) {
     testWidgets('LF04 PUBLISHED COUPON real-listing Store terms render without Cart authority at $scale', (tester) async {
       tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
@@ -367,9 +588,40 @@ class _PublishedCouponSource implements BuyV2CataloguePageSource, BuyV2StoreCoup
   }
   @override dynamic noSuchMethod(Invocation invocation) => throw UnsupportedError('No fixture catalogue page');
 }
+class _RichCouponSource extends _PublishedCouponSource implements BuyV2StructuredStoreCouponSource {
+  bool structuredActive = true;
+  @override bool get structuredStoreCouponDisplayActive => structuredActive;
+}
+class _MixedCouponSource extends _RichCouponSource {
+  @override Future<List<BuyV2PublishedStoreCoupon>> loadStoreCoupons({required String storeId}) async =>
+    values.where((coupon) => coupon.storeId == storeId).toList();
+}
+class _MixedCouponCommerce implements BuyV2CommerceAdapter {
+  _MixedCouponCommerce(this.products);
+  final List<BuyV2Product> products;
+  @override Future<BuyV2CommerceSnapshot> refresh() async {
+    final sample = await _PublishedCouponCommerce(withAddress: true).refresh();
+    return BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready, products: products,
+      addresses: sample.addresses, businessVerified: true);
+  }
+  @override dynamic noSuchMethod(Invocation invocation) => throw UnsupportedError('Isolated mixed Cart host fixture');
+}
+class _HostCouponFacts implements BuyV2ProductFactsAdapter {
+  _HostCouponFacts(this.now, this.location);
+  final DateTime Function() now;
+  final String Function() location;
+  @override BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) => BuyV2ProductFactsSnapshot(
+    productId: product.id, priceMinor: product.priceMinor, deliveryPromise: 'Isolated host courier fixture', partner: product.seller,
+    orderabilityLabel: 'Host checked availability', sourceId: 'isolated-host-coupon-facts', observedAt: now(),
+    eligibility: BuyV2OfferEligibility(productId: product.id, storeId: product.storeId!, sourceRevision: 'host-only-v1',
+      customerLocationKey: location(), observedAt: now(), expiresAt: now().add(const Duration(minutes: 1)),
+      offerClass: product.offerClass!, channelEnabled: true, storeReady: true, fleetAvailable: false,
+      customerLocationConfirmed: true, options: {BuyV2DeliveryOption.courier}));
+}
 class _PublishedCouponCommerce implements BuyV2CommerceAdapter {
-  _PublishedCouponCommerce({this.store = 'host-store-one'});
+  _PublishedCouponCommerce({this.store = 'host-store-one', this.withAddress = false});
   final String store;
+  final bool withAddress;
   late final identity = BuyV2PublicListingIdentity(listingId: 'listing-${(store == 'host-store-one' ? 'd' : 'e') * 64}', realm: 'evaluation',
     storeId: store, skuId: 'host-sku-one', canonicalProductId: 'host-milk-one',
     verifiedPackId: 'host-pack-one', channel: BuyV2OfferClass.retail);
@@ -378,6 +630,9 @@ class _PublishedCouponCommerce implements BuyV2CommerceAdapter {
     destination: BuyV2Destination.shop, categoryId: 'dairy', brand: 'Host', title: 'Host milk', variant: 'Plain',
     pack: '1 litre', priceMinor: 7050, unitPrice: '₹70.50/litre', badge: '', seller: 'Host Store',
     sellerType: 'Retailer', deliveryPromise: '', origin: '', confirmedOn: '', visualLabel: '', visualKind: 'milk');
-  @override Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready, products: [product]);
+  @override Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready, products: [product],
+    addresses: !withAddress ? const [] : const [BuyV2Address(id: 'host-home', kind: BuyV2AddressKind.home,
+      label: 'Host Home', recipient: 'Host buyer', phone: '9000000000', line: 'Isolated host address',
+      area: 'Jodhpur', pinCode: '342003', landmark: '')]);
   @override dynamic noSuchMethod(Invocation invocation) => throw UnsupportedError('Host read-only commerce fixture');
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:crypto/crypto.dart';
+import '../../core/design/mool_colors.dart';
 import '../../shared/commerce/commerce_downloads.dart';
 import 'work_invoice_pdf.dart';
 import 'work_session.dart';
@@ -689,6 +690,7 @@ class StoreSupplierStatementPanel extends StatefulWidget {
 
 class _StoreSupplierStatementPanelState extends State<StoreSupplierStatementPanel> {
   late StoreSupplierStatement snapshot;
+  late List<List<Object?>> visibleRows;
   late final TextEditingController from, to;
   bool stale = false, busy = false;
   String? notice;
@@ -697,7 +699,7 @@ class _StoreSupplierStatementPanelState extends State<StoreSupplierStatementPane
     to.text != StoreSupplierStatement.date(StoreSupplierStatement.previousDay(snapshot.until));
   @override
   void initState() {
-    super.initState(); snapshot = widget.statement;
+    super.initState(); snapshot = widget.statement; visibleRows = snapshot.rows;
     from = TextEditingController(text: StoreSupplierStatement.date(snapshot.from));
     to = TextEditingController(text: StoreSupplierStatement.date(StoreSupplierStatement.previousDay(snapshot.until)));
     widget.changes.addListener(invalidate);
@@ -716,7 +718,7 @@ class _StoreSupplierStatementPanelState extends State<StoreSupplierStatementPane
       if (start == null || end == null) throw const FormatException('Enter dates as DD/MM/YYYY.');
       final next = StoreSupplierStatement(source: snapshot.ledger, storeName: snapshot.storeName,
         from: start, until: DateTime(end.year, end.month, end.day + 1), generatedAt: snapshot.generatedAt, reviewOnly: snapshot.reviewOnly);
-      setState(() { snapshot = next; notice = null; });
+      setState(() { snapshot = next; visibleRows = next.rows; notice = null; });
     } on FormatException catch (e) { setState(() => notice = e.message); }
   }
   Future<void> download(StoreStockExportFormat format) async {
@@ -735,47 +737,170 @@ class _StoreSupplierStatementPanelState extends State<StoreSupplierStatementPane
   @override
   void dispose() { widget.changes.removeListener(invalidate); from.dispose(); to.dispose(); super.dispose(); }
   @override
-  Widget build(BuildContext context) => SafeArea(top: false, child: SingleChildScrollView(padding: const EdgeInsets.all(16),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [Expanded(child: Text('Supplier statement', style: Theme.of(context).textTheme.titleMedium)),
-        TextButton(onPressed: busy ? null : () => Navigator.pop(context), child: const Text('Close'))]),
-      Text(snapshot.ledger.supplierName, style: Theme.of(context).textTheme.titleSmall),
-      if (snapshot.reviewOnly) const Text('Evaluation records only'),
-      Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-        SizedBox(width: (150 * MediaQuery.textScalerOf(context).scale(14) / 14).clamp(150.0, MediaQuery.sizeOf(context).width - 64), child: TextField(key: const Key('supplier-statement-from'), controller: from,
-          style: const TextStyle(fontSize: 14),
-          keyboardType: TextInputType.datetime, onChanged: (_) => setState(() {}),
-          enabled: current && !busy, decoration: const InputDecoration(labelText: 'From', hintText: 'DD/MM/YYYY',
-            isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14)))),
-        SizedBox(width: (150 * MediaQuery.textScalerOf(context).scale(14) / 14).clamp(150.0, MediaQuery.sizeOf(context).width - 64), child: TextField(key: const Key('supplier-statement-to'), controller: to,
-          style: const TextStyle(fontSize: 14),
-          keyboardType: TextInputType.datetime, onChanged: (_) => setState(() {}),
-          enabled: current && !busy, decoration: const InputDecoration(labelText: 'To', hintText: 'DD/MM/YYYY',
-            isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14)))),
-        TextButton(onPressed: current && !busy ? applyPeriod : null, child: const Text('Apply dates'))]),
-      Text('Opening ${StoreSupplierStatement.amount(snapshot.opening)} · Closing ${StoreSupplierStatement.amount(snapshot.closing)}',
-        key: const Key('supplier-statement-balances')),
-      const Text('Positive balance = dues; negative balance = credit with supplier.'),
-      if (!snapshot.balancesReady) const Text('Full balance unavailable. Showing recorded activity only.'),
-      if (unappliedDates) const Text('Apply dates to update the preview before downloading.'),
-      Wrap(spacing: 8, children: [for (final format in [StoreStockExportFormat.pdf, StoreStockExportFormat.csv])
-        TextButton.icon(key: ValueKey('supplier-statement-download-${format.extension}'),
-          onPressed: current && !busy && !unappliedDates ? () => download(format) : null,
-          icon: const Icon(Icons.download_outlined, size: 18), label: Text('Download ${format.label}'))]),
-      if (!current) const Text('Records changed. Close and reopen the statement.'),
-      if (notice != null) Text(notice!), if (busy) const LinearProgressIndicator(),
-      const Text('Swipe the table left or right to see amounts and references.'),
-      SingleChildScrollView(scrollDirection: Axis.horizontal, child: DataTable(columnSpacing: 16,
-        dataRowMinHeight: 40, dataRowMaxHeight: double.infinity,
-        columns: [for (var i = 0; i < StoreSupplierStatement.headers.length; i++)
-          DataColumn(label: Text(StoreSupplierStatement.headers[i]), numeric: i >= 3 && i <= 5)],
-        rows: [for (final row in snapshot.rows) DataRow(cells: [for (var i = 0; i < row.length; i++)
-          DataCell(SizedBox(width: i == 6 ? 240 : i == 2 ? 180 : i == 1 ? 150 : 110,
-            child: Text(row[i] == null ? 'Unavailable' : row[i] is num
-              ? StoreSupplierStatement.amount(((row[i] as num) * 100).round()) : row[i].toString(),
-              textAlign: i >= 3 && i <= 5 ? TextAlign.right : TextAlign.left)))])])),
-      Text('Snapshot ${snapshot.reference} · revision ${snapshot.ledger.revision}', style: Theme.of(context).textTheme.bodySmall),
-    ])));
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, constraints) {
+    final columns = _columnsFit(context, constraints.maxWidth - 24);
+    return SafeArea(top: false, child: Column(children: [
+    Padding(key: const Key('supplier-statement-header'), padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [const Expanded(child: Text('Supplier ledger', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+          for (final format in [StoreStockExportFormat.pdf, StoreStockExportFormat.csv])
+            Tooltip(message: 'Download ${format.label}', child: TextButton(
+              key: ValueKey('supplier-statement-download-${format.extension}'),
+              onPressed: current && !busy && !unappliedDates ? () => download(format) : null,
+              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6), minimumSize: const Size(48, 48)),
+              child: Text(format.label, style: const TextStyle(fontSize: 12)))),
+          TextButton(onPressed: busy ? null : () => Navigator.pop(context), child: const Text('Close'))]),
+        ConstrainedBox(constraints: BoxConstraints(maxHeight: constraints.maxHeight * .35),
+          child: SingleChildScrollView(key: const Key('supplier-statement-identity-scroll'),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(snapshot.ledger.supplierName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              if (snapshot.reviewOnly) const Text('Evaluation records only', style: TextStyle(fontSize: 11)),
+            ]))),
+      ])),
+    Expanded(child: CustomScrollView(key: const Key('supplier-statement-scroll'), slivers: [
+      SliverToBoxAdapter(child: Padding(padding: EdgeInsets.fromLTRB(12, MediaQuery.textScalerOf(context).scale(10), 12, 4),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          LayoutBuilder(builder: (context, constraints) {
+            final pairWidth = (constraints.maxWidth - 96) / 2;
+            final fieldWidth = pairWidth >= MediaQuery.textScalerOf(context).scale(100) ? pairWidth : constraints.maxWidth;
+            return Wrap(spacing: 8, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              for (final field in [(from, 'From', 'supplier-statement-from'), (to, 'To', 'supplier-statement-to')])
+                SizedBox(width: fieldWidth, child: TextField(key: Key(field.$3), controller: field.$1,
+                  style: const TextStyle(fontSize: 12), keyboardType: TextInputType.datetime,
+                  onChanged: (_) => setState(() {}), enabled: current && !busy,
+                  decoration: InputDecoration(labelText: field.$2, hintText: 'DD/MM/YYYY', isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12)))),
+              SizedBox(width: 80, child: Tooltip(message: 'Apply dates', child: TextButton(
+                key: const Key('supplier-statement-apply-dates'), onPressed: current && !busy ? applyPeriod : null,
+                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8), minimumSize: const Size(80, 48)),
+                child: const Text('Apply', style: TextStyle(fontSize: 12))))),
+            ]);
+          }),
+          Container(key: const Key('supplier-statement-balances'), margin: const EdgeInsets.only(top: 6, bottom: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(color: MoolColors.canvas, border: Border.all(color: MoolColors.line), borderRadius: BorderRadius.circular(8)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              _balance('Opening balance', snapshot.opening), const SizedBox(height: 4),
+              _balance('Closing balance', snapshot.closing),
+            ])),
+          if (!snapshot.balancesReady) const Text('Full balance unavailable. Showing recorded activity only.'),
+          if (unappliedDates) const Text('Apply dates to update the preview before downloading.'),
+          if (!current) const Text('Records changed. Close and reopen the statement.'),
+          if (notice != null) Text(notice!), if (busy) const LinearProgressIndicator(),
+        ]))),
+      SliverPersistentHeader(pinned: true, delegate: _SupplierLedgerColumnHeader(
+        extent: MediaQuery.textScalerOf(context).scale(12) * 1.4 + 16,
+        child: Container(key: const Key('supplier-ledger-columns'), color: MoolColors.canvas,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+          child: columns ? _columnRow(
+            const Text('Details', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: MoolColors.navy)),
+            const Text('Amount', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: MoolColors.navy)),
+            const Text('Balance', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: MoolColors.navy)))
+          : const Text('Ledger entries', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: MoolColors.navy))))),
+      SliverPadding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 16), sliver: SliverList(
+        delegate: SliverChildBuilderDelegate((context, index) => _transaction(visibleRows[index], index, columns), childCount: visibleRows.length))),
+    ])),
+  ])); });
+
+  String _direction(int? amount, {bool compact = false}) => amount == null ? 'Balance unavailable' : amount < 0
+    ? (compact ? 'Credit' : 'Credit with supplier') : amount > 0
+    ? (compact ? 'Payable' : 'Payable to supplier') : (compact ? 'Nil' : 'Nil balance');
+
+  Widget _balance(String label, int? amount) => Wrap(alignment: WrapAlignment.spaceBetween,
+    crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, runSpacing: 2, children: [
+    Text(label, style: const TextStyle(fontSize: 11)),
+    Wrap(alignment: WrapAlignment.end, crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, runSpacing: 2, children: [
+      Text(StoreSupplierStatement.amount(amount?.abs()), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.ink, fontFeatures: [FontFeature.tabularFigures()])),
+      Text(_direction(amount), style: const TextStyle(fontSize: 10)),
+    ]),
+  ]);
+
+  String _longestNumber() {
+    var longest = '+₹0.00';
+    for (final row in visibleRows) {
+      for (final value in [row[3], row[4], row[5]]) {
+        if (value is! num) continue;
+        final candidate = '+${StoreSupplierStatement.amount((value * 100).round().abs())}';
+        if (candidate.length > longest.length) longest = candidate;
+      }
+    }
+    return longest;
+  }
+
+  double _numberWidth(BuildContext context) {
+    final painter = TextPainter(text: TextSpan(text: _longestNumber(), style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+      fontSize: 12, fontFeatures: const [FontFeature.tabularFigures()])),
+      textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
+    final width = painter.width; painter.dispose(); return width;
+  }
+
+  bool _columnsFit(BuildContext context, double width) => width >= MediaQuery.textScalerOf(context).scale(300) &&
+    _numberWidth(context) + 4 <= (width - 28) / 4;
+
+  Widget _columnRow(Widget details, Widget amount, Widget balance) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Expanded(flex: 6, child: details), const SizedBox(width: 8),
+    Expanded(flex: 3, child: Align(alignment: Alignment.topRight, child: amount)), const SizedBox(width: 8),
+    Expanded(flex: 3, child: Align(alignment: Alignment.topRight, child: balance)),
+  ]);
+
+  Widget _transaction(List<Object?> row, int index, bool columns) {
+    String value(int column) => row[column] == null ? 'Unavailable' : row[column] is num
+      ? StoreSupplierStatement.amount(((row[column] as num) * 100).round()) : row[column].toString();
+    final balance = row[5] is num ? ((row[5] as num) * 100).round() : null;
+    final hasBalance = row[5] == null || row[5] is num;
+    const numberStyle = TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.ink, fontFeatures: [FontFeature.tabularFigures()]);
+    final details = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (value(0).isNotEmpty) Text(value(0), style: const TextStyle(fontSize: 10, color: MoolColors.muted)),
+      Text(value(1), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.ink)),
+    ]);
+    final amount = Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+      if (row[3] is num) Text('+${value(3)}', style: numberStyle),
+      if (row[4] is num) Text('−${value(4)}', style: numberStyle),
+      if (row[3] is! num && row[4] is! num) const Text('—', semanticsLabel: 'No balance change', style: numberStyle),
+    ]);
+    final balanceCell = Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+      Text(hasBalance ? StoreSupplierStatement.amount(balance?.abs()) : '—', style: numberStyle),
+      if (hasBalance && balance != null) Text(_direction(balance, compact: true), semanticsLabel: _direction(balance), textAlign: TextAlign.right,
+        style: const TextStyle(fontSize: 10, color: MoolColors.muted)),
+    ]);
+    return Container(key: ValueKey('supplier-statement-row-$index'),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(color: index.isOdd ? MoolColors.canvas : Colors.white,
+        border: const Border(bottom: BorderSide(color: MoolColors.line))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (columns) _columnRow(details, amount, balanceCell) else ...[
+          details,
+          LayoutBuilder(key: ValueKey('supplier-ledger-stacked-$index'), builder: (context, constraints) {
+            final half = (constraints.maxWidth - 12) / 2;
+            final fieldWidth = _numberWidth(context) + 4 <= half ? half : constraints.maxWidth;
+            return Wrap(spacing: 12, runSpacing: 6, children: [
+              for (final field in [('Amount', amount), ('Balance', balanceCell)])
+                SizedBox(width: fieldWidth, child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text(field.$1, style: const TextStyle(fontSize: 10, color: MoolColors.muted)), field.$2,
+                ])),
+            ]);
+          }),
+        ],
+        if (value(2).isNotEmpty) Padding(padding: const EdgeInsets.only(top: 3),
+          child: Text(value(2), style: const TextStyle(fontSize: 11, color: MoolColors.muted))),
+        if (value(6).isNotEmpty && value(6) != 'Dues (+), credit with supplier (-)')
+          Text(value(6), style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+      ]));
+  }
+}
+
+class _SupplierLedgerColumnHeader extends SliverPersistentHeaderDelegate {
+  _SupplierLedgerColumnHeader({required this.extent, required this.child});
+  final double extent;
+  final Widget child;
+  @override
+  double get minExtent => extent;
+  @override
+  double get maxExtent => extent;
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => SizedBox.expand(child: child);
+  @override
+  bool shouldRebuild(covariant _SupplierLedgerColumnHeader oldDelegate) => extent != oldDelegate.extent || child != oldDelegate.child;
 }
 
 class StoreCustomerStatement {

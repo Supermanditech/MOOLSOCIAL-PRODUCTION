@@ -15,6 +15,124 @@ export 'buy_v2_models.dart'
         BuyV2MediaFileMetadata,
         BuyV2ProductMediaBinding;
 
+/// Enquiry categories, not offers, eligibility decisions or lender affiliations.
+@immutable
+class BuyV2BusinessFinanceNeed {
+  const BuyV2BusinessFinanceNeed(this.id, this.label, this.group, this.guide,
+      {this.aliases = ''});
+  final String id, label, group, guide;
+  final String aliases;
+  String get searchText => '$label $guide $aliases ${legacyLabels.entries
+    .where((entry) => legacyFamilies[entry.key] == id)
+    .map((entry) => entry.value).join(' ')}'.toLowerCase();
+
+  static const values = [
+    BuyV2BusinessFinanceNeed('purchase', 'Purchase / dealer finance', 'Trade finance',
+      'Fund inventory.', aliases: 'inventory finance stock restock channel distributor purchase invoice'),
+    BuyV2BusinessFinanceNeed('purchase-order', 'Purchase order finance', 'Trade finance',
+      'Finance fulfilment of a confirmed purchase order.', aliases: 'PO pre dispatch'),
+    BuyV2BusinessFinanceNeed('invoice-finance', 'Invoice / bill discounting', 'Trade finance',
+      'Finance against eligible sales or supplier invoices.',
+      aliases: 'receivables sales invoice supply chain finance TReDS MSME-to-MSME Small-to-Small S2S vendor supplier reverse factoring early payment freight logistics'),
+    BuyV2BusinessFinanceNeed('working-capital', 'Working capital (CC / OD)', 'Trade finance',
+      'Cash credit or overdraft for day-to-day operations.', aliases: 'working capital limit revolving credit cash flow'),
+    BuyV2BusinessFinanceNeed('unsecured-business', 'Unsecured business loan', 'Business loans',
+      'Business term loan without collateral.', aliases: 'professional practice doctor CA lawyer'),
+    BuyV2BusinessFinanceNeed('property-backed', 'Loan against property', 'Business loans',
+      'Business borrowing secured against property.', aliases: 'LAP mortgage secured loan'),
+    BuyV2BusinessFinanceNeed('machinery-equipment', 'Machinery / equipment finance', 'Business loans',
+      'Purchase or upgrade machinery and equipment.', aliases: 'plant asset capex'),
+    BuyV2BusinessFinanceNeed('export-factoring', 'Export finance', 'International trade',
+      'Finance export orders, bills or receivables.', aliases: 'export factoring packing credit pre shipment post shipment'),
+    BuyV2BusinessFinanceNeed('import-factoring', 'Import finance', 'International trade',
+      'Finance overseas purchases and import bills.', aliases: 'import factoring overseas supplier'),
+    BuyV2BusinessFinanceNeed('other', 'Other finance requirement', 'Other needs', 'Discuss a requirement that is not listed.'),
+  ];
+
+  // Preserve original submitted/uncertain request IDs and their descriptions.
+  // Discovery grouping must never rewrite an original idempotent request.
+  static const legacyLabels = {
+    'inventory-dealer': 'Inventory / dealer finance',
+    'channel-distributor': 'Channel / distributor finance',
+    'sales-invoice': 'Sales invoice discounting',
+    'treds': 'TReDS invoice finance',
+    'msme-s2s': 'MSME-to-MSME invoice finance',
+    'supplier-vendor': 'Supplier / vendor finance',
+    'early-payment': 'Early payment / reverse factoring',
+    'freight-invoice': 'Freight invoice discounting',
+    'professional-business': 'Business loan for professionals',
+  };
+
+  // Search routing only: these labels describe distinct legacy enquiries.
+  // Never use this map to rewrite a submitted request or receipt.
+  static const legacyFamilies = {
+    'inventory-dealer': 'purchase',
+    'channel-distributor': 'purchase',
+    'sales-invoice': 'invoice-finance',
+    'treds': 'invoice-finance',
+    'msme-s2s': 'invoice-finance',
+    'supplier-vendor': 'invoice-finance',
+    'early-payment': 'invoice-finance',
+    'freight-invoice': 'invoice-finance',
+    'professional-business': 'unsecured-business',
+  };
+
+  static String labelFor(String id) => legacyLabels[id] ??
+    values.firstWhere((value) => value.id == id).label;
+}
+
+/// Proposed frontend handoff only. A future authenticated service must verify
+/// context, persist/deduplicate the request and operate the callback queue.
+@immutable
+class BuyV2FinanceCallbackRequest {
+  BuyV2FinanceCallbackRequest({
+    required this.requestId,
+    required this.origin,
+    required this.contactName,
+    required this.callbackNumber,
+    required Iterable<String> purposeIds,
+    this.note = '',
+    this.buyingStoreId,
+    Iterable<String> productIds = const [],
+  }) : purposeIds = List.unmodifiable(purposeIds),
+       productIds = List.unmodifiable(productIds) {
+    final allowed = {for (final value in BuyV2BusinessFinanceNeed.values) value.id,
+      ...BuyV2BusinessFinanceNeed.legacyLabels.keys};
+    if (!RegExp(r'^FIN-[a-f0-9]{32}$').hasMatch(requestId) ||
+        !const {'enquiry', 'store', 'product', 'cart'}.contains(origin) ||
+        contactName.trim().isEmpty || contactName.length > 100 ||
+        !RegExp(r'^\+?[0-9]{8,15}$').hasMatch(callbackNumber) || note.length > 500 ||
+        this.purposeIds.isEmpty || this.purposeIds.toSet().length != this.purposeIds.length ||
+        this.purposeIds.any((v) => !allowed.contains(v)) ||
+        (origin == 'store' && buyingStoreId == null) ||
+        (buyingStoreId != null && (buyingStoreId!.trim().isEmpty || buyingStoreId!.length > 256)) ||
+        this.productIds.any((v) => v.trim().isEmpty || v.length > 256) ||
+        this.productIds.toSet().length != this.productIds.length) {
+      throw const FormatException('Invalid finance callback enquiry');
+    }
+  }
+  final String requestId, origin, contactName, callbackNumber, note;
+  final String? buyingStoreId;
+  final List<String> purposeIds, productIds;
+}
+
+/// A receipt confirms an enquiry was received, never loan approval or funding.
+@immutable
+class BuyV2FinanceCallbackReceipt {
+  const BuyV2FinanceCallbackReceipt({required this.requestId,
+    required this.reference, required this.acceptedAt, required this.callbackDueAt});
+  final String requestId, reference;
+  final DateTime acceptedAt, callbackDueAt;
+
+  bool matches(BuyV2FinanceCallbackRequest request) => requestId == request.requestId &&
+    RegExp(r'^[A-Za-z0-9][A-Za-z0-9/_-]{0,127}$').hasMatch(reference) &&
+    !callbackDueAt.isBefore(acceptedAt) &&
+    callbackDueAt.difference(acceptedAt) <= const Duration(minutes: 30);
+}
+
+typedef BuyV2FinanceCallbackSubmit = Future<BuyV2FinanceCallbackReceipt> Function(
+  BuyV2FinanceCallbackRequest request);
+
 enum BuyV2FulfilmentMode { quickLocal, standardCourier, bulkFreight }
 
 /// Optional capability of the existing resolution adapter. A receipt confirms
@@ -549,12 +667,61 @@ class BuyV2PublishedStoreCoupon {
   const BuyV2PublishedStoreCoupon({required this.realm, required this.storeId, required this.couponId,
     required this.revision, required this.name, required this.publisherName, required this.publisherType,
     required this.sourceId, required this.observedAt, required this.validFrom, required this.validUntil,
-    required this.terms, required this.configuredTotalUses, required this.configuredUsesPerCustomer});
+    required BuyV2AdvertisedBenefitTerms terms, required this.configuredTotalUses, required this.configuredUsesPerCustomer})
+      : terms = terms, structuredTerms = null, viewerAccountId = null;
+  /// Proposed v2 display contract. Private buyer lists never belong here.
+  /// A reader must explicitly support this version; it grants no redemption.
+  const BuyV2PublishedStoreCoupon.offer({required this.realm, required this.storeId, required this.couponId,
+    required this.revision, required this.name, required this.publisherName, required this.publisherType,
+    required this.sourceId, required this.observedAt, required this.validFrom, required this.validUntil,
+    required BuyV2StoreOfferTerms structuredTerms, required this.configuredTotalUses,
+    required this.configuredUsesPerCustomer, this.viewerAccountId}) : structuredTerms = structuredTerms, terms = null;
   final String realm, storeId, couponId, name, publisherName, sourceId;
   final BuyV2OfferPublisherType publisherType;
   final int revision, configuredTotalUses, configuredUsesPerCustomer;
   final DateTime observedAt, validFrom, validUntil;
-  final BuyV2AdvertisedBenefitTerms terms;
+  final BuyV2AdvertisedBenefitTerms? terms;
+  final BuyV2StoreOfferTerms? structuredTerms;
+  final String? viewerAccountId;
+  String get termsFingerprint => structuredTerms?.fingerprint ?? jsonEncode(terms!.toJson());
+  /// Separate allowlist, never a filtered private campaign serialization.
+  Map<String, Object?> toOfferDisplayJson() {
+    if (structuredTerms == null) throw const FormatException('Not a v2 offer.');
+    return {'schemaVersion': 2, 'currency': 'INR', 'realm': realm, 'storeId': storeId,
+      'couponId': couponId, 'revision': revision, 'name': name, 'publisherName': publisherName,
+      'publisherType': publisherType.name, 'sourceId': sourceId,
+      'observedAt': observedAt.toUtc().toIso8601String(), 'validFrom': validFrom.toUtc().toIso8601String(),
+      'validUntil': validUntil.toUtc().toIso8601String(), 'structuredTerms': structuredTerms!.toJson(),
+      'configuredTotalUses': configuredTotalUses, 'configuredUsesPerCustomer': configuredUsesPerCustomer,
+      'viewerAccountId': viewerAccountId};
+  }
+  factory BuyV2PublishedStoreCoupon.decodeOfferDisplay(Object? raw, {required DateTime now}) {
+    const keys = {'schemaVersion', 'currency', 'realm', 'storeId', 'couponId', 'revision', 'name',
+      'publisherName', 'publisherType', 'sourceId', 'observedAt', 'validFrom', 'validUntil',
+      'structuredTerms', 'configuredTotalUses', 'configuredUsesPerCustomer', 'viewerAccountId'};
+    Never bad() => throw const FormatException('Refresh this Store offer.');
+    if (raw is! Map || raw.length != keys.length || raw.keys.any((key) => !keys.contains(key)) ||
+        raw['schemaVersion'] is! int || raw['schemaVersion'] != 2 || raw['currency'] != 'INR') bad();
+    String text(String key) { final value = raw[key]; if (value is! String) bad(); return value; }
+    int number(String key) { final value = raw[key]; if (value is! int) bad(); return value; }
+    DateTime date(String key) {
+      final value = text(key), at = DateTime.tryParse(value);
+      if (at == null || at.toUtc().toIso8601String() != value) bad(); return at;
+    }
+    final publisher = BuyV2OfferPublisherType.values.where((value) => value.name == raw['publisherType']).firstOrNull;
+    if (publisher == null || raw['viewerAccountId'] != null && raw['viewerAccountId'] is! String) bad();
+    final value = BuyV2PublishedStoreCoupon.offer(realm: text('realm'), storeId: text('storeId'),
+      couponId: text('couponId'), revision: number('revision'), name: text('name'),
+      publisherName: text('publisherName'), publisherType: publisher, sourceId: text('sourceId'),
+      observedAt: date('observedAt'), validFrom: date('validFrom'), validUntil: date('validUntil'),
+      structuredTerms: BuyV2StoreOfferTerms.fromJson(raw['structuredTerms']),
+      configuredTotalUses: number('configuredTotalUses'), configuredUsesPerCustomer: number('configuredUsesPerCustomer'),
+      viewerAccountId: raw['viewerAccountId'] as String?);
+    if (!value.isCurrent(now)) bad(); return value;
+  }
+  bool appliesTo(BuyV2Product product, {String? accountId}) => structuredTerms == null ||
+    structuredTerms!.appliesTo(product) &&
+    (viewerAccountId == null || accountId != null && accountId == viewerAccountId);
   String get identity => jsonEncode([realm, storeId, couponId]);
   // A local cache lifetime, not an operational-availability or redemption claim.
   DateTime get freshUntil {
@@ -568,15 +735,27 @@ class BuyV2PublishedStoreCoupon {
     !RegExp(r'[\x00-\x1f]').hasMatch(name) && publisherName.isNotEmpty && publisherName == publisherName.trim() &&
     publisherName.length <= 240 && !RegExp(r'[\x00-\x1f]').hasMatch(publisherName) &&
     {BuyV2OfferPublisherType.retailer, BuyV2OfferPublisherType.wholesaler, BuyV2OfferPublisherType.manufacturer}.contains(publisherType) &&
-    sourceId == 'store-coupon:$realm:$storeId:$couponId:$revision' &&
+    sourceId == '${structuredTerms == null ? 'store-coupon' : 'store-offer-v2'}:$realm:$storeId:$couponId:$revision' &&
     !observedAt.isAfter(now) && !validFrom.isAfter(observedAt) && observedAt.isBefore(validUntil) &&
     !now.isBefore(validFrom) && now.isBefore(freshUntil) &&
     configuredTotalUses > 0 && configuredTotalUses <= 1000000000 && configuredUsesPerCustomer > 0 &&
     configuredUsesPerCustomer <= configuredTotalUses &&
-    (terms.kind == 'flat' ? terms.flatBasis == 'per_order' && terms.flatAmountMinor != null &&
-      terms.maximumSavingMinor == terms.flatAmountMinor : terms.kind == 'percentage' && terms.percentageBasisPoints != null) &&
-    terms.minimumQuantity == null && terms.minimumSpendMinor != null && terms.minimumSpendMinor! <= 9000000000000 &&
-    terms.maximumSavingMinor != null && terms.maximumSavingMinor! <= 9000000000000;
+    _validTerms;
+  bool get _validTerms {
+    final rich = structuredTerms, legacy = terms;
+    if (rich != null) {
+      bool publishedSku(BuyV2StoreOfferSku sku) => sku.listings.isNotEmpty &&
+        sku.listings.every((listing) => listing.realm == realm);
+      return legacy == null && rich.storeId == storeId && rich.skus.every(publishedSku) &&
+        (rich.rewardSku == null || publishedSku(rich.rewardSku!)) &&
+        (rich.kind == BuyV2StoreOfferKind.buyerDiscount ?
+          viewerAccountId != null && RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(viewerAccountId!) : viewerAccountId == null);
+    }
+    return legacy != null && (legacy.kind == 'flat' ? legacy.flatBasis == 'per_order' && legacy.flatAmountMinor != null &&
+      legacy.maximumSavingMinor == legacy.flatAmountMinor : legacy.kind == 'percentage' && legacy.percentageBasisPoints != null) &&
+      legacy.minimumQuantity == null && legacy.minimumSpendMinor != null && legacy.minimumSpendMinor! <= 9000000000000 &&
+      legacy.maximumSavingMinor != null && legacy.maximumSavingMinor! <= 9000000000000;
+  }
 }
 
 /// Advertised Store basket terms only. No eligible saving, selection or payable
@@ -584,6 +763,12 @@ class BuyV2PublishedStoreCoupon {
 abstract interface class BuyV2StoreCouponSource {
   bool get storeCouponsActive;
   Future<List<BuyV2PublishedStoreCoupon>> loadStoreCoupons({required String storeId});
+}
+
+/// Opt-in proposed read contract; v1 transports do not acquire v2 support merely
+/// because a rich object appears in a response. Checkout support is separate.
+abstract interface class BuyV2StructuredStoreCouponSource implements BuyV2StoreCouponSource {
+  bool get structuredStoreCouponDisplayActive;
 }
 
 /// Separate from destination-scoped legacy benefits. One checked replacement
@@ -689,6 +874,9 @@ class BuyV2StoreCouponEligibility {
   }) {
     Never bad() =>
         throw const FormatException('Store coupon could not be checked.');
+    // This decoder only verifies the accepted v1 money-allocation protocol.
+    // Rich offers need their own eligibility, quote and order-original contract.
+    if (coupon.structuredTerms != null) bad();
     Map<String, dynamic> map(Object? value) {
       if (value is! Map || value.keys.any((key) => key is! String)) bad();
       return Map<String, dynamic>.from(value);
@@ -3272,11 +3460,16 @@ class BuyV2CommercialPaymentTermsSnapshot {
   const BuyV2CommercialPaymentTermsSnapshot({
     required this.state,
     this.terms = const [],
+    this.assignedTermIdsByFulfilmentKey = const {},
     this.customerMessage,
   });
 
   final BuyV2CommerceLoadState state;
   final List<BuyV2CommercialPaymentTerm> terms;
+  /// The supplier-authorized arrangement for each specific delivery and buyer.
+  /// An options list, including a singleton, is not an assignment. Missing,
+  /// unknown or ambiguous assignments must not create purchasing authority.
+  final Map<String, String> assignedTermIdsByFulfilmentKey;
   final String? customerMessage;
 }
 
@@ -4257,7 +4450,7 @@ final class BuyV2CatalogueProductContentAdapter
       sourceId: 'approved-buy-catalogue',
       media: supplierMedia.isNotEmpty
           ? List.unmodifiable(supplierMedia)
-          : [
+          : product.visualKind.trim().isEmpty ? const [] : [
               BuyV2ProductMediaAsset(
                 id: '${product.id}-packshot',
                 label: 'Catalogue illustration',
@@ -4297,19 +4490,28 @@ final class BuyV2CatalogueProductContentAdapter
 
 final class BuyV2CatalogueMarketplaceTrustAdapter
     implements BuyV2MarketplaceTrustAdapter {
-  const BuyV2CatalogueMarketplaceTrustAdapter();
+  const BuyV2CatalogueMarketplaceTrustAdapter({this.storeSource});
+  final BuyV2StoreListing? Function(BuyV2Product)? storeSource;
 
   @override
-  BuyV2MarketplaceTrustSnapshot snapshotFor(BuyV2Product product) =>
-      BuyV2MarketplaceTrustSnapshot(
+  BuyV2MarketplaceTrustSnapshot snapshotFor(BuyV2Product product) {
+    BuyV2StoreListing? store;
+    try { store = storeSource?.call(product); } on Object { store = null; }
+    final sameStore = product.storeId != null && store?.id == product.storeId &&
+      store?.name == product.seller;
+    final address = sameStore ? store!.address.trim() : '';
+    return BuyV2MarketplaceTrustSnapshot(
         productId: product.id,
         state: BuyV2MarketplaceTrustState.ready,
         sourceId: 'approved-buy-catalogue',
         partnerName: product.seller,
         partnerType: product.partnerRole,
-        partnerLocation: product.origin,
+        partnerLocation: address.isEmpty ? null : address,
+        // Product provenance is not the supplier's address. A Store/location
+        // source must supply partnerLocation independently.
         returnSummary: product.returnPolicy,
       );
+  }
 }
 
 enum BuyV2SponsoredPlacement {

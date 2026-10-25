@@ -435,6 +435,8 @@ class MoolDestinationNavigationV2 extends StatefulWidget {
     required this.localActionCount,
     this.familyRootSelected = false,
     this.showFamilyRootAction = true,
+    this.railKey,
+    this.chatControlKey = const Key('mool-global-chat'),
     required this.onOpenMool,
     required this.onOpenAction,
     required this.onOpenChat,
@@ -453,6 +455,8 @@ class MoolDestinationNavigationV2 extends StatefulWidget {
   final int localActionCount;
   final bool familyRootSelected;
   final bool showFamilyRootAction;
+  final Key? railKey;
+  final Key chatControlKey;
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec> onOpenAction;
   final VoidCallback? onOpenChat;
@@ -477,13 +481,6 @@ class _MoolDestinationNavigationV2State
       orElse: () => moolActionFamilies.first,
     );
     final view = View.of(context);
-    final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
-      viewPadding: EdgeInsets.fromViewPadding(
-        view.viewPadding,
-        view.devicePixelRatio,
-      ),
-      platform: defaultTargetPlatform,
-    );
     final horizontalSemanticsClearance =
         moolAndroidExportedHorizontalSemanticsClearance(
           viewPadding: EdgeInsets.fromViewPadding(
@@ -508,11 +505,11 @@ class _MoolDestinationNavigationV2State
           color: Colors.transparent,
           child: Padding(
             key: const Key('moolsocial-android-exported-semantics-clearance'),
-            padding: EdgeInsets.fromLTRB(
-              horizontalSemanticsClearance,
-              0,
-              horizontalSemanticsClearance,
-              exportedSemanticsClearance,
+            // SafeArea owns the real bottom inset. Legacy `uiautomator dump`
+            // clips to Display.getSize; padding must not compensate for that
+            // capture artefact. Raw Android node bounds retain the full row.
+            padding: EdgeInsets.symmetric(
+              horizontal: horizontalSemanticsClearance,
             ),
             child: SafeArea(
               top: false,
@@ -522,6 +519,7 @@ class _MoolDestinationNavigationV2State
                 key: const Key('moolsocial-compact-destination-rail'),
                 height: MoolLocalNavigationTokens.destinationRailHeight,
                 child: Row(
+                  key: widget.railKey,
                   children: [
                     Expanded(
                       child: MoolGlobalNavigationV2(
@@ -557,7 +555,7 @@ class _MoolDestinationNavigationV2State
                     ),
                     Expanded(
                       child: MoolGlobalChatNavigationV2(
-                        controlKey: const Key('mool-global-chat'),
+                        controlKey: widget.chatControlKey,
                         onOpenChat: widget.onOpenChat,
                         expandedCell: true,
                       ),

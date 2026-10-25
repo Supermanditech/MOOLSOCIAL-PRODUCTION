@@ -28,6 +28,23 @@ import 'buy_v2_qualified_provider_fixture.dart';
 import 'buy_v2_discovery_refinement_test.dart'
     show R669BrandCommerce, r669BrandedSession, BuyTestEligibilityFacts;
 
+// Explicit supplier assignments for the saved-agreement dispatch tests. An
+// options list alone deliberately cannot authorise a commercial arrangement.
+final class _SupplierAssignedGroupedTerms extends TestGroupedPaymentTerms {
+  @override
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({
+    required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod,
+    required Map<String, int> quotedTotalsByFulfilmentKey,
+  }) async {
+    final result = await super.loadTerms(groups: groups, selectedPaymentMethod: selectedPaymentMethod,
+      quotedTotalsByFulfilmentKey: quotedTotalsByFulfilmentKey);
+    return BuyV2CommercialPaymentTermsSnapshot(state: result.state, terms: result.terms,
+      assignedTermIdsByFulfilmentKey: {for (final term in result.terms) term.fulfilmentKey: term.id},
+      customerMessage: result.customerMessage);
+  }
+}
+
 final class _R669NoRecoveryCommerce implements BuyV2CommerceAdapter {
   _R669NoRecoveryCommerce(this.delegate);
   final BuyV2CommerceAdapter delegate;
@@ -1790,6 +1807,33 @@ void r669ShoppingAreaTests() {
         expect(session.catalogueAreaLabel, 'Any area');
       },
     );
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('CARTAREA missing location allows explicit browsing only $scale', (tester) async {
+        tester.view.physicalSize = const Size(320, 568);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final session = makeSession(null);
+        final address = session.selectedAddressOrNull;
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(scale)), child: child!),
+          home: Scaffold(body: Builder(builder: (context) => TextButton(
+            onPressed: () => showBuyV2CatalogueArea(context, session), child: const Text('Choose area'))))));
+        await tester.tap(find.text('Choose area'));
+        await tester.pumpAndSettle();
+        expect(session.catalogueRegionId, 'jodhpur');
+        final action = find.byKey(const ValueKey('buy-area-browse-all'));
+        expect(action, findsOneWidget);
+        await tester.ensureVisible(action);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(session.catalogueAreaScope, BuyV2CatalogueAreaScope.allAreas);
+        expect(session.catalogueRegionId, isNull);
+        expect(session.selectedAddressOrNull, same(address));
+        expect(find.byKey(const ValueKey('buy-catalogue-area-list')), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
     for (final size in [const Size(320, 568), const Size(568, 320)]) {
       for (final scale in [1.0, 2.0]) {
         testWidgets(
@@ -2241,6 +2285,35 @@ void r669SharedProductTests() {
 }
 
 void main() {
+  for (final state in ['browsing only', 'Cart item', 'source failure', 'financial recovery']) {
+    test('CARTRECOVERY absent saved listing preserves $state', () async {
+      final source = _PagingRecoverySource()..resolutionProducts = {};
+      if (state == 'source failure') source.failResolution = true;
+      final id = source.productIdAt(0, 0), key = 'shop|listing:${Uri.encodeComponent(source.productIdAt(0, 0))}';
+      final original = BuyV2CustomerStateSnapshot(savedProductKeys: {key}, recentlyViewedProductIds: [id],
+        cartQuantities: state == 'Cart item' ? {id: 1} : {},
+        paymentRecoveryIncomplete: state == 'financial recovery');
+      final store = _MemoryCustomerStateStore('host-browsing-recovery')..snapshot = original;
+      final core = BuySession();
+      final session = BuyV2Session(core: core, reviewDataEnabled: false,
+        cataloguePageSource: source, customerStateStore: store);
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      await session.restoreCustomerState();
+      expect(session.customerStateRecoveryPending, state != 'browsing only');
+      expect(session.cartLines, isEmpty);
+      expect(store.snapshot!.savedProductKeys, {key});
+      if (state == 'browsing only') {
+        expect(session.savedCountFor(BuyV2Destination.shop), 1);
+        session.updateQuery('test');
+        await Future<void>.delayed(Duration.zero);
+        expect(store.snapshot!.savedProductKeys, {key});
+        expect(store.snapshot!.recentlyViewedProductIds, [id]);
+      } else {
+        expect(store.snapshot, same(original));
+        expect(store.writeCalls, 0);
+      }
+    });
+  }
   test('LF fixture independent prepaid purchases stay distinct under an identical clock', () {
     DateTime fixed() => DateTime.utc(2026, 10, 20, 12);
     final first = prepaidCommerceFixture(now: fixed) as _ShopCommerceAdapter;
@@ -3545,7 +3618,7 @@ void main() {
     final commerce = TestGroupedPaymentCommerce();
     final store = _MemoryCustomerStateStore('test-t06-buyer');
     final quote = TestPaymentQuote();
-    final terms = TestGroupedPaymentTerms()..credit = credit;
+    final terms = _SupplierAssignedGroupedTerms()..credit = credit;
     final products = testPaymentProducts
         .map(
           (product) => product.id == 's-rice' || product.id == 'w-rice'
@@ -3692,12 +3765,17 @@ void main() {
 
   for (final grouped in [false, true]) {
     for (final changed in [false, true]) {
-      test('LF08 ordinary same-ID terms across saved agreement grouped=$grouped changed=$changed', () async {
+      test('LF08 frozen same-ID terms across saved attempt grouped=$grouped futurePolicy=$changed', () async {
         final core = BuySession();
         final TestPaymentCommerce commerce = grouped ? TestGroupedPaymentCommerce() : TestLegacyRecoveryCommerce();
+        if (commerce is TestGroupedPaymentCommerce) {
+          commerce.onGroup = (request) => testGroupedPlacement(request, outcome: BuyV2OrderPlacementOutcome.paymentUnknown);
+        } else if (commerce is TestLegacyRecoveryCommerce) {
+          commerce.onPlace = (request) => testGroupedPlacement(request, outcome: BuyV2OrderPlacementOutcome.paymentUnknown);
+        }
         commerce.snapshot = testPaymentSnapshot(null, addresses: const [_instructionAddress]);
         final store = _MemoryCustomerStateStore('host-lf08-held-terms');
-        final terms = TestGroupedPaymentTerms(), quote = TestPaymentQuote();
+        final terms = _SupplierAssignedGroupedTerms(), quote = TestPaymentQuote();
         if (grouped) {
           quote.groupsFor = (lines, method) => [for (var i = 0; i < lines.length; i++)
             BuyV2CheckoutPaymentGroup.minor(id: 'host-group-$i', fulfilmentKeys: {lines[i].fulfilmentKey},
@@ -3714,6 +3792,7 @@ void main() {
         await session.refreshCommercialPaymentTerms();
         final key = session.checkoutFulfilmentGroups.single.key;
         expect(session.chooseCommercialPaymentTerm(session.commercialPaymentTermsFor(key).single), isTrue);
+        final agreedTerm = session.selectedCommercialPaymentTermFor(key)!;
         await session.retainedAccountState();
         final originalQuantity = session.quantityFor('w-notebook');
         final writes = store.writeCalls, hold = Completer<void>();
@@ -3724,18 +3803,26 @@ void main() {
         }
         expect(store.writeCalls, greaterThan(writes));
         final frozen = grouped ? session.currentCheckoutPaymentGroup!.request : session.legacyCheckoutAttempt!.payment.request;
+        expect(frozen.commercialPaymentTermIds[key], agreedTerm.id);
         expect(commerce.requests, isEmpty);
         if (changed) {
+          // A future supplier policy is not a revocation of the frozen request.
+          // The unresolved attempt must retain its original inputs for resolution.
           terms.credit = true;
-          await session.refreshCommercialPaymentTerms();
-          final replacement = session.commercialPaymentTermsFor(key).single;
-          expect(replacement.id, frozen.commercialPaymentTermIds[key]);
-          expect(replacement.kind, BuyV2CommercialPaymentTermKind.supplierCredit);
-          expect(session.selectedCommercialPaymentTermFor(key), isNull);
+          expect(await session.refreshCommercialPaymentTerms(), isFalse);
+          expect(session.selectedCommercialPaymentTermFor(key)!.id, agreedTerm.id);
+          expect(session.selectedCommercialPaymentTermFor(key)!.kind, agreedTerm.kind);
         }
         hold.complete(); await placing;
-        expect(commerce.requests, hasLength(changed ? 0 : 1));
+        expect(commerce.requests, hasLength(1));
+        expect(commerce.requests.single.idempotencyKey, frozen.idempotencyKey);
+        expect(commerce.requests.single.commercialPaymentTermIds, frozen.commercialPaymentTermIds);
+        expect(commerce.requests.single.totalMinor, frozen.totalMinor);
+        expect(commerce.requests.single.amountDueNowMinor, frozen.amountDueNowMinor);
         expect(session.quantityFor('w-notebook'), originalQuantity);
+        expect(session.checkoutRequiresResolution, isTrue);
+        expect(await session.submitOrder(), isFalse);
+        expect(commerce.requests, hasLength(1));
       });
     }
   }
@@ -8378,6 +8465,120 @@ void main() {
       expect(notifications, loadingNotifications);
     });
 
+    for (final update in ['unchanged', 'price', 'revision', 'withdrawn']) {
+      test('LF05-RESTOCK cached return preserves fresh authority $update', () async {
+        var clock = now;
+        final original = product.copyWith(procurementSupplierGrant: supplier());
+        final source = _R669ProcurementCatalogue([original]);
+        final buyerGrant = buyer(until: now.add(const Duration(minutes: 30)));
+        final fixture = await scopedSession(catalogueSource: source,
+          snapshot: commerceSnapshot(products: [original], grant: buyerGrant), clock: () => clock);
+        final session = fixture.session;
+        await session.restoreCustomerState();
+        final query = session.catalogueQuery();
+        final oldPage = session.acquireCatalogueProducts('cached-before-refresh');
+        await oldPage.open(query);
+        expect(session.addProduct(product.id), isTrue);
+        final retained = session.cartLines.single;
+        clock = now.add(const Duration(minutes: 9));
+        final current = original.copyWith(
+          priceMinor: update == 'price' ? original.priceMinor + 100 : original.priceMinor,
+          procurementSupplierGrant: supplier(
+            revision: update == 'revision' ? 'revision-3' : 'revision-2',
+            until: now.add(const Duration(minutes: 15))));
+        if (update == 'withdrawn') {
+          source.products.clear();
+          fixture.adapter.snapshot = commerceSnapshot(products: [], grant: buyerGrant);
+          await session.retryCommerce();
+          expect(session.openCheckout(), isFalse);
+        } else {
+          source.products..clear()..add(current);
+          final freshPage = session.acquireCatalogueProducts('fresh-supplier-read');
+          await freshPage.open(query);
+          expect(session.findProduct(product.id), same(current));
+          expect(session.procurementEligibilityFor(current), BuyV2ProcurementEligibility.eligible);
+        }
+        clock = now.add(update == 'withdrawn'
+          ? const Duration(minutes: 9, seconds: 30) : const Duration(minutes: 11));
+        // Reopening the old query is a cache hit, not a new supplier response.
+        expect(session.acquireCatalogueProducts('cached-before-refresh'), same(oldPage));
+        await oldPage.open(query);
+        if (update == 'withdrawn') {
+          expect(oldPage.page!.items, isEmpty,
+            reason: 'A full snapshot retires the old page before a source retry.');
+        } else {
+          expect(oldPage.page!.items.single, same(original));
+        }
+        session.releaseCatalogueProducts('cached-before-refresh');
+        if (update != 'withdrawn') {
+          expect(session.findProduct(product.id), same(current),
+            reason: 'Cached enumeration cannot replace the more recent source admission.');
+          expect(session.procurementEligibilityFor(session.findProduct(product.id)!),
+            BuyV2ProcurementEligibility.eligible);
+        }
+        session.openCart(scope: BuyV2CartScope.wholesale);
+        expect(session.openCheckout(), update == 'unchanged', reason: session.notice);
+        expect(session.cartLines.single, same(retained));
+        expect(session.cartLines.single.totalMinor, retained.totalMinor);
+        expect(fixture.adapter.placements, isEmpty);
+      });
+    }
+
+    test('LF05-RESTOCK cached pending page cannot cross a full withdrawal', () async {
+      final original = product.copyWith(procurementSupplierGrant: supplier());
+      final source = _R669ProcurementCatalogue([original]);
+      final fixture = await scopedSession(catalogueSource: source);
+      final session = fixture.session;
+      await session.restoreCustomerState();
+      expect(session.addProduct(product.id), isTrue);
+      final retained = session.cartLines.single;
+      final gate = source.gate = Completer<void>();
+      final pager = session.acquireCatalogueProducts('pending-before-withdrawal');
+      final pending = pager.open(session.catalogueQuery());
+      await Future<void>.delayed(Duration.zero);
+      expect(pager.loading, isTrue);
+      fixture.adapter.snapshot = commerceSnapshot(products: []);
+      await session.retryCommerce();
+      expect(pager.page, isNull);
+      gate.complete();
+      await pending;
+      expect(pager.page, isNull, reason: 'The pre-withdrawal response has retired authority.');
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isFalse);
+      expect(session.cartLines.single, same(retained));
+      expect(fixture.adapter.placements, isEmpty);
+    });
+
+    test('LF05-RESTOCK cached concurrent source admissions both remain observable', () async {
+      final original = product.copyWith(procurementSupplierGrant: supplier());
+      final source = _R669ProcurementCatalogue([original]);
+      final fixture = await scopedSession(catalogueSource: source);
+      final session = fixture.session;
+      final firstGate = source.gate = Completer<void>();
+      final firstPager = session.acquireCatalogueProducts('first-pending-admission');
+      final first = firstPager.open(session.catalogueQuery());
+      await Future<void>.delayed(Duration.zero);
+      final secondGate = source.gate = Completer<void>();
+      final secondPager = session.acquireCatalogueProducts('second-pending-admission');
+      final second = secondPager.open(session.catalogueQuery());
+      await Future<void>.delayed(Duration.zero);
+      final firstRead = original.copyWith(procurementSupplierGrant:
+        supplier(until: now.add(const Duration(minutes: 20))));
+      source.products..clear()..add(firstRead);
+      firstGate.complete(); await first;
+      expect(session.findProduct(product.id), same(firstRead));
+      final secondRead = original.copyWith(priceMinor: original.priceMinor + 100,
+        procurementSupplierGrant: supplier(revision: 'revision-3',
+          until: now.add(const Duration(minutes: 15))));
+      source.products..clear()..add(secondRead);
+      secondGate.complete(); await second;
+      expect(session.findProduct(product.id), same(secondRead));
+      session.releaseCatalogueProducts('first-pending-admission');
+      expect(session.findProduct(product.id), same(secondRead),
+        reason: 'Last source admission wins even with a shorter grant; cache release cannot revert it.');
+      expect(fixture.adapter.placements, isEmpty);
+    });
+
     for (final kind in ['static', 'tier', 'commodity']) {
     test('LF05-RESTOCK supplier renewal refreshes expired $kind grants without repricing Cart', () async {
       var clock = now;
@@ -9538,10 +9739,10 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
-          await tester.tap(find.byKey(const ValueKey('buy-change-location')));
+          await tester.tap(find.byKey(const ValueKey('buy-category-picker')));
           await tester.pumpAndSettle();
           expect(
-            find.byKey(const ValueKey('buy-address-sheet-route')),
+            find.byKey(const ValueKey('buy-category-sheet-route')),
             findsOneWidget,
           );
           fixture.identity.value = scope(
@@ -9555,7 +9756,7 @@ void main() {
           );
           expect(find.byKey(const ValueKey('buy-v2-screen')), findsNothing);
           expect(
-            find.byKey(const ValueKey('buy-address-sheet-route')),
+            find.byKey(const ValueKey('buy-category-sheet-route')),
             findsNothing,
           );
           expect(find.text(product.title), findsNothing);
@@ -9668,12 +9869,12 @@ void main() {
       session.openCart(scope: BuyV2CartScope.wholesale);
       expect(session.openCheckout(), isTrue);
       expect(session.choosePayment('UPI'), isTrue);
-      expect(await session.refreshCommercialPaymentTerms(), isFalse);
+      expect(await session.refreshCommercialPaymentTerms(), isTrue);
       expect(
         session.commercialPaymentTermsLoadState,
         BuyV2CommerceLoadState.ready,
       );
-      expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+      expect(session.checkoutPaymentTermsReviewRequired, isFalse);
       for (final group in session.checkoutFulfilmentGroups) {
         expect(
           session.chooseCommercialPaymentTerm(
@@ -9733,7 +9934,8 @@ void main() {
         expect(session.openCheckout(), isTrue, reason: session.notice);
         expect(session.choosePayment('UPI'), isTrue);
         expect(session.checkoutPayableTotalMinor, 10500);
-        expect(await session.refreshCommercialPaymentTerms(), isFalse, reason: 'Wholesale requires explicit selection');
+        expect(await session.refreshCommercialPaymentTerms(), candidate.accepted,
+          reason: 'Only a valid source-assigned arrangement applies; the buyer cannot select around a failed limit.');
         final choices = session.commercialPaymentTermsFor(session.checkoutFulfilmentGroups.single.key);
         expect(choices.length, candidate.accepted ? 1 : 0);
         if (candidate.accepted) {
@@ -17834,7 +18036,8 @@ void r669ComparisonContractTests() {
         expect(retry, findsOneWidget);
         await tester.ensureVisible(retry);
         await tester.pumpAndSettle();
-        expect(find.textContaining('It is still retained.'), findsOneWidget);
+        expect(find.text('Your saved Cart could not be restored. '
+          'Try again before changing your order.'), findsOneWidget);
         expect(store.snapshot!.cartQuantities[listing.id], 3);
         expect(tester.takeException(), isNull);
         // Inspect the persistent recovery panel after its existing transient notice.
@@ -19169,6 +19372,7 @@ class _StoreScopedTermsFixture implements BuyV2CommercialPaymentTermsAdapter {
     required Map<String, int> quotedTotalsByFulfilmentKey,
   }) async => BuyV2CommercialPaymentTermsSnapshot(
     state: BuyV2CommerceLoadState.ready,
+    assignedTermIdsByFulfilmentKey: {for (final group in groups) group.key: 'fixture-full-${group.key}'},
     terms: [
       for (final group in groups)
         BuyV2CommercialPaymentTerm(
@@ -19198,7 +19402,9 @@ class _StoreScopedExactBookingTerms extends _StoreScopedTermsFixture
   @override
   Future<BuyV2CommercialPaymentTermsSnapshot> loadTermsMinor({required List<BuyV2FulfilmentGroup> groups,
     required String selectedPaymentMethod, required Map<String, int> quotedTotalsMinorByFulfilmentKey}) async =>
-    BuyV2CommercialPaymentTermsSnapshot(state: BuyV2CommerceLoadState.ready, terms: [for (final group in groups)
+    BuyV2CommercialPaymentTermsSnapshot(state: BuyV2CommerceLoadState.ready,
+      assignedTermIdsByFulfilmentKey: {for (final group in groups) group.key: 'host-exact-booking'},
+      terms: [for (final group in groups)
       BuyV2CommercialPaymentTerm.minor(id: 'host-exact-booking', fulfilmentKey: group.key, destination: group.destination,
         supplierName: group.partner, kind: BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
         orderTotalMinor: quotedTotalsMinorByFulfilmentKey[group.key]!, amountDueNowMinor: dueMinor,

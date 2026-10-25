@@ -4211,31 +4211,25 @@ void main() {
             tester.state<ScrollableState>(productScroll()).position.pixels,
             closeTo(rootProductOffset, .1),
           );
-          final trust = find.byKey(
-            ValueKey('buy-marketplace-trust-ready-${product.id}'),
+          // Public scores were retired; check the actual supplier/fulfilment
+          // content when restoring this same product and scroll position.
+          expect(find.byKey(ValueKey('buy-marketplace-trust-ready-${product.id}')),
+              findsNothing);
+          expect(find.text('Customer ratings'), findsNothing);
+          final fulfilment = find.byKey(
+            ValueKey('buy-automatic-fulfilment-${product.id}'),
           );
-          if (scale == 1 || product.destination == BuyV2Destination.wholesale) {
-            expect(trust, findsOneWidget);
-          }
-          if (trust.evaluate().isNotEmpty) {
-            final visibleTrust = tester
-                .getRect(trust)
-                .intersect(
-                  tester.getRect(
-                    find.byKey(const ValueKey('buy-cart-content-viewport')),
-                  ),
-                );
-            if (!visibleTrust.isEmpty) {
-              expect(
-                tester
-                    .getRect(
-                      find.byKey(const ValueKey('buy-mini-cart-drag-handle')),
-                    )
-                    .overlaps(visibleTrust),
-                isFalse,
-                reason: 'Restored policy text must remain clear of Cart',
-              );
-            }
+          expect(fulfilment, findsOneWidget);
+          final visibleFulfilment = tester.getRect(fulfilment).intersect(
+            tester.getRect(find.byKey(const ValueKey('buy-cart-content-viewport'))),
+          );
+          if (!visibleFulfilment.isEmpty) {
+            expect(
+              tester.getRect(find.byKey(const ValueKey('buy-mini-cart-drag-handle')))
+                  .overlaps(visibleFulfilment),
+              isFalse,
+              reason: 'Restored supplier details must remain clear of Cart',
+            );
           }
           if (isShop) {
             expectCartClearOf(

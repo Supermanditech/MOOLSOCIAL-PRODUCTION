@@ -91,22 +91,15 @@ void main() {
             expect(session.selectedProductId, id);
             expect(session.view, BuyV2View.product);
             expect(action.hitTestable(), findsOneWidget);
-            final trust = find.byKey(
-              ValueKey(
-                'buy-marketplace-trust-${ratingsReady ? 'ready' : 'offline'}-$id',
-              ),
-            );
-            await tester.scrollUntilVisible(
-              trust,
-              240,
-              maxScrolls: 40,
-              scrollable: scroll,
-            );
-            await tester.pumpAndSettle();
-            expect(
-              find.descendant(of: trust, matching: find.text(label)),
-              findsNothing,
-            );
+            // MVP feedback is purchase-linked and private; supplier identity
+            // remains usable independently of the retired public score panel.
+            for (final state in ['ready', 'offline']) {
+              expect(find.byKey(ValueKey('buy-marketplace-trust-$state-$id')),
+                  findsNothing);
+            }
+            expect(find.text('Customer ratings'), findsNothing);
+            expect(find.text('4.6 from 328 ratings'), findsNothing);
+            expect(find.text(label), findsOneWidget);
             expect(session.itemCount, 0);
             expect(tester.takeException(), isNull);
           },
@@ -115,7 +108,7 @@ void main() {
     }
   }
 
-  testWidgets('verified ratings and seller facts remain product-specific', (
+  testWidgets('seller facts remain product-specific without public ratings', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -143,30 +136,19 @@ void main() {
       ),
       findsOneWidget,
     );
-    final panel = find.byKey(
-      const ValueKey('buy-marketplace-trust-ready-s-milk'),
-    );
-    await tester.scrollUntilVisible(
-      panel,
-      240,
-      scrollable: find
-          .descendant(
-            of: find.byKey(const PageStorageKey('buy-product-s-milk')),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
-    expect(find.text('Customer ratings'), findsOneWidget);
-    expect(find.text('4.6 from 328 ratings'), findsOneWidget);
-    expect(find.text('301'), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-marketplace-trust-ready-s-milk')),
+        findsNothing);
+    expect(find.text('Customer ratings'), findsNothing);
+    expect(find.text('4.6 from 328 ratings'), findsNothing);
+    expect(find.text('301'), findsNothing);
     expect(session.marketplaceTrustFor(product).partnerName, product.seller);
-    expect(find.text('4.8'), findsOneWidget);
+    expect(find.text('4.8'), findsNothing);
     expect(find.text('1842'), findsOneWidget);
     expect(find.text('96% orders delivered as promised'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('ratings recovery never fabricates trust or changes Cart', (
+  testWidgets('seller-source recovery does not expose ratings or change Cart', (
     tester,
   ) async {
     final core = BuySession();
@@ -178,32 +160,29 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
 
-    final retry = find.byKey(
-      const ValueKey('buy-marketplace-trust-retry-s-milk'),
-    );
-    await tester.scrollUntilVisible(
-      retry,
-      240,
-      scrollable: find
-          .descendant(
-            of: find.byKey(const PageStorageKey('buy-product-s-milk')),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
-    expect(find.text('Ratings unavailable'), findsOneWidget);
-    expect(find.text('Ratings could not be loaded.'), findsOneWidget);
+    final product = session.product('s-milk');
+    final total = session.cartTotal;
+    expect(session.marketplaceTrustFor(product).state,
+        BuyV2MarketplaceTrustState.offline);
+    expect(find.byKey(const ValueKey('buy-marketplace-trust-retry-s-milk')),
+        findsNothing);
+    expect(find.text('Ratings unavailable'), findsNothing);
+    expect(find.text('Ratings could not be loaded.'), findsNothing);
     expect(find.text('4.6 from 328 ratings'), findsNothing);
 
     adapter.available = true;
-    await tester.ensureVisible(retry);
+    expect(session.refreshMarketplaceTrust(product.id), isTrue);
     await tester.pumpAndSettle();
-    await tester.tap(retry);
-    await tester.pumpAndSettle();
+    expect(session.marketplaceTrustFor(product).state,
+        BuyV2MarketplaceTrustState.ready);
     expect(
       find.byKey(const ValueKey('buy-marketplace-trust-ready-s-milk')),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(find.text('Customer ratings'), findsNothing);
+    expect(find.text('4.6 from 328 ratings'), findsNothing);
+    expect(session.selectedProductId, product.id);
+    expect(session.cartTotal, total);
     expect(session.cartLines, isEmpty);
     expect(tester.takeException(), isNull);
   });

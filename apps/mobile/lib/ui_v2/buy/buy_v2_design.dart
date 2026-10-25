@@ -19,6 +19,32 @@ final NumberFormat _buyV2Currency = NumberFormat.currency(
 
 String buyV2Money(num value) => _buyV2Currency.format(value);
 
+/// Provenance for the approved review catalogue, never a live-stock claim.
+class BuyV2DemoCatalogueLabel extends StatelessWidget {
+  const BuyV2DemoCatalogueLabel({super.key});
+
+  @override
+  Widget build(BuildContext context) => const ColoredBox(
+    color: Color(0xFFFFF4D8),
+    child: Padding(
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          'Demo catalogue · Not live inventory',
+          key: ValueKey('buy-demo-catalogue-label'),
+          style: TextStyle(
+            color: Color(0xFF71541B),
+            fontSize: 10.5,
+            height: 1.2,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 /// Exact paise display with the existing whole-rupee appearance retained.
 String buyV2MoneyMinor(int minor) {
   final whole = buyV2Money(minor ~/ 100);
@@ -206,9 +232,10 @@ class _BuyV2DrivenFreightPainter extends CustomPainter {
 /// A persistent vertical overflow cue. The list keeps its own controller,
 /// gestures, focus and accessibility scroll actions; the paint intercepts none.
 class BuyV2VerticalScrollIndicator extends StatefulWidget {
-  const BuyV2VerticalScrollIndicator({super.key, required this.child});
+  const BuyV2VerticalScrollIndicator({super.key, required this.child, this.enabled = true});
 
   final Widget child;
+  final bool enabled;
 
   @override
   State<BuyV2VerticalScrollIndicator> createState() =>
@@ -234,7 +261,7 @@ class _BuyV2VerticalScrollIndicatorState
 
   @override
   Widget build(BuildContext context) =>
-      NotificationListener<ScrollMetricsNotification>(
+      !widget.enabled ? widget.child : NotificationListener<ScrollMetricsNotification>(
         onNotification: (notification) {
           _update(notification.metrics, notification.depth);
           return false;
@@ -652,7 +679,7 @@ String buyV2BuyerDeliveryPromise(
   final promise = facts.deliveryPromise.trim().toLowerCase();
   if (confirmAfterStoreAcceptance &&
       (promise.isEmpty || promise == 'delivery time confirmed at checkout')) {
-    return 'Delivery time confirmed after Store acceptance';
+    return 'Delivery schedule unavailable';
   }
   return buyV2BuyerDeliveryPromiseSource(facts.deliveryPromise);
 }
@@ -2218,6 +2245,9 @@ class BuyV2ProductPackshot extends StatelessWidget {
   }
 
   static BuyV2ProductMediaSource? resolveMedia(BuyV2Product product) {
+    // The original provider leaves visualKind empty when it supplies no media.
+    // A category match cannot stand in for this supplier's exact product photo.
+    if (product.visualKind.trim().isEmpty) return null;
     // Generated review listings retain their template's supplied presentation.
     // Require the validated generated identity and exact title/pack/category;
     // real supplier listings never inherit another product's illustration.

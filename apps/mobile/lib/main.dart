@@ -467,7 +467,10 @@ Future<void> main() async {
     _recordReleaseBootstrapStage('auth_emulator', 'begin');
     try {
       await FirebaseAuth.instance
-          .useAuthEmulator(emulatorHost, 9099)
+          .useAuthEmulator(emulatorHost, 9099,
+            automaticHostMapping: !(kDebugMode &&
+              const bool.fromEnvironment('MOOLSOCIAL_CART_LOCAL_EMULATOR') &&
+              firebaseOptions.projectId == 'demo-moolsocial-local' && emulatorHost == '127.0.0.1'))
           .timeout(_releasePlatformStageTimeout);
     } on Object {
       _showReleaseBootstrapFailure('auth_emulator');
@@ -1009,6 +1012,9 @@ Future<void> main() async {
               : DataConnectAccountBootstrapGateway(
                   principalGateway: firebaseSessionBootstrap,
                   emulatorHost: _useEmulators ? emulatorHost : null,
+                  automaticHostMapping: !(kDebugMode &&
+                    const bool.fromEnvironment('MOOLSOCIAL_CART_LOCAL_EMULATOR') &&
+                    firebaseOptions.projectId == 'demo-moolsocial-local' && emulatorHost == '127.0.0.1'),
                 ),
           verifiedPrincipalBindingStore: verifiedPrincipalBindingStore,
           accountIdentityGateway: accountIdentityGateway,

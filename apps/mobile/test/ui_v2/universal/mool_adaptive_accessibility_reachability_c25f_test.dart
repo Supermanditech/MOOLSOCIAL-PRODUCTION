@@ -72,16 +72,17 @@ void main() {
             findsNothing,
           );
           expect(find.byKey(const Key('moolsocial-local-next')), findsNothing);
-          expect(
-            tester.getSize(find.byKey(const Key('mool-compact-launcher'))),
-            const Size(54, 58),
-          );
-          expect(
-            tester.getSize(
-              find.byKey(const ValueKey('moolsocial-family-root-ride')),
-            ),
-            const Size(54, 58),
-          );
+          // This fixture has Mool, the family root, four actions and Chat.
+          // Equal cells use the available width; every target remains >=44dp.
+          for (final key in const [
+            Key('mool-compact-launcher'),
+            Key('moolsocial-family-root-ride'),
+          ]) {
+            final cell = tester.getSize(find.byKey(key));
+            expect(cell.width, closeTo(width / 7, .001));
+            expect(cell.width, greaterThanOrEqualTo(44));
+            expect(cell.height, 58);
+          }
           final rail = find.byKey(
             const Key('moolsocial-compact-destination-rail'),
           );
@@ -142,7 +143,7 @@ void main() {
     (
       id: 'shop',
       route: '/app/buy?sub=shop',
-      chatKey: Key('buy-global-chat'),
+      chatKey: Key('mool-global-chat'),
       ownerKey: Key('buy-v2-screen'),
     ),
     (
@@ -172,13 +173,13 @@ void main() {
     (
       id: 'care medicine',
       route: '/app/buy?sub=medicine',
-      chatKey: Key('buy-global-chat'),
+      chatKey: Key('mool-global-chat'),
       ownerKey: Key('buy-v2-screen'),
     ),
     (
       id: 'work',
       route: '/app/work/earn',
-      chatKey: Key('work-global-chat'),
+      chatKey: Key('mool-global-chat'),
       ownerKey: Key('work-earn-screen'),
     ),
   ]) {
@@ -212,7 +213,7 @@ void main() {
       expect(chatSize.height, greaterThanOrEqualTo(44));
       expect(
         tester
-            .getSemantics(find.byTooltip('Open Chat'))
+            .getSemantics(chatControl)
             .getSemanticsData()
             .hasAction(SemanticsAction.tap),
         isTrue,

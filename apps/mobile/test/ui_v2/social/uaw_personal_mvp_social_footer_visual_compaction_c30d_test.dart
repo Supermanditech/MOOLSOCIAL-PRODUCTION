@@ -35,16 +35,18 @@ void main() {
       expect(systemUi.systemNavigationBarDividerColor, Colors.transparent);
       expect(systemUi.systemNavigationBarContrastEnforced, isFalse);
 
-      final surface = tester.widget<Material>(
-        find.byKey(const Key('moolsocial-compact-destination-rail')),
-      );
-      expect(surface.color, const Color(0xFF0F0F0F));
+      final row = find.byKey(const Key('moolsocial-compact-destination-rail'));
+      final surface = tester.widget<Material>(find.ancestor(
+        of: row, matching: find.byType(Material)).first);
+      final canvas = tester.widget<DecoratedBox>(
+        find.byKey(const Key('moolsocial-uniform-destination-canvas')));
+      expect((canvas.decoration as BoxDecoration).color,
+        MoolLocalNavigationTokens.destinationCanvas);
+      expect(surface.color, Colors.transparent);
       expect(surface.elevation, 0);
-      expect(surface.shadowColor, Colors.transparent);
-      expect(surface.surfaceTintColor, Colors.transparent);
 
       final rail = find.byKey(const Key('screen04-context-tabs'));
-      expect(tester.widget(rail), isA<SizedBox>());
+      expect(tester.widget(rail), isA<Row>());
       expect(
         tester.getSize(rail).height,
         MoolLocalNavigationTokens.destinationRailHeight,
@@ -120,7 +122,8 @@ void main() {
     );
     expect(source, contains('systemNavigationBarDividerColor:'));
     expect(source, contains('systemNavigationBarContrastEnforced:'));
-    expect(source, contains('moolAndroidExportedSemanticsClearance('));
+    expect(source, contains('MoolDestinationNavigationV2('));
+    expect(source, isNot(contains('moolAndroidExportedSemanticsClearance(')));
   });
 }
 

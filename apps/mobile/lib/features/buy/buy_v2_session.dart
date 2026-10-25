@@ -624,6 +624,7 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
     required int pageSize,
   })
   load;
+  void Function(BuyV2CataloguePage<T>)? _onPageAccepted;
   final String Function(T item) identityOf;
   final int pageSize;
   final int maximumCachedPages;
@@ -842,6 +843,7 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
       _pending = null;
       final previous = _page;
       final previousCursor = _cursor;
+      BuyV2CataloguePage<T>? accepted;
       try {
         final pendingPreview = _previews.remove(request.cursor);
         final preview = pendingPreview == null ? null : await pendingPreview;
@@ -874,12 +876,14 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
         _page = result;
         _cursor = request.cursor;
         _message = null;
+        accepted = result;
       } on Object {
         if (_disposed || request.generation != _generation) continue;
         _message = 'Results could not load. Try again.';
       }
       if (!_disposed && request.generation == _generation) {
         _loading = false;
+        if (accepted != null) _onPageAccepted?.call(accepted);
         notifyListeners();
       }
     }
@@ -944,6 +948,7 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _onPageAccepted = null;
     _previewEpoch++;
     _previews.clear();
     _scrollOffsets.clear();
@@ -3421,6 +3426,7 @@ class BuyV2RootSessions {
       journal: bulkQuoteJournalFactory!(identity, catalogueCurrent), role: 'buyer', current: catalogueCurrent);
     final next = accountSessionFactory?.call(store, pending) ??
       BuyV2Session(core: core, reviewDataEnabled: false,
+        catalogueNow: catalogue?.gateway.now ?? DateTime.now,
         bulkQuotes: quotes,
         productPresentations: presentations,
         storeStockReader: catalogue?.gateway.stockSnapshotsSupported == true ? WorkspacePublicStockReader(
@@ -3441,7 +3447,7 @@ class BuyV2RootSessions {
     void catalogueChanged() {
       if (!catalogueCurrent() || !identical(current, next) || catalogue == null) return;
       for (final id in catalogue.observedProductIds) {
-        if (next.findProduct(id) != null) next.refreshProductContent(id);
+        if (next.findProduct(id) != null) next.refreshProductContent(id, requestFresh: false);
       }
     }
     catalogue?.addListener(catalogueChanged);
@@ -3701,8 +3707,7 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2ProductFactsAdapter? productFactsAdapter,
     BuyV2ProductContentAdapter? productContentAdapter,
     BuyV2ComparisonSource? comparisonSource,
-    this.marketplaceTrustAdapter =
-        const BuyV2CatalogueMarketplaceTrustAdapter(),
+    BuyV2MarketplaceTrustAdapter? marketplaceTrustAdapter,
     this.sponsoredContentAdapter = const BuyV2DisabledSponsoredContentAdapter(),
     BuyV2CartBenefitsAdapter? cartBenefitsAdapter,
     this.tipPolicy = const BuyV2DisabledTipPolicy(),
@@ -3739,6 +3744,9 @@ class BuyV2Session extends ChangeNotifier {
     bool? reviewDataEnabled,
   }) : _purchaseReader = purchaseReader,
        _purchaseRealm = purchaseRealm,
+       marketplaceTrustAdapter = marketplaceTrustAdapter ?? BuyV2CatalogueMarketplaceTrustAdapter(
+         storeSource: cataloguePageSource is WorkspacePublicDiscoverySource
+           ? cataloguePageSource.publicStoreForProduct : null),
        productFactsAdapter = productFactsAdapter ?? BuyV2CatalogueProductFactsAdapter(
          includeReviewFixtures: reviewDataEnabled ?? (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled)),
        purchaseOrderAdapter =
@@ -4710,8 +4718,7 @@ class BuyV2Session extends ChangeNotifier {
           ? BuyV2OfferClass.bulk
           : BuyV2OfferClass.wholesale;
       if (query.wholesaleSaleType != null &&
-          (product.offerClass != classification ||
-              !_availableForDiscovery(product) && product.packTerms?.commodityPriceRevision == null)) {
+          product.offerClass != classification) {
         throw const FormatException('Catalogue offer eligibility mismatch');
       }
     }
@@ -4730,18 +4737,21 @@ class BuyV2Session extends ChangeNotifier {
 
   void _validateStore(BuyV2StoreListing store, BuyV2CatalogueQuery query) {
     final exactStore = query.storeId == store.id && query.areaScope == BuyV2CatalogueAreaScope.allAreas;
+    final source = cataloguePageSource, preview = store.previewProduct;
+    final publicBrowse = query.areaScope == BuyV2CatalogueAreaScope.allAreas &&
+      source is WorkspacePublicDiscoverySource && source.active && preview?.storeId == store.id &&
+      source.displayedProduct(preview!) != null;
     if (store.id.trim().isEmpty ||
         store.id.trim() != store.id ||
         store.name.trim().isEmpty ||
         store.area.trim().isEmpty ||
-        store.address.trim().isEmpty ||
-        (store.regionId.trim().isEmpty && !exactStore) ||
+        (store.address.trim().isEmpty && !publicBrowse) ||
+        (store.regionId.trim().isEmpty && !exactStore && !publicBrowse) ||
         (query.storeId != null && store.id != query.storeId) ||
         (store.distanceMeters != null && store.distanceMeters! < 0) ||
         (store.collection != null && store.collection!.storeId != store.id)) {
       throw const FormatException('Catalogue Store identity mismatch');
     }
-    final preview = store.previewProduct;
     if (isStoreProcurement && preview == null) {
       throw const FormatException(
         'Supplier eligibility could not be confirmed',
@@ -4786,6 +4796,8 @@ class BuyV2Session extends ChangeNotifier {
             pager.acceptsCursor(cursor),
       ),
     );
+    pager._onPageAccepted = (page) => _retainCataloguePages(
+      notify: false, acceptedProducts: page.items);
     pager.addListener(_retainCataloguePages);
     _catalogueProductPagers[scopeKey] = _BuyV2PagerLease(pager)
       ..lastUsed = ++_catalogueUseSequence;
@@ -4825,6 +4837,8 @@ class BuyV2Session extends ChangeNotifier {
             pager.acceptsCursor(cursor),
       ),
     );
+    pager._onPageAccepted = (page) => _retainCataloguePages(
+      notify: false, acceptedStores: page.items);
     pager.addListener(_retainCataloguePages);
     _catalogueStorePagers[scopeKey] = _BuyV2PagerLease(pager)
       ..lastUsed = ++_catalogueUseSequence;
@@ -4899,6 +4913,8 @@ class BuyV2Session extends ChangeNotifier {
             pager.acceptsCursor(cursor),
       ),
     );
+    pager._onPageAccepted = (page) => _retainCataloguePages(
+      notify: false, acceptedOffers: page.items);
     pager.addListener(_retainCataloguePages);
     _catalogueOfferPagers[scopeKey] = _BuyV2PagerLease(pager)
       ..lastUsed = ++_catalogueUseSequence;
@@ -4971,7 +4987,12 @@ class BuyV2Session extends ChangeNotifier {
     );
   }
 
-  void _retainCataloguePages({bool notify = true}) {
+  void _retainCataloguePages({
+    bool notify = true,
+    Iterable<BuyV2Product> acceptedProducts = const [],
+    Iterable<BuyV2PublishedCatalogueOffer> acceptedOffers = const [],
+    Iterable<BuyV2StoreListing> acceptedStores = const [],
+  }) {
     if (_collectionDisposed || _procurementOffersRefreshing) return;
     var promotion = _openedStorePromotion;
     if (promotion != null && (!promotion.source.storeOffersActive ||
@@ -4980,58 +5001,53 @@ class BuyV2Session extends ChangeNotifier {
       _openedStorePromotion = promotion = null;
     }
     var promotedProduct = promotion?.product;
-    final superseded = Set<BuyV2Product>.identity()..addAll(promotion?.superseded ?? const []);
-    final imported = Set<BuyV2Product>.identity();
     void remember(BuyV2Product product) {
-      if (promotion != null && product.id == promotedProduct!.id) {
-        imported.add(product);
-        if (superseded.contains(product)) return;
-        if (!identical(product, promotedProduct)) {
-          superseded.add(promotedProduct!);
-          promotedProduct = product;
-          _productFacts.remove(product.id);
-          _productContent.remove(product.id);
-          _productContentMediaInputs.remove(product.id);
-        }
+      if (promotion != null && product.id == promotedProduct!.id &&
+          !identical(product, promotedProduct)) {
+        promotedProduct = product;
+        _productFacts.remove(product.id);
+        _productContent.remove(product.id);
+        _productContentMediaInputs.remove(product.id);
       }
       _pagedProducts[product.id] = product;
     }
-    for (final lease in _catalogueOfferPagers.values) {
-      for (final offer in lease.pager.cachedItems) {
-        _rememberAdvertisedOffer(offer);
-        remember(offer.product);
-      }
+    // Only newly validated source responses admit current offer authority.
+    // Cached pages retain navigation and display identities without replaying it.
+    for (final offer in acceptedOffers) {
+      _rememberAdvertisedOffer(offer);
+      remember(offer.product);
     }
-    for (final lease in _catalogueProductPagers.values) {
-      for (final product in lease.pager.cachedItems) {
-        remember(product);
-      }
-    }
-    for (final product
-        in _variantFamily?.candidates ?? const <BuyV2Product>[]) {
+    for (final product in acceptedProducts) {
       remember(product);
     }
-    final storeIds = <String>{};
-    for (final lease in _catalogueStorePagers.values) {
-      for (final store in lease.pager.cachedItems) {
-        storeIds.add(store.id);
-        if (_admittedStoreListings[store] != true) {
-          _admittedStoreListings[store] = true;
-          _rememberPagedStore(store);
-        }
-        if (promotion != null) {
-          final preview = store.previewProduct;
-          if (preview != null && preview.id == promotedProduct!.id) { remember(preview); }
-        }
+    for (final store in acceptedStores) {
+      _rememberPagedStore(store);
+      final preview = store.previewProduct;
+      if (promotion != null && preview != null && preview.id == promotedProduct!.id) {
+        remember(preview);
       }
     }
+    // Validated prefetch pages can become visible through the cache-only path.
+    // Retain their display identities without overwriting newer source records
+    // or replaying _rememberAdvertisedOffer and its commercial authority.
+    for (final lease in _catalogueProductPagers.values) {
+      for (final product in lease.pager.cachedItems) {
+        _pagedProducts.putIfAbsent(product.id, () => product);
+      }
+    }
+    for (final lease in _catalogueOfferPagers.values) {
+      for (final offer in lease.pager.cachedItems) {
+        _pagedProducts.putIfAbsent(offer.product.id, () => offer.product);
+      }
+    }
+    final storeIds = <String>{
+      for (final lease in _catalogueStorePagers.values)
+        for (final store in lease.pager.cachedItems) store.id,
+    };
     if (promotion != null) {
-      // Preserve one opened navigation product, skipping only the exact cached
-      // representations it replaced. A fresh import wins even if a later lease
-      // still holds a superseded object. No provider snapshot is rewritten.
       _pagedProducts[promotedProduct!.id] = promotedProduct!;
       _openedStorePromotion = (source: promotion.source, offer: promotion.offer,
-        product: promotedProduct!, superseded: imported..remove(promotedProduct));
+        product: promotedProduct!);
     }
     final retained = <String>{
       ...?_variantFamily?.candidates.map((product) => product.id),
@@ -5194,6 +5210,10 @@ class BuyV2Session extends ChangeNotifier {
     if (_collectionDisposed || !procurementScopeCurrent || isStoreProcurement || _holdCartForPaymentResolution()) return false;
     final key = _couponStoreKey(coupon), lines = _couponStoreLines(coupon);
     if (lines.isEmpty) return false;
+    if (coupon.structuredTerms != null) {
+      _storeCouponMessages[key] = 'Applying this offer is not connected yet. No saving or extra quantity has been added.';
+      notifyListeners(); return false;
+    }
     final supplierQuote = _couponSupplierQuote(coupon);
     if (_couponNeedsSupplierQuote(lines) && (supplierQuote == null || !_supplierQuoteCurrent(supplierQuote, lines))) {
       _storeCouponMessages[key] = 'Select a current supplier quote for these Bulk quantities before checking this Store coupon.';
@@ -5203,12 +5223,17 @@ class BuyV2Session extends ChangeNotifier {
       _storeCouponMessages[key] = 'Refresh or remove the current coupon before choosing a Store coupon.';
       notifyListeners(); return false;
     }
-    final destination = lines.first.product.destination, source = _sourceForCatalogue(lines.first.product.destination);
+    final advertisedLine = lines.where((line) => publishedStoreCouponsFor(line.product)
+      .any((row) => identical(row, coupon))).firstOrNull;
+    if (advertisedLine == null) {
+      _storeCouponMessages[key] = 'Refresh this Store’s coupons before applying.'; notifyListeners(); return false;
+    }
+    final destination = advertisedLine.product.destination, source = _sourceForCatalogue(advertisedLine.product.destination);
     if (source is! BuyV2StoreCouponEligibilitySource || !(source as BuyV2StoreCouponEligibilitySource).storeCouponEligibilityActive) {
       _storeCouponMessages[key] = 'Coupon eligibility is not connected yet. No saving has been applied.';
       notifyListeners(); return false;
     }
-    if (!publishedStoreCouponsFor(lines.first.product).any((row) => identical(row, coupon))) {
+    if (!publishedStoreCouponsFor(advertisedLine.product).any((row) => identical(row, coupon))) {
       _storeCouponMessages[key] = 'Refresh this Store’s coupons before applying.'; notifyListeners(); return false;
     }
     final reader = source as BuyV2StoreCouponEligibilitySource, owner = _currentCustomerOrderScope;
@@ -5227,7 +5252,7 @@ class BuyV2Session extends ChangeNotifier {
       identical(_sourceForCatalogue(destination), source) &&
       _couponSupplierQuote(coupon)?.quoteBinding == supplierQuote?.quoteBinding &&
       (supplierQuote == null || _supplierQuoteCurrent(supplierQuote, _couponStoreLines(coupon))) &&
-      publishedStoreCouponsFor(lines.first.product).any((row) => identical(row, coupon)) &&
+      publishedStoreCouponsFor(advertisedLine.product).any((row) => identical(row, coupon)) &&
       buyV2StoreCouponCartInput(lines) == buyV2StoreCouponCartInput(_couponStoreLines(coupon));
     try {
       if (!current()) return false;
@@ -5297,7 +5322,10 @@ class BuyV2Session extends ChangeNotifier {
         !(source as BuyV2StoreCouponSource).storeCouponsActive) { return const []; }
     return List.unmodifiable((_publishedStoreCoupons[key] ?? const <BuyV2PublishedStoreCoupon>[])
       .where((coupon) => coupon.realm == product.publicListingIdentity!.realm &&
-        coupon.storeId == product.storeId && coupon.isCurrent(catalogueNow())));
+        coupon.storeId == product.storeId && coupon.isCurrent(catalogueNow()) &&
+        (coupon.structuredTerms == null || source is BuyV2StructuredStoreCouponSource &&
+          (source as BuyV2StructuredStoreCouponSource).structuredStoreCouponDisplayActive) &&
+        coupon.appliesTo(product, accountId: _currentCustomerOrderScope.$2)));
   }
   Future<bool> refreshPublishedStoreCoupons(String productId) async {
     final product = findProduct(productId);
@@ -5323,13 +5351,17 @@ class BuyV2Session extends ChangeNotifier {
         final fresh = results.where((value) => value.identity == selected.value.coupon.identity).firstOrNull;
         String copy(BuyV2PublishedStoreCoupon value) => jsonEncode([value.revision, value.name,
           value.publisherName, value.publisherType.name, value.validFrom.toIso8601String(),
-          value.validUntil.toIso8601String(), value.terms.toJson()]);
+          value.validUntil.toIso8601String(), value.termsFingerprint, value.viewerAccountId]);
         if (fresh == null || copy(fresh) != copy(selected.value.coupon)) {
           _storeCouponBasketEpochs[key] = (_storeCouponBasketEpochs[key] ?? 0) + 1;
           if (!cartChangesBlocked) { _invalidateCheckoutQuote(); _invalidateCommercialPaymentTerms(); }
         }
       }
-      _publishedStoreCoupons[key] = List.unmodifiable(results);
+      // Legacy readers may return only their accepted wire version. Keep valid
+      // legacy rows independent; never activate richer rows by field presence.
+      _publishedStoreCoupons[key] = List.unmodifiable(results.where((coupon) =>
+        coupon.structuredTerms == null || reader is BuyV2StructuredStoreCouponSource &&
+          reader.structuredStoreCouponDisplayActive));
       _scheduleStoreCouponExpiry(); notifyListeners();
       return true;
     } on Object {
@@ -5367,7 +5399,7 @@ class BuyV2Session extends ChangeNotifier {
     });
   }
   ({BuyV2StorePublishedOffersSource source, BuyV2PublishedCatalogueOffer offer,
-    BuyV2Product product, Set<BuyV2Product> superseded})? _openedStorePromotion;
+    BuyV2Product product})? _openedStorePromotion;
   Timer? _advertisedOfferExpiry;
   DateTime? _advertisedOfferUntil;
   // Session-scoped tombstones survive page refresh/LRU removal. Never revive an
@@ -5463,19 +5495,11 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     try {
-      final superseded = Set<BuyV2Product>.identity()..addAll([
-        ?previous,
-        for (final lease in _catalogueProductPagers.values) ...lease.pager.cachedItems,
-        for (final lease in _catalogueOfferPagers.values) ...lease.pager.cachedItems.map((offer) => offer.product),
-        ...?_variantFamily?.candidates,
-        for (final store in _pagedStores.values) ?store.previewProduct,
-      ].where((candidate) => candidate.id == product.id && !identical(candidate, product)));
       retainCatalogueStoreBrowse(product);
       // Install only after validation/retention succeeds. A rejected product
       // cannot become a later cache import through this navigation pointer.
-      _openedStorePromotion = (source: source, offer: offer, product: product, superseded: superseded);
-      // Retention imports current cached pages. Only after that step replace a
-      // stale same-ID object with this validated exact source product.
+      _openedStorePromotion = (source: source, offer: offer, product: product);
+      // Install this validated source product after retaining its return anchor.
       _pagedProducts[product.id] = product;
       _productFacts.remove(product.id);
       _productContent.remove(product.id);
@@ -5622,12 +5646,15 @@ class BuyV2Session extends ChangeNotifier {
     for (final lease in _catalogueProductPagers.values) {
       lease.pager.dispose();
     }
+    _catalogueProductPagers.clear();
     for (final lease in _catalogueStorePagers.values) {
       lease.pager.dispose();
     }
+    _catalogueStorePagers.clear();
     for (final lease in _catalogueOfferPagers.values) {
       lease.pager.dispose();
     }
+    _catalogueOfferPagers.clear();
     super.dispose();
   }
 
@@ -6212,7 +6239,6 @@ class BuyV2Session extends ChangeNotifier {
   _catalogueOfferPagers = {};
   final Map<String, BuyV2Product> _pagedProducts = {};
   final Map<String, BuyV2StoreListing> _pagedStores = {};
-  final Expando<bool> _admittedStoreListings = Expando<bool>();
   final Map<String, Future<BuyV2StoreListing?>> _storeLookups = {};
   final List<Completer<void>> _catalogueRequestQueue = [];
   int _catalogueActiveRequests = 0;
@@ -7548,6 +7574,9 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2CommercialPaymentTerm> _commercialPaymentTerms = [];
   final Map<String, ({String id, String agreement})>
   _acceptedCommercialPaymentTerms = {};
+  final Map<String, String> _supplierAssignedPaymentTermIds = {};
+  final Map<String, String> _observedSupplierPaymentAgreements = {};
+  (String?, String?, String?, int, int)? _supplierPaymentAssignmentOwner;
   int _commercialPaymentTermsRequestSequence = 0;
   BuyV2CommerceLoadState commercialPaymentTermsLoadState =
       BuyV2CommerceLoadState.ready;
@@ -9349,6 +9378,19 @@ class BuyV2Session extends ChangeNotifier {
         ..clear()
         ..addAll(snapshot.products);
       if (isStoreProcurement) {
+        // A full snapshot retires prior reads, including pending page responses.
+        for (final lease in _catalogueProductPagers.values) { lease.pager._invalidate(); }
+        for (final lease in _catalogueStorePagers.values) { lease.pager._invalidate(); }
+        for (final lease in _catalogueOfferPagers.values) { lease.pager._invalidate(); }
+        _variantFamilyEpoch++;
+        _variantFamily = null;
+        _variantFamilyRequestProduct = null;
+        _variantFamilyRequestProductId = null;
+        _variantFamilyContextKey = null;
+        _variantFamilyLoading = false;
+        _variantFamilyMessage = null;
+        _openedStorePromotion = null;
+        _pagedStores.clear();
         _pagedProducts.clear();
         for (final product in snapshot.products) {
           _pagedProducts[product.id] = product;
@@ -9607,6 +9649,15 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2Product> get visibleSavedProducts =>
       previewSavedProducts(discoveryRefinements);
 
+  bool _savedTradeListingVisible(BuyV2Product product) {
+    final source = cataloguePageSource;
+    // A current public listing can be reviewed without permission to order it.
+    // Existing source admission and account-lifetime checks still apply.
+    return source is WorkspacePublicDiscoverySource && product.publicListingIdentity != null
+      ? source.active && source.displayedProduct(product) != null
+      : _availableForDiscovery(product);
+  }
+
   List<BuyV2Product> previewSavedProducts(
     BuyV2DiscoveryRefinements refinements,
   ) =>
@@ -9624,10 +9675,10 @@ class BuyV2Session extends ChangeNotifier {
               BuyV2Destination.wholesale => switch (wholesaleSaleType) {
                 BuyV2WholesaleSaleType.wholesale =>
                   product.offerClass == BuyV2OfferClass.wholesale &&
-                      _availableForDiscovery(product),
+                      _savedTradeListingVisible(product),
                 BuyV2WholesaleSaleType.bulk =>
                   product.offerClass == BuyV2OfferClass.bulk &&
-                      _availableForDiscovery(product),
+                      _savedTradeListingVisible(product),
               },
               BuyV2Destination.medicine || BuyV2Destination.orders => true,
             },
@@ -9875,7 +9926,10 @@ class BuyV2Session extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  int savedCountFor(BuyV2Destination value) => savedProductsFor(value).length;
+  int savedCountFor(BuyV2Destination value) {
+    final destination = value == BuyV2Destination.orders ? BuyV2Destination.shop : value;
+    return _savedKeys.where((key) => key.startsWith('${destination.name}|')).length;
+  }
 
   bool isSaved(String productId) {
     final item = findProduct(productId);
@@ -9973,6 +10027,7 @@ class BuyV2Session extends ChangeNotifier {
   Future<Map<String, BuyV2Product>> _resolvePersistedCatalogueProducts(
     Set<String> ids, {
     bool refreshKnown = false,
+    bool allowAbsentBrowsingOnly = false,
   }) async {
     final missing = ids
         .where((id) => refreshKnown || findProduct(id) == null)
@@ -10017,7 +10072,7 @@ class BuyV2Session extends ChangeNotifier {
         }
       }
     }
-    if (!isStoreProcurement && !resolved.keys.toSet().containsAll(missing)) {
+    if (!isStoreProcurement && !allowAbsentBrowsingOnly && !resolved.keys.toSet().containsAll(missing)) {
       throw StateError('Some retained products could not be restored');
     }
     return resolved;
@@ -10162,6 +10217,18 @@ class BuyV2Session extends ChangeNotifier {
         _applyCustomerStateSnapshot(snapshot, retainUnknownProducts: true);
         _customerStateSnapshotLoaded = true;
       }
+      // Only an empty, non-transactional browsing snapshot may retain absent
+      // bookmarks without holding the whole Cart. Source errors still throw.
+      final browsingOnly = !isStoreProcurement && snapshot.cartQuantities.isEmpty &&
+          snapshot.procurementDraft == null && snapshot.orders.isEmpty && snapshot.orderSupplyCheckpoints.isEmpty &&
+          snapshot.checkoutIdempotencyKey == null && snapshot.checkoutPaymentAttempt == null &&
+          snapshot.legacyCheckoutAttempt == null && snapshot.retainedLegacyCheckoutAttempts.isEmpty &&
+          snapshot.retainedCheckoutPaymentAttempts.isEmpty && !snapshot.paymentRecoveryIncomplete &&
+          snapshot.balancePaymentHolds.isEmpty && snapshot.orderResolutionHolds.isEmpty &&
+          snapshot.paymentReference == null && snapshot.paymentActionUri == null && snapshot.bankTransferInstructions == null &&
+          snapshot.pendingPurchaseOrderAccountId == null && snapshot.pendingPurchaseOrderRequestId == null &&
+          snapshot.pendingPurchaseOrderRevision == null && snapshot.supplierQuoteSelections.isEmpty &&
+          snapshot.productReportStates.isEmpty && snapshot.productStarAttempts.isEmpty;
       final resolved = await _resolvePersistedCatalogueProducts({
         ...snapshot.cartQuantities.keys,
         ?retainedDraft?.navigation?.productId,
@@ -10172,7 +10239,7 @@ class BuyV2Session extends ChangeNotifier {
             .map(_buyV2SavedListingId)
             .whereType<String>(),
         ...snapshot.recentlyViewedProductIds.take(10),
-      });
+      }, allowAbsentBrowsingOnly: browsingOnly);
       if (_collectionDisposed ||
           !procurementScopeCurrent ||
           store.ownerScope != ownerScope ||
@@ -10188,7 +10255,7 @@ class BuyV2Session extends ChangeNotifier {
         );
       }
       _pagedProducts.addAll(resolved);
-      _applyCustomerStateSnapshot(snapshot);
+      _applyCustomerStateSnapshot(snapshot, retainUnknownProducts: browsingOnly);
       if (isStoreProcurement &&
           restoreBrowsing &&
           browseRevision == _procurementBrowseRevision &&
@@ -10225,7 +10292,7 @@ class BuyV2Session extends ChangeNotifier {
         _customerStateRecoveryOwnerScope = ownerScope;
         _customerStateRestoreInFlight = false;
         commerceMessage =
-            'Your saved Cart could not be restored. It is still retained. '
+            'Your saved Cart could not be restored. '
             'Try again before changing your order.';
       }
       notifyListeners();
@@ -12602,6 +12669,12 @@ class BuyV2Session extends ChangeNotifier {
   ) {
     final accepted = _acceptedCommercialPaymentTerms[fulfilmentKey];
     if (accepted == null) return null;
+    if (_commercialPaymentTerms.any((term) =>
+        term.fulfilmentKey == fulfilmentKey &&
+        term.destination == BuyV2Destination.wholesale) &&
+        supplierAssignedPaymentTermFor(fulfilmentKey)?.id != accepted.id) {
+      return null;
+    }
     return _commercialPaymentTerms
         .where(
           (term) =>
@@ -12610,6 +12683,26 @@ class BuyV2Session extends ChangeNotifier {
               _commercialPaymentAgreement(term) == accepted.agreement,
         )
         .firstOrNull;
+  }
+
+  BuyV2CommercialPaymentTerm? supplierAssignedPaymentTermFor(String fulfilmentKey) {
+    if (_supplierPaymentAssignmentOwner != _currentCustomerOrderScope ||
+        commercialPaymentTermsLoadState != BuyV2CommerceLoadState.ready) {
+      return null;
+    }
+    final id = _supplierAssignedPaymentTermIds[fulfilmentKey];
+    if (id == null) return null;
+    return commercialPaymentTermsFor(fulfilmentKey)
+        .where((term) => term.id == id).firstOrNull;
+  }
+
+  String? get _supplierPaymentTermsReviewMessage {
+    if (!checkoutPaymentTermsReviewRequired) return null;
+    return checkoutFulfilmentGroups.any((group) =>
+        group.destination == BuyV2Destination.wholesale &&
+        supplierAssignedPaymentTermFor(group.key) == null)
+        ? 'Payment terms need confirmation from the affected supplier.'
+        : 'Review the updated supplier payment terms before placing your order.';
   }
 
   bool get checkoutPaymentTermsReviewRequired {
@@ -12655,12 +12748,13 @@ class BuyV2Session extends ChangeNotifier {
   int get checkoutBalanceDue => buyV2WholeRupees(checkoutBalanceDueMinor);
 
   Future<bool> refreshCommercialPaymentTerms() async {
-    if (_collectionDisposed || !procurementScopeCurrent) return false;
+    if (_collectionDisposed || !procurementScopeCurrent || checkoutRequiresResolution) return false;
     final adapter = commercialPaymentTermsAdapter;
     if (adapter == null) return true;
     final requestSequence = ++_commercialPaymentTermsRequestSequence;
     void unavailable(String message) {
       _commercialPaymentTerms = []; _acceptedCommercialPaymentTerms.clear();
+      _supplierAssignedPaymentTermIds.clear();
       commercialPaymentTermsLoadState = BuyV2CommerceLoadState.unavailable;
       commercialPaymentTermsMessage = message; notifyListeners();
     }
@@ -12668,6 +12762,8 @@ class BuyV2Session extends ChangeNotifier {
     if (groups.isEmpty) {
       _commercialPaymentTerms = [];
       _acceptedCommercialPaymentTerms.clear();
+      _supplierAssignedPaymentTermIds.clear();
+      _observedSupplierPaymentAgreements.clear();
       commercialPaymentTermsLoadState = BuyV2CommerceLoadState.ready;
       commercialPaymentTermsMessage = null;
       notifyListeners();
@@ -12686,7 +12782,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     final owner = _currentCustomerOrderScope;
     bool currentContext() =>
-        !_collectionDisposed && procurementScopeCurrent &&
+        !_collectionDisposed && procurementScopeCurrent && !checkoutRequiresResolution &&
         owner == _currentCustomerOrderScope &&
         requestSequence == _commercialPaymentTermsRequestSequence;
     bool currentInputs() {
@@ -12719,6 +12815,7 @@ class BuyV2Session extends ChangeNotifier {
       commercialPaymentTermsMessage = snapshot.customerMessage;
       if (snapshot.state != BuyV2CommerceLoadState.ready) {
         _commercialPaymentTerms = [];
+        _supplierAssignedPaymentTermIds.clear();
         notifyListeners();
         return false;
       }
@@ -12727,16 +12824,46 @@ class BuyV2Session extends ChangeNotifier {
         groups,
         payablesMinor,
       );
+      if (_supplierPaymentAssignmentOwner != owner) {
+        _acceptedCommercialPaymentTerms.clear();
+        _observedSupplierPaymentAgreements.clear();
+        _supplierPaymentAssignmentOwner = owner;
+      }
+      _supplierAssignedPaymentTermIds.clear();
+      for (final group in groups.where((group) =>
+          group.destination == BuyV2Destination.wholesale)) {
+        final id = snapshot.assignedTermIdsByFulfilmentKey[group.key];
+        if (id == null) continue;
+        // A duplicate ID must not silently select one of conflicting policies.
+        final candidates = snapshot.terms.where((term) => term.id == id &&
+            _validCommercialPaymentTerm(term, group: group,
+              expectedTotalMinor: payablesMinor[group.key]));
+        if (candidates.length == 1) _supplierAssignedPaymentTermIds[group.key] = id;
+      }
       _acceptedCommercialPaymentTerms.removeWhere(
         (groupKey, accepted) => !_commercialPaymentTerms.any(
           (term) =>
               term.fulfilmentKey == groupKey &&
               term.id == accepted.id &&
+              (term.destination != BuyV2Destination.wholesale ||
+                  _supplierAssignedPaymentTermIds[groupKey] == term.id) &&
               _commercialPaymentAgreement(term) == accepted.agreement,
         ),
       );
       for (final group in groups) {
-        if (group.destination == BuyV2Destination.wholesale) continue;
+        if (group.destination == BuyV2Destination.wholesale) {
+          final assigned = supplierAssignedPaymentTermFor(group.key);
+          if (assigned != null) {
+            final agreement = _commercialPaymentAgreement(assigned);
+            // Initial supplier assignment is shown for final order review.
+            // A material revision still needs explicit buyer acknowledgment.
+            if (!_observedSupplierPaymentAgreements.containsKey(group.key)) {
+              _acceptedCommercialPaymentTerms[group.key] = (id: assigned.id, agreement: agreement);
+            }
+            _observedSupplierPaymentAgreements[group.key] = agreement;
+          }
+          continue;
+        }
         final retailAdvance = commercialPaymentTermsFor(group.key)
             .where(
               (term) =>
@@ -12752,14 +12879,14 @@ class BuyV2Session extends ChangeNotifier {
       }
       if (checkoutPaymentTermsReviewRequired &&
           commercialPaymentTermsMessage == null) {
-        commercialPaymentTermsMessage =
-            'Choose an available payment term for each Wholesale delivery.';
+        commercialPaymentTermsMessage = _supplierPaymentTermsReviewMessage;
       }
       notifyListeners();
       return !checkoutPaymentTermsReviewRequired;
     } on Object {
       if (!currentContext()) return false;
       _commercialPaymentTerms = [];
+      _supplierAssignedPaymentTermIds.clear();
       commercialPaymentTermsLoadState = BuyV2CommerceLoadState.unavailable;
       commercialPaymentTermsMessage =
           'Payment terms could not be checked. Try again.';
@@ -12874,8 +13001,7 @@ class BuyV2Session extends ChangeNotifier {
       BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery =>
         term.amountDueNowMinor > 0 && term.balanceDueMinor > 0,
       BuyV2CommercialPaymentTermKind.paymentOnDelivery =>
-        isStoreProcurement &&
-            term.amountDueNowMinor == 0 &&
+        term.amountDueNowMinor == 0 &&
             term.balanceDueMinor == expectedTotalMinor &&
             term.netDays == null,
       BuyV2CommercialPaymentTermKind.supplierCredit =>
@@ -12920,6 +13046,12 @@ class BuyV2Session extends ChangeNotifier {
 
   bool chooseCommercialPaymentTerm(BuyV2CommercialPaymentTerm term) {
     if (_holdCartForPaymentResolution()) return false;
+    if (term.destination == BuyV2Destination.wholesale &&
+        supplierAssignedPaymentTermFor(term.fulfilmentKey)?.id != term.id) {
+      notice = 'Payment terms are set by this supplier.';
+      notifyListeners();
+      return false;
+    }
     if (!term.hasValidMoney) {
       notice = 'This payment term is no longer available.'; notifyListeners(); return false;
     }
@@ -12941,10 +13073,8 @@ class BuyV2Session extends ChangeNotifier {
       id: current.id,
       agreement: agreement,
     );
-    commercialPaymentTermsMessage = checkoutPaymentTermsReviewRequired
-        ? 'Choose an available payment term for each Wholesale delivery.'
-        : null;
-    notice = '${_commercialPaymentTermLabel(current.kind)} selected.';
+    commercialPaymentTermsMessage = _supplierPaymentTermsReviewMessage;
+    notice = '${_commercialPaymentTermLabel(current.kind)} reviewed.';
     notifyListeners();
     return true;
   }
@@ -12968,6 +13098,7 @@ class BuyV2Session extends ChangeNotifier {
     if (!commercialPaymentTermsEnabled) return;
     _commercialPaymentTermsRequestSequence += 1;
     _commercialPaymentTerms = [];
+    _supplierAssignedPaymentTermIds.clear();
     commercialPaymentTermsLoadState = BuyV2CommerceLoadState.loading;
     commercialPaymentTermsMessage = null;
   }
@@ -13582,7 +13713,7 @@ class BuyV2Session extends ChangeNotifier {
         _productContent.remove(candidate.id);
         _marketplaceTrust.remove(candidate.id);
       }
-      _retainCataloguePages(notify: false);
+      _retainCataloguePages(notify: false, acceptedProducts: next.candidates);
       return true;
     } on Object {
       if (active()) {
@@ -14359,12 +14490,17 @@ class BuyV2Session extends ChangeNotifier {
     });
   }
 
-  bool refreshProductContent(String productId) {
+  bool refreshProductContent(String productId, {bool requestFresh = true}) {
     final product = findProduct(productId);
     if (product == null) {
       notice = 'This product could not be found.';
       notifyListeners();
       return false;
+    }
+    if (requestFresh) {
+      if (productContentAdapter case final WorkspacePublicDiscoverySource source) {
+        unawaited(source.refreshProductContent(product));
+      }
     }
     final next = productContentAdapter.snapshotFor(product);
     if (!_validProductContent(product, next)) {
@@ -14430,6 +14566,13 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   BuyV2MarketplaceTrustSnapshot marketplaceTrustFor(BuyV2Product product) {
+    final adapter = marketplaceTrustAdapter;
+    // Source withdrawal/expiry must also retire the address; do not retain a
+    // separate seller-details cache after the exact catalogue readback retires.
+    if (adapter is BuyV2CatalogueMarketplaceTrustAdapter && adapter.storeSource != null) {
+      final next = adapter.snapshotFor(product);
+      return _validMarketplaceTrust(product, next) ? next : _catalogueTrustFallback.snapshotFor(product);
+    }
     return _marketplaceTrust.putIfAbsent(product.id, () {
       final next = marketplaceTrustAdapter.snapshotFor(product);
       return _validMarketplaceTrust(product, next)
@@ -16030,22 +16173,27 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> restoreOrderAlerts() async {
-    if (reviewDataEnabled || trackingAlertsBusy) return;
+  Future<void> restoreOrderAlerts({bool showNotice = true}) async {
+    if (reviewDataEnabled || trackingAlertsBusy || _collectionDisposed || !procurementScopeCurrent) return;
+    final procurementEpoch = _procurementEpoch, collectionEpoch = _collectionEpoch;
+    bool current() => !_collectionDisposed && procurementScopeCurrent &&
+      procurementEpoch == _procurementEpoch && collectionEpoch == _collectionEpoch;
     trackingAlertsBusy = true;
     notifyListeners();
     try {
       final result = await commerceAdapter.loadOrderAlerts();
+      if (!current()) return;
       trackingAlertsAvailable = result.available;
       trackingAlertsEnabled = result.available && result.enabled;
-      notice = result.available ? null : result.customerMessage;
+      if (showNotice) notice = result.available ? null : result.customerMessage;
     } on Object {
+      if (!current()) return;
       trackingAlertsAvailable = false;
       trackingAlertsEnabled = false;
-      notice = 'Order alerts could not load. Try again.';
+      if (showNotice) notice = 'Order alerts could not load. Try again.';
     } finally {
       trackingAlertsBusy = false;
-      notifyListeners();
+      if (!_collectionDisposed) notifyListeners();
     }
   }
 
@@ -16914,7 +17062,7 @@ class BuyV2Session extends ChangeNotifier {
         (!_customerStateSnapshotLoaded || !_customerStateRestoreInFlight)) {
       notice =
           commerceMessage ??
-          'Your saved Cart is still retained. Try again before changing your order.';
+          'Your Cart needs recovery. Try again before changing your order.';
       notifyListeners();
       return true;
     }

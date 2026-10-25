@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:crypto/crypto.dart' as crypto;
 
 import '../buy/buy_v2_content_contracts.dart';
@@ -3712,7 +3713,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
     }
     final copies = <String, ({int revision, String? copy})>{};
     for (final value in values) {
-      final copy = jsonEncode([value.name, value.terms.toJson(), value.validFrom.toIso8601String(),
+      final copy = jsonEncode([value.name, value.terms!.toJson(), value.validFrom.toIso8601String(),
         value.validUntil.toIso8601String(), value.configuredTotalUses, value.configuredUsesPerCustomer]);
       final old = _couponHeads[value.couponId];
       if (old != null && (value.revision < old.revision || value.revision == old.revision && old.copy != copy)) {
@@ -4373,6 +4374,18 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   bool get active => !_closed && current() && gateway._procurementScopeCurrent;
   Iterable<String> get observedProductIds => _readback.observedProductIds;
   WorkspaceCatalogueContentResult? displayedProduct(BuyV2Product product) => active ? _readback.displayedProduct(product) : null;
+  /// Already-admitted public Store fields for this exact displayed listing.
+  /// No additional request, address inference, collection or verification grant.
+  BuyV2StoreListing? publicStoreForProduct(BuyV2Product product) {
+    if (!active || displayedProduct(product) == null) return null;
+    final store = _stores[product.storeId], metadata = store?._storeMetadata;
+    final details = metadata?.details;
+    if (metadata?.state != 'ready' || details == null || store?._publicStoreName != product.seller) return null;
+    return BuyV2StoreListing(id: product.storeId!, name: product.seller,
+      area: metadata!.area ?? '', address: details.address, regionId: '',
+      publicContactPhone: details.publicContactPhone.isEmpty ? null : details.publicContactPhone,
+      openingHoursLabel: details.openingTime.isEmpty ? null : '${details.openingTime} – ${details.closingTime}');
+  }
   @override
   BuyV2ProcurementContext? get publicRestockContext =>
       gateway._publicRestockCatalogue ? gateway.procurementContext : null;
@@ -4686,8 +4699,15 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
     if (!active || product.publicListingIdentity?.realm != gateway.realm) return _unavailable(product);
     final snapshot = _readback.snapshotFor(product);
-    if (snapshot.state == BuyV2ProductContentState.unavailable) unawaited(_readback.refresh(product));
+    if (snapshot.state == BuyV2ProductContentState.unavailable && !_readback.hasObserved(product)) {
+      unawaited(_readback.refresh(product));
+    }
     return snapshot;
+  }
+  Future<void> refreshProductContent(BuyV2Product product) async {
+    if (active && product.publicListingIdentity?.realm == gateway.realm) {
+      await _readback.refresh(product);
+    }
   }
   @override
   void dispose() {
@@ -4705,13 +4725,14 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
   required String projectId, required String? tenantId, required String accountUserId,
   required String realm, required bool Function() current}) {
   if (!const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_DISCOVERY_V1') ||
-      environment != 'firebase-service' || projectId != 'moolsocial-dev-503018' || tenantId != null ||
-      !{'evaluation', 'production'}.contains(realm)) { return null; }
+      !workspacePrincipalMatchesConnection(environment: environment, projectId: projectId,
+        tenantId: tenantId, realm: realm)) { return null; }
   final endpoint = Uri.tryParse(const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL'));
   if (endpoint == null || !_validEndpoint(endpoint)) return null;
   final gateway = AuthenticatedWorkspaceCatalogueGateway(endpoint: endpoint,
-    credentials: FirebaseSocialContentCredentials(), transport: IoSocialContentTransport(), realm: realm,
+    credentials: workspaceConnectionCredentials(endpoint), transport: workspaceConnectionTransport(endpoint), realm: realm,
     ownerAccountId: _id(accountUserId), policyReadbackRequired: true,
+    trustedReadClockSupported: true,
     productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
     reviewedFamilyReadbackSupported: true, storeClassificationReadbackSupported: true,
     supplierPublishersVersionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_SUPPLIER_PUBLISHERS_V1'),
@@ -4739,12 +4760,14 @@ WorkspaceProductPresentationGateway? configuredWorkspaceProductPresentations({re
     cartEnabled = bool.fromEnvironment('MOOLSOCIAL_CART_ADDITIONS_V1'),
     checkoutEnabled = bool.fromEnvironment('MOOLSOCIAL_CHECKOUT_ENTRIES_V1'),
     discoveryEnabled = bool.fromEnvironment('MOOLSOCIAL_PRODUCT_DISCOVERY_SOURCES_V1');
-  if ((!productEnabled && !storeEnabled && !cartEnabled && !checkoutEnabled) || environment != 'firebase-service' ||
-      projectId != 'moolsocial-dev-503018' || tenantId != null || !{'evaluation', 'production'}.contains(realm)) {return null;}
+  if ((!productEnabled && !storeEnabled && !cartEnabled && !checkoutEnabled) ||
+      !workspacePrincipalMatchesConnection(environment: environment, projectId: projectId,
+        tenantId: tenantId, realm: realm)) {return null;}
   final endpoint = Uri.tryParse(const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL'));
   if (endpoint == null || !_validEndpoint(endpoint)) return null;
   return WorkspaceProductPresentationGateway(gateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: endpoint,
-    credentials: FirebaseSocialContentCredentials(), transport: IoSocialContentTransport(), realm: realm, ownerAccountId: _id(accountUserId)),
+    credentials: workspaceConnectionCredentials(endpoint), transport: workspaceConnectionTransport(endpoint), realm: realm,
+    trustedReadClockSupported: true, ownerAccountId: _id(accountUserId)),
     current: current, displayed: displayed, productPresentationsEnabled: productEnabled, storePresentationsEnabled: storeEnabled,
     cartAdditionsEnabled: cartEnabled, checkoutEntriesEnabled: checkoutEnabled, discoverySourcesEnabled: discoveryEnabled);
 }
@@ -4777,8 +4800,10 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
   }
   return AuthenticatedWorkspaceCatalogueGateway(
     endpoint: endpoint,
-    credentials: credentials ?? FirebaseSocialContentCredentials(),
-    transport: IoSocialContentTransport(),
+    credentials: credentials ?? workspaceConnectionCredentials(endpoint),
+    transport: workspaceConnectionTransport(endpoint),
+    realm: _localWorkspaceEndpoint(endpoint) ? 'evaluation' : 'production',
+    trustedReadClockSupported: true,
     policyReadbackRequired: true,
     productFactsReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_FACTS_V1'),
     unbrandedProduceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_UNBRANDED_PRODUCE_V1'),
@@ -4804,7 +4829,53 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
   );
 }
 
-bool _validEndpoint(Uri value) =>
+bool _localWorkspaceEndpoint(Uri value) => kDebugMode &&
+    const bool.fromEnvironment('MOOLSOCIAL_CART_LOCAL_EMULATOR') &&
+    value.toString() == 'http://127.0.0.1:5001/demo-moolsocial-local/asia-south1/moolSocialWorkspace';
+
+bool validWorkspaceConnectionEndpoint(Uri value) => _validEndpoint(value);
+
+bool workspacePrincipalMatchesConnection({required String environment, required String projectId,
+  required String? tenantId, required String realm}) {
+  final endpoint = Uri.tryParse(const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL'));
+  if (tenantId != null || endpoint == null) return false;
+  if (_localWorkspaceEndpoint(endpoint)) return
+    environment == jsonEncode(['firebase-emulator', '127.0.0.1', '', 9099]) &&
+    projectId == 'demo-moolsocial-local' && realm == 'evaluation';
+  return environment == 'firebase-service' && _validEndpoint(endpoint) && projectId == 'moolsocial-dev-503018' &&
+    {'evaluation', 'production'}.contains(realm);
+}
+
+SocialContentCredentials workspaceConnectionCredentials(Uri endpoint) =>
+  _localWorkspaceEndpoint(endpoint) ? _LocalWorkspaceCredentials() : FirebaseSocialContentCredentials();
+
+IoSocialContentTransport workspaceConnectionTransport(Uri endpoint) =>
+  IoSocialContentTransport(followRedirects: !_localWorkspaceEndpoint(endpoint));
+
+// Firebase has no App Check emulator. This marker is accepted only by the
+// isolated demo runner; real Firebase emulator authentication is still required.
+class _LocalWorkspaceCredentials implements SocialContentCredentials {
+  FirebaseAuth get _auth {
+    final auth = FirebaseAuth.instance;
+    if (auth.app.options.projectId != 'demo-moolsocial-local' || auth.tenantId != null) {
+      throw StateError('The local Workspace requires its isolated test account.');
+    }
+    return auth;
+  }
+  @override
+  Future<String> firebaseIdToken() async {
+    final token = await _auth.currentUser?.getIdToken();
+    if (token == null || token.isEmpty) throw StateError('Sign in to the test account.');
+    return token;
+  }
+  @override
+  Future<String> appCheckToken(SocialAppCheckTokenMode mode) async {
+    if (_auth.currentUser == null) throw StateError('Sign in to the test account.');
+    return 'local-emulator';
+  }
+}
+
+bool _validEndpoint(Uri value) => _localWorkspaceEndpoint(value) ||
     value.scheme == 'https' &&
     value.host == 'asia-south1-moolsocial-dev-503018.cloudfunctions.net' &&
     value.path == '/moolSocialWorkspace' &&
@@ -4985,10 +5056,11 @@ class AuthenticatedWorkspaceCatalogueGateway
     bool publicRestockCatalogue = false,
     this.publicSupplierTypeFilterSupported = false,
     this.publicRestockSupplierTypes,
+    this.trustedReadClockSupported = false,
     DateTime Function()? now,
   }) : _publicRestockCatalogue = publicRestockCatalogue,
-       _reviewedVariantsOverride = reviewedVariants, _productMediaTransportOverride = productMediaTransport, now = now ?? DateTime.now {
-    if (!_validEndpoint(endpoint) ||
+       _reviewedVariantsOverride = reviewedVariants, _productMediaTransportOverride = productMediaTransport, _deviceNow = now ?? DateTime.now {
+    if (!_validEndpoint(endpoint) || _localWorkspaceEndpoint(endpoint) && realm != 'evaluation' ||
         publicRestockCatalogue && procurementContext?.purpose != BuyV2ProcurementPurpose.restock ||
         !{'production', 'evaluation'}.contains(realm) || procurementContext != null &&
           ((!procurementReadbackSupported && !publicRestockCatalogue) || !procurementContext!.hasIdentity ||
@@ -5073,7 +5145,45 @@ class AuthenticatedWorkspaceCatalogueGateway
   final Map<String, String> _variantInputs = {};
   bool _policyObserved = false;
   bool get policyResolutionRequired => policyReadbackRequired || _policyObserved;
-  final DateTime Function() now;
+  final bool trustedReadClockSupported;
+  final DateTime Function() _deviceNow;
+  final Stopwatch _readClock = Stopwatch()..start();
+  DateTime? _serverTimeFloor;
+  int _serverFloorAtMicros = 0;
+  DateTime Function() get now => _readNow;
+  DateTime _readNow() {
+    final device = _deviceNow().toUtc(), floor = _serverTimeFloor;
+    if (floor == null) return device;
+    final server = floor.add(Duration(microseconds: _readClock.elapsedMicroseconds - _serverFloorAtMicros));
+    return device.isAfter(server) ? device : server;
+  }
+
+  void _observeReadClock(SocialContentResponse response, Map<String, Object?> request, int elapsedMicros) {
+    final operation = request['operation'];
+    if (!trustedReadClockSupported || response.statusCode != 200 || !const {
+      'readPublicCatalogueDiscovery', 'readPublicStoreCatalogue', 'readPublicStoreVariantFamilies',
+    }.contains(operation)) return;
+    try {
+      final envelope = _map(jsonDecode(response.body)), data = _map(envelope['data']);
+      _keys(envelope, ['ok', 'data']);
+      if (envelope['ok'] != true || data['schemaVersion'] is! int || data['schemaVersion'] != 1 ||
+          data['realm'] != realm || data['orderingAvailable'] != false || data['state'] != 'ready') return;
+      if (operation == 'readPublicCatalogueDiscovery') {
+        if (data['discoveryPageVersion'] != 1 || data['resultKind'] != (request['resultKind'] ?? 'products') ||
+            data['requestedStore'] != request['storeId'] ||
+            jsonEncode(_sorted(data['query'])) != jsonEncode(_sorted(request['query']))) return;
+      } else if (data['storeId'] != request['storeId']) { return; }
+      final server = _time(data['observedAt']), device = _deviceNow().toUtc();
+      // Only a small clock lag is corrected. Move time forward conservatively
+      // by the whole request duration; never renew source validity or move back.
+      final floor = server.add(Duration(microseconds: elapsedMicros));
+      if (floor.isAfter(device.add(const Duration(minutes: 5)))) return;
+      if (floor.isAfter(_readNow())) {
+        _serverTimeFloor = floor;
+        _serverFloorAtMicros = _readClock.elapsedMicroseconds;
+      }
+    } on Object { /* An invalid response still fails its existing decoder. */ }
+  }
 
   /// Caller must pin the actual authenticated account/lifetime, not a contact label.
   AuthenticatedWorkspaceCatalogueGateway forOwnerAccount(String accountId, {
@@ -5088,6 +5198,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       transport: transport,
       realm: realm,
       ownerAccountId: accountId,
+      trustedReadClockSupported: trustedReadClockSupported,
       policyReadbackRequired: policyReadbackRequired,
       productFactsReadbackSupported: productFactsReadbackSupported,
       unbrandedProduceReadbackSupported: unbrandedProduceReadbackSupported,
@@ -5115,7 +5226,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       publicRestockCatalogue: publicRestockCatalogue ?? _publicRestockCatalogue,
       publicSupplierTypeFilterSupported: publicSupplierTypeFilterSupported,
       publicRestockSupplierTypes: publicRestockSupplierTypes ?? this.publicRestockSupplierTypes,
-      now: now,
+      now: _deviceNow,
     );
   }
 
@@ -5991,6 +6102,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     );
     if (!active()) return null;
     onDispatch?.call();
+    final requestStartedMicros = _readClock.elapsedMicroseconds;
     final response = await transport
         .postJson(
           endpoint,
@@ -6010,6 +6122,7 @@ class AuthenticatedWorkspaceCatalogueGateway
         )
         .timeout(const Duration(seconds: 20));
     if (!active()) return null;
+    _observeReadClock(response, body, _readClock.elapsedMicroseconds - requestStartedMicros);
     if (procurementRequest == null) return response;
     if (_catalogueHash(procurementRequest) != requestFingerprint) throw const FormatException();
     return _procurementResponse(response, procurementRequest, context!, realm, now().toUtc());
@@ -6321,6 +6434,12 @@ class WorkspaceCatalogueReadback extends ChangeNotifier
   Iterable<String> get observedProductIds => _results.entries
     .where((entry) => !_closed && _owners[entry.key] == context())
     .map((entry) => entry.value.content.productId).toSet();
+
+  bool hasObserved(BuyV2Product product) {
+    final key = _key(product), owner = context(), input = _input(product);
+    return !_closed && owner != null && input != null &&
+        _owners[key] == owner && _inputs[key] == input;
+  }
 
   void _prepareOwner(Object owner) {
     if (_lifetime != owner) {

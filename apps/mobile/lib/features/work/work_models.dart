@@ -3644,7 +3644,7 @@ class WorkspaceSupplierGoodsReceipt {
       day.toIso8601String().substring(0, 10) == deliveredOn &&
       !DateTime.utc(day.year, day.month, day.day).isAfter(
         DateTime.utc(local.year, local.month, local.day)) &&
-      lines.isNotEmpty && lines.length <= 200 && lines.every((line) => line.valid) &&
+      lines.isNotEmpty && lines.every((line) => line.valid) &&
       lines.map((line) => line.sourceLineId).toSet().length == lines.length &&
       (restockOriginal == null || restockOriginal!.matchesReceipt(this));
   }
@@ -3706,7 +3706,7 @@ class WorkspaceSupplierBillGoodsAllocation {
   final DateTime linkedAt;
   bool get valid => [operationId, receiptId, receiptLineId, billId, copyId, productId, billUnit, stockUnit]
       .every((v) => v.trim().isNotEmpty && v.length <= 512) &&
-      copyRevision > 0 && billLineIndex >= 0 && billLineIndex < 200 && conversionReviewed &&
+      copyRevision > 0 && billLineIndex >= 0 && conversionReviewed &&
       stockUnitsNumerator > 0 && stockUnitsNumerator <= 1000000 &&
       stockUnitsDenominator > 0 && stockUnitsDenominator <= 1000000 &&
       BigInt.from(stockUnitsNumerator).gcd(BigInt.from(stockUnitsDenominator)) == BigInt.one &&
@@ -3783,7 +3783,7 @@ class WorkspaceSupplierShortageClaim {
   bool get valid => [operationId, accountScope, workspaceId, supplierId, billId,
     copyId, expectedDeliveryId, receiptLineId, productId, purchaseUnit]
     .every((v) => v.trim().isNotEmpty && v == v.trim() && v.length <= 512) &&
-    copyRevision > 0 && committedRevision > 1 && billLineIndex >= 0 && billLineIndex < 200 &&
+    copyRevision > 0 && committedRevision > 1 && billLineIndex >= 0 &&
     quantityMilli > 0 && quantityMilli <= 2147483647 &&
     outstandingMilli >= quantityMilli && outstandingMilli <= 2147483647 &&
     priorClaimedMilli >= 0 && priorClaimedMilli <= outstandingMilli - quantityMilli &&
@@ -3904,7 +3904,7 @@ class WorkspaceSupplierCreditSupport {
 
   bool get valid => [receiptId, receiptLineId].every(
     (v) => v.trim().isNotEmpty && v == v.trim() && v.length <= 512) &&
-    billLineIndex >= 0 && billLineIndex < 200 &&
+    billLineIndex >= 0 &&
     quantityMilli > 0 && quantityMilli <= 2147483647 &&
     (kind == WorkspaceSupplierCreditSupportKind.goodsReturned
       ? returnOperationId != null && returnOperationId!.trim().isNotEmpty &&
@@ -3973,7 +3973,7 @@ class WorkspaceSupplierCreditNote {
       amountMinor > 0 && _financeAmountValid(amountMinor) && date != null &&
       (requestedAt == null || !requestedAt!.isAfter(recordedAt)) &&
       !date.isAfter(DateTime.utc(committed.year, committed.month, committed.day)) &&
-      supports.isNotEmpty && supports.length <= 200 && supports.every((s) => s.valid) &&
+      supports.isNotEmpty && supports.every((s) => s.valid) &&
       supports.map((s) => s.sourceIdentity).toSet().length == supports.length;
   }
   Map<String, Object?> toJson() => {'operationId': operationId, 'accountScope': accountScope,
@@ -3990,7 +3990,7 @@ class WorkspaceSupplierCreditNote {
       'amountMinor', 'recordedAt', 'committedRevision', 'supports'};
     if (raw is! Map || !keys.every(raw.containsKey) ||
         !raw.keys.every((key) => keys.contains(key) || key == 'requestedAt') ||
-        raw['supports'] is! List || (raw['supports'] as List).length > 200) {
+        raw['supports'] is! List) {
       throw const FormatException('Invalid supplier credit note');
     }
     final note = WorkspaceSupplierCreditNote(operationId: raw['operationId'] as String,
@@ -4202,7 +4202,7 @@ class WorkspaceSupplierGoodsReturn {
       RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(returnedOn) && day != null &&
       day.toIso8601String().substring(0, 10) == returnedOn &&
       !day.isAfter(DateTime(local.year, local.month, local.day)) &&
-      lines.isNotEmpty && lines.length <= 200 && lines.every((line) => line.valid) &&
+      lines.isNotEmpty && lines.every((line) => line.valid) &&
       lines.map((line) => line.receiptLineId).toSet().length == lines.length;
   }
   WorkspaceStockMovement? movementFor(WorkspaceSupplierGoodsReturnLine line) => line.stockUnits == 0
@@ -7596,6 +7596,187 @@ typedef WorkspaceLedgerFormKey = ({
   int ledgerRevision,
 });
 
+/// Private copies retained with one supplier payment, credit, refund or allocation input owner. These are
+/// neither issued receipts nor attachments to an accepted ledger transaction.
+class WorkspaceSupplierMoneyCopies {
+  WorkspaceSupplierMoneyCopies({required this.key, required this.qa,
+    this.active = const [], this.previous = const []});
+  final WorkspaceLedgerFormKey key;
+  final bool qa;
+  final List<WorkspacePurchaseInvoiceAttachment> active;
+  final List<WorkspaceSupplierMoneyCopyGroup> previous;
+  String get captureId => jsonEncode([key.kind == 'supplierCredit' ? 'supplier-credit-draft'
+    : key.kind == 'supplierRefund' ? 'supplier-refund-draft'
+    : key.kind == 'supplierAllocation' ? 'supplier-allocation-draft' : 'supplier-money-draft', key.customer,
+    key.invoice, key.order, key.ledgerRevision]);
+  String get owner => jsonEncode([key.account, key.store, qa, captureId]);
+  Set<String> get documentTypes => key.kind == 'supplierCredit'
+    ? const {'supplierCreditNote', 'other'} : key.kind == 'supplierRefund'
+    ? const {'paymentReceipt', 'paymentAdvice', 'supplierRefundVoucher', 'other'}
+    : const {'paymentReceipt', 'paymentAdvice', 'other'};
+  bool get valid => const {'supplierMoney', 'supplierCredit', 'supplierRefund', 'supplierAllocation'}.contains(key.kind) &&
+    (key.kind != 'supplierRefund' || key.order.startsWith('supplier-refund:${qa ? 'qa' : 'live'}:')) &&
+    (previous.length < 1000 || active.isEmpty) && previous.length <= 1000 &&
+    WorkspaceSupplierGoodsReceiptDraft.validDocuments(active) &&
+    previous.every((g) => g.valid) &&
+    previous.map((g) => g.operation).toSet().length == previous.length &&
+    [...active, ...previous.expand((g) => g.copies)].every((a) =>
+      a.owner == owner && (!a.documentDetails.containsKey('type') ||
+        documentTypes.contains(a.documentDetails['type']))) &&
+    [...active, ...previous.expand((g) => g.copies)]
+      .fold<int>(0, (sum, a) => sum + a.byteLength) <= 200 * 1024 * 1024 &&
+    // Reserve room for the next archived group's identity without losing input.
+    jsonEncode(toJson()).length <= (active.isEmpty ? 1048576 : 1040000);
+  Map<String, Object?> toJson() => {'version': 1, 'qa': qa,
+    'active': active.map((a) => a.toJson()).toList(),
+    'previous': previous.map((g) => g.toJson()).toList()};
+  WorkspaceSupplierMoneyCopies withActive(List<WorkspacePurchaseInvoiceAttachment> value) =>
+    WorkspaceSupplierMoneyCopies(key: key, qa: qa, active: List.unmodifiable(value), previous: previous);
+  WorkspaceSupplierMoneyCopies archive(WorkspaceSupplierMoneyAttempt attempt) =>
+    WorkspaceSupplierMoneyCopies(key: key, qa: qa, previous: List.unmodifiable([
+      ...previous,
+      if (active.isNotEmpty) WorkspaceSupplierMoneyCopyGroup(
+        operation: attempt.entry.operationId, reference: attempt.entry.reference,
+        date: attempt.entry.moneyReview!.occurredOn, copies: active),
+    ]));
+  WorkspaceSupplierMoneyCopies archiveCredit(WorkspaceSupplierCreditIntent intent) {
+    if (key.kind != 'supplierCredit' || !intent.valid || intent.accountScope != key.account ||
+        intent.workspaceId != key.store || intent.supplierId != key.customer ||
+        intent.billId != key.invoice || intent.copyRevision != key.ledgerRevision ||
+        key.order != 'credit-copy:${intent.copyId}') {
+      throw const FormatException('Credit-copy archive owner does not match its saved request');
+    }
+    return WorkspaceSupplierMoneyCopies(key: key, qa: qa, previous: List.unmodifiable([
+      ...previous,
+      if (active.isNotEmpty) WorkspaceSupplierMoneyCopyGroup(operation: intent.operationId,
+        reference: intent.reference, date: intent.occurredOn, copies: active),
+    ]));
+  }
+  WorkspaceSupplierMoneyCopies archiveRefund(WorkspaceSupplierRefundIntent intent) {
+    if (key.kind != 'supplierRefund' || !intent.valid || intent.formKey != key || intent.qa != qa) {
+      throw const FormatException('Refund-copy archive owner does not match its saved request');
+    }
+    return WorkspaceSupplierMoneyCopies(key: key, qa: qa, previous: List.unmodifiable([
+      ...previous,
+      if (active.isNotEmpty) WorkspaceSupplierMoneyCopyGroup(operation: intent.operationId,
+        reference: intent.reference, date: intent.occurredOn, copies: active),
+    ]));
+  }
+  WorkspaceSupplierMoneyCopies archiveAllocation(WorkspaceSupplierMoneyAllocationIntent intent) {
+    if (key.kind != 'supplierAllocation' || !intent.valid || intent.accountScope != key.account ||
+        intent.workspaceId != key.store || intent.supplierId != key.customer ||
+        intent.billId != key.invoice || intent.copyRevision != key.ledgerRevision ||
+        key.order != 'allocation-copy:${intent.copyId}') {
+      throw const FormatException('Allocation-copy archive owner does not match its saved request');
+    }
+    return WorkspaceSupplierMoneyCopies(key: key, qa: qa, previous: List.unmodifiable([
+      ...previous,
+      if (active.isNotEmpty) WorkspaceSupplierMoneyCopyGroup(operation: intent.operationId,
+        reference: 'Allocation draft', date: '', copies: active),
+    ]));
+  }
+  static WorkspaceSupplierMoneyCopies? fromJson(Object? raw, WorkspaceLedgerFormKey key) {
+    try {
+      if (raw is! Map || raw.length != 4 || raw['version'] != 1 || raw['qa'] is! bool ||
+          raw['active'] is! List || raw['previous'] is! List ||
+          (raw['active'] as List).length > 3 || (raw['previous'] as List).length > 1000) { return null; }
+      final value = WorkspaceSupplierMoneyCopies(key: key, qa: raw['qa'] as bool,
+        active: List.unmodifiable((raw['active'] as List).map(WorkspacePurchaseInvoiceAttachment.fromJson)),
+        previous: List.unmodifiable((raw['previous'] as List).map(WorkspaceSupplierMoneyCopyGroup.fromJson)));
+      return value.valid ? value : null;
+    } on Object { return null; }
+  }
+}
+
+class WorkspaceSupplierMoneyCopyGroup {
+  const WorkspaceSupplierMoneyCopyGroup({required this.operation, required this.reference,
+    required this.date, required this.copies});
+  final String operation, reference, date;
+  final List<WorkspacePurchaseInvoiceAttachment> copies;
+  bool get valid => operation.trim().isNotEmpty && operation.length <= 512 &&
+    reference.length <= 512 && date.length <= 40 && copies.isNotEmpty &&
+    WorkspaceSupplierGoodsReceiptDraft.validDocuments(copies);
+  Map<String, Object?> toJson() => {'operation': operation, 'reference': reference,
+    'date': date, 'copies': copies.map((a) => a.toJson()).toList()};
+  static WorkspaceSupplierMoneyCopyGroup fromJson(Object? raw) {
+    if (raw is! Map || raw.length != 4 || raw['operation'] is! String ||
+        raw['reference'] is! String || raw['date'] is! String || raw['copies'] is! List ||
+        (raw['copies'] as List).length > 3) { throw const FormatException('Invalid draft copies'); }
+    final group = WorkspaceSupplierMoneyCopyGroup(operation: raw['operation'] as String,
+      reference: raw['reference'] as String, date: raw['date'] as String,
+      copies: List.unmodifiable((raw['copies'] as List).map(WorkspacePurchaseInvoiceAttachment.fromJson)));
+    if (!group.valid) throw const FormatException('Invalid draft copies');
+    return group;
+  }
+}
+
+/// Private supplier-document input only; never a tax posting or ledger command.
+/// Partial printed amounts remain text so recovery does not erase corrections.
+class WorkspaceSupplierCreditDocumentInput {
+  WorkspaceSupplierCreditDocumentInput({this.treatment = '', this.reasonCode = '',
+    List<Map<String, String>> taxRows = const [], Map<String, String> particulars = const {}})
+    : taxRows = List.unmodifiable(taxRows.map((row) => Map<String, String>.unmodifiable(row))),
+      particulars = Map.unmodifiable(particulars);
+  final String treatment, reasonCode;
+  final List<Map<String, String>> taxRows;
+  final Map<String, String> particulars;
+  static const reasons = {'return', 'shortage', 'damage', 'price', 'tax', 'discount', 'other'};
+  static const taxFields = {'rate', 'taxable', 'cgst', 'sgst', 'igst', 'cess'};
+  static const particularLimits = <String, int>{'documentTitle': 128,
+    'supplierName': 256, 'supplierAddress': 2000, 'supplierGstin': 32,
+    'buyerName': 256, 'buyerAddress': 2000, 'buyerGstinUin': 32,
+    'deliveryAddress': 2000, 'recipientState': 128, 'recipientStateCode': 2,
+    'invoiceReferences': 4000, 'signatureDetails': 512, 'irn': 128, 'qrReference': 8000};
+  bool get valid => const {'', 'gst', 'commercial'}.contains(treatment) &&
+    (reasonCode.isEmpty || reasons.contains(reasonCode)) && taxRows.length <= 100 &&
+    taxRows.every((row) => row.length == taxFields.length &&
+      row.keys.every(taxFields.contains) && row.values.every((value) => value.length <= 100)) &&
+    particulars.length <= particularLimits.length && particulars.entries.every((entry) =>
+      particularLimits.containsKey(entry.key) && entry.value.length <= particularLimits[entry.key]!) &&
+    jsonEncode(toJson()).length <= 65536;
+  /// Comparison of explicitly entered printed amounts, never an inferred tax.
+  int? get printedTotalMinor {
+    if (treatment != 'gst' || taxRows.isEmpty) return null;
+    var total = 0;
+    for (final row in taxRows) {
+      for (final field in const ['taxable', 'cgst', 'sgst', 'igst', 'cess']) {
+        final value = WorkspacePurchaseEntryDraft.printedPaise(row[field]);
+        if (value == null) return null;
+        total += value;
+        if (total.abs() > 9007199254740991) return null;
+      }
+    }
+    return total;
+  }
+  Map<String, Object?> toJson() => {'version': particulars.isEmpty ? 1 : 2, 'treatment': treatment,
+    'reasonCode': reasonCode, 'taxRows': taxRows, if (particulars.isNotEmpty) 'particulars': particulars};
+  static WorkspaceSupplierCreditDocumentInput fromJson(Object? raw) {
+    if (raw is! Map || !((raw['version'] == 1 && raw.length == 4) ||
+        (raw['version'] == 2 && raw.length == 5 && raw['particulars'] is Map)) ||
+        raw['treatment'] is! String || raw['reasonCode'] is! String || raw['taxRows'] is! List ||
+        (raw['taxRows'] as List).length > 100) {
+      throw const FormatException('Invalid supplier credit document input');
+    }
+    final rows = <Map<String, String>>[];
+    for (final row in raw['taxRows'] as List) {
+      if (row is! Map || row.length != taxFields.length ||
+          !row.keys.every(taxFields.contains) || !row.values.every((value) => value is String)) {
+        throw const FormatException('Invalid supplier credit tax input');
+      }
+      rows.add(Map<String, String>.from(row));
+    }
+    final printed = raw['version'] == 2 ? raw['particulars'] as Map : const {};
+    if (printed.length > particularLimits.length || !printed.keys.every((key) =>
+        key is String && particularLimits.containsKey(key)) || !printed.values.every((value) => value is String)) {
+      throw const FormatException('Invalid supplier credit particulars');
+    }
+    final value = WorkspaceSupplierCreditDocumentInput(treatment: raw['treatment'] as String,
+      reasonCode: raw['reasonCode'] as String, taxRows: rows, particulars: Map<String, String>.from(printed));
+    if (!value.valid) throw const FormatException('Invalid supplier credit document input');
+    return value;
+  }
+}
+
 /// Unsent input only. An updated bill uses a different key so an old refund or
 /// collection amount cannot silently become a new payment after confirmation.
 class WorkspaceLedgerFormDraft {
@@ -7642,19 +7823,19 @@ class WorkspaceLedgerFormDraft {
                         'note',
                       ]
                     : key.kind == 'supplierMoney'
-                    ? const ['amount', 'channel', 'reference', 'occurredOn', 'notIncludedInOpening', 'attempt']
+                    ? const ['amount', 'channel', 'reference', 'occurredOn', 'notIncludedInOpening', 'attempt', 'supportingCopies']
                     : key.kind == 'supplierAllocation'
-                    ? const ['amount', 'sourceKind', 'sourceId', 'attempt']
+                    ? const ['amount', 'sourceKind', 'sourceId', 'attempt', 'supportingCopies']
                     : key.kind == 'supplierReceivingInput'
-                    ? const ['arrivalId', 'groupId', 'input', 'restockOriginal']
+                    ? const ['arrivalId', 'groupId', 'input', 'restockOriginal', 'documents', 'copyType']
                     : key.kind == 'supplierGoodsReturn'
                     ? const ['reference', 'reason', 'returnedOn', 'items', 'attempt']
                     : key.kind == 'supplierCredit'
-                    ? const ['amount', 'reference', 'reason', 'occurredOn', 'supports', 'attempt']
+                    ? const ['amount', 'reference', 'reason', 'occurredOn', 'supports', 'attempt', 'supportingCopies', 'documentInput']
                     : key.kind == 'supplierShortage'
                     ? const ['billLineIndex', 'deliveryId', 'lineId', 'quantityMilli', 'attributionReviewed', 'attempt']
                     : key.kind == 'supplierRefund'
-                    ? const ['amount', 'channel', 'reference', 'occurredOn', 'sourceKind', 'sourceId', 'attempt']
+                    ? const ['amount', 'channel', 'reference', 'occurredOn', 'sourceKind', 'sourceId', 'attempt', 'supportingCopies']
                     : key.kind == 'return'
                     ? const ['product', 'quantity', 'sellable', 'reason', 'reasonCode', 'items']
                     : key.kind == 'refund'
@@ -7663,7 +7844,13 @@ class WorkspaceLedgerFormDraft {
                 .contains(field),
       ) &&
       fields.entries.every((entry) =>
-          entry.key == 'restockOriginal' && key.kind == 'supplierReceivingInput'
+          entry.key == 'documentInput' && key.kind == 'supplierCredit'
+              ? entry.value.length <= 65536 && supplierCreditDocumentInput != null
+              : entry.key == 'supportingCopies' && const {'supplierMoney', 'supplierCredit', 'supplierRefund', 'supplierAllocation'}.contains(key.kind)
+              ? entry.value.length <= 1048576 && supplierSupportingCopies != null
+              : entry.key == 'documents' && key.kind == 'supplierReceivingInput'
+              ? entry.value.length <= 1048576 && _validReceivingDocuments(entry.value)
+              : entry.key == 'restockOriginal' && key.kind == 'supplierReceivingInput'
               ? entry.value.length <= 65536 && _validRestockReceivingInput()
               : entry.key == 'input' && key.kind == 'supplierReceivingInput'
               ? entry.value.length <= 262144 && _validReceivingInput(entry.value)
@@ -7689,10 +7876,15 @@ class WorkspaceLedgerFormDraft {
               ? entry.value.length <= 262144
               : entry.value.length <= 512) &&
       (key.kind != 'supplierMoney' || _supplierMoneyNamespaceValid) &&
+      // The accepted financial intent cannot preserve classification or taxes.
+      // New document input must remain an unsent draft until that contract exists.
+      (key.kind != 'supplierCredit' || !fields.containsKey('documentInput') ||
+        fields['attempt']?.isNotEmpty != true) &&
       (key.kind != 'supplierReceivingInput' ||
         (key.ledgerRevision == 1 && key.invoice == 'receiving-input' &&
           const ['receiving-input:qa', 'receiving-input:live'].contains(key.order) &&
-          (fields.isEmpty || (fields.length == (fields.containsKey('restockOriginal') ? 4 : 3) &&
+          (fields.isEmpty || (fields.length == 3 + (fields.containsKey('restockOriginal') ? 1 : 0) + (fields.containsKey('documents') ? 1 : 0) + (fields.containsKey('copyType') ? 1 : 0) &&
+            (!fields.containsKey('copyType') || WorkspacePurchaseInvoiceAttachment.receivingDocumentTypes.contains(fields['copyType'])) &&
             fields['arrivalId']?.trim().isNotEmpty == true &&
             fields['groupId']?.trim().isNotEmpty == true && fields.containsKey('input'))))) &&
       (key.kind != 'supplierRefund' || RegExp(
@@ -7704,8 +7896,44 @@ class WorkspaceLedgerFormDraft {
       (key.kind != 'supplierAllocation' ||
         (key.order.startsWith('allocation-copy:') && key.order.length > 16));
 
+  WorkspaceSupplierMoneyCopies? get supplierMoneyCopies {
+    return key.kind == 'supplierMoney' ? supplierSupportingCopies : null;
+  }
+  WorkspaceSupplierMoneyCopies? get supplierCreditCopies {
+    return key.kind == 'supplierCredit' ? supplierSupportingCopies : null;
+  }
+  WorkspaceSupplierCreditDocumentInput? get supplierCreditDocumentInput {
+    final text = fields['documentInput'];
+    if (key.kind != 'supplierCredit' || text == null || text.length > 65536) return null;
+    try { return WorkspaceSupplierCreditDocumentInput.fromJson(jsonDecode(text)); }
+    on Object { return null; }
+  }
+  WorkspaceSupplierMoneyCopies? get supplierRefundCopies {
+    return key.kind == 'supplierRefund' ? supplierSupportingCopies : null;
+  }
+  WorkspaceSupplierMoneyCopies? get supplierAllocationCopies {
+    return key.kind == 'supplierAllocation' ? supplierSupportingCopies : null;
+  }
+  WorkspaceSupplierMoneyCopies? get supplierSupportingCopies {
+    final text = fields['supportingCopies'];
+    if (!const {'supplierMoney', 'supplierCredit', 'supplierRefund', 'supplierAllocation'}.contains(key.kind) || text == null) return null;
+    try { return WorkspaceSupplierMoneyCopies.fromJson(jsonDecode(text), key); }
+    on Object { return null; }
+  }
+
   // Editable input, not a goods receipt or an authority to post Stock. Keep
   // incomplete quantities as text; validate their meaning only during Review.
+  bool _validReceivingDocuments(String text) {
+    try {
+      final raw = jsonDecode(text);
+      if (raw is! List || raw.length > 3) return false;
+      final documents = raw.map(WorkspacePurchaseInvoiceAttachment.fromJson).toList();
+      return WorkspaceSupplierGoodsReceiptDraft.validDocuments(documents) && documents.every((a) =>
+        a.owner == WorkspaceSupplierGoodsReceiptDraft.documentOwner(
+          (key.account, key.store, key.order == 'receiving-input:qa'), key.customer, fields['arrivalId']!));
+    } on Object { return false; }
+  }
+
   bool _validRestockReceivingInput() {
     try {
       final source = WorkspaceRestockPurchaseOriginal.fromJson(jsonDecode(fields['restockOriginal']!));
@@ -7736,7 +7964,7 @@ class WorkspaceLedgerFormDraft {
   static bool _validReceivingInput(String text) {
     try {
       final value = jsonDecode(text);
-      if (value is! List || value.length < 3 || value.length > 102 ||
+      if (value is! List || value.length < 3 ||
           value[0] is! String || value[1] is! String ||
           (value[0] as String).length > 512 || (value[1] as String).length > 512) {
         return false;
@@ -8968,9 +9196,7 @@ class WorkspaceProductImport {
         mrp: mrp,
         lowStockThreshold: low,
         minimumOrder: minimum,
-        delivery: value('deliveryPromise').isEmpty
-            ? 'Store pickup or local delivery'
-            : value('deliveryPromise'),
+        delivery: value('deliveryPromise'),
       );
       if (error != null) {
         result.add(blocked(error.message, fields: [error.field]));
@@ -9139,7 +9365,7 @@ class WorkspaceProductImport {
             sellingPriceMinor: exact ? selling : null,
             unitPrice: '',
             stock: stock,
-            deliveryPromise: 'Store pickup or local delivery',
+            deliveryPromise: '',
             origin: '',
             visualLabel: '$title ${value('pack')}',
             visualKind: 'catalogue-packshot',
@@ -9334,6 +9560,8 @@ class WorkspaceProductImport {
 }
 
 /// One field-aware validator; the shared editor keeps its existing text API.
+/// Private Stock validation. Publication separately requires delivery information;
+/// saving inventory must not invent a supplier's customer delivery promise.
 ({String field, String message})? workspaceProductValuesIssue({
   required String title,
   required String brand,
@@ -9373,8 +9601,6 @@ class WorkspaceProductImport {
       )
     : mrp != null && mrp < selling
     ? (field: 'mrp', message: 'MRP cannot be lower than the customer price.')
-    : delivery.isEmpty
-    ? (field: 'deliveryPromise', message: 'Add the customer delivery promise.')
     : minimumOrder == null || minimumOrder <= 0
     ? (
         field: 'minimumOrder',
@@ -9455,30 +9681,114 @@ class WorkspaceSupplierProfile {
 class WorkspacePurchaseInvoiceAttachment {
   const WorkspacePurchaseInvoiceAttachment({required this.owner, required this.digest,
     required this.fileName, required this.contentType, required this.byteLength,
-    required this.source, this.detectedText = ''});
+    required this.source, this.detectedText = '', this.extractedFields = const [],
+    this.extractionOverflow = false, this.dismissedFieldIds = const [], this.pageTextLengths = const [],
+    this.documentDetails = const {}});
   final String owner, digest, fileName, contentType, source, detectedText;
+  // Owner-classified supporting copy, never statutory/receipt/payment authority.
+  final Map<String, String> documentDetails;
+  static const documentTypes = {'purchaseOrder', 'orderConfirmation', 'orderAmendment', 'orderCancellation',
+    'pickList', 'packingList', 'shortSupply', 'supplierInvoice', 'deliveryChallan', 'ewayBill',
+    'transportReceipt', 'freightBill', 'proofOfDelivery', 'goodsReceipt', 'shortageDamage', 'failedDelivery',
+    'paymentReceipt', 'paymentAdvice', 'supplierRefundVoucher', 'creditApproval', 'accountStatement', 'returnNote',
+    'supplierCreditNote', 'supplierDebitNote', 'commercialAdjustment', 'claim', 'balanceConfirmation',
+    'settlement', 'other'};
+  static const receivingDocumentTypes = {'deliveryChallan', 'packingList', 'supplierInvoice', 'ewayBill',
+    'transportReceipt', 'freightBill', 'proofOfDelivery', 'goodsReceipt', 'shortageDamage', 'failedDelivery', 'other'};
+  bool get _validDocumentDetails => documentDetails.keys.every(const {'type', 'title', 'reference', 'date'}.contains) &&
+    documentDetails.entries.every((e) => e.value.length <= (e.key == 'date' ? 40 : 120) &&
+      !e.value.contains(RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f]'))) &&
+    (!documentDetails.containsKey('type') || documentTypes.contains(documentDetails['type']));
   final int byteLength;
+  // Local per-copy facts only; never new global accounting/schema columns.
+  final List<WorkspacePurchaseAdditionalField> extractedFields;
+  final bool extractionOverflow;
+  final List<String> dismissedFieldIds;
+  // Boundaries into detectedText, not duplicated OCR text. Absent on old copies.
+  final List<int> pageTextLengths;
+  List<String> get recognizedTextPages {
+    if (pageTextLengths.isEmpty) return [detectedText];
+    var offset = 0;
+    final pages = <String>[];
+    for (final length in pageTextLengths) {
+      pages.add(detectedText.substring(offset, offset + length)); offset += length;
+    }
+    return List.unmodifiable(pages);
+  }
+  bool get _validExtraction => extractedFields.length <= 200 &&
+    pageTextLengths.length <= 20 && pageTextLengths.every((length) => length >= 0 && length <= 60000) &&
+    (pageTextLengths.isEmpty || contentType == 'application/pdf' &&
+      pageTextLengths.fold<int>(0, (sum, length) => sum + length) == detectedText.length) &&
+    dismissedFieldIds.length <= 200 && dismissedFieldIds.toSet().length == dismissedFieldIds.length &&
+    dismissedFieldIds.every((id) => id.isNotEmpty && id.length <= 200 && !extractedFields.any((f) => f.id == id)) &&
+    extractedFields.map((f) => f.id).toSet().length == extractedFields.length &&
+    extractedFields.fold<int>(0, (size, f) => size + f.label.length + f.value.length) <= 48000 &&
+    extractedFields.every((f) => f.valid && f.sourceDigest == digest && (contentType == 'application/pdf' || f.sourcePage == 1) &&
+      (pageTextLengths.isEmpty || f.sourcePage == null || f.sourcePage! <= pageTextLengths.length) &&
+      f.itemIndex == null && f.summaryIndex == null && f.sourceItemIndex == null) &&
+    jsonEncode(extractedFields.map((f) => f.toJson()).toList()).length <= 262144;
   bool get valid => owner.isNotEmpty && owner.length <= 1000 &&
     RegExp(r'^[a-f0-9]{64}$').hasMatch(digest) && fileName.isNotEmpty &&
     fileName.length <= 200 && byteLength > 0 && byteLength <= 10 * 1024 * 1024 &&
     const ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].contains(contentType) &&
-    const ['camera', 'gallery', 'upload'].contains(source) && detectedText.length <= 60000;
+    const ['camera', 'gallery', 'upload'].contains(source) && detectedText.length <= 60000 && _validExtraction && _validDocumentDetails;
   Map<String, Object?> toJson() => {'owner': owner, 'digest': digest,
     'fileName': fileName, 'contentType': contentType, 'byteLength': byteLength,
-    'source': source, 'detectedText': detectedText};
-  WorkspacePurchaseInvoiceAttachment withText(String text) =>
+    'source': source, 'detectedText': detectedText,
+    if (documentDetails.isNotEmpty) 'documentDetails': {'version': 1, ...documentDetails},
+    if (extractedFields.isNotEmpty || extractionOverflow || dismissedFieldIds.isNotEmpty || pageTextLengths.isNotEmpty) 'extractedFields': {
+      'version': 1, 'fields': extractedFields.map((f) => f.toJson()).toList(), 'overflow': extractionOverflow,
+      if (dismissedFieldIds.isNotEmpty) 'dismissed': dismissedFieldIds,
+      if (pageTextLengths.isNotEmpty) 'pageTextLengths': pageTextLengths,
+    }};
+  WorkspacePurchaseInvoiceAttachment withText(String text, {List<int>? pageLengths}) =>
     WorkspacePurchaseInvoiceAttachment(owner: owner, digest: digest,
       fileName: fileName, contentType: contentType, byteLength: byteLength,
-      source: source, detectedText: text);
+      source: source, detectedText: text, extractedFields: extractedFields, extractionOverflow: extractionOverflow,
+      dismissedFieldIds: dismissedFieldIds, documentDetails: documentDetails,
+      pageTextLengths: List.unmodifiable(pageLengths ?? (text == detectedText ? pageTextLengths : const [])));
+  WorkspacePurchaseInvoiceAttachment withExtractedFields(List<WorkspacePurchaseAdditionalField> fields,
+      {bool overflow = false, List<String>? dismissed}) => WorkspacePurchaseInvoiceAttachment(owner: owner, digest: digest,
+        fileName: fileName, contentType: contentType, byteLength: byteLength, source: source,
+        detectedText: detectedText, extractedFields: List.unmodifiable(fields), extractionOverflow: overflow,
+        dismissedFieldIds: List.unmodifiable(dismissed ?? dismissedFieldIds), pageTextLengths: pageTextLengths,
+        documentDetails: documentDetails);
+  WorkspacePurchaseInvoiceAttachment withDocumentDetails(Map<String, String> details) =>
+    WorkspacePurchaseInvoiceAttachment(owner: owner, digest: digest, fileName: fileName,
+      contentType: contentType, byteLength: byteLength, source: source, detectedText: detectedText,
+      extractedFields: extractedFields, extractionOverflow: extractionOverflow, dismissedFieldIds: dismissedFieldIds,
+      pageTextLengths: pageTextLengths, documentDetails: Map.unmodifiable(details));
   static WorkspacePurchaseInvoiceAttachment fromJson(Object? raw) {
     const keys = {'owner', 'digest', 'fileName', 'contentType', 'byteLength', 'source', 'detectedText'};
-    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains)) {
+    if (raw is! Map || !keys.every(raw.containsKey) ||
+        !raw.keys.every((key) => keys.contains(key) || key == 'extractedFields' || key == 'documentDetails')) {
       throw const FormatException('Invoice attachment needs recovery');
+    }
+    final extraction = raw['extractedFields'];
+    final document = raw['documentDetails'];
+    if (raw.containsKey('documentDetails') && (document is! Map || document['version'] != 1 || document.length < 2 ||
+        !document.keys.every(const {'version', 'type', 'title', 'reference', 'date'}.contains) ||
+        document.entries.any((e) => e.key != 'version' && e.value is! String))) {
+      throw const FormatException('Document details need recovery');
+    }
+    if (raw.containsKey('extractedFields') && (extraction is! Map ||
+        !const {'version', 'fields', 'overflow'}.every(extraction.containsKey) ||
+        extraction['version'] != 1 || extraction['fields'] is! List || extraction['overflow'] is! bool ||
+        extraction.containsKey('dismissed') && extraction['dismissed'] is! List ||
+        extraction.containsKey('pageTextLengths') && extraction['pageTextLengths'] is! List ||
+        !extraction.keys.every(const {'version', 'fields', 'overflow', 'dismissed', 'pageTextLengths'}.contains))) {
+      throw const FormatException('Scanned document fields need recovery');
     }
     final value = WorkspacePurchaseInvoiceAttachment(owner: raw['owner'] as String,
       digest: raw['digest'] as String, fileName: raw['fileName'] as String,
       contentType: raw['contentType'] as String, byteLength: raw['byteLength'] as int,
-      source: raw['source'] as String, detectedText: raw['detectedText'] as String);
+      source: raw['source'] as String, detectedText: raw['detectedText'] as String,
+      documentDetails: Map.unmodifiable({if (document is Map) for (final e in document.entries)
+        if (e.key != 'version') e.key as String: e.value as String}),
+      extractedFields: List.unmodifiable([for (final f in extraction == null ? const [] : extraction['fields'] as List)
+        WorkspacePurchaseAdditionalField.fromJson(f)]), extractionOverflow: extraction?['overflow'] as bool? ?? false,
+      dismissedFieldIds: List.unmodifiable([for (final id in extraction?['dismissed'] as List? ?? const []) id as String]),
+      pageTextLengths: List.unmodifiable([for (final length in extraction?['pageTextLengths'] as List? ?? const []) length as int]));
     if (!value.valid) throw const FormatException('Invalid invoice attachment');
     return value;
   }
@@ -9500,7 +9810,7 @@ class WorkspacePurchaseAdditionalField {
     (summaryIndex == null || section == 'tax' && summaryIndex! >= 0) &&
     (sourceDigest == null || RegExp(r'^[a-f0-9]{64}$').hasMatch(sourceDigest!)) &&
     (sourceItemIndex == null || section == 'items' && sourceDigest != null &&
-      sourceItemIndex! >= 0 && sourceItemIndex! < 200) &&
+      sourceItemIndex! >= 0) &&
     (sourcePage == null || sourceDigest != null && sourcePage! > 0 && sourcePage! <= 10000);
   Map<String, Object?> toJson() => {'version': 1, 'id': id, 'label': label,
     'value': value, 'section': section, 'reviewed': reviewed,
@@ -9584,7 +9894,8 @@ class WorkspacePurchaseEntryDraft {
     'documentTitle', 'originalInvoiceDate', 'printedTotalItems', 'printedTotalQuantity',
     'printedTaxRate', 'printedCgstRate', 'printedSgstRate', 'printedUtgstRate',
     'printedIgstRate', 'printedPaymentMark', 'printedFooter', 'printedSignatoryLabel',
-    'printedCompanyLabel', 'printedDeclaration'};
+    'printedCompanyLabel', 'printedDeclaration', 'billOfSupplyReason', 'supplyNature',
+    'buyerRegistration', 'exemptValue'};
   static const goodsExtraKeys = {'hsn', 'barcode', 'freeQuantity', 'batch', 'expiry',
     'mrp', 'sellingPrice', 'discount', 'gstRate', 'cess', 'lineTotal',
     'receivedQuantity', 'damagedQuantity', 'shortQuantity', 'unitCode', 'taxableValue',
@@ -9605,7 +9916,7 @@ class WorkspacePurchaseEntryDraft {
     final warnings = <String>[];
     for (final key in const ['invoiceTotal', 'totalTax', 'amountPayable', 'paidAmount',
         'taxableValue', 'supplyValue', 'cgst', 'sgstAmount', 'utgst', 'igst', 'cess',
-        'billDiscount', 'freight', 'otherCharges', 'roundOff']) {
+        'billDiscount', 'freight', 'otherCharges', 'roundOff', 'exemptValue']) {
       final value = values[key];
       if (value != null && value.trim().isNotEmpty && printedPaise(value) == null) {
         warnings.add('Check the amount format: use rupees with up to two decimal places.');
@@ -9649,7 +9960,7 @@ class WorkspacePurchaseEntryDraft {
   List<String> get invoiceFormatWarnings => reviewInvoiceFormat(
     invoiceReference, invoiceDate, details['documentType']);
   static List<String> reviewInvoiceFormat(String reference, String issuedOn, String? documentType) {
-    if (documentType != 'GST invoice') return const [];
+    if (!const ['GST invoice', 'Tax invoice', 'Bill of supply', 'Invoice-cum-bill of supply'].contains(documentType)) return const [];
     final warnings = <String>[];
     if (!RegExp(r'^[A-Za-z0-9/-]{1,16}$').hasMatch(reference)) {
       warnings.add('Check invoice number: up to 16 letters, digits, / or -.');
@@ -9666,7 +9977,7 @@ class WorkspacePurchaseEntryDraft {
   }
   bool get valid => id.isNotEmpty && supplierId.isNotEmpty &&
       invoiceReference.length <= 120 && invoiceDate.length <= 10 &&
-      !updatedAt.isBefore(createdAt) && goods.length <= 200 &&
+      !updatedAt.isBefore(createdAt) &&
       details.keys.every(detailKeys.contains) &&
       details.entries.every((entry) => entry.value.length <= (entry.key == 'terms' ? 4000 : 500)) &&
       attachments.length <= 3 && attachments.every((a) => a.valid) &&
@@ -9925,23 +10236,36 @@ class WorkspaceSupplierOpeningRecord {
 /// Frozen receiving review. Saving this is not a receipt commit or Stock update.
 /// Its original operation identity survives closing the editor and restarting.
 class WorkspaceSupplierGoodsReceiptDraft {
-  const WorkspaceSupplierGoodsReceiptDraft({required this.supplierId,
-    required this.revision, required this.receipt});
+  WorkspaceSupplierGoodsReceiptDraft({required this.supplierId,
+    required this.revision, required this.receipt, List<WorkspacePurchaseInvoiceAttachment> documents = const []})
+    : documents = List.unmodifiable(documents);
   final String supplierId;
   final int revision;
   final WorkspaceSupplierGoodsReceipt receipt;
+  // Local supporting evidence only. Never part of the receipt posting command.
+  final List<WorkspacePurchaseInvoiceAttachment> documents;
+  static String captureId(String supplierId, String receiptId) => jsonEncode(['goods-receipt', supplierId, receiptId]);
+  static String documentOwner((String, String, bool) scope, String supplierId, String receiptId) =>
+    jsonEncode([scope.$1, scope.$2, scope.$3, captureId(supplierId, receiptId)]);
+  static bool validDocuments(List<WorkspacePurchaseInvoiceAttachment> documents) => documents.length <= 3 &&
+    documents.every((a) => a.valid) && documents.map((a) => a.digest).toSet().length == documents.length &&
+    documents.fold<int>(0, (sum, a) => sum + a.byteLength) <= 20 * 1024 * 1024 &&
+    jsonEncode(documents.map((a) => a.toJson()).toList()).length <= 1048576;
   bool get valid => supplierId.trim().isNotEmpty && supplierId.length <= 240 &&
-      revision > 0 && receipt.valid;
+      revision > 0 && receipt.valid && validDocuments(documents);
   Map<String, Object?> toJson() => {'supplierId': supplierId,
-    'revision': revision, 'receipt': receipt.toJson()};
+    'revision': revision, 'receipt': receipt.toJson(),
+    if (documents.isNotEmpty) 'documents': documents.map((a) => a.toJson()).toList()};
   static WorkspaceSupplierGoodsReceiptDraft fromJson(Object? raw) {
     const keys = {'supplierId', 'revision', 'receipt'};
-    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains)) {
+    if (raw is! Map || !keys.every(raw.containsKey) || !raw.keys.every((key) => keys.contains(key) || key == 'documents') ||
+        raw.containsKey('documents') && (raw['documents'] is! List || (raw['documents'] as List).length > 3)) {
       throw const FormatException('Invalid receiving review');
     }
     final result = WorkspaceSupplierGoodsReceiptDraft(supplierId: raw['supplierId'] as String,
       revision: raw['revision'] as int,
-      receipt: WorkspaceSupplierGoodsReceipt.fromJson(raw['receipt']));
+      receipt: WorkspaceSupplierGoodsReceipt.fromJson(raw['receipt']),
+      documents: [for (final a in raw['documents'] as List? ?? const []) WorkspacePurchaseInvoiceAttachment.fromJson(a)]);
     if (!result.valid) throw const FormatException('Invalid receiving review');
     return result;
   }
@@ -10321,6 +10645,8 @@ class WorkspacePurchaseEntryBook {
       var receiptRevision = 0;
       for (final review in result.goodsReceiptDrafts) {
         if (!receiptIds.add(review.receipt.id) || !ids.contains(review.supplierId) ||
+            review.documents.any((a) => a.owner != WorkspaceSupplierGoodsReceiptDraft.documentOwner(
+              (result.account, result.store, result.qa), review.supplierId, review.receipt.id)) ||
             review.revision <= receiptRevision || review.revision > result.revision) {
           throw const FormatException('Invalid receiving review relationship');
         }

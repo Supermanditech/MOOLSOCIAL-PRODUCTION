@@ -13,7 +13,12 @@ import 'work_catalogue_gateway_test.dart' as catalogue;
 
 // Isolated host facts/journals only; no device policy, consent or live provider.
 const scope = (account: 'owner-one', store: 'store-one', realm: 'evaluation');
-final at = DateTime.utc(2026, 10, 17, 3);
+// WorkSession uses the real clock; anchor its valid host draft to this run.
+// Explicit expiry/stale-response tests still inject their own clock below.
+final at = DateTime.fromMillisecondsSinceEpoch(
+  DateTime.now().millisecondsSinceEpoch,
+  isUtc: true,
+);
 StorePolicyDraft draft([String body = 'Host supplier terms']) =>
     StorePolicyDraft(
       title: 'Host terms',

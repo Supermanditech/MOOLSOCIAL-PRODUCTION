@@ -644,6 +644,7 @@ class WorkSession extends ChangeNotifier {
     this.operationalPendingStoreFactory,
     this.productPromotionGateway,
     this.productPromotionRealm,
+    this.productPromotionNow,
     this.productPromotionPendingStoreFactory,
     this.storeCouponPendingStoreFactory,
   }) : _productionSession = false,
@@ -714,6 +715,7 @@ class WorkSession extends ChangeNotifier {
     this.supplierPolicyJournalFactory,
     this.productPromotionGateway,
     this.productPromotionRealm,
+    this.productPromotionNow,
     this.productPromotionPendingStoreFactory,
     this.storeCouponPendingStoreFactory,
   }) : _productionSession = true,
@@ -970,6 +972,7 @@ class WorkSession extends ChangeNotifier {
       jsonEncode(workspacePublicDetailsFieldsForPublishing?.toJson()) == fingerprint);
   }
   final StorePromotionGateway? productPromotionGateway;
+  final DateTime Function()? productPromotionNow;
   final String? productPromotionRealm;
   final StorePromotionPendingStore Function(StorePromotionScope scope)? productPromotionPendingStoreFactory;
   final StoreCouponPendingStore Function(StorePromotionScope scope)? storeCouponPendingStoreFactory;
@@ -1054,6 +1057,7 @@ class WorkSession extends ChangeNotifier {
     if (existing?.active == true) return existing;
     existing?.dispose();
     return _productPromotions[scope] = StorePromotionController(scope: scope, gateway: connection,
+      now: productPromotionNow ?? () => DateTime.now().toUtc(),
       pendingStore: productPromotionPendingStoreFactory?.call(scope) ?? SecureStorePromotionPendingStore(),
       context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store ? null : publicationPreferencesContext,
       validateSelection: (input, current) async {
@@ -2096,6 +2100,72 @@ class WorkSession extends ChangeNotifier {
     _supplierLoads[key] = operation;
     return operation;
   }
+  /// Save a private supplier contact without creating or replacing a purchase.
+  Future<bool> saveWorkspaceSupplierProfile(WorkspaceSupplierProfile profile, {
+    required (String, String, bool) scope, required int? expectedRevision,
+  }) async {
+    final key = _supplierKey;
+    if (key == null || key != scope || !workspaceSuppliersLoaded ||
+        workspaceSupplierSaving || _supplierLoads.containsKey(key)) { return false; }
+    // Recover an uncertain write before deciding whether the same contact needs
+    // saving. The caller retains the original id/content on a retry.
+    if (_supplierNeedsReload.contains(key) &&
+        !await loadWorkspaceSuppliers(retry: true)) { return false; }
+    if (_supplierKey != key || workspaceSupplierSaving || _supplierLoads.containsKey(key)) { return false; }
+    final old = _supplierDirectories[key];
+    final profiles = old?.profiles ?? const <WorkspaceSupplierProfile>[];
+    final existing = profiles.where((p) => p.id == profile.id).singleOrNull;
+    if (existing != null && jsonEncode(existing.toJson()) == jsonEncode(profile.toJson())) {
+      dismissWorkspacePurchaseValidation(key);
+      return true;
+    }
+    bool reject(String message) {
+      _supplierValidationErrors[key] = message;
+      notifyListeners();
+      return false;
+    }
+    if (old?.revision != expectedRevision) {
+      return reject('Supplier records changed. Reopen the supplier list before saving again.');
+    }
+    if (profile.validationError case final error?) return reject(error);
+    final duplicate = profiles.where((p) => p.id != profile.id &&
+      ((profile.phone.isNotEmpty && p.phone == profile.phone) ||
+       (profile.gstin.isNotEmpty && p.gstin == profile.gstin))).firstOrNull;
+    if (duplicate != null) return reject('These details already belong to ${duplicate.name}. Select the existing supplier.');
+    if (existing != null && (existing.createdAt != profile.createdAt ||
+        profile.updatedAt.isBefore(existing.updatedAt))) {
+      return reject('Supplier details changed. Reopen the supplier before editing again.');
+    }
+    final saved = WorkspacePurchaseEntryBook(account: key.$1, store: key.$2, qa: key.$3,
+      revision: (old?.revision ?? 0) + 1,
+      profiles: [...profiles.where((p) => p.id != profile.id), profile],
+      draft: old?.draft, copies: old?.copies ?? const [],
+      openingRecords: old?.openingRecords ?? const [],
+      goodsReceiptDrafts: old?.goodsReceiptDrafts ?? const [],
+      goodsReceiptCancellations: old?.goodsReceiptCancellations ?? const [],
+      billGoodsReviews: old?.billGoodsReviews ?? const [],
+      billGoodsCancellations: old?.billGoodsCancellations ?? const [],
+      restockGoodsAttempts: old?.restockGoodsAttempts ?? const []);
+    _supplierWrites.add(key);
+    _supplierErrors.remove(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    try {
+      await _supplierStorage.save(saved, expectedRevision: old?.revision);
+      if (_supplierKey != key) { _supplierNeedsReload.add(key); return false; }
+      _supplierDirectories[key] = saved;
+      return true;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (_supplierKey == key) {
+        _supplierErrors[key] = 'Supplier save could not be confirmed. Check again; your entries are kept.';
+      }
+      return false;
+    } finally {
+      _supplierWrites.remove(key);
+      if (_supplierKey == key) notifyListeners();
+    }
+  }
   Future<bool> saveWorkspacePurchaseEntry(WorkspaceSupplierProfile profile, {
     required (String, String, bool) scope, required WorkspacePurchaseEntryDraft draft,
     required int? expectedRevision,
@@ -2617,7 +2687,8 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<bool> _saveServerGoodsReceiptReview(WorkspaceSupplierGoodsReceipt receipt, {required String supplierId,
-    required (String, String, bool) scope, required int expectedRevision}) async {
+    required (String, String, bool) scope, required int expectedRevision,
+    List<WorkspacePurchaseInvoiceAttachment> documents = const []}) async {
     if (_supplierKey != scope || !workspaceServerReceivingFor(receipt.restockOriginal) || workspaceSupplierSaving ||
         workspaceGoodsReceiptBusy || _supplierStorage is! WorkPurchaseGoodsReceiptReviewGuard) { return false; }
     final source = receipt.restockOriginal!, data = _storeData, key = scope, reader = originalPurchaseReader!,
@@ -2637,7 +2708,8 @@ class WorkSession extends ChangeNotifier {
       final previous = old.goodsReceiptDrafts.where((r) => r.receipt.id == receipt.id).singleOrNull;
       if (previous != null) {
         return !old.goodsReceiptCancellations.any((c) => c.receiptId == receipt.id) &&
-          previous.supplierId == supplierId && jsonEncode(previous.receipt.toJson()) == jsonEncode(receipt.toJson());
+          previous.supplierId == supplierId && jsonEncode(previous.receipt.toJson()) == jsonEncode(receipt.toJson()) &&
+          jsonEncode(previous.documents.map((a) => a.toJson()).toList()) == jsonEncode(documents.map((a) => a.toJson()).toList());
       }
       if (old.revision != expectedRevision || old.goodsReceiptDrafts.length >= 1000 || data.inventoryRestockRecoveryPending) return false;
       final group = read.group;
@@ -2645,7 +2717,7 @@ class WorkSession extends ChangeNotifier {
         final total = group.lines.where((total) => total.sourceLineId == line.sourceLineId).singleOrNull;
         return total != null && (total.mappingIdentity != line.mappingIdentity || total.deliveredMilli + line.deliveredMilli > line.expectedMilli!);
       }))) { return false; }
-      final review = WorkspaceSupplierGoodsReceiptDraft(supplierId: supplierId, revision: old.revision + 1, receipt: receipt);
+      final review = WorkspaceSupplierGoodsReceiptDraft(supplierId: supplierId, revision: old.revision + 1, receipt: receipt, documents: documents);
       final next = WorkspacePurchaseEntryBook.fromJson({...old.toJson(), 'revision': old.revision + 1,
         'goodsReceiptDrafts': [...old.goodsReceiptDrafts, review].map((r) => r.toJson()).toList()});
       final signature = _restockInventorySignature(data, key), stockRevision = data.inventoryRevision;
@@ -3574,9 +3646,14 @@ class WorkSession extends ChangeNotifier {
   Future<bool> saveWorkspaceGoodsReceiptDraft(WorkspaceSupplierGoodsReceipt receipt, {
     required String supplierId, required (String, String, bool) scope,
     required int expectedRevision,
+    List<WorkspacePurchaseInvoiceAttachment> documents = const [],
   }) async {
+    documents = List.unmodifiable(documents);
+    if (!WorkspaceSupplierGoodsReceiptDraft.validDocuments(documents) || documents.any((a) =>
+        a.owner != WorkspaceSupplierGoodsReceiptDraft.documentOwner(scope, supplierId, receipt.id))) { return false; }
     if (workspaceGoodsReceiptUsesServer(receipt)) {
-      return _saveServerGoodsReceiptReview(receipt, supplierId: supplierId, scope: scope, expectedRevision: expectedRevision);
+      return _saveServerGoodsReceiptReview(receipt, supplierId: supplierId, scope: scope,
+        expectedRevision: expectedRevision, documents: documents);
     }
     final key = _supplierKey;
     final old = _supplierDirectories[key];
@@ -3592,7 +3669,8 @@ class WorkSession extends ChangeNotifier {
         return false;
       }
       return previous.supplierId == supplierId &&
-          jsonEncode(previous.receipt.toJson()) == jsonEncode(receipt.toJson());
+          jsonEncode(previous.receipt.toJson()) == jsonEncode(receipt.toJson()) &&
+          jsonEncode(previous.documents.map((a) => a.toJson()).toList()) == jsonEncode(documents.map((a) => a.toJson()).toList());
     }
     if (old.revision != expectedRevision || old.goodsReceiptDrafts.length >= 1000) {
       _supplierValidationErrors[key] = 'Receiving reviews changed or storage is full. Recover saved Purchases; do not clear records.';
@@ -3600,7 +3678,7 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     final review = WorkspaceSupplierGoodsReceiptDraft(supplierId: supplierId,
-      revision: old.revision + 1, receipt: receipt);
+      revision: old.revision + 1, receipt: receipt, documents: documents);
     final next = WorkspacePurchaseEntryBook.fromJson(WorkspacePurchaseEntryBook(
       account: old.account, store: old.store, qa: old.qa, revision: old.revision + 1,
       profiles: old.profiles, draft: old.draft, copies: old.copies,
@@ -13512,7 +13590,7 @@ class WorkSession extends ChangeNotifier {
   bool _validOfferDraftFields(Map fields, String storeId) {
     if (fields.entries.any((e) => !_offerDraftFields.contains(e.key) ||
         e.value is! String || (e.value as String).length >
-          (e.key == _couponCampaignField ? 65536 : 4000))) { return false; }
+          (e.key == _couponCampaignField ? 2097152 : 4000))) { return false; }
     try {
       decodeStoreCouponCampaigns(fields[_couponCampaignField] as String?, storeId);
       return true;

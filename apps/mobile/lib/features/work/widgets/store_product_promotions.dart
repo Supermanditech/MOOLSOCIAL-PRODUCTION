@@ -1,27 +1,88 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../../ui_v2/universal/mool_global_navigation_v2.dart' show moolAndroidExportedSemanticsClearance;
 import '../work_catalogue_gateway.dart';
 import '../work_models.dart';
 import '../work_product_promotions.dart';
 import '../work_session.dart';
 import '../../buy/buy_v2_content_contracts.dart' show BuyV2AdvertisedBenefitTerms;
+import '../../buy/buy_v2_models.dart' show BuyV2StoreOfferTerms, BuyV2StoreOfferSku, BuyV2StoreOfferTier, BuyV2StoreOfferKind;
+
+InputDecoration _couponDecoration(BuildContext context, String label, {String? hint}) {
+  final colors = Theme.of(context).colorScheme;
+  OutlineInputBorder border(Color color) => OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: color));
+  return InputDecoration(labelText: label, hintText: hint, isDense: true,
+    floatingLabelBehavior: FloatingLabelBehavior.always,
+    labelStyle: const TextStyle(fontSize: 12), floatingLabelStyle: const TextStyle(fontSize: 12),
+    errorStyle: const TextStyle(fontSize: 11), constraints: const BoxConstraints(minHeight: 48),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    border: border(colors.outlineVariant), enabledBorder: border(colors.outlineVariant), focusedBorder: border(colors.primary));
+}
+ButtonStyle _couponActionStyle(BuildContext context) => OutlinedButton.styleFrom(minimumSize: const Size(0, 48),
+  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+  textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 14, fontWeight: FontWeight.w600));
+Widget _couponPair(BuildContext context, Widget first, Widget second, {double minimumWidth = 300}) =>
+  LayoutBuilder(builder: (context, constraints) => constraints.maxWidth >= minimumWidth && MediaQuery.textScalerOf(context).scale(14) <= 18
+    ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: first), const SizedBox(width: 8), Expanded(child: second)])
+    : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [first, const SizedBox(height: 8), second]));
+
+Future<void> showStoreCouponsManager(BuildContext context, {required WorkSession session,
+    required Listenable scopeOwner, required bool Function() isCurrent}) =>
+  showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true,
+    showDragHandle: false, builder: (context) => AnimatedBuilder(animation: scopeOwner,
+      builder: (context, _) => SizedBox(height: MediaQuery.sizeOf(context).height * .94,
+        child: Scaffold(appBar: AppBar(automaticallyImplyLeading: false, toolbarHeight: 48,
+          title: const Text('Coupons', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          actions: [IconButton(tooltip: 'Close coupons', onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close))]),
+          body: !isCurrent() ? const Center(child: Text('Your Store session changed. Close and reopen Coupons.'))
+            : ListView(padding: const EdgeInsets.all(12), children: [StoreCouponCampaignPanel(
+                session: session, scopeOwner: scopeOwner, isCurrent: isCurrent, showHeading: false)])))));
+
+Widget _couponReviewUnavailable(StoreCouponCampaign campaign, bool Function() current, Listenable owner) =>
+  AnimatedBuilder(animation: owner, builder: (context, _) => ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
+    child: SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+        Row(children: [const Expanded(child: Text('Review coupon', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18))),
+          IconButton(tooltip: 'Close coupon review', onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close))]),
+        if (!current()) const Text('Your Store or saved offer changed. Close and reopen this review.')
+        else ...[
+          Text(campaign.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(_couponSaving(campaign)),
+          if (campaign.structuredTerms case final terms?)
+            for (final line in terms.conditions) Padding(padding: const EdgeInsets.only(top: 6), child: Text(line))
+          else Text('Minimum Store bill ₹${_couponAmount(campaign.minimumSpendMinor)}'),
+          _couponValidityAndLimits(context, StoreCouponInput.fromCampaign(campaign, active: true)),
+          const SizedBox(height: 12),
+          const Text('Private draft · Public status unavailable. Publishing is not connected for these terms.'),
+          const SizedBox(height: 12),
+          const FilledButton(onPressed: null, child: Text('Publish')),
+        ],
+      ]))));
 
 /// Named, reusable Store-wide coupon drafts. Public activation is deliberately
 /// not inferred from a device save or from an existing product advertisement.
 class StoreCouponCampaignPanel extends StatefulWidget {
-  const StoreCouponCampaignPanel({required this.session, super.key});
+  const StoreCouponCampaignPanel({required this.session, this.scopeOwner, this.isCurrent, this.showHeading = true, super.key});
   final WorkSession session;
+  final Listenable? scopeOwner;
+  final bool Function()? isCurrent;
+  final bool showHeading;
   @override State<StoreCouponCampaignPanel> createState() => _StoreCouponCampaignPanelState();
 }
 
 class _StoreCouponCampaignPanelState extends State<StoreCouponCampaignPanel> {
+  final _search = TextEditingController();
   late final String? _storeId;
   late final int? _epoch;
   late final Map<String, String> _original;
   bool _loading = true, _ready = false;
+  @override void dispose() { _search.dispose(); super.dispose(); }
+  late final Listenable _owner = Listenable.merge([widget.session, if (widget.scopeOwner != null) widget.scopeOwner!]);
   bool get _current => mounted && _epoch != null && widget.session.activeWorkspace?.id == _storeId &&
       widget.session.navigationScopeRevision == _epoch &&
+      (widget.isCurrent?.call() ?? true) &&
       identical(widget.session.workspaceOfferDraft, _original);
   @override void initState() {
     super.initState();
@@ -40,22 +101,25 @@ class _StoreCouponCampaignPanelState extends State<StoreCouponCampaignPanel> {
     if (!_current || !_ready || widget.session.workspaceOfferDraftSaving) return;
     await showModalBottomSheet<void>(context: context, isScrollControlled: true,
       isDismissible: false, enableDrag: false,
-      useSafeArea: true, builder: (_) => FractionallySizedBox(heightFactor: .94,
+      useSafeArea: true, showDragHandle: false, builder: (_) => AnimatedBuilder(animation: _owner, builder: (context, _) => FractionallySizedBox(heightFactor: 1,
         child: _StoreCouponEditor(session: widget.session, storeId: _storeId!,
-          campaign: campaign, current: () => _current)));
+          campaign: campaign, owner: _owner, current: () => _current))));
     if (_current) setState(() {});
   }
   Future<void> _publication(StoreCouponCampaign campaign) async {
     final controller = widget.session.workspaceStoreCoupons;
-    if (!_current || !_ready || controller == null) return;
+    if (!_current || !_ready) return;
     bool current() => _current && widget.session.workspaceStoreCouponCampaigns.any((saved) =>
       saved.id == campaign.id && saved.revision == campaign.revision &&
       StoreCouponInput.fromCampaign(saved, active: true).fingerprint == StoreCouponInput.fromCampaign(campaign, active: true).fingerprint);
+    final supported = controller != null && controller.supports(StoreCouponInput.fromCampaign(campaign, active: true));
     await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true,
-      builder: (_) => _StoreCouponPublicationSheet(controller: controller, campaign: campaign, current: current));
+      builder: (_) => AnimatedBuilder(animation: _owner, builder: (context, _) => supported
+        ? _StoreCouponPublicationSheet(controller: controller, campaign: campaign, current: current)
+        : _couponReviewUnavailable(campaign, current, _owner)));
   }
   @override Widget build(BuildContext context) => AnimatedBuilder(
-    animation: widget.session, builder: (context, _) {
+    animation: _owner, builder: (context, _) {
       if (!_current) return const Text('Reopen Store offers to continue.');
       if (_loading) { return const LinearProgressIndicator(); }
       if (!_ready) { return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -69,38 +133,36 @@ class _StoreCouponCampaignPanelState extends State<StoreCouponCampaignPanel> {
         ]);
       }
       final campaigns = widget.session.workspaceStoreCouponCampaigns;
+      final query = _search.text.trim().toLowerCase();
+      final visible = campaigns.where((campaign) => query.isEmpty ||
+        '${campaign.name} ${campaign.structuredTerms?.kind.label ?? ''} ${campaign.structuredTerms?.scopeLabel ?? ''} '
+        '${campaign.structuredTerms?.skus.map((sku) => '${sku.title} ${sku.skuId}').join(' ') ?? ''}'
+          .toLowerCase().contains(query)).toList();
       final publisher = widget.session.workspaceStoreCoupons;
       return Column(key: const Key('work-store-coupons'),
         crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: const LinearGradient(colors: [Color(0xff123d4a), Color(0xff256b78)])),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Row(children: [Icon(Icons.local_offer_outlined, color: Colors.white),
-                SizedBox(width: 9), Expanded(child: Text('Store coupons',
-                  style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w700)))]),
-              const SizedBox(height: 8),
-              const Text('One campaign. All eligible products in your Store.',
-                style: TextStyle(color: Colors.white, height: 1.4)),
-              const SizedBox(height: 12),
-              FilledButton.icon(key: const Key('work-coupon-create'),
-                onPressed: widget.session.workspaceOfferDraftSaving ? null : () => _edit(),
-                icon: const Icon(Icons.add), label: const Text('Create Store coupon')),
-            ])),
-          const SizedBox(height: 10),
-          Text(publisher == null
-            ? 'Save once, reopen and edit anytime. Drafts stay private on this device; public publishing is not connected yet.'
-            : 'Save drafts here. Check and publish each campaign separately; saving a draft does not update its public version.',
+          _couponPair(context, Text(widget.showHeading ? 'Store coupons' : '${campaigns.length} saved',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          FilledButton.icon(key: const Key('work-coupon-create'), style: _couponActionStyle(context),
+            onPressed: widget.session.workspaceOfferDraftSaving ? null : () => _edit(),
+            icon: const Icon(Icons.add, size: 18), label: const Text('New coupon'))),
+          const SizedBox(height: 6),
+          Text(publisher == null ? 'Private drafts · Publishing unavailable.' : 'Save your draft, then review publishing.',
             style: const TextStyle(fontSize: 12, height: 1.4, color: Color(0xff566572))),
-          for (final campaign in campaigns) ListTile(
-            key: ValueKey('work-coupon-${campaign.id}'), contentPadding: EdgeInsets.zero,
+          if (campaigns.length > 4) TextField(controller: _search, onChanged: (_) => setState(() {}),
+            style: const TextStyle(fontSize: 14), decoration: _couponDecoration(context, 'Search coupons', hint: 'Name or selected product')
+              .copyWith(prefixIcon: const Icon(Icons.search, size: 20))),
+          if (campaigns.isNotEmpty && visible.isEmpty) const Text('No matching coupons.'),
+          for (final campaign in visible) ListTile(
+            key: ValueKey('work-coupon-${campaign.id}'), contentPadding: EdgeInsets.zero, dense: true,
             leading: const Icon(Icons.confirmation_number_outlined, color: Color(0xff256b78)),
-            title: Text(campaign.name),
-            subtitle: Text('${_couponSaving(campaign)} · Store-wide\n${publisher == null ? 'Saved draft · not published' : 'Saved draft · check public version separately'}'),
+            title: Text(campaign.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            subtitle: Text('${campaign.structuredTerms?.kind.label ?? 'Bill discount'} · ${_couponSaving(campaign)}\n${campaign.structuredTerms?.scopeLabel ?? 'Store-wide'} · Draft',
+              style: const TextStyle(fontSize: 11)),
             isThreeLine: true,
-            onTap: publisher == null ? null : () => _publication(campaign),
+            onTap: () => _publication(campaign),
             trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-              if (publisher != null) IconButton(tooltip: 'Manage publishing for ${campaign.name}',
+              IconButton(tooltip: 'Manage publishing for ${campaign.name}',
                 onPressed: () => _publication(campaign), icon: const Icon(Icons.cloud_upload_outlined)),
               IconButton(tooltip: 'Edit ${campaign.name}',
               onPressed: widget.session.workspaceOfferDraftSaving ? null : () => _edit(campaign),
@@ -153,8 +215,10 @@ class _StoreCouponPublicationSheetState extends State<_StoreCouponPublicationShe
             IconButton(tooltip: 'Close coupon publishing', onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close))]),
           const SizedBox(height: 12),
           Text(widget.campaign.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 6), Text('${_couponSaving(widget.campaign)} · Store-wide'),
-          Text('Minimum Store bill ₹${_couponAmount(widget.campaign.minimumSpendMinor)}'),
+          const SizedBox(height: 6), Text(_couponSaving(widget.campaign)),
+          if (widget.campaign.structuredTerms case final terms?)
+            for (final line in terms.conditions) Text(line)
+          else Text('Minimum Store bill ₹${_couponAmount(widget.campaign.minimumSpendMinor)}'),
           _couponValidityAndLimits(context, StoreCouponInput.fromCampaign(widget.campaign, active: true)),
           const SizedBox(height: 8),
           const Text('One coupon saving applies to this Store’s eligible basket, not separately to every product. Other Stores are unaffected.'),
@@ -166,7 +230,10 @@ class _StoreCouponPublicationSheetState extends State<_StoreCouponPublicationShe
             const SizedBox(height: 8),
             Text('Original coupon: ${_controller.pending!.input.name}'),
             Text('Original action: ${_controller.pending!.input.active ? 'Publish / update' : 'Pause'}'),
-            Text('Exact original terms: ${_controller.pending!.input.toJson()['percentage'] == true
+            if (_controller.pending!.input.structured) ...[
+              Text('Original offer: ${BuyV2StoreOfferTerms.fromJson(_controller.pending!.input.toJson()['structuredTerms']).savingLabel}'),
+              for (final line in BuyV2StoreOfferTerms.fromJson(_controller.pending!.input.toJson()['structuredTerms']).conditions) Text(line),
+            ] else Text('Exact original terms: ${_controller.pending!.input.toJson()['percentage'] == true
               ? '${_couponAmount(_controller.pending!.input.toJson()['discount'] as int)}% off'
               : '₹${_couponAmount(_controller.pending!.input.toJson()['discount'] as int)} off'} · '
               'minimum ₹${_couponAmount(_controller.pending!.input.toJson()['minimumSpendMinor'] as int)} · '
@@ -213,25 +280,47 @@ Widget _couponValidityAndLimits(BuildContext context, StoreCouponInput input) {
 }
 
 String _couponAmount(int minor) => (minor / 100).toStringAsFixed(minor % 100 == 0 ? 0 : 2);
-String _couponSaving(StoreCouponCampaign campaign) => campaign.percentage
+String _couponSaving(StoreCouponCampaign campaign) => campaign.structuredTerms?.savingLabel ?? (campaign.percentage
     ? '${_couponAmount(campaign.discount)}% off · up to ₹${_couponAmount(campaign.maximumSavingMinor)}'
-    : '₹${_couponAmount(campaign.discount)} off';
+    : '₹${_couponAmount(campaign.discount)} off');
 
 class _StoreCouponEditor extends StatefulWidget {
   const _StoreCouponEditor({required this.session, required this.storeId,
-    required this.current, this.campaign});
+    required this.current, required this.owner, this.campaign});
   final WorkSession session;
   final String storeId;
   final bool Function() current;
+  final Listenable owner;
   final StoreCouponCampaign? campaign;
   @override State<_StoreCouponEditor> createState() => _StoreCouponEditorState();
 }
 
 class _StoreCouponEditorState extends State<_StoreCouponEditor> {
   final _form = GlobalKey<FormState>();
+  final _nameFocus = FocusNode();
+  List<String> get _nameExamples => ['Diwali offer', 'Holi offer', switch (_kind) {
+    BuyV2StoreOfferKind.quantityPrice => 'Bulk savings',
+    BuyV2StoreOfferKind.nextPurchase => 'Shop again offer',
+    BuyV2StoreOfferKind.buyerDiscount => 'Preferred buyer offer',
+    BuyV2StoreOfferKind.dealerIntro => 'Dealer welcome',
+    BuyV2StoreOfferKind.extraQuantity => 'Extra quantity offer',
+    BuyV2StoreOfferKind.productDiscount => 'Product savings',
+    BuyV2StoreOfferKind.billDiscount => 'Store savings',
+  }];
   final _name = TextEditingController(), _discount = TextEditingController(),
     _minimum = TextEditingController(), _maximum = TextEditingController(),
     _total = TextEditingController(), _perCustomer = TextEditingController();
+  final _buyQuantity = TextEditingController(), _rewardQuantity = TextEditingController(),
+    _nextDays = TextEditingController(text: '30');
+  BuyV2StoreOfferKind _kind = BuyV2StoreOfferKind.billDiscount;
+  bool _structuredEditing = false, _allProducts = true;
+  final _skuIds = <String>{}, _buyerIds = <String>{};
+  final _retainedSkus = <String, BuyV2StoreOfferSku>{};
+  final _channels = <String>{'retail', 'wholesale', 'bulk'};
+  List<BuyV2StoreOfferTier> _tiers = const [];
+  BuyV2StoreOfferSku? _retainedReward;
+  String? _rewardId;
+  bool get _money => _kind != BuyV2StoreOfferKind.quantityPrice && _kind != BuyV2StoreOfferKind.extraQuantity;
   late final String _id = widget.campaign?.id ??
       'coupon-${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 30)}';
   bool _percentage = false, _saving = false, _dirty = false;
@@ -249,16 +338,159 @@ class _StoreCouponEditorState extends State<_StoreCouponEditor> {
       _maximum.text = _couponAmount(c.maximumSavingMinor);
       _total.text = '${c.totalUses}'; _perCustomer.text = '${c.usesPerCustomer}';
       _from = c.startsAt.toLocal(); _until = c.endsAt.toLocal();
+      if (c.structuredTerms case final terms?) {
+        _structuredEditing = true; _kind = terms.kind; _allProducts = terms.skus.isEmpty;
+        _skuIds.addAll(terms.skus.map((sku) => sku.skuId));
+        _retainedSkus.addEntries(terms.skus.map((sku) => MapEntry(sku.skuId, sku)));
+        _channels..clear()..addAll(terms.channels); _buyerIds.addAll(c.buyerReferences);
+        _tiers = terms.tiers; _retainedReward = terms.rewardSku; _rewardId = terms.rewardSku?.skuId;
+        _buyQuantity.text = terms.buyQuantity?.toString() ?? '';
+        _rewardQuantity.text = terms.rewardQuantity?.toString() ?? '';
+        _nextDays.text = '${terms.nextPurchaseDays ?? 30}';
+        if (!terms.hasMonetaryDiscount) { _discount.clear(); _maximum.clear(); }
+      }
+    } else {
+      _minimum.text = '0'; _total.text = '100'; _perCustomer.text = '1';
     }
   }
   @override void dispose() {
-    for (final c in [_name, _discount, _minimum, _maximum, _total, _perCustomer]) { c.dispose(); }
+    _nameFocus.dispose();
+    for (final c in [_name, _discount, _minimum, _maximum, _total, _perCustomer,
+      _buyQuantity, _rewardQuantity, _nextDays]) { c.dispose(); }
     super.dispose();
   }
   int? _exact(String raw) {
     if (!RegExp(r'^\d{1,11}(\.\d{1,2})?$').hasMatch(raw.trim())) return null;
     final parts = raw.trim().split('.');
     return int.parse(parts[0]) * 100 + (parts.length == 2 ? int.parse(parts[1].padRight(2, '0')) : 0);
+  }
+  BuyV2StoreOfferSku _sku(String id) {
+    final rows = widget.session.workspaceCatalogueItems.where((item) => item.id == id);
+    if (rows.length != 1) throw const FormatException('A selected product is unavailable. Review the product selection.');
+    final item = rows.single, retained = _retainedSkus[id] ?? (_retainedReward?.skuId == id ? _retainedReward : null);
+    if (retained != null && retained.sellUnit != item.pack) {
+      throw const FormatException('Selling unit changed. Re-select the product and review quantities and prices.');
+    }
+    return BuyV2StoreOfferSku(storeId: widget.storeId, skuId: item.id,
+      title: item.variant.isEmpty ? item.title : '${item.title} · ${item.variant}', sellUnit: item.pack,
+      listings: retained?.sellUnit == item.pack ? retained!.listings : const []);
+  }
+  Future<Set<String>?> _chooseReferences({required String title,
+      required List<({String id, String name, String detail, bool available})> rows,
+      required Set<String> initial, bool single = false}) async {
+    var query = ''; final selected = Set<String>.of(initial);
+    return showModalBottomSheet<Set<String>>(context: context, isScrollControlled: true, useSafeArea: true, showDragHandle: false,
+      builder: (context) => StatefulBuilder(builder: (context, update) => AnimatedBuilder(animation: widget.owner,
+        builder: (context, _) => SizedBox(height: MediaQuery.sizeOf(context).height * .9,
+          child: Padding(padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom +
+            (defaultTargetPlatform == TargetPlatform.android && View.of(context).viewInsets.bottom == 0
+              ? max(36.0, moolAndroidExportedSemanticsClearance(
+                  viewPadding: EdgeInsets.fromViewPadding(View.of(context).viewPadding, View.of(context).devicePixelRatio),
+                  platform: defaultTargetPlatform)) : 0)),
+            child: SafeArea(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [const SizedBox(width: 12), Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700))),
+                IconButton(tooltip: 'Close selection', onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close))]),
+              if (!widget.current()) const Expanded(child: Center(child: Text('Your Store session changed. Reopen this selection.')))
+              else ...[
+                Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: TextField(
+                  key: const Key('work-coupon-reference-search'), style: const TextStyle(fontSize: 14),
+                  decoration: _couponDecoration(context, 'Search', hint: title == 'Eligible buyers' ? 'Buyer name or phone' : 'Product name or SKU')
+                    .copyWith(prefixIcon: const Icon(Icons.search, size: 20)),
+                  onChanged: (value) => update(() => query = value.trim().toLowerCase()))),
+                Expanded(child: Builder(builder: (context) {
+                  final visible = rows.where((row) => '${row.name} ${row.detail} ${row.id}'.toLowerCase().contains(query)).toList();
+                  if (visible.isEmpty) return const Center(child: Text('No matching records.'));
+                  return ListView.builder(itemCount: visible.length, itemBuilder: (context, index) {
+                    final row = visible[index];
+                    return CheckboxListTile(value: selected.contains(row.id), controlAffinity: ListTileControlAffinity.leading,
+                      dense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                      title: Text(row.name, style: const TextStyle(fontSize: 14)),
+                      subtitle: Text(row.available ? row.detail : 'Saved selection unavailable · tap to remove', style: const TextStyle(fontSize: 12)),
+                      onChanged: !widget.current() || !row.available && !selected.contains(row.id) ? null : (checked) => update(() {
+                        if (checked == true) { if (single) selected.clear(); selected.add(row.id); }
+                        else { selected.remove(row.id); }
+                      }));
+                  });
+                })),
+                Padding(padding: const EdgeInsets.all(12), child: FilledButton(style: _couponActionStyle(context),
+                  onPressed: () { if (widget.current()) Navigator.pop(context, selected); }, child: const Text('Use selection'))),
+              ],
+            ])))))));
+  }
+  Future<void> _pickProducts({bool reward = false}) async {
+    final items = widget.session.workspaceCatalogueItems;
+    final currentIds = items.map((item) => item.id).toSet();
+    final retained = {..._retainedSkus, if (_retainedReward != null) _retainedReward!.skuId: _retainedReward!};
+    final rows = <({String id, String name, String detail, bool available})>[
+      for (final item in items) (id: item.id, name: item.title, detail: '${item.pack} · ${item.sku}', available: true),
+      for (final entry in retained.entries) if (!currentIds.contains(entry.key))
+        (id: entry.key, name: entry.value.title, detail: entry.value.sellUnit, available: false),
+    ];
+    final result = await _chooseReferences(title: reward ? 'Additional product' : 'Eligible products', rows: rows,
+      initial: reward ? {if (_rewardId != null) _rewardId!} : _skuIds,
+      single: reward || !_money);
+    if (!mounted || !widget.current() || result == null) return;
+    setState(() { _dirty = true; _structuredEditing = true;
+      BuyV2StoreOfferSku? selectedRef(String id) {
+        final item = items.where((item) => item.id == id).firstOrNull;
+        if (item == null) return null;
+        final old = retained[id];
+        return BuyV2StoreOfferSku(storeId: widget.storeId, skuId: id,
+          title: item.variant.isEmpty ? item.title : '${item.title} · ${item.variant}', sellUnit: item.pack,
+          listings: old?.sellUnit == item.pack ? old!.listings : const []);
+      }
+      if (reward) {
+        final next = result.firstOrNull, nextRef = next == null ? null : selectedRef(next);
+        if (next != _rewardId || nextRef?.sellUnit != _retainedReward?.sellUnit) _rewardQuantity.clear();
+        _rewardId = next; _retainedReward = nextRef;
+      } else {
+        final changed = !setEquals(result, _skuIds) || result.any((id) =>
+          retained[id] != null && selectedRef(id)?.sellUnit != retained[id]!.sellUnit);
+        if (!_money && changed) { _tiers = const []; _buyQuantity.clear(); _rewardQuantity.clear(); }
+        for (final id in result) { final value = selectedRef(id); if (value != null) _retainedSkus[id] = value; }
+        _skuIds..clear()..addAll(result); _allProducts = false;
+      }
+    });
+  }
+  Future<void> _pickBuyers() async {
+    final buyers = widget.session.workspaceCustomerBook;
+    final ids = buyers.map((buyer) => buyer.id).toSet();
+    final rows = <({String id, String name, String detail, bool available})>[
+      for (final buyer in buyers) (id: buyer.id, name: buyer.name, detail: buyer.mobile, available: true),
+      for (final id in _buyerIds) if (!ids.contains(id)) (id: id, name: 'Unavailable saved buyer', detail: id, available: false),
+    ];
+    final result = await _chooseReferences(title: 'Eligible buyers', rows: rows, initial: _buyerIds);
+    if (!mounted || !widget.current() || result == null) return;
+    setState(() { _buyerIds..clear()..addAll(result); _dirty = true; _structuredEditing = true; });
+  }
+  Future<void> _editTiers() async {
+    final unit = _skuIds.length == 1 ? widget.session.workspaceCatalogueItems
+      .where((item) => item.id == _skuIds.single).firstOrNull?.pack : null;
+    if (unit == null) { setState(() => _error = 'Select one selling SKU before adding price slabs.'); return; }
+    final result = await showModalBottomSheet<List<BuyV2StoreOfferTier>>(context: context,
+      isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false, showDragHandle: false,
+      builder: (_) => _StoreOfferTierEditor(initial: _tiers, sellUnit: unit, owner: widget.owner, current: widget.current));
+    if (!mounted || !widget.current() || result == null) return;
+    setState(() { _tiers = result; _dirty = true; _structuredEditing = true; });
+  }
+  BuyV2StoreOfferTerms _terms() {
+    if (_channels.isEmpty) throw const FormatException('Choose at least one selling mode.');
+    if (!_allProducts && _skuIds.isEmpty) throw const FormatException('Select the eligible products.');
+    if (_kind == BuyV2StoreOfferKind.buyerDiscount) {
+      final ids = widget.session.workspaceCustomerBook.map((buyer) => buyer.id).toSet();
+      if (_buyerIds.isEmpty || !_buyerIds.every(ids.contains)) throw const FormatException('Review the selected buyers.');
+    }
+    return BuyV2StoreOfferTerms(storeId: widget.storeId, kind: _kind,
+      skus: _allProducts ? const [] : _skuIds.map(_sku), channels: _channels,
+      discountKind: _money ? _percentage ? 'percentage' : 'flat' : null,
+      discountValue: _money ? _exact(_discount.text) : null,
+      minimumSpendMinor: _exact(_minimum.text) ?? 0,
+      maximumSavingMinor: _money ? _percentage ? _exact(_maximum.text) : _exact(_discount.text) : null,
+      tiers: _kind == BuyV2StoreOfferKind.quantityPrice ? _tiers : const [],
+      buyQuantity: _kind == BuyV2StoreOfferKind.extraQuantity ? int.tryParse(_buyQuantity.text) : null,
+      rewardSku: _kind == BuyV2StoreOfferKind.extraQuantity && _rewardId != null ? _sku(_rewardId!) : null,
+      rewardQuantity: _kind == BuyV2StoreOfferKind.extraQuantity ? int.tryParse(_rewardQuantity.text) : null,
+      nextPurchaseDays: _kind == BuyV2StoreOfferKind.nextPurchase ? int.tryParse(_nextDays.text) : null);
   }
   Future<void> _date(bool start) async {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -269,9 +501,18 @@ class _StoreCouponEditorState extends State<_StoreCouponEditor> {
       firstDate: DateTime(now.year - 5), lastDate: DateTime(now.year + 5),
       initialDate: value ?? now);
     if (!mounted || !widget.current() || selected == null) return;
+    DateTime? exact;
+    if (_kind == BuyV2StoreOfferKind.quantityPrice) {
+      final time = await showTimePicker(context: context,
+        initialTime: value == null ? TimeOfDay(hour: start ? 0 : 23, minute: start ? 0 : 59)
+          : TimeOfDay.fromDateTime(value));
+      if (!mounted || !widget.current() || time == null) return;
+      exact = DateTime(selected.year, selected.month, selected.day, time.hour, time.minute);
+    }
     setState(() {
       // End date is inclusive in the owner's local time, including after reopen.
-      if (start) { _from = selected; }
+      if (exact != null) { if (start) { _from = exact; } else { _until = exact; } }
+      else if (start) { _from = selected; }
       else { _until = DateTime(selected.year, selected.month, selected.day + 1)
         .subtract(const Duration(milliseconds: 1)); }
       _dirty = true;
@@ -294,18 +535,26 @@ class _StoreCouponEditorState extends State<_StoreCouponEditor> {
         _error = 'The saved version could not be checked. Your entries are kept; no new save was sent.'; }); }
       return;
     }
+    final problem = _inputProblem;
+    if (problem != null) {
+      _form.currentState!.validate();
+      setState(() => _error = problem); return;
+    }
     if (!_form.currentState!.validate()) return;
     if (_from == null || _until == null || !_until!.isAfter(_from!)) {
       setState(() => _error = 'Choose a start and end date in order.'); return;
     }
-    final discount = _exact(_discount.text)!;
     StoreCouponCampaign campaign;
     try {
-      campaign = StoreCouponCampaign(id: _id, storeId: widget.storeId,
+      campaign = _structuredEditing ? StoreCouponCampaign.offer(id: _id, storeId: widget.storeId,
+        revision: (widget.campaign?.revision ?? 0) + 1, name: _name.text.trim(), structuredTerms: _terms(),
+        buyerReferences: _kind == BuyV2StoreOfferKind.buyerDiscount ? _buyerIds : const [],
+        startsAt: _from!, endsAt: _until!, totalUses: int.parse(_total.text.trim()),
+        usesPerCustomer: int.parse(_perCustomer.text.trim())) : StoreCouponCampaign(id: _id, storeId: widget.storeId,
         revision: (widget.campaign?.revision ?? 0) + 1, name: _name.text.trim(),
-        percentage: _percentage, discount: discount,
+        percentage: _percentage, discount: _exact(_discount.text)!,
         minimumSpendMinor: _exact(_minimum.text)!,
-        maximumSavingMinor: _percentage ? _exact(_maximum.text)! : discount,
+        maximumSavingMinor: _percentage ? _exact(_maximum.text)! : _exact(_discount.text)!,
         startsAt: _from!, endsAt: _until!, totalUses: int.parse(_total.text.trim()),
         usesPerCustomer: int.parse(_perCustomer.text.trim()));
     } on FormatException catch (e) { setState(() => _error = e.message); return; }
@@ -321,91 +570,298 @@ class _StoreCouponEditorState extends State<_StoreCouponEditor> {
     if (_dirty) {
       final leave = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
         title: const Text('Leave unsaved changes?'),
-        content: Text(_unconfirmedAttempt == null ? 'Your previously saved coupon will stay unchanged.' :
-          'The last save is not confirmed. Reopen Store offers to check the saved version. Closing will leave this editor.'),
+        content: Text(_unconfirmedAttempt != null
+          ? 'The last save is not confirmed. Reopen Store offers to check the saved version. Closing will leave this editor.'
+          : widget.campaign == null
+            ? 'This coupon has not been saved. Leave without saving it?'
+            : 'Your previously saved coupon will stay unchanged.'),
         actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Leave'))]));
       if (leave != true || !mounted) return;
     }
     if (mounted) Navigator.of(context).pop();
   }
+  String? _entryError(String raw, {bool integer = false, bool name = false, bool allowZero = false}) {
+    final text = raw.trim();
+    if (name) return text.isEmpty ? 'Enter a coupon name.' : null;
+    final number = integer ? (RegExp(r'^\d{1,10}$').hasMatch(text) ? int.tryParse(text) : null) : _exact(text);
+    if (number == null || number < (allowZero ? 0 : 1) || number > (integer ? 1000000000 : 9000000000000)) {
+      return integer ? 'Enter a whole number above 0.' : 'Enter an amount with up to 2 decimal places.';
+    }
+    return null;
+  }
+  String? get _inputProblem {
+    String? first;
+    void check(String label, TextEditingController value, {bool integer = false, bool name = false, bool zero = false}) {
+      final error = _entryError(value.text, integer: integer, name: name, allowZero: zero);
+      if (first == null && error != null) first = '$label: $error';
+    }
+    check('Name', _name, name: true);
+    if (_money) {
+      check('Discount', _discount);
+      if (_percentage && (_exact(_discount.text) ?? 0) > 10000) first ??= 'Discount cannot exceed 100%.';
+      if (_percentage) check('Maximum saving', _maximum);
+    }
+    check('Minimum purchase', _minimum, zero: true);
+    if (_kind == BuyV2StoreOfferKind.extraQuantity) {
+      check('Buy quantity', _buyQuantity, integer: true); check('Extra quantity', _rewardQuantity, integer: true);
+    }
+    if (_kind == BuyV2StoreOfferKind.nextPurchase) check('Next-purchase days', _nextDays, integer: true);
+    check('Total uses', _total, integer: true); check('Uses per buyer', _perCustomer, integer: true);
+    return first;
+  }
   Widget _field(String label, String key, TextEditingController controller,
       {bool integer = false, bool name = false, bool allowZero = false}) => Semantics(
     label: label, textField: true, child: TextFormField(
-    key: Key(key), controller: controller,
+    key: Key(key), controller: controller, style: const TextStyle(fontSize: 14),
+    focusNode: name ? _nameFocus : null,
     enabled: !_editingLocked && widget.current(),
     maxLength: name ? 80 : null,
     keyboardType: name ? TextInputType.text : TextInputType.numberWithOptions(decimal: !integer),
-    decoration: InputDecoration(labelText: label, border: const OutlineInputBorder(),
-      helperText: allowZero ? 'Enter 0 for no minimum purchase.' : null),
-    onChanged: (_) => setState(() => _dirty = true),
+    decoration: _couponDecoration(context, label, hint: name ? 'Choose or type a name' : null).copyWith(
+      counterText: name ? '' : null,
+      suffixIcon: name ? IconButton(tooltip: 'Edit coupon name',
+        onPressed: _editingLocked || !widget.current() ? null : () => _nameFocus.requestFocus(),
+        icon: const Icon(Icons.edit_outlined, size: 20)) : null,
+      ),
+    onChanged: (_) => setState(() { _dirty = true; _error = null; }),
     validator: (raw) {
-      final text = raw?.trim() ?? '';
-      if (name) return text.isEmpty ? 'Enter a coupon name.' : null;
-      final number = integer ? (RegExp(r'^\d{1,10}$').hasMatch(text) ? int.tryParse(text) : null) : _exact(text);
-      if (number == null || number < (allowZero ? 0 : 1) || number > (integer ? 1000000000 : 9000000000000)) {
-        return integer ? 'Enter a whole-number limit above 0.' : 'Enter a valid amount with up to 2 decimal places.';
-      }
-      if (key == 'work-coupon-discount' && _percentage && number > 10000) return 'Percentage cannot exceed 100.';
+      final error = _entryError(raw ?? '', integer: integer, name: name, allowZero: allowZero);
+      if (error != null) return error;
+      if (key == 'work-coupon-discount' && _percentage && _exact(raw!)! > 10000) return 'Percentage cannot exceed 100.';
       return null;
     }));
   @override Widget build(BuildContext context) => AnimatedBuilder(animation: widget.session,
-    builder: (context, _) => PopScope(canPop: !_dirty && !_saving,
+    builder: (context, _) {
+      final view = View.of(context);
+      final exportedClearance = defaultTargetPlatform == TargetPlatform.android && view.viewInsets.bottom == 0
+        ? max(36.0, moolAndroidExportedSemanticsClearance(
+            viewPadding: EdgeInsets.fromViewPadding(view.viewPadding, view.devicePixelRatio),
+            platform: defaultTargetPlatform))
+        : 0.0;
+      return PopScope(canPop: !_dirty && !_saving,
       onPopInvokedWithResult: (didPop, _) { if (!didPop) unawaited(_close()); },
       child: Scaffold(backgroundColor: const Color(0xfff7f9fa),
-        appBar: AppBar(automaticallyImplyLeading: false,
-          title: Text(widget.campaign == null ? 'Create Store coupon' : 'Edit Store coupon'),
+        appBar: AppBar(automaticallyImplyLeading: false, toolbarHeight: 48,
+          title: Text(widget.campaign == null ? 'Create coupon' : 'Edit coupon', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
           actions: [IconButton(tooltip: 'Close coupon editor', onPressed: _saving ? null : _close,
             icon: const Icon(Icons.close))]),
         bottomNavigationBar: !widget.current() ? null : Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom + exportedClearance),
           child: SafeArea(top: false, child: Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: FilledButton.icon(key: const Key('work-coupon-save'), onPressed: _saving ? null : _save,
+            child: FilledButton.icon(key: const Key('work-coupon-save'), style: _couponActionStyle(context), onPressed: _saving ? null : _save,
               icon: const Icon(Icons.save_outlined), label: Text(_saving ? 'Please wait…' :
-                _unconfirmedAttempt != null ? 'Check saved coupon' : 'Save coupon draft'))))),
+                _unconfirmedAttempt != null ? 'Check saved coupon' : 'Save draft'))))),
         body: !widget.current() ? const Center(child: Text('Your Store session changed. Close and reopen this coupon.'))
           : Form(key: _form, child: ListView(key: const Key('work-coupon-editor'),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
             children: [
-              const Text('ALL PRODUCTS IN THIS STORE', style: TextStyle(color: Color(0xff256b78), fontWeight: FontWeight.w700)),
-              const SizedBox(height: 6),
-              const Text('One saving per eligible Store basket—not per product. Other Stores are unaffected.'),
-              const SizedBox(height: 16),
-              _field('Coupon name', 'work-coupon-name', _name, name: true),
-              Wrap(spacing: 6, children: [for (final name in ['Diwali savings', 'Festive savings', 'New Year offer'])
-                ActionChip(label: Text(name), onPressed: _editingLocked ? null : () => setState(() { _name.text = name; _dirty = true; }))]),
-              const SizedBox(height: 12),
-              SegmentedButton<bool>(segments: const [ButtonSegment(value: false, label: Text('₹ off')),
+              DropdownButtonFormField<BuyV2StoreOfferKind>(key: const Key('work-coupon-type'),
+                initialValue: _kind, isExpanded: true, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14),
+                decoration: _couponDecoration(context, 'Offer type'),
+                items: [for (final kind in BuyV2StoreOfferKind.values)
+                  DropdownMenuItem(value: kind, child: Text(kind.label))],
+                onChanged: _editingLocked || !widget.current() ? null : (kind) {
+                  if (kind == null) return;
+                  setState(() { _kind = kind; _structuredEditing = true; _dirty = true;
+                    if (kind == BuyV2StoreOfferKind.productDiscount || !_money) _allProducts = false;
+                  });
+                }),
+              const SizedBox(height: 4), Text(_kind.guide, style: const TextStyle(fontSize: 11)),
+              const SizedBox(height: 8),
+              _field('Name', 'work-coupon-name', _name, name: true),
+              Wrap(spacing: 6, runSpacing: 2, children: [for (final example in _nameExamples)
+                ActionChip(key: ValueKey('work-coupon-name-example-$example'),
+                  label: Text(example), backgroundColor: const Color(0xffeef2ff),
+                  labelStyle: const TextStyle(color: Color(0xff101878), fontSize: 12),
+                  tooltip: 'Use $example; you can edit the name',
+                  onPressed: _editingLocked || !widget.current() ? null : () => setState(() {
+                    _name.text = example;
+                    _name.selection = TextSelection.collapsed(offset: example.length);
+                    _dirty = true;
+                  }))]),
+              const SizedBox(height: 4),
+              if (_money && _kind != BuyV2StoreOfferKind.productDiscount)
+                Wrap(spacing: 6, runSpacing: 2, children: [for (final all in [true, false])
+                  ChoiceChip(key: Key(all ? 'work-coupon-scope-all' : 'work-coupon-scope-selected'),
+                    label: Text(all ? 'All Store products' : 'Select products / SKUs'),
+                    selected: _allProducts == all, selectedColor: const Color(0xff100078),
+                    checkmarkColor: Colors.white,
+                    labelStyle: TextStyle(color: _allProducts == all ? Colors.white : const Color(0xff101878), fontSize: 12),
+                    onSelected: _editingLocked || !widget.current() ? null : (_) => setState(() {
+                      _allProducts = all; _structuredEditing = true; _dirty = true;
+                    }))])
+              else Text(_money ? 'Selected products / SKUs' : 'One qualifying SKU', style: const TextStyle(fontSize: 12)),
+              if (!_allProducts) ...[
+                OutlinedButton.icon(key: const Key('work-coupon-products'), style: _couponActionStyle(context),
+                  onPressed: _editingLocked ? null : () => _pickProducts(), icon: const Icon(Icons.inventory_2_outlined),
+                  label: Text(_skuIds.isEmpty ? 'Choose products' : '${_skuIds.length} selected ${_skuIds.length == 1 ? 'SKU' : 'SKUs'}')),
+                for (final id in _skuIds.take(2)) Text(_retainedSkus[id]?.title ??
+                  widget.session.workspaceCatalogueItems.where((item) => item.id == id).firstOrNull?.title ?? 'Unavailable saved product',
+                  style: const TextStyle(fontSize: 12)),
+                if (_skuIds.length > 2) Text('+${_skuIds.length - 2} more selected SKUs', style: const TextStyle(fontSize: 12)),
+              ],
+              Wrap(spacing: 6, runSpacing: 4, children: [for (final channel in ['retail', 'wholesale', 'bulk'])
+                FilterChip(label: Text(channel == 'retail' ? 'Retail' : channel == 'wholesale' ? 'Wholesale' : 'Bulk'),
+                  labelStyle: TextStyle(color: _channels.contains(channel) ? Colors.white : const Color(0xff101878)),
+                  checkmarkColor: Colors.white,
+                  selected: _channels.contains(channel), onSelected: _editingLocked ? null : (selected) => setState(() {
+                    if (selected) { _channels.add(channel); } else { _channels.remove(channel); }
+                    _structuredEditing = true; _dirty = true;
+                  }))]),
+              const SizedBox(height: 8),
+              if (_money) ...[
+              _couponPair(context, SegmentedButton<bool>(style: _couponActionStyle(context), showSelectedIcon: false,
+                segments: const [ButtonSegment(value: false, label: Text('₹ off')),
                 ButtonSegment(value: true, label: Text('% off'))], selected: {_percentage},
-                onSelectionChanged: _editingLocked ? null : (value) => setState(() { _percentage = value.single; _discount.clear(); _dirty = true; })),
-              const SizedBox(height: 12),
-              _field(_percentage ? 'Discount (%)' : 'Discount (₹)', 'work-coupon-discount', _discount),
-              const SizedBox(height: 12),
-              _field('Minimum Store bill (₹)', 'work-coupon-minimum', _minimum, allowZero: true),
-              if (_percentage) ...[const SizedBox(height: 12), _field('Maximum saving per bill (₹)', 'work-coupon-maximum', _maximum)],
-              const SizedBox(height: 12),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                OutlinedButton.icon(key: const Key('work-coupon-start'), onPressed: _editingLocked ? null : () => _date(true),
-                  icon: const Icon(Icons.event), label: Text(_from == null ? 'Start date' : 'From ${MaterialLocalizations.of(context).formatShortDate(_from!)}')),
-                OutlinedButton.icon(key: const Key('work-coupon-end'), onPressed: _editingLocked ? null : () => _date(false),
-                  icon: const Icon(Icons.event_available), label: Text(_until == null ? 'End date' : 'Until ${MaterialLocalizations.of(context).formatShortDate(_until!)}'))]),
-              const SizedBox(height: 12),
-              _field('Total permitted uses', 'work-coupon-total-uses', _total, integer: true),
-              const SizedBox(height: 12),
-              _field('Uses per customer', 'work-coupon-customer-uses', _perCustomer, integer: true),
-              const SizedBox(height: 14),
+                onSelectionChanged: _editingLocked ? null : (value) => setState(() { _percentage = value.single; _discount.clear(); _dirty = true; _error = null; })),
+                _field(_percentage ? 'Discount (%)' : 'Discount (₹)', 'work-coupon-discount', _discount)),
+              const SizedBox(height: 8),
+              ],
+              if (_money && _percentage) _couponPair(context,
+                _field('Minimum purchase (₹)', 'work-coupon-minimum', _minimum, allowZero: true),
+                _field('Maximum saving (₹)', 'work-coupon-maximum', _maximum))
+              else _field('Minimum purchase (₹)', 'work-coupon-minimum', _minimum, allowZero: true),
+              if (_kind == BuyV2StoreOfferKind.quantityPrice) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(key: const Key('work-coupon-tiers'), style: _couponActionStyle(context), onPressed: _editingLocked ? null : _editTiers,
+                  icon: const Icon(Icons.format_list_numbered),
+                  label: Text(_tiers.isEmpty ? 'Add quantity price slabs' : '${_tiers.length} quantity price slabs')),
+                const Text('Quantities and prices use the selected SKU’s selling unit.', style: TextStyle(fontSize: 12)),
+              ],
+              if (_kind == BuyV2StoreOfferKind.extraQuantity) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(key: const Key('work-coupon-reward-product'),
+                  style: _couponActionStyle(context), onPressed: _editingLocked ? null : () => _pickProducts(reward: true), icon: const Icon(Icons.add_box_outlined),
+                  label: Text(_rewardId == null ? 'Choose additional product' : 'Change additional product')),
+                if (_rewardId != null) Text(_retainedReward?.title ?? widget.session.workspaceCatalogueItems
+                  .where((item) => item.id == _rewardId).firstOrNull?.title ?? 'Unavailable saved product', style: const TextStyle(fontSize: 12)),
+                const SizedBox(height: 8), _couponPair(context,
+                  _field('Buy quantity', 'work-coupon-buy-quantity', _buyQuantity, integer: true),
+                  _field('Extra quantity', 'work-coupon-reward-quantity', _rewardQuantity, integer: true)),
+                const Text('Quantities use each product’s selected selling unit.', style: TextStyle(fontSize: 11)),
+              ],
+              if (_kind == BuyV2StoreOfferKind.nextPurchase) ...[
+                const SizedBox(height: 12), _field('Next purchase within (days)', 'work-coupon-next-days', _nextDays, integer: true),
+                const Text('A qualifying completed purchase is required. Eligibility is checked for the buyer.', style: TextStyle(fontSize: 12)),
+              ],
+              if (_kind == BuyV2StoreOfferKind.buyerDiscount) ...[
+                const SizedBox(height: 8), OutlinedButton.icon(key: const Key('work-coupon-buyers'),
+                  style: _couponActionStyle(context), onPressed: _editingLocked ? null : _pickBuyers, icon: const Icon(Icons.people_outline),
+                  label: Text(_buyerIds.isEmpty ? 'Choose buyers' : '${_buyerIds.length} selected buyers')),
+                const Text('Your buyer selection stays private. Eligibility is checked when the buyer shops.', style: TextStyle(fontSize: 12)),
+              ],
+              if (_kind == BuyV2StoreOfferKind.dealerIntro)
+                const Text('For a business buyer’s first eligible order at your Store. Eligibility is checked for the buyer.',
+                  style: TextStyle(fontSize: 12)),
+              const SizedBox(height: 8),
+              _couponPair(context,
+                OutlinedButton.icon(key: const Key('work-coupon-start'), style: _couponActionStyle(context), onPressed: _editingLocked ? null : () => _date(true),
+                  icon: const Icon(Icons.event, size: 18), label: Text(_from == null ? 'Start date' : 'From ${MaterialLocalizations.of(context).formatShortDate(_from!)}')),
+                OutlinedButton.icon(key: const Key('work-coupon-end'), style: _couponActionStyle(context), onPressed: _editingLocked ? null : () => _date(false),
+                  icon: const Icon(Icons.event_available, size: 18), label: Text(_until == null ? 'End date' : 'Until ${MaterialLocalizations.of(context).formatShortDate(_until!)}'))),
+              if (_kind == BuyV2StoreOfferKind.quantityPrice && _from != null && _until != null)
+                Text('Price validity: ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(_from!))} – '
+                  '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(_until!))}', style: const TextStyle(fontSize: 12)),
+              const SizedBox(height: 8),
+              _couponPair(context, _field('Total uses', 'work-coupon-total-uses', _total, integer: true),
+                _field('Uses per buyer', 'work-coupon-customer-uses', _perCustomer, integer: true)),
+              const SizedBox(height: 8),
               Text(widget.session.workspaceStoreCoupons == null
-                ? 'These are your configured limits, not actual usage. Your Store funds the coupon. Public activation and Checkout confirmation are not connected yet.'
-                : 'These are your configured limits, not actual usage. Your Store funds the coupon. Saving keeps a private draft; manage publishing separately. Checkout must confirm savings.',
+                ? 'Your Store funds the offer. One offer for your Store in each Cart. Saved as a private draft; publishing is not available yet.'
+                : 'Your Store funds the offer. One offer for your Store in each Cart. Save your draft, then review publishing. Checkout confirms eligibility.',
                 style: const TextStyle(fontSize: 12, color: Color(0xff566572), height: 1.4)),
               if (_error != null) Padding(padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Semantics(liveRegion: true, child: Text(_error!, style: const TextStyle(color: Color(0xff9c2737))))),
               const SizedBox(height: 12),
-            ])))));
+            ]))));
+    });
 }
 
 /// Explicit public promotion, never a conversion of the private targeted draft.
+class _StoreOfferTierEditor extends StatefulWidget {
+  const _StoreOfferTierEditor({required this.initial, required this.sellUnit, required this.owner, required this.current});
+  final List<BuyV2StoreOfferTier> initial;
+  final String sellUnit;
+  final Listenable owner;
+  final bool Function() current;
+  @override State<_StoreOfferTierEditor> createState() => _StoreOfferTierEditorState();
+}
+class _StoreOfferTierEditorState extends State<_StoreOfferTierEditor> {
+  final _form = GlobalKey<FormState>();
+  final _rows = <({TextEditingController quantity, TextEditingController price})>[];
+  String? _error;
+  void _add([BuyV2StoreOfferTier? value]) => _rows.add((
+    quantity: TextEditingController(text: value?.minimumQuantity.toString() ?? ''),
+    price: TextEditingController(text: value == null ? '' : _couponAmount(value.priceMinor))));
+  @override void initState() { super.initState(); for (final value in widget.initial) { _add(value); } if (_rows.isEmpty) _add(); }
+  @override void dispose() { for (final row in _rows) { row.quantity.dispose(); row.price.dispose(); } super.dispose(); }
+  int? _price(String raw) {
+    if (!RegExp(r'^\d{1,11}(\.\d{1,2})?$').hasMatch(raw.trim())) return null;
+    final parts = raw.trim().split('.');
+    return int.parse(parts[0]) * 100 + (parts.length == 1 ? 0 : int.parse(parts[1].padRight(2, '0')));
+  }
+  void _done() {
+    if (!widget.current() || !_form.currentState!.validate()) return;
+    var previous = 0; final tiers = <BuyV2StoreOfferTier>[];
+    for (var index = 0; index < _rows.length; index++) {
+      final row = _rows[index], quantity = int.tryParse(_rows[index].quantity.text.trim());
+      final price = _price(row.price.text);
+      if (quantity == null || quantity <= previous || quantity > 1000000000 || price == null || price <= 0 || price > 9000000000000) {
+        setState(() => _error = 'Check slab ${index + 1}: use increasing quantities and valid unit prices.'); return;
+      }
+      previous = quantity; tiers.add(BuyV2StoreOfferTier(minimumQuantity: quantity, priceMinor: price));
+    }
+    Navigator.pop(context, List<BuyV2StoreOfferTier>.unmodifiable(tiers));
+  }
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: widget.owner, builder: (context, _) {
+    final view = View.of(context);
+    final clearance = defaultTargetPlatform == TargetPlatform.android && view.viewInsets.bottom == 0
+      ? max(36.0, moolAndroidExportedSemanticsClearance(
+          viewPadding: EdgeInsets.fromViewPadding(view.viewPadding, view.devicePixelRatio), platform: defaultTargetPlatform)) : 0.0;
+    final maximumHeight = MediaQuery.sizeOf(context).height * .94;
+    final expanded = MediaQuery.viewInsetsOf(context).bottom > 0 || MediaQuery.textScalerOf(context).scale(14) > 18;
+    final height = expanded ? maximumHeight : min(maximumHeight, 280.0 + _rows.length * 72 + (_error == null ? 0 : 48));
+    return SizedBox(height: height, child: Scaffold(appBar: AppBar(automaticallyImplyLeading: false, toolbarHeight: 48,
+      title: const Text('Price slabs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+      actions: [IconButton(tooltip: 'Cancel price slabs', onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close))]),
+      bottomNavigationBar: Padding(padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom + clearance),
+        child: SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(12),
+          child: FilledButton(style: _couponActionStyle(context), onPressed: widget.current() ? _done : null, child: const Text('Use price slabs'))))),
+      body: !widget.current() ? const Center(child: Text('Your Store session changed. Reopen price slabs.')) : Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('Unit: ${widget.sellUnit}', style: const TextStyle(fontSize: 12))),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: TextButton.icon(
+            style: _couponActionStyle(context), onPressed: _rows.length >= 100 ? null : () => setState(() => _add()),
+            icon: const Icon(Icons.add, size: 18), label: const Text('Add price slab'))),
+          if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Semantics(liveRegion: true, child: Text(_error!))),
+          Expanded(child: Form(key: _form, child: ListView.builder(key: const Key('work-coupon-tier-rows'),
+            padding: const EdgeInsets.all(12), itemCount: _rows.length, itemBuilder: (context, index) {
+              final row = _rows[index];
+              return Padding(key: ObjectKey(row.quantity), padding: const EdgeInsets.only(bottom: 8), child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start, children: [
+                SizedBox(width: 24, child: Padding(padding: const EdgeInsets.only(top: 16),
+                  child: Text('${index + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)))),
+                Expanded(child: _couponPair(context,
+                  TextFormField(controller: row.quantity, style: const TextStyle(fontSize: 14), keyboardType: TextInputType.number,
+                    decoration: _couponDecoration(context, 'Min. quantity'),
+                    validator: (raw) { final value = int.tryParse(raw?.trim() ?? '');
+                      return value == null || value < 1 || value > 1000000000 ? 'Enter a whole quantity above 0.' : null; }),
+                  TextFormField(controller: row.price, style: const TextStyle(fontSize: 14), keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: _couponDecoration(context, 'Unit price (₹)'),
+                    validator: (raw) { final value = _price(raw ?? '');
+                      return value == null || value < 1 || value > 9000000000000 ? 'Enter a valid price (up to 2 decimals).' : null; }), minimumWidth: 216)),
+                  IconButton(tooltip: 'Remove price slab ${index + 1}', onPressed: _rows.length == 1 ? null : () => setState(() {
+                    _rows.removeAt(index);
+                    WidgetsBinding.instance.addPostFrameCallback((_) { row.quantity.dispose(); row.price.dispose(); });
+                  }), icon: const Icon(Icons.delete_outline, size: 20)),
+              ]));
+            }))),
+        ])));
+  });
+}
+
 class StoreProductPromotionPanel extends StatelessWidget {
   const StoreProductPromotionPanel({
     required this.session,

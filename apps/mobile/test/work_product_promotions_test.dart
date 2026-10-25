@@ -15,8 +15,19 @@ import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
+import 'package:moolsocial/features/buy/buy_v2_models.dart';
 
 // Isolated host records/transport only; never native Store or published offers.
+class _RichOfferMemory extends catalogue.ListingAccount {
+  final values = <String, Map<String, Object?>>{};
+  bool unknownSave = false;
+  @override Future<Map<String, Object?>?> read(String scope) async => values[scope];
+  @override Future<void> save(String scope, Map<String, Object?> draft) async {
+    values[scope] = Map<String, Object?>.from(draft);
+    if (unknownSave) throw StateError('Host unknown save after durable write');
+  }
+  @override Future<void> clear(String scope) async { values.remove(scope); }
+}
 class _FamilyCatalogue extends catalogue.SessionCatalogue implements WorkspaceVariantFamilyOwnerGateway {
   bool supported = true;
   @override bool get variantFamilySubmissionSupported => supported;
@@ -257,6 +268,67 @@ StorePromotionController controller(
   now: now ?? () => at,
 );
 void main() {
+  BuyV2StoreOfferSku offerSku(String id, {String store = 'store-one'}) =>
+    BuyV2StoreOfferSku(storeId: store, skuId: id, title: 'Host $id', sellUnit: '1 L');
+  BuyV2StoreOfferTerms offerTerms({BuyV2StoreOfferKind kind = BuyV2StoreOfferKind.productDiscount}) {
+    if (kind == BuyV2StoreOfferKind.quantityPrice) {
+      return BuyV2StoreOfferTerms(storeId: 'store-one', kind: kind, skus: [offerSku('sku-one')],
+        channels: const {'wholesale', 'bulk'}, tiers: const [BuyV2StoreOfferTier(minimumQuantity: 10, priceMinor: 9000)]);
+    }
+    if (kind == BuyV2StoreOfferKind.extraQuantity) {
+      return BuyV2StoreOfferTerms(storeId: 'store-one', kind: kind, skus: [offerSku('sku-one')],
+        channels: const {'wholesale'}, buyQuantity: 10, rewardSku: offerSku('reward-one'), rewardQuantity: 1);
+    }
+    return BuyV2StoreOfferTerms(storeId: 'store-one', kind: kind, skus: [offerSku('sku-one')],
+      channels: const {'retail', 'wholesale', 'bulk'}, discountKind: 'percentage',
+      discountValue: 500, minimumSpendMinor: 10000, maximumSavingMinor: 20000,
+      nextPurchaseDays: kind == BuyV2StoreOfferKind.nextPurchase ? 30 : null);
+  }
+  StoreCouponCampaign richDraft({BuyV2StoreOfferKind kind = BuyV2StoreOfferKind.productDiscount}) =>
+    StoreCouponCampaign.offer(id: 'coupon-rich', storeId: 'store-one', revision: 1,
+      name: 'Host Holi savings', structuredTerms: offerTerms(kind: kind),
+      buyerReferences: kind == BuyV2StoreOfferKind.buyerDiscount ? const ['customer-one'] : const [],
+      startsAt: at, endsAt: at.add(const Duration(days: 2)), totalUses: 20, usesPerCustomer: 1);
+
+  test('STRUCTUREDOFFER01 immutable exact SKU terms round trip without buyer leakage', () {
+    final terms = offerTerms(kind: BuyV2StoreOfferKind.buyerDiscount);
+    expect(BuyV2StoreOfferKind.values, hasLength(7));
+    expect(BuyV2StoreOfferTerms.fromJson(terms.toJson()).toJson(), terms.toJson());
+    expect(() => terms.skus.clear(), throwsUnsupportedError);
+    expect(() => terms.channels.clear(), throwsUnsupportedError);
+    final campaign = richDraft(kind: BuyV2StoreOfferKind.buyerDiscount);
+    expect(campaign.buyerReferences, ['customer-one']);
+    expect(jsonEncode(terms.toJson()), isNot(contains('customer-one')));
+    expect(() => StoreCouponCampaign.offer(id: 'coupon-rich', storeId: 'other-store', revision: 1,
+      name: campaign.name, structuredTerms: terms, buyerReferences: ['customer-one'],
+      startsAt: at, endsAt: at.add(const Duration(days: 1)), totalUses: 20, usesPerCustomer: 1), throwsFormatException);
+  });
+  test('STRUCTUREDOFFER01 rejects foreign SKU and inconsistent quantity units', () {
+    expect(() => BuyV2StoreOfferTerms(storeId: 'store-one', kind: BuyV2StoreOfferKind.productDiscount,
+      skus: [offerSku('sku-one', store: 'other-store')], channels: {'retail'},
+      discountKind: 'flat', discountValue: 100, maximumSavingMinor: 100), throwsFormatException);
+    expect(() => BuyV2StoreOfferTerms(storeId: 'store-one', kind: BuyV2StoreOfferKind.quantityPrice,
+      skus: [offerSku('sku-one'), offerSku('sku-two')], channels: {'wholesale'},
+      tiers: [const BuyV2StoreOfferTier(minimumQuantity: 10, priceMinor: 10000)]), throwsFormatException);
+    expect(() => BuyV2StoreOfferTerms(storeId: 'store-one', kind: BuyV2StoreOfferKind.extraQuantity,
+      skus: [offerSku('sku-one')], channels: {'wholesale'}, buyQuantity: 10,
+      rewardSku: offerSku('bonus-one', store: 'other-store'), rewardQuantity: 1), throwsFormatException);
+  });
+  test('STRUCTUREDOFFER01 tier thresholds must be unique ordered exact prices', () {
+    final valid = BuyV2StoreOfferTerms(storeId: 'store-one', kind: BuyV2StoreOfferKind.quantityPrice,
+      skus: [offerSku('sku-one')], channels: {'bulk'}, tiers: const [
+        BuyV2StoreOfferTier(minimumQuantity: 10, priceMinor: 10000),
+        BuyV2StoreOfferTier(minimumQuantity: 20, priceMinor: 9500)]);
+    expect(BuyV2StoreOfferTerms.fromJson(valid.toJson()).toJson(), valid.toJson());
+    for (final tiers in [
+      [const BuyV2StoreOfferTier(minimumQuantity: 10, priceMinor: 10000), const BuyV2StoreOfferTier(minimumQuantity: 10, priceMinor: 9500)],
+      [const BuyV2StoreOfferTier(minimumQuantity: 20, priceMinor: 10000), const BuyV2StoreOfferTier(minimumQuantity: 10, priceMinor: 9500)],
+      [const BuyV2StoreOfferTier(minimumQuantity: 0, priceMinor: 10000)],
+    ]) {
+      expect(() => BuyV2StoreOfferTerms(storeId: 'store-one', kind: BuyV2StoreOfferKind.quantityPrice,
+        skus: [offerSku('sku-one')], channels: {'bulk'}, tiers: tiers), throwsFormatException);
+    }
+  });
   StoreCouponCampaign couponDraft() => StoreCouponCampaign(id: 'coupon-one', storeId: scope.store,
     revision: 19, name: 'Host Diwali savings', percentage: false, discount: 1050,
     minimumSpendMinor: 10000, maximumSavingMinor: 1050, startsAt: at,
@@ -265,6 +337,290 @@ void main() {
     scope: scope, couponId: 'coupon-one', expectedRevision: expectedRevision, idempotencyKey: 'coupon-original',
     input: StoreCouponInput.fromJson({...StoreCouponInput.fromCampaign(couponDraft(), active: true).toJson(), 'name': name}),
     fundingAcknowledged: true);
+  test('STRUCTUREDOFFER02 legacy private and pending wire identities survive mixed rich drafts', () {
+    final legacy = couponDraft(), legacyJson = jsonEncode(couponDraft().toJson());
+    final original = couponIntent();
+    final originalJson = jsonEncode(original.toJson());
+    final mixed = decodeStoreCouponCampaigns(encodeStoreCouponCampaigns([legacy, richDraft()]), 'store-one');
+    expect(jsonEncode(mixed.first.toJson()), legacyJson);
+    expect(mixed.last.structuredTerms!.toJson(), offerTerms().toJson());
+    expect(jsonEncode(StoreCouponIntent.fromJson(jsonDecode(originalJson)).toJson()), originalJson);
+    expect(jsonDecode(encodeStoreCouponCampaigns([legacy]))['schemaVersion'], 1);
+    expect(jsonDecode(encodeStoreCouponCampaigns(mixed))['schemaVersion'], 2);
+  });
+  test('STRUCTUREDOFFER02 old publication capability never journals or sends rich terms', () async {
+    final provider = CouponProvider(), pending = CouponPending();
+    final controller = StoreCouponController(scope: scope, gateway: provider, pendingStore: pending,
+      context: () => 1, now: () => at);
+    addTearDown(controller.dispose);
+    final campaign = richDraft();
+    expect(await controller.refresh(campaign.id), isTrue);
+    final result = await controller.submit(campaign.id,
+      StoreCouponInput.fromCampaign(campaign, active: true), fundingAcknowledged: true, inputCurrent: () => true);
+    expect(result.state, StorePromotionResultState.notSent);
+    expect(provider.writes, isEmpty);
+    expect(pending.original, isNull);
+  });
+  test('STRUCTUREDOFFER02 rich original has explicit wire version and Store fence', () {
+    final input = StoreCouponInput.fromCampaign(richDraft(), active: true);
+    final original = StoreCouponIntent(scope: scope, couponId: 'coupon-rich', expectedRevision: 0,
+      idempotencyKey: 'rich-original', input: input, fundingAcknowledged: true);
+    expect(original.toJson()['storeCouponTermsVersion'], 2);
+    expect(original.body['storeCouponTermsVersion'], 2);
+    expect(StoreCouponIntent.fromJson(original.toJson()).fingerprint, original.fingerprint);
+    expect(() => StoreCouponIntent.fromJson({...original.toJson(), 'storeCouponTermsVersion': 1}), throwsFormatException);
+    final foreign = StoreCouponInput.fromJson({...input.toJson(), 'structuredTerms': BuyV2StoreOfferTerms(
+      storeId: 'other-store', kind: BuyV2StoreOfferKind.billDiscount, channels: {'retail'},
+      discountKind: 'flat', discountValue: 100, maximumSavingMinor: 100).toJson()});
+    expect(() => StoreCouponIntent(scope: scope, couponId: 'coupon-rich', expectedRevision: 0,
+      idempotencyKey: 'rich-original', input: foreign, fundingAcknowledged: true), throwsFormatException);
+  });
+  test('STRUCTUREDOFFER02 rich owner receipt binds actor Store and exact original', () {
+    final input = StoreCouponInput.fromCampaign(richDraft(), active: true);
+    final original = StoreCouponIntent(scope: scope, couponId: 'coupon-rich', expectedRevision: 0,
+      idempotencyKey: 'rich-original', input: input, fundingAcknowledged: true);
+    final raw = <String, Object?>{'schemaVersion': 2, 'storeCouponTermsVersion': 2,
+      'accountId': scope.account, 'realm': scope.realm, 'storeId': scope.store,
+      'couponId': original.couponId, 'revision': 1, 'observedAt': at.toIso8601String(), 'coupon': input.toJson()};
+    expect(StoreCouponRecord.decode(raw, scope, at).acknowledges(original), isTrue);
+    for (final patch in [{'accountId': 'another-owner'}, {'storeId': 'other-store'}, {'storeCouponTermsVersion': 1}]) {
+      expect(() => StoreCouponRecord.decode({...raw, ...patch}, scope, at), throwsFormatException);
+    }
+  });
+  Future<WorkSession> openPrivateCouponEditor(WidgetTester tester, StoreCouponCampaign draft) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final owner = WorkSession(gateway: const UnavailableWorkGateway(), contactDraftStore: catalogue.ListingAccount(),
+      offerDraftStoreFactory: (_) => catalogue.ListingAccount())
+      ..activeWorkspace = WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery',
+        profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+    addTearDown(owner.dispose);
+    owner.workspaceCatalogueItems.addAll([catalogue.listingItem('sku-one'), catalogue.listingItem('reward-one')]);
+    expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: 'store-one'), isTrue);
+    expect(await owner.saveWorkspaceStoreCouponCampaign(draft, expectedStoreId: 'store-one'), isTrue);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: ListView(children: [StoreCouponCampaignPanel(session: owner)]))));
+    await tester.pumpAndSettle();
+    final edit = find.byTooltip('Edit ${draft.name}');
+    await tester.ensureVisible(edit); await tester.pumpAndSettle();
+    expect(edit.hitTestable(), findsOneWidget); await tester.tap(edit); await tester.pumpAndSettle();
+    return owner;
+  }
+  testWidgets('COUPONCOMPACT02 invalid offscreen legacy amount cannot crash or write', (tester) async {
+    tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(320, 568);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.reset); addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final draft = StoreCouponCampaign.fromJson({...couponDraft().toJson(), 'revision': 1}, 'store-one');
+    final owner = await openPrivateCouponEditor(tester, draft), before = jsonEncode(owner.workspaceOfferDraft);
+    final scroll = find.descendant(of: find.byKey(const Key('work-coupon-editor')), matching: find.byType(Scrollable)).first;
+    final amount = find.byKey(const Key('work-coupon-discount'));
+    await tester.scrollUntilVisible(amount, 180, scrollable: scroll); await tester.enterText(amount, '10.255');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(const Key('work-coupon-customer-uses')), 220, scrollable: scroll);
+    await tester.pumpAndSettle(); await tester.tap(find.byKey(const Key('work-coupon-save'))); await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('work-coupon-editor')), findsOneWidget);
+    expect(jsonEncode(owner.workspaceOfferDraft), before);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  testWidgets('COUPONCOMPACT01 normal phone pairs financial date and usage controls', (tester) async {
+    tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(360, 806);
+    addTearDown(tester.view.reset);
+    final owner = await openPrivateCouponEditor(tester, richDraft(kind: BuyV2StoreOfferKind.billDiscount));
+    final before = jsonEncode(owner.workspaceOfferDraft);
+    final scroll = find.descendant(of: find.byKey(const Key('work-coupon-editor')), matching: find.byType(Scrollable)).first;
+    final discount = find.byKey(const Key('work-coupon-discount'));
+    await tester.scrollUntilVisible(discount, 160, scrollable: scroll); await tester.pumpAndSettle();
+    final kind = find.byType(SegmentedButton<bool>);
+    expect((tester.getTopLeft(discount).dy - tester.getTopLeft(kind).dy).abs(), lessThanOrEqualTo(4));
+    final start = find.byKey(const Key('work-coupon-start')), end = find.byKey(const Key('work-coupon-end'));
+    await tester.scrollUntilVisible(end, 160, scrollable: scroll);
+    expect((tester.getTopLeft(start).dy - tester.getTopLeft(end).dy).abs(), lessThanOrEqualTo(4));
+    final total = find.byKey(const Key('work-coupon-total-uses')), per = find.byKey(const Key('work-coupon-customer-uses'));
+    await tester.scrollUntilVisible(per, 160, scrollable: scroll);
+    expect((tester.getTopLeft(total).dy - tester.getTopLeft(per).dy).abs(), lessThanOrEqualTo(4));
+    expect(tester.takeException(), isNull); expect(jsonEncode(owner.workspaceOfferDraft), before);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('COUPONCOMPACT03 slab viewport and keyboard retain unit and reachable action $scale', (tester) async {
+      tester.view.devicePixelRatio = 1; tester.view.physicalSize = scale == 1 ? const Size(360, 806) : const Size(320, 640);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset); addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final owner = await openPrivateCouponEditor(tester, richDraft(kind: BuyV2StoreOfferKind.quantityPrice));
+      final before = jsonEncode(owner.workspaceOfferDraft);
+      final scroll = find.descendant(of: find.byKey(const Key('work-coupon-editor')), matching: find.byType(Scrollable)).first;
+      final tiers = find.byKey(const Key('work-coupon-tiers'));
+      await tester.scrollUntilVisible(tiers, 180, scrollable: scroll); await tester.ensureVisible(tiers); await tester.pumpAndSettle();
+      await tester.tap(tiers); await tester.pumpAndSettle();
+      if (scale == 1) expect(tester.getSize(find.byType(Scaffold).last).height, lessThanOrEqualTo(440));
+      expect(find.textContaining('1 L'), findsWidgets);
+      final rows = find.byKey(const Key('work-coupon-tier-rows'));
+      final fields = find.descendant(of: rows, matching: find.byType(TextFormField));
+      expect(fields, findsNWidgets(2));
+      if (scale == 1) expect((tester.getTopLeft(fields.first).dy - tester.getTopLeft(fields.last).dy).abs(), lessThanOrEqualTo(4));
+      await tester.ensureVisible(fields.last); await tester.pumpAndSettle(); await tester.showKeyboard(fields.last);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 260); await tester.pumpAndSettle();
+      final use = find.widgetWithText(FilledButton, 'Use price slabs');
+      expect(use.hitTestable(), findsOneWidget); expect(tester.getSize(use).height, greaterThanOrEqualTo(48));
+      expect(tester.getBottomRight(use).dy, lessThanOrEqualTo((scale == 1 ? 806 : 640) - 260));
+      expect(tester.takeException(), isNull);
+      tester.testTextInput.hide(); tester.view.resetViewInsets(); await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Cancel price slabs')); await tester.pumpAndSettle();
+      expect(jsonEncode(owner.workspaceOfferDraft), before); await tester.pumpWidget(const SizedBox.shrink());
+    });
+    testWidgets('COUPONNAME01 tappable names remain editable without changing saved terms $scale', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(360, 800);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset); addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final owner = WorkSession(gateway: const UnavailableWorkGateway(), contactDraftStore: catalogue.ListingAccount(),
+        offerDraftStoreFactory: (_) => catalogue.ListingAccount())
+        ..activeWorkspace = WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery',
+          profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+      addTearDown(owner.dispose);
+      owner.workspaceCatalogueItems.add(catalogue.listingItem('sku-one'));
+      expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: 'store-one'), isTrue);
+      final draft = richDraft(kind: BuyV2StoreOfferKind.billDiscount);
+      expect(await owner.saveWorkspaceStoreCouponCampaign(draft, expectedStoreId: 'store-one'), isTrue);
+      final before = jsonEncode(owner.workspaceOfferDraft);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: ListView(children: [StoreCouponCampaignPanel(session: owner)]))));
+      await tester.pumpAndSettle(); await tester.tap(find.byTooltip('Edit ${draft.name}')); await tester.pumpAndSettle();
+      final scrollable = find.descendant(of: find.byKey(const Key('work-coupon-editor')), matching: find.byType(Scrollable)).first;
+      final name = find.byKey(const Key('work-coupon-name'));
+      await tester.scrollUntilVisible(name, 160, scrollable: scrollable);
+      final controller = tester.widget<TextFormField>(name).controller!;
+      for (final example in ['Diwali offer', 'Holi offer']) {
+        final chip = find.byKey(ValueKey('work-coupon-name-example-$example'));
+        await tester.scrollUntilVisible(chip, 160, scrollable: scrollable);
+        await tester.ensureVisible(chip); await tester.pumpAndSettle();
+        expect(chip.hitTestable(), findsOneWidget);
+        await tester.tap(chip); await tester.pumpAndSettle();
+        expect(controller.text, example);
+      }
+      await tester.scrollUntilVisible(name, -160, scrollable: scrollable);
+      await tester.ensureVisible(name); await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Edit coupon name')); await tester.pump();
+      await tester.enterText(name, 'My Diwali trade offer');
+      expect(controller.text, 'My Diwali trade offer');
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      final all = find.byKey(const Key('work-coupon-scope-all'));
+      await tester.scrollUntilVisible(all, 160, scrollable: scrollable);
+      await tester.ensureVisible(all); await tester.pumpAndSettle(); await tester.tap(all); await tester.pumpAndSettle();
+      expect(tester.widget<ChoiceChip>(all).selected, isTrue);
+      final selected = find.byKey(const Key('work-coupon-scope-selected'));
+      await tester.ensureVisible(selected); await tester.pumpAndSettle(); await tester.tap(selected); await tester.pumpAndSettle();
+      expect(tester.widget<ChoiceChip>(selected).selected, isTrue);
+      final products = find.byKey(const Key('work-coupon-products'));
+      await tester.scrollUntilVisible(products, 160, scrollable: scrollable);
+      expect(products.hitTestable(), findsOneWidget);
+      await tester.tap(find.byTooltip('Close coupon editor')); await tester.pumpAndSettle();
+      await tester.tap(find.text('Leave')); await tester.pumpAndSettle();
+      expect(jsonEncode(owner.workspaceOfferDraft), before);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+  test('STRUCTUREDOFFER08 all rich drafts reopen from durable storage and recover unknown saves', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    for (final kind in BuyV2StoreOfferKind.values) {
+      final memory = _RichOfferMemory();
+      WorkSession open() => WorkSession(gateway: const UnavailableWorkGateway(), contactDraftStore: memory,
+        offerDraftStoreFactory: (_) => memory)
+        ..activeWorkspace = WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery',
+          profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+      final owner = open();
+      try {
+        expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: 'store-one'), isTrue);
+        memory.unknownSave = true;
+        expect(await owner.saveWorkspaceStoreCouponCampaign(richDraft(kind: kind), expectedStoreId: 'store-one'), isFalse);
+        expect(owner.workspaceStoreCouponRecoveryRequired, isTrue);
+        memory.unknownSave = false;
+        expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: 'store-one'), isTrue);
+        expect(owner.workspaceStoreCouponRecoveryRequired, isFalse);
+        expect(owner.workspaceStoreCouponCampaigns.single.toJson(), richDraft(kind: kind).toJson());
+        final reopened = open();
+        try {
+          expect(await reopened.loadWorkspaceOfferDraft(expectedStoreId: 'store-one'), isTrue);
+          expect(reopened.workspaceStoreCouponCampaigns.single.toJson(), richDraft(kind: kind).toJson());
+          memory.owner = 'other-owner';
+          expect(await reopened.saveWorkspaceStoreCouponCampaign(richDraft(kind: kind), expectedStoreId: 'store-one'), isFalse);
+        } finally { reopened.dispose(); }
+      } finally { owner.dispose(); }
+    }
+  });
+  testWidgets('STRUCTUREDOFFER04 renamed quantity offer cannot inherit a changed selling unit', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final owner = WorkSession(gateway: const UnavailableWorkGateway(), contactDraftStore: catalogue.ListingAccount(),
+      offerDraftStoreFactory: (_) => catalogue.ListingAccount())
+      ..activeWorkspace = WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery',
+        profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+    addTearDown(owner.dispose);
+    owner.workspaceCatalogueItems.add(catalogue.listingItem('sku-one').copyWith(pack: '5 L'));
+    expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: 'store-one'), isTrue);
+    final draft = richDraft(kind: BuyV2StoreOfferKind.quantityPrice);
+    expect(await owner.saveWorkspaceStoreCouponCampaign(draft, expectedStoreId: 'store-one'), isTrue);
+    final before = jsonEncode(owner.workspaceOfferDraft);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: ListView(children: [StoreCouponCampaignPanel(session: owner)]))));
+    await tester.pumpAndSettle(); await tester.tap(find.byTooltip('Edit ${draft.name}')); await tester.pumpAndSettle();
+    final name = find.byKey(const Key('work-coupon-name'));
+    await tester.ensureVisible(name); await tester.enterText(name, 'Host renamed offer');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-coupon-save'))); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-coupon-editor')), findsOneWidget);
+    expect(jsonEncode(owner.workspaceOfferDraft), before);
+    final error = find.textContaining('Selling unit changed');
+    await tester.scrollUntilVisible(error, 180, scrollable: find.descendant(
+      of: find.byKey(const Key('work-coupon-editor')), matching: find.byType(Scrollable)).first);
+    expect(error.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  for (final kind in BuyV2StoreOfferKind.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('STRUCTUREDOFFER03 compact editor fields preserve ${kind.name} $scale', (tester) async {
+        FlutterSecureStorage.setMockInitialValues({});
+        tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(360, 806);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset); addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final owner = WorkSession(gateway: const UnavailableWorkGateway(), contactDraftStore: catalogue.ListingAccount(),
+          offerDraftStoreFactory: (_) => catalogue.ListingAccount())
+          ..activeWorkspace = WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery',
+            profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+        addTearDown(owner.dispose);
+        owner.workspaceCatalogueItems.addAll([catalogue.listingItem('sku-one'), catalogue.listingItem('reward-one')]);
+        expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: 'store-one'), isTrue);
+        final draft = richDraft(kind: kind);
+        expect(await owner.saveWorkspaceStoreCouponCampaign(draft, expectedStoreId: 'store-one'), isTrue);
+        final before = jsonEncode(owner.workspaceOfferDraft);
+        await tester.pumpWidget(MaterialApp(home: Scaffold(body: ListView(children: [StoreCouponCampaignPanel(session: owner)]))));
+        await tester.pumpAndSettle();
+        final edit = find.byTooltip('Edit ${draft.name}'); await tester.ensureVisible(edit);
+        await tester.tap(edit); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-coupon-type')), findsOneWidget);
+        expect(find.text(kind.label), findsWidgets);
+        final expected = switch (kind) {
+          BuyV2StoreOfferKind.quantityPrice => 'work-coupon-tiers',
+          BuyV2StoreOfferKind.extraQuantity => 'work-coupon-buy-quantity',
+          BuyV2StoreOfferKind.nextPurchase => 'work-coupon-next-days',
+          BuyV2StoreOfferKind.buyerDiscount => 'work-coupon-buyers',
+          _ => 'work-coupon-discount',
+        };
+        final field = find.byKey(Key(expected));
+        await tester.scrollUntilVisible(field, 180, scrollable: find.descendant(
+          of: find.byKey(const Key('work-coupon-editor')), matching: find.byType(Scrollable)).first);
+        await tester.ensureVisible(field); await tester.pumpAndSettle();
+        expect(field.hitTestable(), findsOneWidget);
+        if (!draft.structuredTerms!.hasMonetaryDiscount) {
+          expect(find.byKey(const Key('work-coupon-discount')), findsNothing);
+        }
+        final save = find.byKey(const Key('work-coupon-save'));
+        expect(save.hitTestable(), findsOneWidget); expect(tester.getSize(save).height, greaterThanOrEqualTo(48));
+        await tester.tap(find.byTooltip('Close coupon editor')); await tester.pumpAndSettle();
+        expect(jsonEncode(owner.workspaceOfferDraft), before);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
   Map<String, dynamic> couponRecord(StoreCouponIntent original) => {...original.input.toJson(),
     'schemaVersion': 1, 'realm': scope.realm, 'storeId': scope.store, 'couponId': original.couponId,
     'revision': original.expectedRevision + 1, 'observedAt': at.toIso8601String()};
@@ -278,6 +634,68 @@ void main() {
       endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
       credentials: credentials, transport: transport, ownerAccountId: scope.account, realm: scope.realm,
       benefitTermsSupported: true, storeCouponTermsSupported: enabled, now: clock ?? () => at);
+
+  for (final scale in [1.0, 2.0]) {
+    for (final keyboard in [false, true]) {
+      testWidgets('COUPONFOOTER01 exported editor action $scale keyboard=$keyboard', (tester) async {
+        FlutterSecureStorage.setMockInitialValues({});
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 806);
+        tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 44);
+        tester.view.padding = const FakeViewPadding(top: 41, bottom: 44);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final owner = WorkSession(
+          gateway: const UnavailableWorkGateway(),
+          contactDraftStore: catalogue.ListingAccount(),
+          offerDraftStoreFactory: (_) => catalogue.ListingAccount(),
+        )..activeWorkspace = WorkWorkspace(id: scope.store, name: 'Host Store',
+          profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+        addTearDown(owner.dispose);
+        expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: scope.store), isTrue);
+        final campaign = StoreCouponCampaign.fromJson({...couponDraft().toJson(), 'revision': 1,
+          'endsAt': DateTime.utc(2027).toIso8601String()}, scope.store);
+        expect(await owner.saveWorkspaceStoreCouponCampaign(campaign, expectedStoreId: scope.store), isTrue);
+        final before = jsonEncode(owner.workspaceOfferDraft);
+        await tester.pumpWidget(MaterialApp(home: Scaffold(body: ListView(
+          children: [StoreCouponCampaignPanel(session: owner)]))));
+        await tester.pumpAndSettle();
+        final edit = find.byTooltip('Edit ${campaign.name}');
+        await tester.ensureVisible(edit);
+        await tester.pumpAndSettle();
+        expect(edit.hitTestable(), findsOneWidget);
+        await tester.tap(edit);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-coupon-editor')), findsOneWidget);
+        if (keyboard) {
+          final name = find.byKey(const Key('work-coupon-name'));
+          await tester.scrollUntilVisible(name, 150, scrollable: find.descendant(
+            of: find.byKey(const Key('work-coupon-editor')), matching: find.byType(Scrollable)).first);
+          await tester.pumpAndSettle();
+          await tester.showKeyboard(name);
+          tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+          tester.view.padding = const FakeViewPadding(top: 41);
+          await tester.pumpAndSettle();
+        }
+        final save = find.byKey(const Key('work-coupon-save'));
+        expect(save.hitTestable(), findsOneWidget);
+        expect(tester.getSize(save).height, greaterThanOrEqualTo(48));
+        expect(tester.getBottomRight(save).dy, lessThanOrEqualTo(keyboard ? 506.0 : 721.0),
+          reason: 'The whole coupon action must fit inside the exported Android window.');
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.byTooltip('Close coupon editor'));
+        tester.testTextInput.hide();
+        tester.view.resetViewInsets();
+        tester.view.padding = const FakeViewPadding(top: 41, bottom: 44);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-coupon-editor')), findsNothing);
+        expect(jsonEncode(owner.workspaceOfferDraft), before);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
 
   test('LF04 STORE COUPON exact frozen original excludes private revision and requires funding', () {
     final original = couponIntent(), bytes = original.fingerprint;
@@ -762,6 +1180,7 @@ void main() {
           contactDraftStore: catalogue.ListingAccount(),
           catalogueGateway: source,
           productPromotionGateway: provider,
+          productPromotionNow: () => at,
           productPromotionRealm: 'production',
           productPromotionPendingStoreFactory: (_) => journal,
         )

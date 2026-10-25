@@ -1318,7 +1318,309 @@ class _StockSessionCatalogue extends SessionCatalogue implements WorkspaceStoreS
 // never injected into native storage or claimed as live-service acceptance.
 const _bulkServiceCapture20261020 = r'''{"capturedAt":"2026-10-20T12:01:00.000Z","request":{"schemaVersion":1,"requestId":"request-one","storeId":"store-one","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10}]},"offer":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"offer-one","expectedRevision":1,"validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025}]},"accept":{"schemaVersion":1,"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"accept-one","expectedRevision":2},"created":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"supplierRequested":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"offered":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"supplier","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"accepted":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"recovered":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"request","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"request-one","requestFingerprint":"e61bc6284c6b771f90677f3376ecbb035236e77c2ba49d131f164ee30c75e974","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":3,"state":"accepted","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:01:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":{"offerRevision":2,"acceptedAt":"2026-10-20T12:01:00.000Z","agreementFingerprint":"b2c34081b4388d527be144ebaf7fc9202a7e24105d198b9a96457948ef4639cf"},"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"recorded","agreement":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":null,"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"proof":null},"unobserved":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","originalOperation":"accept","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","operationId":"never-accept","requestFingerprint":"9a47224ccf5ad2833db6eaff3e27e70983d53fb33c04c396a6016edc2da9557a","currentHead":{"schemaVersion":1,"realm":"evaluation","quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":2,"state":"offered","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","storeName":"Isolated Bulk supplier","lines":[{"lineId":"line-one","skuId":"sku-one","listingId":"listing-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","skuRevision":1,"quantity":10,"canonicalProductId":"canonical-one","verifiedPackId":"pack-one","name":"Isolated Bulk rice","packLabel":"25 kg bag","supplierPolicy":{"schemaVersion":1,"realm":"evaluation","storeId":"store-one","skuId":"sku-one","state":"ready","revision":1,"requiresAcceptance":true,"policy":{"id":"policy-one","storeId":"store-one","revision":"policy-v1","productIds":["sku-one"],"requiresAcceptance":true,"validUntil":null,"title":"Isolated supplier terms","body":"Discuss bank or delivery terms with supplier"}},"variant":"Aged\ngrain"}],"offer":{"revision":2,"offeredAt":"2026-10-20T12:00:00.000Z","validUntil":"2026-10-20T12:05:00.000Z","prices":[{"lineId":"line-one","unitPriceMinor":10025,"merchandiseMinor":100250}],"merchandiseMinor":100250,"policyFingerprint":"f65601e14f27291dc424fcb7fca23ebedbecf6671612ae817275e7d75fbcfa2d"},"acceptance":null,"viewerRole":"buyer","customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c","kind":"supplier_merchandise_agreement","currency":"INR","orderingAvailable":false,"finalChargesDetermined":false,"creditApproved":false},"state":"not_found","agreement":null,"proof":null},"buyerPage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"buyer","storeId":null,"currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","storeName":"Isolated Bulk supplier","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null},"storePage":{"schemaVersion":1,"realm":"evaluation","authNamespace":"firebase-default","viewerRole":"supplier","storeId":"store-one","currency":"INR","paging":"refreshable_not_snapshot","coverage":"saved_private_requests","summaries":[{"quoteId":"bulk-f9dd84c260b9965b045bcdbb9d2a30937bfd681940d2e0982d4231e6fe60ba7e","storeId":"store-one","revision":1,"state":"requested","storeName":"Isolated Bulk supplier","requestedAt":"2026-10-20T12:00:00.000Z","updatedAt":"2026-10-20T12:00:00.000Z","productCount":1,"offerMerchandiseMinor":null,"offerValidUntil":null,"customerReference":"customer-af4cc0bf97e4c13baaf41b6d5d9f376c"}],"nextCursor":null}}''';
 
+class _CartLocalHttpOverrides extends HttpOverrides {}
+
 void main() {
+  test('CARTSOURCE unavailable content does not retry from listener or getter', () async {
+    final packet = jsonDecode(File(Platform.environment['CART_SOURCE_PACKET']!).readAsStringSync()) as Map<String, dynamic>;
+    final data = packet['data'] as Map<String, dynamic>;
+    final variantPath = Platform.environment['CART_SOURCE_VARIANTS'];
+    var clock = DateTime.parse(data['observedAt'] as String).add(const Duration(milliseconds: 1));
+    var reads = 0, active = true;
+    final transport = OwnerTransport((body) async {
+      if (body['operation'] == 'readPublicStoreCatalogue') {
+        reads++;
+        return const SocialContentResponse(statusCode: 503, body: '{}');
+      }
+      return SocialContentResponse(statusCode: 200, body: body['operation'] == 'readPublicStoreVariantFamilies'
+        ? File(variantPath!).readAsStringSync() : jsonEncode(packet));
+    });
+    final connection = AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, realm: 'evaluation', now: () => clock,
+      reviewedFamilyReadbackSupported: variantPath != null, trustedReadClockSupported: variantPath != null,
+      productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+      storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+      supplierTaxReadbackSupported: true, commodityPriceReadbackSupported: true);
+    final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => active);
+    addTearDown(source.dispose);
+    final page = await source.loadProducts(BuyV2CatalogueQuery(destination: BuyV2Destination.wholesale, regionId: null,
+      areaScope: BuyV2CatalogueAreaScope.allAreas, wholesaleSaleType: BuyV2WholesaleSaleType.wholesale), pageSize: 30);
+    final product = page.items.single;
+    clock = source.displayedProduct(product)!.validUntil!.add(const Duration(seconds: 1));
+    source.addListener(() => source.snapshotFor(product));
+    await source.refreshProductContent(product);
+    for (var i = 0; i < 20; i++) {
+      expect(source.snapshotFor(product).state, BuyV2ProductContentState.unavailable);
+      await Future<void>.delayed(Duration.zero);
+    }
+    expect(reads, 1, reason: 'A failed refresh must not dispatch another read from its notification.');
+    await source.refreshProductContent(product);
+    expect(reads, 2, reason: 'Explicit retry remains possible.');
+    final successor = WorkspacePublicDiscoverySource(gateway: connection, current: () => active);
+    addTearDown(successor.dispose);
+    successor.addListener(() => successor.snapshotFor(product));
+    for (var i = 0; i < 20; i++) {
+      successor.snapshotFor(product);
+    }
+    for (var i = 0; i < 20; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    expect(reads, 3, reason: 'Concurrent initial getters share one read in a new owner.');
+    active = false;
+    await source.refreshProductContent(product);
+    expect(reads, 3, reason: 'A retired source cannot retry.');
+  }, skip: Platform.environment['CART_SOURCE_PACKET'] == null);
+  test('CARTSOURCE recorded authenticated discovery retains provider mappings', () async {
+    final packet = jsonDecode(File(Platform.environment['CART_SOURCE_PACKET']!).readAsStringSync()) as Map<String, dynamic>;
+    final data = packet['data'] as Map<String, dynamic>;
+    final variantPath = Platform.environment['CART_SOURCE_VARIANTS'];
+    final storePacket = Platform.environment['CART_SOURCE_STORES'];
+    final SocialContentTransport api = variantPath == null ? Transport(data) : OwnerTransport((body) async =>
+      SocialContentResponse(statusCode: 200, body: body['operation'] == 'readPublicStoreVariantFamilies'
+        ? File(variantPath).readAsStringSync() : body['resultKind'] == 'stores' && storePacket != null
+        ? File(storePacket).readAsStringSync() : jsonEncode(packet)));
+    final connection = AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: api, realm: 'evaluation',
+      reviewedFamilyReadbackSupported: variantPath != null, trustedReadClockSupported: variantPath != null,
+      productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+      storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+      supplierTaxReadbackSupported: true, commodityPriceReadbackSupported: true,
+      now: () => DateTime.parse(data['observedAt'] as String).add(const Duration(milliseconds: 1)));
+    final generation = ValueNotifier<int>(0);
+    addTearDown(generation.dispose);
+    final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => true,
+      requestGeneration: generation);
+    addTearDown(source.dispose);
+    final result = await source.loadProducts(BuyV2CatalogueQuery(destination: BuyV2Destination.wholesale, regionId: null,
+      areaScope: BuyV2CatalogueAreaScope.allAreas, categoryId: 'all',
+      wholesaleSaleType: BuyV2WholesaleSaleType.wholesale), pageSize: 30);
+    expect(result.items, hasLength(1));
+    expect(result.items.single.sourceSkuId, 'cart-local-rice-1kg');
+    final core = BuySession();
+    final buyer = BuyV2Session(core: core, reviewDataEnabled: false, catalogueNow: connection.now,
+      cataloguePageSource: source, variantFamilySource: source, productContentAdapter: source);
+    addTearDown(core.dispose); addTearDown(buyer.dispose);
+    final pager = buyer.acquireCatalogueProducts('captured-normal-buyer');
+    await pager.open(BuyV2CatalogueQuery(destination: BuyV2Destination.wholesale, regionId: null,
+      areaScope: BuyV2CatalogueAreaScope.allAreas, wholesaleSaleType: BuyV2WholesaleSaleType.wholesale));
+    expect(pager.message, isNull, reason: 'A verified listing must remain browsable when ordering is unavailable.');
+    expect(pager.page!.items.single.sourceSkuId, 'cart-local-rice-1kg');
+    if (storePacket != null) {
+      final stores = buyer.acquireCatalogueStores('captured-normal-stores');
+      await stores.open(BuyV2CatalogueQuery(destination: BuyV2Destination.wholesale, regionId: null,
+        areaScope: BuyV2CatalogueAreaScope.allAreas, wholesaleSaleType: BuyV2WholesaleSaleType.wholesale));
+      expect(stores.message, isNull, reason: 'All-area browsing does not confirm a Store delivery address.');
+      expect(stores.page!.items.single.id, 'cart-local-supplier-one');
+      expect(stores.page!.items.single.address, isEmpty);
+      expect(stores.page!.items.single.regionId, isEmpty);
+    }
+    buyer.openDestination(BuyV2Destination.wholesale);
+    buyer.toggleSaved(result.items.single.id);
+    expect(buyer.isSaved(result.items.single.id), isTrue);
+    expect(buyer.visibleSavedProducts.map((product) => product.id), contains(result.items.single.id),
+      reason: 'An unavailable saved listing stays visible for review; saving does not permit purchase.');
+    expect(buyer.addProduct(result.items.single.id), isFalse);
+    expect(buyer.quantityFor(result.items.single.id), 0);
+    generation.value++;
+    expect(buyer.visibleSavedProducts, isEmpty);
+    expect(buyer.isSaved(result.items.single.id), isTrue);
+  }, skip: Platform.environment['CART_SOURCE_PACKET'] == null);
+  for (final enabled in [false, true]) {
+    test('CARTSOURCE server observation preserves expiry with lagging device clock $enabled', () async {
+      final packet = jsonDecode(File(Platform.environment['CART_SOURCE_PACKET']!).readAsStringSync()) as Map<String, dynamic>;
+      final data = packet['data'] as Map<String, dynamic>, observed = DateTime.parse(data['observedAt'] as String);
+      var device = observed.subtract(const Duration(seconds: 2));
+      final connection = AuthenticatedWorkspaceCatalogueGateway(
+        endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), transport: Transport(data), realm: 'evaluation',
+        productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+        storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+        supplierTaxReadbackSupported: true, commodityPriceReadbackSupported: true,
+        trustedReadClockSupported: enabled, now: () => device);
+      final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => true);
+      addTearDown(source.dispose);
+      final query = BuyV2CatalogueQuery(destination: BuyV2Destination.wholesale, regionId: null,
+        areaScope: BuyV2CatalogueAreaScope.allAreas, wholesaleSaleType: BuyV2WholesaleSaleType.wholesale);
+      if (!enabled) {
+        await expectLater(source.loadProducts(query, pageSize: 30), throwsFormatException);
+        return;
+      }
+      final result = await source.loadProducts(query, pageSize: 30);
+      final product = result.items.single;
+      final listing = (data['items'] as List).single['listing'];
+      final originalUntil = DateTime.parse(listing['items'][0]['channels'][0]['validUntil'] as String);
+      expect(product.packTerms!.priceValidUntil, originalUntil);
+      expect(connection.now().isBefore(observed), isFalse);
+      final clockBefore = connection.now();
+      await Future<void>.delayed(const Duration(milliseconds: 75));
+      expect(connection.now().difference(clockBefore).inMilliseconds, greaterThanOrEqualTo(50));
+      expect(connection.forOwnerAccount('another-host-owner').now(), device);
+      device = originalUntil.add(const Duration(seconds: 1));
+      await expectLater(source.loadProducts(query, pageSize: 30), throwsFormatException);
+    }, skip: Platform.environment['CART_SOURCE_PACKET'] == null);
+  }
+  for (final defect in ['realm', 'schema', 'query', 'timestamp', 'retired', 'failed', 'duration-bound', 'ahead-expired']) {
+    test('CARTSOURCE invalid clock observation is not adopted $defect', () async {
+      final packet = jsonDecode(File(Platform.environment['CART_SOURCE_PACKET']!).readAsStringSync()) as Map<String, dynamic>;
+      final data = packet['data'] as Map<String, dynamic>, observed = DateTime.parse(data['observedAt'] as String);
+      final expiry = DateTime.parse(data['items'][0]['listing']['items'][0]['channels'][0]['validUntil'] as String);
+      final device = defect == 'ahead-expired' ? expiry.add(const Duration(seconds: 1)) :
+        observed.subtract(defect == 'duration-bound' ? const Duration(milliseconds: 299950) : const Duration(seconds: 2));
+      var active = true;
+      if (defect == 'realm') data['realm'] = 'production';
+      if (defect == 'schema') data['schemaVersion'] = 2;
+      if (defect == 'query') data['query']['search'] = 'foreign request';
+      if (defect == 'timestamp') data['observedAt'] = 'invalid';
+      final api = OwnerTransport((body) async {
+        if (defect == 'duration-bound') await Future<void>.delayed(const Duration(milliseconds: 120));
+        if (defect == 'retired') active = false;
+        return SocialContentResponse(statusCode: defect == 'failed' ? 503 : 200, body: jsonEncode(packet));
+      });
+      final connection = AuthenticatedWorkspaceCatalogueGateway(
+        endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), transport: api, realm: 'evaluation', trustedReadClockSupported: true,
+        productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+        storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+        supplierTaxReadbackSupported: true, commodityPriceReadbackSupported: true, now: () => device);
+      final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => active);
+      addTearDown(source.dispose);
+      await expectLater(source.loadProducts(BuyV2CatalogueQuery(destination: BuyV2Destination.wholesale, regionId: null,
+        areaScope: BuyV2CatalogueAreaScope.allAreas, wholesaleSaleType: BuyV2WholesaleSaleType.wholesale), pageSize: 30),
+        throwsFormatException);
+      expect(connection.now(), device);
+    }, skip: Platform.environment['CART_SOURCE_PACKET'] == null);
+  }
+  test('CARTSOURCE late responses cannot rewind the confirmed server clock', () async {
+    final packet = jsonDecode(File(Platform.environment['CART_SOURCE_PACKET']!).readAsStringSync()) as Map<String, dynamic>;
+    final observed = DateTime.parse(packet['data']['observedAt'] as String);
+    final pending = <Completer<SocialContentResponse>>[];
+    final api = OwnerTransport((body) {
+      final result = Completer<SocialContentResponse>(); pending.add(result); return result.future;
+    });
+    final connection = AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: api, realm: 'evaluation', trustedReadClockSupported: true,
+      productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+      storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+      supplierTaxReadbackSupported: true, commodityPriceReadbackSupported: true,
+      now: () => observed.subtract(const Duration(seconds: 2)));
+    final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => true);
+    addTearDown(source.dispose);
+    final query = BuyV2CatalogueQuery(destination: BuyV2Destination.wholesale, regionId: null,
+      areaScope: BuyV2CatalogueAreaScope.allAreas, wholesaleSaleType: BuyV2WholesaleSaleType.wholesale);
+    final first = source.loadProducts(query, pageSize: 30), second = source.loadProducts(query, pageSize: 30);
+    await Future<void>.delayed(Duration.zero);
+    expect(pending, hasLength(2));
+    final newer = jsonDecode(jsonEncode(packet));
+    newer['data']['observedAt'] = observed.add(const Duration(seconds: 1)).toIso8601String();
+    pending[1].complete(SocialContentResponse(statusCode: 200, body: jsonEncode(newer)));
+    expect((await second).items, hasLength(1));
+    final floor = connection.now();
+    pending[0].complete(SocialContentResponse(statusCode: 200, body: jsonEncode(packet)));
+    expect((await first).items, hasLength(1));
+    expect(connection.now().isBefore(floor), isFalse);
+  }, skip: Platform.environment['CART_SOURCE_PACKET'] == null);
+  test('CARTSOURCE source price expires while a lagging device clock is stationary', () async {
+    final packet = jsonDecode(File(Platform.environment['CART_SOURCE_PACKET']!).readAsStringSync()) as Map<String, dynamic>;
+    final data = packet['data'] as Map<String, dynamic>, observed = DateTime.parse(data['observedAt'] as String);
+    final expiry = observed.add(const Duration(milliseconds: 200));
+    for (final row in data['items']) {
+      for (final sku in row['listing']['items']) {
+        for (final channel in sku['channels']) { channel['validUntil'] = expiry.toIso8601String(); }
+      }
+    }
+    final connection = AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: Transport(data), realm: 'evaluation', trustedReadClockSupported: true,
+      productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+      storeClassificationReadbackSupported: true, supplierPublishersVersionSupported: true,
+      supplierTaxReadbackSupported: true, commodityPriceReadbackSupported: true,
+      now: () => observed.subtract(const Duration(seconds: 2)));
+    final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => true);
+    addTearDown(source.dispose);
+    final result = await source.loadProducts(BuyV2CatalogueQuery(destination: BuyV2Destination.wholesale, regionId: null,
+      areaScope: BuyV2CatalogueAreaScope.allAreas, wholesaleSaleType: BuyV2WholesaleSaleType.wholesale), pageSize: 30);
+    final terms = result.items.single.packTerms!;
+    expect(terms.priceValidUntil, expiry);
+    expect(terms.pricingCurrentAt(connection.now()), isTrue);
+    await Future<void>.delayed(const Duration(milliseconds: 230));
+    expect(terms.pricingCurrentAt(connection.now()), isFalse);
+    expect(terms.priceValidUntil, expiry);
+  }, skip: Platform.environment['CART_SOURCE_PACKET'] == null);
+  test('CARTLOCAL exact evaluator endpoint requires explicit local configuration', () {
+    final endpoint = Uri.parse('http://127.0.0.1:5001/demo-moolsocial-local/asia-south1/moolSocialWorkspace');
+    AuthenticatedWorkspaceCatalogueGateway connect({String realm = 'evaluation', Uri? uri}) =>
+      AuthenticatedWorkspaceCatalogueGateway(endpoint: uri ?? endpoint,
+        credentials: Credentials(), transport: Transport({}), realm: realm, ownerAccountId: 'host-local-owner');
+    if (const bool.fromEnvironment('MOOLSOCIAL_CART_LOCAL_EMULATOR')) {
+      expect(connect().endpoint, endpoint);
+      expect(connect().realm, 'evaluation');
+    } else {
+      expect(connect, throwsArgumentError);
+    }
+    expect(() => connect(realm: 'production'), throwsArgumentError);
+    for (final invalid in [
+      'http://localhost:5001/demo-moolsocial-local/asia-south1/moolSocialWorkspace',
+      'http://127.0.0.1:5002/demo-moolsocial-local/asia-south1/moolSocialWorkspace',
+      'http://127.0.0.1:5001/moolsocial-dev-503018/asia-south1/moolSocialWorkspace',
+      'http://127.0.0.1:5001/demo-moolsocial-local/asia-south1/moolSocialWorkspace/other',
+      'http://user@127.0.0.1:5001/demo-moolsocial-local/asia-south1/moolSocialWorkspace',
+      '${endpoint.toString()}?token=bad', '${endpoint.toString()}#bad',
+    ]) expect(() => connect(uri: Uri.parse(invalid)), throwsArgumentError);
+  });
+  test('CARTLOCAL local discovery cannot adopt production or foreign principals', () {
+    final localEnvironment = jsonEncode(['firebase-emulator', '127.0.0.1', '', 9099]);
+    expect(workspacePrincipalMatchesConnection(environment: localEnvironment,
+      projectId: 'demo-moolsocial-local', tenantId: null, realm: 'evaluation'),
+      const bool.fromEnvironment('MOOLSOCIAL_CART_LOCAL_EMULATOR'));
+    for (final environment in ['firebase-service',
+      jsonEncode(['firebase-emulator', '10.0.2.2', '', 9099]),
+      jsonEncode(['firebase-emulator', '127.0.0.1', '', 9098])]) {
+      expect(workspacePrincipalMatchesConnection(environment: environment,
+        projectId: 'demo-moolsocial-local', tenantId: null, realm: 'evaluation'), isFalse);
+    }
+    for (final entry in [
+      (project: 'moolsocial-dev-503018', realm: 'production', tenant: null),
+      (project: 'moolsocial-dev-503018', realm: 'evaluation', tenant: null),
+      (project: 'demo-other-project', realm: 'evaluation', tenant: null),
+      (project: 'demo-moolsocial-local', realm: 'production', tenant: null),
+      (project: 'demo-moolsocial-local', realm: 'evaluation', tenant: 'foreign-tenant'),
+    ]) {
+      expect(configuredWorkspacePublicDiscovery(environment: 'firebase-service', projectId: entry.project,
+        tenantId: entry.tenant, accountUserId: 'host-local-owner', realm: entry.realm, current: () => true), isNull);
+    }
+  });
+  test('CARTLOCAL local transport never forwards credentials on redirect', () async {
+    if (!const bool.fromEnvironment('MOOLSOCIAL_CART_LOCAL_EMULATOR')) return;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    var forwarded = false;
+    final subscription = server.listen((request) async {
+      await request.drain<void>();
+      if (request.uri.path == '/original') {
+        request.response.statusCode = HttpStatus.temporaryRedirect;
+        request.response.headers.set(HttpHeaders.locationHeader,
+          'http://127.0.0.1:${server.port}/unexpected');
+      } else {
+        forwarded = true;
+      }
+      await request.response.close();
+    });
+    final transport = HttpOverrides.runWithHttpOverrides(() => workspaceConnectionTransport(Uri.parse(
+      'http://127.0.0.1:5001/demo-moolsocial-local/asia-south1/moolSocialWorkspace')), _CartLocalHttpOverrides());
+    try {
+      final result = await transport.postJson(Uri.parse('http://127.0.0.1:${server.port}/original'),
+        headers: {'authorization': 'Bearer isolated-host-token', 'x-firebase-appcheck': 'local-emulator'},
+        body: {'operation': 'host-only'});
+      expect(result.statusCode, HttpStatus.temporaryRedirect);
+      expect(forwarded, isFalse);
+    } finally {
+      transport.close(force: true);
+      await subscription.cancel();
+      await server.close(force: true);
+    }
+  });
   Map<String, dynamic> restockClientPackets({bool bulk = false}) {
     final marker = bulk ? 'RESTOCK_BULK_CLIENT_CAPTURE=' : 'RESTOCK_CLIENT_CAPTURE=';
     final lines = File(Platform.environment[bulk ? 'LF_RESTOCK_BULK_CLIENT_LOG' : 'LF_RESTOCK_CLIENT_LOG']!).readAsLinesSync()
@@ -3615,8 +3917,9 @@ void main() {
     final transport = OwnerTransport((body) async {bodies.add(body); return publicCouponResponse(publicCouponData([publicCoupon()]));});
     final gateway = couponConnection(transport), source = WorkspaceStoreCatalogueSource(gateway: couponConnection(transport), storeId: 'store-one', current: () => true);
     final rows = await source.loadStoreCoupons(storeId: 'store-one');
-    expect(rows.single.name, 'Host Diwali savings'); expect(rows.single.terms.flatBasis, 'per_order');
-    expect(rows.single.terms.flatAmountMinor, 1050); expect(rows.single.configuredTotalUses, 20);
+    expect(rows.single.name, 'Host Diwali savings'); expect(rows.single.structuredTerms, isNull);
+    expect(rows.single.terms!.flatBasis, 'per_order');
+    expect(rows.single.terms!.flatAmountMinor, 1050); expect(rows.single.configuredTotalUses, 20);
     expect(rows.single.isCurrent(at), isTrue); expect(rows.single.isCurrent(at.add(const Duration(minutes: 1))), isFalse);
     expect(bodies.single.keys.toSet(), {'operation', 'storeId', 'storeCouponTermsVersion', 'storeCouponSnapshotVersion'});
     expect(bodies.single['operation'], 'readPublicStoreCouponSnapshot');
@@ -11797,7 +12100,7 @@ void main() {
     final details = find.byKey(ValueKey('buy-product-content-unavailable-${selected.id}'));
     await revealOptionalDetails(tester, selected, details);
     expect(find.text('All details'), findsNothing);
-    expect(find.text('Manufacturer info'), findsNothing);
+    expect(find.text('Pack information'), findsNothing);
     expect(find.text('Product details unavailable'), findsOneWidget);
     expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -11842,7 +12145,9 @@ void main() {
       customerStateStore: store, commerceAdapter: adapter, stockReader: stockReader, facts: facts,
       reviewDataEnabled: procurement == null, procurementIdentity: identity, procurementRestriction: restriction, termsAdapter: !withTerms ? null :
         (_HostMinorTerms()..reply = ((groups, totals) async => procurement == null ? _hostExactRetailTerms(groups, totals) :
-          BuyV2CommercialPaymentTermsSnapshot(state: BuyV2CommerceLoadState.ready, terms: [for (final group in groups)
+          BuyV2CommercialPaymentTermsSnapshot(state: BuyV2CommerceLoadState.ready,
+            assignedTermIdsByFulfilmentKey: {for (final group in groups) group.key: 'host-wholesale-advance'},
+            terms: [for (final group in groups)
             BuyV2CommercialPaymentTerm.minor(id: 'host-wholesale-advance', fulfilmentKey: group.key,
               destination: group.destination, supplierName: group.partner, kind: BuyV2CommercialPaymentTermKind.wholesaleAdvance,
               orderTotalMinor: totals[group.key]!, amountDueNowMinor: totals[group.key]!, balanceDueMinor: 0,
@@ -14079,7 +14384,7 @@ void main() {
         storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at).product;
       final session = await optionalDetailsSession(selected, _HostOptionalProductContent());
       await mountOptionalDetails(tester, session, scale);
-      final label = find.text('Store · Supplier');
+      final label = find.text('Sold by · Supplier');
       await revealOptionalDetails(tester, selected, label);
       expect(label, findsOneWidget); expect(selected.manufacturerVerified, isFalse);
       expect(tester.takeException(), isNull);
@@ -14089,8 +14394,8 @@ void main() {
         storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at).product;
       final session = await optionalDetailsSession(selected, _HostOptionalProductContent());
       await mountOptionalDetails(tester, session, scale);
-      await revealOptionalDetails(tester, selected, find.text('Store'));
-      expect(find.text('Store · Seller'), findsNothing); expect(find.text('Store · '), findsNothing);
+      await revealOptionalDetails(tester, selected, find.text('Sold by'));
+      expect(find.text('Sold by · Seller'), findsNothing); expect(find.text('Sold by · '), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -14184,6 +14489,35 @@ void main() {
     expect(store.publicContactPhone, publicFields.publicContactPhone); expect(store.openingHoursLabel, '09:00 – 21:00');
     expect(store.collection, isNull); expect(store.distanceMeters, isNull);
     consumer.releaseCatalogueStores('host-described-store');
+  });
+  test('PUBLICMAP original provider address reaches product and retires with source', () async {
+    SharedPreferences.setMockInitialValues({}); FlutterSecureStorage.setMockInitialValues({});
+    var current = true, clock = at;
+    final source = WorkspacePublicDiscoverySource(current: () => current,
+      gateway: discoveryGateway(OwnerTransport((body) async {
+        final data = discoveryData(body);
+        ((data['items'] as List).single['listing']['publicStore'] as Map)['details'] = metadata();
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      }), clock: () => clock));
+    final core = BuySession();
+    final consumer = BuyV2Session(core: core, cataloguePageSource: source,
+      productContentAdapter: source, reviewDataEnabled: false,
+      customerStateStore: _HostRetirableStateStore());
+    addTearDown(core.dispose); addTearDown(consumer.dispose); addTearDown(source.dispose);
+    final pager = consumer.acquireCatalogueProducts('host-public-address');
+    await pager.open(discoveryQuery());
+    expect(pager.message, isNull);
+    final product = pager.page!.items.single;
+    final trust = consumer.marketplaceTrustFor(product);
+    expect(trust.partnerLocation, publicFields.address);
+    expect(trust.partnerOrderCount, isNull);
+    expect(trust.partnerRating, isNull);
+    current = false;
+    expect(consumer.marketplaceTrustFor(product).partnerLocation, isNull);
+    current = true; clock = at.add(const Duration(hours: 2));
+    expect(consumer.marketplaceTrustFor(product).partnerLocation, isNull,
+      reason: 'Expired product readback must not retain independently cached seller details');
+    consumer.releaseCatalogueProducts('host-public-address');
   });
   test('LF-METADATA stale absent and wrong-Store empty catalogue headers are not confirmed empty feeds', () async {
     var revision = 2, wrongStore = false;

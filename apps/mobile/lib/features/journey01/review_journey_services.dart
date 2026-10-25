@@ -2072,11 +2072,13 @@ class DataConnectAccountBootstrapGateway implements AccountBootstrapGateway {
     required this._principalGateway,
     String? emulatorHost,
     this.port = 9399,
+    bool automaticHostMapping = true,
   }) : _upsertAccount = _executeDataConnectAccountUpsert {
     if (emulatorHost != null) {
       MobileConnector.instance.dataConnect.useDataConnectEmulator(
         emulatorHost,
         port,
+        automaticHostMapping: automaticHostMapping,
       );
     }
   }

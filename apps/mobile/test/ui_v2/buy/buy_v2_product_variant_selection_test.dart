@@ -499,18 +499,20 @@ void main() {
         final row = find.byKey(ValueKey(key));
         await tester.scrollUntilVisible(row, 250, scrollable: scroll);
         await tester.pumpAndSettle();
-        expect(
-          tester.widget<SingleChildScrollView>(row).scrollDirection,
-          Axis.horizontal,
-        );
+        final bounds = tester.getRect(row);
+        expect(bounds.left, greaterThanOrEqualTo(0));
+        expect(bounds.right, lessThanOrEqualTo(
+          tester.view.physicalSize.width / tester.view.devicePixelRatio));
         for (final label in [
           'Compare prices',
           'Cash on Delivery',
           'Customer support',
         ]) {
           final texts = find.descendant(of: row, matching: find.text(label));
-          for (final text in tester.widgetList<Text>(texts)) {
-            expect(text.softWrap, isFalse);
+          for (final text in texts.evaluate()) {
+            expect(tester.getSize(find.byElementPredicate(
+              (element) => identical(element, text))).width,
+              lessThanOrEqualTo(bounds.width));
           }
         }
         await tester.drag(row, const Offset(-240, 0));
@@ -994,7 +996,13 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('5+ packs'), findsOneWidget);
         expect(find.text('₹380 / Case'), findsOneWidget);
-        expect(find.text('Not yet confirmed'), findsNWidgets(2));
+        final priceDetails=find.byKey(ValueKey('buy-product-price-details-inline-${product.id}'));
+        final gstRow=find.ancestor(of:find.descendant(of:priceDetails,matching:find.text('Supplier GST')),
+          matching:find.byType(Padding)).first;
+        final freightRow=find.ancestor(of:find.descendant(of:priceDetails,matching:find.text('Freight')),
+          matching:find.byType(Padding)).first;
+        expect(find.descendant(of:gstRow,matching:find.text('GST not confirmed')),findsOneWidget);
+        expect(find.descendant(of:freightRow,matching:find.text('Not yet confirmed')),findsOneWidget);
         expect(find.text('Total'), findsNothing);
         expect(session.addProduct(product.id), isTrue);
         session.increase(product.id);

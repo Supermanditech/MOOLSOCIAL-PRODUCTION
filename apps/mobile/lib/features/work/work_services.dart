@@ -23,6 +23,7 @@ import '../buy/buy_session.dart';
 import '../buy/buy_v2_session.dart';
 import '../buy/buy_v2_saved_products_store.dart';
 import 'work_models.dart';
+import 'work_document_preview.dart';
 import 'work_customer_feedback.dart';
 import 'work_catalogue_gateway.dart';
 import 'work_supplier_policy.dart';
@@ -800,6 +801,12 @@ class _StoreReviewProcurementCatalogue
     return BuyV2CommercialPaymentTermsSnapshot(
       state: BuyV2CommerceLoadState.ready,
       terms: terms,
+      // Explicit isolated supplier assignment, not a buyer-selected option.
+      assignedTermIdsByFulfilmentKey: {
+        for (final group in groups)
+          if (group.destination == BuyV2Destination.wholesale)
+            group.key: 'test-${group.key}-delivery',
+      },
     );
   }
 
@@ -871,6 +878,7 @@ class WorkProcurementBookmark {
     .where((choice) => choice.name == uiPurpose).firstOrNull;
   static const returnDestinations = {
     'dashboard',
+    'catalogue',
     'stockStatement',
     'sourcing',
     'direct',
@@ -1391,6 +1399,10 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSu
         jsonEncode(previous!.fields) != jsonEncode(draft.fields)) {
       throw const WorkGatewayException('This payment attempt is retained. Verify its saved status before recording another.');
     }
+    if (previous?.supplierSupportingCopies != null && jsonEncode(previous!.supplierSupportingCopies!.previous.map((g) => g.toJson()).toList()) !=
+        jsonEncode(draft.supplierSupportingCopies?.previous.map((g) => g.toJson()).toList())) {
+      throw const WorkGatewayException('Previous draft copies must remain available. Reopen this saved input.');
+    }
     await _storage.write(key: _key(draft.key), value: encoded);
     _check(draft.key);
   });
@@ -1422,6 +1434,10 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSu
     if (previous?.revision != expectedRevision || previous?.supplierRefundIntent == null ||
         !await verifyCommitted(previous!.supplierRefundIntent!)) {
       throw const WorkGatewayException('Verify this exact refund before recording another.');
+    }
+    if (jsonEncode(next.supplierRefundCopies?.toJson()) !=
+        jsonEncode(previous.supplierRefundCopies?.archiveRefund(previous.supplierRefundIntent!).toJson())) {
+      throw const WorkGatewayException('Keep the previous draft copies before starting another refund.');
     }
     _check(next.key);
     await _storage.write(key: _key(next.key), value: encoded);
@@ -1489,6 +1505,10 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSu
         !await verifyCommitted(previous!.supplierCreditIntent!)) {
       throw const WorkGatewayException('Verify this exact supplier credit before starting another.');
     }
+    if (jsonEncode(next.supplierCreditCopies?.toJson()) !=
+        jsonEncode(previous.supplierCreditCopies?.archiveCredit(previous.supplierCreditIntent!).toJson())) {
+      throw const WorkGatewayException('Keep the previous draft copies before starting another credit note.');
+    }
     _check(next.key);
     await _storage.write(key: _key(next.key), value: encoded);
     _check(next.key);
@@ -1523,6 +1543,11 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSu
     if (previous?.revision != expectedRevision || previous?.supplierMoneyAttempt == null ||
         !await verifyCommitted(previous!.supplierMoneyAttempt!.entry)) {
       throw const WorkGatewayException('Verify this exact recorded payment before starting another.');
+    }
+    final copies = previous.supplierMoneyCopies;
+    if (jsonEncode(next.supplierMoneyCopies?.toJson()) !=
+        jsonEncode(copies?.archive(previous.supplierMoneyAttempt!).toJson())) {
+      throw const WorkGatewayException('Keep the previous draft copies before starting another payment.');
     }
     _check(next.key);
     await _storage.write(key: _key(next.key), value: encoded);
@@ -1658,6 +1683,11 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSu
     if (previous?.revision != expectedRevision || previous?.supplierAllocationIntent == null ||
         !await verifyCommitted(previous!.supplierAllocationIntent!)) {
       throw const WorkGatewayException('Verify this exact bill allocation before starting another.');
+    }
+    final copies = previous.supplierAllocationCopies;
+    if (jsonEncode(next.supplierAllocationCopies?.toJson()) !=
+        jsonEncode(copies?.archiveAllocation(previous.supplierAllocationIntent!).toJson())) {
+      throw const WorkGatewayException('Keep the saved bill allocation copies before starting another.');
     }
     _check(next.key);
     await _storage.write(key: _key(next.key), value: encoded);
@@ -2151,7 +2181,8 @@ abstract interface class WorkPurchaseBillGoodsReviewAbandonment {
 class WorkPurchaseInvoiceCapture {
   WorkPurchaseInvoiceCapture({required this.currentScope, WorkProofPicker? picker,
     Future<Directory> Function()? supportDirectory,
-    Future<String> Function(String)? recognize})
+    Future<String> Function(String)? recognize,
+    this.renderPdfPage})
     : picker = picker ?? NativeWorkProofPicker(),
       _supportDirectory = supportDirectory ?? getApplicationSupportDirectory,
       _recognize = recognize ?? _nativeRecognize;
@@ -2159,6 +2190,7 @@ class WorkPurchaseInvoiceCapture {
   final WorkProofPicker picker;
   final Future<Directory> Function() _supportDirectory;
   final Future<String> Function(String) _recognize;
+  final Future<WorkPdfPage> Function(Uint8List, int)? renderPdfPage;
   void _check((String, String, bool) scope) {
     if (scope != currentScope()) {
       throw const WorkGatewayException('Return to the same Store to continue with this invoice.');
@@ -2188,7 +2220,15 @@ class WorkPurchaseInvoiceCapture {
     return file;
   }
   Future<WorkspacePurchaseInvoiceAttachment?> capture((String, String, bool) scope,
-      String draftId, WorkProofSource source) async {
+      String draftId, WorkProofSource source) => _capture(scope, draftId, source);
+  /// Reject an oversized/stale draft candidate before publishing its original.
+  Future<WorkspacePurchaseInvoiceAttachment?> captureForDraft((String, String, bool) scope,
+      String draftId, WorkProofSource source, {
+      required bool Function(WorkspacePurchaseInvoiceAttachment) canRetain}) =>
+    _capture(scope, draftId, source, canRetain: canRetain);
+  Future<WorkspacePurchaseInvoiceAttachment?> _capture((String, String, bool) scope,
+      String draftId, WorkProofSource source, {
+      bool Function(WorkspacePurchaseInvoiceAttachment)? canRetain}) async {
     _check(scope);
     final picked = await picker.pick(source);
     _check(scope);
@@ -2214,16 +2254,27 @@ class WorkPurchaseInvoiceCapture {
       digest: crypto.sha256.convert(bytes).toString(),
       fileName: name.isEmpty ? 'Invoice' : name.substring(0, min(200, name.length)),
       contentType: mime, byteLength: bytes.length, source: source.name);
+    void checkCandidate() {
+      _check(scope);
+      if (canRetain != null && !canRetain(a)) {
+        throw const WorkGatewayException('This copy exceeds the current draft-copy limit or its Store context changed. Earlier copies are kept.');
+      }
+    }
+    checkCandidate();
     final file = await _file(a);
-    _check(scope);
-    if (await file.exists()) {
+    checkCandidate();
+    final exists = await file.exists();
+    checkCandidate();
+    if (exists) {
       await read(scope, draftId, a);
     } else {
       final temporary = File('${file.path}.${DateTime.now().microsecondsSinceEpoch}.${Random.secure().nextInt(1 << 32)}.pending');
       try {
         await temporary.writeAsBytes(bytes, flush: true);
-        _check(scope);
-        if (await file.exists()) {
+        checkCandidate();
+        final published = await file.exists();
+        checkCandidate();
+        if (published) {
           await read(scope, draftId, a);
         } else {
           await temporary.rename(file.path);
@@ -2256,27 +2307,131 @@ class WorkPurchaseInvoiceCapture {
   }
   Future<WorkspacePurchaseInvoiceAttachment> scan((String, String, bool) scope,
       String draftId, WorkspacePurchaseInvoiceAttachment a) async {
-    if (a.contentType == 'application/pdf') {
-      throw const WorkGatewayException('PDF attached. Enter its details manually, or photograph a page to read its text.');
-    }
-    await read(scope, draftId, a);
+    final bytes = await read(scope, draftId, a);
     try {
-      final text = await _recognize((await _file(a)).path);
+      final pdf = a.contentType == 'application/pdf';
+      final pages = pdf ? await _readPdf(scope, a, bytes) : [await _recognize((await _file(a)).path)];
       _check(scope);
+      final text = pages.join();
       if (text.trim().isEmpty || text.length > 60000) {
         throw const WorkGatewayException('The invoice text could not be read. Retake a clear photo or enter the details.');
       }
-      return a.withText(text);
+      final fields = [...a.extractedFields];
+      var overflow = a.extractionOverflow;
+      for (final (pageIndex, pageText) in pages.indexed) {
+        final extracted = WorkDocumentPrintedFields.read(pageText);
+        overflow = overflow || extracted.overflow;
+        for (final field in extracted.fields) {
+        final id = pdf ? 'p${pageIndex + 1}-${field.id}' : field.id;
+        // Stable source identities preserve an owner's corrections on rescan.
+        if (a.dismissedFieldIds.contains(id) || fields.any((old) => old.id == id)) continue;
+        final size = fields.fold<int>(0, (sum, f) => sum + f.label.length + f.value.length);
+        if (fields.length >= 200 || size + field.label.length + field.value.length > 48000) {
+          overflow = true; continue;
+        }
+        fields.add(WorkspacePurchaseAdditionalField(id: id, label: field.label,
+          value: field.value, section: 'receipt', sourceDigest: a.digest, sourcePage: pageIndex + 1));
+        }
+      }
+      final result = a.withText(text, pageLengths: pdf ? pages.map((p) => p.length).toList() : const [])
+        .withExtractedFields(fields, overflow: overflow);
+      if (!result.valid) throw const WorkGatewayException('The read details exceed the saved-copy limit. Your earlier fields are kept; split the document into smaller copies.');
+      return result;
     } on MissingPluginException {
       throw const WorkGatewayException('Text reading needs the next app update. Your invoice is kept; enter its details manually.');
     } on PlatformException {
       throw const WorkGatewayException('Text reading is unavailable. Your invoice is kept; retry or enter its details manually.');
+    } on WorkPdfPreviewException catch (error) {
+      throw WorkGatewayException('PDF text could not be read. ${error.message} Earlier details are kept; enter details manually or photograph the affected page.');
     }
+  }
+  Future<List<String>> _readPdf((String, String, bool) scope,
+      WorkspacePurchaseInvoiceAttachment a, Uint8List bytes) async {
+    final renderer = WorkPdfPreview();
+    final pages = <String>[];
+    var pageCount = 1, size = 0;
+    try {
+      final directory = await _directory(a.owner);
+      _check(scope);
+      for (var index = 0; index < pageCount; index++) {
+        final page = await (renderPdfPage?.call(bytes, index) ?? renderer.render(bytes, page: index));
+        _check(scope);
+        if (page.index != index || page.pageCount < 1 || page.pageCount > 20 ||
+            index > 0 && page.pageCount != pageCount) {
+          throw const WorkGatewayException('Read up to 20 PDF pages per copy. Split a longer document; earlier details are kept.');
+        }
+        pageCount = page.pageCount;
+        // This uniquely named private transient page is the only file this call
+        // may delete. Original PDF and saved photo files are never rewritten.
+        final temporary = File('${directory.path}${Platform.pathSeparator}ocr-${a.digest}-${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}.png');
+        if (await FileSystemEntity.type(temporary.path, followLinks: false) != FileSystemEntityType.notFound) {
+          throw const WorkGatewayException('PDF page storage is unavailable. Your copy is kept.');
+        }
+        try {
+          await temporary.writeAsBytes(page.bytes, flush: true);
+          _check(scope);
+          final text = await _recognize(temporary.path);
+          _check(scope);
+          size += text.length;
+          if (text.trim().isEmpty || size > 60000) {
+            throw WorkGatewayException('PDF page ${index + 1} could not be read within the text limit. No earlier details were replaced; photograph or split the affected page.');
+          }
+          pages.add(text);
+        } finally { if (await temporary.exists()) await temporary.delete(); }
+      }
+      return pages;
+    } finally { renderer.dispose(); }
   }
   static Future<String> _nativeRecognize(String path) async {
     final recognizer = invoice_ocr.TextRecognizer(script: invoice_ocr.TextRecognitionScript.latin);
     try { return (await recognizer.processImage(invoice_ocr.InputImage.fromFilePath(path))).text; }
     finally { await recognizer.close(); }
+  }
+}
+
+/// Printed labels and values only. Unlabelled lines stay explicit text fields;
+/// no inventory, financial, identity or verification decision is inferred.
+class WorkDocumentPrintedFields {
+  WorkDocumentPrintedFields(this.fields, this.overflow);
+  final List<WorkspacePurchaseAdditionalField> fields;
+  final bool overflow;
+  static ({String label, String value})? labelled(String row) {
+    if (row.contains('|') || row.split('\t').length > 2) return null; // Tables require their own explicit headers.
+    final match = RegExp(r'^\s*([^:=：\t]+?)\s*[:=：]\s*(.*?)\s*$').firstMatch(row) ??
+      RegExp(r'^\s*(\S(?:.*?\S)?)\s*(?:\t+| {2,})(\S.*?)\s*$').firstMatch(row);
+    if (match == null || match[1]!.trim().isEmpty) return null;
+    return (label: match[1]!.trim(), value: match[2]!.trim());
+  }
+  static WorkDocumentPrintedFields read(String text, {Set<int> excludedRows = const {}}) {
+    final fields = <WorkspacePurchaseAdditionalField>[];
+    final occurrences = <String, int>{};
+    var size = 0, overflow = false;
+    final rows = text.split(RegExp(r'\r?\n'));
+    void keep(String label, String value) {
+      if (label.length > 120) { value = '$label\n$value'; label = 'Printed text'; }
+      // A long printed paragraph becomes explicit numbered parts, never truncation.
+      final chunks = value.isEmpty ? [''] : [for (var i = 0; i < value.length; i += 4000)
+        value.substring(i, min(i + 4000, value.length))];
+      for (final (index, chunk) in chunks.indexed) {
+        final heading = chunks.length == 1 ? label : '${label.length > 100 ? 'Printed text' : label} · part ${index + 1}';
+        if (fields.length >= 200 || size + heading.length + chunk.length > 48000) { overflow = true; continue; }
+        final source = jsonEncode([heading, chunk]);
+        final occurrence = occurrences.update(source, (n) => n + 1, ifAbsent: () => 0);
+        final id = crypto.sha256.convert(utf8.encode(jsonEncode([source, occurrence]))).toString();
+        fields.add(WorkspacePurchaseAdditionalField(id: 'scan-$id', label: heading, value: chunk, section: 'invoice'));
+        size += heading.length + chunk.length;
+      }
+    }
+    for (var i = 0; i < rows.length; i++) {
+      if (excludedRows.contains(i) || rows[i].trim().isEmpty) continue;
+      final pair = labelled(rows[i]);
+      if (pair == null) { keep('Printed text', rows[i].trim()); continue; }
+      if (pair.value.isEmpty && i + 1 < rows.length && !excludedRows.contains(i + 1) &&
+          rows[i + 1].trim().isNotEmpty && labelled(rows[i + 1]) == null && !rows[i + 1].contains('|')) {
+        keep(pair.label, rows[++i].trim());
+      } else { keep(pair.label, pair.value); }
+    }
+    return WorkDocumentPrintedFields(List.unmodifiable(fields), overflow);
   }
 }
 
@@ -2288,6 +2443,47 @@ class WorkPurchaseInvoiceSuggestions {
   final List<Map<String, String>> goods;
   final List<WorkspacePurchaseAdditionalField> additionalFields;
   final bool additionalOverflow;
+  static WorkPurchaseInvoiceSuggestions fromAttachment(WorkspacePurchaseInvoiceAttachment copy) {
+    if (copy.pageTextLengths.isEmpty) return parse(copy.detectedText);
+    final parsed = copy.recognizedTextPages.map(parse).toList();
+    final candidates = <String, Set<String>>{};
+    for (final page in parsed) {
+      for (final entry in page.fields.entries) { (candidates[entry.key] ??= {}).add(entry.value); }
+    }
+    final ambiguous = candidates.entries.where((e) => e.value.length > 1).map((e) => e.key).toSet();
+    final fields = {for (final entry in candidates.entries) if (entry.value.length == 1) entry.key: entry.value.single};
+    final goods = <Map<String, String>>[], extras = <WorkspacePurchaseAdditionalField>[];
+    var overflow = false, size = 0;
+    void keep(WorkspacePurchaseAdditionalField field, int page, {int? itemIndex}) {
+      if (extras.length >= 200 || size + field.label.length + field.value.length > 48000) { overflow = true; return; }
+      extras.add(WorkspacePurchaseAdditionalField(id: 'p$page-${field.id}', label: field.label, value: field.value,
+        section: field.section, itemIndex: itemIndex, sourceDigest: copy.digest, sourcePage: page));
+      size += field.label.length + field.value.length;
+    }
+    for (final (index, page) in parsed.indexed) {
+      final offset = goods.length;
+      overflow = overflow || page.additionalOverflow;
+      goods.addAll(page.goods);
+      for (final extra in page.additionalFields) {
+        final item = extra.itemIndex == null ? null : offset + extra.itemIndex!;
+        if (item != null && item >= goods.length) { overflow = true; continue; }
+        keep(extra, index + 1, itemIndex: item);
+      }
+      // Conflicting printed totals/identities on different pages remain actual
+      // labelled candidates; never choose one by page order for auto-fill.
+      if (ambiguous.isNotEmpty) {
+        final raw = WorkDocumentPrintedFields.read(copy.recognizedTextPages[index]);
+        overflow = overflow || raw.overflow;
+        for (final field in raw.fields) {
+          if (parse('${field.label}: ${field.value}').fields.keys.any(ambiguous.contains)) {
+            keep(field, index + 1);
+          }
+        }
+      }
+    }
+    return WorkPurchaseInvoiceSuggestions(Map.unmodifiable(fields), List.unmodifiable(goods),
+      additionalFields: List.unmodifiable(extras), additionalOverflow: overflow);
+  }
   static String _label(String value) => value.trim().toLowerCase()
     .replaceAll(RegExp(r'\.(?!\d)'), '').replaceAll(RegExp(r'\s*/\s*'), '/')
     .replaceAll(RegExp(r'\s*₹\s*$'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
@@ -2400,25 +2596,31 @@ class WorkPurchaseInvoiceSuggestions {
     }
     final rows = text.split(RegExp(r'\r?\n'));
     String? party;
+    final coveredRows = <int>{};
     void candidate(String key, String value, String label, String rawValue) {
       (candidates[key] ??= {}).add(value);
       (originalCandidates[key] ??= []).add((label, rawValue));
     }
-    for (final row in rows) {
+    for (final (rowIndex, row) in rows.indexed) {
       final heading = _label(row).replaceFirst(RegExp(r':$'), '');
       final partyHeading = const ['supplier details','seller details','billed by'].contains(heading)
         ? 'supplier' : const ['buyer details','customer details','billed to','bill to'].contains(heading)
         ? 'buyer' : null;
-      if (partyHeading != null) party = partyHeading;
+      if (partyHeading != null) { party = partyHeading; coveredRows.add(rowIndex); }
       if (const ['tax invoice','bill of supply'].contains(heading)) {
         candidate('documentTitle', row.trim(), 'Document title', row.trim());
+        coveredRows.add(rowIndex);
       }
-      final match = RegExp(r'^\s*([^:]+?)\s*:\s*(.+?)\s*$').firstMatch(row);
+      final match = WorkDocumentPrintedFields.labelled(row);
       if (match == null) {
         if (heading.isNotEmpty && partyHeading == null) party = null;
         continue;
       }
-      final originalLabel = match[1]!.trim(), originalValue = match[2]!.trim();
+      // An empty heading may have its value on the following OCR line. Leave
+      // that pair to the loss-preserving extra-fields pass below.
+      if (match.value.isEmpty) continue;
+      coveredRows.add(rowIndex);
+      final originalLabel = match.label, originalValue = match.value;
       final normalizedLabel = _label(originalLabel);
       final rateLabel = RegExp(r'^(cgst|sgst|utgst|igst|gst|cess)\s*(?:@|at)\s*(\d+(?:\.\d+)?)\s*%$')
         .firstMatch(normalizedLabel);
@@ -2436,20 +2638,20 @@ class WorkPurchaseInvoiceSuggestions {
       var value = originalValue;
       if (key == null || value.length > (key == 'terms' ? 4000 :
           const ['shippingTerms', 'paymentTerms', 'amountInWords'].contains(key) ||
-          key.endsWith('Address') ? 500 : 120)) { party = null; keepRaw(match[1]!.trim(), value); continue; }
+          key.endsWith('Address') ? 500 : 120)) { party = null; keepRaw(originalLabel, value); continue; }
       if (key.endsWith('Gstin') && !RegExp(r'^[0-9A-Z]{15}$').hasMatch(value)) {
-        party = null; keepRaw(match[1]!.trim(), value); continue;
+        party = null; keepRaw(originalLabel, value); continue;
       }
       party = key.startsWith('supplier') ? 'supplier' : key.startsWith('buyer') ? 'buyer' : null;
       if (key == 'irn' && !RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(value)) {
-        keepRaw(match[1]!.trim(), value); continue;
+        keepRaw(originalLabel, value); continue;
       }
       if (const {'supplyValue', 'taxableValue', 'cgst', 'sgstAmount', 'sgst', 'utgst',
           'igst', 'cess', 'invoiceTotal', 'totalTax', 'amountPayable', 'roundOff',
           'billDiscount', 'freight', 'otherCharges'}.contains(key)) {
         final amount = _number(value, negative: key == 'roundOff');
         if (amount == null) {
-          keepRaw(match[1]!.trim(), value); continue;
+          keepRaw(originalLabel, value); continue;
         }
         value = amount;
         const printedRates = {'cgst':'printedCgstRate','sgst':'printedSgstRate',
@@ -2462,7 +2664,7 @@ class WorkPurchaseInvoiceSuggestions {
       if (const ['invoiceDate','ackDate','expectedDeliveryDate','dueDate'].contains(key)) {
         final date = _date(value);
         if (date == null) {
-          keepRaw(match[1]!.trim(), value); continue;
+          keepRaw(originalLabel, value); continue;
         }
         if (key == 'invoiceDate' && date != value) {
           candidate('originalInvoiceDate', value, 'Original invoice date', value);
@@ -2490,7 +2692,7 @@ class WorkPurchaseInvoiceSuggestions {
       'utgst %':'utgstRate', 'utgst rate':'utgstRate', 'utgst':'utgst', 'utgst amount':'utgst',
       'igst %':'igstRate', 'igst rate':'igstRate', 'igst':'igst', 'igst amount':'igst',
       'cess %':'cessRate', 'cess rate':'cessRate', 'cess':'cess', 'amount':'lineTotal'};
-    for (final row in rows) {
+    for (final (rowIndex, row) in rows.indexed) {
       if (!row.contains('|') && !row.contains('\t')) { headers = null; originalHeaders = null; continue; }
       final cells = row.split(RegExp(r'\||\t')).map((c) => c.trim()).toList();
       final mapped = cells.map((c) => columns[_label(c)] ?? '').toList();
@@ -2498,6 +2700,7 @@ class WorkPurchaseInvoiceSuggestions {
         final known = mapped.where((key) => key.isNotEmpty).toList();
         headers = known.toSet().length == known.length ? mapped : null;
         originalHeaders = cells;
+        if (headers != null) coveredRows.add(rowIndex);
         continue;
       }
       final rowHeaders = headers;
@@ -2528,13 +2731,17 @@ class WorkPurchaseInvoiceSuggestions {
       final quantity = double.tryParse(line['quantity']!);
       final cost = double.tryParse(line['cost']!);
       if (line['name']!.isNotEmpty && quantityText != null && costText != null &&
-          quantity != null && quantity > 0 && cost != null && cost >= 0 && goods.length < 200) {
+          quantity != null && quantity > 0 && cost != null && cost >= 0) {
         for (final cell in extraCells) {
           keepRaw(cell.$1, cell.$2, section: 'items', itemIndex: goods.length);
         }
         goods.add(line);
+        coveredRows.add(rowIndex);
       }
     }
+    final unmapped = WorkDocumentPrintedFields.read(text, excludedRows: coveredRows);
+    for (final field in unmapped.fields) { keepRaw(field.label, field.value); }
+    overflow = overflow || unmapped.overflow;
     return WorkPurchaseInvoiceSuggestions(Map.unmodifiable(fields), List.unmodifiable(goods),
       additionalFields: List.unmodifiable(additional), additionalOverflow: overflow);
   }
@@ -5964,18 +6171,13 @@ abstract interface class WorkGateway {
 
 WorkGateway buildWorkGateway() {
   final endpoint = Uri.tryParse(moolSocialWorkspaceUrl.trim());
-  if (endpoint == null ||
-      endpoint.scheme != 'https' ||
-      endpoint.host != 'asia-south1-moolsocial-dev-503018.cloudfunctions.net' ||
-      endpoint.path != '/moolSocialWorkspace' ||
-      endpoint.hasQuery ||
-      endpoint.hasFragment) {
+  if (endpoint == null || !validWorkspaceConnectionEndpoint(endpoint)) {
     return const UnavailableWorkGateway();
   }
   return AuthenticatedWorkGateway(
     endpoint: endpoint,
-    credentials: FirebaseSocialContentCredentials(),
-    transport: IoSocialContentTransport(),
+    credentials: workspaceConnectionCredentials(endpoint),
+    transport: workspaceConnectionTransport(endpoint),
   );
 }
 

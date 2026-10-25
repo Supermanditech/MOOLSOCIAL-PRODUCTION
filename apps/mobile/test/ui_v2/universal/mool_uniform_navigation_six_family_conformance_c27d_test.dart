@@ -56,16 +56,8 @@ void main() {
     }
     await tester.tap(find.byKey(const Key('screen04-rail-create')));
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('screen04-create-home')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('moolsocial-compact-destination-rail')),
-      findsOneWidget,
-    );
-    await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
-    await tester.pumpAndSettle();
+    // Create opens its editor directly; the retired intermediate home is not
+    // part of the current route. Closing returns to Feed with its rail restored.
     expect(
       find.byKey(const ValueKey('social-v2-create-workbench')),
       findsOneWidget,
@@ -76,7 +68,11 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('screen04-create-close')));
     await tester.pumpAndSettle();
-    await _expectFamily(tester, 'social', 'create');
+    expect(
+      find.byKey(const ValueKey('social-v2-create-workbench')),
+      findsNothing,
+    );
+    await _expectFamily(tester, 'social', 'feed');
     await _selectAndExpect(tester, 'screen04-rail-shorts', 'social', 'shorts');
 
     await _openFamily(tester, 'buy');
@@ -126,6 +122,76 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+  testWidgets(
+    'C27D real Social footer reserves only Android bottom inset',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      tester.view.padding = const FakeViewPadding(top: 27, bottom: 44);
+      tester.view.viewPadding = const FakeViewPadding(top: 27, bottom: 44);
+      addTearDown(tester.view.reset);
+      final journey = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'manual',
+            areaLabel: 'Jodhpur',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+      );
+      await journey.start();
+      addTearDown(journey.dispose);
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          initialLocation: '/app/social?sub=feed',
+          disposeBookSession: true,
+          disposeBuySession: true,
+          disposeChatSession: true,
+          disposeCreatorSession: true,
+          disposeEatSession: true,
+          disposeRideSession: true,
+          disposeSharedSession: true,
+          disposeWorkSession: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final footer = find.byKey(
+        const Key('moolsocial-single-home-launcher-shell'),
+      );
+      expect(find.byType(MoolDestinationNavigationV2), findsOneWidget);
+      expect(
+        tester
+            .widget<MoolDestinationNavigationV2>(
+              find.byType(MoolDestinationNavigationV2),
+            )
+            .activeId,
+        'social',
+      );
+      expect(
+        find.byKey(const Key('social-android-exported-semantics-clearance')),
+        findsNothing,
+      );
+      expect(tester.getSize(footer).height, 58 + 44);
+      for (final key in const [
+        'mool-compact-launcher',
+        'screen04-rail-videos',
+        'screen04-rail-shorts',
+        'screen04-rail-create',
+        'screen04-rail-feed',
+        'social-global-chat',
+      ]) {
+        final control = find.byKey(ValueKey(key));
+        expect(tester.getSize(control).height, 58);
+        expect(tester.getSize(control).width, greaterThanOrEqualTo(44));
+        expect(tester.getBottomRight(control).dy, closeTo(844 - 44, .001));
+      }
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
 }
 
 Future<void> _selectAndExpect(
@@ -197,7 +263,7 @@ Future<void> _expectFamily(
   if (familyId == 'social') {
     expect(
       find.byKey(const Key('moolsocial-uniform-destination-canvas')),
-      findsNothing,
+      findsOneWidget,
     );
     final socialRail = find.byKey(
       const Key('moolsocial-compact-destination-rail'),
@@ -210,10 +276,7 @@ Future<void> _expectFamily(
     final mool = find.byKey(const Key('mool-compact-launcher'));
     expect(
       tester.getSize(mool),
-      Size(
-        MoolLocalNavigationTokens.destinationFixedCellWidth,
-        MoolLocalNavigationTokens.destinationRailHeight,
-      ),
+      Size(390 / 6, MoolLocalNavigationTokens.destinationRailHeight),
     );
     expect(find.byKey(const Key('social-global-chat')), findsOneWidget);
     const socialControls = <String, String>{
@@ -266,12 +329,18 @@ Future<void> _expectFamily(
   );
 
   final mool = find.byKey(const Key('mool-compact-launcher'));
+  // Current family fixtures use equal outer cells in their available width.
+  // Buy includes Offers; Work has no duplicate root. Retain exact dimensions.
+  final outerCellWidth = switch (familyId) {
+    'buy' || 'book' => 390 / 6,
+    'eat' => 390 / 5,
+    'ride' => 390 / 7,
+    'work' => 390 / 4,
+    _ => throw StateError('Unexpected navigation family $familyId'),
+  };
   expect(
     tester.getSize(mool),
-    Size(
-      MoolLocalNavigationTokens.destinationFixedCellWidth,
-      MoolLocalNavigationTokens.destinationRailHeight,
-    ),
+    Size(outerCellWidth, MoolLocalNavigationTokens.destinationRailHeight),
   );
   expect(
     find.byKey(const Key('mool-compact-launcher-icon-label')),
@@ -283,15 +352,12 @@ Future<void> _expectFamily(
   );
 
   final familyRoot = find.byKey(ValueKey('moolsocial-family-root-$familyId'));
-  if (familyId == 'social') {
+  if (familyId == 'social' || familyId == 'work') {
     expect(familyRoot, findsNothing);
   } else {
     expect(
       tester.getSize(familyRoot),
-      Size(
-        MoolLocalNavigationTokens.destinationFixedCellWidth,
-        MoolLocalNavigationTokens.destinationRailHeight,
-      ),
+      Size(outerCellWidth, MoolLocalNavigationTokens.destinationRailHeight),
     );
     _expectLabelIsNotScaled(within: familyRoot, label: family.label);
   }
@@ -314,7 +380,7 @@ Future<void> _expectFamily(
       matching: find.text(action.label),
     );
     final label = tester.widget<Text>(labelFinder);
-    expect(label.maxLines, 2);
+    expect(label.maxLines, 1);
     expect(label.style?.fontFamily, 'Inter');
     expect(
       label.style?.fontSize,
@@ -324,10 +390,7 @@ Future<void> _expectFamily(
       label.style?.fontWeight,
       action.id == selectedActionId ? FontWeight.w800 : FontWeight.w700,
     );
-    expect(
-      find.ancestor(of: labelFinder, matching: find.byType(FittedBox)),
-      findsNothing,
-    );
+    _expectLabelIsNotScaled(within: control, label: action.label);
 
     final indicator = find.byKey(
       ValueKey('moolsocial-local-${action.id}-selected-indicator'),
@@ -364,8 +427,11 @@ Future<void> _expectFamily(
 void _expectLabelIsNotScaled({required Finder within, required String label}) {
   final text = find.descendant(of: within, matching: find.text(label));
   expect(text, findsOneWidget);
-  expect(
-    find.ancestor(of: text, matching: find.byType(FittedBox)),
-    findsNothing,
-  );
+  // A scaleDown wrapper is not evidence that text was actually shrunk. Check
+  // the rendered transform so real font scaling still fails this contract.
+  final textBox = text.evaluate().single.renderObject! as RenderBox;
+  final ownerBox = within.evaluate().single.renderObject! as RenderBox;
+  final transform = textBox.getTransformTo(ownerBox);
+  expect(transform.entry(0, 0), closeTo(1, .001));
+  expect(transform.entry(1, 1), closeTo(1, .001));
 }

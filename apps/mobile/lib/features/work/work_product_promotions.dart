@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../shared/social_content_gateway.dart';
 import '../buy/buy_v2_content_contracts.dart' show BuyV2AdvertisedBenefitTerms;
+import '../buy/buy_v2_models.dart' show BuyV2StoreOfferTerms, BuyV2StoreOfferKind;
 
 typedef StorePromotionScope = ({String account, String store, String realm});
 
@@ -15,7 +16,8 @@ class StoreCouponCampaign {
     required this.revision, required this.name, required this.percentage,
     required this.discount, required this.minimumSpendMinor,
     required this.maximumSavingMinor, required this.startsAt,
-    required this.endsAt, required this.totalUses, required this.usesPerCustomer}) {
+    required this.endsAt, required this.totalUses, required this.usesPerCustomer})
+    : structuredTerms = null, buyerReferences = const [] {
     if (id.trim().isEmpty || id.length > 128 || storeId.trim().isEmpty ||
         revision < 1 || name != name.trim() || name.isEmpty || name.length > 80 ||
         RegExp(r'[\x00-\x1f]').hasMatch(name) ||
@@ -28,14 +30,45 @@ class StoreCouponCampaign {
       throw const FormatException('Check the coupon name, saving, dates and limits.');
     }
   }
+  StoreCouponCampaign.offer({required this.id, required this.storeId, required this.revision,
+    required this.name, required BuyV2StoreOfferTerms structuredTerms,
+    Iterable<String> buyerReferences = const [], required this.startsAt, required this.endsAt,
+    required this.totalUses, required this.usesPerCustomer})
+    : structuredTerms = structuredTerms, buyerReferences = List.unmodifiable(buyerReferences),
+      percentage = structuredTerms.discountKind == 'percentage',
+      // Legacy monetary accessors are inactive for quantity/free-goods terms.
+      // Such offers always render/serialize structuredTerms, never these zeros.
+      discount = structuredTerms.discountValue ?? 0,
+      minimumSpendMinor = structuredTerms.minimumSpendMinor,
+      maximumSavingMinor = structuredTerms.maximumSavingMinor ?? 0 {
+    if (id.trim().isEmpty || id.length > 128 || storeId.trim().isEmpty ||
+        structuredTerms.storeId != storeId || revision < 1 || name != name.trim() ||
+        name.isEmpty || name.length > 80 || RegExp(r'[\x00-\x1f]').hasMatch(name) ||
+        !endsAt.isAfter(startsAt) || totalUses <= 0 || totalUses > 1000000000 ||
+        usesPerCustomer <= 0 || usesPerCustomer > totalUses || this.buyerReferences.length > 1000 ||
+        this.buyerReferences.toSet().length != this.buyerReferences.length ||
+        this.buyerReferences.any((id) => !RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$').hasMatch(id)) ||
+        (structuredTerms.kind == BuyV2StoreOfferKind.buyerDiscount
+          ? this.buyerReferences.isEmpty : this.buyerReferences.isNotEmpty)) {
+      throw const FormatException('Check this Store’s offer, buyers, dates and usage limits.');
+    }
+  }
   final String id, storeId, name;
+  final BuyV2StoreOfferTerms? structuredTerms;
+  /// Private Store-customer references. Never include these in public terms.
+  final List<String> buyerReferences;
   final int revision;
   final bool percentage;
   /// Flat saving in paise, or percentage in basis points (100 = 1%).
   final int discount, minimumSpendMinor, maximumSavingMinor;
   final DateTime startsAt, endsAt;
   final int totalUses, usesPerCustomer;
-  Map<String, Object> toJson() => {
+  Map<String, Object> toJson() => structuredTerms != null ? {
+    'schemaVersion': 2, 'id': id, 'storeId': storeId, 'revision': revision, 'name': name,
+    'structuredTerms': structuredTerms!.toJson(), 'buyerReferences': buyerReferences,
+    'startsAt': startsAt.toUtc().toIso8601String(), 'endsAt': endsAt.toUtc().toIso8601String(),
+    'totalUses': totalUses, 'usesPerCustomer': usesPerCustomer,
+  } : {
     'id': id, 'storeId': storeId, 'revision': revision, 'name': name,
     'percentage': percentage, 'discount': discount,
     'minimumSpendMinor': minimumSpendMinor, 'maximumSavingMinor': maximumSavingMinor,
@@ -44,6 +77,21 @@ class StoreCouponCampaign {
     'totalUses': totalUses, 'usesPerCustomer': usesPerCustomer,
   };
   factory StoreCouponCampaign.fromJson(Object? raw, String storeId) {
+    if (raw is Map && raw['schemaVersion'] == 2) {
+      final row = _map(raw, ['schemaVersion', 'id', 'storeId', 'revision', 'name',
+        'structuredTerms', 'buyerReferences', 'startsAt', 'endsAt', 'totalUses', 'usesPerCustomer']);
+      if (row['schemaVersion'] is! int || row['storeId'] != storeId || row['buyerReferences'] is! List ||
+          (row['buyerReferences'] as List).any((value) => value is! String) ||
+          row['totalUses'] is! int || row['usesPerCustomer'] is! int) {
+        throw const FormatException('Check the saved offer.');
+      }
+      return StoreCouponCampaign.offer(id: _text(row['id'], 128), storeId: storeId,
+        revision: _revision(row['revision'], 1), name: _text(row['name'], 80),
+        structuredTerms: BuyV2StoreOfferTerms.fromJson(row['structuredTerms']),
+        buyerReferences: (row['buyerReferences'] as List).cast<String>(),
+        startsAt: _time(row['startsAt']), endsAt: _time(row['endsAt']),
+        totalUses: row['totalUses'] as int, usesPerCustomer: row['usesPerCustomer'] as int);
+    }
     if (raw is! Map || raw.length != 12 || raw['storeId'] != storeId ||
         raw['id'] is! String || raw['name'] is! String || raw['revision'] is! int ||
         raw['percentage'] is! bool || raw['discount'] is! int ||
@@ -66,12 +114,15 @@ class StoreCouponCampaign {
 List<StoreCouponCampaign> decodeStoreCouponCampaigns(String? encoded, String storeId) {
   if (encoded == null) return const [];
   final raw = jsonDecode(encoded);
-  if (raw is! Map || raw.length != 2 || raw['schemaVersion'] != 1 ||
+  if (raw is! Map || raw.length != 2 || raw['schemaVersion'] is! int || !{1, 2}.contains(raw['schemaVersion']) ||
       raw['campaigns'] is! List || (raw['campaigns'] as List).length > 50) {
     throw const FormatException('Saved coupons need a compatible app version.');
   }
   final records = (raw['campaigns'] as List)
       .map((row) => StoreCouponCampaign.fromJson(row, storeId)).toList();
+  if (raw['schemaVersion'] == 1 && records.any((record) => record.structuredTerms != null)) {
+    throw const FormatException('Check the saved offer version.');
+  }
   if (records.map((row) => row.id).toSet().length != records.length) {
     throw const FormatException('Saved coupon identities could not be checked.');
   }
@@ -79,7 +130,8 @@ List<StoreCouponCampaign> decodeStoreCouponCampaigns(String? encoded, String sto
 }
 
 String encodeStoreCouponCampaigns(List<StoreCouponCampaign> campaigns) => jsonEncode({
-  'schemaVersion': 1, 'campaigns': campaigns.map((row) => row.toJson()).toList(),
+  'schemaVersion': campaigns.any((row) => row.structuredTerms != null) ? 2 : 1,
+  'campaigns': campaigns.map((row) => row.toJson()).toList(),
 });
 
 const _couponKeys = ['name', 'percentage', 'discount', 'minimumSpendMinor',
@@ -89,11 +141,31 @@ const _couponKeys = ['name', 'percentage', 'discount', 'minimumSpendMinor',
 @immutable
 class StoreCouponInput {
   StoreCouponInput.fromCampaign(StoreCouponCampaign campaign, {required bool active})
-    : this.fromJson({for (final key in _couponKeys.where((k) => k != 'active'))
+    : this.fromJson(campaign.structuredTerms != null ? {
+        'schemaVersion': 2, 'name': campaign.name, 'structuredTerms': campaign.structuredTerms!.toJson(),
+        'buyerReferences': campaign.buyerReferences, 'startsAt': _iso(campaign.startsAt),
+        'endsAt': _iso(campaign.endsAt), 'totalUses': campaign.totalUses,
+        'usesPerCustomer': campaign.usesPerCustomer, 'active': active,
+      } : {for (final key in _couponKeys.where((k) => k != 'active'))
         key: campaign.toJson()[key], 'startsAt': _iso(campaign.startsAt),
         'endsAt': _iso(campaign.endsAt), 'active': active});
   StoreCouponInput.fromJson(Object? raw) : _encoded = _validate(raw);
   static String _validate(Object? raw) {
+    if (raw is Map && raw['schemaVersion'] == 2) {
+      const keys = ['schemaVersion', 'name', 'structuredTerms', 'buyerReferences',
+        'startsAt', 'endsAt', 'totalUses', 'usesPerCustomer', 'active'];
+      final row = _map(raw, keys);
+      if (row['schemaVersion'] is! int || row['active'] is! bool || row['buyerReferences'] is! List ||
+          (row['buyerReferences'] as List).any((id) => id is! String) ||
+          row['totalUses'] is! int || row['usesPerCustomer'] is! int) { throw const FormatException(); }
+      final terms = BuyV2StoreOfferTerms.fromJson(row['structuredTerms']);
+      StoreCouponCampaign.offer(id: 'coupon-check', storeId: terms.storeId, revision: 1,
+        name: _text(row['name'], 80), structuredTerms: terms,
+        buyerReferences: (row['buyerReferences'] as List).cast<String>(),
+        startsAt: _time(row['startsAt']), endsAt: _time(row['endsAt']),
+        totalUses: row['totalUses'] as int, usesPerCustomer: row['usesPerCustomer'] as int);
+      return jsonEncode({for (final key in keys) key: row[key]});
+    }
     final row = _map(raw, _couponKeys);
     if (row['active'] is! bool) throw const FormatException('Check the coupon status.');
     // Share owner validation without adopting its local revision or identity.
@@ -105,6 +177,12 @@ class StoreCouponInput {
     return jsonEncode({for (final key in _couponKeys) key: row[key]});
   }
   final String _encoded;
+  bool get structured => toJson()['schemaVersion'] == 2;
+  void validateStore(String storeId) {
+    if (structured && BuyV2StoreOfferTerms.fromJson(toJson()['structuredTerms']).storeId != storeId) {
+      throw const FormatException('The offer belongs to another Store.');
+    }
+  }
   Map<String, dynamic> toJson() => jsonDecode(_encoded) as Map<String, dynamic>;
   String get fingerprint => _encoded;
   String get name => toJson()['name'] as String;
@@ -124,6 +202,7 @@ class StoreCouponIntent {
     required this.expectedRevision, required this.idempotencyKey,
     required this.input, required bool fundingAcknowledged}) {
     _scope(scope); _id(couponId); _id(idempotencyKey); _revision(expectedRevision);
+    input.validateStore(scope.store);
     if (!fundingAcknowledged || expectedRevision >= 1000000000) {
       throw const FormatException('Confirm Store funding and refresh the coupon.');
     }
@@ -132,22 +211,25 @@ class StoreCouponIntent {
   final String couponId, idempotencyKey;
   final int expectedRevision;
   final StoreCouponInput input;
-  Map<String, dynamic> get body => {'storeId': scope.store, 'couponId': couponId,
+  Map<String, dynamic> get body => {if (input.structured) 'storeCouponTermsVersion': 2,
+    'storeId': scope.store, 'couponId': couponId,
     'expectedRevision': expectedRevision, 'idempotencyKey': idempotencyKey,
     'coupon': input.toJson(), 'fundingAcknowledged': true};
-  Map<String, dynamic> toJson() => {'schemaVersion': 1, 'storeCouponTermsVersion': 1, 'accountId': scope.account,
+  Map<String, dynamic> toJson() => {'schemaVersion': 1, 'storeCouponTermsVersion': input.structured ? 2 : 1, 'accountId': scope.account,
     'realm': scope.realm, ...body};
   String get fingerprint => jsonEncode(toJson());
   factory StoreCouponIntent.fromJson(Object? raw) {
     final row = _map(raw, ['schemaVersion', 'storeCouponTermsVersion', 'accountId', 'realm', 'storeId', 'couponId',
       'expectedRevision', 'idempotencyKey', 'coupon', 'fundingAcknowledged']);
-    if (row['schemaVersion'] != 1 || row['storeCouponTermsVersion'] != 1 || row['fundingAcknowledged'] != true) {
+    final input = StoreCouponInput.fromJson(row['coupon']);
+    if (row['schemaVersion'] is! int || row['schemaVersion'] != 1 || row['storeCouponTermsVersion'] is! int ||
+        row['storeCouponTermsVersion'] != (input.structured ? 2 : 1) || row['fundingAcknowledged'] != true) {
       throw const FormatException('Keep the original coupon request.');
     }
     return StoreCouponIntent(scope: (account: _id(row['accountId']), store: _id(row['storeId']),
       realm: _text(row['realm'], 16)), couponId: _id(row['couponId']),
       expectedRevision: _revision(row['expectedRevision']), idempotencyKey: _id(row['idempotencyKey']),
-      input: StoreCouponInput.fromJson(row['coupon']), fundingAcknowledged: true);
+      input: input, fundingAcknowledged: true);
   }
 }
 
@@ -161,6 +243,18 @@ class StoreCouponRecord {
   final StoreCouponInput input;
   static StoreCouponRecord decode(Object? raw, StorePromotionScope scope, DateTime now) {
     _scope(scope);
+    if (raw is Map && raw['schemaVersion'] == 2) {
+      final row = _map(raw, ['schemaVersion', 'storeCouponTermsVersion', 'accountId', 'realm', 'storeId',
+        'couponId', 'revision', 'observedAt', 'coupon']);
+      final input = StoreCouponInput.fromJson(row['coupon']), observed = _time(row['observedAt']);
+      if (row['schemaVersion'] is! int || row['storeCouponTermsVersion'] is! int ||
+          row['storeCouponTermsVersion'] != 2 || row['accountId'] != scope.account ||
+          row['realm'] != scope.realm || row['storeId'] != scope.store || !input.structured || observed.isAfter(now.toUtc())) {
+        throw const FormatException('Refresh the exact Store offer.');
+      }
+      input.validateStore(scope.store);
+      return StoreCouponRecord._(scope, _id(row['couponId']), _revision(row['revision'], 1), observed, input);
+    }
     final row = _map(raw, [..._couponKeys, 'schemaVersion', 'realm', 'storeId', 'couponId', 'revision', 'observedAt']);
     final observed = _time(row['observedAt']);
     if (row['schemaVersion'] != 1 || row['realm'] != scope.realm || row['storeId'] != scope.store || observed.isAfter(now.toUtc())) {
@@ -193,6 +287,12 @@ abstract interface class StoreCouponGateway {
   Future<StoreCouponResult> reconcileCoupon(StoreCouponIntent original, bool Function() current);
 }
 
+/// Proposed richer publication capability. Existing v1 gateways do not acquire
+/// this authority merely because a private draft has new fields.
+abstract interface class StoreStructuredCouponGateway implements StoreCouponGateway {
+  bool get structuredCouponTermsSupported;
+}
+
 abstract interface class StoreCouponPendingStore {
   Future<StoreCouponIntent?> read(StorePromotionScope scope);
   Future<void> save(StoreCouponIntent original);
@@ -217,6 +317,8 @@ class StoreCouponController extends ChangeNotifier {
   String? loadedCouponId, message;
   StoreCouponRecord? currentRecord, lastAcknowledged;
   StoreCouponIntent? pending;
+  bool supports(StoreCouponInput input) => !input.structured ||
+    gateway is StoreStructuredCouponGateway && (gateway as StoreStructuredCouponGateway).structuredCouponTermsSupported;
   Future<bool>? _restoring;
   void _emit() {if (!_closed) notifyListeners();}
   Future<bool> restore() {
@@ -244,7 +346,7 @@ class StoreCouponController extends ChangeNotifier {
       loadedCouponId = null;
       final result = await gateway.readCoupon(scope, couponId, () => active).timeout(const Duration(seconds: 25));
       if (!active) return false;
-      if (result != null && (result.scope != scope || result.couponId != couponId)) throw const FormatException();
+      if (result != null && (result.scope != scope || result.couponId != couponId || !supports(result.input))) throw const FormatException();
       currentRecord = result; loadedCouponId = couponId; message = null;
       return true;
     } on Object {
@@ -256,6 +358,10 @@ class StoreCouponController extends ChangeNotifier {
     {required bool fundingAcknowledged, required bool Function() inputCurrent}) async {
     const notSent = StoreCouponResult(StorePromotionResultState.notSent);
     if (!active || busy || !gateway.storeCouponTermsSupported || !fundingAcknowledged) return notSent;
+    if (!supports(input)) {
+      message = 'Publishing is not available for this offer yet. Your draft is kept.';
+      _emit(); return notSent;
+    }
     busy = true; _emit();
     try {
       if (!await restore() || !active || pending != null || loadedCouponId != couponId) return notSent;
@@ -296,6 +402,9 @@ class StoreCouponController extends ChangeNotifier {
     try {
       if (!await restore() || !active || pending == null) return unknown;
       final original = pending!;
+      if (!supports(original.input)) {
+        message = 'The original offer needs a compatible service. It remains held.'; return unknown;
+      }
       final result = await gateway.reconcileCoupon(original, () => active).timeout(const Duration(seconds: 25));
       if (result.state != StorePromotionResultState.saved) return unknown;
       return await _finish(original, result);
@@ -313,6 +422,9 @@ class StoreCouponController extends ChangeNotifier {
     try {
       if (!await restore() || !active || pending == null) return unknown;
       final original = pending!;
+      if (!supports(original.input)) {
+        message = 'The original offer needs a compatible service. It remains held.'; return unknown;
+      }
       final result = await gateway.saveCoupon(original, () => active).timeout(const Duration(seconds: 25));
       if (result.state != StorePromotionResultState.saved) {
         if (active) message = 'The original update is still held. No replacement request was created; check its result again.';
@@ -738,7 +850,7 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
     final row = _couponEnvelope(response, scope, ['record']);
     if (row['record'] == null) return null;
     final value = StoreCouponRecord.decode(row['record'], scope, now());
-    if (value.couponId != couponId) throw const FormatException('Wrong coupon returned.');
+    if (value.couponId != couponId || value.input.structured) throw const FormatException('Wrong or unsupported coupon returned.');
     return value;
   }
   @override
@@ -762,6 +874,7 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
     var previous = after;
     for (final item in items) {
       final value = StoreCouponRecord.decode(item, scope, now());
+      if (value.input.structured) throw const FormatException('This service does not support structured offers.');
       if (previous != null && value.couponId.compareTo(previous) <= 0) throw const FormatException('Coupon page order changed.');
       values.add(value); previous = value.couponId;
     }
@@ -774,6 +887,11 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
   @override
   Future<StoreCouponResult> reconcileCoupon(StoreCouponIntent original, bool Function() current) => _writeCoupon(original, current, recovery: true);
   Future<StoreCouponResult> _writeCoupon(StoreCouponIntent original, bool Function() current, {required bool recovery}) async {
+    if (original.input.structured) {
+      // This concrete transport negotiates terms v1 only. A future v2 adapter
+      // must explicitly implement StoreStructuredCouponGateway.
+      return StoreCouponResult(recovery ? StorePromotionResultState.unknown : StorePromotionResultState.notSent);
+    }
     var sent = false;
     try {
       if (!recovery) original.input.validateForSave(now());

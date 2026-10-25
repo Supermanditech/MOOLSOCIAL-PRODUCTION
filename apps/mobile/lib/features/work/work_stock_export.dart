@@ -1238,20 +1238,79 @@ Future<Uint8List> _generateStockLedgerFile(
   );
 }
 
+/// Purpose guidance only; choosing a copy never authorizes its business effect.
+const storeTradeDocumentGuidance = <String, ({String label, String guide})>{
+  'purchaseOrder': (label: 'Purchase order / Sales order', guide: 'The buyer’s purchase order is the supplier’s sales order.'),
+  'orderConfirmation': (label: 'Order confirmation', guide: 'Confirmed items, quantities, prices, payment terms and delivery commitment.'),
+  'orderAmendment': (label: 'Order amendment', guide: 'A recorded change to an order; retain the earlier agreed details.'),
+  'orderCancellation': (label: 'Order cancellation', guide: 'Cancelled items, the reason and who cancelled them.'),
+  'pickList': (label: 'Pick list', guide: 'Internal items and batches to pick for an order.'),
+  'packingList': (label: 'Packing list', guide: 'Items, batches and cartons actually packed.'),
+  'shortSupply': (label: 'Short supply / substitution', guide: 'Unavailable goods or a proposed replacement; check buyer agreement.'),
+  'supplierInvoice': (label: 'Supplier invoice / bill', guide: 'Supplier’s bill. Record its invoice type and amounts in Purchase entry.'),
+  'deliveryChallan': (label: 'Delivery challan', guide: 'Goods-movement document for an applicable purpose; not proof of payment.'),
+  'ewayBill': (label: 'E-way bill', guide: 'Copy the portal-issued number and transport details; attaching it does not verify validity.'),
+  'transportReceipt': (label: 'LR / GR / Bilty', guide: 'Transporter’s consignment receipt, number, date and carrier details.'),
+  'freightBill': (label: 'Freight invoice / transport bill', guide: 'Transport charges billed by the carrier; keep separate from the goods invoice.'),
+  'proofOfDelivery': (label: 'Delivery acknowledgment / POD', guide: 'Recipient’s acknowledgment and delivery evidence; check quantities actually received.'),
+  'goodsReceipt': (label: 'Goods receipt note / GRN', guide: 'The buying Store’s record of goods physically received; distinct from a transporter’s GR.'),
+  'shortageDamage': (label: 'Shortage / damage report', guide: 'Differences between dispatched and received goods, with supporting evidence.'),
+  'failedDelivery': (label: 'Failed delivery / return to origin', guide: 'Undelivered or refused goods and their return movement.'),
+  'paymentReceipt': (label: 'Payment receipt / collection voucher', guide: 'Receipt for an actual payment; a payment screenshot alone does not confirm funds received.'),
+  'paymentAdvice': (label: 'Payment advice / remittance advice', guide: 'Invoices the payer intends to settle; not confirmation that money was received.'),
+  'supplierRefundVoucher': (label: 'Supplier GST refund voucher', guide: 'Supplier-issued against an advance receipt when no supply or tax invoice follows. Keep the original receipt reference and printed GST details; this copy does not adjust GST.'),
+  'creditApproval': (label: 'Credit terms / credit approval', guide: 'Buyer-specific credit approved by the supplier, including days and limit.'),
+  'accountStatement': (label: 'Supplier / customer account statement', guide: 'Bills, payments, credits and outstanding from the relevant account’s perspective.'),
+  'returnNote': (label: 'Purchase return / sales return note', guide: 'Returned goods and inspection; buyer’s purchase return is supplier’s sales return.'),
+  'supplierCreditNote': (label: 'Supplier credit note', guide: 'Supplier-issued credit linked to the original bill; check GST or commercial treatment separately.'),
+  'supplierDebitNote': (label: 'Supplier GST debit note', guide: 'Supplier-issued upward value or tax adjustment; not a buyer’s shortage claim.'),
+  'commercialAdjustment': (label: 'Commercial credit adjustment', guide: 'Agreed financial adjustment; do not assume it changes GST.'),
+  'claim': (label: 'Claim note / invoice dispute', guide: 'Buyer’s shortage, damage or invoice claim; keep the resolution separately.'),
+  'balanceConfirmation': (label: 'Balance confirmation', guide: 'Account balance as at a stated date, with agreed or disputed differences.'),
+  'settlement': (label: 'Settlement record', guide: 'Agreed resolution linked to payments and adjustments; not a new payment receipt.'),
+  'other': (label: 'Other supporting document', guide: 'Copy its actual printed title and details; its purpose remains to be checked.'),
+};
+
+String storeTradeDocumentLabel(String type) => storeTradeDocumentGuidance[type]?.label ?? 'Document type not selected';
+String storeTradeDocumentGuide(String type) => storeTradeDocumentGuidance[type]?.guide ?? 'Choose the purpose of the copy you are attaching.';
+
 /// Display aliases only: legacy saved document types are not rewritten.
 String storePurchaseDocumentTypeLabel(String raw) => switch (raw.trim().toLowerCase()) {
-  'gst invoice' || 'tax invoice' => 'Tax invoice',
+  'gst invoice' || 'tax invoice' => 'GST tax invoice',
   'bill of supply' => 'Bill of supply',
-  'other bill' => 'Other supplier bill',
+  'invoice-cum-bill of supply' => 'Invoice-cum-bill of supply',
+  'non-gst purchase bill' => 'Non-GST purchase bill',
+  'other bill' => 'Other supplier invoice',
   _ => raw,
+};
+
+/// Recording guidance, not evidence of registration, tax eligibility or payment.
+String storePurchaseDocumentTypeUseCase(String raw) => switch (raw.trim().toLowerCase()) {
+  'gst invoice' || 'tax invoice' => 'Supplier’s GST tax invoice, including e-invoices.',
+  'bill of supply' => 'Composition or exempt supply; no separate GST.',
+  'invoice-cum-bill of supply' => 'Taxable and exempt supplies to an unregistered buyer.',
+  'non-gst purchase bill' => 'Unregistered supplier’s bill or cash memo.',
+  'other bill' => 'Type not confirmed; copy the original title.',
+  _ => 'Choose the supplier’s printed bill type.',
+};
+
+String storePurchaseDocumentTypeGuidance(String raw) => switch (raw.trim().toLowerCase()) {
+  'gst invoice' || 'tax invoice' => 'Use the supplier’s Tax Invoice / GST Invoice. For an e-invoice, enter the IRN / QR details below. Payment terms are recorded separately.',
+  'bill of supply' => 'Use a Bill of Supply for composition or exempt supplies. GST should not be charged separately.',
+  'invoice-cum-bill of supply' => 'Invoice-cum-bill of supply: taxable and exempt supplies together to an unregistered buyer. Keep the printed taxable and exempt values separately.',
+  'non-gst purchase bill' => 'Use only for an unregistered supplier’s bill or cash memo. A cash-paid GST invoice is still a GST tax invoice. Buyer reverse-charge obligations need separate review.',
+  'other bill' => 'Document type and tax treatment are not confirmed. Copy the printed title and check the original. Orders, challans, credit notes and payment receipts are not purchase invoices.',
+  _ => 'Choose the supplier’s printed bill type. Cash / credit terms are recorded under Payment; an e-invoice uses GST tax invoice.',
 };
 
 /// Keep a printed title verbatim; never classify an unknown bill as a tax invoice.
 String storePurchaseSupplierDocumentHeading({required String title, required String type}) {
   if (title.trim().isNotEmpty) return title;
-  return switch (storePurchaseDocumentTypeLabel(type)) {
-    'Tax invoice' => 'TAX INVOICE',
-    'Bill of supply' => 'BILL OF SUPPLY',
+  return switch (type.trim().toLowerCase()) {
+    'gst invoice' || 'tax invoice' => 'TAX INVOICE',
+    'bill of supply' => 'BILL OF SUPPLY',
+    'invoice-cum-bill of supply' => 'INVOICE-CUM-BILL OF SUPPLY',
+    'non-gst purchase bill' => 'SUPPLIER BILL',
     _ => 'SUPPLIER INVOICE',
   };
 }
@@ -1311,7 +1370,7 @@ class StorePurchaseAccountingSnapshot {
   String get copyHeading => state == StorePurchaseAccountingState.draft
     ? 'Purchase entry - Recorded copy (Draft)' : 'Purchase entry - Saved copy';
   String get copyExplanation =>
-    'Supplier copy kept separately. Downloading this copy does not change stock, dues or payments.';
+    'Recorded purchase details, not the supplier original. Downloading does not change stock, dues or payments.';
   bool sameEvidence(StorePurchaseAccountingSnapshot other) => state == other.state &&
     scope == other.scope && ledgerProof == other.ledgerProof &&
     jsonEncode(copy?.toJson()) == jsonEncode(other.copy?.toJson());
@@ -1344,7 +1403,17 @@ List<String> storePurchasePdfTextParts(String value) {
 /// A copy of retailer entries with captured account status, not a reissued supplier bill.
 /// Original attachments and their visual evidence remain separate documents.
 String storePurchaseCopyDetailLabel(String key, String label, {required bool isSavedCopy}) =>
-    isSavedCopy && key == 'receiptStatus' ? 'Goods status when copy saved' : label;
+    isSavedCopy && key == 'receiptStatus' ? 'Goods status when copy saved'
+      : isSavedCopy && key == 'taxTreatment' ? 'GST treatment recorded' : label;
+
+const storePurchaseRecordedCopyHeading = 'Recorded purchase copy · not the supplier original';
+const storePurchaseMissingValueLegend = '— = not entered, not zero.';
+String storePurchaseOriginalAvailability(WorkspacePurchaseEntryDraft draft) =>
+  draft.attachments.any((copy) => copy.documentDetails.isEmpty || copy.documentDetails['type'] == 'supplierInvoice')
+    ? 'Supplier invoice copy attached separately.' : 'No supplier invoice copy attached.';
+String? storePurchaseUnconfirmedDocumentGuide(String type) =>
+  const {'GST invoice', 'Tax invoice', 'Bill of supply', 'Invoice-cum-bill of supply', 'Non-GST purchase bill'}.contains(type.trim())
+    ? null : 'Document type and GST treatment unconfirmed · check the supplier original.';
 
 Future<Uint8List> generateStorePurchaseRecordedCopy({
   required WorkspacePurchaseEntryDraft draft,
@@ -1368,7 +1437,7 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
   }
   final font = pw.Font.ttf(await rootBundle.load('assets/fonts/Inter-Variable.ttf'));
   final document = pw.Document(title: 'Recorded purchase copy - ${draft.invoiceReference}',
-    author: 'MoolSocial', subject: '${status.label}; supplier copy retained separately');
+    author: 'MoolSocial', subject: '${status.label}; ${storePurchaseOriginalAvailability(draft)}');
   final embedded = font.getFont(pw.Context(document: document.document));
   final allText = [storeName, storeId, draft.id, supplier.id, supplier.name,
     supplier.phone, supplier.address, supplier.gstin, draft.invoiceReference, draft.invoiceDate,
@@ -1438,6 +1507,8 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
     columnWidths: const {0: pw.FlexColumnWidth(), 1: pw.FlexColumnWidth()},
     children: [pw.TableRow(children: [left, right])]);
   final d = draft.details;
+  final topDeclaration = d['documentType'] == 'Bill of supply' &&
+    d['billOfSupplyReason'] == 'Composition scheme' && d['printedDeclaration']?.trim().isNotEmpty == true;
   const coreItemKeys = {'printedSerial', 'name', 'pack', 'unitCode', 'hsn', 'cost', 'quantity',
     'taxableValue', 'taxAmount', 'lineTotal'};
   const posItemKeys = {'productId', 'receivedQuantity', 'damagedQuantity', 'shortQuantity',
@@ -1472,12 +1543,15 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
     text(status.copyHeading, size: 11, bold: true),
     pw.SizedBox(height: 5),
     text(status.copyExplanation, size: 8),
+    text(storePurchaseOriginalAvailability(draft), size: 8),
+    if (storePurchaseUnconfirmedDocumentGuide(d['documentType'] ?? '') case final message?) text(message, size: 8),
     pw.SizedBox(height: 10),
     pw.Container(width: PdfPageFormat.a4.width - 48, padding: const pw.EdgeInsets.all(9),
       decoration: pw.BoxDecoration(border: border),
       child: pw.Text(storePurchaseSupplierDocumentHeading(
         title: d['documentTitle'] ?? '', type: d['documentType'] ?? ''),
         style: pw.TextStyle(fontSize: 19, fontWeight: pw.FontWeight.bold, color: navy))),
+    if (topDeclaration) text(d['printedDeclaration']!, bold: true),
     pair(block('Supplier', [('Name', supplier.name), ('GSTIN', supplier.gstin),
       ('Address', supplier.address), ('Phone', supplier.phone), ('Email', d['supplierEmail'] ?? '')]),
       block('Invoice details', [('Supplier invoice No.', draft.invoiceReference), ('Invoice date', draft.invoiceDate),
@@ -1547,8 +1621,9 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
   widgets.addAll([
     if (bankKeys.any((key) => d[key]?.isNotEmpty ?? false)) ...[
       pw.SizedBox(height: 8), text('Supplier bank / UPI instructions', bold: true), fields(bankKeys)],
-    if (signKeys.any((key) => d[key]?.isNotEmpty ?? false)) ...[
-      pw.SizedBox(height: 8), text('Signatory details as entered from bill - not verified', bold: true), fields(signKeys)],
+    if (signKeys.any((key) => (!topDeclaration || key != 'printedDeclaration') && (d[key]?.isNotEmpty ?? false))) ...[
+      pw.SizedBox(height: 8), text('Signatory details as entered from bill - not verified', bold: true),
+      fields(signKeys.where((key) => !topDeclaration || key != 'printedDeclaration'))],
     if (['notes', 'terms', 'printedFooter'].any((key) => d[key]?.isNotEmpty ?? false)) ...[
       pw.SizedBox(height: 8), text('Notes & terms', bold: true), fields(['notes', 'terms', 'printedFooter'])],
     if (d.keys.any((k) => !used.contains(k))) fields(d.keys.where((k) => !used.contains(k))),
@@ -1604,7 +1679,12 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
       ['Saved revision', '$revision'], ['Saved on (UTC)', draft.updatedAt.toUtc().toIso8601String()],
       for (final (index, line) in draft.goods.indexed)
         if (line['productId']?.isNotEmpty ?? false) ['Item ${index + 1} product ID', line['productId']!],
-      for (final a in draft.attachments) ['Supplier copy SHA-256', a.digest],
+      for (final a in draft.attachments) ...[
+        if (a.documentDetails['type'] case final type?) ['Supporting copy type', storeTradeDocumentLabel(type)],
+        for (final e in a.documentDetails.entries)
+          if (e.key != 'type') [switch (e.key) {'title' => 'Title on copy', 'reference' => 'Document reference', _ => 'Date on copy'}, e.value],
+        ['Supplier copy SHA-256', a.digest],
+      ],
     ]),
   ]);
   document.addPage(pw.MultiPage(pageFormat: PdfPageFormat.a4,
@@ -2070,6 +2150,25 @@ Future<Uint8List> _generateStoreTable(
 
 /// Immutable current balances, not an accounting ledger or physical stock count.
 /// The caller supplies the whole selected dataset, never only visible rows.
+String storeStockSalePrices(WorkspaceCatalogueItem item, {String Function(int)? formatMoney}) {
+  final trade = item.wholesaleOffer;
+  final money = formatMoney ?? workspacePriceInputFromMinor;
+  return [
+    if (item.retailEnabled) 'Retail ₹${money(item.sellingPriceMinor)}',
+    if (trade?.enabled == true)
+      trade!.valid && trade.saleType != null
+        ? '${trade.saleType!.name == 'bulk' ? 'Bulk' : 'Wholesale'} ₹${money(trade.priceAtMinor(trade.minimumPacks))}'
+        : 'Trade price unconfirmed',
+    if (!item.retailEnabled && trade?.enabled != true) 'Not offered',
+  ].join('\n');
+}
+
+String? storeStockTradeQuantity(WorkspaceCatalogueItem item) {
+  final trade = item.wholesaleOffer;
+  return trade?.enabled == true && trade!.valid && trade.saleType != null
+    ? 'at min ${trade.minimumPacks} packs' : null;
+}
+
 class StoreStockSnapshot {
   StoreStockSnapshot({
     required this.storeId,
@@ -2092,7 +2191,7 @@ class StoreStockSnapshot {
                  ? 'Exact quantity'
                  : 'Availability only',
              p.available ? 'Available' : 'Unavailable',
-             _priceCell(p.sellingPriceMinor),
+             p.retailEnabled ? _priceCell(p.sellingPriceMinor) : null,
              _priceCell(p.purchasePriceMinor),
              _priceCell(p.mrpMinor),
              p.stockMode == WorkspaceStockMode.exactQuantity
@@ -2116,6 +2215,15 @@ class StoreStockSnapshot {
              p.returnPolicy,
              p.composition,
              p.regulatoryNote,
+             p.retailEnabled ? 'Enabled' : 'Not offered',
+             p.wholesaleOffer?.enabled != true ? 'Not offered' : p.wholesaleOffer!.saleType?.name ?? 'Unconfirmed',
+             p.wholesaleOffer?.enabled == true && p.wholesaleOffer!.valid
+                 ? _priceCell(p.wholesaleOffer!.priceAtMinor(p.wholesaleOffer!.minimumPacks)) : null,
+             p.wholesaleOffer?.enabled == true && p.wholesaleOffer!.valid ? p.wholesaleOffer!.minimumPacks : null,
+             p.wholesaleOffer?.enabled == true && p.wholesaleOffer!.valid ? p.wholesaleOffer!.incrementPacks : null,
+             p.wholesaleOffer?.enabled == true && p.wholesaleOffer!.valid
+                 ? p.wholesaleOffer!.tiers.map((tier) => '${tier.minimumPacks}:${workspacePriceInputFromMinor(tier.packPriceMinor)}').join('; ') : '',
+             [storeStockSalePrices(p), ?storeStockTradeQuantity(p)].join('\n'),
            ]),
          ),
        ) {
@@ -2137,20 +2245,20 @@ class StoreStockSnapshot {
   static Object? _priceCell(int? minor) => minor == null ? null
       : minor % 100 == 0 ? minor ~/ 100 : workspacePriceInputFromMinor(minor);
   static const headers = [
-    'Product',
+    'Item',
     'SKU',
     'Barcode',
     'Brand',
     'Variant',
     'Pack',
     'Category',
-    'Recorded stock',
+    'Qty on hand',
     'Stock tracking',
     'Availability',
-    'Selling price (INR)',
+    'Retail price (INR)',
     'Purchase price (INR)',
-    'MRP (INR)',
-    'Reorder level',
+    'Pack MRP (INR)',
+    'Low-stock alert',
     'Visibility selection',
     'Minimum order',
     'Unit price',
@@ -2169,6 +2277,13 @@ class StoreStockSnapshot {
     'Return terms',
     'Composition',
     'Regulatory note',
+    'Retail selling',
+    'Trade type',
+    'Trade price at minimum quantity (INR)',
+    'Trade minimum packs',
+    'Trade quantity step',
+    'Trade quantity prices (packs:INR)',
+    'Sale prices',
   ];
   String get timestamp => generatedAt.toUtc().toIso8601String();
   String get displayTimestamp {
@@ -2384,6 +2499,7 @@ Future<Uint8List> _generateStockFile(
   );
   // Bound each table's layout work. One giant spanning table repeatedly lays
   // out the remaining rows on every page and becomes quadratic for 10k SKUs.
+  final showMrp = snapshot.rows.any((row) => row[12] != null);
   for (var start = 0; start < snapshot.rows.length; start += 50) {
     final batch = snapshot.rows.sublist(
       start,
@@ -2431,12 +2547,12 @@ Future<Uint8List> _generateStockFile(
         build: (_) => [
           table(
             [
-              'Product / SKU / pack',
-              'Stock',
-              'Selling INR',
+              'Item / SKU / pack',
+              'Qty on hand',
+              'Sale prices INR',
               'Purchase INR',
-              'MRP INR',
-              'Reorder',
+              if (showMrp) 'Pack MRP INR',
+              'Low-stock alert',
               'Availability',
             ],
             batch
@@ -2444,9 +2560,9 @@ Future<Uint8List> _generateStockFile(
                   (r) => [
                     '${r[0]}\n${r[1]} | ${r[5]}',
                     r[7]?.toString() ?? 'Not tracked',
-                    '${r[10]}',
+                    r[38].toString().replaceAll('₹', ''),
                     '${r[11]}',
-                    r[12]?.toString() ?? 'Not set',
+                    if (showMrp) r[12]?.toString() ?? '—',
                     r[13]?.toString() ?? 'N/A',
                     '${r[9]}',
                   ],
@@ -2454,7 +2570,7 @@ Future<Uint8List> _generateStockFile(
                 .toList(),
             {
               0: const pw.FlexColumnWidth(3),
-              for (var c = 1; c < 7; c++) c: const pw.FlexColumnWidth(1),
+              for (var c = 1; c < (showMrp ? 7 : 6); c++) c: pw.FlexColumnWidth(c == 2 ? 2 : 1),
             },
           ),
           pw.NewPage(),

@@ -1870,7 +1870,8 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
       );
       _attach();
       _bindPrimaryController();
-    } else if (oldWidget.query != widget.query) {
+    } else if (oldWidget.query != widget.query ||
+        (_pager.page == null && !_pager.loading && _pager.message == null)) {
       _scheduleQuery();
     }
   }
@@ -2041,9 +2042,12 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
     final partialOffers = widget.publishedOffers && page?.offerCoverage?.key == 'retailer';
     final resultNoun = partialOffers ? 'retailer promotions' : widget.publishedOffers ? 'offers' : 'products';
     final resultCount = widget.publishedOffers ? offers.length : unfilteredProducts.length;
+    final compactProcurement = widget.session.isStoreProcurement &&
+        widget.session.procurementContext?.purpose !=
+            BuyV2ProcurementPurpose.restock;
     final pageControls = _CataloguePageControls(
       scopeKey: widget.scopeKey,
-      compactStore: widget.session.isStoreProcurement,
+      compactStore: compactProcurement,
       noun: resultNoun,
       start: publicationCurrent ? page?.startIndex : null,
       count: resultCount,
@@ -2196,7 +2200,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                         textScale: scale,
                         cartQuantityWidth: quantityWidth,
                         denseStore: widget.storeContext,
-                        storeProcurement: widget.session.isStoreProcurement,
+                        storeProcurement: compactProcurement,
                         scrollIndicatorInset: true,
                       );
                       return Padding(
@@ -3017,6 +3021,19 @@ class _CurrentShoppingAreaSheetState extends State<_CurrentShoppingAreaSheet> {
                   ),
                 ),
               ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: const ValueKey('buy-area-browse-all'),
+                onPressed: () {
+                  widget.session.chooseCatalogueArea(null, BuyV2CatalogueAreaScope.allAreas);
+                  Navigator.of(context).pop();
+                },
+                icon: const Icon(Icons.public_rounded, size: 18),
+                label: const Text('Browse any area'),
+              ),
+            ),
+            Text('Delivery is checked at checkout.', style: context.buyMeta),
           ],
         ),
       ),
@@ -3047,12 +3064,14 @@ class BuyV2CatalogueView extends StatelessWidget {
         loading: session.customerStateRestoring,
         title: session.customerStateRestoring
             ? 'Restoring your Cart'
-            : 'Your Cart is still saved',
+            : 'Your Cart needs recovery',
       );
     }
     final savedOnly = session.showingSavedProducts;
+    final compactProcurement = session.isStoreProcurement &&
+        session.procurementContext?.purpose != BuyV2ProcurementPurpose.restock;
     final storePaged =
-        session.isStoreProcurement &&
+        compactProcurement &&
         session.pagedCatalogueEnabled &&
         !savedOnly &&
         !session.showingMonthlyBasketProducts;
@@ -3112,13 +3131,13 @@ class BuyV2CatalogueView extends StatelessWidget {
                 session: session,
                 savedOnly: savedOnly,
                 onShowAll: () => session.showSavedProducts(false),
-                header: session.isStoreProcurement
+                header: compactProcurement
                     ? Column(children: controls)
                     : null,
               ),
             ),
     );
-    if (session.isStoreProcurement && !storePaged) {
+    if (compactProcurement && !storePaged) {
       return catalogue;
     }
     return Column(
@@ -3797,11 +3816,17 @@ class _CatalogueStoreMatchesState extends State<_CatalogueStoreMatches>
 
   String _location(BuyV2StoreListing store) {
     final distance = store.distanceMeters;
-    final location = store.address.contains(store.area)
-        ? store.address
-        : '${store.area} · ${store.address}';
-    if (distance == null) return location;
-    return '$location · ${distance < 1000 ? '${distance.round()} m' : '${(distance / 1000).toStringAsFixed(1)} km'}';
+    final address = store.address.trim();
+    final area = store.area.trim();
+    final parts = <String>[
+      if (area.isNotEmpty && !address.contains(area)) area,
+      if (address.isNotEmpty) address,
+      if (distance != null)
+        distance < 1000
+            ? '${distance.round()} m'
+            : '${(distance / 1000).toStringAsFixed(1)} km',
+    ];
+    return parts.join(' · ');
   }
 
   @override
@@ -10666,6 +10691,8 @@ class _ProductGrid extends StatelessWidget {
     if (products.isEmpty) {
       final savedCollectionEmpty =
           savedOnly && session.savedCountFor(session.destination) == 0;
+      final savedUnavailable = savedOnly && !savedCollectionEmpty &&
+          session.savedProductsFor(session.destination).isEmpty;
       return _withHeader(
         Center(
           child: SingleChildScrollView(
@@ -10685,6 +10712,8 @@ class _ProductGrid extends StatelessWidget {
                   Text(
                     savedCollectionEmpty
                         ? 'No saved products yet'
+                        : savedUnavailable
+                        ? 'Saved products unavailable'
                         : savedOnly
                         ? 'No matching saved products'
                         : 'No matching products',
@@ -10694,6 +10723,8 @@ class _ProductGrid extends StatelessWidget {
                   Text(
                     savedCollectionEmpty
                         ? 'Save products while browsing to find them here.'
+                        : savedUnavailable
+                        ? 'Your products are still saved. Their current listings could not be found.'
                         : savedOnly
                         ? 'Your products are still saved. Clear search and filters to see them.'
                         : session.query.trim().isNotEmpty
@@ -10705,7 +10736,7 @@ class _ProductGrid extends StatelessWidget {
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: () {
-                      if (savedCollectionEmpty) {
+                      if (savedCollectionEmpty || savedUnavailable) {
                         onShowAll();
                       } else {
                         session.updateQuery('');
@@ -10716,6 +10747,8 @@ class _ProductGrid extends StatelessWidget {
                     },
                     child: Text(
                       savedCollectionEmpty
+                          ? 'Show all products'
+                          : savedUnavailable
                           ? 'Show all products'
                           : savedOnly
                           ? 'Clear search and filters'
@@ -10843,6 +10876,7 @@ class BuyV2CatalogueAvailabilityView extends StatelessWidget {
     this.onRetry,
     this.onReturn,
     this.returnLabel = 'Back',
+    this.retryLabel = 'Try again',
   });
 
   final BuyV2Session session;
@@ -10853,6 +10887,7 @@ class BuyV2CatalogueAvailabilityView extends StatelessWidget {
   final VoidCallback? onRetry;
   final VoidCallback? onReturn;
   final String returnLabel;
+  final String retryLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -10918,7 +10953,7 @@ class BuyV2CatalogueAvailabilityView extends StatelessWidget {
                       key: const ValueKey('buy-catalogue-retry'),
                       onPressed: onRetry ?? session.retryCommerce,
                       icon: const Icon(Icons.refresh_rounded, size: 18),
-                      label: const Text('Try again'),
+                      label: Text(retryLabel),
                     ),
                   ),
                 ),
@@ -10960,7 +10995,8 @@ class _SavedDecisionShelf extends StatelessWidget {
     final destination = session.destination;
     final savedTitle = switch (destination) {
       BuyV2Destination.shop => 'Saved in Shop',
-      BuyV2Destination.wholesale => 'Saved for Wholesale',
+      BuyV2Destination.wholesale => session.wholesaleSaleType == BuyV2WholesaleSaleType.bulk
+          ? 'Saved for Bulk' : 'Saved for Wholesale',
       BuyV2Destination.medicine => 'Saved in Medicine',
       BuyV2Destination.orders => 'Saved in Shop',
     };
@@ -11063,7 +11099,7 @@ class _SavedDecisionShelf extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '${products.length} $productLabel · ready for Cart',
+                          '${products.length} $productLabel',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: context.buyMeta.copyWith(fontSize: 8),
@@ -12720,7 +12756,8 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
             facts,
             confirmAfterStoreAcceptance:
                 product.destination != BuyV2Destination.medicine &&
-                BuyV2ThemeScope.refinedOf(context),
+                (BuyV2ThemeScope.refinedOf(context) ||
+                    session.procurementContext?.purpose == BuyV2ProcurementPurpose.restock),
           )
         : facts.deliveryPromise;
     final cataloguePromise =
@@ -12777,7 +12814,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
           label:
               '${product.customerTitle}, ${product.customerVariantPack}, ${buyV2MoneyMinor(facts.priceMinor)}, '
               '${product.unitPrice}, '
-              '${buyV2FulfilmentModeLabel(fulfilmentMode)}, '
+              '${!facts.stale && session.supportsFulfilment(product, fulfilmentMode) ? '${buyV2FulfilmentModeLabel(fulfilmentMode)}, ' : ''}'
               '$cataloguePromise${automaticFulfilment ? ', ${product.customerSeller(facts.partner)}, ${offerDecision!.statusLabel}' : ', fulfilled by ${product.customerSeller(facts.partner)}'}',
           button: true,
           child: Material(
@@ -13147,10 +13184,11 @@ List<_ProductGlanceField> _productGlanceFields(
       ? buyV2BuyerDeliveryPromise(
           facts,
           confirmAfterStoreAcceptance:
-              !storeContext && !session.isStoreProcurement,
+              (!storeContext && !session.isStoreProcurement) ||
+              session.procurementContext?.purpose == BuyV2ProcurementPurpose.restock,
         )
       : facts.deliveryPromise;
-  const detail = TextStyle(
+  final detail = TextStyle(
     color: BuyV2Colors.muted,
     fontSize: 11,
     height: 1.2,
@@ -13196,6 +13234,8 @@ List<_ProductGlanceField> _productGlanceFields(
       style: detail.copyWith(
         color: decision?.canAdd == false
             ? BuyV2Colors.orange
+            : promise == 'Delivery schedule unavailable'
+            ? BuyV2Colors.muted
             : BuyV2Colors.green,
         fontWeight: FontWeight.w700,
       ),
@@ -13379,7 +13419,8 @@ class BuyV2ProductCard extends StatelessWidget {
             facts,
             confirmAfterStoreAcceptance:
                 product.destination != BuyV2Destination.medicine &&
-                BuyV2ThemeScope.refinedOf(context),
+                (BuyV2ThemeScope.refinedOf(context) ||
+                    session.procurementContext?.purpose == BuyV2ProcurementPurpose.restock),
           )
         : facts.deliveryPromise;
     final cataloguePromise =
@@ -13708,7 +13749,7 @@ class BuyV2ProductCard extends StatelessWidget {
         label:
             '${product.customerTitle}, ${product.customerVariantPack}, ${buyV2MoneyMinor(facts.priceMinor)}, '
             '${product.unitPrice}, '
-            '${buyV2FulfilmentModeLabel(fulfilmentMode)}, '
+            '${!facts.stale && session.supportsFulfilment(product, fulfilmentMode) ? '${buyV2FulfilmentModeLabel(fulfilmentMode)}, ' : ''}'
             '$cataloguePromise${automaticFulfilment ? ', ${product.customerSeller(facts.partner)}, ${offerDecision!.statusLabel}' : ', fulfilled by ${product.customerSeller(facts.partner)}'}',
         button: true,
         child: InkWell(

@@ -5076,113 +5076,65 @@ class _SocialOwnershipDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final view = View.of(context);
-    final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
-      viewPadding: EdgeInsets.fromViewPadding(
-        view.viewPadding,
-        view.devicePixelRatio,
-      ),
-      platform: defaultTargetPlatform,
-    );
-    final horizontalSemanticsClearance =
-        moolAndroidExportedHorizontalSemanticsClearance(
-          viewPadding: EdgeInsets.fromViewPadding(
-            view.viewPadding,
-            view.devicePixelRatio,
+    return MoolDestinationNavigationV2(
+      activeId: 'social',
+      destinationLabel: 'Social',
+      railKey: const Key('screen04-context-tabs'),
+      chatControlKey: const Key('social-global-chat'),
+      selectedLocalIndex: switch (selected) {
+        SocialV2Tab.shorts => 1,
+        SocialV2Tab.create => 2,
+        SocialV2Tab.feed => 3,
+        _ => 0,
+      },
+      localActionCount: 4,
+      onOpenMool: onMool,
+      onOpenAction: onOpenAction,
+      onOpenChat: onOpenChat,
+      localNavigation: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SocialOwnershipDockItem(
+            controlKey: const Key('screen04-rail-videos'),
+            icon: Icons.home_outlined,
+            selectedIcon: Icons.home_rounded,
+            label: 'Home',
+            selected: selected == SocialV2Tab.videos,
+            ownership: 'YouTube',
+            selectedAccent: const Color(0xFFFF3355),
+            onTap: onHome,
           ),
-          platform: defaultTargetPlatform,
-        );
-    return Padding(
-      key: const Key('social-android-exported-semantics-clearance'),
-      padding: EdgeInsets.fromLTRB(
-        horizontalSemanticsClearance,
-        0,
-        horizontalSemanticsClearance,
-        exportedSemanticsClearance,
-      ),
-      child: Material(
-        key: const Key('moolsocial-compact-destination-rail'),
-        color: const Color(0xFFF6F6FA),
-        elevation: 0,
-        shadowColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            key: const Key('screen04-context-tabs'),
-            height: MoolLocalNavigationTokens.destinationRailHeight,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: MoolGlobalNavigationV2(
-                    activeId: 'social',
-                    onOpenMool: onMool,
-                    onOpenAction: onOpenAction,
-                    onOpenChat: onOpenChat,
-                    compact: true,
-                    compactExpanded: true,
-                  ),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _SocialOwnershipDockItem(
-                        controlKey: const Key('screen04-rail-videos'),
-                        icon: Icons.home_outlined,
-                        selectedIcon: Icons.home_rounded,
-                        label: 'Home',
-                        selected: selected == SocialV2Tab.videos,
-                        ownership: 'YouTube',
-                        selectedAccent: const Color(0xFFFF3355),
-                        onTap: onHome,
-                      ),
-                      _SocialOwnershipDockItem(
-                        controlKey: const Key('screen04-rail-shorts'),
-                        icon: Icons.smart_display_outlined,
-                        selectedIcon: Icons.smart_display_rounded,
-                        label: 'Shorts',
-                        selected: selected == SocialV2Tab.shorts,
-                        ownership: 'YouTube',
-                        selectedAccent: const Color(0xFFFF3355),
-                        onTap: onShorts,
-                      ),
-                      _SocialOwnershipDockItem(
-                        controlKey: const Key('screen04-rail-create'),
-                        icon: Icons.add_rounded,
-                        selectedIcon: Icons.add_rounded,
-                        label: 'Create',
-                        selected: selected == SocialV2Tab.create,
-                        ownership: 'Create',
-                        selectedAccent: const Color(0xFF7C5CFF),
-                        onTap: onCreate,
-                      ),
-                      _SocialOwnershipDockItem(
-                        controlKey: const Key('screen04-rail-feed'),
-                        icon: Icons.dynamic_feed_outlined,
-                        selectedIcon: Icons.dynamic_feed_rounded,
-                        label: 'Feed',
-                        selected: selected == SocialV2Tab.feed,
-                        ownership: 'MoolSocial',
-                        selectedAccent: const Color(0xFF41C997),
-                        onTap: onFeed,
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: MoolGlobalChatNavigationV2(
-                    controlKey: const Key('social-global-chat'),
-                    onOpenChat: onOpenChat,
-                    expandedCell: true,
-                  ),
-                ),
-              ],
-            ),
+          _SocialOwnershipDockItem(
+            controlKey: const Key('screen04-rail-shorts'),
+            icon: Icons.smart_display_outlined,
+            selectedIcon: Icons.smart_display_rounded,
+            label: 'Shorts',
+            selected: selected == SocialV2Tab.shorts,
+            ownership: 'YouTube',
+            selectedAccent: const Color(0xFFFF3355),
+            onTap: onShorts,
           ),
-        ),
+          _SocialOwnershipDockItem(
+            controlKey: const Key('screen04-rail-create'),
+            icon: Icons.add_rounded,
+            selectedIcon: Icons.add_rounded,
+            label: 'Create',
+            selected: selected == SocialV2Tab.create,
+            ownership: 'Create',
+            selectedAccent: const Color(0xFF7C5CFF),
+            onTap: onCreate,
+          ),
+          _SocialOwnershipDockItem(
+            controlKey: const Key('screen04-rail-feed'),
+            icon: Icons.dynamic_feed_outlined,
+            selectedIcon: Icons.dynamic_feed_rounded,
+            label: 'Feed',
+            selected: selected == SocialV2Tab.feed,
+            ownership: 'MoolSocial',
+            selectedAccent: const Color(0xFF41C997),
+            onTap: onFeed,
+          ),
+        ],
       ),
     );
   }

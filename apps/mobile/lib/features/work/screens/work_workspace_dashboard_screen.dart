@@ -15,11 +15,20 @@ import '../../../shared/commerce/commerce_downloads.dart';
 import '../../../shared/commerce/commerce_downloads_screen.dart';
 import '../work_downloads.dart';
 import '../../../ui_v2/buy/buy_v2_screen.dart';
+import '../../../ui_v2/buy/buy_v2_views.dart' show showMoolBusinessFinanceSheet;
 import '../../../ui_v2/buy/buy_v2_scanner.dart';
 import '../../../ui_v2/profile/global_profile_panel_v2.dart';
 import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../../buy/buy_v2_models.dart';
 import '../../buy/buy_v2_session.dart';
+import '../../buy/buy_session.dart';
+import '../../buy/buy_models.dart';
+import '../../buy/buy_services.dart';
+import '../../buy/buy_v2_cart_contracts.dart';
+import '../../buy/buy_v2_saved_products_store.dart';
+import '../../buy/buy_v2_order_resolution_contracts.dart';
+import '../../buy/buy_v2_shopping_alerts.dart';
+import '../../buy/buy_v2_content_contracts.dart';
 import '../../journey01/journey_services.dart';
 import '../widgets/work_widgets.dart';
 import '../widgets/store_settings_widgets.dart';
@@ -32,6 +41,7 @@ import '../work_order_identity_gateway.dart';
 import '../widgets/store_product_thumbnail.dart';
 import '../widgets/store_catalogue_categories.dart';
 import '../work_models.dart';
+import '../work_publication.dart';
 import '../work_invoice_pdf.dart';
 import '../work_document_preview.dart';
 import '../work_stock_export.dart';
@@ -711,6 +721,9 @@ class _WorkWorkspaceDashboardScreenState
   bool _leavingProcurement = false;
   BuyV2Session? _observedProcurement;
   String? _observedProcurementQuery;
+  BuyV2View? _observedProcurementView;
+  int? _observedProcurementItemCount;
+  bool _procurementRouteCovered = false;
   BuyV2Session get _activeProcurement =>
       _storeProcurement?.session ?? widget.procurementSession;
   final _workspaceMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -776,6 +789,9 @@ class _WorkWorkspaceDashboardScreenState
     }));
   }
   final ScrollController _alertsScroll = ScrollController();
+  final _financeOwner = ValueNotifier<int>(0);
+  bool _financeSheetOpen = false;
+  bool _couponsSheetOpen = false;
   final ScrollController _settingsScroll = ScrollController();
   final ScrollController _homeContentScroll = ScrollController();
   final _settingsForm = GlobalKey<FormState>();
@@ -918,6 +934,8 @@ class _WorkWorkspaceDashboardScreenState
   @override
   void dispose() {
     session.removeListener(_searchScopeChanged);
+    _financeOwner.value++;
+    _financeOwner.dispose();
     session.removeListener(_procurementIdentityChanged);
     _storeProcurement?.removeListener(_observeProcurementQuery);
     _observedProcurement?.removeListener(_procurementQueryChanged);
@@ -939,13 +957,22 @@ class _WorkWorkspaceDashboardScreenState
     _observedProcurement?.removeListener(_procurementQueryChanged);
     _observedProcurement = purchase;
     _observedProcurementQuery = purchase.query;
+    _observedProcurementView = purchase.view;
+    _observedProcurementItemCount = purchase.itemCount;
     purchase.addListener(_procurementQueryChanged);
   }
 
   void _procurementQueryChanged() {
     final query = _observedProcurement?.query;
-    if (query == _observedProcurementQuery) return;
+    final view = _observedProcurement?.view;
+    final itemCount = _observedProcurement?.itemCount;
+    if (query == _observedProcurementQuery && view == _observedProcurementView &&
+        itemCount == _observedProcurementItemCount) {
+      return;
+    }
     _observedProcurementQuery = query;
+    _observedProcurementView = view;
+    _observedProcurementItemCount = itemCount;
     if (!mounted || _view != _WorkspaceControlView.procurement) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _view != _WorkspaceControlView.procurement) return;
@@ -1276,6 +1303,13 @@ class _WorkWorkspaceDashboardScreenState
             : _operation.subtitle,
     };
     final bottomAction = switch (_view) {
+      _WorkspaceControlView.dashboard when _reviewedOrder == null => Wrap(
+        alignment: WrapAlignment.center, spacing: 8, children: [
+          IntrinsicWidth(child: _StoreEdgeAction(keyName: 'work-home-coupons', label: 'Coupons',
+            icon: Icons.local_offer_outlined, onTap: () => unawaited(_showCoupons()))),
+          IntrinsicWidth(child: _StoreEdgeAction(keyName: 'work-home-business-finance', label: 'Business finance',
+            icon: Icons.account_balance_outlined, onTap: () => unawaited(_showBusinessFinance()))),
+        ]),
       _WorkspaceControlView.status => WorkPrimaryButton(
         keyName: 'work-status-save',
         label: _settingsSaving || session.workspaceTradingPreferencesSaving ? 'Saving…' : 'Apply settings',
@@ -1386,6 +1420,9 @@ class _WorkWorkspaceDashboardScreenState
               ),
       ),
     ];
+    final restockNavigationSession = _view == _WorkspaceControlView.procurement &&
+        _activeProcurement.procurementContext?.purpose == BuyV2ProcurementPurpose.restock
+        ? _activeProcurement : null;
     final compactSettings =
         _view == _WorkspaceControlView.status ||
         (_view == _WorkspaceControlView.operation &&
@@ -1417,6 +1454,16 @@ class _WorkWorkspaceDashboardScreenState
     final salesTaskOpen = salesOpen && _salesTask != null ||
         _view == _WorkspaceControlView.operation && _operationReturnOperation == _WorkspaceOperation.sales;
     final procurementOpen = _view == _WorkspaceControlView.procurement;
+    final sharedRestock = procurementOpen &&
+        _activeProcurement.procurementContext?.purpose ==
+            BuyV2ProcurementPurpose.restock;
+    final restockSharedHeader = sharedRestock &&
+        _activeProcurement.destination == BuyV2Destination.wholesale &&
+        (_activeProcurement.view == BuyV2View.cart ||
+            _activeProcurement.view == BuyV2View.checkout ||
+            !_procurementRouteCovered &&
+                (_activeProcurement.view == BuyV2View.catalogue ||
+                    _activeProcurement.view == BuyV2View.product));
     final ordersContext =
         (_view == _WorkspaceControlView.operation &&
             _operation == _WorkspaceOperation.orders) ||
@@ -1454,10 +1501,15 @@ class _WorkWorkspaceDashboardScreenState
           (_view == _WorkspaceControlView.search && ordersContext)) &&
         MediaQuery.sizeOf(context).width >= 700 &&
         MediaQuery.sizeOf(context).height <= 450;
+    final headerNameWidth = ((shortHomeHeader
+        ? (MediaQuery.sizeOf(context).width - 40) / 2
+        : MediaQuery.sizeOf(context).width) -
+      (procurementOpen ? 137 : 127) - (showStoreProfile ? 48 : 0) -
+      (hasHeaderBack ? (procurementOpen ? 51 : 47) : 0)).clamp(64.0, double.infinity);
     final namePainter =
         TextPainter(
           text: TextSpan(
-            text: procurementOpen ? title : workspace.name,
+            text: workspace.name,
             style: Theme.of(context).textTheme.titleLarge!.copyWith(
               fontSize: analyticsSurface ? 16 : 13,
               fontWeight: FontWeight.w800,
@@ -1465,23 +1517,22 @@ class _WorkWorkspaceDashboardScreenState
           ),
           textDirection: Directionality.of(context),
           textScaler: MediaQuery.textScalerOf(context),
-        )..layout(
-          maxWidth:
-              ((shortHomeHeader
-                          ? (MediaQuery.sizeOf(context).width - 40) / 2
-                          : MediaQuery.sizeOf(context).width) -
-                      (procurementOpen ? 137 : 127) - (showStoreProfile ? 48 : 0) -
-                      (hasHeaderBack ? (procurementOpen ? 51 : 47) : 0))
-                  .clamp(64.0, double.infinity),
-        );
+          maxLines: procurementOpen ? 2 : null,
+          ellipsis: procurementOpen ? '…' : null,
+        )..layout(maxWidth: headerNameWidth);
+    final buyerCaptionPainter = procurementOpen ? (TextPainter(
+      text: const TextSpan(text: 'Buying for', style: TextStyle(fontSize: 10, height: 1.2, fontWeight: FontWeight.w600)),
+      textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context),
+    )..layout(maxWidth: headerNameWidth)) : null;
     final storeHeaderHeight =
-        (compactOperation || ordersOperation || shortHomeHeader ? 0 : 47) +
-        (namePainter.height + 8).clamp(
+        (compactOperation || ordersOperation || shortHomeHeader || sharedRestock ? 0 : 47) +
+        (namePainter.height + (buyerCaptionPainter?.height ?? 0) + (procurementOpen ? 2 : 0) + 8).clamp(
           procurementOpen || ordersOperation || shortHomeHeader ? 48.0 : 44.0,
           double.infinity,
         );
     final analyticsHeaderHeight = (namePainter.height + 12).clamp(48.0, double.infinity);
     namePainter.dispose();
+    buyerCaptionPainter?.dispose();
     final composerStore = session.activeWorkspace?.id ?? session.workspaceId;
     final composerAccount = session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope;
     Widget counterSurface(bool expanded) => _CounterOrderSurface(
@@ -1580,7 +1631,7 @@ class _WorkWorkspaceDashboardScreenState
         ),
       );
     }
-    return WorkPageScaffold(
+    final page = WorkPageScaffold(
       session: session,
       title: title,
       subtitle: subtitle,
@@ -1591,8 +1642,8 @@ class _WorkWorkspaceDashboardScreenState
           MediaQuery.sizeOf(context).width >= 700 &&
           MediaQuery.sizeOf(context).height <= 450
           ? double.infinity : MoolMetrics.maximumContentWidth,
-      showBottomNavigation: !salesTaskOpen,
-      headerHeight: salesTaskOpen
+      showBottomNavigation: !salesTaskOpen && restockNavigationSession == null,
+      headerHeight: restockSharedHeader ? 0 : salesTaskOpen
           ? MediaQuery.textScalerOf(context).scale(18).clamp(48, 72)
           : analyticsSurface
           ? analyticsHeaderHeight
@@ -1601,7 +1652,7 @@ class _WorkWorkspaceDashboardScreenState
           : storeRootSurface
           ? storeHeaderHeight
           : 88,
-      headerTitle: salesTaskOpen
+      headerTitle: restockSharedHeader ? const SizedBox.shrink() : salesTaskOpen
           ? Text(salesOpen ? _salesTaskTitle : title, key: const Key('work-sales-task-heading'),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600))
           : analyticsSurface
@@ -1638,7 +1689,7 @@ class _WorkWorkspaceDashboardScreenState
               showStatusLabel:
                   _view == _WorkspaceControlView.dashboard || ordersContext ||
                   _view == _WorkspaceControlView.alerts,
-              compact: compactOperation || ordersOperation ||
+              compact: compactOperation || ordersOperation || sharedRestock ||
                   _view == _WorkspaceControlView.alerts,
               singleLine: shortHomeHeader,
               session: session,
@@ -1648,7 +1699,11 @@ class _WorkWorkspaceDashboardScreenState
                   _view == _WorkspaceControlView.search ||
                   (procurementOpen && _procurementSearchOpen),
               keepSearchUtilities: procurementOpen,
-              nameLabel: procurementOpen ? title : null,
+              nameLabel: procurementOpen ? workspace.name : null,
+              buyingForStore: procurementOpen,
+              buyingInformation: sharedRestock && _storeProcurement != null
+                  ? _StoreRestockSupplierFilter(controller: _storeProcurement!)
+                  : null,
               showProductScanner: !ordersContext,
               nameTextStyle: procurementOpen
                   ? Theme.of(context).textTheme.titleLarge!.copyWith(
@@ -2030,8 +2085,9 @@ class _WorkWorkspaceDashboardScreenState
                   ],
                 );
               }
+              final routeSession = _activeProcurement;
               final surface = _StoreProcurementSurface(
-                session: _activeProcurement,
+                session: routeSession,
                 workSession: session,
                 receivingKey: _receivingKey,
                 accountIdentity: widget.accountIdentity,
@@ -2041,13 +2097,18 @@ class _WorkWorkspaceDashboardScreenState
                 orderId: _trackedPurchase?.orderId,
                 onExit: _leaveProcurement,
                 onDestinationChanged: _handleProcurementDestinationChanged,
+                onRouteCoveredChanged: (covered) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted || _view != _WorkspaceControlView.procurement ||
+                        !identical(routeSession, _activeProcurement) ||
+                        _procurementRouteCovered == covered) {
+                      return;
+                    }
+                    setState(() => _procurementRouteCovered = covered);
+                  });
+                },
               );
               return Column(children: [
-                if (_storeProcurement case final controller? when
-                    controller.bookmark?.context.purpose == BuyV2ProcurementPurpose.restock &&
-                    _activeProcurement.view == BuyV2View.catalogue &&
-                    _activeProcurement.destination == BuyV2Destination.wholesale)
-                  _StoreRestockSupplierFilter(controller: controller),
                 if (_storeProcurement case final controller? when
                     controller.bookmark?.context.purpose != BuyV2ProcurementPurpose.restock &&
                     _activeProcurement.view == BuyV2View.catalogue &&
@@ -2095,6 +2156,7 @@ class _WorkWorkspaceDashboardScreenState
             onOpenStore: _operation == _WorkspaceOperation.orders
                 ? _openCustomerCollection : _showDashboard,
             onBuyStock: _showProcurement,
+            onBusinessFinance: () => unawaited(_showBusinessFinance()),
             onOpenOperation: _showOperation,
             onOpenRoute: openScopedRoute,
             onSearchOrders: _showSearch,
@@ -2106,6 +2168,58 @@ class _WorkWorkspaceDashboardScreenState
           ),
         },
       ),
+    );
+    return Column(children: [
+      Expanded(child: MediaQuery(
+        data: MediaQuery.of(context).removePadding(removeBottom: restockNavigationSession != null),
+        child: page,
+      )),
+      if (restockNavigationSession != null && MediaQuery.viewInsetsOf(context).bottom == 0)
+        _storeRestockNavigation(restockNavigationSession, storeActions, storeActiveId),
+    ]);
+  }
+
+  Widget _storeRestockNavigation(BuyV2Session purchase,
+      List<MoolLocalNavigationAction> actions, String activeId) {
+    final hasCart = purchase.itemCount > 0;
+    final cartSelected = hasCart && (purchase.view == BuyV2View.cart ||
+        purchase.view == BuyV2View.checkout || purchase.productReturnsToCart);
+    final selected = cartSelected ? actions.length : actions.indexWhere((action) => action.id == activeId);
+    final local = MoolLocalNavigationRail(
+      key: const Key('work-local-navigation'), familyId: 'work',
+      semanticLabel: 'Store choices: Store, Orders, Sales and Stock.',
+      activeId: cartSelected ? '' : activeId, actions: actions,
+    );
+    Future<void> external(String route, {bool switchFamily = false}) async {
+      if (!await _confirmPurchaseNavigation() || !mounted) return;
+      session.clearMessages();
+      if (switchFamily) {
+        openMoolConnectedRoute(context, activeFamilyId: 'work', route: route);
+      } else {
+        context.push(route);
+      }
+    }
+    void move(int delta) {
+      final target = (selected + delta) % (actions.length + (hasCart ? 1 : 0));
+      if (target == actions.length) {
+        purchase.openCart();
+      } else {
+        actions[target].onPressed?.call();
+      }
+    }
+    return MoolDestinationNavigationV2(
+      activeId: 'work', destinationLabel: 'Store', showFamilyRootAction: false,
+      selectedLocalIndex: selected < 0 ? 0 : selected,
+      localActionCount: actions.length + (hasCart ? 1 : 0),
+      localNavigation: !hasCart ? local : Row(children: [
+        Expanded(child: local), const SizedBox(width: 4),
+        SizedBox(width: 44, child: Center(child: buyV2CompactCartNavigation(purchase))),
+      ]),
+      onOpenMool: () => unawaited(external('/app/mool?from=work')),
+      onOpenAction: (action) => unawaited(external(action.route, switchFamily: true)),
+      onPreviousLocalAction: () => move(-1), onNextLocalAction: () => move(1),
+      onOpenChat: () => unawaited(external(Uri(path: '/app/chat/inbox',
+        queryParameters: {'return': GoRouterState.of(context).uri.toString()}).toString())),
     );
   }
 
@@ -2638,6 +2752,12 @@ class _WorkWorkspaceDashboardScreenState
     String? productId,
     String? searchQuery,
   }) async {
+    // Keep the Stock entry as the return destination across native Back/restart.
+    final returnTarget = returnOperation ??
+        (_view == _WorkspaceControlView.operation &&
+                _operation == _WorkspaceOperation.catalogue
+            ? _WorkspaceOperation.catalogue
+            : null);
     _searchFocus.unfocus();
     final controller = _storeProcurement;
     if (controller != null) {
@@ -2647,11 +2767,11 @@ class _WorkWorkspaceDashboardScreenState
             : returnOperation == _WorkspaceOperation.groupBuying
             ? BuyV2ProcurementPurpose.groupBulkBuying
             : BuyV2ProcurementPurpose.restock,
-        returnTo: returnOperation?.name ?? 'dashboard',
+        returnTo: returnTarget?.name ?? 'dashboard',
       );
       if (!mounted) return;
       if (!opened) {
-        session.showNotice(
+        session.showError(
           controller.openFailureMessage ??
               'Your Store session changed. Return to Stock and try again.',
         );
@@ -2660,13 +2780,18 @@ class _WorkWorkspaceDashboardScreenState
     }
     session.clearMessages();
     if (returnOperation != _WorkspaceOperation.direct) _releaseDirectFilter();
+    if (productId == null &&
+        _activeProcurement.procurementContext?.purpose ==
+            BuyV2ProcurementPurpose.restock) {
+      _activeProcurement.openDestination(BuyV2Destination.wholesale);
+    }
     if (searchQuery != null) {
       _activeProcurement.updateQuery(searchQuery.trim());
     }
     _searchController.text = _activeProcurement.query;
     setState(() {
       _trackedPurchase = null;
-      _procurementReturnOperation = returnOperation;
+      _procurementReturnOperation = returnTarget;
       _procurementProductId = productId;
       _view = _WorkspaceControlView.procurement;
     });
@@ -2855,6 +2980,11 @@ class _WorkWorkspaceDashboardScreenState
   @override
   void didUpdateWidget(covariant WorkWorkspaceDashboardScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session ||
+        oldWidget.accountIdentity != widget.accountIdentity ||
+        oldWidget.accountAuthenticated != widget.accountAuthenticated) {
+      _financeOwner.value++;
+    }
     if (oldWidget.session != widget.session) {
       oldWidget.session.removeListener(_procurementIdentityChanged);
       session.addListener(_procurementIdentityChanged);
@@ -2864,6 +2994,52 @@ class _WorkWorkspaceDashboardScreenState
     _searchScopeChanged();
     _procurementIdentityChanged();
     _observeProcurementQuery();
+  }
+
+  Future<void> _showBusinessFinance() async {
+    if (_financeSheetOpen || _couponsSheetOpen) return;
+    final source = session, epoch = _financeOwner.value;
+    final store = source.activeWorkspace;
+    if (store == null) return;
+    final owner = source.publicationPreferencesContext;
+    final navigation = source.navigationScopeRevision;
+    final identity = widget.accountIdentity;
+    final authenticated = widget.accountAuthenticated;
+    final ownContact = authenticated && identity?.firebasePrincipal != null ? identity : null;
+    bool current() => mounted && identical(widget.session, source) &&
+        _financeOwner.value == epoch && identical(widget.accountIdentity, identity) &&
+        widget.accountAuthenticated == authenticated && source.activeWorkspace?.id == store.id &&
+        source.publicationPreferencesContext == owner && source.navigationScopeRevision == navigation;
+    _financeSheetOpen = true;
+    try {
+      await showMoolBusinessFinanceSheet(context,
+        scopeOwner: Listenable.merge([source, _financeOwner]),
+        isCurrent: current,
+        storeName: store.name,
+        contactName: ownContact?.displayName,
+        callbackNumber: ownContact?.phoneNumber,
+        origin: 'store', buyingStoreId: store.id,
+      );
+    } finally {
+      _financeSheetOpen = false;
+    }
+  }
+
+  Future<void> _showCoupons() async {
+    if (_couponsSheetOpen || _financeSheetOpen) return;
+    final source = session, epoch = _financeOwner.value, store = session.activeWorkspace;
+    if (store == null) return;
+    final owner = source.publicationPreferencesContext, navigation = source.navigationScopeRevision;
+    final identity = widget.accountIdentity, authenticated = widget.accountAuthenticated;
+    bool current() => mounted && identical(widget.session, source) && _financeOwner.value == epoch &&
+      identical(widget.accountIdentity, identity) && widget.accountAuthenticated == authenticated &&
+      source.activeWorkspace?.id == store.id && source.publicationPreferencesContext == owner &&
+      source.navigationScopeRevision == navigation;
+    _couponsSheetOpen = true;
+    try {
+      await showStoreCouponsManager(context, session: source,
+        scopeOwner: Listenable.merge([source, _financeOwner]), isCurrent: current);
+    } finally { _couponsSheetOpen = false; }
   }
 
   Future<void> _restoreProcurement() async {
@@ -3543,9 +3719,10 @@ class _StoreRestockSupplierFilter extends StatelessWidget {
     final status = controller.restockSupplierClassificationMessage ??
       (controller.restockSupplierFilterConnected ? 'The catalogue requests these supplier types. Check each product before buying.' :
         'Supplier filter awaiting connection. Matching results cannot be confirmed yet.');
-    return Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: TextButton(
+    return IconButton(
       key: const Key('work-restock-supplier-types'),
-      style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+      tooltip: 'Supplier types · $names',
+      constraints: const BoxConstraints.tightFor(width: 48, height: 48),
       onPressed: () => showModalBottomSheet<void>(context: context, isScrollControlled: true,
         builder: (sheetContext) => SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.all(20),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -3563,12 +3740,8 @@ class _StoreRestockSupplierFilter extends StatelessWidget {
                 }
               }, child: const Text('Close')),
           ])))),
-      child: Row(children: [const Icon(Icons.filter_alt_outlined, size: 18), const SizedBox(width: 8),
-        Expanded(child: Text(!controller.restockSupplierClassificationResolved ? 'Sourcing pending' :
-          !controller.restockSupplierFilterConnected ? 'Supplier defaults' :
-          types.length == 1 ? names : 'Supplier types (${types.isEmpty ? 'all' : types.length})',
-          maxLines: 1, overflow: TextOverflow.ellipsis)), const SizedBox(width: 8), const Icon(Icons.info_outline, size: 18)]),
-    ));
+      icon: const Icon(Icons.info_outline, size: 20),
+    );
   }
 }
 
@@ -3639,6 +3812,20 @@ class _StoreRestockPurposeControl extends StatelessWidget {
   }
 }
 
+class _StoreProcurementRouteObserver extends NavigatorObserver {
+  _StoreProcurementRouteObserver(this.onChanged);
+  final ValueChanged<bool> onChanged;
+  void _changed() => onChanged(navigator?.canPop() ?? false);
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _changed();
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _changed();
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) => _changed();
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) => _changed();
+}
+
 class _StoreProcurementSurface extends StatefulWidget {
   const _StoreProcurementSurface({
     required this.session,
@@ -3651,6 +3838,7 @@ class _StoreProcurementSurface extends StatefulWidget {
     this.orderId,
     required this.onExit,
     required this.onDestinationChanged,
+    required this.onRouteCoveredChanged,
   });
   final BuyV2Session session;
   final WorkSession workSession;
@@ -3660,6 +3848,7 @@ class _StoreProcurementSurface extends StatefulWidget {
   final String? productId, orderId;
   final VoidCallback onExit;
   final ValueChanged<BuyV2Destination> onDestinationChanged;
+  final ValueChanged<bool> onRouteCoveredChanged;
 
   @override
   State<_StoreProcurementSurface> createState() =>
@@ -3670,6 +3859,157 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
   WorkspaceRestockPurchaseOriginal? _receivingOriginal;
   WorkspacePurchaseOrder? _receivingOrder;
   bool _openingReceiving = false;
+  GlobalKey<NavigatorState> _buyingNavigatorKey = GlobalKey<NavigatorState>();
+  late final _routeObserver = _StoreProcurementRouteObserver(
+    (covered) => widget.onRouteCoveredChanged(covered));
+
+  Widget _scopedBuyingRoutes(Widget child) {
+    // Supplier/product routes belong inside the existing buying Store shell.
+    // An invalid owner retires every covered route to the existing recovery UI.
+    if (!widget.session.isStoreProcurement || !widget.session.procurementScopeCurrent) {
+      return child;
+    }
+    return NavigatorPopHandler<Object?>(
+      onPopWithResult: (result) {
+        final navigator = _buyingNavigatorKey.currentState;
+        if (navigator != null) unawaited(navigator.maybePop(result));
+      },
+      child: Navigator(
+        key: _buyingNavigatorKey,
+        observers: [_routeObserver],
+        pages: [
+          MaterialPage<Object?>(
+            key: ObjectKey(widget.session),
+            child: child,
+          ),
+        ],
+        onDidRemovePage: (_) {},
+      ),
+    );
+  }
+
+  bool _billingScopeCurrent(WorkSession work, BuyV2Session buy) {
+    final owner = buy.procurementContext;
+    return mounted && identical(widget.workSession, work) &&
+        identical(widget.session, buy) && widget.accountAuthenticated && widget.ready &&
+        buy.isStoreProcurement && buy.procurementScopeCurrent && owner != null &&
+        work.activeWorkspace?.verified == true &&
+        work.activeWorkspace?.id == owner.storeId &&
+        work.publicationPreferencesContext ==
+            (owner.accountId, owner.storeId, work.navigationScopeRevision);
+  }
+
+  Future<void> _openBillingDetails({required Object owner,
+    required Object account, required int visit}) async {
+    final work = widget.workSession, buy = widget.session;
+    var retired = false;
+    bool current() {
+      if (retired) return false;
+      final valid = _billingScopeCurrent(work, buy) &&
+          owner == work.publicationPreferencesContext &&
+          account == work.workspaceAccountRecoveryContext &&
+          visit == buy.navigationMotionSequence && !buy.cartChangesBlocked &&
+          buy.checkoutSubmissionState == BuyV2CheckoutSubmissionState.idle &&
+          !buy.checkoutRequiresResolution;
+      if (!valid) retired = true;
+      return valid;
+    }
+    if (!current() || work.workspacePublicationPreferencesSaving) return;
+    final updates = Listenable.merge([work, buy]);
+    Widget retiredDetails(BuildContext sheet) => SafeArea(child: Padding(
+      padding: const EdgeInsets.all(12), child: Row(children: [
+        const Expanded(child: Text('Your Store changed. Reopen these details in the correct Store.')),
+        IconButton(key: const Key('work-procurement-billing-close'),
+          tooltip: 'Back to checkout', onPressed: () => Navigator.pop(sheet),
+          icon: const Icon(Icons.close)),
+      ])));
+    await showModalBottomSheet<void>(
+      context: context, isScrollControlled: true, useSafeArea: true,
+      builder: (sheet) => !current() ? retiredDetails(sheet) : AnimatedBuilder(
+        animation: updates,
+        builder: (context, _) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+          child: FractionallySizedBox(heightFactor: .92,
+            child: SafeArea(top: false, child: Column(children: [
+              Padding(padding: const EdgeInsets.only(left: 16, right: 4),
+                child: Row(children: [
+                  const Expanded(child: Text('Store details',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+                  IconButton(key: const Key('work-procurement-billing-close'),
+                    tooltip: 'Back to checkout',
+                    onPressed: () => Navigator.pop(sheet),
+                    icon: const Icon(Icons.close)),
+                ])),
+              Expanded(child: SingleChildScrollView(
+                key: const Key('work-procurement-billing-editor'),
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                child: current()
+                    ? StorePublicationSettings(
+                        key: ValueKey(('restock-billing', owner, visit)), session: work)
+                    : const Text('Your Store changed. Reopen these details in the correct Store.'),
+              )),
+            ])),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _billingDetails(BuildContext context) {
+    final work = widget.workSession, buy = widget.session;
+    return AnimatedBuilder(animation: Listenable.merge([work, buy]),
+      builder: (context, _) {
+        final current = _billingScopeCurrent(work, buy);
+        final ready = current && work.workspacePublicationInputsReady;
+        final saving = current && work.workspacePublicationPreferencesSaving;
+        final error = current ? work.workspacePublicationPreferencesError : null;
+        // These are Store-entered inputs, never account/KYC or issued-invoice facts.
+        final details = current ? work.workspacePublicationDetails : null;
+        final name = ready ? details!.legalName.trim() : '';
+        final completeAddress = ready && [details!.street, details.city,
+          details.state, details.pinCode].every((part) => part.trim().isNotEmpty);
+        final address = !ready ? '' : details!.billingAddress.trim().isNotEmpty
+            ? details.billingAddress.trim() : completeAddress ? details.address : '';
+        final message = !current
+            ? 'Return to your Store to check billing details.'
+            : saving ? 'Saving Store details…'
+            : error ?? (!ready ? 'Open Store details to check the saved billing details.'
+                : name.isEmpty || address.isEmpty
+                    ? 'Add the Store’s legal business name and billing address.' : null);
+        final canEdit = current && !saving && !buy.cartChangesBlocked &&
+            buy.checkoutSubmissionState == BuyV2CheckoutSubmissionState.idle &&
+            !buy.checkoutRequiresResolution;
+        final owner = work.publicationPreferencesContext;
+        final account = work.workspaceAccountRecoveryContext;
+        final visit = buy.navigationMotionSequence;
+        return WorkCard(key: const Key('work-procurement-billing-details'),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              const Icon(Icons.receipt_long_outlined, size: 20),
+              const SizedBox(width: 10),
+              const Expanded(child: Text('Billing details',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+              TextButton(key: const Key('work-procurement-billing-edit'),
+                style: TextButton.styleFrom(foregroundColor: MoolColors.navy,
+                  backgroundColor: Colors.white, minimumSize: const Size(44, 44),
+                  textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontSize: 12, fontWeight: FontWeight.w600)),
+                onPressed: canEdit ? () => _openBillingDetails(
+                  owner: owner, account: account, visit: visit) : null,
+                child: Text(ready ? 'Edit' : 'Open')),
+            ]),
+            if (message != null) Text(message,
+              style: const TextStyle(fontSize: 12, color: MoolColors.muted))
+            else ...[
+              Text(name, key: const Key('work-procurement-billing-name'),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text(address, key: const Key('work-procurement-billing-address'),
+                style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+            ],
+          ]));
+      });
+  }
 
   Future<void> _receiveOriginal(WorkspacePurchaseReference reference, WorkspacePurchaseOrder original) async {
     final work = widget.workSession, buy = widget.session;
@@ -3771,6 +4111,7 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
         oldWidget.productId != widget.productId ||
         oldWidget.orderId != widget.orderId) {
       _captureEntry();
+      _buyingNavigatorKey = GlobalKey<NavigatorState>();
     }
     if (oldWidget.session != widget.session) {
       oldWidget.session.removeListener(_trackingChanged);
@@ -3811,6 +4152,9 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
   Widget build(BuildContext context) {
     if (_returnScheduled) return const SizedBox.shrink();
     final session = widget.session;
+    final publicRestockPresentation =
+        session.procurementContext?.purpose == BuyV2ProcurementPurpose.restock &&
+        (session.view == BuyV2View.catalogue || session.view == BuyV2View.product);
     final accountIdentity = widget.accountIdentity;
     final accountAuthenticated = widget.accountAuthenticated;
     final ready = widget.ready;
@@ -3842,7 +4186,9 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
           key: const Key('work-store-procurement-screen'),
           children: [
             Positioned.fill(
-              child: Offstage(offstage: _receivingOriginal != null, child: ClipRect(
+              child: Offstage(
+                offstage: _receivingOriginal != null,
+                child: ClipRect(
                 child: OverflowBox(
                   alignment: Alignment.topCenter,
                   minHeight: height,
@@ -3853,15 +4199,21 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
                       data: media.copyWith(
                         size: Size(
                           media.size.width,
-                          session.isStoreProcurement
+                          session.isStoreProcurement && !publicRestockPresentation
                               ? height
                               : media.size.height + crop,
                         ),
                       ),
-                      child: BuyV2Screen(
+                      child: _scopedBuyingRoutes(BuyV2Screen(
                         key: const ValueKey('work-store-procurement-buy-host'),
                         session: session,
                         embeddedStore: session.isStoreProcurement,
+                        embeddedCartInNavigation:
+                            session.procurementContext?.purpose == BuyV2ProcurementPurpose.restock,
+                        financeStoreName: session.isStoreProcurement
+                            ? widget.workSession.activeWorkspace?.name : null,
+                        storeInvoiceDetailsBuilder: session.isStoreProcurement
+                            ? _billingDetails : null,
                         onReceivePurchasedOrder: session.isStoreProcurement
                           ? (reference, original) => unawaited(_receiveOriginal(reference, original)) : null,
                         onEmbeddedSystemBack: _receivingOriginal == null ? null
@@ -3875,7 +4227,7 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
                         initialCartScope: BuyV2CartScope.wholesale,
                         onExit: onExit,
                         onDestinationChanged: onDestinationChanged,
-                      ),
+                      )),
                     ),
                   ),
                 ),
@@ -4018,6 +4370,8 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
     this.nameTextScaler,
     this.nameTextStyle,
     this.nameLabel,
+    this.buyingForStore = false,
+    this.buyingInformation,
     this.backKey = const Key('work-operation-back'),
     this.backSize = 44,
     this.keepSearchUtilities = false,
@@ -4047,6 +4401,8 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
   final TextScaler? nameTextScaler;
   final TextStyle? nameTextStyle;
   final String? nameLabel;
+  final bool buyingForStore;
+  final Widget? buyingInformation;
   final Key backKey;
   final double backSize;
   final bool keepSearchUtilities;
@@ -4070,6 +4426,10 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget headerPart(Widget child) =>
         singleLine ? Expanded(child: child) : child;
+    Widget storeNameText() => Text(nameLabel ?? workspace.name,
+      key: const Key('work-store-full-name'), textScaler: nameTextScaler,
+      style: nameTextStyle, softWrap: true, maxLines: buyingForStore ? 2 : null,
+      overflow: buyingForStore ? TextOverflow.ellipsis : null);
     return Semantics(
       container: true,
       explicitChildNodes: true,
@@ -4101,10 +4461,13 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                 ],
                 Expanded(
                   child: Semantics(
+                    key: buyingForStore ? const Key('work-procurement-buyer-context') : null,
                     container: true,
                     button: true,
+                    excludeSemantics: buyingForStore,
+                    onTap: buyingForStore ? onSwitchWorkspace : null,
                     label:
-                        '${nameLabel ?? workspace.name}, ${profile.label}, ${workspace.area}. Change Workspace',
+                        '${buyingForStore ? 'Buying for ' : ''}${nameLabel ?? workspace.name}, ${profile.label}, ${workspace.area}. Change Workspace',
                     child: InkWell(
                       key: const Key('work-dashboard-workspace-switcher'),
                       borderRadius: BorderRadius.circular(8),
@@ -4127,13 +4490,14 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                                       fontSize: 13,
                                       fontWeight: FontWeight.w800,
                                     ),
-                                child: Text(
-                                  nameLabel ?? workspace.name,
-                                  key: const Key('work-store-full-name'),
-                                  textScaler: nameTextScaler,
-                                  style: nameTextStyle,
-                                  softWrap: true,
-                                ),
+                                child: buyingForStore ? Tooltip(
+                                  message: 'Buying for ${nameLabel ?? workspace.name}', excludeFromSemantics: true,
+                                  child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [Text('Buying for', key: const Key('work-procurement-buyer-caption'),
+                                      textScaler: nameTextScaler, style: const TextStyle(fontSize: 10, height: 1.2,
+                                        fontWeight: FontWeight.w600, color: MoolColors.muted)),
+                                      const SizedBox(height: 2), storeNameText()]),
+                                ) : storeNameText(),
                               ),
                             ),
                             const SizedBox(width: 4),
@@ -4149,6 +4513,9 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 6),
+                if (buyingInformation != null)
+                  buyingInformation!
+                else
                 Semantics(
                   button: true,
                   excludeSemantics: true,
@@ -5561,6 +5928,28 @@ Widget _analyticsPeriodPicker(int days, ValueChanged<int> onChanged) => PopupMen
       const Icon(Icons.arrow_drop_down, color: MoolColors.navy, size: 20),
     ])),
 );
+Widget _storeInlineBackPriority(BuildContext context, {
+  required bool Function() enabled,
+  required VoidCallback onBack,
+  required Widget child,
+}) {
+  if (Router.maybeOf<Object?>(context)?.backButtonDispatcher == null) {
+    return child;
+  }
+  return BackButtonListener(
+    onBackButtonPressed: () async {
+      final route = ModalRoute.of(context);
+      // Leave dialogs and the launcher's local-history menu to their owners.
+      if (!enabled() || route == null || !route.isCurrent || route.willHandlePopInternally) {
+        return false;
+      }
+      onBack();
+      return true;
+    },
+    child: child,
+  );
+}
+
 /// One reporting canvas; domain expansion never starts a request or a route.
 class _StoreAnalyticsPresentation extends StatefulWidget {
   const _StoreAnalyticsPresentation({
@@ -5859,7 +6248,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
     final categories = {for (final c in widget.sections.whereType<_OperatingCategory>()) c.id: c};
     final metrics = {for (final c in categories.values)
       for (final m in c.children.whereType<_OperatingMetric>()) m.id: m};
-    return FutureBuilder<WorkspaceAnalyticsSnapshot>(
+    final content = FutureBuilder<WorkspaceAnalyticsSnapshot>(
       key: ObjectKey(_result), future: _result, builder: (context, result) {
         final snapshot = result.data;
         final valid = snapshot != null && _request != null && snapshot.usableFor(_request!, DateTime.now());
@@ -6022,16 +6411,24 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
               final controls = [
                 _analyticsPeriodPicker(widget.periodDays, widget.onPeriod),
                 IconButton(key: const Key('store-analytics-export'), tooltip: 'Download analytics PDF',
+                  style: IconButton.styleFrom(minimumSize: const Size(48, 48), visualDensity: VisualDensity.standard),
                   onPressed: _exportBusy || loading || _request == null ? null : () => _exportAnalytics(snapshot),
                   icon: _exportBusy ? const SizedBox(width: 18, height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.download_outlined, size: 20)),
                 IconButton(tooltip: failed ? 'Retry analytics' : 'Refresh analytics',
+                  style: IconButton.styleFrom(minimumSize: const Size(48, 48), visualDensity: VisualDensity.standard),
                   onPressed: widget.onRefresh, icon: const Icon(Icons.refresh, size: 20)),
               ];
-              return MediaQuery.textScalerOf(context).scale(16) > 20
-                ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [heading,
-                    Row(mainAxisAlignment: MainAxisAlignment.end, children: controls)])
-                : Row(children: [const Expanded(child: heading), ...controls]);
+              return Wrap(
+                spacing: 8, runSpacing: 4,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [heading, Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: controls,
+                )],
+              );
             }),
             if (_exportNotice != null) Text(_exportNotice!, key: const Key('store-analytics-export-notice'),
               style: const TextStyle(fontSize: 12)),
@@ -6160,6 +6557,16 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
         ]);
         });
       });
+    return _storeInlineBackPriority(context,
+      enabled: () => _expanded != null,
+      onBack: () {
+        final expanded = _expanded;
+        if (expanded != null) {
+          _toggle(expanded);
+        }
+      },
+      child: content,
+    );
   }
 }
 
@@ -14431,12 +14838,21 @@ String storeBillGoodsReceiptLabel(
 }
 
 /// Matches immutable supplier records; this surface never receives Stock or pays.
+Widget _purchaseBillTaskSummary(Widget label, Widget value) => Row(
+  crossAxisAlignment: CrossAxisAlignment.center,
+  children: [Expanded(flex: 4, child: label), const SizedBox(width: 8),
+    Expanded(flex: 6, child: Align(alignment: Alignment.centerRight, child: value))]);
+
 class _StoreBillGoodsMatch extends StatefulWidget {
   const _StoreBillGoodsMatch({super.key, required this.session, required this.copy,
-    required this.onOpenCopy});
+    required this.onOpenCopy, this.summary, this.actions, this.onBeforeOpen, this.headerBuilder});
   final WorkSession session;
   final WorkspacePurchaseSavedCopy copy;
   final Future<void> Function(WorkspacePurchaseSavedCopy copy) onOpenCopy;
+  final Widget Function(bool verified)? summary;
+  final Widget Function(Widget header)? headerBuilder;
+  final Widget? actions;
+  final Future<bool> Function()? onBeforeOpen;
   @override
   State<_StoreBillGoodsMatch> createState() => _StoreBillGoodsMatchState();
 }
@@ -14501,12 +14917,18 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
     }
     if (!_dirty && !_knownUnstored) return true; // Only a verified saved review survives leaving.
     final leave = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-      title: const Text('Leave goods match?'),
-      content: const Text('These matching quantities are not saved. The supplier bill and received Stock stay unchanged.'),
+      title: const Text('Leave goods reconciliation?'),
+      content: const Text('These reconciliation quantities are not saved. The supplier bill and received Stock stay unchanged.'),
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
         TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard changes'))]));
     if (mounted && leave == true) setState(_clear);
     return mounted && leave == true;
+  }
+  Future<bool> closePanel() async {
+    if (!_opened) return true;
+    if (!await confirmLeave() || !mounted || !_current) return false;
+    setState(() => _opened = false);
+    return true;
   }
   Future<void> _recover() async {
     if (!_current) return;
@@ -14527,7 +14949,7 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
       final posted = ledger!.billGoodsAllocations[review.allocation.operationId];
       final cancelled = session.workspaceBillGoodsCancellations.any((c) => c.operationId == review.allocation.operationId);
       if (posted != null && (cancelled || jsonEncode(posted.toJson()) != jsonEncode(review.allocation.toJson()))) {
-        setState(() { _busy = false; _uncertain = true; _error = 'Saved goods matching needs recovery. Do not receive or match these goods again.'; });
+        setState(() { _busy = false; _uncertain = true; _error = 'Saved goods reconciliation needs recovery. Do not receive or reconcile these goods again.'; });
         return;
       }
     }
@@ -14537,12 +14959,12 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
       !ledger!.billGoodsAllocations.containsKey(review.allocation.operationId)).toList();
     _otherReview = pending.where((r) => r.allocation.copyId != widget.copy.id ||
       r.allocation.copyRevision != widget.copy.revision).firstOrNull;
-    if (pending.length > 1) { _uncertain = true; _error = 'More than one unfinished match needs recovery. Do not prepare another match.'; }
+    if (pending.length > 1) { _uncertain = true; _error = 'More than one unfinished reconciliation needs recovery. Do not prepare another reconciliation.'; }
     final own = pending.where((r) => r.allocation.copyId == widget.copy.id &&
       r.allocation.copyRevision == widget.copy.revision).singleOrNull;
     if (own != null) {
       if (_frozen != null && jsonEncode(_frozen!.toJson()) != jsonEncode(own.allocation.toJson())) {
-        setState(() { _busy = false; _uncertain = true; _error = 'Another saved matching review was found. Keep this attempt and recover before continuing.'; });
+        setState(() { _busy = false; _uncertain = true; _error = 'Another saved reconciliation review was found. Keep this attempt and recover before continuing.'; });
         return;
       }
       _frozen = own.allocation; _reviewVerified = true; _opened = true;
@@ -14556,16 +14978,18 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
       _knownUnstored = savedReview == null && posted == null && cancellation == null;
       if (cancellation != null && posted != null) {
         _uncertain = true;
-        _error = 'Saved match and cancellation conflict. Recover the supplier account; do not replace this match.';
+        _error = 'Saved reconciliation and cancellation conflict. Recover the supplier account before continuing.';
       } else if (cancellation != null) {
-        _clear(); _notice = 'Matching review cancelled. Bill, Stock and payments are unchanged.';
+        _clear(); _notice = 'Reconciliation review cancelled. Bill, Stock and payments are unchanged.';
       } else if (posted != null && jsonEncode(posted.toJson()) != jsonEncode(_frozen!.toJson())) {
         _uncertain = true;
-        _error = 'Saved matching details conflict. Recover before continuing.';
+        _error = 'Saved reconciliation details conflict. Recover before continuing.';
       } else if ((savedReview != null && !_reviewVerified) || (posted != null && savedReview == null)) {
-        _uncertain = true; _error = 'Saved matching review is missing or changed. Recover before continuing.';
+        _uncertain = true; _error = 'Saved reconciliation review is missing or changed. Recover before continuing.';
       }
     }
+    if (_opened && widget.onBeforeOpen != null) await widget.onBeforeOpen!();
+    if (!_current) return;
     setState(() { _busy = false; });
   }
   void _clear() {
@@ -14614,7 +15038,7 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
     if (!_current) return;
     setState(() { _busy = false; _reviewVerified = saved; _bookRevision = session.workspacePurchaseEntryRevision;
       _uncertain = !saved;
-      if (!saved) _error = session.workspaceSupplierError ?? 'Review status needs recovery. Retry saved status before changing the match.'; });
+      if (!saved) _error = session.workspaceSupplierError ?? 'Review status needs recovery. Retry saved status before changing the reconciliation.'; });
     if (saved && mounted) {
       FocusScope.of(context).unfocus();
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -14638,8 +15062,8 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
       scope: _scope!, expectedSupplierRevision: _ledger!.revision, expectedPurchaseRevision: _bookRevision!, requireSavedReview: true);
     if (!_current) return;
     setState(() { _busy = false; _uncertain = !saved;
-      if (saved) { _notice = 'Goods matched. Stock, supplier balance and payments are unchanged.'; }
-      else { _error = session.workspaceSupplierError ?? 'Matching status is unverified. Retry saved status before preparing another match.'; } });
+      if (saved) { _notice = 'Goods receipt reconciled. Stock, supplier balance and payments are unchanged.'; }
+      else { _error = session.workspaceSupplierError ?? 'Reconciliation status is unverified. Retry saved status before preparing another reconciliation.'; } });
   }
   Future<void> _cancel() async {
     if (!_current || _busy || !_reviewVerified || _frozen == null || _committed || _bookRevision == null) return;
@@ -14652,7 +15076,7 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
       cancelledAt: _cancelAttempt!.cancelledAt, reason: _cancelAttempt!.reason);
     if (!_current) return;
     setState(() { _busy = false; if (saved) { _clear(); _bookRevision = session.workspacePurchaseEntryRevision;
-        _notice = 'Matching review cancelled. Bill, Stock and payments are unchanged.'; }
+        _notice = 'Reconciliation review cancelled. Bill, Stock and payments are unchanged.'; }
       else { _uncertain = true; _error = session.workspaceSupplierError ?? 'Cancellation status needs recovery. Retry saved status.'; } });
   }
   Widget _field(String label, TextEditingController controller, String key, {bool locked = false}) =>
@@ -14687,15 +15111,26 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
       matchingProgress.matchedItems == matchingProgress.totalItems;
     // Do not conceal unsaved input or a frozen/recovery attempt when progress changes.
     final completedView = fullyMatched && !_dirty && _frozen == null && _otherReview == null;
+    Future<void> toggleGoods() async {
+      if (_opened && !await confirmLeave()) return;
+      if (!_opened && widget.onBeforeOpen != null && !await widget.onBeforeOpen!()) return;
+      if (_current) setState(() => _opened = !_opened);
+    }
+    final header = TextButton(key: const Key('work-bill-goods-open'), onPressed: _busy ? null : toggleGoods,
+      style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4), minimumSize: const Size(48, 48)),
+      child: Semantics(expanded: _opened, child: widget.headerBuilder != null
+        ? widget.summary?.call(matchingProgress != null) ?? Text(completedView ? 'View goods receipt' : 'Reconcile goods receipt')
+        : Row(children: [Expanded(child: widget.summary?.call(matchingProgress != null) ??
+            Text(completedView ? 'View goods receipt' : 'Reconcile goods receipt')),
+          const SizedBox(width: 8),
+          Icon(_opened ? Icons.expand_less : Icons.expand_more, size: 24, color: MoolColors.muted)])));
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      TextButton.icon(key: const Key('work-bill-goods-open'), onPressed: _busy ? null : () async {
-        if (_opened && !await confirmLeave()) return;
-        if (_current) setState(() => _opened = !_opened);
-      }, icon: Icon(_opened ? Icons.expand_less : Icons.link, size: 18),
-        label: Text(completedView ? 'View received goods' : 'Match received goods')),
+      if (widget.headerBuilder != null) widget.headerBuilder!(header)
+        else Align(alignment: Alignment.centerRight, child: IntrinsicWidth(child: header)),
       if (_opened) ...[
+        if (widget.actions != null) widget.actions!,
         if (!completedView) Text(
-          'Match this bill to saved goods. This does not add Stock or record a payment.',
+          'Reconcile invoice quantities against recorded goods receipts. Stock and payments are unchanged.',
           style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
         for (final match in priorMatches) Padding(
           key: ValueKey(('work-bill-goods-saved-match', match.operationId)),
@@ -14705,12 +15140,12 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${widget.copy.draft.goods[match.billLineIndex]['name']}',
                 style: const TextStyle(fontWeight: FontWeight.w600)),
-              Text('Invoiced: ${_ReceivingLineInput._quantity(match.billQuantityMilli)} · '
-                'Free: ${_ReceivingLineInput._quantity(match.freeBillQuantityMilli)} · Unit: ${match.billUnit}'),
-              Text('Accepted: ${_ReceivingLineInput._quantity(match.acceptedReceiptMilli)} · '
-                'Damaged: ${_ReceivingLineInput._quantity(match.damagedReceiptMilli)} · Unit: '
+              Text('Invoice qty: ${_ReceivingLineInput._quantity(match.billQuantityMilli)} · '
+                'Free qty: ${_ReceivingLineInput._quantity(match.freeBillQuantityMilli)} · Unit: ${match.billUnit}'),
+              Text('Accepted qty: ${_ReceivingLineInput._quantity(match.acceptedReceiptMilli)} · '
+                'Damaged qty: ${_ReceivingLineInput._quantity(match.damagedReceiptMilli)} · Unit: '
                 '${ledger?.goodsReceipts[match.receiptId]?.lines.where((line) => line.sourceLineId == match.receiptLineId).firstOrNull?.purchaseUnit ?? match.stockUnit}'),
-              Text('Receipt: ${_reviewReceiptLabel(match.receiptId, match.receiptLineId)}'),
+              Text('Receipt ref: ${_reviewReceiptLabel(match.receiptId, match.receiptLineId)}'),
               if (match.billUnit != match.stockUnit || match.stockUnitsNumerator != match.stockUnitsDenominator)
                 Text('Unit conversion: ${match.stockUnitsDenominator} ${match.billUnit} = '
                   '${match.stockUnitsNumerator} ${match.stockUnit}'),
@@ -14722,11 +15157,11 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
         if (!_loaded || _uncertain || ledger == null || session.workspaceSupplierRecoveryRequired) TextButton(key: const Key('work-bill-goods-recover'),
           onPressed: _busy ? null : _recover, child: const Text('Retry saved status')),
         if (_otherReview != null) ...[
-          const Text('Finish the saved match for this supplier’s other bill first.'),
+          const Text('Complete the saved reconciliation for this supplier’s other bill first.'),
           if (pendingCopy != null) TextButton(onPressed: _busy ? null : () => widget.onOpenCopy(pendingCopy),
             child: Text('Open invoice ${pendingCopy.draft.invoiceReference}')),
         ] else if (_frozen != null) ...[
-          Text('Receipt: ${_reviewReceiptLabel(_frozen!.receiptId, _frozen!.receiptLineId)}'),
+          Text('Receipt ref: ${_reviewReceiptLabel(_frozen!.receiptId, _frozen!.receiptLineId)}'),
           Text(key: _savedReviewAnchor, '${widget.copy.draft.goods[_frozen!.billLineIndex]['name']} · '
             '${_ReceivingLineInput._quantity(_frozen!.billQuantityMilli)} invoiced + '
             '${_ReceivingLineInput._quantity(_frozen!.freeBillQuantityMilli)} free · Unit: ${_frozen!.billUnit}'),
@@ -14734,19 +15169,19 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
             'Damaged ${_ReceivingLineInput._quantity(_frozen!.damagedReceiptMilli)} · Unit: '
             '${ledger?.goodsReceipts[_frozen!.receiptId]?.lines.where((l) => l.sourceLineId == _frozen!.receiptLineId).firstOrNull?.purchaseUnit ?? ''}'),
           if (_committed) ...[
-            const Text('Match confirmed · no Stock or payment change'),
+            const Text('Reconciliation confirmed · no Stock or payment change'),
             if (!fullyMatched) TextButton(key: const Key('work-bill-goods-next'),
               onPressed: _busy || !_current || _uncertain || !_reviewVerified || session.workspaceSupplierRecoveryRequired
-                ? null : () => setState(_clear), child: const Text('Match another item')),
+                ? null : () => setState(_clear), child: const Text('Reconcile another item')),
           ] else if (_error == null) Wrap(spacing: 8, children: [
             TextButton(key: const Key('work-bill-goods-confirm'), onPressed: _busy || !_reviewVerified ? null : _confirm,
-              child: const Text('Confirm match')),
+              child: const Text('Confirm reconciliation')),
             if (!_reviewVerified) TextButton(onPressed: _busy ? null : _saveReview, child: const Text('Save review again')),
             TextButton(key: const Key('work-bill-goods-cancel'), onPressed: _busy || !_reviewVerified ? null : _cancel,
-              child: const Text('Cancel matching review')),
+              child: const Text('Cancel reconciliation review')),
           ]),
         ] else if (completedView) ...[
-          const Text('All invoice quantities matched', key: Key('work-bill-goods-complete'),
+          const Text('All invoice quantities reconciled', key: Key('work-bill-goods-complete'),
             style: TextStyle(fontSize: 12, color: MoolColors.ink)),
         ] else if (_loaded && !_uncertain) ...[
           DropdownButtonFormField<int>(key: ValueKey(('work-bill-goods-item', _item)), initialValue: _item,
@@ -14756,11 +15191,11 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
                 child: Text('${index + 1}. ${item['name']} · ${item['pack']}', maxLines: 2))],
             onChanged: _editable ? (value) => setState(() { _item = value; _receiptKey = null; _conversion = false; }) : null),
           if (widget.copy.draft.goods.every((item) => (item['productId'] ?? '').isEmpty))
-            const Text('This accepted bill has no saved product links. Do not guess matches by item name; review the product mapping first.'),
+            const Text('This posted bill has no saved product links. Review the product mapping before reconciling quantities.'),
           if (_item != null) ...[
             if (printedQuantitiesKnown) Text('Remaining on bill: ${_ReceivingLineInput._quantity(printedQuantity - billedLinks.fold<int>(0, (s, l) => s + l.billQuantityMilli))} invoiced, '
               '${_ReceivingLineInput._quantity(printedFree - billedLinks.fold<int>(0, (s, l) => s + l.freeBillQuantityMilli))} free · Unit: ${line!['pack']}')
-            else const Text('Invoice quantity is unclear. Check the supplier bill before matching; it is not treated as zero.'),
+            else const Text('Invoice quantity is unclear. Check the supplier bill before reconciliation; it is not treated as zero.'),
             DropdownButtonFormField<(String, String)>(key: ValueKey(('work-bill-goods-receipt', _receiptKey, _item)),
               initialValue: _receiptKey, isExpanded: true, isDense: false, itemHeight: null,
               decoration: const InputDecoration(labelText: 'Saved goods receipt'),
@@ -14772,7 +15207,7 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
                 child: Text(storeBillGoodsReceiptLabel(ledger!.goodsReceipts.values, received.$1, received.$2)))],
               onChanged: _editable ? (value) => setState(() => _chooseReceipt(value)) : null),
             if (_receipts.isEmpty) Text(hasOlderReceipt
-              ? 'Goods are already recorded, but their saved review is unavailable for matching. Do not receive them again.'
+              ? 'Goods are already recorded, but their saved review is unavailable for reconciliation. Do not receive them again.'
               : 'No saved goods receipt for this product. Check whether Stock was already added before recording receipt.'),
             if (pair != null) ...[
               Text('Remaining receipt: ${_ReceivingLineInput._quantity(pair.$2.acceptedMilli - receiptLinks.fold<int>(0, (s, l) => s + l.acceptedReceiptMilli))} accepted, '
@@ -14788,9 +15223,9 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
               CheckboxListTile(key: const Key('work-bill-goods-conversion'), contentPadding: EdgeInsets.zero,
                 value: _conversion, onChanged: _editable ? (value) => setState(() => _conversion = value ?? false) : null,
                 title: Text('I checked quantities and units (${line['pack']} → ${pair.$2.stockUnit}).')),
-              const Text('Damaged quantity matching does not record a supplier credit or refund.'),
+              const Text('Reconciling damaged quantities does not record a supplier credit note or refund.'),
               TextButton(key: const Key('work-bill-goods-save'), onPressed: _editable && printedQuantitiesKnown ? _saveReview : null,
-                child: const Text('Save matching review')),
+                child: const Text('Save reconciliation review')),
             ],
           ],
         ],
@@ -14810,6 +15245,44 @@ Widget _purchaseCompactLabeledField(String label, {required double width, requir
       Semantics(label: label, child: field),
     ]));
 
+Future<void> _revealAddedTradeLine(ScrollController scroll, GlobalKey anchor,
+    bool Function() isCurrent) async {
+  await WidgetsBinding.instance.endOfFrame;
+  double? previousEnd;
+  for (var attempt = 0; attempt < 8 && isCurrent(); attempt++) {
+    final target = anchor.currentContext;
+    if (target != null && target.mounted) {
+      await Scrollable.ensureVisible(target, alignment: 0,
+        duration: const Duration(milliseconds: 180));
+      return;
+    }
+    if (!scroll.hasClients) { return; }
+    final end = scroll.position.maxScrollExtent;
+    if (previousEnd != null && (end - previousEnd).abs() < 1 &&
+        (scroll.offset - end).abs() < 1) { break; }
+    previousEnd = end;
+    await scroll.animateTo(end,
+      duration: const Duration(milliseconds: 180), curve: Curves.easeOut);
+    await WidgetsBinding.instance.endOfFrame;
+  }
+  // Other expanded sections can follow the new item. Search back through those
+  // sections after the lazy list has settled, without collapsing the user's work.
+  while (isCurrent() && scroll.hasClients) {
+    final target = anchor.currentContext;
+    if (target != null && target.mounted) {
+      await Scrollable.ensureVisible(target, alignment: 0,
+        duration: const Duration(milliseconds: 180));
+      return;
+    }
+    final position = scroll.position;
+    if (position.pixels <= position.minScrollExtent) { return; }
+    final next = (position.pixels - position.viewportDimension * .8)
+      .clamp(position.minScrollExtent, position.maxScrollExtent).toDouble();
+    await scroll.animateTo(next, duration: const Duration(milliseconds: 100), curve: Curves.easeOut);
+    await WidgetsBinding.instance.endOfFrame;
+  }
+}
+
 class _PurchaseGoodsInput {
   _PurchaseGoodsInput([Map<String, String>? saved])
       : productId = saved?['productId'] ?? '',
@@ -14820,6 +15293,7 @@ class _PurchaseGoodsInput {
         extra = {for (final key in WorkspacePurchaseEntryDraft.goodsExtraKeys)
           key: TextEditingController(text: saved?[key] ?? '')};
   String productId;
+  final rowKey = GlobalKey();
   final TextEditingController name, pack, quantity, cost;
   final stockSearch = TextEditingController();
   final Map<String, TextEditingController> extra;
@@ -14862,6 +15336,46 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   final _openingKey = GlobalKey<_StoreSupplierOpeningState>();
   final _billGoodsKey = GlobalKey<_StoreBillGoodsMatchState>();
   bool _billGoodsWasAccepted = false;
+  bool _billActionsChanging = false;
+  bool _billReaderAdjusted = false, _billFitWidth = true;
+  final _savedBillScroll = ScrollController();
+  final _purchaseEntryScroll = ScrollController();
+  _PurchaseGoodsInput? _lastAddedPurchaseItem;
+  final _billPanelControllers = <Object, ExpansibleController>{};
+  int _billPanelChange = 0;
+  Object? _fittedRecordedView;
+  ExpansibleController _billPanelController(WorkspacePurchaseSavedCopy copy, String role) =>
+    _billPanelControllers.putIfAbsent((_scope, copy.id, copy.revision, role), ExpansibleController.new);
+  Future<bool> _openBillPanel(WorkspacePurchaseSavedCopy copy, String role) async {
+    if (!mounted || !_current) return false;
+    final change = ++_billPanelChange;
+    final allowed = role == 'goods' || await (_billGoodsKey.currentState?.closePanel() ?? Future.value(true));
+    if (!mounted || !_current || change != _billPanelChange) return false;
+    if (!allowed) { _billPanelController(copy, role).collapse(); return false; }
+    for (final other in ['account']) {
+      if (other != role) _billPanelController(copy, other).collapse();
+    }
+    return true;
+  }
+  Future<bool> _closeBillDetails() async {
+    if (!_current || _busy || _billActionsChanging) return false;
+    _billActionsChanging = true;
+    try {
+      if (!await (_billGoodsKey.currentState?.closePanel() ?? Future.value(true)) || !mounted || !_current) return false;
+      FocusScope.of(context).unfocus();
+      _billPanelController(widget.savedCopy!, 'account').collapse();
+      if (_savedBillScroll.hasClients) _savedBillScroll.jumpTo(0);
+      return true;
+    } finally { _billActionsChanging = false; }
+  }
+  Future<void> _readBillInvoice({bool zoom = false}) async {
+    if (!await _closeBillDetails()) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_current || _fullScreenPreview) return;
+      if (!zoom || !_billReaderAdjusted) _fitInvoice(fitWidth: zoom ? _billFitWidth : false);
+      if (zoom) _zoomInvoice();
+    });
+  }
   static const _paperInk = Color(0xff202124);
   static const _paperMuted = Color(0xff59616d);
   static const _paperRule = Color(0xff92958f);
@@ -14892,13 +15406,25 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
 
   Future<void> _openFullScreenPreview() async {
     if (_fullScreenPreview || !_current || _busy) return;
+    final preserveInline = _readOnly && _sourceAttachment == null;
+    final inlineZoom = _previewZoom.value.clone();
+    final inlineAdjusted = _billReaderAdjusted;
+    if (preserveInline) {
+      _billReaderAdjusted = false;
+      _fittedRecordedView = null;
+    }
     FocusScope.of(context).unfocus();
     _previewClosing = false;
     setState(() => _fullScreenPreview = true);
     // There must be only one mounted invoice viewer for these keys/controllers.
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted || !_current) {
-      if (mounted) setState(() => _fullScreenPreview = false);
+      if (mounted) {
+        setState(() {
+          _fullScreenPreview = false;
+          if (preserveInline) { _billReaderAdjusted = inlineAdjusted; _previewZoom.value = inlineZoom; }
+        });
+      }
       return;
     }
     try {
@@ -14907,8 +15433,10 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           child: AnimatedBuilder(animation: Listenable.merge([_previewChanges, widget.session]),
             builder: (_, _) => Column(
               key: const Key('purchase-full-screen-preview'), children: [
-                Row(children: [const Expanded(child: Padding(padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('Invoice preview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)))),
+                Row(children: [Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(_sourceAttachment != null ? 'Supplier document copy'
+                    : _readOnly ? 'Recorded purchase copy' : 'Invoice preview',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)))),
                   TextButton(key: const Key('purchase-full-screen-close'),
                     style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                     onPressed: _closeFullScreenPreview, child: const Text('Close'))]),
@@ -14924,7 +15452,14 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     } finally {
       _previewRoute = null;
       if (mounted) {
-        setState(() { _fullScreenPreview = false; _readingPointers.clear(); });
+        setState(() {
+          _fullScreenPreview = false; _readingPointers.clear();
+          if (preserveInline) {
+            _previewZoom.value = inlineZoom;
+            _billReaderAdjusted = inlineAdjusted;
+            _fittedRecordedView = null;
+          }
+        });
         _positionReview();
       }
     }
@@ -14981,6 +15516,85 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   bool _loading = true, _busy = false, _leaving = false;
   String? _error, _notice;
   final _expandedSections = <String>{};
+  bool _showAllDocumentFields = false;
+  String get _documentType => _details['documentType']!.text.trim();
+  bool get _billOfSupply => _documentType == 'Bill of supply';
+  bool get _combinedBill => _documentType == 'Invoice-cum-bill of supply';
+  bool get _noSupplierGst => _billOfSupply || _documentType == 'Non-GST purchase bill';
+  bool get _taxInvoice => const ['GST invoice', 'Tax invoice'].contains(_documentType);
+  bool get _unknownDocument => !_taxInvoice && !_noSupplierGst && !_combinedBill;
+  static const _documentTaxKeys = {'priceBasis', 'taxTreatment', 'taxableValue', 'cgst', 'sgst',
+    'sgstAmount', 'utgst', 'igst', 'cess', 'totalTax', 'printedTaxRate', 'printedCgstRate',
+    'printedSgstRate', 'printedUtgstRate', 'printedIgstRate'};
+  static const _itemTaxKeys = {'taxableValue', 'taxAmount', 'gstRate', 'cess', 'cgstRate',
+    'cgst', 'sgstRate', 'sgst', 'utgstRate', 'utgst', 'igstRate', 'igst', 'cessRate'};
+  bool get _hasTaxDetails => _documentTaxKeys.any((k) => _details[k]!.text.isNotEmpty) ||
+    _goods.any((line) => _itemTaxKeys.any((k) => line.extra[k]!.text.isNotEmpty)) ||
+    _taxRows.any((row) => row.values.any((value) => value.text.isNotEmpty));
+  bool get _hasEInvoiceDetails => const ['reverseCharge', 'eInvoiceStatus', 'irn', 'ackNumber',
+    'ackDate', 'qrStatus', 'eInvoiceDeclaration'].any((k) => _details[k]!.text.isNotEmpty);
+  bool get _showGstFields => !_noSupplierGst || _showAllDocumentFields || _hasTaxDetails;
+  bool get _showEInvoiceFields => _taxInvoice || _unknownDocument || _showAllDocumentFields || _hasEInvoiceDetails;
+  bool get _servicesOnly => _details['supplyNature']!.text == 'Services';
+  bool get _hasGoodsReceipt => const ['receiptStatus', 'receivedDate'].any((k) => _details[k]!.text.isNotEmpty) ||
+    _goods.any((line) => const ['receivedQuantity', 'damagedQuantity', 'shortQuantity']
+      .any((k) => line.extra[k]!.text.isNotEmpty));
+  Widget _documentField(bool visible, Widget child) => visible ? child : const SizedBox.shrink();
+  List<String> get _documentMissingDetails {
+    final missing = <String>[];
+    for (final entry in <String, String>{'Supplier name': _name.text, 'Supplier address': _address.text,
+        'Supplier document number': _reference.text, 'Supplier document date': _date.text,
+        'Invoice total': _details['invoiceTotal']!.text}.entries) {
+      if (entry.value.trim().isEmpty) missing.add(entry.key);
+    }
+    if (_documentType.isEmpty) missing.add('Supplier document type');
+    if (const ['', 'Not stated'].contains(_details['supplyNature']!.text)) missing.add('Goods / services described on the bill');
+    if (_taxInvoice || _billOfSupply || _combinedBill) {
+      if (_gstin.text.trim().isEmpty) missing.add('Supplier GSTIN');
+      if (const ['', 'Not shown'].contains(_details['signatureStatus']!.text)) missing.add('Signature / applicable electronic-document exception');
+      if (const ['', 'Not confirmed'].contains(_details['buyerRegistration']!.text)) missing.add('Buyer GST registration status');
+    }
+    if (_billOfSupply && const ['', 'Not stated'].contains(_details['billOfSupplyReason']!.text)) {
+      missing.add('Bill of Supply basis as printed');
+    }
+    if (_billOfSupply && _details['billOfSupplyReason']!.text == 'Composition scheme' &&
+        _details['printedDeclaration']!.text.trim().isEmpty) {
+      missing.add('Printed composition declaration');
+    }
+    if (_details['buyerRegistration']!.text == 'Registered') {
+      if (_details['buyerName']!.text.isEmpty) missing.add('Registered buyer name');
+      if (_details['buyerAddress']!.text.isEmpty) missing.add('Registered buyer address');
+      if (_details['buyerGstin']!.text.isEmpty && _details['buyerUin']!.text.isEmpty) missing.add('Buyer GSTIN / UIN');
+    }
+    if (_combinedBill) {
+      if (_details['buyerRegistration']!.text != 'Unregistered') missing.add('Confirm buyer is unregistered for the combined format');
+      if (_details['exemptValue']!.text.isEmpty) missing.add('Printed exempt supply value');
+    }
+    if ((_taxInvoice || _combinedBill) && _details['taxableValue']!.text.isEmpty) missing.add('Printed taxable value');
+    if (_taxInvoice && _details['reverseCharge']!.text.isEmpty) missing.add('Reverse-charge indication on the invoice');
+    if (_unknownDocument && _details['documentTitle']!.text.isEmpty) missing.add('Exact printed document title');
+    if (!_goods.any((line) => line.name.text.trim().isNotEmpty)) missing.add('Item / service descriptions');
+    if (_details['supplyNature']!.text == 'Goods' &&
+        _goods.any((line) => line.name.text.isNotEmpty && (line.quantity.text.isEmpty || line.pack.text.isEmpty))) {
+      missing.add('Quantity and unit for goods lines');
+    }
+    return missing;
+  }
+  Widget _documentChecks() {
+    final missing = _documentMissingDetails;
+    return ExpansionTile(key: const Key('work-purchase-document-checks'), tilePadding: EdgeInsets.zero,
+      title: const Text('Check the original bill', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      subtitle: Text(missing.isEmpty ? 'Record details entered · applicability still needs checking'
+        : '${missing.length} record details to check', style: const TextStyle(fontSize: 12)),
+      children: [for (final text in missing) Align(alignment: Alignment.centerLeft,
+        child: Text('Not entered / not confirmed: $text', style: const TextStyle(fontSize: 12))),
+        if (_details['supplyNature']!.text == 'Goods and services')
+          const Text('For a mixed bill, check quantity and unit for goods lines only. A service line need not have a physical quantity or unit.',
+            key: Key('work-purchase-mixed-quantity-review'), style: TextStyle(fontSize: 12)),
+        const Text('Check applicable HSN / SAC, GST rates and amounts, buyer particulars, inter-State place of supply and delivery address against the original. Buyer particulars also depend on registration, value and requested details.', style: TextStyle(fontSize: 12)),
+        const Text('These checks do not verify GST registration, IRN, electronic signatures or tax-credit eligibility.', style: TextStyle(fontSize: 12)),
+      ]);
+  }
   bool get _current => mounted && _scope != null && _scope == widget.session.workspaceSupplierScope;
   String get _input => jsonEncode([_name.text, _phone.text, _address.text, _gstin.text,
     _reference.text, _date.text, _goods.map((line) => line.fields).toList(), _supplierId,
@@ -15069,6 +15683,34 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       _phone.text = p.phone; _address.text = p.address; _gstin.text = p.gstin; });
     _supplierFocus.unfocus();
   }
+  Future<void> _pickSupplier() async {
+    if (_busy || _readOnly || !_current) return;
+    final session = widget.session;
+    if (_revision != session.workspacePurchaseEntryRevision) {
+      _showSaveError('Saved purchases changed. Check the saved draft before choosing a supplier. Your entries are kept.');
+      return;
+    }
+    final originalDraft = jsonEncode(session.workspacePurchaseEntryDraft?.toJson());
+    FocusScope.of(context).unfocus();
+    setState(() => _busy = true);
+    final String? selected;
+    try {
+      selected = await _showStoreSupplierSelector(context, session, selectedId: _supplier?.id);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (!_current || _readOnly || selected == null) return;
+    if (jsonEncode(session.workspacePurchaseEntryDraft?.toJson()) != originalDraft) {
+      _showSaveError('The saved bill changed. Your entries are kept; check the saved draft before continuing.');
+      return;
+    }
+    final supplier = session.workspaceSuppliers.where((p) => p.id == selected).singleOrNull;
+    if (supplier == null || session.workspaceSupplierRecoveryRequired) return;
+    // A standalone contact save advances the same purchase-book revision. Only
+    // adopt it after proving that the existing bill draft was not replaced.
+    _revision = session.workspacePurchaseEntryRevision;
+    _chooseSupplier(supplier);
+  }
   void _clearSupplierInstructions() {
     for (final key in const ['supplierEmail', 'bankName', 'bankAccount', 'bankIfsc',
         'bankBranch', 'upiType', 'upiId', 'paymentQrStatus', 'terms', 'signatory', 'paymentTerms']) {
@@ -15121,7 +15763,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       sellingPrice: int.tryParse(line.extra['sellingPrice']!.text.trim()) ?? 0,
       mrp: int.tryParse(line.extra['mrp']!.text.trim()),
       unitPrice: '', stock: 0, available: false, publicListing: false,
-      deliveryPromise: 'Store pickup or local delivery', origin: '',
+      deliveryPromise: '', origin: '',
       visualLabel: 'Product image pending', visualKind: 'catalogue-packshot',
       stockMode: defaults.stockMode, lowStockThreshold: defaults.lowStockThreshold,
     );
@@ -15225,12 +15867,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     setState(() => _error = message);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_current || _error != message) return;
-      final target = _saveErrorAnchor.currentContext;
-      if (target != null && target.mounted) {
-        // Reveal the beginning even when large text exceeds a short viewport.
-        unawaited(Scrollable.ensureVisible(target, alignment: 0,
-          duration: const Duration(milliseconds: 200)));
-      }
+      unawaited(_revealAddedTradeLine(_purchaseEntryScroll, _saveErrorAnchor,
+        () => mounted && _current && _error == message));
     });
   }
   Future<void> _refreshSaved() async {
@@ -15273,6 +15911,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   @override
   void dispose() {
+    for (final controller in _billPanelControllers.values) { controller.dispose(); }
+    _savedBillScroll.dispose();
+    _purchaseEntryScroll.dispose();
     for (final c in [_name, _phone, _address, _gstin, _reference, _date]) { c.dispose(); }
     for (final c in _details.values) { c.dispose(); }
     _supplierFocus.dispose();
@@ -15305,15 +15946,24 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       f.record.itemIndex == itemIndex && f.record.summaryIndex == summaryIndex);
     final owner = '$section-${itemIndex ?? 'all'}-${summaryIndex ?? 'all'}';
     final heading = switch (section) {
-      'supplier' => 'Extra supplier details', 'buyer' => 'Extra billed-to details',
-      'items' => itemIndex == null ? 'Item details to match' : 'Extra item details',
-      'tax' => summaryIndex == null ? 'Extra tax details' : 'Extra tax-row details',
-      'receipt' => 'Extra delivery details', 'payment' => 'Extra payment details',
-      _ => 'Extra invoice details',
+      'supplier' => 'Other supplier details', 'buyer' => 'Other buyer details',
+      'items' => itemIndex == null ? 'Scanned item details to match' : 'Other item details',
+      'tax' => summaryIndex == null ? 'Other tax details' : 'Other tax-row details',
+      'receipt' => 'Other delivery details', 'payment' => 'Other payment details',
+      _ => 'Other invoice details',
+    };
+    final example = switch (section) {
+      'supplier' => ('Supplier code', 'SUP-104'),
+      'buyer' => ('Customer code', 'CUST-104'),
+      'items' => ('Grade', 'A'),
+      'tax' => ('Exempt amount', '250.00'),
+      'receipt' => ('LR number', 'LR-104'),
+      'payment' => ('Credit period', '30 days'),
+      _ => ('Dispatch reference', 'DSP-104'),
     };
     return _section('$heading${selected.isEmpty ? '' : ' · ${selected.length}'}',
       'work-purchase-extra-$owner', [
-        if (selected.isEmpty) const Text('Add any heading and its details that appear on your invoice.',
+        if (selected.isEmpty) const Text('Add a printed detail that has no field above. Copy its field name and value.',
           style: TextStyle(fontSize: 11, color: MoolColors.muted)),
         for (final input in selected) ...[
           if (input.record.sourceItemIndex != null && input.record.itemIndex == null) ...[
@@ -15338,19 +15988,33 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 });
               }),
           ],
-          _field('Heading on bill', input.label, 'purchase-extra-label-${input.record.id}',
-            limit: 120, changed: (_) => setState(() => input.reviewed = false)),
-          _field('Details on bill', input.value, 'purchase-extra-value-${input.record.id}',
-            limit: 4000, multiline: true, changed: (_) => setState(() => input.reviewed = false)),
-          Row(children: [Expanded(child: Text(input.reviewed ? 'Checked with bill' : 'Check with bill',
+          _field('Field name as printed', input.label, 'purchase-extra-label-${input.record.id}',
+            hint: 'e.g. ${example.$1}', limit: 120, changed: (_) => setState(() => input.reviewed = false)),
+          _field('Value as printed', input.value, 'purchase-extra-value-${input.record.id}',
+            hint: 'e.g. ${example.$2}', limit: 4000, multiline: true, changed: (_) => setState(() => input.reviewed = false)),
+          Row(children: [Expanded(child: Text(input.reviewed ? 'Checked with original bill' : 'Check original bill',
             style: const TextStyle(fontSize: 11, color: MoolColors.ink))),
             IconButton(tooltip: input.reviewed ? 'Check again' : 'Mark as checked',
               key: Key('purchase-extra-check-${input.record.id}'),
               onPressed: () => setState(() => input.reviewed = !input.reviewed),
               icon: Icon(input.reviewed ? Icons.check_circle_outline : Icons.radio_button_unchecked,
                 size: 18, color: MoolColors.navy)),
-            IconButton(tooltip: 'Remove extra detail', onPressed: () {
-              setState(() => _additional.remove(input)); input.dispose();
+            IconButton(key: Key('purchase-extra-remove-${input.record.id}'), tooltip: 'Remove extra detail', onPressed: () {
+              final copyIndex = _attachments.indexWhere((a) => a.digest == input.record.sourceDigest);
+              WorkspacePurchaseInvoiceAttachment? updated;
+              if (copyIndex >= 0) {
+                final copy = _attachments[copyIndex];
+                updated = copy.withExtractedFields(copy.extractedFields, overflow: copy.extractionOverflow,
+                  dismissed: {...copy.dismissedFieldIds, input.record.id}.toList());
+                if (!updated.valid) {
+                  setState(() => _error = 'The saved-copy detail limit is reached. Your field is kept; split the document before removing more scanned details.');
+                  return;
+                }
+              }
+              setState(() {
+                if (updated != null) _attachments[copyIndex] = updated;
+                _additional.remove(input);
+              }); input.dispose();
             }, icon: const Icon(Icons.close_rounded, size: 18, color: MoolColors.navy))]),
         ],
         Align(alignment: Alignment.centerLeft, child: TextButton.icon(
@@ -15360,7 +16024,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               id: 'manual-${DateTime.now().microsecondsSinceEpoch}', label: '', value: '',
               section: section, itemIndex: itemIndex, summaryIndex: summaryIndex)))),
           icon: const Icon(Icons.add_rounded, size: 16),
-          label: const Text('Add detail from bill', style: TextStyle(fontSize: 12, color: MoolColors.navy)))),
+          label: const Text('Add printed detail', style: TextStyle(fontSize: 12, color: MoolColors.navy)))),
       ]);
   }
   Future<void> _removeInvoiceRow(int index, {bool tax = false}) async {
@@ -15396,7 +16060,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         style: const TextStyle(fontSize: 12, color: MoolColors.navy, fontWeight: FontWeight.w600))),
         IconButton(tooltip: 'Remove tax row ${index + 1}', onPressed: () => _removeInvoiceRow(index, tax: true),
           icon: const Icon(Icons.close_rounded, size: 18))]),
-      _compactFields([_field('Row heading', row['label']!, 'purchase-tax-label-$index'),
+      _compactFields([_field('Tax row description', row['label']!, 'purchase-tax-label-$index'),
         _field('HSN / SAC', row['hsn']!, 'purchase-tax-hsn-$index'),
         _field('Taxable value ₹', row['taxableValue']!, 'purchase-tax-taxable-$index')]),
       _section('Tax rates & amounts', 'purchase-tax-components-$index', [
@@ -15418,6 +16082,71 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       int limit = 200, TextInputType? keyboard, FocusNode? focus,
       ValueChanged<String>? changed, String? hint, bool lookup = false, bool multiline = false}) {
     _fieldLabels[key] = label;
+    // Entry examples are presentation only: never put them in the controllers.
+    final entryHint = hint ?? switch (label) {
+      'Supplier name' => 'Name on supplier bill',
+      'Supplier phone' => 'Phone number',
+      'Supplier email' => 'e.g. name@firm.in',
+      'Supplier address' => 'Street, city and PIN',
+      'Supplier GSTIN' => 'GSTIN, if registered',
+      'Supplier invoice number' => 'e.g. INV-104',
+      'Document title' => 'e.g. Tax invoice',
+      'Date exactly as printed' => 'e.g. 23-Oct-2026',
+      'Purchase order number' => 'PO number on bill',
+      'Invoice copy type' => 'e.g. Original copy',
+      'IRN' => '64-character IRN',
+      'Ack. number' => 'Number with IRN',
+      'Supplier declaration' => 'Printed declaration',
+      'Buyer name on invoice' => 'Business name as billed',
+      'Billing address' => 'Buyer address on bill',
+      'Buyer phone' => 'Phone number',
+      'Buyer email' => 'e.g. buyer@firm.in',
+      'Buyer GSTIN' => 'GSTIN, if registered',
+      'Buyer UIN (if printed)' => 'UIN, if printed',
+      'Billing State' || 'Ship-to State' || 'Place of supply' => 'e.g. Rajasthan',
+      'Billing State code' || 'Ship-to State code' || 'Supply State code' => 'e.g. 08',
+      'Ship-to address' => 'Delivery address',
+      'Item name on invoice' => 'Description on bill',
+      'Unit on invoice' => 'e.g. kg',
+      'Billed qty' => 'e.g. 10',
+      'Rate / unit ₹' => 'e.g. 50.00',
+      'HSN / SAC' => 'Code on invoice',
+      'Invoice line no.' => 'e.g. 1',
+      'Model / specifications' => 'Printed model / grade',
+      'Item code / barcode' => 'e.g. ITEM-104',
+      'Unit code on invoice' => 'e.g. KGS',
+      'Free qty' => 'e.g. 2',
+      'Batch No.' => 'e.g. B-104',
+      'Expiry date' => 'Expiry date as printed',
+      'Total items' => 'Item count on bill',
+      'Total quantity' => 'Qty & unit on bill',
+      'Amount in words' => 'Written bill amount',
+      'Tax row description' => 'e.g. TOTAL',
+      'Received qty' => 'Units received',
+      'Damaged qty' => 'Damaged units',
+      'Short qty' => 'Units short',
+      'Delivery / shipping terms' => 'Agreed delivery terms',
+      'Payment reference / UTR' => 'UTR / receipt no.',
+      'Payment / credit terms' => 'e.g. Net 30 days',
+      'Printed payment remark' => 'e.g. Paid / Credit',
+      'Supplier bank name' => 'Bank as on bill',
+      'Supplier account number' => 'Account no. on bill',
+      'IFSC' => 'e.g. ABCD0123456',
+      'Branch' => 'Branch as on bill',
+      'Supplier UPI app' => 'App, if printed',
+      'Supplier UPI ID' => 'e.g. shop@bank',
+      'Terms & conditions' => 'Printed supplier terms',
+      'Signatory name' => 'Name by signature',
+      'Signatory business name' => 'Business by signature',
+      'Signature caption' => 'e.g. Proprietor',
+      'Printed declaration' => 'Declaration on bill',
+      'Invoice footer text' => 'Closing text on bill',
+      'Purchase narration' => 'Your purchase note',
+      'Exempt value ₹' => 'e.g. 250.00',
+      _ when label.endsWith('₹') => 'e.g. 250.00',
+      _ when label.endsWith('%') => 'e.g. 5',
+      _ => null,
+    };
     return TextField(key: Key(key), controller: controller,
     focusNode: focus, maxLength: limit, maxLengthEnforcement: MaxLengthEnforcement.none, keyboardType: keyboard,
     minLines: 1, maxLines: multiline ? null : 1,
@@ -15426,12 +16155,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     style: TextStyle(fontSize: 13, color: _paperInk, letterSpacing: 0,
       fontWeight: const ['work-purchase-invoiceTotal', 'work-purchase-amountPayable'].contains(key)
         ? FontWeight.w600 : FontWeight.w400),
-    decoration: InputDecoration(labelText: label, hintText: hint, counterText: '', filled: false,
+    decoration: InputDecoration(labelText: label, hintText: entryHint, counterText: '', filled: false,
       floatingLabelBehavior: FloatingLabelBehavior.always,
       // Flutter scales floating labels by .75. 16 keeps the visible label at 12sp.
       floatingLabelStyle: const TextStyle(fontSize: 16, color: _paperMuted),
       labelStyle: const TextStyle(fontSize: 12, color: _paperMuted),
-      hintStyle: const TextStyle(fontSize: 13, color: _paperMuted),
+      hintStyle: const TextStyle(fontSize: 13, color: _paperMuted, fontWeight: FontWeight.w400),
       isDense: true, contentPadding: const EdgeInsets.symmetric(vertical: 8),
       border: lookup ? InputBorder.none : const UnderlineInputBorder(borderSide: BorderSide(color: _paperRule)),
       enabledBorder: lookup ? InputBorder.none : const UnderlineInputBorder(borderSide: BorderSide(color: _paperRule)),
@@ -15447,9 +16176,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       'work-purchase-invoice-section' => 'Copy the invoice number, date and printed references.',
       'work-purchase-buyer-details' => 'Check your billed-to details and the delivery address.',
       'work-purchase-items-section' => 'Copy each item, quantity and rate; match it to Stock.',
-      'work-purchase-tax-details' => 'Copy tax, discounts and totals exactly as on the invoice.',
+      'work-purchase-tax-details' => 'Copy tax, discounts and totals from the invoice. Leave missing amounts blank.',
       'work-purchase-receipt-details' => 'Check the goods in hand; record shortages or damage.',
-      'work-purchase-payment-details' => 'Record actual payment separately from supplier payment instructions.',
+      'work-purchase-payment-details' => 'Record payments actually made. Copy any printed Paid / Credit remark separately below.',
       _ => 'Compare this entered record with the original, then save draft.',
     };
     return Column(key: key == 'work-purchase-review-section' ? _reviewAnchor
@@ -15519,8 +16248,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   Widget _detail(String label, String key, {bool number = false, bool date = false}) =>
     _field(label, _details[key]!, 'work-purchase-$key', limit: number ? 14 : date ? 10 : key == 'terms' ? 4000 : 500,
-      hint: date ? 'DD/MM/YYYY' : null,
-      multiline: const ['buyerAddress', 'deliveryAddress', 'terms', 'notes', 'shippingTerms', 'paymentTerms', 'amountInWords'].contains(key),
+      hint: date ? 'DD/MM/YYYY' : key == 'documentTitle' ? switch (_documentType) {
+        'GST invoice' || 'Tax invoice' => 'e.g. Tax invoice',
+        'Bill of supply' => 'Bill of supply',
+        'Non-GST purchase bill' => 'Bill / cash memo',
+        _ => 'Printed title',
+      } : null,
+      multiline: const ['buyerAddress', 'deliveryAddress', 'terms', 'notes', 'shippingTerms', 'paymentTerms', 'amountInWords', 'printedDeclaration'].contains(key),
       keyboard: number ? const TextInputType.numberWithOptions(decimal: true, signed: true)
         : date ? TextInputType.datetime : key.endsWith('Email') ? TextInputType.emailAddress
         : key == 'buyerPhone' ? TextInputType.phone : null);
@@ -15528,7 +16262,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     _fieldLabels['work-purchase-$key'] = label;
     return DropdownButtonFormField<String>(
     key: Key('work-purchase-$key'), initialValue: choices.contains(_details[key]!.text) ? _details[key]!.text : '',
-    isExpanded: true, style: const TextStyle(fontSize: 13, color: _paperInk),
+    isExpanded: true, itemHeight: key == 'documentType' ? null : kMinInteractiveDimension,
+    selectedItemBuilder: key != 'documentType' ? null : (context) => [
+      const Align(alignment: Alignment.centerLeft, child: Text('Choose type')),
+      for (final value in choices) Align(alignment: Alignment.centerLeft,
+        child: Text(value == 'Invoice-cum-bill of supply' ? 'Invoice-cum-bill' : storePurchaseDocumentTypeLabel(value),
+          maxLines: 1, overflow: TextOverflow.ellipsis))],
+    style: const TextStyle(fontSize: 13, color: _paperInk),
     decoration: InputDecoration(labelText: label, filled: false, isDense: true,
       floatingLabelBehavior: FloatingLabelBehavior.always,
       floatingLabelStyle: const TextStyle(fontSize: 16, color: _paperMuted),
@@ -15541,10 +16281,18 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       'documentType' => 'Choose type', 'priceBasis' => 'Check printed rates',
       'taxTreatment' => 'Choose GST type', 'receiptStatus' => 'Choose goods status',
       'paymentStatus' => 'Choose payment status', 'paymentMethod' => 'Choose, if paid',
+      'supplyNature' => 'Check the original bill', 'billOfSupplyReason' => 'As printed; do not guess',
+      'buyerRegistration' => 'Check buyer status',
       _ => 'As shown on bill',
     })),
       for (final value in choices) DropdownMenuItem(value: value,
-        child: Text(key == 'documentType' ? storePurchaseDocumentTypeLabel(value) : value))],
+        key: key == 'documentType' ? ValueKey('purchase-document-option-$value') : null,
+        child: key != 'documentType' ? Text(value) : Padding(padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text(storePurchaseDocumentTypeLabel(value), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 3), Text(storePurchaseDocumentTypeUseCase(value),
+              style: const TextStyle(fontSize: 11, color: _paperMuted)),
+          ])))],
     onChanged: (value) => setState(() {
       _details[key]!.text = value ?? '';
     }));
@@ -15716,17 +16464,31 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     return '${minor < 0 ? '−' : ''}${currency ? '₹' : ''}'
       '${_formatStoreAmount(absolute ~/ 100)}.${(absolute % 100).toString().padLeft(2, '0')}';
   }
-  Widget _reviewCopies() {
+  Widget _invoiceAction(String id, String label, IconData icon, VoidCallback? onPressed,
+      {bool vertical = false}) => vertical
+    ? Tooltip(message: label, child: TextButton(key: Key(id), onPressed: onPressed,
+        style: TextButton.styleFrom(alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4), minimumSize: const Size(48, 48)),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 18),
+          Text(switch (id) {
+            'purchase-preview-full-screen' => 'Full screen',
+            'purchase-recorded-download' || 'purchase-original-download' => 'Download',
+            'purchase-review-zoom-in' || 'purchase-original-zoom-in' => 'Zoom',
+            'purchase-review-fit' || 'purchase-original-fit' => 'Fit',
+            _ => label,
+          }, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11))])))
+    : IconButton(key: Key(id), tooltip: label,
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        onPressed: onPressed, icon: Icon(icon, size: 20, color: MoolColors.navy));
+  Widget _reviewCopies({bool vertical = false}) {
     if (_fullScreenPreview) return const SizedBox.shrink();
     final original = _sourceAttachment != null;
     final attachment = _attachments.where((a) => a.digest == _lastOriginal?.digest).firstOrNull
         ?? _attachments.firstOrNull;
-    return SingleChildScrollView(scrollDirection: Axis.horizontal,
-      child: Row(key: const Key('purchase-review-toolbar'), children: [
-      if (!_fullScreenPreview) IconButton(key: const Key('purchase-preview-full-screen'),
-        tooltip: 'View invoice full screen', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-        onPressed: _openFullScreenPreview, icon: const Icon(Icons.open_in_full, size: 20, color: MoolColors.navy)),
-      if (attachment != null) Semantics(selected: original, child: TextButton(
+    final controls = <Widget>[
+      _invoiceAction('purchase-preview-full-screen', 'View invoice full screen', Icons.open_in_full,
+        _openFullScreenPreview, vertical: vertical),
+      if (attachment != null && (!vertical || !original)) Semantics(selected: original, child: TextButton(
         key: const Key('purchase-review-original'),
         style: TextButton.styleFrom(disabledForegroundColor: MoolColors.navy,
           minimumSize: const Size(48,48), padding: const EdgeInsets.symmetric(horizontal:4),
@@ -15734,41 +16496,53 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         onPressed: original || _sourceSaving ? null : () => _openSource(attachment,
           page: attachment.digest == _lastOriginal?.digest ? _lastOriginalPage : 0),
         child: const Text('Supplier copy'))),
-      if (_readOnly || attachment != null) Semantics(selected: !original, child: TextButton(key: const Key('purchase-original-recorded'),
+      if ((_readOnly || attachment != null) && (!vertical || original))
+        Semantics(selected: !original, child: TextButton(key: const Key('purchase-original-recorded'),
         style: TextButton.styleFrom(disabledForegroundColor: MoolColors.navy,
           minimumSize: const Size(48,48), padding: const EdgeInsets.symmetric(horizontal:4),
           textStyle: TextStyle(fontSize: 12, fontWeight: original ? FontWeight.w500 : FontWeight.w700)),
         onPressed: !original || _sourceSaving ? null : _previewPurchase,
         child: const Text('Recorded copy'))),
-      if (original) IconButton(key: const Key('purchase-original-download'),
-        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-        tooltip: _sourceSaving ? 'Saving copy…' : 'Download supplier copy',
-        onPressed: _sourceSaving ? null : _downloadSource,
-        icon: const Icon(Icons.download_outlined, size: 20, color: MoolColors.navy)),
-      if (!original && (_readOnly || _original != null)) IconButton(tooltip: _recordedSaving ? 'Preparing copy…' : 'Download recorded purchase copy',
-        key: const Key('purchase-recorded-download'),
-        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-        onPressed: _recordedSaving ? null : _downloadRecorded,
-        icon: const Icon(Icons.download_outlined, size: 20, color: MoolColors.navy)),
-      _invoiceTools(original: original),
-    ]));
+      if (original) _invoiceAction('purchase-original-download',
+        _sourceSaving ? 'Saving copy…' : 'Download supplier copy', Icons.download_outlined,
+        _sourceSaving ? null : _downloadSource, vertical: vertical),
+      if (!original && (_readOnly || _original != null)) _invoiceAction('purchase-recorded-download',
+        _recordedSaving ? 'Preparing copy…' : 'Download recorded purchase copy', Icons.download_outlined,
+        _recordedSaving ? null : _downloadRecorded, vertical: vertical),
+      ..._invoiceToolControls(original: original, vertical: vertical),
+    ];
+    return vertical ? LayoutBuilder(builder: (context, constraints) {
+      final columns = constraints.maxWidth >= 280 && MediaQuery.textScalerOf(context).scale(1) <= 1.5 ? 4 : 2;
+      final width = (constraints.maxWidth - (columns - 1) * 4) / columns;
+      return Wrap(key: const Key('purchase-review-toolbar'), spacing: 4, runSpacing: 4,
+        children: [for (final control in controls) SizedBox(
+          width: control is Row ? constraints.maxWidth : width, child: control)]);
+    })
+      : SingleChildScrollView(scrollDirection: Axis.horizontal,
+        child: Row(key: const Key('purchase-review-toolbar'), children: controls));
   }
   void _zoomInvoice() {
     final box = _sourceViewport.currentContext?.findRenderObject();
     if (box is! RenderBox) return;
+    if (_readOnly) _billReaderAdjusted = true;
     final centre = box.size.center(Offset.zero);
     final scene = _previewZoom.toScene(centre);
     final scale = (_previewZoom.value.getMaxScaleOnAxis() * 2).clamp(.05, 8.0);
     _previewZoom.value = Matrix4.diagonal3Values(scale, scale, 1)
       ..setTranslationRaw(centre.dx - scene.dx * scale, centre.dy - scene.dy * scale, 0);
   }
-  void _fitInvoice() {
+  void _fitInvoice({bool automatic = false, bool? fitWidth}) {
+    if (automatic && _billReaderAdjusted) return;
     final viewport = _sourceViewport.currentContext?.findRenderObject();
     final page = _documentPage.currentContext?.findRenderObject();
     if (viewport is! RenderBox || page is! RenderBox || page.size.isEmpty) return;
+    if (!automatic) _billReaderAdjusted = false;
+    if (_readOnly && !_fullScreenPreview && fitWidth != null) _billFitWidth = fitWidth;
     final widthScale = viewport.size.width / page.size.width;
     final heightScale = viewport.size.height / page.size.height;
-    final scale = (widthScale < heightScale ? widthScale : heightScale).clamp(.05, 1.0);
+    final useWidth = _readOnly && !_fullScreenPreview && _billFitWidth;
+    final scale = (useWidth ? widthScale : widthScale < heightScale ? widthScale : heightScale)
+      .clamp(.05, useWidth ? 8.0 : 1.0);
     _previewZoom.value = Matrix4.diagonal3Values(scale, scale, 1)
       ..setTranslationRaw((viewport.size.width - page.size.width * scale) / 2, 0, 0);
   }
@@ -15777,22 +16551,33 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     if (changed && mounted) setState(() {});
   }
   Widget _invoiceViewer(String key, double viewportHeight, Widget Function(double width) page) =>
-    LayoutBuilder(builder: (context, constraints) => SizedBox(key: _sourceViewport,
+    LayoutBuilder(builder: (context, constraints) {
+      final completeRecordedPage = _readOnly && key == 'purchase-review-zoom';
+      final fitOwner = (widget.savedCopy?.id, widget.savedCopy?.revision,
+        _fullScreenPreview, constraints.maxWidth, viewportHeight, _billFitWidth, 'width-v1');
+      if (completeRecordedPage && _fittedRecordedView != fitOwner) {
+        _fittedRecordedView = fitOwner;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _current && _fittedRecordedView == fitOwner) _fitInvoice(automatic: true);
+        });
+      }
+      return SizedBox(key: _sourceViewport,
       // Reading mode owns the entire remaining safe viewport; no form controls.
-      height: _fullScreenPreview ? viewportHeight
+      height: _fullScreenPreview || _readOnly ? viewportHeight
         : (viewportHeight * .55).clamp(160.0, 650.0),
       child: Listener(onPointerDown: (e) => _readingPointer(e, true),
         onPointerUp: (e) => _readingPointer(e, false), onPointerCancel: (e) => _readingPointer(e, false),
         child: ClipRect(child: ColoredBox(color: const Color(0xffe8ebef),
           child: InteractiveViewer(key: Key(key), transformationController: _previewZoom,
+            onInteractionStart: _readOnly ? (_) => _billReaderAdjusted = true : null,
             constrained: false, alignment: Alignment.topLeft, minScale: .05, maxScale: 8,
             child: SizedBox(key: _documentPage,
-              width: key == 'purchase-review-zoom' || _fullScreenPreview ? constraints.maxWidth
+              width: completeRecordedPage ? 760 : key == 'purchase-review-zoom' || _fullScreenPreview ? constraints.maxWidth
                 : constraints.maxWidth < 760 ? 760 : constraints.maxWidth,
-              child: page(key == 'purchase-review-zoom' || _fullScreenPreview ? constraints.maxWidth
-                : constraints.maxWidth < 760 ? 760 : constraints.maxWidth))))))));
-  Widget _invoiceTools({required bool original, bool pageNavigationOnly = false}) => Wrap(
-    crossAxisAlignment: WrapCrossAlignment.center, children: [
+              child: page(completeRecordedPage ? 760 : key == 'purchase-review-zoom' || _fullScreenPreview ? constraints.maxWidth
+                : constraints.maxWidth < 760 ? 760 : constraints.maxWidth)))))));
+    });
+  List<Widget> _invoiceToolControls({required bool original, bool pageNavigationOnly = false, bool vertical = false}) => <Widget>[
       if (original && _sourcePage != null) Row(mainAxisSize: MainAxisSize.min, children: [
         IconButton(key: const Key('purchase-original-prev'), tooltip: 'Previous page',
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
@@ -15805,13 +16590,16 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           onPressed: _sourceLoading || _sourcePage!.index + 1 == _sourcePage!.pageCount ? null : () => _sourceTurnPage(_sourcePage!.index + 1),
           icon: const Icon(Icons.chevron_right, size: 20)),
       ]),
-      if (!pageNavigationOnly) IconButton(key: Key(original ? 'purchase-original-zoom-in' : 'purchase-review-zoom-in'),
-        tooltip: 'Zoom in', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-        onPressed: _zoomInvoice, icon: const Icon(Icons.zoom_in, size: 20, color: MoolColors.navy)),
-      if (!pageNavigationOnly) IconButton(key: Key(original ? 'purchase-original-fit' : 'purchase-review-fit'),
-        tooltip: 'Fit page', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-        onPressed: _fitInvoice, icon: const Icon(Icons.fit_screen_outlined, size: 20, color: MoolColors.navy)),
-    ]);
+      if (!pageNavigationOnly) _invoiceAction(original ? 'purchase-original-zoom-in' : 'purchase-review-zoom-in',
+        'Zoom in', Icons.zoom_in, vertical ? () => unawaited(_readBillInvoice(zoom: true)) : _zoomInvoice,
+        vertical: vertical),
+      if (!pageNavigationOnly) _invoiceAction(original ? 'purchase-original-fit' : 'purchase-review-fit',
+        'Fit page', Icons.fit_screen_outlined, vertical ? () => unawaited(_readBillInvoice()) : _fitInvoice,
+        vertical: vertical),
+    ];
+  Widget _invoiceTools({required bool original, bool pageNavigationOnly = false, bool vertical = false}) =>
+    Wrap(crossAxisAlignment: WrapCrossAlignment.center,
+      children: _invoiceToolControls(original: original, pageNavigationOnly: pageNavigationOnly, vertical: vertical));
   Widget _originalReadingView() {
     final image = _sourceAttachment!.contentType == 'application/pdf' ? _sourcePage?.bytes : _sourceBytes;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -15852,7 +16640,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     final image = attachment.contentType == 'application/pdf' ? _sourcePage?.bytes : _sourceBytes;
     return [Column(key: const Key('purchase-original-view'),
       crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _reviewCopies(),
+        if (!_readOnly) _reviewCopies(),
         const Text('Supplier copy · kept unchanged',
           style: TextStyle(fontSize: 12, color: _paperInk)),
         if (_sourceLoading) Row(children: [const Expanded(child: Text('Opening supplier copy…')),
@@ -15876,6 +16664,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   void _previewPurchase({bool recorded = true}) {
     FocusScope.of(context).unfocus();
+    _fittedRecordedView = null;
+    _billReaderAdjusted = false;
+    _billFitWidth = true;
     _previewZoom.value = Matrix4.identity();
     for (final controller in [_recordedItemScroll, _recordedTaxScroll]) {
       if (controller.hasClients) controller.jumpTo(0);
@@ -15897,14 +16688,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           _fullScreenPreview || !_reviewFocused || ModalRoute.of(context)?.isCurrent != true) {
         return;
       }
-      final target = _reviewAnchor.currentContext;
-      if (target != null) {
-        unawaited(Scrollable.ensureVisible(target, alignment: 0, duration: const Duration(milliseconds: 180)));
-      }
+      unawaited(_revealAddedTradeLine(_purchaseEntryScroll, _reviewAnchor,
+        () => mounted && _current && _scope == scope && _draftId == draftId &&
+          !_fullScreenPreview && _reviewFocused && ModalRoute.of(context)?.isCurrent == true));
     });
   }
   String _detailGroup(String key) {
-    const invoiceKeys = {'invoiceReference', 'invoiceDate', 'documentType', 'documentTitle',
+    const invoiceKeys = {'invoiceReference', 'invoiceDate', 'documentType', 'documentTitle', 'billOfSupplyReason', 'supplyNature',
       'originalInvoiceDate', 'poReference', 'documentCopy', 'reverseCharge', 'eInvoiceStatus',
       'irn', 'ackNumber', 'ackDate', 'qrStatus', 'eInvoiceDeclaration'};
     const receiptKeys = {'receiptStatus', 'receivedDate', 'expectedDeliveryDate', 'shippingTerms'};
@@ -15924,16 +16714,33 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       _expandedSections.add('work-purchase-items-section');
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final target = _itemsAnchor.currentContext;
-      if (mounted && target != null) {
-        unawaited(Scrollable.ensureVisible(target, alignment: 0, duration: const Duration(milliseconds: 180)));
-      }
+      if (!mounted || !_current) { return; }
+      unawaited(_revealAddedTradeLine(_purchaseEntryScroll, _itemsAnchor,
+        () => mounted && _current && !_reviewFocused &&
+          _expandedSections.contains('work-purchase-items-section')));
     });
   }
+  // Saved bills must not depend on captions registered by lazy editor rows.
+  String _reviewItemLabel(String key, int index) => widget.savedCopy?.labels[key] ??
+    _fieldLabels['work-purchase-$key-$index'] ?? const {
+      'hsn': 'HSN / SAC', 'barcode': 'Item code / barcode',
+      'freeQuantity': 'Free qty', 'batch': 'Batch No.', 'expiry': 'Expiry date',
+      'mrp': 'MRP ₹', 'sellingPrice': 'Selling price ₹', 'discount': 'Item discount ₹',
+      'gstRate': 'GST %', 'cess': 'Cess ₹', 'lineTotal': 'Item amount ₹',
+      'receivedQuantity': 'Received qty', 'damagedQuantity': 'Damaged qty',
+      'shortQuantity': 'Short qty', 'unitCode': 'Unit code on invoice',
+      'taxableValue': 'Taxable value ₹', 'taxAmount': 'Tax amount ₹',
+      'cgstRate': 'CGST %', 'cgst': 'CGST ₹', 'sgstRate': 'SGST %', 'sgst': 'SGST ₹',
+      'utgstRate': 'UTGST %', 'utgst': 'UTGST ₹', 'igstRate': 'IGST %', 'igst': 'IGST ₹',
+      'cessRate': 'Cess %', 'specifications': 'Model / specifications',
+      'printedSerial': 'Invoice line no.',
+    }[key] ?? 'Item detail';
+
   List<Widget> _reviewPurchase(double viewportHeight) => [
     LayoutBuilder(builder: (context, constraints) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: _reviewPurchaseAtWidth(viewportHeight, constraints.maxWidth))),
+      children: _reviewPurchaseAtWidth(viewportHeight, _readOnly ? 760 : constraints.maxWidth))),
+    if (!_readOnly && !_fullScreenPreview) _documentChecks(),
   ];
   List<Widget> _reviewPurchaseAtWidth(double viewportHeight, double readingWidth) {
     final paperWidth = readingWidth - 1.4;
@@ -16024,6 +16831,15 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     final copy = _details['documentCopy']!.text;
     if (copy.isNotEmpty) used.add('documentCopy');
     final paperParts = <Widget>[
+      if (_readOnly) Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(storePurchaseRecordedCopyHeading, key: const Key('purchase-recorded-copy-provenance'),
+            style: printedStyle.copyWith(fontSize: 10)),
+          Text(storePurchaseOriginalAvailability(widget.savedCopy!.draft),
+            key: const Key('purchase-original-availability'), style: printedStyle.copyWith(fontSize: 10)),
+          if (storePurchaseUnconfirmedDocumentGuide(_documentType) case final message?)
+            Text(message, key: const Key('purchase-recorded-type-unconfirmed'), style: printedStyle.copyWith(fontSize: 10)),
+        ])),
       Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: const BoxDecoration(border: Border(bottom: rule)), child: Row(children: [
           Expanded(child: Padding(key: title.isEmpty ? null : const ValueKey('purchase-review-documentTitle'),
@@ -16033,6 +16849,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 color: Color(0xff17395c))))),
           if (copy.isNotEmpty) Flexible(child: value('', copy, 'documentCopy', cell: true, amount: true)),
         ])),
+      if (_billOfSupply && _details['billOfSupplyReason']!.text == 'Composition scheme' &&
+          _details['printedDeclaration']!.text.trim().isNotEmpty)
+        column([detail('printedDeclaration')]),
       pair('header', [
         Text(_name.text.isEmpty ? 'Supplier details not entered' : _name.text,
           key: const ValueKey('purchase-review-supplier-Supplier name'),
@@ -16077,7 +16896,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 if (line.pack.text.isNotEmpty) value('Pack / unit',line.pack.text,'item-$index-Pack / unit'),
                 for (final e in line.extra.entries)
                   if (!quantityKeys.contains(e.key) && !primaryItemKeys.contains(e.key) && e.value.text.isNotEmpty)
-                    value(_fieldLabels['work-purchase-${e.key}-$index']!,
+                    value(_reviewItemLabel(e.key, index),
                       moneyKeys.contains(e.key) ? _invoiceMoney(e.value.text) : e.value.text,'item-$index-${e.key}'),
                 ...extras('items',item:index),
               ])),
@@ -16149,6 +16968,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       pair('notes-terms', [heading('Notes'),...selected(['notes']),...extras('payment')],
         [heading('Terms & conditions'),...selected(['terms'])]),
       if (_details['printedFooter']!.text.isNotEmpty) column([detail('printedFooter')]),
+      if (_readOnly) Padding(padding: const EdgeInsets.all(8),
+        child: Text(storePurchaseMissingValueLegend, key: const Key('purchase-recorded-missing-legend'),
+          style: printedStyle.copyWith(fontSize: 10))),
     ]);
     final pos = <Widget>[
       value('Purchase voucher No.', _accountingSnapshot.voucher, 'voucher-reference'),
@@ -16159,7 +16981,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       for(final (index,line) in _goods.indexed)
         for(final e in line.extra.entries)
           if(quantityKeys.contains(e.key)&&e.value.text.isNotEmpty)
-            value('${line.name.text} · ${_fieldLabels['work-purchase-${e.key}-$index']!}',
+            value('${line.name.text} · ${_reviewItemLabel(e.key, index)}',
               e.value.text,'receipt-$index-${e.key}'),
       ...extras('receipt'),
     ];
@@ -16174,8 +16996,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     });
     if (_fullScreenPreview) return [invoice];
     return [
-      _reviewCopies(),
-      Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
+      if (!_readOnly) _reviewCopies(),
+      if (!_readOnly) Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
         Text(_readOnly ? 'Purchase copy · Saved' : 'Purchase entry · Draft', key:const Key('work-purchase-review-title'),
           style:const TextStyle(fontSize:12,fontWeight:FontWeight.w600,color:MoolColors.navy)),
         if (!_readOnly && _goods.any((line) => line.name.text.trim().isNotEmpty && line.extra['lineTotal']!.text.trim().isEmpty))
@@ -16193,12 +17015,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (_recordedNotice != null) Padding(padding: const EdgeInsets.only(top: 6),
         child: Text(_recordedNotice!, key: const Key('purchase-recorded-notice'),
           style: const TextStyle(fontSize: 12, color: MoolColors.navy))),
-      const Padding(padding:EdgeInsets.only(top:6),child:Text(
+      if (!_readOnly) const Padding(padding:EdgeInsets.only(top:6),child:Text(
         '— = not entered, not zero. Supplier copy kept separately.',
         style:TextStyle(fontSize:11,color:_paperMuted))),
-      if (!_details.entries.any((e) => e.key.startsWith('buyer') && e.value.text.isNotEmpty))
+      if (!_readOnly && !_details.entries.any((e) => e.key.startsWith('buyer') && e.value.text.isNotEmpty))
         const Text('Billed-to details not entered.', style:TextStyle(fontSize:11,color:_paperMuted)),
-      _section('Goods & payment details','purchase-review-pos-observations',pos),
+      if (!_readOnly) _section('Goods & payment details','purchase-review-pos-observations',pos),
     ];
   }
   Widget _compactFields(List<Widget> fields, {double width = 138}) => LayoutBuilder(
@@ -16240,7 +17062,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       final index = _attachments.indexOf(a);
       if (index >= 0) { setState(() {
         _attachments[index] = read;
-        final suggestions = WorkPurchaseInvoiceSuggestions.parse(read.detectedText);
+        if (!_isInvoiceCopy(read)) {
+          _notice = 'Supporting copy text is ready. Review its printed fields; it will not fill invoice amounts.';
+          return;
+        }
+        final suggestions = WorkPurchaseInvoiceSuggestions.fromAttachment(read);
         final retained = _retainDetectedExtras(read, suggestions, useGoods: false);
         _openSuggestedSections(suggestions);
         if (suggestions.fields.isEmpty && suggestions.goods.isEmpty && suggestions.additionalFields.isEmpty) {
@@ -16267,6 +17093,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       // An extracted row index does not identify an existing manually entered item.
       if (field.itemIndex != null && !useGoods) { keptAll = false; }
       final id = '${a.digest.substring(0, 16)}-${field.id}';
+      if (a.dismissedFieldIds.contains(id)) continue;
       final existing = _additional.where((f) => f.record.id == id).firstOrNull;
       if (existing != null) {
         if (useGoods && field.itemIndex != null && existing.record.itemIndex == null) {
@@ -16285,12 +17112,17 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       _additional.add(_PurchaseAdditionalInput(WorkspacePurchaseAdditionalField(
         id: id, label: field.label, value: field.value, section: field.section,
         itemIndex: useGoods ? field.itemIndex : null,
-        sourceItemIndex: field.itemIndex, sourceDigest: a.digest)));
+        sourceItemIndex: field.itemIndex, sourceDigest: a.digest,
+        sourcePage: field.sourcePage ?? (a.contentType == 'application/pdf' ? null : 1))));
     }
     return keptAll;
   }
   void _applySuggestions(WorkspacePurchaseInvoiceAttachment a) {
-    final suggestions = WorkPurchaseInvoiceSuggestions.parse(a.detectedText);
+    if (!_isInvoiceCopy(a)) {
+      setState(() => _notice = 'This supporting document is not an invoice. Its text will not fill invoice amounts.');
+      return;
+    }
+    final suggestions = WorkPurchaseInvoiceSuggestions.fromAttachment(a);
     if (suggestions.fields.isEmpty && suggestions.goods.isEmpty && suggestions.additionalFields.isEmpty) {
       setState(() => _notice = 'No clear bill details found. Your entries are kept; enter details manually.');
       return;
@@ -16353,10 +17185,40 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       }
     }
   }
+  bool _isInvoiceCopy(WorkspacePurchaseInvoiceAttachment a) =>
+    a.documentDetails.isEmpty || a.documentDetails['type'] == 'supplierInvoice';
+  Future<void> _editAttachmentDetails(WorkspacePurchaseInvoiceAttachment attachment, {bool printedFields = false}) async {
+    if (!_current || _busy || _readOnly || _sourceSaving || !_attachments.contains(attachment)) return;
+    final draft = _draftId, navigation = widget.session.navigationScopeRevision;
+    bool current() => _current && !_readOnly && _draftId == draft &&
+      widget.session.navigationScopeRevision == navigation && _attachments.contains(attachment);
+    if (printedFields && _additional.any((f) => f.record.sourceDigest == attachment.digest)) {
+      setState(() => _notice = 'Details from this copy are already in the bill. Review them in their bill sections; your entries are kept.');
+      return;
+    }
+    bool canKeep(WorkspacePurchaseInvoiceAttachment value) => value.valid &&
+      WorkspaceSupplierGoodsReceiptDraft.validDocuments([for (final a in _attachments) if (identical(a, attachment)) value else a]);
+    final updated = printedFields
+      ? await Navigator.of(context).push<WorkspacePurchaseInvoiceAttachment>(MaterialPageRoute(builder: (_) =>
+          _ReceivingScannedFieldsScreen(session: widget.session, scope: _scope!, captureId: _draftId,
+            attachment: attachment, readOnly: false, isCurrent: current, canKeep: canKeep)))
+      : await showModalBottomSheet<WorkspacePurchaseInvoiceAttachment>(context: context,
+          isScrollControlled: true, useSafeArea: true, builder: (_) =>
+          _TradeDocumentDetailsEditor(session: widget.session, attachment: attachment,
+            types: const ['supplierInvoice', 'purchaseOrder', 'orderConfirmation', 'packingList', 'deliveryChallan',
+              'ewayBill', 'transportReceipt', 'freightBill', 'proofOfDelivery', 'paymentReceipt', 'paymentAdvice',
+              'supplierCreditNote', 'supplierDebitNote', 'commercialAdjustment', 'claim', 'accountStatement', 'other'],
+            isCurrent: current, canKeep: canKeep));
+    if (updated == null || !current() || _busy || _sourceSaving) return;
+    setState(() {
+      _attachments[_attachments.indexOf(attachment)] = updated;
+      if (_sourceAttachment?.digest == attachment.digest) _sourceAttachment = updated;
+    });
+  }
   Widget _attachment(WorkspacePurchaseInvoiceAttachment a) => Column(
     key: Key('work-purchase-document-${a.digest}'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(children: [Expanded(child: Semantics(label: 'Attached supplier bill: ${a.fileName}',
-        child: ExcludeSemantics(child: Text(a.contentType == 'application/pdf' ? 'Bill · PDF' : 'Bill · Photo',
+      Row(children: [Expanded(child: Semantics(label: 'Attached ${_isInvoiceCopy(a) ? 'supplier bill' : 'supporting copy'}: ${a.fileName}',
+        child: ExcludeSemantics(child: Text('${_isInvoiceCopy(a) ? 'Bill' : 'Copy'} · ${a.contentType == 'application/pdf' ? 'PDF' : 'Photo'}',
           key: Key('work-purchase-file-label-${a.digest}'),
           style: const TextStyle(fontSize: 12, color: _paperMuted))))),
         TextButton.icon(key: Key('work-purchase-view-${a.digest}'),
@@ -16364,8 +17226,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           padding: const EdgeInsets.symmetric(horizontal: 8),
           textStyle: const TextStyle(fontSize: 12)),
         onPressed: _sourceSaving ? null : () => _openSource(a), icon: const Icon(Icons.visibility_outlined, size: 18),
-        label: Text('View', semanticsLabel: 'View supplier bill: ${a.fileName}')),
-        IconButton(tooltip: 'Remove attached bill: ${a.fileName}', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        label: Text('View', semanticsLabel: 'View ${_isInvoiceCopy(a) ? 'supplier bill' : 'supporting copy'}: ${a.fileName}')),
+        IconButton(tooltip: 'Remove attached ${_isInvoiceCopy(a) ? 'bill' : 'copy'}: ${a.fileName}', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           onPressed: () {
           if (_additional.any((f) => f.record.sourceDigest == a.digest)) {
             setState(() => _error = 'Extra details were read from this copy. Keep it attached, or remove those details before removing this copy.');
@@ -16375,15 +17237,47 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           }); }
         },
         icon: const Icon(Icons.delete_outline, size: 18, color: MoolColors.navy))]),
-      if (a.contentType != 'application/pdf') TextButton.icon(onPressed: () => _scan(a),
+      if (a.documentDetails['type'] case final type?)
+        Text(storeTradeDocumentLabel(type), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+      if (!_isInvoiceCopy(a)) const Text(
+        'Supporting copy only. Check the bill number, items and amounts against the supplier invoice. Earlier bill entries are kept.',
+        style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+      Wrap(spacing: 4, children: [
+      TextButton(key: Key('work-purchase-copy-details-${a.digest}'), onPressed: _busy || _sourceSaving ? null
+        : () => _editAttachmentDetails(a), child: const Text('Document details')),
+      TextButton.icon(onPressed: _busy ? null : () => _scan(a),
         icon: const Icon(Icons.document_scanner_outlined, size: 18),
-        key: Key('work-purchase-read-${a.digest}'), label: const Text('Try reading photo')),
+        key: Key('work-purchase-read-${a.digest}'), label: Text(a.contentType == 'application/pdf' ? 'Read PDF text' : 'Try reading photo')),
+      if (!_isInvoiceCopy(a) && (a.extractedFields.isNotEmpty || a.detectedText.isNotEmpty))
+        TextButton(key: Key('work-purchase-support-fields-${a.digest}'), onPressed: _busy ? null
+          : () => _editAttachmentDetails(a, printedFields: true), child: const Text('Printed fields')),
+      ]),
       if (a.detectedText.isNotEmpty) ...[
-        const Text('Compare with the original bill. Fill blank fields, then check and correct your entries.', style: TextStyle(fontSize: 12, color: MoolColors.ink)),
-        SelectableText(a.detectedText, style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
-        TextButton(key: Key('work-purchase-use-${a.digest}'),
+        Text(_isInvoiceCopy(a) ? 'Compare with the original bill. Fill blank fields, then check and correct your entries.'
+          : 'Supporting document only. Review its text and printed fields separately from the invoice.',
+          style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+        SelectableText(a.pageTextLengths.isEmpty ? a.detectedText :
+          a.recognizedTextPages.indexed.map((page) => 'Page ${page.$1 + 1}\n${page.$2}').join('\n\n'),
+          style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+        if (_isInvoiceCopy(a)) TextButton(key: Key('work-purchase-use-${a.digest}'),
           onPressed: () => _applySuggestions(a), child: const Text('Fill blank fields'))],
+      if (a.extractionOverflow) const Text('Some text exceeds the extracted-field limit. Check the full copy and split it before relying on every extracted detail.',
+        style: TextStyle(fontSize: 11, color: MoolColors.ink)),
     ]);
+  void _addPurchaseItem() {
+    if (!_current || _readOnly || _busy || _loading || _leaving || _sourceSaving) { return; }
+    FocusManager.instance.primaryFocus?.unfocus();
+    final line = _PurchaseGoodsInput(), navigation = widget.session.navigationScopeRevision;
+    setState(() {
+      _goods.add(line);
+      _lastAddedPurchaseItem = line;
+      _reviewFocused = false;
+      _expandedSections.add('work-purchase-items-section');
+    });
+    unawaited(_revealAddedTradeLine(_purchaseEntryScroll, line.rowKey,
+      () => _current && !_readOnly && widget.session.navigationScopeRevision == navigation &&
+        identical(_lastAddedPurchaseItem, line) && _goods.contains(line)));
+  }
   Widget _draftActions() => AbsorbPointer(absorbing: _busy, child: Container(
     key: const Key('work-purchase-draft-actions'),
     padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
@@ -16393,6 +17287,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       const Text('Draft only — stock, dues and payments stay unchanged.',
         style: TextStyle(fontSize: 11, color: _paperMuted)),
       Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 4, children: [
+        Tooltip(message: 'Add another item manually from the supplier invoice', child: TextButton.icon(
+          key: const Key('work-purchase-add-line'), onPressed: _addPurchaseItem,
+          icon: const Icon(Icons.add, size: 18), label: const Text('Add item'))),
         TextButton(style: TextButton.styleFrom(minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 8)),
           onPressed: _back, child: const Text('Cancel', style: TextStyle(fontSize: 13))),
@@ -16416,6 +17313,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           onPressed: () => _save(), child: Text(_busy ? 'Saving…' : 'Save draft')),
       ]),
     ])));
+  List<Widget> _purchaseFormSections(List<Widget> sections) => _goods.length > 20
+    ? sections : [Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: sections)];
   @override
   Widget build(BuildContext context) {
     if (widget.openingOnly) {
@@ -16429,11 +17328,16 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     final linkedCount = _goods.where((line) => line.productId.isNotEmpty).length;
     final unmatchedExtras = _additional.where((f) => f.record.section == 'items' && f.record.itemIndex == null).length;
     final hsnSummary = WorkspacePurchaseEntryDraft.printedHsnSummary(_goods.map((line) => line.fields).toList());
+    // Register labels even when an inapplicable blank control is not displayed.
+    final taxableInput = _detail('Taxable value ₹', 'taxableValue', number: true);
+    final exemptInput = _detail('Exempt value ₹', 'exemptValue', number: true);
+    final totalTaxInput = _detail('Total tax ₹', 'totalTax', number: true);
     return LayoutBuilder(builder: (context, constraints) {
       // Keep editing room when the keyboard or short landscape leaves little height.
       final pinned = constraints.maxHeight >= 300 && MediaQuery.viewInsetsOf(context).bottom == 0;
       final ready = !_loading && widget.session.workspaceSuppliersLoaded && _current;
-      final form = ListView(key: const Key('work-record-purchase'), primary: false,
+      final form = AbsorbPointer(absorbing: _busy, child: ListView(
+        key: const Key('work-record-purchase'), primary: false, controller: _purchaseEntryScroll,
         physics: _readingPointers.isEmpty ? null : const NeverScrollableScrollPhysics(),
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: EdgeInsets.fromLTRB(12, 0, 12, pinned ? 12 : 24 + MediaQuery.viewInsetsOf(context).bottom),
@@ -16463,14 +17367,18 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             TextButton(onPressed: _current ? () { setState(() => _loading = true);
               unawaited(_draftId.isNotEmpty && !_readOnly ? _refreshSaved() : _load(retry: true));
               setState(() => _loading = false); } : null, child: const Text('Retry')),
-          ] else AbsorbPointer(absorbing: _busy, child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          ] else ..._purchaseFormSections([
               const Text('Keep a clear, full bill photo or PDF.',
                 key: Key('work-purchase-attachment-purpose'),
                 style: TextStyle(fontSize: 12, color: _paperMuted)),
               for (final a in _attachments) _attachment(a),
               _purchaseSection('Enter supplier details', 'work-purchase-supplier-section', [
-                _field('Supplier name or phone', _name, 'work-purchase-supplier-name',
+                Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+                  key: const Key('work-purchase-select-supplier'),
+                  onPressed: _readOnly || _busy ? null : _pickSupplier,
+                  icon: const Icon(Icons.person_search_outlined, size: 18),
+                  label: const Text('Select supplier'))),
+                _field('Supplier name', _name, 'work-purchase-supplier-name',
                   focus: _supplierFocus, limit: 120, lookup: true, changed: (_) => setState(() {
                     if (_supplier != null && _name.text != _supplier!.name) {
                       _supplier = null; _supplierId = widget.session.newWorkspaceSupplierId();
@@ -16483,16 +17391,16 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                   style: TextButton.styleFrom(alignment: Alignment.centerLeft),
                   child: Text(p.phone.isEmpty ? p.name : '${p.name} · ${p.phone}',
                     style: const TextStyle(fontSize: 13, color: MoolColors.navy))),
-                _field('Mobile / phone', _phone, 'work-purchase-supplier-phone',
+                _field('Supplier phone', _phone, 'work-purchase-supplier-phone',
                   limit: 20, keyboard: TextInputType.phone),
-                _detail('Email', 'supplierEmail'),
+                _detail('Supplier email', 'supplierEmail'),
                 _field('Supplier address', _address, 'work-purchase-supplier-address', limit: 500, multiline: true),
                 _field('Supplier GSTIN', _gstin, 'work-purchase-supplier-gstin', limit: 15),
               _extraFields('supplier'),
               ], number: 1, summary: _name.text.isEmpty ? 'Name, contact and GSTIN' : _name.text),
               _purchaseSection('Enter invoice details', 'work-purchase-invoice-section', [
                 LayoutBuilder(builder: (context, constraints) {
-                final fields = [_field('Supplier invoice No.', _reference, 'work-purchase-reference', limit: 120),
+                final fields = [_field('Supplier invoice number', _reference, 'work-purchase-reference', limit: 120),
                   _field('Invoice date', _date, 'work-purchase-date', limit: 10, hint: 'DD/MM/YYYY',
                     keyboard: TextInputType.datetime)];
                 // Floating keyboards can cover the right-hand date without reporting
@@ -16511,91 +17419,128 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 Text('Purchase voucher No.', style: TextStyle(fontSize: 12, color: _paperMuted)),
                 Text(storePurchaseUnpostedVoucherNumber, style: TextStyle(fontSize: 12, color: _paperInk)),
               ]),
-              _choice('Supplier document type', 'documentType', ['GST invoice', 'Bill of supply', 'Other bill']),
+              _choice('Document type', 'documentType', ['GST invoice', 'Bill of supply',
+                'Invoice-cum-bill of supply', 'Non-GST purchase bill', 'Other bill']),
+              Text(storePurchaseDocumentTypeGuidance(_documentType),
+                key: const Key('work-purchase-document-guidance'),
+                style: const TextStyle(fontSize: 12, color: _paperMuted)),
+              _choice('Supply on bill', 'supplyNature', ['Goods', 'Services', 'Goods and services', 'Not stated']),
+              _documentField(_billOfSupply || _showAllDocumentFields ||
+                  _details['billOfSupplyReason']!.text.isNotEmpty,
+                _choice('Bill of supply basis', 'billOfSupplyReason',
+                  ['Composition scheme', 'Exempt supply', 'Not stated'])),
+              if (_billOfSupply && _details['billOfSupplyReason']!.text == 'Composition scheme')
+                const Text('Copy the supplier’s composition declaration under Signature & notes on invoice. Do not add a declaration absent from the original.',
+                  style: TextStyle(fontSize: 11, color: _paperMuted)),
+              if (_noSupplierGst && _hasTaxDetails)
+                const Text('GST details already entered are retained. Check the bill type and the original; this type does not separately charge supplier GST.',
+                  key: Key('work-purchase-document-tax-conflict'),
+                  style: TextStyle(fontSize: 12, color: Color(0xff8b3b13))),
+              if (_documentType == 'Non-GST purchase bill' && _gstin.text.trim().isNotEmpty)
+                const Text('A supplier GSTIN is entered. Confirm registration and the original bill type; do not classify a GST invoice as a non-GST bill.',
+                  style: TextStyle(fontSize: 12, color: Color(0xff8b3b13))),
+              if (_noSupplierGst && _hasEInvoiceDetails)
+                const Text('Previously entered GST / e-invoice references are retained. Check their applicability against the original bill and selected type.',
+                  key: Key('work-purchase-document-reference-check'),
+                  style: TextStyle(fontSize: 12, color: Color(0xff8b3b13))),
+              if (_combinedBill && (_details['buyerRegistration']!.text != 'Unregistered' ||
+                  _details['buyerGstin']!.text.trim().isNotEmpty || _details['buyerUin']!.text.trim().isNotEmpty))
+                const Text('Invoice-cum-bill of supply is for taxable and exempt supplies to an unregistered buyer. Check buyer GST status and identifiers.',
+                  key: Key('work-purchase-combined-buyer-check'),
+                  style: TextStyle(fontSize: 12, color: Color(0xff8b3b13))),
+              SwitchListTile.adaptive(key: const Key('work-purchase-show-all-fields'),
+                contentPadding: EdgeInsets.zero, dense: true,
+                title: const Text('Show other printed fields', style: TextStyle(fontSize: 12)),
+                value: _showAllDocumentFields,
+                onChanged: _readOnly ? null : (value) => setState(() => _showAllDocumentFields = value)),
               for (final warning in WorkspacePurchaseEntryDraft.reviewInvoiceFormat(
                   _reference.text, _date.text, _details['documentType']!.text))
                 Text(warning, key: ValueKey('purchase-format-$warning'),
                   style: const TextStyle(fontSize: 11, color: Color(0xff8b3b13))),
               _section('Printed invoice details', 'work-purchase-document-references', [
-                _detail('Invoice heading', 'documentTitle'),
-                _detail('Date as shown on bill', 'originalInvoiceDate'),
-                _detail('Purchase order No.', 'poReference'),
+                _detail('Document title', 'documentTitle'),
+                const Text('Keep the original date text below only if its format differs from the invoice date above.',
+                  style: TextStyle(fontSize: 11, color: _paperMuted)),
+                _detail('Date exactly as printed', 'originalInvoiceDate'),
+                _detail('Purchase order number', 'poReference'),
                 _detail('Invoice copy type', 'documentCopy'),
               ]),
-              _section('E-invoice details, if printed', 'work-purchase-original-evidence', [
-                _choice('Reverse charge shown?', 'reverseCharge', ['Yes', 'No']),
+              _documentField(_taxInvoice || _combinedBill || _showAllDocumentFields ||
+                  _details['reverseCharge']!.text.isNotEmpty,
+                _choice('Reverse charge', 'reverseCharge', ['Yes', 'No'])),
+              _documentField(_showEInvoiceFields, _section('GST declarations & e-invoice references', 'work-purchase-original-evidence', [
                 _choice('E-invoice details', 'eInvoiceStatus',
                   ['IRN / QR shown', 'Supplier declaration shown', 'Not shown']),
                 _field('IRN', _details['irn']!, 'work-purchase-irn', limit: 64),
-                _compactFields([_detail('Acknowledgement No.', 'ackNumber'),
-                  _detail('Acknowledgement date', 'ackDate', date: true)]),
+                _compactFields([_detail('Ack. number', 'ackNumber'),
+                  _detail('Ack. date', 'ackDate', date: true)]),
                 _choice('E-invoice QR', 'qrStatus', ['Shown on invoice', 'Not shown']),
                 _detail('Supplier declaration', 'eInvoiceDeclaration'),
                 const Text('Keep the original copy. Entering these details does not verify the invoice or claim tax credit.',
                   style: TextStyle(fontSize: 11, color: MoolColors.muted)),
-              ]),
+              ])),
               _extraFields('invoice'),
               ], number: 2, summary: invoiceSummary.isEmpty ? 'Copy bill number, date and references' : invoiceSummary),
               _purchaseSection('Check billed-to & delivery', 'work-purchase-buyer-details', [
-                _detail('Billed to / business name', 'buyerName'), _detail('Billing address', 'buyerAddress'),
-                _compactFields([_detail('Mobile / phone', 'buyerPhone'), _detail('Email', 'buyerEmail')]),
-                _field('Your GSTIN', _details['buyerGstin']!, 'work-purchase-buyerGstin', limit: 15),
-                _field('UIN, only if printed', _details['buyerUin']!, 'work-purchase-buyerUin', limit: 15),
-                _compactFields([_detail('Billing State', 'buyerState'), _detail('State code', 'buyerStateCode')]),
-                _compactFields([_detail('Place of supply', 'placeOfSupply'), _detail('State code', 'placeOfSupplyCode')]),
+                _detail('Buyer name on invoice', 'buyerName'), _detail('Billing address', 'buyerAddress'),
+                _choice('Buyer GST status', 'buyerRegistration', ['Registered', 'Unregistered', 'Not confirmed']),
+                _compactFields([_detail('Buyer phone', 'buyerPhone'), _detail('Buyer email', 'buyerEmail')]),
+                _field('Buyer GSTIN', _details['buyerGstin']!, 'work-purchase-buyerGstin', limit: 15),
+                _field('Buyer UIN (if printed)', _details['buyerUin']!, 'work-purchase-buyerUin', limit: 15),
+                _compactFields([_detail('Billing State', 'buyerState'), _detail('Billing State code', 'buyerStateCode')]),
+                _compactFields([_detail('Place of supply', 'placeOfSupply'), _detail('Supply State code', 'placeOfSupplyCode')]),
                 _section('Shipping address', 'work-purchase-delivery-details', [
-                  _detail('Address, if different from billing', 'deliveryAddress'),
-                  _compactFields([_detail('Shipping State', 'deliveryState'), _detail('State code', 'deliveryStateCode')]),
+                  _detail('Ship-to address', 'deliveryAddress'),
+                  _compactFields([_detail('Ship-to State', 'deliveryState'), _detail('Ship-to State code', 'deliveryStateCode')]),
                 ]), _extraFields('buyer'),
               ], number: 3, summary: _details['buyerName']!.text.isEmpty
                 ? 'Check name, billing and shipping address' : _details['buyerName']!.text),
-              _purchaseSection('Enter items from invoice', 'work-purchase-items-section', [
-              for (var i = 0; i < _goods.length; i++) _goodsRow(i),
-              if (unmatchedExtras > 0) _extraFields('items'),
-              Align(alignment: Alignment.centerLeft, child: TextButton.icon(
-                key: const Key('work-purchase-add-line'), onPressed: _goods.length >= 200 ? null
-                  : () => setState(() => _goods.add(_PurchaseGoodsInput())),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Add item', style: TextStyle(fontSize: 12, color: MoolColors.navy)))),
-              ], number: 4, summary: itemCount == 0
+              _purchaseSection('Enter items from invoice', 'work-purchase-items-section', const [],
+                number: 4, summary: itemCount == 0
                 ? 'Add items or match saved products'
                 : '$itemCount ${itemCount == 1 ? 'item' : 'items'} · $linkedCount linked to Stock'
                   '${unmatchedExtras == 0 ? '' : ' · $unmatchedExtras details to match'}'),
+              if (_expandedSections.contains('work-purchase-items-section')) ...[
+                for (var i = 0; i < _goods.length; i++)
+                  KeyedSubtree(key: _goods[i].rowKey, child: _goodsRow(i)),
+                if (unmatchedExtras > 0) _extraFields('items'),
+              ],
               _remainingSteps([
                 (title: 'Enter tax & totals', key: 'work-purchase-tax-details', fields: [
-                const Text('Use the totals and tax shown on your bill. Leave missing amounts blank.',
-                  style: TextStyle(fontSize: 11, color: MoolColors.muted)),
-                _choice('Rates include GST?', 'priceBasis', ['Before tax', 'Including tax']),
-                _choice('GST type', 'taxTreatment', ['CGST + SGST', 'CGST + UTGST', 'IGST', 'No tax',
-                  if (_details['taxTreatment']!.text == 'CGST + SGST / UTGST') 'CGST + SGST / UTGST']),
-                _compactFields([_detail('Taxable value ₹', 'taxableValue', number: true),
+                if (_noSupplierGst) const Text('This bill type does not separately charge supplier GST. Leave unprinted amounts blank; do not enter a zero merely to complete the form.',
+                  style: TextStyle(fontSize: 12, color: _paperMuted)),
+                _documentField(_showGstFields, _choice('Item rate basis', 'priceBasis', ['Before tax', 'Including tax'])),
+                _documentField(_showGstFields, _choice('GST type', 'taxTreatment', ['CGST + SGST', 'CGST + UTGST', 'IGST', 'No tax',
+                  if (_details['taxTreatment']!.text == 'CGST + SGST / UTGST') 'CGST + SGST / UTGST'])),
+                _compactFields([if (_showGstFields) taxableInput,
+                  if (_combinedBill || _showAllDocumentFields || _details['exemptValue']!.text.isNotEmpty) exemptInput,
                   _detail('Subtotal ₹', 'supplyValue', number: true)]),
-                const Padding(padding: EdgeInsets.symmetric(vertical: 6),
+                if (_showGstFields) const Padding(padding: EdgeInsets.symmetric(vertical: 6),
                   child: Text('Subtotal is the printed item subtotal. Taxable value is after discount, before GST.',
                     style: TextStyle(fontSize: 11, color: _paperMuted))),
-                _taxComponents(),
+                _documentField(_showGstFields, _taxComponents()),
                 _section('Discount, charges & round off', 'work-purchase-bill-adjustments', [
                   _compactFields([
-                  _detail('Bill discount ₹', 'billDiscount', number: true), _detail('Transport charges ₹', 'freight', number: true),
+                  _detail('Bill discount ₹', 'billDiscount', number: true), _detail('Freight ₹', 'freight', number: true),
                   _detail('Other charges ₹', 'otherCharges', number: true), _detail('Round off ₹', 'roundOff', number: true)]),
                 ]),
                 const SizedBox(height: 8),
-                _compactFields([_detail('Total GST / tax ₹', 'totalTax', number: true),
+                _compactFields([if (_showGstFields) totalTaxInput,
                   _detail('Invoice total ₹', 'invoiceTotal', number: true),
-                  _detail('Amount payable ₹', 'amountPayable', number: true)]),
+                  _detail('Payable ₹', 'amountPayable', number: true)]),
                 _compactFields([_detail('Total items', 'printedTotalItems'),
                   _detail('Total quantity', 'printedTotalQuantity')]),
                 _detail('Amount in words', 'amountInWords'),
-                _section('GST rates in bill totals', 'work-purchase-printed-rates', [
+                _documentField(_showGstFields, _section('GST rates in bill totals', 'work-purchase-printed-rates', [
                   _compactFields([_detail('CGST %', 'printedCgstRate'),
                     _detail('SGST %', 'printedSgstRate'), _detail('UTGST %', 'printedUtgstRate'),
                     _detail('IGST %', 'printedIgstRate'), _detail('Total GST %', 'printedTaxRate')]),
-                ]),
-                _printedTaxTable(),
+                ])),
+                _documentField(_showGstFields, _printedTaxTable()),
                 for (final warning in WorkspacePurchaseEntryDraft.reviewAmounts(
                     {for (final e in _details.entries) e.key: e.value.text}))
                   Text(warning, style: const TextStyle(fontSize: 12, color: Color(0xff8b3b13))),
-                _section('Calculated HSN summary', 'work-purchase-hsn-summary', [
+                _documentField(_showGstFields, _section('Calculated HSN summary', 'work-purchase-hsn-summary', [
                   if (hsnSummary.isEmpty)
                     const Text('Enter item HSN, taxable value and tax to see a summary. The original tax table is kept separately above.',
                       style: TextStyle(fontSize: 12, color: MoolColors.ink)),
@@ -16606,15 +17551,19 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                       Expanded(child: Text('Taxable ₹${(row.taxable / 100).toStringAsFixed(2)}\nTax ₹${(row.tax / 100).toStringAsFixed(2)}',
                         textAlign: TextAlign.right, style: const TextStyle(fontSize: 12, color: MoolColors.ink))),
                     ])),
-                ]),
+                ])),
                 if (_details['sgst']!.text.isNotEmpty) ...[
-                  _compactFields([_detail('Earlier SGST / UTGST ₹', 'sgst', number: true)]),
+                  _compactFields([_detail('SGST/UTGST ₹', 'sgst', number: true)]),
                   const Text('Earlier combined tax entry kept. Check the original before separating it.',
                     style: TextStyle(fontSize: 11, color: MoolColors.muted))],
                 _extraFields('tax')]),
                 (title: 'Check goods received', key: 'work-purchase-receipt-details', fields: [
-                _choice('Goods status', 'receiptStatus', ['Received at Store', 'Awaiting delivery', 'Already added to Stock']),
-                _compactFields([_detail('Received date', 'receivedDate', date: true)]),
+                if (_servicesOnly) const Text('Services do not require a physical goods receipt. Existing goods details remain available for checking; service accounting is not verified by this form.',
+                  style: TextStyle(fontSize: 12, color: _paperMuted)),
+                _documentField(!_servicesOnly || _showAllDocumentFields || _hasGoodsReceipt,
+                  Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                _choice('Goods receipt status', 'receiptStatus', ['Received at Store', 'Awaiting delivery', 'Already added to Stock']),
+                _compactFields([_detail('Receipt date', 'receivedDate', date: true)]),
                 for (final (index, line) in _goods.indexed)
                   _section('Goods check · ${line.name.text.trim().isEmpty ? 'Item ${index + 1}' : line.name.text.trim()}',
                     'work-purchase-item-receipt-$index', [
@@ -16623,40 +17572,43 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                       _field(e.value, line.extra[e.key]!, 'work-purchase-${e.key}-$index', limit: 12,
                         keyboard: const TextInputType.numberWithOptions(decimal: true))], width: 96),
                   ]),
+                ])),
                 _section('Delivery date & terms', 'work-purchase-delivery-plan', [
-                  _compactFields([_detail('Expected delivery date', 'expectedDeliveryDate', date: true)]),
+                  _compactFields([_detail('Delivery due', 'expectedDeliveryDate', date: true)]),
                   _detail('Delivery / shipping terms', 'shippingTerms'),
                 ]),
                 const Text('Supplier bill came later? For goods saved through Catalogue, Add manually or CSV, choose Already added to Stock. Do not receive those goods again.',
                   style: TextStyle(fontSize: 11, color: MoolColors.ink)), _extraFields('receipt')]),
                 (title: 'Record payment & terms', key: 'work-purchase-payment-details', fields: [
-                const Text('Record what you have actually paid. A Paid stamp on the bill is kept separately below.',
-                  style: TextStyle(fontSize: 11, color: MoolColors.muted)),
                 _choice('Payment status', 'paymentStatus', ['Paid', 'Part paid', 'On credit']),
-                _compactFields([_detail('Amount paid ₹', 'paidAmount', number: true), _detail('Pay by date', 'dueDate', date: true)]),
+                _compactFields([_detail('Amount paid ₹', 'paidAmount', number: true), _detail('Due date', 'dueDate', date: true)]),
                 _choice('Payment mode', 'paymentMethod', ['Cash', 'UPI', 'Bank transfer', 'Card', 'Other']),
-                _compactFields([_detail('Payment reference', 'paymentReference'),
+                _compactFields([_detail('Payment reference / UTR', 'paymentReference'),
                   _detail('Payment date', 'paymentDate', date: true)]),
                 _detail('Payment / credit terms', 'paymentTerms'),
-                _detail('Payment note on supplier bill', 'printedPaymentMark'),
+                _detail('Printed payment remark', 'printedPaymentMark'),
                 _section('Supplier bank, UPI & terms', 'work-purchase-supplier-instructions', [
                   const Text('Copy supplier payment details from the invoice. This does not make or confirm a payment.',
                     style: TextStyle(fontSize: 12, color: MoolColors.ink)),
-                  _detail('Bank name', 'bankName'), _detail('Account number', 'bankAccount'),
+                  _detail('Supplier bank name', 'bankName'), _detail('Supplier account number', 'bankAccount'),
                   _compactFields([_detail('IFSC', 'bankIfsc'), _detail('Branch', 'bankBranch')]),
-                  _compactFields([_detail('UPI app / type', 'upiType'), _detail('UPI ID', 'upiId')]),
-                  _choice('Payment QR', 'paymentQrStatus', ['Shown on invoice', 'Not shown']),
+                  _compactFields([_detail('Supplier UPI app', 'upiType'), _detail('Supplier UPI ID', 'upiId')]),
+                  _choice('Supplier payment QR', 'paymentQrStatus', ['Shown on invoice', 'Not shown']),
                   _detail('Terms & conditions', 'terms'),
                 ]),
                 _section('Signature & notes on invoice', 'work-purchase-signature-notes', [
                   _choice('Signature on invoice', 'signatureStatus',
                     ['Signed on invoice', 'Electronic document', 'Not shown']),
-                  _detail('Signed by (name)', 'signatory'),
-                  _detail('Business name near signature', 'printedCompanyLabel'),
-                  _detail('Text below signature', 'printedSignatoryLabel'),
-                  _detail('Signature note on bill', 'printedDeclaration'),
-                  _detail('Notes', 'notes'), _detail('Note at bottom of bill', 'printedFooter'),
+                  if (_details['signatureStatus']!.text == 'Electronic document')
+                    const Text('A PDF or photo alone does not establish a valid electronic signature or a signature exemption. Check the original and applicable requirements.',
+                      style: TextStyle(fontSize: 11, color: _paperMuted)),
+                  _detail('Signatory name', 'signatory'),
+                  _detail('Signatory business name', 'printedCompanyLabel'),
+                  _detail('Signature caption', 'printedSignatoryLabel'),
+                  _detail('Printed declaration', 'printedDeclaration'),
+                  _detail('Invoice footer text', 'printedFooter'),
                 ]),
+                _detail('Purchase narration', 'notes'),
                 _extraFields('payment')]),
               ]),
               _purchaseSection('Preview & review purchase', 'work-purchase-review-section',
@@ -16674,8 +17626,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               if (_error != null && !_readOnly) TextButton(key: const Key('work-purchase-refresh-saved'),
                 onPressed: _refreshSaved, child: const Text('Refresh saved records · keep my entries')),
               if (!pinned) _draftActions(),
-            ])),
-        ]);
+            ]),
+        ]));
       return DecoratedBox(key: const Key('work-purchase-paper'),
         decoration: const BoxDecoration(
           gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
@@ -16700,16 +17652,32 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       final normalized = key.substring('work-purchase-'.length).replaceFirst(RegExp(r'-\d+$'), '');
       if (copy.labels.containsKey(normalized)) _fieldLabels[key] = copy.labels[normalized]!;
     }
-    return ListView(key: const Key('work-purchase-saved-copy'), primary: false,
+    return CustomScrollView(key: const Key('work-purchase-saved-copy'), primary: false,
+      controller: _savedBillScroll,
       physics: _readingPointers.isEmpty ? null : const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(12), children: [
-        Row(children: [const Expanded(child: Text('Purchase copy',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
-          TextButton(key: const Key('work-purchase-copy-close'), onPressed: _back, child: const Text('Close'))]),
-        Text('Saved ${_registerDate(copy.savedAt)} · Revision ${copy.revision}',
-          style: const TextStyle(fontSize: 11, color: _paperMuted)),
-        _savedBillActions(copy),
-        if (!_fullScreenPreview) ...(_sourceAttachment == null ? _reviewPurchase(height) : _reviewOriginal(height)),
+      slivers: [
+        PinnedHeaderSliver(child: ColoredBox(color: const Color(0xfffffefb),
+          child: Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          child: LayoutBuilder(builder: (context, constraints) {
+            const title = Text('Purchase bill',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy));
+            final close = TextButton(key: const Key('work-purchase-copy-close'), onPressed: _back,
+              child: const Text('Close'));
+            return Row(children: [const Expanded(child: title), close]);
+          })))),
+        SliverPadding(padding: const EdgeInsets.symmetric(horizontal: 12),
+          sliver: SliverToBoxAdapter(child: _savedBillActions(copy))),
+        if (!_fullScreenPreview) SliverLayoutBuilder(builder: (context, constraints) {
+          // Preceding content extent is stable while scrolling; paint/scroll offsets
+          // must never resize the invoice or reset a reader's zoom.
+          final remaining = (constraints.viewportMainAxisExtent - constraints.precedingScrollExtent - 12)
+            .clamp(160.0, height < 160 ? 160.0 : height).toDouble();
+          return SliverPadding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            sliver: SliverToBoxAdapter(child: Column(key: const Key('work-purchase-document-section'),
+              crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                ...(_sourceAttachment == null ? _reviewPurchase(remaining) : _reviewOriginal(remaining)),
+              ])));
+        }),
       ]);
   }
   WorkspaceOpeningBillInclusion? _billTreatment(WorkspacePurchaseSavedCopy copy,
@@ -16727,22 +17695,23 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     return day.isAfter(DateTime.utc(date.year, date.month, date.day))
       ? WorkspaceOpeningBillInclusion.excluded : null;
   }
-  Widget _savedBillAdjustmentRail(List<Widget> actions) {
-    if (actions.isEmpty) return const SizedBox.shrink();
-    return LayoutBuilder(builder: (context, constraints) {
-      final actionWidth = constraints.maxWidth - (actions.length > 1 ? 26 : 0) - 8;
-      return Row(key: const Key('work-purchase-adjustment-actions'), children: [
-      Expanded(child: SingleChildScrollView(key: const Key('work-purchase-adjustment-scroll'),
-        scrollDirection: Axis.horizontal, child: Row(children: [
-          for (final action in actions) Padding(padding: const EdgeInsets.only(right: 8),
-            child: ConstrainedBox(constraints: BoxConstraints(maxWidth: actionWidth < 48 ? 48 : actionWidth), child: action)),
-        ]))),
-      if (actions.length > 1) const Tooltip(message: 'Swipe actions left or right',
-        child: SizedBox(width: 26, child: Icon(Icons.swap_horiz,
-          key: Key('work-purchase-adjustment-scroll-hint'), size: 18, color: MoolColors.navy))),
-      ]);
-    });
-  }
+  Widget _savedBillActionGrid(List<Widget> actions) => LayoutBuilder(builder: (context, constraints) {
+    final scale = MediaQuery.textScalerOf(context).scale(1);
+    final columns = constraints.maxWidth >= 320 && scale <= 1.25 ? 3
+      : constraints.maxWidth >= 220 ? 2 : 1;
+    return Column(key: const Key('work-purchase-bill-action-grid'), spacing: 4,
+      crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (var start = 0; start < actions.length; start += columns)
+        IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (var column = 0; column < columns; column++) ...[
+            if (column > 0) const SizedBox(width: 4),
+            Expanded(child: start + column < actions.length
+              ? ConstrainedBox(constraints: const BoxConstraints(minHeight: 48), child: actions[start + column])
+              : const SizedBox.shrink()),
+          ],
+        ])),
+    ]);
+  });
   Widget _savedBillActions(WorkspacePurchaseSavedCopy copy) {
     final session = widget.session;
     final ready = _current && session.workspaceInvoiceHistoryLoaded &&
@@ -16765,26 +17734,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       _supplierShortageOptions(copy, ledger!).isNotEmpty;
     final shortageUnverified = !ready || !_shortageDraftKnown;
     final showShortage = shortageUnverified || _shortageDraftPresent || shortageHistory || shortageEligible;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text(!ready ? 'Supplier account status unavailable'
-        : same ? 'Bill confirmed in supplier account'
-        : accepted != null ? 'Another saved revision is confirmed · this copy is not posted'
-        : 'Not posted to books', key: const Key('work-purchase-bill-status'),
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy)),
-      if (same) ...[
-        Text(progress == null ? 'Goods · matching status unavailable'
-          : !progress.hasMatches ? 'Goods · not matched to this bill'
-          : progress.matchedItems == progress.totalItems ? 'Goods · all items matched'
-          : 'Goods · partly matched (${progress.matchedItems}/${progress.totalItems} complete items)',
-          key: const Key('work-purchase-goods-status'),
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy)),
-        if (progress?.damaged == true || progress?.shortage == true || progress?.returnedOnMatchedDelivery == true)
-          Text([if (progress!.damaged) 'Damaged goods matched', if (progress.shortage) 'Bill shortage recorded',
-            if (progress.returnedOnMatchedDelivery) 'Return on matched delivery'].join(' · '),
-            key: const Key('work-purchase-goods-exceptions'), style: const TextStyle(fontSize: 11, color: _paperMuted)),
-        Text(workPurchaseNextStep(progress: progress, remainingMinor: remaining),
-          key: const Key('work-purchase-next-step'), style: const TextStyle(fontSize: 11, color: _paperMuted)),
-        if (widget.onReceiveGoods != null && progress != null &&
+    final goodsActions = Wrap(spacing: 8, runSpacing: 4, children: [
+        if (same && widget.onReceiveGoods != null && progress != null &&
             progress.matchedItems < progress.totalItems)
           TextButton.icon(key: const Key('work-purchase-bill-receive-goods'),
             onPressed: _busy ? null : () async {
@@ -16794,18 +17745,22 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 widget.onReceiveGoods!(copy);
               }
             }, icon: const Icon(Icons.inventory_2_outlined, size: 18), label: const Text('Receive goods')),
-      ],
+      if (_copyVerified && showShortage && session.supplierShortageRecoveryFormKey(copy) != null)
+        TextButton.icon(
+          key: const Key('work-purchase-review-shortage'), onPressed: _busy ? null : () async {
+            if (!await confirmLeave() || !mounted) return;
+            await _showSupplierShortage(context, session, copy);
+            if (mounted && _current) await _load(retry: true);
+          }, icon: const Icon(Icons.inventory_2_outlined, size: 18),
+          label: Text(shortageUnverified ? 'Recover shortages'
+            : _shortageDraftPresent ? 'Resume shortage review'
+            : shortageHistory ? 'Shortages' : 'Short delivery')),
+          ]);
+    final paymentActions = <Widget>[
       if (same) ...[
-        Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-          const Text('Payment', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy)),
-          Text(ledger!.manualBillRemainingMinor(copy.draft.id) == null
-            ? 'Individual bill due not yet verified'
-            : ledger.manualBillRemainingMinor(copy.draft.id)! < 0
-              ? 'Credit with supplier ${_purchaseAmount(-ledger.manualBillRemainingMinor(copy.draft.id)!)}'
-              : 'Bill due ${_purchaseAmount(ledger.manualBillRemainingMinor(copy.draft.id)!)}',
-            key: const Key('work-purchase-payment-status')),
           if (session.workspaceSupplierMoneyInputAvailable)
           TextButton.icon(key: const Key('work-purchase-record-payment'),
+            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
             onPressed: _busy ? null : () async {
               if (!await confirmLeave() || !mounted || !_current) return;
               final currentLedger = session.workspaceSupplierLedger(copy.supplier.id);
@@ -16819,10 +17774,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 copy: currentLedger!.manualBillRemainingMinor(copy.draft.id) == null ? null : copy));
               if (mounted && _current) await _load(retry: true);
             }, icon: const Icon(Icons.payments_outlined, size: 18),
-            label: Text(ledger.manualBillRemainingMinor(copy.draft.id) == null
+            label: Text(ledger!.manualBillRemainingMinor(copy.draft.id) == null
               ? 'Record account payment' : remaining! <= 0 ? 'Bill payment details' : 'Record payment')),
           if (session.workspaceSupplierMoneyInputAvailable && remaining != null && remaining <= 0)
             TextButton.icon(key: const Key('work-purchase-record-advance'),
+              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
               onPressed: _busy ? null : () async {
                 if (!await confirmLeave() || !mounted || !_current) return;
                 final currentBill = session.workspaceSupplierLedger(copy.supplier.id)?.purchaseBills[copy.draft.id];
@@ -16835,29 +17791,19 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 if (mounted && _current) await _load(retry: true);
               }, icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
               label: const Text('Record advance paid')),
-        ]),
-        _StoreSupplierLedgerSummary(session: session, ledger: ledger, billId: copy.draft.id, compact: true),
-      ],
-      _savedBillAdjustmentRail([
       if (same && session.workspaceSupplierAllocationInputAvailable)
         TextButton.icon(
           key: const Key('work-purchase-allocate-money'),
+          style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
           onPressed: _busy ? null : () async {
             if (!await confirmLeave() || !mounted) return;
             await _showSupplierAllocation(context, session, copy);
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.link_outlined, size: 18),
-          label: const Text('Link payment / credit')),
-      if (_copyVerified && showShortage && session.supplierShortageRecoveryFormKey(copy) != null)
-        TextButton.icon(
-          key: const Key('work-purchase-review-shortage'), onPressed: _busy ? null : () async {
-            if (!await confirmLeave() || !mounted) return;
-            await _showSupplierShortage(context, session, copy);
-            if (mounted && _current) await _load(retry: true);
-          }, icon: const Icon(Icons.inventory_2_outlined, size: 18),
-          label: Text(shortageUnverified ? 'Recover shortages'
-            : _shortageDraftPresent ? 'Resume shortage review'
-            : shortageHistory ? 'Shortages' : 'Short delivery')),
+          label: const Text('Allocate payment / credit')),
+      ],
+    ];
+    final adjustmentActions = <Widget>[
       if (same && session.supplierCreditFormKey(copy) != null)
         TextButton.icon(
           key: const Key('work-purchase-record-credit'), onPressed: _busy ? null : () async {
@@ -16877,8 +17823,82 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.call_received_outlined, size: 18),
           label: const Text('Refund received')),
+    ];
+    Widget actionGrid(Widget? goodsHeader) => _savedBillActionGrid([
+      ...paymentActions,
+      ?goodsHeader,
+      ...adjustmentActions,
+      if (same) TextButton.icon(key: const Key('work-purchase-ledger-open'),
+        onPressed: _busy ? null : () async {
+          final controller = _billPanelController(copy, 'account');
+          if (controller.isExpanded) { controller.collapse(); return; }
+          if (await _openBillPanel(copy, 'account') && mounted && _current) controller.expand();
+        }, icon: const Icon(Icons.account_balance_outlined, size: 18),
+        label: const Text('Supplier ledger')),
+    ]);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Column(key: const Key('work-purchase-bill-identity'),
+        crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [Expanded(flex: 7, child: Text(copy.supplier.name,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _paperInk))),
+          const SizedBox(width: 8),
+          Expanded(flex: 3, child: Text(copy.draft.invoiceDate, textAlign: TextAlign.right,
+            style: const TextStyle(fontSize: 10, color: _paperMuted))),
+        ]),
+        Row(children: [Expanded(flex: 6, child: Text('Bill ${copy.draft.invoiceReference}',
+          style: const TextStyle(fontSize: 11, color: _paperInk))), const SizedBox(width: 8),
+          Expanded(flex: 4, child: Text(!ready ? 'Supplier account status unavailable'
+            : same ? 'Posted to supplier ledger'
+            : accepted != null ? 'Another saved revision is confirmed · this copy is not posted'
+            : 'Not posted to supplier ledger', key: const Key('work-purchase-bill-status'),
+            textAlign: TextAlign.right, style: const TextStyle(fontSize: 10, color: _paperMuted))),
+        ]),
       ]),
-      if (same || (_billGoodsWasAccepted && !ready)) _StoreBillGoodsMatch(key: _billGoodsKey, session: session, copy: copy,
+      Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(children: [
+        if (same) Expanded(child: Text(ledger!.manualBillRemainingMinor(copy.draft.id) == null
+            ? 'Individual bill due not yet verified'
+            : ledger.manualBillRemainingMinor(copy.draft.id)! < 0
+              ? 'Credit with supplier ${_purchaseAmount(-ledger.manualBillRemainingMinor(copy.draft.id)!)}'
+              : 'Bill outstanding ${_purchaseAmount(ledger.manualBillRemainingMinor(copy.draft.id)!)}',
+            key: const Key('work-purchase-payment-status'),
+            textAlign: TextAlign.left,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _paperInk)) ) else const Spacer(),
+        const SizedBox(width: 8),
+        Text(_sourceAttachment == null ? 'Recorded copy' : 'Supplier copy',
+          key: const Key('work-purchase-bill-copy-kind'),
+          style: const TextStyle(fontSize: 10, color: _paperMuted)),
+      ])),
+      TextButtonTheme(data: TextButtonThemeData(style:
+        Theme.of(context).textButtonTheme.style?.copyWith(
+          alignment: Alignment.center,
+          textStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+          backgroundColor: const WidgetStatePropertyAll(Colors.white),
+          padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 6, vertical: 4)),
+          shape: WidgetStatePropertyAll(RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4), side: const BorderSide(color: MoolColors.line))))),
+        child: Column(key: const Key('work-purchase-bill-actions-panel'),
+          crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 4, children: [
+      if (same || (_billGoodsWasAccepted && !ready))
+      _StoreBillGoodsMatch(key: _billGoodsKey, session: session, copy: copy,
+        onBeforeOpen: () => _openBillPanel(copy, 'goods'), actions: goodsActions,
+        headerBuilder: (header) => actionGrid(header),
+        summary: (verified) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.center, children: [
+          const Text('Goods receipt', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy)),
+          if (same)
+        Text(progress == null || !verified ? 'Reconciliation status unavailable'
+          : !progress.hasMatches ? 'Pending reconciliation'
+          : progress.matchedItems == progress.totalItems ? 'Fully reconciled'
+          : 'Partly reconciled (${progress.matchedItems}/${progress.totalItems} items)',
+          key: const Key('work-purchase-goods-status'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 11, color: MoolColors.navy)),
+          if (same) ...[
+        if (verified && (progress?.damaged == true || progress?.shortage == true || progress?.returnedOnMatchedDelivery == true))
+          Text([if (progress!.damaged) 'Damaged quantity reconciled', if (progress.shortage) 'Bill shortage recorded',
+            if (progress.returnedOnMatchedDelivery) 'Return against goods receipt'].join(' · '),
+            key: const Key('work-purchase-goods-exceptions'), style: const TextStyle(fontSize: 11, color: _paperMuted)),
+          ],
+        ]),
         onOpenCopy: (other) async {
           if (!await confirmLeave() || !mounted) return;
           final detailKey = GlobalKey<_StoreRecordPurchaseState>();
@@ -16906,7 +17926,17 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                   session: session, savedCopy: other, onBack: finishPop))));
             })));
           if (mounted && _current) await _load(retry: true);
-        }),
+        })
+      else actionGrid(null),
+      if (!(same || (_billGoodsWasAccepted && !ready))) goodsActions,
+      if (same && !(progress != null && progress.totalItems > 0 &&
+          progress.matchedItems == progress.totalItems && remaining != null && remaining > 0 &&
+          session.workspaceSupplierMoneyInputAvailable && session.workspaceSupplierAllocationInputAvailable))
+        Text(workPurchaseNextStep(progress: progress, remainingMinor: remaining),
+          key: const Key('work-purchase-next-step'), style: const TextStyle(fontSize: 11, color: _paperMuted)),
+      if (same) _StoreSupplierLedgerSummary(session: session, ledger: ledger, billId: copy.draft.id,
+        compact: true, hideCompactHeader: true, controller: _billPanelController(copy, 'account'),
+        onExpansionChanged: (expanded) { if (expanded) unawaited(_openBillPanel(copy, 'account')); }),
       if (session.workspaceSupplierOpeningConfirmationAvailable && !ready)
         TextButton(key: const Key('work-purchase-bill-recover'),
           onPressed: _busy ? null : () => _load(retry: true), child: const Text('Retry supplier account')),
@@ -16925,6 +17955,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         TextButton.icon(key: const Key('work-purchase-bill-confirm'),
           onPressed: _busy || session.workspaceSupplierSaving ? null : () => _confirmSavedBill(copy),
           icon: const Icon(Icons.check_circle_outline, size: 18), label: const Text('Confirm bill in supplier account')),
+      _reviewCopies(vertical: true),
+      ])),
       if (_notice != null) Text(_notice!, key: const Key('work-purchase-bill-notice'),
         style: const TextStyle(fontSize: 12, color: _paperInk)),
     ]);
@@ -16997,7 +18029,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       openingTreatment: treatment, openingReview: openingReview, confirmedAt: DateTime.now());
     if (!mounted || !_current) return;
     setState(() { _busy = false;
-      _notice = saved ? 'Bill confirmed in supplier account. Confirming the bill does not change Stock or record a payment.'
+      _notice = saved ? 'Posted to supplier ledger. Confirming the bill does not change Stock or record a payment.'
         : session.workspaceSupplierError ?? 'Confirmation status needs recovery. Retry the supplier account before confirming again.'; });
   }
   Widget _goodsRow(int index) {
@@ -17012,12 +18044,26 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         keyboard: const TextInputType.numberWithOptions(decimal: true)),
       _field('Tax amount ₹', line.extra['taxAmount']!, 'work-purchase-taxAmount-$index',
         keyboard: const TextInputType.numberWithOptions(decimal: true))];
+    final extraItemFields = <Widget>[];
+    for (final e in const {'barcode':'Item code / barcode', 'unitCode':'Unit code on invoice',
+        'freeQuantity':'Free qty', 'batch':'Batch No.', 'expiry':'Expiry date', 'mrp':'MRP ₹',
+        'sellingPrice':'Selling price ₹', 'discount':'Item discount ₹', 'gstRate':'GST %', 'cess':'Cess ₹'}.entries) {
+      final input = _field(e.value, line.extra[e.key]!, 'work-purchase-${e.key}-$index', limit: 200,
+        hint: e.key == 'expiry' ? 'DD/MM/YYYY' : null,
+        keyboard: const ['barcode','batch','expiry','unitCode'].contains(e.key) ? null :
+          const TextInputType.numberWithOptions(decimal: true));
+      final goodsOnly = const ['barcode', 'unitCode', 'freeQuantity', 'batch', 'expiry', 'mrp', 'sellingPrice'].contains(e.key);
+      if ((!_itemTaxKeys.contains(e.key) || _showGstFields) &&
+          (!goodsOnly || !_servicesOnly || _showAllDocumentFields || line.extra[e.key]!.text.isNotEmpty)) {
+        extraItemFields.add(input);
+      }
+    }
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [Padding(padding: const EdgeInsets.only(right: 8),
         child: Text('${index + 1}', semanticsLabel: 'Item ${index + 1}',
           style: const TextStyle(fontSize: 12, color: _paperMuted))),
-        Expanded(child: _field('Item / description', line.name, 'work-purchase-item-$index',
-        lookup: true)),
+        Expanded(child: _field('Item name on invoice', line.name, 'work-purchase-item-$index',
+        lookup: true, hint: 'Enter item name as on bill')),
         if (_goods.length > 1) Tooltip(message: 'Remove item ${index + 1}', child: TextButton(
           key: Key('work-purchase-remove-item-$index'), onPressed: () => _removeInvoiceRow(index),
           child: const Text('Remove')))]),
@@ -17028,7 +18074,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         style: const TextStyle(fontSize: 11, color: _paperMuted))),
         TextButton(key: Key('work-purchase-change-stock-$index'),
           onPressed: () => setState(() => line.productId = ''), child: const Text('Change product'))]),
-      if (line.name.text.trim().isNotEmpty && line.productId.isEmpty)
+      if (!_servicesOnly && line.name.text.trim().isNotEmpty && line.productId.isEmpty)
         Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Row(children: [
           const Expanded(child: Text('Choose a saved product below, or Add product if it is new.',
             key: Key('work-purchase-unmatched-item'),
@@ -17039,7 +18085,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             onPressed: () => _addGoodsProduct(line), child: const Text('Add product')),
         ]), _field('Find saved product', line.stockSearch, 'work-purchase-stock-search-$index',
           focus: line.focus, lookup: true, hint: 'Name, SKU or barcode')]),
-      if (line.focus.hasFocus && line.productId.isEmpty && query.isNotEmpty)
+      if (!_servicesOnly && line.focus.hasFocus && line.productId.isEmpty && query.isNotEmpty)
         for (final p in matches) TextButton(onPressed: () {
           setState(() => line.productId = p.id);
           line.focus.unfocus();
@@ -17051,33 +18097,29 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         final priceWidth = (96 * scaled).clamp(0, constraints.maxWidth).toDouble();
         final packWidth = constraints.maxWidth < quantityWidth + priceWidth + 100
           ? constraints.maxWidth : constraints.maxWidth - quantityWidth - priceWidth - 24;
+        final packInput = _field('Unit on invoice', line.pack, 'work-purchase-pack-$index');
+        final quantityInput = _field('Billed qty', line.quantity, 'work-purchase-quantity-$index',
+          limit: 12, keyboard: const TextInputType.numberWithOptions(decimal: true));
         return Wrap(spacing: 12, runSpacing: 4, children: [
-        SizedBox(width: packWidth,
-          child: _field('Pack / unit', line.pack, 'work-purchase-pack-$index')),
-        SizedBox(width: quantityWidth, child: _field('Qty', line.quantity, 'work-purchase-quantity-$index',
-          limit: 12, keyboard: const TextInputType.numberWithOptions(decimal: true))),
-        SizedBox(width: priceWidth, child: _field('Rate ₹', line.cost, 'work-purchase-cost-$index',
+        if (!_servicesOnly || _showAllDocumentFields || line.pack.text.isNotEmpty)
+          SizedBox(width: packWidth, child: packInput),
+        if (!_servicesOnly || _showAllDocumentFields || line.quantity.text.isNotEmpty)
+          SizedBox(width: quantityWidth, child: quantityInput),
+        SizedBox(width: priceWidth, child: _field('Rate / unit ₹', line.cost, 'work-purchase-cost-$index',
           limit: 12, keyboard: const TextInputType.numberWithOptions(decimal: true))),
       ]); }),
       _compactFields([_field('HSN / SAC', line.extra['hsn']!, 'work-purchase-hsn-$index'),
         _field('Item amount ₹', line.extra['lineTotal']!, 'work-purchase-lineTotal-$index',
           keyboard: const TextInputType.numberWithOptions(decimal: true)),
-        ...itemTaxFields]),
+        if (_showGstFields) ...itemTaxFields]),
       _section('Item details', 'work-purchase-item-details-$index', [
-        _field('S No. / item No.', line.extra['printedSerial']!, 'work-purchase-printedSerial-$index'),
+        _field('Invoice line no.', line.extra['printedSerial']!, 'work-purchase-printedSerial-$index'),
         _field('Model / specifications', line.extra['specifications']!,
           'work-purchase-specifications-$index', limit: 1000, multiline: true),
-        const Text('HSN is the item code printed on the bill. Leave unavailable details blank.',
+        const Text('HSN / SAC is the tax classification. Supplier item codes and barcodes are recorded separately. Copy only details shown on the invoice.',
           style: TextStyle(fontSize: 11, color: MoolColors.ink)),
-        _compactFields([for (final e in const {'barcode':'Barcode / item code',
-          'unitCode':'Unit code on bill',
-          'freeQuantity':'Free qty', 'batch':'Batch No.', 'expiry':'Expiry date', 'mrp':'MRP ₹',
-          'sellingPrice':'Selling price ₹', 'discount':'Discount ₹', 'gstRate':'GST %', 'cess':'Cess ₹'}.entries)
-          _field(e.value, line.extra[e.key]!, 'work-purchase-${e.key}-$index', limit: 200,
-            hint: e.key == 'expiry' ? 'DD/MM/YYYY' : e.key == 'barcode' ? 'Barcode / supplier code' : null,
-            keyboard: const ['hsn','barcode','batch','expiry','unitCode'].contains(e.key) ? null :
-              const TextInputType.numberWithOptions(decimal: true))]),
-        _section('Item GST breakup', 'work-purchase-gst-split-$index', [
+        _compactFields(extraItemFields),
+        _documentField(_showGstFields, _section('Item GST breakup', 'work-purchase-gst-split-$index', [
           const Text('Copy each tax rate and amount shown. Leave components not shown blank.',
             style: TextStyle(fontSize: 11, color: MoolColors.muted)),
           _compactFields([for (final e in const {'cgstRate':'CGST %', 'cgst':'CGST ₹',
@@ -17085,7 +18127,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             'igstRate':'IGST %', 'igst':'IGST ₹', 'cessRate':'Cess %'}.entries)
             _field(e.value, line.extra[e.key]!, 'work-purchase-${e.key}-$index', limit: 200,
               keyboard: const TextInputType.numberWithOptions(decimal: true))]),
-        ]), _extraFields('items', itemIndex: index)]),
+        ])), _extraFields('items', itemIndex: index)]),
       const SizedBox(height: 6),
       const Divider(height: 1, thickness: .7, color: _paperRule),
     ]);
@@ -17097,9 +18139,11 @@ class _StoreSupplierOpeningSurface extends StatefulWidget {
     super.key,
     required this.session,
     required this.onBack,
+    this.initialSupplierId,
   });
   final WorkSession session;
   final VoidCallback onBack;
+  final String? initialSupplierId;
   @override
   State<_StoreSupplierOpeningSurface> createState() =>
       _StoreSupplierOpeningState();
@@ -17141,6 +18185,8 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
     _scope = session.workspaceSupplierScope;
     _revision = session.workspacePurchaseEntryRevision;
     _baseline = _input;
+    final supplier = widget.initialSupplierId;
+    if (supplier != null && session.workspaceSuppliers.any((p) => p.id == supplier)) _show(supplier);
     if (session.workspaceSupplierOpeningConfirmationAvailable) {
       unawaited(_recoverPosting());
     }
@@ -17249,6 +18295,39 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
     );
     _leaving = false;
     return mounted && discard == true;
+  }
+
+  Future<void> _pickSupplier() async {
+    if (!mounted || !_current || _busy || _leaving ||
+        session.workspaceSupplierSaving) {
+      return;
+    }
+    final scope = _scope;
+    final navigation = session.navigationScopeRevision;
+    final epoch = _selectionEpoch;
+    final original = _supplierId;
+    bool validReturn() => mounted && _current && _scope == scope &&
+        session.navigationScopeRevision == navigation &&
+        _selectionEpoch == epoch && _supplierId == original;
+    FocusScope.of(context).unfocus();
+    setState(() => _busy = true);
+    String? selected;
+    try {
+      selected = await _showStoreSupplierSelector(context, session, selectedId: original);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    bool readySelection() => validReturn() && session.workspaceSuppliersLoaded &&
+        !session.workspaceSupplierSaving && !session.workspaceSupplierRecoveryRequired &&
+        session.workspaceSuppliers.any((p) => p.id == selected);
+    if (selected == null || selected == original || !readySelection()) {
+      return;
+    }
+    if (!await confirmLeave() || !readySelection()) return;
+    setState(() {
+      _selectionEpoch++;
+      _show(selected!);
+    });
   }
 
   List<WorkspacePurchaseSavedCopy> get _bills {
@@ -17374,11 +18453,13 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
     onChanged: (_) => _changed(),
     decoration: InputDecoration(
       labelText: label,
+      hintText: money ? 'Enter opening amount' : null,
+      floatingLabelBehavior: money ? FloatingLabelBehavior.always : null,
       filled: false,
       counterText: '',
-      border: InputBorder.none,
-      enabledBorder: InputBorder.none,
-      focusedBorder: InputBorder.none,
+      border: money ? null : InputBorder.none,
+      enabledBorder: money ? null : InputBorder.none,
+      focusedBorder: money ? null : InputBorder.none,
       labelStyle: const TextStyle(fontSize: 12, color: MoolColors.ink),
     ),
   );
@@ -17489,48 +18570,37 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
           const Text(
             'Return to the Store where you started. Unsaved entries are kept.',
           ),
-        if (session.workspaceSuppliers.isEmpty)
+        if (session.workspaceSuppliersLoaded && session.workspaceSuppliers.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Text(
-              'No saved supplier yet. Close, choose Record purchase, enter the supplier name and Save draft. Invoice details can be added later.',
+              'No suppliers yet. Choose Supplier, then Add supplier.',
             ),
           ),
-        DropdownButtonFormField<String>(
-          key: ValueKey(('work-opening-supplier', _supplierId, _selectionEpoch)),
-          initialValue: _supplierId,
-          isExpanded: true,
-          decoration: const InputDecoration(
-            labelText: 'Supplier',
-            filled: false,
+        const SizedBox(height: 16),
+        InkWell(
+          key: const Key('work-opening-supplier-picker'),
+          onTap: _current && !_busy && !session.workspaceSupplierSaving ? _pickSupplier : null,
+          child: InputDecorator(
+            key: ValueKey(('work-opening-supplier', _supplierId, _selectionEpoch)),
+            decoration: InputDecoration(labelText: 'Supplier', filled: false,
+              enabled: _current && !_busy && !session.workspaceSupplierSaving,
+              suffixIcon: const Icon(Icons.search)),
+            isEmpty: _supplierId == null,
+            child: Text(session.workspaceSuppliers
+                .where((p) => p.id == _supplierId).map((p) => p.name).firstOrNull ?? '',
+              overflow: TextOverflow.ellipsis),
           ),
-          items: [
-            for (final p in session.workspaceSuppliers)
-              DropdownMenuItem(
-                value: p.id,
-                child: Text(p.name, overflow: TextOverflow.ellipsis),
-              ),
-          ],
-          onChanged: !usable
-              ? null
-              : (id) async {
-                  final change = id != null &&
-                      id != _supplierId &&
-                      await confirmLeave() &&
-                      mounted;
-                  if (!mounted) return;
-                  setState(() {
-                    _selectionEpoch++;
-                    if (change) _show(id);
-                  });
-                },
         ),
         if (_supplierId != null) ...[
+          if (history.isNotEmpty) const SizedBox(height: 16),
           if (history.isNotEmpty)
             DropdownButtonFormField<int>(
               key: ValueKey(('opening-version', _viewed?.id, _selectionEpoch)),
               initialValue: _viewed?.revision,
               isExpanded: true,
+              isDense: false,
+              itemHeight: null,
               decoration: const InputDecoration(
                 labelText: 'Saved version',
                 filled: false,
@@ -17541,7 +18611,8 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                     value: r.revision,
                     child: Text(
                       '${r.asOfDate} · ${r.amountMinor == null ? 'Amount unknown' : _purchaseAmount(r.amountMinor!)} · v${r.revision}',
-                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13),
+                      softWrap: true,
                     ),
                   ),
               ],
@@ -17581,7 +18652,10 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                   },
           ),
           if (_known) ...[
-            _field('Amount ₹', _amount, 'work-opening-amount', money: true),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: _field('Amount ₹', _amount, 'work-opening-amount', money: true),
+            ),
             DropdownButtonFormField<bool>(
               key: ValueKey(('opening-credit', _credit, _viewed?.id)),
               initialValue: _credit,
@@ -17634,7 +18708,9 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                 'No saved purchase copies for this supplier. The starting record can be saved without a bill.',
               ),
             for (final b in _bills)
-              DropdownButtonFormField<WorkspaceOpeningBillInclusion>(
+              Padding(
+                padding: const EdgeInsets.only(top: 16, bottom: 8),
+                child: DropdownButtonFormField<WorkspaceOpeningBillInclusion>(
                 key: ValueKey((
                   'opening-bill',
                   b.id,
@@ -17645,6 +18721,9 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                 initialValue:
                     _relations[b.id] ?? WorkspaceOpeningBillInclusion.unknown,
                 isExpanded: true,
+                isDense: false,
+                itemHeight: null,
+                style: const TextStyle(fontSize: 13, color: MoolColors.ink),
                 decoration: InputDecoration(
                   labelText:
                       '${b.draft.invoiceReference} · ${b.draft.invoiceDate} · v${b.revision}',
@@ -17672,6 +18751,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                           _changed(clearBills: false);
                         }
                       },
+                ),
               ),
           ] else ...[
             if (_viewed!.bills.isEmpty)
@@ -17780,6 +18860,7 @@ class _ReceivingLineInput {
         e.key: TextEditingController(text: '${e.value}')};
   final String id;
   final WorkspaceSupplierGoodsReceiptLine? original;
+  final rowKey = GlobalKey();
   String productId;
   bool arrives = true;
   final TextEditingController unit, factor, expected, delivered, damaged, short;
@@ -17807,6 +18888,326 @@ class _ReceivingLineInput {
 
 /// Receiving is independent of entering a supplier bill. Persist the reviewed
 /// operation before posting and always resume its exact immutable snapshot.
+Future<String?> _showStoreSupplierSelector(BuildContext context, WorkSession session, {
+  String? selectedId, String? lockedSupplierId, Set<String>? eligibleSupplierIds,
+  String? purposeGuide, String? emptyMessage,
+}) => showModalBottomSheet<String>(context: context, isScrollControlled: true,
+  useSafeArea: true, isDismissible: false, enableDrag: false,
+  builder: (_) => _StoreSupplierSelector(session: session,
+    selectedId: selectedId, lockedSupplierId: lockedSupplierId,
+    eligibleSupplierIds: eligibleSupplierIds, purposeGuide: purposeGuide, emptyMessage: emptyMessage));
+
+class _StoreSupplierSelector extends StatefulWidget {
+  const _StoreSupplierSelector({required this.session, this.selectedId, this.lockedSupplierId,
+    this.eligibleSupplierIds, this.purposeGuide, this.emptyMessage});
+  final WorkSession session;
+  final String? selectedId, lockedSupplierId;
+  final String? purposeGuide, emptyMessage;
+  final Set<String>? eligibleSupplierIds;
+  @override
+  State<_StoreSupplierSelector> createState() => _StoreSupplierSelectorState();
+}
+
+class _StoreSupplierSelectorState extends State<_StoreSupplierSelector> {
+  final _search = TextEditingController(), _name = TextEditingController(),
+    _phone = TextEditingController(), _address = TextEditingController(), _gstin = TextEditingController();
+  final _form = GlobalKey<FormState>();
+  late final _scope = widget.session.workspaceSupplierScope;
+  bool _adding = false, _busy = false, _uncertain = false, _loading = true, _directoryReady = false;
+  String? _error;
+  WorkspaceSupplierProfile? _attempt;
+  int? _revision;
+  bool get _current => mounted && _scope != null && widget.session.workspaceSupplierScope == _scope;
+  bool get _dirty => [_name, _phone, _address, _gstin].any((c) => c.text.isNotEmpty);
+  @override
+  void initState() { super.initState(); unawaited(_loadDirectory()); }
+  Future<void> _loadDirectory() async {
+    if (!_current) return;
+    setState(() { _loading = true; _directoryReady = false; });
+    final ready = await widget.session.loadWorkspaceSuppliers(retry: true);
+    if (!_current) return;
+    setState(() { _loading = false; _directoryReady = ready; });
+  }
+  @override
+  void dispose() {
+    for (final c in [_search, _name, _phone, _address, _gstin]) { c.dispose(); }
+    super.dispose();
+  }
+  Future<void> _close() async {
+    if (_busy) return;
+    if (_adding && _dirty && _current) {
+      final discard = await showDialog<bool>(context: context, builder: (dialog) => AlertDialog(
+        title: const Text('Leave supplier entry?'),
+        content: Text(_uncertain ? 'The save needs checking. Reopen this supplier list to recover saved details.'
+          : 'These supplier details have not been saved.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Keep editing')),
+          TextButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Leave entry'))]));
+      if (discard != true || !mounted) return;
+    }
+    if (_adding && _current) {
+      for (final c in [_name, _phone, _address, _gstin]) { c.clear(); }
+      setState(() { _adding = false; _attempt = null; _uncertain = false; _error = null; });
+      await _loadDirectory();
+    } else if (mounted) { Navigator.pop(context); }
+  }
+  Future<void> _save() async {
+    if (!_current || _busy || !_form.currentState!.validate()) return;
+    final session = widget.session;
+    final now = DateTime.now().toUtc();
+    final proposed = _attempt ?? WorkspaceSupplierProfile(id: session.newWorkspaceSupplierId(),
+      name: _name.text.trim(), phone: _phone.text.trim().replaceAll(RegExp(r'[\s()-]'), ''),
+      address: _address.text.trim(), gstin: _gstin.text.trim().toUpperCase(),
+      createdAt: now, updatedAt: now);
+    setState(() { _busy = true; _error = null; _attempt = proposed; });
+    final saved = await session.saveWorkspaceSupplierProfile(proposed, scope: _scope!, expectedRevision: _revision);
+    if (!mounted) return;
+    if (!_current) { setState(() => _busy = false); return; }
+    if (saved) { Navigator.pop(context, proposed.id); return; }
+    setState(() {
+      _busy = false;
+      _uncertain = session.workspaceSupplierRecoveryError != null;
+      if (!_uncertain) _attempt = null;
+      _error = session.workspaceSupplierError ?? 'Supplier was not saved. Your entries are kept; reopen the supplier list.';
+    });
+  }
+  Widget _field(String key, String label, TextEditingController controller, {
+    String? hint, int maxLength = 120, int maxLines = 1, TextInputType? keyboard,
+    String? Function(String?)? validate,
+  }) => Padding(padding: const EdgeInsets.only(bottom: 10), child: TextFormField(
+    key: Key(key), controller: controller, enabled: !_busy && !_uncertain,
+    maxLength: maxLength, maxLines: maxLines, keyboardType: keyboard,
+    style: const TextStyle(fontSize: 13, color: MoolColors.ink),
+    decoration: InputDecoration(labelText: label, hintText: hint, counterText: '',
+      isDense: true, filled: false, border: const UnderlineInputBorder()),
+    validator: validate));
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(animation: widget.session, builder: (context, _) {
+    final session = widget.session;
+    final query = _search.text.trim().toLowerCase();
+    final phoneQuery = query.replaceAll(RegExp(r'[\s()+-]'), '');
+    final suppliers = session.workspaceSuppliers.where((p) =>
+      (widget.eligibleSupplierIds == null || widget.eligibleSupplierIds!.contains(p.id)) &&
+      (query.isEmpty || p.name.toLowerCase().contains(query) || p.gstin.toLowerCase().contains(query) ||
+      phoneQuery.isNotEmpty && p.phone.replaceAll(RegExp(r'[\s()+-]'), '').contains(phoneQuery))).toList();
+    return PopScope(canPop: false, onPopInvokedWithResult: (didPop, _) { if (!didPop) unawaited(_close()); },
+      child: FractionallySizedBox(heightFactor: .88, child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(padding: const EdgeInsets.only(left: 16, right: 4), child: Row(children: [
+            Expanded(child: Text(_adding ? 'Add supplier' : 'Select supplier',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: MoolColors.navy))),
+            IconButton(tooltip: _adding ? 'Back to suppliers' : 'Close supplier list',
+              onPressed: _busy ? null : _close, icon: const Icon(Icons.close, size: 20)),
+          ])),
+          if (!_current) ...[
+            const Padding(padding: EdgeInsets.all(16), child: Text('Store changed. Close and reopen the supplier list.')),
+          ] else if (!_directoryReady) Expanded(child: Center(child: Padding(padding: const EdgeInsets.all(16),
+            child: _loading ? const CircularProgressIndicator() : Column(mainAxisSize: MainAxisSize.min, children: [
+              const Text('Supplier list could not be opened. Saved details are kept.'),
+              TextButton(key: const Key('work-supplier-retry'), onPressed: _loadDirectory, child: const Text('Retry supplier list')),
+            ])))) else if (widget.lockedSupplierId != null &&
+              !session.workspaceSuppliers.any((p) => p.id == widget.lockedSupplierId))
+            Expanded(child: Center(child: Padding(padding: const EdgeInsets.all(16), child: Column(
+              mainAxisSize: MainAxisSize.min, children: [
+                const Text('The linked supplier is not available in this Store’s supplier list. Keep this purchase unchanged.'),
+                TextButton(key: const Key('work-supplier-retry'), onPressed: _loadDirectory,
+                  child: const Text('Refresh supplier list')),
+              ])))) else if (_adding) Expanded(child: Form(key: _form, child: ListView(
+            key: const Key('work-add-supplier-form'), padding: const EdgeInsets.fromLTRB(16, 6, 16, 16), children: [
+              _field('work-add-supplier-name', 'Supplier name · as on bill', _name,
+                validate: (v) => v == null || v.trim().isEmpty ? 'Enter the supplier name.' : null),
+              _field('work-add-supplier-address', 'Billing address', _address, maxLength: 500, maxLines: 2,
+                hint: 'Street, city, State and PIN code', keyboard: TextInputType.streetAddress),
+              _field('work-add-supplier-gstin', 'GSTIN · if registered', _gstin, maxLength: 15,
+                validate: (v) => v == null || v.trim().isEmpty || RegExp(r'^[0-9A-Z]{15}$').hasMatch(v.trim().toUpperCase())
+                  ? null : 'Enter the 15-character GSTIN as on the bill.'),
+              _field('work-add-supplier-phone', 'Phone · optional', _phone, maxLength: 20, keyboard: TextInputType.phone,
+                validate: (v) => v == null || v.trim().isEmpty || RegExp(r'^\+?[0-9]{7,15}$').hasMatch(v.trim().replaceAll(RegExp(r'[\s()-]'), ''))
+                  ? null : 'Enter a valid phone number.'),
+              const Text('Use the supplier’s billing details. Leave GSTIN blank if unavailable or not registered.',
+                style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+              if (_error != null) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(_error!,
+                key: const Key('work-add-supplier-error'), style: const TextStyle(fontSize: 12, color: Color(0xffa52a2a)))),
+              const SizedBox(height: 8),
+              FilledButton(key: const Key('work-add-supplier-save'), onPressed: _busy ? null : _save,
+                child: Text(_busy ? 'Saving…' : _uncertain ? 'Check saved supplier' : 'Save & select')),
+            ]))) else Expanded(child: CustomScrollView(key: const Key('work-supplier-results'), slivers: [
+            SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: TextField(
+              key: const Key('work-supplier-search'), controller: _search,
+              onChanged: (_) => setState(() {}), style: const TextStyle(fontSize: 13),
+              decoration: const InputDecoration(hintText: 'Search name, phone or GSTIN',
+                prefixIcon: Icon(Icons.search, size: 20), isDense: true, filled: false)))),
+            if (widget.purposeGuide != null) SliverToBoxAdapter(child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+              child: Text(widget.purposeGuide!, key: const Key('supplier-selection-purpose-guide'),
+                style: const TextStyle(fontSize: 12, color: MoolColors.muted)))),
+            if (widget.lockedSupplierId == null && widget.eligibleSupplierIds == null) SliverToBoxAdapter(child: Align(alignment: Alignment.centerLeft,
+              child: Padding(padding: const EdgeInsets.only(left: 8), child: TextButton.icon(
+                key: const Key('work-supplier-add'), onPressed: session.workspaceSupplierSaving ? null : () {
+                  setState(() { _adding = true; _revision = session.workspacePurchaseEntryRevision; });
+                }, icon: const Icon(Icons.add, size: 18), label: const Text('Add supplier'))))),
+            if (widget.lockedSupplierId != null) const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(12),
+              child: Text('This purchase keeps its linked supplier.', style: TextStyle(fontSize: 12)))),
+            if (suppliers.isEmpty) SliverFillRemaining(hasScrollBody: false, child: Center(child: Padding(padding: const EdgeInsets.all(16),
+              child: Text(query.isNotEmpty ? 'No matching supplier.' : widget.eligibleSupplierIds != null
+                ? widget.emptyMessage ?? 'No suppliers available for this action.' : 'No suppliers yet. Add your first supplier.'))))
+              else SliverList(delegate: SliverChildBuilderDelegate((context, index) {
+                  final p = suppliers[index];
+                  final details = [if (p.phone.isNotEmpty) p.phone, if (p.gstin.isNotEmpty) p.gstin].join(' · ');
+                  return ListTile(key: ValueKey('work-supplier-choice-${p.id}'),
+                    selected: p.id == widget.selectedId,
+                    enabled: widget.lockedSupplierId == null || widget.lockedSupplierId == p.id,
+                    title: Text(p.name, style: const TextStyle(fontSize: 13, color: MoolColors.ink)),
+                    subtitle: details.isEmpty ? null : Text(details, style: const TextStyle(fontSize: 11)),
+                    trailing: p.id == widget.selectedId ? const Icon(Icons.check, size: 18) : null,
+                    onTap: () => Navigator.pop(context, p.id));
+                }, childCount: suppliers.length)),
+          ])),
+        ]))));
+  });
+}
+
+Future<String?> _chooseTradeDocumentType(BuildContext context, {required WorkSession session,
+    required Iterable<String> types, required String selected, required bool Function() isCurrent}) =>
+  showModalBottomSheet<String>(context: context, isScrollControlled: true, useSafeArea: true,
+    builder: (_) => _TradeDocumentTypePicker(session: session, types: types.toList(), selected: selected, isCurrent: isCurrent));
+
+class _TradeDocumentTypePicker extends StatefulWidget {
+  const _TradeDocumentTypePicker({required this.session, required this.types, required this.selected, required this.isCurrent});
+  final WorkSession session;
+  final List<String> types;
+  final String selected;
+  final bool Function() isCurrent;
+  @override
+  State<_TradeDocumentTypePicker> createState() => _TradeDocumentTypePickerState();
+}
+class _TradeDocumentTypePickerState extends State<_TradeDocumentTypePicker> {
+  final search = TextEditingController();
+  @override
+  void dispose() { search.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(animation: widget.session, builder: (context, _) {
+    final query = search.text.trim().toLowerCase();
+    final rows = widget.types.where((type) => '${storeTradeDocumentLabel(type)} ${storeTradeDocumentGuide(type)}'.toLowerCase().contains(query)).toList();
+    final compact = widget.types.length <= 3;
+    final media = MediaQuery.of(context);
+    final view = View.of(context);
+    final exportedClearance = compact && defaultTargetPlatform == TargetPlatform.android && media.viewInsets.bottom == 0
+      ? moolAndroidExportedSemanticsClearance(
+          viewPadding: EdgeInsets.fromViewPadding(view.viewPadding, view.devicePixelRatio),
+          platform: defaultTargetPlatform).clamp(MoolMetrics.minimumTapTarget, double.infinity).toDouble()
+      : 0.0;
+    Widget option(BuildContext context, int index) {
+      if (index == 0) {
+        return Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: TextField(
+          key: const Key('trade-document-search'), controller: search,
+          decoration: const InputDecoration(hintText: 'Find a document', prefixIcon: Icon(Icons.search)),
+          onChanged: (_) => setState(() {})));
+      }
+      if (index == rows.length + 1) {
+        return Column(children: [
+          if (rows.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No matching document type')),
+          TextButton(key: const Key('trade-document-unclassified'),
+            onPressed: () => Navigator.pop(context, ''), child: const Text('Leave type unselected')),
+        ]);
+      }
+      final type = rows[index - 1];
+      return ListTile(key: ValueKey('trade-document-option-$type'),
+        title: Text(storeTradeDocumentLabel(type), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        subtitle: Text(storeTradeDocumentGuide(type), style: const TextStyle(fontSize: 12)),
+        trailing: widget.selected == type ? const Icon(Icons.check, size: 18) : null,
+        onTap: () { if (widget.isCurrent()) Navigator.pop(context, type); });
+    }
+    final options = compact ? SingleChildScrollView(key: const Key('trade-document-options'), primary: false,
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [for (var index = 0; index < rows.length + 2; index++) option(context, index)]))
+      : ListView.builder(key: const Key('trade-document-options'), itemCount: rows.length + 2, itemBuilder: option);
+    final body = ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .72),
+        child: Column(mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+          crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(padding: const EdgeInsets.fromLTRB(16, 8, 8, 0), child: Row(children: [
+            const Expanded(child: Text('Document type', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ])),
+          const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 4), child: Text(
+            'Choose the type of document you are attaching.', key: Key('trade-document-purpose-guide'),
+            style: TextStyle(fontSize: 12, color: MoolColors.muted))),
+          if (!widget.isCurrent()) const Padding(padding: EdgeInsets.all(16), child: Text('Return to the same Store entry to continue.'))
+          else Flexible(fit: compact ? FlexFit.loose : FlexFit.tight, child: options),
+        ]));
+    return Padding(padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: compact ? SafeArea(top: false, left: false, right: false,
+        minimum: EdgeInsets.only(bottom: media.padding.bottom + exportedClearance), child: body) : body);
+  });
+}
+
+class _TradeDocumentDetailsEditor extends StatefulWidget {
+  const _TradeDocumentDetailsEditor({required this.session, required this.attachment, required this.types,
+    required this.isCurrent, required this.canKeep, this.readOnly = false});
+  final WorkSession session;
+  final WorkspacePurchaseInvoiceAttachment attachment;
+  final Iterable<String> types;
+  final bool Function() isCurrent;
+  final bool Function(WorkspacePurchaseInvoiceAttachment) canKeep;
+  final bool readOnly;
+  @override
+  State<_TradeDocumentDetailsEditor> createState() => _TradeDocumentDetailsEditorState();
+}
+class _TradeDocumentDetailsEditorState extends State<_TradeDocumentDetailsEditor> {
+  late String type = widget.attachment.documentDetails['type'] ?? '';
+  late final title = TextEditingController(text: widget.attachment.documentDetails['title']);
+  late final reference = TextEditingController(text: widget.attachment.documentDetails['reference']);
+  late final date = TextEditingController(text: widget.attachment.documentDetails['date']);
+  String? error;
+  @override
+  void dispose() { title.dispose(); reference.dispose(); date.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(animation: widget.session, builder: (context, _) {
+    if (!widget.isCurrent()) {
+      return SafeArea(child: Padding(padding: const EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Return to the same Store entry to continue.'),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        ])));
+    }
+    final editable = !widget.readOnly && widget.isCurrent();
+    return SafeArea(top: false, child: Padding(padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SingleChildScrollView(padding: const EdgeInsets.all(16),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [const Expanded(child: Text('Document details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel'))]),
+          Text(widget.attachment.fileName, style: const TextStyle(fontSize: 12)),
+          InkWell(key: const Key('trade-document-type'), onTap: !editable ? null : () async {
+            final selected = await _chooseTradeDocumentType(context, session: widget.session, types: widget.types,
+              selected: type, isCurrent: widget.isCurrent);
+            if (mounted && widget.isCurrent() && selected != null) setState(() => type = selected);
+          }, child: InputDecorator(decoration: const InputDecoration(labelText: 'Document type'),
+            child: Row(children: [Expanded(child: Text(storeTradeDocumentLabel(type), style: const TextStyle(fontSize: 13))),
+              if (editable) const Icon(Icons.expand_more)]))),
+          Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(storeTradeDocumentGuide(type), style: const TextStyle(fontSize: 12))),
+          for (final entry in [(title, 'Title on document', 'Copy the printed title', 'title', 120),
+              (reference, 'Document number / reference', 'As printed on this copy', 'reference', 120),
+              (date, 'Date on document', 'As printed on this copy', 'date', 40)])
+            TextField(key: Key('trade-document-${entry.$4}'), controller: entry.$1, enabled: editable,
+              maxLength: entry.$5, decoration: InputDecoration(labelText: entry.$2, hintText: entry.$3, counterText: '')),
+          if (error != null) Text(error!, style: const TextStyle(color: Color(0xffa52a2a))),
+          if (editable) Align(alignment: Alignment.centerRight, child: FilledButton(key: const Key('trade-document-keep'),
+            onPressed: () {
+              if (!widget.isCurrent()) return;
+              final updated = widget.attachment.withDocumentDetails({if (type.isNotEmpty) 'type': type,
+                if (title.text.isNotEmpty) 'title': title.text,
+                if (reference.text.isNotEmpty) 'reference': reference.text,
+                if (date.text.isNotEmpty) 'date': date.text});
+              if (!updated.valid || !widget.canKeep(updated)) {
+                setState(() => error = 'These details exceed the copy’s limits. Shorten them; your entries are kept.');
+                return;
+              }
+              Navigator.pop(context, updated);
+            }, child: const Text('Keep details'))),
+        ]))));
+  });
+}
+
 class _StoreReceiveGoodsSurface extends StatefulWidget {
   const _StoreReceiveGoodsSurface({super.key, required this.session, required this.onBack,
     this.initialSupplierId, this.initialBill, this.initialRestockOriginal, this.initialRestockOrder});
@@ -17822,8 +19223,12 @@ class _StoreReceiveGoodsSurface extends StatefulWidget {
 
 class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   late final _scope = widget.session.workspaceSupplierScope;
-  final _reference = TextEditingController(), _day = TextEditingController();
+  final _reference = TextEditingController(), _day = TextEditingController(), _displayDay = TextEditingController();
   final _lines = <_ReceivingLineInput>[];
+  final _receivingEntryScroll = ScrollController();
+  _ReceivingLineInput? _lastAddedReceivingItem;
+  final _documents = <WorkspacePurchaseInvoiceAttachment>[];
+  String _copyType = '';
   String? _supplierId;
   String _groupId = '', _arrivalId = '';
   int? _bookRevision;
@@ -17833,6 +19238,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   WorkspaceGoodsReceiptReviewCancellation? _cancelAttempt;
   WorkspaceGoodsReceiptSaveResult? _postResult;
   _LedgerFormAutosave? _draft;
+  Map<String, String>? _lastQueuedInput;
   final _supplierPicker = GlobalKey<FormFieldState<String>>();
   bool _busy = true, _loaded = false, _reviewVerified = false;
   bool _discarding = false;
@@ -17884,22 +19290,66 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       {for (final e in line.prior.entries) if (e.value.text.isNotEmpty) e.key: e.value.text},
       if (line.lotControllers.any((c) => c.text.isNotEmpty)) [for (final c in line.lotControllers) c.text]]]);
   @override
-  void initState() { super.initState(); unawaited(_recover()); }
+  void initState() { super.initState(); _day.addListener(_syncDisplayDay); unawaited(_recover()); }
   @override
-  void dispose() { _draft?.removeListener(_draftChanged); _draft?.dispose(); _reference.dispose(); _day.dispose(); for (final line in _lines) { line.dispose(); } super.dispose(); }
+  void dispose() { _receivingEntryScroll.dispose(); _draft?.removeListener(_draftChanged); _draft?.dispose(); _reference.dispose(); _day.removeListener(_syncDisplayDay); _day.dispose(); _displayDay.dispose(); for (final line in _lines) { line.dispose(); } super.dispose(); }
+  String? _isoReceivedDate(String value) {
+    final text = value.trim();
+    final match = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$').firstMatch(text);
+    final iso = match == null ? text : '${match[3]}-${match[2]}-${match[1]}';
+    final parsed = DateTime.tryParse(iso);
+    return RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(iso) && parsed != null &&
+      parsed.toIso8601String().substring(0, 10) == iso ? iso : null;
+  }
+  void _syncDisplayDay() {
+    final iso = _isoReceivedDate(_day.text);
+    final shown = iso == null ? _day.text : '${iso.substring(8, 10)}/${iso.substring(5, 7)}/${iso.substring(0, 4)}';
+    if (_displayDay.text != shown) _displayDay.text = shown;
+  }
+  Future<void> _openSupportingEntry({required bool openingBalance}) async {
+    if (!_current || _busy || _supplierId == null ||
+        (_frozen != null && (!openingBalance || !_reviewVerified || _committed))) { return; }
+    setState(() => _busy = true);
+    if (!await _flushInput()) { if (_current) setState(() => _busy = false); return; }
+    if (!mounted || !_current) return;
+    FocusScope.of(context).unfocus();
+    if (openingBalance) {
+      final openingKey = GlobalKey<_StoreSupplierOpeningState>();
+      await Navigator.of(context).push<void>(MaterialPageRoute(builder: (routeContext) {
+        Future<void> close() async {
+          if (await (openingKey.currentState?.confirmLeave() ?? Future.value(false)) && routeContext.mounted) {
+            Navigator.pop(routeContext);
+          }
+        }
+        return Scaffold(body: SafeArea(child: PopScope(canPop: false,
+          onPopInvokedWithResult: (didPop, _) { if (!didPop) unawaited(close()); },
+          child: _StoreSupplierOpeningSurface(key: openingKey, session: session,
+            initialSupplierId: _supplierId, onBack: () => Navigator.pop(routeContext)))));
+      }));
+    } else {
+      await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) =>
+        _WorkspaceCatalogueSurface(session: session, entryOnly: true)));
+    }
+    if (_current) await _recover();
+  }
   void _draftChanged() { if (_current) setState(() {}); }
   Map<String, String> get _draftFields => {'arrivalId': _arrivalId, 'groupId': _groupId, 'input': _input,
-    if (_restockOriginal != null) 'restockOriginal': jsonEncode(_restockOriginal!.toJson())};
+    if (_copyType.isNotEmpty) 'copyType': _copyType,
+    if (_restockOriginal != null) 'restockOriginal': jsonEncode(_restockOriginal!.toJson()),
+    if (_documents.isNotEmpty) 'documents': jsonEncode(_documents.map((a) => a.toJson()).toList())};
   bool get _showingOtherDelivery => widget.initialRestockOriginal != null && _arrivalId.isNotEmpty &&
     jsonEncode(widget.initialRestockOriginal!.toJson()) != jsonEncode(_restockOriginal?.toJson());
   void _saveInput() {
-    if (!_current || _frozen != null || _arrivalId.isEmpty || _draft?.key == null) return;
+    if (!_current || _frozen != null || _arrivalId.isEmpty || _draft?.key == null ||
+        _draft?.ready != true) { return; }
     final fields = _draftFields;
+    if (mapEquals(_lastQueuedInput, fields) && _draft!.error == null) return;
     if (!WorkspaceLedgerFormDraft(key: _draft!.key!, revision: 1, fields: fields).valid) {
       _draft!.error = 'Delivery input is too long. Shorten the details before saving.';
       _draft!.changed();
       return;
     }
+    _lastQueuedInput = Map<String, String>.of(fields);
     _draft!.save(fields);
   }
   Future<bool> _flushInput() async {
@@ -17914,6 +19364,9 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     return saved && _current;
   }
   void _resumeSupplierInput(Map<String, String> fields) {
+    _copyType = fields['copyType'] ?? '';
+    _documents..clear()..addAll([for (final a in fields.containsKey('documents')
+      ? jsonDecode(fields['documents']!) as List : const []) WorkspacePurchaseInvoiceAttachment.fromJson(a)]);
     final reviews = session.workspaceGoodsReceiptDrafts.where((r) => r.supplierId == _supplierId &&
       !session.workspaceGoodsReceiptCancellations.any((c) => c.receiptId == r.receipt.id)).toList();
     final arrival = fields['arrivalId'];
@@ -18052,7 +19505,9 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     _bookRevision = session.workspacePurchaseEntryRevision;
     if (ready && _frozen != null) {
       _reviewVerified = session.workspaceGoodsReceiptDrafts.any((r) => r.supplierId == _supplierId &&
-        jsonEncode(r.receipt.toJson()) == jsonEncode(_frozen!.toJson()));
+        jsonEncode(r.receipt.toJson()) == jsonEncode(_frozen!.toJson()) &&
+        jsonEncode(r.documents.map((a) => a.toJson()).toList()) == jsonEncode(_documents.map((a) => a.toJson()).toList()));
+      if (!_reviewVerified) _error = 'Saved receipt or copies differ from this review. Reopen the saved receiving record before recording goods.';
       _postResult = _closed ? WorkspaceGoodsReceiptSaveResult.closed : _committed ? session.workspaceGoodsReceiptRecoveryPending
         ? WorkspaceGoodsReceiptSaveResult.stockRecoveryPending : WorkspaceGoodsReceiptSaveResult.saved
         : session.workspaceRestockAttempt(_frozen!.id) != null ? WorkspaceGoodsReceiptSaveResult.statusUnknown
@@ -18060,7 +19515,10 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     }
     setState(() { _busy = false; _loaded = ready; if (!ready) _error = 'Saved receiving status is unavailable. Retry without clearing Store data.'; });
     if (ready && _supplierId != null && _arrivalId.isEmpty && _draft?.ready == true) _resumeSupplierInput(const {});
-    if (ready && _supplierId == null && widget.initialSupplierId != null) await _chooseSupplier(widget.initialSupplierId!);
+    if (ready && _supplierId == null) {
+      final linked = widget.initialSupplierId ?? _sourceSupplierId;
+      if (linked != null && session.workspaceSuppliers.any((p) => p.id == linked)) await _chooseSupplier(linked);
+    }
   }
   Future<void> _reviewStockBaseline() async {
     final source = _stockRecoverySource, signature = session.workspaceRestockStockReviewSignature;
@@ -18100,12 +19558,32 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     if (retained) await _recover();
   }
   void _restore(WorkspaceSupplierGoodsReceipt receipt) {
+    _copyType = '';
+    _documents..clear()..addAll(session.workspaceGoodsReceiptDrafts.where((r) =>
+      r.supplierId == _supplierId && r.receipt.id == receipt.id).singleOrNull?.documents ?? const []);
     for (final line in _lines) { line.dispose(); }
     _lines..clear()..addAll(receipt.lines.map((line) => _ReceivingLineInput(line.sourceLineId, saved: line, restoreLot: true)));
     _arrivalId = receipt.id; _groupId = receipt.expectedDeliveryId;
     _restockOriginal = receipt.restockOriginal;
     _reference.text = receipt.reference; _day.text = receipt.deliveredOn;
     _frozen = receipt; _reviewVerified = true; _cancelAttempt = null; _postResult = null;
+  }
+  String? get _sourceSupplierId {
+    final source = widget.initialRestockOriginal;
+    if (source == null) return null;
+    return session.workspaceRestockReceiving(source)?.group?.supplierId ??
+      session.workspaceSuppliers.where((supplier) =>
+        session.workspaceSupplierLedger(supplier.id)?.goodsReceipts.values.any((receipt) =>
+          receipt.expectedDeliveryId == source.deliveryGroupId) == true).singleOrNull?.id;
+  }
+  Future<void> _pickSupplier() async {
+    final selected = await _showStoreSupplierSelector(context, session,
+      selectedId: _supplierId, lockedSupplierId: _sourceSupplierId);
+    if (!_current) return;
+    // A contact-only save advances the book, but never reloads dirty receipt inputs.
+    _bookRevision = session.workspacePurchaseEntryRevision;
+    if (selected != null) await _chooseSupplier(selected);
+    if (_current) setState(() => _supplierPicker.currentState?.didChange(_supplierId));
   }
   Future<void> _chooseSupplier(String id) async {
     if (_supplierId == id) return;
@@ -18133,6 +19611,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     if (!_current) return;
     _draft?.removeListener(_draftChanged); _draft?.dispose();
     _supplierId = id;
+    _documents.clear(); _copyType = '';
     _frozen = null; _reviewVerified = false; _error = null; _notice = null;
     for (final line in _lines) { line.dispose(); } _lines.clear();
     _reference.clear(); _day.clear(); _arrivalId = ''; _groupId = '';
@@ -18140,7 +19619,13 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     final fields = await _draft!.load();
     if (!_current) return;
     if (fields != null) {
-      try { _resumeSupplierInput(fields); }
+      try {
+        _resumeSupplierInput(fields);
+        // Loading and closing an unchanged entry must not create a new revision.
+        if (_draft!.ready && fields.isNotEmpty) {
+          _lastQueuedInput = Map<String, String>.of(_draftFields);
+        }
+      }
       on Object { _draft!.ready = false; _error = 'Saved delivery input needs recovery. Do not re-enter these goods.'; }
     }
     setState(() => _busy = false);
@@ -18215,6 +19700,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       }
     }
     _arrivalId = session.newWorkspaceGoodsReceiptId();
+    _documents.clear(); _copyType = '';
     _groupId = _restockOriginal?.deliveryGroupId ?? previous?.expectedDeliveryId ?? session.newWorkspaceDeliveryGroupId();
     _reference.text = previous?.reference ?? _restockOriginal?.reference['orderId'] ?? '';
     _day.text = DateTime.now().toIso8601String().substring(0, 10);
@@ -18263,11 +19749,229 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       restockOriginal: _restockOriginal);
     return receipt.valid ? receipt : null;
   }
+  bool get _canEnter => _current && !_busy && _loaded && !_discarding && _draft?.ready == true && _frozen == null;
+  String get _captureId => WorkspaceSupplierGoodsReceiptDraft.captureId(_supplierId!, _arrivalId);
+  Future<void> _captureDocument(WorkProofSource source) async {
+    if (!_canEnter || _documents.length >= 3) return;
+    final arrival = _arrivalId, supplier = _supplierId, captureId = _captureId,
+      navigation = session.navigationScopeRevision;
+    FocusScope.of(context).unfocus();
+    setState(() { _busy = true; _error = null; });
+    try {
+      if (!await _flushInput()) return;
+      final captured = await session.workspacePurchaseInvoiceCapture.capture(_scope!, captureId, source);
+      final attachment = captured == null ? null : _copyType.isEmpty ? captured : captured.withDocumentDetails({'type': _copyType});
+      if (!_current || _arrivalId != arrival || _supplierId != supplier || _frozen != null ||
+          navigation != session.navigationScopeRevision || attachment == null) { return; }
+      if (_documents.any((a) => a.digest == attachment.digest)) {
+        setState(() => _error = 'This copy is already attached.');
+      } else if (!WorkspaceSupplierGoodsReceiptDraft.validDocuments([..._documents, attachment])) {
+        setState(() => _error = 'Keep up to 3 copies, within 20 MB in total.');
+      } else {
+        setState(() => _documents.add(attachment));
+        await _flushInput();
+      }
+    } on Object {
+      if (_current) setState(() => _error = 'Copy could not be attached. Use a clear photo or PDF up to 10 MB. Your entries are kept.');
+    } finally { if (_current) setState(() => _busy = false); }
+  }
+  Future<void> _readDocument(WorkspacePurchaseInvoiceAttachment attachment) async {
+    if (!_canEnter || !_documents.contains(attachment)) return;
+    final arrival = _arrivalId, supplier = _supplierId, captureId = _captureId,
+      navigation = session.navigationScopeRevision;
+    setState(() { _busy = true; _error = null; });
+    try {
+      final read = await session.workspacePurchaseInvoiceCapture.scan(_scope!, captureId, attachment);
+      if (!_current || _arrivalId != arrival || _supplierId != supplier || _frozen != null ||
+          navigation != session.navigationScopeRevision || !_documents.contains(attachment)) { return; }
+      final copies = [for (final old in _documents) if (identical(old, attachment)) read else old];
+      if (!WorkspaceSupplierGoodsReceiptDraft.validDocuments(copies)) {
+        setState(() => _error = 'The read details exceed this delivery’s saved-copy limit. Earlier copies and entries are kept; use smaller copies.');
+        return;
+      }
+      setState(() => _documents[_documents.indexOf(attachment)] = read);
+      await _flushInput();
+    } on Object catch (error) {
+      if (_current) {
+        setState(() => _error = error is WorkGatewayException ? error.message :
+          'Text could not be read. The copy and your entries are kept; view it and enter details manually.');
+      }
+    } finally { if (_current) setState(() => _busy = false); }
+  }
+  Future<void> _viewDocument(WorkspacePurchaseInvoiceAttachment attachment) async {
+    if (!_current || _busy || !_documents.contains(attachment)) return;
+    if (_frozen == null && !await _flushInput()) return;
+    if (!mounted || !_current) return;
+    await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => _GoodsReceiptCopyScreen(
+      session: session, scope: _scope!, captureId: _captureId, attachment: attachment)));
+  }
+  Future<void> _viewDetectedText(WorkspacePurchaseInvoiceAttachment attachment) async {
+    if (!_current || _busy || !_documents.contains(attachment)) return;
+    await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+      title: const Text('Read from copy'),
+      content: AnimatedBuilder(animation: session, builder: (context, _) => !_current || !_documents.contains(attachment)
+        ? const Text('Return to the same receiving record to view this text.')
+        : SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Compare with the original. Printed quantities do not confirm goods received.', style: TextStyle(fontSize: 12)),
+          const SizedBox(height: 8), SelectableText(attachment.pageTextLengths.isEmpty ? attachment.detectedText :
+            attachment.recognizedTextPages.indexed.map((page) => 'Page ${page.$1 + 1}\n${page.$2}').join('\n\n'),
+            style: const TextStyle(fontSize: 12)),
+        ]))),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))]));
+  }
+  Future<void> _editDocumentFields(WorkspacePurchaseInvoiceAttachment attachment) async {
+    if (!_current || _busy || !_documents.contains(attachment)) return;
+    final arrival = _arrivalId, supplier = _supplierId, captureId = _captureId,
+      navigation = session.navigationScopeRevision;
+    final readOnly = _frozen != null;
+    if (!readOnly && !await _flushInput()) return;
+    if (!mounted || !_current || _arrivalId != arrival || _supplierId != supplier ||
+        navigation != session.navigationScopeRevision || !_documents.contains(attachment)) { return; }
+    setState(() { _busy = true; _error = null; });
+    try {
+      final edited = await Navigator.of(context).push<WorkspacePurchaseInvoiceAttachment>(MaterialPageRoute(
+        builder: (_) => _ReceivingScannedFieldsScreen(session: session, scope: _scope!, captureId: captureId,
+          attachment: attachment, readOnly: readOnly, canKeep: (edited) => WorkspaceSupplierGoodsReceiptDraft.validDocuments(
+            [for (final old in _documents) if (identical(old, attachment)) edited else old]),
+          isCurrent: () => _current && _arrivalId == arrival &&
+            _supplierId == supplier && navigation == session.navigationScopeRevision && _documents.contains(attachment))));
+      if (edited == null || readOnly || !_current || _frozen != null || _arrivalId != arrival ||
+          _supplierId != supplier || navigation != session.navigationScopeRevision || !_documents.contains(attachment)) { return; }
+      final copies = [for (final old in _documents) if (identical(old, attachment)) edited else old];
+      if (!WorkspaceSupplierGoodsReceiptDraft.validDocuments(copies)) {
+        setState(() => _error = 'These details exceed the saved-copy limit. Earlier details are kept; shorten or split the copy.');
+        return;
+      }
+      setState(() => _documents[_documents.indexOf(attachment)] = edited);
+      await _flushInput();
+    } finally { if (_current) setState(() => _busy = false); }
+  }
+  Future<void> _editDocumentDetails(WorkspacePurchaseInvoiceAttachment attachment) async {
+    if (!_current || _busy || !_documents.contains(attachment)) return;
+    final supplier = _supplierId, arrival = _arrivalId, navigation = session.navigationScopeRevision;
+    bool current() => _current && _supplierId == supplier && _arrivalId == arrival &&
+      session.navigationScopeRevision == navigation && _documents.contains(attachment);
+    final updated = await showModalBottomSheet<WorkspacePurchaseInvoiceAttachment>(context: context,
+      isScrollControlled: true, useSafeArea: true, builder: (_) => _TradeDocumentDetailsEditor(
+        session: session, attachment: attachment, types: WorkspacePurchaseInvoiceAttachment.receivingDocumentTypes,
+        isCurrent: current, readOnly: _frozen != null, canKeep: (value) => WorkspaceSupplierGoodsReceiptDraft.validDocuments(
+          [for (final a in _documents) if (identical(a, attachment)) value else a])));
+    if (updated == null || !current() || _frozen != null || _busy) return;
+    setState(() { _documents[_documents.indexOf(attachment)] = updated; _busy = true; });
+    try { await _flushInput(); } finally { if (_current) setState(() => _busy = false); }
+  }
+  Widget _documentControls() => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    const SizedBox(height: 8),
+    const Text('Delivery documents · optional', style: TextStyle(fontSize: 11, color: MoolColors.ink)),
+    if (_frozen == null) InkWell(key: const Key('work-receive-copy-type'), onTap: !_canEnter ? null : () async {
+      final supplier = _supplierId, arrival = _arrivalId, navigation = session.navigationScopeRevision;
+      bool current() => _canEnter && _supplierId == supplier && _arrivalId == arrival && session.navigationScopeRevision == navigation;
+      final type = await _chooseTradeDocumentType(context, session: session,
+        types: WorkspacePurchaseInvoiceAttachment.receivingDocumentTypes, selected: _copyType, isCurrent: current);
+      if (type != null && current()) { setState(() => _copyType = type); _saveInput(); }
+    }, child: InputDecorator(decoration: const InputDecoration(isDense: true, filled: false,
+      constraints: BoxConstraints(minHeight: 48),
+      contentPadding: EdgeInsets.symmetric(vertical: 12), border: UnderlineInputBorder(),
+      enabledBorder: UnderlineInputBorder(),
+      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: MoolColors.navy))),
+      child: Row(children: [Expanded(child: Text(_copyType.isEmpty ? 'Choose document type' : storeTradeDocumentLabel(_copyType),
+        style: const TextStyle(fontSize: 13))), const Icon(Icons.expand_more, size: 20)]))),
+    if (_frozen == null && _copyType.isNotEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Text(storeTradeDocumentGuide(_copyType), style: const TextStyle(fontSize: 12))),
+    if (_frozen == null) Wrap(spacing: 4, children: [
+      for (final item in [(WorkProofSource.camera, Icons.camera_alt_outlined, 'Camera'),
+        (WorkProofSource.gallery, Icons.photo_library_outlined, 'Gallery'),
+        (WorkProofSource.upload, Icons.attach_file, 'Photo / PDF')])
+        TextButton.icon(key: Key('work-receive-copy-${item.$1.name}'),
+          onPressed: _canEnter && _documents.length < 3 ? () => _captureDocument(item.$1) : null,
+          icon: Icon(item.$2, size: 18), label: Text(item.$3, style: const TextStyle(fontSize: 12))),
+    ]),
+    for (final attachment in _documents) Column(key: ValueKey('work-receive-document-${attachment.digest}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(attachment.fileName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+        if (attachment.documentDetails['type'] case final type?)
+          Text(storeTradeDocumentLabel(type), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        if (attachment.documentDetails['reference'] case final reference?)
+          Text(reference, style: const TextStyle(fontSize: 12)),
+        Wrap(spacing: 4, children: [
+          TextButton(key: Key('work-receive-copy-details-${attachment.digest}'),
+            onPressed: _busy ? null : () => _editDocumentDetails(attachment), child: const Text('Document details')),
+          TextButton(onPressed: _busy ? null : () => _viewDocument(attachment), child: const Text('View copy')),
+          if (_frozen == null) TextButton(
+            key: Key('work-receive-copy-read-${attachment.digest}'),
+            onPressed: _canEnter ? () => _readDocument(attachment) : null, child: const Text('Read text')),
+          if (attachment.detectedText.isNotEmpty) TextButton(onPressed: _busy ? null : () => _viewDetectedText(attachment),
+            child: const Text('Review text')),
+          if (attachment.extractedFields.isNotEmpty || attachment.detectedText.isNotEmpty) TextButton(
+            key: Key('work-receive-copy-fields-${attachment.digest}'),
+            onPressed: _busy ? null : () => _editDocumentFields(attachment),
+            child: Text('Printed fields · ${attachment.extractedFields.length}')),
+          if (_frozen == null) TextButton(onPressed: !_canEnter ? null : () async {
+            setState(() { _documents.remove(attachment); _busy = true; });
+            await _flushInput();
+            if (_current) setState(() => _busy = false);
+          }, child: const Text('Remove')),
+        ]),
+        if (attachment.contentType == 'application/pdf') const Text('PDF text reading · up to 20 pages. Check every field against the copy.', style: TextStyle(fontSize: 11)),
+        if (attachment.extractionOverflow) const Text('Some printed details exceed the field limit. Review the full text and split this copy before relying on its extracted fields.',
+          style: TextStyle(fontSize: 11, color: MoolColors.ink)),
+      ]),
+  ]);
+  void _selectStock(_ReceivingLineInput line, String id) {
+    if (line.productId == id) return;
+    line.productId = id;
+    for (final c in line.prior.values) { c.dispose(); } line.prior.clear();
+    if (_restockOriginal == null) {
+      line.unit.text = session.workspaceCatalogueItems.where((p) => p.id == id).singleOrNull?.pack ?? '';
+      line.factor.text = '1';
+    } else { line.factor.clear(); }
+    for (final controller in line.lotControllers) { controller.clear(); }
+    _saveInput();
+  }
+  bool _mappingLocked(_ReceivingLineInput line) => line.original != null ||
+    (_serverReceiving && (_serverGroup?.lines.any((saved) => saved.sourceLineId == line.id) ?? false)) ||
+    (_ledger?.goodsReceipts.values.any((r) => r.expectedDeliveryId == _groupId &&
+      r.lines.any((saved) => saved.sourceLineId == line.id)) ?? false);
+  Future<void> _findStock(_ReceivingLineInput line, {bool camera = false, bool scanner = false}) async {
+    if (!_canEnter || _mappingLocked(line) || !_lines.contains(line)) return;
+    final arrival = _arrivalId, supplier = _supplierId, navigation = session.navigationScopeRevision;
+    bool current() => _canEnter && _arrivalId == arrival && _supplierId == supplier &&
+      navigation == session.navigationScopeRevision && _lines.contains(line) && !_mappingLocked(line);
+    FocusScope.of(context).unfocus();
+    String? selected;
+    if (camera) {
+      final code = await showStoreProductScanner(context);
+      if (!current() || code == null) return;
+      final matches = session.workspaceCatalogueItems.where((p) => p.stockMode == WorkspaceStockMode.exactQuantity && p.barcode == code.trim()).toList();
+      if (matches.length != 1) {
+        setState(() => _error = matches.isEmpty ? 'No Stock product matches this barcode. Search or add the product.'
+          : 'More than one Stock product uses this barcode. Choose the exact product.');
+        return;
+      }
+      selected = matches.single.id;
+    } else {
+      selected = await showModalBottomSheet<String>(context: context, isScrollControlled: true, useSafeArea: true,
+        builder: (_) => _GoodsReceiptStockPicker(session: session, scanner: scanner, isCurrent: current));
+    }
+    if (selected != null && current()) setState(() => _selectStock(line, selected!));
+  }
   Future<void> _review() async {
     if (_frozen == null) {
       setState(() => _busy = true);
       final saved = await _flushInput();
       if (!_current) return;
+      if (saved) {
+        try {
+          for (final attachment in _documents) {
+            await session.workspacePurchaseInvoiceCapture.read(_scope!, _captureId, attachment);
+            if (!_current) return;
+          }
+        } on Object {
+          if (_current) setState(() { _busy = false; _error = 'A receiving copy is unavailable. Reattach it, or remove its link before reviewing. Your entries are kept.'; });
+          return;
+        }
+      }
       setState(() => _busy = false);
       if (!saved) return;
     }
@@ -18278,7 +19982,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     }
     setState(() { _frozen = receipt; _busy = true; _error = null; });
     final saved = await session.saveWorkspaceGoodsReceiptDraft(receipt, supplierId: _supplierId!,
-      scope: _scope!, expectedRevision: _bookRevision!);
+      scope: _scope!, expectedRevision: _bookRevision!, documents: _documents);
     if (!_current) return;
     setState(() { _busy = false; _reviewVerified = saved; _bookRevision = session.workspacePurchaseEntryRevision;
       if (!saved && !session.workspaceSupplierRecoveryRequired) _frozen = null;
@@ -18365,6 +20069,16 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   Future<void> _close() async {
     if (await confirmLeave() && _current) widget.onBack();
   }
+  void _addReceivingItem() {
+    if (!_canEnter || _restockOriginal != null) { return; }
+    FocusManager.instance.primaryFocus?.unfocus();
+    final line = _ReceivingLineInput(session.newWorkspaceDeliveryLineId()),
+      navigation = session.navigationScopeRevision, arrival = _arrivalId, supplier = _supplierId;
+    setState(() { _lines.add(line); _lastAddedReceivingItem = line; _saveInput(); });
+    unawaited(_revealAddedTradeLine(_receivingEntryScroll, line.rowKey,
+      () => _current && _frozen == null && session.navigationScopeRevision == navigation &&
+        _arrivalId == arrival && _supplierId == supplier && identical(_lastAddedReceivingItem, line) && _lines.contains(line)));
+  }
   Widget _receivingHeader(String title) => ListenableBuilder(
     listenable: FocusManager.instance,
     builder: (context, child) {
@@ -18378,10 +20092,37 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           icon: const Icon(Icons.keyboard_hide_outlined)),
         Expanded(child: Text(title, style: const TextStyle(fontSize: 16,
           fontWeight: FontWeight.w700, color: MoolColors.navy))),
+        if (_supplierId != null && _frozen == null && _restockOriginal == null)
+          Tooltip(message: 'Add another product manually to this receipt', child:
+            MediaQuery.sizeOf(context).width < 350 || MediaQuery.textScalerOf(context).scale(13) > 18
+              ? IconButton(key: const Key('work-receive-add-line'), tooltip: 'Add item',
+                  constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                  onPressed: _canEnter ? _addReceivingItem : null, icon: const Icon(Icons.add, size: 20))
+              : TextButton.icon(key: const Key('work-receive-add-line'),
+                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                  onPressed: _canEnter ? _addReceivingItem : null,
+                  icon: const Icon(Icons.add, size: 18), label: const Text('Add item'))),
         TextButton(onPressed: _busy ? null : _close, child: const Text('Close')),
       ]);
     });
-  Widget _field(String label, TextEditingController controller, String key, {bool number = true, bool enabled = true, String? errorText}) =>
+  Widget _receivingPage(String title, List<Widget> children) => Column(children: [
+    Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: _receivingHeader(title)),
+    Expanded(child: NotificationListener<ScrollNotification>(onNotification: (notification) {
+      if (notification.depth == 0 && (notification is ScrollStartNotification || notification is ScrollUpdateNotification)) {
+        final editor = FocusManager.instance.primaryFocus?.context?.findAncestorStateOfType<EditableTextState>();
+        if (editor?.context.findAncestorStateOfType<_StoreReceiveGoodsState>() == this) editor?.hideToolbar();
+      }
+      return false;
+    }, child: ListView(key: const Key('work-goods-receiving'), controller: _receivingEntryScroll,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12), children: children))),
+  ]);
+  Widget _entryGrid(List<Widget> fields) => LayoutBuilder(builder: (context, constraints) {
+    final minimum = 140 * MediaQuery.textScalerOf(context).scale(12) / 12;
+    final columns = constraints.maxWidth >= minimum * 2 + 12 ? 2 : 1;
+    final width = (constraints.maxWidth - 12 * (columns - 1)) / columns;
+    return Wrap(spacing: 12, runSpacing: 8, children: [for (final field in fields) SizedBox(width: width, child: field)]);
+  });
+  Widget _field(String label, TextEditingController controller, String key, {bool number = true, bool enabled = true, bool fullWidth = false, String? errorText}) =>
     LayoutBuilder(builder: (context, constraints) {
       final available = constraints.hasBoundedWidth ? constraints.maxWidth
           : MediaQuery.sizeOf(context).width - 24;
@@ -18391,10 +20132,14 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       final desired = measure.width + 16;
       measure.dispose();
       final width = (desired < 116 ? 116.0 : desired).clamp(0.0, available).toDouble();
-      return SizedBox(width: number ? width : double.infinity, child: TextField(key: ValueKey(key), controller: controller,
+      return SizedBox(width: number && !fullWidth ? width : double.infinity, child: TextField(key: ValueKey(key), controller: controller,
       enabled: !_busy && _loaded && !_discarding && _draft?.ready == true && _frozen == null && enabled,
-      onChanged: (_) { setState(() {}); _saveInput(); },
-      keyboardType: number ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+      onChanged: (_) {
+        if (key == 'work-receive-date') _day.text = _isoReceivedDate(controller.text) ?? controller.text;
+        setState(() {}); _saveInput();
+      },
+      keyboardType: key == 'work-receive-date' ? TextInputType.datetime
+        : number ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
       style: const TextStyle(fontSize: 13, color: MoolColors.ink),
       decoration: InputDecoration(label: Text(label, key: ValueKey('$key-label'),
         maxLines: 3, softWrap: true, overflow: TextOverflow.visible), isDense: true, filled: false,
@@ -18403,7 +20148,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         focusedErrorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffa52a2a))),
         floatingLabelBehavior: FloatingLabelBehavior.always,
         labelStyle: const TextStyle(fontSize: 12, color: MoolColors.ink),
-        contentPadding: const EdgeInsets.symmetric(vertical: 10), constraints: const BoxConstraints(minHeight: 48),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8), constraints: const BoxConstraints(minHeight: 48),
         border: const UnderlineInputBorder(), enabledBorder: const UnderlineInputBorder(),
         focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: MoolColors.navy)),
         disabledBorder: const UnderlineInputBorder())));
@@ -18418,10 +20163,9 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     final linkedReceipts = _ledger?.goodsReceipts.values.where((receipt) => linkedReceiptIds.contains(receipt.id))
       .toList() ?? const <WorkspaceSupplierGoodsReceipt>[];
     if (bill != null && _loaded && !_busy && !_billContextValid) {
-      return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
+      return _receivingPage('Receive goods', [
         Text('Supplier bill ${bill.draft.invoiceReference}'),
         const Text('This saved bill is unavailable. Return to Purchases and reopen it before receiving goods.'),
-        TextButton(onPressed: _close, child: const Text('Close')),
       ]);
     }
     if (bill != null && _billContextValid && _savedStatusResolved && _committed && !_billReceiptChosen) {
@@ -18429,15 +20173,13 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       // bill. Preserve it until the retailer explicitly chooses a verified link
       // or starts another delivery under the existing receiving guards.
       if (linkedReceiptIds.length != linkedReceipts.length) {
-        return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
+        return _receivingPage('Receive goods', [
           Text('Supplier bill ${bill.draft.invoiceReference}', key: const Key('work-receive-bill-context')),
           const Text('A linked delivery is unavailable. Recover saved records before receiving these goods again.'),
           TextButton(onPressed: _busy ? null : _recover, child: const Text('Recover saved status')),
-          TextButton(onPressed: _busy ? null : _close, child: const Text('Close')),
         ]);
       }
-      return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
-        _receivingHeader('Receive goods'),
+      return _receivingPage('Receive goods', [
         Text('Supplier bill ${bill.draft.invoiceReference}', key: const Key('work-receive-bill-context'),
           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
         Text(linkedReceipts.isEmpty ? 'No received goods linked to this bill.' : 'Deliveries linked to this bill',
@@ -18468,8 +20210,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       ]);
     }
     // WorkPageScaffold owns system Back; parent and local actions share confirmLeave.
-    return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
-        _receivingHeader(_closed ? 'Receiving attempt closed' : _committed && !_conflict ? 'Goods received' : 'Receive goods'),
+    return _receivingPage(_closed ? 'Receiving attempt closed' : _committed && !_conflict ? 'Goods received' : 'Receive goods', [
         if (widget.initialRestockOriginal case final requested?) ...[
           Text('Purchase ${requested.reference['orderId']}', key: const Key('work-receive-order-context'),
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
@@ -18494,7 +20235,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
             const Text('Complete this supplier delivery, then match it to the bill. Existing delivery input is kept.',
               style: TextStyle(fontSize: 12, color: MoolColors.ink)),
         ],
-        if (!_committed || _conflict) const Text('Record goods with or without a supplier bill. Link earlier Stock entries instead of adding them again.',
+        if (!_committed || _conflict) const Text('Enter the goods received. Supplier bill and payment are recorded separately.',
           style: TextStyle(fontSize: 12, color: MoolColors.ink)),
         if (!_loaded) TextButton(onPressed: _busy ? null : _recover, child: const Text('Retry saved records')),
         if (_stockRecoverySource != null && (session.workspaceRestockBaselineMissing || session.workspaceRestockStockConflict != null)) ...[
@@ -18503,29 +20244,31 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           TextButton(key: const Key('work-receive-stock-baseline'), onPressed: _busy ? null : _reviewStockBaseline,
             child: Text(session.workspaceRestockStockConflict != null ? 'Review saved Stock' : 'Review current Stock')),
         ],
-        if (session.workspaceSuppliersLoaded && session.workspaceSuppliers.isEmpty)
-          const Text('First save the supplier through Record purchase → Supplier → Save draft. A bill is not required.'),
-        if (session.workspaceSuppliersLoaded && (!_committed || _conflict)) KeyedSubtree(key: const Key('work-receive-supplier'), child: DropdownButtonFormField<String>(key: _supplierPicker, initialValue: _supplierId,
-          isExpanded: true, style: const TextStyle(fontSize: 13, color: MoolColors.ink),
-          decoration: const InputDecoration(labelText: 'Supplier', filled: false,
-            floatingLabelBehavior: FloatingLabelBehavior.always, labelStyle: TextStyle(fontSize: 12, color: MoolColors.ink),
-            contentPadding: EdgeInsets.symmetric(vertical: 8), enabledBorder: UnderlineInputBorder(),
-            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: MoolColors.navy))),
-          items: [for (final p in session.workspaceSuppliers) DropdownMenuItem(value: p.id, child: Text(p.name))],
-          onChanged: !_busy && !_discarding && _frozen == null && (editable || _supplierId == null) && bill == null
-            ? (value) { if (value != null) unawaited(_chooseSupplier(value)); } : null)),
+        if (session.workspaceSuppliersLoaded && (!_committed || _conflict)) KeyedSubtree(key: const Key('work-receive-supplier'),
+          child: FormField<String>(key: _supplierPicker, initialValue: _supplierId,
+            enabled: !_busy && !_discarding && _frozen == null && (editable || _supplierId == null) && bill == null,
+            builder: (field) => InkWell(onTap: field.widget.enabled ? _pickSupplier : null,
+              child: InputDecorator(decoration: const InputDecoration(labelText: 'Supplier', filled: false,
+                floatingLabelBehavior: FloatingLabelBehavior.always, labelStyle: TextStyle(fontSize: 12, color: MoolColors.ink),
+                contentPadding: EdgeInsets.symmetric(vertical: 8), enabledBorder: UnderlineInputBorder()),
+                child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 40), child: Row(children: [
+                  Expanded(child: Text(session.workspaceSuppliers.where((p) => p.id == _supplierId).singleOrNull?.name ?? 'Select or add supplier',
+                    style: const TextStyle(fontSize: 13, color: MoolColors.ink))),
+                  const Icon(Icons.expand_more, size: 20, color: MoolColors.navy),
+                ])))))),
         if (_supplierId != null) ...[
           if (_frozen == null) ...[
-            Text(_draft?.error ?? (_draft?.busy == true ? 'Saving delivery input…'
+            Row(crossAxisAlignment: CrossAxisAlignment.center, children: [Expanded(child: Text(_draft?.error ?? (_draft?.busy == true ? 'Saving draft…'
               : _draft?.ready == true && _draft?.revision != null
-                ? 'Delivery draft saved · goods not yet recorded' : 'Opening saved delivery input…'),
-              key: const Key('work-receive-input-status'), style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+                ? 'Draft saved · Stock unchanged' : 'Opening saved draft…'),
+              key: const Key('work-receive-input-status'), style: const TextStyle(fontSize: 11, color: MoolColors.ink))),
+              if (_draft?.ready == true) TextButton(key: const Key('work-receive-discard-input'),
+                onPressed: _busy ? null : _discardInput,
+                child: Text(_discarding ? 'Retry discard' : 'Discard', style: const TextStyle(fontSize: 12))),
+            ]),
             if (_draft?.error != null || _draft?.ready != true)
               TextButton(key: const Key('work-receive-retry-input'), onPressed: _busy ? null : _retryInput,
                 child: const Text('Retry delivery draft')),
-            if (_draft?.ready == true)
-              TextButton(key: const Key('work-receive-discard-input'), onPressed: _busy ? null : _discardInput,
-                child: Text(_discarding ? 'Retry discard' : 'Discard delivery draft')),
             if (_discarding && _error != null)
               Text(_error!, key: const Key('work-receive-error'), style: const TextStyle(fontSize: 12, color: Color(0xffa52a2a))),
           ],
@@ -18537,14 +20280,16 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
             Text('Delivery ${_frozen!.reference}', style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
             Text('Received ${_registerDate(DateTime.parse(_frozen!.deliveredOn))}',
               style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
-          ] else Wrap(spacing: 12, runSpacing: 12, children: [
-            _field('Delivery reference', _reference, 'work-receive-reference', number: false),
-            _field('Received date · YYYY-MM-DD', _day, 'work-receive-date', number: false)]),
-          if (!_serverReceiving && _ledger?.openingRecord == null) const Text('Confirm this supplier’s Opening dues before recording goods. Choose zero only when there are no earlier dues or advances.',
-            style: TextStyle(fontSize: 12, color: MoolColors.ink)),
-          for (final (index, line) in _lines.indexed) _lineView(line, index),
-          if (editable && _restockOriginal == null) TextButton.icon(key: const Key('work-receive-add-line'), onPressed: _lines.length >= 100 ? null : () => setState(() {
-            _lines.add(_ReceivingLineInput(session.newWorkspaceDeliveryLineId())); _saveInput(); }), icon: const Icon(Icons.add, size: 18), label: const Text('Add item')),
+          ] else _entryGrid([
+            _field('Receipt / challan no.', _reference, 'work-receive-reference', number: false),
+            _field('Received on · DD/MM/YYYY', _displayDay, 'work-receive-date', number: false,
+              errorText: _displayDay.text.trim().isNotEmpty && _isoReceivedDate(_displayDay.text) == null
+                ? 'Enter a valid date (DD/MM/YYYY)' : null)]),
+          if (_frozen == null || _documents.isNotEmpty) _documentControls(),
+          if (editable) Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+            key: const Key('work-receive-add-product'), onPressed: () => _openSupportingEntry(openingBalance: false),
+            icon: const Icon(Icons.add, size: 18), label: const Text('Add Stock product', style: TextStyle(fontSize: 12)))),
+          for (final (index, line) in _lines.indexed) KeyedSubtree(key: line.rowKey, child: _lineView(line, index)),
           if (_frozen != null) Text(_conflict ? 'Receipt and cancellation conflict · recover saved records'
             : _closed ? 'Closed without recording · Stock unchanged'
             : _closing ? 'Closing receipt · verify before entering another arrival'
@@ -18552,10 +20297,19 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
             : _postResult == WorkspaceGoodsReceiptSaveResult.stockRecoveryPending ? 'Goods recorded · Stock recovery pending'
             : _cancelled ? 'Review cancelled · goods history kept'
             : _committed ? session.workspaceGoodsReceiptRecoveryPending ? 'Goods recorded · Stock recovery pending' : 'Goods recorded'
-            : _reviewVerified ? 'Saved review · not yet received' : 'Review save status unverified',
+            : _reviewVerified ? 'Receipt reviewed · Stock unchanged' : 'Review save status unverified',
             key: const Key('work-receive-status'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.navy)),
+          if (!_serverReceiving && _ledger?.openingRecord == null) ...[
+            const Text('Before final recording, confirm the supplier’s opening balance. Do not assume zero.',
+              style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+            if (_frozen == null || _reviewVerified && !_committed) Align(alignment: Alignment.centerLeft, child: TextButton(
+              key: const Key('work-receive-opening-balance'),
+              onPressed: (_frozen == null ? editable : _reviewVerified && !_busy && _loaded)
+                ? () => _openSupportingEntry(openingBalance: true) : null,
+              child: const Text('Set up opening balance'))),
+          ],
           Wrap(spacing: 8, children: [
-            if (_frozen == null) TextButton(key: const Key('work-receive-review'), onPressed: editable ? _review : null, child: const Text('Review & save goods details')),
+            if (_frozen == null) FilledButton(key: const Key('work-receive-review'), onPressed: editable ? _review : null, child: const Text('Review receipt')),
             if (_frozen != null && !_reviewVerified && !_cancelled) TextButton(key: const Key('work-receive-retry-review'),
               onPressed: _busy ? null : _review, child: const Text('Retry this exact review save')),
             if (_frozen != null && !_cancelled && !_closed && !_closing && _reviewVerified &&
@@ -18563,7 +20317,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
               onPressed: _busy || !_loaded || (!_serverReceiving &&
                 (!session.workspaceSupplierOpeningConfirmationAvailable || _ledger?.openingRecord == null)) ? null : _post,
               child: Text(_committed ? 'Verify / recover Stock'
-                : _serverReceiving && session.workspaceRestockAttempt(_frozen!.id) != null ? 'Retry this receiving receipt' : 'Confirm goods received')),
+                : _serverReceiving && session.workspaceRestockAttempt(_frozen!.id) != null ? 'Retry this receiving receipt' : 'Record goods received')),
             if (_frozen != null && !_committed && !_cancelled && _reviewVerified && session.workspaceGoodsReceiptCanCancel(_frozen!)) TextButton(key: const Key('work-receive-cancel'),
               onPressed: _busy ? null : _cancel, child: const Text('Cancel review to correct')),
             if (_serverReceiving && _frozen != null && !_committed && !_closed && _reviewVerified &&
@@ -18619,8 +20373,8 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           Text('${index + 1}. ${saved.productLabel}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MoolColors.navy)),
           Text('${_closed ? 'Closed review' : 'This arrival'} · ${saved.purchaseUnit}', style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
           const SizedBox(height: 6),
-          figure('Delivered', qty(saved.deliveredMilli)),
-          figure('Accepted', qty(saved.acceptedMilli)),
+          figure('Received qty', qty(saved.deliveredMilli)),
+          figure('Accepted qty', qty(saved.acceptedMilli)),
           if (saved.damagedMilli > 0) figure('Damaged · not added to Stock', qty(saved.damagedMilli)),
           if (saved.shortMilli > 0) figure('Short in this arrival', qty(saved.shortMilli)),
           if (saved.linkedStockUnits > 0) figure(_closed ? 'Reviewed earlier Stock link' : 'Already in Stock · linked', '${saved.linkedStockUnits}'),
@@ -18632,8 +20386,8 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
             for (final label in saved.lotDetails!.labels) Text(label, style: const TextStyle(fontSize: 12)),
           ],
           const SizedBox(height: 6),
-          Text(expected == null ? 'Total delivered ${qty(earlier)} · expected quantity not entered'
-            : 'Total delivered ${qty(earlier)} of ${qty(expected)} · pending ${qty(expected - earlier)}',
+          Text(expected == null ? 'Total received ${qty(earlier)} · expected quantity not entered'
+            : 'Total received ${qty(earlier)} of ${qty(expected)} · pending ${qty(expected - earlier)}',
             key: ValueKey('work-receive-total-$index'), style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
           const Divider(height: 16),
         ]));
@@ -18654,66 +20408,336 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           ? widget.initialRestockOrder!.lines.where((p) => p.lineId == line.id).singleOrNull?.name ?? line.id : line.id}'
         ' · ordered ${line.expected.text} ${line.unit.text}',
         key: ValueKey('work-receive-ordered-$index'), style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
-      DropdownButtonFormField<String>(key: ValueKey('work-receive-product-$index'), initialValue: line.productId.isEmpty ? null : line.productId,
-        isExpanded: true, style: const TextStyle(fontSize: 13, color: MoolColors.ink),
-        decoration: const InputDecoration(labelText: 'Match saved Stock product', filled: false,
+      Semantics(button: true, enabled: _canEnter && !inherited,
+        child: InkWell(key: ValueKey('work-receive-product-$index'),
+        onTap: _canEnter && !inherited ? () => _findStock(line) : null,
+        child: InputDecorator(decoration: InputDecoration(labelText: 'Stock product', filled: false,
+          enabled: _canEnter && !inherited,
           floatingLabelBehavior: FloatingLabelBehavior.always, labelStyle: TextStyle(fontSize: 12, color: MoolColors.ink),
           contentPadding: EdgeInsets.symmetric(vertical: 8), enabledBorder: UnderlineInputBorder(),
           focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: MoolColors.navy))),
-        items: [for (final p in session.workspaceCatalogueItems.where((p) => p.stockMode == WorkspaceStockMode.exactQuantity))
-          DropdownMenuItem(value: p.id, child: Text('${p.title} · ${p.pack}')),
-          if (line.productId.isNotEmpty && (product == null || product.stockMode != WorkspaceStockMode.exactQuantity))
-            DropdownMenuItem(value: line.productId, enabled: false, child: const Text('Saved product unavailable · recover Stock'))],
-        onChanged: !_busy && _loaded && !_discarding && _draft?.ready == true && _frozen == null && !inherited ? (value) => setState(() {
-          line.productId = value ?? ''; for (final c in line.prior.values) { c.dispose(); } line.prior.clear();
-          if (_restockOriginal == null) {
-            line.unit.text = session.workspaceCatalogueItems.where((p) => p.id == value).firstOrNull?.pack ?? '';
-            line.factor.text = '1';
-          } else { line.factor.clear(); }
-          for (final controller in line.lotControllers) { controller.clear(); }
-          _saveInput();
-        }) : null),
-      Wrap(spacing: 12, runSpacing: 12, children: [
-        _field('Delivery unit', line.unit, 'work-receive-unit-$index', number: false, enabled: !inherited && _restockOriginal == null),
-        _field('Stock units / unit', line.factor, 'work-receive-factor-$index', enabled: !inherited),
-        _field('Expected qty', line.expected, 'work-receive-expected-$index', enabled: !inherited && _restockOriginal == null,
-          errorText: expected == null && line.expected.text.trim().isNotEmpty ? 'Enter a complete qty' : null),
-        _field('Delivered qty', line.delivered, 'work-receive-delivered-$index'),
-        _field('Damaged qty', line.damaged, 'work-receive-damaged-$index'),
-        _field('Short this arrival', line.short, 'work-receive-short-$index'),
+        child: Row(children: [Expanded(child: Text(line.productId.isEmpty
+          ? 'Select a product or scan barcode'
+          : product == null || product.stockMode != WorkspaceStockMode.exactQuantity
+            ? 'Saved product unavailable · recover Stock' : '${product.title} · ${product.pack}',
+          maxLines: 2, overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: line.productId.isEmpty ? 12 : 13,
+            color: line.productId.isEmpty ? MoolColors.muted : MoolColors.ink))),
+          const Icon(Icons.arrow_drop_down, color: MoolColors.muted),
+        ])))),
+      if (_frozen == null && !inherited) Wrap(spacing: 4, children: [
+        TextButton.icon(key: ValueKey('work-receive-find-$index'), onPressed: _canEnter ? () => _findStock(line) : null,
+          icon: const Icon(Icons.search, size: 18), label: const Text('Find', style: TextStyle(fontSize: 12))),
+        TextButton.icon(key: ValueKey('work-receive-camera-$index'), onPressed: _canEnter ? () => _findStock(line, camera: true) : null,
+          icon: const Icon(Icons.qr_code_scanner, size: 18), label: const Text('Scan', style: TextStyle(fontSize: 12))),
+        TextButton.icon(key: ValueKey('work-receive-scanner-$index'), onPressed: _canEnter ? () => _findStock(line, scanner: true) : null,
+          icon: const Icon(Icons.keyboard_outlined, size: 18), label: const Text('Scanner', style: TextStyle(fontSize: 12))),
       ]),
-      Text('Accepted: ${accepted == null || accepted < 0 ? 'Check quantities' : _ReceivingLineInput._quantity(accepted)}${product == null ? '' : ' · Stock unit: ${product.pack}'}', style: const TextStyle(fontSize: 12)),
+      _entryGrid([
+        _field('Receipt unit', line.unit, 'work-receive-unit-$index', number: false, enabled: !inherited && _restockOriginal == null),
+        _field('Stock conversion', line.factor, 'work-receive-factor-$index', enabled: !inherited, fullWidth: true),
+        _field('Received qty', line.delivered, 'work-receive-delivered-$index', fullWidth: true),
+        _field('Damaged qty', line.damaged, 'work-receive-damaged-$index', fullWidth: true,
+          errorText: damage != null && delivered != null && damage > delivered ? 'Cannot exceed received qty' : null),
+        _field('Expected qty · optional', line.expected, 'work-receive-expected-$index', enabled: !inherited && _restockOriginal == null, fullWidth: true,
+          errorText: expected == null && line.expected.text.trim().isNotEmpty ? 'Enter a complete qty' : null),
+        _field('Short qty', line.short, 'work-receive-short-$index', fullWidth: true),
+      ]),
+      Text('Accepted qty: ${accepted == null || accepted < 0 ? '—' : _ReceivingLineInput._quantity(accepted)}${line.unit.text.isEmpty ? '' : ' ${line.unit.text}'}',
+        key: ValueKey('work-receive-accepted-$index'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
       ExpansionTile(key: ValueKey('work-receive-lot-$index'), tilePadding: EdgeInsets.zero,
         dense: true, initiallyExpanded: line.lotControllers.any((c) => c.text.isNotEmpty),
         title: const Text('Batch & pack details · optional', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         subtitle: Semantics(liveRegion: line.lotError != null,
-          child: Text(line.lotError ?? 'Only for this delivery · not published',
+          child: Text(line.lotError ?? 'Printed pack details for this receipt',
             style: TextStyle(fontSize: 12, color: line.lotError == null ? null : Theme.of(context).colorScheme.error))),
         children: [
           Text(_restockOriginal == null
-            ? 'Copy the pack label as printed, including month/year or best-before wording. Leave unknown details blank. For multiple batches, use a separate item line for each batch. These details do not change Stock cost.'
-            : 'Copy the pack label as printed, including month/year or best-before wording. Leave unknown details blank. For multiple batches, record each batch separately using Next arrival for the remaining quantity. These details do not change Stock cost.',
+            ? 'Copy dates and details as printed. Leave unknown details blank. Use a separate item line for each batch.'
+            : 'Copy dates and details as printed. Leave unknown details blank. Record separate batches using Next arrival for the remaining quantity.',
             style: const TextStyle(fontSize: 12)),
-          _field('Batch / lot number', line.batch, 'work-receive-batch-$index', number: false, errorText: line.printedLabelError(line.batch)),
-          _field('Manufactured · as printed', line.manufactured, 'work-receive-manufactured-$index', number: false, errorText: line.printedLabelError(line.manufactured)),
-          _field('Expiry / best before / use by · as printed', line.expiry, 'work-receive-expiry-$index', number: false, errorText: line.printedLabelError(line.expiry)),
-          Text('Pack MRP is for one saved Stock unit: ${product?.pack ?? 'choose a product'}', style: const TextStyle(fontSize: 12)),
-          _field('Pack MRP ₹', line.mrp, 'work-receive-mrp-$index',
-            errorText: line.mrp.text.trim().isNotEmpty && workspacePriceMinorFromInput(line.mrp.text, maximumMinor: 9007199254740991) == null ? 'Enter an amount with up to 2 decimal places' : null),
+          _entryGrid([
+            _field('Batch / lot number', line.batch, 'work-receive-batch-$index', number: false, errorText: line.printedLabelError(line.batch)),
+            _field('Manufactured · as printed', line.manufactured, 'work-receive-manufactured-$index', number: false, errorText: line.printedLabelError(line.manufactured)),
+            _field('Expiry / best before / use by · as printed', line.expiry, 'work-receive-expiry-$index', number: false, errorText: line.printedLabelError(line.expiry)),
+            _field('Pack MRP ₹', line.mrp, 'work-receive-mrp-$index', fullWidth: true,
+              errorText: line.mrp.text.trim().isNotEmpty && workspacePriceMinorFromInput(line.mrp.text, maximumMinor: 9007199254740991) == null ? 'Enter an amount with up to 2 decimal places' : null),
+          ]),
+          Text('MRP per Stock unit: ${product?.pack ?? 'select a product'}', style: const TextStyle(fontSize: 12)),
           const SizedBox(height: 8),
         ]),
       if (prior.isNotEmpty) const Text('Already entered in Stock? Link only the matching original entry below.', style: TextStyle(fontSize: 12)),
-      for (final entry in prior.entries) Row(children: [Expanded(child: Text('${entry.key.reason}\n${_registerDate(entry.key.occurredAt)} · original ${entry.key.quantityDelta} · unlinked ${entry.value}', style: const TextStyle(fontSize: 12))),
-        _field('Link Stock units', line.prior[entry.key.id]!, 'work-receive-prior-$index-${entry.key.id}')]),
-      Text(stock == null ? 'Check conversion: accepted goods must equal whole Stock units.' : 'Accepted Stock units $stock − earlier linked $linked = add ${stock - linked}',
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy)),
-      if (expected != null || line.expected.text.trim().isEmpty)
-      Text(expected == null ? 'Pending qty: expected quantity not entered'
-        : 'Earlier delivered ${_ReceivingLineInput._quantity(earlier)} · pending before this arrival ${_ReceivingLineInput._quantity(expected - earlier)}', style: const TextStyle(fontSize: 12)),
+      for (final entry in prior.entries) _entryGrid([
+        Text('${entry.key.reason}\n${_registerDate(entry.key.occurredAt)} · original ${entry.key.quantityDelta} · unlinked ${entry.value}', style: const TextStyle(fontSize: 12)),
+        _field('Link Stock units', line.prior[entry.key.id]!, 'work-receive-prior-$index-${entry.key.id}', fullWidth: true)]),
+      if (product == null) const Text('Select a Stock product to calculate received quantities.', style: TextStyle(fontSize: 12))
+      else if (line.delivered.text.trim().isEmpty) const Text('Enter received quantity to calculate Stock.', style: TextStyle(fontSize: 12))
+      else ...[
+        if (factor != null && factor > 0 && line.unit.text.isNotEmpty)
+          Text('${line.unit.text} → $factor × ${product.pack}', style: const TextStyle(fontSize: 12)),
+        Text(stock == null ? 'Check conversion: accepted goods must equal whole Stock units.'
+          : linked > stock ? 'Linked quantity exceeds accepted Stock.'
+          : 'Stock to add: ${stock - linked} ${product.pack}${linked == 0 ? '' : ' · $linked already in Stock'}',
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy)),
+      ],
+      if (expected != null)
+        Text('Previously received ${_ReceivingLineInput._quantity(earlier)} · pending before this receipt ${_ReceivingLineInput._quantity(expected - earlier)}',
+          style: const TextStyle(fontSize: 12)),
       ],
       const Divider(height: 16),
     ]));
   }
+}
+
+class _GoodsReceiptStockPicker extends StatefulWidget {
+  const _GoodsReceiptStockPicker({required this.session, required this.scanner, required this.isCurrent});
+  final WorkSession session;
+  final bool scanner;
+  final bool Function() isCurrent;
+  @override
+  State<_GoodsReceiptStockPicker> createState() => _GoodsReceiptStockPickerState();
+}
+class _GoodsReceiptStockPickerState extends State<_GoodsReceiptStockPicker> {
+  final _query = TextEditingController();
+  String? _message;
+  @override
+  void dispose() { _query.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(animation: widget.session, builder: (context, _) {
+    final products = widget.isCurrent() ? widget.session.workspaceCatalogueItems.where((p) => p.stockMode == WorkspaceStockMode.exactQuantity &&
+      '${p.title} ${p.pack} ${p.sku} ${p.barcode}'.toLowerCase().contains(_query.text.trim().toLowerCase())).toList() : <WorkspaceCatalogueItem>[];
+    final inset = MediaQuery.viewInsetsOf(context).bottom;
+    final available = (MediaQuery.sizeOf(context).height - inset - MediaQuery.paddingOf(context).vertical - 16)
+      .clamp(100.0, double.infinity);
+    final height = (MediaQuery.sizeOf(context).height * .75).clamp(100.0, available);
+    final compact = inset > 0 && height < 240;
+    return SafeArea(child: Padding(padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + inset),
+      child: SizedBox(height: height, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          compact ? const SizedBox.shrink() : Row(children: [Expanded(child: Text(widget.scanner ? 'Scan product barcode' : 'Select Stock product',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+            TextButton(key: const Key('work-receive-stock-close'),
+              onPressed: () => Navigator.pop(context), child: const Text('Close'))]),
+          Row(children: [Expanded(child: TextField(key: const Key('work-receive-stock-search'), controller: _query, autofocus: widget.scanner,
+            enabled: widget.isCurrent(),
+            textInputAction: widget.scanner ? TextInputAction.done : TextInputAction.search,
+            style: const TextStyle(fontSize: 14),
+            decoration: InputDecoration(labelText: widget.scanner ? 'Scanner / barcode' : 'Search Stock products',
+              hintText: 'Name, SKU or barcode',
+              suffixIcon: _query.text.isEmpty ? null : IconButton(tooltip: 'Clear search',
+                onPressed: widget.isCurrent() ? () => setState(() { _query.clear(); _message = null; }) : null,
+                icon: const Icon(Icons.clear, size: 20))),
+            onChanged: (_) => setState(() => _message = null), onSubmitted: (value) {
+              if (!widget.isCurrent()) return;
+              final exact = widget.session.workspaceCatalogueItems.where((p) => p.stockMode == WorkspaceStockMode.exactQuantity &&
+                value.trim().isNotEmpty && p.barcode == value.trim()).toList();
+              if (exact.length == 1) { Navigator.pop(context, exact.single.id); }
+              else { setState(() => _message = 'Choose the exact Stock product below.'); }
+            })),
+            if (compact) IconButton(key: const Key('work-receive-stock-close'), tooltip: 'Close product list',
+              onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+          ]),
+          Expanded(child: CustomScrollView(key: const Key('work-receive-stock-results'), slivers: [
+            SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (_message != null) Text(_message!, style: const TextStyle(fontSize: 12)),
+              if (widget.scanner) const Text('USB/Bluetooth scanner: focus this field, then scan. Quantity stays unchanged.', style: TextStyle(fontSize: 12)),
+              if (products.isEmpty) Padding(padding: const EdgeInsets.only(top: 12),
+                child: Text(widget.isCurrent() ? 'No matching Stock product' : 'Return to the same receiving draft.')),
+            ])),
+            SliverList.builder(itemCount: products.length,
+                itemBuilder: (_, index) => ListTile(key: ValueKey('work-receive-stock-option-${products[index].id}'),
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('${products[index].title} · ${products[index].pack}', style: const TextStyle(fontSize: 13)),
+                  subtitle: products[index].sku.isEmpty ? null : Text('SKU: ${products[index].sku}',
+                    style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+                  onTap: () { if (widget.isCurrent()) Navigator.pop(context, products[index].id); })),
+          ])),
+      ]))));
+  });
+}
+
+class _ReceivingScannedFieldsScreen extends StatefulWidget {
+  const _ReceivingScannedFieldsScreen({required this.session, required this.scope, required this.captureId,
+    required this.attachment, required this.readOnly, required this.isCurrent, required this.canKeep,
+    this.copyDescription = 'receiving copy', this.limitDescription = 'delivery'});
+  final String copyDescription, limitDescription;
+  final WorkSession session;
+  final (String, String, bool) scope;
+  final String captureId;
+  final WorkspacePurchaseInvoiceAttachment attachment;
+  final bool readOnly;
+  final bool Function() isCurrent;
+  final bool Function(WorkspacePurchaseInvoiceAttachment) canKeep;
+  @override
+  State<_ReceivingScannedFieldsScreen> createState() => _ReceivingScannedFieldsState();
+}
+
+class _ReceivingScannedFieldsState extends State<_ReceivingScannedFieldsScreen> {
+  late final _fields = widget.attachment.extractedFields.map(_PurchaseAdditionalInput.new).toList();
+  late final _dismissed = widget.attachment.dismissedFieldIds.toSet();
+  String? _error;
+  bool _allowPop = false, _confirmingLeave = false;
+  bool get _current => mounted && widget.isCurrent() && widget.session.workspaceSupplierScope == widget.scope;
+  bool get _editable => _current && !widget.readOnly;
+  bool get _dirty => !widget.readOnly && (jsonEncode(_fields.map((f) => f.field.toJson()).toList()) !=
+    jsonEncode(widget.attachment.extractedFields.map((f) => f.toJson()).toList()) ||
+    !setEquals(_dismissed, widget.attachment.dismissedFieldIds.toSet()));
+  @override
+  void dispose() { for (final input in _fields) { input.dispose(); } super.dispose(); }
+  void _finish([WorkspacePurchaseInvoiceAttachment? value]) {
+    if (!mounted || _allowPop) return;
+    setState(() => _allowPop = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) Navigator.pop(context, value); });
+  }
+  Future<void> _close() async {
+    if (_confirmingLeave) return;
+    if (!_current || !_dirty) { _finish(); return; }
+    _confirmingLeave = true;
+    final discard = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Discard field changes?'),
+      content: Text('Keep details saves your edits with this ${widget.copyDescription}. Your original copy stays unchanged.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard changes'))]));
+    _confirmingLeave = false;
+    if (mounted && (discard == true || !_current)) _finish();
+  }
+  void _save() {
+    if (!_editable) return;
+    final value = widget.attachment.withExtractedFields(_fields.map((f) => f.field).toList(),
+      overflow: widget.attachment.extractionOverflow, dismissed: _dismissed.toList());
+    if (!value.valid) {
+      setState(() => _error = 'Give each field a heading. Keep up to 200 fields, 120 characters per heading and 4,000 per value, within the copy’s total limit.');
+      return;
+    }
+    if (!widget.canKeep(value)) {
+      setState(() => _error = 'These details exceed this ${widget.limitDescription}’s total saved-copy limit. Your edits remain here; shorten them or split the copy.');
+      return;
+    }
+    _finish(value);
+  }
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(animation: widget.session, builder: (context, _) => PopScope<WorkspacePurchaseInvoiceAttachment>(
+    canPop: _allowPop || !_current || !_dirty,
+    onPopInvokedWithResult: (didPop, _) { if (!didPop) unawaited(_close()); },
+    child: Scaffold(
+    appBar: AppBar(leading: BackButton(onPressed: _close),
+      title: const Text('Copy fields', style: TextStyle(fontSize: 16)), actions: [
+      if (_editable) TextButton(key: const Key('work-receive-fields-keep'), onPressed: _save,
+        child: const Text('Save', semanticsLabel: 'Save printed details', style: TextStyle(fontSize: 12))),
+    ]),
+    body: !_current ? const Center(child: Text('Return to the same receiving record to view these details.')) :
+      ListView(key: const Key('work-receive-fields-list'), padding: const EdgeInsets.all(12), children: [
+        Text(widget.attachment.fileName, maxLines: 2, overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
+          Text('${_fields.length} fields${widget.attachment.contentType == 'application/pdf' ? '' : ' · Page 1'}', style: const TextStyle(fontSize: 12)),
+          TextButton(onPressed: () => Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) =>
+            _GoodsReceiptCopyScreen(session: widget.session, scope: widget.scope, captureId: widget.captureId,
+              attachment: widget.attachment))), child: const Text('View original')),
+        ]),
+        const Text('Check against the copy. Goods and payment amounts stay unchanged.',
+          style: TextStyle(fontSize: 12)),
+        if (widget.attachment.extractionOverflow) const Padding(padding: EdgeInsets.symmetric(vertical: 8),
+          child: Text('More text is present than the field limit allows. Read the full text and split the copy to retain every field.')),
+        if (_error != null) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(_error!)),
+        for (final input in _fields) Padding(key: ValueKey('work-receive-field-${input.record.id}'),
+          padding: const EdgeInsets.only(top: 8, bottom: 4), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (widget.attachment.contentType == 'application/pdf') Text(input.record.sourcePage == null ?
+              'Page not specified' : 'Page ${input.record.sourcePage}', style: const TextStyle(fontSize: 11)),
+            LayoutBuilder(builder: (context, constraints) {
+              final inputs = [TextField(key: Key('work-receive-field-label-${input.record.id}'), controller: input.label,
+              readOnly: !_editable, maxLength: 120, style: const TextStyle(fontSize: 13),
+              decoration: const InputDecoration(labelText: 'Heading', isDense: true, filled: false, counterText: '',
+                contentPadding: EdgeInsets.symmetric(vertical: 8), border: UnderlineInputBorder()),
+              onChanged: (_) => setState(() => input.reviewed = false)),
+              TextField(key: Key('work-receive-field-value-${input.record.id}'), controller: input.value,
+              readOnly: !_editable, maxLength: 4000, minLines: 1, maxLines: 5, style: const TextStyle(fontSize: 13),
+              decoration: const InputDecoration(labelText: 'Value', isDense: true, filled: false, counterText: '',
+                contentPadding: EdgeInsets.symmetric(vertical: 8), border: UnderlineInputBorder()),
+              onChanged: (_) => setState(() => input.reviewed = false))];
+              if (constraints.maxWidth >= 280 * MediaQuery.textScalerOf(context).scale(12) / 12 + 12) {
+                return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(child: inputs[0]), const SizedBox(width: 12), Expanded(child: inputs[1])]);
+              }
+              return Column(children: inputs);
+            }),
+            Row(children: [Expanded(child: CheckboxListTile(key: Key('work-receive-field-check-${input.record.id}'), contentPadding: EdgeInsets.zero,
+              dense: true, controlAffinity: ListTileControlAffinity.leading, value: input.reviewed,
+              title: const Text('Checked against copy', style: TextStyle(fontSize: 12)),
+              onChanged: !_editable ? null : (value) => setState(() => input.reviewed = value ?? false))),
+              if (_editable) IconButton(tooltip: 'Remove printed field', onPressed: () {
+                setState(() {
+                  if (input.record.id.startsWith('scan-')) _dismissed.add(input.record.id);
+                  _fields.remove(input);
+                }); input.dispose();
+              }, icon: const Icon(Icons.close, size: 18)),
+            ]),
+            const Divider(height: 1),
+          ])),
+        if (_editable) Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+          key: const Key('work-receive-field-add'), onPressed: _fields.length >= 200 ? null : () => setState(() {
+            _fields.add(_PurchaseAdditionalInput(WorkspacePurchaseAdditionalField(
+              id: 'manual-${DateTime.now().microsecondsSinceEpoch}', label: '', value: '', section: 'receipt',
+              sourceDigest: widget.attachment.digest, sourcePage: widget.attachment.contentType == 'application/pdf' ? null : 1)));
+          }), icon: const Icon(Icons.add, size: 18), label: const Text('Add detail from copy'))),
+      ]))));
+}
+
+class _GoodsReceiptCopyScreen extends StatefulWidget {
+  const _GoodsReceiptCopyScreen({required this.session, required this.scope, required this.captureId, required this.attachment,
+    this.title = 'Receiving copy', this.isCurrent});
+  final String title;
+  final bool Function()? isCurrent;
+  final WorkSession session;
+  final (String, String, bool) scope;
+  final String captureId;
+  final WorkspacePurchaseInvoiceAttachment attachment;
+  @override
+  State<_GoodsReceiptCopyScreen> createState() => _GoodsReceiptCopyScreenState();
+}
+
+class _GoodsReceiptCopyScreenState extends State<_GoodsReceiptCopyScreen> {
+  final _pdf = WorkPdfPreview();
+  Uint8List? _bytes, _pageBytes;
+  int _page = 0, _pages = 1;
+  bool _loading = true;
+  String? _error;
+  bool get _current => mounted && widget.session.workspaceSupplierScope == widget.scope && (widget.isCurrent?.call() ?? true);
+  @override
+  void initState() { super.initState(); unawaited(_load(0)); }
+  @override
+  void dispose() { _pdf.dispose(); super.dispose(); }
+  Future<void> _load(int page) async {
+    if (!_current) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final bytes = await widget.session.workspacePurchaseInvoiceCapture.read(widget.scope, widget.captureId, widget.attachment);
+      if (!_current) return;
+      if (widget.attachment.contentType == 'application/pdf') {
+        final rendered = await _pdf.render(bytes, page: page);
+        if (!_current) return;
+        _pageBytes = rendered.bytes; _pages = rendered.pageCount; _page = page;
+      }
+      _bytes = bytes;
+    } on Object {
+      if (_current) _error = 'Copy could not be opened. The saved link is kept; retry or reattach the original.';
+    } finally { if (_current) setState(() => _loading = false); }
+  }
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(animation: widget.session, builder: (context, _) => Scaffold(
+    appBar: AppBar(title: Text(widget.title)),
+    body: !_current ? const Center(child: Text('Return to the same Store to view this copy.')) : Column(children: [
+      Padding(padding: const EdgeInsets.all(8), child: Text(widget.attachment.fileName, maxLines: 2, overflow: TextOverflow.ellipsis)),
+      if (_loading) const LinearProgressIndicator(),
+      if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Column(children: [
+        Text(_error!), TextButton(onPressed: _loading ? null : () => _load(_page), child: const Text('Retry copy'))])),
+      if (_bytes != null && _error == null) Expanded(child: InteractiveViewer(minScale: .5, maxScale: 8,
+        child: Center(child: Image.memory(_pageBytes ?? _bytes!, fit: BoxFit.contain)))),
+      if (_bytes != null && _pages > 1) Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
+        TextButton(onPressed: _loading || _page == 0 ? null : () => _load(_page - 1), child: const Text('Previous page')),
+        Text('${_page + 1} / $_pages'),
+        TextButton(onPressed: _loading || _page + 1 >= _pages ? null : () => _load(_page + 1), child: const Text('Next page')),
+      ]),
+    ])));
 }
 
 class _PurchaseCategoryHeader extends SliverPersistentHeaderDelegate {
@@ -19000,8 +21024,32 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     return 'Stock added ${line.newStockUnits}';
   }
 
-  Future<T?> _chooseActionRecord<T>(String title, List<(T, String, String)> rows) =>
-    showDialog<T>(context: context, useSafeArea: true, builder: (dialogContext) => Dialog.fullscreen(
+  Future<T?> _chooseActionRecord<T>(String title, List<(T, String, String)> rows, {String? supplierName}) {
+    if (supplierName != null) {
+      return showDialog<T>(context: context, useRootNavigator: true, useSafeArea: true,
+        builder: (sheetContext) => Dialog(insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24), child: ConstrainedBox(
+          key: const Key('supplier-payment-purpose-sheet'),
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheetContext).height * .8),
+          child: SafeArea(top: false, child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Padding(padding: const EdgeInsets.only(left: 16, right: 4), child: Row(children: [
+              Expanded(child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+              IconButton(key: const Key('supplier-payment-purpose-close'), tooltip: 'Close',
+                onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close, size: 20)),
+            ])),
+            Flexible(child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Text(supplierName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
+                const Padding(padding: EdgeInsets.only(top: 4, bottom: 8), child: Text('Choose how to record money already paid.',
+                  style: TextStyle(fontSize: 12, color: MoolColors.muted))),
+                for (final row in rows) ListTile(key: ValueKey('supplier-payment-purpose-${row.$1}'),
+                  contentPadding: EdgeInsets.zero, minVerticalPadding: 8, dense: true,
+                  title: Text(row.$2, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MoolColors.navy)),
+                  subtitle: Text(row.$3, style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+                  trailing: const Icon(Icons.chevron_right, size: 20), onTap: () => Navigator.pop(sheetContext, row.$1)),
+              ])))),
+          ])))));
+    }
+    return showDialog<T>(context: context, useSafeArea: true, builder: (dialogContext) => Dialog.fullscreen(
       child: SafeArea(child: Column(children: [
         ListTile(title: Text(title), trailing: IconButton(tooltip: 'Close',
           onPressed: () => Navigator.pop(dialogContext), icon: const Icon(Icons.close))),
@@ -19012,6 +21060,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
             trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.pop(dialogContext, row.$1)),
         ])),
       ]))));
+  }
 
   Future<void> _purchaseAction(String action) async {
     _purchaseSearchFocus.unfocus();
@@ -19052,13 +21101,21 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     if (action == 'stock') { widget.onOpenStock?.call(); return; }
     if (action == 'receive') { setState(() => _receiveGoods = true); return; }
     if (action == 'continue-receive' || action == 'prior-stock') {
-      final supplier = await _chooseActionRecord<WorkspaceSupplierProfile>('Choose supplier', [
+      final eligible = {
         for (final supplier in session.workspaceSuppliers)
-          if (action != 'continue-receive' || _receivingResumeIds.contains(supplier.id))
-            (supplier, supplier.name, supplier.phone),
-      ]);
-      if (!current() || supplier == null || !session.workspaceSuppliers.any((p) => p.id == supplier.id)) return;
-      setState(() { _receivingSupplierId = supplier.id; _receiveGoods = true; });
+          if (action != 'continue-receive' || _receivingResumeIds.contains(supplier.id)) supplier.id,
+      };
+      final selected = await _showStoreSupplierSelector(context, session, eligibleSupplierIds: eligible,
+        purposeGuide: action == 'continue-receive'
+          ? 'Choose the supplier for the delivery entry you want to continue.'
+          : 'Choose the supplier for the goods already added to Stock.',
+        emptyMessage: action == 'continue-receive'
+          ? 'No unfinished delivery entries are available.' : 'No suppliers are available to link these goods.');
+      if (!current() || selected == null || !eligible.contains(selected) ||
+          !session.workspaceSuppliers.any((p) => p.id == selected)) {
+        return;
+      }
+      setState(() { _receivingSupplierId = selected; _receiveGoods = true; });
       return;
     }
     final recovered = await session.recoverCustomerLedger();
@@ -19092,24 +21149,24 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       return;
     }
     if (action == 'accounts' || action == 'statement' || action == 'money-history' || action == 'money' || action == 'refund' || action == 'return') {
-      final supplier = await _chooseActionRecord<WorkspaceSupplierProfile>('Choose supplier', [
-        for (final supplier in session.workspaceSuppliers) (supplier, supplier.name, supplier.phone),
-      ]);
+      final selected = await _showStoreSupplierSelector(context, session);
+      if (!mounted || !current() || selected == null) return;
+      final supplier = session.workspaceSuppliers.where((p) => p.id == selected).singleOrNull;
       if (!mounted || !current() || supplier == null || !session.workspaceSuppliers.any((p) => p.id == supplier.id)) return;
       final ledger = session.workspaceSupplierLedger(supplier.id);
       if (action == 'money') {
-        final purpose = await _chooseActionRecord<String>('What was this money paid for?', const [
-          ('bill', 'Payment against a bill', 'Choose the supplier bill you paid.'),
-          ('advance', 'Advance before the bill', 'Money paid ahead of a supplier bill.'),
-          ('account', 'Supplier account payment', 'Money paid against the supplier account.'),
-        ]);
+        final purpose = await _chooseActionRecord<String>('Record supplier payment', const [
+          ('bill', 'Against a bill', 'Select the supplier bill this payment settles.'),
+          ('advance', 'Supplier advance', 'Paid before the supplier bill is received.'),
+          ('account', 'On-account payment', 'Paid to the supplier without choosing a bill.'),
+        ], supplierName: supplier.name);
         if (!mounted || !current() || purpose == null) return;
         if (purpose != 'bill') {
           await _showSupplierMoneyEntry(context, session,
             _StoreSupplierMoneyTarget(supplierId: supplier.id, advance: purpose == 'advance'));
           return;
         }
-        final copy = await _chooseActionBill('Choose the bill paid', supplierId: supplier.id, acceptedOnly: true);
+        final copy = await _chooseActionBill('Choose the bill paid', supplierId: supplier.id, acceptedOnly: true, paymentSelection: true);
         if (!mounted || !current() || copy == null) return;
         await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(supplierId: supplier.id, copy: copy));
       } else if (action == 'refund') {
@@ -19130,7 +21187,11 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       return;
     }
     final copy = await _chooseActionBill('Choose supplier bill',
-      acceptedOnly: action == 'allocate' || action == 'credit' || action == 'match');
+      acceptedOnly: action == 'allocate' || action == 'credit' || action == 'match',
+      paymentSelection: action == 'allocate' || action == 'credit',
+      purposeGuide: action == 'allocate'
+        ? 'Choose the bill for an existing payment, advance or bill credit.'
+        : action == 'credit' ? 'Choose the bill covered by your supplier’s credit note.' : null);
     if (!mounted || !current() || copy == null) return;
     if (action == 'allocate') {
       await _showSupplierAllocation(context, session, copy);
@@ -19143,7 +21204,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     }
   }
 
-  Future<WorkspacePurchaseSavedCopy?> _chooseActionBill(String title, {String? supplierId, bool acceptedOnly = false, bool editableOnly = false}) async {
+  Future<WorkspacePurchaseSavedCopy?> _chooseActionBill(String title, {String? supplierId, bool acceptedOnly = false, bool editableOnly = false, bool paymentSelection = false, String? purposeGuide}) async {
     final scope = session.workspaceSupplierScope;
     final eligible = <(WorkspacePurchaseSavedCopy, String, String)>[
       for (final copy in session.workspaceLatestPurchaseCopies)
@@ -19153,6 +21214,13 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           (copy, '${copy.supplier.name} · ${copy.draft.invoiceReference}', '${copy.draft.invoiceDate} · Revision ${copy.revision}'),
     ];
     final copy = editableOnly && eligible.length == 1 ? eligible.single.$1
+      : paymentSelection
+      ? await showDialog<WorkspacePurchaseSavedCopy>(context: context, useSafeArea: true,
+          builder: (_) => _StorePaymentBillSelector(title: title,
+            purposeGuide: purposeGuide ?? 'Choose the supplier bill you have paid.',
+            supplierName: supplierId == null ? null
+              : session.workspaceSuppliers.where((s) => s.id == supplierId).firstOrNull?.name ?? 'Supplier unavailable',
+            copies: eligible.map((row) => row.$1).toList()))
       : await _chooseActionRecord<WorkspacePurchaseSavedCopy>(title, eligible);
     if (!mounted || scope != session.workspaceSupplierScope || copy == null ||
         !session.workspacePurchaseCopies.any((c) => jsonEncode(c.toJson()) == jsonEncode(copy.toJson()))) { return null; }
@@ -19375,18 +21443,18 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       ('edit', 'Edit saved bill entry', 'Correct details in an existing entry—not another purchase.'),
     ]),
     ('Goods received & returns', [
-      ('receive', 'Receive goods', 'Goods arrived? Record quantities received, missing or damaged—even without the bill.'),
+      ('receive', 'Receive goods', 'Record your goods receipt (GRN), delivery copies and actual quantities—even without the bill.'),
       ('continue-receive', 'Continue receiving entry', 'Finish the delivery details you saved earlier.'),
       ('match', 'Match goods with a bill', 'Link received goods to their supplier bill without adding Stock again.'),
       ('prior-stock', 'Link goods already in Stock', 'The bill came later? Link goods previously entered through Catalogue, manual entry or CSV.'),
-      ('shortage', 'Review short delivery', 'Record billed quantities that the supplier did not deliver.'),
-      ('return', 'Return goods to supplier', 'Record goods sent back and the quantities leaving Stock.'),
+      ('shortage', 'Review short delivery', 'Record a buyer’s short-delivery claim, separate from a supplier GST debit note.'),
+      ('return', 'Return goods to supplier', 'Record the purchase return and quantities sent back; supplier credit is separate.'),
       ('goods-history', 'Received goods & returns', 'Check earlier deliveries, damaged quantities and supplier returns.'),
     ]),
     ('Money paid, credit & refunds', [
-      ('money', 'Record money paid', 'Already paid the supplier? Record the amount, date and method.'),
-      ('allocate', 'Use existing payment or credit', 'Apply a recorded payment, advance or supplier credit to a bill.'),
-      ('credit', 'Record supplier credit note', 'Enter a credit issued for a return, shortage or bill adjustment.'),
+      ('money', 'Record money paid', 'Record actual money paid using its receipt, UTR or bank reference.'),
+      ('allocate', 'Use existing payment or credit', 'Allocate an existing payment or credit to a bill; remittance advice is an instruction, not new funds.'),
+      ('credit', 'Record supplier credit note', 'Record supplier-issued credit for a return, shortage or bill adjustment; check GST treatment separately.'),
       ('refund', 'Record refund received', 'Record money the supplier has actually returned to you.'),
       ('money-history', 'Payments, advances & credits', 'Check previous money entries and which bills they were applied to.'),
     ]),
@@ -19397,7 +21465,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     ]),
     ('Supplier accounts & documents', [
       ('accounts', 'Supplier accounts', 'Check what you owe each supplier or what credit they hold for you.'),
-      ('statement', 'Supplier statement', 'Review dated bills, payments, credits, refunds and running balance.'),
+      ('statement', 'Supplier statement', 'Supplier ledger and outstanding: review dated bills, payments, credits, refunds and balance.'),
       ('documents', 'View or download bills', 'Open the attached supplier bill or your recorded purchase copy.'),
     ]),
   ];
@@ -19708,6 +21776,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       return byDate != 0 ? byDate : a.shipmentId.compareTo(b.shipmentId);
     });
     final terms = _purchaseSearch.text.trim().toLowerCase().split(RegExp(r'\s+'));
+    final noLinkedPurchases = records.isEmpty && _purchaseSearch.text.trim().isEmpty;
     final visible = records.where((record) {
       final searchable = [record.supplierName, record.orderId, record.shipmentId,
         record.purchaseId, record.invoiceReference, record.purchaseOrderReference,
@@ -19761,7 +21830,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                 onSubmitted: (_) => _purchaseSearchFocus.unfocus(),
                 style: const TextStyle(fontSize: 13, color: MoolColors.ink),
                 decoration: InputDecoration(
-                  hintText: 'Search supplier, order or invoice',
+                  hintText: 'Search purchases',
                   filled: false, isDense: true,
                   border: InputBorder.none, enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none, disabledBorder: InputBorder.none,
@@ -19848,9 +21917,9 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                 'Available updates only · full history unavailable',
                 style: TextStyle(fontSize: 11, color: MoolColors.muted))),
             if (visible.isEmpty && savedCopies.isEmpty) ...[
-              Text(records.isEmpty ? 'No linked supplier deliveries' : 'No matching purchases',
+              Text(noLinkedPurchases ? 'No linked supplier deliveries' : 'No matching purchases',
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy)),
-              Text(records.isEmpty
+              Text(noLinkedPurchases
                   ? 'MoolSocial supplier orders and receipt updates will appear here.'
                   : 'Try another supplier or reference, or clear the filters.',
                   style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
@@ -19994,11 +22063,16 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
     this.orderId,
     this.billId,
     this.compact = false,
+    this.controller,
+    this.onExpansionChanged,
+    this.hideCompactHeader = false,
   });
   final WorkSession session;
   final WorkspaceSupplierLedger? ledger;
   final String? orderId, billId;
-  final bool compact;
+  final bool compact, hideCompactHeader;
+  final ExpansibleController? controller;
+  final ValueChanged<bool>? onExpansionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -20012,31 +22086,7 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
         current.openingBalanceMinor != null ? current.openingRecord : null;
     final entries = current.entries.where((entry) => orderId != null
       ? entry.orderId == orderId : billId != null ? entry.billId == billId : true);
-    return ExpansionTile(
-      key: PageStorageKey((
-        'supplier-ledger-expansion',
-        current.accountScope,
-        current.workspaceId,
-        current.supplierId,
-        orderId,
-        billId,
-      )),
-      tilePadding: EdgeInsets.zero,
-      minTileHeight: compact ? 48 : null,
-      title: compact ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Supplier account', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-        Text(payable == null || credit == null ? 'Full balance unavailable'
-          : credit > 0 ? 'Credit with supplier ${_purchaseAmount(credit)}'
-          : 'Amount payable ${_purchaseAmount(payable)}', style: const TextStyle(fontSize: 11)),
-      ]) : const Text('Supplier account'),
-      subtitle: compact ? null : Text(
-        payable == null || credit == null
-            ? 'Full balance unavailable'
-            : credit > 0
-            ? 'Credit with supplier ${_purchaseAmount(credit)}'
-            : 'Amount payable ${_purchaseAmount(payable)}',
-      ),
-      children: [
+    final detailWidgets = <Widget>[
         Align(alignment: Alignment.centerLeft, child: TextButton.icon(
           key: ValueKey('supplier-statement-open-${current.supplierId}'),
           onPressed: () => _showSupplierStatement(context, session, current),
@@ -20094,7 +22144,58 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
               ? 'Other / unassigned credit ${_purchaseAmount(-current.unassignedAccountBalanceMinor!)}'
               : 'Other / unassigned dues ${_purchaseAmount(current.unassignedAccountBalanceMinor!)}'),
         ],
-      ],
+    ];
+    if (compact && controller != null) {
+      final balance = payable == null || credit == null ? 'Full balance unavailable'
+        : credit > 0 ? 'Credit with supplier ${_purchaseAmount(credit)}'
+        : 'Amount payable ${_purchaseAmount(payable)}';
+      return Expansible(controller: controller!,
+        animationStyle: const AnimationStyle(duration: Duration(milliseconds: 180)),
+        maintainState: true,
+        headerBuilder: (context, animation) => hideCompactHeader ? const SizedBox.shrink() : Align(alignment: Alignment.centerRight,
+          child: IntrinsicWidth(child: Semantics(expanded: controller!.isExpanded,
+            child: TextButton(onPressed: () {
+              controller!.toggle();
+              onExpansionChanged?.call(controller!.isExpanded);
+            }, child: Row(children: [
+              Expanded(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end,
+                children: [const Text('Supplier ledger', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  Text(balance, textAlign: TextAlign.right, style: const TextStyle(fontSize: 11))])),
+              const SizedBox(width: 8), Icon(controller!.isExpanded ? Icons.expand_less : Icons.expand_more, size: 24),
+            ]))))),
+        bodyBuilder: (context, animation) => Column(crossAxisAlignment: CrossAxisAlignment.start,
+          children: [if (hideCompactHeader) Text(balance,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)), ...detailWidgets]));
+    }
+    return ExpansionTile(
+      controller: controller,
+      onExpansionChanged: onExpansionChanged,
+      key: PageStorageKey((
+        'supplier-ledger-expansion',
+        current.accountScope,
+        current.workspaceId,
+        current.supplierId,
+        orderId,
+        billId,
+      )),
+      tilePadding: EdgeInsets.zero,
+      minTileHeight: compact ? 48 : null,
+      expandedAlignment: compact ? Alignment.centerLeft : null,
+      expandedCrossAxisAlignment: compact ? CrossAxisAlignment.start : null,
+      title: compact ? _purchaseBillTaskSummary(
+        const Text('Supplier ledger', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(payable == null || credit == null ? 'Full balance unavailable'
+          : credit > 0 ? 'Credit with supplier ${_purchaseAmount(credit)}'
+          : 'Amount payable ${_purchaseAmount(payable)}', textAlign: TextAlign.right, style: const TextStyle(fontSize: 11)),
+      ) : const Text('Supplier account'),
+      subtitle: compact ? null : Text(
+        payable == null || credit == null
+            ? 'Full balance unavailable'
+            : credit > 0
+            ? 'Credit with supplier ${_purchaseAmount(credit)}'
+            : 'Amount payable ${_purchaseAmount(payable)}',
+      ),
+      children: detailWidgets,
     );
   }
 }
@@ -20111,6 +22212,7 @@ class _StoreStatementSurface extends StatefulWidget {
     this.onPrepareCounter,
     this.onNewSale,
     this.onOpenOperation,
+    this.onBusinessFinance,
     super.key,
   });
   final WorkSession session;
@@ -20123,6 +22225,7 @@ class _StoreStatementSurface extends StatefulWidget {
   final Future<bool> Function(bool Function() stillCurrent)? onPrepareCounter;
   final VoidCallback? onNewSale;
   final ValueChanged<_WorkspaceOperation>? onOpenOperation;
+  final VoidCallback? onBusinessFinance;
   @override
   State<_StoreStatementSurface> createState() => _StoreStatementSurfaceState();
 }
@@ -21111,6 +23214,13 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               ),
             ),
           ),
+        if (!widget.salesOnly && _book == 'Money' && widget.onBusinessFinance != null)
+          Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+            key: const Key('work-business-finance-open'),
+            onPressed: widget.onBusinessFinance,
+            icon: const Icon(Icons.account_balance_outlined, size: 18),
+            label: const Text('Business finance'),
+          )),
         Expanded(
           child: KeyedSubtree(
             // Keep each ledger's place without sharing offsets across Stores,
@@ -21609,6 +23719,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.purchaseRegisterBookmark,
     required this.onOpenStore,
     required this.onBuyStock,
+    required this.onBusinessFinance,
     required this.onOpenOperation,
     required this.onOpenRoute,
     required this.onTrackPurchase,
@@ -21635,6 +23746,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final _PurchaseRegisterBookmark? purchaseRegisterBookmark;
   final VoidCallback onOpenStore;
   final VoidCallback onBuyStock;
+  final VoidCallback onBusinessFinance;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
   final ValueChanged<String> onOpenRoute;
   final ValueChanged<String> onTrackPurchase;
@@ -21672,6 +23784,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         session: session,
         salesOnly: operation == _WorkspaceOperation.sales,
         onOpenOperation: onOpenOperation,
+        onBusinessFinance: onBusinessFinance,
         onNewSale: () {
           if (session.prepareWorkspaceOrder(
             source: 'Counter',
@@ -22518,16 +24631,61 @@ class _WorkspaceCatalogueSurfaceState
 
   bool _retryingInventory = false;
 
-  Future<void> _retryInventory() async {
-    if (_retryingInventory) return;
+  bool get _stockNeedsRecovery => !widget.session.workspaceInventoryLoaded &&
+      (widget.session.localInventoryEnabled || widget.session.workspaceInventoryError != null ||
+        widget.session.workspaceCatalogueItems.isEmpty);
+
+  Future<void> _retryInventory(WorkSession owner, Object scope, int? navigation) async {
+    bool current() => mounted && identical(widget.session, owner) &&
+        owner.tradingPreferencesContext == scope && owner.navigationScopeRevision == navigation;
+    if (_retryingInventory || !current()) return;
     setState(() => _retryingInventory = true);
     try {
-      if (await widget.session.loadWorkspaceInventory(retry: true)) {
-        await widget.session.retryWorkspaceInventorySave();
+      if (await owner.loadWorkspaceInventory(retry: true) && current()) {
+        await owner.retryWorkspaceInventorySave();
       }
     } finally {
       if (mounted) setState(() => _retryingInventory = false);
     }
+  }
+
+  Widget _inventoryStatusCard({required bool recovery}) {
+    final owner = widget.session, error = owner.workspaceInventoryError;
+    final scope = owner.tradingPreferencesContext, navigation = owner.navigationScopeRevision;
+    final title = recovery ? (error == null ? 'Stock not loaded' : 'Stock unavailable') : 'Stock changes not saved';
+    final detail = error == 'Saved stock could not be recovered. Retry without clearing Store data.'
+        ? 'Try again without clearing Store data.'
+        : error ?? 'Load saved stock before searching or adding products.';
+    final label = recovery
+        ? (_retryingInventory ? (error == null ? 'Loading…' : 'Recovering…') : (error == null ? 'Load stock' : 'Recover stock'))
+        : (_retryingInventory ? 'Saving…' : 'Retry stock save');
+    return WorkCard(
+      keyName: error == null ? 'store-inventory-load-status' : 'store-inventory-save-error',
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        key: Key(recovery ? 'work-stock-recovery-panel' : 'work-stock-save-panel'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(children: [
+            const Icon(Icons.inventory_2_outlined, size: 20, color: MoolColors.muted),
+            const SizedBox(width: 8),
+            Expanded(child: Semantics(header: true, child: Text(title,
+              style: const TextStyle(fontSize: 14, height: 1.25, fontWeight: FontWeight.w700, color: MoolColors.ink)))),
+          ]),
+          const SizedBox(height: 8),
+          Align(alignment: Alignment.centerLeft, child: FilledButton.icon(
+            key: const Key('work-stock-recovery-action'),
+            onPressed: _retryingInventory ? null : () => unawaited(_retryInventory(owner, scope, navigation)),
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: Text(label),
+          )),
+          const SizedBox(height: 8),
+          Text(detail,
+            style: const TextStyle(fontSize: 12, height: 1.4, color: MoolColors.muted)),
+        ],
+      ),
+    );
   }
 
   late final Widget _entryPage = _addProductEntry();
@@ -22570,7 +24728,7 @@ class _WorkspaceCatalogueSurfaceState
       sellingPrice: 0,
       unitPrice: '',
       stock: 0,
-      deliveryPromise: 'Store pickup or local delivery',
+      deliveryPromise: '',
       origin: '',
       visualLabel: 'Product image pending',
       visualKind: 'catalogue-packshot',
@@ -23178,6 +25336,7 @@ class _WorkspaceCatalogueSurfaceState
     return SizedBox.expand(
       key: const Key('work-dashboard-catalogue-screen'),
       child: _StockQuickActionsFrame(
+        wholeActions: true,
         expanded: _actionsExpanded,
         onToggle: _toggleActions,
         actions: [
@@ -23185,7 +25344,8 @@ class _WorkspaceCatalogueSurfaceState
             keyName: 'work-quick-add-products',
             icon: Icons.add_box_outlined,
             label: 'Add products',
-            onTap: () async {
+            onTap: _stockNeedsRecovery ? null : () async {
+              if (_stockNeedsRecovery) return;
               await Navigator.of(context).push<bool>(
                 MaterialPageRoute(
                   builder: (_) => _WorkspaceCatalogueSurface(
@@ -23201,14 +25361,14 @@ class _WorkspaceCatalogueSurfaceState
             _StoreEdgeAction(
               keyName: 'work-quick-buy',
               icon: Icons.inventory_2_outlined,
-              label: 'Buy stock',
+              label: 'Restock',
               onTap: widget.onBuyStock,
             ),
           if (widget.onPurchases != null)
             _StoreEdgeAction(
               keyName: 'work-incoming-purchases',
               icon: Icons.local_shipping_outlined,
-              label: 'Purchases',
+              label: 'Purchase register',
               onTap: widget.onPurchases,
             ),
           if (widget.onGroupBuying != null)
@@ -23219,7 +25379,11 @@ class _WorkspaceCatalogueSurfaceState
               onTap: widget.onGroupBuying,
             ),
         ],
-        child: Column(
+        child: _stockNeedsRecovery ? SingleChildScrollView(
+          key: const Key('work-stock-recovery-scroll'),
+          padding: const EdgeInsets.all(12),
+          child: _inventoryStatusCard(recovery: true),
+        ) : Column(
           children: [
             ListenableBuilder(
               listenable: widget.session,
@@ -23227,26 +25391,11 @@ class _WorkspaceCatalogueSurfaceState
                 final error = widget.session.workspaceInventoryError;
                 if (error == null) return const SizedBox.shrink();
                 return Padding(
-                  key: const Key('store-inventory-save-error'),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 6,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        error,
-                        style: const TextStyle(color: MoolColors.ink),
-                      ),
-                      TextButton(
-                        onPressed: _retryingInventory ? null : _retryInventory,
-                        child: Text(
-                          _retryingInventory ? 'Saving…' : 'Retry stock save',
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: _inventoryStatusCard(recovery: false),
                 );
               },
             ),
@@ -23267,6 +25416,7 @@ class _WorkspaceCatalogueSurfaceState
                 stockStatementBuilder: (products, count, vertical, loadMore) =>
                     _StoreStockStatementTable(
                       products: products,
+                      showMrp: widget.session.workspaceCatalogueItems.any((item) => item.mrpMinor != null),
                       bottomClearance: _actionsExpanded
                           ? 0
                           : _stockQuickTabHeight(context) + 6,
@@ -23355,10 +25505,10 @@ class _StoreEdgeAction extends StatelessWidget {
                   Icon(icon, size: 15, color: selected == true ? Colors.white : onTap == null
                       ? MoolColors.muted : MoolColors.navy),
                   const SizedBox(width: 5),
-                  Text(label, softWrap: false, style: TextStyle(
+                  Flexible(child: Text(label, style: TextStyle(
                     fontSize: 11, height: 1.25, fontWeight: FontWeight.w600,
                     color: selected == true ? Colors.white : onTap == null ? MoolColors.muted : MoolColors.navy,
-                  )),
+                  ))),
                 ],
               ),
             ),
@@ -23385,6 +25535,29 @@ double _stockQuickTabHeight(BuildContext context) {
   return height;
 }
 
+({int columns, double height}) _stockActionLayout(
+  BuildContext context, List<_StoreEdgeAction> actions, double width,
+) {
+  final style = DefaultTextStyle.of(context).style.merge(const TextStyle(
+    fontSize: 11, height: 1.25, fontWeight: FontWeight.w600));
+  final painters = [for (final action in actions) TextPainter(
+    text: TextSpan(text: action.label, style: style),
+    textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout()];
+  var minimum = 48.0;
+  for (final painter in painters) {
+    if (painter.width + 40 > minimum) minimum = painter.width + 40;
+  }
+  final columns = (width / minimum).floor().clamp(1, actions.length).toInt();
+  var height = 48.0;
+  for (final painter in painters) {
+    // Cell padding, icon and gap consume40px; text keeps its full scaled size.
+    painter.layout(maxWidth: (width / columns - 40).clamp(1.0, double.infinity));
+    if (painter.height + 12 > height) height = painter.height + 12;
+    painter.dispose();
+  }
+  return (columns: columns, height: height.ceilToDouble());
+}
+
 /// Shared horizontal action shelf, collapsed manually to the corner control.
 class _StockQuickActionsFrame extends StatelessWidget {
   const _StockQuickActionsFrame({
@@ -23394,6 +25567,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
     required this.onToggle,
     this.keyPrefix = 'work-stock',
     this.enabled = true,
+    this.wholeActions = false,
   });
   final Widget child;
   final List<Widget> actions;
@@ -23401,6 +25575,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
   final VoidCallback onToggle;
   final String keyPrefix;
   final bool enabled;
+  final bool wholeActions;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -23500,8 +25675,12 @@ class _StockQuickActionsFrame extends StatelessWidget {
         ),
       );
       if (expanded) {
-        final actionHeight = (MediaQuery.textScalerOf(context).scale(11) * 1.25 + 16)
+        var actionHeight = (MediaQuery.textScalerOf(context).scale(11) * 1.25 + 16)
             .clamp(48.0, double.infinity);
+        if (wholeActions && actions.isNotEmpty && actions.every((a) => a is _StoreEdgeAction)) {
+          final width = (box.maxWidth - 48).clamp(1.0, double.infinity);
+          actionHeight = _stockActionLayout(context, actions.cast<_StoreEdgeAction>(), width).height;
+        }
         return Column(
           children: [
             Expanded(child: SizedBox(
@@ -23510,7 +25689,7 @@ class _StockQuickActionsFrame extends StatelessWidget {
               child: readableContent,
             )),
             _StoreBottomActionShelf(keyPrefix: keyPrefix, actions: actions,
-              height: actionHeight + 6, toggle: toggle),
+              height: actionHeight + 6, toggle: toggle, wholeActions: wholeActions),
           ],
         );
       }
@@ -23536,17 +25715,20 @@ class _StockQuickActionsFrame extends StatelessWidget {
 /// Stock shelf retains its horizontal action list and original collapse control.
 class _StoreBottomActionShelf extends StatelessWidget {
   const _StoreBottomActionShelf({required this.keyPrefix,
-    required this.actions, this.height, this.toggle});
+    required this.actions, this.height, this.toggle, this.wholeActions = false});
   final String keyPrefix;
   final List<Widget> actions;
   final double? height;
   final Widget? toggle;
+  final bool wholeActions;
 
   @override
   Widget build(BuildContext context) => Container(
     key: Key('$keyPrefix-actions-panel'), height: height, color: Colors.white,
     child: Row(children: [
-      Expanded(child: SingleChildScrollView(
+      Expanded(child: wholeActions && actions.isNotEmpty && actions.every((a) => a is _StoreEdgeAction)
+        ? _StockWholeActionStrip(keyPrefix: keyPrefix, actions: actions.cast<_StoreEdgeAction>())
+        : SingleChildScrollView(
         key: Key('$keyPrefix-entry-controls'), scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
         child: Row(children: [for (final action in actions)
@@ -23555,6 +25737,89 @@ class _StoreBottomActionShelf extends StatelessWidget {
       ?toggle,
     ]),
   );
+}
+
+/// Whole Stock actions share the existing shelf; Sales keeps its current rail.
+class _StockWholeActionStrip extends StatefulWidget {
+  const _StockWholeActionStrip({required this.keyPrefix, required this.actions});
+  final String keyPrefix;
+  final List<_StoreEdgeAction> actions;
+  @override
+  State<_StockWholeActionStrip> createState() => _StockWholeActionStripState();
+}
+
+class _StockWholeActionStripState extends State<_StockWholeActionStrip> {
+  final _scroll = ScrollController();
+  int _page = 0, _columns = 0, _pageCount = 0, _layoutEpoch = 0;
+  double? _pageWidth;
+  bool _aligningPage = false, _pageUpdateScheduled = false;
+  @override
+  void dispose() { _scroll.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, constraints) {
+    final width = constraints.maxWidth;
+    if (width <= 0) return const SizedBox.shrink();
+    final columns = _stockActionLayout(context, widget.actions, width).columns;
+    final pages = (widget.actions.length / columns).ceil();
+    _page = _page.clamp(0, pages - 1).toInt();
+    if (_pageWidth != width || _columns != columns || _pageCount != pages) {
+      final previous = _pageWidth;
+      _pageWidth = width; _columns = columns; _pageCount = pages;
+      final epoch = ++_layoutEpoch;
+      if (previous != null) {
+        final targetPage = _page;
+        _aligningPage = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || epoch != _layoutEpoch) return;
+          try {
+            if (_scroll.hasClients) {
+              _scroll.jumpTo((targetPage * width).clamp(0.0, _scroll.position.maxScrollExtent));
+            }
+          } finally {
+            if (mounted && epoch == _layoutEpoch) {
+              setState(() { _page = targetPage; _aligningPage = false; });
+            }
+          }
+        });
+      }
+    }
+    return Semantics(
+      key: Key('${widget.keyPrefix}-action-pages'),
+      label: 'Stock actions, page ${_page + 1} of $pages. Swipe for more actions.',
+      child: Column(children: [
+        Expanded(child: NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (_aligningPage || _pageUpdateScheduled || notification.metrics.axis != Axis.horizontal ||
+                notification is! ScrollUpdateNotification && notification is! ScrollEndNotification) {
+              return false;
+            }
+            _pageUpdateScheduled = true;
+            final epoch = _layoutEpoch;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _pageUpdateScheduled = false;
+              if (!mounted || epoch != _layoutEpoch || _aligningPage || !_scroll.hasClients || _pageWidth == null) return;
+              final page = (_scroll.offset / _pageWidth!).round().clamp(0, _pageCount - 1).toInt();
+              if (page != _page) setState(() => _page = page);
+            });
+            return false;
+          },
+          child: SingleChildScrollView(
+            key: Key('${widget.keyPrefix}-entry-controls'), controller: _scroll,
+            scrollDirection: Axis.horizontal, physics: const PageScrollPhysics(),
+            child: Row(children: [for (var i = 0; i < pages * columns; i++)
+              SizedBox(width: width / columns, child: i < widget.actions.length
+                ? Padding(padding: const EdgeInsets.symmetric(horizontal: 2), child: widget.actions[i])
+                : const SizedBox.shrink())]),
+          ),
+        )),
+        SizedBox(height: 6, child: ExcludeSemantics(child: Row(mainAxisAlignment: MainAxisAlignment.center,
+          children: [if (pages > 1) for (var i = 0; i < pages; i++)
+            Container(width: 4, height: 4, margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: i == _page ? MoolColors.navy : MoolColors.line))]))),
+      ]),
+    );
+  });
 }
 
 class _StockActionCutout extends CustomClipper<Path> {
@@ -23927,6 +26192,7 @@ class _CatalogueMetric extends StatelessWidget {
 class _StoreStockStatementTable extends StatefulWidget {
   const _StoreStockStatementTable({
     required this.products,
+    required this.showMrp,
     required this.visibleCount,
     required this.vertical,
     required this.loadMore,
@@ -23935,6 +26201,7 @@ class _StoreStockStatementTable extends StatefulWidget {
   });
   final double bottomClearance;
   final List<WorkspaceCatalogueItem> products;
+  final bool showMrp;
   final int visibleCount;
   final ScrollController vertical;
   final VoidCallback loadMore;
@@ -23969,15 +26236,24 @@ class _StoreStockStatementTableState extends State<_StoreStockStatementTable> {
     var moneyCharacters = 0;
     for (final product in widget.products) {
       for (final amount in [
-        product.sellingPriceMinor,
         product.purchasePriceMinor,
-        product.mrpMinor ?? product.sellingPriceMinor,
+        if (product.mrpMinor != null) product.mrpMinor!,
       ]) {
         final length = '₹${_formatStoreMinorAmount(amount)}'.length;
         if (length > moneyCharacters) moneyCharacters = length;
       }
     }
     final moneyWidth = (moneyCharacters * 10.0 + 24).clamp(96.0, 260.0);
+    var saleWidth = 112.0;
+    for (final item in widget.products) {
+      for (final line in storeStockSalePrices(item, formatMoney: _formatStoreMinorAmount).split('\n')) {
+        final text = TextPainter(text: TextSpan(text: line,
+          style: DefaultTextStyle.of(context).style.merge(_stockStatementPrimaryStyle)),
+          textDirection: Directionality.of(context))..layout();
+        if (text.width + 34 > saleWidth) saleWidth = text.width + 34;
+        text.dispose();
+      }
+    }
     final stockCharacters = widget.products.fold<int>(
       1,
       (length, product) => product.stock.toString().length > length
@@ -23990,9 +26266,9 @@ class _StoreStockStatementTableState extends State<_StoreStockStatementTable> {
           )
           ? 112
           : (stockCharacters * 10.0 + 20).clamp(64.0, 180.0),
+      saleWidth.clamp(112.0, 320.0),
       moneyWidth,
-      moneyWidth,
-      moneyWidth,
+      widget.showMrp ? moneyWidth : 0,
       104,
     ].map((w) => w * scale).toList();
     return Column(
@@ -24039,7 +26315,7 @@ class _StoreStockStatementTableState extends State<_StoreStockStatementTable> {
                                 child: Align(
                                   alignment: Alignment.centerLeft,
                                   child: Text(
-                                    'Product',
+                                    'Item',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: MoolColors.muted,
@@ -24051,19 +26327,26 @@ class _StoreStockStatementTableState extends State<_StoreStockStatementTable> {
                               data: Row(
                                 children: [
                                   for (var i = 0; i < widths.length; i++)
+                                    if (widths[i] > 0)
                                     SizedBox(
                                       width: widths[i],
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 8,
                                         ),
-                                        child: Text(
+                                        child: Tooltip(message: const [
+                                          'Quantity in the item pack/unit shown below its name. Availability-only items show their status.',
+                                          'Saved Retail and Wholesale/Bulk prices per item pack/unit. Trade price is shown at its stated minimum quantity; quantity prices may differ.',
+                                          'Saved purchase price per item pack/unit. This is not a stock valuation or manufacturing cost.',
+                                          'Pack MRP from the product label, when recorded. A blank amount is not zero.',
+                                          'Quantity threshold for a low-stock alert. This is not an order quantity.',
+                                        ][i], child: Text(
                                           const [
-                                            'Stock',
-                                            'Selling price',
+                                            'Qty on hand',
+                                            'Sale prices',
                                             'Purchase price',
-                                            'MRP',
-                                            'Reorder level',
+                                            'Pack MRP',
+                                            'Low-stock alert',
                                           ][i],
                                           key: Key('work-stock-heading-$i'),
                                           textAlign: TextAlign.center,
@@ -24072,7 +26355,7 @@ class _StoreStockStatementTableState extends State<_StoreStockStatementTable> {
                                             color: MoolColors.muted,
                                             fontWeight: FontWeight.w600,
                                           ),
-                                        ),
+                                        )),
                                       ),
                                     ),
                                 ],
@@ -24190,6 +26473,24 @@ const _stockStatementPrimaryStyle = TextStyle(
   fontFeatures: [FontFeature.tabularFigures()],
 );
 
+// The fixed product column covers these cells visually and in accessibility.
+class _StockDataClipper extends CustomClipper<Rect> {
+  const _StockDataClipper(this.coveredWidth);
+  final double coveredWidth;
+
+  @override
+  Rect getClip(Size size) => Rect.fromLTRB(
+    coveredWidth.clamp(0.0, size.width), 0, size.width, size.height,
+  );
+
+  @override
+  Rect getApproximateClipRect(Size size) => getClip(size);
+
+  @override
+  bool shouldReclip(_StockDataClipper oldClipper) =>
+      coveredWidth != oldClipper.coveredWidth;
+}
+
 class _StockFrozenRow extends StatelessWidget {
   const _StockFrozenRow({
     super.key,
@@ -24216,16 +26517,21 @@ class _StockFrozenRow extends StatelessWidget {
       builder: (_, _) => Stack(
         children: [
           Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: background,
-                border: const Border(
-                  bottom: BorderSide(color: Color(0xFFE6E9F1)),
-                ),
+            child: ClipRect(
+              clipper: _StockDataClipper(
+                frozenWidth + (horizontal.hasClients ? horizontal.offset : 0),
               ),
-              child: Padding(
-                padding: EdgeInsets.only(left: frozenWidth),
-                child: data,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: background,
+                  border: const Border(
+                    bottom: BorderSide(color: Color(0xFFE6E9F1)),
+                  ),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.only(left: frozenWidth),
+                  child: data,
+                ),
               ),
             ),
           ),
@@ -24439,6 +26745,7 @@ class _WorkspaceProductRow extends StatelessWidget {
       VoidCallback? onTap,
       Key? anchor,
       String? note,
+      Color noteColor = const Color(0xFF9A4A00),
     }) => SizedBox(
       key: anchor,
       width: statementWidths[column],
@@ -24470,9 +26777,9 @@ class _WorkspaceProductRow extends StatelessWidget {
                   Text(
                     note,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
-                      color: Color(0xFF9A4A00),
+                      color: noteColor,
                     ),
                   ),
                 ],
@@ -24582,8 +26889,10 @@ class _WorkspaceProductRow extends StatelessWidget {
               cell(
                 1,
                 'work-catalogue-price-${product.id}',
-                '₹${_formatStoreMinorAmount(product.sellingPriceMinor)}',
-                onTap: onChangePrice,
+                storeStockSalePrices(product, formatMoney: _formatStoreMinorAmount),
+                note: storeStockTradeQuantity(product), noteColor: MoolColors.muted,
+                onTap: product.wholesaleOffer?.enabled == true
+                  ? onEditField == null ? null : () => onEditField!('wholesalePrice') : onChangePrice,
               ),
               cell(
                 2,
@@ -24591,11 +26900,11 @@ class _WorkspaceProductRow extends StatelessWidget {
                 '₹${_formatStoreMinorAmount(product.purchasePriceMinor)}',
                 onTap: () => onEditField?.call('purchasePrice'),
               ),
-              cell(
+              if (statementWidths[3] > 0) cell(
                 3,
                 'work-catalogue-mrp-${product.id}',
                 product.mrpMinor == null
-                    ? 'Not set'
+                    ? '—'
                     : '₹${_formatStoreMinorAmount(product.mrpMinor!)}',
                 onTap: () => onEditField?.call('mrp'),
               ),
@@ -24603,7 +26912,7 @@ class _WorkspaceProductRow extends StatelessWidget {
                 4,
                 'work-catalogue-reorder-${product.id}',
                 counted ? '${product.lowStockThreshold}' : 'Not applicable',
-                onTap: () => onEditField?.call('lowStockThreshold'),
+                onTap: counted ? () => onEditField?.call('lowStockThreshold') : null,
               ),
             ],
           ),
@@ -25654,6 +27963,7 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
   late final _controllers = {for (final label in _allLabels) label: TextEditingController(text:
     widget.original.specifications.entries.where((e) => e.key.toLowerCase() == label.toLowerCase()).firstOrNull?.value ?? '')};
   late final _focusNodes = {for (final label in _allLabels) label: FocusNode()};
+  late final _labelKeys = {for (final label in _allLabels) label: GlobalKey()};
   bool _revealPending = false;
   double? _viewportDimension;
   String _guide = 'general';
@@ -25676,13 +27986,30 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
     if (_revealPending) return;
     _revealPending = true;
     // Dialog inset animation can resize the scroll viewport after the device
-    // metrics event. Reveal the input, not its potentially much taller helper.
+    // metrics event. Keep the caption with the input when both fit, without
+    // including the potentially much taller helper in the reveal target.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _revealPending = false;
       if (!mounted) return;
       final focused = _focusNodes.entries.where((entry) => entry.value.hasFocus).firstOrNull;
-      final target = focused?.value.context;
-      if (target != null && target.mounted) Scrollable.ensureVisible(target, alignment: .15);
+      if (focused == null) return;
+      final target = focused.value.context;
+      if (target == null || !target.mounted) return;
+      final caption = _labelKeys[focused.key]?.currentContext;
+      if (caption != null && caption.mounted) {
+        final viewport = Scrollable.maybeOf(caption);
+        final captionBox = caption.findRenderObject(), inputBox = target.findRenderObject();
+        if (viewport != null && captionBox is RenderBox && inputBox is RenderBox &&
+            captionBox.attached && inputBox.attached && captionBox.hasSize && inputBox.hasSize) {
+          final height = inputBox.localToGlobal(Offset(0, inputBox.size.height)).dy -
+              captionBox.localToGlobal(Offset.zero).dy;
+          if (height >= 0 && height <= viewport.position.viewportDimension) {
+            Scrollable.ensureVisible(caption, alignment: 0);
+            return;
+          }
+        }
+      }
+      Scrollable.ensureVisible(target, alignment: .15);
     });
   }
   @override
@@ -25708,6 +28035,8 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
     content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text(_guide == 'warranty'
         ? 'Optional manufacturer or seller warranty details. Blank fields stay hidden. Returns, refunds and claim approval are separate.'
+        : _guide == 'electronics'
+        ? 'Use exact model details and describe the condition of the item you are offering. Blank fields are omitted from public pages.'
         : 'Optional details from the product label or manufacturer information. Blank fields are omitted from public pages.'),
       if (widget.allowProductGuides) ...[
         const SizedBox(height: 16),
@@ -25723,12 +28052,10 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
             FocusScope.of(context).unfocus();
             setState(() { _guide = value; _error = null; });
           }),
-        if (_guide == 'general') const Padding(padding: EdgeInsets.only(top: 8),
-          child: Text('Choose a guide above to add optional product details. Existing specifications are kept.')),
       ],
       for (final label in _visibleLabels) ...[
         const SizedBox(height: 16),
-        Text(label),
+        Text(label, key: _labelKeys[label]),
         Semantics(label: '$label details', child: TextField(
           key: Key('work-product-guided-$label'), controller: _controllers[label],
           focusNode: _focusNodes[label],
@@ -25736,7 +28063,10 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
           decoration: InputDecoration(hintText: 'Optional', counterText: '',
             helper: WorkspaceProductContent.guidedHintForLabel(label) == 'Optional'
               ? null : Text(WorkspaceProductContent.guidedHintForLabel(label), softWrap: true)),
-          onChanged: (_) { if (_error != null) setState(() => _error = null); })),
+          onChanged: (_) {
+            _revealFocusedField();
+            if (_error != null) setState(() => _error = null);
+          })),
       ],
       if (_error != null) Semantics(liveRegion: true, child: Text(_error!,
         style: TextStyle(color: Theme.of(context).colorScheme.error))),
@@ -25745,7 +28075,8 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
     actions: [
       TextButton(key: const Key('work-product-guided-cancel'),
         onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-      FilledButton(key: const Key('work-product-guided-apply'), onPressed: () {
+      FilledButton(key: const Key('work-product-guided-apply'),
+        style: FilledButton.styleFrom(minimumSize: const Size(48,48)), onPressed: () {
         try {
           final next = widget.original.withGuidedDetails({for (final e in _controllers.entries) e.key: e.value.text});
           Navigator.pop(context, next);
@@ -25755,6 +28086,147 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
       }, child: const Text('Apply')),
     ],
   ));
+}
+
+/// Projects an existing saved SKU into Buy's renderer, without publishing it.
+/// The Store remains the data owner; this route has no commerce or review grant.
+class SavedStoreProductCustomerPreview extends StatefulWidget {
+  const SavedStoreProductCustomerPreview({super.key, required this.work,
+    required this.saved, this.channel = BuyV2Destination.shop});
+  final WorkSession work;
+  final WorkspaceCatalogueItem saved;
+  final BuyV2Destination channel;
+  @override State<SavedStoreProductCustomerPreview> createState() => _SavedStoreProductCustomerPreviewState();
+}
+
+class _SavedStoreProductCustomerPreviewState extends State<SavedStoreProductCustomerPreview> {
+  late final Object _owner = widget.work.publicationPreferencesContext;
+  late final String? _storeId = widget.work.activeWorkspace?.id;
+  late final WorkspaceCatalogueItem _saved = widget.saved;
+  late final BuyV2Destination _channel = widget.channel;
+  late final WorkspaceStorePublicationDetails _storeDetails = widget.work.workspacePublicationDetails;
+  late final String _storeDetailsKey = jsonEncode(_storeDetails.toJson());
+  bool _sessionStarted = false;
+  late final String? _projectionIssue = () {
+    if (widget.channel == BuyV2Destination.shop) {
+      return widget.saved.retailEnabled ? null : 'Retail is not enabled for this product.';
+    }
+    final offer = widget.saved.wholesaleOffer;
+    if (widget.channel != BuyV2Destination.wholesale || offer == null || !offer.enabled ||
+        !offer.valid || offer.saleType == null) {
+      return 'Preview is unavailable for this selling channel.';
+    }
+    return widget.saved.publicSellingTermsIssue(channel: widget.channel,
+      storeId: widget.work.activeWorkspace?.id) == null ? null
+      : 'Quantity prices need confirmation before this preview is available.';
+  }();
+  late final BuySession _core = BuySession(
+    orderGateway: const _SavedProductPreviewGateway(),
+    medicineGateway: const _SavedProductPreviewGateway());
+  late final _SavedProductPreviewStateStore _stateStore = _SavedProductPreviewStateStore(
+    'saved-store-preview:${_source.product.storeId}:${widget.saved.id}', () => _current);
+  late final _SavedStoreProductPreviewSource _source = _SavedStoreProductPreviewSource(
+    // Match WorkspacePublicCatalogueEntry: these legacy display strings are
+    // absent from submission/readback. Clear only the projection copy.
+    saved: widget.saved, product: widget.saved.copyWith(
+      deliveryPromise: '', origin: '', visualLabel: '', visualKind: '').toBuyPublicProduct(
+      storeName: widget.work.activeWorkspace!.name,
+      storeId: widget.work.activeWorkspace!.id, channel: widget.channel,
+      storeDetails: _storeDetails, badge: '', confirmedOn: ''),
+      current: () => _current);
+  late final BuyV2Session _buy = BuyV2Session(core: _core, reviewDataEnabled: false,
+    cataloguePageSource: _source, productContentAdapter: _source,
+    marketplaceTrustAdapter: BuyV2CatalogueMarketplaceTrustAdapter(
+      storeSource: (_) => _current ? widget.work.workspacePublicStoreDetails : null),
+    customerStateStore: _stateStore,
+    cartBenefitsAdapter: const BuyV2DisabledCartBenefitsAdapter(),
+    orderResolutionAdapter: const BuyV2UnavailableOrderResolutionAdapter(),
+    shoppingAlertsAdapter: const BuyV2UnavailableShoppingAlertsAdapter(),
+    commerceAdapter: const BuyV2UnavailableCommerceAdapter());
+  bool get _current => mounted && kDebugMode && widget.work.gateway is ReviewWorkGateway &&
+    _storeId != null && widget.work.activeWorkspace?.id == _storeId &&
+    identical(widget.saved, _saved) && widget.channel == _channel &&
+    widget.work.publicationPreferencesContext == _owner &&
+    jsonEncode(widget.work.workspacePublicationDetails.toJson()) == _storeDetailsKey &&
+    widget.work.workspaceCatalogueItems.any((item) => identical(item, widget.saved));
+  @override void initState() {
+    super.initState();
+    if (_current && _projectionIssue == null) { _buy; _sessionStarted = true; }
+  }
+  @override void dispose() {
+    if (_sessionStarted) { _buy.dispose(); _core.dispose(); }
+    super.dispose();
+  }
+  @override Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(child: Column(children: [
+      Padding(padding: const EdgeInsets.fromLTRB(12, 2, 4, 2), child: Row(children: [
+        const Expanded(child: Text('Customer preview · saved Store product', style: TextStyle(fontSize: 12))),
+        IconButton(tooltip: 'Close customer preview', onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+      ])),
+      const Text('Test preview · Not published · Ordering unavailable', style: TextStyle(fontSize: 11)),
+      Expanded(child: AnimatedBuilder(animation: widget.work, builder: (context, _) {
+        if (!_current) {
+          return const Center(child: Text('The Store or saved product changed. Close this preview and reopen the product.'));
+        }
+        if (_projectionIssue case final issue?) {
+          return Center(child: Padding(padding: const EdgeInsets.all(16), child: Text(issue)));
+        }
+        if (!_sessionStarted) {
+          return const Center(child: Text('Close this preview and reopen the product.'));
+        }
+        return BuyV2Screen(session: _buy, initialDestination: widget.channel, initialView: BuyV2View.product,
+          productId: _source.product.id, onExit: () => Navigator.pop(context));
+      })),
+    ])),
+  );
+}
+
+/// A route-local store must be explicit: device-review constructor defaults
+/// otherwise use personal shopping persistence even with reviewDataEnabled=false.
+class _SavedProductPreviewStateStore implements BuyV2CustomerStateStore {
+  _SavedProductPreviewStateStore(this.ownerScope, this.current);
+  @override final String ownerScope;
+  final bool Function() current;
+  BuyV2CustomerStateSnapshot? _snapshot;
+  @override Future<BuyV2CustomerStateSnapshot?> read() async => current() ? _snapshot : null;
+  @override Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
+    if (!current()) return false;
+    _snapshot = snapshot;
+    return true;
+  }
+}
+
+class _SavedProductPreviewGateway implements BuyOrderGateway, BuyMedicineGateway {
+  const _SavedProductPreviewGateway();
+  static const _unavailable = BuyServiceException('Ordering is unavailable in Customer preview.');
+  @override Future<BuyOrderReceipt> placeOrder({required List<BuyCartLine> lines,
+    required int total, required BuyFulfilment fulfilment, required String address,
+    required String deliveryPromise, required BuyPaymentMethod paymentMethod}) async => throw _unavailable;
+  @override Future<String> submitPrescription({required String productId}) async => throw _unavailable;
+  @override Future<String> requestPharmacist({required String question}) async => throw _unavailable;
+}
+
+class _SavedStoreProductPreviewSource implements BuyV2CataloguePageSource, BuyV2ProductContentAdapter {
+  _SavedStoreProductPreviewSource({required this.saved, required this.product, required this.current});
+  final WorkspaceCatalogueItem saved;
+  final BuyV2Product product;
+  final bool Function() current;
+  @override Future<List<BuyV2Product>> resolveProducts(Set<String> ids) async =>
+    current() && ids.contains(product.id) ? [product] : [];
+  @override Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(BuyV2CatalogueQuery query,
+    {String? cursor, required int pageSize}) async => BuyV2CataloguePage(queryKey: query.key,
+      snapshotId: 'saved-store-preview', startIndex: 0,
+      items: current() && cursor == null && query.destination == product.destination ? [product] : []);
+  @override Future<BuyV2CataloguePage<BuyV2StoreListing>> loadStores(BuyV2CatalogueQuery query,
+    {String? cursor, required int pageSize}) async => BuyV2CataloguePage(queryKey: query.key,
+      snapshotId: 'saved-store-preview', startIndex: 0, items: const []);
+  @override BuyV2ProductContentSnapshot snapshotFor(BuyV2Product selected) =>
+    current() && selected.id == product.id && selected.storeId == product.storeId &&
+        selected.canonicalId == product.canonicalId && selected.destination == product.destination && selected.offerClass == product.offerClass
+      ? WorkspacePublicContentAdapter(storeId: product.storeId!, item: saved,
+          sourceId: 'saved-store-preview:${product.storeId}:${product.id}').snapshotFor(selected)
+      : BuyV2ProductContentSnapshot(productId: selected.id, state: BuyV2ProductContentState.unavailable,
+          sourceId: 'saved-store-preview');
 }
 
 class _CatalogueProductEditor extends StatefulWidget {
@@ -26419,6 +28891,25 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       });
   }
 
+  Future<void> _openSavedCustomerPreview() async {
+    if (!_reviewEditorCurrent || _hasUnsavedEdits || _savingInventory || !await widget.session.workspaceInventorySaved || !mounted || !_reviewEditorCurrent) return;
+    final saved = widget.session.workspaceCatalogueItems.where((item) => item.id == widget.product.id).firstOrNull;
+    if (saved == null) return;
+    final channels = [if (saved.retailEnabled) BuyV2Destination.shop,
+      if (saved.wholesaleOffer?.enabled == true && saved.wholesaleOffer!.valid) BuyV2Destination.wholesale];
+    if (channels.isEmpty) return;
+    final channel = channels.length == 1 ? channels.single : await showModalBottomSheet<BuyV2Destination>(
+      context: context, builder: (sheet) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        for (final value in channels) ListTile(title: Text(value == BuyV2Destination.shop ? 'Retail'
+          : saved.wholesaleOffer!.saleType == BuyV2WholesaleSaleType.bulk ? 'Bulk' : 'Wholesale'),
+          onTap: () => Navigator.pop(sheet, value)),
+      ])));
+    if (channel == null || !mounted || !_reviewEditorCurrent || _hasUnsavedEdits ||
+        !identical(widget.session.workspaceCatalogueItems.where((item) => item.id == saved.id).firstOrNull, saved)) { return; }
+    await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => SavedStoreProductCustomerPreview(
+      work: widget.session, saved: saved, channel: channel)));
+  }
+
   Future<void> _editVariantOptions({bool create = false}) async {
     if (_savingInventory || _saved) return;
     if (_title.text.trim().isEmpty) { _reject('Enter the product name before creating its group.', field: 'title'); return; }
@@ -26451,17 +28942,51 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       },
     };
     String? error;
+    BuildContext? focusedInput;
+    bool revealPending = false;
+    double? inputViewportDimension;
+    void revealInput() {
+      if (revealPending) return;
+      revealPending = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        revealPending = false;
+        final target = focusedInput;
+        if (target != null && target.mounted) Scrollable.ensureVisible(target, alignment: .15);
+      });
+    }
+    Widget revealOnFocus(Widget input) => Builder(builder: (inputContext) => Focus(
+      skipTraversal: true,
+      onFocusChange: (focused) {
+        if (focused) {
+          focusedInput = inputContext;
+          revealInput();
+        } else if (focusedInput == inputContext) {
+          focusedInput = null;
+        }
+      },
+      child: input,
+    ));
     final result = await showDialog<({WorkspaceVariantFamily family, Map<String, Map<String, String>> selections})>(
-      context: context, builder: (dialogContext) => StatefulBuilder(builder: (context, update) => AlertDialog(
+      context: context, builder: (dialogContext) => StatefulBuilder(builder: (context, update) => NotificationListener<ScrollMetricsNotification>(
+          onNotification: (notification) {
+            if (notification.depth == 0 && notification.metrics.axis == Axis.vertical &&
+                inputViewportDimension != notification.metrics.viewportDimension) {
+              inputViewportDimension = notification.metrics.viewportDimension;
+              revealInput();
+            }
+            return false;
+          },
+          child: AlertDialog(
+        scrollable: true,
         title: Text(create ? 'New product group' : 'Edit group options'),
-        content: SizedBox(width: 440, child: SingleChildScrollView(child: Column(
+        content: SizedBox(width: 440, child: Column(
           mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           const Text('Add dimensions such as Colour, Storage, Size or Flavour. Enter one option per line. Only combinations you save become SKUs.'),
           for (var i = 0; i < dimensions.length; i++) ...[
             const SizedBox(height: 16),
-            TextFormField(key: ValueKey('family-dimension-${dimensions[i].id}'),
+            revealOnFocus(TextFormField(key: ValueKey('family-dimension-${dimensions[i].id}'),
               initialValue: dimensions[i].label, decoration: const InputDecoration(labelText: 'Dimension name'),
-              onChanged: (value) { final old = dimensions[i]; dimensions[i] = (id: old.id, label: value, kind: old.kind, values: old.values); }),
+              onChanged: (value) { final old = dimensions[i]; dimensions[i] = (id: old.id, label: value, kind: old.kind, values: old.values); })),
             const SizedBox(height: 8),
             DropdownButtonFormField<BuyV2VariantDimensionKind>(
               initialValue: dimensions[i].kind, isExpanded: true,
@@ -26475,11 +29000,11 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
               onChanged: (value) { if (value == null) return; final old = dimensions[i];
                 dimensions[i] = (id: old.id, label: old.label, kind: value, values: old.values); }),
             const SizedBox(height: 8),
-            TextFormField(key: ValueKey('family-options-${dimensions[i].id}'),
+            revealOnFocus(TextFormField(key: ValueKey('family-options-${dimensions[i].id}'),
               initialValue: dimensions[i].values, minLines: 2, maxLines: 6,
-              decoration: const InputDecoration(labelText: 'Options — one per line'),
+              decoration: const InputDecoration(labelText: 'Options'),
               onChanged: (value) => update(() { final old = dimensions[i];
-                dimensions[i] = (id: old.id, label: old.label, kind: old.kind, values: value); })),
+                dimensions[i] = (id: old.id, label: old.label, kind: old.kind, values: value); }))),
             if (base != null)
               for (final member in members) ...[
                 if (!member.variantMembership!.selections.containsKey(dimensions[i].id)) ...[
@@ -26500,7 +29025,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           TextButton.icon(onPressed: dimensions.length >= 8 ? null : () => update(addDimension),
             icon: const Icon(Icons.add), label: const Text('Add dimension')),
           if (error != null) Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-        ]))),
+        ])),
         actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
           FilledButton(onPressed: () {
             try {
@@ -26534,7 +29059,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
               Navigator.pop(dialogContext, (family: family, selections: selected));
             } on FormatException catch (failure) { update(() => error = failure.message); }
           }, child: const Text('Use these options'))],
-      )));
+      ))));
     if (!mounted || result == null) return;
     setState(() {
       if (create) { _variantSelections.clear(); _siblingVariantSelections.clear(); }
@@ -27671,6 +30196,13 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     final keyboardInset = widget.embeddedPage
         ? 0.0
         : MediaQuery.viewInsetsOf(context).bottom;
+    final view = View.of(context);
+    final exportedClearance = widget.embeddedPage &&
+            defaultTargetPlatform == TargetPlatform.android && view.viewInsets.bottom == 0
+        ? moolAndroidExportedSemanticsClearance(
+            viewPadding: EdgeInsets.fromViewPadding(view.viewPadding, view.devicePixelRatio),
+            platform: defaultTargetPlatform).clamp(36.0, double.infinity).toDouble()
+        : 0.0;
     final product = widget.product.copyWith(
       privatePhoto: _matchingPhoto,
       clearPrivatePhoto: _matchingPhoto == null,
@@ -27929,6 +30461,11 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                               ),
                             if (_wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null)
                               _productSubmissionControls(),
+                            if (kDebugMode && widget.session.gateway is ReviewWorkGateway && widget.session.localInventoryEnabled &&
+                                _wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null)
+                              TextButton.icon(key: const Key('work-product-customer-preview'),
+                                onPressed: !_reviewEditorCurrent || _hasUnsavedEdits || _savingInventory ? null : _openSavedCustomerPreview,
+                                icon: const Icon(Icons.preview_outlined), label: const Text('Customer preview')),
                             if (_wasOwned && widget.product.wholesaleOffer?.enabled == true && widget.purchaseScope == null &&
                                 widget.importRow == null && widget.onDraftReviewed == null) ...[
                               TextButton.icon(key: const Key('work-product-confirm-trade-price'),
@@ -27989,6 +30526,14 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                               'work-product-delivery',
                               'Customer delivery promise',
                               _delivery,
+                              hint: 'Your delivery terms',
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.only(top: 4),
+                              child: Text(
+                                'Required for public review. You can save private Stock without it.',
+                                style: TextStyle(fontSize: 12, height: 1.4, color: MoolColors.muted),
+                              ),
                             ),
                             const SizedBox(height: 10),
                             _group([
@@ -28285,7 +30830,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                   top: false,
                   child: Container(
                     color: Colors.white,
-                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                    padding: EdgeInsets.fromLTRB(10, 8, 10, 8 + exportedClearance),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -30067,15 +32612,19 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
         onClose: () => setState(() { _bulkQuotesOpen = false; }));
     }
     if (_feedbackOpen) {
-      return StoreCustomerFeedback(
+      void closeFeedback() => setState(() { _feedbackOpen = false; });
+      return _storeInlineBackPriority(context,
+        enabled: () => _feedbackOpen,
+        onBack: closeFeedback,
+        child: StoreCustomerFeedback(
         controller: widget.session.workspaceCustomerFeedback,
         orderId: widget.orderId,
-        onClose: () => setState(() { _feedbackOpen = false; }),
+        onClose: closeFeedback,
         onOpenOrder: (id) {
-          setState(() { _feedbackOpen = false; });
+          closeFeedback();
           widget.onOpenOrder(id);
         },
-      );
+      ));
     }
     bool matches(WorkspaceOrderRecord order, String filter) => switch (filter) {
       'Live' => !order.isClosed,
@@ -34798,6 +37347,80 @@ class _StoreSupplierRefundTarget {
     openingRevision: opening.revision, copyId: copy?.id, copyRevision: copy?.revision);
 }
 
+String _supplierRefundPrintedDate(String value) {
+  if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) return value;
+  final day = DateTime.tryParse(value);
+  if (day == null || !day.toIso8601String().startsWith(value)) return value;
+  return '${value.substring(8)}/${value.substring(5, 7)}/${value.substring(0, 4)}';
+}
+
+class _StoreSupplierRefundSourceSelector extends StatefulWidget {
+  const _StoreSupplierRefundSourceSelector({required this.supplierName, required this.sources});
+  final String supplierName;
+  final List<_StoreSupplierRefundTarget> sources;
+  @override
+  State<_StoreSupplierRefundSourceSelector> createState() => _StoreSupplierRefundSourceSelectorState();
+}
+
+class _StoreSupplierRefundSourceSelectorState extends State<_StoreSupplierRefundSourceSelector> {
+  final search = TextEditingController();
+  String normalized(String value) => value.toLowerCase().replaceAll(RegExp(r'\s'), '');
+  @override
+  void dispose() { search.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => Dialog.fullscreen(child: SafeArea(child: LayoutBuilder(builder: (context, bounds) {
+    final query = normalized(search.text);
+    // Enumerate before filtering: row identity and returned source stay unchanged.
+    final visible = widget.sources.indexed.where((row) => normalized(row.$2.label).contains(query)).toList();
+    final short = bounds.maxHeight < MediaQuery.textScalerOf(context).scale(160);
+    const heading = Text('Choose refund source',
+      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy));
+    final identity = Align(alignment: Alignment.centerLeft, child: Text(widget.supplierName,
+      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.ink)));
+    const guide = Text('Choose the bill or advance linked to the refund. You can also reopen a saved request.',
+      style: TextStyle(fontSize: 12, color: MoolColors.muted));
+    final close = IconButton(key: const Key('supplier-refund-source-close'), tooltip: 'Close',
+      onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 20));
+    final searchField = TextField(key: const Key('supplier-refund-source-search'), controller: search,
+      onChanged: (_) => setState(() {}), style: const TextStyle(fontSize: 13), textInputAction: TextInputAction.search,
+      decoration: InputDecoration(hintText: 'Search bill, advance or date', isDense: true,
+        constraints: const BoxConstraints(minHeight: 48), prefixIcon: const Icon(Icons.search, size: 20),
+        suffixIcon: search.text.isEmpty ? null : IconButton(tooltip: 'Clear source search',
+          onPressed: () { search.clear(); setState(() {}); }, icon: const Icon(Icons.clear, size: 20))));
+    final empty = Padding(padding: const EdgeInsets.all(16), child: Text(widget.sources.isEmpty
+      ? 'No saved bill or advance. Recover the supplier account or record the supporting bill first.'
+      : 'No matching sources', style: const TextStyle(fontSize: 13)));
+    return Column(key: const Key('supplier-refund-source-selector'), children: [
+      if (short) Padding(padding: const EdgeInsets.only(left: 12, right: 4),
+        child: Row(children: [Expanded(child: searchField), close]))
+      else ...[
+        Padding(padding: const EdgeInsets.only(left: 12, right: 4), child: Row(children: [Expanded(child: heading), close])),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: bounds.maxHeight * .15), child: SingleChildScrollView(child: identity))),
+        const Padding(padding: EdgeInsets.fromLTRB(12, 4, 12, 0), child: guide),
+        Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 8), child: searchField),
+      ],
+      Expanded(child: visible.isEmpty && !short ? Center(child: empty)
+        : ListView.builder(key: const Key('supplier-refund-source-results'), itemCount: visible.length + (short ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (short && index == 0) {
+              return Padding(padding: const EdgeInsets.all(12), child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, children: [heading, const SizedBox(height: 4), identity,
+                const SizedBox(height: 4), guide, if (visible.isEmpty) empty]));
+            }
+            final row = visible[index - (short ? 1 : 0)];
+            return InkWell(key: ValueKey('supplier-refund-source-${row.$1}'), onTap: () => Navigator.pop(context, row.$2),
+              child: Container(constraints: const BoxConstraints(minHeight: 48),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: MoolColors.line))),
+                child: Row(children: [Expanded(child: Text(row.$2.label,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.navy))),
+                  const SizedBox(width: 8), const Icon(Icons.chevron_right, size: 18, color: MoolColors.muted)])));
+          })),
+    ]);
+  })));
+}
+
 Future<void> _chooseSupplierRefund(BuildContext context, WorkSession session, String supplierId) async {
   final opening = session.workspaceSupplierOpeningRecord(supplierId);
   if (opening == null) return;
@@ -34805,28 +37428,21 @@ Future<void> _chooseSupplierRefund(BuildContext context, WorkSession session, St
   final sources = <_StoreSupplierRefundTarget>[
     if (opening.supplierCredit) _StoreSupplierRefundTarget(supplierId: supplierId,
       sourceKind: WorkspaceSupplierRefundSourceKind.openingAdvance, sourceId: opening.id,
-      label: 'Starting advance · ${opening.asOfDate}', opening: opening),
+      label: 'Starting advance · ${_supplierRefundPrintedDate(opening.asOfDate)}', opening: opening),
     for (final entry in ledger?.entries ?? <WorkspaceSupplierLedgerEntry>[])
       if (entry.origin == WorkspaceSupplierEntryOrigin.supplierAccount && entry.kind == WorkspaceSupplierEntryKind.advance)
         _StoreSupplierRefundTarget(supplierId: supplierId,
           sourceKind: WorkspaceSupplierRefundSourceKind.accountAdvance, sourceId: entry.operationId,
-          label: 'Advance · ${entry.reference} · ${entry.moneyReview?.occurredOn ?? ''}', opening: opening),
+          label: 'Advance · ${entry.reference} · ${_supplierRefundPrintedDate(entry.moneyReview?.occurredOn ?? '')}', opening: opening),
     for (final copy in session.workspaceLatestPurchaseCopies.where((c) => c.supplier.id == supplierId))
       _StoreSupplierRefundTarget(supplierId: supplierId, sourceKind: WorkspaceSupplierRefundSourceKind.manualBillSurplus,
         sourceId: copy.draft.id, label: 'Bill ${copy.draft.invoiceReference} · ${copy.draft.invoiceDate}',
         opening: opening, copy: copy),
   ];
-  final target = await showModalBottomSheet<_StoreSupplierRefundTarget>(context: context, useSafeArea: true,
-    isScrollControlled: true, builder: (sheet) => SafeArea(top: false, child: ListView(shrinkWrap: true,
-      padding: const EdgeInsets.all(16), children: [
-        const Text('Refund received from supplier', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        const Text('Choose the bill or advance. Saved requests remain available even when no credit remains.'),
-        if (sources.isEmpty) const Text('No saved bill or advance. Recover the supplier account or record the supporting bill first.'),
-        for (var i = 0; i < sources.length; i++) ListTile(contentPadding: EdgeInsets.zero,
-          key: ValueKey('supplier-refund-source-$i'), title: Text(sources[i].label),
-          trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.pop(sheet, sources[i])),
-        TextButton(onPressed: () => Navigator.pop(sheet), child: const Text('Close')),
-      ])));
+  final target = await showDialog<_StoreSupplierRefundTarget>(context: context, useSafeArea: true,
+    builder: (_) => _StoreSupplierRefundSourceSelector(
+      supplierName: session.workspaceSuppliers.where((supplier) => supplier.id == supplierId).firstOrNull?.name ?? 'Supplier unavailable',
+      sources: sources));
   if (target != null && context.mounted) await _showSupplierRefund(context, session, target);
 }
 
@@ -34845,11 +37461,15 @@ class _StoreSupplierRefundSheet extends StatefulWidget {
 
 class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
   late final _LedgerFormAutosave draft;
+  final formFocus = FocusScopeNode();
   final amount = TextEditingController(), reference = TextEditingController(), date = TextEditingController();
   String channel = 'Cash';
   WorkspaceSupplierRefundIntent? frozen;
   WorkspaceLedgerFormDraft? resetAttempt;
-  bool busy = false, closing = false, recovered = false, statusVerified = false;
+  WorkspaceSupplierMoneyCopies? supportingCopies;
+  bool _busy = false, closing = false, recovered = false, statusVerified = false;
+  Object? _copyBusyLease;
+  bool get busy => _busy || _copyBusyLease != null;
   String? confirmedAttempt;
   bool get confirmed => current && frozen != null &&
     confirmedAttempt == jsonEncode(frozen!.toJson());
@@ -34886,12 +37506,13 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
   Map<String, String> get fields => {'amount': amount.text, 'reference': reference.text,
     'channel': channel, 'occurredOn': frozen?.occurredOn ?? date.text,
     'sourceKind': widget.target.sourceKind.name, 'sourceId': widget.target.sourceId,
-    if (frozen != null) 'attempt': jsonEncode(frozen!.toJson())};
+    if (frozen != null) 'attempt': jsonEncode(frozen!.toJson()),
+    if (supportingCopies != null) 'supportingCopies': jsonEncode(supportingCopies!.toJson())};
   @override
   void initState() {
     super.initState();
     draft = _LedgerFormAutosave(widget.session, widget.target.key(widget.session));
-    draft.addListener(refresh); unawaited(load());
+    draft.addListener(refresh); FocusManager.instance.addListener(refresh); unawaited(load());
   }
   void refresh() { if (mounted) setState(() {}); }
   Future<void> verify() async {
@@ -34908,16 +37529,22 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
   }
   Future<void> load() async {
     if (busy || draft.busy) return;
-    setState(() { busy = true; error = null; });
+    setState(() { _busy = true; error = null; });
     try {
       if (!await flushPending() || !mounted || !current) return;
       final saved = await draft.load();
       if (!mounted || saved == null || !current) throw StateError('Saved request unavailable');
+      final copies = WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision ?? 1,
+        fields: saved).supplierRefundCopies;
+      if (copies != null && copies.qa != widget.session.workspaceSupplierScope?.$3) {
+        throw const FormatException('Saved refund copies belong to another Store mode');
+      }
       frozen = saved['attempt']?.isNotEmpty == true
         ? WorkspaceSupplierRefundIntent.fromJson(jsonDecode(saved['attempt']!)) : null;
+      supportingCopies = copies;
       amount.text = saved['amount'] ?? ''; reference.text = saved['reference'] ?? '';
       channel = saved['channel']?.isNotEmpty == true ? saved['channel']! : 'Cash';
-      date.text = frozen == null ? saved['occurredOn'] ?? printedDate(DateTime.now().toUtc().toIso8601String().substring(0, 10))
+      date.text = frozen == null ? saved['occurredOn'] ?? printedDate(DateTime.now().toIso8601String().substring(0, 10))
         : printedDate(frozen!.occurredOn);
       if (frozen != null) await verify();
       recovered = await widget.session.recoverCustomerLedger();
@@ -34926,7 +37553,7 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
     } on Object {
       recovered = false;
       error = confirmed ? 'Refund recorded; account refresh pending.' : 'Saved refund status is unverified. Keep these details and retry.';
-    } finally { if (mounted) setState(() => busy = false); }
+    } finally { if (mounted) setState(() => _busy = false); }
   }
   Future<bool> flushPending() async {
     if (!draft.ready) return true;
@@ -34936,31 +37563,33 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
   Future<void> close() async {
     if (busy || closing || draft.busy) return;
     final route = ModalRoute.of(context);
-    setState(() { closing = true; busy = true; });
+    setState(() { closing = true; _busy = true; });
     try {
       if (await flushPending() && mounted && route?.isCurrent == true) {
         Navigator.pop(context);
       }
     } finally {
-      if (mounted) setState(() { closing = false; busy = false; });
+      if (mounted) setState(() { closing = false; _busy = false; });
     }
   }
   Future<void> submit() async {
     if (busy || !current || !draft.ready || draft.busy) return;
-    setState(() { busy = true; error = null; });
+    setState(() { _busy = true; error = null; });
     try {
       if (!await draft.flush() || !mounted || !current) return;
       if (confirmed) {
         if (!recovered) { error = 'Refresh the account before recording another refund.'; return; }
-        resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1, fields: const {});
+        resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1, fields: {
+          if (supportingCopies != null) 'supportingCopies': jsonEncode(supportingCopies!.archiveRefund(frozen!).toJson())});
         if (!await widget.session.resetConfirmedWorkspaceSupplierRefundDraft(resetAttempt!, expectedRevision: draft.revision!)) {
           error = 'Recorded refund is kept. Retry recovery before starting another.'; return;
         }
         if (!mounted || !current) return;
         draft.revision = resetAttempt!.revision; draft.pending = null; draft.error = null;
+        supportingCopies = resetAttempt!.supplierRefundCopies;
         frozen = null; resetAttempt = null; confirmedAttempt = null; statusVerified = false;
         amount.clear(); reference.clear(); channel = 'Cash';
-        date.text = printedDate(DateTime.now().toUtc().toIso8601String().substring(0, 10));
+        date.text = printedDate(DateTime.now().toIso8601String().substring(0, 10));
         return;
       }
       if (frozen == null) {
@@ -34988,12 +37617,63 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
         : 'Refund not confirmed. Keep and retry this same saved request.';
     } on Object {
       error = confirmed ? 'Refund recorded; account refresh pending.' : 'Refund status unverified. Keep and recover this saved request.';
-    } finally { if (mounted) setState(() => busy = false); }
+    } finally { if (mounted) setState(() => _busy = false); }
   }
   @override
   void dispose() {
-    draft.removeListener(refresh); draft.dispose(); amount.dispose(); reference.dispose(); date.dispose(); super.dispose();
+    draft.removeListener(refresh); draft.dispose();
+    FocusManager.instance.removeListener(refresh); formFocus.dispose();
+    amount.dispose(); reference.dispose(); date.dispose(); super.dispose();
   }
+  InputDecoration _refundInput(String? label, {String? helper}) => InputDecoration(
+    labelText: label, helperText: helper, helperMaxLines: 3, isDense: true,
+    labelStyle: const TextStyle(fontSize: 12), helperStyle: const TextStyle(fontSize: 11),
+    constraints: const BoxConstraints(minHeight: 48),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14));
+  EditableTextState? get _focusedRefundEditor {
+    final editor = FocusManager.instance.primaryFocus?.context?.findAncestorStateOfType<EditableTextState>();
+    return editor?.context.findAncestorStateOfType<_StoreSupplierRefundSheetState>() == this ? editor : null;
+  }
+  double _refundDateWidth(BuildContext context, double availableWidth) {
+    final theme = Theme.of(context);
+    final base = theme.useMaterial3 ? theme.textTheme.bodyLarge! : theme.textTheme.titleMedium!;
+    final painter = TextPainter(text: TextSpan(
+      text: RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(date.text) ? date.text : '00/00/0000',
+      style: base.merge(const TextStyle(fontSize: 13))),
+      textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
+    // Material 3 also reserves the outline's gap on each side of the input.
+    final border = theme.inputDecorationTheme.border;
+    final outlineGaps = theme.useMaterial3 && border is OutlineInputBorder ? border.gapPadding * 2 : 0.0;
+    final measured = (painter.width + 24 + outlineGaps + 8).ceilToDouble();
+    painter.dispose();
+    return (measured < 170 ? 170.0 : measured).clamp(0.0, availableWidth).toDouble();
+  }
+  Widget _refundViewport(BuildContext context, Widget body) => FocusScope(node: formFocus,
+    child: SafeArea(top: false, child: Padding(padding: EdgeInsets.only(
+      // Leave a small usable gap between field borders/help and the keyboard.
+      bottom: MediaQuery.viewInsetsOf(context).bottom > 0 ? MediaQuery.viewInsetsOf(context).bottom + 8 : 0),
+      child: LayoutBuilder(builder: (context, constraints) => ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: constraints.maxHeight),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(padding: const EdgeInsets.fromLTRB(16, 8, 8, 0), child: Row(children: [
+            const Expanded(child: Text('Supplier refund received',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+            if (_focusedRefundEditor?.widget.readOnly == false || MediaQuery.viewInsetsOf(context).bottom > 0)
+              IconButton(key: const Key('supplier-refund-hide-keyboard'), tooltip: 'Hide keyboard',
+                onPressed: formFocus.unfocus, icon: const Icon(Icons.keyboard_hide_outlined)),
+            TextButton(key: const Key('supplier-refund-close'),
+              style: TextButton.styleFrom(textStyle: const TextStyle(fontSize: 12)),
+              onPressed: busy || draft.busy ? null : close, child: const Text('Close')),
+          ])),
+          Flexible(child: NotificationListener<ScrollNotification>(onNotification: (notification) {
+            if (notification.depth == 0 &&
+                (notification is ScrollStartNotification || notification is ScrollUpdateNotification)) {
+              _focusedRefundEditor?.hideToolbar();
+            }
+            return false;
+          }, child: body)),
+        ]),
+      )))));
   @override
   Widget build(BuildContext context) {
     final editable = draft.ready && recovered && current && !busy && frozen == null;
@@ -35001,54 +37681,168 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
     final available = capacity;
     return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null,
       onPopInvokedWithResult: (didPop, result) async { if (!didPop) await close(); },
-      child: SafeArea(top: false, child: Padding(padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-        child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: _refundViewport(context, SingleChildScrollView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Theme(data: Theme.of(context).copyWith(textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(minimumSize: const Size(48, 48), textStyle: const TextStyle(fontSize: 12)))),
+        child: DefaultTextStyle.merge(style: const TextStyle(fontSize: 12, color: MoolColors.ink),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
-              Text('Supplier refund received', style: Theme.of(context).textTheme.titleMedium),
-              TextButton(key: const Key('supplier-refund-close'), onPressed: busy || draft.busy ? null : close, child: const Text('Close'))]),
-            Text('${widget.session.workspaceSuppliers.where((s) => s.id == widget.target.supplierId).firstOrNull?.name ?? 'Supplier'} · ${widget.target.label}'),
-            const Text('Records money received; no transfer or Stock change.'),
-            Text(available == null ? 'Available credit needs verification' : 'Available to receive ${_purchaseAmount(available)}',
-              key: const Key('supplier-refund-available')),
-            Wrap(spacing: 12, runSpacing: 8, children: [
+            Text(widget.session.workspaceSuppliers.where((s) => s.id == widget.target.supplierId).firstOrNull?.name ?? 'Supplier',
+              key: const Key('supplier-refund-supplier'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            Text(widget.target.label, key: const Key('supplier-refund-source')),
+            const SizedBox(height: 6),
+            const Text('Record money already received from your supplier.'),
+            const SizedBox(height: 6),
+            Text(available == null ? 'Available credit needs verification' : 'Available credit ${_purchaseAmount(available)}',
+              key: const Key('supplier-refund-available'), style: const TextStyle(fontWeight: FontWeight.w600)),
+            if (!retained && available == 0) const Padding(padding: EdgeInsets.only(top: 4),
+              child: Text('No refundable balance is recorded for this source. Refresh the supplier account or check its linked payments and credits.',
+                key: Key('supplier-refund-zero-guide'), style: TextStyle(fontSize: 11))),
+            const SizedBox(height: 8),
+            LayoutBuilder(builder: (context, constraints) => Wrap(spacing: 12, runSpacing: 8, children: [
               _purchaseCompactLabeledField('Amount received (₹)', width: 145, field: TextField(
                 key: const Key('supplier-refund-amount'), controller: amount, enabled: editable || retained,
                 readOnly: retained,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(fontSize: 13), decoration: _refundInput(null),
                 onChanged: editable ? (_) => draft.save(fields) : null)),
-              _purchaseCompactLabeledField('Received date', width: 145, field: TextField(
+              _purchaseCompactLabeledField('Receipt date', width: _refundDateWidth(context, constraints.maxWidth), field: TextField(
                 key: const Key('supplier-refund-date'), controller: date, enabled: editable || retained,
                 readOnly: retained,
-                decoration: InputDecoration(helperText: retained ? null : 'DD/MM/YYYY'), keyboardType: TextInputType.datetime,
+                style: const TextStyle(fontSize: 13),
+                decoration: _refundInput(null, helper: retained ? null : 'DD/MM/YYYY'), keyboardType: TextInputType.datetime,
                 onChanged: editable ? (_) => draft.save(fields) : null)),
-            ]),
+            ])),
             const SizedBox(height: 8),
             if (retained) Padding(padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text('Received by · $channel', key: const Key('supplier-refund-saved-method'),
-                style: Theme.of(context).textTheme.bodyLarge))
+              child: Text('Refund mode · $channel', key: const Key('supplier-refund-saved-method'),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)))
             else DropdownButtonFormField<String>(key: ValueKey('supplier-refund-method-$channel'), initialValue: channel,
-              isExpanded: true, decoration: const InputDecoration(labelText: 'Received by'),
+              isExpanded: true, style: const TextStyle(fontSize: 13, color: MoolColors.navy), decoration: _refundInput('Refund mode'),
               items: [for (final method in ['Cash', 'UPI', 'Bank transfer']) DropdownMenuItem(value: method, child: Text(method))],
               onChanged: editable ? (value) { setState(() => channel = value!); draft.save(fields); } : null),
+            const SizedBox(height: 8),
             TextField(key: const Key('supplier-refund-reference'), controller: reference, enabled: editable || retained,
               readOnly: retained,
-              decoration: InputDecoration(labelText: 'Refund reference',
-                helperText: retained ? null : 'Receipt No. / UPI reference / bank reference'),
+              style: const TextStyle(fontSize: 13), decoration: _refundInput('Refund reference'),
               onChanged: editable ? (_) => draft.save(fields) : null),
+            if (!retained) const Padding(padding: EdgeInsets.only(top: 4), child: Text(
+              'Receipt No. / UPI reference / bank reference', style: TextStyle(fontSize: 11))),
             if (frozen != null) Text(confirmed ? 'Refund recorded · ${_purchaseAmount(frozen!.amountMinor)}'
               : statusVerified ? 'Saved request · not recorded' : 'Saved refund status unverified', key: const Key('supplier-refund-status')),
             if (confirmed && recovered && ledger?.creditMinor != null) Text('Credit remaining with supplier ${_purchaseAmount(ledger!.creditMinor!)}'),
-            if (error != null || draft.error != null) Text(error ?? draft.error!),
-            if (frozen != null || error != null || draft.error != null || !recovered)
+            if (draft.ready && recovered && current && widget.session.workspaceSupplierScope != null &&
+                (frozen == null || supportingCopies?.active.isNotEmpty == true ||
+                  supportingCopies?.previous.isNotEmpty == true)) _SupplierPaymentDraftCopies(
+              session: widget.session, value: supportingCopies ?? WorkspaceSupplierMoneyCopies(
+                key: draft.key!, qa: widget.session.workspaceSupplierScope!.$3),
+              editable: editable && !draft.busy && draft.error == null,
+              saved: draft.pending == null && !draft.busy && draft.error == null,
+              isCurrent: () => mounted && current, beforeChange: draft.flush,
+              onBusy: (lease, active) {
+                if (mounted && (active || identical(_copyBusyLease, lease))) {
+                  setState(() => _copyBusyLease = active ? lease : null);
+                }
+              },
+              onChanged: (value) async {
+                if (!mounted || !current || frozen != null || !recovered) return false;
+                setState(() => supportingCopies = value);
+                draft.save(fields);
+                return draft.flush();
+              }),
+            if (error != null || draft.error != null) Text(error ?? draft.error!, style: const TextStyle(color: Color(0xffa52a2a))),
+            if (draft.error != null) TextButton(key: const Key('supplier-refund-retry-save'),
+              onPressed: busy ? null : () => draft.save(fields), child: const Text('Retry saving input')),
+            if (frozen != null || error != null || draft.error != null || !recovered || available == 0)
               TextButton(key: const Key('supplier-refund-recover'), onPressed: busy || draft.busy ? null : load,
-              child: const Text('Recover saved refund')),
+              child: Text(frozen == null && available == 0 ? 'Refresh supplier account' : 'Recover saved refund')),
             FilledButton(key: const Key('supplier-refund-submit'), onPressed: !busy && !draft.busy && draft.ready && current && draft.error == null &&
               (frozen != null || recovered && (available ?? 0) > 0) ? submit : null,
               child: Text(busy ? 'Recording…' : confirmed ? 'Record another refund'
                 : frozen == null ? 'Record refund received' : 'Retry same refund')),
-          ])))));
+          ]))))));
   }
+}
+
+class _StorePaymentBillSelector extends StatefulWidget {
+  const _StorePaymentBillSelector({required this.title, required this.purposeGuide, required this.supplierName, required this.copies});
+  final String title, purposeGuide;
+  final String? supplierName;
+  final List<WorkspacePurchaseSavedCopy> copies;
+  @override
+  State<_StorePaymentBillSelector> createState() => _StorePaymentBillSelectorState();
+}
+
+class _StorePaymentBillSelectorState extends State<_StorePaymentBillSelector> {
+  final search = TextEditingController();
+  late final List<WorkspacePurchaseSavedCopy> copies = List.of(widget.copies)..sort((a, b) {
+    final saved = b.savedAt.compareTo(a.savedAt);
+    return saved != 0 ? saved : a.id.compareTo(b.id);
+  });
+  String normalized(String value) => value.toLowerCase().replaceAll(RegExp(r'[,\s₹]'), '');
+  String total(WorkspacePurchaseSavedCopy copy) {
+    final amount = WorkspacePurchaseEntryDraft.printedPaise(copy.draft.details['invoiceTotal']);
+    return amount == null ? 'Total not entered' : 'Bill total ${_purchaseAmount(amount)}';
+  }
+  @override
+  void dispose() { search.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => Dialog.fullscreen(child: SafeArea(child: LayoutBuilder(builder: (context, bounds) {
+    final query = normalized(search.text);
+    final visible = copies.where((copy) => normalized('${widget.supplierName == null ? copy.supplier.name : ''} '
+      '${copy.draft.invoiceReference} ${copy.draft.invoiceDate} '
+      '${copy.draft.details['invoiceTotal'] ?? ''} ${total(copy)}').contains(query)).toList();
+    final short = bounds.maxHeight < MediaQuery.textScalerOf(context).scale(160);
+    final heading = Text(widget.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy));
+    final guide = Text(widget.purposeGuide, key: const Key('supplier-bill-purpose-guide'),
+      style: const TextStyle(fontSize: 12, color: MoolColors.muted));
+    final identity = widget.supplierName == null ? null : Align(alignment: Alignment.centerLeft, child: Text(widget.supplierName!,
+      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.ink)));
+    final close = IconButton(key: const Key('supplier-payment-bill-close'), tooltip: 'Close',
+      onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 20));
+    final searchField = TextField(
+        key: const Key('supplier-payment-bill-search'), controller: search, onChanged: (_) => setState(() {}),
+        style: const TextStyle(fontSize: 13), textInputAction: TextInputAction.search,
+        decoration: InputDecoration(hintText: widget.supplierName == null ? 'Search supplier or bill' : 'Search bill number, date or amount', isDense: true,
+          prefixIcon: const Icon(Icons.search, size: 20), suffixIcon: search.text.isEmpty ? null : IconButton(
+            tooltip: 'Clear bill search', onPressed: () { search.clear(); setState(() {}); }, icon: const Icon(Icons.clear, size: 20))));
+    final empty = Padding(padding: const EdgeInsets.all(16), child: Text(
+      copies.isEmpty ? 'No confirmed supplier bills available.' : 'No matching bills', style: const TextStyle(fontSize: 13)));
+    return Column(key: const Key('supplier-payment-bill-selector'), children: [
+      if (short) Padding(padding: const EdgeInsets.only(left: 12, right: 4), child: Row(children: [Expanded(child: searchField), close]))
+      else ...[
+        Padding(padding: const EdgeInsets.only(left: 12, right: 4), child: Row(children: [Expanded(child: heading), close])),
+        if (identity != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: bounds.maxHeight * .15), child: SingleChildScrollView(child: identity))),
+        Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 0), child: Align(alignment: Alignment.centerLeft, child: guide)),
+        Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 8), child: searchField),
+      ],
+      Expanded(child: visible.isEmpty && !short ? Center(child: empty)
+        : ListView.builder(key: const Key('supplier-payment-bill-results'), itemCount: visible.length + (short ? 1 : 0), itemBuilder: (context, index) {
+          if (short && index == 0) {
+            return Padding(padding: const EdgeInsets.all(12), child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, children: [heading,
+                if (identity != null) ...[const SizedBox(height: 4), identity],
+                const SizedBox(height: 4), guide, if (visible.isEmpty) empty]));
+          }
+          final copy = visible[index - (short ? 1 : 0)];
+          return InkWell(key: ValueKey('supplier-payment-bill-${copy.id}'), onTap: () => Navigator.pop(context, copy),
+            child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: MoolColors.line))),
+              child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (widget.supplierName == null) ...[
+                  Text(copy.supplier.name, style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+                  const SizedBox(height: 2),
+                ],
+                Text(copy.draft.invoiceReference, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.navy)),
+                const SizedBox(height: 4),
+                Wrap(alignment: WrapAlignment.spaceBetween, spacing: 12, runSpacing: 4, children: [
+                  Text(copy.draft.invoiceDate, style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+                  Text(total(copy), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.ink)),
+                ]),
+              ])), const SizedBox(width: 8), const Icon(Icons.chevron_right, size: 18, color: MoolColors.muted)])));
+        })),
+    ]);
+  })));
 }
 
 class _StoreSupplierMoneyTarget {
@@ -35567,12 +38361,54 @@ class _StoreSupplierCreditSheet extends StatefulWidget {
 
 class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
   late final _LedgerFormAutosave draft;
+  final formFocus = FocusScopeNode();
   final reference = TextEditingController(), amount = TextEditingController(),
     reason = TextEditingController(), date = TextEditingController();
   final selected = <String, (WorkspaceSupplierCreditSupport, TextEditingController)>{};
+  String treatment = '', reasonCode = '';
+  final taxRows = <Map<String, TextEditingController>>[];
+  final particulars = {for (final key in WorkspaceSupplierCreditDocumentInput.particularLimits.keys)
+    key: TextEditingController()};
+  static const particularLabels = <String, String>{'documentTitle': 'Printed document title',
+    'supplierName': 'Supplier legal name', 'supplierAddress': 'Supplier address', 'supplierGstin': 'Supplier GSTIN',
+    'buyerName': 'Buyer legal name', 'buyerAddress': 'Buyer billing address', 'buyerGstinUin': 'Buyer GSTIN / UIN',
+    'deliveryAddress': 'Delivery address', 'recipientState': 'Delivery State / UT', 'recipientStateCode': 'State / UT code',
+    'invoiceReferences': 'Invoice numbers & dates on note', 'signatureDetails': 'Signature / electronic authentication',
+    'irn': 'IRN, if printed', 'qrReference': 'QR text / reference, if provided'};
+  String? draftMessage, inputError;
+  static const reasonLabels = <String, String>{'return': 'Goods return', 'shortage': 'Short supply',
+    'damage': 'Damage / quality issue', 'price': 'Price correction', 'tax': 'Tax correction',
+    'discount': 'Discount / rebate', 'other': 'Other reason'};
+  WorkspaceSupplierCreditDocumentInput get documentInput => WorkspaceSupplierCreditDocumentInput(
+    treatment: treatment, reasonCode: reasonCode,
+    taxRows: [for (final row in taxRows) {for (final field in row.entries) field.key: field.value.text}],
+    particulars: {for (final entry in particulars.entries) if (entry.value.text.isNotEmpty) entry.key: entry.value.text});
+  void clearTaxRows() {
+    for (final row in taxRows) { for (final controller in row.values) { controller.dispose(); } }
+    taxRows.clear();
+  }
+  Map<String, TextEditingController> taxRow([Map<String, String> saved = const {}]) => {
+    for (final field in WorkspaceSupplierCreditDocumentInput.taxFields)
+      field: TextEditingController(text: saved[field] ?? ''),
+  };
+  bool changed() {
+    draftMessage = null;
+    final snapshot = fields;
+    if (draft.key == null || !WorkspaceLedgerFormDraft(key: draft.key!,
+        revision: draft.revision ?? 1, fields: snapshot).valid) {
+      setState(() => inputError = 'These details are too long to save. Shorten the entries; your input is kept here.');
+      return false;
+    }
+    inputError = null;
+    draft.save(snapshot);
+    return true;
+  }
   WorkspaceSupplierCreditIntent? frozen;
   WorkspaceLedgerFormDraft? resetAttempt;
-  bool busy = false, recovered = false, confirmed = false, conflict = false;
+  WorkspaceSupplierMoneyCopies? supportingCopies;
+  bool _busy = false, recovered = false, confirmed = false, conflict = false;
+  Object? _copyBusyLease;
+  bool get busy => _busy || _copyBusyLease != null;
   String? error;
   WorkspaceSupplierLedger? get ledger => widget.session.workspaceSupplierLedger(widget.copy.supplier.id);
   bool get current => draft.key != null &&
@@ -35597,12 +38433,15 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
       {'support': value.$1.toJson(), 'quantity': value.$2.text}])
       : jsonEncode(frozen!.supports.map((s) => s.toJson()).toList()),
     if (frozen != null) 'attempt': jsonEncode(frozen!.toJson()),
+    if (frozen == null) 'documentInput': jsonEncode(documentInput.toJson()),
+    if (supportingCopies != null) 'supportingCopies': jsonEncode(supportingCopies!.toJson()),
   };
   @override
   void initState() {
     super.initState();
     draft = _LedgerFormAutosave(widget.session, widget.session.supplierCreditFormKey(widget.copy));
     draft.addListener(refresh);
+    FocusManager.instance.addListener(refresh);
     unawaited(load());
   }
   void refresh() { if (mounted) setState(() {}); }
@@ -35611,6 +38450,13 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
     selected.clear();
   }
   void restore(Map<String, String> saved) {
+    final savedDraft = WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision ?? 1, fields: saved);
+    if (!savedDraft.valid) throw const FormatException('Invalid saved credit input');
+    final input = savedDraft.supplierCreditDocumentInput;
+    final copies = savedDraft.supplierCreditCopies;
+    if (copies != null && copies.qa != widget.session.workspaceSupplierScope?.$3) {
+      throw const FormatException('Saved credit copies belong to another Store mode');
+    }
     final text = saved['attempt'];
     final intent = text == null || text.isEmpty ? null : WorkspaceSupplierCreditIntent.fromJson(jsonDecode(text));
     final restored = <String, (WorkspaceSupplierCreditSupport, TextEditingController)>{};
@@ -35640,6 +38486,26 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
     reason.text = saved['reason'] ?? '';
     date.text = intent == null ? saved['occurredOn'] ?? '' : printedDate(intent.occurredOn);
     frozen = intent;
+    supportingCopies = copies;
+    treatment = input?.treatment ?? ''; reasonCode = input?.reasonCode ?? '';
+    for (final entry in particulars.entries) { entry.value.text = input?.particulars[entry.key] ?? ''; }
+    clearTaxRows();
+    if (input != null) taxRows.addAll(input.taxRows.map(taxRow));
+    draftMessage = null; inputError = null;
+  }
+  Future<void> saveDocumentDraft() async {
+    if (busy || conflict || !recovered || !draft.ready || !current || frozen != null) return;
+    formFocus.unfocus();
+    if (!changed()) return;
+    final snapshot = jsonEncode(fields);
+    setState(() => _busy = true);
+    try {
+      final saved = await draft.flush();
+      if (!mounted || !current) return;
+      setState(() => draftMessage = saved && draft.pending == null && !draft.busy &&
+        draft.error == null && snapshot == jsonEncode(fields)
+        ? 'Draft saved · not applied to your supplier account.' : null);
+    } finally { if (mounted) setState(() => _busy = false); }
   }
   Future<void> verifyStatus() async {
     confirmed = false;
@@ -35652,7 +38518,7 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
   }
   Future<void> load() async {
     if (busy || draft.busy) return;
-    setState(() { busy = true; recovered = false; confirmed = false; });
+    setState(() { _busy = true; recovered = false; confirmed = false; });
     try {
       if (draft.pending != null) {
         draft.save(fields);
@@ -35672,19 +38538,24 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
     } on Object {
       recovered = false; conflict = true;
       error = 'Credit-note status could not be verified. Keep these details and retry recovery.';
-    } finally { if (mounted) setState(() => busy = false); }
+    } finally { if (mounted) setState(() => _busy = false); }
   }
   Future<void> submit() async {
+    if (frozen == null) { await saveDocumentDraft(); return; }
     if (busy || conflict || !recovered || !draft.ready || !current) return;
-    setState(() { busy = true; error = null; });
+    setState(() { _busy = true; error = null; });
     try {
       if (!await draft.flush() || !mounted || !current) return;
       if (confirmed) {
         resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1,
-          fields: const {'reference': '', 'amount': '', 'reason': '', 'occurredOn': '', 'supports': '[]'});
+          fields: {'reference': '', 'amount': '', 'reason': '', 'occurredOn': '', 'supports': '[]',
+            if (supportingCopies != null) 'supportingCopies': jsonEncode(supportingCopies!.archiveCredit(frozen!).toJson())});
         if (await widget.session.resetConfirmedWorkspaceSupplierCreditDraft(resetAttempt!, expectedRevision: draft.revision!)) {
           draft.revision = resetAttempt!.revision; draft.pending = null; draft.error = null;
           reference.clear(); amount.clear(); reason.clear(); date.clear(); clearSelections();
+          treatment = ''; reasonCode = ''; clearTaxRows(); draftMessage = null;
+          for (final controller in particulars.values) { controller.clear(); }
+          supportingCopies = resetAttempt!.supplierCreditCopies;
           frozen = null; confirmed = false; resetAttempt = null;
         } else { error = 'Recorded credit note is kept. Retry recovery before starting another.'; }
         return;
@@ -35751,13 +38622,51 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
     } on Object {
       recovered = false;
       error = 'Credit-note status is unverified. Keep the request and retry recovery.';
-    } finally { if (mounted) setState(() => busy = false); }
+    } finally { if (mounted) setState(() => _busy = false); }
   }
   @override
   void dispose() {
-    draft.removeListener(refresh); draft.dispose(); clearSelections();
+    draft.removeListener(refresh); draft.dispose(); clearSelections(); clearTaxRows();
+    FocusManager.instance.removeListener(refresh); formFocus.dispose();
+    for (final controller in particulars.values) { controller.dispose(); }
     reference.dispose(); amount.dispose(); reason.dispose(); date.dispose(); super.dispose();
   }
+  InputDecoration _creditInput(String? label, {String? helper}) => InputDecoration(
+    labelText: label, helperText: helper, isDense: true,
+    labelStyle: const TextStyle(fontSize: 12), helperStyle: const TextStyle(fontSize: 11),
+    constraints: const BoxConstraints(minHeight: 48),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14));
+
+  EditableTextState? get _focusedCreditEditor {
+    final editor = FocusManager.instance.primaryFocus?.context?.findAncestorStateOfType<EditableTextState>();
+    return editor?.context.findAncestorStateOfType<_StoreSupplierCreditSheetState>() == this ? editor : null;
+  }
+
+  Widget _creditViewport(BuildContext context, Widget body, Future<void> Function() close) =>
+    FocusScope(node: formFocus, child: SafeArea(top: false,
+      child: Padding(padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: LayoutBuilder(builder: (context, constraints) => ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: constraints.maxHeight),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Padding(padding: const EdgeInsets.fromLTRB(16, 8, 8, 0), child: Row(children: [
+              const Expanded(child: Text('Record supplier credit note',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+              if (_focusedCreditEditor != null || MediaQuery.viewInsetsOf(context).bottom > 0)
+                IconButton(key: const Key('supplier-credit-hide-keyboard'), tooltip: 'Hide keyboard',
+                  onPressed: formFocus.unfocus, icon: const Icon(Icons.keyboard_hide_outlined)),
+              TextButton(key: const Key('supplier-credit-close'),
+                style: TextButton.styleFrom(textStyle: const TextStyle(fontSize: 12)),
+                onPressed: busy || conflict ? null : close, child: const Text('Close')),
+            ])),
+            Flexible(child: NotificationListener<ScrollNotification>(onNotification: (notification) {
+              if (notification.depth == 0 &&
+                  (notification is ScrollStartNotification || notification is ScrollUpdateNotification)) {
+                _focusedCreditEditor?.hideToolbar();
+              }
+              return false;
+            }, child: ClipRect(child: body))),
+          ]),
+        )))));
   @override
   Widget build(BuildContext context) {
     final options = ledger?.availableCreditSupports(widget.copy.draft.id) ?? const [];
@@ -35774,41 +38683,97 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
     final editable = draft.ready && recovered && current && !busy && !conflict && frozen == null;
     final savedVerified = draft.pending == null && draft.error == null && draft.revision != null && !draft.busy;
     Future<void> close() async {
-      if (!busy && !conflict && await draft.flush() && context.mounted) Navigator.pop(context);
+      if (!busy && !conflict && inputError == null && await draft.flush() && context.mounted) Navigator.pop(context);
     }
-    return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null && !conflict,
+    return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null && !conflict && inputError == null,
       onPopInvokedWithResult: (didPop, result) async { if (!didPop) await close(); },
-      child: SafeArea(top: false, child: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-        child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: _creditViewport(context, SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Theme(data: Theme.of(context).copyWith(textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(minimumSize: const Size(48, 48), textStyle: const TextStyle(fontSize: 12)))),
+        child: DefaultTextStyle.merge(style: const TextStyle(fontSize: 12, color: MoolColors.ink),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            Text('Supplier credit note', style: Theme.of(context).textTheme.titleMedium),
-            TextButton(key: const Key('supplier-credit-close'), onPressed: busy || conflict ? null : close,
-              child: const Text('Close'))]),
-          Text('${widget.copy.supplier.name} · ${widget.copy.draft.invoiceReference}'),
-          const Text('Enter the credit note received from your supplier. Reduces dues; no Stock change or refund.'),
+          Text(widget.copy.supplier.name, key: const Key('supplier-credit-supplier'),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text('Bill ${widget.copy.draft.invoiceReference}', key: const Key('supplier-credit-bill')),
+          const SizedBox(height: 6),
+          const Text('Record a credit note received from your supplier that reduces what you owe or gives you credit for future purchases.',
+            key: Key('supplier-credit-purpose-guide')),
+          const SizedBox(height: 8),
+          if (frozen != null) const Text('GST treatment not recorded', key: Key('supplier-credit-unknown-treatment'))
+          else ...[
+            DropdownButtonFormField<String>(key: const Key('supplier-credit-type'),
+              initialValue: treatment.isEmpty ? null : treatment, isExpanded: true,
+              decoration: _creditInput('Credit note type', helper: treatment == 'gst' ? 'GST adjusted'
+                : treatment == 'commercial' ? 'GST unchanged' : 'Choose as shown on the supplier’s credit note'),
+              items: const [DropdownMenuItem(value: 'gst', child: Text('GST credit note')),
+                DropdownMenuItem(value: 'commercial', child: Text('Commercial credit note'))],
+              onChanged: editable ? (value) {
+                setState(() {
+                  treatment = value ?? '';
+                  if (treatment == 'gst' && taxRows.isEmpty) taxRows.add(taxRow());
+                });
+                changed();
+              } : null),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(key: const Key('supplier-credit-reason-type'),
+              initialValue: reasonCode.isEmpty ? null : reasonCode, isExpanded: true,
+              decoration: _creditInput('Reason for credit'),
+              items: [for (final entry in reasonLabels.entries)
+                DropdownMenuItem(value: entry.key, child: Text(entry.value))],
+              onChanged: editable ? (value) { setState(() => reasonCode = value ?? ''); changed(); } : null),
+            const SizedBox(height: 8),
+          ],
           TextField(key: const Key('supplier-credit-reference'), controller: reference, enabled: editable,
-            decoration: const InputDecoration(labelText: 'Credit note No.'), onChanged: (_) => draft.save(fields)),
-          Wrap(spacing: 12, runSpacing: 8, children: [
-            _purchaseCompactLabeledField('Credit note date', width: 170, field: TextField(key: const Key('supplier-credit-date'), controller: date,
+            style: const TextStyle(fontSize: 13),
+            decoration: _creditInput('Credit note No.'), onChanged: (_) => changed()),
+          const SizedBox(height: 8),
+          LayoutBuilder(builder: (context, constraints) {
+            final paired = constraints.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(13) <= 14.3;
+            final width = paired ? (constraints.maxWidth - 12) / 2 : 170.0;
+            final dateField = _purchaseCompactLabeledField('Credit note date', width: width, field: TextField(key: const Key('supplier-credit-date'), controller: date,
               enabled: editable, keyboardType: TextInputType.datetime,
-              decoration: const InputDecoration(helperText: 'DD/MM/YYYY'),
-              onChanged: (_) => draft.save(fields))),
-            _purchaseCompactLabeledField('Amount credited (₹)', width: 170, field: TextField(key: const Key('supplier-credit-amount'), controller: amount,
+              style: const TextStyle(fontSize: 13), decoration: _creditInput(null, helper: 'DD/MM/YYYY'),
+              onChanged: (_) => changed()));
+            final amountField = _purchaseCompactLabeledField('Total credit amount (₹)', width: width, field: TextField(key: const Key('supplier-credit-amount'), controller: amount,
               enabled: editable, keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(), onChanged: (_) => draft.save(fields))),
-          ]),
+              style: const TextStyle(fontSize: 13), decoration: _creditInput(null), onChanged: (_) => changed()));
+            return paired ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [dateField, const SizedBox(width: 12), amountField])
+              : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [dateField, const SizedBox(height: 8), amountField]);
+          }),
+          const SizedBox(height: 8),
           TextField(key: const Key('supplier-credit-reason'), controller: reason, enabled: editable,
-            decoration: const InputDecoration(labelText: 'Reason on credit note'), onChanged: (_) => draft.save(fields)),
+            style: const TextStyle(fontSize: 13),
+            decoration: _creditInput('Details as on credit note'), onChanged: (_) => changed()),
+          if (frozen == null) _documentParticulars(editable),
+          if (frozen == null && treatment == 'gst') ...[
+            const SizedBox(height: 12),
+            const Text('GST adjustment as on credit note', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            const Text('Enter each rate separately. Use 0 where only the tax is corrected.'),
+            for (var index = 0; index < taxRows.length; index++)
+              _taxRowFields(index, editable),
+            Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+              key: const Key('supplier-credit-add-tax-rate'),
+              onPressed: editable && taxRows.length < 100 ? () {
+                setState(() => taxRows.add(taxRow())); changed();
+              } : null, icon: const Icon(Icons.add, size: 16), label: const Text('Add GST rate'))),
+            if (documentInput.printedTotalMinor case final enteredTotal?) ...[
+              Text('Entered value + GST: ${_purchaseAmount(enteredTotal)}',
+                key: const Key('supplier-credit-entered-total')),
+              if (WorkspacePurchaseEntryDraft.printedPaise(amount.text) case final creditTotal?)
+                if (enteredTotal != creditTotal) const Text('The entered amounts differ from the total credit. Check the note.',
+                  key: Key('supplier-credit-total-mismatch'), style: TextStyle(color: Color(0xffa52a2a))),
+            ],
+          ],
+          if (frozen != null || const {'return', 'shortage', 'damage'}.contains(reasonCode) ||
+              (reasonCode.isEmpty && selected.isNotEmpty)) ...[
           const SizedBox(height: 12),
-          Text('Goods credited', style: Theme.of(context).textTheme.titleSmall),
-          if (rows.isEmpty) const Text('First link this bill to received goods or record goods returned. Short-delivery credit needs a reviewed shortage record.'),
+          const Text('Goods credited', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          if (rows.isEmpty) const Text('No linked goods record. You can keep this credit note as a draft.'),
           for (final entry in rows.entries) ...[
             CheckboxListTile(key: ValueKey('supplier-credit-select-${entry.key}'), contentPadding: EdgeInsets.zero,
               controlAffinity: ListTileControlAffinity.leading, value: selected.containsKey(entry.key),
-              title: Text(entry.value.$2), subtitle: frozen == null
+              title: Text(entry.value.$2, style: const TextStyle(fontSize: 13)), subtitle: frozen == null
                 ? Text('Available ${_ReceivingLineInput._quantity(entry.value.$1.quantityMilli)} ${entry.value.$3}') : null,
               onChanged: editable ? (checked) {
                 setState(() {
@@ -35816,31 +38781,120 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
                     selected[entry.key] = (entry.value.$1, TextEditingController(text: _ReceivingLineInput._quantity(entry.value.$1.quantityMilli)));
                   } else { selected.remove(entry.key)?.$2.dispose(); }
                 });
-                draft.save(fields);
+                changed();
               } : null),
             if (selected[entry.key] case final value?) Align(alignment: Alignment.centerLeft,
               child: _purchaseCompactLabeledField('Credited qty', width: 112, field: TextField(key: ValueKey('supplier-credit-qty-${entry.key}'),
                 controller: value.$2, enabled: editable, keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(), onChanged: (_) => draft.save(fields)))),
+                style: const TextStyle(fontSize: 13), decoration: _creditInput(null), onChanged: (_) => changed()))),
+          ],
           ],
           if (frozen != null) Text(confirmed ? 'Credit note recorded · ${_purchaseAmount(frozen!.amountMinor)}'
             : savedVerified ? 'Saved credit-note request · not confirmed. Recover before retrying.'
             : 'Saved status unverified · keep this request and retry saving.', key: const Key('supplier-credit-status')),
-          if (error != null || draft.error != null) Text(error ?? draft.error!),
-          TextButton(key: const Key('supplier-credit-recover'), onPressed: busy || draft.busy ? null : load,
+          if (draft.ready && recovered && current && !conflict &&
+              widget.session.workspaceSupplierScope != null &&
+              (frozen == null || supportingCopies?.active.isNotEmpty == true ||
+                supportingCopies?.previous.isNotEmpty == true)) _SupplierPaymentDraftCopies(
+            session: widget.session, value: supportingCopies ?? WorkspaceSupplierMoneyCopies(
+              key: draft.key!, qa: widget.session.workspaceSupplierScope!.$3),
+            editable: editable && !draft.busy && draft.error == null && inputError == null,
+            saved: draft.pending == null && !draft.busy && draft.error == null,
+            isCurrent: () => mounted && current, beforeChange: () async => inputError == null && await draft.flush(),
+            onBusy: (lease, active) {
+              if (mounted && (active || identical(_copyBusyLease, lease))) {
+                setState(() => _copyBusyLease = active ? lease : null);
+              }
+            },
+            onChanged: (value) async {
+              if (!mounted || !current || frozen != null || conflict) return false;
+              setState(() => supportingCopies = value);
+              if (!changed()) return false;
+              return draft.flush();
+            }),
+          if (error != null || draft.error != null) Text(error ?? draft.error!, style: const TextStyle(color: Color(0xffa52a2a))),
+          if (inputError != null) Text(inputError!, key: const Key('supplier-credit-input-error'),
+            style: const TextStyle(color: Color(0xffa52a2a))),
+          if (draftMessage != null) Text(draftMessage!, key: const Key('supplier-credit-draft-status')),
+          if (draft.error != null) TextButton(key: const Key('supplier-credit-retry-save'),
+            onPressed: busy || conflict ? null : () => changed(), child: const Text('Retry saving input')),
+          TextButton(key: const Key('supplier-credit-recover'), onPressed: busy || draft.busy || inputError != null ? null : load,
             child: const Text('Recover saved credit note')),
           FilledButton(key: const Key('supplier-credit-submit'),
             onPressed: draft.ready && recovered && current && !busy && !conflict && !draft.busy && draft.error == null
-              && (frozen != null || rows.isNotEmpty) ? submit : null,
+              ? frozen == null ? saveDocumentDraft : submit : null,
             child: Text(busy ? 'Recording…' : confirmed ? 'Record another credit note'
-              : frozen == null ? 'Save supplier credit note' : 'Retry same credit note')),
-        ])))));
+              : frozen == null ? 'Save draft' : 'Retry same credit note')),
+          if (frozen == null) const Text('Saving this draft does not change your balance, GST or Stock.'),
+        ])))), close));
+  }
+
+  Widget _documentParticulars(bool editable) => ExpansionTile(
+    key: const Key('supplier-credit-particulars'), maintainState: true,
+    initiallyExpanded: documentInput.particulars.isNotEmpty, tilePadding: EdgeInsets.zero,
+    childrenPadding: const EdgeInsets.only(bottom: 8),
+    title: const Text('Parties & document details', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+    subtitle: const Text('As printed on the credit note', style: TextStyle(fontSize: 11)),
+    children: [
+      Align(alignment: Alignment.centerLeft, child: Text([
+        'Linked purchase: ${widget.copy.draft.invoiceReference} · ${widget.copy.draft.invoiceDate}',
+        'Supplier: ${widget.copy.supplier.name}',
+        if (widget.copy.supplier.gstin.isNotEmpty) 'GSTIN: ${widget.copy.supplier.gstin}',
+        if (widget.copy.supplier.address.isNotEmpty) widget.copy.supplier.address,
+        widget.copy.draft.details['buyerName']?.trim().isNotEmpty == true
+          ? 'Buyer on bill: ${widget.copy.draft.details['buyerName']}' : 'Buying Store: ${widget.copy.storeName}',
+        for (final key in ['buyerGstin', 'buyerUin', 'buyerAddress'])
+          if (widget.copy.draft.details[key]?.trim().isNotEmpty == true) widget.copy.draft.details[key]!,
+      ].join('\n'), key: const Key('supplier-credit-linked-purchase'), style: const TextStyle(fontSize: 12))),
+      const SizedBox(height: 8),
+      LayoutBuilder(builder: (context, constraints) {
+        final paired = constraints.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(13) <= 14.3;
+        return Wrap(spacing: 8, runSpacing: 8, children: [for (final entry in particularLabels.entries)
+          _purchaseCompactLabeledField(entry.value, width: paired && !const {'supplierAddress', 'buyerAddress', 'deliveryAddress',
+              'invoiceReferences', 'signatureDetails', 'qrReference'}.contains(entry.key)
+            ? (constraints.maxWidth - 8) / 2 : constraints.maxWidth,
+            field: TextField(key: ValueKey('supplier-credit-detail-${entry.key}'),
+              controller: particulars[entry.key], enabled: editable, style: const TextStyle(fontSize: 13),
+              minLines: 1, maxLines: const {'supplierAddress', 'buyerAddress', 'deliveryAddress',
+                'invoiceReferences', 'signatureDetails', 'qrReference'}.contains(entry.key) ? 4 : 1,
+              maxLength: WorkspaceSupplierCreditDocumentInput.particularLimits[entry.key],
+              decoration: _creditInput(null, helper: entry.key == 'invoiceReferences'
+                ? 'Copy each invoice number and date; one per line' : null).copyWith(counterText: ''),
+              onChanged: (_) => changed())),
+        ]);
+      }),
+    ]);
+
+  Widget _taxRowFields(int index, bool editable) {
+    final row = taxRows[index];
+    const labels = {'rate': 'GST rate (%)', 'taxable': 'Taxable value (₹)', 'cgst': 'CGST (₹)',
+      'sgst': 'SGST / UTGST (₹)', 'igst': 'IGST (₹)', 'cess': 'Cess (₹)'};
+    return Padding(padding: const EdgeInsets.only(top: 8), child: Column(
+      key: ObjectKey(row), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [Expanded(child: Text('Rate ${index + 1}', style: const TextStyle(fontWeight: FontWeight.w600))),
+        IconButton(key: ValueKey('supplier-credit-remove-tax-$index'), tooltip: 'Remove GST rate',
+          onPressed: editable ? () {
+            setState(() { taxRows.removeAt(index); });
+            for (final controller in row.values) { controller.dispose(); }
+            changed();
+          } : null, icon: const Icon(Icons.close, size: 18))]),
+      LayoutBuilder(builder: (context, constraints) {
+        final paired = constraints.maxWidth >= 280 && MediaQuery.textScalerOf(context).scale(13) <= 18;
+        final width = paired ? (constraints.maxWidth - 8) / 2 : constraints.maxWidth;
+        return Wrap(spacing: 8, runSpacing: 8, children: [for (final field in row.entries)
+          SizedBox(width: width, child: TextField(key: ValueKey('supplier-credit-tax-$index-${field.key}'),
+            controller: field.value, enabled: editable, maxLength: 24,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(fontSize: 13), decoration: _creditInput(labels[field.key]).copyWith(counterText: ''),
+            onChanged: (_) => changed()))]);
+      }),
+    ]));
   }
 }
 
 Future<void> _showSupplierAllocation(BuildContext context, WorkSession session,
     WorkspacePurchaseSavedCopy copy) => showModalBottomSheet<void>(context: context,
-      isScrollControlled: true, isDismissible: false, enableDrag: false,
+      isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
       builder: (_) => _StoreSupplierAllocationSheet(session: session, copy: copy));
 
 class _StoreSupplierAllocationSheet extends StatefulWidget {
@@ -35854,11 +38908,15 @@ class _StoreSupplierAllocationSheet extends StatefulWidget {
 class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationSheet> {
   late final _LedgerFormAutosave draft;
   final amount = TextEditingController();
+  final amountFocus = FocusNode();
   WorkspaceSupplierMoneySourceKind? sourceKind;
   String sourceId = '';
   WorkspaceSupplierMoneyAllocationIntent? frozen;
   WorkspaceLedgerFormDraft? resetAttempt;
-  bool busy = false, recovered = false, confirmed = false, conflict = false;
+  WorkspaceSupplierMoneyCopies? supportingCopies;
+  bool _busy = false, recovered = false, confirmed = false, conflict = false;
+  Object? _copyBusyLease;
+  bool get busy => _busy || _copyBusyLease != null;
   String? error;
   WorkspaceSupplierLedger? get ledger => widget.session.workspaceSupplierLedger(widget.copy.supplier.id);
   List<(WorkspaceSupplierMoneySourceKind, String, String, int)> get sources {
@@ -35894,13 +38952,15 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
   }
   String sourceValue(WorkspaceSupplierMoneySourceKind kind, String id) => jsonEncode([kind.name, id]);
   Map<String, String> get fields => {'amount': amount.text, 'sourceKind': sourceKind?.name ?? '',
-    'sourceId': sourceId, if (frozen != null) 'attempt': jsonEncode(frozen!.intentToJson())};
+    'sourceId': sourceId, if (frozen != null) 'attempt': jsonEncode(frozen!.intentToJson()),
+    if (supportingCopies != null) 'supportingCopies': jsonEncode(supportingCopies!.toJson())};
 
   @override
   void initState() {
     super.initState();
     draft = _LedgerFormAutosave(widget.session, widget.session.supplierAllocationFormKey(widget.copy));
     draft.addListener(refresh);
+    amountFocus.addListener(refresh);
     unawaited(load());
   }
   void refresh() { if (mounted) setState(() {}); }
@@ -35917,13 +38977,13 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
     final session = widget.session;
     if (busy || conflict || frozen != null || !draft.ready || !recovered ||
         session.supplierAllocationFormKey(widget.copy) != draft.key) { return; }
-    setState(() => busy = true);
+    setState(() => _busy = true);
     try {
       if (!await draft.flush() || !mounted ||
           session.supplierAllocationFormKey(widget.copy) != draft.key) { return; }
       await _showSupplierMoneyEntry(context, session,
         _StoreSupplierMoneyTarget(supplierId: widget.copy.supplier.id, advance: advance));
-    } finally { if (mounted) setState(() => busy = false); }
+    } finally { if (mounted) setState(() => _busy = false); }
     if (mounted && session.supplierAllocationFormKey(widget.copy) == draft.key) {
       await load();
     } else if (mounted) {
@@ -35932,14 +38992,23 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
   }
   Future<void> load() async {
     if (busy || draft.busy) return;
-    setState(() => busy = true);
+    setState(() => _busy = true);
     try {
       var pendingConflict = false;
-      if (draft.pending != null) { draft.save(fields); pendingConflict = !await draft.flush(); }
+      if (draft.pending != null) {
+        draft.save(conflict ? draft.pending!.fields : fields);
+        pendingConflict = !await draft.flush();
+      }
       if (!mounted || draft.key == null) return;
       recovered = await widget.session.recoverWorkspaceSupplierAllocationStatus(draft.key!);
       final saved = await draft.load();
       if (!mounted || saved == null) return;
+      final copies = WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision ?? 1,
+        fields: saved).supplierAllocationCopies;
+      if (copies != null && copies.qa != widget.session.workspaceSupplierScope?.$3) {
+        throw const FormatException('Saved allocation copies belong to another Store mode');
+      }
+      supportingCopies = copies;
       amount.text = saved['amount'] ?? '';
       sourceKind = WorkspaceSupplierMoneySourceKind.values.where((k) => k.name == saved['sourceKind']).firstOrNull;
       sourceId = saved['sourceId'] ?? '';
@@ -35951,25 +39020,27 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
           draft.pending = null;
         } else {
           conflict = true;
-          draft.error = 'Saved allocation differs from this unsaved input. The unsaved input remains on this screen; do not replace either record.';
+          draft.error = 'Saved allocation differs from unsaved input. Both versions are kept; retry recovery before continuing.';
           error = draft.error;
         }
       }
       inspect();
     } on Object {
       if (mounted) setState(() { conflict = true; error = 'Saved allocation could not be read. Keep the request and retry recovery.'; });
-    } finally { if (mounted) setState(() => busy = false); }
+    } finally { if (mounted) setState(() => _busy = false); }
   }
   Future<void> submit() async {
     if (busy || conflict || !recovered || !draft.ready || draft.key == null) return;
-    setState(() { busy = true; error = null; });
+    setState(() { _busy = true; error = null; });
     try {
       if (!await draft.flush() || !mounted) return;
       if (confirmed) {
         resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1,
-          fields: const {'amount': '', 'sourceKind': '', 'sourceId': ''});
+          fields: {'amount': '', 'sourceKind': '', 'sourceId': '',
+            if (supportingCopies != null) 'supportingCopies': jsonEncode(supportingCopies!.archiveAllocation(frozen!).toJson())});
         if (await widget.session.resetConfirmedWorkspaceSupplierAllocationDraft(resetAttempt!, expectedRevision: draft.revision!)) {
           draft.revision = resetAttempt!.revision; draft.pending = null; draft.error = null;
+          supportingCopies = resetAttempt!.supplierAllocationCopies;
           amount.clear(); sourceKind = null; sourceId = ''; frozen = null; confirmed = false; resetAttempt = null;
         } else { error = 'Recorded allocation is kept. Retry before starting another.'; }
         return;
@@ -36009,10 +39080,44 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
       error = saved && confirmed ? null : capacityChanged
         ? 'This request cannot be linked: the available money or bill due has changed. The request is retained for review.'
         : 'Allocation status needs recovery. Keep and retry this request, not a new one.';
-    } finally { if (mounted) setState(() => busy = false); }
+    } finally { if (mounted) setState(() => _busy = false); }
   }
   @override
-  void dispose() { draft.removeListener(refresh); draft.dispose(); amount.dispose(); super.dispose(); }
+  void dispose() {
+    draft.removeListener(refresh); draft.dispose(); amount.dispose();
+    amountFocus.removeListener(refresh); amountFocus.dispose(); super.dispose();
+  }
+  Widget _allocationViewport(BuildContext context, Widget body) => SafeArea(top: false,
+    child: Padding(padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: LayoutBuilder(builder: (context, constraints) => ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: constraints.maxHeight),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(padding: const EdgeInsets.fromLTRB(16, 8, 8, 0), child: Row(children: [
+            const Expanded(child: Text('Apply payment or credit to bill',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+            if (amountFocus.hasFocus || MediaQuery.viewInsetsOf(context).bottom > 0)
+              IconButton(key: const Key('supplier-allocation-hide-keyboard'), tooltip: 'Hide keyboard',
+                onPressed: () => FocusScope.of(context).unfocus(), icon: const Icon(Icons.keyboard_hide_outlined)),
+            TextButton(key: const Key('supplier-allocation-close'),
+              style: TextButton.styleFrom(textStyle: const TextStyle(fontSize: 12)),
+              onPressed: busy || conflict ? null : () async {
+                if (await draft.flush() && context.mounted) Navigator.pop(context);
+              }, child: const Text('Close')),
+          ])),
+          Flexible(child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification.depth == 0 &&
+                  (notification is ScrollStartNotification || notification is ScrollUpdateNotification)) {
+                final editor = FocusManager.instance.primaryFocus?.context
+                    ?.findAncestorStateOfType<EditableTextState>();
+                if (editor?.context.findAncestorStateOfType<_StoreSupplierAllocationSheetState>() == this) {
+                  editor?.hideToolbar();
+                }
+              }
+              return false;
+            }, child: body)),
+        ]),
+      ))));
   @override
   Widget build(BuildContext context) {
     final list = sources;
@@ -36028,33 +39133,42 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
     return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null && !conflict,
       onPopInvokedWithResult: (didPop, result) async {
         if (!didPop && !busy && !conflict && await draft.flush() && context.mounted) Navigator.pop(context);
-      }, child: SafeArea(top: false, child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
+      }, child: _allocationViewport(context, SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Theme(data: Theme.of(context).copyWith(textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(minimumSize: const Size(48, 48), textStyle: const TextStyle(fontSize: 12)))),
+        child: DefaultTextStyle.merge(style: const TextStyle(fontSize: 12, color: MoolColors.ink),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            Text('Apply payment or credit to bill', style: Theme.of(context).textTheme.titleMedium),
-            TextButton(key: const Key('supplier-allocation-close'), onPressed: busy || conflict ? null : () async {
-              if (await draft.flush() && context.mounted) Navigator.pop(context);
-            }, child: const Text('Close'))]),
-          Text('${widget.copy.supplier.name} · ${widget.copy.draft.invoiceReference}'),
-          const Text('Uses an existing advance, payment or bill credit. No new payment or Stock change.'),
+          Text(widget.copy.supplier.name, key: const Key('supplier-allocation-supplier'),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text('Bill ${widget.copy.draft.invoiceReference}', key: const Key('supplier-allocation-bill')),
+          const SizedBox(height: 6),
+          const Text('Apply a recorded payment, advance or credit to this bill.',
+            key: Key('supplier-allocation-purpose-guide')),
+          const SizedBox(height: 6),
           Text(billDue == null ? 'Bill due unavailable' : billDue < 0
-            ? 'Credit with supplier ${_purchaseAmount(-billDue)}' : 'Bill due ${_purchaseAmount(billDue)}'),
+            ? 'Credit with supplier ${_purchaseAmount(-billDue)}' : 'Bill due ${_purchaseAmount(billDue)}',
+            style: const TextStyle(fontWeight: FontWeight.w600)),
           if (settled) const Text('No amount remains to link to this bill. Your recorded payments and allocations are kept.',
             key: Key('supplier-allocation-settled')),
           if (!settled && list.isEmpty && accountReady && frozen == null) ...[
-            const Text('No available advance, payment or bill credit. If you have already paid this supplier, record that payment or advance first.'),
+            const SizedBox(height: 6),
+            const Text('No unallocated payment, advance or bill credit is available. If you have already paid and it is not recorded, record that payment or advance first.'),
             if (billDue != null && billDue > 0) Wrap(spacing: 8, children: [
               TextButton(key: const Key('supplier-allocation-record-payment'),
-                onPressed: editable ? () => recordMoney(false) : null, child: const Text('Record supplier payment')),
+                onPressed: editable ? () => recordMoney(false) : null, child: const Text('Record payment')),
               TextButton(key: const Key('supplier-allocation-record-advance'),
-                onPressed: editable ? () => recordMoney(true) : null, child: const Text('Record supplier advance')),
+                onPressed: editable ? () => recordMoney(true) : null, child: const Text('Record advance')),
             ]),
           ],
           if (!settled && !emptySources) ...[
+          const SizedBox(height: 12),
           DropdownButtonFormField<String>(key: ValueKey(('supplier-allocation-source', selected)),
             initialValue: selectionKnown ? selected : null, isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Advance, payment or bill credit'),
+            style: const TextStyle(fontSize: 13, color: MoolColors.navy),
+            decoration: const InputDecoration(labelText: 'Advance, payment or bill credit', isDense: true,
+              constraints: BoxConstraints(minHeight: 48), labelStyle: TextStyle(fontSize: 12),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14)),
             items: [for (final s in list) DropdownMenuItem(value: sourceValue(s.$1, s.$2),
               child: Text('${s.$3} · Unassigned ${_purchaseAmount(s.$4)}', overflow: TextOverflow.ellipsis))],
             onChanged: editable ? (value) {
@@ -36064,23 +39178,271 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
             } : null),
           if (selectedSource != null) Text('${selectedSource.$3} · Unassigned ${_purchaseAmount(selectedSource.$4)}',
             key: const Key('supplier-allocation-selected-source')),
+          const SizedBox(height: 12),
           Align(alignment: Alignment.centerLeft, child: SizedBox(width: 180, child: TextField(
-            key: const Key('supplier-allocation-amount'), controller: amount, enabled: editable,
+            key: const Key('supplier-allocation-amount'), controller: amount, enabled: editable, focusNode: amountFocus,
+            style: const TextStyle(fontSize: 13),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Amount (₹)'), onChanged: (_) => draft.save(fields)))),
+            decoration: const InputDecoration(labelText: 'Apply amount (₹)', isDense: true, floatingLabelBehavior: FloatingLabelBehavior.always,
+              constraints: BoxConstraints(minHeight: 48), labelStyle: TextStyle(fontSize: 12),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14)), onChanged: (_) => draft.save(fields)))),
           ],
           if (frozen != null) Text(confirmed ? 'Allocation recorded · ${_purchaseAmount(frozen!.amountMinor)}'
             : savedVerified ? 'Saved allocation request · recover and retry the same details.'
             : 'Saved status unverified · keep this request and retry saving.', key: const Key('supplier-allocation-status')),
-          if (error != null || draft.error != null) Text(error ?? draft.error!),
+          if (draft.ready && accountReady && !conflict && widget.session.workspaceSupplierScope != null &&
+              ((frozen == null && !settled) || supportingCopies?.active.isNotEmpty == true ||
+                supportingCopies?.previous.isNotEmpty == true)) _SupplierPaymentDraftCopies(
+            session: widget.session, value: supportingCopies ?? WorkspaceSupplierMoneyCopies(
+              key: draft.key!, qa: widget.session.workspaceSupplierScope!.$3),
+            editable: editable && !settled && !draft.busy && draft.error == null,
+            saved: draft.pending == null && !draft.busy && draft.error == null,
+            isCurrent: () => mounted && widget.session.supplierAllocationFormKey(widget.copy) == draft.key,
+            beforeChange: draft.flush,
+            onBusy: (lease, active) {
+              if (mounted && (active || identical(_copyBusyLease, lease))) {
+                setState(() => _copyBusyLease = active ? lease : null);
+              }
+            },
+            onChanged: (value) async {
+              if (!mounted || widget.session.supplierAllocationFormKey(widget.copy) != draft.key ||
+                  frozen != null || conflict) { return false; }
+              setState(() => supportingCopies = value);
+              draft.save(fields);
+              return draft.flush();
+            }),
+          if (error != null || draft.error != null) Text(error ?? draft.error!, style: const TextStyle(color: Color(0xffa52a2a))),
+          if (draft.error != null) TextButton(key: const Key('supplier-allocation-retry-save'),
+            onPressed: busy || conflict ? null : () => draft.save(fields), child: const Text('Retry saving input')),
           TextButton(key: const Key('supplier-allocation-recover'), onPressed: busy || draft.busy ? null : load,
-            child: const Text('Recover saved allocation')),
+            child: Text(frozen != null && !confirmed ? 'Check saved allocation' : 'Refresh payments & credits')),
           if (!settled && !emptySources) FilledButton(key: const Key('supplier-allocation-submit'),
             onPressed: draft.ready && accountReady && !busy && !conflict && !draft.busy && draft.error == null ? submit : null,
             child: Text(busy ? 'Recording…' : confirmed ? 'Link another amount'
               : frozen == null ? 'Apply selected amount' : 'Retry same allocation')),
-        ]))));
+        ]))))));
   }
+}
+
+class _SupplierPaymentDraftCopies extends StatefulWidget {
+  const _SupplierPaymentDraftCopies({required this.session, required this.value,
+    required this.editable, required this.saved, required this.isCurrent, required this.beforeChange,
+    required this.onBusy, required this.onChanged});
+  final WorkSession session;
+  final WorkspaceSupplierMoneyCopies value;
+  final bool editable, saved;
+  final bool Function() isCurrent;
+  final Future<bool> Function() beforeChange;
+  final void Function(Object, bool) onBusy;
+  final Future<bool> Function(WorkspaceSupplierMoneyCopies) onChanged;
+  @override
+  State<_SupplierPaymentDraftCopies> createState() => _SupplierPaymentDraftCopiesState();
+}
+
+class _SupplierPaymentDraftCopiesState extends State<_SupplierPaymentDraftCopies> {
+  late final _scope = widget.session.workspaceSupplierScope!;
+  late final _navigation = widget.session.navigationScopeRevision;
+  bool _busy = false;
+  final Object _busyLease = Object();
+  late String _type;
+  String? _error;
+  String? _unsavedValue;
+  bool get _credit => widget.value.key.kind == 'supplierCredit';
+  bool get _refund => widget.value.key.kind == 'supplierRefund';
+  bool get _allocation => widget.value.key.kind == 'supplierAllocation';
+  String get _prefix => _allocation ? 'supplier-allocation' : _refund ? 'supplier-refund' : _credit ? 'supplier-credit' : 'supplier-payment';
+  String get _inputName => _allocation ? 'allocation' : _refund ? 'refund' : _credit ? 'credit-note' : 'payment';
+  String get _unsavedWarning => 'Copy details are not saved yet. Retry saving the $_inputName input before leaving.';
+  bool get _current => mounted && widget.isCurrent() &&
+    widget.session.workspaceSupplierScope == _scope &&
+    widget.session.navigationScopeRevision == _navigation;
+  bool get _editable => _current && widget.editable && !_busy;
+  @override
+  void initState() {
+    super.initState();
+    _type = _allocation ? 'paymentAdvice' : _credit ? 'supplierCreditNote' : 'paymentReceipt';
+    widget.session.addListener(_scopeChanged);
+  }
+  @override
+  void didUpdateWidget(_SupplierPaymentDraftCopies oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_unsavedValue != null && widget.saved &&
+        jsonEncode(widget.value.toJson()) == _unsavedValue) {
+      _unsavedValue = null;
+      if (_error == _unsavedWarning) { _error = null; }
+    }
+  }
+  void _scopeChanged() {
+    if (!mounted) return;
+    if (!_current && _busy) { widget.onBusy(_busyLease, false); }
+    setState(() {});
+  }
+  bool _fits(WorkspacePurchaseInvoiceAttachment value) => widget.value.withActive([
+    for (final old in widget.value.active) if (old.digest == value.digest) value else old,
+  ]).valid;
+  Future<void> _run(Future<void> Function() action, {bool mutate = false}) async {
+    if (!_current || _busy || (mutate && !_editable)) return;
+    setState(() { _busy = true; _error = null; });
+    widget.onBusy(_busyLease, true);
+    try {
+      if (mutate && !await widget.beforeChange()) {
+        if (_current) setState(() => _error = 'Save the current $_inputName input before attaching or editing a copy.');
+        return;
+      }
+      if (_current) await action();
+    } on Object catch (error) {
+        if (_current) { setState(() => _error = error is WorkGatewayException ? error.message :
+        'Copy could not be opened or saved. Your earlier copies and $_inputName input are kept.'); }
+    } finally {
+      widget.onBusy(_busyLease, false);
+      if (mounted) { setState(() => _busy = false); }
+    }
+  }
+  @override
+  void dispose() {
+    widget.session.removeListener(_scopeChanged);
+    final release = widget.onBusy;
+    final lease = _busyLease;
+    WidgetsBinding.instance.addPostFrameCallback((_) => release(lease, false));
+    super.dispose();
+  }
+  Future<void> _keep(WorkspaceSupplierMoneyCopies value) async {
+    if (!_current) return;
+    if (!value.valid) {
+      setState(() => _error = 'The draft-copy limit has been reached. Earlier copies are kept; use smaller copies.');
+      return;
+    }
+    final saved = await widget.onChanged(value);
+    if (_current && !saved) {
+      setState(() {
+        _unsavedValue = jsonEncode(value.toJson());
+        _error = _unsavedWarning;
+      });
+    }
+  }
+  Future<void> _capture(WorkProofSource source) => _run(() async {
+    final value = await widget.session.workspacePurchaseInvoiceCapture.captureForDraft(_scope, widget.value.captureId, source,
+      canRetain: (candidate) => _current && (widget.value.active.any((a) =>
+        a.digest == candidate.digest && a.byteLength == candidate.byteLength && a.contentType == candidate.contentType) ||
+        widget.value.withActive([...widget.value.active,
+          candidate.withDocumentDetails({if (_type.isNotEmpty) 'type': _type})]).valid));
+    if (!_current || value == null) return;
+    if (widget.value.active.any((a) => a.digest == value.digest)) {
+      setState(() => _error = 'This copy is already in the current draft.'); return;
+    }
+    await _keep(widget.value.withActive([...widget.value.active,
+      value.withDocumentDetails({if (_type.isNotEmpty) 'type': _type})]));
+  }, mutate: true);
+  Future<void> _details(WorkspacePurchaseInvoiceAttachment copy, bool readOnly) => _run(() async {
+    final value = await showModalBottomSheet<WorkspacePurchaseInvoiceAttachment>(context: context,
+      isScrollControlled: true, useSafeArea: true, builder: (_) => _TradeDocumentDetailsEditor(
+        session: widget.session, attachment: copy, types: widget.value.documentTypes,
+        isCurrent: () => _current, readOnly: readOnly, canKeep: _fits));
+    if (_current && !readOnly && value != null) await _replace(value);
+  }, mutate: !readOnly);
+  Future<void> _replace(WorkspacePurchaseInvoiceAttachment value) => _keep(widget.value.withActive([
+    for (final old in widget.value.active) if (old.digest == value.digest) value else old,
+  ]));
+  Future<void> _read(WorkspacePurchaseInvoiceAttachment copy) => _run(() async {
+    final value = await widget.session.workspacePurchaseInvoiceCapture.scan(_scope, widget.value.captureId, copy);
+    if (_current) await _replace(value);
+  }, mutate: true);
+  Future<void> _fields(WorkspacePurchaseInvoiceAttachment copy, bool readOnly) => _run(() async {
+    final value = await Navigator.of(context).push<WorkspacePurchaseInvoiceAttachment>(MaterialPageRoute(
+      builder: (_) => _ReceivingScannedFieldsScreen(session: widget.session, scope: _scope,
+        captureId: widget.value.captureId, attachment: copy, readOnly: readOnly,
+        isCurrent: () => _current, canKeep: _fits,
+        copyDescription: 'supporting copy', limitDescription: 'draft')));
+    if (_current && !readOnly && value != null) await _replace(value);
+  }, mutate: !readOnly);
+  Future<void> _view(WorkspacePurchaseInvoiceAttachment copy) => _run(() async {
+    await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => _GoodsReceiptCopyScreen(
+      session: widget.session, scope: _scope, captureId: widget.value.captureId,
+      attachment: copy, title: 'Supporting copy', isCurrent: () => _current)));
+  });
+  Widget _copy(WorkspacePurchaseInvoiceAttachment copy, {bool previous = false}) {
+    final readOnly = previous || !widget.editable;
+    return Column(key: ValueKey('$_prefix-copy-${previous ? 'previous-' : ''}${copy.digest}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text(copy.documentDetails['reference']?.trim().isNotEmpty == true
+        ? '${copy.documentDetails['reference']} · ${copy.fileName}' : copy.fileName,
+        maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+      Text(storeTradeDocumentLabel(copy.documentDetails['type'] ?? ''), style: const TextStyle(fontSize: 11)),
+      Wrap(spacing: 4, children: [
+        TextButton(onPressed: !_current || _busy ? null : () => _view(copy), child: const Text('View copy')),
+        TextButton(onPressed: !_current || _busy ? null : () => _details(copy, readOnly), child: const Text('Document details')),
+        if (!readOnly) TextButton(onPressed: !_editable ? null : () => _read(copy), child: const Text('Read text')),
+        if (copy.detectedText.isNotEmpty || copy.extractedFields.isNotEmpty)
+          TextButton(onPressed: !_current || _busy ? null : () => _fields(copy, readOnly),
+            child: Text('Printed fields · ${copy.extractedFields.length}')),
+        if (!readOnly) TextButton(onPressed: !_editable ? null : () => _run(() async {
+          final remove = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+            title: const Text('Remove from this draft?'),
+            content: const Text('This removes the copy from the current draft. It does not delete the private original file.'),
+            actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep copy')),
+              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Remove from draft'))]));
+          if (_current && remove == true) { await _keep(widget.value.withActive(
+            widget.value.active.where((a) => a.digest != copy.digest).toList())); }
+        }, mutate: true), child: const Text('Remove')),
+      ]),
+      if (copy.extractionOverflow) const Text('Review the original: some printed details exceeded the field limit.',
+        style: TextStyle(fontSize: 11)),
+    ]);
+  }
+  @override
+  Widget build(BuildContext context) => ExpansionTile(
+    key: Key('$_prefix-supporting-copies'), tilePadding: EdgeInsets.zero,
+    childrenPadding: EdgeInsets.zero, dense: true,
+    title: const Text('Supporting copies · optional', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+    subtitle: Text('${widget.value.active.length} current · ${widget.value.previous.length} previous drafts',
+      style: const TextStyle(fontSize: 11)),
+    children: [Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text(_allocation
+        ? 'Attach payment advice to this private draft.'
+        : _refund
+        ? 'Attach a refund receipt, bank advice or supplier refund voucher to this private draft.'
+        : _credit
+        ? 'Attach your supplier’s credit note to this private draft.'
+        : 'Attach a receipt or payment advice to this private draft.',
+        style: const TextStyle(fontSize: 12)),
+      if (widget.editable || _busy) ...[
+        TextButton(key: Key('$_prefix-copy-type'), onPressed: !_editable ? null : () async {
+          final value = await _chooseTradeDocumentType(context, session: widget.session,
+            types: widget.value.documentTypes, selected: _type, isCurrent: () => _current);
+          if (_editable && value != null) setState(() => _type = value);
+        }, child: Align(alignment: Alignment.centerLeft, child: Text('${storeTradeDocumentLabel(_type)} ▾',
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)))),
+        Wrap(spacing: 4, children: [for (final item in [
+          (WorkProofSource.camera, Icons.camera_alt_outlined, 'Camera'),
+          (WorkProofSource.gallery, Icons.photo_library_outlined, 'Gallery'),
+          (WorkProofSource.upload, Icons.attach_file, 'Photo / PDF')])
+          TextButton.icon(key: Key('$_prefix-copy-${item.$1.name}'),
+            onPressed: !_editable || widget.value.active.length >= 3 || widget.value.previous.length >= 1000
+              ? null : () => _capture(item.$1), icon: Icon(item.$2, size: 18),
+            label: Text(item.$3, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)))]),
+        const Text('Up to 3 current copies · 10 MB each, 20 MB total. Compare read fields with the original.',
+          style: TextStyle(fontSize: 11)),
+      ],
+      if (!widget.editable && !_busy && widget.value.active.isNotEmpty)
+        Text(_allocation ? 'Copies are read-only with this saved allocation request.'
+          : _refund ? 'Copies are read-only with this saved refund request.'
+          : _credit ? 'Copies are read-only with this saved credit-note request.'
+          : 'Copies are read-only with this saved payment attempt.', style: const TextStyle(fontSize: 11)),
+      for (final copy in widget.value.active) _copy(copy),
+      if (widget.value.previous.isNotEmpty) ExpansionTile(tilePadding: EdgeInsets.zero, dense: true,
+        key: Key('$_prefix-previous-copies'), title: const Text('Previous draft copies', style: TextStyle(fontSize: 12)),
+        children: [SizedBox(height: 320, child: ListView.builder(
+          itemCount: widget.value.previous.length, itemBuilder: (_, index) {
+            final group = widget.value.previous[widget.value.previous.length - 1 - index];
+            return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text(group.date.isEmpty ? group.reference : '${group.reference} · ${group.date}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              for (final copy in group.copies) _copy(copy, previous: true),
+            ]);
+          }))]),
+      if (_busy) const LinearProgressIndicator(),
+      if (_error != null) Semantics(liveRegion: true, child: Text(_error!, style: const TextStyle(fontSize: 12))),
+    ])]);
 }
 
 class _StoreMoneyEntrySheet extends StatefulWidget {
@@ -36125,12 +39487,16 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
 
   final amount = TextEditingController(), reference = TextEditingController();
   final note = TextEditingController();
+  final amountFocus = FocusNode(), referenceFocus = FocusNode();
   String category = 'Shop expense';
   String method = 'Bank transfer';
-  bool saving = false;
+  bool _saving = false;
+  Object? _copyBusyLease;
+  bool get saving => _saving || _copyBusyLease != null;
   bool moneyRecovered = false, excludedFromOpening = false, confirmed = false, conflict = false;
   String occurredOn = DateTime.now().toIso8601String().substring(0, 10);
   WorkspaceSupplierMoneyAttempt? frozen;
+  WorkspaceSupplierMoneyCopies? supportingCopies;
   WorkspaceLedgerFormDraft? resetAttempt;
   String? error;
   late final _LedgerFormAutosave draft;
@@ -36143,6 +39509,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     if (manualMoney) 'occurredOn': occurredOn,
     if (manualMoney) 'notIncludedInOpening': '$excludedFromOpening',
     if (manualMoney && frozen != null) 'attempt': jsonEncode(frozen!.toJson()),
+    if (manualMoney && supportingCopies != null) 'supportingCopies': jsonEncode(supportingCopies!.toJson()),
   };
   @override
   void initState() {
@@ -36156,6 +39523,8 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
           : widget.session.supplierPaymentFormKey(widget.purchase!),
     );
     draft.addListener(refresh);
+    amountFocus.addListener(refresh);
+    referenceFocus.addListener(refresh);
     unawaited(load());
   }
 
@@ -36167,11 +39536,11 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
 
   Future<void> load() async {
     if (saving || draft.busy) return;
-    setState(() => saving = true);
+    setState(() => _saving = true);
     try {
       await _loadMoneyInputLocked();
     } finally {
-      if (mounted) setState(() => saving = false);
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -36193,6 +39562,12 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     category = saved['category'] ?? 'Shop expense';
     note.text = saved['note'] ?? '';
     if (manualMoney) {
+      supportingCopies = WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision ?? 1,
+        fields: saved).supplierMoneyCopies;
+      if (supportingCopies != null && supportingCopies!.qa != widget.session.workspaceSupplierScope?.$3) {
+        setState(() { conflict = true; error = 'Return to the same Store session to open the saved draft copies.'; });
+        return;
+      }
       occurredOn = saved['occurredOn'] ?? occurredOn;
       excludedFromOpening = saved['notIncludedInOpening'] == 'true';
       final text = saved['attempt'];
@@ -36235,11 +39610,11 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
 
   Future<void> submitManualMoney() async {
     if (saving || confirmed || conflict || !moneyRecovered) return;
-    setState(() => saving = true);
+    setState(() => _saving = true);
     try {
       await _submitManualMoneyLocked();
     } finally {
-      if (mounted) setState(() => saving = false);
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -36270,16 +39645,16 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
         amountMinor: minor, paymentMethod: method, postedAt: DateTime.now().toUtc(), moneyReview: review);
       final attempt = WorkspaceSupplierMoneyAttempt(entry: entry, expectedRevision: ledger.revision);
       if (!attempt.valid) { setState(() => error = 'Check the payment date and details.'); return; }
-      setState(() { frozen = attempt; saving = true; error = null; });
+      setState(() { frozen = attempt; _saving = true; error = null; });
       // Earlier editable snapshots have been flushed. Persist the immutable
       // attempt first; a failed/lost draft reply cannot create another payment.
       draft.save(fields);
       if (!await draft.flush() || !mounted) {
-        if (mounted) setState(() { saving = false; error = 'Payment has not been submitted. Retry saving this same attempt first.'; });
+        if (mounted) setState(() { _saving = false; error = 'Payment has not been submitted. Retry saving this same attempt first.'; });
         return;
       }
     } else {
-      setState(() { saving = true; error = null; });
+      setState(() { _saving = true; error = null; });
     }
     final saved = await widget.session.recordWorkspaceSupplierMoneyDraft(draft.key!, frozen!);
     if (!mounted) return;
@@ -36287,18 +39662,18 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     if (!mounted) return;
     _inspectSavedMoney();
     setState(() {
-      saving = false;
+      _saving = false;
       error = saved && confirmed ? null : 'Payment status needs checking. This saved attempt is retained; recover and retry it, not a new payment.';
     });
   }
 
   Future<void> recordAnother() async {
     if (saving || !confirmed || draft.revision == null) return;
-    setState(() => saving = true);
+    setState(() => _saving = true);
     try {
       await _recordAnotherLocked();
     } finally {
-      if (mounted) setState(() => saving = false);
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -36306,8 +39681,9 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     if (!await draft.flush() || !mounted) return;
     resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1,
       fields: {'amount': '', 'reference': '', 'channel': method,
-        'occurredOn': DateTime.now().toIso8601String().substring(0, 10), 'notIncludedInOpening': 'false'});
-    setState(() { saving = true; error = null; });
+        'occurredOn': DateTime.now().toIso8601String().substring(0, 10), 'notIncludedInOpening': 'false',
+        if (supportingCopies != null) 'supportingCopies': jsonEncode(supportingCopies!.archive(frozen!).toJson())});
+    setState(() { _saving = true; error = null; });
     final reset = await widget.session.resetConfirmedWorkspaceSupplierMoneyDraft(resetAttempt!, expectedRevision: draft.revision!);
     if (!mounted) return;
     if (reset) {
@@ -36315,10 +39691,11 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
       draft.pending = null;
       draft.error = null;
       amount.clear(); reference.clear();
+      supportingCopies = resetAttempt!.supplierMoneyCopies;
       occurredOn = resetAttempt!.fields['occurredOn']!;
       excludedFromOpening = false; frozen = null; confirmed = false; conflict = false; resetAttempt = null;
     }
-    setState(() { saving = false; error = reset ? null : 'The recorded payment is kept. Retry starting another payment.'; });
+    setState(() { _saving = false; error = reset ? null : 'The recorded payment is kept. Retry starting another payment.'; });
   }
 
   Future<void> choosePaymentDate() async {
@@ -36353,7 +39730,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
         (parts.length == 1 ? 0 : int.parse(parts.last.padRight(2, '0')));
     final key = draft.key!;
     setState(() {
-      saving = true;
+      _saving = true;
       error = null;
     });
     final saved = expense
@@ -36389,7 +39766,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
       return;
     }
     setState(() {
-      saving = false;
+      _saving = false;
       error = expense
           ? 'Expense not confirmed. Recover saved status before retrying.'
           : 'Payment not confirmed. Check the bill balance and saved status before retrying.';
@@ -36403,16 +39780,55 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     amount.dispose();
     reference.dispose();
     note.dispose();
+    amountFocus.removeListener(refresh);
+    referenceFocus.removeListener(refresh);
+    amountFocus.dispose();
+    referenceFocus.dispose();
     super.dispose();
   }
+
+  InputDecoration _moneyDecoration(String label, {String? hint}) =>
+      InputDecoration(labelText: label, hintText: hint,
+        isDense: manualMoney ? true : null,
+        constraints: manualMoney ? const BoxConstraints(minHeight: 48) : null,
+        labelStyle: manualMoney ? const TextStyle(fontSize: 12) : null,
+        hintStyle: manualMoney ? const TextStyle(fontSize: 12) : null,
+        contentPadding: manualMoney ? const EdgeInsets.symmetric(horizontal: 12, vertical: 14) : null);
 
   Widget _paidAmountField() => TextField(
     key: Key(expense ? 'store-expense-amount' : 'supplier-payment-amount'),
     controller: amount,
+    focusNode: manualMoney ? amountFocus : null,
+    style: manualMoney ? const TextStyle(fontSize: 13) : null,
     enabled: draft.ready && !saving && !_settledBillInput && (!manualMoney || (frozen == null && !conflict)),
     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-    decoration: const InputDecoration(labelText: 'Paid (₹)'),
+    decoration: manualMoney ? _moneyDecoration('Amount paid (₹)') : const InputDecoration(labelText: 'Paid (₹)'),
     onChanged: (_) => draft.save(fields));
+
+  Widget _paymentMethodField() => DropdownButtonFormField<String>(
+    key: ValueKey('supplier-payment-method-$method'),
+    initialValue: method,
+    isExpanded: true,
+    style: manualMoney ? const TextStyle(fontSize: 13, color: Color(0xff000066)) : null,
+    decoration: manualMoney ? _moneyDecoration('Payment method') : const InputDecoration(labelText: 'Method used'),
+    items: [for (final value in {'UPI', 'Cheque', 'Bank transfer', 'NEFT', 'RTGS', 'Cash', method})
+      DropdownMenuItem(value: value, child: Text(value))],
+    onChanged: !draft.ready || saving || _settledBillInput || (manualMoney && (frozen != null || conflict))
+      ? null : (value) {
+        if (value != null) {
+          setState(() => method = value);
+          draft.save(fields);
+        }
+      });
+
+  Widget _manualAmountAndMethod() => LayoutBuilder(builder: (context, constraints) {
+    final paired = constraints.maxWidth >= MediaQuery.textScalerOf(context).scale(140) * 2 + 8;
+    final width = paired ? (constraints.maxWidth - 8) / 2 : constraints.maxWidth;
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      SizedBox(width: width, child: _paidAmountField()),
+      SizedBox(width: width, child: _paymentMethodField()),
+    ]);
+  });
 
   Widget _moneyViewport(BuildContext context, Widget fields) {
     if (!manualMoney) return fields;
@@ -36422,12 +39838,14 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
         Padding(padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
           child: Row(children: [
             Expanded(child: Text(title,
-              style: Theme.of(context).textTheme.titleMedium)),
-            IconButton(key: const Key('supplier-money-hide-keyboard'),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xff000066)))),
+            if (amountFocus.hasFocus || referenceFocus.hasFocus || MediaQuery.viewInsetsOf(context).bottom > 0)
+              IconButton(key: const Key('supplier-money-hide-keyboard'),
               tooltip: 'Hide keyboard',
               onPressed: () => FocusScope.of(context).unfocus(),
               icon: const Icon(Icons.keyboard_hide_outlined)),
             TextButton(key: const Key('supplier-money-close'),
+              style: TextButton.styleFrom(textStyle: const TextStyle(fontSize: 13)),
               onPressed: saving ? null : () async {
                 if (await draft.flush() && context.mounted) Navigator.pop(context);
               }, child: const Text('Close')),
@@ -36476,57 +39894,46 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (!manualMoney) Text(title, style: Theme.of(context).textTheme.titleLarge),
-            Text(
-              manualMoney ? '${moneyLedger?.supplierName ?? 'Supplier'}${widget.supplierMoney!.copy == null ? '' : ' · ${widget.supplierMoney!.copy!.draft.invoiceReference}'}'
-              : expense
+            if (manualMoney) ...[
+              Text(moneyLedger?.supplierName ?? 'Supplier', key: const Key('supplier-money-supplier'),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              if (widget.supplierMoney!.copy != null)
+                Text('Bill ${widget.supplierMoney!.copy!.draft.invoiceReference}', key: const Key('supplier-money-bill-reference'),
+                  style: const TextStyle(fontSize: 12)),
+              const SizedBox(height: 4),
+            ] else Text(
+              expense
                   ? 'Business expense not already recorded elsewhere.'
                   : '${widget.purchase!.supplierName} · ${draft.key?.invoice ?? 'Bill unavailable'}',
             ),
             if (_compactSettled) Text('Bill balance ${_purchaseAmount(billBalance!)}',
               key: const Key('supplier-money-compact-balance'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-            Text(manualMoney ? 'Evaluation record · no money is transferred.' : 'Test record only. No money is transferred.'),
+            if (manualMoney) Text(widget.supplierMoney!.copy != null
+              ? 'Record a payment already made against this bill.'
+              : widget.supplierMoney!.advance
+              ? 'Record an advance already paid; apply it to a bill later.'
+              : 'Record money already paid without linking it to a bill.',
+              key: const Key('supplier-money-purpose-guide'),
+              style: const TextStyle(fontSize: 12, color: MoolColors.muted))
+            else const Text('Test record only. No money is transferred.'),
             if (_settledBillInput) const Text(
               'No amount is due on this bill. To record extra money already paid to the supplier, close and choose Record advance paid.',
               key: Key('supplier-money-no-bill-due')),
-            if (manualMoney && widget.supplierMoney!.advance) const Text(
-              'Record money already paid to the supplier as an advance. Link it to a bill separately.'),
-            if (!expense && !_compactSettled)
+            if (!expense && !_compactSettled && !(manualMoney && widget.supplierMoney!.advance))
               Text(
-                manualMoney && widget.supplierMoney!.advance
-                    ? 'Advance paid before or after delivery. Stock stays unchanged.'
-                : billBalance == null
+                billBalance == null
                     ? 'Bill balance unavailable'
                     : '${manualMoney && widget.supplierMoney!.copy == null ? 'Supplier dues' : 'Bill balance'} ${_purchaseAmount(billBalance!)}',
+                style: manualMoney ? const TextStyle(fontSize: 12, fontWeight: FontWeight.w600) : null,
               ),
-            if (!_compactSettled) if (manualMoney) Align(alignment: Alignment.centerLeft,
-              child: SizedBox(width: 180, child: _paidAmountField())) else _paidAmountField(),
-            if (!_compactSettled) DropdownButtonFormField<String>(
-              key: ValueKey('supplier-payment-method-$method'),
-              initialValue: method,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Method used'),
-              items: [
-                for (final value in {
-                  'UPI',
-                  'Cheque',
-                  'Bank transfer',
-                  'NEFT',
-                  'RTGS',
-                  'Cash',
-                  method,
-                })
-                  DropdownMenuItem(value: value, child: Text(value)),
-              ],
-              onChanged: !draft.ready || saving || _settledBillInput || (manualMoney && (frozen != null || conflict))
-                  ? null
-                  : (value) {
-                      if (value != null) {
-                        setState(() => method = value);
-                        draft.save(fields);
-                      }
-                    },
-            ),
+            if (!_compactSettled) ...[
+              if (manualMoney) ...[
+                const SizedBox(height: 12),
+                _manualAmountAndMethod(),
+                const SizedBox(height: 8),
+              ] else ...[_paidAmountField(), _paymentMethodField()],
+            ],
             if (!_compactSettled) TextField(
               key: Key(
                 expense
@@ -36534,19 +39941,22 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                     : 'supplier-payment-reference',
               ),
               controller: reference,
+              focusNode: manualMoney ? referenceFocus : null,
+              style: manualMoney ? const TextStyle(fontSize: 13) : null,
               enabled: draft.ready && !saving && !_settledBillInput && (!manualMoney || (frozen == null && !conflict)),
-              decoration: InputDecoration(labelText: 'Payment reference',
-                hintText: manualMoney ? 'UPI/bank reference or cash note' : null),
+              decoration: manualMoney ? _moneyDecoration('Payment reference', hint: 'UPI/bank reference or cash note')
+                : const InputDecoration(labelText: 'Payment reference'),
               onChanged: (_) => draft.save(fields),
             ),
             if (manualMoney) ...[
-              if (!_compactSettled) TextButton.icon(key: const Key('supplier-money-date'),
+              if (!_compactSettled) Align(alignment: Alignment.centerLeft, child: TextButton.icon(key: const Key('supplier-money-date'),
+                style: TextButton.styleFrom(textStyle: const TextStyle(fontSize: 12), alignment: Alignment.centerLeft),
                 onPressed: !draft.ready || saving || _settledBillInput || conflict || frozen != null ? null : choosePaymentDate,
                 icon: const Icon(Icons.calendar_today_outlined, size: 16),
-                label: Text('Payment date · ${occurredOn.split('-').reversed.join('/')}')),
+                label: Text('Payment date · ${occurredOn.split('-').reversed.join('/')}'))),
               if (!_compactSettled) CheckboxListTile(key: const Key('supplier-money-opening-excluded'),
                 contentPadding: EdgeInsets.zero, dense: true, value: excludedFromOpening,
-                title: const Text('Not already included in the starting balance'),
+                title: const Text('This payment is not included in opening balance', style: TextStyle(fontSize: 12)),
                 onChanged: !draft.ready || saving || _settledBillInput || conflict || frozen != null ? null : (value) {
                   setState(() => excludedFromOpening = value == true); draft.save(fields);
                 }),
@@ -36595,6 +40005,30 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                 onChanged: (_) => draft.save(fields),
               ),
             ],
+            if (manualMoney && draft.ready && moneyRecovered && !conflict && draft.key != null &&
+                widget.session.workspaceSupplierScope != null &&
+                ((frozen == null && !_settledBillInput) || supportingCopies?.active.isNotEmpty == true ||
+                  supportingCopies?.previous.isNotEmpty == true)) _SupplierPaymentDraftCopies(
+              session: widget.session, value: supportingCopies ?? WorkspaceSupplierMoneyCopies(
+                key: draft.key!, qa: widget.session.workspaceSupplierScope!.$3),
+              editable: !saving && !draft.busy && draft.error == null && frozen == null && !_settledBillInput,
+              saved: draft.pending == null && !draft.busy && draft.error == null,
+              isCurrent: () => mounted && widget.session.supplierMoneyFormKey(widget.supplierMoney!.supplierId,
+                copy: widget.supplierMoney!.copy, advance: widget.supplierMoney!.advance) == draft.key,
+              beforeChange: draft.flush,
+              onBusy: (lease, busy) {
+                if (mounted && (busy || identical(_copyBusyLease, lease))) {
+                  setState(() => _copyBusyLease = busy ? lease : null);
+                }
+              },
+              onChanged: (value) async {
+                if (!mounted || frozen != null || conflict ||
+                    widget.session.supplierMoneyFormKey(widget.supplierMoney!.supplierId,
+                      copy: widget.supplierMoney!.copy, advance: widget.supplierMoney!.advance) != draft.key) { return false; }
+                setState(() => supportingCopies = value);
+                draft.save(fields);
+                return draft.flush();
+              }),
             if (error != null || draft.error != null)
               Text(error ?? draft.error!),
             if (!draft.ready)

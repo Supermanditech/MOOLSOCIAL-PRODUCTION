@@ -123,6 +123,24 @@ if ($RequireLfPublicationProbes) {
   Assert-Fixture (-not $record.execution.runtimeWriteAuthorized) 'Historical published execution authority was overwritten.'
   Assert-Fixture (Test-Lf27Batch01Continuation $continuation @()) 'Exact Batch01 activation rejected.'
   $cases+=2
+  foreach ($maintenanceOwner in @('apps/mobile/test/ui_v2/buy/buy_v2_marketplace_trust_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
+      'apps/mobile/test/work_supplier_policy_test.dart')) {
+    Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($maintenanceOwner)) 'Exact F6 maintenance owner rejected.'
+    $cases++
+  }
+  $widenedMaintenance=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+  $widenedMaintenance.batch02Facts.owners+='apps/mobile/test/ui_v2/buy/unclaimed_maintenance_test.dart'
+  Assert-Fixture (-not (Test-Lf27Batch01Continuation $widenedMaintenance @())) 'F6 maintenance admitted an unclaimed owner.'
+  $cases++
+  foreach ($maintenanceOwner in @('apps/mobile/test/ui_v2/buy/buy_v2_marketplace_trust_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart')) {
+    $legacyMaintenance=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $legacyMaintenance.batch02Facts.owners=@($legacyMaintenance.batch02Facts.owners | Where-Object { $_ -cne $maintenanceOwner })
+    Assert-Fixture (Test-Lf27Batch01Continuation $legacyMaintenance @()) 'Historical F6-absent continuation rejected.'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacyMaintenance @($maintenanceOwner))) 'Unrecorded F6 owner admitted.'
+    $cases+=2
+  }
   foreach ($visitOwner in @('apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart')) {
     Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($visitOwner)) 'Recorded visit owner rejected.'
@@ -146,6 +164,7 @@ if ($RequireLfPublicationProbes) {
     $originalBatch=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $originalBatch.PSObject.Properties.Remove('batch02Facts')
     $originalBatch.PSObject.Properties.Remove('batch02OwnerVariants')
+    $originalBatch.PSObject.Properties.Remove('runtimeRegressionGate')
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $originalBatch @($owner))) 'Batch01 admitted an unrelated owner.'
     $cases++
   }
@@ -191,6 +210,19 @@ if ($RequireLfPublicationProbes) {
     }
   }
   if ($null -ne $continuation.PSObject.Properties['batch04DocumentExport']) {
+    $supplierExportOwner='apps/mobile/lib/features/work/work_stock_export.dart'
+    $withoutSupplierExport=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $withoutSupplierExport.batch04DocumentExport.owners=@($withoutSupplierExport.batch04DocumentExport.owners |
+      Where-Object { $_ -cne $supplierExportOwner })
+    Assert-Fixture (Test-Lf27Batch01Continuation $withoutSupplierExport @()) 'Historical supplier-export absence rejected.'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $withoutSupplierExport @($supplierExportOwner))) 'Unrecorded supplier-export owner admitted.'
+    $neighborExport=$withoutSupplierExport | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $neighborExport.batch04DocumentExport.owners+='apps/mobile/lib/features/work/work_stock_export_other.dart'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $neighborExport @())) 'Neighbor supplier-export owner admitted.'
+    $wildcardExport=$withoutSupplierExport | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $wildcardExport.batch04DocumentExport.owners+='apps/mobile/lib/features/work/*'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $wildcardExport @())) 'Supplier export gained a directory grant.'
+    $cases+=4
     foreach ($owner in $continuation.batch04DocumentExport.owners) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact document export owner rejected.'
       $cases++
@@ -209,7 +241,7 @@ if ($RequireLfPublicationProbes) {
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Export widened into backend.'
     $oldExport=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $oldExport.batch04DocumentExport.owners=@($oldExport.batch04DocumentExport.owners |
-      Where-Object { $_ -cne 'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart' })
+      Where-Object { $_ -cne 'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart' -and $_ -cne $supplierExportOwner })
     Assert-Fixture (Test-Lf27Batch01Continuation $oldExport @()) 'Historical two-owner export rejected.'
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $oldExport @('apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart'))) 'Unrecorded preview owner admitted.'
     $cases+=2
@@ -283,6 +315,23 @@ if ($RequireLfPublicationProbes) {
     $cases++
   }
   if ($null -ne $continuation.PSObject.Properties['batch03PolicyRecovery']) {
+    if ($null -ne $continuation.PSObject.Properties['supplierStatementReview20261023']) {
+      foreach ($owner in $continuation.supplierStatementReview20261023.owners) {
+        Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact statement owner rejected.'
+        $cases++
+      }
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.supplierStatementReview20261023.owners += 'backend/functions/src/index.ts'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Statement scope widened into backend.'
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.supplierStatementReview20261023.state='unrelated'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Unapproved statement state admitted.'
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.PSObject.Properties.Remove('supplierStatementReview20261023')
+      Assert-Fixture (Test-Lf27Batch01Continuation $probe @()) 'Historical statement-free continuation rejected.'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @('apps/mobile/lib/features/work/work_downloads.dart'))) 'Undeclared statement runtime admitted.'
+      $cases+=4
+    }
     foreach ($owner in $continuation.batch03PolicyRecovery.owners) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact original-policy recovery owner rejected.'
       $cases++
@@ -309,6 +358,21 @@ if ($RequireLfPublicationProbes) {
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $withoutProgress @('apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart'))) 'Unclaimed progress test admitted.'
     $cases+=2
     $cases+=3
+    $checkoutOwner='apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart'
+    $withCheckout=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    if (@($withCheckout.batch03PolicyRecovery.owners) -cnotcontains $checkoutOwner) {
+      $withCheckout.batch03PolicyRecovery.owners+=$checkoutOwner
+    }
+    Assert-Fixture (Test-Lf27Batch01Continuation $withCheckout @($checkoutOwner)) 'Exact already-admitted Checkout regression owner rejected.'
+    $withoutCheckout=$withCheckout | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $withoutCheckout.batch03PolicyRecovery.owners=@($withoutCheckout.batch03PolicyRecovery.owners | Where-Object { $_ -cne $checkoutOwner })
+    Assert-Fixture (Test-Lf27Batch01Continuation $withoutCheckout @()) 'Historical recovery without Checkout regression rejected.'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $withoutCheckout @($checkoutOwner))) 'Undeclared Checkout regression admitted.'
+    $neighbor=$withoutCheckout | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $neighborOwner='apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_other_test.dart'
+    $neighbor.batch03PolicyRecovery.owners+=$neighborOwner
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $neighbor @($neighborOwner))) 'Neighboring Checkout owner admitted.'
+    $cases+=4
   }
   if ($null -ne $continuation.PSObject.Properties['batch02Promotions']) {
     foreach ($moneyFixture in @('apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart',

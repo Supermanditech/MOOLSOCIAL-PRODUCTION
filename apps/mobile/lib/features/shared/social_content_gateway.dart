@@ -659,11 +659,13 @@ class IoSocialContentTransport implements SocialContentTransport {
     HttpClient? client,
     this.timeout = const Duration(seconds: 45),
     this.maximumResponseBytes = 2 * 1024 * 1024,
+    this.followRedirects = true,
   }) : _client = client ?? HttpClient();
 
   final HttpClient _client;
   final Duration timeout;
   final int maximumResponseBytes;
+  final bool followRedirects;
 
   @override
   Future<SocialContentResponse> postJson(
@@ -674,6 +676,7 @@ class IoSocialContentTransport implements SocialContentTransport {
     final encoded = utf8.encode(jsonEncode(body));
     try {
       final request = await _client.postUrl(endpoint).timeout(timeout);
+      request.followRedirects = followRedirects;
       request.headers.contentType = ContentType.json;
       headers.forEach(request.headers.set);
       request.contentLength = encoded.length;
