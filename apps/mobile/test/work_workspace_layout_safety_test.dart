@@ -71089,51 +71089,32 @@ void main() {
         await reveal(tester, find.byKey(const Key('work-quick-buy')));
         await tester.tap(find.byKey(const Key('work-quick-buy')));
         await tester.pumpAndSettle();
-        final indicator = find.byWidgetPredicate(
-          (widget) =>
-              widget is Semantics &&
-              (widget.properties.label ?? '').startsWith('Catalogue products:'),
-        );
-        final transition = tester.widget<AnimatedSwitcher>(
-          find.descendant(
-            of: indicator,
-            matching: find.byType(AnimatedSwitcher),
-          ),
-        );
-        // Exercise the real indicator's transition configuration. Repeated
-        // loading states can overlap while search and sale type change.
-        for (final (state, elapsed) in [
-          ('69-false', 220),
-          ('null-true', 150),
-          ('0-false', 16),
-          ('null-true', 16),
-          ('3-false', 16),
+        await tester.pump(const Duration(milliseconds: 700));
+        await tester.pumpAndSettle();
+        final buy = tester.widget<BuyV2Screen>(find.byType(BuyV2Screen)).session;
+        // The shared public pager replaced the detached Store count animation.
+        // Exercise real catalogue updates and exit while frames overlap.
+        for (final (query, mode, elapsed) in [
+          ('', BuyV2WholesaleSaleType.wholesale, 220),
+          ('zzqav12', BuyV2WholesaleSaleType.wholesale, 150),
+          ('', BuyV2WholesaleSaleType.bulk, 16),
+          ('zzqav12', BuyV2WholesaleSaleType.bulk, 16),
+          ('', BuyV2WholesaleSaleType.wholesale, 16),
         ]) {
-          await tester.pumpWidget(
-            MaterialApp(
-              home: AnimatedSwitcher(
-                duration: transition.duration,
-                reverseDuration: transition.reverseDuration,
-                switchInCurve: transition.switchInCurve,
-                switchOutCurve: transition.switchOutCurve,
-                transitionBuilder: transition.transitionBuilder,
-                layoutBuilder: transition.layoutBuilder,
-                child: Text(state, key: ValueKey(state)),
-              ),
-            ),
-          );
+          buy.updateQuery(query);
+          buy.chooseWholesaleSaleType(mode);
           await tester.pump(Duration(milliseconds: elapsed));
           expect(
             tester.takeException(),
             isNull,
-            reason: 'Count transition $state',
+            reason: 'Shared catalogue update $query/$mode',
           );
         }
-        // Back removes the indicator before all outgoing fades have completed.
-        await tester.pumpWidget(const MaterialApp(home: Text('Dashboard')));
+        await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        expect(find.text('Dashboard'), findsOneWidget);
+        expect(find.byKey(const Key('work-store-procurement-screen')), findsNothing);
+        expect(find.byKey(const Key('work-dashboard-catalogue-screen')), findsOneWidget);
       },
     );
     testWidgets('STOREBACK01 full app Restock Bulk native Back lifecycle', (
@@ -71245,6 +71226,7 @@ void main() {
               await reveal(tester, find.byKey(const Key('work-quick-buy')));
               await reveal(tester, find.byKey(const Key('work-quick-buy')));
               await tester.tap(find.byKey(const Key('work-quick-buy')));
+              await tester.pump(const Duration(milliseconds: 700));
               await tester.pumpAndSettle();
               expect(
                 find.byKey(const Key('work-store-procurement-screen')),
@@ -71256,22 +71238,17 @@ void main() {
               if (retainedProductId == null) {
                 final product = buy.visibleProducts.first;
                 retainedProductId = product.id;
-                final add = find.byKey(ValueKey('buy-add-${product.id}'));
-                await tester.ensureVisible(add);
-                await tester.tap(add);
-                await tester.pumpAndSettle();
                 retainedQuantity = buy.quantityFor(product.id);
-                expect(retainedQuantity, greaterThan(0));
+                // This real-app review harness has no supplier purchase grant.
+                // Positive authorised Cart retention is covered by STOREBACK03.
+                expect(buy.addProduct(product.id), isFalse);
+                expect(buy.quantityFor(product.id), retainedQuantity);
+                await tester.pumpAndSettle();
               }
               expect(buy.quantityFor(retainedProductId), retainedQuantity);
-              final opener = find.byKey(const Key('work-dashboard-search'));
-              if (opener.evaluate().isNotEmpty) {
-                await tester.tap(opener);
-                await tester.pumpAndSettle();
-              }
-              final search = find.byKey(
-                const Key('work-dashboard-search-field'),
-              );
+              await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+              await tester.pumpAndSettle();
+              final search = find.byKey(const ValueKey('buy-search-field'));
               await tester.tap(search);
               await tester.enterText(search, 'zzqav12');
               tester.view.viewInsets = FakeViewPadding(
@@ -71285,31 +71262,34 @@ void main() {
               tester.view.viewInsets = const FakeViewPadding();
               await tester.pump(Duration(milliseconds: delay));
               await tester.tap(
-                find.byKey(const Key('work-dashboard-search-clear')),
+                find.byKey(const ValueKey('buy-search-clear')),
               );
               await tester.pump(Duration(milliseconds: delay));
-              await tester.tap(find.text('Bulk'));
-              await tester.pump(Duration(milliseconds: delay));
-              expect(
-                tester.takeException(),
-                isNull,
-                reason: 'Bulk $delay/$repeat',
-              );
-              final searchFocus = tester.widget<TextField>(search).focusNode!;
+              final searchFocus = tester.widget<EditableText>(
+                find.descendant(of: search, matching: find.byType(EditableText)),
+              ).focusNode;
               if (!nativeConnectionClosed) {
                 expect(searchFocus.hasFocus, isTrue);
               }
-              // Preserve the delayed native-write cases and also exercise a
-              // completed write before another frame can settle focus changes.
-              delayBookmarkWrites = repeat != 4;
+              // Shared public search closes before sale-type tabs are exposed.
               await tester.binding.handlePopRoute();
               await tester.pump();
               expect(
                 searchFocus.hasFocus,
                 isFalse,
                 reason:
-                    'Back must release search focus before native storage completes.',
+                    'Public search Back releases focus before leaving Restock.',
               );
+              await tester.pumpAndSettle();
+              expect(find.byKey(const Key('work-store-procurement-screen')), findsOneWidget);
+              await tester.tap(find.text('Bulk'));
+              await tester.pump(Duration(milliseconds: delay));
+              expect(tester.takeException(), isNull,
+                  reason: 'Bulk $delay/$repeat');
+              // Preserve delayed native writes and completed-write exits.
+              delayBookmarkWrites = repeat != 4;
+              await tester.binding.handlePopRoute();
+              await tester.pump();
               for (var frame = 0; frame < 20; frame++) {
                 await tester.pump(const Duration(milliseconds: 16));
               }
@@ -71326,7 +71306,7 @@ void main() {
                 findsNothing,
               );
               expect(
-                find.byKey(const Key('work-workspace-dashboard')),
+                find.byKey(const Key('work-dashboard-catalogue-screen')),
                 findsOneWidget,
               );
             }
@@ -71488,7 +71468,7 @@ void main() {
         expect(bookmarks.value!.active, isFalse);
         expect(buy.quantityFor(product.id), quantity);
         expect(
-          find.byKey(const Key('work-workspace-dashboard')),
+          find.byKey(const Key('work-dashboard-catalogue-screen')),
           findsOneWidget,
         );
         expect(tester.takeException(), isNull);
