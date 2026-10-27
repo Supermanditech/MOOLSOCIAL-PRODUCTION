@@ -6,6 +6,7 @@ import 'journey_services.dart';
 import 'account_profile_gateway.dart';
 import 'account_plans_gateway.dart';
 import '../assistant/model_gateway.dart';
+import '../assistant/history_gateway.dart';
 
 const _deviceReviewMode = bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');
 
@@ -135,6 +136,24 @@ class JourneySession extends ChangeNotifier {
   AssistantModelGateway? _assistantModelGateway;
   AccountProfileOwner? _assistantModelOwner;
   int? _assistantModelGeneration;
+  AssistantHistoryGateway? _assistantHistoryGateway;
+  AccountProfileOwner? _assistantHistoryOwner;
+  int? _assistantHistoryGeneration;
+  AssistantHistoryGateway? get assistantHistoryGateway {
+    final owner = authenticatedBuyPersistenceIdentity;
+    final generation = navigationAuthenticationGeneration;
+    final source = _accountIdentityGateway;
+    if (_disposed || owner == null || generation == null || owner.tenantId != null || source is! AssistantHistoryGatewaySource) {
+      _assistantHistoryGateway?.dispose(); _assistantHistoryGateway = null; return null;
+    }
+    if (_assistantHistoryOwner != owner || _assistantHistoryGeneration != generation) {
+      _assistantHistoryGateway?.dispose();
+      _assistantHistoryOwner = owner; _assistantHistoryGeneration = generation;
+      _assistantHistoryGateway = (source as AssistantHistoryGatewaySource).assistantHistoryGateway(owner,
+        () => !_disposed && navigationAuthenticationGeneration == generation && authenticatedBuyPersistenceIdentity == owner);
+    }
+    return _assistantHistoryGateway;
+  }
   AssistantModelGateway? get assistantModelGateway {
     final owner = authenticatedBuyPersistenceIdentity;
     final generation = navigationAuthenticationGeneration;
@@ -2368,6 +2387,7 @@ class JourneySession extends ChangeNotifier {
       _disposed = true;
       _assistantModelGateway?.dispose();
       _plansAssistantEntitlements?.dispose();
+      _assistantHistoryGateway?.dispose();
       _plansGateway?.dispose();
       _authenticationGeneration += 1;
       final subscription = _firebasePrincipalSubscription;

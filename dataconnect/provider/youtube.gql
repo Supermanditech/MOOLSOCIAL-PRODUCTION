@@ -427,9 +427,6 @@ mutation UpdateYouTubePublicationIfConnected(
 # Tombstone the account rather than deleting historical order/invoice links.
 # Original save receipts also contain private Profile data and must be erased.
 mutation EraseMoolSocialUser($userId: String!) @auth(level: NO_ACCESS) @transaction {
-  assistantPreparationRequest_deleteMany(where: {owner: {uid: {eq: $userId}}})
-  assistantUsageReservation_deleteMany(where: {owner: {uid: {eq: $userId}}})
-  assistantProfileOperation_deleteMany(where: {owner: {uid: {eq: $userId}}})
   appUser_update(
     key: {uid: $userId}
     data: {
@@ -440,6 +437,11 @@ mutation EraseMoolSocialUser($userId: String!) @auth(level: NO_ACCESS) @transact
       updatedAt_expr: "request.time"
     }
   )
+  assistantConversation_deleteMany(where: {owner: {uid: {eq: $userId}}})
+  assistantConversationSave_deleteMany(where: {owner: {uid: {eq: $userId}}})
+  assistantPreparationRequest_deleteMany(where: {owner: {uid: {eq: $userId}}})
+  assistantUsageReservation_deleteMany(where: {owner: {uid: {eq: $userId}}})
+  assistantProfileOperation_deleteMany(where: {owner: {uid: {eq: $userId}}})
 }
 
 mutation DeleteYouTubePublications($userId: String!)

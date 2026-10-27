@@ -387,6 +387,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
       builder: (context, child) => MoolAssistantHost(
         entitlements: _session.accountPlansAssistantEntitlements,
         readModelSource: () => _session.assistantModelGateway,
+        readHistorySource: () => _session.assistantHistoryGateway,
         prepareContext: (assistantContext, currentContext, original) {
           final navigator = Navigator.of(assistantContext, rootNavigator: true);
           final router = _router, buy = _buyRoot.current;

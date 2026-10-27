@@ -1793,11 +1793,13 @@ class MoolAssistantConversation {
     required this.updatedAt,
     this.draft = '',
     this.language = 'Auto',
+    this.revision = 0,
     List<(bool, String)> messages = const [],
     List<MoolAssistantAttachment> attachments = const [],
   }) : messages = List.unmodifiable(messages),
        attachments = List.unmodifiable(attachments);
   final String id, title, draft, language;
+  final int revision;
   final Object binding;
   final DateTime updatedAt;
 
@@ -1836,6 +1838,26 @@ abstract interface class MoolAssistantHistorySource {
     String? conversationId,
     required String text,
     required String language,
+    required List<MoolAssistantAttachment> attachments,
+  });
+}
+
+class MoolAssistantHistoryAccessFailure implements Exception {
+  const MoolAssistantHistoryAccessFailure();
+}
+
+/// Full inert transcript persistence; no proposals/consents are restored.
+abstract interface class MoolAssistantConversationHistorySource
+    implements MoolAssistantHistorySource {
+  Future<MoolAssistantConversation> saveConversation(
+    MoolAssistantContext context, {
+    required String draftKey,
+    required String editorKey,
+    String? conversationId,
+    required int expectedRevision,
+    required String text,
+    required String language,
+    required List<(bool, String)> messages,
     required List<MoolAssistantAttachment> attachments,
   });
 }
@@ -2068,8 +2090,15 @@ Map<String, MoolAssistantNativeAdapter> _assistantNativeRegistry(
   return Map.unmodifiable(registry);
 }
 
-/// Ephemeral composer state. It does not persist text, post a domain command,
-/// call a model, activate a subscription or resolve arbitrary app routes.
+/// An editor identity for History deduplication, never an access credential.
+String _newHistoryEditorSession() {
+  final random = math.Random.secure();
+  return 'chat-' + List.generate(16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+}
+
+/// Composer state uses bound services. History restores inert text; domain
+/// effects still require the original native forms and explicit confirmations.
 class MoolAssistantController extends ChangeNotifier {
   MoolAssistantController({
     required MoolAssistantContext Function() currentContext,
@@ -2142,7 +2171,9 @@ class MoolAssistantController extends ChangeNotifier {
       requestId: 'req-${List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}',
       requestRevision: revision, message: _draft, language: language,
       expectedEntitlementRevision: entitlement,
-      history: messages.map((m) => {'role': m.$1 ? 'user' : 'assistant', 'text': m.$2}).toList(growable: false),
+      // History retains the full supported transcript; model context keeps
+      // the existing service contract's latest twenty messages only.
+      history: messages.skip(messages.length > 20 ? messages.length - 20 : 0).map((m) => {'role': m.$1 ? 'user' : 'assistant', 'text': m.$2}).toList(growable: false),
       actionId: taskId?.replaceFirst(RegExp(r'^store\.'), ''),
     );
     _modelInput = input; _modelSource = source; _modelBinding = binding;
@@ -2373,13 +2404,15 @@ class MoolAssistantController extends ChangeNotifier {
   List<MoolAssistantConversation> get history => List.unmodifiable(_history);
   List<(bool, String)> messages = const [];
   String? conversationId, historyCursor, historyNotice;
+  int conversationRevision = 0;
   String? conversationTitle;
   bool historyLoading = false, historyBusy = false;
   int _historyRead = 0, _historyWrite = 0, _conversationGeneration = 0;
-  final String _draftSession = DateTime.now().microsecondsSinceEpoch.toString();
+  final String _draftSession = _newHistoryEditorSession();
   bool get hasInput => _draft.trim().isNotEmpty || _selected.isNotEmpty || (_modelRecovered && _modelInput!=null);
   bool get canChangeConversation =>
       !historyBusy &&
+      !modelBusy &&
       !reviewBusy &&
       !recording &&
       !voiceBusy &&
@@ -2700,8 +2733,12 @@ class MoolAssistantController extends ChangeNotifier {
         ..clear()
         ..addAll(earlier);
       historyCursor = page.nextCursor;
-    } on Object {
+    } on Object catch (error) {
       if (!_disposed && epoch == _epoch) {
+        if (error is MoolAssistantHistoryAccessFailure) {
+          _history.clear();
+          historyCursor = null;
+        }
         historyNotice = 'Could not load chat history. Try again.';
       }
     } finally {
@@ -2718,7 +2755,8 @@ class MoolAssistantController extends ChangeNotifier {
     synchronize();
     if (!canChangeConversation) return false;
     if (id != null && id == conversationId) return true;
-    if (historySource == null && (id != null || hasInput)) {
+    final hasHistoryContent = hasInput || messages.isNotEmpty;
+    if (historySource == null && (id != null || hasHistoryContent)) {
       notice = 'Chat history is unavailable. Your current draft is unchanged.';
       notifyListeners();
       return false;
@@ -2727,6 +2765,7 @@ class MoolAssistantController extends ChangeNotifier {
     final epoch = _epoch, binding = context.binding, attempt = ++_historyWrite;
     final text = _draft,
         selected = List<MoolAssistantAttachment>.of(_selected),
+        transcript = List<(bool, String)>.of(messages),
         lang = language;
     bool current() =>
         !_disposed &&
@@ -2734,17 +2773,26 @@ class MoolAssistantController extends ChangeNotifier {
         binding == _currentContext().binding &&
         text == _draft &&
         lang == language &&
+        listEquals(transcript, messages) &&
         listEquals(selected, _selected);
     historyBusy = true;
     notice = null;
     notifyListeners();
     try {
-      if (hasInput) {
+      if (hasHistoryContent) {
         if (!context.signedIn) throw StateError('Unauthenticated draft');
-        final saved = await historySource!.saveDraft(
+        final full = historySource;
+        if (transcript.isNotEmpty && full is! MoolAssistantConversationHistorySource) {
+          throw StateError('Full transcript persistence is unavailable');
+        }
+        final draftKey = '$_draftSession:$_conversationGeneration:${Object.hash(text, lang, Object.hashAll(selected), Object.hashAll(transcript))}';
+        final saved = full is MoolAssistantConversationHistorySource ? await full.saveConversation(
+          context, draftKey: draftKey, editorKey: '$_draftSession:$_conversationGeneration',
+          conversationId: conversationId, expectedRevision: conversationRevision, text: text, language: lang,
+          messages: List.unmodifiable(transcript), attachments: List.unmodifiable(selected),
+        ) : await historySource!.saveDraft(
           context,
-          draftKey:
-              '$_draftSession:$_conversationGeneration:${Object.hash(text, lang, Object.hashAll(selected))}',
+          draftKey: draftKey,
           conversationId: conversationId,
           text: text,
           language: lang,
@@ -2756,6 +2804,7 @@ class MoolAssistantController extends ChangeNotifier {
             (conversationId != null && saved.id != conversationId) ||
             saved.draft != text ||
             saved.language != lang ||
+            (full is MoolAssistantConversationHistorySource && !listEquals(saved.messages, transcript)) ||
             saved.attachments.length != selected.length ||
             !selected.asMap().entries.every((entry) {
               final original = entry.value, copy = saved.attachments[entry.key];
@@ -2785,6 +2834,7 @@ class MoolAssistantController extends ChangeNotifier {
       _retirePrivateInput();
       _conversationGeneration++;
       conversationId = restored?.id;
+      conversationRevision = restored?.revision ?? 0;
       conversationTitle = restored?.title;
       messages = restored?.messages ?? const [];
       _retireProposal();
@@ -2793,8 +2843,12 @@ class MoolAssistantController extends ChangeNotifier {
       _selected.addAll(restored?.attachments ?? const []);
       notifyListeners();
       return true;
-    } on Object {
+    } on Object catch (error) {
       if (current()) {
+        if (error is MoolAssistantHistoryAccessFailure) {
+          _history.clear();
+          historyCursor = null;
+        }
         notice = 'Could not switch chats. Your current draft is unchanged.';
       }
       return false;
@@ -2882,6 +2936,7 @@ class MoolAssistantController extends ChangeNotifier {
     historyNotice = null;
     _history.clear();
     conversationId = null;
+    conversationRevision = 0;
     conversationTitle = null;
     messages = const [];
     _draft = '';

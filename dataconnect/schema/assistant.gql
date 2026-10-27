@@ -47,3 +47,31 @@ type AssistantProfileOperation @table(name: "assistant_profile_operation", key: 
   createdAt: Timestamp!
   updatedAt: Timestamp!
 }
+
+# Private inert text only. Account/Workspace/paid access is revalidated by the
+# service; stored text, revisions and receipts never grant execution authority.
+type AssistantConversation @table(name: "assistant_conversation", key: "conversationKey") {
+  conversationKey: String! @col(dataType: "varchar(64)")
+  owner: AppUser!
+  projectId: String!
+  scopeJson: String!
+  conversationId: String! @col(dataType: "varchar(128)")
+  revision: Int!
+  title: String!
+  snapshotJson: String!
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+type AssistantConversationSave @table(name: "assistant_conversation_save", key: "requestKey") {
+  requestKey: String! @col(dataType: "varchar(64)")
+  owner: AppUser!
+  projectId: String!
+  scopeJson: String!
+  requestId: String! @col(dataType: "varchar(128)")
+  fingerprint: String! @col(dataType: "varchar(64)")
+  accessRevision: String!
+  state: String! @col(dataType: "varchar(16)")
+  outcomeJson: String
+  createdAt: Timestamp!
+}

@@ -232,7 +232,7 @@ Future<void> _capture(WidgetTester tester, String name) async {
   });
 }
 
-class _History implements MoolAssistantHistorySource {
+class _History implements MoolAssistantConversationHistorySource {
   Future<MoolAssistantHistoryPage> Function(MoolAssistantContext, String?)?
   listing;
   Future<MoolAssistantConversation> Function(MoolAssistantContext, String)?
@@ -244,6 +244,18 @@ class _History implements MoolAssistantHistorySource {
   )?
   saving;
   int saves = 0, reads = 0;
+  @override
+  Future<MoolAssistantConversation> saveConversation(
+    MoolAssistantContext c, {required String draftKey, required String editorKey,
+    String? conversationId, required int expectedRevision, required String text,
+    required String language, required List<(bool, String)> messages,
+    required List<MoolAssistantAttachment> attachments}) async {
+    final saved = await saveDraft(c, draftKey: draftKey, conversationId: conversationId,
+      text: text, language: language, attachments: attachments);
+    return MoolAssistantConversation(id: saved.id, binding: saved.binding, title: saved.title,
+      updatedAt: saved.updatedAt, draft: saved.draft, language: saved.language,
+      revision: expectedRevision + 1, attachments: saved.attachments, messages: messages);
+  }
   @override
   Future<MoolAssistantHistoryPage> list(
     MoolAssistantContext c, {

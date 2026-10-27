@@ -22,6 +22,9 @@ import {DurablePreparationUsageAuthority} from "./assistant/usage_store.js";
 import {ProfilePreparationExecutionService} from "./assistant/profile_execution.js";
 import {ProfileWorkspacePreparationContext} from "./assistant/profile_context.js";
 import {handleAssistantModelRequest} from "./assistant/model_http.js";
+import {AssistantHistoryService} from "./assistant/history_service.js";
+import {DataConnectHistoryRepository} from "./assistant/history_dataconnect_store.js";
+import {handleAssistantHistoryRequest} from "./assistant/history_http.js";
 
 import {
   FetchXProviderTransport,
@@ -2642,6 +2645,45 @@ export const moolSocialAssistantPreparation = onRequest(
       response.status(reply.status).json(reply.body);
     } catch {
       response.status(503).json({ok: false, error: {code: "assistant_unavailable", message: "Mool AI is unavailable right now. Your records are unchanged."}});
+    }
+  },
+);
+
+let assistantHistoryRuntime: {projectId: string; service: AssistantHistoryService} | undefined;
+export const moolSocialAssistantHistory = onRequest(
+  {region: "asia-south1", timeoutSeconds: 60, memory: "256MiB", minInstances: 0,
+    // History snapshots have a larger technical body bound than preparation.
+    maxInstances: 4, concurrency: 4, serviceAccount: publicAuthRuntimeServiceAccount},
+  async (request, response) => {
+    response.setHeader("cache-control", "no-store");
+    response.setHeader("x-content-type-options", "nosniff");
+    response.setHeader("x-request-id", requestId(request.headers));
+    try {
+      const projectId = publicAuthProjectId();
+      const enabled = process.env.MOOLSOCIAL_ASSISTANT_HISTORY_QUALIFIED === "true" &&
+        process.env.MOOLSOCIAL_ACCOUNT_PLANS_STORAGE_QUALIFIED === "true";
+      const durable = enabled ? assistantDurableSources(projectId) : undefined;
+      if (assistantHistoryRuntime && assistantHistoryRuntime.projectId !== projectId) throw Error("History project changed");
+      if (durable && !assistantHistoryRuntime) {
+        accountPlansRuntimeService ??= new AccountPlansService(
+          new DataConnectAccountPlansRepository(getDataConnect({location: "asia-south1", serviceId: "moolsocial-core", connector: "mobile"})),
+          {projectId, readWorkspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)});
+        assistantHistoryRuntime = {projectId, service: new AssistantHistoryService({projectId,
+          plans: accountPlansRuntimeService, repository: new DataConnectHistoryRepository(durable.sql, projectId)})};
+      }
+      const reply = await handleAssistantHistoryRequest({method: request.method, headers: request.headers,
+        body: request.body, bodyBytes: request.rawBody.byteLength}, {projectId, enabled: enabled && !!durable,
+        ...(assistantHistoryRuntime ? {service: assistantHistoryRuntime.service} : {}),
+        verifyAppCheck: async (token, consume) => getAppCheck().verifyToken(token, consume ? {consume: true} : undefined),
+        verifyIdToken: async token => {
+          const verified = await getAuth().verifyIdToken(token, true);
+          return {uid: verified.uid, projectId: verified.aud,
+            ...(verified.firebase?.tenant ? {tenantId: verified.firebase.tenant} : {}),
+            anonymous: verified.firebase?.sign_in_provider === "anonymous"};
+        }});
+      response.status(reply.status).json(reply.body);
+    } catch {
+      response.status(503).json({ok: false, error: {code: "history_unavailable", message: "Chat history is unavailable right now."}});
     }
   },
 );

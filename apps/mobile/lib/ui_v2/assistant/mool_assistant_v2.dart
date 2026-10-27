@@ -94,6 +94,7 @@ class MoolAssistantHost extends InheritedWidget {
     this.readModelSource,
     this.prepareContext,
     this.historySource,
+    this.readHistorySource,
     super.key,
   });
 
@@ -105,6 +106,7 @@ class MoolAssistantHost extends InheritedWidget {
       MoolAssistantContext Function() readContext,
       List<MoolAssistantNativeAdapter> original)? prepareContext;
   final MoolAssistantHistorySource? historySource;
+  final MoolAssistantHistorySource? Function()? readHistorySource;
 
   static MoolAssistantHost? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<MoolAssistantHost>();
@@ -129,7 +131,7 @@ class MoolAssistantHost extends InheritedWidget {
       entitlements: entitlements,
       readModelSource: readModelSource,
       preparationGuard: guard,
-      historySource: historySource,
+      historySource: historySource ?? readHistorySource?.call(),
       nativeAdapters: guard?.adapters ?? nativeAdapters,
       attachments: NativeWorkProofPicker(),
       mediaPicker: MoolAssistantNativeMediaPicker(),
@@ -163,7 +165,8 @@ class MoolAssistantHost extends InheritedWidget {
       oldWidget.entitlements != entitlements ||
       oldWidget.readModelSource != readModelSource ||
       oldWidget.prepareContext != prepareContext ||
-      oldWidget.historySource != historySource;
+      oldWidget.historySource != historySource ||
+      oldWidget.readHistorySource != readHistorySource;
 }
 
 /// Contextual native frontend capabilities. No model/provider or permission grant.
@@ -797,6 +800,7 @@ class _MoolAssistantPageState extends State<MoolAssistantPage>
   bool _closePromptOpen = false;
   bool get _pendingInput =>
       widget.controller.hasInput ||
+      widget.controller.messages.isNotEmpty ||
       widget.controller.recording ||
       widget.controller.voiceBusy ||
       widget.controller.pickingAttachment ||
