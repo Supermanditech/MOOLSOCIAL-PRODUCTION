@@ -7,7 +7,7 @@
   "founderDecision": "accepted_for_combined_b07_b04_profile_local_implementation_with_retained_limits",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 2,
+  "localMetadataCommits": 3,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -20,5 +20,12 @@
     "path": "docs/quality/AI-DOMAIN-CATALOGUE-SELECTOR-20261028.md",
     "sha256": "925A65AF2FD4AC01837A08EB6493D8DF77EE6637CA4EE0679175BBDFA0376F69",
     "authority": "Existing20-scope EXECUTE and standing necessary admissions; not separately founder-read hash review"
+  },
+  "toolingReadRecurrence": {
+    "regressionId": "REG-20260818-2972-C34P-COORDINATION-POLICY-APPLY-PATCH-OUTPUT-TRUNCATION",
+    "evidence": "docs/quality/AI-DOMAIN-TOOL-READ-INCIDENT-20261028.md",
+    "registryEntries": 4624,
+    "registrySha256": "4B3DF3778AC782C95C287D209493C91052F7497C92CEB700FAC40ABF0DA30F2A",
+    "authority": "Existing standing exact necessary metadata reconciliation only; no runtime or business expansion."
   }
 }

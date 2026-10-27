@@ -66021,7 +66021,17 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json",
         "docs/quality/REG-20260818-2972-C34P-COORDINATION-POLICY-APPLY-PATCH-OUTPUT-TRUNCATION.md"
-      ]
+      ],
+      "domainBatchRecurrence20261028": {
+        "id": "REG-20260818-2972-C34P-COORDINATION-POLICY-APPLY-PATCH-OUTPUT-TRUNCATION",
+        "recurrence": "AI-DOMAIN-BATCH-20 bounded diagnostic and subagent instruction reads exceeded output budgets on 2026-10-28",
+        "rootCause": "Multiple long owners or long single-line metadata were printed in one bounded response without accounting for token budget. A metadata-helper template anchor and an implicit-encoding read also failed before any write; recovery uses exact line positions and explicit UTF-8.",
+        "detection": "Tool returned explicit truncated output; no source or device attempt follows registration stop.",
+        "prevention": "Read one mandatory owner at a time in checked pages; use scalar structural projections for long metadata; no truncated result qualifies evidence.",
+        "evidence": "docs/quality/AI-DOMAIN-TOOL-READ-INCIDENT-20261028.md",
+        "subagent": "catalogue_boundary_review stopped and not resumed; read-only exploratory reports remain directions for primary verification, not gate-qualified acceptance",
+        "limits": "No business, runtime, cloud, APK or scope extension. Exact recurrence bookkeeping only."
+      }
     },
     {
       "id": "REG-20260818-2973-C34P-COORDINATION-GATE-MISSING-REQUIRED-PARAMETERS",

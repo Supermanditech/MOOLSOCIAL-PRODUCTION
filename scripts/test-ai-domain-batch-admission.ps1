@@ -6,7 +6,7 @@ $f=@{Root='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-domain-batch-20261
 Check (Test-AiDomainBatchIdentity $f) 'identity'
 foreach($k in $f.Keys){$b=$f.Clone();$b[$k]='foreign';Check (!(Test-AiDomainBatchIdentity $b)) "foreign $k";$b=$f.Clone();$b.Remove($k);Check (!(Test-AiDomainBatchIdentity $b)) "missing $k"}
 foreach($phase in @('build','deploy','ticket_acceptance','handoff')){$b=$f.Clone();$b.Phase=$phase;Check (!(Test-AiDomainBatchIdentity $b)) "forbidden $phase"}
-Check (@(Get-AiDomainBatchRuntimeOwners).Count -eq 30) '30 exact runtime/test owners';Check (@(Get-AiDomainBatchMetadataOwners).Count -eq 10) 'ten exact metadata owners'
+Check (@(Get-AiDomainBatchRuntimeOwners).Count -eq 30) '30 exact runtime/test owners';Check (@(Get-AiDomainBatchMetadataOwners).Count -eq 12) 'twelve exact metadata owners'
 $root=Split-Path -Parent $PSScriptRoot
 Check ($root.Replace('\','/') -ceq $f.Root) 'actual checkout root matches identity'
 Check ((Get-FileHash (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-CONTRACT-20261028.md')).Hash -ceq '9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382') 'contract bytes'
@@ -18,4 +18,5 @@ Check (([regex]::Replace($current,$pattern,'').Replace("`r`n","`n").TrimEnd()) -
 Check (@(Get-AiDomainBatchBootstrapOwners).Count -eq 9) 'original nine bootstrap owners'
 Check (@(Get-AiDomainBatchSelectorAmendOwners).Count -eq 7) 'exact seven selector amendment owners'
 Check ((Get-FileHash (Join-Path $root 'docs/quality/AI-DOMAIN-CATALOGUE-SELECTOR-20261028.md')).Hash -ceq '925A65AF2FD4AC01837A08EB6493D8DF77EE6637CA4EE0679175BBDFA0376F69') 'exact selector contract'
+Check (@(Get-AiDomainBatchRecurrenceOwners).Count -eq 6) 'exact six recurrence owners'
 Write-Output "AI domain batch admission checks passed: $n."

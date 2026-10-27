@@ -34,7 +34,6 @@
       "task": "/root",
       "role": "primary",
       "owners": [
-        "config/codex-development-regression-registry.json",
         "scripts/check-apk-regression-gate-state.ps1",
         "scripts/check-store-journey-qualification.ps1",
         "scripts/test-store-journey-qualification.ps1",
@@ -414,7 +413,9 @@
         "scripts/check-codex-subagent-coordination-policy.ps1",
         "scripts/ai-domain-batch-admission.ps1",
         "scripts/test-ai-domain-batch-admission.ps1",
-        "docs/quality/AI-DOMAIN-CATALOGUE-SELECTOR-20261028.md"
+        "docs/quality/AI-DOMAIN-CATALOGUE-SELECTOR-20261028.md",
+        "config/codex-development-regression-registry.json",
+        "docs/quality/AI-DOMAIN-TOOL-READ-INCIDENT-20261028.md"
       ]
     }
   ],
