@@ -142,3 +142,6 @@ docs/quality/AI-B01-CONTRACT-20261027.md text eol=lf
 
 # Exact accepted THIN-B03 local context contract.
 docs/quality/THIN-B03-CONTRACT-20261027.md -text
+
+# Exact accepted THIN-B03 read-only refresh addendum.
+docs/quality/THIN-B03-READONLY-ADDENDUM-20261027.md -text

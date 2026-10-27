@@ -177,7 +177,8 @@
       "apps/mobile/test/assistant_model_gateway_test.dart",
       "apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart",
       "apps/mobile/test/mool_assistant_test.dart",
-      "apps/mobile/test/journey_session_test.dart"
+      "apps/mobile/test/journey_session_test.dart",
+      "apps/mobile/lib/features/journey01/account_profile_gateway.dart"
     ],
     "acceptedUiCommit": "da3333ed69bfb7c187320d2294b1e1953ee3bc60",
     "contractSha256": "224C61B3546E7F0D3C81F55651C6207AE61D63CCCEC73F6A5A5BE7D30788456A",
@@ -185,7 +186,7 @@
     "sqlMigration": false,
     "deployment": false,
     "backendBranchPush": false,
-    "timelineDisclosure": "The historical 4Ã¢â‚¬â€œ19 October delivery window has elapsed; scope stays bounded and robustness is not waived. The zero incremental timeline value is not a claim of on-time MVP delivery.",
+    "timelineDisclosure": "The historical 4ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“19 October delivery window has elapsed; scope stays bounded and robustness is not waived. The zero incremental timeline value is not a claim of on-time MVP delivery.",
     "sourceSnapshots": []
   }
 }

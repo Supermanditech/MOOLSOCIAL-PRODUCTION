@@ -22,7 +22,7 @@ foreach($phase in @('build','deployment','handoff','ticket_close','ticket_accept
  $f=$facts.Clone();$f.Phase=$phase;Check (!(Test-ThinB03Identity $f)) "unadmitted $phase"
 }
 $runtime=@(Get-ThinB03RuntimeOwners);$metadata=@(Get-ThinB03MetadataOwners)
-Check ($runtime.Count -eq 28 -and @($runtime|Sort-Object -Unique).Count -eq 28) 'exact runtime count'
+Check ($runtime.Count -eq 29 -and @($runtime|Sort-Object -Unique).Count -eq 29) 'exact runtime count'
 Check ($metadata.Count -eq 9 -and @($metadata|Sort-Object -Unique).Count -eq 9) 'exact metadata count'
 foreach($owner in @('apps/mobile/lib/main.dart','backend/functions/package.json',
  'apps/admin/src/main.ts','config/mvp-scope-policy.json','dataconnect/schema/../schema/universal.gql')){
