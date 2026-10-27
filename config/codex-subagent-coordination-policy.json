@@ -219,7 +219,6 @@
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
         "apps/mobile/lib/features/journey01/account_profile_gateway.dart",
         "apps/mobile/lib/features/work/screens/work_onboarding_screens.dart",
-        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
         "apps/mobile/lib/features/work/work_services.dart",
         "apps/mobile/lib/features/work/work_session.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
@@ -251,6 +250,7 @@
         "scripts/check-codex-subagent-coordination-policy.ps1",
         "scripts/profile-b02-admission.ps1",
         "scripts/test-profile-b02-admission.ps1",
+        "docs/quality/PROFILE-B02-WORKSPACE-PLACEMENT-20261027.md",
         "apps/mobile/lib/features/journey01/account_plans_gateway.dart",
         "apps/mobile/lib/features/journey01/journey_session.dart",
         "apps/mobile/lib/features/journey01/review_journey_services.dart",
@@ -270,6 +270,7 @@
         "backend/functions/src/account/plans_http.test.ts",
         "backend/functions/src/account/plans_dataconnect_store.ts",
         "backend/functions/src/account/plans_dataconnect_store.test.ts",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
         "dataconnect/schema/universal.gql",
         "dataconnect/mobile/universal.gql"
       ]

@@ -10,5 +10,26 @@
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
-  "productionAcceptance": false
+  "productionAcceptance": false,
+  "placementAmendment": {
+    "path": "docs/quality/PROFILE-B02-WORKSPACE-PLACEMENT-20261027.md",
+    "sha256": "2DE1F3E33A4D404B457FF806F3A9158B932FBC09EDFDFF683E42936E56596AE0",
+    "additionalRuntimeOwner": "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+    "founderBehaviourAnswer": "approved",
+    "founderAdmissionAnswer": "Approve exact placement admission and one metadata amendment commit",
+    "additionalLocalMetadataCommits": 1,
+    "metadataOwners": [
+      ".gitattributes",
+      "config/codex-subagent-coordination-policy.json",
+      "docs/quality/PROFILE-B02-BACKEND-20261027.json",
+      "docs/quality/PROFILE-B02-ACCEPTANCE-20261027.json",
+      "docs/quality/PROFILE-B02-WORKSPACE-PLACEMENT-20261027.md",
+      "scripts/profile-b02-admission.ps1",
+      "scripts/test-profile-b02-admission.ps1"
+    ],
+    "sourceFeatureCommits": false,
+    "backendBranchPush": false,
+    "originalAdmissionCommit": "3d2ea869bbfc82bd769dfdd3823ad095d7f9d891",
+    "commitSubject": "coordination(profile-b02-20261027): admit Workspace placement amendment"
+  }
 }

@@ -32,6 +32,7 @@ function Get-ProfileB02RuntimeOwners {
     'backend/functions/src/account/plans_http.test.ts',
     'backend/functions/src/account/plans_dataconnect_store.ts',
     'backend/functions/src/account/plans_dataconnect_store.test.ts',
+    'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart',
     'dataconnect/schema/universal.gql',
     'dataconnect/mobile/universal.gql'
   )
@@ -58,13 +59,13 @@ function Invoke-ProfileB02Admission {
   $branch=@(Get-OctoberCompatibilityGitLines @('branch','--show-current'))[0]
   Assert-Coordination (Test-ProfileB02Identity @{Root=$root.Replace('\','/');Branch=$branch;Lane=$ProductionLane;
     Role=$AgentRole;Task=$AgentTask;WorkId=$ProductionWorkId;Ticket=$ProductionTicketId;Phase=$ProductionPhase}) 'B02 exact identity/phase required.'
-  $metadata=@(Get-ProfileB02MetadataOwners);$runtime=@(Get-ProfileB02RuntimeOwners);$owners=$metadata+$runtime
+  $bootstrap=@(Get-ProfileB02MetadataOwners);$metadata=$bootstrap+@('docs/quality/PROFILE-B02-WORKSPACE-PLACEMENT-20261027.md');$runtime=@(Get-ProfileB02RuntimeOwners);$owners=$metadata+$runtime
   Assert-Coordination ($binding.baselineHead -ceq $base -and $binding.branch -ceq $branch -and
     $binding.worktreePath -ceq $root.Replace('\','/') -and $binding.task -ceq '/root/codex_backend_profile_b02' -and
     $binding.lane -ceq 'codex_backend' -and $binding.ticketId -ceq 'PROFILE-B02' -and
     $binding.workId -ceq 'profile-b02-20261027' -and $binding.role -ceq 'primary' -and
     $binding.bootstrapCommitSubject -ceq 'coordination(profile-b02-20261027): record exact Plans admission' -and
-    (@($binding.bootstrapOwners|Sort-Object)-join '|') -ceq (@($metadata|Sort-Object)-join '|') -and
+    (@($binding.bootstrapOwners|Sort-Object)-join '|') -ceq (@($bootstrap|Sort-Object)-join '|') -and
     (@($record.backendAdmission.runtimeOwners|Sort-Object)-join '|') -ceq (@($runtime|Sort-Object)-join '|')) 'B02 owner/baseline binding changed.'
   foreach($owner in $owners){Assert-Coordination ((Get-CanonicalOwner $owner) -ceq $owner) 'B02 noncanonical owner.'}
   Assert-Coordination ((Get-Sha256 (Join-Path $root $contract)) -ceq $hash) 'B02 contract changed.'
@@ -74,6 +75,17 @@ function Invoke-ProfileB02Admission {
     $approval.founderAnswer -ceq 'Approve exact B02 baseline, contract and one metadata admission commit' -and
     $approval.localMetadataCommits -eq 1 -and !$approval.sourceFeatureCommits -and !$approval.backendBranchPush -and
     !$approval.deployment -and !$approval.productionAcceptance) 'B02 exact founder acceptance required.'
+  $placementPath='docs/quality/PROFILE-B02-WORKSPACE-PLACEMENT-20261027.md'
+  $placementHash='2DE1F3E33A4D404B457FF806F3A9158B932FBC09EDFDFF683E42936E56596AE0'
+  Assert-Coordination ((Get-Sha256 (Join-Path $root $placementPath)) -ceq $placementHash -and
+    $record.placementAmendment.sha256 -ceq $placementHash -and $approval.placementAmendment.sha256 -ceq $placementHash -and
+    $approval.placementAmendment.founderAdmissionAnswer -ceq 'Approve exact placement admission and one metadata amendment commit' -and
+    $record.placementAmendment.additionalRuntimeOwner -ceq 'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart' -and
+    $record.placementAmendment.additionalLocalMetadataCommits -eq 1 -and
+    !$record.placementAmendment.sourceFeatureCommits -and !$record.placementAmendment.backendBranchPush) 'B02 exact placement amendment required.'
+  $placementMetadata=@(Get-ProfileB02PlacementMetadataOwners)
+  Assert-Coordination ((@($record.placementAmendment.metadataOwners|Sort-Object)-join '|') -ceq
+    (@($placementMetadata|Sort-Object)-join '|')) 'B02 placement metadata scope differs.'
   $policy=Get-Content -Raw (Join-Path $root 'config/codex-subagent-coordination-policy.json')|ConvertFrom-Json
   $expected=(@(Get-OctoberCompatibilityGitLines @('show',"${base}:config/codex-subagent-coordination-policy.json"))-join "`n")|ConvertFrom-Json
   foreach($claim in @($expected.activeClaims)){$claim.owners=@($claim.owners|Where-Object {$_ -cnotin $owners})}
@@ -91,29 +103,35 @@ function Invoke-ProfileB02Admission {
   $head=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))[0]
   Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$base,$head)|Out-Null
   $commits=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"$base..$head"))
-  Assert-Coordination ($commits.Count -le 1 -and
+  Assert-Coordination ($commits.Count -le 2 -and
     @(Get-OctoberCompatibilityGitLines @('rev-list','--merges',"$base..$head")).Count -eq 0 -and
     @(Get-OctoberCompatibilityGitLines @('for-each-ref','--format=%(refname)','refs/replace')).Count -eq 0 -and
     @(Get-OctoberCompatibilityGitLines @('ls-files','-v')|Where-Object {$_ -cmatch '^[a-zS] '}).Count -eq 0) 'B02 no feature commits/history overrides/hidden index.'
   $changed=@(@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$base))+
     @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')))|Sort-Object -Unique
   Assert-ProfileB02Owners $changed $owners
-  if($head -ceq $base){
-    Assert-Coordination ($ProductionPhase -cin @('coordination_bootstrap','pre_commit')) 'B02 recorded admission checkpoint required.'
-    Assert-ProfileB02Owners $changed $metadata
-  }else{
+  $originalAdmission='3d2ea869bbfc82bd769dfdd3823ad095d7f9d891'
+  Assert-Coordination ($commits.Count -ge 1 -and $commits[0] -ceq $originalAdmission) 'B02 original admission checkpoint changed.'
+  $first=@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$base,$originalAdmission))
+  Assert-Coordination ((@($first|Sort-Object)-join '|') -ceq (@($bootstrap|Sort-Object)-join '|')) 'B02 original metadata delta changed.'
+  if($commits.Count -eq 2){
     $parent=@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$head))[0]
     $subject=@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',$head))[0]
-    $admitted=@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$base,$head))
-    Assert-Coordination ($parent -ceq $base -and $subject -ceq $binding.bootstrapCommitSubject -and
-      (@($admitted|Sort-Object)-join '|') -ceq (@($metadata|Sort-Object)-join '|')) 'B02 metadata commit identity/scope differs.'
+    $admitted=@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$parent,$head))
+    Assert-Coordination ($parent -ceq $originalAdmission -and
+      $subject -ceq 'coordination(profile-b02-20261027): admit Workspace placement amendment' -and
+      (@($admitted|Sort-Object)-join '|') -ceq (@($placementMetadata|Sort-Object)-join '|')) 'B02 amendment commit scope/history changed.'
     foreach($owner in $metadata){Get-OctoberCompatibilityGitLines @('diff','--exit-code',$head,'--',$owner)|Out-Null}
+  }else{
+    foreach($owner in @($bootstrap|Where-Object {$_ -cnotin $placementMetadata})){
+      Get-OctoberCompatibilityGitLines @('diff','--exit-code',$head,'--',$owner)|Out-Null
+    }
   }
   if($ProductionPhase -ceq 'pre_commit'){
     $staged=@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only'))
-    Assert-Coordination ($head -ceq $base -and (@($staged|Sort-Object)-join '|') -ceq (@($metadata|Sort-Object)-join '|') -and
-      @(Get-OctoberCompatibilityGitLines @('diff','--name-only')).Count -eq 0 -and
-      @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')).Count -eq 0) 'B02 only fully staged exact metadata commit.'
+    Assert-Coordination ($head -ceq $originalAdmission -and
+      (@($staged|Sort-Object)-join '|') -ceq (@($placementMetadata|Sort-Object)-join '|')) 'B02 permits only the exact seven-file placement amendment commit.'
+    foreach($owner in $placementMetadata){Get-OctoberCompatibilityGitLines @('diff','--exit-code','--',$owner)|Out-Null}
   }
   if($ProductionPhase -cin @('coordination_bootstrap','task_start')){
     $remote=@(Get-OctoberCompatibilityGitLines @('ls-remote','--heads','origin','refs/heads/work/codex-backend/profile-combined-20261027'))
@@ -129,5 +147,12 @@ function Invoke-ProfileB02Admission {
   & (Join-Path $root 'scripts/check-cross-agent-incremental-ticket-gate.ps1') -RepositoryRoot $root -Phase implementation -Lane codex_backend -TicketId PROFILE-B02 -UiScope account.plans_entitlements -CandidateVersionName '1.0.0-r67.9' -CandidateVersionCode 2026102705 -PackageId com.moolsocial.app.runtime -AcceptedUiCommit $base -UiContractPath $contract -UiContractSha256 $hash
   Assert-ProductionSecretSafe -BaseCommit $base -HeadCommit $head
   Assert-ProductionSecretSafe -BaseCommit $base -HeadCommit $head -IndexOnly
-  Write-Output "PROFILE-B02 admission passed: phase=$ProductionPhase; runtimeOwners=21; metadataOwners=9; no source commits/push/cloud/billing/APK authority."
+  Write-Output "PROFILE-B02 admission passed: phase=$ProductionPhase; runtimeOwners=22; metadataOwners=10; no source commits/push/cloud/billing/APK authority."
+}
+
+function Get-ProfileB02PlacementMetadataOwners {
+  @('.gitattributes','config/codex-subagent-coordination-policy.json',
+    'docs/quality/PROFILE-B02-BACKEND-20261027.json','docs/quality/PROFILE-B02-ACCEPTANCE-20261027.json',
+    'docs/quality/PROFILE-B02-WORKSPACE-PLACEMENT-20261027.md',
+    'scripts/profile-b02-admission.ps1','scripts/test-profile-b02-admission.ps1')
 }

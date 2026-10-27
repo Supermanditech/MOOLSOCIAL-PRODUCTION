@@ -22,7 +22,7 @@ foreach($phase in @('build','deployment','handoff','ticket_close','ticket_accept
  $f=$facts.Clone();$f.Phase=$phase;Check (!(Test-ProfileB02Identity $f)) "unadmitted $phase"
 }
 $runtime=@(Get-ProfileB02RuntimeOwners);$metadata=@(Get-ProfileB02MetadataOwners)
-Check ($runtime.Count -eq 21 -and @($runtime|Sort-Object -Unique).Count -eq 21) 'exact runtime count'
+Check ($runtime.Count -eq 22 -and @($runtime|Sort-Object -Unique).Count -eq 22) 'exact runtime count'
 Check ($metadata.Count -eq 9 -and @($metadata|Sort-Object -Unique).Count -eq 9) 'exact metadata count'
 foreach($owner in @('apps/mobile/lib/main.dart','backend/functions/package.json',
  'apps/admin/src/main.ts','config/mvp-scope-policy.json','dataconnect/schema/../schema/universal.gql')){
@@ -43,4 +43,7 @@ $record=Get-Content -Raw (Join-Path $root 'docs/quality/PROFILE-B02-BACKEND-2026
 Check (!$record.execution.buildAuthorized -and !$record.execution.deviceInstallAuthorized -and
  !$record.execution.externalServiceWriteAuthorized -and !$record.backendAdmission.deployment -and
  !$record.backendAdmission.sqlProvisioning -and !$record.backendAdmission.backendBranchPush) 'release and billing limits'
+Check ((Get-FileHash (Join-Path $root 'docs/quality/PROFILE-B02-WORKSPACE-PLACEMENT-20261027.md')).Hash -ceq '2DE1F3E33A4D404B457FF806F3A9158B932FBC09EDFDFF683E42936E56596AE0') 'placement amendment bytes pinned'
+Check (@(Get-ProfileB02PlacementMetadataOwners).Count -eq 7) 'exact seven-file amendment commit'
+Check ('apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart' -cin $runtime) 'existing Store profile caller admitted'
 Write-Output "PROFILE-B02 admission regression checks passed: $cases."

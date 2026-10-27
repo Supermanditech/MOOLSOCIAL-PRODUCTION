@@ -44,7 +44,8 @@
         "backend/functions/src/account/plans_dataconnect_store.ts",
         "backend/functions/src/account/plans_dataconnect_store.test.ts",
         "dataconnect/schema/universal.gql",
-        "dataconnect/mobile/universal.gql"
+        "dataconnect/mobile/universal.gql",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
@@ -87,7 +88,8 @@
     "classification": "mvp_supporting",
     "classificationReason": "Required catalogue/paid AI readback using existing Buy/Workspace account flow.",
     "minimumCompleteScope": [
-      "Implement scoped readback and feature checks, local regressions, reachable OPPO inspection and accurate deferred dependencies."
+      "Implement scoped readback and feature checks, local regressions, reachable OPPO inspection and accurate deferred dependencies.",
+      "Founder-approved pre-approval Workspace activation/status guide; personal-only plans after approval; Store-only subscription entry with free approved access preserved."
     ],
     "explicitExclusions": [
       "No Google setup/deployment, live billing/charges, admin, APK, source feature commits/push or unrelated feature.",
@@ -167,7 +169,8 @@
       "backend/functions/src/account/plans_dataconnect_store.ts",
       "backend/functions/src/account/plans_dataconnect_store.test.ts",
       "dataconnect/schema/universal.gql",
-      "dataconnect/mobile/universal.gql"
+      "dataconnect/mobile/universal.gql",
+      "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart"
     ],
     "acceptedUiCommit": "955f793dcfc593b603797d9e960925f774a6c2c2",
     "contractSha256": "44233B52F1FE9371D37BDE8476D8B6FA18305E5CCD2B9F20AC110514B22E2F9A",
@@ -177,5 +180,26 @@
     "backendBranchPush": false,
     "timelineDisclosure": "The historical 4\u00e2\u20ac\u201c19 October delivery window has elapsed; scope stays bounded and robustness is not waived. The zero incremental timeline value is not a claim of on-time MVP delivery.",
     "sourceSnapshots": []
+  },
+  "placementAmendment": {
+    "path": "docs/quality/PROFILE-B02-WORKSPACE-PLACEMENT-20261027.md",
+    "sha256": "2DE1F3E33A4D404B457FF806F3A9158B932FBC09EDFDFF683E42936E56596AE0",
+    "additionalRuntimeOwner": "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+    "founderBehaviourAnswer": "approved",
+    "founderAdmissionAnswer": "Approve exact placement admission and one metadata amendment commit",
+    "additionalLocalMetadataCommits": 1,
+    "metadataOwners": [
+      ".gitattributes",
+      "config/codex-subagent-coordination-policy.json",
+      "docs/quality/PROFILE-B02-BACKEND-20261027.json",
+      "docs/quality/PROFILE-B02-ACCEPTANCE-20261027.json",
+      "docs/quality/PROFILE-B02-WORKSPACE-PLACEMENT-20261027.md",
+      "scripts/profile-b02-admission.ps1",
+      "scripts/test-profile-b02-admission.ps1"
+    ],
+    "sourceFeatureCommits": false,
+    "backendBranchPush": false,
+    "originalAdmissionCommit": "3d2ea869bbfc82bd769dfdd3823ad095d7f9d891",
+    "commitSubject": "coordination(profile-b02-20261027): admit Workspace placement amendment"
   }
 }
