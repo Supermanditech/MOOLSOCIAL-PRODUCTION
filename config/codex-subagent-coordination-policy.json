@@ -404,6 +404,7 @@
         "apps/mobile/lib/features/assistant/model_gateway.dart",
         "apps/mobile/test/assistant_model_gateway_test.dart",
         "apps/mobile/lib/features/assistant/mool_assistant.dart",
+        "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
         ".gitattributes",
         "config/codex-subagent-coordination-policy.json",
         "config/cross-agent-incremental-ticket-gate.json",
@@ -415,7 +416,8 @@
         "scripts/test-ai-domain-batch-admission.ps1",
         "docs/quality/AI-DOMAIN-CATALOGUE-SELECTOR-20261028.md",
         "config/codex-development-regression-registry.json",
-        "docs/quality/AI-DOMAIN-TOOL-READ-INCIDENT-20261028.md"
+        "docs/quality/AI-DOMAIN-TOOL-READ-INCIDENT-20261028.md",
+        "docs/quality/AI-DOMAIN-ORIGINAL-PROVIDER-TEST-20261028.md"
       ]
     }
   ],

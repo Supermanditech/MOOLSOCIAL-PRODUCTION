@@ -7,7 +7,7 @@
   "founderDecision": "accepted_for_combined_b07_b04_profile_local_implementation_with_retained_limits",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 3,
+  "localMetadataCommits": 4,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -27,5 +27,13 @@
     "registryEntries": 4624,
     "registrySha256": "4B3DF3778AC782C95C287D209493C91052F7497C92CEB700FAC40ABF0DA30F2A",
     "authority": "Existing standing exact necessary metadata reconciliation only; no runtime or business expansion."
+  },
+  "originalProviderTestAdmission": {
+    "path": "docs/quality/AI-DOMAIN-ORIGINAL-PROVIDER-TEST-20261028.md",
+    "sha256": "A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22",
+    "existingTestOwner": "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
+    "authority": "Existing standing exact necessary admission, not separate founder hash review.",
+    "sourceFeatureCommit": false,
+    "push": false
   }
 }

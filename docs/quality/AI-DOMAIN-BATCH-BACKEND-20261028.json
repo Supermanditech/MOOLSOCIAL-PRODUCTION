@@ -193,7 +193,8 @@
       "backend/functions/src/assistant/model_service.test.ts",
       "apps/mobile/lib/features/assistant/model_gateway.dart",
       "apps/mobile/test/assistant_model_gateway_test.dart",
-      "apps/mobile/lib/features/assistant/mool_assistant.dart"
+      "apps/mobile/lib/features/assistant/mool_assistant.dart",
+      "backend/functions/src/workspace/workspace_catalogue_service.test.ts"
     ],
     "acceptedUiCommit": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
     "contractSha256": "9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382",
@@ -211,6 +212,11 @@
       "path": "docs/quality/AI-DOMAIN-CATALOGUE-SELECTOR-20261028.md",
       "sha256": "925A65AF2FD4AC01837A08EB6493D8DF77EE6637CA4EE0679175BBDFA0376F69",
       "sourceReason": "Original listing identity and selected current records must bind typed native targets and recovery."
+    },
+    "originalProviderTestAddendum": {
+      "path": "docs/quality/AI-DOMAIN-ORIGINAL-PROVIDER-TEST-20261028.md",
+      "sha256": "A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22",
+      "standingAuthority": "Exact necessary test admission within existing scope; no runtime provider or rule change."
     }
   }
 }
