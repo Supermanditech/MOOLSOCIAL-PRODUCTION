@@ -40,6 +40,12 @@
         "uiCommit": "9499d740a5171d892702387ceb1e5f6a413a336a",
         "contractPath": "docs/quality/AI-HISTORY-CONTRACT-20261028.md",
         "contractSha256": "39CDABA8770338E6D370C92445A77D8702E0FAABDACEBA9EA51536EC25963965"
+      },
+      {
+        "id": "assistant.domains",
+        "uiCommit": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
+        "contractPath": "docs/quality/AI-DOMAIN-BATCH-CONTRACT-20261028.md",
+        "contractSha256": "9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382"
       }
     ],
     "reachableBuyDestinations": [

@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "AI-DOMAIN-BATCH-20",
+    "selectedTicketAssessment": {
+      "ticketId": "AI-DOMAIN-BATCH-20",
+      "customerOutcome": "Use existing Buy/Store tasks through original authorised source reads and exact native reviews; preserve missing-source boundaries.",
+      "necessityProof": "History has no production receiver; existing draft-only save signature does not persist completed conversation messages.",
+      "implementationDisposition": [
+        "reuse",
+        "new_necessary_work"
+      ],
+      "sharedImplementationOwners": [
+        "backend/functions/src/assistant/domain_context_contract.ts",
+        "backend/functions/src/assistant/domain_context_contract.test.ts",
+        "backend/functions/src/assistant/domain_context.ts",
+        "backend/functions/src/assistant/domain_context.test.ts",
+        "backend/functions/src/assistant/domain_context_http.ts",
+        "backend/functions/src/assistant/domain_context_http.test.ts",
+        "backend/functions/src/assistant/domain_context_integration.test.ts",
+        "backend/functions/src/index.ts",
+        "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+        "apps/mobile/lib/features/assistant/profile_context.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/journey01/review_journey_services.dart",
+        "apps/mobile/lib/app/moolsocial_app.dart",
+        "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+        "apps/mobile/test/assistant_domain_context_guard_test.dart",
+        "apps/mobile/test/assistant_domain_context_integration_test.dart",
+        "apps/mobile/test/assistant_profile_context_test.dart",
+        "apps/mobile/test/assistant_model_flow_test.dart",
+        "apps/mobile/test/mool_assistant_test.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [
+        "backend/functions/src/assistant/history_contract.ts",
+        "backend/functions/src/assistant/history_contract.test.ts",
+        "backend/functions/src/assistant/history_service.ts",
+        "backend/functions/src/assistant/history_service.test.ts",
+        "backend/functions/src/assistant/history_dataconnect_store.ts",
+        "backend/functions/src/assistant/history_dataconnect_store.test.ts",
+        "backend/functions/src/assistant/history_http.ts",
+        "backend/functions/src/assistant/history_http.test.ts"
+      ],
+      "robustnessCoverage": [
+        "Durable SQL revision/duplicate/receipt/paging/isolation/erasure and disk restart tests.",
+        "Actual client-handler-repository/controller text History integration, lost acknowledgement and new-draft preservation.",
+        "Existing AI/Profile regressions, exact current-source OPPO guard/navigation/keyboard checks and108 saved fingerprints."
+      ],
+      "adjustments": [
+        "Reuse existing History UI and original Plans/Workspace/account/erasure services; restore inert text only; no business action replay."
+      ],
+      "explicitExclusions": [
+        "No cloud/model activation, new billing/retention rules, admin, media/OCR/voice processing, commerce/financial execution, APK, publication or source feature commit/push."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder explicitly delegated next existing-ticket selection and standing admission/implementation/testing acceptance; not represented as a separate exact-hash review.",
+        "Reuse original Plans/Workspace/account authorities. Missing qualified cloud/SDK and authentic device services remain unavailable.",
+        "Private media persistence remains BE-06; reject unsupported saves without losing input."
+      ],
+      "manifestPath": "docs/quality/AI-DOMAIN-BATCH-CONTRACT-20261028.md",
+      "manifestSha256": "9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382",
+      "evidencePath": "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "AI-DOMAIN-BATCH-20",
+    "customerOutcome": "Use existing Buy/Store tasks through original authorised source reads and exact native reviews; preserve missing-source boundaries.",
+    "classification": "mvp_supporting",
+    "classificationReason": "Completes the existing paid Buy/approved-Workspace assistant History requirement using current authorities and UI.",
+    "minimumCompleteScope": [
+      "Execute only the20 already prepared work packages with explicit per-scope qualification/blocked results.",
+      "First reconcile sources and register exact tools; do not recreate completed manual features or missing domain authorities."
+    ],
+    "explicitExclusions": [
+      "Completed Profile/Plans/Workspace/History work",
+      "Google provisioning/configuration/credentials/deployment; live model/API/voice/OCR; BE-06 media service activation",
+      "Admin, payouts/settlements and finance callback receiver remain separately parked",
+      "New pricing/tax/coupon/credit rules or duplicate inventories/accounting ledgers",
+      "Live financial operations/orders/publication, runtime synthetic providers/data, APK/install, main/promotion/force-push",
+      "Policy or governance development, unrelated UI redesign or scope growth"
+    ],
+    "dependenciesAndApprovals": [
+      "Founder explicitly delegated next existing-ticket selection and standing admission/implementation/testing acceptance; not represented as a separate exact-hash review.",
+      "Reuse original Plans/Workspace/account authorities. Missing qualified cloud/SDK and authentic device services remain unavailable.",
+      "Private media persistence remains BE-06; reject unsupported saves without losing input."
+    ],
+    "testAndEvidencePlan": [
+      "Durable SQL revision/duplicate/receipt/paging/isolation/erasure and disk restart tests.",
+      "Actual client-handler-repository/controller text History integration, lost acknowledgement and new-draft preservation.",
+      "Existing AI/Profile regressions, exact current-source OPPO guard/navigation/keyboard checks and108 saved fingerprints."
+    ]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/AI-DOMAIN-BATCH-CONTRACT-20261028.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+    "beyondMvpExplicitlyAuthorized": false
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "backendAdmission": {
+    "binding": {
+      "id": "thin_b07_b04_20261027",
+      "state": "founder_authorized_2026_10_27",
+      "lane": "codex_backend",
+      "role": "primary",
+      "task": "/root/codex_backend_ai_domain_batch",
+      "workId": "ai-domain-batch-20261028",
+      "ticketId": "AI-DOMAIN-BATCH-20",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-domain-batch-20261028",
+      "branch": "work/codex-backend/ai-domain-batch-20261028",
+      "baselineHead": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
+      "bootstrapCommitSubject": "coordination(ai-domain-batch-20261028): record exact bounded domain batch admission",
+      "bootstrapOwners": [
+        ".gitattributes",
+        "config/codex-subagent-coordination-policy.json",
+        "config/cross-agent-incremental-ticket-gate.json",
+        "docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json",
+        "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+        "docs/quality/AI-DOMAIN-BATCH-CONTRACT-20261028.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/ai-domain-batch-admission.ps1",
+        "scripts/test-ai-domain-batch-admission.ps1"
+      ]
+    },
+    "runtimeOwners": [
+      "backend/functions/src/assistant/domain_context_contract.ts",
+      "backend/functions/src/assistant/domain_context_contract.test.ts",
+      "backend/functions/src/assistant/domain_context.ts",
+      "backend/functions/src/assistant/domain_context.test.ts",
+      "backend/functions/src/assistant/domain_context_http.ts",
+      "backend/functions/src/assistant/domain_context_http.test.ts",
+      "backend/functions/src/assistant/domain_context_integration.test.ts",
+      "backend/functions/src/index.ts",
+      "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+      "apps/mobile/lib/features/assistant/profile_context.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "apps/mobile/lib/app/moolsocial_app.dart",
+      "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+      "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+      "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+      "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+      "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+      "apps/mobile/test/assistant_domain_context_guard_test.dart",
+      "apps/mobile/test/assistant_domain_context_integration_test.dart",
+      "apps/mobile/test/assistant_profile_context_test.dart",
+      "apps/mobile/test/assistant_model_flow_test.dart",
+      "apps/mobile/test/mool_assistant_test.dart"
+    ],
+    "acceptedUiCommit": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
+    "contractSha256": "9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382",
+    "sqlProvisioning": false,
+    "sqlMigration": false,
+    "deployment": false,
+    "backendBranchPush": false,
+    "timelineDisclosure": "Local integration only; original sources and current-source OPPO qualification per scope; all cloud/model/hardware limits retained.",
+    "sourceSnapshots": {
+      "startingCheckpoint": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
+      "scopeInventory": "outputs/ai-domain-batch-plan-20261028-v1/INVENTORY.json",
+      "runtimeImplementationsAtAdmission": false
+    }
+  }
+}

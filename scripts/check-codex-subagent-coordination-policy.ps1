@@ -8885,6 +8885,14 @@ function Invoke-Lf01Admission {
   Write-Output "LF-01 admission passed: phase=$ProductionPhase; owners=$($owners.Count); baseline=$base; no APK/provider/acceptance authority."
 }
 
+# Founder-approved bounded existing-domain integration goal.
+if ($ProductionTicketId -ceq 'AI-DOMAIN-BATCH-20' -or $ProductionWorkId -ceq 'ai-domain-batch-20261028' -or
+    $root.Replace('\','/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-domain-batch-20261028') {
+  . (Join-Path $root 'scripts/ai-domain-batch-admission.ps1')
+  Invoke-AiDomainBatchAdmission
+  return
+}
+
 # Founder-delegated bounded text History goal.
 if ($ProductionTicketId -ceq 'AI-HISTORY-01' -or $ProductionWorkId -ceq 'ai-history-20261028' -or
     $root.Replace('\','/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-history-20261028') {

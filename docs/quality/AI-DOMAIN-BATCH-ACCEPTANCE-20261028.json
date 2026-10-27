@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "AI-DOMAIN-BATCH-20",
+  "acceptedUiCommit": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
+  "uiContractPath": "docs/quality/AI-DOMAIN-BATCH-CONTRACT-20261028.md",
+  "uiContractSha256": "9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382",
+  "founderDecision": "accepted_for_combined_b07_b04_profile_local_implementation_with_retained_limits",
+  "founderAnswer": "EXECUTE",
+  "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
+  "localMetadataCommits": 1,
+  "sourceFeatureCommits": false,
+  "backendBranchPush": false,
+  "deployment": false,
+  "productionAcceptance": false,
+  "acceptanceMode": "Founder-delegated selection and standing acceptance; Codex selected this exact History-only contract",
+  "separateFounderHashReviewClaimed": false,
+  "authorityMode": "Founder explicitly activated prepared20 scopes; exact derived implementation contract/admissions under standing authorisation",
+  "standingQualifiedSourceSealsAndNamedBranchPush": true
+}
