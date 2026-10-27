@@ -82,6 +82,17 @@ Future<Map<String, Object?>> _localControl(Map<String, String> query) async {
   }
 }
 
+class _CaptureGuard implements MoolAssistantPreparationGuard {
+ bool fail = true;
+ bool live = false;
+ @override bool get current => live;
+ @override void retire() {live=false;}
+ @override Future<void> capture(MoolAssistantContext context, bool Function() current) async {
+  if(fail) throw const AssistantModelFailure('context_unavailable');
+  live=current();
+ }
+}
+
 class ModelEntitlements extends ChangeNotifier
     implements MoolAssistantEntitlementSource {
   MoolAssistantAccess access = MoolAssistantAccess.active;
@@ -152,6 +163,7 @@ fixture(
   MoolAssistantAccess access = MoolAssistantAccess.active,
   bool widgetOwned = false,
   WorkProofPicker? picker,
+  MoolAssistantPreparationGuard? preparationGuard,
 }) async {
   final context = ValueNotifier(
     const MoolAssistantContext(
@@ -175,6 +187,7 @@ fixture(
     contextChanges: context,
     entitlements: paid,
     attachments: picker,
+    preparationGuard: preparationGuard,
     nativeAdapters: [native],
     readModelSource: () => gateway,
     clock: () => modelAt,
@@ -191,6 +204,17 @@ fixture(
 }
 
 void main() {
+
+  test('THIN-B03 unsent capture failure permits fresh explicit prepare without status recovery', () async {
+    final guard=_CaptureGuard();
+    final t=ModelTransport((b)=>modelResponse(modelData(Map<String,Object?>.from(b['payload'] as Map))));
+    final f=await fixture(t,preparationGuard:guard);
+    expect(await f.c.sendRequest(),false);expect(t.calls,isEmpty);expect(f.c.modelBusy,false);
+    guard.fail=false;
+    expect(await f.c.sendRequest(),true);
+    expect(t.calls.map((b)=>b['operation']),['prepare']);
+  });
+
 
   test('AI-B01 authoritative not-found status permits a new explicit request without a retry loop',() async {
     var prepares=0;

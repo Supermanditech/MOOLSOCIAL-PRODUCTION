@@ -464,12 +464,12 @@ const moolAssistantActions = <MoolAssistantAction>[
   ),
   MoolAssistantAction(
     "AI-ACT-196",
-    "Account and files",
+    "Shopping",
     "View my personal profile",
   ),
   MoolAssistantAction(
     "AI-ACT-197",
-    "Account and files",
+    "Shopping",
     "Change my display name",
   ),
   MoolAssistantAction(
@@ -534,7 +534,7 @@ const moolAssistantActions = <MoolAssistantAction>[
   ),
   MoolAssistantAction(
     "AI-ACT-210",
-    "Account and files",
+    "Shopping",
     "View or manage subscription plans",
   ),
   MoolAssistantAction(
@@ -1971,6 +1971,13 @@ abstract interface class MoolAssistantNativeAdapter {
   );
 }
 
+/// Captures original native state before preparation; it grants no authority.
+abstract interface class MoolAssistantPreparationGuard {
+  Future<void> capture(MoolAssistantContext context, bool Function() current);
+  bool get current;
+  void retire();
+}
+
 /// Additive FE-HANDOFF01 signal. Notification rechecks authority; it grants none.
 abstract interface class MoolAssistantOwnerAwareNativeAdapter implements MoolAssistantNativeAdapter {
   Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,
@@ -2058,6 +2065,7 @@ class MoolAssistantController extends ChangeNotifier {
     required this.contextChanges,
     this.entitlements,
     this.readModelSource,
+    this.preparationGuard,
     this.attachments,
     this.mediaPicker,
     this.voiceRecorder,
@@ -2077,6 +2085,7 @@ class MoolAssistantController extends ChangeNotifier {
   final Listenable contextChanges;
   final MoolAssistantEntitlementSource? entitlements;
   final AssistantModelSource? Function()? readModelSource;
+  final MoolAssistantPreparationGuard? preparationGuard;
   bool modelBusy = false;
   int _modelAttempt = 0;
   AssistantModelInput? _modelInput;
@@ -2090,6 +2099,7 @@ class MoolAssistantController extends ChangeNotifier {
   bool get canSend => modelReady && hasInput && canChangeConversation &&
       !modelBusy && _proposal == null && _preparationBatch == null && _selected.isEmpty;
   void _retireModel() {
+    preparationGuard?.retire();
     _modelAttempt++;
     modelBusy = false;
     final input = _modelInput, source = _modelSource;
@@ -2122,10 +2132,25 @@ class MoolAssistantController extends ChangeNotifier {
     );
     _modelInput = input; _modelSource = source; _modelBinding = binding;
     modelBusy = true; notice = null; notifyListeners();
-    bool current() => !_disposed && _foreground && attempt == _modelAttempt &&
+    bool actorCurrent() => !_disposed && _foreground && attempt == _modelAttempt &&
       binding == _currentContext().binding && revision == _requestRevision &&
       paidAccessCurrent && entitlement == _entitlement?.revision;
+    var captured = statusOnly;
+    var submitted = statusOnly;
+    bool current() => actorCurrent() && (!captured || preparationGuard?.current != false);
+    void unsent() {
+      if (!actorCurrent() || !identical(_modelInput, input)) return;
+      _modelInput = null; _modelSource = null; _modelBinding = null;
+      preparationGuard?.retire();
+      if (actorCurrent()) notice = 'The original details are unavailable. Review your draft and try again.';
+    }
     try {
+      if (!statusOnly && preparationGuard != null) {
+        await preparationGuard!.capture(context, actorCurrent);
+        captured = true;
+        if (!current()) {unsent(); return false;}
+      }
+      submitted = true;
       final reply = await (statusOnly ? source.status(input, current) : source.prepare(input, current));
       if (!current()) return false;
       modelBusy = false;
@@ -2154,6 +2179,7 @@ class MoolAssistantController extends ChangeNotifier {
       if (!accepted) notice = 'This suggestion could not be used. Your draft is unchanged.';
       return accepted;
     } on Object catch (error) {
+      if (!submitted && actorCurrent()) {unsent(); return false;}
       if (current()) {
         final confirmedRejection = error is AssistantModelFailure && const {
           'invalid_request', 'request_not_found', 'request_identity_conflict',

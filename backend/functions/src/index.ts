@@ -17,6 +17,7 @@ import {AccountPlansService} from "./account/plans_service.js";
 import {DataConnectAccountPlansRepository} from "./account/plans_dataconnect_store.js";
 import {handleAccountPlansRequest} from "./account/plans_http.js";
 import {AssistantPreparationService} from "./assistant/model_service.js";
+import {ProfileWorkspacePreparationContext} from "./assistant/profile_context.js";
 import {handleAssistantModelRequest} from "./assistant/model_http.js";
 
 import {
@@ -2600,7 +2601,14 @@ export const moolSocialAssistantPreparation = onRequest(
       accountPlansRuntimeService ??= new AccountPlansService(
         new DataConnectAccountPlansRepository(getDataConnect({location: "asia-south1", serviceId: "moolsocial-core", connector: "mobile"})),
         {projectId, readWorkspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)});
-      assistantPreparationRuntimeService ??= new AssistantPreparationService({projectId, plans: accountPlansRuntimeService});
+      accountProfileRuntimeService ??= new AccountProfileService(
+        new DataConnectAccountProfileRepository(getDataConnect({location: "asia-south1", serviceId: "moolsocial-core", connector: "mobile"})), projectId);
+      assistantPreparationRuntimeService ??= new AssistantPreparationService({projectId, plans: accountPlansRuntimeService,
+        ...(process.env.MOOLSOCIAL_ACCOUNT_PROFILE_STORAGE_QUALIFIED === "true" ? {
+          context: new ProfileWorkspacePreparationContext({profile: accountProfileRuntimeService, plans: accountPlansRuntimeService,
+            workspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)}),
+        } : {}),
+      });
       const reply = await handleAssistantModelRequest({method: request.method, headers: request.headers,
         body: request.body, bodyBytes: request.rawBody.byteLength}, {projectId,
         enabled: process.env.MOOLSOCIAL_ASSISTANT_PREPARATION_QUALIFIED === "true" &&

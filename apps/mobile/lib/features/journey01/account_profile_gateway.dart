@@ -482,6 +482,16 @@ class AccountProfileGateway {
     return _snapshot = value;
   }
 
+  /// AI source validation never reconciles or replays an earlier save.
+  Future<AccountProfileSnapshot> readForPreparation() => _exclusive(() async {
+    final pending = await _pendingStore.read(_ownerKey);
+    _current();
+    if (pending != null) {
+      throw const AccountProfileFailure('profile_outcome_unknown', uncertain: true);
+    }
+    return _accept(await _call('read', {}));
+  });
+
   Future<AccountProfileSnapshot> read() {
     if (_reading != null) return _reading!;
     late final Future<AccountProfileSnapshot> read;

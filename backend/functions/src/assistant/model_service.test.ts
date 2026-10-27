@@ -52,6 +52,24 @@ test("AI-B01 actual paid service prepares a typed native proposal without domain
   assert.equal(result.reply.entitlementRevision, "personal:null:1:1"); assert.deepEqual(f.settlements, ["completed"]);
   assert.equal(f.counts().calls, 1);
 });
+
+test("THIN-B03 registered field normalisation returns original native fields only", async () => {
+  const f = fixture();
+  Object.assign(f.context.tools[0]!, {decodeFields: (fields: Readonly<Record<string, unknown>>) => ({query: (fields.query as string).trim()})});
+  f.model(async () => ({kind: "tool", name: "prepare_search", arguments: {query: "  चावल  "}}));
+  const result = await f.service.handle(actor, {operation: "prepare", payload: request});
+  assert.equal(result.state, "ready"); if (result.state !== "ready" || result.reply.outcome.kind !== "proposal") return;
+  assert.deepEqual(result.reply.outcome.fields, {query: "चावल"});
+});
+test("THIN-B03 changed source reference data retires a result even when a source reuses its revision", async () => {
+  const f = fixture(); Object.assign(f.context, {modelContext: {displayName: "Original"}});
+  f.model(async () => {
+    Object.assign(f.context, {modelContext: {displayName: "Changed"}});
+    return {kind: "tool", name: "prepare_search", arguments: {query: "चावल"}};
+  });
+  await assert.rejects(f.service.handle(actor, {operation: "prepare", payload: request}), {code: "stale_preparation"});
+  assert.equal(f.counts().calls, 1); assert.deepEqual(f.settlements, ["uncertain"]);
+});
 for (const state of ["pending", "expired", "revoked"]) test(`AI-B01 ${state} makes zero model/context/usage calls`, async () => {
   const f = fixture(); Object.assign(f.row.subscription as object, {state});
   await assert.rejects(f.service.handle(actor, {operation: "prepare", payload: request}), {code: "ai_access_required"});

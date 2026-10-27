@@ -31,6 +31,8 @@ import '../features/work/screens/work_onboarding_screens.dart' show WorkspaceSet
 import '../features/work/work_services.dart' show SecureWorkBulkQuoteJournal;
 import '../ui_v2/launch/launch_interruption_guard.dart';
 import '../ui_v2/assistant/mool_assistant_v2.dart';
+import '../ui_v2/assistant/profile_context_adapter.dart';
+import '../features/assistant/profile_context.dart';
 import '../ui_v2/launch/launch_presentation_gate.dart';
 import '../ui_v2/motion/mool_buy_tap_acknowledgement.dart';
 import '../ui_v2/social/social_v2_consumer.dart';
@@ -385,6 +387,25 @@ class _MoolSocialAppState extends State<MoolSocialApp>
       builder: (context, child) => MoolAssistantHost(
         entitlements: _session.accountPlansAssistantEntitlements,
         readModelSource: () => _session.assistantModelGateway,
+        prepareContext: (assistantContext, currentContext, original) {
+          final navigator = Navigator.of(assistantContext, rootNavigator: true);
+          final router = _router, buy = _buyRoot.current;
+          bool currentRoot() => mounted && navigator.mounted && identical(router, _router) && identical(buy, _buyRoot.current);
+          final changes = Listenable.merge([_session, _workSession, buy, router.routerDelegate]);
+          final extra = assistantOriginalProfileAdapters(session: _session, buy: buy, navigator: navigator,
+            currentContext: currentContext, rootCurrent: currentRoot,
+            routeIdentity: () => (router.state.uri, router.state.pageKey),
+            nameEditorAlreadyOpen: () => router.state.uri.path == '/app/account/identity/name',
+            changes: changes, openPersonalPlans: () async {
+              if (currentRoot()) await router.push<void>('/app/account/plans?scope=account');
+            });
+          final reader = AssistantOriginalContextReader(session: _session, work: _workSession, rootCurrent: currentRoot);
+          return AssistantProfileContextGuard(readCanonical: reader.read, readContext: currentContext,
+            ownerChanges: changes, nativeAdapters: [
+              ...original,
+              ...extra.where((adapter) => !original.any((value) => value.actionId == adapter.actionId)),
+            ]);
+        },
         readContext: () => MoolAssistantContext(
           accountScope: _session.authenticatedBuyPersistenceIdentity,
           authenticationRevision: _session.navigationAuthenticationGeneration,

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/design/mool_design_system.dart';
 import '../../features/journey01/journey_session.dart';
+import '../../features/assistant/profile_context.dart';
 import 'global_profile_panel_v2.dart';
 
 const _profileNavy = Color(0xFF000080);
@@ -15,6 +16,7 @@ class GlobalPersonalProfileV2 extends StatefulWidget {
     required this.session,
     this.gstDetails,
     this.onOpenAddresses,
+    this.onPreparedClose,
     this.surfaceTone = GlobalProfileSurfaceTone.light,
     super.key,
   });
@@ -22,6 +24,7 @@ class GlobalPersonalProfileV2 extends StatefulWidget {
   final JourneySession session;
   final Widget? gstDetails;
   final VoidCallback? onOpenAddresses;
+  final VoidCallback? onPreparedClose;
   final GlobalProfileSurfaceTone surfaceTone;
 
   @override
@@ -399,7 +402,8 @@ class _GlobalPersonalProfileV2State extends State<GlobalPersonalProfileV2> {
     return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
-  static void _leave(BuildContext context) {
+  void _leave(BuildContext context) {
+    if (widget.onPreparedClose != null) {widget.onPreparedClose!(); return;}
     if (context.canPop()) {
       context.pop();
     } else {
@@ -417,6 +421,9 @@ class GlobalPersonalProfileNameEditorV2 extends StatefulWidget {
   const GlobalPersonalProfileNameEditorV2({
     required this.session,
     this.onSaveDisplayName,
+    this.preparation,
+    this.preparationCurrent,
+    this.onPreparedClose,
     super.key,
   });
 
@@ -425,6 +432,9 @@ class GlobalPersonalProfileNameEditorV2 extends StatefulWidget {
   /// PROFILE-B01 must supply an account/revision-bound writer. True means a
   /// confirmed write/readback, never an optimistic local device-snapshot save.
   final Future<bool> Function(String name)? onSaveDisplayName;
+  final AssistantProfileNamePrefill? preparation;
+  final bool Function()? preparationCurrent;
+  final VoidCallback? onPreparedClose;
 
   @override
   State<GlobalPersonalProfileNameEditorV2> createState() =>
@@ -446,6 +456,12 @@ class _GlobalPersonalProfileNameEditorV2State
   late final int? _openingGeneration;
   late final Object? _openingIdentity;
   late final Object? _openingAccountScope;
+  bool get _preparationCurrent {
+    final initial = widget.preparation;
+    return initial == null || widget.preparationCurrent?.call() == true &&
+        initial.owner == widget.session.authenticatedBuyPersistenceIdentity &&
+        initial.revision == widget.session.accountProfileGateway?.snapshot?.revision;
+  }
   bool get _sameAccount =>
       widget.session.isAuthenticated &&
       widget.session.navigationAuthenticationGeneration == _openingGeneration &&
@@ -468,12 +484,15 @@ class _GlobalPersonalProfileNameEditorV2State
   }
 
   Future<void> _loadCanonical() async {
-    final loaded=await widget.session.refreshAccountProfile();
+    final loaded = widget.preparation == null
+        ? await widget.session.refreshAccountProfile()
+        : await widget.session.refreshAccountProfileForPreparation();
     if (!mounted || !_sameAccount) return;
     setState(() {
       _loadingCanonical=false;
-      _canonicalLoadFailed=!loaded;
-      if (loaded) _controller.text=widget.session.accountIdentity?.displayName ?? '';
+      _canonicalLoadFailed=!loaded || !_preparationCurrent;
+      if (!_canonicalLoadFailed) _controller.text = widget.preparation?.displayName ??
+          widget.session.accountIdentity?.displayName ?? '';
     });
   }
 
@@ -486,6 +505,10 @@ class _GlobalPersonalProfileNameEditorV2State
   Future<void> _save() async {
     if (_saving || _loadingCanonical || _canonicalLoadFailed ||
         !_sameAccount || widget.onSaveDisplayName == null) return;
+    if (!_preparationCurrent) {
+      setState(() => _nameError = 'Your details changed. Close and ask again.');
+      return;
+    }
     final name = _controller.text.trim();
     if (name.length < 2 || name.length > 60) {
       setState(
@@ -514,6 +537,7 @@ class _GlobalPersonalProfileNameEditorV2State
   }
 
   void _leave() {
+    if (widget.onPreparedClose != null) {widget.onPreparedClose!(); return;}
     // The editor owns a deterministic Profile return. Keyboard/local history
     // must not consume it or pop past Profile after an asynchronous save.
     final destination = globalProfileSafeReturnLocation(

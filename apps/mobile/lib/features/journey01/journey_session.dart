@@ -215,6 +215,14 @@ class JourneySession extends ChangeNotifier {
     on Object {return false;}
   }
 
+  /// AI source validation may read, never reconcile/replay a pending save.
+  Future<bool> refreshAccountProfileForPreparation() async {
+    final gateway = accountProfileGateway;
+    if (gateway == null) return false;
+    try {return _applyCanonicalProfile(gateway, await gateway.readForPreparation());}
+    on Object {return false;}
+  }
+
   Future<bool> saveAccountProfileName(String name) async {
     final gateway = accountProfileGateway;
     if (gateway == null) return false;

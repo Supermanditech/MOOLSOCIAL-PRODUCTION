@@ -3094,8 +3094,10 @@ void main() {
       'AI-ACT-194',
       'AI-ACT-195',
     };
-    expect(c.actions(), hasLength(78));
-    expect(c.actions().where((a) => a.group == 'Shopping'), hasLength(78));
+    expect(c.actions(), hasLength(81));
+    expect(c.actions().where((a) => a.group == 'Shopping'), hasLength(81));
+    expect(c.actions().where((a) => const {'AI-ACT-196', 'AI-ACT-197', 'AI-ACT-210'}.contains(a.id)).length, 3,
+      reason: 'THIN-B03 includes the accepted personal Profile/name/Plans handoffs; Workspace setup remains excluded.');
     expect(c.actions().where((a) => a.id == 'AI-ACT-036'), isEmpty);
     expect(
       c.actions().where((a) => a.group == 'Work').map((a) => a.id).toSet(),
@@ -3682,7 +3684,7 @@ void main() {
       expect(moolAssistantActions.map((a) => a.id).toSet().length, 405);
       final context = _Context(), c = _controller(_Context());
       addTearDown(c.dispose);
-      expect(c.actions().length, 78);
+      expect(c.actions().length, 81);
       expect(c.actions().every((a) => !a.store), isTrue);
       final store = _controller(context..change(_context('a', 1, store: 's')));
       addTearDown(store.dispose);

@@ -9,6 +9,7 @@ import '../../core/design/mool_design_system.dart' show MoolMotion;
 import '../../core/design/mool_theme.dart';
 import '../../features/assistant/mool_assistant.dart';
 import '../../features/assistant/model_gateway.dart';
+import '../../features/assistant/profile_context.dart';
 import '../../features/work/work_services.dart'
     show NativeWorkProofPicker, WorkProofSource, WorkPickedProof;
 import '../../features/chat/chat_models.dart' show ChatAttachmentKind;
@@ -91,6 +92,7 @@ class MoolAssistantHost extends InheritedWidget {
     required super.child,
     this.entitlements,
     this.readModelSource,
+    this.prepareContext,
     this.historySource,
     super.key,
   });
@@ -99,6 +101,9 @@ class MoolAssistantHost extends InheritedWidget {
   final Listenable contextChanges;
   final MoolAssistantEntitlementSource? entitlements;
   final AssistantModelSource? Function()? readModelSource;
+  final AssistantProfileContextGuard? Function(BuildContext context,
+      MoolAssistantContext Function() readContext,
+      List<MoolAssistantNativeAdapter> original)? prepareContext;
   final MoolAssistantHistorySource? historySource;
 
   static MoolAssistantHost? maybeOf(BuildContext context) =>
@@ -116,13 +121,16 @@ class MoolAssistantHost extends InheritedWidget {
                 ?.readAdapters(context) ??
             const <MoolAssistantNativeAdapter>[])
         .toList(growable: false);
+    MoolAssistantContext currentContext() => readContext().withWorkspace(workspace?.call());
+    final guard = prepareContext?.call(context, currentContext, nativeAdapters);
     final controller = MoolAssistantController(
-      currentContext: () => readContext().withWorkspace(workspace?.call()),
+      currentContext: currentContext,
       contextChanges: contextChanges,
       entitlements: entitlements,
       readModelSource: readModelSource,
+      preparationGuard: guard,
       historySource: historySource,
-      nativeAdapters: nativeAdapters,
+      nativeAdapters: guard?.adapters ?? nativeAdapters,
       attachments: NativeWorkProofPicker(),
       mediaPicker: MoolAssistantNativeMediaPicker(),
       voiceRecorder: NativeChatVoiceRecorder(),
@@ -143,9 +151,10 @@ class MoolAssistantHost extends InheritedWidget {
     } on Object {
       // The page has not taken ownership; do not retain expiry timers/listeners.
       controller.dispose();
+      guard?.dispose();
       rethrow;
     }
-    await navigator.push<void>(route);
+    try {await navigator.push<void>(route);} finally {guard?.dispose();}
   }
 
   @override
@@ -153,6 +162,7 @@ class MoolAssistantHost extends InheritedWidget {
       oldWidget.readContext != readContext ||
       oldWidget.entitlements != entitlements ||
       oldWidget.readModelSource != readModelSource ||
+      oldWidget.prepareContext != prepareContext ||
       oldWidget.historySource != historySource;
 }
 
@@ -1858,73 +1868,76 @@ const _taskDisplayNumbers = <String, int>{
   'AI-ACT-017': 9,
   'AI-ACT-344': 10,
   'AI-ACT-018': 11,
-  'AI-ACT-005': 12,
-  'AI-ACT-047': 13,
-  'AI-ACT-352': 14,
-  'AI-ACT-041': 15,
-  'AI-ACT-024': 16,
-  'AI-ACT-007': 17,
-  'AI-ACT-343': 18,
-  'AI-ACT-033': 19,
-  'AI-ACT-023': 20,
-  'AI-ACT-028': 21,
-  'AI-ACT-011': 22,
-  'AI-ACT-013': 23,
-  'AI-ACT-012': 24,
-  'AI-ACT-020': 25,
-  'AI-ACT-008': 26,
-  'AI-ACT-053': 27,
-  'AI-ACT-339': 28,
-  'AI-ACT-040': 29,
-  'AI-ACT-345': 30,
-  'AI-ACT-336': 31,
-  'AI-ACT-414': 32,
-  'AI-ACT-026': 33,
-  'AI-ACT-035': 34,
-  'AI-ACT-003': 35,
-  'AI-ACT-001': 36,
-  'AI-ACT-338': 37,
-  'AI-ACT-004': 38,
-  'AI-ACT-052': 39,
-  'AI-ACT-029': 40,
-  'AI-ACT-350': 41,
-  'AI-ACT-016': 42,
-  'AI-ACT-055': 43,
-  'AI-ACT-059': 44,
-  'AI-ACT-042': 45,
-  'AI-ACT-058': 46,
-  'AI-ACT-057': 47,
-  'AI-ACT-347': 48,
-  'AI-ACT-027': 49,
-  'AI-ACT-019': 50,
-  'AI-ACT-348': 51,
-  'AI-ACT-022': 52,
-  'AI-ACT-346': 53,
-  'AI-ACT-056': 54,
-  'AI-ACT-051': 55,
-  'AI-ACT-050': 56,
-  'AI-ACT-048': 57,
-  'AI-ACT-340': 58,
-  'AI-ACT-060': 59,
-  'AI-ACT-351': 60,
-  'AI-ACT-049': 61,
-  'AI-ACT-349': 62,
-  'AI-ACT-037': 63,
-  'AI-ACT-039': 64,
-  'AI-ACT-038': 65,
-  'AI-ACT-009': 66,
-  'AI-ACT-015': 67,
-  'AI-ACT-031': 68,
-  'AI-ACT-342': 69,
-  'AI-ACT-337': 70,
-  'AI-ACT-034': 71,
-  'AI-ACT-006': 72,
-  'AI-ACT-045': 73,
-  'AI-ACT-044': 74,
-  'AI-ACT-413': 75,
-  'AI-ACT-043': 76,
-  'AI-ACT-010': 77,
-  'AI-ACT-054': 78,
+  'AI-ACT-197': 12,
+  'AI-ACT-005': 13,
+  'AI-ACT-047': 14,
+  'AI-ACT-352': 15,
+  'AI-ACT-041': 16,
+  'AI-ACT-024': 17,
+  'AI-ACT-007': 18,
+  'AI-ACT-343': 19,
+  'AI-ACT-033': 20,
+  'AI-ACT-023': 21,
+  'AI-ACT-028': 22,
+  'AI-ACT-011': 23,
+  'AI-ACT-013': 24,
+  'AI-ACT-012': 25,
+  'AI-ACT-020': 26,
+  'AI-ACT-008': 27,
+  'AI-ACT-053': 28,
+  'AI-ACT-339': 29,
+  'AI-ACT-040': 30,
+  'AI-ACT-345': 31,
+  'AI-ACT-336': 32,
+  'AI-ACT-414': 33,
+  'AI-ACT-026': 34,
+  'AI-ACT-035': 35,
+  'AI-ACT-003': 36,
+  'AI-ACT-001': 37,
+  'AI-ACT-338': 38,
+  'AI-ACT-004': 39,
+  'AI-ACT-052': 40,
+  'AI-ACT-029': 41,
+  'AI-ACT-350': 42,
+  'AI-ACT-016': 43,
+  'AI-ACT-055': 44,
+  'AI-ACT-059': 45,
+  'AI-ACT-042': 46,
+  'AI-ACT-058': 47,
+  'AI-ACT-057': 48,
+  'AI-ACT-347': 49,
+  'AI-ACT-027': 50,
+  'AI-ACT-019': 51,
+  'AI-ACT-348': 52,
+  'AI-ACT-022': 53,
+  'AI-ACT-346': 54,
+  'AI-ACT-056': 55,
+  'AI-ACT-051': 56,
+  'AI-ACT-050': 57,
+  'AI-ACT-048': 58,
+  'AI-ACT-340': 59,
+  'AI-ACT-060': 60,
+  'AI-ACT-351': 61,
+  'AI-ACT-049': 62,
+  'AI-ACT-349': 63,
+  'AI-ACT-037': 64,
+  'AI-ACT-039': 65,
+  'AI-ACT-038': 66,
+  'AI-ACT-009': 67,
+  'AI-ACT-015': 68,
+  'AI-ACT-031': 69,
+  'AI-ACT-342': 70,
+  'AI-ACT-337': 71,
+  'AI-ACT-034': 72,
+  'AI-ACT-006': 73,
+  'AI-ACT-045': 74,
+  'AI-ACT-044': 75,
+  'AI-ACT-196': 76,
+  'AI-ACT-210': 77,
+  'AI-ACT-413': 78,
+  'AI-ACT-043': 79,
+  'AI-ACT-010': 80,
+  'AI-ACT-054': 81,
   'AI-ACT-275': 1,
   'AI-ACT-235': 2,
   'AI-ACT-402': 3,

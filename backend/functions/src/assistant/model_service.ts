@@ -30,7 +30,7 @@ function expiry(stamp: string): number {
 }
 function contextBinding(c: PreparationContext): string {
   return canonical({revision: c.revision, tools: c.tools.map(t => ({name: t.name, actionId: t.actionId, entityId: t.entityId,
-    sourceRevision: t.sourceRevision, description: t.description, parameters: t.parameters}))});
+    sourceRevision: t.sourceRevision, description: t.description, parameters: t.parameters})), modelContext: c.modelContext ?? null});
 }
 export class AssistantPreparationService {
   private readonly cancellations = new Map<string, AbortController>();
@@ -110,7 +110,7 @@ export class AssistantPreparationService {
       if (abort.signal.aborted || before.until <= this.now() || before.revision !== spending.revision ||
           expiry(spendingContext.validUntil) <= this.now() ||
           binding !== contextBinding({...spendingContext, tools: spendingContext.tools.filter(t => input.actionId === null || t.actionId === input.actionId)})) return fail("stale_preparation", 409);
-      const prepared = await this.deps.model.prepare(input, tools, abort.signal);
+      const prepared = await this.deps.model.prepare(input, tools, abort.signal, context.modelContext);
       if (abort.signal.aborted) return await store.finish(key, claim.lease, {state: "cancelled"});
       const after = await this.paid(actor, input.scope);
       const current = await this.deps.context.read(actor, input);
@@ -127,10 +127,12 @@ export class AssistantPreparationService {
         if (matches.length !== 1) return fail("invalid_model_result");
         const tool = matches[0]!;
         // Field and meaning validation belongs to the registered original capability.
-        if (!tool.validate(prepared.arguments) || Object.keys(prepared.arguments).some(k => !Object.hasOwn(tool.parameters.properties as object, k))) return fail("invalid_model_result");
+        if (Object.keys(prepared.arguments).some(k => !Object.hasOwn(tool.parameters.properties as object, k))) return fail("invalid_model_result");
+        const fields = tool.decodeFields?.(prepared.arguments) ?? prepared.arguments;
+        if (!tool.validate(fields)) return fail("invalid_model_result");
         outcome = {kind: "proposal", id: randomUUID(), actionId: tool.actionId, entityId: tool.entityId,
           sourceRevision: tool.sourceRevision, title: tool.description, summary: "Review the suggested details before continuing.",
-          fields: JSON.parse(canonical(prepared.arguments)) as Readonly<Record<string, unknown>>};
+          fields: JSON.parse(canonical(fields)) as Readonly<Record<string, unknown>>};
       }
       await this.deps.usage.settle(permit.id, "completed"); settled = true;
       const finalPaid = await this.paid(actor, input.scope);

@@ -58,8 +58,14 @@ export interface PreparationTool {
   readonly name: string; readonly actionId: string; readonly entityId: string | null;
   readonly sourceRevision: string; readonly description: string; readonly parameters: Record<string, unknown>;
   validate(fields: Readonly<Record<string, unknown>>): boolean;
+  /** Registered schema normalisation only; never supplied by a caller/model. */
+  decodeFields?(fields: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 }
-export interface PreparationContext {readonly revision: string; readonly validUntil: string; readonly tools: readonly PreparationTool[]}
+export interface PreparationContext {
+  readonly revision: string; readonly validUntil: string; readonly tools: readonly PreparationTool[];
+  /** Minimal original-source data selected by the trusted context adapter. */
+  readonly modelContext?: Readonly<Record<string, unknown>>;
+}
 export type PreparationOutcome = {readonly kind: "clarification"; readonly text: string} |
   {readonly kind: "proposal"; readonly id: string; readonly actionId: string; readonly entityId: string | null;
     readonly sourceRevision: string; readonly title: string; readonly summary: string; readonly fields: Readonly<Record<string, unknown>>};
