@@ -272,7 +272,13 @@
         "backend/functions/src/account/plans_dataconnect_store.test.ts",
         "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
         "dataconnect/schema/universal.gql",
-        "dataconnect/mobile/universal.gql"
+        "dataconnect/mobile/universal.gql",
+        "scripts/profile-b02-source-seal.ps1",
+        "scripts/test-profile-b02-source-seal.ps1",
+        "docs/quality/PROFILE-B02-SOURCE-SEAL-20261027.json",
+        "docs/quality/PROFILE-B02-SOURCE-SEAL-SCOPE-20261027.md",
+        "docs/quality/PROFILE-B02-SOURCE-RESULT-20261027.json",
+        "docs/quality/PROFILE-B02-SOURCE-RESULT-20261027.md"
       ]
     }
   ],

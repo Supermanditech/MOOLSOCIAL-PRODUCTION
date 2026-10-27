@@ -50,6 +50,11 @@ function Assert-ProfileB02Owners([string[]]$Actual,[string[]]$Allowed){
   foreach($owner in $Actual){Assert-Coordination ($owner -cin $Allowed) "B02 unadmitted owner: $owner"}
 }
 function Invoke-ProfileB02Admission {
+  if(Test-Path (Join-Path $root 'docs/quality/PROFILE-B02-SOURCE-SEAL-20261027.json')){
+    . (Join-Path $root 'scripts/profile-b02-source-seal.ps1')
+    Invoke-ProfileB02SourceSeal
+    return
+  }
   $base='955f793dcfc593b603797d9e960925f774a6c2c2'
   $contract='docs/quality/PROFILE-B02-CONTRACT-20261027.md'
   $hash='44233B52F1FE9371D37BDE8476D8B6FA18305E5CCD2B9F20AC110514B22E2F9A'

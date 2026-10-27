@@ -128,3 +128,11 @@ docs/quality/PROFILE-B02-CONTRACT-20261027.md text eol=lf
 
 # Preserve the exact approved B02 Workspace placement amendment.
 docs/quality/PROFILE-B02-WORKSPACE-PLACEMENT-20261027.md text eol=lf
+
+# Exact B02 source-sealing scope and evidence bytes.
+scripts/profile-b02-source-seal.ps1 text eol=lf
+scripts/test-profile-b02-source-seal.ps1 text eol=lf
+docs/quality/PROFILE-B02-SOURCE-SEAL-20261027.json text eol=lf
+docs/quality/PROFILE-B02-SOURCE-SEAL-SCOPE-20261027.md text eol=lf
+docs/quality/PROFILE-B02-SOURCE-RESULT-20261027.json text eol=lf
+docs/quality/PROFILE-B02-SOURCE-RESULT-20261027.md text eol=lf
