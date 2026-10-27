@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "workId": "thin-b07-b04-20261027",
+  "date": "2026-10-28",
+  "sourceCommit": "d4beab6b9004e566be8819a2bf86ae3ca921602a",
+  "sourceOwnerCount": 25,
+  "sourceManifestSha256": "73072E6F94CC26DBDF21A7339718F2100F63AF729A0B2D171835D2DDA088FBC5",
+  "productionAcceptance": false,
+  "formalTicketClose": false,
+  "founderScreenApproval": false,
+  "scope": "B07 durable preparation/status/technical usage and B04 original Profile name/address Save only",
+  "runtimeEditsDuringSealing": false,
+  "implemented": [
+    "Durable owner/project/personal-or-Store request identity, status, cancellation tombstones and one-shot model dispatch barrier",
+    "Durable technical usage reservation/status/completion/uncertainty; separately approved authorizer required; no billing or quota invented",
+    "Bounded owner-scoped secure pending-request metadata and explicit original-status recovery after recreation",
+    "Prepared Profile name and delivery-address add/edit handoff to original native forms; only native Save accepts final edited payload",
+    "Durable preparation-to-original-operation linkage and original Profile receipt reconciliation; no duplicated Profile master",
+    "Read-only AI address opening; original manual Profile save/recovery preserved",
+    "Original account-erasure operation atomically clears new private AI records while retaining the tombstoned principal"
+  ],
+  "priorLocalQualification": {
+    "backendFinal": {
+      "pass": 132,
+      "fail": 0,
+      "skip": 0,
+      "log": "backend-final-regression.log"
+    },
+    "pendingDiskReopenFollowup": {
+      "pass": 9,
+      "fail": 0,
+      "log": "backend-pending-disk-restart.log"
+    },
+    "mobileMain": {
+      "pass": 752,
+      "fail": 0,
+      "conditionalSkips": 13,
+      "inheritedExactExcludedCase": "AI-VISUAL-03 Workspace approval reads existing reviewed owner state",
+      "log": "mobile-final-regression.log"
+    },
+    "mobileAdversarial": {
+      "pass": 9,
+      "fail": 0,
+      "log": "mobile-adversarial-recovery-v3.log"
+    },
+    "joinedHttpNativeNameAddress": {
+      "pass": 18,
+      "fail": 0,
+      "log": "mobile-http-name-address-qualified.log"
+    },
+    "separateClientAndBackendProcessRecovery": {
+      "pass": 2,
+      "modelCalls": 1,
+      "originalProfileWrites": 1,
+      "receipt": "PROCESS-RESTART-QUALIFICATION.json"
+    },
+    "admissionChecks": 30,
+    "oppoRestartParityChecks": 22,
+    "dartErrors": 0,
+    "dartWarnings": 0,
+    "dartInformationalNotices": 125,
+    "countsNotAdditive": "Follow-up groups overlap main tests; optional loopback/process tests are separately qualified by their explicit runs."
+  },
+  "priorCountsNotRerunOrAdditive": true,
+  "freshSealAdmissionChecks": 54,
+  "freshOppoAssessment": {
+    "sourceCommit": "d4beab6b9004e566be8819a2bf86ae3ca921602a",
+    "verifiedRuntimeOwners": 10,
+    "restartParityPassed": 22,
+    "savedData": {
+      "before": 108,
+      "after": 108,
+      "unchanged": true,
+      "changed": 0,
+      "added": 0,
+      "removed": 0
+    },
+    "inspected": [
+      "Personal Tasks list and composer return",
+      "Selected address task populates request only",
+      "Composer keyboard spacing and disabled Send",
+      "Original keep/discard transient draft confirmation",
+      "Close to Shop and signed-out My details -> original Security sign-in guard",
+      "Return to neutral Mool AI home"
+    ],
+    "newBlockingVisualDefectObserved": false,
+    "injectedRuntimeAuthority": false,
+    "saveModelOrPaymentSubmitted": false,
+    "authenticatedModelDrivenDeviceSaveQualified": false,
+    "inheritedAccessibilityReleaseLimitRetained": true,
+    "selfAssessmentNotFounderApproval": true
+  },
+  "freshVmSourceProof": {
+    "verified": true,
+    "owners": [
+      {
+        "owner": "app/moolsocial_app.dart",
+        "verified": true,
+        "sourceSha256": "0b13eca6a7aef855f08f35e756c93d79649a3fdb646326cedac96643d246f69e",
+        "diskSha256": "0b13eca6a7aef855f08f35e756c93d79649a3fdb646326cedac96643d246f69e"
+      },
+      {
+        "owner": "features/assistant/model_gateway.dart",
+        "verified": true,
+        "sourceSha256": "027f7c84410ca93297344d0dd5070c39f8468d5e36dfb57638a7193447121f71",
+        "diskSha256": "027f7c84410ca93297344d0dd5070c39f8468d5e36dfb57638a7193447121f71"
+      },
+      {
+        "owner": "features/assistant/preparation_pending_store.dart",
+        "verified": true,
+        "sourceSha256": "b368f1bb2adaf527f9240492dd0cfd1fdc17def2c89a643b50e3b9fa0680ecb4",
+        "diskSha256": "b368f1bb2adaf527f9240492dd0cfd1fdc17def2c89a643b50e3b9fa0680ecb4"
+      },
+      {
+        "owner": "features/assistant/mool_assistant.dart",
+        "verified": true,
+        "sourceSha256": "09b38f455d006c7d7fbf71fcc761b77ee5e6d4439f21d2004b7f31267d44863e",
+        "diskSha256": "09b38f455d006c7d7fbf71fcc761b77ee5e6d4439f21d2004b7f31267d44863e"
+      },
+      {
+        "owner": "features/assistant/profile_context.dart",
+        "verified": true,
+        "sourceSha256": "42c3002eca8480fdaa4bdcfbadbe38219da205284ac071e9784d6f7b100dda72",
+        "diskSha256": "42c3002eca8480fdaa4bdcfbadbe38219da205284ac071e9784d6f7b100dda72"
+      },
+      {
+        "owner": "features/journey01/journey_session.dart",
+        "verified": true,
+        "sourceSha256": "03c69d8f4ba8271441fbc7908478932913d0b44c81100d41253ee6cd744128a2",
+        "diskSha256": "03c69d8f4ba8271441fbc7908478932913d0b44c81100d41253ee6cd744128a2"
+      },
+      {
+        "owner": "features/journey01/account_profile_gateway.dart",
+        "verified": true,
+        "sourceSha256": "6a0cb83c7c99882c38f3ce095a6bfb99ecdf8c9a957c06d1662719afb70ae1ca",
+        "diskSha256": "6a0cb83c7c99882c38f3ce095a6bfb99ecdf8c9a957c06d1662719afb70ae1ca"
+      },
+      {
+        "owner": "ui_v2/assistant/profile_context_adapter.dart",
+        "verified": true,
+        "sourceSha256": "b7fcb4a09b1f9fe8e288925aea445768ed0fd00fbfabb4d862eccb357c66e1ed",
+        "diskSha256": "b7fcb4a09b1f9fe8e288925aea445768ed0fd00fbfabb4d862eccb357c66e1ed"
+      },
+      {
+        "owner": "features/buy/buy_v2_session.dart",
+        "verified": true,
+        "sourceSha256": "7447f305311647689f6bc9ae6ead6c76b8e152a93b78a772840390b1260ff1f3",
+        "diskSha256": "7447f305311647689f6bc9ae6ead6c76b8e152a93b78a772840390b1260ff1f3"
+      },
+      {
+        "owner": "ui_v2/buy/buy_v2_views.dart",
+        "verified": true,
+        "sourceSha256": "5984a86eb7e34049810079685b6b4e988a4ea7e675a85f400465d970d113e514",
+        "diskSha256": "5984a86eb7e34049810079685b6b4e988a4ea7e675a85f400465d970d113e514"
+      }
+    ]
+  },
+  "deferredDependencies": [
+    {
+      "dependency": "Qualified SQL Connect/admin SDK and cloud source",
+      "evidence": "New schema and actual erasure compile without errors; full connectors retain the same10 inherited raw-SQL compiler diagnostics, adjusted for three inserted lines. SDK/deployed SQL not qualified.",
+      "resume": "Qualify supported original SDK/raw-SQL path and migrate/provision only in separately activated cloud scope."
+    },
+    {
+      "dependency": "Approved usage authorizer and connected model/access services",
+      "evidence": "No approved authorizer or model is connected; qualified-only runtime remains closed. Host seams do not grant runtime permission.",
+      "resume": "Connect approved authority/model in their separately authorized scope; exercise real request/status/cancel."
+    },
+    {
+      "dependency": "Authenticated OPPO Profile prepared Save and native secure-store process recovery",
+      "evidence": "Current evaluation session is signed out. No synthetic runtime actor or entitlement injected. Local actual gateway/handler/native form/durable SQL path passed with explicit host seams.",
+      "resume": "Use real authorized test account, qualified storage/entitlements/model; test native restart, Save and original receipt on OPPO."
+    },
+    {
+      "dependency": "Inherited Android exported-tap-target/viewport release qualification",
+      "evidence": "Existing separately recorded device/accessibility limit is preserved; reachable visual inspection is not all-device release qualification.",
+      "resume": "Finish existing release/device qualification ticket before production release."
+    }
+  ],
+  "cloudDeployed": false,
+  "liveModelCalls": false,
+  "apkBuiltOrInstalled": false,
+  "liveTransactions": false,
+  "nativeAuthenticatedProfileSaveOnDeviceQualified": false,
+  "claim": "Reproducible tested source checkpoint with reachable-device recheck; not live production readiness."
+}
