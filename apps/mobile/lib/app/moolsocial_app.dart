@@ -33,6 +33,7 @@ import '../ui_v2/launch/launch_interruption_guard.dart';
 import '../ui_v2/assistant/mool_assistant_v2.dart';
 import '../ui_v2/assistant/profile_context_adapter.dart';
 import '../features/assistant/profile_context.dart';
+import '../features/assistant/domain_context_gateway.dart';
 import '../ui_v2/launch/launch_presentation_gate.dart';
 import '../ui_v2/motion/mool_buy_tap_acknowledgement.dart';
 import '../ui_v2/social/social_v2_consumer.dart';
@@ -400,9 +401,13 @@ class _MoolSocialAppState extends State<MoolSocialApp>
             changes: changes, openPersonalPlans: () async {
               if (currentRoot()) await router.push<void>('/app/account/plans?scope=account');
             });
-          final reader = AssistantOriginalContextReader(session: _session, work: _workSession, rootCurrent: currentRoot);
+          final reader = AssistantOriginalContextReader(session: _session, work: _workSession, buy: buy, rootCurrent: currentRoot);
           return AssistantProfileContextGuard(readCanonical: reader.read, readContext: currentContext,
-            ownerChanges: changes, nativeAdapters: [
+            ownerChanges: changes,
+            canonicalActions: {...assistantProfileContextActions, ...assistantWorkspaceContextActions,
+              ...assistantDomainContextActions},
+            recoverableActions: {...assistantProfileContextActions, ...assistantDomainContextActions},
+            nativeAdapters: [
               ...original,
               ...extra.where((adapter) => !original.any((value) => value.actionId == adapter.actionId)),
             ]);

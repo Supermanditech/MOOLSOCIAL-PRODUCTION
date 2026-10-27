@@ -32,6 +32,28 @@ export function digest(value: unknown): string { return createHash("sha256").upd
 export interface PreparationRequest {
   readonly scope: PlansScope; readonly requestId: string; readonly requestRevision: number;
   readonly expectedEntitlementRevision: string; readonly message: string; readonly language: string; readonly history: readonly {role: "user" | "assistant"; text: string}[]; readonly actionId: string | null; readonly entityId: string | null;
+  /** Original public listing selection only; never records or permission. */
+  readonly catalogueListingIds?: readonly string[];
+  /** Untrusted hints from captured native reviews; original sources still grant all authority. */
+  readonly nativeTargets?: readonly PreparationTargetHint[];
+}
+export interface PreparationTargetHint {readonly actionId: string; readonly entityId: string | null;}
+export function nativeTargetSelection(value: unknown): readonly PreparationTargetHint[] {
+  if (!Array.isArray(value) || value.length > 5000) return fail("invalid_request", 400);
+  const seen = new Set<string>();
+  return Object.freeze(value.map(raw => {
+    const row = object(raw, ["actionId", "entityId"]);
+    if (typeof row.actionId !== "string" || !/^AI-ACT-\d{3}$/u.test(row.actionId)) return fail("invalid_request", 400);
+    const selected = {actionId: row.actionId, entityId: row.entityId === null ? null : id(row.entityId)};
+    const key = canonical([selected.actionId, selected.entityId]);
+    if (seen.has(key)) return fail("invalid_request", 400);
+    seen.add(key); return Object.freeze(selected);
+  }));
+}
+export function catalogueListingSelection(value: unknown): readonly string[] {
+  if (!Array.isArray(value) || value.length > 500 || new Set(value).size !== value.length ||
+      value.some(v => typeof v !== "string" || !/^listing-[a-f0-9]{64}$/u.test(v))) return fail("invalid_request", 400);
+  return Object.freeze([...value] as string[]);
 }
 // Match the approved composer hints. Other languages still use original user
 // text with Auto; never interpolate an arbitrary client instruction as language.
@@ -42,7 +64,10 @@ export function command(value: unknown): AssistantCommand {
   const row = object(value, ["operation", "payload"]);
   const prepare = row.operation === "prepare";
   if (!prepare && row.operation !== "status" && row.operation !== "cancel") return fail("invalid_request", 400);
-  const p = object(row.payload, prepare ? ["scope", "requestId", "requestRevision", "message", "language", "actionId", "entityId", "history", "expectedEntitlementRevision"] : ["scope", "requestId"]);
+  const payload = object(row.payload);
+  const p = object(payload, prepare ? ["scope", "requestId", "requestRevision", "message", "language", "actionId", "entityId", "history", "expectedEntitlementRevision",
+    ...(Object.hasOwn(payload, "catalogueListingIds") ? ["catalogueListingIds"] : []),
+    ...(Object.hasOwn(payload, "nativeTargets") ? ["nativeTargets"] : [])] : ["scope", "requestId"]);
   const scope = decodePlansScope(p.scope), requestId = id(p.requestId);
   if (!prepare) return {operation: row.operation as "status" | "cancel", payload: {scope, requestId}};
   if (!Number.isSafeInteger(p.requestRevision) || (p.requestRevision as number) < 0) return fail("invalid_request", 400);
@@ -52,19 +77,35 @@ export function command(value: unknown): AssistantCommand {
     if (item.role !== "user" && item.role !== "assistant") return fail("invalid_request", 400);
     return {role: item.role as "user" | "assistant", text: text(item.text, 8000)};});
   return {operation: "prepare", payload: {scope, requestId, history, expectedEntitlementRevision: text(p.expectedEntitlementRevision), requestRevision: p.requestRevision as number,
-    message: text(p.message, 8000), language: text(p.language, 80), actionId: p.actionId === null ? null : id(p.actionId), entityId: p.entityId === null ? null : id(p.entityId)}};
+    message: text(p.message, 8000), language: text(p.language, 80), actionId: p.actionId === null ? null : id(p.actionId), entityId: p.entityId === null ? null : id(p.entityId),
+    ...(Object.hasOwn(p, "catalogueListingIds") ? {catalogueListingIds: catalogueListingSelection(p.catalogueListingIds)} : {}),
+    ...(Object.hasOwn(p, "nativeTargets") ? {nativeTargets: nativeTargetSelection(p.nativeTargets)} : {})}};
+}
+export interface PreparationNativeTarget {
+  readonly actionId: string; readonly entityId: string | null; readonly sourceRevision: string;
+}
+export interface ResolvedPreparationTarget {
+  readonly entityId: string | null; readonly sourceRevision: string;
+  readonly fields: Readonly<Record<string, unknown>>;
+  readonly title?: string; readonly summary?: string;
 }
 export interface PreparationTool {
   readonly name: string; readonly actionId: string; readonly entityId: string | null;
   readonly sourceRevision: string; readonly description: string; readonly parameters: Record<string, unknown>;
+  /** Registered original selector property. Caller/model cannot define or rename it. */
+  readonly targetSelector?: string;
   validate(fields: Readonly<Record<string, unknown>>): boolean;
   /** Registered schema normalisation only; never supplied by a caller/model. */
   decodeFields?(fields: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
+  /** Registered source-backed selector, never model-authored routing/code. */
+  resolveTarget?(fields: Readonly<Record<string, unknown>>): ResolvedPreparationTarget;
 }
 export interface PreparationContext {
   readonly revision: string; readonly validUntil: string; readonly tools: readonly PreparationTool[];
   /** Minimal original-source data selected by the trusted context adapter. */
   readonly modelContext?: Readonly<Record<string, unknown>>;
+  /** Exact original source targets, independent of compact model tool schemas. */
+  readonly nativeTargets?: readonly PreparationNativeTarget[];
 }
 export type PreparationOutcome = {readonly kind: "clarification"; readonly text: string} |
   {readonly kind: "proposal"; readonly id: string; readonly actionId: string; readonly entityId: string | null;

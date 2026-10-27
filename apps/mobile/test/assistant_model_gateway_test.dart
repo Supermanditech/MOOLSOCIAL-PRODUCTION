@@ -95,6 +95,33 @@ SocialContentResponse modelResponse(Map<String, Object?> data) =>
       body: jsonEncode({'ok': true, 'data': data}),
     );
 void main() {
+  test('Native target hints freeze exact IDs without source permissions or alternate task codes', () {
+    final hints = <AssistantNativeTargetHint>[(actionId: 'AI-ACT-001', entityId: null)];
+    final input = modelInput.withNativeTargets(hints); hints.clear();
+    expect(input.toJson()['nativeTargets'], [{'actionId': 'AI-ACT-001', 'entityId': null}]);
+    expect(() => input.nativeTargets!.clear(), throwsUnsupportedError);
+    expect(input.withCatalogueListingIds([]).nativeTargets, input.nativeTargets);
+    for (final invalid in <List<AssistantNativeTargetHint>>[
+      [(actionId: 'AI-ACT-001', entityId: null), (actionId: 'AI-ACT-001', entityId: null)],
+      [(actionId: 'run-code', entityId: null)], [(actionId: 'AI-ACT-001', entityId: '../foreign')],
+      List.generate(5001, (index) => (actionId: 'AI-ACT-001', entityId: 'item-$index')),
+    ]) {
+      expect(() => assistantNativeTargetSelection(invalid), throwsA(isA<AssistantModelFailure>()));
+    }
+    expect(modelInput.toJson().containsKey('nativeTargets'), false);
+  });
+  test('Catalogue read hints are immutable original listing IDs, never record payloads', () {
+    final id = 'listing-${List.filled(64, 'a').join()}';
+    final selected = <String>[id];
+    final input = modelInput.withCatalogueListingIds(selected);
+    selected.clear();
+    expect(input.toJson()['catalogueListingIds'], [id]);
+    expect(() => input.catalogueListingIds!.clear(), throwsUnsupportedError);
+    for (final value in <Object?>[null, [id, id], ['invented-product'], [{'id': id}], List.filled(501, id)]) {
+      expect(() => assistantCatalogueListingSelection(value), throwsA(isA<AssistantModelFailure>()));
+    }
+    expect(modelInput.toJson().containsKey('catalogueListingIds'), false);
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
   test(

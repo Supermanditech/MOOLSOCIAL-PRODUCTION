@@ -34,6 +34,9 @@ import {WorkspaceSupplierPolicyService, FirestoreSupplierPolicyRepository} from 
 import {createCatalogueAggregate, type CatalogueAggregate} from "../commerce/catalogue_contract.js";
 import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
   type SupplyParticipantWorkspace} from "../commerce/supply_participant_contract.js";
+import {AccountPlansService} from "../account/plans_service.js";
+import {OriginalCataloguePreparationContext} from "../assistant/domain_context.js";
+import {planCommodityPriceConfirmation, type CommodityPriceRecord} from "./workspace_catalogue_service.js";
 
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
 const at = "2026-10-16T12:00:00.000Z";
@@ -3817,6 +3820,73 @@ async function discoveryFixture() {
   const unreviewed = input('unreviewed-one'); unreviewed.content.title = 'Unreviewed private replacement';
   await subject(repository).saveSku('owner-one', save(unreviewed));
   return repository;
+}
+
+// Existing production planners + original provider; host-only, never phone data.
+class AssistantOriginalProviderMemory extends DiscoveryMemory {
+  price?: CommodityPriceRecord;
+  override async publicCatalogueSource(storeId: string, identity: {catalogueId: string; tenantId: string},
+    families = false, transaction?: unknown, selected?: readonly string[], procurement = false): Promise<PublicCatalogueSource | undefined> {
+    const source = await super.publicCatalogueSource(storeId, identity, families, transaction, selected, procurement);
+    return source && {...source, commodityPrices: this.price ? [this.price] : [],
+      commodityAuthority: producerAuthority(), commodityParticipant: producerParticipant()};
+  }
+}
+for (const channel of ['retail', 'wholesale', 'bulk'] as const) {
+  test(`AI-DOMAIN original populated provider preserves GST and ${channel} source identity`, async () => {
+    const repository = new AssistantOriginalProviderMemory(), value = input();
+    value.channels[0]!.kind = channel;
+    value.channels[0]!.supplierTax = {version: 2, rateBasisPoints: 1800, basis: 'included'};
+    let aggregate: CatalogueAggregate | undefined;
+    for (const original of productionCommands(value)) {
+      const command = original.type === 'create_offer' ? {...original,
+        buyingContext: channel === 'retail' ? 'consumer' : 'wholesale'} : original;
+      const owner = ['propose_product', 'propose_pack', 'create_offer'].includes(String(command.type));
+      const authority = producerAuthority(owner);
+      aggregate = planCatalogueProduction({operatorUserId: authority.userId, identity: catalogueIdentity,
+        input: command, observedAt: at}, authority, aggregate, producerParticipant(), profile).aggregate;
+    }
+    repository.aggregate = aggregate!;
+    const provider = subject(repository);
+    const saved = await provider.saveSku('owner-one', save(value)) as {saved: StoreSkuRecord};
+    if (channel === 'bulk') repository.price = planCommodityPriceConfirmation('owner-one', 'evaluation', catalogueIdentity,
+      {storeId: 'store-one', skuId: value.skuId, channel, skuRevision: 1, expectedRevision: 0,
+        idempotencyKey: 'host-assistant-price', frequent: true, validityMinutes: 120, priceMinor: 10025, tiers: []},
+      {record: saved.saved, catalogue: aggregate!, profile, authority: producerAuthority(), participant: producerParticipant()}, at).record;
+    const before = cataloguePayloadHash({records: [...repository.records], catalogue: repository.aggregate, price: repository.price ?? null});
+    const actor = {uid: 'host-assistant-buyer', projectId: 'host-assistant-project'};
+    const scope = {audience: 'personal' as const, storeId: null};
+    const plans = new AccountPlansService({async read(uid, selectedScope) {return {
+      ownerUid: uid, accountStatus: 'ACTIVE', catalogue: {audience: selectedScope.audience, revision: 1, state: 'approved', offers: []},
+      subscription: {ownerUid: uid, scope: selectedScope, revision: 1, planId: 'host-paid', planVersion: 'v1',
+        name: 'Host-only paid authority', state: 'active', validFrom: '2026-10-15T00:00:00.000Z',
+        validUntil: '2026-10-17T00:00:00.000Z', featureIds: ['mool_ai']}};}}, {projectId: actor.projectId, now: () => new Date(at)});
+    const calls: Readonly<Record<string, unknown>>[] = [], originalRead = provider.publicDiscovery.bind(provider);
+    provider.publicDiscovery = async (body, procurement) => {calls.push(body); return originalRead(body, procurement);};
+    const listing = cataloguePublicListingBindings('evaluation', saved.saved).find(binding => binding.channel === channel)!;
+    const context = new OriginalCataloguePreparationContext({projectId: actor.projectId, plans, catalogue: provider, now: () => new Date(at)});
+    const result = await context.read(actor, {scope, requestId: 'host-provider-read', requestRevision: 1,
+      expectedEntitlementRevision: 'personal:null:1:1', message: 'Show the original product', language: 'English', history: [],
+      actionId: 'AI-ACT-006', entityId: null, catalogueListingIds: [listing.listingId]});
+    assert.equal(result.tools.length, 1);
+    const selected = result.tools[0]!.resolveTarget!({listingId: listing.listingId});
+    assert.equal(selected.entityId, listing.listingId); assert.deepEqual(selected.fields, {});
+    assert.ok(calls.length >= 6);
+    assert.ok(calls.every(body => body.supplierTaxReadbackVersion === 1 && body.commodityPriceReadbackVersion === 1 && body.supplierPublishersVersion === 1));
+    const actual = await originalRead({discoveryPageVersion: 1, pageSize: 1,
+      supplierPublishersVersion: 1, supplierTaxReadbackVersion: 1, commodityPriceReadbackVersion: 1,
+      query: {...viewQuery, destination: channel === 'retail' ? 'shop' : 'wholesale', listingIds: [listing.listingId]}}) as any;
+    assert.equal(actual.items.length, 1);
+    const originalTerms = actual.items[0].listing.items[0].channels.find((term: StoreSkuChannel) => term.kind === channel);
+    assert.deepEqual(originalTerms.supplierTax, value.channels[0]!.supplierTax);
+    assert.equal(originalTerms.priceMinor, channel === 'bulk' ? 10025 : value.channels[0]!.priceMinor);
+    const preparedProduct = (result.modelContext!.products as Array<Record<string, unknown>>)[0]!;
+    assert.equal(preparedProduct.priceMinor, originalTerms.priceMinor);
+    assert.deepEqual(preparedProduct.supplierTax, originalTerms.supplierTax);
+    assert.equal((preparedProduct.supplier as {id: string; name: string}).id, 'store-one');
+    assert.equal((preparedProduct.supplier as {id: string; name: string}).name, profile.name);
+    assert.equal(before, cataloguePayloadHash({records: [...repository.records], catalogue: repository.aggregate, price: repository.price ?? null}));
+  });
 }
 
 const procurementContext = {accountId: 'buyer-one', storeId: 'buying-store',

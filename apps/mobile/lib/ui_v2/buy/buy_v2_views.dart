@@ -1373,6 +1373,9 @@ class BuyBrowseNativeAdapter implements MoolAssistantNativeAdapter {
     return store != null && store.id == product.storeId && store.publicContactPhone?.trim().isNotEmpty == true ? store : null;
   }
   bool _available(String? entity) {
+    // An absent owned preference source is unknown, not an empty saved list.
+    if (const {'AI-ACT-009', 'AI-ACT-010', 'AI-ACT-011', 'AI-ACT-012', 'AI-ACT-013'}.contains(actionId) &&
+        session.customerStateStore?.ownerScope?.trim().isNotEmpty != true) return false;
     final product = _product(entity);
     return switch (actionId) {
       'AI-ACT-002' => entity == null && session.categoriesFor(session.destination).isNotEmpty,

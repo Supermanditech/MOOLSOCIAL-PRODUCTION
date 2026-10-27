@@ -92,6 +92,11 @@ class _CaptureGuard implements MoolAssistantPreparationGuard {
   live=current();
  }
 }
+class _NativeSelectionGuard extends _CaptureGuard implements MoolAssistantNativeSelectionGuard {
+  List<AssistantNativeTargetHint> hints = [(actionId: 'AI-ACT-001', entityId: null)];
+  @override List<String>? get catalogueListingIds => current ? [] : null;
+  @override List<AssistantNativeTargetHint>? get nativeTargets => current ? hints : null;
+}
 
 class ModelEntitlements extends ChangeNotifier
     implements MoolAssistantEntitlementSource {
@@ -215,6 +220,22 @@ void main() {
     guard.fail=false;
     expect(await f.c.sendRequest(),true);
     expect(t.calls.map((b)=>b['operation']),['prepare']);
+  });
+  test('Captured native hints accompany preparation and missing selected reviews make no request', () async {
+    final guard = _NativeSelectionGuard()..fail = false;
+    final transport = ModelTransport((body) => modelResponse(modelData(Map<String, Object?>.from(body['payload'] as Map))));
+    final f = await fixture(transport, preparationGuard: guard);
+    guard.hints = [];
+    expect(await f.c.sendRequest(), false); expect(transport.calls, isEmpty); expect(f.c.modelBusy, false);
+    expect(f.c.draft, 'चावल खोजें');
+    guard.hints = [(actionId: 'AI-ACT-001', entityId: null)];
+    f.c.chooseTask('AI-ACT-007', 'Choose a product pack');
+    expect(await f.c.sendRequest(), false); expect(transport.calls, isEmpty);
+    f.c.chooseTask('AI-ACT-001', 'Find rice');
+    expect(await f.c.sendRequest(), true);
+    final payload = transport.calls.single['payload'] as Map;
+    expect(payload['nativeTargets'], [{'actionId': 'AI-ACT-001', 'entityId': null}]);
+    expect(payload['catalogueListingIds'], isEmpty);
   });
 
 

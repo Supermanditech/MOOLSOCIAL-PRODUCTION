@@ -1,7 +1,7 @@
 import {randomUUID} from "node:crypto";
 import type {AccountProfileActor} from "../account/profile_service.js";
 import type {AccountPlansService, PlansScope} from "../account/plans_service.js";
-import {assertStrictSchema, canonical, digest, fail, id, text, clarificationToolName, type AssistantCommand, type PreparationContext, type PreparationReply, type PreparationRequest} from "./model_contract.js";
+import {assertStrictSchema, canonical, digest, fail, id, text, object, nativeTargetSelection, clarificationToolName, type AssistantCommand, type PreparationContext, type PreparationReply, type PreparationRequest} from "./model_contract.js";
 import type {PreparationModel} from "./responses_transport.js";
 
 export type PreparationState = {state: "pending" | "uncertain" | "cancelled" | "failed"} | {state: "ready"; reply: PreparationReply};
@@ -27,6 +27,9 @@ export interface PreparationUsageAuthority {
 export interface PreparationContextSource {
   /** Original permission/source authority only; client hints never grant access. */
   read(actor: AccountProfileActor, request: PreparationRequest): Promise<PreparationContext>;
+  /** Read back an already stored proposal against its original source. Never a client command or effect. */
+  readPrepared?(actor: AccountProfileActor, request: PreparationRequest,
+    proposal: Extract<PreparationReply['outcome'], {kind: "proposal"}>): Promise<PreparationContext>;
 }
 function expiry(stamp: string): number {
   const value = Date.parse(stamp);
@@ -35,7 +38,28 @@ function expiry(stamp: string): number {
 }
 function contextBinding(c: PreparationContext): string {
   return canonical({revision: c.revision, tools: c.tools.map(t => ({name: t.name, actionId: t.actionId, entityId: t.entityId,
-    sourceRevision: t.sourceRevision, description: t.description, parameters: t.parameters})), modelContext: c.modelContext ?? null});
+    sourceRevision: t.sourceRevision, description: t.description, parameters: t.parameters,
+    ...(t.targetSelector === undefined ? {} : {targetSelector: t.targetSelector})})), modelContext: c.modelContext ?? null,
+    ...(c.nativeTargets === undefined ? {} : {nativeTargets: c.nativeTargets})});
+}
+/** Intersect native readiness hints with original registered source targets.
+ * No caller-authored tool, field, permission or source revision is admitted. */
+function nativeContext(context: PreparationContext, request: PreparationRequest): PreparationContext {
+  if (request.nativeTargets === undefined) return context;
+  const hints = new Set(nativeTargetSelection(request.nativeTargets).map(value => canonical([value.actionId, value.entityId])));
+  const targets = context.nativeTargets ?? context.tools.map(({actionId, entityId, sourceRevision}) => ({actionId, entityId, sourceRevision}));
+  const nativeTargets = targets.filter(target => hints.has(canonical([target.actionId, target.entityId])));
+  const tools = context.tools.flatMap(tool => {
+    if (tool.targetSelector === undefined) return hints.has(canonical([tool.actionId, tool.entityId])) ? [tool] : [];
+    const properties = object(tool.parameters.properties), selector = object(properties[tool.targetSelector]);
+    if (!tool.resolveTarget || !Array.isArray(selector.enum) || selector.enum.some(value => typeof value !== "string")) return fail("context_unavailable");
+    const permitted = new Set(nativeTargets.filter(target => target.actionId === tool.actionId && target.entityId !== null).map(target => target.entityId));
+    const values = selector.enum.filter(value => permitted.has(value as string));
+    if (!values.length) return [];
+    return [{...tool, parameters: {...tool.parameters, properties: {...properties,
+      [tool.targetSelector]: {...selector, enum: values}}}}];
+  });
+  return {...context, tools, nativeTargets};
 }
 export class AssistantPreparationService {
   private readonly cancellations = new Map<string, AbortController>();
@@ -49,6 +73,10 @@ export class AssistantPreparationService {
     if (!value.activeFeatureIds.includes("mool_ai") || expiry(value.validUntil) <= this.now()) return fail("ai_access_required", 403);
     return {revision: `${scope.audience}:${scope.storeId}:${value.catalogueRevision}:${value.subscriptionRevision}`, until: expiry(value.validUntil)};
   }
+  private async readContext(actor: AccountProfileActor, input: PreparationRequest) {
+    if (!this.deps.context) return fail("context_unavailable");
+    return nativeContext(await this.deps.context.read(actor, input), input);
+  }
   private async validateReady(actor: AccountProfileActor, state: PreparationState, revision: string): Promise<PreparationState> {
     if (state.state !== "ready") return state;
     const r = state.reply;
@@ -56,8 +84,9 @@ export class AssistantPreparationService {
     if (r.outcome.kind === "proposal") {
       if (!this.deps.context) return fail("context_unavailable");
       const p = r.outcome;
-      const current = await this.deps.context.read(actor, {scope: r.scope, requestId: r.requestId, requestRevision: r.requestRevision,
-        message: "Read preparation status", language: "English", history: [], expectedEntitlementRevision: r.entitlementRevision, actionId: p.actionId, entityId: p.entityId});
+      const selection: PreparationRequest = {scope: r.scope, requestId: r.requestId, requestRevision: r.requestRevision,
+        message: "Read preparation status", language: "English", history: [], expectedEntitlementRevision: r.entitlementRevision, actionId: p.actionId, entityId: p.entityId};
+      const current = await (this.deps.context.readPrepared?.(actor, selection, p) ?? this.deps.context.read(actor, selection));
       const tools = current.tools.filter(t => t.actionId === p.actionId && t.entityId === p.entityId);
       if (expiry(current.validUntil) <= this.now() || tools.length !== 1 || tools[0]!.sourceRevision !== p.sourceRevision || !tools[0]!.validate(p.fields)) return fail("stale_preparation", 409);
     }
@@ -97,7 +126,7 @@ export class AssistantPreparationService {
     let permit: {id: string; validUntil: string} | undefined;
     let settled = false;
     try {
-      const context = await this.deps.context.read(actor, input);
+      const context = await this.readContext(actor, input);
       text(context.revision); if (expiry(context.validUntil) <= this.now() || !context.tools.length) return fail("context_unavailable");
       const tools = context.tools.filter(t => input.actionId === null || t.actionId === input.actionId);
       if (!tools.length || new Set(tools.map(t => t.name)).size !== tools.length || new Set(tools.map(t => `${t.actionId}:${t.entityId}`)).size !== tools.length) return fail("context_unavailable");
@@ -112,7 +141,7 @@ export class AssistantPreparationService {
       // Usage/source reads may await external authority. Revalidate immediately
       // before spending on a model call, not merely after its result arrives.
       const spending = await this.paid(actor, input.scope);
-      const spendingContext = await this.deps.context.read(actor, input);
+      const spendingContext = await this.readContext(actor, input);
       if (abort.signal.aborted || before.until <= this.now() || before.revision !== spending.revision ||
           expiry(spendingContext.validUntil) <= this.now() ||
           binding !== contextBinding({...spendingContext, tools: spendingContext.tools.filter(t => input.actionId === null || t.actionId === input.actionId)})) return fail("stale_preparation", 409);
@@ -120,7 +149,7 @@ export class AssistantPreparationService {
       const prepared = await this.deps.model.prepare(input, tools, abort.signal, context.modelContext);
       if (abort.signal.aborted) return await store.finish(key, claim.lease, {state: "cancelled"}, identity);
       const after = await this.paid(actor, input.scope);
-      const current = await this.deps.context.read(actor, input);
+      const current = await this.readContext(actor, input);
       const latest = await store.read(key, identity);
       if (!latest) return fail("request_state_unavailable");
       if (abort.signal.aborted || latest?.state === "cancelled") return await store.finish(key, claim.lease, {state: "cancelled"}, identity);
@@ -135,15 +164,23 @@ export class AssistantPreparationService {
         const tool = matches[0]!;
         // Field and meaning validation belongs to the registered original capability.
         if (Object.keys(prepared.arguments).some(k => !Object.hasOwn(tool.parameters.properties as object, k))) return fail("invalid_model_result");
-        const fields = tool.decodeFields?.(prepared.arguments) ?? prepared.arguments;
+        const target = tool.resolveTarget ? tool.resolveTarget(prepared.arguments) : null;
+        if (tool.resolveTarget && !target) return fail("invalid_model_result");
+        const fields = target ? target.fields : tool.decodeFields?.(prepared.arguments) ?? prepared.arguments;
+        const entityId = target ? target.entityId === null ? null : id(target.entityId) : tool.entityId;
+        const sourceRevision = text(target ? target.sourceRevision : tool.sourceRevision, 256);
+        if (target && !context.nativeTargets || context.nativeTargets &&
+            context.nativeTargets.filter(t => t.actionId === tool.actionId &&
+              t.entityId === entityId && t.sourceRevision === sourceRevision).length !== 1) return fail("invalid_model_result");
         if (!tool.validate(fields)) return fail("invalid_model_result");
-        outcome = {kind: "proposal", id: randomUUID(), actionId: tool.actionId, entityId: tool.entityId,
-          sourceRevision: tool.sourceRevision, title: tool.description, summary: "Review the suggested details before continuing.",
+        outcome = {kind: "proposal", id: randomUUID(), actionId: tool.actionId, entityId,
+          sourceRevision, title: text(target?.title ?? tool.description, 1000),
+          summary: text(target?.summary ?? "Review the suggested details before continuing.", 2000),
           fields: JSON.parse(canonical(fields)) as Readonly<Record<string, unknown>>};
       }
       await this.deps.usage.settle(permit.id, "completed"); settled = true;
       const finalPaid = await this.paid(actor, input.scope);
-      const finalContext = await this.deps.context.read(actor, input);
+      const finalContext = await this.readContext(actor, input);
       if (finalPaid.revision !== after.revision || expiry(finalContext.validUntil) <= this.now() ||
           binding !== contextBinding({...finalContext, tools: finalContext.tools.filter(t => input.actionId === null || t.actionId === input.actionId)})) return fail("stale_preparation", 409);
       if (abort.signal.aborted || this.now() >= until) return fail("stale_preparation", 409);

@@ -7,6 +7,7 @@ import 'account_profile_gateway.dart';
 import 'account_plans_gateway.dart';
 import '../assistant/model_gateway.dart';
 import '../assistant/history_gateway.dart';
+import '../assistant/domain_context_gateway.dart';
 
 const _deviceReviewMode = bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');
 
@@ -139,6 +140,25 @@ class JourneySession extends ChangeNotifier {
   AssistantHistoryGateway? _assistantHistoryGateway;
   AccountProfileOwner? _assistantHistoryOwner;
   int? _assistantHistoryGeneration;
+  AssistantDomainContextGateway? _assistantDomainContextGateway;
+  AccountProfileOwner? _assistantDomainContextOwner;
+  int? _assistantDomainContextGeneration;
+  AssistantDomainContextGateway? get assistantDomainContextGateway {
+    final owner = authenticatedBuyPersistenceIdentity;
+    final generation = navigationAuthenticationGeneration;
+    final source = _accountIdentityGateway;
+    if (_disposed || owner == null || generation == null || owner.tenantId != null ||
+        source is! AssistantDomainContextGatewaySource) {
+      _assistantDomainContextGateway?.dispose(); _assistantDomainContextGateway = null; return null;
+    }
+    if (_assistantDomainContextOwner != owner || _assistantDomainContextGeneration != generation) {
+      _assistantDomainContextGateway?.dispose();
+      _assistantDomainContextOwner = owner; _assistantDomainContextGeneration = generation;
+      _assistantDomainContextGateway = (source as AssistantDomainContextGatewaySource).assistantDomainContextGateway(owner,
+        () => !_disposed && navigationAuthenticationGeneration == generation && authenticatedBuyPersistenceIdentity == owner);
+    }
+    return _assistantDomainContextGateway;
+  }
   AssistantHistoryGateway? get assistantHistoryGateway {
     final owner = authenticatedBuyPersistenceIdentity;
     final generation = navigationAuthenticationGeneration;
@@ -2388,6 +2408,7 @@ class JourneySession extends ChangeNotifier {
       _assistantModelGateway?.dispose();
       _plansAssistantEntitlements?.dispose();
       _assistantHistoryGateway?.dispose();
+      _assistantDomainContextGateway?.dispose();
       _plansGateway?.dispose();
       _authenticationGeneration += 1;
       final subscription = _firebasePrincipalSubscription;

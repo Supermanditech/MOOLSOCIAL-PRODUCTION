@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import '../../features/assistant/mool_assistant.dart';
 import '../../features/assistant/model_gateway.dart';
 import '../../features/assistant/profile_context.dart';
+import '../../features/assistant/domain_context_gateway.dart';
 import '../../features/buy/buy_v2_session.dart';
+import '../../features/buy/buy_v2_models.dart' show BuyV2View;
 import '../../features/journey01/journey_session.dart';
 import '../../features/work/work_session.dart';
 import '../buy/buy_v2_views.dart';
@@ -13,9 +15,10 @@ import '../profile/global_personal_profile_v2.dart';
 /// Original authenticated gateways only. No local/profile-plan preference grants.
 class AssistantOriginalContextReader {
   const AssistantOriginalContextReader({required this.session, required this.work,
-    required this.rootCurrent});
+    required this.rootCurrent, this.buy});
   final JourneySession session;
   final WorkSession work;
+  final BuyV2Session? buy;
   final bool Function() rootCurrent;
 
   Future<AssistantCanonicalContextSnapshot> read(MoolAssistantContext context,
@@ -71,8 +74,37 @@ class AssistantOriginalContextReader {
         throw const AssistantModelFailure('context_unavailable');
       }
     }
+    final domainGateway = session.assistantDomainContextGateway;
+    List<String>? catalogueListingIds;
+    if (domainGateway != null) {
+      try {
+        final selected = buy?.selectedProduct;
+        final candidates = buy != null && buy!.view == BuyV2View.product && selected != null
+          ? [selected] : buy?.visibleProducts;
+        final selection = !context.inWorkspace && buy != null && !buy!.isStoreProcurement
+          ? candidates!.where((product) => product.publicListingIdentity != null &&
+              product.hasValidPublicListingIdentity && !product.requiresPrescription &&
+              product.destination == buy!.destination).map((product) => product.id).toSet().toList()
+          : null;
+        selection?.sort();
+        final domain = await domainGateway.read(context, alive, catalogueListingIds: selection);
+        if (!alive() || domain.binding != context.binding) throw const AssistantModelFailure('stale_preparation');
+        if (domain.revisions.keys.any((key) =>
+            !assistantDomainContextActions.contains(key.$1) || revisions.containsKey(key))) {
+          throw const AssistantModelFailure('context_unavailable');
+        }
+        revisions.addAll(domain.revisions);
+        catalogueListingIds = domain.catalogueListingIds;
+        if (domain.validUntil.isBefore(until)) until = domain.validUntil;
+      } on AssistantModelFailure catch (error) {
+        // Mirror backend composition: an unavailable optional domain exposes no
+        // tools; it never removes established original Profile capabilities.
+        if (error.code != 'context_unavailable') rethrow;
+      }
+    }
     if (!alive() || !until.isAfter(DateTime.now().toUtc())) throw const AssistantModelFailure('stale_preparation');
-    return AssistantCanonicalContextSnapshot(binding: context.binding, revisions: revisions, validUntil: until);
+    return AssistantCanonicalContextSnapshot(binding: context.binding, revisions: revisions, validUntil: until,
+      catalogueListingIds: catalogueListingIds);
   }
 }
 

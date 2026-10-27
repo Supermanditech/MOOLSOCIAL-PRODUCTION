@@ -6,10 +6,28 @@ import '../journey01/account_profile_gateway.dart' show AccountProfileOwner;
 import '../shared/social_content_gateway.dart';
 
 typedef AssistantModelScope = ({String audience, String? storeId});
+typedef AssistantNativeTargetHint = ({String actionId, String? entityId});
+
+List<AssistantNativeTargetHint> assistantNativeTargetSelection(List<AssistantNativeTargetHint> values) {
+  if (values.length > 5000 || values.toSet().length != values.length || values.any((value) =>
+      !RegExp(r'^AI-ACT-\d{3}$').hasMatch(value.actionId) || value.entityId != null &&
+      (value.entityId!.length > 128 || !RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]*$').hasMatch(value.entityId!)))) {
+    throw const AssistantModelFailure('invalid_request');
+  }
+  return List.unmodifiable(values);
+}
 
 class AssistantModelFailure implements Exception {
   const AssistantModelFailure(this.code);
   final String code;
+}
+
+List<String> assistantCatalogueListingSelection(Object? value) {
+  if (value is! List || value.length > 500 || value.toSet().length != value.length ||
+      value.any((id) => id is! String || !RegExp(r'^listing-[a-f0-9]{64}$').hasMatch(id))) {
+    throw const AssistantModelFailure('invalid_request');
+  }
+  return List<String>.unmodifiable(value.cast<String>());
 }
 
 class AssistantModelInput {
@@ -23,12 +41,24 @@ class AssistantModelInput {
     this.actionId,
     this.entityId,
     this.history = const [],
+    this.catalogueListingIds,
+    this.nativeTargets,
   });
   final AssistantModelScope scope;
   final String requestId, message, language, expectedEntitlementRevision;
   final int requestRevision;
   final String? actionId, entityId;
   final List<Map<String, String>> history;
+  final List<String>? catalogueListingIds;
+  final List<AssistantNativeTargetHint>? nativeTargets;
+  AssistantModelInput withCatalogueListingIds(List<String>? ids) => AssistantModelInput(
+    scope: scope, requestId: requestId, requestRevision: requestRevision, message: message, language: language,
+    expectedEntitlementRevision: expectedEntitlementRevision, actionId: actionId, entityId: entityId, history: history,
+    catalogueListingIds: ids == null ? null : assistantCatalogueListingSelection(ids), nativeTargets: nativeTargets);
+  AssistantModelInput withNativeTargets(List<AssistantNativeTargetHint>? targets) => AssistantModelInput(
+    scope: scope, requestId: requestId, requestRevision: requestRevision, message: message, language: language,
+    expectedEntitlementRevision: expectedEntitlementRevision, actionId: actionId, entityId: entityId, history: history,
+    catalogueListingIds: catalogueListingIds, nativeTargets: targets == null ? null : assistantNativeTargetSelection(targets));
   Map<String, Object?> toJson() => {
     'scope': {'audience': scope.audience, 'storeId': scope.storeId},
     'requestId': requestId,
@@ -39,6 +69,9 @@ class AssistantModelInput {
     'history': history,
     'actionId': actionId,
     'entityId': entityId,
+    if (catalogueListingIds != null) 'catalogueListingIds': assistantCatalogueListingSelection(catalogueListingIds),
+    if (nativeTargets != null) 'nativeTargets': assistantNativeTargetSelection(nativeTargets!)
+      .map((value) => {'actionId': value.actionId, 'entityId': value.entityId}).toList(growable: false),
   };
 }
 
@@ -200,6 +233,8 @@ class AssistantModelGateway implements RecoverableAssistantModelSource {
     bool Function() current,
   ) async {
     _check(current);
+    if (input.catalogueListingIds != null) input = input.withCatalogueListingIds(input.catalogueListingIds);
+    if (input.nativeTargets != null) input = input.withNativeTargets(input.nativeTargets);
     if (input.scope.audience != 'personal' &&
             input.scope.audience != 'workspace' ||
         (input.scope.audience == 'personal'

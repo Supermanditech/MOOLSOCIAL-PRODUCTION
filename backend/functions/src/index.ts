@@ -25,6 +25,8 @@ import {handleAssistantModelRequest} from "./assistant/model_http.js";
 import {AssistantHistoryService} from "./assistant/history_service.js";
 import {DataConnectHistoryRepository} from "./assistant/history_dataconnect_store.js";
 import {handleAssistantHistoryRequest} from "./assistant/history_http.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext} from "./assistant/domain_context.js";
+import {handleAssistantCanonicalContextRequest} from "./assistant/domain_context_http.js";
 
 import {
   FetchXProviderTransport,
@@ -2608,6 +2610,52 @@ function assistantDurableSources(projectId: string) {
   }
   return assistantDurableRuntime;
 }
+function assistantOriginalContextSource(projectId: string) {
+  const profile = process.env.MOOLSOCIAL_ACCOUNT_PROFILE_STORAGE_QUALIFIED === "true";
+  const catalogue = process.env.MOOLSOCIAL_ASSISTANT_DOMAIN_CONTEXT_QUALIFIED === "true";
+  if (!profile && !catalogue) return undefined;
+  accountPlansRuntimeService ??= new AccountPlansService(
+    new DataConnectAccountPlansRepository(getDataConnect({location: "asia-south1", serviceId: "moolsocial-core", connector: "mobile"})),
+    {projectId, readWorkspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)});
+  if (profile) accountProfileRuntimeService ??= new AccountProfileService(
+    new DataConnectAccountProfileRepository(getDataConnect({location: "asia-south1", serviceId: "moolsocial-core", connector: "mobile"})), projectId);
+  return new CompositePreparationContext({
+    nativePreferencesEnabled: profile && catalogue,
+    ...(profile && accountProfileRuntimeService ? {original: new ProfileWorkspacePreparationContext({
+      profile: accountProfileRuntimeService, plans: accountPlansRuntimeService,
+      workspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)})} : {}),
+    ...(catalogue ? {catalogue: new OriginalCataloguePreparationContext({projectId,
+      plans: accountPlansRuntimeService, catalogue: workspaceCatalogueService()})} : {}),
+  });
+}
+export const moolSocialAssistantContext = onRequest(
+  {region: "asia-south1", timeoutSeconds: 60, memory: "256MiB", minInstances: 0,
+    maxInstances: 4, concurrency: 4, serviceAccount: publicAuthRuntimeServiceAccount},
+  async (request, response) => {
+    response.setHeader("cache-control", "no-store");
+    response.setHeader("x-content-type-options", "nosniff");
+    response.setHeader("x-request-id", requestId(request.headers));
+    try {
+      const projectId = publicAuthProjectId();
+      const enabled = process.env.MOOLSOCIAL_ASSISTANT_DOMAIN_CONTEXT_QUALIFIED === "true" &&
+        process.env.MOOLSOCIAL_ACCOUNT_PLANS_STORAGE_QUALIFIED === "true";
+      const context = enabled ? assistantOriginalContextSource(projectId) : undefined;
+      const reply = await handleAssistantCanonicalContextRequest({method: request.method, headers: request.headers,
+        body: request.body, bodyBytes: request.rawBody.byteLength}, {projectId, enabled,
+        ...(context ? {context} : {}),
+        verifyAppCheck: async (token, consume) => getAppCheck().verifyToken(token, consume ? {consume: true} : undefined),
+        verifyIdToken: async token => {
+          const verified = await getAuth().verifyIdToken(token, true);
+          return {uid: verified.uid, projectId: verified.aud,
+            ...(verified.firebase?.tenant ? {tenantId: verified.firebase.tenant} : {}),
+            anonymous: verified.firebase?.sign_in_provider === "anonymous"};
+        }});
+      response.status(reply.status).json(reply.body);
+    } catch {
+      response.status(503).json({ok: false, error: {code: "context_unavailable",
+        message: "Mool AI could not read the current source. Your app records are unchanged."}});
+    }
+  });
 let assistantPreparationRuntimeService: AssistantPreparationService | undefined;
 export const moolSocialAssistantPreparation = onRequest(
   {region: "asia-south1", timeoutSeconds: 60, memory: "256MiB", minInstances: 0,
@@ -2623,12 +2671,10 @@ export const moolSocialAssistantPreparation = onRequest(
         {projectId, readWorkspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)});
       accountProfileRuntimeService ??= new AccountProfileService(
         new DataConnectAccountProfileRepository(getDataConnect({location: "asia-south1", serviceId: "moolsocial-core", connector: "mobile"})), projectId);
+      const originalContext = assistantOriginalContextSource(projectId);
       assistantPreparationRuntimeService ??= new AssistantPreparationService({projectId, plans: accountPlansRuntimeService,
         ...(assistantDurableSources(projectId) ?? {}),
-        ...(process.env.MOOLSOCIAL_ACCOUNT_PROFILE_STORAGE_QUALIFIED === "true" ? {
-          context: new ProfileWorkspacePreparationContext({profile: accountProfileRuntimeService, plans: accountPlansRuntimeService,
-            workspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)}),
-        } : {}),
+        ...(originalContext ? {context: originalContext} : {}),
       });
       const reply = await handleAssistantModelRequest({method: request.method, headers: request.headers,
         body: request.body, bodyBytes: request.rawBody.byteLength}, {projectId,

@@ -26,6 +26,7 @@ import 'account_profile_gateway.dart';
 import 'account_plans_gateway.dart';
 import '../assistant/model_gateway.dart';
 import '../assistant/history_gateway.dart';
+import '../assistant/domain_context_gateway.dart';
 import '../shared/social_content_gateway.dart';
 
 const reviewAuthenticatedUserPreferenceKey =
@@ -1030,10 +1031,22 @@ class FirebaseAuthSocialClient implements FirebaseSocialAuthClient {
 
 class FirebaseAuthenticatedAccountIdentityGateway
     implements AuthenticatedAccountIdentityGateway, AuthenticatedAccountPrincipalSource,
-        AccountProfileGatewaySource, AccountPlansGatewaySource, AssistantModelGatewaySource, AssistantHistoryGatewaySource {
+        AccountProfileGatewaySource, AccountPlansGatewaySource, AssistantModelGatewaySource, AssistantHistoryGatewaySource,
+        AssistantDomainContextGatewaySource {
   FirebaseAuthenticatedAccountIdentityGateway(this._auth);
 
   final FirebaseAuth _auth;
+
+  @override
+  AssistantDomainContextGateway? assistantDomainContextGateway(AccountProfileOwner owner, bool Function() current) {
+    if (!const bool.fromEnvironment('MOOLSOCIAL_ASSISTANT_DOMAIN_CONTEXT_ENABLED') ||
+        const bool.fromEnvironment('MOOLSOCIAL_USE_EMULATORS') ||
+        owner.environment != 'firebase-service' || owner.tenantId != null ||
+        owner.projectId != _auth.app.options.projectId ||
+        currentFirebasePrincipal != (projectId: owner.projectId, tenantId: owner.tenantId, userId: owner.userId)) return null;
+    return AssistantDomainContextGateway(owner: owner, isCurrent: current,
+      credentials: FirebaseSocialContentCredentials(auth: _auth));
+  }
 
   @override
   AssistantHistoryGateway? assistantHistoryGateway(AccountProfileOwner owner, bool Function() current) {

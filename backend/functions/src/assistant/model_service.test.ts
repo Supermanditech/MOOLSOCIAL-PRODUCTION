@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {AccountPlansService, type PlansRepositorySnapshot} from "../account/plans_service.js";
-import {AssistantPreparationService, type PreparationRequestStore, type PreparationState} from "./model_service.js";
+import {AssistantPreparationService, type PreparationContextSource, type PreparationRequestStore, type PreparationState} from "./model_service.js";
 import type {PreparationContext, PreparationRequest} from "./model_contract.js";
 import type {ModelPreparation} from "./responses_transport.js";
 import {InMemoryWorkspaceProfileRepository,WorkspaceProfileService,type WorkspaceProfileRecord} from "../workspace/workspace_profile_service.js";
@@ -37,9 +37,10 @@ function fixture() {
     validate: f => Object.keys(f).length === 1 && typeof f.query === "string" && f.query.length >= 2 && f.query.length <= 80,
   }]};
   const store = new FixtureRequests(); const settlements: string[] = [];
+  const contextSource: PreparationContextSource = {async read() {contexts++; return context;}};
   let model = async (): Promise<ModelPreparation> => ({kind: "tool", name: "prepare_search", arguments: {query: "ચોખા"}});
   const deps = {plans, projectId: actor.projectId, now: () => now, requests: store,
-    context: {async read() {contexts++; return context;}},
+    context: contextSource,
     usage: {async reserve() {reserved++; return {id: "fixture-permit", validUntil: context.validUntil};}, async settle(_id: string, state: string) {settlements.push(state);}},
     model: {async prepare() {calls++; return model();}}};
   return {service: new AssistantPreparationService(deps), deps, row, context, store, settlements,
@@ -51,6 +52,23 @@ test("AI-B01 actual paid service prepares a typed native proposal without domain
   assert.equal(result.reply.outcome.kind, "proposal"); assert.deepEqual(result.reply.scope, request.scope);
   assert.equal(result.reply.entitlementRevision, "personal:null:1:1"); assert.deepEqual(f.settlements, ["completed"]);
   assert.equal(f.counts().calls, 1);
+});
+test("Stored proposal status uses original readback without re-preparing, charging or replaying an effect", async () => {
+  const f = fixture(); let reads = 0, missing = false;
+  f.deps.context.readPrepared = async (who, input, proposal) => {
+    reads++; assert.deepEqual(who, actor); assert.equal(input.actionId, proposal.actionId);
+    assert.equal(input.entityId, proposal.entityId); assert.deepEqual(proposal.fields, {query: "ચોખા"});
+    assert.equal(input.catalogueListingIds, undefined);
+    if (missing) throw Error("Original source unavailable");
+    return f.context;
+  };
+  const result = await f.service.handle(actor, {operation: "prepare", payload: request});
+  assert.equal(result.state, "ready"); const before = f.counts(), originalReads = reads;
+  assert.deepEqual(await f.service.handle(actor, {operation: "status", payload: {scope: request.scope, requestId: request.requestId}}), result);
+  assert.ok(reads > originalReads); assert.equal(f.counts().calls, before.calls); assert.equal(f.counts().reserved, before.reserved);
+  missing = true;
+  await assert.rejects(f.service.handle(actor, {operation: "status", payload: {scope: request.scope, requestId: request.requestId}}));
+  assert.equal(f.counts().calls, before.calls); assert.equal(f.counts().reserved, before.reserved);
 });
 
 test("THIN-B03 registered field normalisation returns original native fields only", async () => {
@@ -192,4 +210,79 @@ test("AI-B01 source change while usage authority awaits makes zero model calls",
   };
   await assert.rejects(f.service.handle(actor, {operation: "prepare", payload: request}));
   assert.equal(f.counts().calls, 0);
+});
+
+function selectedCatalogueFixture() {
+  const f = fixture(), listingId = "listing-" + "a".repeat(64), generic = f.context.tools[0]!;
+  Object.assign(generic, {actionId: "AI-ACT-006", sourceRevision: "catalogue:1", targetSelector: "listingId",
+    parameters: {type: "object", properties: {listingId: {type: "string", enum: [listingId]}},
+      required: ["listingId"], additionalProperties: false},
+    validate: (fields: Readonly<Record<string, unknown>>) => Object.keys(fields).length === 0,
+    resolveTarget: (fields: Readonly<Record<string, unknown>>) => {
+      assert.deepEqual(fields, {listingId});
+      return {entityId: listingId, sourceRevision: "record:1", fields: {}, title: "Original public product"};
+    }});
+  Object.assign(f.context, {nativeTargets: [{actionId: "AI-ACT-006", entityId: listingId, sourceRevision: "record:1"}]});
+  f.deps.context.read = async (...args: unknown[]) => {
+    const selected = args[1] as PreparationRequest | undefined;
+    if (selected?.entityId !== null && selected?.entityId !== undefined) {
+      const {resolveTarget: _selector, targetSelector: _property, ...tool} = generic;
+      return {...f.context, tools: [{...tool, entityId: listingId, sourceRevision: "record:1",
+        parameters: {type: "object", properties: {}, required: [], additionalProperties: false}}]};
+    }
+    return f.context;
+  };
+  f.model(async () => ({kind: "tool", name: generic.name, arguments: {listingId}}));
+  return {...f, listingId, generic};
+}
+test("Domain typed selector resolves only an original witnessed entity and strips selector before native fields", async () => {
+  const f = selectedCatalogueFixture(), result = await f.service.handle(actor, {operation: "prepare", payload: request});
+  assert.equal(result.state, "ready"); if (result.state !== "ready" || result.reply.outcome.kind !== "proposal") return;
+  assert.equal(result.reply.outcome.actionId, "AI-ACT-006"); assert.equal(result.reply.outcome.entityId, f.listingId);
+  assert.equal(result.reply.outcome.sourceRevision, "record:1"); assert.deepEqual(result.reply.outcome.fields, {});
+  assert.equal(result.reply.outcome.title, "Original public product");
+  assert.deepEqual(await f.service.handle(actor, {operation: "status", payload: {scope: request.scope, requestId: request.requestId}}), result);
+  assert.equal(f.counts().calls, 1);
+});
+test("Native hints cannot grant an absent backend action or target and spend no model usage", async () => {
+  for (const hints of [[], [{actionId: "AI-ACT-999", entityId: null}],
+    [{actionId: "AI-ACT-006", entityId: "listing-" + "b".repeat(64)}]]) {
+    const f = selectedCatalogueFixture();
+    await assert.rejects(f.service.handle(actor, {operation: "prepare", payload: {...request, nativeTargets: hints}}), /context_unavailable/u);
+    assert.equal(f.counts().calls, 0); assert.equal(f.counts().reserved, 0);
+  }
+});
+test("Model selector is narrowed to original targets with native review anchors; forged model target still fails", async () => {
+  for (const forged of [false, true]) {
+    const f = selectedCatalogueFixture(), other = "listing-" + "b".repeat(64);
+    Object.assign(f.generic, {parameters: {...f.generic.parameters, properties: {listingId: {type: "string", enum: [f.listingId, other]}}},
+      resolveTarget: (fields: Readonly<Record<string, unknown>>) => ({entityId: fields.listingId, sourceRevision: "record:1", fields: {}})});
+    Object.assign(f.context, {nativeTargets: [f.context.nativeTargets![0], {actionId: "AI-ACT-006", entityId: other, sourceRevision: "record:1"}]});
+    let calls = 0;
+    f.deps.model.prepare = async (...args: unknown[]) => {
+      calls++;
+      const tools = args[1] as Array<{name: string; parameters: {properties: {listingId: {enum: string[]}}}}>; 
+      assert.deepEqual(tools[0]!.parameters.properties.listingId.enum, [f.listingId]);
+      return {kind: "tool" as const, name: tools[0]!.name, arguments: {listingId: forged ? other : f.listingId}};
+    };
+    const result = f.service.handle(actor, {operation: "prepare", payload: {...request,
+      nativeTargets: [{actionId: "AI-ACT-006", entityId: f.listingId}]}});
+    if (forged) await assert.rejects(result, /invalid_model_result/u);
+    else assert.equal((await result).state, "ready");
+    assert.equal(calls, 1); assert.equal(f.counts().reserved, 1);
+  }
+});
+test("Domain selector cannot invent a target outside the original captured witness", async () => {
+  const f = selectedCatalogueFixture();
+  Object.assign(f.generic, {resolveTarget: () => ({entityId: "listing-" + "b".repeat(64), sourceRevision: "record:1", fields: {}})});
+  await assert.rejects(f.service.handle(actor, {operation: "prepare", payload: request}), /invalid_model_result/u);
+  assert.ok([...f.store.rows.values()].every(row => row.result.state === "failed"));
+});
+test("Domain target witness changes during inference retire preparation even when tool schema is unchanged", async () => {
+  const f = selectedCatalogueFixture();
+  f.model(async () => {
+    Object.assign(f.context, {nativeTargets: [{actionId: "AI-ACT-006", entityId: f.listingId, sourceRevision: "record:2"}]});
+    return {kind: "tool", name: f.generic.name, arguments: {listingId: f.listingId}};
+  });
+  await assert.rejects(f.service.handle(actor, {operation: "prepare", payload: request}), /stale_preparation/u);
 });

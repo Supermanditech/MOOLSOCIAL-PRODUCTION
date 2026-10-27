@@ -28,11 +28,14 @@ class AssistantProfileNamePrefill {
 /// Canonical revisions only. No private Profile fields are copied into chat.
 class AssistantCanonicalContextSnapshot {
   AssistantCanonicalContextSnapshot({required this.binding,
-    required Map<AssistantContextKey, String> revisions, required this.validUntil})
-    : revisions = Map.unmodifiable(revisions);
+    required Map<AssistantContextKey, String> revisions, required this.validUntil,
+    List<String>? catalogueListingIds})
+    : revisions = Map.unmodifiable(revisions),
+      catalogueListingIds = catalogueListingIds == null ? null : assistantCatalogueListingSelection(catalogueListingIds);
   final Object binding;
   final Map<AssistantContextKey, String> revisions;
   final DateTime validUntil;
+  final List<String>? catalogueListingIds;
 }
 typedef AssistantCanonicalContextReader = Future<AssistantCanonicalContextSnapshot>
     Function(MoolAssistantContext context, bool Function() current);
@@ -45,15 +48,18 @@ class _NativeAnchor {
 
 /// Binds original local snapshots BEFORE inference. A later fresh native token
 /// can never be substituted to make an older server preparation look current.
-class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, MoolAssistantRecoveredReviewGuard {
+class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, MoolAssistantRecoveredReviewGuard, MoolAssistantNativeSelectionGuard {
   AssistantProfileContextGuard({required this.readCanonical,
     required this.readContext, required this.ownerChanges,
     required Iterable<MoolAssistantNativeAdapter> nativeAdapters,
-    DateTime Function()? clock}) : _clock = clock ?? DateTime.now {
+    DateTime Function()? clock, Set<String>? canonicalActions, Set<String>? recoverableActions})
+      : _clock = clock ?? DateTime.now,
+        _canonicalActions = Set.unmodifiable(canonicalActions ??
+          {...assistantProfileContextActions, ...assistantWorkspaceContextActions}),
+        _recoverableActions = Set.unmodifiable(recoverableActions ?? assistantProfileContextActions) {
     _original = List.unmodifiable(nativeAdapters);
     adapters = List.unmodifiable(_original.map((adapter) =>
-      assistantProfileContextActions.contains(adapter.actionId) ||
-              assistantWorkspaceContextActions.contains(adapter.actionId)
+      _canonicalActions.contains(adapter.actionId)
           ? _CanonicalNativeAdapter(this, adapter) : adapter));
     _observedBinding = readContext().binding;
     ownerChanges.addListener(_ownerChanged);
@@ -62,6 +68,8 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
   final MoolAssistantContext Function() readContext;
   final Listenable ownerChanges;
   final DateTime Function() _clock;
+  final Set<String> _canonicalActions;
+  final Set<String> _recoverableActions;
   late final List<MoolAssistantNativeAdapter> _original;
   late final List<MoolAssistantNativeAdapter> adapters;
   Map<AssistantContextKey, _NativeAnchor> _anchors = const {};
@@ -69,6 +77,10 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
   int _generation = 0;
   late Object _observedBinding;
   bool _disposed = false;
+  @override List<String>? get catalogueListingIds => current ? _canonical?.catalogueListingIds : null;
+  @override List<AssistantNativeTargetHint>? get nativeTargets => current
+    ? assistantNativeTargetSelection([for (final key in _anchors.keys.where((key) => _canonicalActions.contains(key.$1)))
+        (actionId: key.$1, entityId: key.$2)]) : null;
   void _ownerChanged() {
     final binding = readContext().binding;
     if (binding != _observedBinding) { _observedBinding = binding; retire(); }
@@ -88,7 +100,7 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
   @override Future<void> captureRecoveredReview(MoolAssistantContext context,
       MoolAssistantProposal proposal, bool Function() valid) async {
     if(!valid() || !proposal.recovered || proposal.preparationRequestId==null ||
-       !assistantProfileContextActions.contains(proposal.actionId) ||
+       !_recoverableActions.contains(proposal.actionId) ||
        proposal.preparationSourceRevision!=proposal.sourceRevision) throw const AssistantModelFailure('stale_preparation');
     final canonical=await readCanonical(context,valid);
     if(!valid() || canonical.binding!=context.binding || canonical.revisions[(proposal.actionId,proposal.entityId)]!=proposal.sourceRevision) {
@@ -121,11 +133,13 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
     }
     final fresh = await readCanonical(context, alive);
     if (!alive() || fresh.binding != context.binding ||
-        !mapEquals(source.revisions, fresh.revisions) || !fresh.validUntil.isAfter(_clock())) {
+        !mapEquals(source.revisions, fresh.revisions) ||
+        !listEquals(source.catalogueListingIds, fresh.catalogueListingIds) || !fresh.validUntil.isAfter(_clock())) {
       throw const AssistantModelFailure('stale_preparation');
     }
     _canonical = AssistantCanonicalContextSnapshot(binding: context.binding,
       revisions: fresh.revisions,
+      catalogueListingIds: fresh.catalogueListingIds,
       validUntil: source.validUntil.isBefore(fresh.validUntil) ? source.validUntil : fresh.validUntil);
     _anchors = Map.unmodifiable(anchors);
   }

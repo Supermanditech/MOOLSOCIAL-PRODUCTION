@@ -2011,6 +2011,13 @@ abstract interface class MoolAssistantPreparationGuard {
   void retire();
 }
 
+/// Original read hints captured with native review readiness.
+/// These identifiers never grant access, permission or source authority.
+abstract interface class MoolAssistantNativeSelectionGuard {
+  List<String>? get catalogueListingIds;
+  List<AssistantNativeTargetHint>? get nativeTargets;
+}
+
 /// Additive FE-HANDOFF01 signal. Notification rechecks authority; it grants none.
 abstract interface class MoolAssistantOwnerAwareNativeAdapter implements MoolAssistantNativeAdapter {
   Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,
@@ -2166,7 +2173,7 @@ class MoolAssistantController extends ChangeNotifier {
     final statusOnly = _modelInput != null && _modelBinding == binding;
     final recovered = statusOnly && _modelRecovered;
     final random = math.Random.secure();
-    final input = statusOnly ? _modelInput! : AssistantModelInput(
+    var input = statusOnly ? _modelInput! : AssistantModelInput(
       scope: (audience: context.inWorkspace ? 'workspace' : 'personal', storeId: context.inWorkspace ? context.workspaceId : null),
       requestId: 'req-${List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}',
       requestRevision: revision, message: _draft, language: language,
@@ -2197,6 +2204,17 @@ class MoolAssistantController extends ChangeNotifier {
         await preparationGuard!.capture(context, actorCurrent);
         captured = true;
         if (!current()) {unsent(); return false;}
+        final guard = preparationGuard;
+        if (guard is MoolAssistantNativeSelectionGuard) {
+          final selection = guard as MoolAssistantNativeSelectionGuard;
+          final targets = selection.nativeTargets;
+          if (targets != null && (targets.isEmpty || input.actionId != null &&
+              !targets.any((target) => target.actionId == input.actionId))) {
+            unsent(); return false;
+          }
+          input = input.withCatalogueListingIds(selection.catalogueListingIds).withNativeTargets(targets);
+          _modelInput = input;
+        }
       }
       submitted = true;
       final reply = await (statusOnly ? source.status(input, current) : source.prepare(input, current));

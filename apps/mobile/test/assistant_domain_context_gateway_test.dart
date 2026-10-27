@@ -1,0 +1,130 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:moolsocial/features/assistant/domain_context_gateway.dart';
+import 'package:moolsocial/features/assistant/model_gateway.dart';
+import 'package:moolsocial/features/assistant/mool_assistant.dart';
+import 'package:moolsocial/features/shared/social_content_gateway.dart';
+
+// Explicit host-only credential and network seams; never phone authority/data.
+const _owner = (environment: 'firebase-service', projectId: 'fixture-project', tenantId: null, userId: 'domain-host-a');
+const _context = MoolAssistantContext(accountScope: _owner, authenticationRevision: 1);
+final _at = DateTime.utc(2026, 10, 28, 8);
+const _scope = {'audience': 'personal', 'storeId': null};
+class _Credentials implements SocialContentCredentials {
+  int tokens = 0;
+  void Function()? onToken;
+  final modes = <SocialAppCheckTokenMode>[];
+  @override Future<String> firebaseIdToken() async {tokens++; onToken?.call(); return 'isolated-host-token';}
+  @override Future<String> appCheckToken(SocialAppCheckTokenMode mode) async {modes.add(mode); return 'isolated-host-proof';}
+}
+class _Wire implements SocialContentTransport {
+  _Wire(this.reply);
+  final FutureOr<SocialContentResponse> Function() reply;
+  final bodies = <Map<String, Object?>>[];
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {required Map<String, String> headers,
+      required Map<String, Object?> body}) async {
+    expect(endpoint.toString(), 'https://asia-south1-fixture-project.cloudfunctions.net/moolSocialAssistantContext');
+    bodies.add(body); return await reply();
+  }
+}
+Map<String, Object?> _data() => {
+  'ownerKey': sha256.convert(utf8.encode(jsonEncode(['fixture-project', 'domain-host-a', 'personal', null]))).toString(),
+  'scope': _scope, 'validUntil': '2026-10-28T08:01:00.000Z',
+  'revisions': [{'actionId': 'AI-ACT-001', 'entityId': null, 'sourceRevision': 'catalogue-search:host-source'}],
+};
+SocialContentResponse _ok(Map<String, Object?> data) => SocialContentResponse(
+  statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bool Function()? current}) =>
+  AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
+    credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at);
+void main() {
+  for (final action in assistantDomainProductContextActions) {
+  test('Domain $action metadata must belong to the immutable original selection sent', () async {
+    final id = 'listing-${List.filled(64, 'a').join()}';
+    final selected = <String>[id];
+    final wire = _Wire(() => _ok({..._data(), 'revisions': [
+      {'actionId': action, 'entityId': id, 'sourceRevision': 'catalogue-product:original'},
+    ]}));
+    final value = await _source(wire).read(_context, () => true, catalogueListingIds: selected);
+    selected.clear();
+    expect(value.catalogueListingIds, [id]);
+    expect(value.revisions.keys.single, (action, id));
+    expect((wire.bodies.single['payload'] as Map)['catalogueListingIds'], [id]);
+    await expectLater(_source(wire).read(_context, () => true), throwsA(isA<AssistantModelFailure>()));
+  });
+  }
+  test('Category channel and area read metadata remains personal and has no invented entity', () async {
+    for (final action in ['AI-ACT-002', 'AI-ACT-003', 'AI-ACT-004', 'AI-ACT-005',
+      ...assistantDomainPreferenceContextActions]) {
+      final data = {..._data(), 'revisions': [
+        {'actionId': action, 'entityId': null, 'sourceRevision': 'catalogue-choice:original'},
+      ]};
+      final value = await _source(_Wire(() => _ok(data))).read(_context, () => true);
+      expect(value.revisions.keys.single, (action, null));
+      final invalid = {...data, 'revisions': [
+        {'actionId': action, 'entityId': 'invented-entity', 'sourceRevision': 'catalogue-choice:original'},
+      ]};
+      await expectLater(_source(_Wire(() => _ok(invalid))).read(_context, () => true), throwsA(isA<AssistantModelFailure>()));
+    }
+  });
+  test('Domain gateway exact read-only request returns bound registered revisions with standard proof', () async {
+    final credentials = _Credentials(), wire = _Wire(() => _ok(_data()));
+    final value = await _source(wire, credentials: credentials).read(_context, () => true);
+    expect(value.binding, _context.binding); expect(value.revisions, {('AI-ACT-001', null): 'catalogue-search:host-source'});
+    expect(wire.bodies, [{'operation': 'read', 'payload': {'scope': _scope}}]);
+    expect(credentials.modes, [SocialAppCheckTokenMode.standard]);
+  });
+  test('Domain gateway unsigned or foreign account cannot read source or credentials', () async {
+    final credentials = _Credentials(), wire = _Wire(() => _ok(_data())), source = _source(wire, credentials: credentials);
+    for (final c in [const MoolAssistantContext(accountScope: null, authenticationRevision: null),
+      const MoolAssistantContext(accountScope: 'foreign', authenticationRevision: 1)]) {
+      await expectLater(source.read(c, () => true), throwsA(isA<AssistantModelFailure>()));
+    }
+    expect(credentials.tokens, 0); expect(wire.bodies, isEmpty);
+  });
+  test('Domain gateway retired identity while awaiting credential stops before network', () async {
+    var current = true; final credentials = _Credentials()..onToken = () {current = false;};
+    final wire = _Wire(() => _ok(_data()));
+    await expectLater(_source(wire, credentials: credentials, current: () => current).read(_context, () => current), throwsA(anything));
+    expect(wire.bodies, isEmpty);
+  });
+  test('Domain gateway foreign owner response retires this source and never becomes a grant', () async {
+    final wire = _Wire(() => _ok({..._data(), 'ownerKey': 'another-owner'})), source = _source(wire);
+    await expectLater(source.read(_context, () => true), throwsA(anything));
+    await expectLater(source.read(_context, () => true), throwsA(anything));
+    expect(wire.bodies.length, 1); expect(source.available, false);
+  });
+  test('Domain gateway rejects malformed unknown and duplicate tool metadata', () async {
+    for (final data in [{..._data(), 'toolInstructions': 'run arbitrary code'},
+      {..._data(), 'revisions': [{'actionId': 'AI-ACT-235', 'entityId': null, 'sourceRevision': 'fake'}]},
+      {..._data(), 'revisions': [for (var i = 0; i < 2; i++) {'actionId': 'AI-ACT-001', 'entityId': null, 'sourceRevision': 'same'}]},
+      {..._data(), 'revisions': [{'actionId': 'AI-ACT-001', 'entityId': 'guessed-product', 'sourceRevision': 'same'}]}]) {
+      await expectLater(_source(_Wire(() => _ok(data))).read(_context, () => true), throwsA(anything));
+    }
+  });
+  test('Domain gateway expired or unbounded validity never opens a native action', () async {
+    for (final stamp in ['2026-10-28T07:59:00.000Z', '2026-10-29T08:00:00.000Z', 'not-a-stamp']) {
+      await expectLater(_source(_Wire(() => _ok({..._data(), 'validUntil': stamp}))).read(_context, () => true), throwsA(anything));
+    }
+  });
+  test('Domain gateway temporary access failure can revalidate without private cached metadata', () async {
+    var deny = true; final wire = _Wire(() => deny ? const SocialContentResponse(statusCode: 403, body: '{}') : _ok(_data()));
+    final source = _source(wire); await expectLater(source.read(_context, () => true), throwsA(anything));
+    deny = false; expect((await source.read(_context, () => true)).revisions.length, 1); expect(wire.bodies.length, 2);
+  });
+  test('Domain gateway scope switch while awaiting response retires stale metadata', () async {
+    var current = true; final wire = _Wire(() {current = false; return _ok(_data());});
+    await expectLater(_source(wire).read(_context, () => current), throwsA(anything));
+  });
+  test('Domain gateway cross-Store response cannot bind a personal source', () async {
+    final source = _source(_Wire(() => _ok({..._data(), 'scope': {'audience': 'workspace', 'storeId': 'store-a'}})));
+    await expectLater(source.read(_context, () => true), throwsA(anything)); expect(source.available, false);
+  });
+  test('Domain gateway disposal prevents fresh credential and source reads', () async {
+    final credentials = _Credentials(), wire = _Wire(() => _ok(_data()));
+    final source = _source(wire, credentials: credentials)..dispose();
+    await expectLater(source.read(_context, () => true), throwsA(anything)); expect(credentials.tokens, 0);
+  });
+}
