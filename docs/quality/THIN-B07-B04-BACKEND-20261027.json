@@ -56,7 +56,8 @@
         "apps/mobile/test/assistant_preparation_recovery_test.dart",
         "apps/mobile/test/account_profile_gateway_test.dart",
         "apps/mobile/test/journey_session_test.dart",
-        "apps/mobile/test/mool_assistant_test.dart"
+        "apps/mobile/test/mool_assistant_test.dart",
+        "dataconnect/provider/youtube.gql"
       ],
       "newScreens": [],
       "newRoutes": [],
@@ -189,7 +190,8 @@
       "apps/mobile/test/assistant_preparation_recovery_test.dart",
       "apps/mobile/test/account_profile_gateway_test.dart",
       "apps/mobile/test/journey_session_test.dart",
-      "apps/mobile/test/mool_assistant_test.dart"
+      "apps/mobile/test/mool_assistant_test.dart",
+      "dataconnect/provider/youtube.gql"
     ],
     "acceptedUiCommit": "566c88f6b3698648a6f4facbdc01b86c5ecf42bb",
     "contractSha256": "23B6413B17C57F2E9ABE7E03D16F916C32C27908E65BED900663E02D7F67E382",
@@ -198,6 +200,12 @@
     "deployment": false,
     "backendBranchPush": false,
     "timelineDisclosure": "The historical 4\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u20ac\u0161\u00c2\u00ac\u00c3\u00a2\u00e2\u201a\u00ac\u00c5\u201c19 October delivery window has elapsed; scope stays bounded and robustness is not waived. The zero incremental timeline value is not a claim of on-time MVP delivery.",
-    "sourceSnapshots": []
+    "sourceSnapshots": [],
+    "erasureAmendment": {
+      "acceptance": "docs/quality/THIN-B07-B04-ERASURE-ACCEPTANCE-20261028.json",
+      "runtimeOwner": "dataconnect/provider/youtube.gql",
+      "addendumSha256": "EFAA6776F0B4F928FFE84A9162FCD42161C292432F608A575C382DDFA1034C1A",
+      "additionalMetadataCommits": 1
+    }
   }
 }

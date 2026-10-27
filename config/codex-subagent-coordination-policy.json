@@ -223,8 +223,7 @@
         "backend/functions/src/account/profile_service.test.ts",
         "backend/functions/src/account/profile_service.ts",
         "backend/functions/src/workspace/workspace_profile_service.test.ts",
-        "backend/functions/src/workspace/workspace_profile_service.ts",
-        "dataconnect/provider/youtube.gql"
+        "backend/functions/src/workspace/workspace_profile_service.ts"
       ]
     },
     {
@@ -346,6 +345,7 @@
         "apps/mobile/test/account_profile_gateway_test.dart",
         "apps/mobile/test/journey_session_test.dart",
         "apps/mobile/test/mool_assistant_test.dart",
+        "dataconnect/provider/youtube.gql",
         ".gitattributes",
         "config/codex-subagent-coordination-policy.json",
         "config/cross-agent-incremental-ticket-gate.json",
@@ -354,7 +354,9 @@
         "docs/quality/THIN-B07-B04-CONTRACT-20261027.md",
         "scripts/check-codex-subagent-coordination-policy.ps1",
         "scripts/thin-b07-b04-admission.ps1",
-        "scripts/test-thin-b07-b04-admission.ps1"
+        "scripts/test-thin-b07-b04-admission.ps1",
+        "docs/quality/THIN-B07-B04-ERASURE-ADDENDUM-20261028.md",
+        "docs/quality/THIN-B07-B04-ERASURE-ACCEPTANCE-20261028.json"
       ]
     }
   ],

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "originalFounderAnswer": "Approve exact combined contract and 33-file admission",
+  "standingFounderMessage": "keep this standing authorisation or approval if needed while i am away",
+  "interpretation": "Necessary bounded original-account erasure linkage only; no new business/governance scope.",
+  "runtimeOwner": "dataconnect/provider/youtube.gql",
+  "addendum": "docs/quality/THIN-B07-B04-ERASURE-ADDENDUM-20261028.md",
+  "addendumSha256": "EFAA6776F0B4F928FFE84A9162FCD42161C292432F608A575C382DDFA1034C1A",
+  "metadataOwners": [
+    ".gitattributes",
+    "config/codex-subagent-coordination-policy.json",
+    "docs/quality/THIN-B07-B04-BACKEND-20261027.json",
+    "docs/quality/THIN-B07-B04-ERASURE-ADDENDUM-20261028.md",
+    "docs/quality/THIN-B07-B04-ERASURE-ACCEPTANCE-20261028.json",
+    "scripts/thin-b07-b04-admission.ps1",
+    "scripts/test-thin-b07-b04-admission.ps1"
+  ],
+  "additionalMetadataCommits": 1,
+  "sourceFeatureCommits": false,
+  "push": false,
+  "scopeUnchanged": true
+}
