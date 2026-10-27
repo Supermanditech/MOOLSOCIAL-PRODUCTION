@@ -7,7 +7,7 @@
   "founderDecision": "accepted_for_combined_b07_b04_profile_local_implementation_with_retained_limits",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 1,
+  "localMetadataCommits": 2,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -15,5 +15,10 @@
   "acceptanceMode": "Founder-delegated selection and standing acceptance; Codex selected this exact History-only contract",
   "separateFounderHashReviewClaimed": false,
   "authorityMode": "Founder explicitly activated prepared20 scopes; exact derived implementation contract/admissions under standing authorisation",
-  "standingQualifiedSourceSealsAndNamedBranchPush": true
+  "standingQualifiedSourceSealsAndNamedBranchPush": true,
+  "catalogueSelectorAdmission": {
+    "path": "docs/quality/AI-DOMAIN-CATALOGUE-SELECTOR-20261028.md",
+    "sha256": "925A65AF2FD4AC01837A08EB6493D8DF77EE6637CA4EE0679175BBDFA0376F69",
+    "authority": "Existing20-scope EXECUTE and standing necessary admissions; not separately founder-read hash review"
+  }
 }

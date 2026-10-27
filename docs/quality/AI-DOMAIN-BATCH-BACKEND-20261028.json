@@ -46,7 +46,14 @@
         "apps/mobile/test/assistant_domain_context_integration_test.dart",
         "apps/mobile/test/assistant_profile_context_test.dart",
         "apps/mobile/test/assistant_model_flow_test.dart",
-        "apps/mobile/test/mool_assistant_test.dart"
+        "apps/mobile/test/mool_assistant_test.dart",
+        "backend/functions/src/assistant/model_contract.ts",
+        "backend/functions/src/assistant/model_contract.test.ts",
+        "backend/functions/src/assistant/model_service.ts",
+        "backend/functions/src/assistant/model_service.test.ts",
+        "apps/mobile/lib/features/assistant/model_gateway.dart",
+        "apps/mobile/test/assistant_model_gateway_test.dart",
+        "apps/mobile/lib/features/assistant/mool_assistant.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
@@ -179,7 +186,14 @@
       "apps/mobile/test/assistant_domain_context_integration_test.dart",
       "apps/mobile/test/assistant_profile_context_test.dart",
       "apps/mobile/test/assistant_model_flow_test.dart",
-      "apps/mobile/test/mool_assistant_test.dart"
+      "apps/mobile/test/mool_assistant_test.dart",
+      "backend/functions/src/assistant/model_contract.ts",
+      "backend/functions/src/assistant/model_contract.test.ts",
+      "backend/functions/src/assistant/model_service.ts",
+      "backend/functions/src/assistant/model_service.test.ts",
+      "apps/mobile/lib/features/assistant/model_gateway.dart",
+      "apps/mobile/test/assistant_model_gateway_test.dart",
+      "apps/mobile/lib/features/assistant/mool_assistant.dart"
     ],
     "acceptedUiCommit": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
     "contractSha256": "9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382",
@@ -192,6 +206,11 @@
       "startingCheckpoint": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
       "scopeInventory": "outputs/ai-domain-batch-plan-20261028-v1/INVENTORY.json",
       "runtimeImplementationsAtAdmission": false
+    },
+    "catalogueSelectorAddendum": {
+      "path": "docs/quality/AI-DOMAIN-CATALOGUE-SELECTOR-20261028.md",
+      "sha256": "925A65AF2FD4AC01837A08EB6493D8DF77EE6637CA4EE0679175BBDFA0376F69",
+      "sourceReason": "Original listing identity and selected current records must bind typed native targets and recovery."
     }
   }
 }

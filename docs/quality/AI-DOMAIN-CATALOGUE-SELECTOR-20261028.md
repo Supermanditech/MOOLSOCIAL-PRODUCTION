@@ -1,0 +1,13 @@
+# Scope01 original listing selection and typed target resolution
+
+Same activated20-domain goal, accepted original UI and sealed7ffe45ca baseline. Existing exact owners are extended under founder standing authorisation; no new feature, domain master, governance framework or business rule.
+
+Evidence: the original provider constructs BuyV2Product.id from identity.listingId; BuyV2PublicListingIdentity.matches requires equality. Reuse that original canonical identifier. No alternate product provider or alias system.
+
+A bounded optional catalogueListingIds selection may accompany canonical source read and model preparation. It contains only current original public listing identifiers; it is an untrusted read selector, never a capability, source record or permission. The server registers every tool itself and re-reads each permitted selected original through the existing catalogue service. Actor, paid entitlement, current Workspace and source revisions still apply. No private query/transcript/credentials are added to the client pending journal; existing full request fingerprint binds selectors and status-before-retry remains original.
+
+Registered typed catalogue selector tools may resolve only a listing returned by their captured original source into the exact existing native action/entity/fields and source revision. The tool cannot change its registered action, supply a route or invent native fields. Model selectors are stripped before native prefill. Generic arbitrary JSON or model-authored tools remain forbidden. Static Profile tools keep their existing behaviour.
+
+Expose bounded native-target revision metadata separately from compact model tool descriptors, preventing one model function per SKU. Existing native snapshots are captured before inference and still required for Review. Persisted proposal status must re-read the exact original action/entity and validate its current source revision; do not require plaintext selector storage or reconstruct consent/effects. Explicit restored Review remains fresh and inert until native confirmation.
+
+Keep existing public-source pagination/batch boundaries; do not impose a new business inventory/item limit or invent price/availability/tax results. Missing/stale records remain unavailable. All added protocol/target paths need strict-envelope, wrong-owner/Store, unavailable-source, malformed selector, stale revision, duplicate/recovery, original-service integration, actual native-prefill and OPPO qualification. Cloud/model/API activation and live effects remain excluded. Scope01 is not complete merely because search works.
