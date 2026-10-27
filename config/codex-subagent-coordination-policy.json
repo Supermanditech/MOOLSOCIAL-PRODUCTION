@@ -385,7 +385,13 @@
         "docs/quality/AI-HISTORY-CONTRACT-20261028.md",
         "scripts/check-codex-subagent-coordination-policy.ps1",
         "scripts/ai-history-admission.ps1",
-        "scripts/test-ai-history-admission.ps1"
+        "scripts/test-ai-history-admission.ps1",
+        "docs/quality/AI-HISTORY-SOURCE-SEAL-20261028.json",
+        "scripts/ai-history-source-seal.ps1",
+        "scripts/test-ai-history-source-seal.ps1",
+        "docs/quality/AI-HISTORY-LOCAL-RESULT-20261028.json",
+        "docs/quality/AI-HISTORY-LOCAL-SOURCE-MANIFEST-20261028.json",
+        "docs/quality/AI-HISTORY-LOCAL-REPORT-20261028.md"
       ]
     }
   ],

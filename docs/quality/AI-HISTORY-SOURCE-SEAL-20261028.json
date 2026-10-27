@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "startHead": "9fbf17f91f5df462c9bd7d6347e2a224cf956e7a",
+  "branch": "work/codex-backend/ai-history-20261028",
+  "approval": "Founder authorised Git baseline sealing and standing continuation",
+  "founderMessage": "NOW FOLLOW GIT AND BASELINE THEN GIVE ME 15-20 SCOPES TOGATHER AS A ONE BOUNDED GOAL - OPPO TESTING EACH - AND THEN GIT DISCIPLINE - KEEPING STANDING AUTHORISATION , APPROVAL - WHILE FOUNDER ON SLEEP BUT NO UNNECESSARY SCOPE ALLOWED , NO POLICY OR GOVERNANCE ALLOWED",
+  "acceptedInteractionContractSha256": "39CDABA8770338E6D370C92445A77D8702E0FAABDACEBA9EA51536EC25963965",
+  "sourceOwners": [
+    "backend/functions/src/assistant/history_contract.ts",
+    "backend/functions/src/assistant/history_contract.test.ts",
+    "backend/functions/src/assistant/history_service.ts",
+    "backend/functions/src/assistant/history_service.test.ts",
+    "backend/functions/src/assistant/history_dataconnect_store.ts",
+    "backend/functions/src/assistant/history_dataconnect_store.test.ts",
+    "backend/functions/src/assistant/history_http.ts",
+    "backend/functions/src/assistant/history_http.test.ts",
+    "backend/functions/src/index.ts",
+    "dataconnect/schema/assistant.gql",
+    "dataconnect/provider/youtube.gql",
+    "apps/mobile/lib/features/assistant/history_gateway.dart",
+    "apps/mobile/lib/features/assistant/mool_assistant.dart",
+    "apps/mobile/lib/features/journey01/journey_session.dart",
+    "apps/mobile/lib/features/journey01/review_journey_services.dart",
+    "apps/mobile/lib/app/moolsocial_app.dart",
+    "apps/mobile/lib/ui_v2/assistant/mool_assistant_v2.dart",
+    "apps/mobile/test/assistant_history_gateway_test.dart",
+    "apps/mobile/test/assistant_history_flow_test.dart",
+    "apps/mobile/test/assistant_history_durable_integration_test.dart",
+    "apps/mobile/test/mool_assistant_test.dart"
+  ],
+  "metadataOwners": [
+    "config/codex-subagent-coordination-policy.json",
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "docs/quality/AI-HISTORY-SOURCE-SEAL-20261028.json",
+    "scripts/ai-history-source-seal.ps1",
+    "scripts/test-ai-history-source-seal.ps1"
+  ],
+  "evidenceOwners": [
+    "docs/quality/AI-HISTORY-LOCAL-RESULT-20261028.json",
+    "docs/quality/AI-HISTORY-LOCAL-SOURCE-MANIFEST-20261028.json",
+    "docs/quality/AI-HISTORY-LOCAL-REPORT-20261028.md"
+  ],
+  "files": [
+    {
+      "path": "backend/functions/src/assistant/history_contract.ts",
+      "sha256": "21030EDEA272BE1A890907493415F5CC298AE5C4BEE45D1F26D9196E8A390AE5",
+      "normalizedSha256": "21030EDEA272BE1A890907493415F5CC298AE5C4BEE45D1F26D9196E8A390AE5"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_contract.test.ts",
+      "sha256": "7B4A0670E6ABCEC51ACEC4992C5DDF84B9C64937DCFE85BEA2C883A806F36CEE",
+      "normalizedSha256": "7B4A0670E6ABCEC51ACEC4992C5DDF84B9C64937DCFE85BEA2C883A806F36CEE"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_service.ts",
+      "sha256": "67E332C368B0912C1203BAB35722BCA6D2A73ED285BF52539373585AF5F169F4",
+      "normalizedSha256": "67E332C368B0912C1203BAB35722BCA6D2A73ED285BF52539373585AF5F169F4"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_service.test.ts",
+      "sha256": "9D878F140F0F7DFA60A00CE648685BB6115F88B152BD3677E40E620842C54BD2",
+      "normalizedSha256": "9D878F140F0F7DFA60A00CE648685BB6115F88B152BD3677E40E620842C54BD2"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_dataconnect_store.ts",
+      "sha256": "2557DB59A5DD0970AAA08D1EA016133FBA6EB6547F33917CE065C7C21732D8E5",
+      "normalizedSha256": "2557DB59A5DD0970AAA08D1EA016133FBA6EB6547F33917CE065C7C21732D8E5"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_dataconnect_store.test.ts",
+      "sha256": "C960E24B730DCB8BD3F04E741C4C585AC7B36F56974B28F4994A2BF25BB99F22",
+      "normalizedSha256": "C960E24B730DCB8BD3F04E741C4C585AC7B36F56974B28F4994A2BF25BB99F22"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_http.ts",
+      "sha256": "4F75BA9B5FAF924DD824D20DE7A77A4CD50C210E121F23A884B63FEC2AEB2AA3",
+      "normalizedSha256": "4F75BA9B5FAF924DD824D20DE7A77A4CD50C210E121F23A884B63FEC2AEB2AA3"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_http.test.ts",
+      "sha256": "26EE2C7C6B8B8D05735F89423B8EF5B2598FBFE5097BE9C436E9F38ED4ECBF7A",
+      "normalizedSha256": "26EE2C7C6B8B8D05735F89423B8EF5B2598FBFE5097BE9C436E9F38ED4ECBF7A"
+    },
+    {
+      "path": "backend/functions/src/index.ts",
+      "sha256": "34CF086AD85A4E25C13A8089C6E49F307CDBFBA032A7E0A257AA5B8C910D869C",
+      "normalizedSha256": "08CD09BF466E01F189BB6F3FE8019CE28BE341BBC2760A39A26D9A1A47DA8BF3"
+    },
+    {
+      "path": "dataconnect/schema/assistant.gql",
+      "sha256": "6CF09B176CC21EB1BF7912CDA4B4D792AC9FC22A1DCA91A17CB5F1B64FC1A6FD",
+      "normalizedSha256": "E49355392F53086399C5FAFFBDBF4E037D673B2C35B166226438427F9430601A"
+    },
+    {
+      "path": "dataconnect/provider/youtube.gql",
+      "sha256": "4501D2A0F87AB715DC8C836E3B815A73EEBC64219AC5EDAE3105CB2BCA72C25E",
+      "normalizedSha256": "7C95582B5F8ABD666C995B9FD6DF0F762EECC1D1968DB262DBBA6CD14547775E"
+    },
+    {
+      "path": "apps/mobile/lib/features/assistant/history_gateway.dart",
+      "sha256": "C0B0D78889D92F57882631CCE1A4CFB20568110B8F933992A7F6A97933148F4E",
+      "normalizedSha256": "C0B0D78889D92F57882631CCE1A4CFB20568110B8F933992A7F6A97933148F4E"
+    },
+    {
+      "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+      "sha256": "2F946BAE92D3FA38238AB721E36DE38931529637ACAC50F1599DD574620A657A",
+      "normalizedSha256": "2F946BAE92D3FA38238AB721E36DE38931529637ACAC50F1599DD574620A657A"
+    },
+    {
+      "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+      "sha256": "4809B3CB1D2887D9EF76C20A3865F0492D17E88E2C8D6E311A34203B136D40B8",
+      "normalizedSha256": "4809B3CB1D2887D9EF76C20A3865F0492D17E88E2C8D6E311A34203B136D40B8"
+    },
+    {
+      "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "sha256": "D21494E357F8FA64E2DF2FFF6D06C3276E3E69F537CEC86187E2C96AD64388AC",
+      "normalizedSha256": "D21494E357F8FA64E2DF2FFF6D06C3276E3E69F537CEC86187E2C96AD64388AC"
+    },
+    {
+      "path": "apps/mobile/lib/app/moolsocial_app.dart",
+      "sha256": "5ECFCC94BD4592EA242256AA1686865AFD61B68884C585B978E703CB960A2FA0",
+      "normalizedSha256": "5ECFCC94BD4592EA242256AA1686865AFD61B68884C585B978E703CB960A2FA0"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/assistant/mool_assistant_v2.dart",
+      "sha256": "4C64B7DA116E959F17A71CE799B3DC99732D7C024FD161EF4BCF25D922E69103",
+      "normalizedSha256": "4C64B7DA116E959F17A71CE799B3DC99732D7C024FD161EF4BCF25D922E69103"
+    },
+    {
+      "path": "apps/mobile/test/assistant_history_gateway_test.dart",
+      "sha256": "20EF9AEFA97020FA5E851C7D455529A084B6D6DC1E981651AB40FED86361AFD0",
+      "normalizedSha256": "20EF9AEFA97020FA5E851C7D455529A084B6D6DC1E981651AB40FED86361AFD0"
+    },
+    {
+      "path": "apps/mobile/test/assistant_history_flow_test.dart",
+      "sha256": "C9C1F5B020252A1FF18A6C6561823AD778B8A8A9D3DCB614BCE264FB0BE92CE0",
+      "normalizedSha256": "C9C1F5B020252A1FF18A6C6561823AD778B8A8A9D3DCB614BCE264FB0BE92CE0"
+    },
+    {
+      "path": "apps/mobile/test/assistant_history_durable_integration_test.dart",
+      "sha256": "D619085DA26372177F86432B066365D8C10B090930056EF1688A00273D165A17",
+      "normalizedSha256": "D619085DA26372177F86432B066365D8C10B090930056EF1688A00273D165A17"
+    },
+    {
+      "path": "apps/mobile/test/mool_assistant_test.dart",
+      "sha256": "0A012D2038E5C0C89F39C0429E1375698952827DD0B478DAFEE0A60435180A44",
+      "normalizedSha256": "0A012D2038E5C0C89F39C0429E1375698952827DD0B478DAFEE0A60435180A44"
+    }
+  ],
+  "commitSubjects": [
+    "coordination(ai-history-20261028): admit exact tested source seal",
+    "feat(ai-history-20261028): persist private text History and original save recovery",
+    "evidence(ai-history-20261028): record local History and OPPO qualification limits"
+  ],
+  "remoteRef": "refs/heads/work/codex-backend/ai-history-20261028",
+  "sourceChangesPermitted": false,
+  "productionAcceptance": false,
+  "formalTicketClose": false,
+  "exclusions": [
+    "No main/tag/promotion/history rewriting",
+    "No runtime edits or new features",
+    "No cloud/deployment/live model",
+    "No billing/admin/domain operations",
+    "No APK/publication",
+    "No broader policy or governance development"
+  ]
+}
