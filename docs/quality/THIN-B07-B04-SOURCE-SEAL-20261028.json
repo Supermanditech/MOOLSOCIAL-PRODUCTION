@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "startHead": "379fd7e07a042bd000f2f6260ace249bc6bf17f8",
+  "branch": "work/codex-backend/thin-b07-b04-20261027",
+  "approval": "Founder authorised next required baseline seal and standing continuation",
+  "founderMessage": "1. GO AHEAD WITH NEXT SCOPE WHETHER BASELINE SEAL IF NEEDED OTHERWISE FIND NEXT TWO OR 3 SCOPE OR TICKETS TO CONTINUE WITH ONE BOUNDED GOAL AND USE STANDING AUTHORISATION OR APPROVAL WITHOUT STOP UNTILL NEW GOAL IS OPPO TESTED",
+  "acceptedInteractionContractSha256": "23B6413B17C57F2E9ABE7E03D16F916C32C27908E65BED900663E02D7F67E382",
+  "sourceOwners": [
+    "apps/mobile/lib/features/assistant/model_gateway.dart",
+    "apps/mobile/lib/features/assistant/mool_assistant.dart",
+    "apps/mobile/lib/features/assistant/preparation_pending_store.dart",
+    "apps/mobile/lib/features/assistant/profile_context.dart",
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/features/journey01/account_profile_gateway.dart",
+    "apps/mobile/lib/features/journey01/journey_session.dart",
+    "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "apps/mobile/test/assistant_model_flow_test.dart",
+    "apps/mobile/test/assistant_model_gateway_test.dart",
+    "apps/mobile/test/assistant_preparation_recovery_test.dart",
+    "apps/mobile/test/assistant_profile_context_test.dart",
+    "backend/functions/src/account/profile_http.test.ts",
+    "backend/functions/src/account/profile_http.ts",
+    "backend/functions/src/assistant/model_service.ts",
+    "backend/functions/src/assistant/preparation_dataconnect_store.test.ts",
+    "backend/functions/src/assistant/preparation_dataconnect_store.ts",
+    "backend/functions/src/assistant/profile_execution.test.ts",
+    "backend/functions/src/assistant/profile_execution.ts",
+    "backend/functions/src/assistant/usage_store.test.ts",
+    "backend/functions/src/assistant/usage_store.ts",
+    "backend/functions/src/index.ts",
+    "dataconnect/provider/youtube.gql",
+    "dataconnect/schema/assistant.gql"
+  ],
+  "metadataOwners": [
+    "config/codex-subagent-coordination-policy.json",
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "docs/quality/THIN-B07-B04-SOURCE-SEAL-20261028.json",
+    "scripts/thin-b07-b04-source-seal.ps1",
+    "scripts/test-thin-b07-b04-source-seal.ps1"
+  ],
+  "evidenceOwners": [
+    "docs/quality/THIN-B07-B04-LOCAL-RESULT-20261028.json",
+    "docs/quality/THIN-B07-B04-LOCAL-SOURCE-MANIFEST-20261028.json",
+    "docs/quality/THIN-B07-B04-LOCAL-REPORT-20261028.md"
+  ],
+  "files": [
+    {
+      "path": "apps/mobile/lib/features/assistant/model_gateway.dart",
+      "normalizedSha256": "027F7C84410CA93297344D0DD5070C39F8468D5E36DFB57638A7193447121F71"
+    },
+    {
+      "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+      "normalizedSha256": "09B38F455D006C7D7FBF71FCC761B77EE5E6D4439F21D2004B7F31267D44863E"
+    },
+    {
+      "path": "apps/mobile/lib/features/assistant/preparation_pending_store.dart",
+      "normalizedSha256": "B368F1BB2ADAF527F9240492DD0CFD1FDC17DEF2C89A643B50E3B9FA0680ECB4"
+    },
+    {
+      "path": "apps/mobile/lib/features/assistant/profile_context.dart",
+      "normalizedSha256": "42C3002ECA8480FDAA4BDCFBADBE38219DA205284AC071E9784D6F7B100DDA72"
+    },
+    {
+      "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+      "normalizedSha256": "7447F305311647689F6BC9AE6EAD6C76B8E152A93B78A772840390B1260FF1F3"
+    },
+    {
+      "path": "apps/mobile/lib/features/journey01/account_profile_gateway.dart",
+      "normalizedSha256": "6A0CB83C7C99882C38F3CE095A6BFB99ECDF8C9A957C06D1662719AFB70AE1CA"
+    },
+    {
+      "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+      "normalizedSha256": "03C69D8F4BA8271441FBC7908478932913D0B44C81100D41253EE6CD744128A2"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+      "normalizedSha256": "B7FCB4A09B1F9FE8E288925AEA445768ED0FD00FBFABB4D862ECCB357C66E1ED"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+      "normalizedSha256": "5984A86EB7E34049810079685B6B4E988A4EA7E675A85F400465D970D113E514"
+    },
+    {
+      "path": "apps/mobile/test/assistant_model_flow_test.dart",
+      "normalizedSha256": "8F30FC3B231F0122439E6798C790C26AD07D8BFCF11008884208D5F30E55574D"
+    },
+    {
+      "path": "apps/mobile/test/assistant_model_gateway_test.dart",
+      "normalizedSha256": "1183775075F5CA0965C07C295A6141C4A94FDCD4EAF62BA7E244B835FEB2424B"
+    },
+    {
+      "path": "apps/mobile/test/assistant_preparation_recovery_test.dart",
+      "normalizedSha256": "75468C1BD46CF23C1935C1EFEB74BFE223B0470A3D655B7A0DCAE2F2DCD03006"
+    },
+    {
+      "path": "apps/mobile/test/assistant_profile_context_test.dart",
+      "normalizedSha256": "72EC1B2C8C4968EA64851EA3C512692D3941C7EC232BA6D152F01A1666AEC955"
+    },
+    {
+      "path": "backend/functions/src/account/profile_http.test.ts",
+      "normalizedSha256": "29FFE4E8DBAC5AEBB92E92E130D81471F8B5A7BD99A8B162BBB60D9DE239F2F4"
+    },
+    {
+      "path": "backend/functions/src/account/profile_http.ts",
+      "normalizedSha256": "5DE4AF8D819E6F781A780879A0BDE77AA71678250397344A1D2D5281A7BA4E62"
+    },
+    {
+      "path": "backend/functions/src/assistant/model_service.ts",
+      "normalizedSha256": "1FC59646909391AD332A71DC6CD2C24C60EDA84F496C4848CC237868BB4E290F"
+    },
+    {
+      "path": "backend/functions/src/assistant/preparation_dataconnect_store.test.ts",
+      "normalizedSha256": "5AD8FFBB436382BCF407BC532811DCC864ECD5B99AB3B0AED81B3DD80622B774"
+    },
+    {
+      "path": "backend/functions/src/assistant/preparation_dataconnect_store.ts",
+      "normalizedSha256": "0945E451BC008E0AB70DA33A94C535D0A36E75D30723A2F2452610D8D1B05B06"
+    },
+    {
+      "path": "backend/functions/src/assistant/profile_execution.test.ts",
+      "normalizedSha256": "26D31CAD514D6073C9E4D76E81492D83E258B77B1E6BF391C5D0B5976D7F8BA2"
+    },
+    {
+      "path": "backend/functions/src/assistant/profile_execution.ts",
+      "normalizedSha256": "5B831D21BA36277F2CC4E78A1EF519453E091DA68105F1CB5871FAC37A1FF90D"
+    },
+    {
+      "path": "backend/functions/src/assistant/usage_store.test.ts",
+      "normalizedSha256": "D2AE92A48E70F857D75AA3BAFEBF66991FFB404CD8FEDBF3067272B0BD5FACDF"
+    },
+    {
+      "path": "backend/functions/src/assistant/usage_store.ts",
+      "normalizedSha256": "3536C3287F75DD72E462492507597609C0514E2F6A1C9DA97BB08EF29D92004B"
+    },
+    {
+      "path": "backend/functions/src/index.ts",
+      "normalizedSha256": "D507E556E32151A8F399A5E85791DEAC2608D67A1CC9C389214465964EE894A9"
+    },
+    {
+      "path": "dataconnect/provider/youtube.gql",
+      "normalizedSha256": "4F0DDF8EC92FFB14F3A1C4F78A54BD0139A0B78D52E10377549D418AABFF1328"
+    },
+    {
+      "path": "dataconnect/schema/assistant.gql",
+      "normalizedSha256": "936E2756B2E53893B5D1EE34E558AB1A374DA7F1D36D2FBE12184555300131E2"
+    }
+  ],
+  "commitSubjects": [
+    "coordination(thin-b07-b04-20261027): admit exact tested source seal",
+    "feat(thin-b07-b04-20261027): persist AI recovery and confirmed Profile handoff",
+    "evidence(thin-b07-b04-20261027): record local recovery and OPPO qualification limits"
+  ],
+  "remoteRef": "refs/heads/work/codex-backend/thin-b07-b04-20261027",
+  "sourceChangesPermitted": false,
+  "productionAcceptance": false,
+  "formalTicketClose": false,
+  "exclusions": [
+    "runtime feature edits",
+    "cloud/model/billing activation",
+    "deployment",
+    "APK",
+    "live commerce/financial effects",
+    "main/tag changes",
+    "unrelated branch push"
+  ]
+}

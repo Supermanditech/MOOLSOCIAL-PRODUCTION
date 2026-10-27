@@ -8889,6 +8889,7 @@ function Invoke-Lf01Admission {
 if ($ProductionTicketId -ceq 'THIN-B07-B04-PROFILE' -or $ProductionWorkId -ceq 'thin-b07-b04-20261027' -or
     $root.Replace('\','/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-thin-b07-b04-20261027') {
   . (Join-Path $root 'scripts/thin-b07-b04-admission.ps1')
+  if(Test-Path -LiteralPath (Join-Path $root 'docs/quality/THIN-B07-B04-SOURCE-SEAL-20261028.json')) { . (Join-Path $root 'scripts/thin-b07-b04-source-seal.ps1'); Invoke-ThinB07B04SourceSeal; return }
   Invoke-ThinB07B04Admission
   return
 }

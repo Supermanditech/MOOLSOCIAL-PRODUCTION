@@ -356,7 +356,13 @@
         "scripts/thin-b07-b04-admission.ps1",
         "scripts/test-thin-b07-b04-admission.ps1",
         "docs/quality/THIN-B07-B04-ERASURE-ADDENDUM-20261028.md",
-        "docs/quality/THIN-B07-B04-ERASURE-ACCEPTANCE-20261028.json"
+        "docs/quality/THIN-B07-B04-ERASURE-ACCEPTANCE-20261028.json",
+        "docs/quality/THIN-B07-B04-SOURCE-SEAL-20261028.json",
+        "scripts/thin-b07-b04-source-seal.ps1",
+        "scripts/test-thin-b07-b04-source-seal.ps1",
+        "docs/quality/THIN-B07-B04-LOCAL-RESULT-20261028.json",
+        "docs/quality/THIN-B07-B04-LOCAL-SOURCE-MANIFEST-20261028.json",
+        "docs/quality/THIN-B07-B04-LOCAL-REPORT-20261028.md"
       ]
     }
   ],
