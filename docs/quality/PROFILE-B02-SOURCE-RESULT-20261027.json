@@ -1,0 +1,215 @@
+{
+  "ticket": "PROFILE-B02",
+  "disposition": "actionable local implementation and bounded qualification complete; cloud/authentic billing/device qualification deferred",
+  "tests": {
+    "mobileBounded": {
+      "passed": 704,
+      "skipped": 5,
+      "excludedInheritedCase": "AI-VISUAL-03 Workspace approval reads existing reviewed owner state"
+    },
+    "backend": {
+      "passed": 152
+    },
+    "admission": {
+      "passed": 47
+    },
+    "localMobileHttpDurableSql": {
+      "passed": 2
+    },
+    "independentDurableRestart": {
+      "passed": 1
+    },
+    "hostRenderedStates": {
+      "passed": 1,
+      "scenes": 4
+    },
+    "devicePrerequisitePublicStoreParity": {
+      "passed": 22
+    },
+    "analysis": {
+      "errors": 0,
+      "warnings": 0,
+      "infos": 28
+    }
+  },
+  "device": {
+    "currentSourceOwnersVerified": 8,
+    "protectedFingerprints": 108,
+    "changedFingerprints": 0,
+    "reachable": "signed-out Buy > Profile > Plans & billing > original Security sign-in guard",
+    "populatedPaidPlansVerified": false,
+    "fakeRuntimeDataInjected": false,
+    "ownedDebuggerDetached": true
+  },
+  "deferred": [
+    "Founder commercial catalogue: detailed Personal/Workspace free feature lists, paid prices, benefits, limits and assigned versions",
+    "Google SQL Connect compiler/schema/real SDK provisioning/AppCheck/deployment qualification",
+    "Canonical B03 current Workspace authority source connection and authentic approved memberships",
+    "Billing provider, subscription issuance/lifecycle authority, Upgrade/Manage receiving contracts",
+    "Authentic signed-in Personal/Store and paid OPPO end-to-end qualification",
+    "Existing baseline qualification holds: all 37 observed broader-suite failures reproduce at sealed baseline; no blanket full-app green claim",
+    "APK/native multi-device/accessibility and release qualification; model service and paid quota enforcement remain outside this read-only ticket"
+  ],
+  "forbiddenActionsPerformed": [],
+  "sourceCommit": "ef9d0c2335a3eac2768b55583cc0ed81be10396e",
+  "sourceBaseline": "955f793dcfc593b603797d9e960925f774a6c2c2",
+  "sourceSealAdmission": "80ad376b",
+  "implementationMetadataHead": "f46d6a1300ec26f021248499e86e1ad9d9e74c8c",
+  "productionAcceptance": false,
+  "formalTicketClose": false,
+  "founderSourceSealingApproval": "approved",
+  "remoteBranch": "refs/heads/work/codex-backend/profile-b02-20261027",
+  "remoteVerification": "To be independently read back after this evidence commit is pushed; recorded separately in local sealing receipt.",
+  "evidenceHashes": [
+    {
+      "artifact": "mobile-bounded-regressions-placement-final.log",
+      "bytes": 157450,
+      "sha256": "F5C4643E88BE4A12682A99A406618447886502243A75E78216C8055DE60977C9"
+    },
+    {
+      "artifact": "backend-placement-all-tests.log",
+      "bytes": 17081,
+      "sha256": "6A78F778158728305CB595AC183EEB587EB9929CAA61516B6C4FC28F770276B2"
+    },
+    {
+      "artifact": "local-mobile-server-parity-final.log",
+      "bytes": 382,
+      "sha256": "BC8C0B9D07126DD8191C9E8F9B6488D0CA82F6CF963965F811332EC10ECDA423"
+    },
+    {
+      "artifact": "local-durable-restart-final.log",
+      "bytes": 255,
+      "sha256": "C0A029B3343328325038FA6681E1F99265466CA8AC604133A5CBDEBC69AFBE29"
+    },
+    {
+      "artifact": "analysis-placement-final.log",
+      "bytes": 5711,
+      "sha256": "CAD1FD2AE2EEE14884D5476A4AB74C4DA2DAA8F26D9A500716017D8DF0EA11F7"
+    },
+    {
+      "artifact": "BASELINE-REGRESSION-COMPARISON.json",
+      "bytes": 13385,
+      "sha256": "79152B2C82BD11226CB23A539FB76F5E08E068FE6A0AAC366CEBEC2FFEAE1700"
+    },
+    {
+      "artifact": "DEFECTS.md",
+      "bytes": 7673,
+      "sha256": "A9B4D843DC08AEFDC66FB70EDDAD4520799EB428EC9EDE93BEA241B73FCFC737"
+    },
+    {
+      "artifact": "host-render-checks-v3.log",
+      "bytes": 209,
+      "sha256": "329FEDA8AD8422D6B3FBC3BD0635F958C20568257D89974350100E384325C749"
+    },
+    {
+      "artifact": "oppo-source-v1/VM-SOURCE-VERIFICATION.json",
+      "bytes": 2235,
+      "sha256": "D96CAEDA7CFCAB593152D7FAC09DDF7599A6E1A63EF2455D363400F324AE2265"
+    },
+    {
+      "artifact": "oppo-source-v1/SAVED-DATA-COMPARISON.json",
+      "bytes": 103,
+      "sha256": "9CBCBA4D71BEE50D9E5E5DB83F72D689953EF9F72D63C6903E1FAD704B8C4EC6"
+    },
+    {
+      "artifact": "oppo-source-v1/oppo-restart-gate.log",
+      "bytes": 502,
+      "sha256": "A4925EC9BC2569E8CD9A3A0B3CFD606AB1213641441ED03D7B56BA52B0F7C19D"
+    },
+    {
+      "artifact": "FREE-ACCESS-CONTENT-AMENDMENT.md",
+      "bytes": 909,
+      "sha256": "3E80AE0B2465DE618BDA9E7F43719B742A2A2868BDF2EE305DCF6627D996A4F2"
+    }
+  ],
+  "runtimeSourceManifest": [
+    {
+      "path": "apps/mobile/lib/features/journey01/account_plans_gateway.dart",
+      "sha256Lf": "DB16B3C0469509518E911E59995C7409E1DF0A0F0559E83E39AFD6C43A67C45B"
+    },
+    {
+      "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+      "sha256Lf": "D60A4BE11EF5C5406357C418886B905633373FA33408BB317648B2A0F6D7070C"
+    },
+    {
+      "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "sha256Lf": "BAA0ACC92CE430282568A68C4BAC2DE024050810242A453B4139144B61341042"
+    },
+    {
+      "path": "apps/mobile/lib/features/journey01/journey_router.dart",
+      "sha256Lf": "D303F3A12DD0F133FA977D9F28723FB957CF91339C2FE72A152EE1F03482B989"
+    },
+    {
+      "path": "apps/mobile/lib/app/moolsocial_app.dart",
+      "sha256Lf": "B82B954F12F3BD46B4D0711037EC910D0B30342B3D583628905439FB5CF7F1C5"
+    },
+    {
+      "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+      "sha256Lf": "92BDCF0A9645266726D589E407D7CA2460B61828110220B12035ED19F27E049E"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/profile/global_account_plans_v2.dart",
+      "sha256Lf": "BB17E83F044738C20AB46D209E5B9F67111B88E39B6B387C47EF4F28EC452EC8"
+    },
+    {
+      "path": "apps/mobile/test/account_plans_gateway_test.dart",
+      "sha256Lf": "7C15F1C05E291FE7B706A1CD35A258457DF47B78DCD2E0E6F9666F5CCD512F4B"
+    },
+    {
+      "path": "apps/mobile/test/account_plans_flow_test.dart",
+      "sha256Lf": "0D638FA29945FD72AFBE244C87D6F0D281751EAD9715C508CE3D0EBA819912E7"
+    },
+    {
+      "path": "apps/mobile/test/journey_session_test.dart",
+      "sha256Lf": "52E86361026900EA64AAB39FE3081A4B9ADD5F580593559C64B1B76CC50B97C9"
+    },
+    {
+      "path": "apps/mobile/test/mool_assistant_test.dart",
+      "sha256Lf": "0474EF44AD99EA6EEA26FBB6EF544088CA49FC5A48E973CD12119018221821A3"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/profile/global_account_plans_v2_test.dart",
+      "sha256Lf": "5951DB49C19E9E9BF47366C1CE770C96E14B6846452C2E533EA0D396AEAF62AE"
+    },
+    {
+      "path": "backend/functions/src/index.ts",
+      "sha256Lf": "E3C7CB2F074A4A493F1DED6CF5A1E8C31F8F44D95AA14CBD1CA629B4ACE78D8A"
+    },
+    {
+      "path": "backend/functions/src/account/plans_service.ts",
+      "sha256Lf": "4AE3987B2C213BFDCB50506E3C5E61AF68E30DC2F33F29D5888C9C65A8FB69CF"
+    },
+    {
+      "path": "backend/functions/src/account/plans_service.test.ts",
+      "sha256Lf": "E1FE00E3F773C3F9F85628BDE998E8B8CDDE77C5550067F2D2BF770B61A42F9B"
+    },
+    {
+      "path": "backend/functions/src/account/plans_http.ts",
+      "sha256Lf": "E871D74AC38C99B96719DF4ABCD0D50AB0908D444FC45DDFAEC4DCF81CC4D817"
+    },
+    {
+      "path": "backend/functions/src/account/plans_http.test.ts",
+      "sha256Lf": "A74AADD6507070C27DE5E4EB7A30703A2D008368F982DEFB1F6363FD8A89C736"
+    },
+    {
+      "path": "backend/functions/src/account/plans_dataconnect_store.ts",
+      "sha256Lf": "0E8BD661870330506029BB255593C39C9886E7841E12E9CDB648386D5419CECC"
+    },
+    {
+      "path": "backend/functions/src/account/plans_dataconnect_store.test.ts",
+      "sha256Lf": "305C05F2B586D1495C477B42A0DFD6DBB5A7CB1FBD5C043BEE1282067D02FF62"
+    },
+    {
+      "path": "dataconnect/schema/universal.gql",
+      "sha256Lf": "C0155DC751DE7D09BE6C580167DEA88206D009E3C60B089ECE2DED3C99BE8D35"
+    },
+    {
+      "path": "dataconnect/mobile/universal.gql",
+      "sha256Lf": "36946A3F1D897F860870F7F5A430258C0EFCA08A99CABCDF7A7901B465596E14"
+    },
+    {
+      "path": "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+      "sha256Lf": "7A54D2539710C08415BC65FE0AD42D64E45EC56BC7590CBC060A090BB43957EF"
+    }
+  ]
+}
