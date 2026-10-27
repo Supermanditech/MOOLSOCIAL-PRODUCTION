@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "startHead": "c2a225c5463df4f71ed2ac905a0cb47ef4cf4611",
+  "branch": "work/codex-backend/ai-b01-20261027",
+  "root": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-b01-20261027",
+  "approval": "Approve exact source checkpoint and branch push",
+  "planSha256": "13022ae2bf6aa2fe585d3601dfbfb2aa65cf3c79f1b25613babab57425a218f5",
+  "metadataOwners": [
+    "config/codex-subagent-coordination-policy.json",
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "docs/quality/AI-B01-SOURCE-SEAL-20261027.json",
+    "scripts/ai-b01-source-seal.ps1",
+    "scripts/test-ai-b01-source-seal.ps1"
+  ],
+  "sourceOwners": [
+    "apps/mobile/lib/app/moolsocial_app.dart",
+    "apps/mobile/lib/features/assistant/mool_assistant.dart",
+    "apps/mobile/lib/features/journey01/journey_session.dart",
+    "apps/mobile/lib/features/journey01/review_journey_services.dart",
+    "apps/mobile/lib/ui_v2/assistant/mool_assistant_v2.dart",
+    "backend/functions/src/index.ts",
+    "apps/mobile/lib/features/assistant/model_gateway.dart",
+    "apps/mobile/test/assistant_model_flow_test.dart",
+    "apps/mobile/test/assistant_model_gateway_test.dart",
+    "backend/functions/src/assistant/model_contract.test.ts",
+    "backend/functions/src/assistant/model_contract.ts",
+    "backend/functions/src/assistant/model_http.test.ts",
+    "backend/functions/src/assistant/model_http.ts",
+    "backend/functions/src/assistant/model_service.test.ts",
+    "backend/functions/src/assistant/model_service.ts",
+    "backend/functions/src/assistant/responses_transport.test.ts",
+    "backend/functions/src/assistant/responses_transport.ts"
+  ],
+  "evidenceOwners": [
+    "docs/quality/AI-B01-LOCAL-RESULT-20261027.json",
+    "docs/quality/AI-B01-LOCAL-SOURCE-MANIFEST-20261027.json",
+    "docs/quality/AI-B01-LOCAL-REPORT-20261027.md"
+  ],
+  "files": [
+    {
+      "path": "apps/mobile/lib/app/moolsocial_app.dart",
+      "bytes": 22906,
+      "sha256": "eeff80f2bc63c1589a1dc243a7df61f0772ea58bb1542ef4ada00d0f56a5cd91",
+      "normalizedSha256": "5780f571c728a6123d79750cb3a8d7e4374fa5ae583ba3a7787e7165084025df"
+    },
+    {
+      "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+      "bytes": 98434,
+      "sha256": "95670048deea7d3650c8c8f9df11d33802d7c87bbd3a74dfda590982a079adcd",
+      "normalizedSha256": "9edb446041e0877afd094a54e9ba9b71324901da791c22e9edbe3631d71901a6"
+    },
+    {
+      "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+      "bytes": 90736,
+      "sha256": "ffa4c86363bd09b9a6edd40cbee5347c50b13b984e6f3abf025b70249bffdc97",
+      "normalizedSha256": "8b47d7ac8e3f9c2d93ee0910cf4a0f5f54f2afedc1f0e3150521386d5fe3bb95"
+    },
+    {
+      "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "bytes": 80056,
+      "sha256": "9b1e69c25d24ad13fa5b1267253cb3fb1bc1929eefec948d4bc73c6797517dd7",
+      "normalizedSha256": "dda000bbd6fae0729e8ccb865c06d495dfea5f54e2591ce95f8ce2049300b5d4"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/assistant/mool_assistant_v2.dart",
+      "bytes": 106476,
+      "sha256": "eff9ca23d2f6c800734e502280a0430b95f2b75a7d73cace9d53e88257694a16",
+      "normalizedSha256": "2f8f42a8d548cf24ffde4d6e864fbeb82a58140018b5c482ade49d66c8d90ab5"
+    },
+    {
+      "path": "backend/functions/src/index.ts",
+      "bytes": 141931,
+      "sha256": "76a3f08bb8bc7bf179a5daff2c02d69d4c00444c3227fbd7b57aced7e86f8394",
+      "normalizedSha256": "d89d34a026965b45ed69160c007b49a2aee99cf67056159c624c1517341774cc"
+    },
+    {
+      "path": "apps/mobile/lib/features/assistant/model_gateway.dart",
+      "bytes": 11422,
+      "sha256": "f350344f1f8a4c2e0d12fc29086e089ad33db65b010fea5b2908726b63502ea9",
+      "normalizedSha256": "d62c0dbf328bfee8f1ae9126b650e06d2e77e24e6bec84250e5b84c391e9c84f"
+    },
+    {
+      "path": "apps/mobile/test/assistant_model_flow_test.dart",
+      "bytes": 19978,
+      "sha256": "e293959999c20cc6b4a821e2fcaf524757047e1a4fa8a22a6deee8e9903f065b",
+      "normalizedSha256": "dd1cc73b33d1b7ef504963681e7408dc3bf264713ce72efe6e9d7577a5d021cc"
+    },
+    {
+      "path": "apps/mobile/test/assistant_model_gateway_test.dart",
+      "bytes": 9973,
+      "sha256": "8d9b51e8e148e3588671ab73fee8c12e6631c6cce20021167e68692b7bed71db",
+      "normalizedSha256": "cb5709502119e80954c3f50dec94f9027a04039fd28b5aea718faa5269f2ddde"
+    },
+    {
+      "path": "backend/functions/src/assistant/model_contract.test.ts",
+      "bytes": 2566,
+      "sha256": "5f035aa5ea02920fb063f686f111b2bb7d6434d20be7a4612049dda654699146",
+      "normalizedSha256": "9bf1624cd887f7f75bc38dc238fbdd009c34e3ac450fabf16252304dfec83f65"
+    },
+    {
+      "path": "backend/functions/src/assistant/model_contract.ts",
+      "bytes": 6351,
+      "sha256": "351bc0169d82e8363423bb62b2bb6e51294ab5a80ea7fb8c3a72323690b282a7",
+      "normalizedSha256": "20cd40c4c2941c191acf5b416dd3f5fdd352884ba180613e693b82af125178c8"
+    },
+    {
+      "path": "backend/functions/src/assistant/model_http.test.ts",
+      "bytes": 3109,
+      "sha256": "810a71abb720dbb9dd95b786306b4ddd488ed4100441bd172b9a2cd20ba68de9",
+      "normalizedSha256": "fcf5971d42bfc0a7670a8897e281282f3b4bea33a9fdcaf72d23144670a88d28"
+    },
+    {
+      "path": "backend/functions/src/assistant/model_http.ts",
+      "bytes": 2407,
+      "sha256": "57c044bd39222054420560af20d894080786cf3ef19cf8372b5cec0b96f62538",
+      "normalizedSha256": "57c044bd39222054420560af20d894080786cf3ef19cf8372b5cec0b96f62538"
+    },
+    {
+      "path": "backend/functions/src/assistant/model_service.test.ts",
+      "bytes": 14957,
+      "sha256": "668f37d7c0b65a8ab996db1d057de73d6627e00931376753aa59ea9476a92b5b",
+      "normalizedSha256": "8b312c30eb3c4ba23b358acc8d1a1a131517c250d6b912e41fab914bbebbcfd1"
+    },
+    {
+      "path": "backend/functions/src/assistant/model_service.ts",
+      "bytes": 11451,
+      "sha256": "67784621304f71508dfffddddbe0b80585a249323fc4a878aeb9d462b89c42b7",
+      "normalizedSha256": "51f4866c51db618bda8c069eb73221dd5b167ea0b3ad50851d5cc250d60edb16"
+    },
+    {
+      "path": "backend/functions/src/assistant/responses_transport.test.ts",
+      "bytes": 5338,
+      "sha256": "b1767c9309606b02ce2c1e4a98aad0f7b7dba453912f78c9cdc0c4ea8817f069",
+      "normalizedSha256": "c4081059ceb7abc7e4ff65e8c6d65375e6a5e7e2d388ac05f08f7dc3bc10acaa"
+    },
+    {
+      "path": "backend/functions/src/assistant/responses_transport.ts",
+      "bytes": 4351,
+      "sha256": "956d44c06f10af21066eea02c906d4140e8b30a0a9cc3c2a7f2a35a22912df7f",
+      "normalizedSha256": "f1be0524f364d8e18c272d18103d648ca17ead47526fd6b1063620b90ddf87d5"
+    }
+  ],
+  "formalTicketClose": false,
+  "productionAcceptance": false,
+  "remoteRef": "refs/heads/work/codex-backend/ai-b01-20261027",
+  "commitSubjects": [
+    "coordination(ai-b01-20261027): admit exact source checkpoint",
+    "codex-backend(ai-b01-20261027): connect typed AI preparation",
+    "evidence(ai-b01-20261027): record local verification and limits"
+  ]
+}

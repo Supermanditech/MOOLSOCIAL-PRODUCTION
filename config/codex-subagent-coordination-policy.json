@@ -301,7 +301,13 @@
         "apps/mobile/lib/ui_v2/assistant/mool_assistant_v2.dart",
         "apps/mobile/test/assistant_model_gateway_test.dart",
         "apps/mobile/test/assistant_model_flow_test.dart",
-        "apps/mobile/test/mool_assistant_test.dart"
+        "apps/mobile/test/mool_assistant_test.dart",
+        "docs/quality/AI-B01-SOURCE-SEAL-20261027.json",
+        "scripts/ai-b01-source-seal.ps1",
+        "scripts/test-ai-b01-source-seal.ps1",
+        "docs/quality/AI-B01-LOCAL-RESULT-20261027.json",
+        "docs/quality/AI-B01-LOCAL-SOURCE-MANIFEST-20261027.json",
+        "docs/quality/AI-B01-LOCAL-REPORT-20261027.md"
       ]
     }
   ],

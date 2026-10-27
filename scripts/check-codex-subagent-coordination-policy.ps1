@@ -8889,6 +8889,7 @@ function Invoke-Lf01Admission {
 if ($ProductionTicketId -ceq 'AI-B01' -or $ProductionWorkId -ceq 'ai-b01-20261027' -or
     $root.Replace('\','/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-b01-20261027') {
   . (Join-Path $root 'scripts/ai-b01-admission.ps1')
+  if(Test-Path -LiteralPath (Join-Path $root 'docs/quality/AI-B01-SOURCE-SEAL-20261027.json')) { . (Join-Path $root 'scripts/ai-b01-source-seal.ps1'); Invoke-AiB01SourceSeal; return }
   Invoke-AiB01Admission
   return
 }
