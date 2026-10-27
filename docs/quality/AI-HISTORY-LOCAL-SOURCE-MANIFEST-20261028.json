@@ -1,0 +1,90 @@
+{
+  "sourceCommit": "7180bb25a9cc93ca3b1a5ba063bccbef3db68dd4",
+  "sourceOwnerCount": 21,
+  "files": [
+    {
+      "path": "backend/functions/src/assistant/history_contract.ts",
+      "normalizedSha256": "21030EDEA272BE1A890907493415F5CC298AE5C4BEE45D1F26D9196E8A390AE5"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_contract.test.ts",
+      "normalizedSha256": "7B4A0670E6ABCEC51ACEC4992C5DDF84B9C64937DCFE85BEA2C883A806F36CEE"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_service.ts",
+      "normalizedSha256": "67E332C368B0912C1203BAB35722BCA6D2A73ED285BF52539373585AF5F169F4"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_service.test.ts",
+      "normalizedSha256": "9D878F140F0F7DFA60A00CE648685BB6115F88B152BD3677E40E620842C54BD2"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_dataconnect_store.ts",
+      "normalizedSha256": "2557DB59A5DD0970AAA08D1EA016133FBA6EB6547F33917CE065C7C21732D8E5"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_dataconnect_store.test.ts",
+      "normalizedSha256": "C960E24B730DCB8BD3F04E741C4C585AC7B36F56974B28F4994A2BF25BB99F22"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_http.ts",
+      "normalizedSha256": "4F75BA9B5FAF924DD824D20DE7A77A4CD50C210E121F23A884B63FEC2AEB2AA3"
+    },
+    {
+      "path": "backend/functions/src/assistant/history_http.test.ts",
+      "normalizedSha256": "26EE2C7C6B8B8D05735F89423B8EF5B2598FBFE5097BE9C436E9F38ED4ECBF7A"
+    },
+    {
+      "path": "backend/functions/src/index.ts",
+      "normalizedSha256": "08CD09BF466E01F189BB6F3FE8019CE28BE341BBC2760A39A26D9A1A47DA8BF3"
+    },
+    {
+      "path": "dataconnect/schema/assistant.gql",
+      "normalizedSha256": "E49355392F53086399C5FAFFBDBF4E037D673B2C35B166226438427F9430601A"
+    },
+    {
+      "path": "dataconnect/provider/youtube.gql",
+      "normalizedSha256": "7C95582B5F8ABD666C995B9FD6DF0F762EECC1D1968DB262DBBA6CD14547775E"
+    },
+    {
+      "path": "apps/mobile/lib/features/assistant/history_gateway.dart",
+      "normalizedSha256": "C0B0D78889D92F57882631CCE1A4CFB20568110B8F933992A7F6A97933148F4E"
+    },
+    {
+      "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+      "normalizedSha256": "2F946BAE92D3FA38238AB721E36DE38931529637ACAC50F1599DD574620A657A"
+    },
+    {
+      "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+      "normalizedSha256": "4809B3CB1D2887D9EF76C20A3865F0492D17E88E2C8D6E311A34203B136D40B8"
+    },
+    {
+      "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "normalizedSha256": "D21494E357F8FA64E2DF2FFF6D06C3276E3E69F537CEC86187E2C96AD64388AC"
+    },
+    {
+      "path": "apps/mobile/lib/app/moolsocial_app.dart",
+      "normalizedSha256": "5ECFCC94BD4592EA242256AA1686865AFD61B68884C585B978E703CB960A2FA0"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/assistant/mool_assistant_v2.dart",
+      "normalizedSha256": "4C64B7DA116E959F17A71CE799B3DC99732D7C024FD161EF4BCF25D922E69103"
+    },
+    {
+      "path": "apps/mobile/test/assistant_history_gateway_test.dart",
+      "normalizedSha256": "20EF9AEFA97020FA5E851C7D455529A084B6D6DC1E981651AB40FED86361AFD0"
+    },
+    {
+      "path": "apps/mobile/test/assistant_history_flow_test.dart",
+      "normalizedSha256": "C9C1F5B020252A1FF18A6C6561823AD778B8A8A9D3DCB614BCE264FB0BE92CE0"
+    },
+    {
+      "path": "apps/mobile/test/assistant_history_durable_integration_test.dart",
+      "normalizedSha256": "D619085DA26372177F86432B066365D8C10B090930056EF1688A00273D165A17"
+    },
+    {
+      "path": "apps/mobile/test/mool_assistant_test.dart",
+      "normalizedSha256": "0A012D2038E5C0C89F39C0429E1375698952827DD0B478DAFEE0A60435180A44"
+    }
+  ]
+}

@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "7180bb25a9cc93ca3b1a5ba063bccbef3db68dd4",
+  "sourceOwnerCount": 21,
+  "sourceManifestSha256": "10ED50786C724F64E3971667B9D6E91342F313FAAFC87D9EC05A892DF096FE4F",
+  "productionAcceptance": false,
+  "formalTicketClose": false,
+  "founderScreenApproval": false,
+  "runtimeEditsDuringSealing": false,
+  "scope": [
+    "THIN-B07/BE-07 durable private text History slice",
+    "THIN-F02 existing History gateway/UI connection"
+  ],
+  "localChecks": {
+    "backend": 210,
+    "mobile": 777,
+    "mobileConditionalSkips": 21,
+    "actualHttpSqlController": 6,
+    "independentProcessRecovery": 2,
+    "admission": 27,
+    "mandatoryDeviceParity": 22,
+    "analysisErrors": 0,
+    "analysisWarnings": 0,
+    "analysisInfos": 56
+  },
+  "oppo": {
+    "currentSourceRestart": true,
+    "vmOwnersMatched": 10,
+    "protectedHashesBefore": 108,
+    "protectedHashesFinal": 108,
+    "allProtectedDataUnchanged": true,
+    "runtimeExceptionMarkers": 0,
+    "layoutInspected": [
+      "AI composer unavailable",
+      "full-screen History unavailable/search unavailable",
+      "Tasks list",
+      "selected task draft",
+      "keyboard clearance",
+      "New chat unavailable retains draft",
+      "History return retains draft",
+      "Close keep-editing",
+      "Android Back guard",
+      "discard own unsaved probe and original return",
+      "final clean Mool AI"
+    ],
+    "newBlockingVisualDefects": 0,
+    "populatedAuthenticatedHistoryQualified": false,
+    "debuggerDetached": true,
+    "finalScreen": "Mool AI"
+  },
+  "requirements": [
+    {
+      "id": "H1",
+      "requirement": "Durable private text contracts/read/save/status and strict inert role payloads",
+      "verdict": "locally_qualified",
+      "evidence": [
+        "backend-final-regression-v3.log",
+        "TESTED-SOURCE-MANIFEST.json"
+      ]
+    },
+    {
+      "id": "H2",
+      "requirement": "Original current account/Plans/approved Workspace permissions, scope isolation and revocation",
+      "verdict": "locally_qualified; authentic cloud readback deferred",
+      "evidence": [
+        "backend-final-regression-v3.log",
+        "mobile-history-http-current.log"
+      ]
+    },
+    {
+      "id": "H3",
+      "requirement": "Exact Unicode/messages/draft/language, bounds and rejected media preserves input",
+      "verdict": "locally_qualified",
+      "evidence": [
+        "backend-final-regression-v3.log",
+        "mobile-final-regression.log"
+      ]
+    },
+    {
+      "id": "H4",
+      "requirement": "Original identity, expected revisions, conflict/late-save/duplicate and lost-ack recovery",
+      "verdict": "locally_qualified",
+      "evidence": [
+        "backend-final-regression-v3.log",
+        "mobile-history-http-current.log",
+        "PROCESS-RECOVERY-RESULTS.json"
+      ]
+    },
+    {
+      "id": "H5",
+      "requirement": "Owner-bound metadata-only journal and independent process recovery without effects/consents",
+      "verdict": "locally_qualified",
+      "evidence": [
+        "mobile-history-process-prepare.log",
+        "mobile-history-process-recover.log",
+        "PROCESS-RECOVERY-RESULTS.json"
+      ]
+    },
+    {
+      "id": "H6",
+      "requirement": "Original account-erasure linkage, rollback and active account lock ordering",
+      "verdict": "local_SQL_and_compiler_qualified; deployed independent workers deferred",
+      "evidence": [
+        "backend-final-regression-v3.log",
+        "SCHEMA-COMPILER-RESULTS.json",
+        "LOCKING-ERASURE-REVIEW.md"
+      ]
+    },
+    {
+      "id": "H7",
+      "requirement": "Existing app History/New chat/resume wiring, unchanged compact UI and exact reachable OPPO source",
+      "verdict": "host_and_reachable_OPPO_qualified; populated authenticated device History deferred",
+      "evidence": [
+        "mobile-final-regression.log",
+        "oppo-source-v1/VM-SOURCE-VERIFICATION.json",
+        "oppo-source-v1/14-keyboard-current.png",
+        "oppo-source-v1/20-close-prompt.png",
+        "oppo-source-v1/28-final-ai.png"
+      ]
+    },
+    {
+      "id": "H8",
+      "requirement": "Preserve saved records; no cloud/model/domain/APK/publication/source push or scope drift",
+      "verdict": "verified_within_goal",
+      "evidence": [
+        "oppo-source-v1/saved-data-final-detached.json",
+        "oppo-source-v1/SAVED-DATA-COMPARISON.json",
+        "FINAL-LOCAL-DISCIPLINE.json",
+        "TESTED-SOURCE-MANIFEST.json"
+      ]
+    }
+  ],
+  "deferred": [
+    "Qualified deployed SQL SDK/raw-SQL envelope and original authenticated account/Plans/Workspace sources",
+    "Independent production PostgreSQL worker/erasure lock execution",
+    "Genuine paid-user/Store populated History on device",
+    "BE-06 private media/OCR/voice; full parent BE-07 autosave outside this slice",
+    "Existing Android exported semantics viewport/tap-target release qualification remains separate",
+    "Ten inherited full connector raw-SQL compiler diagnostics"
+  ],
+  "claimsNotMade": [
+    "Full parent BE-07 completion",
+    "Live model/agent execution",
+    "Cloud deployment or production readiness",
+    "Founder screen approval"
+  ],
+  "evidenceHashes": [
+    {
+      "evidence": "FINAL-REQUIREMENT-AUDIT.json",
+      "sha256": "F80C657BB818B4F9BF5F44CCFE5B01DEDD8DD0837E1CF39AAACA5A08639136E1"
+    },
+    {
+      "evidence": "PROCESS-RECOVERY-RESULTS.json",
+      "sha256": "70B50AC50BA097C987B45F8E9DD8FA6EC56FA615F75AC22A24718E5445B6DE8B"
+    },
+    {
+      "evidence": "SCHEMA-COMPILER-COMPARISON.json",
+      "sha256": "81DF705C5B5AC1584D9934DCC31FCB22E701ADA51A5DD0BC725E102F8558E0BE"
+    },
+    {
+      "evidence": "oppo-source-v1/VM-SOURCE-VERIFICATION.json",
+      "sha256": "24FBA810D339A4CC1AA9183D29443B2820ACF8F01D8AD6D9584E0415A3D2D44F"
+    },
+    {
+      "evidence": "oppo-source-v1/SAVED-DATA-COMPARISON.json",
+      "sha256": "9A7635F4CE47F75EB9CC019683E8C4361270C0D4E57B96480059C426C49EBCAB"
+    },
+    {
+      "evidence": "oppo-source-v1/RUNTIME-ERROR-CHECK.json",
+      "sha256": "1E10E927AB5DBAD61AB7AAE85DFBF846B6D4CE2E26327B5FD3E0F6B15D78D03B"
+    }
+  ],
+  "externalDetailedEvidence": "outputs/ai-history-20261028-v1/FINAL-REPORT.md",
+  "rawSecretsOrPrivateVmUrisIncluded": false
+}
