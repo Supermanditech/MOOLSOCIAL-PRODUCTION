@@ -1,0 +1,140 @@
+{
+  "ticket": "THIN-B03",
+  "sourceCommit": "82c76b5996f523200a395f4661e9a3b3fa01d365",
+  "files": [
+    {
+      "path": "apps/mobile/lib/app/moolsocial_app.dart",
+      "bytes": 23898,
+      "sha256": "0B13ECA6A7AEF855F08F35E756C93D79649A3FDB646326CEDAC96643D246F69E",
+      "normalizedSha256": "0b13eca6a7aef855f08f35e756c93d79649a3fdb646326cedac96643d246f69e"
+    },
+    {
+      "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+      "bytes": 96414,
+      "sha256": "0AEB497C281746E887A252A58032CD66E782ED2B0E5EB9410AEF2FDAE54262B8",
+      "normalizedSha256": "0aeb497c281746e887a252a58032cd66e782ed2b0e5eb9410aef2fdae54262b8"
+    },
+    {
+      "path": "apps/mobile/lib/features/assistant/profile_context.dart",
+      "bytes": 8988,
+      "sha256": "BA5543DD99FA591EEF686F8E94F28B87092F77D29C814C4E41389E2499AE3A65",
+      "normalizedSha256": "ba5543dd99fa591eef686f8e94f28b87092f77d29c814c4e41389e2499ae3a65"
+    },
+    {
+      "path": "apps/mobile/lib/features/journey01/account_profile_gateway.dart",
+      "bytes": 24193,
+      "sha256": "14744C59C6FA89F864B454736F72E68408287BA22F00C6B38E15646766553BA7",
+      "normalizedSha256": "14744c59c6fa89f864b454736f72e68408287ba22f00c6b38e15646766553ba7"
+    },
+    {
+      "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+      "bytes": 88496,
+      "sha256": "07CF9D2728425DB407F06AA1B14F3FDA31B61C85FF4126BB9490FAA8FB7172CD",
+      "normalizedSha256": "07cf9d2728425db407f06aa1b14f3fda31b61c85ff4126bb9490faa8fb7172cd"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/assistant/mool_assistant_v2.dart",
+      "bytes": 104526,
+      "sha256": "E6C77BDAE6A70DF2CF5851C4D69785003EC1E17E8F02525D2ADFE0DBA60C5AE1",
+      "normalizedSha256": "e6c77bdae6a70df2cf5851c4d69785003ec1e17e8f02525d2adfe0dba60c5ae1"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+      "bytes": 11723,
+      "sha256": "AB2B501EFB11E50F610E161FBDFC96B45017461227388E66AB6B95CADCB8FFE8",
+      "normalizedSha256": "ab2b501efb11e50f610e161fbdfc96b45017461227388e66ab6b95cadcb8ffe8"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart",
+      "bytes": 35545,
+      "sha256": "7F861B32F1CD4216B85CC1213E9BD9287D6575350D709C639BF68CCBF198A8CE",
+      "normalizedSha256": "7f861b32f1cd4216b85cc1213e9bd9287d6575350d709c639bf68ccbf198a8ce"
+    },
+    {
+      "path": "apps/mobile/test/assistant_model_flow_test.dart",
+      "bytes": 20984,
+      "sha256": "96AF6C30EF6B0D1FB7EF7C94EF0AD0E884445348186C9AE6E4469FBF72067139",
+      "normalizedSha256": "6bf99eff8fe98479d2d53d38c5f9f63b60241481753c76671019e6a7c8254a14"
+    },
+    {
+      "path": "apps/mobile/test/assistant_profile_context_test.dart",
+      "bytes": 20964,
+      "sha256": "333AC3804635E2D2C400D2F704EB85244743A29BF6C105AE84C4DB48B5FF5C43",
+      "normalizedSha256": "999dbe4b5088d9deb8f4eda1c333e9770291b8a156b27ecf0a1446054fdb3bd7"
+    },
+    {
+      "path": "apps/mobile/test/assistant_workspace_context_test.dart",
+      "bytes": 8097,
+      "sha256": "9645EDAEDA6CC8F0853181D11EB6FF9A2948F5AED456B3BA12F1C1E6D6FD7222",
+      "normalizedSha256": "9645edaeda6cc8f0853181d11eb6ff9a2948f5aed456b3ba12f1c1e6d6fd7222"
+    },
+    {
+      "path": "apps/mobile/test/mool_assistant_test.dart",
+      "bytes": 208920,
+      "sha256": "E096555A4845D03C9299BD58BFFA01263DDE4FF8EA473546328A164CE34E27A8",
+      "normalizedSha256": "e096555a4845d03c9299bd58bffa01263dde4ff8ea473546328a164ce34e27a8"
+    },
+    {
+      "path": "backend/functions/src/assistant/context_contract.test.ts",
+      "bytes": 3286,
+      "sha256": "C438ACD45FCC8DE59FDC24FD7F295FA910B89A73A4673CEDE5A461F8E0E20286",
+      "normalizedSha256": "c438acd45fcc8de59fdc24fd7f295fa910b89a73a4673cede5a461f8e0e20286"
+    },
+    {
+      "path": "backend/functions/src/assistant/context_contract.ts",
+      "bytes": 4262,
+      "sha256": "FD05580BAFD548106B7A11A20B2763B0C306B8C4601A3B3C22CCBC60313F90E3",
+      "normalizedSha256": "fd05580bafd548106b7a11a20b2763b0c306b8c4601a3b3c22ccbc60313f90e3"
+    },
+    {
+      "path": "backend/functions/src/assistant/model_contract.ts",
+      "bytes": 6678,
+      "sha256": "EECE0BFE13F3ADA2CC95407AE4915C98CC864FA5F4F0EB9378177A1B2DF1ECA0",
+      "normalizedSha256": "8a5273dbfa3a7795152d49b56554fb07863adbef6bb30713199a3269e20496a1"
+    },
+    {
+      "path": "backend/functions/src/assistant/model_service.test.ts",
+      "bytes": 16243,
+      "sha256": "E5B5E704A260A8F287651BF926627B6AC53B66C49467A143D522E796EE5EAB19",
+      "normalizedSha256": "976f51121755b1b2755c3dbfc5bfab2f9d5a3c036122b1cc8a9d47ec16367c7b"
+    },
+    {
+      "path": "backend/functions/src/assistant/model_service.ts",
+      "bytes": 11622,
+      "sha256": "D81C8F014C4F52DA1FBFF655A55076916479EFDD6962DED7D5577F9689BC9750",
+      "normalizedSha256": "f0ece67c1ca9b8dac6602f8018ad7fd6c6f85377dca014c6b029f6952efc072b"
+    },
+    {
+      "path": "backend/functions/src/assistant/profile_context.test.ts",
+      "bytes": 9944,
+      "sha256": "CE8F7CE63F732FACB363128128BB8AFFE26400A4F16EDA84D8DE4AD6F6CA3C40",
+      "normalizedSha256": "ce8f7ce63f732facb363128128bb8affe26400a4f16eda84d8de4ad6f6ca3c40"
+    },
+    {
+      "path": "backend/functions/src/assistant/profile_context.ts",
+      "bytes": 8300,
+      "sha256": "CD7C920422A9B9125234A40561CEEA69C8976FE3EDC8D251F9342222DE2233D1",
+      "normalizedSha256": "cd7c920422a9b9125234a40561ceea69c8976fe3edc8d251f9342222de2233d1"
+    },
+    {
+      "path": "backend/functions/src/assistant/responses_transport.test.ts",
+      "bytes": 6859,
+      "sha256": "DB855C49AF0CC4ACA84D88620639348A0197BF046C0C550114F7441158D2AAC2",
+      "normalizedSha256": "7ccd225b12c8c5653de67bb1afa93af53ee32b1b167d57c6d9679a2ba88b97b4"
+    },
+    {
+      "path": "backend/functions/src/assistant/responses_transport.ts",
+      "bytes": 4937,
+      "sha256": "FA267CE2F893C5D363519894BCFBBDDC90BC844D77B3E4E26102E5DA7F2528BB",
+      "normalizedSha256": "6fc2d3e569760e58eab749cdde9c545737e93d1da7155e52fcd90f402ab34069"
+    },
+    {
+      "path": "backend/functions/src/index.ts",
+      "bytes": 142573,
+      "sha256": "07A7C3DB831A49351EFBE06851D2E34A35D75A1F30B1CAD621E3606A0677F31B",
+      "normalizedSha256": "69b56865c67e9e59d8b8b937960f03d2b7ec4f851ba0684a9a9248f5110c642b"
+    }
+  ],
+  "testedManifestSha256": "7325432d015baa982ddce495e393623dd06f90e8f65a63a03368733bf3d85205",
+  "productionAcceptance": false
+}
