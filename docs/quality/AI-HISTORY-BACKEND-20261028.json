@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "AI-HISTORY-01",
+    "selectedTicketAssessment": {
+      "ticketId": "AI-HISTORY-01",
+      "customerOutcome": "New chat and resumed chats preserve private text conversations and drafts through the existing compact History UI, without replaying actions.",
+      "necessityProof": "History has no production receiver; existing draft-only save signature does not persist completed conversation messages.",
+      "implementationDisposition": [
+        "reuse",
+        "new_necessary_work"
+      ],
+      "sharedImplementationOwners": [
+        "backend/functions/src/assistant/history_contract.ts",
+        "backend/functions/src/assistant/history_contract.test.ts",
+        "backend/functions/src/assistant/history_service.ts",
+        "backend/functions/src/assistant/history_service.test.ts",
+        "backend/functions/src/assistant/history_dataconnect_store.ts",
+        "backend/functions/src/assistant/history_dataconnect_store.test.ts",
+        "backend/functions/src/assistant/history_http.ts",
+        "backend/functions/src/assistant/history_http.test.ts",
+        "backend/functions/src/index.ts",
+        "dataconnect/schema/assistant.gql",
+        "dataconnect/provider/youtube.gql",
+        "apps/mobile/lib/features/assistant/history_gateway.dart",
+        "apps/mobile/lib/features/assistant/mool_assistant.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/journey01/review_journey_services.dart",
+        "apps/mobile/lib/app/moolsocial_app.dart",
+        "apps/mobile/lib/ui_v2/assistant/mool_assistant_v2.dart",
+        "apps/mobile/test/assistant_history_gateway_test.dart",
+        "apps/mobile/test/assistant_history_flow_test.dart",
+        "apps/mobile/test/assistant_history_durable_integration_test.dart",
+        "apps/mobile/test/mool_assistant_test.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [
+        "backend/functions/src/assistant/history_contract.ts",
+        "backend/functions/src/assistant/history_contract.test.ts",
+        "backend/functions/src/assistant/history_service.ts",
+        "backend/functions/src/assistant/history_service.test.ts",
+        "backend/functions/src/assistant/history_dataconnect_store.ts",
+        "backend/functions/src/assistant/history_dataconnect_store.test.ts",
+        "backend/functions/src/assistant/history_http.ts",
+        "backend/functions/src/assistant/history_http.test.ts"
+      ],
+      "robustnessCoverage": [
+        "Durable SQL revision/duplicate/receipt/paging/isolation/erasure and disk restart tests.",
+        "Actual client-handler-repository/controller text History integration, lost acknowledgement and new-draft preservation.",
+        "Existing AI/Profile regressions, exact current-source OPPO guard/navigation/keyboard checks and108 saved fingerprints."
+      ],
+      "adjustments": [
+        "Reuse existing History UI and original Plans/Workspace/account/erasure services; restore inert text only; no business action replay."
+      ],
+      "explicitExclusions": [
+        "No cloud/model activation, new billing/retention rules, admin, media/OCR/voice processing, commerce/financial execution, APK, publication or source feature commit/push."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder explicitly delegated next existing-ticket selection and standing admission/implementation/testing acceptance; not represented as a separate exact-hash review.",
+        "Reuse original Plans/Workspace/account authorities. Missing qualified cloud/SDK and authentic device services remain unavailable.",
+        "Private media persistence remains BE-06; reject unsupported saves without losing input."
+      ],
+      "manifestPath": "docs/quality/AI-HISTORY-CONTRACT-20261028.md",
+      "manifestSha256": "39CDABA8770338E6D370C92445A77D8702E0FAABDACEBA9EA51536EC25963965",
+      "evidencePath": "docs/quality/AI-HISTORY-ACCEPTANCE-20261028.json",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "AI-HISTORY-01",
+    "customerOutcome": "New chat and resumed chats preserve private text conversations and drafts through the existing compact History UI, without replaying actions.",
+    "classification": "mvp_supporting",
+    "classificationReason": "Completes the existing paid Buy/approved-Workspace assistant History requirement using current authorities and UI.",
+    "minimumCompleteScope": [
+      "H1: durable scoped text History list/read/save/original-status, revisions and erasure.",
+      "H2: typed existing UI gateway/controller connection, full text snapshots and safe New chat/resume.",
+      "Run local durable/client integration, regressions and reachable current-source OPPO; record external limits and stop."
+    ],
+    "explicitExclusions": [
+      "No cloud/model activation, new billing/retention rules, admin, media/OCR/voice processing, commerce/financial execution, APK, publication or source feature commit/push."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder explicitly delegated next existing-ticket selection and standing admission/implementation/testing acceptance; not represented as a separate exact-hash review.",
+      "Reuse original Plans/Workspace/account authorities. Missing qualified cloud/SDK and authentic device services remain unavailable.",
+      "Private media persistence remains BE-06; reject unsupported saves without losing input."
+    ],
+    "testAndEvidencePlan": [
+      "Durable SQL revision/duplicate/receipt/paging/isolation/erasure and disk restart tests.",
+      "Actual client-handler-repository/controller text History integration, lost acknowledgement and new-draft preservation.",
+      "Existing AI/Profile regressions, exact current-source OPPO guard/navigation/keyboard checks and108 saved fingerprints."
+    ]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/AI-HISTORY-CONTRACT-20261028.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/AI-HISTORY-ACCEPTANCE-20261028.json",
+    "beyondMvpExplicitlyAuthorized": false
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "backendAdmission": {
+    "binding": {
+      "id": "thin_b07_b04_20261027",
+      "state": "founder_authorized_2026_10_27",
+      "lane": "codex_backend",
+      "role": "primary",
+      "task": "/root/codex_backend_ai_history",
+      "workId": "ai-history-20261028",
+      "ticketId": "AI-HISTORY-01",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-history-20261028",
+      "branch": "work/codex-backend/ai-history-20261028",
+      "baselineHead": "9499d740a5171d892702387ceb1e5f6a413a336a",
+      "bootstrapCommitSubject": "coordination(ai-history-20261028): record exact bounded History admission",
+      "bootstrapOwners": [
+        ".gitattributes",
+        "config/codex-subagent-coordination-policy.json",
+        "config/cross-agent-incremental-ticket-gate.json",
+        "docs/quality/AI-HISTORY-BACKEND-20261028.json",
+        "docs/quality/AI-HISTORY-ACCEPTANCE-20261028.json",
+        "docs/quality/AI-HISTORY-CONTRACT-20261028.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/ai-history-admission.ps1",
+        "scripts/test-ai-history-admission.ps1"
+      ]
+    },
+    "runtimeOwners": [
+      "backend/functions/src/assistant/history_contract.ts",
+      "backend/functions/src/assistant/history_contract.test.ts",
+      "backend/functions/src/assistant/history_service.ts",
+      "backend/functions/src/assistant/history_service.test.ts",
+      "backend/functions/src/assistant/history_dataconnect_store.ts",
+      "backend/functions/src/assistant/history_dataconnect_store.test.ts",
+      "backend/functions/src/assistant/history_http.ts",
+      "backend/functions/src/assistant/history_http.test.ts",
+      "backend/functions/src/index.ts",
+      "dataconnect/schema/assistant.gql",
+      "dataconnect/provider/youtube.gql",
+      "apps/mobile/lib/features/assistant/history_gateway.dart",
+      "apps/mobile/lib/features/assistant/mool_assistant.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "apps/mobile/lib/app/moolsocial_app.dart",
+      "apps/mobile/lib/ui_v2/assistant/mool_assistant_v2.dart",
+      "apps/mobile/test/assistant_history_gateway_test.dart",
+      "apps/mobile/test/assistant_history_flow_test.dart",
+      "apps/mobile/test/assistant_history_durable_integration_test.dart",
+      "apps/mobile/test/mool_assistant_test.dart"
+    ],
+    "acceptedUiCommit": "9499d740a5171d892702387ceb1e5f6a413a336a",
+    "contractSha256": "39CDABA8770338E6D370C92445A77D8702E0FAABDACEBA9EA51536EC25963965",
+    "sqlProvisioning": false,
+    "sqlMigration": false,
+    "deployment": false,
+    "backendBranchPush": false,
+    "timelineDisclosure": "The historical 4\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u20ac\u0161\u00c2\u00ac\u00c3\u00a2\u00e2\u201a\u00ac\u00c5\u201c19 October delivery window has elapsed; scope stays bounded and robustness is not waived. The zero incremental timeline value is not a claim of on-time MVP delivery.",
+    "sourceSnapshots": [
+      {
+        "sourceCommit": "d4beab6b9004e566be8819a2bf86ae3ca921602a",
+        "sealedEvidenceHead": "9499d740a5171d892702387ceb1e5f6a413a336a",
+        "qualification": "Existing B07/B04 source and its local/reachable-OPPO limits preserved; not production acceptance."
+      }
+    ]
+  }
+}

@@ -34,6 +34,12 @@
         "uiCommit": "566c88f6b3698648a6f4facbdc01b86c5ecf42bb",
         "contractPath": "docs/quality/THIN-B07-B04-CONTRACT-20261027.md",
         "contractSha256": "23B6413B17C57F2E9ABE7E03D16F916C32C27908E65BED900663E02D7F67E382"
+      },
+      {
+        "id": "assistant.history",
+        "uiCommit": "9499d740a5171d892702387ceb1e5f6a413a336a",
+        "contractPath": "docs/quality/AI-HISTORY-CONTRACT-20261028.md",
+        "contractSha256": "39CDABA8770338E6D370C92445A77D8702E0FAABDACEBA9EA51536EC25963965"
       }
     ],
     "reachableBuyDestinations": [

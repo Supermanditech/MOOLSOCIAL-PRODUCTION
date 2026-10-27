@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "AI-HISTORY-01",
+  "acceptedUiCommit": "9499d740a5171d892702387ceb1e5f6a413a336a",
+  "uiContractPath": "docs/quality/AI-HISTORY-CONTRACT-20261028.md",
+  "uiContractSha256": "39CDABA8770338E6D370C92445A77D8702E0FAABDACEBA9EA51536EC25963965",
+  "founderDecision": "accepted_for_combined_b07_b04_profile_local_implementation_with_retained_limits",
+  "founderAnswer": "THEN CONTINUE NEXT - GO AHEAD WITH NEXT SCOPE WHETHER BASELINE SEAL IF NEEDED OTHERWISE FIND NEXT TWO OR 3 SCOPE OR TICKETS TO CONTINUE WITH ONE BOUNDED GOAL AND USE STANDING AUTHORISATION OR APPROVAL WITHOUT STOP UNTILL NEW GOAL IS OPPO TESTED",
+  "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
+  "localMetadataCommits": 1,
+  "sourceFeatureCommits": false,
+  "backendBranchPush": false,
+  "deployment": false,
+  "productionAcceptance": false,
+  "acceptanceMode": "Founder-delegated selection and standing acceptance; Codex selected this exact History-only contract",
+  "separateFounderHashReviewClaimed": false
+}
