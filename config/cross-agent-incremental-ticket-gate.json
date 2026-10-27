@@ -28,6 +28,12 @@
         "uiCommit": "da3333ed69bfb7c187320d2294b1e1953ee3bc60",
         "contractPath": "docs/quality/THIN-B03-CONTRACT-20261027.md",
         "contractSha256": "224C61B3546E7F0D3C81F55651C6207AE61D63CCCEC73F6A5A5BE7D30788456A"
+      },
+      {
+        "id": "assistant.profile_durable_recovery",
+        "uiCommit": "566c88f6b3698648a6f4facbdc01b86c5ecf42bb",
+        "contractPath": "docs/quality/THIN-B07-B04-CONTRACT-20261027.md",
+        "contractSha256": "23B6413B17C57F2E9ABE7E03D16F916C32C27908E65BED900663E02D7F67E382"
       }
     ],
     "reachableBuyDestinations": [

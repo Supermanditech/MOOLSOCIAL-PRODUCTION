@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "THIN-B07-B04-PROFILE",
+    "selectedTicketAssessment": {
+      "ticketId": "THIN-B07-B04-PROFILE",
+      "customerOutcome": "Durable AI preparation/status and consent-linked original Profile Save recover safely without duplicate effects.",
+      "necessityProof": "Original request/usage authorities and client process recovery are absent; native Save lacks durable preparation linkage.",
+      "implementationDisposition": [
+        "reuse",
+        "new_necessary_work"
+      ],
+      "sharedImplementationOwners": [
+        "backend/functions/src/assistant/model_contract.ts",
+        "backend/functions/src/assistant/model_contract.test.ts",
+        "backend/functions/src/assistant/model_service.ts",
+        "backend/functions/src/assistant/model_service.test.ts",
+        "backend/functions/src/assistant/model_http.ts",
+        "backend/functions/src/assistant/model_http.test.ts",
+        "backend/functions/src/assistant/preparation_dataconnect_store.ts",
+        "backend/functions/src/assistant/preparation_dataconnect_store.test.ts",
+        "backend/functions/src/assistant/usage_store.ts",
+        "backend/functions/src/assistant/usage_store.test.ts",
+        "backend/functions/src/assistant/profile_execution.ts",
+        "backend/functions/src/assistant/profile_execution.test.ts",
+        "backend/functions/src/account/profile_http.ts",
+        "backend/functions/src/account/profile_http.test.ts",
+        "backend/functions/src/index.ts",
+        "dataconnect/schema/assistant.gql",
+        "apps/mobile/lib/features/assistant/model_gateway.dart",
+        "apps/mobile/lib/features/assistant/preparation_pending_store.dart",
+        "apps/mobile/lib/features/assistant/profile_context.dart",
+        "apps/mobile/lib/features/assistant/mool_assistant.dart",
+        "apps/mobile/lib/features/journey01/account_profile_gateway.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+        "apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/assistant_model_gateway_test.dart",
+        "apps/mobile/test/assistant_model_flow_test.dart",
+        "apps/mobile/test/assistant_profile_context_test.dart",
+        "apps/mobile/test/assistant_preparation_recovery_test.dart",
+        "apps/mobile/test/account_profile_gateway_test.dart",
+        "apps/mobile/test/journey_session_test.dart",
+        "apps/mobile/test/mool_assistant_test.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [
+        "backend/functions/src/assistant/preparation_dataconnect_store.ts",
+        "backend/functions/src/assistant/preparation_dataconnect_store.test.ts",
+        "backend/functions/src/assistant/usage_store.ts",
+        "backend/functions/src/assistant/usage_store.test.ts",
+        "backend/functions/src/assistant/profile_execution.ts",
+        "backend/functions/src/assistant/profile_execution.test.ts"
+      ],
+      "robustnessCoverage": [
+        "Actual durable SQL races/restart/cancellation and request/usage identity",
+        "Original Profile native Save/receipt linkage, actor/source/consent changes and recovery",
+        "Client/server integration, manual regressions, exact OPPO source/data preservation"
+      ],
+      "adjustments": [
+        "Reuse original Profile mutation, native Save and authoritative entitlement/source; no generic unrestricted writer."
+      ],
+      "explicitExclusions": [
+        "No new usage/billing rules, cloud/model live calls, commerce execution, OCR/History/APK or feature commits/push."
+      ],
+      "dependenciesAndApprovals": [
+        "Exact combined contract/33-file admission and one metadata-only commit approved; standing authorisation within goal.",
+        "Approved usage authorization and real services remain unavailable when absent."
+      ],
+      "manifestPath": "docs/quality/THIN-B07-B04-CONTRACT-20261027.md",
+      "manifestSha256": "23B6413B17C57F2E9ABE7E03D16F916C32C27908E65BED900663E02D7F67E382",
+      "evidencePath": "docs/quality/THIN-B07-B04-ACCEPTANCE-20261027.json",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "THIN-B07-B04-PROFILE",
+    "customerOutcome": "Durable AI preparation/status and consent-linked original Profile Save recover safely without duplicate effects.",
+    "classification": "mvp_supporting",
+    "classificationReason": "Existing Buy/Store paid-assistant model/preparation connection.",
+    "minimumCompleteScope": [
+      "Implement and locally qualify the accepted B07 plus B04 Profile-only contract; record exact external limits and stop."
+    ],
+    "explicitExclusions": [
+      "No new usage/billing rules, cloud/model live calls, commerce execution, OCR/History/APK or feature commits/push."
+    ],
+    "dependenciesAndApprovals": [
+      "Exact combined contract/33-file admission and one metadata-only commit approved; standing authorisation within goal.",
+      "Approved usage authorization and real services remain unavailable when absent."
+    ],
+    "testAndEvidencePlan": [
+      "Original Profile/Plans/Workspace service parity, minimal scoped fields and paid/approval isolation.",
+      "Canonical/native revision, account A-B-A/Store switching, stale/unavailable/cancellation recovery and no automatic Save.",
+      "Actual local mobile/backend/original-source/native Review and reachable OPPO preservation."
+    ]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/THIN-B07-B04-CONTRACT-20261027.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/THIN-B07-B04-ACCEPTANCE-20261027.json",
+    "beyondMvpExplicitlyAuthorized": false
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "backendAdmission": {
+    "binding": {
+      "id": "thin_b07_b04_20261027",
+      "state": "founder_authorized_2026_10_27",
+      "lane": "codex_backend",
+      "role": "primary",
+      "task": "/root/codex_backend_thin_b07_b04",
+      "workId": "thin-b07-b04-20261027",
+      "ticketId": "THIN-B07-B04-PROFILE",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-thin-b07-b04-20261027",
+      "branch": "work/codex-backend/thin-b07-b04-20261027",
+      "baselineHead": "566c88f6b3698648a6f4facbdc01b86c5ecf42bb",
+      "bootstrapCommitSubject": "coordination(thin-b07-b04-20261027): record exact combined admission",
+      "bootstrapOwners": [
+        ".gitattributes",
+        "config/codex-subagent-coordination-policy.json",
+        "config/cross-agent-incremental-ticket-gate.json",
+        "docs/quality/THIN-B07-B04-BACKEND-20261027.json",
+        "docs/quality/THIN-B07-B04-ACCEPTANCE-20261027.json",
+        "docs/quality/THIN-B07-B04-CONTRACT-20261027.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/thin-b07-b04-admission.ps1",
+        "scripts/test-thin-b07-b04-admission.ps1"
+      ]
+    },
+    "runtimeOwners": [
+      "backend/functions/src/assistant/model_contract.ts",
+      "backend/functions/src/assistant/model_contract.test.ts",
+      "backend/functions/src/assistant/model_service.ts",
+      "backend/functions/src/assistant/model_service.test.ts",
+      "backend/functions/src/assistant/model_http.ts",
+      "backend/functions/src/assistant/model_http.test.ts",
+      "backend/functions/src/assistant/preparation_dataconnect_store.ts",
+      "backend/functions/src/assistant/preparation_dataconnect_store.test.ts",
+      "backend/functions/src/assistant/usage_store.ts",
+      "backend/functions/src/assistant/usage_store.test.ts",
+      "backend/functions/src/assistant/profile_execution.ts",
+      "backend/functions/src/assistant/profile_execution.test.ts",
+      "backend/functions/src/account/profile_http.ts",
+      "backend/functions/src/account/profile_http.test.ts",
+      "backend/functions/src/index.ts",
+      "dataconnect/schema/assistant.gql",
+      "apps/mobile/lib/features/assistant/model_gateway.dart",
+      "apps/mobile/lib/features/assistant/preparation_pending_store.dart",
+      "apps/mobile/lib/features/assistant/profile_context.dart",
+      "apps/mobile/lib/features/assistant/mool_assistant.dart",
+      "apps/mobile/lib/features/journey01/account_profile_gateway.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+      "apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart",
+      "apps/mobile/lib/features/buy/buy_v2_session.dart",
+      "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+      "apps/mobile/test/assistant_model_gateway_test.dart",
+      "apps/mobile/test/assistant_model_flow_test.dart",
+      "apps/mobile/test/assistant_profile_context_test.dart",
+      "apps/mobile/test/assistant_preparation_recovery_test.dart",
+      "apps/mobile/test/account_profile_gateway_test.dart",
+      "apps/mobile/test/journey_session_test.dart",
+      "apps/mobile/test/mool_assistant_test.dart"
+    ],
+    "acceptedUiCommit": "566c88f6b3698648a6f4facbdc01b86c5ecf42bb",
+    "contractSha256": "23B6413B17C57F2E9ABE7E03D16F916C32C27908E65BED900663E02D7F67E382",
+    "sqlProvisioning": false,
+    "sqlMigration": false,
+    "deployment": false,
+    "backendBranchPush": false,
+    "timelineDisclosure": "The historical 4\u00c3\u0192\u00c2\u00a2\u00c3\u00a2\u00e2\u20ac\u0161\u00c2\u00ac\u00c3\u00a2\u00e2\u201a\u00ac\u00c5\u201c19 October delivery window has elapsed; scope stays bounded and robustness is not waived. The zero incremental timeline value is not a claim of on-time MVP delivery.",
+    "sourceSnapshots": []
+  }
+}

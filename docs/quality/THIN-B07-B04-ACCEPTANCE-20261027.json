@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "THIN-B07-B04-PROFILE",
+  "acceptedUiCommit": "566c88f6b3698648a6f4facbdc01b86c5ecf42bb",
+  "uiContractPath": "docs/quality/THIN-B07-B04-CONTRACT-20261027.md",
+  "uiContractSha256": "23B6413B17C57F2E9ABE7E03D16F916C32C27908E65BED900663E02D7F67E382",
+  "founderDecision": "accepted_for_combined_b07_b04_profile_local_implementation_with_retained_limits",
+  "founderAnswer": "Approve exact combined contract and 33-file admission",
+  "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
+  "localMetadataCommits": 1,
+  "sourceFeatureCommits": false,
+  "backendBranchPush": false,
+  "deployment": false,
+  "productionAcceptance": false
+}

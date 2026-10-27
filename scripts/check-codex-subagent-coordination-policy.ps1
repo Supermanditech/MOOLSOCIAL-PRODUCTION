@@ -8885,6 +8885,14 @@ function Invoke-Lf01Admission {
   Write-Output "LF-01 admission passed: phase=$ProductionPhase; owners=$($owners.Count); baseline=$base; no APK/provider/acceptance authority."
 }
 
+# Founder-approved combined B07/B04 Profile-only local goal.
+if ($ProductionTicketId -ceq 'THIN-B07-B04-PROFILE' -or $ProductionWorkId -ceq 'thin-b07-b04-20261027' -or
+    $root.Replace('\','/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-thin-b07-b04-20261027') {
+  . (Join-Path $root 'scripts/thin-b07-b04-admission.ps1')
+  Invoke-ThinB07B04Admission
+  return
+}
+
 # Founder-approved THIN-B03: bounded local authorised Profile and Workspace context only.
 if ($ProductionTicketId -ceq 'THIN-B03' -or $ProductionWorkId -ceq 'thin-b03-20261027' -or
     $root.Replace('\','/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-thin-b03-20261027') {
