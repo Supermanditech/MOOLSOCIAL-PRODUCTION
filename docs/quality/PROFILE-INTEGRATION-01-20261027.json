@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "PROFILE-INTEGRATION-01",
+    "selectedTicketAssessment": {
+      "ticketId": "PROFILE-INTEGRATION-01",
+      "customerOutcome": "Combined original Profile persistence and approved Workspace access paths retain both implementations, source/data ownership and recovery without new features or fabricated authority.",
+      "necessityProof": "Existing B01 and B03 are separate source snapshots; their shared router/index and combined recovery have not been qualified together.",
+      "implementationDisposition": [
+        "reuse",
+        "new_necessary_work"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "backend/functions/src/index.ts"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": [
+        "Combined identity/contact/address/invoice save/read, original recipients and actor/Store isolation.",
+        "Stale reads/edits, duplicate saves, unknown-result/restart recovery, unavailable services and proof expiry/revocation.",
+        "Both source worktrees frozen; current-source reachable OPPO inspection and protected data fingerprints."
+      ],
+      "adjustments": [
+        "Reuse the exact existing 27-owner union; no redesign or new business rule."
+      ],
+      "explicitExclusions": [
+        "No new features/admin/Google configuration or deployment/billing implementation/live transactions/APK/publication/push/runtime feature commits.",
+        "No fabricated grants, account/provider injection, alternate persistence, full Git closure or full production-acceptance claim."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder approved exact combined contract and ONE local metadata-only admission commit.",
+        "Original B01/B03 dependencies remain deferred; locally qualified source is not a live-service or combined APK acceptance."
+      ],
+      "manifestPath": "docs/quality/PROFILE-INTEGRATION-01-CONTRACT-20261027.md",
+      "manifestSha256": "41A13A42DEDB2BD7CEE8D116A0D81AE94CC8BE5FF70A44C88D8EDA23EECA5D14",
+      "evidencePath": "docs/quality/PROFILE-INTEGRATION-01-ACCEPTANCE-20261027.json",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "PROFILE-INTEGRATION-01",
+    "customerOutcome": "Combined original Profile persistence and approved Workspace access paths retain both implementations, source/data ownership and recovery without new features or fabricated authority.",
+    "classification": "mvp_required",
+    "classificationReason": "Combined source preservation and original Profile/Workspace isolation are necessary before another Profile feature.",
+    "minimumCompleteScope": [
+      "Preserve/reconcile the two sources, integrate only admitted existing implementations, test, inspect reachable OPPO and record exact dependencies; stop."
+    ],
+    "explicitExclusions": [
+      "No new features/admin/Google configuration or deployment/billing implementation/live transactions/APK/publication/push/runtime feature commits.",
+      "No fabricated grants, account/provider injection, alternate persistence, full Git closure or full production-acceptance claim."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder approved exact combined contract and ONE local metadata-only admission commit.",
+      "Original B01/B03 dependencies remain deferred; locally qualified source is not a live-service or combined APK acceptance."
+    ],
+    "testAndEvidencePlan": [
+      "Combined identity/contact/address/invoice save/read, original recipients and actor/Store isolation.",
+      "Stale reads/edits, duplicate saves, unknown-result/restart recovery, unavailable services and proof expiry/revocation.",
+      "Both source worktrees frozen; current-source reachable OPPO inspection and protected data fingerprints."
+    ]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/PROFILE-INTEGRATION-01-CONTRACT-20261027.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/PROFILE-INTEGRATION-01-ACCEPTANCE-20261027.json",
+    "beyondMvpExplicitlyAuthorized": false
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "backendAdmission": {
+    "binding": {
+      "id": "profile_combined_20261027",
+      "state": "founder_authorized_2026_10_27",
+      "lane": "codex_backend",
+      "role": "primary",
+      "task": "/root/codex_backend_profile_combined",
+      "workId": "profile-combined-20261027",
+      "ticketId": "PROFILE-INTEGRATION-01",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-profile-combined-20261027",
+      "branch": "work/codex-backend/profile-combined-20261027",
+      "baselineHead": "c9d03bb37b6115f7fe63f3f1dd819892dc037fc9",
+      "bootstrapCommitSubject": "coordination(profile-combined-20261027): record exact combined admission",
+      "bootstrapOwners": [
+        ".gitattributes",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/profile-combined-admission.ps1",
+        "scripts/test-profile-combined-admission.ps1",
+        "config/codex-subagent-coordination-policy.json",
+        "config/cross-agent-incremental-ticket-gate.json",
+        "docs/quality/PROFILE-INTEGRATION-01-20261027.json",
+        "docs/quality/PROFILE-INTEGRATION-01-ACCEPTANCE-20261027.json",
+        "docs/quality/PROFILE-INTEGRATION-01-CONTRACT-20261027.md"
+      ]
+    },
+    "runtimeOwners": [
+      "apps/mobile/lib/features/buy/buy_v2_session.dart",
+      "apps/mobile/lib/features/journey01/account_profile_gateway.dart",
+      "apps/mobile/lib/features/journey01/journey_router.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "apps/mobile/lib/features/work/screens/work_onboarding_screens.dart",
+      "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+      "apps/mobile/lib/features/work/work_services.dart",
+      "apps/mobile/lib/features/work/work_session.dart",
+      "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+      "apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart",
+      "apps/mobile/test/account_profile_gateway_test.dart",
+      "apps/mobile/test/journey_session_test.dart",
+      "apps/mobile/test/work_production_gateway_test.dart",
+      "apps/mobile/test/work_workspace_layout_safety_test.dart",
+      "backend/functions/src/account/profile_dataconnect_store.test.ts",
+      "backend/functions/src/account/profile_dataconnect_store.ts",
+      "backend/functions/src/account/profile_http.test.ts",
+      "backend/functions/src/account/profile_http.ts",
+      "backend/functions/src/account/profile_service.test.ts",
+      "backend/functions/src/account/profile_service.ts",
+      "backend/functions/src/index.ts",
+      "backend/functions/src/workspace/workspace_profile_service.test.ts",
+      "backend/functions/src/workspace/workspace_profile_service.ts",
+      "dataconnect/mobile/universal.gql",
+      "dataconnect/provider/youtube.gql",
+      "dataconnect/schema/universal.gql"
+    ],
+    "acceptedUiCommit": "c9d03bb37b6115f7fe63f3f1dd819892dc037fc9",
+    "contractSha256": "41A13A42DEDB2BD7CEE8D116A0D81AE94CC8BE5FF70A44C88D8EDA23EECA5D14",
+    "sqlProvisioning": false,
+    "sqlMigration": false,
+    "deployment": false,
+    "backendBranchPush": false,
+    "timelineDisclosure": "The historical 4\u00e2\u20ac\u201c19 October delivery window has elapsed; scope stays bounded and robustness is not waived. The zero incremental timeline value is not a claim of on-time MVP delivery.",
+    "sourceSnapshots": [
+      {
+        "ticket": "B01",
+        "root": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-profile-b01-20261027",
+        "head": "4fd0644eb129173af6c3aea96528bf65f84a71ac",
+        "files": {
+          "apps/mobile/lib/features/buy/buy_v2_session.dart": "ff67895f8961e455963480e9459df9bbd1129b810804f494bf1f088e32531e20",
+          "apps/mobile/lib/features/journey01/account_profile_gateway.dart": "5a14d7ded3f136031a4b627c40742416c314bbff8b89cf69a30c9ff31ac0fb1c",
+          "apps/mobile/lib/features/journey01/journey_router.dart": "2cab1eb00a29e06af5e44daacdb46bcbae070eed86ae1300eb4ba8908381532a",
+          "apps/mobile/lib/features/journey01/journey_session.dart": "76d044f03604be3db5d8eab94d59b8d6c879403b5600799d6eee3e011ee29265",
+          "apps/mobile/lib/features/journey01/review_journey_services.dart": "115cd67cb3ff14fb1e204e351b82a194ee1ebf9ed36779be0266d825134f1791",
+          "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart": "de78aba52cec853bc9bddbd31671f54217164f2d9f8d42f1119e78102f59746f",
+          "apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart": "94b635b9a1ae9b0a91d04f760bf831d81d2d1776802ade7e7d6f35bec3680dd7",
+          "apps/mobile/test/account_profile_gateway_test.dart": "1441d6655a802909aff3e6cd9d93965267ce542688d8e143ff4d6c056f0ad660",
+          "apps/mobile/test/journey_session_test.dart": "708ec58d26945807779a01cb3960181f0cd9daf62687a0e2773bf356da359b3c",
+          "backend/functions/src/account/profile_dataconnect_store.test.ts": "bcb22abc0334d4f49d484c5c1dc5b7a793be403c0d66bcdd5c8c04bee0989059",
+          "backend/functions/src/account/profile_dataconnect_store.ts": "e9f6117d7b30a6aefd6dbe6a68ddade3a357aa1a217e4a5b0d8e89a4108c3ded",
+          "backend/functions/src/account/profile_http.test.ts": "cff36e8b80c5267fa973a3a2d8f16c7a51fa93a3d167e5024544b90d07392d7d",
+          "backend/functions/src/account/profile_http.ts": "c2d48717e40304c324b94affbf1290e505adcebdbdeb79da081dccb44bd4104e",
+          "backend/functions/src/account/profile_service.test.ts": "05634ead018b08ab030caf914b19b93f4efcf25763963f47778046c6e9da8dae",
+          "backend/functions/src/account/profile_service.ts": "bbcee5d1e4a4e7d8b025c9804cd1b4ed58bcb7dc530666a8769b740aa4c27343",
+          "backend/functions/src/index.ts": "58032d9ac3d56633ccdfa19bf057aea083f801eaf4c23f7092a234f8c800d041",
+          "dataconnect/mobile/universal.gql": "104098015f12ce97dd91359f722bd4f3d5105454fb3e551543c89d4779ed9ba4",
+          "dataconnect/provider/youtube.gql": "4801a62988ed61878648353c0c07cda9ce107aaf777e4836c0381b2f788ba600",
+          "dataconnect/schema/universal.gql": "fcb6b0f6397a964d857a017b82d7b14f25c3578d14af170571caaedb1125c1dc"
+        }
+      },
+      {
+        "ticket": "B03",
+        "root": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-profile-b03-20261027",
+        "head": "1f9da95413fee1421f42ab7988a1124fa1bf36c4",
+        "files": {
+          "apps/mobile/lib/features/journey01/journey_router.dart": "441f36f12a1245996a8bcd8183486bf24467201a40f170bd6857639696ab5e76",
+          "apps/mobile/lib/features/work/screens/work_onboarding_screens.dart": "8e03a0cde935848832b5c3a496b5f642e4c70b0e301bfa3e280e188663eba7db",
+          "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart": "ba24b105deb94447f6aff4a4e130ed1d47bdb1088e16c6201d393dc7e15b8c0c",
+          "apps/mobile/lib/features/work/work_services.dart": "c7ad9590fb6c8fac88d9371b0f79eccbb1d5c7819695cf9b8d04e5f8c0acfc50",
+          "apps/mobile/lib/features/work/work_session.dart": "7087e917ef6594cf9f4f832ae009dece2e999fc89ab234c4e129fc9f2c6893c2",
+          "apps/mobile/test/work_production_gateway_test.dart": "fa95bba2e7e8e3c765ce65e403f8851293c22f8b40f2c42b157ca601e329d46b",
+          "apps/mobile/test/work_workspace_layout_safety_test.dart": "13e2bf5d7187900b545e9043c46e15c91b54c4452ecd7988a4bfce80beace873",
+          "backend/functions/src/index.ts": "79f4afb3a7913bc98928d4774f30ff71ebecf3f381c4a28ba701dff314377c4f",
+          "backend/functions/src/workspace/workspace_profile_service.test.ts": "6c4a6c797a2abe33346155884f879a0d779faf271f475325c5292f12e0a299b1",
+          "backend/functions/src/workspace/workspace_profile_service.ts": "5baa391c466d258054574b7bcae22d88bf27d37bff9895dbced66e16f8827dfb"
+        }
+      }
+    ]
+  }
+}

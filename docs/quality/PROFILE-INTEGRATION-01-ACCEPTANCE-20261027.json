@@ -1,0 +1,20 @@
+{
+  "schema": "moolsocial_profile_combined_source_acceptance_v1",
+  "ticketId": "PROFILE-INTEGRATION-01",
+  "acceptedUiCommit": "c9d03bb37b6115f7fe63f3f1dd819892dc037fc9",
+  "uiContractPath": "docs/quality/PROFILE-INTEGRATION-01-CONTRACT-20261027.md",
+  "uiContractSha256": "41A13A42DEDB2BD7CEE8D116A0D81AE94CC8BE5FF70A44C88D8EDA23EECA5D14",
+  "founderDecision": "accepted_for_profile_combined_source_qualification_only",
+  "founderAnswer": "Approve exact combined contract and one metadata admission commit",
+  "allowedGitActions": [
+    "one_local_metadata_admission_commit_only"
+  ],
+  "backendBranchPush": false,
+  "deployment": false,
+  "productionAcceptance": false,
+  "retainedQualificationLimits": true,
+  "sourceContracts": {
+    "B01": "42D622BF5741C8C8DC68B5B64E192ED83C08247963CE99249FE05C371070E970",
+    "B03": "9D0BFFA85800DBDF6BB58EA37BF1AD1E72DBFE331AEDB3756616B94885F11788"
+  }
+}

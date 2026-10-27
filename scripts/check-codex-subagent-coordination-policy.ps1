@@ -8885,6 +8885,15 @@ function Invoke-Lf01Admission {
   Write-Output "LF-01 admission passed: phase=$ProductionPhase; owners=$($owners.Count); baseline=$base; no APK/provider/acceptance authority."
 }
 
+# Founder-approved PROFILE-INTEGRATION-01 follows the sealed Profile source, preserving
+# the historical frontend/integration admission bodies unchanged.
+if ($ProductionTicketId -ceq 'PROFILE-INTEGRATION-01' -or $ProductionWorkId -ceq 'profile-combined-20261027' -or
+    $root.Replace('\','/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-profile-combined-20261027') {
+  . (Join-Path $root 'scripts/profile-combined-admission.ps1')
+  Invoke-ProfileCombinedAdmission
+  return
+}
+
 # A new authorized frontend task must not replay the completed integration graph.
 if ($ProductionTicketId -ceq 'LF-01' -or $ProductionWorkId -ceq 'last-frontend-lf01-20261015' -or
     $root.Replace('\','/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015') {

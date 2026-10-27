@@ -119,3 +119,6 @@ docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-FOCUSED.jsonl text eol=lf
 docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-1.jsonl text eol=lf
 docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-2.jsonl text eol=lf
 docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-3.jsonl text eol=lf
+
+# Preserve the exact founder-approved COMBINED interaction contract across checkouts.
+docs/quality/PROFILE-INTEGRATION-01-CONTRACT-20261027.md text eol=lf
