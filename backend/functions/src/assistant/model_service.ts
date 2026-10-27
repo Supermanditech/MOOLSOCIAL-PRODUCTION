@@ -4,15 +4,20 @@ import type {AccountPlansService, PlansScope} from "../account/plans_service.js"
 import {assertStrictSchema, canonical, digest, fail, id, text, clarificationToolName, type AssistantCommand, type PreparationContext, type PreparationReply, type PreparationRequest} from "./model_contract.js";
 import type {PreparationModel} from "./responses_transport.js";
 
-export type PreparationState = {state: "pending" | "cancelled" | "failed"} | {state: "ready"; reply: PreparationReply};
+export type PreparationState = {state: "pending" | "uncertain" | "cancelled" | "failed"} | {state: "ready"; reply: PreparationReply};
+export interface PreparationRequestIdentity {
+  readonly ownerUid: string; readonly projectId: string; readonly scope: PlansScope; readonly requestId: string;
+}
 export interface PreparationRequestStore {
   /** Must be atomic, owner-keyed and durable before production enablement. No in-memory runtime fallback. */
-  claim(key: string, fingerprint: string): Promise<{state: "claimed"; lease: string} | {state: "conflict"} | PreparationState>;
+  claim(key: string, fingerprint: string, identity?: PreparationRequestIdentity): Promise<{state: "claimed"; lease: string} | {state: "conflict"} | PreparationState>;
   /** Undefined means authoritative absence; an unavailable store must throw. */
-  read(key: string): Promise<PreparationState | undefined>;
+  read(key: string, identity?: PreparationRequestIdentity): Promise<PreparationState | undefined>;
   /** Atomic lease/cancellation check; a late completion cannot overwrite cancel. */
-  finish(key: string, lease: string, result: PreparationState): Promise<PreparationState>;
-  cancel(key: string): Promise<PreparationState | undefined>;
+  finish(key: string, lease: string, result: PreparationState, identity?: PreparationRequestIdentity): Promise<PreparationState>;
+  cancel(key: string, identity?: PreparationRequestIdentity): Promise<PreparationState | undefined>;
+  /** Durable single-dispatch barrier; absent only in isolated legacy host fixtures. */
+  markDispatched?(key: string, lease: string, identity?: PreparationRequestIdentity): Promise<void>;
 }
 export interface PreparationUsageAuthority {
   reserve(actor: AccountProfileActor, request: PreparationRequest): Promise<{id: string; validUntil: string}>;
@@ -63,11 +68,12 @@ export class AssistantPreparationService {
     const request = cmd.payload;
     if (!actor.uid || actor.projectId !== this.deps.projectId || actor.tenantId !== undefined) return fail("account_scope_mismatch", 403);
     const store = this.deps.requests;
+    const identity: PreparationRequestIdentity = {ownerUid: actor.uid, projectId: actor.projectId, scope: request.scope, requestId: request.requestId};
     const key = digest({actor: {uid: actor.uid, projectId: actor.projectId}, scope: request.scope, requestId: request.requestId});
     if (cmd.operation === "cancel") {
       if (!store) return fail();
       this.cancellations.get(key)?.abort();
-      if (!await store.cancel(key)) return fail("request_not_found", 404);
+      if (!await store.cancel(key, identity)) return fail("request_not_found", 404);
       // An owner may stop their own preparation after paid access expires.
       // Never return retained private proposal data through this control path.
       return {state: "cancelled"};
@@ -75,14 +81,14 @@ export class AssistantPreparationService {
     const before = await this.paid(actor, request.scope);
     if (!store) return fail();
     if (cmd.operation === "status") {
-      const state = await store.read(key) ?? fail("request_not_found", 404);
+      const state = await store.read(key, identity) ?? fail("request_not_found", 404);
       return this.validateReady(actor, state, before.revision);
     }
     if (cmd.operation !== "prepare") return fail("invalid_request", 400);
     const input = cmd.payload;
     if (input.expectedEntitlementRevision !== before.revision) return fail("stale_entitlement", 409);
     if (!this.deps.context || !this.deps.usage || !this.deps.model) return fail();
-    const claim = await store.claim(key, digest(input));
+    const claim = await store.claim(key, digest(input), identity);
     if (claim.state === "conflict") return fail("request_identity_conflict", 409);
     if (claim.state !== "claimed") {
       return this.validateReady(actor, claim, before.revision);
@@ -110,13 +116,14 @@ export class AssistantPreparationService {
       if (abort.signal.aborted || before.until <= this.now() || before.revision !== spending.revision ||
           expiry(spendingContext.validUntil) <= this.now() ||
           binding !== contextBinding({...spendingContext, tools: spendingContext.tools.filter(t => input.actionId === null || t.actionId === input.actionId)})) return fail("stale_preparation", 409);
+      await store.markDispatched?.(key, claim.lease, identity);
       const prepared = await this.deps.model.prepare(input, tools, abort.signal, context.modelContext);
-      if (abort.signal.aborted) return await store.finish(key, claim.lease, {state: "cancelled"});
+      if (abort.signal.aborted) return await store.finish(key, claim.lease, {state: "cancelled"}, identity);
       const after = await this.paid(actor, input.scope);
       const current = await this.deps.context.read(actor, input);
-      const latest = await store.read(key);
+      const latest = await store.read(key, identity);
       if (!latest) return fail("request_state_unavailable");
-      if (abort.signal.aborted || latest?.state === "cancelled") return await store.finish(key, claim.lease, {state: "cancelled"});
+      if (abort.signal.aborted || latest?.state === "cancelled") return await store.finish(key, claim.lease, {state: "cancelled"}, identity);
       if (before.revision !== after.revision || binding !== contextBinding({...current, tools: current.tools.filter(t => input.actionId === null || t.actionId === input.actionId)})) return fail("stale_preparation", 409);
       const checked = this.now(), until = Math.min(before.until, after.until, expiry(context.validUntil), expiry(current.validUntil), expiry(permit.validUntil));
       if (until <= checked) return fail("stale_preparation", 409);
@@ -141,9 +148,9 @@ export class AssistantPreparationService {
           binding !== contextBinding({...finalContext, tools: finalContext.tools.filter(t => input.actionId === null || t.actionId === input.actionId)})) return fail("stale_preparation", 409);
       if (abort.signal.aborted || this.now() >= until) return fail("stale_preparation", 409);
       return await store.finish(key, claim.lease, {state: "ready", reply: {requestId: input.requestId, requestRevision: input.requestRevision,
-        scope: input.scope, entitlementRevision: after.revision, checkedAt: new Date(checked).toISOString(), validUntil: new Date(until).toISOString(), outcome}});
+        scope: input.scope, entitlementRevision: after.revision, checkedAt: new Date(checked).toISOString(), validUntil: new Date(until).toISOString(), outcome}}, identity);
     } catch (error) {
-      await store.finish(key, claim.lease, {state: abort.signal.aborted ? "cancelled" : "failed"});
+      await store.finish(key, claim.lease, {state: abort.signal.aborted ? "cancelled" : "failed"}, identity);
       throw error;
     } finally {
       if (permit && !settled) await this.deps.usage.settle(permit.id, "uncertain");

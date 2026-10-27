@@ -25,6 +25,31 @@ typedef AccountProfileOwner = ({
   String userId,
 });
 
+/// B04 provenance only. A native Save still supplies the final payload and
+/// original operation ID; this value cannot grant permission or trigger a write.
+class AccountProfileAssistantConsent {
+  const AccountProfileAssistantConsent({required this.preparationRequestId, required this.proposalId,
+    required this.actionId, required this.entityId, required this.sourceRevision, required this.entitlementRevision});
+  final String preparationRequestId, proposalId, actionId, sourceRevision, entitlementRevision;
+  final String? entityId;
+  Map<String,Object?> toJson() {
+    if (!{'AI-ACT-197','AI-ACT-025','AI-ACT-026'}.contains(actionId) ||
+        !RegExp(r'^profile:[0-9]+$').hasMatch(sourceRevision) || entitlementRevision.isEmpty || entitlementRevision.length>256) {
+      throw const AccountProfileFailure('invalid_profile_request');
+    }
+    return {'preparationRequestId':_id(preparationRequestId),'proposalId':_id(proposalId),
+      'actionId':actionId,'entityId':entityId==null?null:_id(entityId),'sourceRevision':sourceRevision,'entitlementRevision':entitlementRevision};
+  }
+  factory AccountProfileAssistantConsent.fromJson(Object? raw) {
+    final value=_map(raw);
+    _keys(value,{'preparationRequestId','proposalId','actionId','entityId','sourceRevision','entitlementRevision'});
+    final result=AccountProfileAssistantConsent(preparationRequestId:_id(value['preparationRequestId']),proposalId:_id(value['proposalId']),
+      actionId:_id(value['actionId']),entityId:value['entityId']==null?null:_id(value['entityId']),
+      sourceRevision:_text(value['sourceRevision']),entitlementRevision:_text(value['entitlementRevision']));
+    result.toJson();return result;
+  }
+}
+
 abstract interface class AccountProfileGatewaySource {
   AccountProfileGateway? profileGateway(
     AccountProfileOwner owner,
@@ -506,6 +531,7 @@ class AccountProfileGateway {
           try {
             final receipt = await _call('reconcile', {
               'requestId': request['requestId'],
+              if(request.containsKey('assistant')) 'assistant':request['assistant'],
             });
             return await _confirmed(
               receipt ?? await _call('save', request),
@@ -532,7 +558,8 @@ class AccountProfileGateway {
     if (journal['ownerKey'] != _ownerKey)
       throw const AccountProfileFailure('account_scope_mismatch');
     final request = _map(journal['request']);
-    _keys(request, {'requestId', 'expectedRevision', 'change'});
+    _keys(request, {'requestId', 'expectedRevision', 'change', if(request.containsKey('assistant')) 'assistant'});
+    if(request.containsKey('assistant')) AccountProfileAssistantConsent.fromJson(request['assistant']);
     _id(request['requestId']);
     _revision(request['expectedRevision']);
     _change(request['change']);
@@ -549,6 +576,10 @@ class AccountProfileGateway {
           'account_restricted',
           'account_not_ready',
           'profile_request_too_large',
+          'invalid_profile_preparation',
+          'profile_operation_conflict',
+          'stale_preparation',
+          'ai_access_required',
         }.contains(error.code)) {
       await _pendingStore.clear(_ownerKey);
       _snapshot = null;
@@ -563,7 +594,7 @@ class AccountProfileGateway {
 
   Future<AccountProfileSnapshot> saveDelivery(
     List<BuyV2Address> addresses,
-    String? selectedId,
+    String? selectedId, {AccountProfileAssistantConsent? assistant}
   ) => save({
     'kind': 'delivery',
     'addresses': addresses
@@ -582,13 +613,14 @@ class AccountProfileGateway {
         )
         .toList(),
     'selectedAddressId': selectedId,
-  });
+  }, assistant:assistant);
 
   Future<AccountProfileSnapshot> save(
-    Map<String, Object?> change,
+    Map<String, Object?> change, {AccountProfileAssistantConsent? assistant}
   ) => _exclusive(() async {
     // Freeze before the first await; callers cannot change a dispatched request.
     final frozen = _change(jsonDecode(jsonEncode(change)));
+    final prepared=assistant?.toJson();
     if (!{'name', 'delivery', 'invoices'}.contains(frozen['kind'])) {
       throw const AccountProfileFailure('invalid_profile_request');
     }
@@ -597,7 +629,7 @@ class AccountProfileGateway {
     Map<String, Object?> request;
     if (pending != null) {
       request = _originalRequest(pending);
-      if (jsonEncode(request['change']) != jsonEncode(frozen)) {
+      if (jsonEncode(request['change']) != jsonEncode(frozen) || jsonEncode(request['assistant']) != jsonEncode(prepared)) {
         throw const AccountProfileFailure(
           'profile_original_save_pending',
           uncertain: true,
@@ -605,13 +637,16 @@ class AccountProfileGateway {
       }
       final original = await _call('reconcile', {
         'requestId': request['requestId'],
+              if(request.containsKey('assistant')) 'assistant':request['assistant'],
       });
       if (original != null) return _confirmed(original, request);
     } else {
       final current = _snapshot;
       if (current == null)
         throw const AccountProfileFailure('profile_read_required');
+      if(prepared!=null && assistant!.sourceRevision!='profile:${current.revision}') throw const AccountProfileFailure('stale_preparation');
       request = {
+        if(prepared!=null) 'assistant':prepared,
         'requestId': _id(_requestId()),
         'expectedRevision': current.revision,
         'change': frozen,

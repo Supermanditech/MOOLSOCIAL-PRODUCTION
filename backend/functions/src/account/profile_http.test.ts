@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {handleAccountProfileRequest,type AccountProfileHttpDependencies,type AccountProfileHttpInput} from "./profile_http.js";
-import {AccountProfileService,type AccountProfileRepository,type AccountProfileAccount} from "./profile_service.js";
+import {AccountProfileError,AccountProfileService,type AccountProfileRepository,type AccountProfileAccount} from "./profile_service.js";
 function setup(){
   let reads=0,commits=0;
   const proofs:boolean[]=[];
@@ -85,4 +85,27 @@ test("B01 HTTP host: unknown write result remains explicitly uncertain",async()=
    requestId:"request-one",expectedRevision:0,change:{kind:"name",displayName:"Fixture name"}}}},deps);
  assert.equal(r.status,503);assert.equal(r.body.ok,false);
  if(!r.body.ok){assert.equal(r.body.error.uncertain,true);assert.equal(r.body.error.code,"profile_outcome_unknown");}
+});
+
+
+test("B04 HTTP prepared Save stays unavailable without its qualified original-operation wrapper",async()=>{
+ const f=setup(),r=await handleAccountProfileRequest({...f.input,body:{operation:"save",payload:{requestId:"host-op",expectedRevision:0,change:{kind:"name",displayName:"Host name"},assistant:{}}}},f.deps);
+ assert.equal(r.status,503);assert.deepEqual(f.counts(),{reads:0,commits:0});
+});
+test("B04 HTTP prepared Save retains verified actor and consumed native-write proof",async()=>{
+ const f=setup();let invoked=0;
+ const r=await handleAccountProfileRequest({...f.input,body:{operation:"save",payload:{requestId:"host-op",expectedRevision:0,change:{kind:"name",displayName:"Host final name"},assistant:{hostOnly:true}}}},
+ {...f.deps,assistant:{async save(actor,raw){invoked++;assert.equal(actor.uid,"fixture-owner");const v=raw as {requestId:string;expectedRevision:number;change:unknown};return f.deps.service.save(actor,{requestId:v.requestId,expectedRevision:v.expectedRevision,change:v.change});},async reconcile(){throw Error("Unexpected");}}});
+ assert.equal(r.status,200);assert.equal(invoked,1);assert.deepEqual(f.proofs,[true]);assert.equal(f.counts().commits,1);
+});
+test("B04 HTTP original reconciliation never consumes a new write proof",async()=>{
+ const f=setup();let invoked=0;
+ const r=await handleAccountProfileRequest({...f.input,body:{operation:"reconcile",payload:{requestId:"host-op",assistant:{hostOnly:true}}}},
+ {...f.deps,assistant:{async save(){throw Error("No Save");},async reconcile(actor){invoked++;assert.equal(actor.uid,"fixture-owner");return null;}}});
+ assert.equal(r.status,200);assert.equal(invoked,1);assert.deepEqual(f.proofs,[false]);assert.equal(f.counts().commits,0);
+});
+test("B04 HTTP uncertain confirmed-dispatch outcome keeps explicit original recovery status",async()=>{
+ const f=setup();const r=await handleAccountProfileRequest({...f.input,body:{operation:"save",payload:{requestId:"host-op",expectedRevision:0,change:{kind:"name",displayName:"Host name"},assistant:{}}}},
+ {...f.deps,assistant:{async save(){throw new AccountProfileError("profile_outcome_unknown",503,true);},async reconcile(){return null;}}});
+ assert.equal(r.status,503);assert.equal(r.body.ok,false);if(!r.body.ok)assert.equal(r.body.error.uncertain,true);
 });

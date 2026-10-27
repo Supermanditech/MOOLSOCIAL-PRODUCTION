@@ -426,7 +426,10 @@ mutation UpdateYouTubePublicationIfConnected(
 # Existing account-erasure worker calls this server-only connector operation.
 # Tombstone the account rather than deleting historical order/invoice links.
 # Original save receipts also contain private Profile data and must be erased.
-mutation EraseMoolSocialUser($userId: String!) @auth(level: NO_ACCESS) {
+mutation EraseMoolSocialUser($userId: String!) @auth(level: NO_ACCESS) @transaction {
+  assistantPreparationRequest_deleteMany(where: {owner: {uid: {eq: $userId}}})
+  assistantUsageReservation_deleteMany(where: {owner: {uid: {eq: $userId}}})
+  assistantProfileOperation_deleteMany(where: {owner: {uid: {eq: $userId}}})
   appUser_update(
     key: {uid: $userId}
     data: {

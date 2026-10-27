@@ -6172,14 +6172,14 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> refreshAccountProfileAddresses() async {
+  Future<bool> refreshAccountProfileAddresses({bool preparationOnly=false}) async {
     final gateway = _accountProfileGateway;
     if (gateway == null) return true;
     await restoreCustomerState();
     if (_collectionDisposed || !identical(gateway,_accountProfileGateway) ||
         gateway.ownerScope != customerStateStore?.ownerScope || cartChangesBlocked) return false;
     try {
-      final saved = await gateway.read();
+      final saved = preparationOnly ? await gateway.readForPreparation() : await gateway.read();
       if (_collectionDisposed || !identical(gateway,_accountProfileGateway) ||
           gateway.ownerScope != customerStateStore?.ownerScope || cartChangesBlocked) return false;
       _applyProfileAddresses(saved);
@@ -6190,7 +6190,7 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
-  Future<bool> _saveProfileAddresses(List<BuyV2Address> addresses, String? selectedId) async {
+  Future<bool> _saveProfileAddresses(List<BuyV2Address> addresses, String? selectedId, {AccountProfileAssistantConsent? assistant}) async {
     final gateway = _accountProfileGateway;
     if (gateway == null || _profileAddressesBusy || _holdCartForPaymentResolution()) return false;
     if (_profileAddressRevision == null || _profileAddressRevision != gateway.snapshot?.revision) {
@@ -6200,7 +6200,7 @@ class BuyV2Session extends ChangeNotifier {
     _profileAddressesBusy=true;
     notifyListeners();
     try {
-      final saved=await gateway.saveDelivery(addresses,selectedId);
+      final saved=await gateway.saveDelivery(addresses,selectedId,assistant:assistant);
       if (_collectionDisposed || !identical(gateway,_accountProfileGateway) ||
           gateway.ownerScope != customerStateStore?.ownerScope) return false;
       _applyProfileAddresses(saved);
@@ -6219,8 +6219,9 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
-  Future<bool> saveAddressConfirmed(BuyV2Address address, {bool existing=false}) async {
+  Future<bool> saveAddressConfirmed(BuyV2Address address, {bool existing=false, AccountProfileAssistantConsent? assistant}) async {
     if (_accountProfileGateway == null) {
+      if(assistant!=null) return false;
       if (existing) return updateAddress(address);
       addAddress(address);return _selectedAddressId == address.id && _addresses.contains(address);
     }
@@ -6228,7 +6229,7 @@ class BuyV2Session extends ChangeNotifier {
     if (existing ? index<0 : index>=0) return false;
     final next=List<BuyV2Address>.of(_addresses);
     if (existing) {next[index]=address;} else {next.add(address);}
-    return _saveProfileAddresses(next,existing ? _selectedAddressId : address.id);
+    return _saveProfileAddresses(next,existing ? _selectedAddressId : address.id,assistant:assistant);
   }
 
   Future<bool> chooseAddressConfirmed(String id) async {

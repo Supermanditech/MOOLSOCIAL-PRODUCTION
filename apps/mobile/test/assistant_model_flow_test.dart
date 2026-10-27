@@ -204,6 +204,8 @@ fixture(
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
 
   test('THIN-B03 unsent capture failure permits fresh explicit prepare without status recovery', () async {
     final guard=_CaptureGuard();

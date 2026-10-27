@@ -1,3 +1,4 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
@@ -94,6 +95,8 @@ SocialContentResponse modelResponse(Map<String, Object?> data) =>
       body: jsonEncode({'ok': true, 'data': data}),
     );
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
   test(
     'AI-B01 gateway sends original Unicode and exact scope without submitted owner/key',
     () async {

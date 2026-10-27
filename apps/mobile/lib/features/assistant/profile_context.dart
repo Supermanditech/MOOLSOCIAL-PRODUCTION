@@ -45,7 +45,7 @@ class _NativeAnchor {
 
 /// Binds original local snapshots BEFORE inference. A later fresh native token
 /// can never be substituted to make an older server preparation look current.
-class AssistantProfileContextGuard implements MoolAssistantPreparationGuard {
+class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, MoolAssistantRecoveredReviewGuard {
   AssistantProfileContextGuard({required this.readCanonical,
     required this.readContext, required this.ownerChanges,
     required Iterable<MoolAssistantNativeAdapter> nativeAdapters,
@@ -84,6 +84,22 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard {
   };
   @override void retire() {
     _generation++; _anchors = const {}; _canonical = null;
+  }
+  @override Future<void> captureRecoveredReview(MoolAssistantContext context,
+      MoolAssistantProposal proposal, bool Function() valid) async {
+    if(!valid() || !proposal.recovered || proposal.preparationRequestId==null ||
+       !assistantProfileContextActions.contains(proposal.actionId) ||
+       proposal.preparationSourceRevision!=proposal.sourceRevision) throw const AssistantModelFailure('stale_preparation');
+    final canonical=await readCanonical(context,valid);
+    if(!valid() || canonical.binding!=context.binding || canonical.revisions[(proposal.actionId,proposal.entityId)]!=proposal.sourceRevision) {
+      throw const AssistantModelFailure('stale_preparation');
+    }
+    // The user explicitly requested a NEW native review of the original result.
+    // Existing editors/drafts must still satisfy each original adapter snapshot;
+    // no old token is relabelled and no form is opened or saved during capture.
+    await capture(context,valid);
+    if(!valid() || _canonical?.revisions[(proposal.actionId,proposal.entityId)]!=proposal.sourceRevision ||
+       !_anchors.containsKey((proposal.actionId,proposal.entityId))) throw const AssistantModelFailure('stale_preparation');
   }
   @override Future<void> capture(MoolAssistantContext context, bool Function() valid) async {
     retire(); final generation = _generation;
@@ -163,6 +179,8 @@ class _CanonicalNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter {
       binding: proposal.binding, requestRevision: proposal.requestRevision,
       entitlementRevision: proposal.entitlementRevision, validUntil: proposal.validUntil,
       sourceRevision: anchor.native.sourceRevision, entityId: proposal.entityId,
+      preparationRequestId: proposal.preparationRequestId, recovered:proposal.recovered,
+      preparationSourceRevision: proposal.preparationSourceRevision,
       title: proposal.title, summary: proposal.summary, fields: proposal.fields);
     bool current() => isCurrent() && guard.current;
     final owner = Listenable.merge([guard.ownerChanges, ownerChanges]);

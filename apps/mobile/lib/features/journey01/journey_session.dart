@@ -223,16 +223,18 @@ class JourneySession extends ChangeNotifier {
     on Object {return false;}
   }
 
-  Future<bool> saveAccountProfileName(String name) async {
+  Future<bool> saveAccountProfileName(String name, {AccountProfileAssistantConsent? assistant}) async {
     final gateway = accountProfileGateway;
     if (gateway == null) return false;
     final normalised=name.trim().replaceAll(RegExp(r'\s+'),' ');
     if (normalised.length<2 || normalised.length>60) return false;
     try {
-      if (gateway.snapshot == null) await gateway.read();
+      if (gateway.snapshot == null) {
+        if(assistant==null) {await gateway.read();} else {await gateway.readForPreparation();}
+      }
       final current=gateway.snapshot;
       if (current?.displayName==normalised) return _applyCanonicalProfile(gateway,current!);
-      final saved = await gateway.save({'kind':'name','displayName':normalised});
+      final saved = await gateway.save({'kind':'name','displayName':normalised},assistant:assistant);
       return _applyCanonicalProfile(gateway,saved);
     } on Object {return false;}
   }

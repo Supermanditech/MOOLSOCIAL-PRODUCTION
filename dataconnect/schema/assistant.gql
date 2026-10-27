@@ -1,0 +1,49 @@
+# B07 local source contract. Provisioning, generated-SDK and deployed SQL
+# qualification remain deferred. Required AppUser references use the existing
+# account master and cascade on account deletion; no independent identity store.
+type AssistantPreparationRequest @table(name: "assistant_preparation_request", key: "requestKey") {
+  requestKey: String! @col(dataType: "varchar(64)")
+  owner: AppUser!
+  projectId: String!
+  scopeJson: String!
+  requestId: String! @col(dataType: "varchar(128)")
+  fingerprint: String @col(dataType: "varchar(64)")
+  lease: String! @col(dataType: "varchar(128)")
+  state: String! @col(dataType: "varchar(16)")
+  dispatched: Boolean! @default(value: false)
+  validUntil: Timestamp!
+  resultJson: String
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+# Technical reservations and observed completion/uncertainty, not an entitlement
+# issuer, token-price table, quota schedule or confirmed monetary charge.
+type AssistantUsageReservation @table(name: "assistant_usage_reservation", key: "requestKey") {
+  requestKey: String! @col(dataType: "varchar(64)")
+  reservationId: String! @col(dataType: "varchar(128)") @unique
+  owner: AppUser!
+  projectId: String!
+  scopeJson: String!
+  requestId: String! @col(dataType: "varchar(128)")
+  fingerprint: String! @col(dataType: "varchar(64)")
+  state: String! @col(dataType: "varchar(16)")
+  grantJson: String
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+# A preparation links to at most one original Profile operation. The original
+# Profile receipt remains the result authority; no Profile master is duplicated.
+type AssistantProfileOperation @table(name: "assistant_profile_operation", key: "preparationKey") {
+  preparationKey: String! @col(dataType: "varchar(64)")
+  owner: AppUser!
+  projectId: String!
+  operationId: String! @col(dataType: "varchar(128)")
+  proposalId: String! @col(dataType: "varchar(128)")
+  fingerprint: String! @col(dataType: "varchar(64)")
+  consentJson: String!
+  confirmedRevision: Int
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}

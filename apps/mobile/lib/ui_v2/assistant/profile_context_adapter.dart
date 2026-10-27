@@ -1,3 +1,4 @@
+import '../../features/journey01/account_profile_gateway.dart' show AccountProfileAssistantConsent;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../features/assistant/mool_assistant.dart';
@@ -152,6 +153,15 @@ class _OriginalProfileAdapter implements MoolAssistantOwnerAwareNativeAdapter {
         proposal.binding != context.binding || validateFields(proposal.fields) != null) return MoolAssistantReviewResult.stale;
     bool current() => isCurrent() && _actorCurrent && context.binding == currentContext().binding;
     final profile = session.accountProfileGateway!.snapshot!;
+    AccountProfileAssistantConsent? consent;
+    if (_address || actionId=='AI-ACT-197') {
+      if(proposal.preparationRequestId==null || proposal.preparationSourceRevision!='profile:${profile.revision}') {
+        return MoolAssistantReviewResult.unavailable;
+      }
+      consent=AccountProfileAssistantConsent(preparationRequestId:proposal.preparationRequestId!,proposalId:proposal.id,
+        actionId:actionId,entityId:proposal.entityId,sourceRevision:proposal.preparationSourceRevision!,entitlementRevision:proposal.entitlementRevision);
+      consent.toJson();
+    }
     final owner = Listenable.merge([changes, ownerChanges, session, buy]);
     if (!navigator.mounted) return MoolAssistantReviewResult.stale;
     _open = true;
@@ -161,7 +171,7 @@ class _OriginalProfileAdapter implements MoolAssistantOwnerAwareNativeAdapter {
       } else if (_address || actionId == 'AI-ACT-196' && proposal.fields['section'] == 'delivery') {
         if (_address) {
           await showBuyV2AddressInitialReview(navigator.context, buy,
-            initialData: BuyV2AddressInitialData.fromFields(proposal.fields), scopeOwner: owner, isCurrent: current,
+            initialData: BuyV2AddressInitialData.fromFields(proposal.fields), scopeOwner: owner, isCurrent: current, assistant:consent,
             existingAddress: actionId == 'AI-ACT-026' ? profile.deliveryAddresses.where((a) => a.id == proposal.entityId).singleOrNull : null);
         } else {
           await showBuyV2AddressSheet(navigator.context, buy);
@@ -170,7 +180,7 @@ class _OriginalProfileAdapter implements MoolAssistantOwnerAwareNativeAdapter {
         late final MaterialPageRoute<void> route;
         void close() {if (route.isCurrent && navigator.mounted) navigator.pop();}
         route = MaterialPageRoute<void>(builder: (_) => actionId == 'AI-ACT-197'
-          ? GlobalPersonalProfileNameEditorV2(session: session, onSaveDisplayName: session.saveAccountProfileName,
+          ? GlobalPersonalProfileNameEditorV2(session: session, onSaveDisplayName: (name) => session.saveAccountProfileName(name,assistant:consent),
               preparation: AssistantProfileNamePrefill(owner: session.authenticatedBuyPersistenceIdentity!, revision: profile.revision,
                 displayName: proposal.fields['displayName'] as String), preparationCurrent: current, onPreparedClose: close)
           : GlobalPersonalProfileV2(session: session, onPreparedClose: close,

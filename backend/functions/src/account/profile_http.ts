@@ -1,3 +1,5 @@
+import type {ProfilePreparationExecutionService} from "../assistant/profile_execution.js";
+import {AssistantModelError} from "../assistant/model_contract.js";
 import { SocialContentError } from "../social/contracts.js";
 import { verifySocialInvocation, type VerifiedSocialAppCheck } from "../social/request_security.js";
 import { AccountProfileError, type AccountProfileActor, type AccountProfileService } from "./profile_service.js";
@@ -10,6 +12,7 @@ export interface AccountProfileHttpDependencies {
   verifyAppCheck(token:string,consume:boolean):Promise<VerifiedSocialAppCheck>;
   verifyIdToken(token:string):Promise<AccountProfileActor & {anonymous?:boolean}>;
   readonly service: AccountProfileService;
+  readonly assistant?: Pick<ProfilePreparationExecutionService, "save" | "reconcile">;
 }
 export interface AccountProfileHttpInput {
   readonly method: string;
@@ -65,12 +68,18 @@ export async function handleAccountProfileRequest(input:AccountProfileHttpInput,
     },body.operation==="save",true);
     if(!uid||!actor||actor.uid!==uid)throw new AccountProfileError("authentication_required",401);
     if(!deps.storageQualified)throw new AccountProfileError("profile_service_unavailable",503);
+    const prepared = Object.hasOwn(payload, "assistant");
+    if (prepared && !deps.assistant) throw new AccountProfileError("profile_preparation_unavailable",503);
     const data=body.operation==="read"?await deps.service.read(actor):
-      body.operation==="save"?await deps.service.save(actor,payload):await deps.service.reconcile(actor,payload);
+      body.operation==="save" ? prepared ? await deps.assistant!.save(actor,payload) : await deps.service.save(actor,payload)
+      : prepared ? await deps.assistant!.reconcile(actor,payload) : await deps.service.reconcile(actor,payload);
     return {status:200,body:{ok:true,data}};
   }catch(error){
     if(error instanceof AccountProfileError){
       return {status:error.status,body:{ok:false,error:{code:error.code,message:message(error.code),uncertain:error.uncertain}}};
+    }
+    if(error instanceof AssistantModelError){
+      return {status:error.status,body:{ok:false,error:{code:error.code,message:message(error.code),uncertain:false}}};
     }
     if(error instanceof SocialContentError){
       return {status:error.httpStatus,body:{ok:false,error:{code:error.code,message:message(error.code),uncertain:false}}};

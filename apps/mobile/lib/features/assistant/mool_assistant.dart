@@ -1882,6 +1882,9 @@ class MoolAssistantProposal {
     required this.title,
     required this.summary,
     this.entityId,
+    this.preparationRequestId,
+    this.preparationSourceRevision,
+    this.recovered = false,
     required Map<String, Object?> fields,
   }) : fields = _freezeAssistantFields(fields);
 
@@ -1895,6 +1898,8 @@ class MoolAssistantProposal {
   final int requestRevision;
   final DateTime validUntil;
   final String? entityId;
+  final String? preparationRequestId, preparationSourceRevision;
+  final bool recovered;
   final Map<String, Object?> fields;
 }
 
@@ -1972,6 +1977,12 @@ abstract interface class MoolAssistantNativeAdapter {
 }
 
 /// Captures original native state before preparation; it grants no authority.
+/// Used only after the user explicitly chooses Review on a recovered result.
+/// This is a new native review boundary, never a silent replacement of an old draft.
+abstract interface class MoolAssistantRecoveredReviewGuard {
+  Future<void> captureRecoveredReview(MoolAssistantContext context, MoolAssistantProposal proposal, bool Function() current);
+}
+
 abstract interface class MoolAssistantPreparationGuard {
   Future<void> capture(MoolAssistantContext context, bool Function() current);
   bool get current;
@@ -2091,6 +2102,8 @@ class MoolAssistantController extends ChangeNotifier {
   AssistantModelInput? _modelInput;
   AssistantModelSource? _modelSource;
   Object? _modelBinding;
+  bool _modelRecovered = false;
+  Future<void>? _modelRetirement;
   bool get modelReady {
     final source = readModelSource?.call();
     return !_disposed && _foreground && paidAccessCurrent &&
@@ -2103,9 +2116,10 @@ class MoolAssistantController extends ChangeNotifier {
     _modelAttempt++;
     modelBusy = false;
     final input = _modelInput, source = _modelSource;
-    _modelInput = null; _modelSource = null; _modelBinding = null;
+    _modelInput = null; _modelSource = null; _modelBinding = null; _modelRecovered=false;
     if (input != null && source != null && source.available && source.owner == context.accountScope) {
-      unawaited(source.cancel(input).then<void>((_) {}, onError: (Object _) {}));
+      final retiring=source.cancel(input).then<void>((_) {}, onError: (Object _) {});
+      _modelRetirement=retiring;unawaited(retiring);
     }
   }
   void cancelPreparation() {
@@ -2121,6 +2135,7 @@ class MoolAssistantController extends ChangeNotifier {
     final entitlement = _entitlement!.revision;
     final attempt = ++_modelAttempt;
     final statusOnly = _modelInput != null && _modelBinding == binding;
+    final recovered = statusOnly && _modelRecovered;
     final random = math.Random.secure();
     final input = statusOnly ? _modelInput! : AssistantModelInput(
       scope: (audience: context.inWorkspace ? 'workspace' : 'personal', storeId: context.inWorkspace ? context.workspaceId : null),
@@ -2135,7 +2150,7 @@ class MoolAssistantController extends ChangeNotifier {
     bool actorCurrent() => !_disposed && _foreground && attempt == _modelAttempt &&
       binding == _currentContext().binding && revision == _requestRevision &&
       paidAccessCurrent && entitlement == _entitlement?.revision;
-    var captured = statusOnly;
+    var captured = statusOnly && !recovered;
     var submitted = statusOnly;
     bool current() => actorCurrent() && (!captured || preparationGuard?.current != false);
     void unsent() {
@@ -2145,6 +2160,8 @@ class MoolAssistantController extends ChangeNotifier {
       if (actorCurrent()) notice = 'The original details are unavailable. Review your draft and try again.';
     }
     try {
+      await _modelRetirement;
+      if(!actorCurrent())return false;
       if (!statusOnly && preparationGuard != null) {
         await preparationGuard!.capture(context, actorCurrent);
         captured = true;
@@ -2154,31 +2171,46 @@ class MoolAssistantController extends ChangeNotifier {
       final reply = await (statusOnly ? source.status(input, current) : source.prepare(input, current));
       if (!current()) return false;
       modelBusy = false;
+      if(reply.state=='uncertain'){notice='The earlier request has an uncertain outcome. Start a new chat to cancel it before asking again.';return false;}
       if (reply.state == 'pending') {
         notice = 'Still preparing. Tap Send to check this request.'; return false;
       }
-      _modelInput = null; _modelSource = null; _modelBinding = null;
+      if(reply.state!='ready'){_modelInput = null; _modelSource = null; _modelBinding = null;_modelRecovered=false;}
       if (reply.state != 'ready' || reply.requestId != input.requestId ||
-          reply.requestRevision != revision || reply.entitlementRevision != entitlement ||
+          reply.requestRevision != input.requestRevision || reply.entitlementRevision != entitlement ||
           reply.validUntil?.isAfter(_clock()) != true || reply.outcome == null) {
         notice = 'This request could not be prepared. Your draft is unchanged.'; return false;
       }
       final outcome = reply.outcome!;
       if (outcome['kind'] == 'clarification') {
+        if(source is RecoverableAssistantModelSource)await source.acknowledge(input);
+        if(!current())return false;
         messages = List.unmodifiable([...messages, (true, input.message), (false, outcome['text'] as String)]);
+        _modelInput=null;_modelSource=null;_modelBinding=null;_modelRecovered=false;preparationGuard?.retire();
         _draft = ''; _requestRevision++;
         return true;
       }
       final accepted = receiveProposal(MoolAssistantProposal(
         id: outcome['id'] as String, actionId: outcome['actionId'] as String,
+        preparationRequestId: input.requestId, preparationSourceRevision: outcome['sourceRevision'] as String,
         binding: binding, requestRevision: revision, entitlementRevision: entitlement,
         sourceRevision: outcome['sourceRevision'] as String, validUntil: reply.validUntil!,
-        title: outcome['title'] as String, summary: outcome['summary'] as String,
+        title: outcome['title'] as String, summary: recovered ? 'Recovered suggestion. Review your current details before saving.' : outcome['summary'] as String,
+        recovered:recovered,
         entityId: outcome['entityId'] as String?, fields: Map<String,Object?>.from(outcome['fields'] as Map),
       ));
       if (!accepted) notice = 'This suggestion could not be used. Your draft is unchanged.';
+      if(accepted)_modelRecovered=false;
       return accepted;
     } on Object catch (error) {
+      if(error is AssistantModelFailure && error.code=='original_request_pending' && actorCurrent() && source is RecoverableAssistantModelSource){
+        final previous=await source.pending(input.scope,actorCurrent);
+        if(actorCurrent() && previous!=null){
+          _modelInput=previous;_modelSource=source;_modelBinding=binding;_modelRecovered=true;preparationGuard?.retire();
+          notice='Check the earlier request before starting another. Your new draft is unchanged.';
+        }
+        return false;
+      }
       if (!submitted && actorCurrent()) {unsent(); return false;}
       if (current()) {
         final confirmedRejection = error is AssistantModelFailure && const {
@@ -2345,7 +2377,7 @@ class MoolAssistantController extends ChangeNotifier {
   bool historyLoading = false, historyBusy = false;
   int _historyRead = 0, _historyWrite = 0, _conversationGeneration = 0;
   final String _draftSession = DateTime.now().microsecondsSinceEpoch.toString();
-  bool get hasInput => _draft.trim().isNotEmpty || _selected.isNotEmpty;
+  bool get hasInput => _draft.trim().isNotEmpty || _selected.isNotEmpty || (_modelRecovered && _modelInput!=null);
   bool get canChangeConversation =>
       !historyBusy &&
       !reviewBusy &&
@@ -2515,6 +2547,11 @@ class MoolAssistantController extends ChangeNotifier {
       if (attempt != _reviewAttempt || !_proposalCurrent(value)) {
         return MoolAssistantReviewResult.stale;
       }
+      if(value.recovered){
+        final guard=preparationGuard;
+        if(guard is! MoolAssistantRecoveredReviewGuard){proposalNotice='Open the original screen to review this recovered request.';return MoolAssistantReviewResult.unavailable;}
+        await (guard as MoolAssistantRecoveredReviewGuard).captureRecoveredReview(context,value,()=>attempt==_reviewAttempt && _proposalCurrent(value));
+      }
       final native = await Future.any<MoolAssistantNativeSnapshot?>([
         adapter.snapshot(context, value.entityId),
         retired.future,
@@ -2557,6 +2594,7 @@ class MoolAssistantController extends ChangeNotifier {
       synchronize();
       if (!_proposalCurrent(value)) return MoolAssistantReviewResult.stale;
       _retireProposal(requestChanged: false,preservePreparationBatch:true);
+      if(value.preparationRequestId!=null)_retireModel();
       proposalNotice = switch (result) {
         MoolAssistantReviewResult.opened => null,
         MoolAssistantReviewResult.returnToOwner => 'Your review is ready.',
@@ -2911,6 +2949,15 @@ class MoolAssistantController extends ChangeNotifier {
         access = result.access;
         if (access == MoolAssistantAccess.active) {
           _expiry = Timer(result.validUntil!.difference(_clock()), synchronize);
+          final model=readModelSource?.call();
+          if(model is RecoverableAssistantModelSource && model.available && model.owner==account && !hasInput && _proposal==null && _modelInput==null){
+            final pending=await model.pending((audience:context.inWorkspace?'workspace':'personal',storeId:context.inWorkspace?context.workspaceId:null),
+              ()=>!_disposed && attempt==_readAttempt && binding==_currentContext().binding);
+            if(!_disposed && attempt==_readAttempt && binding==_currentContext().binding && pending!=null && !hasInput && _proposal==null){
+              _modelInput=pending;_modelSource=model;_modelBinding=binding;_modelRecovered=true;
+              notice='An earlier request needs checking. Tap Send to view its status.';
+            }
+          }
         }
       }
     } on Object {

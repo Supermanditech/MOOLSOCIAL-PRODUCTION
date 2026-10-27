@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:async';
+import 'package:crypto/crypto.dart';
+import 'preparation_pending_store.dart';
 import '../journey01/account_profile_gateway.dart' show AccountProfileOwner;
 import '../shared/social_content_gateway.dart';
 
@@ -69,6 +72,11 @@ abstract interface class AssistantModelSource {
   Future<AssistantModelReply> cancel(AssistantModelInput input);
 }
 
+abstract interface class RecoverableAssistantModelSource implements AssistantModelSource {
+  Future<AssistantModelInput?> pending(AssistantModelScope scope, bool Function() current);
+  Future<void> acknowledge(AssistantModelInput input);
+}
+
 abstract interface class AssistantModelGatewaySource {
   AssistantModelGateway? assistantModelGateway(
     AccountProfileOwner owner,
@@ -77,14 +85,16 @@ abstract interface class AssistantModelGatewaySource {
 }
 
 /// Owner-bound transport only. No model key, entitlement issuance or domain writes.
-class AssistantModelGateway implements AssistantModelSource {
+class AssistantModelGateway implements RecoverableAssistantModelSource {
   AssistantModelGateway({
     required this.owner,
     required this.isCurrent,
     required SocialContentCredentials credentials,
     SocialContentTransport? transport,
+    AssistantPreparationPendingStore? pendingStore,
     DateTime Function()? clock,
   }) : _credentials = credentials,
+       _pendingStore = pendingStore ?? SecureAssistantPreparationPendingStore(),
        _transport =
            transport ??
            IoSocialContentTransport(
@@ -102,6 +112,7 @@ class AssistantModelGateway implements AssistantModelSource {
   final AccountProfileOwner owner;
   final bool Function() isCurrent;
   final SocialContentCredentials _credentials;
+  final AssistantPreparationPendingStore _pendingStore;
   final SocialContentTransport _transport;
   final DateTime Function() _clock;
   Future<void> Function(AssistantModelScope)? refreshAuthority;
@@ -111,6 +122,57 @@ class AssistantModelGateway implements AssistantModelSource {
   void dispose() {
     _disposed = true;
     refreshAuthority = null;
+  }
+
+  static final Map<String,Future<void>> _pendingTails={};
+  Future<T> _pendingLock<T>(AssistantModelScope scope, Future<T> Function() operation) async {
+    final key=_pendingKey(scope),previous=_pendingTails[_pendingKey(scope)],done=Completer<void>();
+    _pendingTails[key]=done.future;
+    try {await previous;return await operation();}
+    finally {done.complete();if(identical(_pendingTails[key],done.future))_pendingTails.remove(key);}
+  }
+  String _pendingKey(AssistantModelScope scope) => sha256.convert(utf8.encode(jsonEncode([
+    owner.environment,owner.projectId,owner.tenantId,owner.userId,scope.audience,scope.storeId]))).toString();
+  Future<Map<String,Object?>?> _pendingMetadata(AssistantModelScope scope, bool Function() current) async {
+    _check(current);
+    final raw=await _pendingStore.read(_pendingKey(scope));_check(current);
+    if(raw==null)return null;
+    if(utf8.encode(raw).length>4096)throw const AssistantModelFailure('original_request_pending');
+    final data=_map(jsonDecode(raw),{'schemaVersion','ownerKey','scope','requestId','requestRevision','expectedEntitlementRevision','actionId','entityId','fingerprint'});
+    final savedScope=_map(data['scope'],{'audience','storeId'});
+    if(data['schemaVersion']!=1 || data['ownerKey']!=_pendingKey(scope) || savedScope['audience']!=scope.audience || savedScope['storeId']!=scope.storeId ||
+       !_id(data['requestId']) || data['requestRevision'] is! int || (data['requestRevision'] as int)<0 ||
+       data['expectedEntitlementRevision'] is! String || (data['expectedEntitlementRevision'] as String).length>256 ||
+       data['fingerprint'] is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(data['fingerprint'] as String)) {
+      throw const AssistantModelFailure('original_request_pending');
+    }
+    return data;
+  }
+  @override Future<AssistantModelInput?> pending(AssistantModelScope scope, bool Function() current) async {
+    final data=await _pendingLock(scope,()=>_pendingMetadata(scope,current));if(data==null)return null;
+    return AssistantModelInput(scope:scope,requestId:data['requestId'] as String,requestRevision:data['requestRevision'] as int,
+      message:'Recovered request',language:'Auto',expectedEntitlementRevision:data['expectedEntitlementRevision'] as String,
+      actionId:data['actionId'] as String?,entityId:data['entityId'] as String?);
+  }
+  Future<void> _journal(AssistantModelInput input,bool Function() current) => _pendingLock(input.scope,()=>_journalUnlocked(input,current));
+  Future<void> _journalUnlocked(AssistantModelInput input,bool Function() current) async {
+    final previous=await _pendingMetadata(input.scope,current);
+    final fingerprint=sha256.convert(utf8.encode(jsonEncode(input.toJson()))).toString();
+    if(previous!=null){
+      if(previous['requestId']!=input.requestId || previous['fingerprint']!=fingerprint)throw const AssistantModelFailure('original_request_pending');
+      return;
+    }
+    final data={'schemaVersion':1,'ownerKey':_pendingKey(input.scope),'scope':{'audience':input.scope.audience,'storeId':input.scope.storeId},
+      'requestId':input.requestId,'requestRevision':input.requestRevision,'expectedEntitlementRevision':input.expectedEntitlementRevision,
+      'actionId':input.actionId,'entityId':input.entityId,'fingerprint':fingerprint};
+    await _pendingStore.write(_pendingKey(input.scope),jsonEncode(data));_check(current);
+  }
+  @override Future<void> acknowledge(AssistantModelInput input) => _clearOriginal(input);
+  Future<void> _clearOriginal(AssistantModelInput input) => _pendingLock(input.scope,()=>_clearOriginalUnlocked(input));
+  Future<void> _clearOriginalUnlocked(AssistantModelInput input) async {
+    if(!available)return;
+    final previous=await _pendingMetadata(input.scope,()=>true);
+    if(previous?['requestId']==input.requestId)await _pendingStore.clear(_pendingKey(input.scope));
   }
 
   void _check(bool Function() current) {
@@ -153,6 +215,7 @@ class AssistantModelGateway implements AssistantModelSource {
         input.expectedEntitlementRevision.length > 256) {
       throw const AssistantModelFailure('invalid_request');
     }
+    if(operation=='prepare')await _journal(input,current);
     final elapsed = Stopwatch()..start();
     try {
       final token = await _credentials.firebaseIdToken();
@@ -224,6 +287,9 @@ class AssistantModelGateway implements AssistantModelSource {
             /* Remain unavailable; never grant from a failed refresh. */
           }
         }
+        if(const {'invalid_request','request_not_found','request_identity_conflict','stale_preparation','stale_entitlement','ai_access_required'}.contains(code)) {
+          await _clearOriginal(input);
+        }
         throw AssistantModelFailure(code);
       }
       final envelope = _map(jsonDecode(response.body), {'ok', 'data'});
@@ -232,10 +298,11 @@ class AssistantModelGateway implements AssistantModelSource {
       final data = _map(envelope['data']);
       final state = data['state'];
       if (state is! String ||
-          !{'pending', 'cancelled', 'failed', 'ready'}.contains(state))
+          !{'pending', 'uncertain', 'cancelled', 'failed', 'ready'}.contains(state))
         throw const AssistantModelFailure('invalid_response');
       if (state != 'ready') {
         _map(data, {'state'});
+        if(state=='cancelled'||state=='failed')await _clearOriginal(input);
         return AssistantModelReply(state: state);
       }
       _map(data, {'state', 'reply'});

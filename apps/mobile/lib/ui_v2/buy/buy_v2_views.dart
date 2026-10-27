@@ -1,3 +1,4 @@
+import '../../features/journey01/account_profile_gateway.dart' show AccountProfileAssistantConsent;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -22979,8 +22980,9 @@ Future<void> showBuyV2AddressInitialReview(BuildContext context, BuyV2Session se
   required Listenable scopeOwner,
   required bool Function() isCurrent,
   BuyV2Address? existingAddress,
+  AccountProfileAssistantConsent? assistant,
 }) => _showAddAddressSheet(context, session, existingAddress: existingAddress,
-    initialData: initialData, scopeOwner: scopeOwner, isCurrent: isCurrent);
+    initialData: initialData, scopeOwner: scopeOwner, isCurrent: isCurrent, assistant:assistant, preparationOnly:true);
 
 Future<void> _showAddAddressSheet(
   BuildContext context,
@@ -22990,11 +22992,13 @@ Future<void> _showAddAddressSheet(
   BuyV2AddressInitialData? initialData,
   Listenable? scopeOwner,
   bool Function()? isCurrent,
+  AccountProfileAssistantConsent? assistant,
+  bool preparationOnly=false,
 }) async {
   if (buyV2AddressFormOpen(session) || isCurrent?.call() == false) return;
   if (session.accountProfileAddressesEnabled) {
     final editingId=existingAddress?.id;
-    if (!await session.refreshAccountProfileAddresses() || !context.mounted ||
+    if (!await session.refreshAccountProfileAddresses(preparationOnly:preparationOnly) || !context.mounted ||
         isCurrent?.call() == false) return;
     if (editingId != null) {
       existingAddress=session.addresses.where((a)=>a.id==editingId).firstOrNull;
@@ -23032,10 +23036,10 @@ Future<void> _showAddAddressSheet(
       return false;
     }
     if (existingAddress == null) {
-      return session.saveAddressConfirmed(address);
+      return session.saveAddressConfirmed(address,assistant:assistant);
     }
     if (existingAddress.id != address.id) return false;
-    return session.saveAddressConfirmed(address,existing:true);
+    return session.saveAddressConfirmed(address,existing:true,assistant:assistant);
   }
 
   _buyAddressForms[session] = true;

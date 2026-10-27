@@ -17,6 +17,9 @@ import {AccountPlansService} from "./account/plans_service.js";
 import {DataConnectAccountPlansRepository} from "./account/plans_dataconnect_store.js";
 import {handleAccountPlansRequest} from "./account/plans_http.js";
 import {AssistantPreparationService} from "./assistant/model_service.js";
+import {DataConnectAssistantSql, DataConnectPreparationRequestStore} from "./assistant/preparation_dataconnect_store.js";
+import {DurablePreparationUsageAuthority} from "./assistant/usage_store.js";
+import {ProfilePreparationExecutionService} from "./assistant/profile_execution.js";
 import {ProfileWorkspacePreparationContext} from "./assistant/profile_context.js";
 import {handleAssistantModelRequest} from "./assistant/model_http.js";
 
@@ -2588,6 +2591,20 @@ export const moolSocialAccountPlans = onRequest(
 // AI-B01 is source-connected but unavailable until the separately deferred
 // credential/model, usage/request-store and trusted context sources are qualified.
 // No in-memory authority, fake provider, client key or billing fallback.
+// Source composition only. No provisioning or qualifier flag is enabled here.
+let assistantDurableRuntime: {projectId: string; sql: DataConnectAssistantSql; requests: DataConnectPreparationRequestStore; usage: DurablePreparationUsageAuthority} | undefined;
+function assistantDurableSources(projectId: string) {
+  if (process.env.MOOLSOCIAL_ASSISTANT_STORAGE_QUALIFIED !== "true") return undefined;
+  if (assistantDurableRuntime && assistantDurableRuntime.projectId !== projectId) throw Error("Assistant source project changed");
+  if (!assistantDurableRuntime) {
+    const sql = new DataConnectAssistantSql(getDataConnect({location: "asia-south1", serviceId: "moolsocial-core", connector: "mobile"}));
+    assistantDurableRuntime = {projectId, sql, requests: new DataConnectPreparationRequestStore(sql, projectId),
+      // An approved usage authorization source is deliberately absent. A paid
+      // feature bit is not a quota/charge policy; reserve therefore stays closed.
+      usage: new DurablePreparationUsageAuthority(sql, projectId)};
+  }
+  return assistantDurableRuntime;
+}
 let assistantPreparationRuntimeService: AssistantPreparationService | undefined;
 export const moolSocialAssistantPreparation = onRequest(
   {region: "asia-south1", timeoutSeconds: 60, memory: "256MiB", minInstances: 0,
@@ -2604,6 +2621,7 @@ export const moolSocialAssistantPreparation = onRequest(
       accountProfileRuntimeService ??= new AccountProfileService(
         new DataConnectAccountProfileRepository(getDataConnect({location: "asia-south1", serviceId: "moolsocial-core", connector: "mobile"})), projectId);
       assistantPreparationRuntimeService ??= new AssistantPreparationService({projectId, plans: accountPlansRuntimeService,
+        ...(assistantDurableSources(projectId) ?? {}),
         ...(process.env.MOOLSOCIAL_ACCOUNT_PROFILE_STORAGE_QUALIFIED === "true" ? {
           context: new ProfileWorkspacePreparationContext({profile: accountProfileRuntimeService, plans: accountPlansRuntimeService,
             workspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)}),
@@ -2641,10 +2659,17 @@ export const moolSocialAccountProfile = onRequest(
       accountProfileRuntimeService ??= new AccountProfileService(
         new DataConnectAccountProfileRepository(getDataConnect({location:"asia-south1",
           serviceId:"moolsocial-core",connector:"mobile"})),projectId);
+      const durable = assistantDurableSources(projectId);
+      if (durable) accountPlansRuntimeService ??= new AccountPlansService(
+        new DataConnectAccountPlansRepository(getDataConnect({location: "asia-south1", serviceId: "moolsocial-core", connector: "mobile"})),
+        {projectId, readWorkspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)});
+      const preparedProfile = durable && accountPlansRuntimeService ? new ProfilePreparationExecutionService({projectId,
+        sql: durable.sql, requests: durable.requests, profile: accountProfileRuntimeService, plans: accountPlansRuntimeService}) : undefined;
       const reply=await handleAccountProfileRequest({method:request.method,headers:request.headers,
       body:request.body,bodyBytes:request.rawBody.byteLength},{projectId,
       storageQualified:process.env.MOOLSOCIAL_ACCOUNT_PROFILE_STORAGE_QUALIFIED === "true",
       service:accountProfileRuntimeService,
+      ...(preparedProfile ? {assistant: preparedProfile} : {}),
       verifyAppCheck:async(token,consume)=>getAppCheck().verifyToken(token,consume?{consume:true}:undefined),
       verifyIdToken:async token=>{
         const verified=await getAuth().verifyIdToken(token,true);
