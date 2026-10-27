@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "PROFILE-B02",
+  "acceptedUiCommit": "955f793dcfc593b603797d9e960925f774a6c2c2",
+  "uiContractPath": "docs/quality/PROFILE-B02-CONTRACT-20261027.md",
+  "uiContractSha256": "44233B52F1FE9371D37BDE8476D8B6FA18305E5CCD2B9F20AC110514B22E2F9A",
+  "founderDecision": "accepted_for_b02_local_implementation_with_retained_limits",
+  "founderAnswer": "Approve exact B02 baseline, contract and one metadata admission commit",
+  "localMetadataCommits": 1,
+  "sourceFeatureCommits": false,
+  "backendBranchPush": false,
+  "deployment": false,
+  "productionAcceptance": false
+}

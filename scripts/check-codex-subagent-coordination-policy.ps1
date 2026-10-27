@@ -8885,6 +8885,14 @@ function Invoke-Lf01Admission {
   Write-Output "LF-01 admission passed: phase=$ProductionPhase; owners=$($owners.Count); baseline=$base; no APK/provider/acceptance authority."
 }
 
+# Founder-approved PROFILE-B02: exact local catalogue/entitlement continuation only.
+if ($ProductionTicketId -ceq 'PROFILE-B02' -or $ProductionWorkId -ceq 'profile-b02-20261027' -or
+    $root.Replace('\','/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-profile-b02-20261027') {
+  . (Join-Path $root 'scripts/profile-b02-admission.ps1')
+  Invoke-ProfileB02Admission
+  return
+}
+
 # Founder-approved PROFILE-INTEGRATION-01 follows the sealed Profile source, preserving
 # the historical frontend/integration admission bodies unchanged.
 if ($ProductionTicketId -ceq 'PROFILE-INTEGRATION-01' -or $ProductionWorkId -ceq 'profile-combined-20261027' -or

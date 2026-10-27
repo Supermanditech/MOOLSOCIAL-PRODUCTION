@@ -122,3 +122,6 @@ docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-3.jsonl text eol=lf
 
 # Preserve the exact founder-approved COMBINED interaction contract across checkouts.
 docs/quality/PROFILE-INTEGRATION-01-CONTRACT-20261027.md text eol=lf
+
+# Preserve exact founder-approved B02 interaction contract bytes.
+docs/quality/PROFILE-B02-CONTRACT-20261027.md text eol=lf

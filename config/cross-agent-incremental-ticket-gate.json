@@ -10,6 +10,12 @@
         "uiCommit": "c9d03bb37b6115f7fe63f3f1dd819892dc037fc9",
         "contractPath": "docs/quality/PROFILE-INTEGRATION-01-CONTRACT-20261027.md",
         "contractSha256": "41A13A42DEDB2BD7CEE8D116A0D81AE94CC8BE5FF70A44C88D8EDA23EECA5D14"
+      },
+      {
+        "id": "account.plans_entitlements",
+        "uiCommit": "955f793dcfc593b603797d9e960925f774a6c2c2",
+        "contractPath": "docs/quality/PROFILE-B02-CONTRACT-20261027.md",
+        "contractSha256": "44233B52F1FE9371D37BDE8476D8B6FA18305E5CCD2B9F20AC110514B22E2F9A"
       }
     ],
     "reachableBuyDestinations": [

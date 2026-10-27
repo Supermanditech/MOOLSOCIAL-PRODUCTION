@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "PROFILE-B02",
+    "selectedTicketAssessment": {
+      "ticketId": "PROFILE-B02",
+      "customerOutcome": "Original Plans cards read configurable Personal/Workspace catalogues and verified scoped subscriptions; paid feature access remains separate from free Buy and approved free Store authority.",
+      "necessityProof": "Approved Plans page has no connected catalogue; existing Mool AI access needs scoped authoritative readback.",
+      "implementationDisposition": [
+        "reuse",
+        "new_necessary_work"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/features/journey01/account_plans_gateway.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/journey01/review_journey_services.dart",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/lib/app/moolsocial_app.dart",
+        "apps/mobile/lib/features/assistant/mool_assistant.dart",
+        "apps/mobile/lib/ui_v2/profile/global_account_plans_v2.dart",
+        "apps/mobile/test/account_plans_gateway_test.dart",
+        "apps/mobile/test/account_plans_flow_test.dart",
+        "apps/mobile/test/journey_session_test.dart",
+        "apps/mobile/test/mool_assistant_test.dart",
+        "apps/mobile/test/ui_v2/profile/global_account_plans_v2_test.dart",
+        "backend/functions/src/index.ts",
+        "backend/functions/src/account/plans_service.ts",
+        "backend/functions/src/account/plans_service.test.ts",
+        "backend/functions/src/account/plans_http.ts",
+        "backend/functions/src/account/plans_http.test.ts",
+        "backend/functions/src/account/plans_dataconnect_store.ts",
+        "backend/functions/src/account/plans_dataconnect_store.test.ts",
+        "dataconnect/schema/universal.gql",
+        "dataconnect/mobile/universal.gql"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [
+        "backend/functions/src/account/plans_service.ts",
+        "backend/functions/src/account/plans_service.test.ts",
+        "backend/functions/src/account/plans_http.ts",
+        "backend/functions/src/account/plans_http.test.ts",
+        "backend/functions/src/account/plans_dataconnect_store.ts",
+        "backend/functions/src/account/plans_dataconnect_store.test.ts"
+      ],
+      "robustnessCoverage": [
+        "Production HTTP/service/durable-repository/mobile-gateway parity with explicit isolated fixtures.",
+        "Actor/Store/tenant isolation, stale/duplicate/reversed replies, expiry/cancellation/revocation and recovery.",
+        "Arbitrary catalogue size, missing content, compact original UI, current-source reachable OPPO states and unchanged saved data."
+      ],
+      "adjustments": [
+        "Reuse original Profile/Plans, credentials, DataConnect and Mool AI controller; only thin B02 adapters."
+      ],
+      "explicitExclusions": [
+        "No Google setup/deployment, live billing/charges, admin, APK, source feature commits/push or unrelated feature.",
+        "No invented prices/benefits, false approvals/entitlements, native fixture injection or full live-service acceptance."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder approved exact B02 baseline, contract and one metadata-only admission commit.",
+        "Commercial content, billing issuance, authentic cloud/native and canonical Store authority remain deferred."
+      ],
+      "manifestPath": "docs/quality/PROFILE-B02-CONTRACT-20261027.md",
+      "manifestSha256": "44233B52F1FE9371D37BDE8476D8B6FA18305E5CCD2B9F20AC110514B22E2F9A",
+      "evidencePath": "docs/quality/PROFILE-B02-ACCEPTANCE-20261027.json",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "PROFILE-B02",
+    "customerOutcome": "Original Plans cards read configurable Personal/Workspace catalogues and verified scoped subscriptions; paid feature access remains separate from free Buy and approved free Store authority.",
+    "classification": "mvp_supporting",
+    "classificationReason": "Required catalogue/paid AI readback using existing Buy/Workspace account flow.",
+    "minimumCompleteScope": [
+      "Implement scoped readback and feature checks, local regressions, reachable OPPO inspection and accurate deferred dependencies."
+    ],
+    "explicitExclusions": [
+      "No Google setup/deployment, live billing/charges, admin, APK, source feature commits/push or unrelated feature.",
+      "No invented prices/benefits, false approvals/entitlements, native fixture injection or full live-service acceptance."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder approved exact B02 baseline, contract and one metadata-only admission commit.",
+      "Commercial content, billing issuance, authentic cloud/native and canonical Store authority remain deferred."
+    ],
+    "testAndEvidencePlan": [
+      "Production HTTP/service/durable-repository/mobile-gateway parity with explicit isolated fixtures.",
+      "Actor/Store/tenant isolation, stale/duplicate/reversed replies, expiry/cancellation/revocation and recovery.",
+      "Arbitrary catalogue size, missing content, compact original UI, current-source reachable OPPO states and unchanged saved data."
+    ]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/PROFILE-B02-CONTRACT-20261027.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/PROFILE-B02-ACCEPTANCE-20261027.json",
+    "beyondMvpExplicitlyAuthorized": false
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "backendAdmission": {
+    "binding": {
+      "id": "profile_b02_20261027",
+      "state": "founder_authorized_2026_10_27",
+      "lane": "codex_backend",
+      "role": "primary",
+      "task": "/root/codex_backend_profile_b02",
+      "workId": "profile-b02-20261027",
+      "ticketId": "PROFILE-B02",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-profile-b02-20261027",
+      "branch": "work/codex-backend/profile-b02-20261027",
+      "baselineHead": "955f793dcfc593b603797d9e960925f774a6c2c2",
+      "bootstrapCommitSubject": "coordination(profile-b02-20261027): record exact Plans admission",
+      "bootstrapOwners": [
+        ".gitattributes",
+        "config/codex-subagent-coordination-policy.json",
+        "config/cross-agent-incremental-ticket-gate.json",
+        "docs/quality/PROFILE-B02-BACKEND-20261027.json",
+        "docs/quality/PROFILE-B02-ACCEPTANCE-20261027.json",
+        "docs/quality/PROFILE-B02-CONTRACT-20261027.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/profile-b02-admission.ps1",
+        "scripts/test-profile-b02-admission.ps1"
+      ]
+    },
+    "runtimeOwners": [
+      "apps/mobile/lib/features/journey01/account_plans_gateway.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "apps/mobile/lib/features/journey01/journey_router.dart",
+      "apps/mobile/lib/app/moolsocial_app.dart",
+      "apps/mobile/lib/features/assistant/mool_assistant.dart",
+      "apps/mobile/lib/ui_v2/profile/global_account_plans_v2.dart",
+      "apps/mobile/test/account_plans_gateway_test.dart",
+      "apps/mobile/test/account_plans_flow_test.dart",
+      "apps/mobile/test/journey_session_test.dart",
+      "apps/mobile/test/mool_assistant_test.dart",
+      "apps/mobile/test/ui_v2/profile/global_account_plans_v2_test.dart",
+      "backend/functions/src/index.ts",
+      "backend/functions/src/account/plans_service.ts",
+      "backend/functions/src/account/plans_service.test.ts",
+      "backend/functions/src/account/plans_http.ts",
+      "backend/functions/src/account/plans_http.test.ts",
+      "backend/functions/src/account/plans_dataconnect_store.ts",
+      "backend/functions/src/account/plans_dataconnect_store.test.ts",
+      "dataconnect/schema/universal.gql",
+      "dataconnect/mobile/universal.gql"
+    ],
+    "acceptedUiCommit": "955f793dcfc593b603797d9e960925f774a6c2c2",
+    "contractSha256": "44233B52F1FE9371D37BDE8476D8B6FA18305E5CCD2B9F20AC110514B22E2F9A",
+    "sqlProvisioning": false,
+    "sqlMigration": false,
+    "deployment": false,
+    "backendBranchPush": false,
+    "timelineDisclosure": "The historical 4\u00e2\u20ac\u201c19 October delivery window has elapsed; scope stays bounded and robustness is not waived. The zero incremental timeline value is not a claim of on-time MVP delivery.",
+    "sourceSnapshots": []
+  }
+}
