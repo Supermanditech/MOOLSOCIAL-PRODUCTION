@@ -1,0 +1,30 @@
+# THIN-B03 — Profile and approved Workspace authorised context
+Exact existing UI/source baseline: da3333ed69bfb7c187320d2294b1e1953ee3bc60, clean and origin-exact on work/codex-backend/ai-b01-20261027. This includes unchanged tested AI-B01 source ba1223c0986b36e8533c2e6d854f96f7814647c5. Original approved normal/AI layouts and all prior qualification limits remain binding.
+Implementation checkout: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-thin-b03-20261027; branch work/codex-backend/thin-b03-20261027. Existing THIN-B03 ticket only; no duplicate feature or commerce-wide context claim.
+
+## User-visible behaviour
+1. Mool AI uses the current signed-in person's original Profile and, in a Store chat, only the selected approved/currently permitted Workspace. Personal shopping and Store context never merge.
+2. Reuse existing action IDs and native screens for supported Profile view/display-name preparation, delivery-address add/edit, Plans view and permitted approved-Workspace opening/selection. No new category, redesigned screen, extra confirmation system or generic route tool. Do not expose application/setup actions to ordinary buyers.
+3. Profile name/address/invoice data come from AccountProfileService under current actor/project/account authority. Invoice fields may appear through the existing Profile/invoice view; no invented invoice-edit task, tax decision or legal identity. Do not send all saved private data to every request: minimise fields to the selected operation and record.
+4. AccountPlansService remains paid-AI authority. WorkspaceProfileService and canonical membership readback remain Store authority. Free Buy and approved free Workspace access do not require a paid plan; AI entitlement does not approve or create a Workspace/membership. Pending/rejected/suspended/revoked/expired/unavailable approval or membership denies Store AI context.
+5. Context returns only exact registered Profile/Workspace preparation tools and permitted source fields. No proof files, provider credentials, private account tokens, unrelated Store/customer data or arbitrary client-provided context. Missing canonical sources disable affected capabilities; no local role or source fallback.
+6. Original user instructions and model output remain untrusted. Only allowlisted keys/types and original record IDs are accepted. Existing schemas/native validators and original save/permission rules remain authoritative. Unsupported roles/capabilities stay unavailable; do not introduce staff permission or subscription policy.
+
+## Source/review integrity
+7. Keep canonical server Profile/application/membership/entitlement revisions separate from native form/draft/navigation revisions. A client-supplied snapshot token is never backend authority. A freshly captured native token must not be used to relabel an older server result as current.
+8. Bind the request, selected record, source snapshot and native preparation state before inference/handoff. Before Review, refresh original authority and ensure both canonical and native state still match that preparation. Changes during model/read/review, duplicate identities and account/Store A-B-A switching retire the result. Do not overwrite a newer native draft.
+9. Review populates the actual existing form or original read-only view. It never saves a Profile, changes a selected Store, posts an order/payment, or grants access automatically. Native Save/Open/confirmation retains user control and original stale-revision checks. Close/Cancel preserves existing data and drafts.
+10. Missing model/usage/durable-request/Google services keep the default runtime unavailable. Context wiring must be usable by the production composition without test-only providers or fabricated paid actors. Existing THIN-B07/THIN-B04 dependencies remain separate.
+
+## Required qualification
+- Test actual AccountProfileService/AccountPlansService/WorkspaceProfileService behind the context adapter; scoped host repository fixtures must be explicitly identified. Reuse the existing durable local Profile backend harness where applicable.
+- Unpaid/restricted/deleted/foreign actor, project/tenant mismatch, missing/duplicate/foreign record, wrong Store, pending/rejected/suspended/revoked/expired membership and stale revisions must not disclose private context or prepare a permitted result.
+- Verify exact field/schema mapping, minimal context, malformed/unknown keys, no proof/credential leakage, no UI-token authority, no automatic saves and no unknown-result replay.
+- Actual local mobile gateway -> backend handler/service -> original source -> proposal -> existing native form/view tests. Cover canonical and native changes independently, account/Store switching, unavailable/recovery, cancellation and repeated taps.
+- Run appropriate focused and combined Profile/B02/B03/AI regressions. Preserve inherited failures/skips as explicit qualification limits rather than adjusting production validation.
+- Inspect reachable current-source OPPO guards, context navigation and native screens without injecting synthetic credentials, grants or model sources. Verify known protected saved-data fingerprints. Authenticated populated real-service cases remain explicitly unverified until connected services exist.
+
+## Stop and authority limits
+Finish all actionable admitted local Profile/approved-Workspace context work, record demonstrated defects, fixes, source/test/device evidence and exact remaining dependencies, then stop.
+No Google provisioning/deployment, actual model/API calls or keys, domain execution, OCR/voice/media service, durable History/request-store implementation, billing rules, admin interface, commerce-source fabrication, APK, publication or live transactions. No source feature commit/push for this new ticket. One local metadata-only exact admission commit is requested. AI-B01's separately approved named-branch seal is already complete; it does not authorise a THIN-B03 source push.
+Self-assessment is not founder or full production/live-agent acceptance.

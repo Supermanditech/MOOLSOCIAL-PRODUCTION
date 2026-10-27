@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "ticketId": "THIN-B03",
+  "acceptedUiCommit": "da3333ed69bfb7c187320d2294b1e1953ee3bc60",
+  "uiContractPath": "docs/quality/THIN-B03-CONTRACT-20261027.md",
+  "uiContractSha256": "224C61B3546E7F0D3C81F55651C6207AE61D63CCCEC73F6A5A5BE7D30788456A",
+  "founderDecision": "accepted_for_thin_b03_local_implementation_with_retained_limits",
+  "founderAnswer": "Approve exact THIN-B03 contract and admission",
+  "localMetadataCommits": 1,
+  "sourceFeatureCommits": false,
+  "backendBranchPush": false,
+  "deployment": false,
+  "productionAcceptance": false
+}
