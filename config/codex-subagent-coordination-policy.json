@@ -328,7 +328,13 @@
         "apps/mobile/test/journey_session_test.dart",
         "apps/mobile/lib/features/journey01/account_profile_gateway.dart",
         "docs/quality/THIN-B03-READONLY-ADDENDUM-20261027.md",
-        "docs/quality/THIN-B03-READONLY-ACCEPTANCE-20261027.json"
+        "docs/quality/THIN-B03-READONLY-ACCEPTANCE-20261027.json",
+        "docs/quality/THIN-B03-SOURCE-SEAL-20261027.json",
+        "scripts/thin-b03-source-seal.ps1",
+        "scripts/test-thin-b03-source-seal.ps1",
+        "docs/quality/THIN-B03-LOCAL-RESULT-20261027.json",
+        "docs/quality/THIN-B03-LOCAL-SOURCE-MANIFEST-20261027.json",
+        "docs/quality/THIN-B03-LOCAL-REPORT-20261027.md"
       ]
     }
   ],
