@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -14,16 +15,21 @@ import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_order_resolution_contracts.dart';
 import '../../features/buy/buy_v2_saved_products_store.dart';
 import '../../features/buy/buy_v2_session.dart';
+import '../../features/assistant/mool_assistant.dart';
 import '../../features/work/scan_and_pick_contract.dart';
 import '../../features/work/work_order_identity_gateway.dart';
+import '../../features/work/work_catalogue_gateway.dart' show WorkspaceBulkQuote;
 import '../../features/work/widgets/workspace_purchase_originals.dart';
 import '../../features/journey01/journey_services.dart';
+import '../assistant/mool_assistant_v2.dart' show MoolAssistantRouteBoundNativeAdapter;
 import '../universal/mool_global_navigation_v2.dart' show moolAndroidExportedSemanticsClearance;
 import 'buy_v2_address_form_sheet_motion.dart';
 import 'buy_v2_address_sheet_motion.dart';
 import 'buy_v2_catalogue.dart'
     show
-        BuyV2ProductCard,
+        BuyV2ProductCard, buyV2CartMonthlyBasket,
+        BuyV2BrowseReviewEffect, buyV2BrowseNativeBody, buyV2BrowseStoreOwner,
+        buyV2BrowseStoreOwnerCurrent, buyV2BrowseStoreOwnerSource, buyV2BrowseCategoryFormOpen, buyV2BrowseAreaFormOpen,
         BuyV2AddFace,
         BuyV2ProductEdgeControls,
         BuyV2AdvertisedOfferLink,
@@ -39,8 +45,2083 @@ import 'buy_v2_product_video.dart';
 import 'buy_v2_scanner.dart';
 import 'buy_v2_store_address.dart';
 
+// Actual mounted Buy screen resources. This bridge grants no domain permission.
+final _buyShop04Owners=Expando<Set<BuyShop04NativeOwner>>('buy-original-checkout-owners');
+class BuyShop04NativeOwner extends ChangeNotifier {
+  BuyShop04NativeOwner({required this.session,required this.navigator,required this.route,required this.invoiceController,required this.paymentHandoff,
+    required this.invoiceDownloader,this.collectionCameraBuilder,required bool Function() current,required bool Function() admitted}):
+    _current=current,_admitted=admitted;
+  final BuyV2Session session;
+  final NavigatorState navigator;
+  final Route<dynamic> route;
+  final BuyV2GstInvoiceController invoiceController;
+  final BuyV2PaymentHandoff? paymentHandoff;
+  final BuyV2InvoiceDownloader? invoiceDownloader;
+  final BuyV2CollectionCameraBuilder? collectionCameraBuilder;
+  final bool Function() _current,_admitted;
+  bool _active=true,_disposed=false;
+  bool get current=>_active && navigator.mounted && route.isActive && identical(route.navigator,navigator) && _current() && (_buyShop04Owners[session]?.contains(this)??false);
+  bool get admitted=>current && _admitted();
+  void retire(){if(!_active)return;_active=false;
+    _buyShop04Owners[session]?.remove(this);
+    WidgetsBinding.instance.addPostFrameCallback((_){if(_disposed)return;notifyListeners();dispose();});}
+  @override void dispose(){if(_disposed)return;_disposed=true;super.dispose();}
+}
+void bindBuyShop04NativeOwner(BuyShop04NativeOwner owner){
+  // Multiple actual Buy screens may share a session (for example native search).
+  // Retiring one screen must never revoke another mounted native owner.
+  (_buyShop04Owners[owner.session]??=Set<BuyShop04NativeOwner>.identity()).add(owner);
+}
+
+@immutable
+class BuyShop04InitialData {
+  const BuyShop04InitialData._({this.method,this.profileId,this.enabled,this.useQr,this.slot,this.kind,this.reason,this.lineId,this.stars,this.quantities=const {}});
+  final String? method,profileId;
+  final String? slot,kind,reason,lineId;
+  final int? stars;
+  final Map<String,int> quantities;
+
+
+  final bool? enabled,useQr;
+  static Set<String> fieldsFor(String action)=>switch(action){
+    'AI-ACT-048'=>const {'slot'},'AI-ACT-050'=>const {'kind','reason','quantities'},'AI-ACT-055'=>const {'lineId','stars'},
+    'AI-ACT-033'=>const {'method'},'AI-ACT-047'=>const {'enabled'},
+    'AI-ACT-342'=>const {'profileId'},'AI-ACT-343'=>const {'useQr'},_=>const {},
+  };
+  factory BuyShop04InitialData.fromFields(String action,Map<String,Object?> fields){
+    if(fields.keys.any((key)=>!fieldsFor(action).contains(key)))throw const FormatException('Review the supplied order fields again.');
+    String? text(String key){final value=fields[key];if(!fields.containsKey(key))return null;
+      if(value is! String || value.trim().isEmpty || value!=value.trim())throw const FormatException('Choose an exact current native option.');return value;}
+    bool? flag(String key){final value=fields[key];if(!fields.containsKey(key))return null;
+      if(value is! bool)throw const FormatException('Choose On or Off.');return value;}
+    final rating=fields['stars'];
+    if(fields.containsKey('stars')&&(rating is! int||rating<1||rating>5))throw const FormatException('Choose 1–5 stars.');
+    final raw=fields['quantities'];final quantities=<String,int>{};
+    if(raw!=null){if(raw is! Map<String,Object?>)throw const FormatException('Review the purchased quantities.');
+      for(final entry in raw.entries){if(entry.key.trim().isEmpty||entry.value is! int||(entry.value as int)<=0)throw const FormatException('Choose positive whole purchased quantities.');quantities[entry.key]=entry.value as int;}}
+    final kind=text('kind');if(kind!=null&&!BuyV2OrderResolutionKind.values.any((v)=>v.name==kind))throw const FormatException('Choose an available request type.');
+    return BuyShop04InitialData._(method:text('method'),profileId:text('profileId'),enabled:flag('enabled'),useQr:flag('useQr'),
+      slot:text('slot'),kind:kind,reason:text('reason'),lineId:text('lineId'),stars:rating as int?,quantities:Map.unmodifiable(quantities));
+  }
+}
+
+Iterable<MoolAssistantNativeAdapter> buyShop04NativeAdapters({required BuyV2Session session,
+  required NavigatorState navigator,required MoolAssistantContext Function() currentContext,
+  required bool Function() isRootCurrent,required Listenable scopeOwner,
+  required AuthenticatedAccountIdentity? Function() accountIdentity,required bool Function() accountAuthenticated}) {
+  // Called by readAdapters before the assistant route is pushed. Do not attempt
+  // a fresh top-route admission while that exact admitted owner is covered.
+  final owner=(_buyShop04Owners[session]??const <BuyShop04NativeOwner>{})
+    .where((candidate)=>candidate.admitted).singleOrNull;
+  if(owner==null)return const [];
+  return [for(final id in const ['AI-ACT-029','AI-ACT-033','AI-ACT-037','AI-ACT-038','AI-ACT-040','AI-ACT-041','AI-ACT-042',
+    'AI-ACT-043','AI-ACT-044','AI-ACT-045','AI-ACT-046','AI-ACT-047','AI-ACT-057','AI-ACT-058','AI-ACT-342','AI-ACT-343',
+    'AI-ACT-344','AI-ACT-345','AI-ACT-346','AI-ACT-413','AI-ACT-414'])BuyShop04NativeAdapter(actionId:id,session:session,
+      navigator:navigator,currentContext:currentContext,isRootCurrent:isRootCurrent,scopeOwner:scopeOwner,
+      accountIdentity:accountIdentity,accountAuthenticated:accountAuthenticated,capturedOwner:owner)];
+}
+
+Iterable<MoolAssistantNativeAdapter> buyShop05NativeAdapters({required BuyV2Session session,
+  required NavigatorState navigator,required MoolAssistantContext Function() currentContext,
+  required bool Function() isRootCurrent,required Listenable scopeOwner,
+  required AuthenticatedAccountIdentity? Function() accountIdentity,required bool Function() accountAuthenticated}) {
+  final owner=(_buyShop04Owners[session]??const <BuyShop04NativeOwner>{}).where((candidate)=>candidate.admitted).singleOrNull;
+  if(owner==null)return const [];
+  return [for(final id in const ['AI-ACT-048','AI-ACT-049','AI-ACT-050','AI-ACT-051','AI-ACT-052','AI-ACT-053','AI-ACT-055'])
+    BuyShop04NativeAdapter(actionId:id,session:session,navigator:navigator,currentContext:currentContext,
+      isRootCurrent:isRootCurrent,scopeOwner:scopeOwner,accountIdentity:accountIdentity,
+      accountAuthenticated:accountAuthenticated,capturedOwner:owner),
+    for(final id in const ['AI-ACT-054','AI-ACT-056'])BuyProductFeedbackNativeAdapter(actionId:id,
+      session:session,navigator:navigator,currentContext:currentContext,isRootCurrent:isRootCurrent,
+      scopeOwner:scopeOwner,accountIdentity:accountIdentity,accountAuthenticated:accountAuthenticated,capturedOwner:owner)];
+}
+
+/// Original product feedback input, shared by manual Buy and AI preparation.
+/// A target is an existing authenticated purchase, never inferred from a SKU.
+class BuyProductFeedbackInitialData {
+  const BuyProductFeedbackInitialData({this.targetId,this.stars,this.comment='',this.reason=''});
+  final String? targetId;
+  final int? stars;
+  final String comment,reason;
+  static Set<String> fieldsFor(String action)=>action=='AI-ACT-054'
+    ?const {'targetId','stars','comment'}:const {'reason'};
+  factory BuyProductFeedbackInitialData.fromFields(String action,Map<String,Object?> fields){
+    if(!const {'AI-ACT-054','AI-ACT-056'}.contains(action)||fields.keys.any((key)=>!fieldsFor(action).contains(key)))
+      throw const FormatException('Review the original product feedback fields.');
+    if(action=='AI-ACT-056'){
+      final reason=fields['reason'];
+      if(reason is! String||reason.trim().isEmpty)throw const FormatException('Describe what is incorrect about this product.');
+      return BuyProductFeedbackInitialData(reason:reason);
+    }
+    final target=fields['targetId'],stars=fields['stars'],comment=fields['comment'];
+    if(target is! String||target.trim().isEmpty||target!=target.trim()||stars is! int||stars<1||stars>5||
+      comment is! String||comment.characters.length>8000)throw const FormatException('Choose the original purchase, 1–5 stars and review text.');
+    return BuyProductFeedbackInitialData(targetId:target,stars:stars,comment:comment);
+  }
+}
+
+class BuyProductFeedbackNativeAdapter extends BuyShop04NativeAdapter {
+  BuyProductFeedbackNativeAdapter({required super.actionId,required super.session,required super.navigator,
+    required super.currentContext,required super.isRootCurrent,required super.scopeOwner,
+    required super.accountIdentity,required super.accountAuthenticated,required super.capturedOwner});
+  BuyV2Product? _product(String? id){
+    final p=id==null?null:session.findProduct(id);
+    return p!=null&&const {BuyV2Destination.shop,BuyV2Destination.wholesale}.contains(p.destination)&&!p.requiresPrescription?p:null;
+  }
+  @override bool _available(String? entity,BuyShop04NativeOwner owner){
+    if(!owner.current||session.reviewDataEnabled||session.productFeedbackBusy(entity??''))return false;
+    final product=_product(entity);if(product==null)return false;
+    return actionId=='AI-ACT-054'?session.canReviewProduct(product.id):session.canReportProduct(product.id);
+  }
+  @override List<Object?> _inputs(String? entity,BuyShop04NativeOwner owner)=>[
+    ...super._inputs(entity,owner),session.commerceAdapter,session.productFeedbackContext,session.reviewDraftOwnerScope,
+    _product(entity),if(actionId=='AI-ACT-054')...session.ratingTargetsFor(entity??'',kind:BuyV2RatingKind.product),
+  ];
+  @override Set<String> get allowedFields=>BuyProductFeedbackInitialData.fieldsFor(actionId);
+  @override String? validateFields(Map<String,Object?> fields){
+    try{BuyProductFeedbackInitialData.fromFields(actionId,fields);return null;}
+    on FormatException catch(error){return error.message;}
+  }
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,
+      {required bool Function() isCurrent,required Listenable ownerChanges})async{
+    final owner=_nativeOwner;
+    if(owner==null||!_assistantCurrent||!isCurrent()||p.actionId!=actionId||p.sourceRevision!=_revision||
+      !p.validUntil.isAfter(DateTime.now())||validateFields(p.fields)!=null||!_same(p.binding,p.entityId)||
+      !_available(p.entityId,owner)||_buyNativeReviews[session]==true)return MoolAssistantReviewResult.stale;
+    final product=_product(p.entityId)!;
+    final initial=BuyProductFeedbackInitialData.fromFields(actionId,p.fields);
+    if(actionId=='AI-ACT-054'&&session.ratingTargetsFor(product.id,kind:BuyV2RatingKind.product)
+      .where((target)=>target.id==initial.targetId).length!=1)return MoolAssistantReviewResult.unavailable;
+    bool actor()=>isCurrent()&&p.validUntil.isAfter(DateTime.now())&&_actor(p.binding)&&_assistantActive&&
+      owner.current&&_actorAtSnapshot==_actorOwner;
+    bool current()=>actor()&&_same(p.binding,p.entityId);
+    Future<bool>? issued;
+    var retired=false;
+    _buyNativeReviews[session]=true;
+    try{
+      await navigator.push<void>(MaterialPageRoute(builder:(_)=>BuyProductFeedbackPage(session:session,product:product,
+        report:actionId=='AI-ACT-056',initial:initial,current:current,actorCurrent:actor,
+        changes:Listenable.merge([scopeOwner,ownerChanges,owner,session,?session.collectionIdentity,?session.procurementIdentity]),
+        validUntil:p.validUntil,onIssued:(operation)=>issued=operation,onRetired:()=>retired=true)));
+      // An already-issued report belongs to the original Session journal. UI
+      // cancellation/retirement never cancels or repeats that report.
+      if(issued!=null)await issued;
+      return !retired&&actor()?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    }finally{_buyNativeReviews[session]=false;}
+  }
+}
+
+Future<void> showBuyV2ProductFeedback(BuildContext context,{required BuyV2Session session,
+    required BuyV2Product product,required bool report})async{
+  if(session.isStoreProcurement||product.requiresPrescription||
+    !const {BuyV2Destination.shop,BuyV2Destination.wholesale}.contains(product.destination))return;
+  final owner=session.reviewDraftOwnerScope,feedback=session.productFeedbackContext;
+  final original=session.findProduct(product.id);
+  bool actor()=>context.mounted&&owner!=null&&session.reviewDraftOwnerScope==owner&&
+    session.productFeedbackContext==feedback&&!session.customerStateRecoveryPending&&!session.isStoreProcurement;
+  bool current()=>actor()&&identical(original,product)&&identical(session.findProduct(product.id),product);
+  if(!current())return;
+  await Navigator.of(context,rootNavigator:true).push<void>(MaterialPageRoute(builder:(_)=>BuyProductFeedbackPage(
+    session:session,product:product,report:report,current:current,actorCurrent:actor,changes:session)));
+}
+
+/// Original compact native form. Preparation is never a successful submission.
+/// Written-review sending stays unavailable until its durable attempt/status
+/// contract exists; private purchase stars continue through their original UI.
+class BuyProductFeedbackPage extends StatefulWidget {
+  const BuyProductFeedbackPage({super.key,required this.session,required this.product,required this.report,
+    required this.current,required this.actorCurrent,required this.changes,this.initial,
+    this.validUntil,this.onIssued,this.onRetired});
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final bool report;
+  final bool Function() current,actorCurrent;
+  final Listenable changes;
+  final BuyProductFeedbackInitialData? initial;
+  final DateTime? validUntil;
+  final ValueChanged<Future<bool>>? onIssued;
+  final VoidCallback? onRetired;
+  @override State<BuyProductFeedbackPage> createState()=>_BuyProductFeedbackPageState();
+}
+class _BuyProductFeedbackPageState extends State<BuyProductFeedbackPage>{
+  late final TextEditingController _text;
+  BuyV2RatingTarget? _target;
+  int _stars=0;
+  Route<dynamic>? _route;
+  Timer? _expiry;
+  bool _retired=false,_closing=false,_busy=false,_issued=false,_confirmed=false;
+  String? _status;
+  bool get _actor=>mounted&&!_closing&&!_retired&&widget.actorCurrent();
+  bool get _here=>_actor&&_route?.isCurrent==true;
+  bool get _source=>_here&&widget.current();
+
+  BuyV2ProductReviewDraft? _retained;
+  String? _draftOwner,_baselineTarget;
+  Object? _feedbackContext;
+  int _baselineStars=0;
+  String _baselineText='';
+  bool _edited=false,_asking=false,_draftWriteFailed=false;
+  Route<dynamic>? _decisionRoute;
+  bool _sameDraft(BuyV2ProductReviewDraft? a,BuyV2ProductReviewDraft? b)=>
+    a?.rating==b?.rating&&a?.comment==b?.comment;
+  BuyV2ProductReviewDraft? get _savedDraft=>_target==null?null:
+    widget.session.productReviewDraft(widget.product.id,targetId:_target!.id);
+  bool get _dirty=>!widget.report&&_edited&&(_baselineTarget!=_target?.id||
+    _baselineStars!=_stars||_baselineText!=_text.text);
+  bool get _canRetain=>!widget.report&&(_draftWriteFailed||(_retained==null?
+    _stars!=0||_text.text.isNotEmpty:_retained!.rating!=_stars||_retained!.comment!=_text.text));
+  bool get _draftSource=>_source&&!_busy&&!_issued&&_target!=null&&
+    widget.session.reviewDraftOwnerScope==_draftOwner&&widget.session.productFeedbackContext==_feedbackContext&&
+    widget.session.canReviewProduct(widget.product.id)&&widget.session.ratingTargetsFor(widget.product.id,
+      kind:BuyV2RatingKind.product).any((target)=>identical(target,_target));
+  void _captureDraftBaseline({required bool restore}){
+    _retained=_savedDraft;
+    if(restore){_stars=_retained?.rating??0;_text.text=_retained?.comment??'';}
+    _baselineTarget=_target?.id;_baselineStars=_stars;_baselineText=_text.text;_edited=false;_draftWriteFailed=false;
+  }
+  bool get _decisionCurrent=>_actor&&widget.current()&&_route?.isActive==true&&_decisionRoute?.isCurrent==true;
+  Future<String?> _chooseDraft({required bool replace})async{
+    if(!_source||_asking)return null;_asking=true;
+    final navigator=Navigator.of(context);
+    late final DialogRoute<String> decision;
+    try{
+      decision=DialogRoute<String>(context:context,builder:(dialogContext){
+      void choose(String choice){
+        if(dialogContext.mounted&&identical(_decisionRoute,decision)&&decision.isCurrent&&_decisionCurrent)
+          navigator.pop(choice);
+      }
+      return AlertDialog(title:Text(replace?'Replace saved draft?':'Keep your review?'),
+        content:Text(replace?'This purchase already has a saved draft. Replace it with your edited review?':
+          'Save your changes as a draft, or discard these changes.'),actions:[
+          TextButton(onPressed:()=>choose('keep'),child:const Text('Keep editing')),
+          if(!replace)TextButton(onPressed:()=>choose('discard'),child:const Text('Discard changes')),
+          FilledButton(onPressed:()=>choose('save'),child:Text(replace?'Replace draft':'Save draft'))]);
+      });
+      _decisionRoute=decision;
+      return await navigator.push(decision);
+    }finally{if(identical(_decisionRoute,decision))_decisionRoute=null;_asking=false;}
+  }
+  Future<bool> _saveDraft()async{
+    if(!_draftSource||!_canRetain)return false;
+    if(!_sameDraft(_retained,_savedDraft)){
+      setState(()=>_status='Your saved draft changed. Reopen it before saving.');return false;
+    }
+    final replacing=widget.initial!=null&&_retained!=null&&
+      (_retained!.rating!=_stars||_retained!.comment!=_text.text);
+    if(replacing&&await _chooseDraft(replace:true)!='save')return false;
+    if(!_draftSource)return false;
+    if(!_sameDraft(_retained,_savedDraft)){
+      setState(()=>_status='Your saved draft changed. Reopen it before saving.');return false;
+    }
+    final target=_target!,rating=_stars,comment=_text.text;
+    setState((){_busy=true;_status=null;});
+    final saved=await widget.session.retainProductReviewDraft(productId:widget.product.id,rating:rating,
+      comment:comment,ownerScope:_draftOwner,targetId:target.id,feedbackContext:_feedbackContext);
+    if(!_actor)return false;
+    final current=_here&&widget.current()&&identical(_target,target)&&
+      _stars==rating&&_text.text==comment&&widget.session.reviewDraftOwnerScope==_draftOwner&&
+      widget.session.productFeedbackContext==_feedbackContext;
+    if(!current){setState(()=>_busy=false);return false;}
+    setState((){_busy=false;
+      if(saved){_captureDraftBaseline(restore:false);_status='Draft saved.';}
+      else{_draftWriteFailed=true;_retained=_savedDraft;_status='Draft save is not confirmed. Keep this review and try again.';}
+    });
+    return saved;
+  }
+  Future<void> _requestClose()async{
+    if(!_source||_busy||_asking)return;
+    if(!_dirty){_close();return;}
+    final choice=await _chooseDraft(replace:false);
+    if(!_source)return;
+    if(choice=='discard')_close();
+    else if(choice=='save'&&await _saveDraft()&&_source)_close();
+  }
+
+  bool get _canSend=>_source&&!_busy&&!_issued&&widget.report&&
+    !widget.session.reviewDataEnabled&&widget.session.canReportProduct(widget.product.id)&&_text.text.trim().isNotEmpty;
+  @override void initState(){
+    super.initState();final initial=widget.initial;
+    _text=TextEditingController(text:widget.report?initial?.reason??'':initial?.comment??'');
+    _stars=initial?.stars??0;
+    final targets=widget.session.ratingTargetsFor(widget.product.id,kind:BuyV2RatingKind.product);
+    _target=initial?.targetId==null?(targets.length==1?targets.single:null):targets.where((t)=>t.id==initial!.targetId).singleOrNull;
+    _draftOwner=widget.session.reviewDraftOwnerScope;_feedbackContext=widget.session.productFeedbackContext;
+    if(!widget.report)_captureDraftBaseline(restore:initial==null);
+    widget.changes.addListener(_changed);
+    final deadline=widget.validUntil;
+    if(deadline!=null){final remaining=deadline.difference(DateTime.now());
+      _expiry=Timer(remaining.isNegative?Duration.zero:remaining,_retire);}
+  }
+  @override void didChangeDependencies(){super.didChangeDependencies();_route??=ModalRoute.of(context);}
+  void _changed(){
+    if(!mounted||_closing)return;
+    if(!widget.actorCurrent()||!_issued&&!widget.current()){_retire();return;}
+    setState((){});
+  }
+  void _retire(){
+    if(_retired||_closing)return;_retired=true;_expiry?.cancel();widget.onRetired?.call();
+    WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_close();});
+    if(mounted)setState((){});
+  }
+  void _close(){
+    if(!mounted||_closing)return;_closing=true;_expiry?.cancel();
+    final decision=_decisionRoute;
+    if(decision?.isActive==true)decision!.navigator?.removeRoute(decision);
+    final route=_route;if(route?.isActive!=true)return;
+    final navigator=Navigator.of(context);
+    if(route!.isCurrent)navigator.pop();else navigator.removeRoute(route);
+  }
+  Future<void> _send()async{
+    if(!_canSend)return;
+    final reason=_text.text;
+    setState((){_busy=true;_issued=true;_status=null;});
+    // Check the exact original source again after notification, just before the
+    // Session's own persist/dispatch boundary. Covered or retired controls fail.
+    bool inputCurrent()=>_source;
+    final operation=widget.session.reportProductOnline(productId:widget.product.id,reason:reason,inputCurrent:inputCurrent);
+    widget.onIssued?.call(operation);
+    try{
+      final confirmed=await operation;
+      if(!_actor)return;
+      setState((){_confirmed=confirmed;_status=widget.session.notice??
+        'Your report is not confirmed. Check with support before submitting again.';});
+    }finally{if(mounted)setState(()=>_busy=false);}
+  }
+  @override void dispose(){_expiry?.cancel();widget.changes.removeListener(_changed);_text.dispose();super.dispose();}
+  @override Widget build(BuildContext context){
+    final session=widget.session;
+    final unavailable=widget.report?session.productReportRetentionMessage(widget.product.id):
+      session.productReviewUnavailableReason(widget.product.id);
+    return PopScope<void>(canPop:!_busy&&!_dirty,onPopInvokedWithResult:(didPop,_){if(!didPop&&!_busy)_requestClose();},
+      child:Scaffold(appBar:AppBar(title:Text(widget.report?'Report product':'Product review'),
+        leading:BackButton(onPressed:_requestClose)),body:!_actor?const SizedBox.shrink():
+        ListView(key:ValueKey(widget.report?'buy-product-report-form':'buy-product-text-review-form'),
+          padding:const EdgeInsets.all(16),keyboardDismissBehavior:ScrollViewKeyboardDismissBehavior.onDrag,children:[
+            Text(widget.product.title,style:const TextStyle(fontSize:15,fontWeight:FontWeight.w600)),
+            const SizedBox(height:8),
+            Text(widget.report?'Tell us what is incorrect about this listing.':'Review the item you purchased.'),
+            const SizedBox(height:12),
+            if(!widget.report)...[
+              if(_target!=null)Text(_target!.purchaseLabel,key:const ValueKey('buy-text-review-purchase')),
+              if(_target==null)DropdownButtonFormField<BuyV2RatingTarget>(isExpanded:true,
+                decoration:const InputDecoration(labelText:'Purchase'),items:[
+                  for(final t in session.ratingTargetsFor(widget.product.id,kind:BuyV2RatingKind.product))
+                    DropdownMenuItem(value:t,child:Text(t.purchaseLabel))],
+                onChanged:_source&&!_issued&&!_busy?(value){if(!_source||_issued||_busy)return;setState((){_target=value;_captureDraftBaseline(restore:true);});}:null),
+              Wrap(spacing:0,children:[for(var star=1;star<=5;star++)IconButton(
+                key:ValueKey('buy-text-review-star-$star'),tooltip:'$star of 5 stars',
+                onPressed:_source&&!_issued&&!_busy&&_target!=null?(){if(!_source||_issued||_busy||_target==null)return;setState((){_stars=star;_edited=true;});}:null,
+                icon:Icon(star<=_stars?Icons.star_rounded:Icons.star_border_rounded))]),
+            ],
+            TextField(key:ValueKey(widget.report?'buy-product-report-reason':'buy-product-text-review-comment'),
+              controller:_text,enabled:_source&&!_issued&&!_busy&&(widget.report||_target!=null),minLines:3,maxLines:8,
+              maxLength:widget.report?null:8000,decoration:InputDecoration(
+                labelText:widget.report?'Report details':'Your review',alignLabelWithHint:true),
+              onChanged:(_){if(!_source||_issued||_busy||!widget.report&&_target==null)return;setState(()=>_edited=true);}),
+            if(unavailable!=null)Padding(padding:const EdgeInsets.only(top:8),child:Text(unavailable)),
+            if(!widget.report)const Padding(padding:EdgeInsets.only(top:8),child:
+              Text('Written reviews cannot be sent right now.')),
+            if(widget.report&&session.reviewDataEnabled)const Padding(padding:EdgeInsets.only(top:8),child:
+              Text('Reporting is unavailable for demo listings.')),
+            if(_status!=null)Padding(padding:const EdgeInsets.only(top:8),child:Text(_status!,
+              key:const ValueKey('buy-product-feedback-status'))),
+            const SizedBox(height:12),
+            if(!widget.report)OutlinedButton(key:const ValueKey('buy-product-review-save-draft'),
+              onPressed:_draftSource&&_canRetain?()async{await _saveDraft();}:null,
+              child:Text(_busy?'Saving...':'Save draft')),
+            FilledButton(key:ValueKey(widget.report?'buy-product-report-send':'buy-product-text-review-send'),
+              onPressed:_canSend?_send:null,child:Text(widget.report&&_busy?'Sending…':_confirmed?'Report received':widget.report?'Send report':'Send review')),
+          ])));
+  }
+}
+
+class _BuyShop05PurchasedStars extends StatefulWidget {
+  const _BuyShop05PurchasedStars({required this.session,required this.order,required this.initial,required this.scope});
+  final BuyV2Session session;final BuyV2Order order;final BuyShop04InitialData initial;final _BuyShop04Scope scope;
+  @override State<_BuyShop05PurchasedStars> createState()=>_BuyShop05PurchasedStarsState();
+}
+class _BuyShop05PurchasedStarsState extends State<_BuyShop05PurchasedStars>{
+  WorkspacePurchaseReference? reference;WorkspacePurchaseOrder? original;WorkspacePurchasedSkuLine? line;
+  bool loading=true;
+  @override void initState(){super.initState();unawaited(_read());}
+  Future<void> _read()async{
+    final session=widget.session,reader=session.purchaseReader,realm=session.purchaseRealm;
+    final purchaseId=widget.order.purchaseId;
+    if(reader==null||purchaseId==null||!widget.scope.sourceCurrent()){if(mounted)setState(()=>loading=false);return;}
+    try{
+      final projection=await reader.readPurchaseProjection(role:WorkspaceOrderIdentityRole.buyer,realm:realm,purchaseId:purchaseId);
+      if(!mounted||!widget.scope.sourceCurrent()||!identical(reader,session.purchaseReader)||!reader.isCurrent||realm!=session.purchaseRealm)return;
+      final orders=projection?.orders.where((value)=>value.orderId==widget.order.id).toList(growable:false)??const <WorkspacePurchaseOrder>[];
+      if(orders.length!=1||projection?.purchaseId!=purchaseId)return;
+      final found=orders.single.lines.where((value)=>value.lineId==widget.initial.lineId).toList(growable:false);
+      if(found.length!=1||found.single.publicListing==null)return;
+      final ref=WorkspacePurchaseReference(purchaseId:purchaseId,storeId:orders.single.storeId,orderId:orders.single.orderId,
+        originalFingerprint:orders.single.originalFingerprint,sourceRevision:projection!.sourceRevision);
+      if(!ref.valid)return;
+      reference=ref;original=orders.single;line=found.single;
+    }on Object {/* The original purchase remains unavailable; no rating is sent. */}
+    finally{if(mounted)setState(()=>loading=false);}
+  }
+  @override Widget build(BuildContext context){
+    if(loading)return const Center(child:CircularProgressIndicator());
+    if(reference==null||original==null||line==null)return const Center(child:Padding(padding:EdgeInsets.all(16),
+      child:Text('This purchased item could not be verified. Reopen the original purchase.')));
+    return AnimatedBuilder(animation:widget.session,builder:(_,__)=>_ProductReviewSheet(session:widget.session,reference:reference!,
+      original:original!,line:line!,initialStars:widget.initial.stars,capturedCurrent:widget.scope.ownerCurrent,
+      capturedCommit:(operation)=>widget.scope.perform(operation,false)));
+  }
+}
+
+
+class BuyShop04NativeAdapter implements MoolAssistantOwnerAwareNativeAdapter, MoolAssistantRouteBoundNativeAdapter {
+  BuyShop04NativeAdapter({required this.actionId,required this.session,required this.navigator,
+    required this.currentContext,required this.isRootCurrent,required this.scopeOwner,
+    required this.accountIdentity,required this.accountAuthenticated,required this.capturedOwner});
+  final BuyShop04NativeOwner capturedOwner;
+  Route<void>? _assistantRoute;
+  bool _rejectedBinding=false;
+  @override void bindAssistantRoute(Route<void> route,NavigatorState boundNavigator){
+    if(_assistantRoute!=null || !identical(boundNavigator,navigator) || !identical(boundNavigator,capturedOwner.navigator) || !capturedOwner.admitted || route.navigator!=null){
+      _rejectedBinding=true;return;
+    }
+    _assistantRoute=route;
+  }
+  bool get _assistantActive=>!_rejectedBinding && capturedOwner.current &&
+    _assistantRoute?.isActive==true && identical(_assistantRoute?.navigator,navigator);
+  bool get _assistantCurrent=>_assistantActive && _assistantRoute?.isCurrent==true;
+  @override final String actionId;
+  final BuyV2Session session;
+  final NavigatorState navigator;
+  final MoolAssistantContext Function() currentContext;
+  final bool Function() isRootCurrent,accountAuthenticated;
+  final Listenable scopeOwner;
+  final AuthenticatedAccountIdentity? Function() accountIdentity;
+  static const _orderActions={'AI-ACT-048','AI-ACT-049','AI-ACT-050','AI-ACT-051','AI-ACT-052','AI-ACT-053','AI-ACT-055','AI-ACT-044','AI-ACT-045','AI-ACT-046','AI-ACT-047','AI-ACT-057','AI-ACT-413','AI-ACT-414'};
+  static const _attemptActions={'AI-ACT-040','AI-ACT-041','AI-ACT-042','AI-ACT-344','AI-ACT-345'};
+  Object? _binding,_actorAtSnapshot;
+  BuyShop04NativeOwner? _nativeOwner;
+  BuyV2CheckoutReadProjection? _cartProjection;
+  List<Object?>? _inputsAtSnapshot;
+  String? _entity;
+  int _version=0;
+  bool _supported(BuyV2Destination d)=>d==BuyV2Destination.shop || d==BuyV2Destination.wholesale;
+  bool _line(BuyV2CartLine l)=>_supported(l.product.destination) && !l.product.requiresPrescription;
+  bool _orderPermitted(BuyV2Order order)=>_supported(order.destination) && order.lines.every(_line) &&
+    (order.collection==null || session.collectionOrderBelongsToCurrentAccount(order)) &&
+    (!session.reviewDataEnabled || session.orderRefreshState(order.id)==BuyV2CommerceLoadState.ready);
+  BuyV2Order? _order(String? id)=>session.orders.where((o)=>o.id==id && _orderPermitted(o)).singleOrNull;
+  String? get _attemptId=>session.checkoutPaymentAttempt?.id ?? session.legacyCheckoutAttempt?.payment.request.idempotencyKey ?? session.checkoutIdempotencyKey;
+  List<BuyV2CartLine> get _attemptLines=>session.checkoutPaymentAttempt?.groups.expand((g)=>g.request.lines).toList() ??
+    session.legacyCheckoutAttempt?.payment.request.lines ?? const [];
+  Object get _actorOwner=>(accountIdentity()?.firebasePrincipal,session.customerStateStore?.ownerScope,
+    session.collectionIdentity?.value?.accountId,session.collectionIdentity?.value?.sessionId,
+    session.procurementContext?.customerStateOwnerScope,session.commerceAdapter,session.cataloguePageSource);
+  bool _actor(Object binding)=>navigator.mounted && isRootCurrent() && accountAuthenticated() &&
+    accountIdentity()?.firebasePrincipal!=null && currentContext().signedIn && !currentContext().inWorkspace &&
+    currentContext().binding==binding && !session.isStoreProcurement && session.procurementScopeCurrent &&
+    !session.customerStateRecoveryPending && _cartEligible && (_supported(session.destination) || session.destination==BuyV2Destination.orders);
+  bool get _cartEligible=>session.cartScope!=BuyV2CartScope.medicine && session.checkoutScope!=BuyV2CartScope.medicine &&
+    session.allCartLines.every(_line) && session.checkoutLines.every(_line);
+  bool _available(String? entity,BuyShop04NativeOwner owner){
+    if(!owner.current || session.checkoutBusy)return false;
+    if(_orderActions.contains(actionId)){
+      final order=_order(entity);if(order==null)return false;
+      return switch(actionId){
+        'AI-ACT-048'=>session.deliveryExceptionAdapter!=null && !session.deliveryExceptionBusy(order.id) &&
+          session.deliveryExceptionFor(order.id)?.kind==BuyV2DeliveryExceptionKind.rescheduleAvailable,
+        'AI-ACT-049'=>session.replacementConsentAvailable && session.orderSupplyProgressFor(order.id)?.replacementOffer!=null && !session.replacementConsentBusy(order.id),
+        'AI-ACT-050'=>session.orderResolutionFor(order.id)?.state==BuyV2OrderResolutionState.ready && !session.orderResolutionBusy(order.id),
+        'AI-ACT-051'=>session.deliveryExceptionAdapter!=null && session.deliveryExceptionFor(order.id)?.kind==BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable && !session.deliveryExceptionBusy(order.id),
+        'AI-ACT-052'=>session.balancePaymentAdapter!=null && session.balancePaymentFor(order.id)!=null && !session.balancePaymentBusy(order.id),
+        'AI-ACT-053'=>order.collection!=null && session.canScanCollection(order.id),
+        'AI-ACT-055'=>session.privateStarsAvailable && session.purchaseReader?.isCurrent==true && session.purchaseReader?.accountUserId==accountIdentity()?.firebasePrincipal?.userId && order.purchaseId!=null && session.privateStarTargets(orderId:order.id,purchaseId:order.purchaseId).isNotEmpty,
+        'AI-ACT-046'=>order.status==BuyV2OrderStatus.delivered && !session.cartChangesBlocked && !session.checkoutRequiresResolution && order.lines.isNotEmpty &&
+          order.lines.every((l){final p=session.findProduct(l.product.id);return p!=null && _supported(p.destination) && !p.requiresPrescription;}),
+        'AI-ACT-047'=>session.trackingAlertsAvailable && !session.trackingAlertsBusy,
+        'AI-ACT-057'=>session.selectedOrderOrNull?.id==order.id && !session.orderRefreshBusy(order.id),
+        _=>true,
+      };
+    }
+    if(actionId=='AI-ACT-043')return entity==null;
+    if(_attemptActions.contains(actionId)){
+      if(entity==null || entity!=_attemptId || !_attemptLines.every(_line))return false;
+      return switch(actionId){
+        'AI-ACT-040'=>session.checkoutRecoveryAmountKnown && session.checkoutSubmissionState==BuyV2CheckoutSubmissionState.paymentActionRequired &&
+          session.paymentActionUri!=null && owner.paymentHandoff!=null,
+        'AI-ACT-041'=>session.checkoutRequiresResolution || session.checkoutSubmissionState!=BuyV2CheckoutSubmissionState.idle,
+        'AI-ACT-042'=>session.checkoutSubmissionState==BuyV2CheckoutSubmissionState.paymentActionRequired &&
+          const {'Bank transfer','NEFT','RTGS'}.contains(session.checkoutCommittedPaymentMethod) &&
+          session.bankTransferInstructions!=null && session.paymentReference!=null,
+        'AI-ACT-344'=>session.checkoutSubmissionState==BuyV2CheckoutSubmissionState.paymentActionRequired,
+        'AI-ACT-345'=>session.checkoutPaymentAttempt!=null && session.currentCheckoutPaymentGroup?.financiallyClosed==true,
+        _=>false,
+      };
+    }
+    if(!_cartEligible)return false;
+    if(actionId=='AI-ACT-058')return entity==null && session.view==BuyV2View.recovery && !session.checkoutRequiresResolution;
+    if(actionId=='AI-ACT-346')return entity!=null && session.view==BuyV2View.recovery && !session.cartChangesBlocked &&
+      !session.checkoutRequiresResolution && session.checkoutAvailabilityIssue?.productId==entity && session.cartLineFor(entity)!=null;
+    if(actionId=='AI-ACT-037' && session.view==BuyV2View.cart)return entity==null && session.readCheckoutFromCurrentCart()!=null;
+    if(session.view!=BuyV2View.checkout || session.cartChangesBlocked || session.checkoutRequiresResolution)return false;
+    return switch(actionId){
+      'AI-ACT-029'=>entity!=null && session.collectionCheckoutStores.any((s)=>s.id==entity),
+      'AI-ACT-033'=>entity==null && _buyV2CustomerPaymentChoices(session).isNotEmpty,
+      'AI-ACT-037'=>entity==null && session.checkoutLines.isNotEmpty,
+      'AI-ACT-038'=>entity==null && session.checkoutPriceReviewRequired && session.checkoutPriceChanges.isNotEmpty,
+      'AI-ACT-342'=>entity==null && !owner.invoiceController.busy && !owner.invoiceController.restoring && !owner.invoiceController.loadFailed,
+      'AI-ACT-343'=>entity==null && session.canChooseUpiQr,
+      _=>false,
+    };
+  }
+  List<Object?> _inputs(String? entity,BuyShop04NativeOwner owner){
+    final c=owner.invoiceController;
+    return [if(actionId=='AI-ACT-037' && session.view==BuyV2View.cart)...?session.readCheckoutFromCurrentCart()?.sourceSnapshot,
+      session.navigationMotionSequence,session.destination,session.view,session.saleTypeSignature,session.query,session.commerceLoadState,session.purchaseReader,session.purchaseRealm,
+      session.cartScope,session.checkoutScope,session.selectedAddressOrNull,session.eligibilityLocationKey,
+      session.allCartLines.length,...session.allCartLines,session.checkoutLines.length,...session.checkoutLines,
+      if(_orderActions.contains(actionId))_order(entity),
+      if(const {'AI-ACT-048','AI-ACT-051'}.contains(actionId))session.deliveryExceptionFor(entity!),
+      if(actionId=='AI-ACT-049')...[session.orderSupplyProgressFor(entity!),session.replacementReviewScopeKey],
+      if(actionId=='AI-ACT-050')session.orderResolutionFor(entity!),
+      if(actionId=='AI-ACT-052')session.balancePaymentFor(entity!),
+      if(actionId=='AI-ACT-053')session.collectionSnapshotFor(entity!),
+      if(actionId=='AI-ACT-055')...[session.reviewDraftOwnerScope,session.productFeedbackContext,session.purchaseRealm,session.privateStarsNativeReviewSource],
+      if(actionId=='AI-ACT-043')session.readOrderHistory('').length,
+      if(actionId=='AI-ACT-043')...session.readOrderHistory(''),
+      if(actionId=='AI-ACT-029')session.collectionCheckoutStores.length,
+      if(actionId=='AI-ACT-029')...session.collectionCheckoutStores,
+      session.collectionCheckoutSelected,session.collectionCheckoutStore,session.collectionCheckoutQuote,
+      session.selectedPayment,session.checkoutQuote,session.checkoutQuoteReviewRequired,session.checkoutPaymentTermsReviewRequired,
+      session.checkoutBenefitReviewRequired,session.checkoutPriceReviewRequired,session.checkoutPromiseReviewRequired,
+      session.checkoutPriceChanges.length,...session.checkoutPriceChanges,
+      session.checkoutDeliveryPromiseChanges.length,...session.checkoutDeliveryPromiseChanges,
+      session.checkoutPaymentAttempt,session.legacyCheckoutAttempt,session.currentCheckoutPaymentGroup,
+      session.checkoutIdempotencyKey,session.paymentReference,session.paymentActionUri,session.bankTransferInstructions,
+      session.checkoutRecoveryAmountKnown,session.checkoutRecoveryBlocked,session.checkoutSubmissionState,
+      session.upiQrAction,session.canChooseUpiQr,session.useUpiQr,session.checkoutCommittedPaymentMethod,
+      session.recoveryKind,session.checkoutAvailabilityIssue,
+      session.trackingAlertsAvailable,session.trackingAlertsEnabled,
+      c.store?.ownerScope,c.busy,c.restoring,c.loadFailed,c.savedProfiles.length,...c.savedProfiles,
+      for(final d in const [BuyV2Destination.shop,BuyV2Destination.wholesale])... [c.requestedFor(d),c.detailsFor(d)],
+    ];
+  }
+  bool _same(Object binding,String? entity)=>_actor(binding) && _binding==binding && _entity==entity &&
+    _nativeOwner?.current==true && (_buyShop04Owners[session]?.contains(_nativeOwner)??false) && _actorAtSnapshot==_actorOwner &&
+    listEquals(_inputsAtSnapshot,_inputs(entity,_nativeOwner!));
+  String get _revision=>'buy-checkout-order-native:$actionId:$_version';
+  @override Set<String> get allowedFields=>BuyShop04InitialData.fieldsFor(actionId);
+  @override String? validateFields(Map<String,Object?> fields){try{BuyShop04InitialData.fromFields(actionId,fields);return null;}
+    on FormatException catch(e){return e.message;}}
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId)async{
+    final owner=capturedOwner;
+    if(!_assistantCurrent || !_actor(context.binding) || !_available(entityId,owner) ||
+      _buyNativeReviews[session]==true || _buyBrowseReviews[session]==true || _buyInstructionDraftOpen(session) ||
+      (_buyQuantityEditors[session]??0)>0 || buyV2AddressFormOpen(session) || buyV2AddressRequestFormOpen(session))return null;
+    if(!_same(context.binding,entityId)){_binding=context.binding;_entity=entityId;_nativeOwner=owner;
+      _actorAtSnapshot=_actorOwner;_inputsAtSnapshot=List.unmodifiable(_inputs(entityId,owner));_version++;}
+    _cartProjection=actionId=='AI-ACT-037' && session.view==BuyV2View.cart?session.readCheckoutFromCurrentCart():null;
+    return MoolAssistantNativeSnapshot(binding:context.binding,sourceRevision:_revision,permitted:true,entityId:entityId);
+  }
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() isCurrent)=>
+    openOwnedReview(p,isCurrent:isCurrent,ownerChanges:scopeOwner);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,
+    {required bool Function() isCurrent,required Listenable ownerChanges})async{
+    final owner=_nativeOwner;
+    if(owner==null || !_assistantCurrent || !isCurrent() || !p.validUntil.isAfter(DateTime.now()) || p.actionId!=actionId || p.sourceRevision!=_revision ||
+      validateFields(p.fields)!=null || !_same(p.binding,p.entityId) || !_available(p.entityId,owner) || _buyNativeReviews[session]==true)
+      return MoolAssistantReviewResult.stale;
+    final initial=BuyShop04InitialData.fromFields(actionId,p.fields);
+    if(initial.method!=null && !_buyV2CustomerPaymentChoices(session).any((c)=>c.$1==initial.method) ||
+      initial.profileId!=null && initial.profileId!='personal' && !owner.invoiceController.savedProfiles.any((v)=>v.id==initial.profileId))
+      return MoolAssistantReviewResult.unavailable;
+    if(initial.slot!=null&&!session.deliveryExceptionFor(p.entityId!)!.rescheduleSlots.contains(initial.slot))return MoolAssistantReviewResult.unavailable;
+    if(actionId=='AI-ACT-055'&&(initial.lineId==null||session.privateStarTargets(orderId:p.entityId,orderLineId:initial.lineId).length!=1))return MoolAssistantReviewResult.unavailable;
+    if(actionId=='AI-ACT-050'){
+      final snapshot=session.orderResolutionFor(p.entityId!);
+      final option=snapshot?.options.where((v)=>v.kind.name==initial.kind).singleOrNull;
+      if(initial.kind!=null&&option==null||initial.reason!=null&&(option==null||!option.reasons.contains(initial.reason)))return MoolAssistantReviewResult.unavailable;
+      if(option!=null&&!session.orderResolutionItemsAllowed(orderId:p.entityId!,kind:option.kind,itemQuantities:initial.quantities))return MoolAssistantReviewResult.unavailable;
+    }
+    bool current()=>isCurrent() && p.validUntil.isAfter(DateTime.now()) && _same(p.binding,p.entityId);
+    bool actorCurrent()=>isCurrent() && p.validUntil.isAfter(DateTime.now()) && _actor(p.binding) &&
+      _assistantActive && owner.current && _actorAtSnapshot==_actorOwner;
+    Future<void>? nativeOperation;var retired=false,prepared=false;_buyNativeReviews[session]=true;
+    try{
+      final used=await navigator.push<bool>(MaterialPageRoute(builder:(_)=>_BuyShop04ReviewPage(session:session,
+        actionId:actionId,entity:p.entityId,initial:initial,order:_order(p.entityId),nativeOwner:owner,
+        readProjection:_cartProjection,onPrepared:()=>prepared=true,
+        current:current,actorCurrent:actorCurrent,validUntil:p.validUntil,
+        trackNative:(future)=>nativeOperation=future,onRetired:()=>retired=true,
+        changes:Listenable.merge([scopeOwner,ownerChanges,owner,owner.invoiceController,session,?session.collectionIdentity,?session.procurementIdentity]))));
+      if(nativeOperation!=null)await nativeOperation;
+      if(!retired && actorCurrent() && prepared)return MoolAssistantReviewResult.returnToOwner;
+      return !retired && actorCurrent() && (used==true || _same(p.binding,p.entityId))?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    }finally{_buyNativeReviews[session]=false;}
+  }
+}
+
+// Native UI intent metadata only; source methods retain every business/financial rule.
+enum _BuyShop04Intent { historyRetry,collection,method,place,prices,continuePayment,reconcilePayment,bankSent,
+  readNavigation,reorder,alerts,refreshOrder,recovery,recipient,qr,leavePayment,remaining,removeIssue,invoice,download,reschedule,replacement,resolution,proof,balance,collect,privateStars,unrelated }
+String? _shop04ActionFor(_BuyShop04Intent intent)=>switch(intent){
+  _BuyShop04Intent.reschedule=>'AI-ACT-048',_BuyShop04Intent.replacement=>'AI-ACT-049',_BuyShop04Intent.resolution=>'AI-ACT-050',
+  _BuyShop04Intent.proof=>'AI-ACT-051',_BuyShop04Intent.balance=>'AI-ACT-052',_BuyShop04Intent.collect=>'AI-ACT-053',_BuyShop04Intent.privateStars=>'AI-ACT-055',
+  _BuyShop04Intent.historyRetry=>'AI-ACT-043',_BuyShop04Intent.collection=>'AI-ACT-029',_BuyShop04Intent.method=>'AI-ACT-033',_BuyShop04Intent.place=>'AI-ACT-037',
+  _BuyShop04Intent.prices=>'AI-ACT-038',_BuyShop04Intent.continuePayment=>'AI-ACT-040',_BuyShop04Intent.reconcilePayment=>'AI-ACT-041',
+  _BuyShop04Intent.bankSent=>'AI-ACT-042',_BuyShop04Intent.reorder=>'AI-ACT-046',_BuyShop04Intent.alerts=>'AI-ACT-047',
+  _BuyShop04Intent.refreshOrder=>'AI-ACT-057',_BuyShop04Intent.recovery=>'AI-ACT-058',_BuyShop04Intent.recipient=>'AI-ACT-342',
+  _BuyShop04Intent.qr=>'AI-ACT-343',_BuyShop04Intent.leavePayment=>'AI-ACT-344',_BuyShop04Intent.remaining=>'AI-ACT-345',
+  _BuyShop04Intent.removeIssue=>'AI-ACT-346',_BuyShop04Intent.invoice=>'AI-ACT-413',_BuyShop04Intent.download=>'AI-ACT-414',_=>null,
+};
+class _BuyShop04Scope extends InheritedWidget {
+  const _BuyShop04Scope({required this.actionId,required this.entity,required this.initial,required this.order,
+    required this.canAct,required this.ownerCurrent,required this.sourceCurrent,required this.close,required this.perform,
+    required this.track,required this.readAlertsValue,required this.setAlertsDraft,required this.present,required super.child});
+  final bool Function() readAlertsValue;
+  bool get alertsValue=>readAlertsValue();
+  final Future<void> Function(Future<void> Function()) present;
+  final ValueChanged<bool> setAlertsDraft;
+  final String actionId;
+  final String? entity;
+  final BuyShop04InitialData initial;
+  final BuyV2Order? order;
+  final bool Function() canAct,ownerCurrent,sourceCurrent;
+  final VoidCallback close;
+  final Future<void> Function(Future<void> Function(),bool) perform;
+  final void Function(Future<void>) track;
+  static _BuyShop04Scope? of(BuildContext context)=>context.dependOnInheritedWidgetOfExactType<_BuyShop04Scope>();
+  bool permits(_BuyShop04Intent intent)=>intent==_BuyShop04Intent.readNavigation || actionId==_shop04ActionFor(intent);
+  bool here(BuildContext context)=>canAct() && context.mounted && ModalRoute.of(context)?.isCurrent==true;
+  static VoidCallback? callback(BuildContext context,_BuyShop04Intent intent,VoidCallback? original,{bool local=false}){
+    final scope=of(context);if(scope==null)return original;
+    if(original==null || !scope.permits(intent) || !scope.canAct())return null;
+    return (){if(!scope.here(context))return;
+      if(local || intent==_BuyShop04Intent.readNavigation){original();return;}
+      // The original native VoidCallback may return a Future. Await its actual
+      // completion without changing the original manual callback/signature.
+      // This is a closed native callback, never a model-supplied function/name.
+      unawaited(scope.perform(()async{await Function.apply(original,const []);},false));};
+  }
+  static VoidCallback? asyncCallback(BuildContext context,_BuyShop04Intent intent,Future<void> Function() original){
+    final scope=of(context);if(scope==null)return ()=>unawaited(original());
+    if(!scope.permits(intent) || !scope.canAct())return null;
+    return (){if(scope.here(context))unawaited(scope.perform(original,true));};
+  }
+  @override bool updateShouldNotify(_BuyShop04Scope oldWidget)=>true;
+}
+
+class _BuyShop04ReviewPage extends StatefulWidget {
+  const _BuyShop04ReviewPage({required this.session,required this.actionId,required this.entity,required this.initial,
+    required this.order,required this.nativeOwner,required this.current,required this.actorCurrent,
+    required this.validUntil,required this.changes,required this.trackNative,required this.onRetired,required this.readProjection,required this.onPrepared});
+  final BuyV2Session session;
+  final String actionId;
+  final String? entity;
+  final BuyShop04InitialData initial;
+  final BuyV2Order? order;
+  final BuyShop04NativeOwner nativeOwner;
+  final BuyV2CheckoutReadProjection? readProjection;
+  final VoidCallback onPrepared;
+  final bool Function() current,actorCurrent;
+  final DateTime validUntil;
+  final Listenable changes;
+  final ValueChanged<Future<void>> trackNative;
+  final VoidCallback onRetired;
+  @override State<_BuyShop04ReviewPage> createState()=>_BuyShop04ReviewPageState();
+}
+class _BuyShop04ReviewPageState extends State<_BuyShop04ReviewPage>{
+  final _inner=GlobalKey<NavigatorState>();Route<dynamic>? _route;Timer? _expiry;
+  bool _busy=false,_modalBusy=false,_closing=false,_used=false,_expired=false,_retirePending=false;
+  String? _error;
+  bool? _alertsDraft;
+  String? _rescheduleDraft;
+  String? get _rescheduleValue=>_rescheduleDraft??widget.initial.slot??widget.session.selectedDeliveryRescheduleSlot(widget.entity!);
+  bool get _alertsValue=>_alertsDraft ?? widget.initial.enabled ?? widget.session.trackingAlertsEnabled;
+  bool get _ownerCurrent=>mounted && !_closing && !_expired && !_retirePending && widget.actorCurrent() && _route?.isCurrent==true;
+  bool get _sourceCurrent=>_ownerCurrent && widget.current();
+  bool get _canAct=>_sourceCurrent && !_busy && !_modalBusy;
+  bool get _renderCurrent=>mounted && !_closing && !_expired && !_retirePending && widget.actorCurrent() && (_busy || _used || widget.current());
+  @override void initState(){super.initState();widget.changes.addListener(_changed);
+    final remaining=widget.validUntil.difference(DateTime.now());
+    _expiry=Timer(remaining.isNegative?Duration.zero:remaining,(){_expired=true;widget.onRetired();_finish();});}
+  @override void didChangeDependencies(){super.didChangeDependencies();_route??=ModalRoute.of(context);
+    WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_changed();});}
+  void _changed(){if(!mounted || _closing)return;
+    if(!widget.actorCurrent() || !_busy && !_used && !widget.current()){
+      if(_retirePending)return;_retirePending=true;widget.onRetired();
+      WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_finish();});}}
+  void _finish(){if(!mounted || _closing)return;_closing=true;
+    _inner.currentState?.popUntil((owned)=>owned.isFirst);
+    final route=_route;if(route?.isActive!=true)return;
+    if(route!.isCurrent)Navigator.of(context).pop(_used);else Navigator.of(context).removeRoute(route);}
+  Future<void> _present(Future<void> Function() presentation)async{
+    if(!_canAct)return;
+    setState(()=>_modalBusy=true);
+    try{await presentation();}finally{_modalBusy=false;if(mounted){setState((){});_changed();}}
+  }
+  Future<void> _perform(Future<void> Function() operation,bool closeAfter){
+    // The sole owned modal may commit after its explicit final control. Other
+    // retained controls still use canAct/here and cannot enter during that modal.
+    if(!_sourceCurrent || _busy)return Future.value();
+    final pending=_run(operation,closeAfter);widget.trackNative(pending);return pending;
+  }
+  Future<void> _run(Future<void> Function() operation,bool closeAfter)async{
+    setState(()=>_busy=true);
+    try{await operation();_used=true;}
+    on Object {if(mounted && widget.actorCurrent())setState(()=>_error='The result is unavailable. Check the original order or payment status before trying again.');}
+    finally{_busy=false;if(mounted){if(_used && closeAfter)_finish();else{setState((){});_changed();}}}
+  }
+  BuyV2PaymentHandoff? get _paymentHandoff {
+    final original=widget.nativeOwner.paymentHandoff;if(original==null)return null;
+    return (uri)async{if(!_ownerCurrent)return false;return original(uri);};
+  }
+  Future<BuyV2InvoiceDownloadOutcome> _download(BuyV2InvoiceDocument document)async{
+    final original=widget.nativeOwner.invoiceDownloader;
+    if(!_canAct || original==null || widget.actionId!='AI-ACT-414' || !identical(document.order,widget.order))
+      return BuyV2InvoiceDownloadOutcome.unavailable;
+    setState(()=>_busy=true);
+    try{final pending=original(document);widget.trackNative(pending.then<void>((_){},onError:(Object _,StackTrace _){}));return await pending;}
+    finally{_busy=false;if(mounted){setState((){});_changed();}}
+  }
+  Future<void> _invoice(BuildContext nativeContext)async{
+    await _openOrderInvoice(nativeContext,session:widget.session,order:widget.order!,
+      downloader:widget.actionId=='AI-ACT-414'?_download:null,capturedCurrent:()=>_sourceCurrent,
+      allowDownload:widget.actionId=='AI-ACT-414');
+    if(mounted)_finish();
+  }
+  Future<void> _recipient(BuildContext nativeContext)async{
+    await _present(()async{
+      await _showInvoiceRecipientSelector(nativeContext,widget.nativeOwner.invoiceController,
+        widget.session.checkoutDestinations.where((d)=>d==BuyV2Destination.shop || d==BuyV2Destination.wholesale).toList(),widget.session,
+        capturedCurrent:()=>_sourceCurrent,capturedOwnerCurrent:()=>_ownerCurrent,
+        capturedCommit:(operation)=>_perform(operation,false),initialProfileId:widget.initial.profileId);
+    });
+    if(mounted && !_busy)_finish();
+  }
+  Widget _body(BuildContext nativeContext){
+    final session=widget.session,owner=widget.nativeOwner,action=widget.actionId;
+    if(const {'AI-ACT-048','AI-ACT-051'}.contains(action))return ListView(padding:const EdgeInsets.all(12),children:[
+      _DeliveryExceptionCard(session:session,order:widget.order!,selectedDraft:_rescheduleValue,
+        onChooseDraft:(value){if(_canAct)setState(()=>_rescheduleDraft=value);})]);
+    if(action=='AI-ACT-049')return _BuyShop04OpenNative(onOpen:()async{if(!_canAct)return;await showBuyV2ReplacementReviewSheet(nativeContext,session:session,orderId:widget.order!.id);if(mounted)_finish();});
+    if(action=='AI-ACT-050')return _BuyShop04OpenNative(onOpen:()async{if(!_canAct)return;await showBuyV2OrderResolutionSheet(nativeContext,session:session,order:widget.order!,onOpenSupport:(){},initial:widget.initial);if(mounted)_finish();});
+    if(action=='AI-ACT-052')return ListView(padding:const EdgeInsets.all(12),children:[_BalancePaymentCard(session:session,order:widget.order!,paymentHandoff:_paymentHandoff)]);
+    if(action=='AI-ACT-053')return _BuyV2CollectionOrderView(session:session,order:widget.order!,onOpenOrderHelp:(_){},capturedCurrent:()=>_ownerCurrent,allowCapturedScan:true,cameraBuilder:widget.nativeOwner.collectionCameraBuilder);
+    if(action=='AI-ACT-055')return _BuyShop05PurchasedStars(session:session,order:widget.order!,initial:widget.initial,scope:_BuyShop04Scope.of(nativeContext)!);
+    if(action=='AI-ACT-413' || action=='AI-ACT-414')return _BuyShop04OpenNative(onOpen:()=>_invoice(nativeContext));
+    if(action=='AI-ACT-043')return BuyV2OrdersView(session:session,onOpenOrderHelp:(_){},invoiceDownloader:null,readQuery:'',
+      permittedOrder:(order)=>order.destination!=BuyV2Destination.medicine && order.lines.every((line)=>!line.product.requiresPrescription));
+    if(action=='AI-ACT-045')return BuyV2OrderItemsView(session:session,capturedOrder:widget.order);
+    if(const {'AI-ACT-044','AI-ACT-046','AI-ACT-047','AI-ACT-057'}.contains(action))return BuyV2TrackingView(
+      session:session,capturedOrder:widget.order,onOpenOrderHelp:(_){},invoiceDownloader:null,paymentHandoff:null);
+    if(action=='AI-ACT-058' || action=='AI-ACT-346')return BuyV2RecoveryView(session:session,onOpenOrderHelp:(_){});
+    if(action=='AI-ACT-029'){
+      final store=session.collectionCheckoutStores.singleWhere((s)=>s.id==widget.entity);
+      return ListView(padding:const EdgeInsets.all(16),children:[
+        _CheckoutFulfilmentChoices(session:session,reviewCollection:true,capturedStoreId:store.id,
+          reviewEffect:(effect){if(!_canAct || ModalRoute.of(nativeContext)?.isCurrent!=true)return false;
+            unawaited(_perform(()async{effect();},true));return true;}),
+        _CheckoutCollectionDetails(session:session,choosingStore:true,reviewing:true,capturedStore:store,
+          capturedLines:session.collectionCheckoutLinesFor(store.id)),
+      ]);
+    }
+    if(action=='AI-ACT-033' || action=='AI-ACT-343')return ListView(padding:const EdgeInsets.all(16),children:[
+      _CheckoutPaymentStage(session:session,hasPaymentHandoff:_paymentHandoff!=null)]);
+    if(action=='AI-ACT-038')return ListView(padding:const EdgeInsets.all(16),children:[_CheckoutPriceChangeReview(session:session)]);
+    if(action=='AI-ACT-342')return _BuyShop04OpenNative(onOpen:()=>_recipient(nativeContext));
+    return BuyV2CheckoutView(session:session,gstInvoiceController:owner.invoiceController,paymentHandoff:_paymentHandoff,
+      onContinueOwner:action=='AI-ACT-037' && widget.readProjection==null && _canAct?(){
+        unawaited(_perform(()async{if(_ownerCurrent)widget.onPrepared();},true));
+      }:null,readProjection:widget.readProjection,onContinuePrepared:widget.readProjection==null?null:(){
+        if(!_canAct)return;
+        unawaited(_perform(()async{
+          if(!session.checkoutReadProjectionCurrent(widget.readProjection!))return;
+          final admitted=session.openCheckout(isCurrent:()=>_ownerCurrent);
+          if(!admitted)throw StateError('Original Checkout admission unavailable');
+          if(_ownerCurrent)widget.onPrepared();
+        },true));
+      });
+  }
+  @override void dispose(){_expiry?.cancel();widget.changes.removeListener(_changed);super.dispose();}
+  @override Widget build(BuildContext context){
+    final target=widget.order!=null || widget.actionId=='AI-ACT-043'?BuyV2Destination.orders:widget.session.destination;
+    final view=widget.actionId=='AI-ACT-043'?BuyV2View.catalogue:widget.actionId=='AI-ACT-045'?BuyV2View.orderItems:
+      widget.order!=null?BuyV2View.tracking:widget.actionId=='AI-ACT-058' || widget.actionId=='AI-ACT-346'?BuyV2View.recovery:BuyV2View.checkout;
+    return PopScope<bool>(canPop:_closing,onPopInvokedWithResult:(didPop,_){if(!didPop){
+      if(_inner.currentState?.canPop()==true)_inner.currentState!.pop();else _finish();}},
+      child:Scaffold(appBar:AppBar(title:const Text('Review order action'),leading:BackButton(onPressed:_finish)),
+        body:BuyV2ThemeScope(spec:BuyV2ThemeSpec.resolve(target,view),refinedCommerce:true,
+          child:_BuyShop04Scope(actionId:widget.actionId,entity:widget.entity,initial:widget.initial,order:widget.order,
+            canAct:()=>_canAct,sourceCurrent:()=>_sourceCurrent,ownerCurrent:()=>_ownerCurrent,close:_finish,perform:_perform,
+            track:widget.trackNative,present:_present,readAlertsValue:()=>_alertsValue,setAlertsDraft:(value){if(_canAct)setState(()=>_alertsDraft=value);},child:Navigator(key:_inner,onGenerateRoute:(_)=>MaterialPageRoute<void>(builder:(nativeContext)=>
+              AnimatedBuilder(animation:widget.changes,builder:(_,__)=>_renderCurrent?
+                Column(children:[if(_error!=null)Padding(padding:const EdgeInsets.all(12),child:Text(_error!)),
+                  Expanded(child:SafeArea(child:_body(nativeContext)))]):const SizedBox.shrink())))))));
+  }
+}
+class _BuyShop04OpenNative extends StatefulWidget {
+  const _BuyShop04OpenNative({required this.onOpen});final Future<void> Function() onOpen;
+  @override State<_BuyShop04OpenNative> createState()=>_BuyShop04OpenNativeState();
+}
+class _BuyShop04OpenNativeState extends State<_BuyShop04OpenNative>{
+  @override void initState(){super.initState();WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)unawaited(widget.onOpen());});}
+  @override Widget build(BuildContext context)=>const SizedBox.shrink();
+}
+
+class _CheckoutBankTransferClaim extends StatelessWidget {
+  const _CheckoutBankTransferClaim({required this.session});
+  final BuyV2Session session;
+  @override Widget build(BuildContext context) {
+    final scope=_BuyShop04Scope.of(context);
+    final instructions=session.bankTransferInstructions;
+    if(scope==null || scope.actionId!='AI-ACT-042' || instructions==null)return const SizedBox.shrink();
+    return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      _CheckoutPaymentFact(label:'Beneficiary',value:instructions.beneficiaryName),
+      _CheckoutPaymentFact(label:'Bank',value:instructions.bankName),
+      _CheckoutPaymentFact(label:'Account',value:instructions.accountNumber),
+      _CheckoutPaymentFact(label:'IFSC',value:instructions.ifsc),
+      _CheckoutPaymentFact(label:'Reference',value:instructions.transferReference),
+      const Text('Only confirm after you have sent this transfer. Payment remains subject to verification.'),
+      FilledButton(key:const ValueKey('buy-checkout-bank-transfer-sent'),
+        onPressed:scope.canAct()?()async{
+          if(!scope.here(context))return;
+          await scope.present(()async{
+            final confirmed=await showDialog<bool>(context:context,useRootNavigator:false,builder:(dialogContext)=>AlertDialog(
+              title:const Text('Confirm transfer sent'),
+              content:Text('Have you already sent the transfer using reference ${instructions.transferReference}? This does not confirm that payment was received.'),
+              actions:[
+                TextButton(onPressed:(){if(scope.sourceCurrent() && dialogContext.mounted && ModalRoute.of(dialogContext)?.isCurrent==true)Navigator.pop(dialogContext,false);},child:const Text('Cancel')),
+                FilledButton(key:const ValueKey('buy-checkout-bank-transfer-confirm'),onPressed:(){
+                  if(scope.sourceCurrent() && dialogContext.mounted && ModalRoute.of(dialogContext)?.isCurrent==true)Navigator.pop(dialogContext,true);
+                },child:const Text('I have transferred')),
+              ],
+            ));
+            if(confirmed!=true || !scope.sourceCurrent() || !context.mounted || ModalRoute.of(context)?.isCurrent!=true)return;
+            if(!identical(session.bankTransferInstructions,instructions))return;
+            await scope.perform(()async{if(scope.ownerCurrent())session.markBankTransferSent();},false);
+          });
+        }:null,
+        child:const Text('I have transferred'),
+      ),
+    ]);
+  }
+}
+
+// Insert in buy_v2_views.dart after the original imports. Requires the prior
+// Shop03 025/026/340/341 native form registry/import draft, without duplicating it.
+typedef _BuyNativeReviewEffect = bool Function(bool Function() effect);
+final _buyQuantityEditors = Expando<int>('buy-native-quantity-editor');
+final _buyNativeReviews = Expando<bool>('buy-native-review');
+final _buyInstructionEditors = Expando<Set<_CartDeliveryInstructionCardState>>();
+bool _buyInstructionDraftOpen(BuyV2Session session) => _buyInstructionEditors[session]?.any(
+  (state) => state.mounted && identical(state.widget.session, session) &&
+    state._editing && state.widget.reviewInitialText == null) == true;
+
+class BuyShopReviewInitialData {
+  const BuyShopReviewInitialData._(this.mode, this.text, this.amount);
+  final String? mode, text;
+  final int? amount;
+  static Set<String> fieldsFor(String action) => switch (action) {
+    'AI-ACT-028' => const {'mode'}, 'AI-ACT-030' => const {'text'},
+    'AI-ACT-031' => const {'amount'}, _ => const {},
+  };
+  factory BuyShopReviewInitialData.fromFields(String action, Map<String, Object?> fields) {
+    final allowed = fieldsFor(action);
+    if (fields.length != allowed.length || fields.keys.any((key) => !allowed.contains(key))) {
+      throw const FormatException('Use the current native review fields.');
+    }
+    if (action == 'AI-ACT-028' && fields['mode'] != 'delivery' && fields['mode'] != 'collection') {
+      throw const FormatException('Choose delivery or collection.');
+    }
+    if (action == 'AI-ACT-030' && (fields['text'] is! String ||
+        (fields['text'] as String).trim().isEmpty || (fields['text'] as String).characters.length > 200)) {
+      throw const FormatException('Use up to 200 characters for delivery instructions.');
+    }
+    if (action == 'AI-ACT-031' && (fields['amount'] is! int || (fields['amount'] as int) < 0)) {
+      throw const FormatException('Choose a current native tip option.');
+    }
+    return BuyShopReviewInitialData._(fields['mode'] as String?, fields['text'] as String?, fields['amount'] as int?);
+  }
+}
+
+Iterable<MoolAssistantNativeAdapter> buyShopReviewNativeAdapters({
+  required BuyV2Session session, required NavigatorState navigator,
+  required MoolAssistantContext Function() currentContext,
+  required bool Function() isRootCurrent, required Listenable scopeOwner,
+  required AuthenticatedAccountIdentity? Function() accountIdentity,
+  required bool Function() accountAuthenticated,
+}) {
+  if (!isRootCurrent() || !currentContext().signedIn || currentContext().inWorkspace) return const [];
+  return [for (final id in const ['AI-ACT-024', 'AI-ACT-027', 'AI-ACT-028',
+    'AI-ACT-030', 'AI-ACT-031', 'AI-ACT-039'])
+    BuyShopReviewNativeAdapter(actionId: id, session: session, navigator: navigator,
+      currentContext: currentContext, isRootCurrent: isRootCurrent, scopeOwner: scopeOwner,
+      accountIdentity: accountIdentity, accountAuthenticated: accountAuthenticated)];
+}
+
+class BuyShopReviewNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  BuyShopReviewNativeAdapter({required this.actionId, required this.session,
+    required this.navigator, required this.currentContext, required this.isRootCurrent,
+    required this.scopeOwner, required this.accountIdentity, required this.accountAuthenticated});
+  @override final String actionId;
+  final BuyV2Session session;
+  final NavigatorState navigator;
+  final MoolAssistantContext Function() currentContext;
+  final bool Function() isRootCurrent;
+  final Listenable scopeOwner;
+  final AuthenticatedAccountIdentity? Function() accountIdentity;
+  final bool Function() accountAuthenticated;
+  Object? _snapshotOwner, _binding;
+  String? _signature, _entity;
+  int _version = 0;
+  bool _actor(Object binding) => navigator.mounted && isRootCurrent() &&
+    accountAuthenticated() && accountIdentity()?.firebasePrincipal != null &&
+    currentContext().signedIn && !currentContext().inWorkspace && currentContext().binding == binding &&
+    !session.isStoreProcurement && session.procurementScopeCurrent && !session.customerStateRecoveryPending &&
+    _supportedDestination(session.destination);
+  bool _supportedDestination(BuyV2Destination value) =>
+    value == BuyV2Destination.shop || value == BuyV2Destination.wholesale;
+  bool _eligibleLine(BuyV2CartLine line) {
+    final latest = session.findProduct(line.product.id);
+    return _supportedDestination(line.product.destination) && !line.product.requiresPrescription &&
+      latest != null && _supportedDestination(latest.destination) && !latest.requiresPrescription &&
+      latest.destination == line.product.destination;
+  }
+  bool _eligibleLines(Iterable<BuyV2CartLine> lines) => lines.every(_eligibleLine);
+  bool get _globalCommerceEligible => session.cartScope != BuyV2CartScope.medicine &&
+    _eligibleLines(session.allCartLines) && (session.view != BuyV2View.checkout ||
+      session.checkoutScope != BuyV2CartScope.medicine && _eligibleLines(session.checkoutLines));
+  Object get _owner => (session.customerStateStore?.ownerScope,
+    session.collectionIdentity?.value?.accountId, session.collectionIdentity?.value?.sessionId,
+    session.procurementContext?.customerStateOwnerScope, session.navigationMotionSequence,
+    session.destination, session.view, session.cartScope, session.checkoutScope, session.saleTypeSignature);
+  BuyV2Address? _address(String? id) => session.addresses.where((value) => value.id == id).singleOrNull;
+  BuyV2FulfilmentGroup? _group(String? id) => session.scopedCartFulfilmentGroups.where((value) =>
+    value.key == id && _supportedDestination(value.destination) && _eligibleLines(value.lines)).singleOrNull;
+  BuyV2Destination? get _instructionDestination => session.cartLines.firstOrNull?.product.destination;
+  bool _available(String? entity) {
+    if (session.cartChangesBlocked || session.checkoutBusy || session.checkoutRequiresResolution) return false;
+    return switch (actionId) {
+      'AI-ACT-024' || 'AI-ACT-027' => _globalCommerceEligible && entity != null && _address(entity) != null,
+      'AI-ACT-028' => entity == null && session.view == BuyV2View.checkout &&
+        session.checkoutScope != BuyV2CartScope.medicine && _eligibleLines(session.checkoutLines) &&
+        session.checkoutLines.isNotEmpty && (session.collectionCheckoutStores.isNotEmpty || session.collectionCheckoutSelected),
+      'AI-ACT-030' => _globalCommerceEligible && entity == 'delivery' && _instructionDestination != null &&
+        session.deliveryInstructionsFor(_instructionDestination!).isNotEmpty && !_buyInstructionDraftOpen(session),
+      'AI-ACT-031' => _group(entity) != null && session.tipOptionsFor(_group(entity)!.destination).isNotEmpty,
+      'AI-ACT-039' => entity == null && session.view == BuyV2View.checkout &&
+        session.checkoutScope != BuyV2CartScope.medicine && _eligibleLines(session.checkoutLines) && session.checkoutLines.isNotEmpty &&
+        session.checkoutPromiseReviewRequired && session.checkoutDeliveryPromiseChanges.isNotEmpty,
+      _ => false,
+    };
+  }
+  String _source() => jsonEncode([
+    session.selectedAddressId, session.collectionCheckoutSelected,
+    [for (final address in session.addresses) [address.id, address.label, address.kind.name, address.recipient,
+      address.phone, address.line, address.area, address.pinCode, address.landmark]],
+    [for (final line in session.allCartLines) [line.product.id, line.product.canonicalId,
+      line.product.requiresPrescription, session.findProduct(line.product.id)?.requiresPrescription,
+      line.product.destination.name, line.product.storeId, line.product.sourceSkuId,
+      line.product.packTerms?.revision, line.product.publicListingIdentity?.toJson(), line.quantity,
+      line.scheduledFulfilment?.toJson()]],
+    [for (final store in session.collectionCheckoutStores) [store.id, store.name, store.area, store.address, store.regionId]],
+    session.publicDeliveryInstruction, session.previousPublicDeliveryInstructions,
+    [for (final group in session.scopedCartFulfilmentGroups) [group.key, group.destination.name,
+      group.partner, group.partnerType, group.deliveryProviderName, group.deliveryServiceLevel,
+      group.promise, group.promisedByLabel, session.tipForGroup(group),
+      [for (final option in session.tipOptionsFor(group.destination)) option.amount]]],
+    [for (final change in session.checkoutDeliveryPromiseChanges) [change.groupKey,
+      change.previousPromise, change.previousPromisedByLabel, change.currentPromise, change.currentPromisedByLabel]],
+  ]);
+  bool _same(Object binding, String? entity) => _actor(binding) && _binding == binding &&
+    _entity == entity && _snapshotOwner == _owner && _signature == _source() && _available(entity);
+  String get _revision => 'buy-native-review:$actionId:$_version';
+  @override Set<String> get allowedFields => BuyShopReviewInitialData.fieldsFor(actionId);
+  @override String? validateFields(Map<String, Object?> fields) {
+    try { BuyShopReviewInitialData.fromFields(actionId, fields); return null; }
+    on FormatException catch (error) { return error.message; }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context, String? entityId) async {
+    if (!_actor(context.binding) || !_available(entityId) || _buyNativeReviews[session] == true ||
+        buyV2AddressFormOpen(session) || buyV2AddressRequestFormOpen(session)) return null;
+    if (!_same(context.binding, entityId)) {
+      _binding = context.binding; _entity = entityId; _snapshotOwner = _owner;
+      _signature = _source(); _version++;
+    }
+    return MoolAssistantNativeSnapshot(binding: context.binding, permitted: true,
+      entityId: entityId, sourceRevision: _revision);
+  }
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) =>
+    openOwnedReview(proposal,isCurrent:isCurrent,ownerChanges:scopeOwner);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,
+      {required bool Function() isCurrent,required Listenable ownerChanges}) async {
+    if (!isCurrent() || !proposal.validUntil.isAfter(DateTime.now()) || proposal.actionId != actionId || validateFields(proposal.fields) != null ||
+        proposal.sourceRevision != _revision || !_same(proposal.binding, proposal.entityId) ||
+        _buyNativeReviews[session] == true || buyV2AddressFormOpen(session) || buyV2AddressRequestFormOpen(session)) {
+      return MoolAssistantReviewResult.stale;
+    }
+    final initial = BuyShopReviewInitialData.fromFields(actionId, proposal.fields);
+    final group = _group(proposal.entityId), address = _address(proposal.entityId);
+    if (actionId == 'AI-ACT-031' && (group == null ||
+        !session.tipPolicy.accepts(group.destination, initial.amount!) ||
+        initial.amount != 0 && !session.tipOptionsFor(group.destination).any((option) => option.amount == initial.amount))) {
+      return MoolAssistantReviewResult.unavailable;
+    }
+    bool current() => isCurrent() && proposal.validUntil.isAfter(DateTime.now()) && _same(proposal.binding, proposal.entityId);
+    _buyNativeReviews[session] = true;
+    try {
+      final accepted = await navigator.push<bool>(MaterialPageRoute<bool>(builder: (_) => _BuyOriginalReviewPage(
+        session: session, actionId: actionId, initial: initial, address: address, group: group,
+        instructionDestination: _instructionDestination, isCurrent: current, validUntil: proposal.validUntil,
+        changes: Listenable.merge([if(!identical(ownerChanges,scopeOwner))ownerChanges, scopeOwner, session, ?session.collectionIdentity, ?session.procurementIdentity]))));
+      return isCurrent() && proposal.validUntil.isAfter(DateTime.now()) && _actor(proposal.binding) && (accepted == true || _same(proposal.binding, proposal.entityId))
+        ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+    } finally { _buyNativeReviews[session] = false; }
+  }
+}
+
+class _BuyOriginalReviewPage extends StatefulWidget {
+  const _BuyOriginalReviewPage({required this.session, required this.actionId, required this.initial,
+    required this.address, required this.group, required this.instructionDestination,
+    required this.isCurrent, required this.changes, required this.validUntil});
+  final BuyV2Session session;
+  final String actionId;
+  final BuyShopReviewInitialData initial;
+  final BuyV2Address? address;
+  final BuyV2FulfilmentGroup? group;
+  final BuyV2Destination? instructionDestination;
+  final bool Function() isCurrent;
+  final Listenable changes;
+  final DateTime validUntil;
+  @override State<_BuyOriginalReviewPage> createState() => _BuyOriginalReviewPageState();
+}
+class _BuyOriginalReviewPageState extends State<_BuyOriginalReviewPage> {
+  Route<dynamic>? _route;
+  DialogRoute<bool>? _discardRoute;
+  DialogRoute<bool>? _removalRoute;
+  Timer? _expiry;
+  bool _committing = false, _accepted = false, _closing = false, _prompting = false;
+  bool _removalOpen = false;
+  @override void initState() {
+    super.initState(); widget.changes.addListener(_changed);
+    final remaining = widget.validUntil.difference(DateTime.now());
+    _expiry = Timer(remaining.isNegative ? Duration.zero : remaining, _retire);
+  }
+  @override void didChangeDependencies() {
+    super.didChangeDependencies(); _route ??= ModalRoute.of(context);
+    if (widget.actionId == 'AI-ACT-027' && !_prompting) {
+      _prompting = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) unawaited(_removeAddress()); });
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _changed());
+  }
+  void _changed() {
+    if (!mounted || _closing || _committing || _accepted || widget.isCurrent()) return;
+    _retire();
+  }
+  void _retire() {
+    if (!mounted || _closing || _committing || _accepted) return;
+    final route = _route;
+    if (route?.isActive == true) {
+      _closing = true;
+      final navigator = Navigator.of(context);
+      final discard = _discardRoute;
+      if (discard?.isActive == true) navigator.removeRoute(discard!);
+      final removal = _removalRoute;
+      if (removal?.isActive == true) removal!.navigator?.removeRoute(removal);
+      navigator.removeRoute(route!);
+    }
+  }
+  bool _effect(bool Function() effect) {
+    if (!mounted || _closing || _committing || _accepted || !widget.isCurrent() || ModalRoute.of(context)?.isCurrent!=true) return false;
+    _committing = true;
+    var accepted = false;
+    try { accepted = effect(); if (accepted) _accepted = true; }
+    finally { _committing = false; }
+    if (accepted) _finish(true);
+    else {
+      final notice = widget.session.notice;
+      if (mounted && notice != null && notice.trim().isNotEmpty) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(notice)));
+      }
+      _changed();
+    }
+    return accepted;
+  }
+  void _finish([bool accepted = false]) {
+    if (!mounted || _closing) return;
+    _closing = true;
+    final route = _route;
+    if (route == null || !route.isActive) return;
+    if (route.isCurrent) Navigator.of(context).pop(accepted);
+    else Navigator.of(context).removeRoute(route);
+  }
+  Future<void> _removeAddress() async {
+    final address = widget.address;
+    if (_removalOpen || address == null || !widget.isCurrent()) return;
+    _removalOpen = true;
+    final bool? remove;
+    try { remove = await _confirmBuyV2AddressRemoval(context, address,
+      isCurrent: widget.isCurrent, changes: widget.changes,
+      onRoute: (route) => _removalRoute = route); }
+    finally { _removalOpen = false; }
+    if (!mounted) return;
+    if (remove == true) _effect(() => widget.session.removeAddress(address.id));
+    else _finish();
+  }
+  Future<void> _close() async {
+    if (_committing || _closing || _discardRoute != null) return;
+    if (widget.actionId != 'AI-ACT-030' || !widget.isCurrent()) { _finish(); return; }
+    final route = DialogRoute<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Discard instruction changes?'), content: const Text('Your instructions have not been saved.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard changes'))]));
+    _discardRoute = route;
+    final bool? discard;
+    try { discard = await Navigator.of(context).push(route); }
+    finally { _discardRoute = null; }
+    if (mounted && (discard == true || !widget.isCurrent())) _finish();
+  }
+  @override void dispose() { _expiry?.cancel(); widget.changes.removeListener(_changed); super.dispose(); }
+  @override Widget build(BuildContext context) => PopScope<bool>(canPop: _closing || widget.actionId != 'AI-ACT-030',
+    onPopInvokedWithResult: (didPop, _) { if (!didPop) unawaited(_close()); },
+    child: Scaffold(appBar: AppBar(leading: BackButton(onPressed: _close), title: const Text('Review delivery details')),
+      body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.all(16),
+        child: !widget.isCurrent() && !_accepted ? const Text('Your delivery details changed. Reopen this review.') : switch (widget.actionId) {
+        'AI-ACT-024' || 'AI-ACT-027' => _BuyV2AddressChoice(address: widget.address!,
+          selected: widget.session.selectedAddressId == widget.address!.id,
+          onTap: widget.actionId == 'AI-ACT-027' ? _removeAddress
+            : () => _effect(() => widget.session.chooseAddress(widget.address!.id)),
+          onEdit: () => showBuyV2AddressInitialReview(context, widget.session,
+            existingAddress: widget.address,
+            initialData: BuyV2AddressInitialData.fromFields({'recipient': widget.address!.recipient}),
+            scopeOwner: widget.changes, isCurrent: widget.isCurrent),
+          onDelete: _removeAddress),
+        'AI-ACT-028' => _CheckoutFulfilmentChoices(session: widget.session,
+          reviewCollection: widget.initial.mode == 'collection', reviewEffect: _effect),
+        'AI-ACT-030' => BuyV2ThemeScope(
+          spec: BuyV2ThemeSpec.resolve(widget.instructionDestination!, BuyV2View.cart), refinedCommerce: true,
+          child: _CartDeliveryInstructionCard(session: widget.session,
+          destination: widget.instructionDestination!, showDestination: false,
+          reviewInitialText: widget.initial.text, reviewEffect: _effect)),
+        'AI-ACT-031' => BuyV2ThemeScope(
+          spec: BuyV2ThemeSpec.resolve(widget.group!.destination, BuyV2View.cart), refinedCommerce: true,
+          child: _CartTipCard(session: widget.session, group: widget.group!,
+          reviewAmount: widget.initial.amount, reviewEffect: _effect)),
+        'AI-ACT-039' => _CheckoutPromiseChangeReview(session: widget.session, reviewEffect: _effect),
+        _ => const SizedBox.shrink(),
+      }))));
+}
+
+// Original removal confirmation, shared with the manual address row.
+Future<bool?> _confirmBuyV2AddressRemoval(BuildContext context, BuyV2Address address, {
+  required bool Function() isCurrent, Listenable? changes,
+  void Function(DialogRoute<bool>?)? onRoute,
+}) async {
+  final navigator = Navigator.of(context, rootNavigator: true);
+  late final DialogRoute<bool> route;
+  var completed = false;
+  void finish(bool value) {
+    if (completed || !route.isActive || !route.isCurrent || value && !isCurrent()) return;
+    completed = true; navigator.pop(value);
+  }
+  route = DialogRoute<bool>(context: context, builder: (dialogContext) => AlertDialog(
+    title: Text('Remove ${address.label} address?'),
+    content: const Text('Existing orders stay unchanged. You can add this address again later.'),
+    actions: [TextButton(key: const ValueKey('buy-address-delete-cancel'),
+      onPressed: () => finish(false), child: const Text('Keep address')),
+      Align(widthFactor: 1, heightFactor: 1, child: FilledButton(style: BuyV2ActionStyle.button(),
+        key: const ValueKey('buy-address-delete-confirm'),
+        onPressed: () => finish(true), child: const Text('Remove')))],
+  ));
+  void retire() { if (!isCurrent() && route.isActive) { completed = true; navigator.removeRoute(route); } }
+  onRoute?.call(route);
+  changes?.addListener(retire);
+  try { if (!isCurrent()) return false; return await navigator.push(route); }
+  finally { changes?.removeListener(retire); onRoute?.call(null); }
+}
+
+/// Proposed facts only. Native controls own lookup, validation and final effects.
+class BuyBrowseInitialData {
+  BuyBrowseInitialData._(Map<String, Object?> fields) : fields = Map.unmodifiable({
+    for (final entry in fields.entries) entry.key:
+      entry.value is List ? List<Object?>.unmodifiable(entry.value! as List) : entry.value,
+  });
+  final Map<String, Object?> fields;
+  static const actions = {'AI-ACT-002', 'AI-ACT-003', 'AI-ACT-004', 'AI-ACT-005',
+    'AI-ACT-006', 'AI-ACT-007', 'AI-ACT-008', 'AI-ACT-009', 'AI-ACT-010',
+    'AI-ACT-011', 'AI-ACT-012', 'AI-ACT-013', 'AI-ACT-060', 'AI-ACT-336', 'AI-ACT-337',
+    'AI-ACT-338', 'AI-ACT-339', 'AI-ACT-352'};
+  static Set<String> fieldsFor(String action) => switch (action) {
+    'AI-ACT-002' => const {'categoryId'},
+    'AI-ACT-003' => const {'brands', 'maximumPrice', 'pack', 'sort', 'availableOnly'},
+    'AI-ACT-004' => const {'saleType'},
+    'AI-ACT-005' => const {'query'},
+    'AI-ACT-007' => const {'variantId'},
+    'AI-ACT-008' => const {'quantityMilli'},
+    'AI-ACT-009' => const {'saved'},
+    'AI-ACT-338' => const {'query'},
+    _ => const {},
+  };
+  factory BuyBrowseInitialData.fromFields(String action, Map<String, Object?> fields) {
+    if (!actions.contains(action) || !fields.keys.every(fieldsFor(action).contains)) {
+      throw const FormatException('Use the original native browse fields.');
+    }
+    if (action == 'AI-ACT-003') {
+      if (fields.containsKey('brands') && (fields['brands'] is! List ||
+          !(fields['brands']! as List).every((value) => value is String))) {
+        throw const FormatException('Use original brand labels.');
+      }
+      if (fields['maximumPrice'] != null && fields['maximumPrice'] is! int ||
+          fields['pack'] != null && fields['pack'] is! String ||
+          fields['sort'] != null && fields['sort'] is! String ||
+          fields.containsKey('availableOnly') && fields['availableOnly'] is! bool) {
+        throw const FormatException('Use the native filter field types.');
+      }
+    } else {
+      if (action != 'AI-ACT-008' && fields.length != fieldsFor(action).length) {
+        throw const FormatException('Supply the native target value.');
+      }
+      if (action == 'AI-ACT-008' && fields.containsKey('quantityMilli') && fields['quantityMilli'] is! int) {
+        throw const FormatException('Use the original comparison quantity unit.');
+      }
+      for (final key in ['categoryId', 'variantId', 'query']) {
+        if (fields.containsKey(key) && (fields[key] is! String || (fields[key]! as String).trim().isEmpty)) {
+          throw const FormatException('Supply an exact native identifier or search text.');
+        }
+      }
+      if (action == 'AI-ACT-004' && !const {'wholesale', 'bulk'}.contains(fields['saleType']) ||
+          action == 'AI-ACT-009' && fields['saved'] is! bool) {
+        throw const FormatException('Use the original native choice.');
+      }
+      if (action == 'AI-ACT-005' && ((fields['query']! as String).trim().length < 2 ||
+          (fields['query']! as String).trim().length > 80)) {
+        throw const FormatException('Use the original area search length.');
+      }
+    }
+    return BuyBrowseInitialData._(fields);
+  }
+}
+
+final _buyBrowseReviews = Expando<bool>('buy-browse-native-review');
+final _buyBrowseFilterForms = Expando<int>('native-refinement-inputs');
+
+Iterable<MoolAssistantNativeAdapter> buyBrowseNativeAdapters({
+  required BuyV2Session session, required NavigatorState navigator,
+  required MoolAssistantContext Function() currentContext, required bool Function() isRootCurrent,
+  required Listenable scopeOwner, required AuthenticatedAccountIdentity? Function() accountIdentity,
+  required bool Function() accountAuthenticated,
+}) => [if (isRootCurrent() && currentContext().signedIn && !currentContext().inWorkspace)
+  for (final id in BuyBrowseInitialData.actions)
+    BuyBrowseNativeAdapter(actionId: id, session: session, navigator: navigator,
+      currentContext: currentContext, isRootCurrent: isRootCurrent, scopeOwner: scopeOwner,
+      accountIdentity: accountIdentity, accountAuthenticated: accountAuthenticated)];
+
+class BuyBrowseNativeAdapter implements MoolAssistantNativeAdapter {
+  BuyBrowseNativeAdapter({required this.actionId, required this.session, required this.navigator,
+    required this.currentContext, required this.isRootCurrent, required this.scopeOwner,
+    required this.accountIdentity, required this.accountAuthenticated, this.contactLauncher});
+  @override final String actionId;
+  final BuyV2Session session;
+  final NavigatorState navigator;
+  final MoolAssistantContext Function() currentContext;
+  final bool Function() isRootCurrent, accountAuthenticated;
+  final Listenable scopeOwner;
+  final AuthenticatedAccountIdentity? Function() accountIdentity;
+  final Future<bool> Function(Uri)? contactLauncher;
+  Object? _binding, _sourceOwner, _storeOwner, _catalogueSource;
+  String? _signature, _entity;
+  int _version = 0;
+  bool _supported(BuyV2Destination value) => value == BuyV2Destination.shop || value == BuyV2Destination.wholesale;
+  bool _actor(Object binding) => navigator.mounted && isRootCurrent() && accountAuthenticated() &&
+    accountIdentity()?.firebasePrincipal != null && currentContext().signedIn && !currentContext().inWorkspace &&
+    currentContext().binding == binding && !session.isStoreProcurement && session.procurementScopeCurrent &&
+    !session.customerStateRecoveryPending && _supported(session.destination);
+  Object get _owner => (session.customerStateStore?.ownerScope,
+    session.collectionIdentity?.value?.accountId, session.collectionIdentity?.value?.sessionId,
+    session.procurementContext?.customerStateOwnerScope, session.cataloguePageSource);
+  Object get _readScope => (session.navigationMotionSequence, session.destination, session.view,
+    session.saleTypeSignature, session.selectedCategoryId, session.query, session.catalogueRegionId,
+    session.eligibilityLocationKey, session.activeShoppingIntent);
+  BuyV2Product? _product(String? id) {
+    final value = id == null ? null : session.findProduct(id);
+    return value != null && _supported(value.destination) && !value.requiresPrescription &&
+      value.destination == session.destination && (value.publicListingIdentity == null ||
+        value.publicListingIdentity!.valid && value.publicListingIdentity!.matches(value)) ? value : null;
+  }
+  bool _eligible(Iterable<BuyV2Product> values) => values.every((p) => _product(p.id) != null &&
+    _supported(p.destination) && !p.requiresPrescription);
+  Uri? _productUri(BuyV2Product? product) => product == null || product.publicListingIdentity == null ||
+    session.cataloguePageSource == null ? null : buyV2SharedProductUri(product);
+  BuyV2StoreListing? _contact(BuyV2Product? product) {
+    if (product?.publicListingIdentity == null || session.cataloguePageSource == null) return null;
+    final store = session.catalogueStore(product!.storeId!);
+    return store != null && store.id == product.storeId && store.publicContactPhone?.trim().isNotEmpty == true ? store : null;
+  }
+  bool _available(String? entity) {
+    final product = _product(entity);
+    return switch (actionId) {
+      'AI-ACT-002' => entity == null && session.categoriesFor(session.destination).isNotEmpty,
+      'AI-ACT-003' || 'AI-ACT-005' => entity == null,
+      'AI-ACT-010' => entity == null &&
+        session.savedCountFor(session.destination) == session.savedProductsFor(session.destination).length &&
+        _eligible(session.savedProductsFor(session.destination)),
+      'AI-ACT-004' => entity == null && session.destination == BuyV2Destination.wholesale,
+      'AI-ACT-006' || 'AI-ACT-009' => product != null,
+      'AI-ACT-336' || 'AI-ACT-337' => _productUri(product) != null,
+      'AI-ACT-339' => _contact(product) != null,
+      'AI-ACT-007' => product != null && session.view == BuyV2View.product && session.selectedProduct?.id == product.id &&
+        session.variantFamilyFor(product) != null && _eligible(session.productVariantsFor(product)),
+      'AI-ACT-008' => product != null && session.comparisonSource != null && session.comparisonQueryFor(product) != null,
+      'AI-ACT-011' => entity == null && session.savedCountFor(session.destination) > 0 &&
+        session.savedCountFor(session.destination) == session.savedProductsFor(session.destination).length &&
+        _eligible(session.savedProductsFor(session.destination)),
+      'AI-ACT-012' => entity == null && session.recentlyViewedProductsFor(session.destination).isNotEmpty &&
+        _eligible(session.recentlyViewedProductsFor(session.destination)),
+      'AI-ACT-013' => entity == null && session.recentSearchesFor(session.destination).isNotEmpty,
+      'AI-ACT-060' || 'AI-ACT-352' => !session.cartChangesBlocked && product != null && product.hasValidPackTerms &&
+        product.packTerms?.commodityPriceRevision != null && product.packTerms?.priceValidUntil != null &&
+        product.packTerms?.pricingCurrentAt(session.catalogueNow()) == false,
+      'AI-ACT-338' => product != null && product.storeId != null && product.publicListingIdentity != null &&
+        (_storeOwner != null ? buyV2BrowseStoreOwnerCurrent(session, product, _storeOwner!) :
+          buyV2BrowseStoreOwner(session, product) != null),
+      _ => false,
+    };
+  }
+  String _source(String? entity) {
+    final p = _product(entity), r = session.discoveryRefinements;
+    final family = p == null ? null : session.variantFamilyFor(p);
+    return jsonEncode([session.destination.name, session.view.name, session.navigationMotionSequence,
+      session.saleTypeSignature, session.query, session.selectedCategoryId, session.catalogueRegionId,
+      session.catalogueAreaScope.name, session.showingSavedProducts, session.selectedProduct?.id,
+      session.activeShoppingIntent?.name, session.eligibilityLocationKey,
+      session.categoriesFor(session.destination).map((c) => c.id).toList(),
+      [r.brands.toList()..sort(), r.maximumPrice, r.pack?.name, r.fulfilmentMode?.name, r.filter, r.sort.name, r.availableOnly],
+      session.discoveryBrands, session.discoveryPriceLimits,
+      session.selectedAddressId,
+      session.savedProductsFor(session.destination).map((v) => [v.id, v.requiresPrescription,
+        v.publicListingIdentity?.toJson()]).toList(), session.savedCountFor(session.destination),
+      session.recentlyViewedProductsFor(session.destination).map((v) => v.id).toList(),
+      session.recentSearchesFor(session.destination),
+      p == null ? null : [p.id, p.canonicalId, p.storeId, p.sourceSkuId, p.pack,
+        p.customerTitle, p.seller, p.sellerType, p.brand, p.priceMinor, p.mrpMinor, p.minimumOrder, p.quantityStep,
+        p.publicListingIdentity?.toJson(), p.requiresPrescription, p.packTerms?.revision,
+        p.packTerms?.commodityPriceRevision, p.packTerms?.priceValidUntil?.toUtc().toIso8601String(),
+        session.productFactsFor(p).sourceId, session.productFactsFor(p).priceMinor, session.productFactsFor(p).stale, session.isSaved(p.id)],
+      family == null ? null : [family.sourceId, family.revision, family.validUntil.toUtc().toIso8601String(),
+        family.candidates.map((v) => [v.id, v.publicListingIdentity?.toJson(), v.packTerms?.revision, v.requiresPrescription]).toList()],
+      _productUri(p)?.toString(),
+      actionId == 'AI-ACT-008' && p != null ? session.comparisonQueryFor(p)?.key : null,
+      _contact(p) == null ? null : [_contact(p)!.id, _contact(p)!.name, _contact(p)!.address,
+        _contact(p)!.regionId, _contact(p)!.publicContactPhone],
+      actionId == 'AI-ACT-338' && p != null && _storeOwner != null
+        ? buyV2BrowseStoreOwnerSource(session, p, _storeOwner!) : null,
+    ]);
+  }
+  bool _same(Object binding, String? entity) => _actor(binding) && _binding == binding &&
+    identical(_catalogueSource, session.cataloguePageSource) &&
+    _sourceOwner == _owner && _entity == entity && _available(entity) && _signature == _source(entity);
+  String get _revision => 'buy-browse:$actionId:$_version';
+  @override Set<String> get allowedFields => BuyBrowseInitialData.fieldsFor(actionId);
+  @override String? validateFields(Map<String, Object?> fields) {
+    try { BuyBrowseInitialData.fromFields(actionId, fields); return null; }
+    on FormatException catch (error) { return error.message.toString(); }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context, String? entityId) async {
+    if (!_actor(context.binding) || _buyBrowseReviews[session] == true ||
+        buyV2AddressFormOpen(session) || buyV2AddressRequestFormOpen(session) ||
+        actionId == 'AI-ACT-003' && (_buyBrowseFilterForms[session] ?? 0) > 0 ||
+        actionId == 'AI-ACT-002' && buyV2BrowseCategoryFormOpen(session) ||
+        actionId == 'AI-ACT-005' && buyV2BrowseAreaFormOpen(session)) return null;
+    if (actionId == 'AI-ACT-339') {
+      final product = _product(entityId), owner = _owner, readScope = _readScope, source = session.cataloguePageSource;
+      if (product?.publicListingIdentity == null || source == null) return null;
+      final store = await session.refreshCatalogueStore(product!.storeId!, product.destination);
+      if (store == null || !_actor(context.binding) || _owner != owner || _readScope != readScope ||
+          !identical(source, session.cataloguePageSource) || store.id != product.storeId) return null;
+    }
+    if (actionId == 'AI-ACT-338') {
+      final product = _product(entityId);
+      _storeOwner = product == null ? null : buyV2BrowseStoreOwner(session, product);
+    }
+    if (!_available(entityId)) return null;
+    if (!_same(context.binding, entityId)) {
+      _binding = context.binding; _sourceOwner = _owner; _catalogueSource = session.cataloguePageSource; _entity = entityId;
+      _signature = _source(entityId); _version++;
+    }
+    return MoolAssistantNativeSnapshot(binding: context.binding, sourceRevision: _revision,
+      permitted: true, entityId: entityId);
+  }
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) async {
+    if (!isCurrent() || !proposal.validUntil.isAfter(DateTime.now()) || proposal.actionId != actionId ||
+        proposal.sourceRevision != _revision || !_same(proposal.binding, proposal.entityId) ||
+        validateFields(proposal.fields) != null || _buyBrowseReviews[session] == true ||
+        buyV2AddressFormOpen(session) || buyV2AddressRequestFormOpen(session) ||
+        actionId == 'AI-ACT-003' && (_buyBrowseFilterForms[session] ?? 0) > 0 ||
+        actionId == 'AI-ACT-002' && buyV2BrowseCategoryFormOpen(session) ||
+        actionId == 'AI-ACT-005' && buyV2BrowseAreaFormOpen(session)) return MoolAssistantReviewResult.stale;
+    final initial = BuyBrowseInitialData.fromFields(actionId, proposal.fields), product = _product(proposal.entityId);
+    if (actionId == 'AI-ACT-008' && session.comparisonQueryFor(product!,
+        requestedQuantityMilli: initial.fields['quantityMilli'] as int?) == null) return MoolAssistantReviewResult.unavailable;
+    if (actionId == 'AI-ACT-002' && !session.categoriesFor(session.destination).any((c) => c.id == initial.fields['categoryId']) ||
+        actionId == 'AI-ACT-009' && session.isSaved(product!.id) == initial.fields['saved'] ||
+        actionId == 'AI-ACT-007' && !session.productVariantsFor(product!).any((v) =>
+          v.id == initial.fields['variantId'] && _product(v.id) != null)) return MoolAssistantReviewResult.unavailable;
+    BuyV2DiscoveryRefinements? refinements;
+    try { if (actionId == 'AI-ACT-003') refinements = _buyBrowseProposedRefinements(session, initial.fields); }
+    on FormatException { return MoolAssistantReviewResult.unavailable; }
+    final owner = _owner, catalogueSource = session.cataloguePageSource;
+    bool actor() => _actor(proposal.binding) && _owner == owner && identical(session.cataloguePageSource, catalogueSource);
+    bool source() => isCurrent() && proposal.validUntil.isAfter(DateTime.now()) && _same(proposal.binding, proposal.entityId);
+    _buyBrowseReviews[session] = true;
+    var nativeShown = actionId != 'AI-ACT-003';
+    try {
+      final accepted = await navigator.push<bool>(MaterialPageRoute<bool>(builder: (_) => _BuyBrowseReviewPage(
+        session: session, actionId: actionId, initial: initial, product: product, storeOwner: _storeOwner,
+        onNativeShown: () => nativeShown = true,
+        refinements: refinements, validUntil: proposal.validUntil, ownerCurrent: actor, sourceCurrent: source,
+        contactLauncher: contactLauncher,
+        changes: Listenable.merge([scopeOwner, session, ?session.collectionIdentity, ?session.procurementIdentity]))));
+      if (!actor() || !proposal.validUntil.isAfter(DateTime.now())) return MoolAssistantReviewResult.stale;
+      if (!nativeShown) return MoolAssistantReviewResult.unavailable;
+      return accepted == true || source() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+    } finally { _buyBrowseReviews[session] = false; }
+  }
+}
+
+BuyV2DiscoveryRefinements _buyBrowseProposedRefinements(BuyV2Session session, Map<String, Object?> fields) {
+  final original = session.discoveryRefinements;
+  final brands = fields.containsKey('brands') ? (fields['brands']! as List).cast<String>().toSet() : original.brands;
+  final available = {...session.discoveryBrands, ...original.brands};
+  final price = fields.containsKey('maximumPrice') ? fields['maximumPrice'] as int? : original.maximumPrice;
+  final pack = fields.containsKey('pack') ? BuyV2PackFilter.values.where((v) => v.name == fields['pack']).singleOrNull
+    : session.destination == BuyV2Destination.wholesale ? null : original.pack;
+  final sort = fields.containsKey('sort') ? BuyV2ProductSort.values.where((v) => v.name == fields['sort']).singleOrNull
+    : original.sort == BuyV2ProductSort.deliveryFastest ? BuyV2ProductSort.relevance : original.sort;
+  if (!brands.every(available.contains) || price != null && !session.discoveryPriceLimits.contains(price) && price != original.maximumPrice ||
+      fields['pack'] != null && pack == null || pack != null && session.destination == BuyV2Destination.wholesale ||
+      pack != null && !const {BuyV2PackFilter.standard, BuyV2PackFilter.multipack}.contains(pack) ||
+      sort == null || fields.containsKey('sort') && !const {BuyV2ProductSort.relevance,
+        BuyV2ProductSort.priceLowToHigh, BuyV2ProductSort.priceHighToLow}.contains(sort)) {
+    throw const FormatException('Choose the existing native filter values.');
+  }
+  return BuyV2DiscoveryRefinements(brands: brands, maximumPrice: price, pack: pack,
+    sort: sort, availableOnly: fields['availableOnly'] as bool? ?? original.availableOnly);
+}
+
+class _BuyBrowseReviewPage extends StatefulWidget {
+  const _BuyBrowseReviewPage({required this.session, required this.actionId, required this.initial,
+    required this.product, required this.storeOwner, required this.refinements, required this.validUntil,
+    required this.ownerCurrent, required this.sourceCurrent, required this.changes, required this.onNativeShown,
+    this.contactLauncher});
+  final BuyV2Session session;
+  final String actionId;
+  final BuyBrowseInitialData initial;
+  final BuyV2Product? product;
+  final Object? storeOwner;
+  final BuyV2DiscoveryRefinements? refinements;
+  final DateTime validUntil;
+  final bool Function() ownerCurrent, sourceCurrent;
+  final Listenable changes;
+  final VoidCallback onNativeShown;
+  final Future<bool> Function(Uri)? contactLauncher;
+  @override State<_BuyBrowseReviewPage> createState() => _BuyBrowseReviewPageState();
+}
+class _BuyBrowseReviewPageState extends State<_BuyBrowseReviewPage> {
+  final _inner = GlobalKey<NavigatorState>();
+  Route<dynamic>? _route;
+  Timer? _expiry;
+  String? _actionError;
+  bool _accepted = false, _committing = false, _closing = false, _asyncBusy = false;
+  bool get _current => mounted && !_closing && widget.ownerCurrent() &&
+    widget.validUntil.isAfter(DateTime.now()) && (_accepted || widget.sourceCurrent());
+  @override void initState() {
+    super.initState(); widget.changes.addListener(_changed);
+    final remaining = widget.validUntil.difference(DateTime.now());
+    _expiry = Timer(remaining.isNegative ? Duration.zero : remaining, _retire);
+  }
+  @override void didChangeDependencies() {
+    super.didChangeDependencies(); _route ??= ModalRoute.of(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _changed(); });
+  }
+  void _changed() { if (mounted && !_closing && !_committing && !_current) _retire(); }
+  void _retire() {
+    if (!mounted || _closing || _committing) return;
+    final route = _route;
+    if (route?.isActive == true) { _closing = true; route!.navigator?.removeRoute(route); }
+  }
+  void _finish([bool accepted = false]) {
+    if (!mounted || _closing) return;
+    final route = _route;
+    if (route?.isActive != true) return;
+    _closing = true;
+    if (route!.isCurrent) { route.navigator?.pop(accepted); }
+    else { route.navigator?.removeRoute(route); }
+  }
+  bool _effect(bool Function() effect) {
+    if (!_current || _committing || _accepted || _asyncBusy) return false;
+    _committing = true;
+    bool accepted;
+    try { accepted = effect(); if (accepted) _accepted = true; }
+    finally { _committing = false; }
+    if (accepted) { _finish(true); } else { _changed(); }
+    return accepted;
+  }
+  Future<bool> _asyncEffect(Future<bool> Function() effect, {bool closeWhenAccepted = false}) async {
+    if (!_current || _committing || _accepted || _asyncBusy) return false;
+    _asyncBusy = true;
+    try {
+      final accepted = await effect();
+      if (!mounted || !_current) return accepted;
+      if (accepted) { _accepted = true; if (closeWhenAccepted) _finish(true); }
+      return accepted;
+    } finally { _asyncBusy = false; }
+  }
+  Future<void> _filters(BuildContext nativeContext) async {
+    if (!_current) return;
+    await showBuyV2DiscoveryRefinementSheet(nativeContext, widget.session,
+      browseReviewInitial: widget.refinements, browseReviewCurrent: () => _current,
+      browseReviewShown: widget.onNativeShown,
+      browseReviewEffect: (effect) {
+        // Original Apply closes its own local modal before this page finishes.
+        if (!_current || _committing || _accepted || (_buyBrowseFilterForms[widget.session] ?? 0) > 1) return false;
+        _committing = true;
+        try { final accepted = effect(); if (accepted) _accepted = true; return accepted; }
+        finally { _committing = false; }
+      });
+    if (mounted && !_closing) _finish(_accepted);
+  }
+  Widget _body(BuildContext nativeContext) {
+    final session = widget.session, product = widget.product;
+    if (widget.actionId == 'AI-ACT-003') return _BuyBrowseOpenFilters(onOpen: () => _filters(nativeContext));
+    if (const {'AI-ACT-002', 'AI-ACT-004', 'AI-ACT-005', 'AI-ACT-010', 'AI-ACT-011',
+      'AI-ACT-012', 'AI-ACT-013', 'AI-ACT-338'}.contains(widget.actionId)) {
+      return buyV2BrowseNativeBody(actionId: widget.actionId, session: session, fields: widget.initial.fields,
+        isCurrent: () => _current, effect: _effect, close: _finish, product: product, storeOwner: widget.storeOwner);
+    }
+    if (product == null) return const SizedBox.shrink();
+    if (widget.actionId == 'AI-ACT-006') return BuyV2ProductView(session: session,
+      capturedProduct: product, capturedCurrent: () => _current, onReturn: _finish);
+    if (widget.actionId == 'AI-ACT-008') return _ProductComparisonSheet(session: session, product: product,
+      browseRequestedQuantityMilli: widget.initial.fields['quantityMilli'] as int?,
+      browseReviewCurrent: () => _current, browseReviewClose: _finish,
+      browseOfferPermitted: (offer) => const {BuyV2Destination.shop, BuyV2Destination.wholesale}.contains(offer.product.destination) && !offer.product.requiresPrescription,
+      onVisitProduct: (value) async { _effect(() => session.openProduct(value.id)); });
+    final facts = session.productFactsFor(product);
+    return SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(product.customerTitle, style: nativeContext.buyTitle), Text(product.pack, style: nativeContext.buyBody),
+        _ProductHeroPrice(productId: product.id, amountMinor: facts.priceMinor, mrpMinor: product.mrpMinor, fontSize: 22),
+        _ProductStoreSummary(product: product, facts: facts, capturedCurrent: () => _current),
+        if (widget.actionId == 'AI-ACT-007') _ProductVariantOption(session: session,
+          option: session.productVariantsFor(product).singleWhere((v) => v.id == widget.initial.fields['variantId']),
+          selected: true, width: 220, browseReviewSelect: (value) => _effect(() => session.selectProductVariant(value.id))),
+        if (widget.actionId == 'AI-ACT-009') _ProductQuickActionButton(
+          key: ValueKey('buy-product-action-save-${product.id}'),
+          icon: session.isSaved(product.id) ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+          label: session.isSaved(product.id) ? 'Saved' : 'Save',
+          onPressed: () { _effect(() { session.toggleSaved(product.id); return true; }); }),
+        if (widget.actionId == 'AI-ACT-337') _ProductQuickActionButton(
+          key: ValueKey('buy-product-action-share-${product.id}'), icon: Icons.ios_share_outlined, label: 'Share',
+          onPressed: () { unawaited(_asyncEffect(() async {
+            return _shareBuyV2Product(nativeContext, session: session, product: product, capturedCurrent: () => _current);
+          }, closeWhenAccepted: true)); }),
+        if (widget.actionId == 'AI-ACT-336') _ProductQuickActionButton(
+          key: ValueKey('buy-product-action-copy-link-${product.id}'), icon: Icons.link_rounded, label: 'Copy link',
+          onPressed: () { unawaited(_asyncEffect(() async {
+            if (mounted) setState(() => _actionError = null);
+            try {
+              await Clipboard.setData(ClipboardData(text: buyV2SharedProductUri(product).toString()));
+              return true;
+            } on Object {
+              if (mounted && _current) setState(() => _actionError = 'Could not copy the product link. Try again.');
+              return false;
+            }
+          }, closeWhenAccepted: true)); }),
+        if (_actionError != null) Text(_actionError!, key: const ValueKey('buy-browse-native-error')),
+        if (widget.actionId == 'AI-ACT-339') BuyV2StoreAddress(
+          store: session.catalogueStore(product.storeId!)!, showContactAction: true, contactCurrent: () => _current,
+          openContact: (uri) => _asyncEffect(() => widget.contactLauncher?.call(uri) ?? buyV2OpenStoreContact(uri), closeWhenAccepted: true)),
+        if (widget.actionId == 'AI-ACT-060' || widget.actionId == 'AI-ACT-352') BuyV2PriceFreshness(
+          product: product, now: session.catalogueNow,
+          onRequestRefresh: () => _asyncEffect(() => session.requestCommodityPriceRefresh(product, isCurrent: () => _current))),
+      ]));
+  }
+  @override void dispose() { _expiry?.cancel(); widget.changes.removeListener(_changed); super.dispose(); }
+  @override Widget build(BuildContext context) => PopScope<bool>(canPop: _closing,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) { if (_inner.currentState?.canPop() == true) { _inner.currentState!.pop(); } else { _finish(_accepted); } }
+    }, child: Scaffold(appBar: AppBar(title: const Text('Review product discovery'),
+      leading: BackButton(onPressed: () => _finish(_accepted))),
+      // Native subroutes belong to this one review. Retiring its exact outer
+      // route disposes its native children and preserves unrelated root routes.
+      body: Navigator(key: _inner, onGenerateRoute: (_) => MaterialPageRoute<void>(builder: (nativeContext) =>
+        AnimatedBuilder(animation: widget.changes, builder: (bodyContext, child) =>
+          BuyV2ThemeScope(spec: BuyV2ThemeSpec.resolve(widget.session.destination,
+            const {'AI-ACT-006','AI-ACT-007','AI-ACT-008','AI-ACT-009','AI-ACT-060','AI-ACT-336','AI-ACT-337','AI-ACT-339','AI-ACT-352'}.contains(widget.actionId) ? BuyV2View.product : BuyV2View.catalogue),
+            refinedCommerce: true, child: Builder(builder: (targetContext) => SafeArea(child: _current ? _body(targetContext) : const SizedBox.shrink()))))))));
+}
+// FE-SHOP-02 stages original native controls. An opened review is not a Cart/order outcome.
+@immutable
+class BuyCartReviewInitialData {
+  BuyCartReviewInitialData._(this.quantity, this.slotId);
+  final int? quantity;
+  final String? slotId;
+  static Set<String> fieldsFor(String action) => switch (action) {
+    'AI-ACT-014' || 'AI-ACT-017' => const {'quantity'},
+    'AI-ACT-015' => const {'quantity', 'slotId'},
+    _ => const {},
+  };
+  factory BuyCartReviewInitialData.fromFields(String action, Map<String, Object?> fields) {
+    if (fields.keys.any((key) => !fieldsFor(action).contains(key))) {
+      throw const FormatException('Review the supplied Cart fields again.');
+    }
+    final quantity = fields['quantity'], slot = fields['slotId'];
+    if (fields.containsKey('quantity') && (quantity is! int || quantity < 1) ||
+        fields.containsKey('slotId') && (slot is! String || slot.trim().isEmpty || slot != slot.trim())) {
+      throw const FormatException('Supply exact whole packs and the current delivery window identity.');
+    }
+    return BuyCartReviewInitialData._(quantity as int?, slot as String?);
+  }
+}
+
+Iterable<MoolAssistantNativeAdapter> buyCartReviewNativeAdapters({required BuyV2Session session,
+  required NavigatorState navigator, required MoolAssistantContext Function() currentContext,
+  required bool Function() isRootCurrent, required Listenable scopeOwner,
+  required AuthenticatedAccountIdentity? Function() accountIdentity, required bool Function() accountAuthenticated}) =>
+  [for (final id in const ['AI-ACT-014','AI-ACT-015','AI-ACT-016','AI-ACT-017','AI-ACT-019',
+    'AI-ACT-020','AI-ACT-021','AI-ACT-022','AI-ACT-023','AI-ACT-059','AI-ACT-347'])
+    BuyCartReviewNativeAdapter(actionId:id, session:session, navigator:navigator, currentContext:currentContext,
+      isRootCurrent:isRootCurrent, scopeOwner:scopeOwner, accountIdentity:accountIdentity, accountAuthenticated:accountAuthenticated)];
+
+class BuyCartReviewNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  BuyCartReviewNativeAdapter({required this.actionId,required this.session,required this.navigator,
+    required this.currentContext,required this.isRootCurrent,required this.scopeOwner,
+    required this.accountIdentity,required this.accountAuthenticated});
+  @override final String actionId;
+  final BuyV2Session session;
+  final NavigatorState navigator;
+  final MoolAssistantContext Function() currentContext;
+  final bool Function() isRootCurrent,accountAuthenticated;
+  final Listenable scopeOwner;
+  final AuthenticatedAccountIdentity? Function() accountIdentity;
+  Object? _binding,_ownerAtSnapshot,_actorAtSnapshot,_productAtSnapshot;
+  String? _entity,_signature;
+  int _version=0;
+  bool _supported(BuyV2Destination d) => d==BuyV2Destination.shop || d==BuyV2Destination.wholesale;
+  bool _actor(Object binding) => navigator.mounted && isRootCurrent() && accountAuthenticated() &&
+    accountIdentity()?.firebasePrincipal!=null && currentContext().signedIn && !currentContext().inWorkspace &&
+    currentContext().binding==binding && !session.isStoreProcurement && session.procurementScopeCurrent &&
+    !session.customerStateRecoveryPending && _supported(session.destination);
+  Object get _actorOwner => (accountIdentity()?.firebasePrincipal,session.customerStateStore?.ownerScope,
+    session.collectionIdentity?.value?.accountId,session.collectionIdentity?.value?.sessionId,
+    session.procurementContext?.customerStateOwnerScope,session.cataloguePageSource);
+  Object get _owner => (accountIdentity()?.firebasePrincipal,session.customerStateStore?.ownerScope,
+    session.collectionIdentity?.value?.accountId,session.collectionIdentity?.value?.sessionId,
+    session.procurementContext?.customerStateOwnerScope,session.cataloguePageSource,
+    session.navigationMotionSequence,session.destination,session.view,session.cartScope,session.checkoutScope,
+    session.saleTypeSignature,session.eligibilityLocationKey,session.selectedAddressId);
+  BuyV2Product? _product(String? id) {
+    final p=id==null?null:session.findProduct(id);
+    return p!=null && _supported(p.destination) && !p.requiresPrescription && p.hasValidMoney &&
+      p.hasValidPackTerms && p.hasValidPublicListingIdentity ? p:null;
+  }
+  bool _lineEligible(BuyV2CartLine line) {
+    final p=_product(line.product.id), old=line.product;
+    return p!=null && _supported(old.destination) && !old.requiresPrescription &&
+      p.destination==old.destination && p.canonicalId==old.canonicalId && p.storeId==old.storeId &&
+      p.sourceSkuId==old.sourceSkuId && p.offerClass==old.offerClass &&
+      p.publicListingIdentity==old.publicListingIdentity && p.packTerms?.revision==old.packTerms?.revision;
+  }
+  bool get _commerceEligible => session.cartScope!=BuyV2CartScope.medicine &&
+    session.checkoutScope!=BuyV2CartScope.medicine && session.allCartLines.every(_lineEligible) &&
+    session.checkoutLines.every(_lineEligible);
+  BuyV2PublishedStoreCoupon? _coupon(String? id) => session.cartStoreCoupons.where((v)=>v.identity==id).singleOrNull;
+  List<BuyV2CartBenefit> get _benefits => [for(final d in const [BuyV2Destination.shop,BuyV2Destination.wholesale])
+    for(final kind in BuyV2CartBenefitKind.values) ...session.cartBenefits(kind:kind,destination:d)];
+  BuyV2CartBenefit? _benefit(String? id) => _benefits.where((v)=>BuyV2Session.benefitIdentity(v)==id).singleOrNull;
+  bool _available(String? entity) {
+    if (!_commerceEligible || session.cartChangesBlocked || session.checkoutBusy || session.checkoutRequiresResolution ||
+        session.pendingSupplierPolicyAdd!=null || (_buyQuantityEditors[session] ?? 0)>0) return false;
+    final p=_product(entity);
+    return switch(actionId) {
+      'AI-ACT-014' || 'AI-ACT-017' => p!=null && p.destination==session.destination,
+      'AI-ACT-015' => p!=null && p.destination==session.destination && session.scheduledWindowFor(p)!=null,
+      'AI-ACT-016' => entity==null && session.destination==BuyV2Destination.shop &&
+        session.monthlyBasketPlan.every(_lineEligible),
+      'AI-ACT-019' => entity!=null && session.cartLineFor(entity)!=null && _lineEligible(session.cartLineFor(entity)!),
+      'AI-ACT-020' => entity==null && session.cartLines.isNotEmpty,
+      'AI-ACT-021' => _coupon(entity)!=null,
+      'AI-ACT-022' => _coupon(entity)!=null && session.selectedStoreCouponFor(_coupon(entity)!)!=null,
+      'AI-ACT-023' => _benefit(entity)!=null && !session.isCartBenefitSelected(_benefit(entity)!),
+      'AI-ACT-347' => _benefit(entity)!=null && session.isCartBenefitSelected(_benefit(entity)!),
+      'AI-ACT-059' => session.view==BuyV2View.recovery && session.recoveryKind==BuyV2RecoveryKind.stockUnavailable &&
+        session.checkoutAvailabilityIssue?.productId==entity && p!=null && session.cartLineFor(p.id)!=null,
+      _=>false,
+    };
+  }
+  List<Object?> _productInput(BuyV2Product p) {
+    final f=session.productFactsFor(p), t=p.packTerms;
+    return [p.id,p.canonicalId,p.destination.name,p.requiresPrescription,p.storeId,p.sourceSkuId,
+      p.publicListingIdentity?.toJson(),p.offerClass?.name,p.priceMinor,p.pack,p.minimumOrder,p.quantityStep,
+      t?.skuId,t?.revision,t?.commodityPriceRevision,t?.priceValidUntil?.toUtc().toIso8601String(),
+      t?.pricingCurrentAt(session.catalogueNow()),f.priceMinor,f.stale,f.sourceId,
+      f.observedAt?.toUtc().toIso8601String(),f.eligibility?.toJson(),f.storeOperatingState.name,
+      session.deliveryOptionsFor(p).map((o)=>o.name).toList()..sort()];
+  }
+  String _source(String? entity) => jsonEncode([
+    if(_product(entity) case final p?) _productInput(p),
+    [for(final line in session.allCartLines) [_productInput(line.product),
+      if(session.findProduct(line.product.id) case final p?) _productInput(p),line.quantity,line.scheduledFulfilment?.toJson()]],
+    [for(final line in session.monthlyBasketPlan) [_productInput(line.product),line.quantity]],
+    [for(final c in session.cartStoreCoupons) [c.identity,c.revision,c.termsFingerprint,c.name,c.publisherName,
+      c.validUntil.toUtc().toIso8601String(),c.freshUntil.toUtc().toIso8601String(),
+      session.storeCouponAdvertisementCurrent(c),session.selectedStoreCouponFor(c)?.quoteBinding,
+      session.storeCouponNeedsReview(c),session.storeCouponQuoteConfirmed(c)]],
+    [for(final b in _benefits) [BuyV2Session.benefitIdentity(b),b.title,b.detail,b.savingAmountMinor,b.freeDelivery,
+      b.validFrom?.toUtc().toIso8601String(),b.validUntil?.toUtc().toIso8601String(),b.minimumSpendMinor,
+      b.minimumQuantity,b.eligiblePaymentMethods.toList()..sort(),session.isCartBenefitSelected(b)]],
+    session.selectedSupplierQuotes.map((q)=>q.quoteBinding).toList()..sort(),
+    session.selectedPayment,session.recoveryKind?.name,session.checkoutAvailabilityIssue?.productId,
+    session.checkoutAvailabilityIssue?.orderabilityLabel,
+  ]);
+  bool _same(Object binding,String? entity) => _actor(binding) && _binding==binding && _entity==entity &&
+    _ownerAtSnapshot==_owner && !session.cartChangesBlocked && !session.checkoutBusy && !session.checkoutRequiresResolution && identical(_productAtSnapshot,_product(entity)) && _signature==_source(entity);
+  String get _revision=>'buy-cart-native:$actionId:$_version';
+  @override Set<String> get allowedFields=>BuyCartReviewInitialData.fieldsFor(actionId);
+  @override String? validateFields(Map<String,Object?> fields) {
+    try {BuyCartReviewInitialData.fromFields(actionId,fields);return null;} on FormatException catch(e){return e.message;}
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId) async {
+    if(!_actor(context.binding) || !_available(entityId) || _buyNativeReviews[session]==true || _buyBrowseReviews[session]==true ||
+       buyV2AddressFormOpen(session) || buyV2AddressRequestFormOpen(session)) return null;
+    if(!_same(context.binding,entityId)) {_binding=context.binding;_entity=entityId;_ownerAtSnapshot=_owner;_actorAtSnapshot=_actorOwner;
+      _productAtSnapshot=_product(entityId);_signature=_source(entityId);_version++;}
+    return MoolAssistantNativeSnapshot(binding:context.binding,entityId:entityId,permitted:true,sourceRevision:_revision);
+  }
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal,bool Function() isCurrent) =>
+    openOwnedReview(proposal,isCurrent:isCurrent,ownerChanges:scopeOwner);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,
+      {required bool Function() isCurrent,required Listenable ownerChanges}) async {
+    if(!isCurrent() || !proposal.validUntil.isAfter(DateTime.now()) || proposal.actionId!=actionId ||
+       validateFields(proposal.fields)!=null || proposal.sourceRevision!=_revision ||
+       !_same(proposal.binding,proposal.entityId) || !_available(proposal.entityId) || _buyNativeReviews[session]==true) {
+      return MoolAssistantReviewResult.stale;
+    }
+    final initial=BuyCartReviewInitialData.fromFields(actionId,proposal.fields),p=_product(proposal.entityId);
+    if(actionId=='AI-ACT-015' && initial.slotId!=null && initial.slotId!=session.scheduledWindowFor(p!)?.slotId) {
+      return MoolAssistantReviewResult.unavailable;
+    }
+    if(actionId=='AI-ACT-015') {
+      final target=p!;
+      final retained=session.cartLineFor(target.id),window=session.scheduledWindowFor(target);
+      if(retained!=null && retained.scheduledFulfilment!=window && initial.quantity!=null && initial.quantity!=retained.quantity) {
+        return MoolAssistantReviewResult.unavailable;
+      }
+    }
+    final now=DateTime.now();
+    final deadlines=[proposal.validUntil,
+      for(final product in [if(p!=null)p,...session.allCartLines.map((line)=>line.product)]) ...[
+        if(product.packTerms?.priceValidUntil case final until? when until.isAfter(now))until,
+        if(session.productFactsFor(product).eligibility?.expiresAt case final until? when until.isAfter(now))until,
+      ],
+      if(_coupon(proposal.entityId)?.freshUntil case final until? when until.isAfter(now))until,
+      if(_benefit(proposal.entityId)?.validUntil case final until? when until.isAfter(now))until,
+    ]..sort();
+    final deadline=deadlines.first;
+    bool current()=>isCurrent() && deadline.isAfter(DateTime.now()) && _same(proposal.binding,proposal.entityId);
+    bool actorCurrent()=>isCurrent() && deadline.isAfter(DateTime.now()) && _actor(proposal.binding) && _actorAtSnapshot==_actorOwner;
+    _buyNativeReviews[session]=true;
+    Future<void>? nativeOperation;
+    try {
+      final used=await navigator.push<bool>(MaterialPageRoute<bool>(builder:(_)=>_BuyCartReviewPage(
+        session:session,actionId:actionId,initial:initial,product:p,coupon:_coupon(proposal.entityId),
+        benefit:_benefit(proposal.entityId),isCurrent:current,actorCurrent:actorCurrent,validUntil:deadline,
+        trackNative:(future)=>nativeOperation=future,
+        changes:Listenable.merge([ownerChanges,scopeOwner,session,?session.collectionIdentity,?session.procurementIdentity]))));
+      if(nativeOperation!=null)await nativeOperation;
+      return isCurrent() && proposal.validUntil.isAfter(DateTime.now()) && _actor(proposal.binding) &&
+        (used==true || _same(proposal.binding,proposal.entityId)) ? MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    } finally {_buyNativeReviews[session]=false;}
+  }
+}
+
+class _BuyCartReviewPage extends StatefulWidget {
+  const _BuyCartReviewPage({required this.session,required this.actionId,required this.initial,required this.product,
+    required this.coupon,required this.benefit,required this.isCurrent,required this.actorCurrent,required this.validUntil,required this.changes,required this.trackNative});
+  final BuyV2Session session;
+  final String actionId;
+  final BuyCartReviewInitialData initial;
+  final BuyV2Product? product;
+  final BuyV2PublishedStoreCoupon? coupon;
+  final BuyV2CartBenefit? benefit;
+  final bool Function() isCurrent,actorCurrent;
+  final DateTime validUntil;
+  final Listenable changes;
+  final ValueChanged<Future<void>> trackNative;
+  @override State<_BuyCartReviewPage> createState()=>_BuyCartReviewPageState();
+}
+class _BuyCartReviewPageState extends State<_BuyCartReviewPage> {
+  final _inner=GlobalKey<NavigatorState>();
+  Route<dynamic>? _route;
+  Timer? _expiry;
+  bool _busy=false,_closing=false,_used=false;
+  String? _error;
+  bool get _current=>mounted && !_closing && widget.isCurrent();
+  @override void initState(){super.initState();widget.changes.addListener(_changed);
+    final wait=widget.validUntil.difference(DateTime.now());_expiry=Timer(wait.isNegative?Duration.zero:wait,_finish);}
+  @override void didChangeDependencies(){super.didChangeDependencies();_route??=ModalRoute.of(context);
+    WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_changed();});}
+  void _changed(){if(mounted && !_closing && !_used && !widget.isCurrent() && (!_busy || !widget.actorCurrent()))_finish();}
+  void _finish(){if(!mounted || _closing)return;_closing=true;final route=_route;
+    if(route?.isActive!=true)return;_inner.currentState?.popUntil((owned)=>owned.isFirst);if(route!.isCurrent)Navigator.of(context).pop(_used);else Navigator.of(context).removeRoute(route);}
+  Future<bool> _effect(FutureOr<bool> Function() operation,{bool closeOnSuccess=true}) {
+    if(!_current || _busy || _used)return Future.value(false);
+    final pending=_runEffect(operation,closeOnSuccess:closeOnSuccess);widget.trackNative(pending.then<void>((_){}));return pending;
+  }
+  Future<bool> _runEffect(FutureOr<bool> Function() operation,{required bool closeOnSuccess}) async {
+    if(!_current || _busy || _used)return false;
+    _busy=true;
+    try {final used=await operation();if(used)_used=true;return used;}
+    on Object {if(mounted)setState(()=>_error='The result is unavailable. Check your Cart and its current status before trying again.');return false;}
+    finally{_busy=false;if(mounted){if(_used){if(closeOnSuccess)_finish();}else{setState((){});_changed();}}}
+  }
+  void _voidEffect(VoidCallback operation){
+    if(!_current || _busy || _used)return;_busy=true;
+    try{operation();_used=true;}finally{_busy=false;if(mounted)_finish();}
+  }
+  Future<bool> _add(BuildContext nativeContext,int quantity) async {
+    if(!_current)return false;
+    final session=widget.session,p=widget.product!;
+    final added=widget.actionId=='AI-ACT-017' && session.cartLineFor(p.id)!=null
+      ? session.setCartQuantity(p.id,'$quantity'):session.addProduct(p.id,quantity:quantity);
+    if(added){return widget.actionId=='AI-ACT-017'
+      ? widget.actorCurrent() && identical(session.findProduct(p.id),p) && session.buyProductNow(p.id):true;}
+    bool consentAdded=false;
+    if(_current) {
+      if(session.pendingSupplierPolicyAdd case final intent?) {
+      await showBuyV2SupplierPolicySheet(nativeContext,session,intent:intent,
+        capturedCurrent:()=>_current,useRootNavigator:false,capturedResult:(added)=>consentAdded=added);
+      }
+    }
+    // Only the native consent operation's actual boolean can complete Add; it never automatically continues Buy.
+    return widget.actionId=='AI-ACT-014' && consentAdded;
+  }
+  Future<void> _openQuantity(BuildContext nativeContext) async {
+    final p=widget.product!,session=widget.session,scheduled=widget.actionId=='AI-ACT-015';
+    final window=scheduled?session.scheduledWindowFor(p):null;
+    final retained=session.cartLineFor(p.id);
+    final replacing=scheduled && retained!=null && retained.scheduledFulfilment!=window;
+    final fixedQuantity=replacing?retained.quantity:null;
+    await showBuyV2QuantityEditor(nativeContext,session,p,
+      initialQuantity:fixedQuantity ?? widget.initial.quantity ?? (widget.actionId=='AI-ACT-017' && session.quantityFor(p.id)>0
+        ? session.quantityFor(p.id):p.minimumOrder),scopeOwner:widget.changes,isReviewCurrent:()=>_busy?widget.actorCurrent():_current,
+      reviewValidUntil:widget.validUntil,
+      reviewTheme:BuyV2ThemeSpec.resolve(p.destination,session.view),refinedCommerce:true,
+      reviewQuantityReadOnly:replacing,
+      reviewTitle:scheduled?'Schedule purchase':widget.actionId=='AI-ACT-017'?'Buy this product':'Add to Cart',
+      reviewActionLabel:scheduled?(retained==null?'Add with this window':replacing?'Use this window':'Add another with this window'):
+        widget.actionId=='AI-ACT-017'?'Buy this product':'Add to Cart',
+      reviewDetail:window==null?null:Text('Scheduled · ${_scheduledWindowLabel(nativeContext,window)}\n'
+        '${replacing?'All $fixedQuantity packs will use this window. Quantity stays unchanged.\n':''}'
+        'Requested window only. Confirm availability and price at Checkout.'),
+      validateReviewInput:(text){final count=int.tryParse(text.trim());
+        if(replacing && count!=fixedQuantity)return 'All $fixedQuantity packs use this window. Quantity stays unchanged.';
+        return count!=null && count>0?null:'Enter a whole number of packs.';},
+      commitReview:(quantity)=>_effect(()=>scheduled
+        ? _addWithScheduledWindow(nativeContext,session,p,window!,quantity:quantity,capturedCurrent:()=>_current,useRootNavigator:false)
+        : _add(nativeContext,quantity),closeOnSuccess:false));
+    if(mounted)_finish();
+  }
+  Widget _body(BuildContext nativeContext){
+    final session=widget.session,p=widget.product,coupon=widget.coupon,benefit=widget.benefit;
+    if(const {'AI-ACT-014','AI-ACT-015','AI-ACT-017'}.contains(widget.actionId)) {
+      return _BuyCartOpenNative(onOpen:()=>_openQuantity(nativeContext));
+    }
+    if(widget.actionId=='AI-ACT-020')return _BuyCartOpenNative(onOpen:() async {
+      await _confirmBuyV2CartClear(nativeContext,session,capturedCurrent:()=>_current,
+        reviewCommit:(scope)=>_effect(()=>session.clearCartScope(scope)));
+      if(mounted)_finish();
+    });
+    if(widget.actionId=='AI-ACT-016')return buyV2CartMonthlyBasket(session:session,onClose:_finish,
+      onSeeProducts:()=>_voidEffect((){session.chooseShoppingIntent(BuyV2ShoppingIntent.monthlyBasket);session.chooseCategory('all');
+        session.showNotice('Choose Quick or Scheduled to view each basket group.');}),
+      onAddToCart:()=>_voidEffect((){session.chooseShoppingIntent(BuyV2ShoppingIntent.monthlyBasket);session.addMonthlyBasket();}));
+    if(widget.actionId=='AI-ACT-059')return BuyV2RecoveryView(session:session,onOpenOrderHelp:(_){},
+      capturedCurrent:()=>_current,capturedRetry:()=>unawaited(_effect(session.retryCheckoutAvailability)));
+    return ListView(padding:const EdgeInsets.all(16),children:[
+      if(_error!=null)Text(_error!,key:const ValueKey('buy-cart-native-error')),
+      if(widget.actionId=='AI-ACT-019' && p!=null) _CartLine(session:session,line:session.cartLineFor(p.id)!,
+        reviewRemove:()=>unawaited(_effect((){session.remove(p.id);return session.cartLineFor(p.id)==null;}))),
+      if(coupon!=null)_CartStoreCouponRow(session:session,coupon:coupon,capturedCurrent:()=>_current,
+        reviewApply:widget.actionId=='AI-ACT-021'?()=>unawaited(_effect(()=>session.chooseStoreCoupon(coupon,isCurrent:()=>_current))):null,
+        reviewRemove:widget.actionId=='AI-ACT-022'?()=>_voidEffect(()=>session.removeStoreCoupon(coupon,
+          expectedSelection:session.selectedStoreCouponFor(coupon)!)):null),
+      if(benefit!=null)_CartBenefitCard(benefit:benefit,colourIndex:0,selected:session.isCartBenefitSelected(benefit),
+        enabled:_current && !_busy && !session.cartChangesBlocked,
+        scopeLabel:benefit.scope==BuyV2CartBenefitScope.platform?null:session.cartLines.where((l)=>benefit.appliesTo(l.product))
+          .map((l)=>l.product.customerTitle).toSet().join(' · '),
+        paymentStatus:benefit.kind==BuyV2CartBenefitKind.paymentOffer?_paymentOfferStatus(session,benefit):null,
+        onSelect:()=>unawaited(_effect(()=>session.chooseCartBenefit(benefit))),
+        onRemove:()=>_voidEffect(()=>session.removeCartBenefit(kind:benefit.kind,destination:benefit.destination,expectedBenefit:benefit))),
+    ]);
+  }
+  @override void dispose(){_expiry?.cancel();widget.changes.removeListener(_changed);super.dispose();}
+  @override Widget build(BuildContext context)=>PopScope<bool>(canPop:_closing,onPopInvokedWithResult:(didPop,_){
+    if(!didPop){if(_inner.currentState?.canPop()==true)_inner.currentState!.pop();else _finish();}},
+    child:Scaffold(appBar:AppBar(title:const Text('Review Cart action'),leading:BackButton(onPressed:_finish)),
+      body:Navigator(key:_inner,onGenerateRoute:(_)=>MaterialPageRoute<void>(builder:(nativeContext)=>
+        AnimatedBuilder(animation:widget.changes,builder:(_,__)=>BuyV2ThemeScope(
+          spec:BuyV2ThemeSpec.resolve(widget.session.destination,BuyV2View.cart),refinedCommerce:true,
+          child:Builder(builder:(targetContext)=>SafeArea(child:_current?_body(targetContext):const SizedBox.shrink()))))))));
+}
+class _BuyCartOpenNative extends StatefulWidget {
+  const _BuyCartOpenNative({required this.onOpen});final Future<void> Function() onOpen;
+  @override State<_BuyCartOpenNative> createState()=>_BuyCartOpenNativeState();
+}
+class _BuyCartOpenNativeState extends State<_BuyCartOpenNative>{
+  @override void initState(){super.initState();WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)unawaited(widget.onOpen());});}
+  @override Widget build(BuildContext context)=>const SizedBox.shrink();
+}
+
+class _BuyBrowseOpenFilters extends StatefulWidget {
+  const _BuyBrowseOpenFilters({required this.onOpen});
+  final Future<void> Function() onOpen;
+  @override State<_BuyBrowseOpenFilters> createState() => _BuyBrowseOpenFiltersState();
+}
+class _BuyBrowseOpenFiltersState extends State<_BuyBrowseOpenFilters> {
+  @override void initState() { super.initState(); WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) unawaited(widget.onOpen()); }); }
+  @override Widget build(BuildContext context) => const SizedBox.shrink();
+}
+
+String _buyBrowseComparisonQuantityLabel(BuyV2ComparisonQuery query) {
+  final quantity = query.requestedQuantityMilli;
+  final fraction = (quantity % 1000).toString().padLeft(3, '0').replaceFirst(RegExp(r'0+$'), '');
+  return 'Quantity: ${quantity ~/ 1000}${fraction.isEmpty ? '' : '.$fraction'} ${query.identity.unit.name}';
+}
+
 typedef BuyV2LiveDeliveryMapBuilder =
     Widget Function(BuildContext context, BuyV2LiveDeliverySnapshot snapshot);
+
+// Frontend form schema only; this is not a finance-data revision.
+const moolBusinessFinanceFormRevision = 'business-finance-form-v1';
+
+/// Editable native form values, never a callback request or funding decision.
+@immutable
+class MoolBusinessFinancePrefill {
+  const MoolBusinessFinancePrefill._({
+    this.purposeIds, this.contactName, this.callbackNumber, this.note,
+  });
+
+  static const allowedFields = <String>{
+    'purposeIds', 'contactName', 'callbackNumber', 'note',
+  };
+  final List<String>? purposeIds;
+  final String? contactName, callbackNumber, note;
+
+  static String? contactNameError(String? value) =>
+      value?.trim().isNotEmpty != true ? 'Enter your name'
+      : value!.length > 100 ? 'Use a name of 100 characters or fewer' : null;
+
+  static String? callbackNumberError(String? value) {
+    final number = (value ?? '').replaceAll(RegExp(r'[\s()-]'), '');
+    return (value?.length ?? 0) <= 24 &&
+        RegExp(r'^\+?[0-9]{8,15}$').hasMatch(number)
+        ? null : 'Enter a valid callback number';
+  }
+
+  static String? noteError(String? value) => (value?.length ?? 0) <= 500
+      ? null : 'Use a note of 500 characters or fewer';
+
+  factory MoolBusinessFinancePrefill.fromFields(Map<String, Object?> fields) {
+    if (fields.isEmpty || fields.keys.any((key) => !allowedFields.contains(key))) {
+      throw const FormatException('Review the finance details again.');
+    }
+    String? readText(String key) {
+      if (!fields.containsKey(key)) return null;
+      final value = fields[key];
+      if (value is! String) {
+        throw const FormatException('Review the finance details again.');
+      }
+      return value;
+    }
+    final name = readText('contactName');
+    final number = readText('callbackNumber');
+    final note = readText('note');
+    final error = (name == null ? null : contactNameError(name)) ??
+        (number == null ? null : callbackNumberError(number)) ?? noteError(note);
+    if (error != null) throw FormatException(error);
+    List<String>? purposes;
+    if (fields.containsKey('purposeIds')) {
+      final value = fields['purposeIds'];
+      final allowed = {for (final need in BuyV2BusinessFinanceNeed.values) need.id};
+      if (value is! List || value.isEmpty ||
+          value.any((item) => item is! String || !allowed.contains(item)) ||
+          value.toSet().length != value.length) {
+        throw const FormatException('Choose at least one listed finance option.');
+      }
+      purposes = List<String>.unmodifiable(value.cast<String>());
+    }
+    return MoolBusinessFinancePrefill._(
+      purposeIds: purposes, contactName: name,
+      callbackNumber: number, note: note,
+    );
+  }
+}
+
+final _buyPurchaseFinanceForms = Expando<bool>('buy-purchase-finance-form');
+bool buyV2PurchaseFinanceFormOpen(BuyV2Session session) => _buyPurchaseFinanceForms[session] == true;
+
+/// Match the existing wholesale product/cart finance entry points.
+bool buyV2PurchaseFinanceAvailable(BuyV2Session session) =>
+    session.view == BuyV2View.product &&
+        session.selectedProductId != null &&
+        session.selectedProduct?.id == session.selectedProductId &&
+        session.selectedProduct?.destination == BuyV2Destination.wholesale ||
+    session.view == BuyV2View.cart && session.visibleCartLines.any(
+        (line) => line.product.destination == BuyV2Destination.wholesale);
+
+/// Frontend purchase-context signature, not price/eligibility/serviceability truth.
+String buyV2PurchaseFinanceContextKey(BuyV2Session session) => jsonEncode([
+  session.destination.name, session.view.name,
+  if (session.view == BuyV2View.product)
+    [session.selectedProductId, session.selectedProduct?.customerTitle, session.selectedProduct?.pack]
+  else for (final line in session.cartLines)
+    if (line.product.destination == BuyV2Destination.wholesale)
+      [line.product.id, line.quantity, line.product.destination.name],
+]);
+
+/// Original Buy finance opener shared by manual entry and typed initial review.
+Future<void> showBuyV2PurchaseFinanceSheet(BuildContext context, BuyV2Session session, {
+  required Listenable scopeOwner, required bool Function() isCurrent,
+  String? storeName, String? contactName, String? callbackNumber,
+  MoolBusinessFinancePrefill? prefill,
+}) async {
+  if (!isCurrent() || !buyV2PurchaseFinanceAvailable(session) ||
+      buyV2PurchaseFinanceFormOpen(session)) return;
+  final source = buyV2PurchaseFinanceContextKey(session);
+  final view = session.view, productId = session.selectedProductId;
+  bool current() => isCurrent() && session.procurementScopeCurrent &&
+      buyV2PurchaseFinanceAvailable(session) &&
+      buyV2PurchaseFinanceContextKey(session) == source;
+  _buyPurchaseFinanceForms[session] = true;
+  try {
+    await showMoolBusinessFinanceSheet(context,
+      scopeOwner: scopeOwner, isCurrent: current,
+      storeName: storeName, contactName: contactName, callbackNumber: callbackNumber,
+      prefill: prefill,
+      origin: view == BuyV2View.product ? 'product' : 'cart',
+      buyingStoreId: session.procurementContext?.storeId,
+      productIds: view == BuyV2View.product && productId != null ? [productId]
+          : session.cartLines.where((line) => line.product.destination == BuyV2Destination.wholesale)
+              .map((line) => line.product.id).toSet().toList(growable: false),
+      purchaseLabel: view == BuyV2View.product && session.selectedProduct != null
+          ? '${session.selectedProduct!.customerTitle} · ${session.selectedProduct!.pack}'
+          : 'Wholesale / Bulk Cart',
+      // Deliberately no callback receiver: prefill/review never sends a request.
+    );
+  } finally { _buyPurchaseFinanceForms[session] = false; }
+}
 
 /// Shared enquiry frontend. The optional receiver is deliberately unconfigured
 /// until an authenticated callback service and operations queue are connected.
@@ -52,11 +2133,14 @@ Future<void> showMoolBusinessFinanceSheet(
   String? contactName,
   String? callbackNumber,
   String? purchaseLabel,
+  MoolBusinessFinancePrefill? prefill,
   String origin = 'enquiry',
   String? buyingStoreId,
   List<String> productIds = const [],
   BuyV2FinanceCallbackSubmit? onRequestCallback,
-}) => showModalBottomSheet<void>(
+}) {
+  if (!isCurrent()) return Future<void>.value();
+  return showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
@@ -70,10 +2154,12 @@ Future<void> showMoolBusinessFinanceSheet(
     contactName: contactName,
     callbackNumber: callbackNumber,
     purchaseLabel: purchaseLabel,
+    prefill: prefill,
     origin: origin, buyingStoreId: buyingStoreId,
     productIds: List.unmodifiable(productIds), onRequestCallback: onRequestCallback,
   ),
-);
+  );
+}
 
 class _BusinessFinanceSheet extends StatefulWidget {
   const _BusinessFinanceSheet({
@@ -83,6 +2169,7 @@ class _BusinessFinanceSheet extends StatefulWidget {
     this.contactName,
     this.callbackNumber,
     this.purchaseLabel,
+    this.prefill,
     required this.origin,
     this.buyingStoreId,
     required this.productIds,
@@ -91,6 +2178,7 @@ class _BusinessFinanceSheet extends StatefulWidget {
   final Listenable scopeOwner;
   final bool Function() isCurrent;
   final String? storeName, contactName, callbackNumber, purchaseLabel;
+  final MoolBusinessFinancePrefill? prefill;
   final String origin;
   final String? buyingStoreId;
   final List<String> productIds;
@@ -173,8 +2261,13 @@ class _BusinessFinanceSheetState extends State<_BusinessFinanceSheet> {
   @override
   void initState() {
     super.initState();
-    _name = TextEditingController(text: widget.contactName?.trim() ?? '');
-    _number = TextEditingController(text: widget.callbackNumber?.trim() ?? '');
+    final prefill = widget.prefill;
+    _name = TextEditingController(text: prefill?.contactName ?? widget.contactName?.trim() ?? '');
+    _number = TextEditingController(text: prefill?.callbackNumber ?? widget.callbackNumber?.trim() ?? '');
+    _note.text = prefill?.note ?? '';
+    if (prefill?.purposeIds != null) {
+      _purposes..clear()..addAll(prefill!.purposeIds!);
+    }
     _scopeChanged();
     widget.scopeOwner.addListener(_scopeChanged);
   }
@@ -316,7 +2409,7 @@ class _BusinessFinanceSheetState extends State<_BusinessFinanceSheet> {
                               textCapitalization: TextCapitalization.words,
                               textInputAction: TextInputAction.next,
                               decoration: const InputDecoration(label: ExcludeSemantics(child: Text('Contact name')), counterText: ''),
-                              validator: (value) => value?.trim().isNotEmpty == true ? null : 'Enter your name',
+                              validator: MoolBusinessFinancePrefill.contactNameError,
                             ))),
                             const SizedBox(height: 12),
                             MergeSemantics(child: Semantics(label: 'Callback number', child: TextFormField(
@@ -328,16 +2421,13 @@ class _BusinessFinanceSheetState extends State<_BusinessFinanceSheet> {
                               textInputAction: TextInputAction.next,
                               decoration: const InputDecoration(label: ExcludeSemantics(child: Text('Callback number')),
                                 helperText: 'Use another number if you prefer.', helperMaxLines: 2, counterText: ''),
-                              validator: (value) {
-                                final number = (value ?? '').replaceAll(RegExp(r'[\s()-]'), '');
-                                return RegExp(r'^\+?[0-9]{8,15}$').hasMatch(number)
-                                  ? null : 'Enter a valid callback number';
-                              },
+                              validator: MoolBusinessFinancePrefill.callbackNumberError,
                             ))),
                             const SizedBox(height: 12),
                             MergeSemantics(child: Semantics(label: 'Note (optional)', child: TextFormField(
                               key: const Key('business-finance-note'),
                               controller: _note,
+                              validator: MoolBusinessFinancePrefill.noteError,
                               enabled: !_locked,
                               minLines: 2,
                               maxLines: 4,
@@ -402,14 +2492,26 @@ Future<void> _openOrderInvoice(
   required BuyV2Session session,
   required BuyV2Order order,
   BuyV2InvoiceDownloader? downloader,
+  bool Function()? capturedCurrent,
+  bool allowDownload = true,
 }) async {
+  final captured = _BuyShop04Scope.of(context);
+  capturedCurrent ??= captured?.sourceCurrent;
+  if (captured != null) allowDownload = allowDownload && captured.actionId == 'AI-ACT-414';
+  if (capturedCurrent?.call() == false) return;
   if (order.lines.isNotEmpty) {
+    if (capturedCurrent != null) {
+      await showBuyV2InvoicePage(context, order: order, downloader: downloader,
+        capturedCurrent: capturedCurrent, allowDownload: allowDownload);
+      return;
+    }
     showBuyV2InvoicePage(context, order: order, downloader: downloader);
     return;
   }
   final owner = session.customerStateStore?.ownerScope;
   final refresh = await showDialog<bool>(
     context: context,
+    useRootNavigator: capturedCurrent == null,
     builder: (dialogContext) => AlertDialog(
       key: ValueKey('buy-invoice-items-unavailable-${order.id}'),
       scrollable: true,
@@ -433,7 +2535,11 @@ Future<void> _openOrderInvoice(
               context,
             ).textTheme.labelLarge?.copyWith(fontSize: 14),
           ),
-          onPressed: () => Navigator.of(dialogContext).pop(false),
+          onPressed: () {
+            if (capturedCurrent != null && (!dialogContext.mounted ||
+                !capturedCurrent() || ModalRoute.of(dialogContext)?.isCurrent != true)) return;
+            Navigator.of(dialogContext).pop(false);
+          },
           child: const Text('Back'),
         ),
         Align(
@@ -448,7 +2554,7 @@ Future<void> _openOrderInvoice(
                 ).textTheme.labelLarge?.copyWith(fontSize: 14),
               ),
             ),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
+            onPressed: capturedCurrent != null ? null : () => Navigator.of(dialogContext).pop(true),
             child: const Text('Refresh orders'),
           ),
         ),
@@ -978,24 +3084,28 @@ Future<void> showBuyV2SupplierPolicySheet(
   BuyV2Session session, {
   BuyV2Product? product,
   BuyV2SupplierPolicyAddIntent? intent,
+  bool Function()? capturedCurrent,
+  bool useRootNavigator = true,
+  ValueChanged<bool>? capturedResult,
 }) async {
   final item = intent?.product ?? product;
-  if (item == null) return;
+  if (item == null || capturedCurrent?.call()==false) return;
   final policy = intent?.policy ?? session.publishedSupplierPolicyFor(item);
   if (policy == null) return;
+  Future<bool>? capturedConsent;
   try {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      useRootNavigator: true,
+      useRootNavigator: useRootNavigator,
       backgroundColor: Colors.white,
       builder: (sheetContext) => SafeArea(
         top: false,
         child: AnimatedBuilder(
           animation: session,
           builder: (context, _) {
-            if (intent != null &&
+            if (capturedCurrent?.call()==false || intent != null &&
                 !identical(session.pendingSupplierPolicyAdd, intent)) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (sheetContext.mounted &&
@@ -1029,7 +3139,7 @@ Future<void> showBuyV2SupplierPolicySheet(
                         ),
                         IconButton(
                           tooltip: 'Close',
-                          onPressed: () => Navigator.of(sheetContext).pop(),
+                          onPressed: () {if(capturedCurrent!=null && (!sheetContext.mounted || capturedCurrent()==false || ModalRoute.of(sheetContext)?.isCurrent!=true))return;Navigator.of(sheetContext).pop();},
                           icon: const Icon(Icons.close),
                         ),
                       ],
@@ -1060,9 +3170,11 @@ Future<void> showBuyV2SupplierPolicySheet(
                         onChanged: session.supplierPolicyConsentBusy
                             ? null
                             : (checked) async {
-                                if (checked != true) return;
-                                final added = await session
-                                    .acceptSupplierPolicyAndAdd(intent);
+                                if (checked != true || capturedCurrent?.call()==false) return;
+                                final pending = session.acceptSupplierPolicyAndAdd(intent,isCurrent:capturedCurrent);
+                                if(capturedCurrent!=null)capturedConsent=pending;
+                                final added=await pending;
+                                capturedResult?.call(added);
                                 if (sheetContext.mounted &&
                                     (ModalRoute.of(sheetContext)?.isCurrent ??
                                         false) &&
@@ -1084,7 +3196,7 @@ Future<void> showBuyV2SupplierPolicySheet(
                       style: TextButton.styleFrom(
                         foregroundColor: BuyV2Colors.ink,
                       ),
-                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      onPressed: () {if(capturedCurrent!=null && (!sheetContext.mounted || capturedCurrent()==false || ModalRoute.of(sheetContext)?.isCurrent!=true))return;Navigator.of(sheetContext).pop();},
                       child: Text(intent == null ? 'Close' : 'Cancel'),
                     ),
                   ],
@@ -1096,6 +3208,7 @@ Future<void> showBuyV2SupplierPolicySheet(
       ),
     );
   } finally {
+    if(capturedCurrent!=null && capturedConsent!=null){try{await capturedConsent;}on Object{/* Original cleanup below still runs. */}}
     if (intent != null && identical(session.pendingSupplierPolicyAdd, intent)) {
       session.cancelSupplierPolicyAdd();
     }
@@ -1112,15 +3225,17 @@ String _scheduledWindowLabel(BuildContext context, BuyV2ScheduledFulfilment sele
       '${sameDay ? '' : '${local.formatFullDate(end)} · '}${time(end)}';
 }
 
-Future<void> _addWithScheduledWindow(BuildContext context, BuyV2Session session,
-    BuyV2Product product, BuyV2ScheduledFulfilment selected) async {
-  if (session.cartChangesBlocked) return;
+Future<bool> _addWithScheduledWindow(BuildContext context, BuyV2Session session,
+    BuyV2Product product, BuyV2ScheduledFulfilment selected, {int? quantity,
+    bool Function()? capturedCurrent, bool useRootNavigator=true}) async {
+  if (session.cartChangesBlocked || capturedCurrent?.call()==false) return false;
   final original = session.cartLineFor(product.id);
   final account = session.collectionIdentity?.value;
   final replace = original != null && original.scheduledFulfilment != selected;
   if (replace) {
     final confirmed = await showDialog<bool>(
       context: context,
+      useRootNavigator: useRootNavigator,
       builder: (context) => AlertDialog(
         title: const Text('Replace delivery choice?'),
         content: SingleChildScrollView(child: Text(
@@ -1131,26 +3246,29 @@ Future<void> _addWithScheduledWindow(BuildContext context, BuyV2Session session,
           'Availability and price must still be confirmed at Checkout.',
         )),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep current')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Replace choice')),
+          TextButton(onPressed: () {if(capturedCurrent!=null && (!context.mounted || capturedCurrent()==false || ModalRoute.of(context)?.isCurrent!=true))return;Navigator.pop(context,false);}, child: const Text('Keep current')),
+          TextButton(onPressed: () {if(capturedCurrent!=null && (!context.mounted || capturedCurrent()==false || ModalRoute.of(context)?.isCurrent!=true))return;Navigator.pop(context,true);}, child: const Text('Replace choice')),
         ],
       ),
     );
     if (confirmed != true || !context.mounted ||
-        !identical(account, session.collectionIdentity?.value)) {
-      return;
+        !identical(account, session.collectionIdentity?.value) || capturedCurrent?.call()==false) {
+      return false;
     }
   }
   final saved = await session.addProductForScheduledWindow(product.id, selected,
-      replaceLine: replace ? original : null);
-  if (!context.mounted) return;
+      quantity: replace ? null : quantity, replaceLine: replace ? original : null);
+  if (!context.mounted || capturedCurrent?.call()==false) return saved;
+  var consentSaved=false;
   if (!saved) {
     if (session.pendingSupplierPolicyAdd case final intent?) {
-      await showBuyV2SupplierPolicySheet(context, session, intent: intent);
+      await showBuyV2SupplierPolicySheet(context, session, intent: intent,
+        capturedCurrent:capturedCurrent,useRootNavigator:useRootNavigator,capturedResult:(value)=>consentSaved=value);
     } else if (session.pendingPrescriptionProductId == product.id) {
       await showBuyV2PrescriptionSheet(context, session);
     }
   }
+  return saved || consentSaved;
 }
 
 class _ProductPresentationObserver extends StatefulWidget {
@@ -1270,6 +3388,22 @@ class _StoreStockObserverState extends State<_StoreStockObserver> with WidgetsBi
   }
 }
 
+// Optional ownership seam for the original product details presentation only.
+// Manual views have no scope and retain their original callback objects.
+class _BuyCapturedProductDetails extends InheritedWidget {
+  const _BuyCapturedProductDetails({required this.product,required this.current,required super.child});
+  final BuyV2Product product;
+  final bool Function() current;
+  static _BuyCapturedProductDetails? of(BuildContext context) =>
+    context.getInheritedWidgetOfExactType<_BuyCapturedProductDetails>();
+  static VoidCallback? effect(BuildContext context,VoidCallback? callback) => of(context)==null?callback:null;
+  static VoidCallback? read(BuildContext context,VoidCallback? callback) {
+    final owner=of(context);if(owner==null||callback==null)return callback;
+    return () {if(context.mounted&&owner.current())callback();};
+  }
+  @override bool updateShouldNotify(_BuyCapturedProductDetails oldWidget)=>current!=oldWidget.current||product!=oldWidget.product;
+}
+
 class BuyV2ProductView extends StatelessWidget {
   const BuyV2ProductView({
     super.key,
@@ -1283,12 +3417,14 @@ class BuyV2ProductView extends StatelessWidget {
     this.onOpenFinance,
     this.onVisitComparisonProduct,
     this.onOpenPartnerCatalogue,
-    this.aggregateCart = false,
+    this.aggregateCart = false, this.capturedProduct, this.capturedCurrent,
     this.wholesaleTradeDecisionAdapter =
         const BuyV2UnavailableWholesaleTradeDecisionAdapter(),
   });
 
   final BuyV2Session session;
+  final BuyV2Product? capturedProduct;
+  final bool Function()? capturedCurrent;
   final Widget? trailingAction;
   final ScrollController? scrollController;
   final double bottomContentInset;
@@ -1303,10 +3439,13 @@ class BuyV2ProductView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final product = session.selectedProduct;
+    final product = capturedProduct ?? session.selectedProduct;
+    if (capturedProduct != null && capturedCurrent?.call() == false) return const SizedBox.shrink();
     if (product == null) {
       return const SizedBox.shrink();
     }
+    VoidCallback? captureEffect(VoidCallback? callback) => capturedProduct == null ? callback : null;
+    VoidCallback captureVoid(VoidCallback callback) => capturedProduct == null ? callback : () {};
     final quantity = session.quantityFor(product.id);
     final facts = session.productFactsFor(product);
     final content = session.productContentFor(product);
@@ -1377,9 +3516,10 @@ class BuyV2ProductView extends StatelessWidget {
         product.requiresPrescription &&
         !session.isPrescriptionApproved(product.id);
     final displayedWindow = session.scheduledWindowFor(product);
-    final purchaseEnabled = !session.cartChangesBlocked &&
+    final purchaseEnabled = capturedProduct == null && !session.cartChangesBlocked &&
         (!session.productScheduledReview || displayedWindow != null);
     void addProduct() {
+      if (capturedProduct != null) return;
       HapticFeedback.selectionClick();
       if (session.productScheduledReview) {
         if (displayedWindow != null) {
@@ -1406,7 +3546,7 @@ class BuyV2ProductView extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            onPressed: () => onOpenPartnerCatalogue!(product),
+            onPressed: captureEffect(() => onOpenPartnerCatalogue!(product)),
             icon: Icon(
               Icons.storefront_outlined,
               size: 18,
@@ -1432,7 +3572,7 @@ class BuyV2ProductView extends StatelessWidget {
           key: ValueKey('buy-product-hero-store-${product.id}'),
           product: product,
           facts: facts,
-          storeNative: storeNative,
+          storeNative: storeNative, capturedCurrent: capturedCurrent,
           action: automaticFulfilment ? null : storeAction,
           location: trust.state == BuyV2MarketplaceTrustState.ready
               ? trust.partnerLocation
@@ -1470,15 +3610,15 @@ class BuyV2ProductView extends StatelessWidget {
                               key: ValueKey('buy-product-return-${product.id}'),
                               tightHitOwner: storeNative,
                               hitOwnerKey: storeNative ? ValueKey('buy-product-return-hit-${product.id}') : null,
-                              label: session.canReturnToComparedProduct
+                              label: capturedProduct != null ? (returnLabel ?? product.destination.label) : session.canReturnToComparedProduct
                                   ? session.productReturnLabel!
                                   : returnLabel ??
                                         session.productReturnLabel ??
                                         product.destination.label,
                               minimumHeight: storeNative ? 48 : 44,
-                              onTap: session.canReturnToComparedProduct
-                                  ? session.closeProduct
-                                  : onReturn ?? session.closeProduct,
+                              onTap: capturedProduct != null
+                                  ? () { if (capturedCurrent?.call() == true) onReturn?.call(); }
+                                  : session.canReturnToComparedProduct ? session.closeProduct : onReturn ?? session.closeProduct,
                             ),
                           ),
                           if (automaticFulfilment) ...[
@@ -1489,7 +3629,7 @@ class BuyV2ProductView extends StatelessWidget {
                               tooltip: session.isSaved(product.id)
                                   ? 'Saved'
                                   : 'Save',
-                              onPressed: () => session.toggleSaved(product.id),
+                              onPressed: captureEffect(() => session.toggleSaved(product.id)),
                               icon: Icon(
                                 session.isSaved(product.id)
                                     ? Icons.bookmark_rounded
@@ -1501,13 +3641,13 @@ class BuyV2ProductView extends StatelessWidget {
                                 'buy-product-action-share-${product.id}',
                               ),
                               tooltip: 'Share',
-                              onPressed: () => unawaited(
+                              onPressed: captureEffect(() => unawaited(
                                 _shareBuyV2Product(
                                   context,
                                   session: session,
                                   product: product,
                                 ),
-                              ),
+                              )),
                               icon: Icon(
                                 Icons.ios_share_outlined,
                                 color: const Color(0xFF326C76),
@@ -1521,10 +3661,10 @@ class BuyV2ProductView extends StatelessWidget {
                             ? BuyV2CartAvoidanceRegion(child: actions)
                             : actions;
     });
-    return Column(
+    final presentation = Column(
       children: [
-        _ProductPresentationObserver(session: session, product: product),
-        _StoreStockObserver(session: session, products: [product]),
+        if (capturedProduct == null) _ProductPresentationObserver(session: session, product: product),
+        if (capturedProduct == null) _StoreStockObserver(session: session, products: [product]),
         if (session.reviewDataEnabled) const BuyV2DemoCatalogueLabel(),
         if (storeNative) Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10), child: productActions),
@@ -1600,8 +3740,8 @@ class BuyV2ProductView extends StatelessWidget {
                                       product: product,
                                       media: media,
                                       active: active,
-                                      onRetry: () => session
-                                          .refreshProductContent(product.id),
+                                      onRetry: captureVoid(() => session
+                                          .refreshProductContent(product.id)),
                                     ),
                               ),
                           ],
@@ -1741,16 +3881,16 @@ class BuyV2ProductView extends StatelessWidget {
                                                       style: TextButton.styleFrom(
                                                         textStyle: context.buyBody.copyWith(fontSize: 12),
                                                         minimumSize: const Size(48, 48)),
-                                                      onPressed: () => unawaited(session.retryCommerce()),
+                                                      onPressed: captureEffect(() => unawaited(session.retryCommerce())),
                                                       child: const Text('Refresh buying access'),
                                                     )
                                                   : TextButton(
                                                       key: ValueKey(
                                                         'buy-wholesale-verify-business-${product.id}',
                                                       ),
-                                                      onPressed: () => context.push(
+                                                      onPressed: captureEffect(() => context.push(
                                                         '/app/work/workspace/choose',
-                                                      ),
+                                                      )),
                                                       child: const Text(
                                                         'Verify business',
                                                       ),
@@ -1760,10 +3900,10 @@ class BuyV2ProductView extends StatelessWidget {
                                                       key: ValueKey(
                                                         'buy-wholesale-retry-offer-${product.id}',
                                                       ),
-                                                      onPressed: () => session
+                                                      onPressed: captureEffect(() => session
                                                           .refreshProductFacts(
                                                             product.id,
-                                                          ),
+                                                          )),
                                                       child: const Text(
                                                         'Check availability',
                                                       ),
@@ -1794,20 +3934,20 @@ class BuyV2ProductView extends StatelessWidget {
                                                             '${buyV2BuyerDeliveryPromise(facts, confirmAfterStoreAcceptance: product.destination != BuyV2Destination.medicine && BuyV2ThemeScope.refinedOf(context))}',
                                                         rxBlocked: rxBlocked,
                                                         onAdd: addProduct,
-                                                        onEdit: () =>
+                                                        onEdit: captureVoid(() =>
                                                             showBuyV2QuantityEditor(
                                                               context,
                                                               session,
                                                               product,
-                                                            ),
-                                                        onDecrease: () =>
+                                                            )),
+                                                        onDecrease: captureVoid(() =>
                                                             session.decrease(
                                                               product.id,
-                                                            ),
-                                                        onIncrease: () =>
+                                                            )),
+                                                        onIncrease: captureVoid(() =>
                                                             session.increase(
                                                               product.id,
-                                                            ),
+                                                            )),
                                                       ),
                                                     ),
                                             )
@@ -1923,16 +4063,16 @@ class BuyV2ProductView extends StatelessWidget {
                                                         buyerPromise,
                                                     rxBlocked: rxBlocked,
                                                     onAdd: addProduct,
-                                                    onEdit: () =>
+                                                    onEdit: captureVoid(() =>
                                                         showBuyV2QuantityEditor(
                                                           context,
                                                           session,
                                                           product,
-                                                        ),
-                                                    onDecrease: () => session
-                                                        .decrease(product.id),
-                                                    onIncrease: () => session
-                                                        .increase(product.id),
+                                                        )),
+                                                    onDecrease: captureVoid(() => session
+                                                        .decrease(product.id)),
+                                                    onIncrease: captureVoid(() => session
+                                                        .increase(product.id)),
                                                   ),
                                                 );
                                                 return summary(
@@ -2056,15 +4196,15 @@ class BuyV2ProductView extends StatelessWidget {
                                     deliveryDecision: buyerPromise,
                                     rxBlocked: rxBlocked,
                                     onAdd: addProduct,
-                                    onEdit: () => showBuyV2QuantityEditor(
+                                    onEdit: captureVoid(() => showBuyV2QuantityEditor(
                                       context,
                                       session,
                                       product,
-                                    ),
-                                    onDecrease: () =>
-                                        session.decrease(product.id),
-                                    onIncrease: () =>
-                                        session.increase(product.id),
+                                    )),
+                                    onDecrease: captureVoid(() =>
+                                        session.decrease(product.id)),
+                                    onIncrease: captureVoid(() =>
+                                        session.increase(product.id)),
                                   ),
                                 ],
                               ],
@@ -2082,11 +4222,11 @@ class BuyV2ProductView extends StatelessWidget {
                           ),
                           icon: const Icon(Icons.policy_outlined, size: 18),
                           label: Text(supplierPolicy.title),
-                          onPressed: () => showBuyV2SupplierPolicySheet(
+                          onPressed: captureEffect(() => showBuyV2SupplierPolicySheet(
                             context,
                             session,
                             product: product,
-                          ),
+                          )),
                         ),
                       if (variants.length > 1 ||
                           sizeChart != null ||
@@ -2191,8 +4331,8 @@ class BuyV2ProductView extends StatelessWidget {
                                     semanticLabel:
                                         'View ${partnerProducts.length} more products from ${product.seller} '
                                         'that are available now. Not medical advice',
-                                    onTap: () =>
-                                        onOpenPartnerCatalogue!(product),
+                                    onTap: captureVoid(() =>
+                                        onOpenPartnerCatalogue!(product)),
                                   ),
                                 _DecisionRow(
                                   icon: Icons.route_outlined,
@@ -2220,7 +4360,7 @@ class BuyV2ProductView extends StatelessWidget {
                                   Text('Explore funding for your business purchase.', style: context.buyBody),
                                   TextButton.icon(
                                     key: const Key('buy-product-finance-open'),
-                                    onPressed: onOpenFinance,
+                                    onPressed: captureEffect(onOpenFinance),
                                     icon: const Icon(Icons.account_balance_outlined, size: 18),
                                     label: const Text('Explore finance'),
                                   ),
@@ -2455,7 +4595,7 @@ class BuyV2ProductView extends StatelessWidget {
                           ],
                           if (automaticFulfilment) ...[
                             const SizedBox(height: 12),
-                            _ProductContinuationSection(
+                            if (capturedProduct == null) _ProductContinuationSection(
                               session: session,
                               product: product,
                             ),
@@ -2474,12 +4614,12 @@ class BuyV2ProductView extends StatelessWidget {
                           ),
                           if (!automaticFulfilment) ...[
                             const SizedBox(height: 10),
-                            _ProductContinuationSection(
+                            if (capturedProduct == null) _ProductContinuationSection(
                               session: session,
                               product: product,
                             ),
                           ],
-                          if (automaticFulfilment)
+                          if (automaticFulfilment && capturedProduct == null)
                             _ProductDiscoverySections(
                               key: ValueKey(
                                 'buy-product-discovery-${product.id}',
@@ -2509,6 +4649,16 @@ class BuyV2ProductView extends StatelessWidget {
         ),
       ],
     );
+    // The original full product presentation is reused for a captured details
+    // review. Its commerce/source effects are unavailable on this path;
+    // scrolling, gallery, information tabs and guarded reading remain available.
+    if (capturedProduct == null) return presentation;
+    return _BuyCapturedProductDetails(product: product, current: capturedCurrent ?? () => false, child: Column(children: [
+      const Padding(padding: EdgeInsets.all(8), child: Text(
+        'Product details review. Shopping controls are unavailable here.',
+        key: ValueKey('buy-product-captured-read-only'))),
+      Expanded(child: presentation),
+    ]));
   }
 }
 
@@ -2519,13 +4669,14 @@ class _ProductStoreSummary extends StatelessWidget {
     required this.facts,
     this.action,
     this.location,
-    this.storeNative = false,
+    this.storeNative = false, this.capturedCurrent,
   });
   final BuyV2Product product;
   final BuyV2ProductFactsSnapshot facts;
   final Widget? action;
   final String? location;
   final bool storeNative;
+  final bool Function()? capturedCurrent;
   @override
   Widget build(BuildContext context) {
     final status = switch (facts.storeOperatingState) {
@@ -2609,27 +4760,28 @@ class _ProductStoreSummary extends StatelessWidget {
                 size: 16,
                 color: BuyV2Colors.muted,
               ),
-              onPressed: () async {
+              onPressed: _BuyCapturedProductDetails.effect(context,() async {
+                if (capturedCurrent?.call() == false) return;
                 final details = [
                   product.customerSeller(facts.partner),
                   ?_nonBlankComplianceValue(location),
                 ].join('\n');
                 try {
                   await Clipboard.setData(ClipboardData(text: details));
-                  if (!context.mounted) return;
+                  if (!context.mounted || capturedCurrent?.call() == false) return;
                   HapticFeedback.selectionClick();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Store details copied')),
                   );
                 } catch (_) {
-                  if (!context.mounted) return;
+                  if (!context.mounted || capturedCurrent?.call() == false) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Could not copy store details. Try again.'),
                     ),
                   );
                 }
-              },
+              }),
               );
               return storeNative ? BuyV2CartAvoidanceRegion(child: copy) : copy;
             }),
@@ -2866,7 +5018,7 @@ class _PublicProductOrderInformationState
               );
               final change = TextButton(
                 key: ValueKey('buy-product-change-address-${product.id}'),
-                onPressed: () => showBuyV2AddressSheet(context, session),
+                onPressed: _BuyCapturedProductDetails.effect(context,() => showBuyV2AddressSheet(context, session)),
                 style: TextButton.styleFrom(
                   minimumSize: const Size(48, 48),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -2898,7 +5050,7 @@ class _PublicProductOrderInformationState
               const Divider(height: 1, thickness: .5, color: BuyV2Colors.line),
             rows[i],
           ],
-          BuyV2AdvertisedOfferLink(session: session, product: product),
+          BuyV2AdvertisedOfferLink(session: session, product: product, capturedCurrent: _BuyCapturedProductDetails.of(context)?.current, useRootNavigator: _BuyCapturedProductDetails.of(context) == null),
           if (retained != null) ...[
             const SizedBox(height: 6),
             Text('Selected window · ${_scheduledWindowLabel(context, retained)}',
@@ -2918,13 +5070,13 @@ class _PublicProductOrderInformationState
               key: ValueKey('buy-product-use-window-${product.id}'),
               style: TextButton.styleFrom(minimumSize: const Size(48, 48),
                 alignment: Alignment.centerLeft),
-              onPressed: session.cartChangesBlocked ? null : () => _addWithScheduledWindow(context, session, product, window),
+              onPressed: _BuyCapturedProductDetails.effect(context,session.cartChangesBlocked ? null : () => _addWithScheduledWindow(context, session, product, window)),
               icon: const Icon(Icons.add_shopping_cart_outlined, size: 18),
               label: Text(session.cartLineFor(product.id) == null ? 'Add with this window'
                   : retained == window ? 'Add another with this window' : 'Use this window'),
             ),
             Text('Requested window only. Confirm availability and price at Checkout.', style: context.buyMeta),
-          ] else if (session.productScheduledReview)
+          ] else if (_BuyCapturedProductDetails.of(context) == null && session.productScheduledReview)
             Padding(padding: const EdgeInsets.only(top: 8),
               child: Text('No delivery window is currently confirmed for this address. Check availability again.',
                 style: context.buyMeta)),
@@ -3380,10 +5532,10 @@ class _ProductQuickActionButton extends StatelessWidget {
       child: Semantics(
         button: true,
         label: semanticLabel ?? label,
-        onTap: onPressed,
+        onTap: _BuyCapturedProductDetails.effect(context,onPressed),
         excludeSemantics: true,
         child: InkWell(
-          onTap: onPressed,
+          onTap: _BuyCapturedProductDetails.effect(context,onPressed),
           borderRadius: BorderRadius.circular(13),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 48),
@@ -3418,19 +5570,22 @@ class _ProductQuickActionButton extends StatelessWidget {
   }
 }
 
-Future<void> _shareBuyV2Product(
+Future<bool> _shareBuyV2Product(
   BuildContext context, {
   required BuyV2Session session,
   required BuyV2Product product,
+  bool Function()? capturedCurrent,
 }) async {
+  if (!context.mounted || capturedCurrent?.call() == false) return false;
   final facts = session.productFactsFor(product);
   final renderBox = context.findRenderObject() as RenderBox?;
   final origin = renderBox == null
       ? const Rect.fromLTWH(0, 0, 1, 1)
       : renderBox.localToGlobal(Offset.zero) & renderBox.size;
   final productLink = buyV2SharedProductUri(product);
+  var platformFailed = false;
   try {
-    await SharePlus.instance.share(
+    final result = await SharePlus.instance.share(
       ShareParams(
         title: product.customerTitle,
         subject: '${product.customerTitle} on MoolSocial',
@@ -3444,9 +5599,16 @@ Future<void> _shareBuyV2Product(
         mailToFallbackEnabled: false,
       ),
     );
-  } on Object {
-    session.showNotice('Sharing is unavailable right now. Try again.');
+    if (!context.mounted || capturedCurrent?.call() == false) return false;
+    if (result.status == ShareResultStatus.success) return true;
+    if (result.status == ShareResultStatus.dismissed) return false;
+  } on Object { platformFailed = true; }
+  if (context.mounted && capturedCurrent?.call() != false && (platformFailed || capturedCurrent != null)) {
+    const message = 'Sharing is unavailable right now. Try again.';
+    session.showNotice(message);
+    if (capturedCurrent != null) ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(content: Text(message)));
   }
+  return false;
 }
 
 Future<void> _showBuyV2ProductComparison(
@@ -3499,10 +5661,14 @@ class _ProductComparisonSheet extends StatefulWidget {
   const _ProductComparisonSheet({
     required this.session,
     required this.product,
-    this.onVisitProduct,
+    this.onVisitProduct, this.browseReviewCurrent, this.browseReviewClose, this.browseRequestedQuantityMilli, this.browseOfferPermitted,
   });
   final BuyV2Session session;
   final BuyV2Product product;
+  final bool Function()? browseReviewCurrent;
+  final VoidCallback? browseReviewClose;
+  final int? browseRequestedQuantityMilli;
+  final bool Function(BuyV2ComparisonOffer)? browseOfferPermitted;
   final Future<void> Function(BuyV2Product)? onVisitProduct;
   @override
   State<_ProductComparisonSheet> createState() =>
@@ -3553,9 +5719,10 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
   }
 
   Future<void> _reload() async {
+    if (widget.browseReviewCurrent?.call() == false) return;
     final session = widget.session;
     final source = session.comparisonSource;
-    final query = session.comparisonQueryFor(widget.product);
+    final query = session.comparisonQueryFor(widget.product, requestedQuantityMilli: widget.browseRequestedQuantityMilli);
     if (source == null || query == null) {
       _controller?.dispose();
       _controller = null;
@@ -3571,7 +5738,7 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
     _controller ??= BuyV2ComparisonController(
       source: source,
       isCurrent: session.comparisonQueryIsCurrent,
-      offerPermitted: session.comparisonOfferPermitted,
+      offerPermitted: (offer) => session.comparisonOfferPermitted(offer) && (widget.browseOfferPermitted?.call(offer) ?? true),
       now: session.catalogueNow,
     )..addListener(_changed);
     await _controller!.open(query);
@@ -3580,7 +5747,7 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
   Future<void> _openProduct(BuyV2ComparisonOffer offer) async {
     final controller = _controller;
     final visit = widget.onVisitProduct;
-    if (_opening || controller == null || visit == null) return;
+    if (_opening || widget.browseReviewCurrent?.call() == false || controller == null || visit == null) return;
     if (!widget.session.admitComparisonProduct(controller, offer)) {
       _message =
           'This offer changed. Refresh the comparison before continuing.';
@@ -3600,7 +5767,7 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
 
   bool _beforeSave(BuyV2ComparisonOffer offer) {
     final controller = _controller;
-    if (controller == null ||
+    if (widget.browseReviewCurrent?.call() == false || controller == null ||
         !widget.session.admitComparisonProduct(controller, offer)) {
       _message =
           'This offer changed. Refresh the comparison before continuing.';
@@ -3641,7 +5808,7 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
       }
       if (query.key != controller.query!.key) {
         await controller.open(query);
-        if (!mounted) return false;
+        if (!mounted || widget.browseReviewCurrent?.call() == false) return false;
       }
       final refreshed = controller.page?.offers
           .where(
@@ -3682,7 +5849,7 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
         return false;
       }
       _message = null;
-      return true;
+      return widget.browseReviewCurrent?.call() != false;
     } finally {
       _cartChanging = false;
     }
@@ -3751,12 +5918,14 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
                 ),
                 IconButton(
                   tooltip: 'Close comparison',
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: widget.browseReviewClose ?? () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close, size: 20),
                   color: BuyV2ActionStyle.primaryForeground,
                 ),
               ],
             ),
+            if (widget.browseRequestedQuantityMilli != null && query != null)
+              Text(_buyBrowseComparisonQuantityLabel(query), key: const ValueKey('buy-comparison-requested-quantity')),
             Wrap(
               spacing: 6,
               crossAxisAlignment: WrapCrossAlignment.center,
@@ -3769,7 +5938,7 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
                   ),
                 ),
                 Text(
-                  '${widget.product.pack}${query == null ? '' : ' · ${_packCountLabel(query.requestedQuantityMilli ~/ query.identity.packQuantityMilli)}'}',
+                  '${widget.product.pack}${query == null || widget.browseRequestedQuantityMilli != null ? '' : ' · ${_packCountLabel(query.requestedQuantityMilli ~/ query.identity.packQuantityMilli)}'}',
                   style: context.buyMeta.copyWith(fontSize: 11),
                 ),
               ],
@@ -4163,7 +6332,7 @@ class _ProductPriceExtrasState extends State<_ProductPriceExtras>
                       facts.stale ? null : _supplierGstForPack(product.packTerms,
                         facts.priceMinor))),
                   BuyV2PriceFreshness(product: product, now: widget.session.catalogueNow,
-                    onRequestRefresh: () => widget.session.requestCommodityPriceRefresh(product)),
+                    onRequestRefresh: _BuyCapturedProductDetails.of(context) == null ? () => widget.session.requestCommodityPriceRefresh(product) : null),
                   if (hasTiers) ...[
                     for (final tier in terms.priceTiers)
                       _ProductInfoRow(
@@ -4322,6 +6491,7 @@ class _ProductAssuranceControls extends StatelessWidget {
   );
 
   Future<void> _returns(BuildContext context) async {
+    final captured = _BuyCapturedProductDetails.of(context);
     final openHelp = await showModalBottomSheet<bool>(
       context: context,
       useSafeArea: true,
@@ -4329,7 +6499,7 @@ class _ProductAssuranceControls extends StatelessWidget {
       builder: (context) => AnimatedBuilder(
         animation: session,
         builder: (context, _) {
-          final current = session.selectedProduct;
+          final current = captured == null ? session.selectedProduct : captured.current() ? captured.product : null;
           final lines = current?.id == product.id
               ? _purchaseProtectionLines(current!)
               : <String>[];
@@ -4353,7 +6523,7 @@ class _ProductAssuranceControls extends StatelessWidget {
                 ),
               TextButton.icon(
                 key: const ValueKey('buy-product-how-to-return'),
-                onPressed: () => Navigator.of(context).pop(true),
+                onPressed: captured == null ? () => Navigator.of(context).pop(true) : null,
                 icon: const Icon(Icons.help_outline),
                 label: const Text('How to return'),
               ),
@@ -4407,7 +6577,7 @@ class _ProductAssuranceControls extends StatelessWidget {
             minimumSize: const Size(48, 48),
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           ),
-          onPressed: action,
+          onPressed: id == 'support' ? _BuyCapturedProductDetails.effect(context,action) : _BuyCapturedProductDetails.read(context,action),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -4572,8 +6742,8 @@ class _ProductVariantSelector extends StatelessWidget {
                 if (sizeChart != null)
                   TextButton(
                     key: ValueKey('buy-product-size-chart-${product.id}'),
-                    onPressed: () =>
-                        _showProductSizeChart(context, session, product),
+                    onPressed: _BuyCapturedProductDetails.read(context,() =>
+                        _showProductSizeChart(context, session, product)),
                     child: const Text('Size chart'),
                   ),
               ],
@@ -4665,7 +6835,7 @@ class _StructuredProductVariants extends StatelessWidget {
               IconButton(
                 key: ValueKey('buy-variant-family-refresh-${product.id}'),
                 tooltip: 'Refresh product options',
-                onPressed: session.variantFamilyLoadingFor(product)
+                onPressed: _BuyCapturedProductDetails.of(context) != null || session.variantFamilyLoadingFor(product)
                     ? null
                     : () => unawaited(session.refreshVariantFamily(product)),
                 icon: const Icon(Icons.refresh_rounded, size: 18),
@@ -4673,8 +6843,7 @@ class _StructuredProductVariants extends StatelessWidget {
             if (sizeChart != null)
               TextButton(
                 key: ValueKey('buy-product-size-chart-${product.id}'),
-                onPressed: () =>
-                    _showProductSizeChart(context, session, product),
+                onPressed: _BuyCapturedProductDetails.read(context,() => _showProductSizeChart(context, session, product)),
                 child: const Text('Size chart'),
               ),
           ],
@@ -4817,7 +6986,7 @@ class _ProductColourOption extends StatelessWidget {
         key: ValueKey(
           'buy-product-option-${value.dimensionId}-${value.optionId}',
         ),
-        onTap: onSelected,
+        onTap: _BuyCapturedProductDetails.effect(context,onSelected),
         radius: 24,
         child: SizedBox(
           width: 48,
@@ -4927,7 +7096,7 @@ class _ProductVariantOption extends StatelessWidget {
     required this.selected,
     required this.width,
     this.optionLabel,
-    this.optionKey,
+    this.optionKey, this.browseReviewSelect,
   });
 
   final BuyV2Session session;
@@ -4936,6 +7105,7 @@ class _ProductVariantOption extends StatelessWidget {
   final double width;
   final String? optionLabel;
   final String? optionKey;
+  final bool Function(BuyV2Product)? browseReviewSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -4949,6 +7119,7 @@ class _ProductVariantOption extends StatelessWidget {
         ? BuyV2Colors.green
         : BuyV2Colors.orange;
     void select() {
+      if (browseReviewSelect != null) { browseReviewSelect!(option); return; }
       HapticFeedback.selectionClick();
       session.selectProductVariant(option.id);
     }
@@ -4959,7 +7130,7 @@ class _ProductVariantOption extends StatelessWidget {
       selected: selected,
       label:
           '${optionLabel ?? option.pack}, ${_comparisonMoney(facts.priceMinor)}, ${decision.statusLabel}',
-      onTap: select,
+      onTap: _BuyCapturedProductDetails.effect(context,select),
       excludeSemantics: true,
       child: SizedBox(
         width: width,
@@ -4983,7 +7154,7 @@ class _ProductVariantOption extends StatelessWidget {
             ),
             child: InkWell(
               key: ValueKey(optionKey ?? 'buy-product-variant-${option.id}'),
-              onTap: select,
+              onTap: _BuyCapturedProductDetails.effect(context,select),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: 48),
                 child: Padding(
@@ -5104,7 +7275,7 @@ class _WholesaleVerificationCard extends StatelessWidget {
               child: FilledButton.icon(
                 style: BuyV2ActionStyle.button(),
                 key: const ValueKey('buy-wholesale-open-workspace'),
-                onPressed: onOpenWorkspace,
+                onPressed: _BuyCapturedProductDetails.effect(context,onOpenWorkspace),
                 icon: const Icon(Icons.storefront_outlined, size: 18),
                 label: const Text('Open business profile'),
               ),
@@ -5335,11 +7506,11 @@ class _WholesaleTradeDecisionPanelState
                               minimumSize: const Size(0, 44),
                             ),
                           ),
-                          onPressed: () {
+                          onPressed: _BuyCapturedProductDetails.effect(context,() {
                             HapticFeedback.selectionClick();
                             widget.session.refreshProductFacts(product.id);
                             _loadSignal();
-                          },
+                          }),
                           icon: const Icon(Icons.refresh_rounded),
                           label: const Text('Check availability'),
                         ),
@@ -5356,7 +7527,7 @@ class _WholesaleTradeDecisionPanelState
                               minimumSize: const Size(0, 44),
                             ),
                           ),
-                          onPressed: widget.session.closeProduct,
+                          onPressed: _BuyCapturedProductDetails.effect(context,widget.session.closeProduct),
                           icon: const Icon(Icons.swap_horiz_rounded),
                           label: const Text('Change product'),
                         ),
@@ -5604,7 +7775,7 @@ class _WholesaleTradeSignalCard extends StatelessWidget {
                   style: BuyV2ActionStyle.button(
                     OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
                   ),
-                  onPressed: onRetry,
+                  onPressed: _BuyCapturedProductDetails.effect(context,onRetry),
                   icon: const Icon(Icons.refresh_rounded),
                   label: const Text('Check local insight again'),
                 ),
@@ -5691,10 +7862,10 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                               minimumSize: const Size(0, 44),
                             ),
                           ),
-                          onPressed: () {
+                          onPressed: _BuyCapturedProductDetails.effect(context,() {
                             HapticFeedback.selectionClick();
                             session.refreshProductFacts(product.id);
-                          },
+                          }),
                           icon: const Icon(Icons.refresh_rounded),
                           label: const Text('Check availability'),
                         ),
@@ -5711,7 +7882,7 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                               minimumSize: const Size(0, 44),
                             ),
                           ),
-                          onPressed: session.closeProduct,
+                          onPressed: _BuyCapturedProductDetails.effect(context,session.closeProduct),
                           icon: const Icon(Icons.swap_horiz_rounded),
                           label: const Text('Change product'),
                         ),
@@ -6725,7 +8896,7 @@ class _ProductContentMediaSurfaceState
                 IconButton(
                   key: ValueKey('buy-product-image-retry-${media.id}'),
                   tooltip: 'Retry image',
-                  onPressed: _retrying ? null : _retry,
+                  onPressed: _BuyCapturedProductDetails.effect(context,_retrying ? null : _retry),
                   icon: const Icon(Icons.refresh_rounded),
                 ),
               ],
@@ -7329,7 +9500,7 @@ class _ProductContentSections extends StatelessWidget {
                 child: OutlinedButton.icon(
                   style: BuyV2ActionStyle.button(),
                   key: ValueKey('buy-product-content-retry-${product.id}'),
-                  onPressed: () => session.refreshProductContent(product.id),
+                  onPressed: _BuyCapturedProductDetails.effect(context,() => session.refreshProductContent(product.id)),
                   icon: const Icon(Icons.refresh_rounded),
                   label: const Text('Try again'),
                 ),
@@ -7762,8 +9933,7 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
                 key: ValueKey('buy-product-content-retry-${product.id}'),
-                onPressed: () =>
-                    widget.session.refreshProductContent(product.id),
+                onPressed: _BuyCapturedProductDetails.effect(context,() => widget.session.refreshProductContent(product.id)),
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Try again'),
               ),
@@ -7992,18 +10162,18 @@ class _PublishedStoreCouponPanel extends StatelessWidget {
     if (coupons.isEmpty) return const SizedBox.shrink();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       for (final coupon in coupons.take(3)) _PublishedStoreCouponTile(coupon: coupon),
-      if (coupons.length > 3) TextButton(onPressed: () => showModalBottomSheet<void>(context: context,
+      if (coupons.length > 3) TextButton(onPressed: _BuyCapturedProductDetails.read(context,() => showModalBottomSheet<void>(context: context,
         isScrollControlled: true, useSafeArea: true, builder: (context) => AnimatedBuilder(animation: session,
           builder: (context, _) {
             final current = session.publishedStoreCouponsFor(product);
             return SizedBox(height: MediaQuery.sizeOf(context).height * .8, child: Column(children: [
               ListTile(title: const Text('Store coupon terms'), trailing: IconButton(tooltip: 'Close coupon terms',
-                icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context))),
+                icon: const Icon(Icons.close), onPressed: _BuyCapturedProductDetails.read(context,() => Navigator.pop(context)))),
               Expanded(child: current.isEmpty ? const Center(child: Text('These terms need checking again.'))
                 : ListView.builder(padding: const EdgeInsets.all(12), itemCount: current.length,
                   itemBuilder: (context, index) => _PublishedStoreCouponTile(coupon: current[index]))),
             ]));
-          })), child: Text('View all ${coupons.length} Store coupons')),
+          }))), child: Text('View all ${coupons.length} Store coupons')),
     ]);
   }
 }
@@ -8122,7 +10292,7 @@ class _ProductBenefitsPreview extends StatelessWidget {
               child: OutlinedButton.icon(
                 style: BuyV2ActionStyle.button(),
                 key: ValueKey('buy-product-benefits-retry-${product.id}'),
-                onPressed: () => session.refreshProductBenefits(product.id),
+                onPressed: _BuyCapturedProductDetails.effect(context,() => session.refreshProductBenefits(product.id)),
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Try again'),
               ),
@@ -8336,7 +10506,7 @@ class _MarketplaceTrustPanel extends StatelessWidget {
                 child: OutlinedButton.icon(
                   style: BuyV2ActionStyle.button(),
                   key: ValueKey('buy-marketplace-trust-retry-${product.id}'),
-                  onPressed: () => session.refreshMarketplaceTrust(product.id),
+                  onPressed: _BuyCapturedProductDetails.effect(context,() => session.refreshMarketplaceTrust(product.id)),
                   icon: const Icon(Icons.refresh_rounded),
                   label: const Text('Try again'),
                 ),
@@ -8477,8 +10647,9 @@ double _productFeedbackSheetHeight(BuildContext context) {
 }
 
 class _ProductReviewSheet extends StatefulWidget {
-  const _ProductReviewSheet({required this.session, required this.reference, required this.original, required this.line});
+  const _ProductReviewSheet({required this.session, required this.reference, required this.original, required this.line,this.initialStars,this.capturedCurrent,this.capturedCommit});
   final BuyV2Session session;
+  final int? initialStars;final bool Function()? capturedCurrent;final Future<void> Function(Future<void> Function())? capturedCommit;
   final WorkspacePurchaseReference reference;
   final WorkspacePurchaseOrder original;
   final WorkspacePurchasedSkuLine line;
@@ -8492,7 +10663,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
   late final AuthenticatedWorkspaceOrderIdentityGateway? _reader;
   late final String _realm;
   final _selections = <String, int>{};
-  bool get _current => mounted && _feedbackContext == widget.session.productFeedbackContext &&
+  bool get _current => mounted && widget.capturedCurrent?.call()!=false && _feedbackContext == widget.session.productFeedbackContext &&
     _owner == widget.session.reviewDraftOwnerScope && identical(_reader, widget.session.purchaseReader) &&
     _realm == widget.session.purchaseRealm && _reader?.isCurrent == true;
   @override
@@ -8502,7 +10673,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
     _owner = widget.session.reviewDraftOwnerScope;
     _reader = widget.session.purchaseReader;
     _realm = widget.session.purchaseRealm;
-    scheduleMicrotask(() {if (mounted && _current) {unawaited(widget.session.loadPrivateStarsFor(widget.reference, widget.line));}});
+    scheduleMicrotask(() {if (mounted && _current && widget.capturedCurrent==null) {unawaited(widget.session.loadPrivateStarsFor(widget.reference, widget.line));}});
   }
 
   @override
@@ -8520,7 +10691,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
     final target = targets.length == 1 ? targets.single : null;
     final saved = target == null ? null : session.privateStarRating(target.id);
     final pending = target == null ? null : session.privateStarAttempt(target.id);
-    final selected = target == null ? 0 : pending?.stars ?? _selections[target.id] ?? saved?.stars ?? 0;
+    final selected = target == null ? 0 : pending?.stars ?? _selections[target.id] ?? widget.initialStars ?? saved?.stars ?? 0;
     final busy = session.privateStarsBusy || session.privateStarsLoading;
     return Semantics(container: true, scopesRoute: true, namesRoute: true, explicitChildNodes: true,
       label: 'Rate your purchase',
@@ -8563,16 +10734,17 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                     Text('Original ${pending.stars}-star save needs checking. Changing the rating is locked until it is resolved.',
                       style: context.buyBody),
                     Wrap(spacing: 8, runSpacing: 4, children: [
-                      OutlinedButton(onPressed: busy ? null : () { if (_current) unawaited(session.checkPrivateStars(target.id)); },
+                      OutlinedButton(onPressed: busy ? null : () { if (_current) unawaited(session.checkPrivateStars(target.id,capturedCurrent:widget.capturedCurrent)); },
                         child: const Text('Check original save')),
-                      TextButton(onPressed: busy ? null : () { if (_current) unawaited(session.checkPrivateStars(target.id, retryOriginal: true)); },
+                      TextButton(onPressed: busy ? null : () { if (_current) unawaited(session.checkPrivateStars(target.id,retryOriginal:true,capturedCurrent:widget.capturedCurrent)); },
                         child: Text('Retry original ${pending.stars} stars')),
                     ]),
                   ] else
                     FilledButton.icon(key: const ValueKey('buy-submit-private-stars'),
                       style: BuyV2ActionStyle.button(),
                       onPressed: !session.canSavePrivateStars(target.id) || selected == 0 ? null
-                        : () { if (_current) unawaited(session.savePrivateStars(target.id, selected)); },
+                        : () { if (_current&&ModalRoute.of(context)?.isCurrent==true) {Future<void> send()async{await session.savePrivateStars(target.id,selected,capturedCurrent:widget.capturedCurrent);}
+                            unawaited(widget.capturedCommit==null?send():widget.capturedCommit!(send));} },
                       icon: const Icon(Icons.check_rounded, size: 18),
                       label: const Text('Send rating')),
                 ],
@@ -9109,23 +11281,16 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
             ),
           ),
         ),
-      for (final quote in session.selectedSupplierQuotes) Padding(padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Material(type: MaterialType.transparency, child: ListTile(contentPadding: EdgeInsets.zero,
-          key: ValueKey('buy-selected-supplier-quote-${quote.storeId}'), leading: const Icon(Icons.request_quote_outlined),
-          title: Text('Supplier quote · ${session.cartLines.firstWhere((l) => l.product.storeId == quote.storeId).product.seller}'),
-          subtitle: Text(session.supplierQuoteCurrentForCart(quote)
-            ? 'Agreed product prices ${_comparisonMoney(quote.merchandiseMinor)} · final charges at Checkout'
-            : 'Quote needs review. Check its validity, products and quantities.'),
-          trailing: IconButton(tooltip: 'Remove selected supplier quote', icon: const Icon(Icons.close_rounded),
-            onPressed: session.cartChangesBlocked ? null : () async {
+      for (final quote in session.selectedSupplierQuotes) _SelectedSupplierQuote(session:session,quote:quote,
+        onRemove:session.cartChangesBlocked ? null : () async {
               if (!mounted || !identical(widget.session, quoteOwner)) return;
               final removed = await quoteOwner.removeSupplierQuote(quote);
               if (!removed && mounted && identical(widget.session, quoteOwner) && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('The supplier quote selection could not be removed.')));
               }
-            }), onTap: () {
+},onOpen:(){
               if (mounted && identical(widget.session, quoteOwner)) _showBulkQuotes(context, quoteOwner);
-            }))),
+        }),
       if (lines.any((line) => !session.usesRetainedSupplierAgreement(line.product) &&
           (line.product.packTerms?.commodityPriceRevision != null ||
           line.product.destination == BuyV2Destination.wholesale && line.product.publicListingIdentity != null)))
@@ -9581,10 +11746,13 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
 
 Future<void> _confirmBuyV2CartClear(
   BuildContext context,
-  BuyV2Session session,
-) async {
+  BuyV2Session session, {
+  bool Function()? capturedCurrent,
+  Future<bool> Function(BuyV2CartScope)? reviewCommit,
+}) async {
+  if(capturedCurrent?.call()==false)return;
   if (session.checkoutRequiresResolution) {
-    session.clearCart();
+    if(capturedCurrent==null)session.clearCart();
     return;
   }
   final scope = session.usesMixedCartSelection
@@ -9679,7 +11847,7 @@ Future<void> _confirmBuyV2CartClear(
                     heightFactor: 1,
                     child: OutlinedButton(
                       key: const ValueKey('buy-cart-clear-cancel'),
-                      onPressed: () => Navigator.of(sheetContext).pop(false),
+                      onPressed: () {if(capturedCurrent!=null && (!sheetContext.mounted || capturedCurrent()==false || ModalRoute.of(sheetContext)?.isCurrent!=true))return;Navigator.of(sheetContext).pop(false);},
                       style: BuyV2ActionStyle.button(
                         OutlinedButton.styleFrom(
                           minimumSize: const Size(0, 48),
@@ -9698,7 +11866,7 @@ Future<void> _confirmBuyV2CartClear(
                     heightFactor: 1,
                     child: FilledButton(
                       key: const ValueKey('buy-cart-clear-confirm'),
-                      onPressed: () => Navigator.of(sheetContext).pop(true),
+                      onPressed: () {if(capturedCurrent!=null && (!sheetContext.mounted || capturedCurrent()==false || ModalRoute.of(sheetContext)?.isCurrent!=true))return;Navigator.of(sheetContext).pop(true);},
                       style: BuyV2ActionStyle.button(
                         FilledButton.styleFrom(
                           minimumSize: const Size(0, 48),
@@ -9742,8 +11910,8 @@ Future<void> _confirmBuyV2CartClear(
       ),
     ),
   );
-  if (confirmed == true && context.mounted) {
-    session.clearCartScope(scope);
+  if (confirmed == true && context.mounted && capturedCurrent?.call()!=false) {
+    if(reviewCommit!=null){await reviewCommit(scope);}else{session.clearCartScope(scope);}
   }
 }
 
@@ -9838,7 +12006,7 @@ class BuyV2CheckoutGstDetails extends StatelessWidget {
             TextButton(
               key: const ValueKey('buy-invoice-change'),
               onPressed:
-                  (session?.cartChangesBlocked ?? false) ||
+                  _BuyShop04Scope.callback(context, _BuyShop04Intent.recipient, (session?.cartChangesBlocked ?? false) ||
                       controller.busy ||
                       controller.restoring
                   ? null
@@ -9849,7 +12017,7 @@ class BuyV2CheckoutGstDetails extends StatelessWidget {
                       controller,
                       destinations,
                       session,
-                    ),
+                    )),
               child: Text(
                 controller.loadFailed ? 'Try again' : 'Change',
                 style: TextStyle(
@@ -9870,8 +12038,13 @@ Future<void> _showInvoiceRecipientSelector(
   BuildContext context,
   BuyV2GstInvoiceController controller,
   List<BuyV2Destination> destinations,
-  BuyV2Session? session,
-) async {
+  BuyV2Session? session, {
+  bool Function()? capturedCurrent,
+  bool Function()? capturedOwnerCurrent,
+  Future<void> Function(Future<void> Function())? capturedCommit,
+  String? initialProfileId,
+}) async {
+  if (capturedCurrent?.call() == false) return;
   if ((session?.cartChangesBlocked ?? false) ||
       controller.busy ||
       controller.restoring ||
@@ -9880,11 +12053,11 @@ Future<void> _showInvoiceRecipientSelector(
   }
   final navigatorContext = Navigator.of(context).context;
   final owner = controller.store?.ownerScope;
-  final personalSelected =
+  final personalSelected = initialProfileId != null ? initialProfileId == 'personal' :
       destinations.isNotEmpty &&
       destinations.every((d) => !controller.requestedFor(d));
   bool profileSelected(BuyV2GstInvoiceDetails profile) =>
-      destinations.isNotEmpty &&
+      initialProfileId != null ? initialProfileId == profile.id : destinations.isNotEmpty &&
       destinations.every(
         (d) =>
             controller.requestedFor(d) &&
@@ -9908,7 +12081,7 @@ Future<void> _showInvoiceRecipientSelector(
             Text('Invoice recipient', style: context.buyTitle),
             ListTile(
               key: const ValueKey('buy-invoice-personal'),
-              selected: personalSelected,
+              selected: initialProfileId == null ? personalSelected : initialProfileId == 'personal',
               selectedColor: Theme.of(context).colorScheme.onSurface,
               trailing: personalSelected
                   ? Icon(
@@ -9918,12 +12091,12 @@ Future<void> _showInvoiceRecipientSelector(
                   : null,
               title: const Text('Personal purchase'),
               subtitle: const Text('Use personal details for this order'),
-              onTap: () => Navigator.pop(context, 'personal'),
+              onTap: () {if(capturedCurrent != null && (!context.mounted || !capturedCurrent() || ModalRoute.of(context)?.isCurrent != true))return;Navigator.pop(context, 'personal');},
             ),
             for (final profile in controller.savedProfiles)
               ListTile(
                 key: ValueKey('buy-invoice-profile-${profile.id}'),
-                selected: profileSelected(profile),
+                selected: initialProfileId == null ? profileSelected(profile) : initialProfileId == profile.id,
                 selectedColor: Theme.of(context).colorScheme.onSurface,
                 trailing: profileSelected(profile)
                     ? Icon(
@@ -9937,14 +12110,14 @@ Future<void> _showInvoiceRecipientSelector(
                       ? 'Business · Not GST-registered'
                       : 'Business · ${profile.gstin}',
                 ),
-                onTap: () => Navigator.pop(context, profile.id),
+                onTap: () {if(capturedCurrent != null && (!context.mounted || !capturedCurrent() || ModalRoute.of(context)?.isCurrent != true))return;Navigator.pop(context, profile.id);},
               ),
             ListTile(
               key: const ValueKey('buy-invoice-add-business'),
               leading: const Icon(Icons.business_outlined),
               title: const Text('Add business details'),
               subtitle: const Text('Manage invoice details in Profile'),
-              onTap: session == null
+              onTap: session == null || capturedCurrent != null
                   ? null
                   : () => Navigator.pop(context, 'add'),
             ),
@@ -9953,7 +12126,7 @@ Future<void> _showInvoiceRecipientSelector(
       ),
     ),
   );
-  if (!navigatorContext.mounted ||
+  if (!navigatorContext.mounted || capturedCurrent?.call() == false ||
       changed == null ||
       owner != controller.store?.ownerScope ||
       (session?.cartChangesBlocked ?? false)) {
@@ -9968,22 +12141,32 @@ Future<void> _showInvoiceRecipientSelector(
     );
     return;
   }
-  if (changed == 'personal') {
-    for (final d in destinations) {
-      controller.setRequested(d, false);
+  Future<void> applySelection() async {
+    if (capturedOwnerCurrent?.call() == false) return;
+    if (changed == 'personal') {
+      for (final d in destinations) {
+        if (capturedOwnerCurrent?.call() == false) return;
+        controller.setRequested(d, false);
+      }
+    } else {
+      final profile = controller.savedProfiles
+          .where((p) => p.id == changed)
+          .firstOrNull;
+      if (profile == null) return;
+      for (final d in destinations) {
+        if (capturedOwnerCurrent?.call() == false) return;
+        controller.selectSaved(d, profile);
+      }
     }
-  } else {
-    final profile = controller.savedProfiles
-        .where((p) => p.id == changed)
-        .firstOrNull;
-    if (profile == null) return;
-    for (final d in destinations) {
-      controller.selectSaved(d, profile);
-    }
+    // The existing quote stays authoritative; recipient-aware transport is an
+    // integration dependency and business submission remains unavailable below.
+    if (session != null && capturedOwnerCurrent?.call() != false) await session.refreshCheckoutQuote(isCurrent:capturedOwnerCurrent);
   }
-  // The existing quote stays authoritative; recipient-aware transport is an
-  // integration dependency and business submission remains unavailable below.
-  if (session != null) await session.refreshCheckoutQuote();
+  if (capturedCommit == null) {
+    await applySelection();
+  } else {
+    await capturedCommit(applySelection);
+  }
 }
 
 Future<void> _manageBusinessInvoiceFromCheckout(
@@ -10823,7 +13006,7 @@ class _CheckoutQuoteCard extends StatelessWidget {
             if (!loading && session.checkoutQuoteEnabled)
               TextButton(
                 key: const ValueKey('buy-checkout-quote-retry'),
-                onPressed: session.refreshCheckoutQuote,
+                onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, session.refreshCheckoutQuote),
                 child: const Text('Retry'),
               ),
           ],
@@ -10971,7 +13154,7 @@ class _CheckoutCommercialPaymentTerms extends StatelessWidget {
             if (!loading)
               TextButton(
                 key: const ValueKey('buy-checkout-payment-terms-retry'),
-                onPressed: session.refreshCommercialPaymentTerms,
+                onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, session.refreshCommercialPaymentTerms),
                 child: const Text('Retry'),
               ),
           ],
@@ -11076,12 +13259,15 @@ String _storePaymentChoiceLabel(BuyV2CommercialPaymentTerm term) {
 }
 
 class _CommercialPaymentTermGroup extends StatelessWidget {
-  const _CommercialPaymentTermGroup({super.key, required this.session, required this.group});
+  const _CommercialPaymentTermGroup({super.key, required this.session, required this.group,this.readOnly=false,this.inputCurrent});
   final BuyV2Session session;
   final BuyV2FulfilmentGroup group;
+  final bool readOnly;
+  final bool Function()? inputCurrent;
 
   @override
   Widget build(BuildContext context) {
+    if(inputCurrent?.call()==false)return const SizedBox.shrink();
     final selected = session.selectedCommercialPaymentTermFor(group.key);
     final assigned = group.destination == BuyV2Destination.wholesale
         ? session.supplierAssignedPaymentTermFor(group.key) : selected;
@@ -11099,7 +13285,7 @@ class _CommercialPaymentTermGroup extends StatelessWidget {
             style: context.buyMeta.copyWith(color: BuyV2Colors.orange)),
           Align(alignment: Alignment.centerLeft, child: TextButton(
             key: ValueKey('buy-payment-terms-retry-${group.key}'),
-            onPressed: locked ? null : session.refreshCommercialPaymentTerms,
+            onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, readOnly || locked ? null : session.refreshCommercialPaymentTerms),
             child: const Text('Refresh payment terms'))),
         ] else ...[
           Column(key: ValueKey('buy-payment-term-summary-${group.key}'),
@@ -11114,7 +13300,7 @@ class _CommercialPaymentTermGroup extends StatelessWidget {
           if (selected == null)
             Align(alignment: Alignment.centerLeft, child: TextButton(
               key: ValueKey('buy-payment-term-review-${group.key}'),
-              onPressed: locked ? null : () => session.chooseCommercialPaymentTerm(assigned),
+              onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, readOnly || locked ? null : () => session.chooseCommercialPaymentTerm(assigned)),
               child: const Text('Accept updated terms'))),
         ],
         if (session.isStoreProcurement && assigned != null &&
@@ -11145,7 +13331,7 @@ class BuyV2CheckoutView extends StatefulWidget {
     required this.gstInvoiceController,
     this.keyboardVisible = false,
     this.paymentHandoff,
-    this.storeInvoiceDetailsBuilder,
+    this.storeInvoiceDetailsBuilder, this.readProjection, this.onContinuePrepared, this.onContinueOwner,
   });
 
   final BuyV2Session session;
@@ -11153,6 +13339,9 @@ class BuyV2CheckoutView extends StatefulWidget {
   final bool keyboardVisible;
   final BuyV2PaymentHandoff? paymentHandoff;
   final WidgetBuilder? storeInvoiceDetailsBuilder;
+  final BuyV2CheckoutReadProjection? readProjection;
+  final VoidCallback? onContinuePrepared;
+  final VoidCallback? onContinueOwner;
 
   @override
   State<BuyV2CheckoutView> createState() => _BuyV2CheckoutViewState();
@@ -11196,10 +13385,28 @@ class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> with WidgetsBindi
 
   @override
   Widget build(BuildContext context) {
+    final projection = widget.readProjection;
+    if (projection != null) {
+      return Column(children:[
+        Expanded(child:ListView(key:const PageStorageKey('buy-checkout-unified'),
+          padding:const EdgeInsets.fromLTRB(12,8,12,20),children:[
+            _CheckoutAddressStage(session:session,wholesaleReceiving:projection.groups.every((group)=>group.destination==BuyV2Destination.wholesale),
+              readProjection:projection),
+            const SizedBox(height:8),
+            _CheckoutOrderDetails(session:session,gstInvoiceController:gstInvoiceController,
+              invoiceDestinations:projection.groups.map((group)=>group.destination).toSet().toList(),
+              instructionsKey:_instructionsKey,readProjection:projection),
+            const SizedBox(height:8),
+            _CheckoutPaymentStage(session:session,hasPaymentHandoff:paymentHandoff!=null,preparingFromCart:true),
+          ])),
+        _CheckoutPrimaryActionBar(session:session,label:'Continue to Checkout',
+          onPressed:widget.onContinuePrepared,busy:session.checkoutBusy,preparingFromCart:true),
+      ]);
+    }
     return AnimatedBuilder(
       animation: Listenable.merge([session, gstInvoiceController]),
       builder: (context, _) {
-        _scheduleCheckoutPresentation();
+        if (_BuyShop04Scope.of(context) == null) _scheduleCheckoutPresentation();
         final destinations = session.checkoutDestinations;
         final wholesaleReceiving =
             destinations.isNotEmpty &&
@@ -11311,6 +13518,9 @@ class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> with WidgetsBindi
                   onPressed: action.$2,
                   busy: session.checkoutBusy,
                 ),
+              if (widget.onContinueOwner != null && action.$2 == null && !session.checkoutBusy)
+                SafeArea(top:false,child:TextButton(key:const ValueKey('buy-checkout-continue-owner'),
+                  onPressed:widget.onContinueOwner,child:const Text('Continue in Checkout'))),
             ],
           ),
         );
@@ -11335,6 +13545,7 @@ bool _supplierPaymentTermsPending(BuyV2Session session) =>
   required BuyV2PaymentHandoff? paymentHandoff,
   required VoidCallback reviewInstructions,
 }) {
+  final capturedCurrent = _BuyShop04Scope.of(context)?.ownerCurrent;
   if (session.checkoutBusy) return ('Checking payment…', null);
   if (session.collectionCheckoutSelected) {
     final controller = session.collectionCheckout;
@@ -11342,10 +13553,10 @@ bool _supplierPaymentTermsPending(BuyV2Session session) =>
       if (controller?.paymentActionUri != null && paymentHandoff != null) {
         return (
           'Pay ${_collectionCheckoutAmount(session)}',
-          () => session.continueCollectionPayment(paymentHandoff),
+          _BuyShop04Scope.callback(context, _BuyShop04Intent.continuePayment, () => session.continueCollectionPayment(paymentHandoff, isCurrent: capturedCurrent)),
         );
       }
-      return ('Check payment', session.reconcileCollectionPurchase);
+      return ('Check payment', _BuyShop04Scope.callback(context, _BuyShop04Intent.reconcilePayment, () => session.reconcileCollectionPurchase(isCurrent: capturedCurrent)));
     }
     if (session.purchaseOrderReviewRequired) {
       return ('Check order agreement', null);
@@ -11354,42 +13565,42 @@ bool _supplierPaymentTermsPending(BuyV2Session session) =>
     if (basket != null && controller?.canPlace(basket) == true) {
       return (
         'Pay ${_collectionCheckoutAmount(session)} & place order',
-        () async {
+        _BuyShop04Scope.callback(context, _BuyShop04Intent.place, () async {
           final committedTotal = session.collectionCheckoutQuote?.totalMinor;
           final committedMethod = session.selectedPayment;
           if (!session.showCheckoutStep(BuyV2CheckoutStep.confirm)) return;
-          await session.submitCollectionPurchase();
-          if (session.view == BuyV2View.checkout &&
+          await session.submitCollectionPurchase(isCurrent: capturedCurrent);
+          if (capturedCurrent?.call() != false && session.view == BuyV2View.checkout &&
               session.collectionCheckoutQuote?.totalMinor == committedTotal &&
               session.selectedPayment == committedMethod &&
               controller?.paymentActionUri != null &&
               paymentHandoff != null) {
-            await session.continueCollectionPayment(paymentHandoff);
+            await session.continueCollectionPayment(paymentHandoff, isCurrent: capturedCurrent);
           }
-        },
+        }),
       );
     }
     return (
       'Check total',
-      basket != null &&
+      _BuyShop04Scope.callback(context, _BuyShop04Intent.place, basket != null &&
               controller?.available == true &&
               session.paymentEligibilityFor(session.selectedPayment).selectable
-          ? session.prepareCollectionCheckout
-          : null,
+          ? () => session.prepareCollectionCheckout(isCurrent: capturedCurrent)
+          : null),
     );
   }
   final group = session.currentCheckoutPaymentGroup;
   if (session.checkoutRecoveryBlocked) {
     return (
       'Check payment',
-      session.checkoutBusy ? null : session.reconcilePayment,
+      _BuyShop04Scope.callback(context, _BuyShop04Intent.reconcilePayment, session.checkoutBusy ? null : () => session.reconcilePayment(isCurrent: capturedCurrent)),
     );
   }
   if (group != null) {
     if (group.financiallyClosed) {
       return (
         'Review remaining checkout',
-        session.reviewRemainingGroupedCheckout,
+        _BuyShop04Scope.callback(context, _BuyShop04Intent.remaining, session.reviewRemainingGroupedCheckout),
       );
     }
     if (session.checkoutSubmissionState == BuyV2CheckoutSubmissionState.idle) {
@@ -11399,28 +13610,28 @@ bool _supplierPaymentTermsPending(BuyV2Session session) =>
           )) {
         return (
           'Review remaining checkout',
-          session.reviewRemainingGroupedCheckout,
+          _BuyShop04Scope.callback(context, _BuyShop04Intent.remaining, session.reviewRemainingGroupedCheckout),
         );
       }
       return (
         session.checkoutPaymentActionAmountMinor == 0
             ? 'Place orders'
             : 'Pay ${_comparisonMoney(session.checkoutPaymentActionAmountMinor)} · Payment ${session.checkoutPaymentNumber} of ${session.checkoutPaymentCount}',
-        () async {
+        _BuyShop04Scope.callback(context, _BuyShop04Intent.place, () async {
           final committedAmount = session.checkoutPaymentActionAmountMinor;
           final committedMethod = session.selectedPayment;
           final attemptId = session.checkoutPaymentAttempt?.id;
-          await session.submitOrder();
-          if (session.view == BuyV2View.checkout &&
+          await session.submitOrder(isCurrent: capturedCurrent);
+          if (capturedCurrent?.call() != false && session.view == BuyV2View.checkout &&
               session.checkoutPaymentAttempt?.id == attemptId &&
               session.checkoutPaymentActionAmountMinor == committedAmount &&
               session.selectedPayment == committedMethod &&
               session.checkoutSubmissionState ==
                   BuyV2CheckoutSubmissionState.paymentActionRequired &&
               paymentHandoff != null) {
-            await session.continuePayment(paymentHandoff);
+            await session.continuePayment(paymentHandoff, isCurrent: capturedCurrent);
           }
-        },
+        }),
       );
     }
     if (const {
@@ -11428,7 +13639,7 @@ bool _supplierPaymentTermsPending(BuyV2Session session) =>
       BuyV2CheckoutSubmissionState.cancelled,
       BuyV2CheckoutSubmissionState.unavailable,
     }.contains(session.checkoutSubmissionState)) {
-      return ('Check payment', session.reconcilePayment);
+      return ('Check payment', _BuyShop04Scope.callback(context, _BuyShop04Intent.reconcilePayment, () => session.reconcilePayment(isCurrent: capturedCurrent)));
     }
   }
   if (session.checkoutRequiresResolution &&
@@ -11437,7 +13648,7 @@ bool _supplierPaymentTermsPending(BuyV2Session session) =>
           !session.checkoutRecoveryAmountKnown)) {
     return (
       'Check payment',
-      session.checkoutBusy ? null : session.reconcilePayment,
+      _BuyShop04Scope.callback(context, _BuyShop04Intent.reconcilePayment, session.checkoutBusy ? null : () => session.reconcilePayment(isCurrent: capturedCurrent)),
     );
   }
   final selectedPaymentAvailable =
@@ -11451,18 +13662,18 @@ bool _supplierPaymentTermsPending(BuyV2Session session) =>
         paymentHandoff == null
             ? 'Unavailable'
             : 'Pay ${_comparisonMoney(session.checkoutPaymentActionAmountMinor)}',
-        paymentHandoff == null
+        _BuyShop04Scope.callback(context, _BuyShop04Intent.continuePayment, paymentHandoff == null
             ? null
-            : () => session.continuePayment(paymentHandoff),
+            : () => session.continuePayment(paymentHandoff, isCurrent: capturedCurrent)),
       );
     case BuyV2CheckoutSubmissionState.paymentPending:
     case BuyV2CheckoutSubmissionState.paymentUnknown:
-      return ('Check payment', session.reconcilePayment);
+      return ('Check payment', _BuyShop04Scope.callback(context, _BuyShop04Intent.reconcilePayment, () => session.reconcilePayment(isCurrent: capturedCurrent)));
     case BuyV2CheckoutSubmissionState.cancelled:
-      return ('Choose again', session.retryCheckoutPayment);
+      return ('Choose again', _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, session.retryCheckoutPayment));
     case BuyV2CheckoutSubmissionState.failed:
     case BuyV2CheckoutSubmissionState.unavailable:
-      return ('Try payment again', session.retryCheckoutPayment);
+      return ('Try payment again', _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, session.retryCheckoutPayment));
     case BuyV2CheckoutSubmissionState.submitting:
       return ('Checking payment…', null);
     case BuyV2CheckoutSubmissionState.confirmed:
@@ -11471,12 +13682,12 @@ bool _supplierPaymentTermsPending(BuyV2Session session) =>
       if (session.selectedAddressOrNull == null) {
         return (
           'Add delivery address',
-          () => _showAddAddressSheet(context, session),
+          _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => _showAddAddressSheet(context, session)),
         );
       }
       if (!selectedPaymentAvailable) return ('Choose payment method', null);
       if (session.publicDeliveryInstructionReviewRequired) {
-        return ('Review delivery instructions', reviewInstructions);
+        return ('Review delivery instructions', _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, reviewInstructions));
       }
       if (session.checkoutDeliveryEligibilityReviewRequired) {
         return ('Place order', null);
@@ -11497,7 +13708,7 @@ bool _supplierPaymentTermsPending(BuyV2Session session) =>
         if (gstInvoiceController.loadFailed) {
           return (
             'Check invoice details',
-            () => gstInvoiceController.restore(force: true),
+            _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => gstInvoiceController.restore(force: true)),
           );
         }
         final destinations = session.checkoutDestinations
@@ -11511,12 +13722,12 @@ bool _supplierPaymentTermsPending(BuyV2Session session) =>
             missingDetails.isNotEmpty
                 ? 'Choose invoice details'
                 : 'Review business invoice',
-            () => _showInvoiceRecipientSelector(
+            _BuyShop04Scope.callback(context, _BuyShop04Intent.recipient, () => _showInvoiceRecipientSelector(
               context,
               gstInvoiceController,
               destinations,
               session,
-            ),
+            )),
           );
         }
       }
@@ -11549,21 +13760,21 @@ bool _supplierPaymentTermsPending(BuyV2Session session) =>
           : 'Pay ${_comparisonMoney(session.checkoutPaymentActionAmountMinor)} & place $orderWord';
       return (
         label,
-        reviewBlocked
+        _BuyShop04Scope.callback(context, _BuyShop04Intent.place, reviewBlocked
             ? null
             : () async {
                 final committedAmount = session.checkoutPaymentActionAmountMinor;
                 final committedMethod = session.selectedPayment;
-                await session.submitOrder();
-                if (session.view == BuyV2View.checkout &&
+                await session.submitOrder(isCurrent: capturedCurrent);
+                if (capturedCurrent?.call() != false && session.view == BuyV2View.checkout &&
                     session.checkoutPaymentActionAmountMinor == committedAmount &&
                     session.selectedPayment == committedMethod &&
                     session.checkoutSubmissionState ==
                         BuyV2CheckoutSubmissionState.paymentActionRequired &&
                     paymentHandoff != null) {
-                  await session.continuePayment(paymentHandoff);
+                  await session.continuePayment(paymentHandoff, isCurrent: capturedCurrent);
                 }
-              },
+              }),
       );
   }
 }
@@ -11582,17 +13793,24 @@ class _CheckoutCollectionDetails extends StatelessWidget {
     required this.session,
     this.choosingStore = false,
     this.reviewing = false,
+    this.capturedStore,
+    this.capturedLines,
   });
 
   final BuyV2Session session;
   final bool choosingStore;
   final bool reviewing;
+  final BuyV2StoreListing? capturedStore;
+  final List<BuyV2CartLine>? capturedLines;
 
   @override
   Widget build(BuildContext context) {
-    final store = session.collectionCheckoutStore;
-    final quote = session.collectionCheckoutQuote;
-    final message = session.collectionCheckoutMessage;
+    final store = capturedStore ?? session.collectionCheckoutStore;
+    final exactCurrentStore = capturedStore == null ||
+        session.collectionCheckoutSelected && capturedStore!.id == session.collectionCheckoutStore?.id;
+    final quote = exactCurrentStore ? session.collectionCheckoutQuote : null;
+    final message = exactCurrentStore ? session.collectionCheckoutMessage :
+        'Review this Store choice. Its collection total has not been checked.';
     final resolving = session.checkoutRequiresResolution;
     final notice = message == null
         ? null
@@ -11646,12 +13864,12 @@ class _CheckoutCollectionDetails extends StatelessWidget {
                     '${buyV2CustomerStoreName(option.name, option.id)} · ${option.area}',
                 detail: option.address,
                 onTap:
-                    session.checkoutBusy || session.checkoutRequiresResolution
+                    _BuyShop04Scope.callback(context, _BuyShop04Intent.collection, session.checkoutBusy || session.checkoutRequiresResolution
                     ? null
                     : () => session.chooseCheckoutCollection(
                         true,
                         storeId: option.id,
-                      ),
+                      )),
               ),
             ),
             const SizedBox(height: 8),
@@ -11665,11 +13883,11 @@ class _CheckoutCollectionDetails extends StatelessWidget {
             detail: store.address,
             action: reviewing && !choosingStore ? 'Change' : null,
             onTap:
-                reviewing &&
+                _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, reviewing &&
                     !choosingStore &&
                     !session.checkoutRequiresResolution
                 ? () => session.showCheckoutStep(BuyV2CheckoutStep.address)
-                : null,
+                : null),
           ),
         if (store != null && !resolving) ...[
           BuyV2StoreAddress(store: store, showAddress: false),
@@ -11693,7 +13911,7 @@ class _CheckoutCollectionDetails extends StatelessWidget {
             BuyV2PurchaseOrderPanel(session: session),
           ],
           const SizedBox(height: 12),
-          for (final line in session.checkoutLines) ...[
+          for (final line in capturedLines ?? session.checkoutLines) ...[
             _CheckoutCard(
               key: ValueKey('buy-checkout-collection-line-${line.product.id}'),
               icon: Icons.inventory_2_outlined,
@@ -11729,38 +13947,19 @@ class _CheckoutCollectionDetails extends StatelessWidget {
   }
 }
 
-class _CheckoutAddressStage extends StatefulWidget {
-  const _CheckoutAddressStage({
-    super.key,
-    required this.session,
-    required this.wholesaleReceiving,
-  });
-
+class _CheckoutFulfilmentChoices extends StatelessWidget {
+  const _CheckoutFulfilmentChoices({required this.session, this.reviewCollection, this.reviewEffect, this.capturedStoreId});
   final BuyV2Session session;
-  final bool wholesaleReceiving;
-
-  @override
-  State<_CheckoutAddressStage> createState() => _CheckoutAddressStageState();
-}
-
-class _CheckoutAddressStageState extends State<_CheckoutAddressStage> {
-  bool _choosingAddress = false;
-  BuyV2Session get session => widget.session;
-  bool get wholesaleReceiving => widget.wholesaleReceiving;
-
-  @override
-  Widget build(BuildContext context) {
-    final addresses = session.addresses;
-    final selectedId = session.selectedAddressId;
-    final address = session.selectedAddressOrNull;
-    final locked = session.checkoutBusy || session.checkoutRequiresResolution;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if ((session.procurementContext?.purpose != BuyV2ProcurementPurpose.restock &&
-                session.collectionCheckoutStores.isNotEmpty) ||
-            session.collectionCheckoutSelected) ...[
-          Wrap(
+  final bool? reviewCollection;
+  final String? capturedStoreId;
+  final _BuyNativeReviewEffect? reviewEffect;
+  bool _choose(BuildContext context,bool value) {
+    final captured=_BuyShop04Scope.of(context);
+    if(captured!=null && (!captured.permits(_BuyShop04Intent.collection) || !captured.here(context)))return false;
+    bool effect() => session.chooseCheckoutCollection(value, storeId: capturedStoreId);
+    return reviewEffect?.call(effect) ?? effect();
+  }
+  @override Widget build(BuildContext context) => Wrap(
             spacing: 8,
             runSpacing: 6,
             children: [
@@ -11775,10 +13974,10 @@ class _CheckoutAddressStageState extends State<_CheckoutAddressStage> {
                 showCheckmark: true,
                 checkmarkColor: BuyV2ActionStyle.primaryForeground,
                 label: const Text('Delivery'),
-                selected: !session.collectionCheckoutSelected,
-                onSelected: session.checkoutRequiresResolution
+                selected: !(reviewCollection ?? session.collectionCheckoutSelected),
+                onSelected: (_BuyShop04Scope.of(context)!=null && !_BuyShop04Scope.of(context)!.permits(_BuyShop04Intent.collection)) || session.checkoutRequiresResolution || capturedStoreId != null
                     ? null
-                    : (_) => session.chooseCheckoutCollection(false),
+                    : (_) => _choose(context,false),
               ),
               ChoiceChip(
                 side: const BorderSide(color: BuyV2ActionStyle.primaryBorder),
@@ -11791,13 +13990,61 @@ class _CheckoutAddressStageState extends State<_CheckoutAddressStage> {
                 showCheckmark: true,
                 checkmarkColor: BuyV2ActionStyle.primaryForeground,
                 label: const Text('Collect at store'),
-                selected: session.collectionCheckoutSelected,
-                onSelected: session.checkoutRequiresResolution
+                selected: reviewCollection ?? session.collectionCheckoutSelected,
+                onSelected: (_BuyShop04Scope.of(context)!=null && !_BuyShop04Scope.of(context)!.permits(_BuyShop04Intent.collection)) || session.checkoutRequiresResolution
                     ? null
-                    : (_) => session.chooseCheckoutCollection(true),
+                    : (_) => _choose(context,true),
               ),
             ],
-          ),
+          );
+}
+
+class _CheckoutAddressStage extends StatefulWidget {
+  const _CheckoutAddressStage({
+    super.key,
+    required this.session,
+    required this.wholesaleReceiving, this.readProjection,
+  });
+
+  final BuyV2Session session;
+  final bool wholesaleReceiving;
+  final BuyV2CheckoutReadProjection? readProjection;
+
+  @override
+  State<_CheckoutAddressStage> createState() => _CheckoutAddressStageState();
+}
+
+class _CheckoutAddressStageState extends State<_CheckoutAddressStage> {
+  bool _choosingAddress = false;
+  BuyV2Session get session => widget.session;
+  bool get wholesaleReceiving => widget.wholesaleReceiving;
+
+  @override
+  Widget build(BuildContext context) {
+
+    final projection = widget.readProjection;
+    if (projection != null) {
+      final address = projection.address;
+      return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+        Text(projection.collectionSelected ? 'Collect at store' : 'Delivery address',style:context.buyBody),
+        if(projection.collectionSelected)
+          projection.collectionStore == null ? Text('Choose the missing Store in Checkout.',style:context.buyMeta) : BuyV2StoreAddress(store:projection.collectionStore!)
+        else if(!projection.collectionSelected && address != null)
+          _CheckoutAddressChoice(address:address,selected:true,onSelect:(){},onEdit:(){})
+        else Text('Choose the missing address or Store in Checkout.',style:context.buyMeta),
+      ]);
+    }
+    final addresses = session.addresses;
+    final selectedId = session.selectedAddressId;
+    final address = session.selectedAddressOrNull;
+    final locked = session.checkoutBusy || session.checkoutRequiresResolution;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if ((session.procurementContext?.purpose != BuyV2ProcurementPurpose.restock &&
+                session.collectionCheckoutStores.isNotEmpty) ||
+            session.collectionCheckoutSelected) ...[
+          _CheckoutFulfilmentChoices(session: session),
           const SizedBox(height: 6),
         ],
         if (session.collectionCheckoutSelected)
@@ -11815,9 +14062,9 @@ class _CheckoutAddressStageState extends State<_CheckoutAddressStage> {
                 '${address.recipient} · ${address.phone}\n'
                 '${address.line}, ${address.shortLine}',
             action: locked ? null : 'Change',
-            onTap: locked
+            onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, locked
                 ? null
-                : () => setState(() => _choosingAddress = true),
+                : () => setState(() => _choosingAddress = true), local: true),
           )
         else ...[
           Wrap(
@@ -11831,7 +14078,7 @@ class _CheckoutAddressStageState extends State<_CheckoutAddressStage> {
               ),
               TextButton.icon(
                 key: const ValueKey('buy-checkout-add-address'),
-                onPressed: () => _showAddAddressSheet(context, session),
+                onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => _showAddAddressSheet(context, session)),
                 icon: const Icon(Icons.add_location_alt_outlined, size: 18),
                 label: const Text('Add address'),
                 style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
@@ -11839,7 +14086,7 @@ class _CheckoutAddressStageState extends State<_CheckoutAddressStage> {
               if (address != null)
                 TextButton(
                   key: const ValueKey('buy-checkout-address-cancel'),
-                  onPressed: () => setState(() => _choosingAddress = false),
+                  onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => setState(() => _choosingAddress = false), local: true),
                   child: const Text('Cancel'),
                 ),
             ],
@@ -11870,11 +14117,11 @@ class _CheckoutAddressStageState extends State<_CheckoutAddressStage> {
                   session.chooseAddress(address.id);
                   setState(() => _choosingAddress = false);
                 },
-                onEdit: () => _showAddAddressSheet(
+                onEdit: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => _showAddAddressSheet(
                   context,
                   session,
                   existingAddress: address,
-                ),
+                )),
               ),
               const SizedBox(height: 8),
             ],
@@ -11895,7 +14142,7 @@ class _CheckoutAddressChoice extends StatelessWidget {
   final BuyV2Address address;
   final bool selected;
   final VoidCallback onSelect;
-  final VoidCallback onEdit;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -11907,7 +14154,7 @@ class _CheckoutAddressChoice extends StatelessWidget {
       button: true,
       label:
           '${address.label}. ${address.recipient}. ${address.phone}. ${address.line}, ${address.shortLine}.',
-      onTap: onSelect,
+      onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, onSelect),
       child: Material(
         color: selected ? BuyV2Colors.softBlue : Colors.white,
         shape: RoundedRectangleBorder(
@@ -11919,7 +14166,7 @@ class _CheckoutAddressChoice extends StatelessWidget {
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: onSelect,
+          onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, onSelect),
           excludeFromSemantics: true,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 6, 5, 6),
@@ -11968,11 +14215,12 @@ class _CheckoutAddressChoice extends StatelessWidget {
                   container: true,
                   button: true,
                   label: 'Edit ${address.label} address',
-                  onTap: onEdit,
+                  enabled: onEdit == null ? false : null,
+                  onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, onEdit),
                   excludeSemantics: true,
                   child: TextButton(
                     key: ValueKey('buy-checkout-address-edit-${address.id}'),
-                    onPressed: onEdit,
+                    onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, onEdit),
                     style: TextButton.styleFrom(
                       minimumSize: const Size(58, 44),
                     ),
@@ -12079,11 +14327,12 @@ class _CheckoutPaymentStage extends StatefulWidget {
   const _CheckoutPaymentStage({
     super.key,
     required this.session,
-    required this.hasPaymentHandoff,
+    required this.hasPaymentHandoff, this.preparingFromCart=false,
   });
 
   final BuyV2Session session;
   final bool hasPaymentHandoff;
+  final bool preparingFromCart;
 
   @override
   State<_CheckoutPaymentStage> createState() => _CheckoutPaymentStageState();
@@ -12095,6 +14344,12 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
+    if(widget.preparingFromCart)return _CheckoutCard(icon:Icons.payment_outlined,
+      title:'Payment · ${session.selectedPayment}',
+      detail:'Review the available payment options and final total in Checkout.');
+    final captured = _BuyShop04Scope.of(context);
+    final proposedMethod = captured?.actionId == 'AI-ACT-033' ? captured?.initial.method : null;
+    final proposedQr = captured?.actionId == 'AI-ACT-343' ? captured?.initial.useQr : null;
     final choices = _buyV2CustomerPaymentChoices(session);
     final selected = choices
         .where((choice) => choice.$1 == session.selectedPayment)
@@ -12116,7 +14371,7 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
                 session.checkoutPaymentAttempt != null ||
                 session.checkoutPaymentGroupReviewRequired))
           _CheckoutPaymentGroups(session: session),
-        if (selected != null && (!_choosingPayment || locked))
+        if (selected != null && (!_choosingPayment || locked) && captured?.actionId != 'AI-ACT-033')
           _CheckoutCard(
             key: const ValueKey('buy-checkout-confirm-payment'),
             icon: selected.$2,
@@ -12127,9 +14382,9 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
                 ? '${selected.$3}. Enter card details in the secure payment provider flow.'
                 : selected.$3,
             action: locked ? null : 'Change',
-            onTap: locked
+            onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.method, locked
                 ? null
-                : () => setState(() => _choosingPayment = true),
+                : () => setState(() => _choosingPayment = true), local: true),
           )
         else ...[
           Text('Payment method', style: context.buyBody),
@@ -12143,23 +14398,23 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
             for (final choice in choices) ...[
               _BuyV2PaymentChoice(
                 choice: choice,
-                selected: session.selectedPayment == choice.$1,
+                selected: (proposedMethod ?? session.selectedPayment) == choice.$1,
                 onTap:
-                    locked ||
+                    _BuyShop04Scope.callback(context, _BuyShop04Intent.method, locked ||
                         !session.paymentEligibilityFor(choice.$1).selectable
                     ? null
                     : () {
                         HapticFeedback.selectionClick();
                         session.choosePayment(choice.$1);
                         setState(() => _choosingPayment = false);
-                      },
+                      }),
               ),
               const SizedBox(height: 6),
             ],
           if (selected != null)
             TextButton(
               key: const ValueKey('buy-checkout-payment-cancel'),
-              onPressed: () => setState(() => _choosingPayment = false),
+              onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.method, () => setState(() => _choosingPayment = false), local: true),
               child: const Text('Cancel'),
             ),
         ],
@@ -12170,13 +14425,13 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
               children: [
                 for (final qr in [false, true])
                   Semantics(
-                    checked: session.useUpiQr == qr,
+                    checked: (proposedQr ?? session.useUpiQr) == qr,
                     inMutuallyExclusiveGroup: true,
                     child: TextButton.icon(
                       key: ValueKey(qr ? 'buy-upi-use-qr' : 'buy-upi-use-app'),
-                      onPressed: () => session.chooseUpiQr(qr),
+                      onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.qr, () => session.chooseUpiQr(qr)),
                       icon: Icon(
-                        session.useUpiQr == qr
+                        (proposedQr ?? session.useUpiQr) == qr
                             ? Icons.radio_button_checked
                             : Icons.radio_button_unchecked,
                         size: 18,
@@ -12187,6 +14442,8 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
               ],
             ),
           ),
+        if (_BuyShop04Scope.of(context)?.actionId == 'AI-ACT-042')
+          _CheckoutBankTransferClaim(session: session),
         if (session.upiQrAction case final qr?)
           _CheckoutUpiQr(session: session, action: qr),
         if ((session.currentPaymentChargeMinor ?? 0) > 0)
@@ -12488,9 +14745,9 @@ class _CheckoutPaymentGroups extends StatelessWidget {
                   minimumSize: const Size(64, 44),
                   textStyle: context.buyBody.copyWith(fontFamily: 'Inter'),
                 ),
-                onPressed: session.checkoutBusy
+                onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.remaining, session.checkoutBusy
                     ? null
-                    : session.reviewRemainingGroupedCheckout,
+                    : session.reviewRemainingGroupedCheckout),
                 child: const Text('Review remaining checkout'),
               ),
             if (count > 1)
@@ -12627,9 +14884,9 @@ class _CheckoutPaymentStateRow extends StatelessWidget {
                   : 'buy-checkout-payment-not-shown',
             ),
             onPressed:
-                state == BuyV2CheckoutSubmissionState.paymentActionRequired
+                _BuyShop04Scope.callback(context, _BuyShop04Intent.leavePayment, state == BuyV2CheckoutSubmissionState.paymentActionRequired
                 ? session.cancelPaymentAttempt
-                : session.markPaymentStatusNeedsChecking,
+                : session.markPaymentStatusNeedsChecking),
             style: TextButton.styleFrom(minimumSize: const Size(76, 44)),
             child: Text(actionLabel),
           );
@@ -12683,10 +14940,11 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
   const BuyV2PurchaseOrderPanel({
     super.key,
     required this.session,
-    this.compact = true,
+    this.compact = true,this.capturedDocumentId,
   });
   final BuyV2Session session;
   final bool compact;
+  final String? capturedDocumentId;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -12703,7 +14961,7 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
               ? 'Review this order’s amount and payment schedule.'
               : 'Approved for this order.',
           action: 'Review',
-          onTap: session.checkoutBusy
+          onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, session.checkoutBusy
               ? null
               : () => showModalBottomSheet<void>(
                   context: context,
@@ -12726,11 +14984,14 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
+                )),
         );
       }
       final controller = session.purchaseOrder;
       final review = controller?.review;
+      final capturedScope=_BuyShop06Scope.of(context);
+      bool inputCurrent()=>context.mounted && capturedScope?.inputCurrent()!=false &&
+        identical(session.purchaseOrder?.review,review);
       final busy = controller?.busy ?? false;
       final address = session.collectionCheckoutSelected
           ? null
@@ -12763,9 +15024,15 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
                 'Order approval is unavailable right now.',
                 style: context.buyMeta,
               ),
+            if (review == null && capturedScope!=null) ...[
+              for(final line in session.purchaseOrderLines)
+                Text('${line.quantity} × ${line.product.customerTitle} · ${line.product.pack}',style:context.buyBody),
+              if(address!=null)Text(address.line,style:context.buyMeta),
+              if(store!=null)Text('${store.name} · ${store.address}',style:context.buyMeta),
+            ],
             if (review != null) ...[
               Text('Buyer: ${review.buyerName}', style: context.buyBody),
-              for (final doc in review.documents) ...[
+              for (final doc in review.documents.where((d)=>capturedDocumentId==null || d.id==capturedDocumentId)) ...[
                 const SizedBox(height: 8),
                 Text(doc.supplierName, style: context.buyBody),
                 Text(
@@ -12806,9 +15073,9 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
                   TextButton(
                     key: ValueKey('buy-po-approve-${doc.id}'),
                     onPressed:
-                        busy || !current || controller.needsReconciliation
+                        _BuyShop06Scope.callback(context,'approve',_BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, busy || !current || controller.needsReconciliation
                         ? null
-                        : () => session.approvePurchaseOrderRevision(doc.id),
+                        : () => session.approvePurchaseOrderRevision(doc.id,isCurrent:capturedScope==null?null:inputCurrent)),document:doc.id),
                     child: const Text('Approve revised terms'),
                   ),
               ],
@@ -12823,11 +15090,11 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
                   TextButton(
                     key: const ValueKey('buy-po-review'),
                     onPressed:
-                        controller == null ||
+                        _BuyShop06Scope.callback(context,'prepare',_BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, controller == null ||
                             controller.identity.value == null ||
                             busy
                         ? null
-                        : session.reviewPurchaseOrder,
+                        : () => session.reviewPurchaseOrder(isCurrent:capturedScope==null?null:inputCurrent))),
                     child: const Text('Check order agreement'),
                   ),
                 if (review != null &&
@@ -12837,9 +15104,9 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
                   TextButton(
                     key: const ValueKey('buy-po-issue'),
                     onPressed:
-                        busy || !current || controller.needsReconciliation
+                        _BuyShop06Scope.callback(context,'issue',_BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, busy || !current || controller.needsReconciliation
                         ? null
-                        : session.issuePurchaseOrder,
+                        : () => session.issuePurchaseOrder(isCurrent:capturedScope==null?null:inputCurrent))),
                     child: const Text('Confirm this order'),
                   ),
                 if (review != null &&
@@ -12849,15 +15116,15 @@ class BuyV2PurchaseOrderPanel extends StatelessWidget {
                         )))
                   TextButton(
                     key: const ValueKey('buy-po-refresh'),
-                    onPressed: busy ? null : controller!.refresh,
+                    onPressed: _BuyShop06Scope.callback(context,'status',_BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, busy ? null : () => controller!.refresh(isCurrent:capturedScope==null?null:inputCurrent))),
                     child: const Text('Check status'),
                   ),
                 if (review != null && !current)
                   TextButton(
                     key: const ValueKey('buy-po-review-updated'),
-                    onPressed: busy || controller!.needsReconciliation
+                    onPressed: _BuyShop06Scope.callback(context,'prepare',_BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, busy || controller!.needsReconciliation
                         ? null
-                        : session.reviewPurchaseOrder,
+                        : () => session.reviewPurchaseOrder(isCurrent:capturedScope==null?null:inputCurrent))),
                     child: const Text('Refresh order agreement'),
                   ),
               ],
@@ -12876,7 +15143,7 @@ class _CheckoutOrderDetails extends StatelessWidget {
     required this.gstInvoiceController,
     required this.invoiceDestinations,
     required this.instructionsKey,
-    this.storeInvoiceDetailsBuilder,
+    this.storeInvoiceDetailsBuilder, this.readProjection,
   });
 
   final BuyV2Session session;
@@ -12884,9 +15151,25 @@ class _CheckoutOrderDetails extends StatelessWidget {
   final List<BuyV2Destination> invoiceDestinations;
   final GlobalKey<_CheckoutDeliveryInstructionsState> instructionsKey;
   final WidgetBuilder? storeInvoiceDetailsBuilder;
+  final BuyV2CheckoutReadProjection? readProjection;
 
   @override
   Widget build(BuildContext context) {
+    final projection = readProjection;
+    if (projection != null) return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      BuyV2CheckoutGstDetails(destinations:invoiceDestinations,controller:gstInvoiceController,session:session),
+      const SizedBox(height:8),
+      _CheckoutDeliveryInstructions(key:instructionsKey,session:session,readDestinations:invoiceDestinations),
+      const SizedBox(height:8),
+      Text('Order items',style:context.buyBody),
+      const SizedBox(height:7),
+      for(final group in projection.groups)...[
+        _CheckoutDeliverySummaryCard(key:ValueKey('buy-checkout-confirm-delivery-${group.key}'),preparingFromCart:true,
+          session:session,group:group,artwork:buyV2DeliveryArtworkForLines(group.lines,fulfilmentModeFor:session.fulfilmentModeFor)),
+        const SizedBox(height:8),
+      ],
+      Text('The final total, delivery availability and payment options are checked in Checkout.',style:context.buyMeta),
+    ]);
     if (session.collectionCheckoutSelected) return const SizedBox.shrink();
     final groups = session.checkoutRecoveryAmountKnown
         ? session.checkoutFulfilmentGroups
@@ -12917,26 +15200,26 @@ class _CheckoutOrderDetails extends StatelessWidget {
                   children: [
                     TextButton(
                       key: const ValueKey('buy-checkout-eligibility-retry'),
-                      onPressed: session.checkoutBusy
+                      onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, session.checkoutBusy
                           ? null
-                          : session.refreshCheckoutDeliveryEstimates,
+                          : session.refreshCheckoutDeliveryEstimates),
                       child: const Text('Try again'),
                     ),
                     TextButton(
                       key: const ValueKey('buy-delivery-unavailable-address'),
-                      onPressed: () => _showAddAddressSheet(
+                      onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => _showAddAddressSheet(
                         context,
                         session,
                         existingAddress: session.selectedAddressOrNull,
-                      ),
+                      )),
                       child: const Text('Change address or collection'),
                     ),
                     TextButton(
                       key: const ValueKey('buy-delivery-unavailable-cart'),
-                      onPressed: () {
+                      onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () {
                         session.rememberCartScrollOffset(session.cartScope, 0);
                         session.openCart(scope: session.cartScope);
-                      },
+                      }),
                       child: const Text('Edit basket'),
                     ),
                   ],
@@ -13035,9 +15318,10 @@ class _CheckoutOrderDetails extends StatelessWidget {
 }
 
 class _CheckoutDeliveryInstructions extends StatefulWidget {
-  const _CheckoutDeliveryInstructions({super.key, required this.session});
+  const _CheckoutDeliveryInstructions({super.key, required this.session, this.readDestinations});
 
   final BuyV2Session session;
+  final List<BuyV2Destination>? readDestinations;
 
   @override
   State<_CheckoutDeliveryInstructions> createState() =>
@@ -13067,7 +15351,7 @@ class _CheckoutDeliveryInstructionsState
 
   @override
   Widget build(BuildContext context) {
-    final destinations = session.checkoutDestinations;
+    final destinations = widget.readDestinations?.toSet() ?? session.checkoutDestinations;
     final saved = [
       if (!session.isStoreProcurement) ?session.publicDeliveryInstruction,
       if (session.isStoreProcurement)
@@ -13118,13 +15402,14 @@ class _CheckoutPrimaryActionBar extends StatelessWidget {
     required this.session,
     required this.label,
     required this.onPressed,
-    required this.busy,
+    required this.busy, this.preparingFromCart=false,
   });
 
   final BuyV2Session session;
   final String label;
   final VoidCallback? onPressed;
   final bool busy;
+  final bool preparingFromCart;
 
   @override
   Widget build(BuildContext context) {
@@ -13141,7 +15426,7 @@ class _CheckoutPrimaryActionBar extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final paymentTermsPending = _supplierPaymentTermsPending(session);
-              final countText =
+              final countText = preparingFromCart ? 'Checkout review' :
                   paymentTermsPending
                   ? session.checkoutRecoveryAmountKnown ? 'Order total' : 'Total pending'
                   : session.isStoreProcurement &&
@@ -13150,10 +15435,9 @@ class _CheckoutPrimaryActionBar extends StatelessWidget {
                   ? 'Due now'
                   : _checkoutDockCountLabel(session);
               final countStyle = context.buyMeta.copyWith(fontSize: 8);
-              final amountKnown =
-                  session.collectionCheckoutSelected ||
-                  session.checkoutRecoveryAmountKnown;
-              final amountText = paymentTermsPending
+              final amountKnown = !preparingFromCart && (
+                  session.collectionCheckoutSelected || session.checkoutRecoveryAmountKnown);
+              final amountText = preparingFromCart ? 'Total pending' : paymentTermsPending
                   ? session.checkoutRecoveryAmountKnown
                       ? _comparisonMoney(session.checkoutPayableTotalMinor)
                       : 'Amount needs checking'
@@ -13304,9 +15588,10 @@ class _CheckoutPrimaryActionBar extends StatelessWidget {
 }
 
 class _WholesaleCheckoutReceivingLines extends StatelessWidget {
-  const _WholesaleCheckoutReceivingLines({required this.group, required this.session});
+  const _WholesaleCheckoutReceivingLines({required this.group, required this.session,this.preparingFromCart=false});
 
   final BuyV2FulfilmentGroup group;
+  final bool preparingFromCart;
   final BuyV2Session session;
 
   @override
@@ -13323,7 +15608,7 @@ class _WholesaleCheckoutReceivingLines extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var index = 0; index < group.lines.length; index++) ...[
-            _WholesaleCheckoutReceivingLine(line: group.lines[index], session: session),
+            _WholesaleCheckoutReceivingLine(line: group.lines[index], session: session,preparingFromCart:preparingFromCart),
             if (index != group.lines.length - 1)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 6),
@@ -13337,15 +15622,16 @@ class _WholesaleCheckoutReceivingLines extends StatelessWidget {
 }
 
 class _WholesaleCheckoutReceivingLine extends StatelessWidget {
-  const _WholesaleCheckoutReceivingLine({required this.line, required this.session});
+  const _WholesaleCheckoutReceivingLine({required this.line, required this.session,this.preparingFromCart=false});
 
   final BuyV2CartLine line;
+  final bool preparingFromCart;
   final BuyV2Session session;
 
   @override
   Widget build(BuildContext context) {
     final product = line.product;
-    final agreed = session.agreedUnitPriceFor(line, checkout: true), subtotalMinor = session.merchandiseForLine(line, checkout: true);
+    final agreed = session.agreedUnitPriceFor(line, checkout: !preparingFromCart), subtotalMinor = session.merchandiseForLine(line, checkout: !preparingFromCart);
     final quantityLabel = _packCountLabel(line.quantity);
     final semanticLabel =
         '${product.customerTitle}. $quantityLabel. ${product.pack}. '
@@ -13490,7 +15776,7 @@ class _CheckoutPriceChangeReview extends StatelessWidget {
                 child: FilledButton(
                   style: BuyV2ActionStyle.button(),
                   key: const ValueKey('buy-checkout-accept-prices'),
-                  onPressed: session.acceptCheckoutPriceChanges,
+                  onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.prices, session.acceptCheckoutPriceChanges),
                   child: const Text('Accept updated prices'),
                 ),
               ),
@@ -13503,9 +15789,10 @@ class _CheckoutPriceChangeReview extends StatelessWidget {
 }
 
 class _CheckoutPromiseChangeReview extends StatelessWidget {
-  const _CheckoutPromiseChangeReview({required this.session});
+  const _CheckoutPromiseChangeReview({required this.session, this.reviewEffect});
 
   final BuyV2Session session;
+  final _BuyNativeReviewEffect? reviewEffect;
 
   @override
   Widget build(BuildContext context) {
@@ -13553,7 +15840,7 @@ class _CheckoutPromiseChangeReview extends StatelessWidget {
               child: FilledButton(
                 style: BuyV2ActionStyle.button(),
                 key: const ValueKey('buy-accept-updated-delivery-times'),
-                onPressed: session.acceptCheckoutPromiseChanges,
+                onPressed: () => reviewEffect?.call(session.acceptCheckoutPromiseChanges) ?? session.acceptCheckoutPromiseChanges(),
                 child: const Text('Accept updated times'),
               ),
             ),
@@ -14065,10 +16352,13 @@ class BuyV2RecoveryView extends StatelessWidget {
     super.key,
     required this.session,
     required this.onOpenOrderHelp,
+    this.capturedCurrent,this.capturedRetry,
   });
 
   final BuyV2Session session;
   final ValueChanged<BuyV2Order> onOpenOrderHelp;
+  final bool Function()? capturedCurrent;
+  final VoidCallback? capturedRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -14202,7 +16492,7 @@ class BuyV2RecoveryView extends StatelessWidget {
                     child: FilledButton.icon(
                       style: BuyV2ActionStyle.button(),
                       key: const ValueKey('buy-recovery-retry-availability'),
-                      onPressed: session.retryCheckoutAvailability,
+                      onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, capturedCurrent==null?session.retryCheckoutAvailability:capturedCurrent!()?capturedRetry:null),
                       icon: const Icon(Icons.refresh_rounded),
                       label: const Text('Retry availability'),
                     ),
@@ -14217,7 +16507,7 @@ class BuyV2RecoveryView extends StatelessWidget {
                     child: OutlinedButton(
                       style: BuyV2ActionStyle.button(),
                       key: const ValueKey('buy-recovery-remove-product'),
-                      onPressed: session.removeCheckoutIssueProduct,
+                      onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.removeIssue, capturedCurrent==null?session.removeCheckoutIssueProduct:null),
                       child: const Text('Remove from Cart'),
                     ),
                   ),
@@ -14225,12 +16515,12 @@ class BuyV2RecoveryView extends StatelessWidget {
                 const SizedBox(height: 4),
                 TextButton(
                   key: const ValueKey('buy-recovery-view-product'),
-                  onPressed: session.openCheckoutIssueProduct,
+                  onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, capturedCurrent==null?session.openCheckoutIssueProduct:null),
                   child: const Text('View product'),
                 ),
                 TextButton(
                   key: const ValueKey('buy-recovery-return-checkout'),
-                  onPressed: session.retryRecovery,
+                  onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.recovery, capturedCurrent==null?session.retryRecovery:null),
                   child: Text(session.recoveryReturnLabel),
                 ),
               ] else if (resolvesAddress) ...[
@@ -14242,10 +16532,10 @@ class BuyV2RecoveryView extends StatelessWidget {
                     child: FilledButton.icon(
                       style: BuyV2ActionStyle.button(),
                       key: const ValueKey('buy-recovery-change-address'),
-                      onPressed: () {
+                      onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.recovery, capturedCurrent!=null?null:() {
                         session.retryRecovery();
                         showBuyV2AddressSheet(context, session);
-                      },
+                      }),
                       icon: const Icon(Icons.location_on_outlined),
                       label: const Text('Change address'),
                     ),
@@ -14260,7 +16550,7 @@ class BuyV2RecoveryView extends StatelessWidget {
                     child: OutlinedButton(
                       style: BuyV2ActionStyle.button(),
                       key: const ValueKey('buy-recovery-return-checkout'),
-                      onPressed: session.retryRecovery,
+                      onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.recovery, capturedCurrent==null?session.retryRecovery:null),
                       child: Text(session.recoveryReturnLabel),
                     ),
                   ),
@@ -14274,7 +16564,7 @@ class BuyV2RecoveryView extends StatelessWidget {
                     child: FilledButton(
                       style: BuyV2ActionStyle.button(),
                       key: const ValueKey('buy-recovery-primary'),
-                      onPressed: session.retryRecovery,
+                      onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.recovery, capturedCurrent==null?session.retryRecovery:null),
                       child: Text(session.recoveryReturnLabel),
                     ),
                   ),
@@ -14288,11 +16578,11 @@ class BuyV2RecoveryView extends StatelessWidget {
                     heightFactor: 1,
                     child: OutlinedButton(
                       style: BuyV2ActionStyle.button(),
-                      onPressed: () {
+                      onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, capturedCurrent!=null?null:() {
                         if (session.openRecoveryOrderHelp()) {
                           onOpenOrderHelp(session.selectedOrder);
                         }
-                      },
+                      }),
                       child: const Text('Get help'),
                     ),
                   ),
@@ -14354,18 +16644,21 @@ class BuyV2OrdersView extends StatelessWidget {
     required this.onOpenOrderHelp,
     this.invoiceDownloader,
     this.browseProducts,
-    this.onReceivePurchasedOrder,
+    this.onReceivePurchasedOrder, this.readQuery, this.permittedOrder,
   });
 
   final BuyV2Session session;
   final ValueChanged<BuyV2Order> onOpenOrderHelp;
   final BuyV2InvoiceDownloader? invoiceDownloader;
   final Widget? browseProducts;
+  final String? readQuery;
+  final bool Function(BuyV2Order)? permittedOrder;
   final void Function(WorkspacePurchaseReference, WorkspacePurchaseOrder)? onReceivePurchasedOrder;
 
   @override
   Widget build(BuildContext context) {
-    final visibleOrders = session.visibleOrderHistory;
+    final visibleOrders=(readQuery==null?session.visibleOrderHistory:session.readOrderHistory(readQuery!))
+        .where((order)=>permittedOrder?.call(order)??true).toList(growable:false);
     final sections = [
       (
         'Active',
@@ -14391,19 +16684,19 @@ class BuyV2OrdersView extends StatelessWidget {
           if (session.bulkQuotes?.active == true) ListTile(key: const ValueKey('buy-orders-bulk-quotes'),
             leading: const Icon(Icons.history_outlined), title: const Text('Past supplier agreements'),
             subtitle: const Text('Review saved agreements and unresolved requests'),
-            trailing: const Icon(Icons.chevron_right_rounded), onTap: () => _showBulkQuotes(context, session)),
-          if (session.purchaseReader case final reader? when reader.isCurrent && session.query.trim().isEmpty)
+            trailing: const Icon(Icons.chevron_right_rounded), onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => _showBulkQuotes(context, session))),
+          if (session.purchaseReader case final reader? when reader.isCurrent && (readQuery??session.query).trim().isEmpty)
             WorkspacePurchaseOriginals(key: ValueKey(('buyer-originals',reader,session.purchaseRealm,session.procurementContext?.storeId)),
-              gateway: reader, role: WorkspaceOrderIdentityRole.buyer, realm: session.purchaseRealm,
+              gateway: reader, capturedCurrent: _BuyShop04Scope.of(context)?.sourceCurrent, role: WorkspaceOrderIdentityRole.buyer, realm: session.purchaseRealm,
               buyingStoreId: session.procurementContext?.storeId,
               onReceivePurchasedOrder: session.isStoreProcurement ? onReceivePurchasedOrder : null,
-              onRatePurchasedItem: !session.privateStarsAvailable ? null : (reference, original, line) =>
+              onRatePurchasedItem: _BuyShop04Scope.of(context) != null || !session.privateStarsAvailable ? null : (reference, original, line) =>
                 unawaited(_showPrivateStarsSheet(context, session, reference: reference, original: original, line: line))),
           if (session.canReturnToAccount) ...[
             _ReturnAffordance(
               key: const ValueKey('buy-orders-return-account'),
               label: 'Account',
-              onTap: session.returnToAccount,
+              onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, session.returnToAccount),
             ),
             const SizedBox(height: 6),
           ],
@@ -14420,7 +16713,7 @@ class BuyV2OrdersView extends StatelessWidget {
             child: !session.catalogueAvailable
                 ? _OrdersAvailabilityState(session: session)
                 : visibleOrders.isEmpty
-                ? _OrdersEmptyState(query: session.query)
+                ? _OrdersEmptyState(query: readQuery??session.query)
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -14536,7 +16829,7 @@ class BuyV2OrdersView extends StatelessWidget {
                   ),
           ),
           BuyV2SponsoredSlot(
-            content: session.sponsoredContentFor(
+            content: _BuyShop04Scope.of(context)!=null?null:session.sponsoredContentFor(
               BuyV2SponsoredPlacement.ordersAfterHistory,
             ),
           ),
@@ -14573,9 +16866,10 @@ class BuyV2OrdersView extends StatelessWidget {
 }
 
 class BuyV2OrderItemsView extends StatelessWidget {
-  const BuyV2OrderItemsView({super.key, required this.session});
+  const BuyV2OrderItemsView({super.key, required this.session, this.capturedOrder});
 
   final BuyV2Session session;
+  final BuyV2Order? capturedOrder;
 
   String _recordedItemSummary(BuyV2Order order, BuyV2Product product) {
     final lines = order.lines.where((line) => line.product.id == product.id);
@@ -14589,7 +16883,7 @@ class BuyV2OrderItemsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final order = session.selectedOrderOrNull;
+    final order = capturedOrder ?? session.selectedOrderOrNull;
     if (order == null) {
       return _MissingOrderSelection(session: session);
     }
@@ -14603,7 +16897,7 @@ class BuyV2OrderItemsView extends StatelessWidget {
       children: [
         _ReturnAffordance(
           label: 'Order ${order.id}',
-          onTap: () => session.openTracking(order.id),
+          onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.readNavigation, () => session.openTracking(order.id)),
         ),
         const SizedBox(height: 8),
         Container(
@@ -14656,7 +16950,7 @@ class BuyV2OrderItemsView extends StatelessWidget {
                 color: Colors.transparent,
                 child: InkWell(
                   key: ValueKey('buy-order-product-${product.id}'),
-                  onTap: () => session.openProduct(product.id),
+                  onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => session.openProduct(product.id)),
                   borderRadius: BorderRadius.circular(15),
                   child: Container(
                     constraints: const BoxConstraints(minHeight: 104),
@@ -14789,7 +17083,7 @@ class _OrdersAvailabilityState extends StatelessWidget {
                 child: FilledButton.icon(
                   style: BuyV2ActionStyle.button(),
                   key: const ValueKey('buy-orders-retry'),
-                  onPressed: session.retryCommerce,
+                  onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.historyRetry, () => session.retryCommerce(isCurrent:_BuyShop04Scope.of(context)?.ownerCurrent)),
                   icon: const Icon(Icons.refresh_rounded, size: 18),
                   label: const Text('Try again'),
                 ),
@@ -14848,6 +17142,7 @@ class _OrdersContinuationRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (_BuyShop04Scope.of(context) != null) return const SizedBox.shrink();
     final cards = [
       if (!session.isStoreProcurement)
         BuyV2PromotionCard(
@@ -14939,6 +17234,8 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
   BuyV2Order order,
   ValueChanged<BuyV2Order> onOpenOrderHelp,
 ) async {
+  final captured = _BuyShop04Scope.of(context);
+  if (captured?.sourceCurrent() == false) return;
   final destination = session.destination;
   final view = session.view;
   final orderId = order.id;
@@ -14953,11 +17250,12 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
     BuildContext sheetContext,
     Future<void> Function() continuation,
   ) async {
+    if(captured != null && (!sheetContext.mounted || !captured.sourceCurrent() || ModalRoute.of(sheetContext)?.isCurrent != true))return;
     HapticFeedback.selectionClick();
     final routeCompleted = ModalRoute.of(sheetContext)?.completed;
     Navigator.of(sheetContext).pop();
     if (routeCompleted != null) await routeCompleted;
-    if (!context.mounted ||
+    if (!context.mounted || captured?.sourceCurrent() == false ||
         session.destination != destination ||
         session.view != view ||
         session.selectedOrderId != orderId) {
@@ -15025,7 +17323,7 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
                   IconButton(
                     key: const ValueKey('buy-order-delivery-close'),
                     tooltip: 'Close order delivery details',
-                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    onPressed: _BuyShop04Scope.callback(sheetContext, _BuyShop04Intent.readNavigation, () => Navigator.of(sheetContext).pop()),
                     icon: const Icon(Icons.close_rounded),
                     style: IconButton.styleFrom(
                       minimumSize: const Size(44, 44),
@@ -15137,10 +17435,10 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
                 icon: Icons.edit_location_alt_outlined,
                 title: 'Manage addresses for future checkout',
                 detail: 'View, add or choose a saved checkout address',
-                onTap: () => continueAfterReverse(
+                onTap: _BuyShop04Scope.callback(sheetContext, _BuyShop04Intent.unrelated, () => continueAfterReverse(
                   sheetContext,
                   () => showBuyV2AddressSheet(context, session),
-                ),
+                )),
               ),
               const SizedBox(height: 8),
               _OrderDeliveryContinuation(
@@ -15149,10 +17447,10 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
                 title: 'Get help with this order',
                 detail: '$orderId stays attached in Shop Chat',
                 primary: true,
-                onTap: () => continueAfterReverse(
+                onTap: _BuyShop04Scope.callback(sheetContext, _BuyShop04Intent.unrelated, () => continueAfterReverse(
                   sheetContext,
                   () async => onOpenOrderHelp(order),
-                ),
+                )),
               ),
             ],
           ),
@@ -15163,7 +17461,8 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
 }
 
 class _DeliveryExceptionCard extends StatelessWidget {
-  const _DeliveryExceptionCard({required this.session, required this.order});
+  const _DeliveryExceptionCard({required this.session, required this.order,this.selectedDraft,this.onChooseDraft});
+  final String? selectedDraft;final ValueChanged<String>? onChooseDraft;
 
   final BuyV2Session session;
   final BuyV2Order order;
@@ -15212,9 +17511,9 @@ class _DeliveryExceptionCard extends StatelessWidget {
             ),
             TextButton(
               key: const ValueKey('buy-delivery-exception-retry'),
-              onPressed: busy
+              onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, busy
                   ? null
-                  : () => session.restoreDeliveryException(order.id),
+                  : () => session.restoreDeliveryException(order.id)),
               child: const Text('Retry'),
             ),
           ],
@@ -15223,7 +17522,7 @@ class _DeliveryExceptionCard extends StatelessWidget {
     }
     final kind = snapshot.kind;
     if (kind == null) return const SizedBox.shrink();
-    final selectedSlot = session.selectedDeliveryRescheduleSlot(order.id);
+    final selectedSlot = onChooseDraft==null?session.selectedDeliveryRescheduleSlot(order.id):selectedDraft;
     final accent = switch (kind) {
       BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable ||
       BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed =>
@@ -15361,12 +17660,9 @@ class _DeliveryExceptionCard extends StatelessWidget {
                                 ),
                               ),
                             ),
-                        onPressed: busy
+                        onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.reschedule, busy
                             ? null
-                            : () => session.chooseDeliveryRescheduleSlot(
-                                order.id,
-                                slot,
-                              ),
+                            : () {if(onChooseDraft!=null){onChooseDraft!(slot);}else{session.chooseDeliveryRescheduleSlot(order.id,slot);}},local:true),
                         child: Text(slot, textAlign: TextAlign.center),
                       ),
                     ),
@@ -15385,9 +17681,11 @@ class _DeliveryExceptionCard extends StatelessWidget {
                 child: FilledButton(
                   style: BuyV2ActionStyle.button(),
                   key: const ValueKey('buy-delivery-confirm-reschedule'),
-                  onPressed: busy || selectedSlot == null
+                  onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.reschedule, busy || selectedSlot == null
                       ? null
-                      : () => session.confirmDeliveryReschedule(order.id),
+                      : () async {final scope=_BuyShop04Scope.of(context);if(scope!=null&&!scope.ownerCurrent())return;
+                          if(onChooseDraft!=null&&!session.chooseDeliveryRescheduleSlot(order.id,selectedSlot))return;
+                          await session.confirmDeliveryReschedule(order.id,capturedCurrent:scope?.ownerCurrent);}),
                   child: const Text('Confirm new time'),
                 ),
               ),
@@ -15406,9 +17704,9 @@ class _DeliveryExceptionCard extends StatelessWidget {
                 child: OutlinedButton(
                   style: BuyV2ActionStyle.button(),
                   key: const ValueKey('buy-delivery-dispute-proof'),
-                  onPressed: busy
+                  onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.proof, busy
                       ? null
-                      : () => session.disputeProofOfDelivery(order.id),
+                      : () => session.disputeProofOfDelivery(order.id,capturedCurrent:_BuyShop04Scope.of(context)?.ownerCurrent)),
                   child: const Text('Report a delivery problem'),
                 ),
               ),
@@ -15465,17 +17763,17 @@ class _BalancePaymentCard extends StatelessWidget {
     String? actionLabel;
     switch (state) {
       case BuyV2BalancePaymentState.due || BuyV2BalancePaymentState.overdue:
-        action = () => session.startBalancePayment(order.id);
+        action = () => session.startBalancePayment(order.id,capturedCurrent:_BuyShop04Scope.of(context)?.ownerCurrent);
         actionLabel = 'Pay balance';
       case BuyV2BalancePaymentState.paymentActionRequired:
         final handoff = paymentHandoff;
         if (handoff != null) {
-          action = () => session.continueBalancePayment(order.id, handoff);
+          action = () => session.continueBalancePayment(order.id, handoff,capturedCurrent:_BuyShop04Scope.of(context)?.ownerCurrent);
           actionLabel = 'Continue payment';
         }
       case BuyV2BalancePaymentState.paymentPending ||
           BuyV2BalancePaymentState.unknown:
-        action = () => session.reconcileBalancePayment(order.id);
+        action = () => session.reconcileBalancePayment(order.id,capturedCurrent:_BuyShop04Scope.of(context)?.ownerCurrent);
         actionLabel = 'Check payment';
       case BuyV2BalancePaymentState.offline ||
           BuyV2BalancePaymentState.unavailable:
@@ -15547,7 +17845,7 @@ class _BalancePaymentCard extends StatelessWidget {
                   key: ValueKey(
                     'buy-tracking-balance-${actionLabel.toLowerCase().replaceAll(' ', '-')}',
                   ),
-                  onPressed: busy ? null : action,
+                  onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.balance, busy ? null : action),
                   child: Text(actionLabel),
                 ),
               ),
@@ -15563,7 +17861,7 @@ class BuyV2LiveDeliveryPanel extends StatefulWidget {
   const BuyV2LiveDeliveryPanel({
     required this.session,
     required this.order,
-    this.mapBuilder,
+    this.mapBuilder, this.capturedCurrent,
     this.pollInterval = const Duration(seconds: 15),
     super.key,
   });
@@ -15572,6 +17870,7 @@ class BuyV2LiveDeliveryPanel extends StatefulWidget {
   final BuyV2Order order;
   final BuyV2LiveDeliveryMapBuilder? mapBuilder;
   final Duration pollInterval;
+  final bool Function()? capturedCurrent;
 
   @override
   State<BuyV2LiveDeliveryPanel> createState() => _BuyV2LiveDeliveryPanelState();
@@ -15613,10 +17912,10 @@ class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel>
 
   void _start() {
     _timer?.cancel();
-    if (!_isForeground) return;
+    if (!_isForeground || widget.capturedCurrent?.call() == false) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _isForeground) {
-        unawaited(widget.session.refreshLiveDelivery(widget.order.id));
+      if (mounted && _isForeground && widget.capturedCurrent?.call() != false) {
+        unawaited(widget.session.refreshLiveDelivery(widget.order.id, isCurrent: widget.capturedCurrent));
       }
     });
     if (!widget.session.liveDeliveryAvailable ||
@@ -15625,8 +17924,8 @@ class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel>
       return;
     }
     _timer = Timer.periodic(widget.pollInterval, (_) {
-      if (mounted && !widget.session.liveDeliveryBusy(widget.order.id)) {
-        unawaited(widget.session.refreshLiveDelivery(widget.order.id));
+      if (mounted && widget.capturedCurrent?.call() != false && !widget.session.liveDeliveryBusy(widget.order.id)) {
+        unawaited(widget.session.refreshLiveDelivery(widget.order.id, isCurrent: widget.capturedCurrent));
       }
     });
   }
@@ -15712,11 +18011,11 @@ class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel>
                   child: OutlinedButton.icon(
                     style: BuyV2ActionStyle.button(),
                     key: ValueKey('buy-live-delivery-retry-${widget.order.id}'),
-                    onPressed: busy
+                    onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.readNavigation, busy
                         ? null
                         : () => widget.session.refreshLiveDelivery(
-                            widget.order.id,
-                          ),
+                            widget.order.id,isCurrent:widget.capturedCurrent,
+                          )),
                     icon: const Icon(Icons.refresh_rounded, size: 18),
                     label: const Text('Try again'),
                   ),
@@ -15751,7 +18050,7 @@ class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel>
                   key: ValueKey(
                     'buy-live-delivery-map-toggle-${widget.order.id}',
                   ),
-                  onPressed: () => setState(() => _mapExpanded = !_mapExpanded),
+                  onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => setState(() => _mapExpanded = !_mapExpanded), local: true),
                   icon: Icon(
                     _mapExpanded ? Icons.expand_less : Icons.expand_more,
                     size: 18,
@@ -15814,11 +18113,11 @@ class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel>
                   heightFactor: 1,
                   child: OutlinedButton.icon(
                     style: BuyV2ActionStyle.button(),
-                    onPressed: busy
+                    onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.readNavigation, busy
                         ? null
                         : () => widget.session.refreshLiveDelivery(
-                            widget.order.id,
-                          ),
+                            widget.order.id,isCurrent:widget.capturedCurrent,
+                          )),
                     icon: const Icon(Icons.refresh_rounded, size: 18),
                     label: const Text('Refresh location'),
                   ),
@@ -15851,10 +18150,12 @@ class _BuyV2CollectionOrderView extends StatefulWidget {
     required this.session,
     required this.order,
     required this.onOpenOrderHelp,
-    this.cameraBuilder,
+    this.cameraBuilder, this.capturedCurrent,this.allowCapturedScan=false,
   });
 
   final BuyV2Session session;
+  final bool Function()? capturedCurrent;
+  final bool allowCapturedScan;
   final BuyV2Order order;
   final ValueChanged<BuyV2Order> onOpenOrderHelp;
   final BuyV2CollectionCameraBuilder? cameraBuilder;
@@ -15882,6 +18183,7 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
     WidgetsBinding.instance.addObserver(this);
     _identity = widget.session.collectionIdentity?.value;
     widget.session.addListener(_changed);
+    if (widget.capturedCurrent != null) return;
     _poll = Timer.periodic(const Duration(seconds: 3), (_) => _refresh());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _refresh();
@@ -15905,6 +18207,7 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
   }
 
   void _refresh() {
+    if (widget.capturedCurrent != null) return;
     if (!mounted ||
         !_foreground ||
         _submitting ||
@@ -15926,6 +18229,7 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (widget.capturedCurrent != null&&!widget.allowCapturedScan) return;
     if (state == AppLifecycleState.resumed) {
       _foreground = true;
       _refresh();
@@ -15953,6 +18257,7 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
   }
 
   Future<void> _detected(String raw) async {
+    if (widget.capturedCurrent != null && (!widget.allowCapturedScan||!widget.capturedCurrent!())) return;
     if (!mounted ||
         !_scanning ||
         _submitting ||
@@ -15968,7 +18273,7 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
       _cameraMessage = null;
     });
     if (!session.canScanCollection(orderId)) {
-      await session.refreshCollectionOrder(orderId);
+      await session.refreshCollectionOrder(orderId, isCurrent: widget.capturedCurrent);
     }
     if (mounted &&
         generation == _scanGeneration &&
@@ -15976,7 +18281,9 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
         identical(widget.session, session) &&
         widget.order.id == orderId &&
         session.canScanCollection(orderId)) {
-      await session.authoriseCollection(orderId, raw);
+      final scope=_BuyShop04Scope.of(context);
+      Future<void> confirm()async{await session.authoriseCollection(orderId,raw,isCurrent:widget.capturedCurrent);}
+      if(scope==null){await confirm();}else{await scope.perform(confirm,false);}
     }
     if (!mounted ||
         generation != _scanGeneration ||
@@ -16065,7 +18372,7 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
                         ? 'Shopping help'
                         : 'Orders',
                     minimumHeight: 44,
-                    onTap: session.returnToOrders,
+                    onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, session.returnToOrders),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -16193,7 +18500,7 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
                             ),
                           ),
                         ),
-                        onPressed: session.canScanCollection(order.id)
+                        onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.collect, session.canScanCollection(order.id)
                             ? () {
                                 setState(() {
                                   _scanning = true;
@@ -16201,7 +18508,7 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
                                 });
                                 _revealCollectionAnchor(_cameraAnchor);
                               }
-                            : null,
+                            : null, local: true),
                         icon: const Icon(
                           Icons.qr_code_scanner_rounded,
                           size: 22,
@@ -16218,7 +18525,7 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
                       style: TextButton.styleFrom(
                         minimumSize: const Size(0, 44),
                       ),
-                      onPressed: () => setState(() => _scanning = false),
+                      onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.collect, () => setState(() => _scanning = false), local: true),
                       child: const Text('Close camera'),
                     ),
                 ],
@@ -16308,6 +18615,7 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
                 _ProductAcceptanceCard(
                   controller: session.productAcceptanceFor(order.id)!,
                   order: order,
+                  capturedCurrent: widget.capturedCurrent,
                 ),
               ],
               const SizedBox(height: 12),
@@ -16319,7 +18627,7 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
                 TextButton.icon(
                   key: const ValueKey('buy-collection-help'),
                   style: TextButton.styleFrom(minimumSize: const Size(0, 44)),
-                  onPressed: () {
+                  onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () {
                     _scanGeneration++;
                     setState(() {
                       _scanning = false;
@@ -16327,7 +18635,7 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
                     });
                     session.pauseCollection();
                     widget.onOpenOrderHelp(order);
-                  },
+                  }, local: true),
                   icon: const Icon(Icons.help_outline_rounded, size: 18),
                   label: const Text('Order help'),
                 ),
@@ -16428,11 +18736,11 @@ class _OrderSupplyProgress extends StatelessWidget {
             if (progress.replacementOffer != null)
               TextButton(
                 key: ValueKey('buy-review-replacement-${order.id}'),
-                onPressed: () => showBuyV2ReplacementReviewSheet(
+                onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => showBuyV2ReplacementReviewSheet(
                   context,
                   session: session,
                   orderId: order.id,
-                ),
+                )),
                 child: const Text('Review replacement'),
               ),
           ],
@@ -16534,32 +18842,32 @@ Future<void> showBuyV2ReplacementReviewSheet(
                 children: [
                   FilledButton(
                     key: const ValueKey('buy-accept-replacement'),
-                    onPressed: eligible
+                    onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.replacement, eligible
                         ? () => session.decideOrderReplacement(
                             orderId: orderId,
                             reviewedKey: reviewedKey,
                             reviewedScopeKey: reviewedScopeKey,
-                            accept: true,
+                            accept: true,capturedCurrent:_BuyShop04Scope.of(context)?.ownerCurrent,
                           )
-                        : null,
+                        : null),
                     child: Text(
                       busy ? 'Checking choice…' : 'Accept replacement',
                     ),
                   ),
                   OutlinedButton(
                     key: const ValueKey('buy-decline-replacement'),
-                    onPressed: eligible
+                    onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.replacement, eligible
                         ? () => session.decideOrderReplacement(
                             orderId: orderId,
                             reviewedKey: reviewedKey,
                             reviewedScopeKey: reviewedScopeKey,
-                            accept: false,
+                            accept: false,capturedCurrent:_BuyShop04Scope.of(context)?.ownerCurrent,
                           )
-                        : null,
+                        : null),
                     child: const Text('Decline replacement'),
                   ),
                   TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.readNavigation, () => Navigator.of(context).pop()),
                     child: const Text('Close'),
                   ),
                 ],
@@ -16573,9 +18881,10 @@ Future<void> showBuyV2ReplacementReviewSheet(
 }
 
 class _ProductAcceptanceCard extends StatefulWidget {
-  const _ProductAcceptanceCard({required this.controller, required this.order});
+  const _ProductAcceptanceCard({required this.controller, required this.order, this.capturedCurrent});
   final BuyV2ProductAcceptanceController controller;
   final BuyV2Order order;
+  final bool Function()? capturedCurrent;
   @override
   State<_ProductAcceptanceCard> createState() => _ProductAcceptanceCardState();
 }
@@ -16584,18 +18893,19 @@ class _ProductAcceptanceCardState extends State<_ProductAcceptanceCard> {
   @override
   void initState() {
     super.initState();
-    unawaited(widget.controller.refresh());
+    if (widget.capturedCurrent == null) unawaited(widget.controller.refresh());
   }
 
   @override
   void didUpdateWidget(_ProductAcceptanceCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.controller, widget.controller)) {
-      unawaited(widget.controller.refresh());
+      if (widget.capturedCurrent == null) unawaited(widget.controller.refresh());
     }
   }
 
   Future<void> _confirm() async {
+    if (widget.capturedCurrent != null) return;
     final controller = widget.controller;
     final snapshot = controller.snapshot;
     final reviewedKey = controller.reviewKey;
@@ -16624,12 +18934,12 @@ class _ProductAcceptanceCardState extends State<_ProductAcceptanceCard> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => Navigator.pop(context, false)),
             child: const Text('Cancel'),
           ),
           FilledButton(
             key: const ValueKey('buy-product-acceptance-confirm'),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => Navigator.pop(context, true)),
             child: const Text('Accept products'),
           ),
         ],
@@ -16671,14 +18981,14 @@ class _ProductAcceptanceCardState extends State<_ProductAcceptanceCard> {
             if (controller.canAccept)
               FilledButton(
                 key: const ValueKey('buy-product-acceptance-review'),
-                onPressed: _confirm,
+                onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, _confirm),
                 child: const Text('Review and accept'),
               )
             else if (state != BuyV2ProductAcceptanceState.accepted &&
                 state != BuyV2ProductAcceptanceState.disputed)
               TextButton(
                 key: const ValueKey('buy-product-acceptance-check'),
-                onPressed: controller.busy ? null : controller.refresh,
+                onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, controller.busy ? null : controller.refresh),
                 child: Text(
                   controller.busy ? 'Checking…' : 'Check acceptance status',
                 ),
@@ -16699,10 +19009,11 @@ class BuyV2TrackingView extends StatelessWidget {
     this.paymentHandoff,
     this.liveDeliveryMapBuilder,
     this.collectionCameraBuilder,
-    this.onRestoreDeliveryStatus,
+    this.onRestoreDeliveryStatus, this.capturedOrder,
   });
 
   final BuyV2Session session;
+  final BuyV2Order? capturedOrder;
   final ValueChanged<BuyV2Order> onOpenOrderHelp;
   final BuyV2InvoiceDownloader? invoiceDownloader;
   final BuyV2PaymentHandoff? paymentHandoff;
@@ -16712,7 +19023,25 @@ class BuyV2TrackingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final order = session.selectedOrderOrNull;
+    final capturedReview = _BuyShop04Scope.of(context);
+    final nativeAlertsControl = Switch.adaptive(
+                key: const ValueKey('buy-tracking-alerts-toggle'),
+                value: capturedReview?.alertsValue ?? session.trackingAlertsEnabled,
+                onChanged:
+                    capturedReview == null ? (session.trackingAlertsBusy ||
+                        !session.trackingAlertsAvailable
+                    ? null
+                    : (enabled) {
+                        HapticFeedback.selectionClick();
+                        session.setTrackingAlerts(enabled);
+                      })
+                    : capturedReview.actionId != 'AI-ACT-047' || !capturedReview.canAct()
+                    ? null : (enabled) {
+                        if (capturedReview.here(context)) capturedReview.setAlertsDraft(enabled);
+                      },
+                activeTrackColor: BuyV2Colors.green,
+              );
+    final order = capturedOrder ?? session.selectedOrderOrNull;
     if (order == null) {
       return _MissingOrderSelection(session: session);
     }
@@ -16722,6 +19051,7 @@ class BuyV2TrackingView extends StatelessWidget {
         order: order,
         onOpenOrderHelp: onOpenOrderHelp,
         cameraBuilder: collectionCameraBuilder,
+        capturedCurrent: _BuyShop04Scope.of(context)?.ownerCurrent,
       );
     }
     final purchasedQuantity = order.lines.fold<int>(
@@ -16748,7 +19078,7 @@ class BuyV2TrackingView extends StatelessWidget {
             : session.canReturnToShoppingAlerts
             ? 'Shopping alerts'
             : 'Orders',
-        onTap: session.returnToOrders,
+        onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, session.returnToOrders),
       ),
     );
     final orderHeading = Column(
@@ -16766,9 +19096,9 @@ class BuyV2TrackingView extends StatelessWidget {
     final refreshOrder = IconButton(
       key: ValueKey('buy-tracking-refresh-${order.id}'),
       tooltip: 'Refresh order',
-      onPressed: session.orderRefreshBusy(order.id)
+      onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.refreshOrder, session.orderRefreshBusy(order.id)
           ? null
-          : () => session.refreshOrder(order.id),
+          : () => session.refreshOrder(order.id, isCurrent: _BuyShop04Scope.of(context)?.ownerCurrent)),
       constraints: const BoxConstraints.tightFor(
         width: BuyV2Metrics.minimumTap,
         height: BuyV2Metrics.minimumTap,
@@ -16879,7 +19209,7 @@ class BuyV2TrackingView extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               key: const ValueKey('buy-quick-delivery-restore'),
-              onPressed: onRestoreDeliveryStatus,
+              onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, onRestoreDeliveryStatus),
               icon: BuyV2DeliveryModeIcon(
                 artwork: buyV2DeliveryArtworkForLines(
                   order.lines,
@@ -17009,6 +19339,7 @@ class BuyV2TrackingView extends StatelessWidget {
             session: session,
             order: order,
             mapBuilder: liveDeliveryMapBuilder,
+            capturedCurrent: _BuyShop04Scope.of(context)?.sourceCurrent,
           ),
           const SizedBox(height: 6),
         ],
@@ -17148,7 +19479,7 @@ class BuyV2TrackingView extends StatelessWidget {
         _TrackingTimeline(order: order),
         if (session.productAcceptanceFor(order.id) case final acceptance?) ...[
           const SizedBox(height: 6),
-          _ProductAcceptanceCard(controller: acceptance, order: order),
+          _ProductAcceptanceCard(controller: acceptance, order: order, capturedCurrent: _BuyShop04Scope.of(context)?.ownerCurrent),
         ],
         const SizedBox(height: 6),
         Container(
@@ -17242,21 +19573,23 @@ class BuyV2TrackingView extends StatelessWidget {
                 IconButton(
                   key: const ValueKey('buy-tracking-alerts-retry'),
                   tooltip: 'Retry order alerts',
-                  onPressed: session.restoreOrderAlerts,
+                  onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, session.restoreOrderAlerts),
                   icon: const Icon(Icons.refresh_rounded),
                 ),
-              Switch.adaptive(
-                key: const ValueKey('buy-tracking-alerts-toggle'),
-                value: session.trackingAlertsEnabled,
-                onChanged:
-                    session.trackingAlertsBusy ||
-                        !session.trackingAlertsAvailable
-                    ? null
-                    : (enabled) {
-                        HapticFeedback.selectionClick();
-                        session.setTrackingAlerts(enabled);
-                      },
-                activeTrackColor: BuyV2Colors.green,
+              capturedReview == null ? nativeAlertsControl : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  nativeAlertsControl,
+                  if (capturedReview.actionId == 'AI-ACT-047') TextButton(
+                    key: const ValueKey('buy-tracking-alerts-apply'),
+                    onPressed: _BuyShop04Scope.asyncCallback(context, _BuyShop04Intent.alerts, () async {
+                      final accepted = await session.setTrackingAlerts(capturedReview.alertsValue,
+                        isCurrent: capturedReview.ownerCurrent);
+                      if (!accepted) throw StateError('Original order-alert update unavailable');
+                    }),
+                    child: const Text('Apply'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -17266,17 +19599,17 @@ class BuyV2TrackingView extends StatelessWidget {
           actions: [
             _TrackingAction(
               key: const ValueKey('buy-tracking-address'),
-              onPressed: () => _showBuyV2OrderDeliveryContextSheet(
+              onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.readNavigation, () => _showBuyV2OrderDeliveryContextSheet(
                 context,
                 session,
                 order,
                 onOpenOrderHelp,
-              ),
+              )),
               icon: Icons.location_on_outlined,
               label: 'Address',
             ),
             _TrackingAction(
-              onPressed: () => session.openOrderItems(order.id),
+              onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.readNavigation, () => session.openOrderItems(order.id)),
               icon: Icons.inventory_2_outlined,
               label: 'Items',
             ),
@@ -17286,9 +19619,9 @@ class BuyV2TrackingView extends StatelessWidget {
                     ? 'buy-tracking-reorder'
                     : 'buy-tracking-help',
               ),
-              onPressed: order.status == BuyV2OrderStatus.delivered
+              onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.reorder, order.status == BuyV2OrderStatus.delivered
                   ? () => session.reorder(order)
-                  : () => onOpenOrderHelp(order),
+                  : () => onOpenOrderHelp(order)),
               icon: order.status == BuyV2OrderStatus.delivered
                   ? Icons.replay_rounded
                   : Icons.chat_outlined,
@@ -17320,12 +19653,12 @@ class BuyV2TrackingView extends StatelessWidget {
             TextButton.icon(
               key: ValueKey('buy-tracking-manage-order-${order.id}'),
               style: TextButton.styleFrom(minimumSize: const Size(0, 44)),
-              onPressed: () => showBuyV2OrderResolutionSheet(
+              onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => showBuyV2OrderResolutionSheet(
                 context,
                 session: session,
                 order: order,
                 onOpenSupport: () => onOpenOrderHelp(order),
-              ),
+              )),
               icon: const Icon(Icons.assignment_return_outlined, size: 18),
               label: Text(
                 order.status == BuyV2OrderStatus.delivered
@@ -17337,12 +19670,12 @@ class BuyV2TrackingView extends StatelessWidget {
               TextButton.icon(
                 key: ValueKey('buy-tracking-invoice-${order.id}'),
                 style: TextButton.styleFrom(minimumSize: const Size(0, 44)),
-                onPressed: () => _openOrderInvoice(
+                onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.readNavigation, () => _openOrderInvoice(
                   context,
                   session: session,
                   order: order,
                   downloader: invoiceDownloader,
-                ),
+                )),
                 icon: const Icon(Icons.receipt_long_outlined, size: 18),
                 label: const Text('Invoice'),
               ),
@@ -17383,7 +19716,7 @@ class BuyV2TrackingView extends StatelessWidget {
             icon: Icons.support_agent_outlined,
             title: 'Get help with this order',
             detail: 'Prepare a return, replacement or refund question',
-            onTap: () => onOpenOrderHelp(order),
+            onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => onOpenOrderHelp(order)),
           ),
         ],
       ],
@@ -17396,6 +19729,7 @@ Future<void> showBuyV2OrderResolutionSheet(
   required BuyV2Session session,
   required BuyV2Order order,
   required VoidCallback onOpenSupport,
+  BuyShop04InitialData? initial,
 }) async {
   await showModalBottomSheet<void>(
     context: context,
@@ -17410,7 +19744,7 @@ Future<void> showBuyV2OrderResolutionSheet(
     builder: (sheetContext) => _BuyV2OrderResolutionSheet(
       session: session,
       order: order,
-      onOpenSupport: onOpenSupport,
+      onOpenSupport: onOpenSupport,initial:initial,capturedScope:_BuyShop04Scope.of(context),
     ),
   );
 }
@@ -17419,12 +19753,13 @@ class _BuyV2OrderResolutionSheet extends StatefulWidget {
   const _BuyV2OrderResolutionSheet({
     required this.session,
     required this.order,
-    required this.onOpenSupport,
+    required this.onOpenSupport,this.initial,this.capturedScope,
   });
 
   final BuyV2Session session;
   final BuyV2Order order;
   final VoidCallback onOpenSupport;
+  final BuyShop04InitialData? initial;final _BuyShop04Scope? capturedScope;
 
   @override
   State<_BuyV2OrderResolutionSheet> createState() =>
@@ -17441,6 +19776,7 @@ class _BuyV2OrderResolutionSheetState
   @override
   void initState() {
     super.initState();
+    if(widget.initial case final initial?){selectedKind=BuyV2OrderResolutionKind.values.where((v)=>v.name==initial.kind).singleOrNull;selectedReason=initial.reason;selectedItemQuantities.addAll(initial.quantities);return;}
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         unawaited(widget.session.refreshOrderResolution(widget.order.id));
@@ -17455,6 +19791,7 @@ class _BuyV2OrderResolutionSheetState
   }
 
   Future<void> submit() async {
+    if(widget.capturedScope!=null&&(!widget.capturedScope!.ownerCurrent()||ModalRoute.of(context)?.isCurrent!=true))return;
     final kind = selectedKind;
     final reason = selectedReason;
     if (kind == null || reason == null) return;
@@ -17463,11 +19800,13 @@ class _BuyV2OrderResolutionSheetState
       setState(() => selectionError = 'Choose at least one product.');
       return;
     }
+    final scope=widget.capturedScope;
+    Future<void> send()async{
     final accepted = await widget.session.submitOrderResolution(
       orderId: widget.order.id,
       kind: kind,
       reason: reason,
-      itemQuantities: selectedItemQuantities,
+      itemQuantities: selectedItemQuantities,capturedCurrent:scope?.ownerCurrent,
     );
     if (!mounted) return;
     if (accepted) {
@@ -17475,6 +19814,8 @@ class _BuyV2OrderResolutionSheetState
     } else {
       setState(() => selectionError = widget.session.notice);
     }
+    }
+    if(scope==null){await send();}else{await scope.perform(send,false);}
   }
 
   @override
@@ -18982,9 +21323,12 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
   BuildContext context,
   BuyV2Session session, {
   List<BuyV2FilterSheetAction> actions = const [],
+  BuyV2DiscoveryRefinements? browseReviewInitial, VoidCallback? browseReviewShown,
+  bool Function()? browseReviewCurrent, BuyV2BrowseReviewEffect? browseReviewEffect,
 }) async {
   final destination = session.destination;
   if (destination == BuyV2Destination.orders) return;
+  if (browseReviewCurrent != null && (_buyBrowseFilterForms[session] ?? 0) > 0) return;
   final savedOnly = session.showingSavedProducts;
   String browseScope() =>
       '${session.destination.name}|${session.saleTypeSignature}|'
@@ -19006,6 +21350,7 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
         : current.sort,
     availableOnly: current.availableOnly,
   );
+  if (browseReviewInitial != null) draft = browseReviewInitial;
   final brands = {...session.discoveryBrands, ...current.brands}.toList()
     ..sort();
   const packFilters = [BuyV2PackFilter.standard, BuyV2PackFilter.multipack];
@@ -19019,6 +21364,7 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
   if (preview != null) {
     unawaited(preview.open(session.catalogueQuery(refinements: draft)));
   }
+  _buyBrowseFilterForms[session] = (_buyBrowseFilterForms[session] ?? 0) + 1;
   try {
     await showModalBottomSheet<void>(
       context: context,
@@ -19034,11 +21380,11 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
       ),
       clipBehavior: Clip.antiAlias,
       sheetAnimationStyle: BuyV2FilterSheetMotion.resolve(context),
-      builder: (sheetContext) => StatefulBuilder(
+      builder: (sheetContext) { browseReviewShown?.call(); return StatefulBuilder(
         builder: (sheetContext, setSheetState) => AnimatedBuilder(
           animation: Listenable.merge([session, ?preview]),
           builder: (sheetContext, _) {
-            final scopeMatches = browseScope() == originalScope;
+            final scopeMatches = browseScope() == originalScope && browseReviewCurrent?.call() != false;
             final productCount = savedOnly
                 ? session.previewSavedProducts(draft).length
                 : preview == null
@@ -19047,6 +21393,7 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
                 ? null
                 : preview.page?.totalCount;
             void update(BuyV2DiscoveryRefinements value) {
+              if (browseReviewCurrent?.call() == false || !sheetContext.mounted) return;
               setSheetState(() => draft = value);
               if (preview != null && scopeMatches) {
                 unawaited(
@@ -19303,10 +21650,10 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
                                 onPressed: !scopeMatches
                                     ? null
                                     : () {
-                                        session.applyDiscoveryRefinements(
-                                          draft,
-                                        );
-                                        Navigator.of(sheetContext).pop();
+                                        bool apply() { session.applyDiscoveryRefinements(draft); return true; }
+                                        if (browseReviewEffect?.call(apply) ?? apply()) {
+                                          if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                                        }
                                       },
                                 style: BuyV2ActionStyle.button(
                                   FilledButton.styleFrom(
@@ -19329,9 +21676,11 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
             );
           },
         ),
-      ),
+      );
+      },
     );
   } finally {
+    _buyBrowseFilterForms[session] = (_buyBrowseFilterForms[session] ?? 1) - 1;
     if (preview != null) session.releaseCatalogueProducts(previewScope);
   }
 }
@@ -20205,38 +22554,8 @@ Future<void> showBuyV2AddressSheet(
                       },
                       onDelete: () async {
                         if (!canUseAddressContext(sheetContext)) return;
-                        final remove = await showDialog<bool>(
-                          context: sheetContext,
-                          builder: (dialogContext) => AlertDialog(
-                            title: Text('Remove ${address.label} address?'),
-                            content: const Text(
-                              'Existing orders stay unchanged. You can add this address again later.',
-                            ),
-                            actions: [
-                              TextButton(
-                                key: const ValueKey(
-                                  'buy-address-delete-cancel',
-                                ),
-                                onPressed: () =>
-                                    Navigator.of(dialogContext).pop(false),
-                                child: const Text('Keep address'),
-                              ),
-                              Align(
-                                widthFactor: 1,
-                                heightFactor: 1,
-                                child: FilledButton(
-                                  style: BuyV2ActionStyle.button(),
-                                  key: const ValueKey(
-                                    'buy-address-delete-confirm',
-                                  ),
-                                  onPressed: () =>
-                                      Navigator.of(dialogContext).pop(true),
-                                  child: const Text('Remove'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
+                        final remove = await _confirmBuyV2AddressRemoval(sheetContext, address,
+                          isCurrent: () => scopeCurrent() && !session.cartChangesBlocked);
                         if (remove != true || !sheetContext.mounted) return;
                         if (!canUseAddressContext(sheetContext)) return;
                         if (session.removeAddress(address.id)) {
@@ -20537,12 +22856,37 @@ class _BuyV2AddressChoice extends StatelessWidget {
   }
 }
 
+/// Recipient text for the original address-request form; opening does not send.
+class BuyV2AddressRequestInitialData {
+  const BuyV2AddressRequestInitialData._(this.recipient);
+  final String recipient;
+  static const allowedFields = <String>{'recipient'};
+  factory BuyV2AddressRequestInitialData.fromFields(Map<String, Object?> fields) {
+    final recipient = fields['recipient'];
+    if (fields.length != 1 || recipient is! String || recipient.trim().isEmpty) {
+      throw const FormatException('Supply the recipient name to review.');
+    }
+    return BuyV2AddressRequestInitialData._(recipient);
+  }
+}
+final _buyAddressRequestForms = Expando<bool>('buy-address-request-form');
+bool buyV2AddressRequestFormOpen(BuyV2Session session) => _buyAddressRequestForms[session] == true;
+Future<void> showBuyV2AddressRequestInitialReview(BuildContext context, BuyV2Session session, {
+  required BuyV2AddressRequestInitialData initialData, required Listenable scopeOwner,
+  required bool Function() isCurrent,
+}) => _showAddressRequestSheet(context, session, scopeCurrent: isCurrent,
+  scopeOwner: scopeOwner, initialRecipient: initialData.recipient);
+
 Future<void> _showAddressRequestSheet(
   BuildContext context,
   BuyV2Session session, {
   required bool Function() scopeCurrent,
-}) {
-  return showModalBottomSheet<void>(
+  String initialRecipient = '', Listenable? scopeOwner,
+}) async {
+  if (!scopeCurrent() || buyV2AddressRequestFormOpen(session) || buyV2AddressFormOpen(session)) return;
+  _buyAddressRequestForms[session] = true;
+  try {
+  await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -20558,16 +22902,73 @@ Future<void> _showAddressRequestSheet(
     sheetAnimationStyle: BuyV2AddressFormSheetMotion.resolve(context),
     routeSettings: const RouteSettings(name: 'buy-address-request-form'),
     builder: (sheetContext) =>
-        _BuyV2AddressRequestForm(session: session, scopeCurrent: scopeCurrent),
+        _BuyV2AddressRequestForm(session: session, scopeCurrent: scopeCurrent,
+          initialRecipient: initialRecipient, scopeOwner: scopeOwner),
   );
+  } finally { _buyAddressRequestForms[session] = false; }
 }
+
+/// Typed editable values for the original address form. No coordinates/coverage.
+class BuyV2AddressInitialData {
+  BuyV2AddressInitialData._(Map<String, String> inputs, this.kind)
+      : inputs = Map.unmodifiable(inputs);
+  static const allowedFields = <String>{
+    'recipient', 'phone', 'line', 'area', 'pinCode', 'landmark', 'kind',
+  };
+  final Map<String, String> inputs;
+  final BuyV2AddressKind? kind;
+  // A type alone leaves Add's actual address text empty; Edit may change kind.
+  bool get hasSuppliedValue => inputs.values.any((value) => value.trim().isNotEmpty);
+
+  factory BuyV2AddressInitialData.fromFields(Map<String, Object?> fields) {
+    if (fields.isEmpty || fields.keys.any((key) => !allowedFields.contains(key)) ||
+        fields.values.any((value) => value is! String)) {
+      throw const FormatException('Review the address details again.');
+    }
+    final inputs = <String, String>{
+      for (final entry in fields.entries) if (entry.key != 'kind') entry.key: entry.value as String,
+    };
+    BuyV2AddressKind? kind;
+    if (fields.containsKey('kind')) {
+      kind = BuyV2AddressKind.values.where((value) => value.name == fields['kind']).singleOrNull;
+      if (kind == null) throw const FormatException('Choose an address type.');
+    }
+    if (const ['recipient', 'line', 'area'].any((key) =>
+        inputs.containsKey(key) && inputs[key]!.trim().isEmpty)) {
+      throw const FormatException('Add the recipient, street address and locality.');
+    }
+    if (inputs['phone'] case final phone? when !RegExp(r'^\d{10}$').hasMatch(phone.trim())) {
+      throw const FormatException('Enter a 10-digit phone number.');
+    }
+    if (inputs['pinCode'] case final pin? when !RegExp(r'^\d{6}$').hasMatch(pin.trim())) {
+      throw const FormatException('Enter a valid 6-digit PIN code.');
+    }
+    return BuyV2AddressInitialData._(inputs, kind);
+  }
+}
+
+final _buyAddressForms = Expando<bool>('buy-address-form');
+bool buyV2AddressFormOpen(BuyV2Session session) => _buyAddressForms[session] == true;
+
+/// Opens the existing form. Only its original Save calls addAddress/updateAddress.
+Future<void> showBuyV2AddressInitialReview(BuildContext context, BuyV2Session session, {
+  required BuyV2AddressInitialData initialData,
+  required Listenable scopeOwner,
+  required bool Function() isCurrent,
+  BuyV2Address? existingAddress,
+}) => _showAddAddressSheet(context, session, existingAddress: existingAddress,
+    initialData: initialData, scopeOwner: scopeOwner, isCurrent: isCurrent);
 
 Future<void> _showAddAddressSheet(
   BuildContext context,
   BuyV2Session session, {
   BuyV2Address? existingAddress,
   String initialRecipient = '',
-}) {
+  BuyV2AddressInitialData? initialData,
+  Listenable? scopeOwner,
+  bool Function()? isCurrent,
+}) async {
+  if (buyV2AddressFormOpen(session) || isCurrent?.call() == false) return;
   final destination = session.destination;
   final view = session.view;
   final selectedAddressId = session.selectedAddressId;
@@ -20575,8 +22976,19 @@ Future<void> _showAddAddressSheet(
   final navigation = session.navigationMotionSequence;
   final owner = session.customerStateStore?.ownerScope;
   final buyer = session.collectionIdentity?.value;
+  final procurement = session.procurementContext?.customerStateOwnerScope;
+  final addresses = List<BuyV2Address>.of(session.addresses);
+  bool scopeCurrent() => (isCurrent?.call() ?? true) &&
+      session.customerStateStore?.ownerScope == owner &&
+      session.collectionIdentity?.value?.accountId == buyer?.accountId &&
+      session.collectionIdentity?.value?.sessionId == buyer?.sessionId &&
+      session.procurementContext?.customerStateOwnerScope == procurement &&
+      session.procurementScopeCurrent && session.navigationMotionSequence == navigation &&
+      session.destination == destination && session.view == view &&
+      session.selectedAddressId == selectedAddressId && listEquals(session.addresses, addresses) &&
+      (existingAddress == null || session.addresses.any((value) => identical(value, existingAddress)));
   bool saveToExistingOwner(BuyV2Address address) {
-    if (session.cartChangesBlocked ||
+    if (!scopeCurrent() || session.cartChangesBlocked ||
         session.customerStateStore?.ownerScope != owner ||
         session.collectionIdentity?.value?.accountId != buyer?.accountId ||
         session.collectionIdentity?.value?.sessionId != buyer?.sessionId ||
@@ -20596,7 +23008,9 @@ Future<void> _showAddAddressSheet(
     return session.updateAddress(address);
   }
 
-  return showModalBottomSheet<void>(
+  _buyAddressForms[session] = true;
+  try {
+  await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -20615,19 +23029,24 @@ Future<void> _showAddAddressSheet(
       session: session,
       existingAddress: existingAddress,
       initialRecipient: initialRecipient,
+      initialData: initialData, scopeOwner: scopeOwner,
+      isCurrent: isCurrent == null ? null : scopeCurrent,
       onSubmit: saveToExistingOwner,
     ),
   );
+  } finally { _buyAddressForms[session] = false; }
 }
 
 class _BuyV2AddressRequestForm extends StatefulWidget {
   const _BuyV2AddressRequestForm({
     required this.session,
-    required this.scopeCurrent,
+    required this.scopeCurrent, this.initialRecipient = '', this.scopeOwner,
   });
 
   final BuyV2Session session;
   final bool Function() scopeCurrent;
+  final String initialRecipient;
+  final Listenable? scopeOwner;
 
   @override
   State<_BuyV2AddressRequestForm> createState() =>
@@ -20635,11 +23054,24 @@ class _BuyV2AddressRequestForm extends StatefulWidget {
 }
 
 class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
-  final recipientController = TextEditingController();
+  late final TextEditingController recipientController;
+  bool _retired = false;
+  void _scopeChanged() {
+    if (!mounted || _retired || widget.scopeCurrent() && !widget.session.cartChangesBlocked) return;
+    _retired = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() {}); });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+  @override void initState() {
+    super.initState();
+    recipientController = TextEditingController(text: widget.initialRecipient);
+    widget.scopeOwner?.addListener(_scopeChanged);
+    _scopeChanged();
+  }
   bool requestBusy = false;
 
   bool _canUseRequest() {
-    if (widget.scopeCurrent() && !widget.session.cartChangesBlocked) {
+    if (!_retired && widget.scopeCurrent() && !widget.session.cartChangesBlocked) {
       return true;
     }
     if (mounted) {
@@ -20657,6 +23089,7 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
 
   @override
   void dispose() {
+    widget.scopeOwner?.removeListener(_scopeChanged);
     recipientController.dispose();
     super.dispose();
   }
@@ -20732,6 +23165,12 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
 
   @override
   Widget build(BuildContext context) {
+    if (_retired) return Semantics(key: const ValueKey('buy-address-request-form-route'),
+      container: true, scopesRoute: true, namesRoute: true,
+      explicitChildNodes: true, label: 'Request an address',
+      child: Padding(padding: const EdgeInsets.all(16), child: _AddressFormHeader(
+        title: 'Request an address', body: 'Your account or delivery details changed. Reopen delivery addresses.',
+        closeKey: const ValueKey('buy-address-request-form-close'))));
     final bottomPadding =
         18 +
         BuyV2AddressFormSheetMotion.resolveBottomSafeInset(context) +
@@ -20812,6 +23251,9 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
                           context,
                           widget.session,
                           initialRecipient: recipientController.text,
+                          scopeOwner: widget.scopeOwner,
+                          isCurrent: widget.scopeOwner == null ? null :
+                              () => !_retired && widget.scopeCurrent() && !widget.session.cartChangesBlocked,
                         );
                       }
                     },
@@ -20833,8 +23275,12 @@ class _BuyV2AddAddressForm extends StatefulWidget {
     required this.onSubmit,
     this.existingAddress,
     this.initialRecipient = '',
+    this.initialData, this.scopeOwner, this.isCurrent,
   });
 
+  final BuyV2AddressInitialData? initialData;
+  final Listenable? scopeOwner;
+  final bool Function()? isCurrent;
   final bool Function(BuyV2Address address) onSubmit;
   final BuyV2Session session;
   final BuyV2Address? existingAddress;
@@ -20854,24 +23300,34 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
 
   late BuyV2AddressKind kind;
   String? validationMessage;
+  bool _retired = false, _submitting = false;
+  void _scopeChanged() {
+    if (!mounted || _retired || _submitting || widget.isCurrent?.call() != false) return;
+    _retired = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() {}); });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
 
   @override
   void initState() {
     super.initState();
-    final address = widget.existingAddress;
+    final address = widget.existingAddress, initial = widget.initialData;
     recipientController = TextEditingController(
-      text: address?.recipient ?? widget.initialRecipient,
+      text: initial?.inputs['recipient'] ?? address?.recipient ?? widget.initialRecipient,
     );
-    phoneController = TextEditingController(text: address?.phone);
-    lineController = TextEditingController(text: address?.line);
-    pinController = TextEditingController(text: address?.pinCode);
-    areaController = TextEditingController(text: address?.area);
-    landmarkController = TextEditingController(text: address?.landmark);
-    kind = address?.kind ?? BuyV2AddressKind.home;
+    phoneController = TextEditingController(text: initial?.inputs['phone'] ?? address?.phone);
+    lineController = TextEditingController(text: initial?.inputs['line'] ?? address?.line);
+    pinController = TextEditingController(text: initial?.inputs['pinCode'] ?? address?.pinCode);
+    areaController = TextEditingController(text: initial?.inputs['area'] ?? address?.area);
+    landmarkController = TextEditingController(text: initial?.inputs['landmark'] ?? address?.landmark);
+    kind = initial?.kind ?? address?.kind ?? BuyV2AddressKind.home;
+    widget.scopeOwner?.addListener(_scopeChanged);
+    _scopeChanged();
   }
 
   @override
   void dispose() {
+    widget.scopeOwner?.removeListener(_scopeChanged);
     recipientController.dispose();
     phoneController.dispose();
     lineController.dispose();
@@ -20883,6 +23339,10 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
 
   void submit() {
     FocusScope.of(context).unfocus();
+    if (_retired || widget.isCurrent?.call() == false) {
+      setState(() => _retired = true);
+      return;
+    }
     if (widget.session.cartChangesBlocked) {
       setState(
         () => validationMessage =
@@ -20917,7 +23377,10 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
       BuyV2AddressKind.other => 'Other place',
     };
     final existingAddress = widget.existingAddress;
-    final added = widget.onSubmit(
+    _submitting = true;
+    final bool added;
+    try {
+    added = widget.onSubmit(
       BuyV2Address(
         id:
             existingAddress?.id ??
@@ -20932,6 +23395,7 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
         landmark: landmark.isEmpty ? 'No nearby landmark' : landmark,
       ),
     );
+    } finally { _submitting = false; }
     if (!added) {
       setState(() {
         validationMessage =
@@ -20948,6 +23412,13 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
     final title = editingAddress == null
         ? 'Add delivery address'
         : 'Edit ${editingAddress.label} address';
+    if (_retired) return Semantics(
+      key: const ValueKey('buy-address-add-form-route'),
+      container: true, scopesRoute: true, namesRoute: true,
+      explicitChildNodes: true, label: title,
+      child: Padding(padding: const EdgeInsets.all(16), child: _AddressFormHeader(
+        title: 'Delivery address', body: 'Your account or delivery details changed. Reopen this address form.',
+        closeKey: const ValueKey('buy-address-add-form-close'))));
     final bottomPadding =
         18 + BuyV2AddressFormSheetMotion.resolveBottomSafeInset(context);
     final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
@@ -21227,7 +23698,7 @@ class _ReturnAffordance extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool tightHitOwner;
   final Key? hitOwnerKey;
   final double minimumHeight;
@@ -21273,6 +23744,7 @@ class _ReturnAffordance extends StatelessWidget {
               key: hitOwnerKey,
               container: true,
               button: true,
+              enabled: onTap == null ? false : null,
               label: label,
               onTap: onTap,
               child: ExcludeSemantics(child: affordance),
@@ -21823,7 +24295,17 @@ Future<void> showBuyV2QuantityEditor(
   BuildContext context,
   BuyV2Session session,
   BuyV2Product product, {
+  int? initialQuantity,
   Future<bool> Function(int)? beforeSave,
+  Listenable? scopeOwner,
+  bool Function()? isReviewCurrent,
+  DateTime? reviewValidUntil,
+  BuyV2ThemeSpec? reviewTheme,
+  bool refinedCommerce = false,
+  String? reviewTitle, String? reviewActionLabel, Widget? reviewDetail,
+  bool reviewQuantityReadOnly=false,
+  String? Function(String)? validateReviewInput,
+  Future<bool> Function(int)? commitReview,
 }) async {
   final bottomClearance = BuyV2AddressSheetMotion.resolveModalActionBottomInset(
     context,
@@ -21836,20 +24318,36 @@ Future<void> showBuyV2QuantityEditor(
     backgroundColor: Colors.white,
     constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
     sheetAnimationStyle: BuyV2ProductFeedbackSheetMotion.resolve(context),
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.only(
-        // The keyboard already covers the system navigation clearance.
-        bottom: math.max(
-          MediaQuery.viewInsetsOf(sheetContext).bottom,
-          bottomClearance,
-        ),
-      ),
-      child: _QuantityEditor(
+    builder: (sheetContext) {
+      final editor = _QuantityEditor(
         session: session,
         product: product,
+        initialQuantity: initialQuantity,
         beforeSave: beforeSave,
-      ),
-    ),
+        scopeOwner: scopeOwner,
+        isReviewCurrent: isReviewCurrent,
+        reviewValidUntil: reviewValidUntil,
+        reviewTitle:reviewTitle,reviewActionLabel:reviewActionLabel,reviewDetail:reviewDetail,
+        reviewQuantityReadOnly:reviewQuantityReadOnly,
+        validateReviewInput:validateReviewInput,commitReview:commitReview,
+      );
+      return Padding(
+        padding: EdgeInsets.only(
+          // The keyboard already covers the system navigation clearance.
+          bottom: math.max(
+            MediaQuery.viewInsetsOf(sheetContext).bottom,
+            bottomClearance,
+          ),
+        ),
+        child: reviewTheme == null
+            ? editor
+            : BuyV2ThemeScope(
+                spec: reviewTheme,
+                refinedCommerce: refinedCommerce,
+                child: editor,
+              ),
+      );
+    },
   );
 }
 
@@ -21857,12 +24355,27 @@ class _QuantityEditor extends StatefulWidget {
   const _QuantityEditor({
     required this.session,
     required this.product,
+    this.initialQuantity,
     this.beforeSave,
+    this.scopeOwner,
+    this.isReviewCurrent,
+    this.reviewValidUntil,
+    this.reviewTitle,this.reviewActionLabel,this.reviewDetail,this.validateReviewInput,this.commitReview,
+    this.reviewQuantityReadOnly=false,
   });
 
   final BuyV2Session session;
   final BuyV2Product product;
+  final int? initialQuantity;
   final Future<bool> Function(int)? beforeSave;
+  final Listenable? scopeOwner;
+  final bool Function()? isReviewCurrent;
+  final DateTime? reviewValidUntil;
+  final String? reviewTitle,reviewActionLabel;
+  final Widget? reviewDetail;
+  final bool reviewQuantityReadOnly;
+  final String? Function(String)? validateReviewInput;
+  final Future<bool> Function(int)? commitReview;
 
   @override
   State<_QuantityEditor> createState() => _QuantityEditorState();
@@ -21873,29 +24386,67 @@ class _QuantityEditorState extends State<_QuantityEditor> {
   String? _error;
   bool _closing = false;
   bool _saving = false;
+  Route<dynamic>? _reviewRoute;
+  Timer? _reviewExpiryTimer;
 
   @override
   void initState() {
     super.initState();
-    final text = '${widget.session.quantityFor(widget.product.id)}';
+    _buyQuantityEditors[widget.session]=(_buyQuantityEditors[widget.session] ?? 0)+1;
+    final text = '${widget.initialQuantity ?? widget.session.quantityFor(widget.product.id)}';
     _controller = TextEditingController(text: text)
       ..selection = TextSelection(baseOffset: 0, extentOffset: text.length);
+    widget.scopeOwner?.addListener(_reviewOwnerChanged);
+    final deadline = widget.reviewValidUntil;
+    if (deadline != null) {
+      final remaining = deadline.difference(DateTime.now());
+      _reviewExpiryTimer = Timer(
+        remaining.isNegative ? Duration.zero : remaining,
+        _removeReviewRouteIfStale,
+      );
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reviewRoute ??= ModalRoute.of(context);
+    if (widget.isReviewCurrent?.call() == false) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _removeReviewRouteIfStale());
+    }
+  }
+
+  void _reviewOwnerChanged() => _removeReviewRouteIfStale();
+
+  void _removeReviewRouteIfStale() {
+    if (!mounted || _closing || widget.isReviewCurrent?.call() != false) return;
+    final route = _reviewRoute;
+    if (route == null || !route.isActive) return;
+    _closing = true;
+    Navigator.of(context).removeRoute(route);
   }
 
   @override
   void dispose() {
+    widget.scopeOwner?.removeListener(_reviewOwnerChanged);
+    _reviewExpiryTimer?.cancel();
+    _buyQuantityEditors[widget.session]=(_buyQuantityEditors[widget.session] ?? 1)-1;
     _controller.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     if (_closing || _saving) return;
+    if (widget.isReviewCurrent?.call() == false) {
+      _removeReviewRouteIfStale();
+      return;
+    }
     setState(() => _saving = true);
     try {
-      final error = widget.session.cartQuantityError(
+      final error = widget.validateReviewInput==null ? widget.session.cartQuantityError(
         widget.product.id,
         _controller.text,
-      );
+      ):widget.validateReviewInput!(_controller.text);
       if (error != null) {
         setState(() => _error = error);
         return;
@@ -21904,6 +24455,10 @@ class _QuantityEditorState extends State<_QuantityEditor> {
         int.parse(_controller.text.trim()),
       );
       if (!mounted || _closing) return;
+      if (widget.isReviewCurrent?.call() == false) {
+        _removeReviewRouteIfStale();
+        return;
+      }
       if (accepted == false) {
         setState(
           () => _error =
@@ -21911,12 +24466,16 @@ class _QuantityEditorState extends State<_QuantityEditor> {
         );
         return;
       }
-      if (widget.session.setCartQuantity(widget.product.id, _controller.text)) {
+      final committed=widget.commitReview==null
+        ? widget.session.setCartQuantity(widget.product.id,_controller.text)
+        : await widget.commitReview!(int.parse(_controller.text.trim()));
+      if (!mounted || _closing) return;
+      if (committed) {
         _dismiss();
       } else {
         setState(
           () => _error =
-              widget.session.notice ?? 'Quantity could not be updated.',
+              widget.session.notice ?? (widget.commitReview==null?'Quantity could not be updated.':'Check your Cart and current status before trying again.'),
         );
       }
     } finally {
@@ -21925,7 +24484,7 @@ class _QuantityEditorState extends State<_QuantityEditor> {
   }
 
   void _dismiss() {
-    if (_closing) return;
+    if (_closing || !mounted) return;
     _closing = true;
     Navigator.of(context).pop();
   }
@@ -21939,14 +24498,16 @@ class _QuantityEditorState extends State<_QuantityEditor> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Edit quantity', style: context.buyTitle),
+          Text(widget.reviewTitle ?? 'Edit quantity', style: context.buyTitle),
           const SizedBox(height: 8),
           Text(widget.product.customerTitle, style: context.buyBody),
           Text(widget.product.pack, style: context.buyMeta),
+          if(widget.reviewDetail!=null)widget.reviewDetail!,
           const SizedBox(height: 16),
           TextField(
             key: const ValueKey('buy-quantity-input'),
             controller: _controller,
+            readOnly:widget.reviewQuantityReadOnly,
             autofocus: true,
             keyboardType: TextInputType.number,
             textInputAction: TextInputAction.done,
@@ -21973,7 +24534,7 @@ class _QuantityEditorState extends State<_QuantityEditor> {
               style: BuyV2ActionStyle.button(),
               key: const ValueKey('buy-quantity-save'),
               onPressed: _saving ? null : _save,
-              child: const Text('Update quantity'),
+              child: Text(widget.reviewActionLabel ?? 'Update quantity'),
             ),
           ),
           TextButton(onPressed: _dismiss, child: const Text('Cancel')),
@@ -22907,9 +25468,12 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
 }
 
 class _CartStoreCouponRow extends StatelessWidget {
-  const _CartStoreCouponRow({required this.session, required this.coupon});
+  const _CartStoreCouponRow({required this.session, required this.coupon,
+    this.capturedCurrent,this.reviewApply,this.reviewRemove});
   final BuyV2Session session;
   final BuyV2PublishedStoreCoupon coupon;
+  final bool Function()? capturedCurrent;
+  final VoidCallback? reviewApply,reviewRemove;
   @override Widget build(BuildContext context) {
     final selected = session.selectedStoreCouponFor(coupon), busy = session.storeCouponChecking(coupon);
     final review = session.storeCouponNeedsReview(coupon), confirmed = session.storeCouponQuoteConfirmed(coupon);
@@ -22937,9 +25501,11 @@ class _CartStoreCouponRow extends StatelessWidget {
         if (coupon.structuredTerms != null)
           Text('Applying this offer is not connected yet.', style: context.buyMeta),
         Wrap(spacing: 8, alignment: WrapAlignment.end, children: [
-          if (selected != null) TextButton(onPressed: session.cartChangesBlocked || busy ? null : () => session.removeStoreCoupon(coupon, expectedSelection: selected),
+          if (selected != null) TextButton(onPressed: session.cartChangesBlocked || busy || capturedCurrent?.call()==false || capturedCurrent!=null && reviewRemove==null
+            ? null : () {if(capturedCurrent?.call()==false)return;if(reviewRemove!=null){reviewRemove!();}else{session.removeStoreCoupon(coupon,expectedSelection:selected);}},
             child: const Text('Remove')),
-          TextButton(onPressed: session.cartChangesBlocked || busy || coupon.structuredTerms != null ? null : () => unawaited(session.chooseStoreCoupon(coupon)),
+          TextButton(onPressed: session.cartChangesBlocked || busy || coupon.structuredTerms != null || capturedCurrent?.call()==false || capturedCurrent!=null && reviewApply==null
+            ? null : () {if(capturedCurrent?.call()==false)return;if(reviewApply!=null){reviewApply!();}else{unawaited(session.chooseStoreCoupon(coupon));}},
             child: Text(busy ? 'Checking…' : selected == null ? 'Apply' : review ? 'Recheck' : 'Check again')),
         ]),
       ]));
@@ -24636,12 +27202,14 @@ class _CartDeliveryInstructionCard extends StatefulWidget {
     super.key,
     required this.session,
     required this.destination,
-    required this.showDestination,
+    required this.showDestination, this.reviewInitialText, this.reviewEffect,
   });
 
   final BuyV2Session session;
   final BuyV2Destination destination;
   final bool showDestination;
+  final String? reviewInitialText;
+  final _BuyNativeReviewEffect? reviewEffect;
 
   @override
   State<_CartDeliveryInstructionCard> createState() =>
@@ -24659,6 +27227,9 @@ class _CartDeliveryInstructionCardState
   bool _editing = false;
   @override
   bool get wantKeepAlive => _editing;
+  late BuyV2Session _instructionRegistryOwner;
+  bool _commit(bool Function() effect) => !mounted || _BuyShop04Scope.of(context) != null
+      ? false : widget.reviewEffect?.call(effect) ?? effect();
   BuyV2Session get session => widget.session;
   BuyV2Destination get destination => widget.destination;
   bool get showDestination => widget.showDestination;
@@ -24673,6 +27244,23 @@ class _CartDeliveryInstructionCardState
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _noteFocus.addListener(_revealEditor);
+    _instructionRegistryOwner = session;
+    (_buyInstructionEditors[_instructionRegistryOwner] ??= <_CartDeliveryInstructionCardState>{}).add(this);
+    if (widget.reviewInitialText case final text?) {
+      _noteController.text = text;
+      _editing = true;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _CartDeliveryInstructionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(_instructionRegistryOwner, widget.session)) {
+      _buyInstructionEditors[_instructionRegistryOwner]?.remove(this);
+      _instructionRegistryOwner = widget.session;
+      (_buyInstructionEditors[_instructionRegistryOwner] ??= <_CartDeliveryInstructionCardState>{}).add(this);
+    }
+    // Retain this original controller's dirty text across a session replacement.
   }
 
   @override
@@ -24710,6 +27298,7 @@ class _CartDeliveryInstructionCardState
   }
 
   void openEditor({bool focus = false}) {
+    if (_BuyShop04Scope.of(context) != null) return;
     if (session.checkoutBusy || session.checkoutRequiresResolution) return;
     if (!_editing) {
       setState(() {
@@ -24732,6 +27321,7 @@ class _CartDeliveryInstructionCardState
     WidgetsBinding.instance.removeObserver(this);
     _noteFocus.removeListener(_revealEditor);
     _noteFocus.dispose();
+    _buyInstructionEditors[_instructionRegistryOwner]?.remove(this);
     _noteController.dispose();
     _choiceScrollController.dispose();
     super.dispose();
@@ -24753,7 +27343,7 @@ class _CartDeliveryInstructionCardState
       ),
     );
     super.build(context);
-    final locked = session.cartChangesBlocked;
+    final locked = session.cartChangesBlocked || _BuyShop04Scope.of(context) != null;
     final options = session.deliveryInstructionsFor(destination);
     final selected = session.selectedDeliveryInstructionFor(destination);
     final customNote = session.customDeliveryInstructionFor(destination);
@@ -24807,10 +27397,10 @@ class _CartDeliveryInstructionCardState
                         ),
                         onPressed: () {
                           HapticFeedback.selectionClick();
-                          session.chooseDeliveryInstruction(
+                          _commit(() => session.chooseDeliveryInstruction(
                             destination: destination,
                             instructionId: null,
-                          );
+                          ));
                         },
                         child: const Text('Clear'),
                       ),
@@ -24845,10 +27435,10 @@ class _CartDeliveryInstructionCardState
                                     ? null
                                     : () {
                                         HapticFeedback.selectionClick();
-                                        session.chooseDeliveryInstruction(
+                                        _commit(() => session.chooseDeliveryInstruction(
                                           destination: destination,
                                           instructionId: option.id,
-                                        );
+                                        ));
                                       },
                                 child: ConstrainedBox(
                                   constraints: const BoxConstraints(
@@ -25009,10 +27599,11 @@ class _CartDeliveryInstructionCardState
                         onPressed: locked
                             ? null
                             : () {
-                                if (session.setCustomDeliveryInstruction(
+                                if (_commit(() => session.setCustomDeliveryInstruction(
                                   destination: destination,
                                   text: _noteController.text,
-                                )) {
+                                ))) {
+                                  if (!mounted) return;
                                   FocusScope.of(context).unfocus();
                                   _closeEditor();
                                 }
@@ -25067,14 +27658,20 @@ class _CartTipSections extends StatelessWidget {
 }
 
 class _CartTipCard extends StatelessWidget {
-  const _CartTipCard({required this.session, required this.group});
+  const _CartTipCard({required this.session, required this.group, this.reviewAmount, this.reviewEffect});
 
   final BuyV2Session session;
   final BuyV2FulfilmentGroup group;
+  final int? reviewAmount;
+  final _BuyNativeReviewEffect? reviewEffect;
+  bool _choose(int amount) {
+    bool effect() => session.chooseTip(fulfilmentKey: group.key, destination: group.destination, amount: amount);
+    return reviewEffect?.call(effect) ?? effect();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final selected = session.tipForGroup(group);
+    final selected = reviewAmount ?? session.tipForGroup(group);
     final options = session.tipOptionsFor(group.destination);
     final title = group.destination == BuyV2Destination.medicine
         ? 'Tip pharmacy delivery partner'
@@ -25117,11 +27714,7 @@ class _CartTipCard extends StatelessWidget {
                 selected: selected == 0,
                 onSelected: session.cartChangesBlocked
                     ? null
-                    : (_) => session.chooseTip(
-                        fulfilmentKey: group.key,
-                        destination: group.destination,
-                        amount: 0,
-                      ),
+                    : (_) => _choose(0),
               ),
               for (final option in options)
                 ChoiceChip(
@@ -25137,11 +27730,7 @@ class _CartTipCard extends StatelessWidget {
                   selected: selected == option.amount,
                   onSelected: session.cartChangesBlocked
                       ? null
-                      : (_) => session.chooseTip(
-                          fulfilmentKey: group.key,
-                          destination: group.destination,
-                          amount: option.amount,
-                        ),
+                      : (_) => _choose(option.amount),
                 ),
             ],
           ),
@@ -25325,10 +27914,11 @@ class _CartSavingsSummary extends StatelessWidget {
 }
 
 class _CartLine extends StatelessWidget {
-  const _CartLine({required this.session, required this.line});
+  const _CartLine({required this.session, required this.line,this.reviewRemove});
 
   final BuyV2Session session;
   final BuyV2CartLine line;
+  final VoidCallback? reviewRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -25386,17 +27976,19 @@ class _CartLine extends StatelessWidget {
       '${gstDisclosure == null ? '' : '. $gstDisclosure'}'
       '${compactSupplier ? '. Supplier: ${product.customerSeller(automaticFulfilment ? facts.partner : product.seller)}' : ''}';
     void openProductDetails() {
+      if(reviewRemove!=null)return;
       HapticFeedback.selectionClick();
       session.openProduct(product.id);
     }
 
+    final VoidCallback? detailsAction=reviewRemove==null?openProductDetails:null;
     final photo = SizedBox(
       key: ValueKey('buy-cart-packshot-${product.id}'),
       width: thumbnailExtent,
       height: thumbnailExtent,
       child: GestureDetector(
         excludeFromSemantics: true,
-        onTap: openProductDetails,
+        onTap: detailsAction,
         child: BuyV2ProductPackshot(product: product, borderRadius: 11),
       ),
     );
@@ -25406,16 +27998,16 @@ class _CartLine extends StatelessWidget {
       child: Semantics(
         key: ValueKey('buy-cart-product-summary-${product.id}'),
         container: true,
-        button: true,
+        button: reviewRemove==null,
         label: productDetailsLabel,
         excludeSemantics: true,
-        onTap: openProductDetails,
+        onTap: detailsAction,
         child: Material(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(11),
           child: InkWell(
             key: ValueKey('buy-cart-product-details-${product.id}'),
-            onTap: openProductDetails,
+            onTap: detailsAction,
             highlightColor: Colors.transparent,
             splashColor: Colors.transparent,
             borderRadius: BorderRadius.circular(11),
@@ -25606,7 +28198,7 @@ class _CartLine extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                tooltip: product.quantityStep > 1
+                tooltip: reviewRemove!=null ? 'Remove ${product.customerTitle} from Cart' : product.quantityStep > 1
                     ? line.quantity <= product.minimumOrder
                           ? 'Remove ${product.customerTitle} from Cart'
                           : 'Remove ${product.quantityStep} packs'
@@ -25615,9 +28207,7 @@ class _CartLine extends StatelessWidget {
                           ? 'Remove ${product.customerTitle} from Cart'
                           : 'Remove one trade pack'
                     : 'Remove one',
-                onPressed: session.cartChangesBlocked
-                    ? null
-                    : () => session.decrease(product.id),
+                onPressed: session.cartChangesBlocked ? null : reviewRemove ?? () => session.decrease(product.id),
                 visualDensity: compactTitle
                     ? VisualDensity.standard
                     : VisualDensity.compact,
@@ -25662,9 +28252,7 @@ class _CartLine extends StatelessWidget {
                     : wholesale
                     ? 'Add one trade pack'
                     : 'Add one',
-                onPressed: session.cartChangesBlocked
-                    ? null
-                    : () => session.increase(product.id),
+                onPressed: session.cartChangesBlocked || reviewRemove!=null ? null : () => session.increase(product.id),
                 visualDensity: compactTitle
                     ? VisualDensity.standard
                     : VisualDensity.compact,
@@ -25693,14 +28281,14 @@ class _CartLine extends StatelessWidget {
                   value: session.cartProductSelected(product.id),
                   activeColor: BuyV2ActionStyle.primaryForeground,
                   semanticLabel: 'Include ${product.customerTitle} in checkout',
-                  onChanged: session.cartChangesBlocked
+                  onChanged: session.cartChangesBlocked || reviewRemove!=null
                       ? null
                       : (value) => session.selectCartProduct(
                           product.id,
                           value == true,
                         ),
                 ),
-              Expanded(
+              if(reviewRemove==null)Expanded(
                 child: BuyV2ProductEdgeControls(
                   session: session,
                   product: product,
@@ -25769,9 +28357,9 @@ class _CartLine extends StatelessWidget {
                         ],
                       ),
                     if (compactTitle && !stackMedia) purchaseControls,
-                    BuyV2AdvertisedOfferLink(session: session, product: product),
+                    if(reviewRemove==null)BuyV2AdvertisedOfferLink(session: session, product: product),
                     BuyV2PriceFreshness(product: product, now: session.catalogueNow,
-                      onRequestRefresh: () => session.requestCommodityPriceRefresh(product)),
+                      onRequestRefresh: reviewRemove!=null?null:() => session.requestCommodityPriceRefresh(product)),
                     if (line.scheduledFulfilment case final selected?) ...[
                       const SizedBox(height: 5),
                       Text('Requested delivery · ${_scheduledWindowLabel(context, selected)}',
@@ -25779,7 +28367,7 @@ class _CartLine extends StatelessWidget {
                         style: context.buyMeta.copyWith(color: BuyV2Colors.navy)),
                       TextButton(
                         style: TextButton.styleFrom(alignment: Alignment.centerLeft, minimumSize: const Size(48, 48)),
-                        onPressed: () => session.openProduct(product.id, reviewScheduledWindow: true),
+                        onPressed: reviewRemove!=null?null:() => session.openProduct(product.id, reviewScheduledWindow: true),
                         child: const Text('Review delivery window')),
                     ],
                     if (tradeFacts != null) ...[
@@ -25795,7 +28383,7 @@ class _CartLine extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           minimumSize: const Size(44, 44),
                         ),
-                        onPressed: () => session.setCartQuantity(
+                        onPressed: reviewRemove!=null?null:() => session.setCartQuantity(
                           product.id,
                           '${quantityTier.minimumPacks}',
                         ),
@@ -25911,12 +28499,13 @@ class _CheckoutDeliverySummaryCard extends StatefulWidget {
     super.key,
     required this.group,
     required this.session,
-    required this.artwork,
+    required this.artwork, this.preparingFromCart=false,
   });
 
   final BuyV2FulfilmentGroup group;
   final BuyV2Session session;
   final BuyV2DeliveryArtwork artwork;
+  final bool preparingFromCart;
 
   @override
   State<_CheckoutDeliverySummaryCard> createState() =>
@@ -26008,7 +28597,7 @@ class _CheckoutDeliverySummaryCardState
               child: Divider(height: 1),
             ),
             if (group.destination == BuyV2Destination.wholesale)
-              _WholesaleCheckoutReceivingLines(group: group, session: widget.session),
+              _WholesaleCheckoutReceivingLines(group: group, session: widget.session,preparingFromCart:widget.preparingFromCart),
             for (final line in group.lines) ...[
               if (line.scheduledFulfilment case final selected?)
                 Padding(padding: const EdgeInsets.symmetric(vertical: 4),
@@ -26257,9 +28846,9 @@ class _CompactOrderCardState extends State<_CompactOrderCard> {
                     style: BuyV2ActionStyle.button(
                       FilledButton.styleFrom(minimumSize: const Size(0, 44)),
                     ),
-                    onPressed: owned
+                    onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.readNavigation, owned
                         ? () => session.openTracking(order.id)
-                        : null,
+                        : null),
                     child: const Text('View order'),
                   ),
                 ),
@@ -26333,11 +28922,11 @@ class _CompactOrderCardState extends State<_CompactOrderCard> {
       expanded: _detailsExpanded,
       label: 'Order details for ${order.id}',
       excludeSemantics: true,
-      onTap: toggleDetails,
+      onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, toggleDetails),
       child: IconButton(
         key: ValueKey('buy-order-details-${order.id}'),
         tooltip: _detailsExpanded ? 'Hide order details' : 'Order details',
-        onPressed: toggleDetails,
+        onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, toggleDetails),
         constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
         padding: EdgeInsets.zero,
         icon: AnimatedRotation(
@@ -26360,14 +28949,14 @@ class _CompactOrderCardState extends State<_CompactOrderCard> {
           container: true,
           button: true,
           label: '${completed ? 'Open order' : 'Track order'} ${order.id}',
-          onTap: activatePrimaryAction,
+          onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, activatePrimaryAction),
           child: Material(
             color: completed ? Colors.transparent : Colors.white,
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
               key: ValueKey('buy-order-card-${order.id}'),
               excludeFromSemantics: true,
-              onTap: activatePrimaryAction,
+              onTap: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, activatePrimaryAction),
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.all(10),
@@ -26691,12 +29280,12 @@ class _CompactOrderCardState extends State<_CompactOrderCard> {
                                   ),
                                 ),
                                 label: const Text('Invoice'),
-                                onPressed: () => _openOrderInvoice(
+                                onPressed: _BuyShop04Scope.callback(context, _BuyShop04Intent.readNavigation, () => _openOrderInvoice(
                                   context,
                                   session: session,
                                   order: order,
                                   downloader: invoiceDownloader,
-                                ),
+                                )),
                                 icon: const Icon(
                                   Icons.receipt_long_outlined,
                                   size: 18,
@@ -26844,7 +29433,7 @@ class _TrackingAction extends StatelessWidget {
     this.primary = false,
   });
 
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final IconData icon;
   final String label;
   final bool primary;
@@ -26858,6 +29447,7 @@ class _TrackingAction extends StatelessWidget {
         : BuyV2ActionStyle.primaryForeground;
     return Semantics(
       button: true,
+      enabled: onPressed == null ? false : null,
       label: label,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -26875,9 +29465,9 @@ class _TrackingAction extends StatelessWidget {
             ),
           ),
           child: InkWell(
-            onTap: () {
+            onTap: onPressed == null ? null : () {
               HapticFeedback.selectionClick();
-              onPressed();
+              onPressed!();
             },
             borderRadius: BorderRadius.circular(12),
             child: ConstrainedBox(
@@ -26920,7 +29510,7 @@ class _OrderDeliveryContinuation extends StatelessWidget {
   final IconData icon;
   final String title;
   final String detail;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool primary;
 
   @override
@@ -26931,6 +29521,7 @@ class _OrderDeliveryContinuation extends StatelessWidget {
     final detailColor = context.buyMeta.color;
     return Semantics(
       button: true,
+      enabled: onTap == null ? false : null,
       label: '$title. $detail',
       onTap: onTap,
       excludeSemantics: true,
@@ -27594,4 +30185,312 @@ class _ShareChoiceState extends State<_ShareChoice> {
       ),
     );
   }
+}
+
+final _buyPurchaseReferenceDrafts=Expando<Set<Object>>('buy-native-po-reference-drafts');
+bool _buyPurchaseReferenceDirty(BuyV2Session session)=>_buyPurchaseReferenceDrafts[session]?.isNotEmpty==true;
+
+/// The native optional reference field uses the original persistent setter only
+/// on Save. Review's supplied value remains in its own text controller.
+class _CheckoutPurchaseOrderReference extends StatefulWidget {
+  const _CheckoutPurchaseOrderReference({required this.session,this.initialValue,this.inputCurrent,this.canSave});
+  final BuyV2Session session;
+  final String? initialValue;
+  final bool Function()? inputCurrent,canSave;
+  @override State<_CheckoutPurchaseOrderReference> createState()=>_CheckoutPurchaseOrderReferenceState();
+}
+class _CheckoutPurchaseOrderReferenceState extends State<_CheckoutPurchaseOrderReference>{
+  final _token=Object();late TextEditingController _text;
+  late String _original;late Object _fieldOwner;
+  Object get _sourceOwner=>(widget.session.customerStateStore?.ownerScope,
+    widget.session.collectionIdentity?.value?.accountId,widget.session.collectionIdentity?.value?.sessionId,
+    widget.session.procurementContext?.customerStateOwnerScope);
+  bool get _current=>mounted && _fieldOwner==_sourceOwner && widget.inputCurrent?.call()!=false;
+  bool get _nativeLocked=>!_current || _BuyShop04Scope.of(context)!=null || widget.session.checkoutBusy || widget.session.cartChangesBlocked || widget.session.checkoutRequiresResolution;
+  bool get _locked=>_nativeLocked || widget.canSave?.call()==false;
+  void _dirty(){
+    final drafts=_buyPurchaseReferenceDrafts[widget.session]??=Set<Object>.identity();
+    if(_text.text!=_original){drafts.add(_token);}else{drafts.remove(_token);}
+  }
+  @override void initState(){super.initState();_fieldOwner=_sourceOwner;_original=widget.session.purchaseOrderReference;
+    _text=TextEditingController(text:widget.initialValue??_original);_dirty();}
+  @override void didUpdateWidget(covariant _CheckoutPurchaseOrderReference old){
+    super.didUpdateWidget(old);
+    if(!identical(old.session,widget.session) || _fieldOwner!=_sourceOwner){
+      _buyPurchaseReferenceDrafts[old.session]?.remove(_token);
+      _fieldOwner=_sourceOwner;_original=widget.session.purchaseOrderReference;_text.text=widget.initialValue??_original;_dirty();
+    }else if(_text.text==_original && widget.session.purchaseOrderReference!=_original){
+      _original=widget.session.purchaseOrderReference;_text.text=_original;_dirty();
+    }
+  }
+  void _save(Object expectedOwner){
+    if(expectedOwner!=_fieldOwner || _locked || ModalRoute.of(context)?.isCurrent!=true)return;
+    void save(){
+      if(_nativeLocked)return;
+      widget.session.updatePurchaseOrderReference(_text.text);
+      if(!_current)return;
+      setState((){_original=widget.session.purchaseOrderReference;_dirty();});
+    }
+    final captured=_BuyShop06Scope.of(context);
+    if(captured==null){save();}else{unawaited(captured.perform(()async{save();},false));}
+  }
+  @override void dispose(){_buyPurchaseReferenceDrafts[widget.session]?.remove(_token);_text.dispose();super.dispose();}
+  @override Widget build(BuildContext context)=>AnimatedBuilder(animation:widget.session,builder:(context,_){
+    final expectedOwner=_fieldOwner;return _current?Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      TextField(key:const ValueKey('buy-checkout-purchase-order-reference'),controller:_text,enabled:!_locked,
+        decoration:const InputDecoration(labelText:'Purchase-order reference',helperText:'Optional reference for this purchase.'),
+        onChanged:(_){if(expectedOwner!=_fieldOwner || !_current)return;setState(_dirty);}),
+      if(widget.session.notice case final notice?)Text(notice),
+      Align(alignment:Alignment.centerRight,child:TextButton(key:const ValueKey('buy-checkout-purchase-order-reference-save'),
+        onPressed:_locked?null:()=>_save(expectedOwner),child:const Text('Save reference'))),
+    ]):const SizedBox.shrink();});
+}
+
+Iterable<MoolAssistantNativeAdapter> buyShop06NativeAdapters({required BuyV2Session session,
+  required NavigatorState navigator,required MoolAssistantContext Function() currentContext,
+  required bool Function() isRootCurrent,required Listenable scopeOwner,
+  required AuthenticatedAccountIdentity? Function() accountIdentity,required bool Function() accountAuthenticated}){
+  final owner=(_buyShop04Owners[session]??const <BuyShop04NativeOwner>{}).where((value)=>value.admitted).singleOrNull;
+  if(owner==null)return const [];
+  return [for(final id in const ['AI-ACT-032','AI-ACT-034','AI-ACT-035','AI-ACT-348','AI-ACT-349','AI-ACT-350','AI-ACT-351'])
+    BuyShop06NativeAdapter(actionId:id,session:session,navigator:navigator,currentContext:currentContext,
+      isRootCurrent:isRootCurrent,scopeOwner:scopeOwner,accountIdentity:accountIdentity,
+      accountAuthenticated:accountAuthenticated,capturedOwner:owner)];
+}
+
+/// Reuses the applied exact Host/native route owner and public actor/source
+/// admission. Only these seven existing native forms/controls are added here.
+class BuyShop06NativeAdapter extends BuyShop04NativeAdapter {
+  BuyShop06NativeAdapter({required super.actionId,required super.session,required super.navigator,
+    required super.currentContext,required super.isRootCurrent,required super.scopeOwner,
+    required super.accountIdentity,required super.accountAuthenticated,required super.capturedOwner});
+  @override bool _actor(Object binding)=>super._actor(binding) &&
+    (!const {'AI-ACT-348','AI-ACT-349'}.contains(actionId) || session.bulkQuotes?.active==true && session.bulkQuotes?.role=='buyer') &&
+    (!const {'AI-ACT-034','AI-ACT-035'}.contains(actionId) || !session.checkoutQuoteReviewRequired && session.commercialPaymentTermsLoadState==BuyV2CommerceLoadState.ready);
+  BuyV2FulfilmentGroup? _termGroup(String? id)=>session.checkoutFulfilmentGroups.where((g)=>g.key==id).singleOrNull;
+  BuyV2SupplierQuoteSelection? _selected(String? id)=>session.selectedSupplierQuotes.where((q)=>q.quoteId==id).singleOrNull;
+  WorkspaceBulkQuote? _selectedHead(String? id){
+    final selected=_selected(id),access=session.bulkQuotes;
+    if(selected==null || access?.active!=true || access!.role!='buyer' || access.realm!=selected.realm)return null;
+    try{
+      final owner=access.forStore(selected.storeId),head=owner.head(selected.quoteId);
+      if(!owner.active || !owner.initialized || owner.busy || owner.pending.isNotEmpty || head==null || !head.accepted ||
+        head.revision!=selected.acceptedRevision || head.toJson()['acceptance']['agreementFingerprint']!=selected.agreementFingerprint)return null;
+      return head;
+    }on Object{return null;}
+  }
+  bool get _poCurrent{
+    final controller=session.purchaseOrder;
+    return controller!=null && controller.currentFor(session.purchaseOrderLines,
+      session.collectionCheckoutSelected?null:session.selectedAddressOrNull,
+      collectionStore:session.collectionCheckoutSelected?session.collectionCheckoutStore:null);
+  }
+  @override Set<String> get allowedFields=>actionId=='AI-ACT-032'?const {'reference'}:const {};
+  @override String? validateFields(Map<String,Object?> fields){
+    if(fields.keys.any((key)=>!allowedFields.contains(key)) || fields.containsKey('reference') && fields['reference'] is! String)
+      return 'Review the supplied purchase fields again.';
+    return null;
+  }
+  @override bool _available(String? entity,BuyShop04NativeOwner owner){
+    if(!owner.current || session.checkoutBusy || session.checkoutRequiresResolution || session.cartChangesBlocked)return false;
+    if(const {'AI-ACT-348','AI-ACT-349'}.contains(actionId)){
+      final selected=_selected(entity);
+      return session.view==BuyV2View.cart && selected!=null && session.bulkQuotes?.active==true &&
+        session.bulkQuotes?.role=='buyer' && (actionId=='AI-ACT-348' || _selectedHead(entity)!=null);
+    }
+    if(!const {BuyV2View.cart,BuyV2View.checkout}.contains(session.view))return false;
+    if(actionId=='AI-ACT-032')return entity==null && session.cartLines.isNotEmpty && session.customerStateStore?.ownerScope?.trim().isNotEmpty==true;
+    if(session.view!=BuyV2View.checkout)return false;
+    if(actionId=='AI-ACT-034' || actionId=='AI-ACT-035'){
+      final group=_termGroup(entity);if(group==null || session.commercialPaymentTermsBusy)return false;
+      return actionId=='AI-ACT-034'?group.destination==BuyV2Destination.wholesale && session.supplierAssignedPaymentTermFor(group.key)!=null:
+        (group.destination==BuyV2Destination.wholesale?session.supplierAssignedPaymentTermFor(group.key):session.selectedCommercialPaymentTermFor(group.key))!=null;
+    }
+    final controller=session.purchaseOrder,review=controller?.review;
+    if(!session.purchaseOrderNativeSourceAvailable || !session.purchaseOrderRequired || controller==null ||
+      controller.identity.value==null || controller.busy || controller.needsReconciliation)return false;
+    final address=session.collectionCheckoutSelected?null:session.selectedAddressOrNull;
+    final store=session.collectionCheckoutSelected?session.collectionCheckoutStore:null;
+    if((address==null)==(store==null) || store!=null && !store.hasCollectionAddress)return false;
+    if(actionId=='AI-ACT-350')return review==null?entity==null:_poCurrent && entity==review.requestId &&
+      review.documents.every((d)=>d.state==BuyV2PurchaseOrderState.draft);
+    return actionId=='AI-ACT-351' && review!=null && _poCurrent &&
+      review.documents.where((d)=>d.id==entity && d.state==BuyV2PurchaseOrderState.revised).length==1;
+  }
+  List<Object?> _termWitness(BuyV2CommercialPaymentTerm? term)=>term==null?const [null]:[
+    term.id,term.fulfilmentKey,term.destination,term.supplierName,term.kind,term.orderTotalMinor,
+    term.amountDueNowMinor,term.balanceDueMinor,term.balanceDueLabel,term.sourceId,term.supplierIsMicroOrSmall,
+    term.advancePercent,term.upiTransactionLimitMinor,term.acceptedPaymentMethods.length,...(term.acceptedPaymentMethods.toList()..sort()),
+    term.netDays,term.financierName,term.annualPercentageRate,term.keyFactsUri,
+  ];
+  List<Object?> _stableInputs(String? entity,BuyShop04NativeOwner owner)=>[
+    ...super._inputs(entity,owner),session.purchaseOrderReference,session.purchaseOrderAdapter,session.purchaseOrder,
+    session.bulkQuotes,session.bulkQuotes?.account,session.bulkQuotes?.realm,session.bulkQuotes?.active,session.bulkQuotes?.role,
+    for(final q in session.selectedSupplierQuotes)q.quoteBinding,
+    if(const {'AI-ACT-348','AI-ACT-349'}.contains(actionId))_selectedHead(entity),
+    session.commercialPaymentTermsLoadState,session.commercialPaymentTermsMessage,
+    for(final group in session.checkoutFulfilmentGroups)...[
+      group.key,session.commercialPaymentTermsFor(group.key).length,for(final term in session.commercialPaymentTermsFor(group.key))..._termWitness(term),
+      ..._termWitness(session.supplierAssignedPaymentTermFor(group.key)),..._termWitness(session.selectedCommercialPaymentTermFor(group.key))],
+  ];
+  @override List<Object?> _inputs(String? entity,BuyShop04NativeOwner owner)=>[
+    ..._stableInputs(entity,owner),session.purchaseOrder?.review,session.purchaseOrder?.busy,session.purchaseOrder?.needsReconciliation];
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId){
+    if(_buyPurchaseReferenceDirty(session))return Future.value(null);
+    return super.snapshot(context,entityId);
+  }
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,
+    {required bool Function() isCurrent,required Listenable ownerChanges})async{
+    final owner=_nativeOwner;
+    if(owner==null || !_assistantCurrent || !isCurrent() || !p.validUntil.isAfter(DateTime.now()) ||
+      p.actionId!=actionId || p.sourceRevision!=_revision || validateFields(p.fields)!=null ||
+      !_same(p.binding,p.entityId) || !_available(p.entityId,owner) || _buyNativeReviews[session]==true || _buyPurchaseReferenceDirty(session))
+      return MoolAssistantReviewResult.stale;
+    final stable=List<Object?>.unmodifiable(_stableInputs(p.entityId,owner));
+    final poController=session.purchaseOrder;
+    final poDeadline=const {'AI-ACT-350','AI-ACT-351'}.contains(actionId)?poController?.review?.validUntil:null;
+    bool deadlineCurrent()=>poDeadline==null || poController?.now().isBefore(poDeadline)==true;
+    final poRemaining=poDeadline?.difference(poController!.now());
+    final sourceUntil=poRemaining==null?p.validUntil:DateTime.now().add(poRemaining);
+    final until=sourceUntil.isBefore(p.validUntil)?sourceUntil:p.validUntil;
+    bool actor()=>isCurrent() && p.validUntil.isAfter(DateTime.now()) && deadlineCurrent() && _actor(p.binding) &&
+      _assistantActive && owner.current && _actorAtSnapshot==_actorOwner;
+    bool current()=>actor() && _same(p.binding,p.entityId);
+    bool acceptNativeRead(){
+      // Only the original explicit Check may supply the checked PO request.
+      // Never adopt a new Cart/account/quote/term/reference/source while waiting.
+      if(actionId!='AI-ACT-350' || !actor() || !listEquals(stable,_stableInputs(p.entityId,owner)) || !_poCurrent)return false;
+      return true;
+    }
+    Future<void>? operation;var retired=false,prepared=false;_buyNativeReviews[session]=true;
+    try{
+      final controller=const {'AI-ACT-348','AI-ACT-349'}.contains(actionId)?session.bulkQuotes?.forStore(_selected(p.entityId)!.storeId):null;
+      final used=await navigator.push<bool>(MaterialPageRoute(builder:(_)=>_BuyShop06ReviewPage(session:session,
+        actionId:actionId,entity:p.entityId,reference:p.fields['reference'] as String?,quote:_selected(p.entityId),head:_selectedHead(p.entityId),
+        group:_termGroup(p.entityId),current:current,actor:actor,
+        nativeCurrent:()=>actor() && listEquals(stable,_stableInputs(p.entityId,owner)),validUntil:until,acceptNativeRead:acceptNativeRead,
+        onPrepared:()=>prepared=true,changes:Listenable.merge([scopeOwner,ownerChanges,owner,session,?session.purchaseOrder,?controller,?session.collectionIdentity]),
+        track:(future)=>operation=future,onRetired:()=>retired=true)));
+      if(operation!=null)await operation;
+      if(prepared && !retired && actor())return MoolAssistantReviewResult.returnToOwner;
+      return !retired && actor() && (used==true || current())?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    }finally{_buyNativeReviews[session]=false;}
+  }
+}
+
+class _BuyShop06Scope extends InheritedWidget{
+  const _BuyShop06Scope({required this.action,required this.entity,required this.current,required this.inputCurrent,required this.perform,required super.child});
+  final String action;
+  final String? entity;
+  final bool Function() current,inputCurrent;
+  final Future<void> Function(Future<void> Function(),bool) perform;
+  @override bool updateShouldNotify(_BuyShop06Scope oldWidget)=>
+    action!=oldWidget.action || entity!=oldWidget.entity || current!=oldWidget.current ||
+    inputCurrent!=oldWidget.inputCurrent || perform!=oldWidget.perform;
+  static _BuyShop06Scope? of(BuildContext context)=>context.dependOnInheritedWidgetOfExactType<_BuyShop06Scope>();
+  static VoidCallback? callback(BuildContext context,String kind,VoidCallback? original,{String? document}){
+    final scope=of(context);if(scope==null)return original;
+    final permitted=scope.action=='AI-ACT-350' && const {'prepare','issue','status'}.contains(kind) ||
+      scope.action=='AI-ACT-351' && (kind=='status' || kind=='approve' && scope.entity==document);
+    if(original==null || !permitted || !scope.current())return null;
+    return (){if(!scope.current() || !context.mounted || ModalRoute.of(context)?.isCurrent!=true)return;
+      unawaited(scope.perform(()async{await Function.apply(original,const []);},kind=='prepare'));};
+  }
+}
+
+class _SelectedSupplierQuote extends StatelessWidget{
+  const _SelectedSupplierQuote({required this.session,required this.quote,this.onRemove,this.onOpen});
+  final BuyV2Session session;
+  final BuyV2SupplierQuoteSelection quote;
+  final VoidCallback? onRemove,onOpen;
+  @override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.symmetric(vertical:6),
+    child:Material(type:MaterialType.transparency,child:ListTile(contentPadding:EdgeInsets.zero,
+      key:ValueKey('buy-selected-supplier-quote-${quote.storeId}'),leading:const Icon(Icons.request_quote_outlined),
+      title:Text('Supplier quote Â· ${session.cartLines.where((l)=>l.product.storeId==quote.storeId).firstOrNull?.product.seller??'Supplier name unavailable'}'),
+      subtitle:Text(session.supplierQuoteCurrentForCart(quote)
+        ?'Agreed product prices ${_comparisonMoney(quote.merchandiseMinor)} Â· final charges at Checkout'
+        :'Quote needs review. Check its validity, products and quantities.'),
+      trailing:IconButton(tooltip:'Remove selected supplier quote',icon:const Icon(Icons.close_rounded),onPressed:onRemove),onTap:onOpen)));
+}
+
+class _BuyShop06ReviewPage extends StatefulWidget{
+  const _BuyShop06ReviewPage({required this.session,required this.actionId,required this.entity,required this.reference,
+    required this.quote,required this.head,required this.group,required this.current,required this.actor,required this.nativeCurrent,required this.validUntil,
+    required this.changes,required this.acceptNativeRead,required this.track,required this.onRetired,required this.onPrepared});
+  final BuyV2Session session;
+  final String actionId;
+  final String? entity,reference;
+  final BuyV2SupplierQuoteSelection? quote;
+  final WorkspaceBulkQuote? head;
+  final BuyV2FulfilmentGroup? group;
+  final bool Function() current,actor,nativeCurrent,acceptNativeRead;
+  final DateTime validUntil;
+  final Listenable changes;
+  final ValueChanged<Future<void>> track;
+  final VoidCallback onRetired,onPrepared;
+  @override State<_BuyShop06ReviewPage> createState()=>_BuyShop06ReviewPageState();
+}
+class _BuyShop06ReviewPageState extends State<_BuyShop06ReviewPage>{
+  Route<dynamic>? _route;Timer? _expiry;bool _busy=false,_used=false,_retired=false,_closing=false;
+  String? _error;
+  bool get _owner=>mounted && !_retired && !_closing && widget.actor() && _route?.isCurrent==true;
+  bool get _current=>_owner && widget.current();
+  bool get _canAct=>_current && !_busy;
+  @override void initState(){super.initState();widget.changes.addListener(_changed);
+    final remaining=widget.validUntil.difference(DateTime.now());
+    _expiry=Timer(remaining.isNegative?Duration.zero:remaining,_retire);}
+  @override void didChangeDependencies(){super.didChangeDependencies();_route??=ModalRoute.of(context);
+    WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_changed();});}
+  void _changed(){if(!mounted || _closing)return;
+    if(!widget.actor() || !_busy && !_used && !widget.current())_retire();else setState((){});}
+  void _retire(){if(!mounted || _retired || _closing)return;_retired=true;widget.onRetired();
+    WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_finish();});WidgetsBinding.instance.ensureVisualUpdate();}
+  void _finish(){if(!mounted || _closing)return;_closing=true;final route=_route;
+    if(route?.isActive!=true)return;
+    if(route!.isCurrent)Navigator.of(context).pop(_used);else Navigator.of(context).removeRoute(route);}
+  Future<void> _perform(Future<void> Function() original,bool read)async{
+    if(!_canAct)return;
+    setState(()=>_busy=true);
+    final operation=()async{
+      try{
+        await original();
+        if(read){
+          if(_owner && widget.acceptNativeRead()){widget.onPrepared();_finish();}else{_used=false;}
+        }else{_used=true;}
+        if(const {'AI-ACT-350','AI-ACT-351'}.contains(widget.actionId) && !widget.nativeCurrent())_retire();
+      }on Object{if(_owner)_error='This action could not be completed. Check its original status before trying again.';}
+      finally{_busy=false;if(mounted){setState((){});_changed();}}
+    }();
+    widget.track(operation);await operation;
+  }
+  Widget _body(BuildContext context){
+    final session=widget.session;
+    switch(widget.actionId){
+      case 'AI-ACT-032':return ListView(padding:const EdgeInsets.all(16),children:[
+        _CheckoutPurchaseOrderReference(session:session,initialValue:widget.reference,inputCurrent:()=>_owner,canSave:()=>_canAct),
+      ]);
+      case 'AI-ACT-034':case 'AI-ACT-035':return ListView(padding:const EdgeInsets.all(16),children:[
+        _CommercialPaymentTermGroup(session:session,group:widget.group!,readOnly:true,inputCurrent:()=>_current),
+      ]);
+      case 'AI-ACT-348':return ListView(padding:const EdgeInsets.all(16),children:[
+        _SelectedSupplierQuote(session:session,quote:widget.quote!,onRemove:_canAct?(){
+          unawaited(_perform(()async{if(!_current)return;
+            if(!await session.removeSupplierQuote(widget.quote!))throw StateError('Native quote removal unavailable');
+            if(_owner){_used=true;_finish();}},false));
+        }:null),
+      ]);
+      case 'AI-ACT-349':return WorkspaceBulkQuotes(access:session.bulkQuotes!,readOnlyQuote:widget.head,
+        inputCurrent:()=>_current,onClose:_finish);
+      default:return ListView(padding:const EdgeInsets.all(16),children:[
+        BuyV2PurchaseOrderPanel(session:session,compact:false,capturedDocumentId:widget.actionId=='AI-ACT-351'?widget.entity:null),
+      ]);
+    }
+  }
+  @override Widget build(BuildContext context)=>PopScope<bool>(canPop:_closing,onPopInvokedWithResult:(didPop,_){if(!didPop)_finish();},
+    child:Scaffold(appBar:AppBar(title:const Text('Review purchase details'),leading:BackButton(onPressed:_finish)),
+      body:BuyV2ThemeScope(spec:BuyV2ThemeSpec.resolve(widget.session.destination,widget.session.view),refinedCommerce:true,
+        child:_BuyShop06Scope(action:widget.actionId,entity:widget.entity,current:()=>_canAct,inputCurrent:()=>_owner && widget.nativeCurrent(),perform:_perform,
+          child:!_retired && widget.actor() && (_busy || _used || widget.current())?
+            Column(children:[if(_error!=null)Padding(padding:const EdgeInsets.all(12),child:Text(_error!)),Expanded(child:Builder(builder:_body))]):const SizedBox.shrink()))));
+  @override void dispose(){_expiry?.cancel();widget.changes.removeListener(_changed);super.dispose();}
 }

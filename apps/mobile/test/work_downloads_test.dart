@@ -786,6 +786,77 @@ void main() {
     );
   }
 
+  test('AI-REPORT closed schemas accept only native report fields and exact analytics periods', () {
+    final valid = <String, Map<String, Object?>>{
+      'AI-ACT-312': {}, 'AI-ACT-313': {'periodDays': 7}, 'AI-ACT-314': {'periodDays': 30},
+      'AI-ACT-315': {'statementKind': 'sales', 'period': 'Week'},
+      'AI-ACT-409': {'customerId': 'ग्राहक-૧', 'period': 'Recorded history'},
+      'AI-ACT-410': {'customerId': 'ग्राहक-૧', 'period': 'Custom dates', 'from': '2026-09-01', 'to': '2026-09-10'},
+      'AI-ACT-411': {'sectionId': 'money'}, 'AI-ACT-412': {},
+    };
+    for (final row in valid.entries) {
+      final parsed = StoreReportInitialData.fromFields(row.key, row.value);
+      expect(parsed.fields, row.value); expect(() => parsed.fields['new'] = 'x', throwsUnsupportedError);
+      expect(() => StoreReportInitialData.fromFields(row.key, {...row.value, 'storeId': 'foreign'}), throwsFormatException);
+    }
+    for (final invalid in [0, 2, 90, 7.0, '7']) {
+      expect(() => StoreReportInitialData.fromFields('AI-ACT-313', {'periodDays': invalid}), throwsFormatException);
+    }
+    expect(() => StoreReportInitialData.fromFields('AI-ACT-411', {'sectionId': 'invented'}), throwsFormatException);
+    expect(() => StoreReportInitialData.fromFields('AI-ACT-313', {}), throwsFormatException);
+    expect(() => StoreReportInitialData.fromFields('AI-ACT-410', {'period': 'Custom dates', 'from': '2026-02-30', 'to': '2026-03-01'}), throwsFormatException);
+    expect(() => StoreReportInitialData.fromFields('AI-ACT-315', {'statementKind': 'sales', 'period': 'This week'}), throwsFormatException);
+  });
+  testWidgets('AI-REPORT selected original customer is prepared without print/export; only native PDF tap saves', (tester) async {
+    var saves = 0; final calls = <String>[]; final saved = Completer<void>();
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, (call) async { calls.add(call.method); return null; });
+    addTearDown(() => messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, null));
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: StoreCustomerReportsPanel(
+      accountId: 'account', storeId: 'store', storeName: 'Original Store', ledgers: [customer()], isCurrent: () => true,
+      initialData: StoreReportInitialData.fromFields('AI-ACT-410', {'customerId': 'customer-01'}),
+      saveFile: (bytes, name, format) async { saves++; expect(bytes, isNotEmpty); expect(format.extension, 'pdf'); saved.complete(); return true; })))));
+    await tester.pumpAndSettle(); expect(saves, 0); expect(calls, isEmpty);
+    final download = find.byKey(const Key('customer-statement-download-pdf'));
+    expect(tester.widget<TextButton>(download).onPressed, isNotNull);
+    await tester.ensureVisible(download); await tester.pumpAndSettle();
+    await tester.tap(download);
+    // The native PDF uses real asset/isolate work; pump its captured widget
+    // callbacks between real event turns instead of blocking the fake clock.
+    for (var turn = 0; turn < 100 && !saved.isCompleted; turn++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    expect(saved.isCompleted, isTrue, reason: 'Actual native PDF saver must complete');
+    expect(saves, 1); expect(calls, isEmpty);
+  });
+  testWidgets('AI-REPORT native custom dates are prefilled but missing opening coverage keeps export disabled', (tester) async {
+    var saves = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: StoreCustomerReportsPanel(
+      accountId: 'account', storeId: 'store', storeName: 'Store', ledgers: [customer()], isCurrent: () => true,
+      initialData: StoreReportInitialData.fromFields('AI-ACT-410', {'customerId': 'customer-01', 'period': 'Custom dates', 'from': '2026-09-01', 'to': '2026-09-10'}),
+      saveFile: (bytes, name, format) async { saves++; return true; })))));
+    await tester.pumpAndSettle();
+    final texts = tester.widgetList<TextField>(find.byType(TextField)).map((field) => field.controller?.text).toList();
+    expect(texts, containsAll(['01/09/2026', '10/09/2026']));
+    expect(tester.widget<TextButton>(find.byKey(const Key('customer-statement-download-pdf'))).onPressed, isNull);
+    expect(saves, 0);
+  });
+  testWidgets('AI-REPORT customer source retirement hides native exports and does not invent all-customer completeness', (tester) async {
+    final changes = ValueNotifier<int>(0); addTearDown(changes.dispose);
+    var current = true, saves = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: AnimatedBuilder(animation: changes,
+      builder: (context, _) => SingleChildScrollView(child: StoreCustomerReportsPanel(
+        accountId: 'account', storeId: 'store', storeName: 'Store', ledgers: [customer()], isCurrent: () => current,
+        scopeChanges: changes, initialData: StoreReportInitialData.fromFields('AI-ACT-315', {'statementKind': 'outstanding'}),
+        saveFile: (bytes, name, format) async { saves++; return true; }))))));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextButton>(find.byKey(const Key('customer-statement-download-pdf'))).onPressed, isNull);
+    current = false; changes.value++; await tester.pumpAndSettle();
+    expect(find.byKey(const Key('customer-statement-download-pdf')), findsNothing); expect(saves, 0);
+  });
+
   test('SALESSTATEMENT separates posted collections and refuses later-day zero', () {
     final f = WorkspaceFinanceSnapshot(accountScope: 'account', workspaceId: 'store',
       revision: 1, asOf: DateTime.utc(2026, 9, 10), salesTodayMinor: 0, duesMinor: 0,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,11 +13,35 @@ import '../buy/buy_v2_screen_test.dart'
     show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
+  Future<JourneySession> signedInJourney() async {
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'manual',
+          areaLabel: 'Jodhpur',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+    );
+    await session.start();
+    session.accountIdentity = const AuthenticatedAccountIdentity(
+      displayName: 'Host member',
+      emailAddress: 'host@example.com',
+      signInMethods: ['Email'],
+    );
+    return session;
+  }
+
   Future<GoRouter> pumpProfile(
     WidgetTester tester,
     JourneySession session, {
     Size size = const Size(390, 844),
     double textScale = 1,
+    Widget? gstDetails,
+    VoidCallback? onOpenAddresses,
+    Future<bool> Function(String name)? nameWriter,
     GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
   }) async {
     tester.view.devicePixelRatio = 1;
@@ -42,12 +67,16 @@ void main() {
           builder: (context, state) => GlobalPersonalProfileV2(
             session: session,
             surfaceTone: surfaceTone,
+            gstDetails: gstDetails,
+            onOpenAddresses: onOpenAddresses,
           ),
         ),
         GoRoute(
           path: '/app/account/identity/name',
-          builder: (_, _) =>
-              GlobalPersonalProfileNameEditorV2(session: session),
+          builder: (_, _) => GlobalPersonalProfileNameEditorV2(
+            session: session,
+            onSaveDisplayName: nameWriter,
+          ),
         ),
         GoRoute(
           path: '/app/account/security',
@@ -80,12 +109,213 @@ void main() {
     return router;
   }
 
+  testWidgets('guest Profile hides stale identity and unowned device alias', (
+    tester,
+  ) async {
+    final session = JourneySession(store: MemoryJourneyStore())
+      ..profileDisplayName = 'Unowned old alias'
+      ..accountIdentity = const AuthenticatedAccountIdentity(
+        displayName: 'Old identity',
+        emailAddress: 'old@example.com',
+        signInMethods: ['Email'],
+      );
+    addTearDown(session.dispose);
+    await pumpProfile(tester, session);
+    expect(find.text('Unowned old alias'), findsNothing);
+    expect(find.text('Old identity'), findsNothing);
+    expect(find.text('old@example.com'), findsNothing);
+    await tester.tap(find.byKey(const Key('global-personal-profile-name')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('profile-security-destination')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'buying details reuse the provided address action and collapsed invoice form',
+    (tester) async {
+      final session = JourneySession(store: MemoryJourneyStore());
+      addTearDown(session.dispose);
+      var addresses = 0;
+      await pumpProfile(
+        tester,
+        session,
+        gstDetails: const Text('Original invoice form fixture'),
+        onOpenAddresses: () => addresses++,
+      );
+      expect(find.text('Original invoice form fixture'), findsNothing);
+      await tester.tap(
+        find.byKey(const Key('global-personal-profile-addresses')),
+      );
+      expect(addresses, 1);
+      final invoice = find.byKey(
+        const Key('global-personal-profile-invoice-details'),
+      );
+      await tester.ensureVisible(invoice);
+      await tester.tap(find.text('Invoice details'));
+      await tester.pumpAndSettle();
+      expect(find.text('Original invoice form fixture'), findsOneWidget);
+    },
+  );
+
+  testWidgets('name editor rejects a draft after account identity changes', (
+    tester,
+  ) async {
+    final session = await signedInJourney();
+    addTearDown(session.dispose);
+    var calls = 0;
+    await pumpProfile(
+      tester,
+      session,
+      nameWriter: (_) async {
+        calls++;
+        return true;
+      },
+    );
+    await tester.tap(find.byKey(const Key('global-personal-profile-name')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('global-personal-profile-name-field')),
+      'Previous account draft',
+    );
+    final originalName = session.profileDisplayName;
+    session.accountIdentity = const AuthenticatedAccountIdentity(
+      displayName: 'Different account',
+      emailAddress: 'other@example.com',
+      signInMethods: ['Email'],
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(session.profileDisplayName, originalName);
+    expect(calls, 0);
+    expect(
+      find.byKey(const Key('global-personal-profile-name-editor')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'unconnected account name writer cannot report a device alias save',
+    (tester) async {
+      final session = await signedInJourney();
+      addTearDown(session.dispose);
+      await pumpProfile(tester, session);
+      await tester.tap(find.byKey(const Key('global-personal-profile-name')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Account name updates are not available right now.'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const Key('global-personal-profile-name-field')),
+            )
+            .readOnly,
+        isTrue,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('global-personal-profile-name-save')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(session.profileDisplayName, isNull);
+    },
+  );
+
+  for (final result in ['ack', 'reject', 'throw', 'actor-change']) {
+    testWidgets(
+      'account name writer $result preserves acknowledgement and navigation',
+      (tester) async {
+        final session = await signedInJourney();
+        addTearDown(session.dispose);
+        final completion = Completer<bool>();
+        var calls = 0;
+        final router = await pumpProfile(
+          tester,
+          session,
+          nameWriter: (name) {
+            expect(name, 'Reviewed name');
+            calls++;
+            return completion.future;
+          },
+        );
+        await tester.tap(find.byKey(const Key('global-personal-profile-name')));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const Key('global-personal-profile-name-field')),
+          '  Reviewed name  ',
+        );
+        final save = tester
+            .widget<FilledButton>(
+              find.byKey(const Key('global-personal-profile-name-save')),
+            )
+            .onPressed!;
+        save();
+        save();
+        await tester.pump();
+        expect(calls, 1);
+        expect(
+          find.byKey(const Key('global-personal-profile-name-editor')),
+          findsOneWidget,
+        );
+        if (result == 'actor-change') {
+          session.accountIdentity = const AuthenticatedAccountIdentity(
+            displayName: 'New actor',
+            signInMethods: ['Email'],
+          );
+          router.go('/app/account/security');
+          await tester.pumpAndSettle();
+        }
+        if (result == 'throw') {
+          completion.completeError(StateError('host writer failed'));
+        } else {
+          completion.complete(result != 'reject');
+        }
+        await tester.pumpAndSettle();
+        if (result == 'ack') {
+          expect(
+            find.byKey(const Key('global-personal-profile-v2')),
+            findsOneWidget,
+          );
+        } else if (result == 'actor-change') {
+          expect(
+            find.byKey(const Key('profile-security-destination')),
+            findsOneWidget,
+          );
+        } else {
+          expect(
+            find.text(
+              'Could not save your name. Check your account and try again.',
+            ),
+            findsOneWidget,
+          );
+          expect(
+            tester
+                .widget<TextField>(
+                  find.byKey(const Key('global-personal-profile-name-field')),
+                )
+                .controller!
+                .text,
+            '  Reviewed name  ',
+          );
+        }
+        expect(session.profileDisplayName, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final textScale in [1.0, 2.0]) {
     for (final size in [const Size(390, 844), const Size(320, 568)]) {
       testWidgets('D004 complete name validation ${size.width} text $textScale', (
         tester,
       ) async {
-        final session = JourneySession(store: MemoryJourneyStore());
+        final session = await signedInJourney();
         addTearDown(session.dispose);
         final originalName = session.profileDisplayName;
         final router = await pumpProfile(
@@ -93,6 +323,8 @@ void main() {
           session,
           size: size,
           textScale: textScale,
+          nameWriter: (_) async =>
+              throw StateError('Invalid name must not reach writer'),
         );
         await tester.scrollUntilVisible(
           find.byKey(const Key('global-personal-profile-name')),
@@ -114,7 +346,7 @@ void main() {
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
         const message = 'Enter a display name from 2 to 60 characters.';
-        expect(session.errorMessage, message);
+        expect(find.text(message), findsOneWidget);
         expect(session.profileDisplayName, originalName);
         for (final keyboard in [true, false]) {
           if (!keyboard) {
@@ -149,13 +381,18 @@ void main() {
   testWidgets('one personal profile shows only global account information', (
     tester,
   ) async {
-    final session = JourneySession(store: MemoryJourneyStore())
-      ..accountIdentity = const AuthenticatedAccountIdentity(
-        displayName: 'Test Member',
-        emailAddress: 'member@example.com',
-        phoneNumber: '+91 90000 00000',
-        signInMethods: ['Google', 'Phone'],
-      )
+    final session = JourneySession(
+      store: MemoryJourneyStore(),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+    );
+    await session.start();
+    session.accountIdentity = const AuthenticatedAccountIdentity(
+      displayName: 'Test Member',
+      emailAddress: 'member@example.com',
+      phoneNumber: '+91 90000 00000',
+      signInMethods: ['Google', 'Phone'],
+    );
+    session
       ..languageCode = 'en'
       ..currentAreaLabel = 'Jodhpur';
     addTearDown(session.dispose);
@@ -165,10 +402,17 @@ void main() {
     expect(find.text('Test Member'), findsWidgets);
     expect(find.text('member@example.com'), findsWidgets);
     expect(find.text('+91 90000 00000'), findsOne);
-    expect(find.text('Jodhpur'), findsOne);
-    expect(find.text('Google · Phone'), findsOne);
-    expect(find.text('3 of 3 complete'), findsOne);
-    expect(find.textContaining('Workspace'), findsNothing);
+    expect(find.byKey(const Key('global-personal-profile-area')), findsNothing);
+    expect(find.text('Google · Phone'), findsNothing);
+    expect(
+      find.byKey(const Key('global-personal-profile-progress')),
+      findsNothing,
+    );
+    expect(find.text('My Workspaces'), findsNothing);
+    expect(
+      find.byKey(const Key('global-profile-active-workspace')),
+      findsNothing,
+    );
     expect(find.textContaining('Orders'), findsNothing);
     expect(find.textContaining('Payments'), findsNothing);
 
@@ -194,35 +438,33 @@ void main() {
     addTearDown(session.dispose);
     final router = await pumpProfile(tester, session);
 
-    expect(find.text('Sign in'), findsOneWidget);
-    expect(find.text('Not signed in'), findsOneWidget);
-    expect(find.text('Add a sign-in method'), findsOneWidget);
-    expect(find.text('Next: display name · contact'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('global-personal-profile-name')));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('global-personal-profile-name-field')),
-      'Aarav Sharma',
-    );
-    await tester.ensureVisible(
-      find.byKey(const Key('global-personal-profile-name-save')),
-    );
-    await tester.pumpAndSettle();
-    tester
-        .widget<FilledButton>(
-          find.byKey(const Key('global-personal-profile-name-save')),
-        )
-        .onPressed!();
-    await tester.pumpAndSettle();
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pumpAndSettle();
-    expect(session.profileDisplayName, 'Aarav Sharma');
-    expect(find.text('Aarav Sharma'), findsWidgets);
+    expect(find.text('Sign in with email or mobile OTP'), findsOneWidget);
     expect(
-      router.routeInformationProvider.value.uri.path,
-      '/app/account/identity',
+      find.byKey(const Key('global-personal-profile-status')),
+      findsNothing,
     );
+    expect(
+      find.byKey(const Key('global-personal-profile-methods')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('global-personal-profile-progress-detail')),
+      findsNothing,
+    );
+
+    final nameRow = find.byKey(const Key('global-personal-profile-name'));
+    expect(nameRow.hitTestable(), findsOneWidget);
+    await tester.tap(nameRow);
+    await tester.pumpAndSettle();
+    expect(
+      GoRouterState.of(
+        tester.element(find.byKey(const Key('profile-security-destination'))),
+      ).uri.path,
+      '/app/account/security',
+    );
+    expect(session.profileDisplayName, isNull);
+    router.go('/app/account/identity');
+    await tester.pumpAndSettle();
 
     await tester.ensureVisible(
       find.byKey(const Key('global-personal-profile-email')),
@@ -245,27 +487,17 @@ void main() {
     router.go('/app/account/identity');
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(
+    expect(
       find.byKey(const Key('global-personal-profile-language')),
-    );
-    await tester.pumpAndSettle();
-    tester
-        .widget<InkWell>(
-          find.byKey(const Key('global-personal-profile-language')),
-        )
-        .onTap!();
-    await tester.pumpAndSettle();
-    expect(
-      GoRouterState.of(
-        tester.element(
-          find.byKey(const Key('profile-preferences-destination')),
-        ),
-      ).uri.path,
-      '/app/account/workspaces/preferences',
+      findsNothing,
     );
     expect(
-      find.byKey(const Key('profile-preferences-destination')),
-      findsOneWidget,
+      find.byKey(const Key('global-personal-profile-plans')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('global-personal-profile-workspaces')),
+      findsNothing,
     );
     expect(tester.takeException(), isNull);
   });
@@ -273,12 +505,13 @@ void main() {
   testWidgets('compact personal profile remains readable without overflow', (
     tester,
   ) async {
-    final session = JourneySession(store: MemoryJourneyStore())
-      ..accountIdentity = const AuthenticatedAccountIdentity(
-        displayName: 'A long authenticated MoolSocial member name',
-        emailAddress: 'a.long.account.address@example.com',
-        signInMethods: ['Email'],
-      )
+    final session = await signedInJourney();
+    session.accountIdentity = const AuthenticatedAccountIdentity(
+      displayName: 'A long authenticated MoolSocial member name',
+      emailAddress: 'a.long.account.address@example.com',
+      signInMethods: ['Email'],
+    );
+    session
       ..languageCode = 'hi'
       ..manualArea = 'Khema-Ka-Kuwa, Jodhpur, Rajasthan';
     addTearDown(session.dispose);

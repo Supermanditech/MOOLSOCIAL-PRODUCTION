@@ -7,6 +7,8 @@ import '../../shared/commerce/commerce_downloads.dart';
 import '../../shared/commerce/commerce_downloads_screen.dart';
 
 import '../book/book_session.dart';
+import '../assistant/mool_assistant.dart';
+import '../../ui_v2/assistant/mool_assistant_v2.dart';
 import '../book/screens/book_home_screen.dart';
 import '../book/screens/bus_booking_screen.dart';
 import '../book/screens/doctor_screens.dart';
@@ -105,6 +107,7 @@ import '../work/work_session.dart';
 import '../../ui_v2/launch/launch_interruption_guard.dart';
 import '../../ui_v2/launch/launch_presentation_gate.dart';
 import '../../ui_v2/profile/global_personal_profile_v2.dart';
+import '../../ui_v2/profile/global_account_plans_v2.dart';
 import '../../ui_v2/profile/global_privacy_preferences_v2.dart';
 import '../../ui_v2/profile/global_profile_panel_v2.dart';
 import '../../ui_v2/profile/global_help_support_v2.dart';
@@ -138,8 +141,10 @@ final class _WorkspacePublicBuyCommerceAdapter implements BuyV2CommerceAdapter {
     final selected = loadProduct == null ? product : await loadProduct!();
     return BuyV2CommerceSnapshot(
       state: loadProduct != null && selected == null
-          ? BuyV2CommerceLoadState.unavailable : BuyV2CommerceLoadState.ready,
-      products: [?selected], paymentMethods: const {},
+          ? BuyV2CommerceLoadState.unavailable
+          : BuyV2CommerceLoadState.ready,
+      products: [?selected],
+      paymentMethods: const {},
     );
   }
 
@@ -280,9 +285,14 @@ GoRouter createJourneyRouter(
   _WorkspacePublicBuySession? workspacePublicBuySession;
   String? workspacePublicBuySignature;
   Future<void>? workspacePublicBuyRestore;
-  BuyV2Session resolveWorkspacePublicBuySession(String productId, BuyV2Destination destination) {
+  BuyV2Session resolveWorkspacePublicBuySession(
+    String productId,
+    BuyV2Destination destination,
+  ) {
     final source = workSession.catalogueGateway;
-    final publicSource = source is AuthenticatedWorkspaceCatalogueGateway ? source : null;
+    final publicSource = source is AuthenticatedWorkspaceCatalogueGateway
+        ? source
+        : null;
     BuyV2Session unavailablePreview() {
       workspacePublicBuySession?.dispose();
       final blocked = _WorkspacePublicBuySession(
@@ -294,16 +304,22 @@ GoRouter createJourneyRouter(
       workspacePublicBuyRestore = blocked.restoreCommerce();
       return blocked;
     }
+
     // Private draft completeness never stands in for server publication. The
     // configured path must obtain verified public readback, with no local fallback.
-    if (publicSource == null && (!workSession.workspaceVisibleToCustomers ||
-        !workSession.workspacePublicationReport.ready)) {
+    if (publicSource == null &&
+        (!workSession.workspaceVisibleToCustomers ||
+            !workSession.workspacePublicationReport.ready)) {
       return unavailablePreview();
     }
     final product = workSession.workspaceCatalogueItems
-        .where((item) => item.id == productId && (publicSource != null || item.published))
+        .where(
+          (item) =>
+              item.id == productId && (publicSource != null || item.published),
+        )
         .firstOrNull;
-    if (product == null) return publicSource == null ? buyV2Session : unavailablePreview();
+    if (product == null)
+      return publicSource == null ? buyV2Session : unavailablePreview();
     final storeId = workSession.activeWorkspace?.id ?? workSession.workspaceId;
     final authentication = session.navigationAuthenticationGeneration;
     final ownerContext = workSession.publicationPreferencesContext;
@@ -317,10 +333,18 @@ GoRouter createJourneyRouter(
     } on FormatException {
       return unavailablePreview();
     }
-    final exact = priceMinor % 100 != 0 || mrpMinor != null && mrpMinor % 100 != 0;
+    final exact =
+        priceMinor % 100 != 0 || mrpMinor != null && mrpMinor % 100 != 0;
     final signatureValues = [
       storeId,
-      if (publicSource != null) [authentication, contextFields.$1, contextFields.$2, contextFields.$3, destination.name],
+      if (publicSource != null)
+        [
+          authentication,
+          contextFields.$1,
+          contextFields.$2,
+          contextFields.$3,
+          destination.name,
+        ],
       product.id,
       product.canonicalId,
       product.title,
@@ -329,7 +353,11 @@ GoRouter createJourneyRouter(
       product.pack,
       product.barcode,
       exact ? priceMinor : priceMinor ~/ 100,
-      mrpMinor == null ? null : exact ? mrpMinor : mrpMinor ~/ 100,
+      mrpMinor == null
+          ? null
+          : exact
+          ? mrpMinor
+          : mrpMinor ~/ 100,
       product.unitPrice,
       product.minimumOrder,
       product.returnPolicy,
@@ -355,67 +383,112 @@ GoRouter createJourneyRouter(
       workSession.workspacePublicationDetails.toJson(),
       workSession.activeWorkspace?.name ?? workSession.workName,
     ];
-    final signature = jsonEncode(exact
-        ? {'version': 2, 'moneyUnit': 'minor', 'values': signatureValues} : signatureValues);
+    final signature = jsonEncode(
+      exact
+          ? {'version': 2, 'moneyUnit': 'minor', 'values': signatureValues}
+          : signatureValues,
+    );
     if (workspacePublicBuySession != null &&
         workspacePublicBuySignature == signature) {
       return workspacePublicBuySession!;
     }
     workspacePublicBuySession?.dispose();
-    final publicProduct = publicSource == null ? product.toBuyPublicProduct(
-      storeName: workSession.activeWorkspace?.name ?? workSession.workName,
-      storeId: storeId,
-      confirmedOn: 'Updated by Store',
-      storeDetails: workSession.workspacePublicationDetails,
-    ) : null;
+    final publicProduct = publicSource == null
+        ? product.toBuyPublicProduct(
+            storeName:
+                workSession.activeWorkspace?.name ?? workSession.workName,
+            storeId: storeId,
+            confirmedOn: 'Updated by Store',
+            storeDetails: workSession.workspacePublicationDetails,
+          )
+        : null;
     final contentReadback = workSession.workspaceCatalogueReadback;
     late final _WorkspacePublicBuySession next;
-    bool current() => identical(workspacePublicBuySession, next) &&
-      authentication != null && session.navigationAuthenticationGeneration == authentication &&
-      workSession.activeWorkspace?.id == storeId && workSession.publicationPreferencesContext == ownerContext &&
-      workSession.navigationScopeRevision == navigation;
+    bool current() =>
+        identical(workspacePublicBuySession, next) &&
+        authentication != null &&
+        session.navigationAuthenticationGeneration == authentication &&
+        workSession.activeWorkspace?.id == storeId &&
+        workSession.publicationPreferencesContext == ownerContext &&
+        workSession.navigationScopeRevision == navigation;
     next = _WorkspacePublicBuySession(
       core: buySession,
-      storeStockReader: publicSource?.stockSnapshotsSupported == true && contentReadback != null ? WorkspacePublicStockReader(
-        gateway: publicSource!, displayed: contentReadback.displayedProduct, current: current, now: publicSource.now) : null,
+      storeStockReader:
+          publicSource?.stockSnapshotsSupported == true &&
+              contentReadback != null
+          ? WorkspacePublicStockReader(
+              gateway: publicSource!,
+              displayed: contentReadback.displayedProduct,
+              current: current,
+              now: publicSource.now,
+            )
+          : null,
       commerceAdapter: publicSource == null
           ? _WorkspacePublicBuyCommerceAdapter(publicProduct)
-          : _WorkspacePublicBuyCommerceAdapter(null, loadProduct: () async {
-              if (!current() || storeId == null) return null;
-              final entry = await publicSource.readPublicEntry(storeId: storeId, skuId: product.id,
-                channel: destination == BuyV2Destination.wholesale
-                    ? product.wholesaleOffer?.saleType == BuyV2WholesaleSaleType.bulk ? BuyV2OfferClass.bulk : BuyV2OfferClass.wholesale
-                    : BuyV2OfferClass.retail, current: current);
-              if (entry == null || !current()) return null;
-              next.resolvedProductId = entry.product.id;
-              contentReadback?.admitPublicEntry(entry, expectedContext: ownerContext);
-              return entry.product;
-            }),
-      cataloguePageSource: publicSource == null || storeId == null ? null : WorkspaceStoreCatalogueSource(
-        gateway: publicSource, storeId: storeId, current: current, contentReadback: contentReadback),
-      productContentAdapter: contentReadback ?? WorkspacePublicContentAdapter(
-        storeId: storeId!,
-        item: product,
-        sourceId: 'store:$storeId:sku:${product.id}',
-      ),
+          : _WorkspacePublicBuyCommerceAdapter(
+              null,
+              loadProduct: () async {
+                if (!current() || storeId == null) return null;
+                final entry = await publicSource.readPublicEntry(
+                  storeId: storeId,
+                  skuId: product.id,
+                  channel: destination == BuyV2Destination.wholesale
+                      ? product.wholesaleOffer?.saleType ==
+                                BuyV2WholesaleSaleType.bulk
+                            ? BuyV2OfferClass.bulk
+                            : BuyV2OfferClass.wholesale
+                      : BuyV2OfferClass.retail,
+                  current: current,
+                );
+                if (entry == null || !current()) return null;
+                next.resolvedProductId = entry.product.id;
+                contentReadback?.admitPublicEntry(
+                  entry,
+                  expectedContext: ownerContext,
+                );
+                return entry.product;
+              },
+            ),
+      cataloguePageSource: publicSource == null || storeId == null
+          ? null
+          : WorkspaceStoreCatalogueSource(
+              gateway: publicSource,
+              storeId: storeId,
+              current: current,
+              contentReadback: contentReadback,
+            ),
+      productContentAdapter:
+          contentReadback ??
+          WorkspacePublicContentAdapter(
+            storeId: storeId!,
+            item: product,
+            sourceId: 'store:$storeId:sku:${product.id}',
+          ),
     );
     workspacePublicBuySession = next;
     workspacePublicBuySignature = signature;
     if (contentReadback != null) {
       void changed() {
         if (identical(workspacePublicBuySession, next) &&
-            identical(workSession.workspaceCatalogueReadback, contentReadback)) {
+            identical(
+              workSession.workspaceCatalogueReadback,
+              contentReadback,
+            )) {
           for (final id in contentReadback.observedProductIds) {
             if (next.findProduct(id) != null) next.refreshProductContent(id);
           }
         }
       }
+
       contentReadback.addListener(changed);
-      next.releaseContentReadback = () => contentReadback.removeListener(changed);
+      next.releaseContentReadback = () =>
+          contentReadback.removeListener(changed);
     }
     workspacePublicBuyRestore = () async {
       await next.restoreCommerce();
-      if (publicSource == null && contentReadback != null && identical(workspacePublicBuySession, next)) {
+      if (publicSource == null &&
+          contentReadback != null &&
+          identical(workspacePublicBuySession, next)) {
         final selected = next.findProduct(publicProduct!.id);
         if (selected != null) await contentReadback.refresh(selected);
       }
@@ -470,6 +543,45 @@ GoRouter createJourneyRouter(
       router.replace(location);
     }
   }
+
+  bool profileWorkspaceReadReady() =>
+      workSession.workspaceAccountCurrent(
+        accountReady: session.isAuthenticated,
+      ) &&
+      !workSession.workspaceAccountRecoveryPending &&
+      !workSession.workspaceAccountRecoveryFailed;
+  bool profileApprovedWorkspace() =>
+      session.isAuthenticated &&
+      profileWorkspaceReadReady() &&
+      workSession.workspaceStoreAuthoringAvailable &&
+      workSession.workspaceApprovalMatchesAccount(
+        session.authenticatedBuyPersistenceIdentity,
+      );
+  bool profileOwnedApplication() {
+    final account = session.authenticatedBuyPersistenceIdentity;
+    return session.isAuthenticated &&
+        profileWorkspaceReadReady() &&
+        account != null &&
+        workSession.workspaceApplicationAccountScope == account.userId &&
+        workSession.reviewCaseId != null;
+  }
+
+  Widget profileAccountScope(Widget child) => GlobalProfileAccountScope(
+    changes: Listenable.merge([session, workSession]),
+    readAuthenticated: () => session.isAuthenticated,
+    readApplicationInProgress: profileOwnedApplication,
+    readApprovedWorkspace: () {
+      if (!profileApprovedWorkspace()) return null;
+      final workspace = workSession.activeWorkspace;
+      if (workspace == null) return null;
+      return GlobalProfileWorkspaceContext(
+        name: workspace.name,
+        roleLabel: workspace.profileLabel,
+        area: workspace.area,
+      );
+    },
+    child: child,
+  );
 
   router = GoRouter(
     initialLocation: initialLocation,
@@ -700,7 +812,10 @@ GoRouter createJourneyRouter(
               state.uri.queryParameters['workspaceProduct'];
           final routedBuySession = workspaceProductId == null
               ? buyV2Session
-              : resolveWorkspacePublicBuySession(workspaceProductId, destination);
+              : resolveWorkspacePublicBuySession(
+                  workspaceProductId,
+                  destination,
+                );
           if (routedBuySession case final _WorkspacePublicBuySession session) {
             session.directProductExit = buyExit(context, state);
           }
@@ -718,7 +833,8 @@ GoRouter createJourneyRouter(
             initialView: view,
             initialCartScope: cartScope,
             productId: routedBuySession is _WorkspacePublicBuySession
-                ? routedBuySession.resolvedProductId ?? state.uri.queryParameters['product']
+                ? routedBuySession.resolvedProductId ??
+                      state.uri.queryParameters['product']
                 : state.uri.queryParameters['product'],
             orderId: state.uri.queryParameters['order'],
             recoveryKind: _buyV2Recovery(state.uri.queryParameters['recovery']),
@@ -728,20 +844,22 @@ GoRouter createJourneyRouter(
           );
           return moolMainDestinationPage(
             state: state,
-            child: workspaceProductId == null
-                ? buildBuyScreen()
-                : FutureBuilder<void>(
-                    future: workspacePublicBuyRestore,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState != ConnectionState.done) {
-                        return const ColoredBox(
-                          color: Color(0xFFF8FAFF),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      return buildBuyScreen();
-                    },
-                  ),
+            child: profileAccountScope(
+              workspaceProductId == null
+                  ? buildBuyScreen()
+                  : FutureBuilder<void>(
+                      future: workspacePublicBuyRestore,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState != ConnectionState.done) {
+                          return const ColoredBox(
+                            color: Color(0xFFF8FAFF),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        return buildBuyScreen();
+                      },
+                    ),
+            ),
           );
         },
       ),
@@ -1882,6 +2000,7 @@ GoRouter createJourneyRouter(
         path: '/app/account/identity',
         builder: (context, state) => GlobalPersonalProfileV2(
           session: session,
+          onOpenAddresses: () => showBuyV2AddressSheet(context, buyV2Session),
           gstDetails: BuyV2GstProfileSection(
             key: ValueKey(session.accountIdentity),
             store: buyV2Session.gstInvoiceProfileStore,
@@ -1922,8 +2041,16 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/account/workspaces',
-        builder: (context, state) =>
-            SharedHubScreen(session: sharedSession, screen: 162),
+        redirect: (context, state) {
+          if (!session.isAuthenticated) {
+            return '/app/account/security?return=%2Fapp%2Faccount%2Fidentity';
+          }
+          if (profileApprovedWorkspace())
+            return '/app/work/workspace/dashboard';
+          return profileOwnedApplication()
+              ? '/app/work/workspace/proof'
+              : '/app/work/workspace/choose?entry=workspaces';
+        },
       ),
       GoRoute(
         path: '/app/account/workspaces/preferences',
@@ -1936,11 +2063,23 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/account/plans',
-        builder: (context, state) => SocialPlansV2Screen(
-          sharedSession: sharedSession,
-          retailerSession: retailerSession,
-          creatorSession: creatorSession,
-        ),
+        builder: (context, state) =>
+            state.uri.queryParameters['scope'] == 'account'
+            ? AnimatedBuilder(
+                animation: session,
+                builder: (context, _) => GlobalAccountPlansV2(
+                  accountScope: session.authenticatedBuyPersistenceIdentity,
+                  accountAuthenticated: session.isAuthenticated,
+                  onClose: () => context.canPop()
+                      ? context.pop()
+                      : context.go('/app/account/identity'),
+                ),
+              )
+            : SocialPlansV2Screen(
+                sharedSession: sharedSession,
+                retailerSession: retailerSession,
+                creatorSession: creatorSession,
+              ),
       ),
       GoRoute(
         path: '/app/social/promote',
@@ -1965,7 +2104,7 @@ GoRouter createJourneyRouter(
         path: '/app/work/earn',
         pageBuilder: (context, state) => moolMainDestinationPage(
           state: state,
-          child: WorkEarnScreen(session: workSession),
+          child: profileAccountScope(WorkEarnScreen(session: workSession)),
         ),
       ),
       GoRoute(
@@ -2019,14 +2158,35 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/work/workspace/dashboard',
-        builder: (context, state) => WorkWorkspaceDashboardScreen(
-          session: workSession,
-          initialSection: state.uri.queryParameters['section'],
-          procurementSession: buyV2Session,
-          useStoreProcurement: true,
-          accountIdentity: session.accountIdentity,
-          accountAuthenticated: session.isAuthenticated,
-          accountRecoveryReady: session.isAuthenticated || uiReviewOnly,
+        builder: (context, state) => profileAccountScope(
+          MoolAssistantWorkspaceScope(
+            readWorkspace: () {
+              final workspace = workSession.activeWorkspace;
+              final revision = workSession.navigationScopeRevision;
+              if (workspace == null || revision == null) return null;
+              return MoolAssistantWorkspace(
+                id: workspace.id,
+                name: workspace.name,
+                profile: workspace.profileId,
+                revision: revision,
+                isStore: workSession.workspaceStoreAuthoringAvailable,
+                approved: workSession.workspaceApprovalMatchesAccount(
+                  session.authenticatedBuyPersistenceIdentity,
+                ),
+                approvalAccountScope:
+                    session.authenticatedBuyPersistenceIdentity,
+              );
+            },
+            child: WorkWorkspaceDashboardScreen(
+              session: workSession,
+              initialSection: state.uri.queryParameters['section'],
+              procurementSession: buyV2Session,
+              useStoreProcurement: true,
+              accountIdentity: session.accountIdentity,
+              accountAuthenticated: session.isAuthenticated,
+              accountRecoveryReady: session.isAuthenticated || uiReviewOnly,
+            ),
+          ),
         ),
       ),
       GoRoute(

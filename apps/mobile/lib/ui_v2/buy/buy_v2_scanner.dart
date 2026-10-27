@@ -229,20 +229,24 @@ class _BuyV2CollectionCameraState extends State<BuyV2CollectionCamera>
 typedef BuyV2ScannerLauncher = Future<String?> Function(BuildContext context);
 
 /// Returns only a code. The Store caller owns matching, review and saving.
-Future<String?> showStoreProductScanner(BuildContext context) =>
-    showBuyV2ProductScanner(context, storeMode: true);
+Future<String?> showStoreProductScanner(BuildContext context, {bool Function()? ownerCurrent, Listenable? ownerChanges}) =>
+    showBuyV2ProductScanner(context, storeMode: true, ownerCurrent: ownerCurrent, ownerChanges: ownerChanges);
 
 Future<String?> showBuyV2ProductScanner(
   BuildContext context, {
   bool storeMode = false,
+  bool Function()? ownerCurrent,
+  Listenable? ownerChanges,
 }) async {
+  if (ownerCurrent?.call() == false) return null;
   final permission = await Permission.camera.request();
+  if (ownerCurrent?.call() == false) return null;
   if (!permission.isGranted) {
     if (!context.mounted) return null;
     return showBuyV2ManualCodeSheet(
       context,
       cameraUnavailable: true,
-      storeMode: storeMode,
+      storeMode: storeMode, ownerCurrent: ownerCurrent, ownerChanges: ownerChanges,
       canOpenSettings:
           permission.isPermanentlyDenied || permission.isRestricted,
     );
@@ -252,7 +256,7 @@ Future<String?> showBuyV2ProductScanner(
   return Navigator.of(context).push<String>(
     MaterialPageRoute<String>(
       fullscreenDialog: true,
-      builder: (_) => BuyV2ProductScanner(storeMode: storeMode),
+      builder: (_) => _BuyV2ScannerOwner(current: ownerCurrent, changes: ownerChanges, child: BuyV2ProductScanner(storeMode: storeMode,ownerCurrent: ownerCurrent,ownerChanges: ownerChanges)),
     ),
   );
 }
@@ -262,6 +266,7 @@ Future<String?> showBuyV2ManualCodeSheet(
   bool cameraUnavailable = false,
   bool canOpenSettings = false,
   bool storeMode = false,
+  bool Function()? ownerCurrent, Listenable? ownerChanges,
 }) {
   return showModalBottomSheet<String>(
     context: context,
@@ -278,11 +283,11 @@ Future<String?> showBuyV2ManualCodeSheet(
       padding: EdgeInsets.only(
         bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
       ),
-      child: _BuyV2ManualCodePanel(
+      child: _BuyV2ScannerOwner(current: ownerCurrent, changes: ownerChanges, child: _BuyV2ManualCodePanel(
         storeMode: storeMode,
         cameraUnavailable: cameraUnavailable,
-        canOpenSettings: canOpenSettings,
-      ),
+        canOpenSettings: canOpenSettings,ownerCurrent: ownerCurrent,
+      )),
     ),
   );
 }
@@ -291,12 +296,13 @@ class _BuyV2ManualCodePanel extends StatefulWidget {
   const _BuyV2ManualCodePanel({
     this.storeMode = false,
     required this.cameraUnavailable,
-    required this.canOpenSettings,
+    required this.canOpenSettings,this.ownerCurrent,
   });
 
   final bool cameraUnavailable;
   final bool storeMode;
   final bool canOpenSettings;
+  final bool Function()? ownerCurrent;
 
   @override
   State<_BuyV2ManualCodePanel> createState() => _BuyV2ManualCodePanelState();
@@ -313,6 +319,7 @@ class _BuyV2ManualCodePanelState extends State<_BuyV2ManualCodePanel> {
   }
 
   void _submit([String? value]) {
+    if (widget.ownerCurrent != null && (!mounted || !widget.ownerCurrent!() || ModalRoute.of(context)?.isCurrent != true)) return;
     final code = (value ?? _controller.text).trim();
     if (code.isEmpty) {
       setState(() => _showCodeError = true);
@@ -527,7 +534,9 @@ class _BuyV2ManualCodePanelState extends State<_BuyV2ManualCodePanel> {
 }
 
 class BuyV2ProductScanner extends StatefulWidget {
-  const BuyV2ProductScanner({super.key, this.storeMode = false});
+  const BuyV2ProductScanner({super.key, this.storeMode = false,this.ownerCurrent,this.ownerChanges});
+  final bool Function()? ownerCurrent;
+  final Listenable? ownerChanges;
   final bool storeMode;
 
   @override
@@ -600,6 +609,7 @@ class _BuyV2ProductScannerState extends State<BuyV2ProductScanner>
   }
 
   Future<void> _complete(String code) async {
+    if (widget.ownerCurrent != null && (!mounted || !widget.ownerCurrent!() || ModalRoute.of(context)?.isCurrent != true)) return;
     if (_handled || code.trim().isEmpty) return;
     _handled = true;
     _scanFeedbackTimer?.cancel();
@@ -616,7 +626,7 @@ class _BuyV2ProductScannerState extends State<BuyV2ProductScanner>
       // A decoded/manual result must not be lost if camera teardown fails.
     }
     await Future<void>.delayed(const Duration(milliseconds: 180));
-    if (mounted) Navigator.of(context).pop(code.trim());
+    if (mounted && (widget.ownerCurrent == null || widget.ownerCurrent!() && ModalRoute.of(context)?.isCurrent == true)) Navigator.of(context).pop(code.trim());
   }
 
   Future<void> _scanNow() async {
@@ -666,6 +676,7 @@ class _BuyV2ProductScannerState extends State<BuyV2ProductScanner>
   }
 
   Future<void> _enterCode() async {
+    if (widget.ownerCurrent != null && (!mounted || !widget.ownerCurrent!())) return;
     if (_handled || _manualOpen || _scanActionBusy) return;
     _scanFeedbackTimer?.cancel();
     final direction = _controller.value.cameraDirection;
@@ -680,11 +691,10 @@ class _BuyV2ProductScannerState extends State<BuyV2ProductScanner>
       // Manual entry remains available even when the camera cannot stop cleanly.
     }
     if (!mounted) return;
-    final code = await showBuyV2ManualCodeSheet(
-      context,
-      storeMode: widget.storeMode,
-    );
-    if (!mounted) return;
+    if (widget.ownerCurrent?.call() == false) return;
+    final code = await showBuyV2ManualCodeSheet(context,storeMode: widget.storeMode,
+      ownerCurrent: widget.ownerCurrent,ownerChanges: widget.ownerChanges);
+    if (!mounted || widget.ownerCurrent?.call() == false) return;
     setState(() => _manualOpen = false);
     if (code != null) {
       await _complete(code);
@@ -1307,4 +1317,16 @@ class _ScannerFramePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// Optional native owner lifetime. Manual callers retain their existing path.
+class _BuyV2ScannerOwner extends StatelessWidget {
+  const _BuyV2ScannerOwner({required this.current, required this.changes, required this.child});
+  final bool Function()? current;
+  final Listenable? changes;
+  final Widget child;
+  Widget surface() => current?.call() != false ? child : const Material(child: SafeArea(
+    child: Padding(padding: EdgeInsets.all(24), child: Text('Your Store or account changed. Close this scanner.'))));
+  @override Widget build(BuildContext context) => changes == null ? surface() :
+    AnimatedBuilder(animation: changes!, builder: (context, _) => surface());
 }

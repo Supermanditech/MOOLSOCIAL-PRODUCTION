@@ -11,12 +11,18 @@ class StoreCustomerFeedback extends StatefulWidget {
     required this.controller,
     required this.onClose,
     this.orderId,
-    this.onOpenOrder,
+    this.onOpenOrder,this.preparedReviewId,this.preparedReportText,this.reviewCurrent,this.reviewOwnerCurrent,this.onReviewNativeChange,this.reviewChanges,this.runPreparedNative,this.onPreparedDraft,
   });
   final StoreFeedbackController? controller;
   final VoidCallback onClose;
   final String? orderId;
   final ValueChanged<String>? onOpenOrder;
+  final String? preparedReviewId,preparedReportText;
+  final bool Function()? reviewCurrent,reviewOwnerCurrent;
+  final VoidCallback? onReviewNativeChange;
+  final Listenable? reviewChanges;
+  final Future<void> Function(Future<void> Function())? runPreparedNative;
+  final ValueChanged<String>? onPreparedDraft;
 
   @override
   State<StoreCustomerFeedback> createState() => _StoreCustomerFeedbackState();
@@ -36,18 +42,30 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
   void initState() {
     super.initState();
     _listen();
+    widget.reviewChanges?.addListener(_changed);
+    _prepareReport();
   }
 
   void _listen() {
     widget.controller?.addListener(_changed);
     final controller = widget.controller;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && identical(widget.controller, controller)) {
+      if (widget.reviewCurrent==null && mounted && identical(widget.controller, controller)) {
         unawaited(controller?.load());
       }
     });
   }
 
+  bool _preparedCurrent()=>widget.reviewCurrent==null || mounted&&widget.reviewCurrent!()&&ModalRoute.of(context)?.isCurrent==true;
+  void _prepareReport(){
+    final controller=widget.controller,id=widget.preparedReviewId;
+    if(controller==null||id==null||widget.reviewCurrent?.call()==false)return;
+    final entry=controller.entries.where((row)=>row.id==id&&row.orderId!=null&&row.canReport).firstOrNull;
+    final binding=controller.bindingFor(id);
+    if(entry==null||binding==null||binding.version!=entry.version)return;
+    _selected=id;_kind=entry.kind;_action=StoreFeedbackAction.report;_audience=StoreFeedbackAudience.moderation;
+    _editorBinding=binding;_editorGeneration=Object();_editor.text=widget.preparedReportText??controller.draft(id,StoreFeedbackAction.report);
+  }
   void _changed() {
     if (mounted) setState(() {});
   }
@@ -55,6 +73,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
   @override
   void didUpdateWidget(covariant StoreCustomerFeedback oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if(!identical(oldWidget.reviewChanges,widget.reviewChanges)){oldWidget.reviewChanges?.removeListener(_changed);widget.reviewChanges?.addListener(_changed);}
     if (!identical(oldWidget.controller, widget.controller) ||
         oldWidget.orderId != widget.orderId) {
       oldWidget.controller?.removeListener(_changed);
@@ -65,11 +84,14 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
       _editorBinding = null;
       _editorGeneration = Object();
       _listen();
+      _prepareReport();
     }
   }
 
   @override
   void dispose() {
+    if(widget.preparedReviewId!=null)widget.onPreparedDraft?.call(_editor.text);
+    widget.reviewChanges?.removeListener(_changed);
     widget.controller?.removeListener(_changed);
     _editor.dispose();
     _scroll.dispose();
@@ -91,6 +113,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
       };
 
   void _edit(StoreFeedbackEntry entry, StoreFeedbackAction action) {
+    if(widget.reviewCurrent!=null&&(!_preparedCurrent()||entry.id!=widget.preparedReviewId||action!=StoreFeedbackAction.report))return;
     final controller = widget.controller!;
     final binding = controller.bindingFor(entry.id);
     if (!controller.canAct(entry.id, action) ||
@@ -110,6 +133,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
   }
 
   Future<void> _send(StoreFeedbackEntry entry, Object generation) async {
+    if(!_preparedCurrent())return;
     final controller = widget.controller;
     final action = _action, audience = _audience;
     final binding = _editorBinding;
@@ -123,8 +147,13 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
       return;
     }
     final submitted = _editor.text;
-    await controller.submit(binding, action, audience);
-    if (!mounted ||
+    if(widget.reviewCurrent==null){await controller.submit(binding,action,audience);}else{
+      controller.setDraft(binding,action,_editor.text);widget.onReviewNativeChange?.call();
+      Future<void> run()=>controller.submit(binding,action,audience,reviewOwnerCurrent:widget.reviewOwnerCurrent,
+        reviewInputCurrent:_preparedCurrent,onReviewNativeChange:widget.onReviewNativeChange);
+      if(widget.runPreparedNative!=null){await widget.runPreparedNative!(run);}else{await run();}
+    }
+    if (!mounted || !_preparedCurrent() ||
         !identical(widget.controller, controller) ||
         !identical(generation, _editorGeneration) ||
         _selected != entry.id ||
@@ -143,7 +172,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
     final starsOnly = controller?.starsOnly == true;
     final scoped = controller != null && controller.context() != null;
     final entries = scoped && controller.current
-        ? controller.entries
+        ? controller.entries.where((row)=>widget.preparedReviewId==null||row.id==widget.preparedReviewId).toList(growable:false)
         : <StoreFeedbackEntry>[];
     final selected = entries.where((e) => e.id == _selected).firstOrNull;
     final visible = entries.where(
@@ -206,7 +235,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
                   tooltip: 'Refresh feedback',
                   onPressed: controller.loading
                       ? null
-                      : () => unawaited(controller.load()),
+                      : () {if(_preparedCurrent())unawaited(controller.load());},
                   icon: const Icon(Icons.refresh),
                 ),
             ],
@@ -227,7 +256,11 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
               onPressed: controller.commandInFlight || !controller.recoveryReady ||
                       controller.adapter?.commandRecoveryReady != true
                   ? null
-                  : () => unawaited(controller.reconcile()),
+                  : widget.reviewCurrent==null?()=>unawaited(controller.reconcile()):(){
+                    if(!_preparedCurrent())return;
+                    Future<void> run()=>controller.reconcile(reviewOwnerCurrent:widget.reviewOwnerCurrent,reviewInputCurrent:_preparedCurrent,onReviewNativeChange:widget.onReviewNativeChange);
+                    unawaited(widget.runPreparedNative?.call(run)??run());
+                  },
               icon: const Icon(Icons.update),
               label: const Text('Check original request'),
             ),
@@ -346,7 +379,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
               TextButton(
                 onPressed: controller.loading
                     ? null
-                    : () => unawaited(controller.load(more: true)),
+                    : () {if(_preparedCurrent())unawaited(controller.load(more:true));},
                 child: const Text('Load more feedback'),
               ),
           ] else if (controller != null) ...[
@@ -391,7 +424,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
               Wrap(
                 spacing: 12,
                 children: [
-                  if (selected.replyAudiences.isNotEmpty)
+                  if (widget.reviewCurrent==null && selected.replyAudiences.isNotEmpty)
                     TextButton.icon(
                       onPressed:
                           controller.canAct(
@@ -466,7 +499,7 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
                   if (!mounted || !identical(generation, _editorGeneration)) {
                     return;
                   }
-                  controller.setDraft(binding, action, value);
+                  if(widget.reviewCurrent==null){controller.setDraft(binding,action,value);}else{widget.onPreparedDraft?.call(value);}
                   setState(() {});
                 },
               ),

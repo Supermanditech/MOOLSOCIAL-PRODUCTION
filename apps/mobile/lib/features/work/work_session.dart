@@ -902,6 +902,19 @@ class WorkSession extends ChangeNotifier {
   /// Presentation access only. The server still verifies live profile, owner,
   /// producer capabilities and reviewed SKU bindings before publication.
   bool get workspaceStoreAuthoringAvailable => _storeAuthoringProfile(activeWorkspace?.profileId);
+  /// Reads existing reviewed, account-bound state; registration/profile alone
+  /// is never approval. Domain services must still authorise each operation.
+  bool workspaceApprovalMatchesAccount(
+      ({String environment, String projectId, String? tenantId, String userId})? account) =>
+      !_disposed && account != null && account.environment.isNotEmpty &&
+      account.projectId.isNotEmpty && account.userId == _contactAccountScope &&
+      !_contactDraftRecoveryBusy && !_contactDraftRecoveryFailed &&
+      activeWorkspace?.verified == true && workspaceId != null &&
+      activeWorkspace?.id == workspaceId && !reviewStatusNeedsRefresh &&
+      {WorkRemoteReviewStatus.approved, WorkRemoteReviewStatus.live}
+          .contains(remoteReviewStatus) &&
+      {WorkReviewStage.approved, WorkReviewStage.setup, WorkReviewStage.live}
+          .contains(reviewStage);
   WorkspacePublicDetailsController? get workspacePublicDetailsPublisher {
     final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
     if (_disposed || account == null || account.isEmpty || store == null ||
@@ -962,13 +975,13 @@ class WorkSession extends ChangeNotifier {
       }), includeBusinessType: source is AuthenticatedWorkspaceCatalogueGateway && source.storeClassificationReadbackSupported);
     } catch (_) { return null; }
   }
-  Future<WorkspacePublicDetailsWriteResult> publishWorkspacePublicDetails({required bool Function() inputCurrent}) async {
+  Future<WorkspacePublicDetailsWriteResult> publishWorkspacePublicDetails({required bool Function() inputCurrent, bool Function()? current, bool Function(WorkspacePublicDetailsIntent)? admitOriginal, void Function(WorkspacePublicDetailsIntent)? onOriginalResolved}) async {
     final controller = workspacePublicDetailsPublisher, fields = workspacePublicDetailsFieldsForPublishing;
     if (controller == null || fields == null || !inputCurrent()) {
       return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.notSent);
     }
     final owner = publicationPreferencesContext, fingerprint = jsonEncode(fields.toJson());
-    return controller.publish(fields, inputCurrent: () => inputCurrent() && owner == publicationPreferencesContext &&
+    return controller.publish(fields, current: current, admitOriginal: admitOriginal, onOriginalResolved: onOriginalResolved, inputCurrent: () => inputCurrent() && owner == publicationPreferencesContext &&
       jsonEncode(workspacePublicDetailsFieldsForPublishing?.toJson()) == fingerprint);
   }
   final StorePromotionGateway? productPromotionGateway;
@@ -1311,15 +1324,16 @@ class WorkSession extends ChangeNotifier {
     final family = workspaceVariantFamilies.where((f) => f.id == item.variantMembership?.familyId).firstOrNull;
     return WorkspaceProductSubmissionInput.fromSaved(item, family: family);
   }
-  Future<bool> checkWorkspaceProductSubmission(String skuId, {bool retry = false}) async {
+  Future<bool> checkWorkspaceProductSubmission(String skuId, {bool retry = false, bool Function()? current, bool Function()? inputCurrent}) async {
     final controller = workspaceProductSubmission(skuId);
-    if (controller == null || workspaceProductSubmissionBusy(skuId)) return false;
-    if (!await controller.restore() || !controller.active) return false;
+    if (controller == null || current?.call() == false || inputCurrent?.call() == false || workspaceProductSubmissionBusy(skuId)) return false;
+    bool ownerCurrent() => controller.active && current?.call() != false;
+    if (!await controller.restore() || !ownerCurrent() || inputCurrent?.call() == false) return false;
     if (controller.pending != null) {
-      final result = retry ? await controller.retryOriginal() : await controller.reconcile();
-      return result.state == WorkspaceProductSubmissionWriteState.submitted;
+      final result = retry ? await controller.retryOriginal(current: current, inputCurrent: inputCurrent) : await controller.reconcile(current: current, inputCurrent: inputCurrent);
+      return ownerCurrent() && result.state == WorkspaceProductSubmissionWriteState.submitted;
     }
-    return retry ? false : controller.refresh();
+    return retry ? false : controller.refresh(current: current, inputCurrent: inputCurrent);
   }
   Future<bool> submitWorkspaceProduct(String skuId, {required bool Function() inputCurrent}) async {
     final controller = workspaceProductSubmission(skuId), owner = publicationPreferencesContext;
@@ -1391,13 +1405,13 @@ class WorkSession extends ChangeNotifier {
       ..sort((a, b) => a.id.compareTo(b.id));
     return jsonEncode([family.toJson(), for (final p in members) p.toInventoryJson()]);
   }
-  Future<bool> checkWorkspaceVariantFamily(String familyId, {bool original = false, bool retry = false}) async {
+  Future<bool> checkWorkspaceVariantFamily(String familyId, {bool original = false, bool retry = false, bool Function()? current, bool Function()? inputCurrent}) async {
     final publisher = workspaceVariantFamilyPublisher(familyId);
-    if (publisher == null || workspaceVariantFamilyBusy(familyId)) return false;
+    if (publisher == null || current?.call() == false || inputCurrent?.call() == false || workspaceVariantFamilyBusy(familyId)) return false;
     final ok = original || retry
-      ? (retry ? await publisher.retryOriginal() : await publisher.reconcile()).state == WorkspaceVariantFamilyWriteState.submitted
-      : await publisher.refresh();
-    return ok;
+      ? (retry ? await publisher.retryOriginal(current: current, inputCurrent: inputCurrent) : await publisher.reconcile(current: current, inputCurrent: inputCurrent)).state == WorkspaceVariantFamilyWriteState.submitted
+      : await publisher.refresh(current: current, inputCurrent: inputCurrent);
+    return current?.call() != false && ok;
   }
   Future<bool> submitWorkspaceVariantFamily(String familyId, {required bool Function() inputCurrent}) async {
     final publisher = workspaceVariantFamilyPublisher(familyId), owner = publicationPreferencesContext;
@@ -1549,6 +1563,9 @@ class WorkSession extends ChangeNotifier {
     }
     return link.canonicalProductId;
   }
+  String? get workspaceCatalogueListingPendingSkuId => _catalogueListingController?.pending?.skuId;
+  String? get workspaceCatalogueListingPendingRequestId => _catalogueListingController?.pending?.idempotencyKey;
+  bool get workspaceCatalogueListingPendingIsPriceConfirmation => _catalogueListingController?.pending?.isPriceConfirmation ?? false;
   bool get workspaceCatalogueListingPending => _catalogueListingController?.pending != null;
   bool get workspaceCatalogueListingConnectionConfigured => _catalogueListingController != null;
   bool get workspaceCatalogueListingReady => _catalogueListingController?.ready ?? true;
@@ -1574,28 +1591,28 @@ class WorkSession extends ChangeNotifier {
     }
   }
   /// Deliberately cannot create a new intent or change local product preferences.
-  Future<bool> reconcileWorkspaceCatalogueListing() async {
+  Future<bool> reconcileWorkspaceCatalogueListing({bool Function()? current, bool Function()? inputCurrent}) async {
     final controller = _catalogueListingController;
-    if (controller == null || workspaceCatalogueListingBusy) return false;
+    if (controller == null || current?.call() == false || inputCurrent?.call() == false || workspaceCatalogueListingBusy) return false;
     final owner = publicationPreferencesContext;
-    bool current() => !_disposed && publicationPreferencesContext == owner;
+    bool ownerCurrent() => !_disposed && publicationPreferencesContext == owner && current?.call() != false;
     _catalogueListingLoads.add(controller.scope);
     notifyListeners();
     try {
-      if (!await controller.restore() || !current()) return false;
+      if (!await controller.restore() || !ownerCurrent() || inputCurrent?.call() == false) return false;
       if (controller.pending == null) {
         showNotice('No saved listing update is waiting to be checked.');
         return true;
       }
-      final result = await controller.reconcile();
-      if (!current()) return false;
+      final result = await controller.reconcile(current: ownerCurrent, inputCurrent: inputCurrent);
+      if (!ownerCurrent()) return false;
       showNotice(result.state == WorkspaceCatalogueBindingState.saved
           ? 'Saved listing update checked. Public visibility still needs confirmation.'
           : controller.error ?? 'Listing update is not confirmed. Your original request is kept.');
       return result.state == WorkspaceCatalogueBindingState.saved;
     } finally {
       _catalogueListingLoads.remove(controller.scope);
-      if (current()) notifyListeners();
+      if (ownerCurrent()) notifyListeners();
     }
   }
   bool _listingMirrorIdentityMatches(WorkspaceCatalogueOwnedSku owned, WorkspaceCatalogueItem item) {
@@ -1752,7 +1769,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   /// Explicit owner price confirmation; ordinary editor/CSV saves never upload.
-  Future<bool> confirmWorkspaceCommodityPrice(String productId, {required int validityMinutes}) async {
+  Future<bool> confirmWorkspaceCommodityPrice(String productId, {required int validityMinutes, bool Function()? current, bool Function()? inputCurrent}) async {
     final item = workspaceCatalogueItems.where((p) => p.id == productId).firstOrNull, controller = _catalogueListingController;
     final offer = item?.wholesaleOffer, source = controller?.gateway;
     if (item == null || offer?.enabled != true || offer?.valid != true || offer?.saleType == null ||
@@ -1760,20 +1777,20 @@ class WorkSession extends ChangeNotifier {
         !(source as WorkspaceCommodityPriceGateway).commodityPriceReadbackSupported || validityMinutes < 1 || validityMinutes > 525600) {
       showError('Supplier price confirmation is not connected or the saved trade price is incomplete.'); return false;
     }
-    if (workspaceCatalogueListingBusy) return false;
+    if (current?.call() == false || inputCurrent?.call() == false || workspaceCatalogueListingBusy) return false;
     final owner = publicationPreferencesContext, originalInput = _listingInput(item);
-    bool current() => !_disposed && publicationPreferencesContext == owner;
-    bool unchanged() => current() && workspaceCatalogueItems.any((p) => p.id == productId && _listingInput(p) == originalInput);
+    bool ownerCurrent() => !_disposed && publicationPreferencesContext == owner && current?.call() != false;
+    bool unchanged() => ownerCurrent() && inputCurrent?.call() != false && workspaceCatalogueItems.any((p) => p.id == productId && _listingInput(p) == originalInput);
     _catalogueListingLoads.add(controller.scope); notifyListeners();
     try {
       if (!await controller.restore() || !unchanged()) return false;
       if (controller.pending != null) {
-        final result = await controller.reconcile();
-        if (current()) showNotice(result.priceConfirmation == null ? controller.error ?? 'Check the saved update before confirming a new price.'
+        final result = await controller.reconcile(current: ownerCurrent, inputCurrent: inputCurrent);
+        if (ownerCurrent()) showNotice(result.priceConfirmation == null ? controller.error ?? 'Check the saved update before confirming a new price.'
           : 'Original supplier price confirmation recovered.');
         // Recover the original attempt only. A different product's pending
         // confirmation must never acknowledge the button just pressed.
-        return result.priceConfirmation?.skuId == productId;
+        return ownerCurrent() && result.priceConfirmation?.skuId == productId;
       }
       if (!_stockEditAvailable() || localInventoryEnabled && !await workspaceInventorySaved || !unchanged()) return false;
       final owned = await controller.gateway.readOwnedSku(storeId: controller.scope.store, skuId: productId, current: unchanged);
@@ -1796,7 +1813,7 @@ class WorkSession extends ChangeNotifier {
           'priceMinor': offer.priceAtMinor(offer.minimumPacks),
           'tiers': [for (final entry in prices.entries) {'minimumQuantity': entry.key, 'unitPriceMinor': entry.value}]});
       final result = await controller.submit(original, inputCurrent: unchanged);
-      if (!current()) return false;
+      if (!ownerCurrent()) return false;
       if (result.priceConfirmation != null) {
         (_commodityPriceHeads[controller.scope] ??= {})[productId] = result.priceConfirmation;
         _commodityPriceCheckedAt.remove(controller.scope);
@@ -1806,9 +1823,9 @@ class WorkSession extends ChangeNotifier {
         : controller.error ?? 'Price confirmation could not be completed. Check the saved update before trying again.');
       return result.priceConfirmation != null;
     } on Object {
-      if (current()) showError('Supplier price could not be confirmed. Your saved product and original request are kept.');
+      if (ownerCurrent()) showError('Supplier price could not be confirmed. Your saved product and original request are kept.');
       return false;
-    } finally { _catalogueListingLoads.remove(controller.scope); if (current()) notifyListeners(); }
+    } finally { _catalogueListingLoads.remove(controller.scope); if (ownerCurrent()) notifyListeners(); }
   }
 
   /// Explicit owner listing intent only; ordinary editor/CSV/inventory saves never upload.
@@ -1817,12 +1834,12 @@ class WorkSession extends ChangeNotifier {
     if (item == null) return false;
     return requestWorkspaceProductListing(productId, listed: !item.publicListing);
   }
-  Future<bool> requestWorkspaceProductListing(String productId, {required bool listed}) async {
+  Future<bool> requestWorkspaceProductListing(String productId, {required bool listed, bool Function()? current}) async {
     final item = workspaceCatalogueItems.where((p) => p.id == productId).firstOrNull;
-    if (item == null || workspaceCatalogueListingBusy) return false;
+    if (item == null || current?.call() == false || workspaceCatalogueListingBusy) return false;
     final inputContext = publicationPreferencesContext, originalInput = _listingInput(item);
-    bool current() => !_disposed && publicationPreferencesContext == inputContext;
-    bool unchanged() => current() && workspaceCatalogueItems.any((p) => p.id == productId && _listingInput(p) == originalInput);
+    bool ownerCurrent() => !_disposed && publicationPreferencesContext == inputContext && current?.call() != false;
+    bool unchanged() => ownerCurrent() && workspaceCatalogueItems.any((p) => p.id == productId && _listingInput(p) == originalInput);
     final controller = _catalogueListingController;
     if (controller == null) {
       if (!_stockEditAvailable()) return false;
@@ -1836,12 +1853,12 @@ class WorkSession extends ChangeNotifier {
     }
     _catalogueListingLoads.add(controller.scope); notifyListeners();
     try {
-      if (!await controller.restore() || !current()) {
-        if (current()) showError(controller.error ?? 'Saved listing update could not be opened.'); return false;
+      if (!await controller.restore() || !ownerCurrent()) {
+        if (ownerCurrent()) showError(controller.error ?? 'Saved listing update could not be opened.'); return false;
       }
       if (controller.pending != null) {
-        final result = await controller.reconcile();
-        if (!current()) return false;
+        final result = await controller.reconcile(current: ownerCurrent);
+        if (!ownerCurrent()) return false;
         showNotice(result.state == WorkspaceCatalogueBindingState.saved
           ? 'Saved listing update checked. Public visibility still needs confirmation.'
           : controller.error ?? 'Listing update is not confirmed. Your original request is kept.');
@@ -1864,12 +1881,12 @@ class WorkSession extends ChangeNotifier {
       // This is the owner's explicit preference, never data copied from an acknowledgement.
       if (item.publicListing != listed && !addOrUpdateWorkspaceProduct(item.copyWith(publicListing: listed))) return false;
       final selectedInput = _listingInput(workspaceCatalogueItems.firstWhere((p) => p.id == productId));
-      bool selectedCurrent() => current() && workspaceCatalogueItems.any((p) => p.id == productId && _listingInput(p) == selectedInput);
+      bool selectedCurrent() => ownerCurrent() && workspaceCatalogueItems.any((p) => p.id == productId && _listingInput(p) == selectedInput);
       if (localInventoryEnabled && !await workspaceInventorySaved || !selectedCurrent()) return false;
       final original = owned.listingIntent(accountId: controller.scope.account,
         idempotencyKey: _newCounterIdentity('catalogue-listing'), listed: listed);
       final result = await controller.submit(original, inputCurrent: selectedCurrent);
-      if (!current()) return false;
+      if (!ownerCurrent()) return false;
       showNotice(switch (result.state) {
         WorkspaceCatalogueBindingState.saved => 'Listing preference saved. Public visibility still needs confirmation.',
         WorkspaceCatalogueBindingState.rejected => 'Listing update was not accepted. Review the product before trying again.',
@@ -1878,9 +1895,9 @@ class WorkSession extends ChangeNotifier {
       });
       return result.state == WorkspaceCatalogueBindingState.saved;
     } on Object {
-      if (current()) showError('Listing update could not be confirmed. Your Store data is kept.');
+      if (ownerCurrent()) showError('Listing update could not be confirmed. Your Store data is kept.');
       return false;
-    } finally { _catalogueListingLoads.remove(controller.scope); if (current()) notifyListeners(); }
+    } finally { _catalogueListingLoads.remove(controller.scope); if (ownerCurrent()) notifyListeners(); }
   }
   final Map<(String, String), WorkspaceCatalogueReadback> _catalogueReadbacks = {};
 
@@ -1898,6 +1915,10 @@ class WorkSession extends ChangeNotifier {
   final StoreFeedbackPendingStore Function(StoreFeedbackScope scope)? customerFeedbackPendingStoreFactory;
   final Map<StoreFeedbackScope, StoreFeedbackController> _customerFeedback = {};
 
+  StoreFeedbackController? get existingWorkspaceCustomerFeedback {
+    final account=_contactAccountScope,store=activeWorkspace?.id;
+    return _disposed||account==null||store==null?null:_customerFeedback[(account:account,store:store)];
+  }
   StoreFeedbackController? get workspaceCustomerFeedback {
     final account = _contactAccountScope;
     final store = activeWorkspace?.id;
@@ -1920,6 +1941,7 @@ class WorkSession extends ChangeNotifier {
   /// Read-only integration seam. No tracking, posting or local analytics seed.
   final WorkspaceAnalyticsReader? analyticsReader;
   WorkspaceProductPresentationGateway? _productPresentationReader;
+  Object? get workspaceAnalyticsReaderIdentity => analyticsReader ?? _productPresentationReader;
   bool get hasAnalyticsReader => analyticsReader != null || _productPresentationReader != null;
   void bindProductPresentationReader(WorkspaceProductPresentationGateway? reader) {
     // A supplied integration retains ownership. Auth-root replacements must
@@ -2499,6 +2521,20 @@ class WorkSession extends ChangeNotifier {
       source.realm == (key.$3 ? 'evaluation' : 'production') && source.realm == originalPurchaseRealm &&
       reader != null && reader.isCurrent && reader.accountUserId == key.$1 && _supplierStorage is WorkPurchaseRestockArrivalGuard &&
       _inventoryStorage is WorkInventoryRestockProjectionGuard;
+  }
+  Object get restockReceivingReviewOwner=>_restockReceivingEpoch;
+  /// Read-only native receiving view for a frontend Review. Unlike recovery,
+  /// this never admits a cache/baseline, saves input or projects Stock.
+  Future<WorkspaceGoodsReceivingRead?> readWorkspaceRestockReceivingForReview(WorkspaceRestockPurchaseOriginal source,{bool Function()? inputCurrent}) async {
+    if(_disposed||!workspaceServerReceivingFor(source))return null;
+    final data=_storeData,key=_supplierKey,reader=originalPurchaseReader!,epoch=_restockReceivingEpoch,navigation=navigationScopeRevision;
+    bool current()=>!_disposed&&inputCurrent?.call()!=false&&identical(data,_storeData)&&key==_supplierKey&&identical(reader,originalPurchaseReader)&&
+      identical(epoch,_restockReceivingEpoch)&&navigation==navigationScopeRevision&&workspaceServerReceivingFor(source);
+    try {
+      if(!current()||!await _restockReceivingOriginalCurrent(source)||!current())return null;
+      final read=await AuthenticatedWorkspaceOrderOperationsGateway(reader).readBuyerGoodsReceiving(source);
+      return current()&&read!=null&&jsonEncode(read.original.toJson())==jsonEncode(source.toJson())?read:null;
+    }on Object{return null;} // Unavailable/unverified is never an absent receipt.
   }
   WorkspaceGoodsReceivingRead? workspaceRestockReceiving(WorkspaceRestockPurchaseOriginal source) {
     if (!workspaceServerReceivingFor(source)) return null;
@@ -3976,6 +4012,7 @@ class WorkSession extends ChangeNotifier {
     }
   }
   bool get workspaceInventoryLoaded => _storeData.inventoryLoaded;
+  int? get workspaceInventoryRevision => _storeData.inventoryRevision;
   Future<bool> get workspaceInventorySaved => _storeData.inventoryWrites;
   bool get workspaceGoodsReceiptBusy => _storeData.inventoryReceiptBusy;
   bool get workspaceGoodsReceiptRecoveryPending => _storeData.inventoryReceiptRecoveryPending || _storeData.inventoryRestockRecoveryPending;
@@ -4297,15 +4334,15 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<void> saveInvoiceDeliveryPreference(
-    WorkspaceInvoiceDeliveryPreference preference,
+    WorkspaceInvoiceDeliveryPreference preference, {bool Function()? current, WorkspaceInvoiceDeliveryMode? expectedOriginalMode}
   ) async {
     final scope = (account: preference.account, store: preference.store);
-    if (!preference.valid || scope != storeInvoiceDeliveryScope) {
+    if (current?.call() == false || !preference.valid || scope != storeInvoiceDeliveryScope) {
       throw const WorkGatewayException(
         'Return to your Store to change invoice delivery.',
       );
     }
-    await _invoiceDeliveryStorage.save(preference);
+    await _invoiceDeliveryStorage.save(preference, current: current, expectedOriginalMode: expectedOriginalMode);
     if (scope != storeInvoiceDeliveryScope) {
       throw const WorkGatewayException(
         'Return to your Store to change invoice delivery.',
@@ -4336,13 +4373,13 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<void> saveStoreUpiDestination(
-    WorkspaceUpiDestination destination,
+    WorkspaceUpiDestination destination, {bool Function()? current, String? expectedDestinationFingerprint}
   ) async {
     final scope = (account: destination.account, store: destination.store);
-    if (!destination.valid || scope != storeUpiScope) {
+    if (current?.call() == false || !destination.valid || scope != storeUpiScope) {
       throw const WorkGatewayException('Check your Store UPI details.');
     }
-    await _upiDestinationStorage.save(destination);
+    await _upiDestinationStorage.save(destination, current: current, expectedDestinationFingerprint: expectedDestinationFingerprint);
     if (scope != storeUpiScope) {
       throw const WorkGatewayException('Return to your Store to set up UPI.');
     }
@@ -4633,6 +4670,36 @@ class WorkSession extends ChangeNotifier {
   _CounterDraftRecovery? get _counterRecovery =>
       _counterDraftRecovery[_counterDraftScope];
   Object? get counterDraftIdentity => _counterDraftScope;
+  String? get counterDraftEditorId => _counterRecovery?.editingId;
+  ({String account,String store})? get counterDraftScopeForReview => _counterDraftScope;
+  Future<void> get workspaceCounterDraftWrites => _counterRecovery?.writes ?? Future<void>.value();
+  // Frontend comparison only. The witness is minted solely by the original
+  // synchronous reservation inside this native Counter submission; it grants
+  // no edit, Stock, invoice or recovery authority.
+  String get counterCatalogueReviewSignature => jsonEncode([
+    workspaceInventoryRevision, workspaceInventoryLoaded,
+    workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(),
+    // Preserve all nine contentIdentity fields using canonical JSON primitives.
+    workspaceStockMovements.map((m) => [m.id,m.productId,m.productLabel,m.kind.name,
+      m.quantityDelta,m.reason,m.occurredAt.toUtc().toIso8601String(),m.referenceKind?.name,m.referenceId]).toList(),
+  ]);
+  // Opaque comparison observation only: no native submit/Stock permission.
+  // An unobserved manual sale never serializes the catalogue for this witness.
+  final _counterReviewStockObservers=<Object,({Object? scope,int generation,String? editor})>{};
+  Object observeCounterReviewStock() {
+    final token=Object();
+    _counterReviewStockObservers[token]=(scope:_counterDraftScope,generation:counterSaleGeneration,
+      editor:counterDraftEditorId ?? retainedCounterDraft?.id);
+    return token;
+  }
+  void endCounterReviewStockObservation(Object token) {_counterReviewStockObservers.remove(token);}
+  Object? _counterReviewStockScope;
+  int? _counterReviewStockGeneration;
+  ({String draftId,String orderId,String before,String after})? _counterReviewStockTransition;
+  ({String draftId,String orderId,String before,String after})? get counterReviewStockTransition =>
+    _counterReviewStockScope == _counterDraftScope && _counterReviewStockGeneration == counterSaleGeneration
+      ? _counterReviewStockTransition : null;
+
   int _counterSaleGeneration = 0;
   int get counterSaleGeneration => _counterSaleGeneration;
   bool get counterDraftLoading => _counterRecovery?.loading == true;
@@ -4997,10 +5064,11 @@ class WorkSession extends ChangeNotifier {
 
   WorkspaceBillDiscount get workspaceCounterDiscount =>
       _storeData.counterDiscount;
-  int get workspaceCounterSubtotalMinor {
+  int get workspaceCounterSubtotalMinor => workspaceCounterSubtotalFor(workspaceOrderQuantities);
+  int workspaceCounterSubtotalFor(Map<String,int> quantities) {
     var total = BigInt.zero;
     for (final product in workspaceCatalogueItems) {
-      final quantity = workspaceOrderQuantities[product.id] ?? 0;
+      final quantity = quantities[product.id] ?? 0;
       if (quantity <= 0) continue;
       total += BigInt.from(product.sellingPriceMinor) * BigInt.from(quantity);
       // Retain the Counter draft/ledger's existing signed64-bit amount bound.
@@ -5554,7 +5622,8 @@ class WorkSession extends ChangeNotifier {
     return workspaceAccountCurrent(accountReady: accountReady) && !_contactDraftRecoveryFailed;
   }
   Future<void>? _contactDraftWrite;
-  ({String scope, Map<String, Object?> draft})? _queuedContactDraft;
+  Object? _workspaceApplicationNativeOperation;
+  ({String scope, Map<String, Object?> draft, bool Function()? current})? _queuedContactDraft;
   int _contactDraftRevision = 0;
   final Set<String> _editedDraftFields = {};
   String? contactDraftMessage;
@@ -6000,8 +6069,9 @@ class WorkSession extends ChangeNotifier {
     WorkspaceIssueRecord issue, {
     required WorkspaceIssueDraft expectedDraft,
     bool declineConfirmed = false,
+    bool Function()? inputCurrent,
   }) async {
-    if (!workspaceIssueCanSend(issue) ||
+    if (inputCurrent?.call()==false || !workspaceIssueCanSend(issue) ||
         (expectedDraft.response == WorkspaceIssueResponse.declineRequest &&
             !declineConfirmed) ||
         jsonEncode(workspaceIssueDraft(issue)?.toJson()) !=
@@ -6014,7 +6084,7 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
     try {
       await _issueDraftWrites[key];
-      if (!_issueIsCurrent(issue) ||
+      if (inputCurrent?.call()==false || !_issueIsCurrent(issue) ||
           workspaceIssueStale(issue) ||
           issue.revision != _storeData.issues[issue.cacheId]?.revision ||
           !issue.sameRevisionContent(_storeData.issues[issue.cacheId]!) ||
@@ -6035,7 +6105,7 @@ class WorkSession extends ChangeNotifier {
       if (!command.valid) return false;
       _issueResponses[key] = WorkIssueSubmission(command);
       _issueNotDispatched.add(key);
-      return await _performIssueResponse(issue, command, submit: true);
+      return await _performIssueResponse(issue, command, submit: true,inputCurrent:inputCurrent);
     } finally {
       _issueResponseBusy.remove(key);
       if (_issueIsCurrent(issue)) notifyListeners();
@@ -6045,7 +6115,9 @@ class WorkSession extends ChangeNotifier {
   Future<bool> checkWorkspaceIssueResponse(
     WorkspaceIssueRecord issue, {
     bool retrySend = false,
+    bool Function()? inputCurrent,
   }) async {
+    if(inputCurrent?.call()==false)return false;
     final saved = workspaceIssueResponse(issue);
     if (!_issueGatewayAvailable(issue) ||
         !_issueIsCurrent(issue) ||
@@ -6062,6 +6134,7 @@ class WorkSession extends ChangeNotifier {
         issue,
         saved!.command,
         submit: retrySend,
+        inputCurrent:inputCurrent,
       );
     } finally {
       _issueResponseBusy.remove(key);
@@ -6073,11 +6146,12 @@ class WorkSession extends ChangeNotifier {
     WorkspaceIssueRecord issue,
     WorkIssueCommand command, {
     required bool submit,
+    bool Function()? inputCurrent,
   }) async {
     final key = command.key;
     final authority = _canonicalIssueAuthority[key];
     bool current() => issue.purchaseContext == null || _issueIsCurrent(issue) && _caseAuthorityCurrent(authority);
-    if (key.account != _contactAccountScope || _disposed) return false;
+    if (inputCurrent?.call()==false || key.account != _contactAccountScope || _disposed) return false;
     if (!current()) return false;
     if (submit) {
       final pending = WorkIssueSubmission(command);
@@ -6091,13 +6165,15 @@ class WorkSession extends ChangeNotifier {
       }
       if (key.account != _contactAccountScope || _disposed || !current()) return false;
       _issueResponses[key] = pending;
-      _issueNotDispatched.remove(key);
+
     }
     _issueResponseMessages[key] = submit
         ? 'Sending response…'
         : 'Checking response…';
     if (_issueIsCurrent(issue)) notifyListeners();
     try {
+      if(inputCurrent?.call()==false)return false;
+      if(submit)_issueNotDispatched.remove(key);
       final reply =
           await (submit
                   ? issueCommandGateway!.submitIssueResponse(command)
@@ -6188,8 +6264,9 @@ class WorkSession extends ChangeNotifier {
     required WorkspaceIssueResponse? response,
     required String note,
     bool reviewedUpdate = false,
+    bool Function()? inputCurrent,
   }) async {
-    if (!_issueIsCurrent(issue) ||
+    if (inputCurrent?.call()==false || !_issueIsCurrent(issue) ||
         !workspaceIssueDraftLoaded(issue) ||
         workspaceIssueResponseLocksDraft(issue) ||
         issue.revision != _storeData.issues[issue.cacheId]?.revision ||
@@ -6219,7 +6296,7 @@ class WorkSession extends ChangeNotifier {
       // Coalesce queued keystrokes, without allowing an older write to win.
       if (!identical(_issueDrafts[key], draft)) return;
       try {
-        if (key.account != _contactAccountScope) {
+        if (inputCurrent?.call()==false || key.account != _contactAccountScope) {
           throw const FormatException('Account changed before draft save');
         }
         await _issueDraftStorage.save(draft);
@@ -6286,7 +6363,7 @@ class WorkSession extends ChangeNotifier {
 
   /// One linked ledger snapshot; never infer money from fulfilment or replay
   /// stock/invoice effects. The future authenticated adapter owns membership.
-  bool applyWorkspaceFinance(WorkspaceFinanceSnapshot snapshot) {
+  bool applyWorkspaceFinance(WorkspaceFinanceSnapshot snapshot, {VoidCallback? onReviewNativeChange}) {
     if (_disposed ||
         !snapshot.valid ||
         snapshot.accountScope != _contactAccountScope) {
@@ -6361,6 +6438,7 @@ class WorkSession extends ChangeNotifier {
     data.financePayoutHistory.addEntries(
       snapshot.payouts.map((p) => MapEntry(p.id, p)),
     );
+    onReviewNativeChange?.call();
     if (identical(data, _storeData)) notifyListeners();
     return true;
   }
@@ -6692,9 +6770,11 @@ class WorkSession extends ChangeNotifier {
 
   Future<bool> applyCustomerCredit({required String customerId,
     required String sourceInvoiceId, required String targetInvoiceId,
-    required int amountMinor, required int expectedRevision}) async {
+    required int amountMinor, required int expectedRevision, bool Function()? reviewOwnerCurrent, bool Function()? reviewInputCurrent, VoidCallback? onReviewNativeChange}) async {
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
+
     final data = _storeData;
-    if (!await recoverCustomerLedger() || !identical(data, _storeData) ||
+    if (!await recoverCustomerLedger() || !identical(data, _storeData) || reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false ||
         !customerCreditAvailable || data.ledgerCheckpointStore == null) { return false; }
     final before = data.finance!;
     final adapter = data.customerCollectionGateway as StoreReviewCustomerCollectionGateway;
@@ -6712,11 +6792,14 @@ class WorkSession extends ChangeNotifier {
         billedInvoices: data.ledgerBilledInvoices, purchaseReceipts: data.ledgerPurchaseReceipts,
         supplierLedgers: _supplierLedgerCheckpointEntries(data),
         moneyRegisters: _moneyRegisterCheckpointEntries(data), expenses: _expenseCheckpointEntries(data));
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
       saving = true;
       await data.ledgerCheckpointStore!.save(checkpoint, expectedRevision: data.ledgerCheckpointRevision);
+      if(reviewOwnerCurrent?.call()==false)return false;
       data.ledgerCheckpointRevision = checkpoint.revision;
-      if (!_isStoreScopeCurrent(data, before.workspaceId, before.accountScope) ||
-          !adapter.acceptSavedCredit(before, next) || !applyWorkspaceFinance(next)) {
+      onReviewNativeChange?.call();
+      if (reviewOwnerCurrent?.call()==false || !_isStoreScopeCurrent(data, before.workspaceId, before.accountScope) ||
+          !adapter.acceptSavedCredit(before, next) || !applyWorkspaceFinance(next,onReviewNativeChange:onReviewNativeChange)) {
         throw StateError('Saved credit requires recovery.');
       }
       showNotice('Customer credit applied. No money was collected or refunded.');
@@ -6731,7 +6814,7 @@ class WorkSession extends ChangeNotifier {
         data.ledgerRecoveryError = 'Reopen saved records to check the credit update before trying again.';
         data.customerCollectionGateway = StoreReviewCustomerCollectionGateway(data.finance!);
       }
-      if (!_disposed && identical(data, _storeData)) { showNotice(saving
+      if (reviewOwnerCurrent?.call()!=false && !_disposed && identical(data, _storeData)) { showNotice(saving
           ? 'Credit update needs checking. Reopen saved records before trying again.'
           : 'Credit or invoice changed. Reopen and check the available amount.'); }
       return false;
@@ -6741,6 +6824,15 @@ class WorkSession extends ChangeNotifier {
     }
   }
   bool get workspaceInvoiceHistoryLoaded => _storeData.ledgerRecovered;
+  // Read-only original native ownership; never a model-supplied financial source.
+  Object get workspaceCustomerActionSource {
+    final data=_storeData;
+    return (_contactAccountScope,activeWorkspace,data.finance,data.financeStale,data.ledgerRecovered,
+      data.ledgerCheckpointRevision,data.customerCollectionGateway,data.ledgerCheckpointStore,
+      data.pendingCustomerCollection,data.pendingCustomerReturn,data.pendingCustomerRefund,
+      data.collectionMayHaveSubmitted,data.returnMayHaveSubmitted,data.refundMayHaveSubmitted,
+      data.returnIntentSaved,data.refundIntentSaved,data.ledgerInventory);
+  }
   bool get customerCollectionBusy => _storeData.customerCollectionBusy;
   WorkspaceCustomerRefund? get pendingCustomerRefund =>
       _storeData.pendingCustomerRefund;
@@ -7092,9 +7184,12 @@ class WorkSession extends ChangeNotifier {
     String? reasonCode,
     int? expectedCreditMinor,
     int? expectedLedgerRevision,
+    bool Function()? reviewOwnerCurrent, bool Function()? reviewInputCurrent, VoidCallback? onReviewNativeChange,
   }) async {
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
+
     final data = _storeData;
-    if (!await recoverCustomerLedger() || !identical(data, _storeData)) {
+    if (!await recoverCustomerLedger() || !identical(data, _storeData) || reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false) {
       return false;
     }
     final finance = workspaceFinance;
@@ -7169,15 +7264,19 @@ class WorkSession extends ChangeNotifier {
       creditMinor: credit,
       originalItems: order.itemSnapshots,
     );
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
     data.pendingCustomerReturn = intent;
     data.returnMayHaveSubmitted = false;
     data.returnIntentSaved = false;
-    return _sendCustomerReturn(data, intent, order, reconcile: false);
+    onReviewNativeChange?.call();
+    return _sendCustomerReturn(data, intent, order, reconcile: false,reviewOwnerCurrent:reviewOwnerCurrent,reviewInputCurrent:reviewInputCurrent,onReviewNativeChange:onReviewNativeChange);
   }
 
-  Future<bool> reconcileCustomerReturn() async {
+  Future<bool> reconcileCustomerReturn({bool Function()? reviewOwnerCurrent, bool Function()? reviewInputCurrent, VoidCallback? onReviewNativeChange}) async {
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
+
     final data = _storeData;
-    if (!await recoverCustomerLedger() || !identical(data, _storeData)) {
+    if (!await recoverCustomerLedger() || !identical(data, _storeData) || reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false) {
       return false;
     }
     final intent = data.pendingCustomerReturn;
@@ -7200,7 +7299,7 @@ class WorkSession extends ChangeNotifier {
       data,
       intent,
       order,
-      reconcile: data.returnMayHaveSubmitted,
+      reconcile: data.returnMayHaveSubmitted, reviewOwnerCurrent:reviewOwnerCurrent,reviewInputCurrent:reviewInputCurrent,onReviewNativeChange:onReviewNativeChange,
     );
   }
 
@@ -7208,8 +7307,10 @@ class WorkSession extends ChangeNotifier {
     _StoreOperationalData data,
     WorkspacePendingCustomerReturn intent,
     WorkspaceOrderRecord? order, {
-    required bool reconcile,
+    required bool reconcile, bool Function()? reviewOwnerCurrent, bool Function()? reviewInputCurrent, VoidCallback? onReviewNativeChange,
   }) async {
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
+
     final request = intent.request;
     data.customerCollectionBusy = true;
     notifyListeners();
@@ -7242,14 +7343,18 @@ class WorkSession extends ChangeNotifier {
           moneyRegisters: _moneyRegisterCheckpointEntries(data),
           expenses: _expenseCheckpointEntries(data),
         );
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
         await journal.save(
           pending,
           expectedRevision: data.ledgerCheckpointRevision,
         );
+        if(reviewOwnerCurrent?.call()==false)return false;
         data.ledgerCheckpointRevision = pending.revision;
+        onReviewNativeChange?.call();
         data.returnIntentSaved = true;
         data.ledgerInventory = inventory;
-        if (!_isStoreScopeCurrent(
+        onReviewNativeChange?.call();
+        if (reviewOwnerCurrent?.call()==false || !_isStoreScopeCurrent(
           data,
           request.workspaceId,
           request.accountScope,
@@ -7259,13 +7364,15 @@ class WorkSession extends ChangeNotifier {
       }
       final adapter =
           data.customerCollectionGateway as WorkCustomerReturnGateway;
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
       data.returnMayHaveSubmitted = true;
+      onReviewNativeChange?.call();
       final reply =
           await (reconcile
                   ? adapter.reconcileReturn(request)
                   : adapter.recordReturn(request, order!))
               .timeout(const Duration(seconds: 15));
-      if (!_isStoreScopeCurrent(
+      if (reviewOwnerCurrent?.call()==false || !_isStoreScopeCurrent(
         data,
         request.workspaceId,
         request.accountScope,
@@ -7313,31 +7420,39 @@ class WorkSession extends ChangeNotifier {
         moneyRegisters: _moneyRegisterCheckpointEntries(data),
         expenses: _expenseCheckpointEntries(data),
       );
+      if(reviewOwnerCurrent?.call()==false)return false;
+      reviewInputCurrent?.call();
       await journal.save(
         completed,
         expectedRevision: data.ledgerCheckpointRevision,
       );
-      data.ledgerCheckpointRevision = completed.revision;
-      if (!_isStoreScopeCurrent(
+      if(reviewOwnerCurrent?.call()==false)return false;
+        data.ledgerCheckpointRevision = completed.revision;
+        onReviewNativeChange?.call();
+      if (reviewOwnerCurrent?.call()==false || !_isStoreScopeCurrent(
         data,
         request.workspaceId,
         request.accountScope,
       )) {
         return false;
       }
-      if (!applyWorkspaceFinance(reply)) {
+      if (!applyWorkspaceFinance(reply,onReviewNativeChange:onReviewNativeChange)) {
         throw StateError('Saved return needs projection recovery.');
       }
       final stockChanged = _restoreLedgerInventory(data, nextInventory);
+      onReviewNativeChange?.call();
+      if(reviewOwnerCurrent?.call()==false)return false;
       data.pendingCustomerReturn = null;
+      onReviewNativeChange?.call();
       data.returnIntentSaved = false;
+      onReviewNativeChange?.call();
       _queueCommittedLedgerStock(data, changed: stockChanged);
       showNotice(
         'Return recorded. Customer dues and sellable stock are updated.',
       );
       return true;
     } catch (_) {
-      if (!_disposed && identical(data, _storeData)) {
+      if (reviewOwnerCurrent?.call()!=false && !_disposed && identical(data, _storeData)) {
         showNotice(
           data.returnIntentSaved
               ? 'Return not confirmed. Its details are saved; check its status before entering it again.'
@@ -7358,10 +7473,13 @@ class WorkSession extends ChangeNotifier {
     required WorkspacePaymentChannel channel,
     String? reference,
     String? sourceCollectionId,
+    bool Function()? reviewOwnerCurrent, bool Function()? reviewInputCurrent, VoidCallback? onReviewNativeChange,
   }) async {
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
+
     final data = _storeData;
     if (!await recoverCustomerLedger() ||
-        !identical(data, _storeData) ||
+        !identical(data, _storeData) || reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false ||
         !customerRefundAvailable) {
       return false;
     }
@@ -7398,15 +7516,19 @@ class WorkSession extends ChangeNotifier {
     if (!request.valid || !ledger.permitsReceiptRefund(request)) {
       return false;
     }
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
     data.pendingCustomerRefund = request;
     data.refundMayHaveSubmitted = false;
     data.refundIntentSaved = false;
-    return _sendCustomerRefund(data, request, reconcile: false);
+    onReviewNativeChange?.call();
+    return _sendCustomerRefund(data, request, reconcile: false,reviewOwnerCurrent:reviewOwnerCurrent,reviewInputCurrent:reviewInputCurrent,onReviewNativeChange:onReviewNativeChange);
   }
 
-  Future<bool> reconcileCustomerRefund() async {
+  Future<bool> reconcileCustomerRefund({bool Function()? reviewOwnerCurrent, bool Function()? reviewInputCurrent, VoidCallback? onReviewNativeChange}) async {
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
+
     final data = _storeData;
-    if (!await recoverCustomerLedger() || !identical(data, _storeData)) {
+    if (!await recoverCustomerLedger() || !identical(data, _storeData) || reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false) {
       return false;
     }
     final request = data.pendingCustomerRefund;
@@ -7418,15 +7540,17 @@ class WorkSession extends ChangeNotifier {
     return _sendCustomerRefund(
       data,
       request,
-      reconcile: data.refundMayHaveSubmitted,
+      reconcile: data.refundMayHaveSubmitted, reviewOwnerCurrent:reviewOwnerCurrent,reviewInputCurrent:reviewInputCurrent,onReviewNativeChange:onReviewNativeChange,
     );
   }
 
   Future<bool> _sendCustomerRefund(
     _StoreOperationalData data,
     WorkspaceCustomerRefund request, {
-    required bool reconcile,
+    required bool reconcile, bool Function()? reviewOwnerCurrent, bool Function()? reviewInputCurrent, VoidCallback? onReviewNativeChange,
   }) async {
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
+
     data.customerCollectionBusy = true;
     notifyListeners();
     try {
@@ -7444,13 +7568,17 @@ class WorkSession extends ChangeNotifier {
           expenses: _expenseCheckpointEntries(data),
           pendingRefund: request,
         );
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
         await journal.save(
           pending,
           expectedRevision: data.ledgerCheckpointRevision,
         );
+        if(reviewOwnerCurrent?.call()==false)return false;
         data.ledgerCheckpointRevision = pending.revision;
+        onReviewNativeChange?.call();
         data.refundIntentSaved = true;
-        if (!_isStoreScopeCurrent(
+        onReviewNativeChange?.call();
+        if (reviewOwnerCurrent?.call()==false || !_isStoreScopeCurrent(
           data,
           request.workspaceId,
           request.accountScope,
@@ -7468,13 +7596,15 @@ class WorkSession extends ChangeNotifier {
                 p.customerId == request.customerId,
           )
           .firstOrNull;
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
       data.refundMayHaveSubmitted = true;
+      onReviewNativeChange?.call();
       final reply =
           await (reconcile
                   ? adapter.reconcileRefund(request)
                   : adapter.recordRefund(request))
               .timeout(const Duration(seconds: 15));
-      if (!_isStoreScopeCurrent(
+      if (reviewOwnerCurrent?.call()==false || !_isStoreScopeCurrent(
         data,
         request.workspaceId,
         request.accountScope,
@@ -7520,27 +7650,34 @@ class WorkSession extends ChangeNotifier {
         moneyRegisters: _moneyRegisterCheckpointEntries(data),
         expenses: _expenseCheckpointEntries(data),
       );
+      if(reviewOwnerCurrent?.call()==false)return false;
+      reviewInputCurrent?.call();
       await journal.save(
         completed,
         expectedRevision: data.ledgerCheckpointRevision,
       );
-      data.ledgerCheckpointRevision = completed.revision;
-      if (!_isStoreScopeCurrent(
+      if(reviewOwnerCurrent?.call()==false)return false;
+        data.ledgerCheckpointRevision = completed.revision;
+        onReviewNativeChange?.call();
+      if (reviewOwnerCurrent?.call()==false || !_isStoreScopeCurrent(
         data,
         request.workspaceId,
         request.accountScope,
       )) {
         return false;
       }
-      if (!applyWorkspaceFinance(reply)) {
+      if (!applyWorkspaceFinance(reply,onReviewNativeChange:onReviewNativeChange)) {
         throw StateError('Saved refund needs projection recovery.');
       }
+      if(reviewOwnerCurrent?.call()==false)return false;
       data.pendingCustomerRefund = null;
+      onReviewNativeChange?.call();
       data.refundIntentSaved = false;
+      onReviewNativeChange?.call();
       showNotice('Refund recorded against the invoice.');
       return true;
     } catch (_) {
-      if (!_disposed && identical(data, _storeData)) {
+      if (reviewOwnerCurrent?.call()!=false && !_disposed && identical(data, _storeData)) {
         showNotice(
           data.refundIntentSaved
               ? 'Refund not confirmed. Its details are saved; check its status before recording it again.'
@@ -7550,7 +7687,7 @@ class WorkSession extends ChangeNotifier {
       return false;
     } finally {
       data.customerCollectionBusy = false;
-      if (!_disposed && identical(data, _storeData)) {
+      if (reviewOwnerCurrent?.call()!=false && !_disposed && identical(data, _storeData)) {
         notifyListeners();
       }
     }
@@ -7562,9 +7699,12 @@ class WorkSession extends ChangeNotifier {
     required int amountMinor,
     required WorkspacePaymentChannel channel,
     String? reference,
+    bool Function()? reviewOwnerCurrent, bool Function()? reviewInputCurrent, VoidCallback? onReviewNativeChange,
   }) async {
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
+
     final data = _storeData;
-    if (!await recoverCustomerLedger() || !identical(data, _storeData)) {
+    if (!await recoverCustomerLedger() || !identical(data, _storeData) || reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false) {
       return false;
     }
     final finance = workspaceFinance;
@@ -7601,14 +7741,18 @@ class WorkSession extends ChangeNotifier {
       reference: reference?.trim(),
     );
     if (!request.valid) return false;
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
     data.pendingCustomerCollection = request;
     data.collectionMayHaveSubmitted = false;
-    return _sendCustomerCollection(data, request, reconcile: false);
+    onReviewNativeChange?.call();
+    return _sendCustomerCollection(data, request, reconcile: false,reviewOwnerCurrent:reviewOwnerCurrent,reviewInputCurrent:reviewInputCurrent,onReviewNativeChange:onReviewNativeChange);
   }
 
-  Future<bool> reconcileCustomerCollection() async {
+  Future<bool> reconcileCustomerCollection({bool Function()? reviewOwnerCurrent, bool Function()? reviewInputCurrent, VoidCallback? onReviewNativeChange}) async {
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
+
     final data = _storeData;
-    if (!await recoverCustomerLedger() || !identical(data, _storeData)) {
+    if (!await recoverCustomerLedger() || !identical(data, _storeData) || reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false) {
       return false;
     }
     final request = data.pendingCustomerCollection;
@@ -7620,15 +7764,17 @@ class WorkSession extends ChangeNotifier {
     return _sendCustomerCollection(
       data,
       request,
-      reconcile: data.collectionMayHaveSubmitted,
+      reconcile: data.collectionMayHaveSubmitted, reviewOwnerCurrent:reviewOwnerCurrent,reviewInputCurrent:reviewInputCurrent,onReviewNativeChange:onReviewNativeChange,
     );
   }
 
   Future<bool> _sendCustomerCollection(
     _StoreOperationalData data,
     WorkspaceCustomerCollection request, {
-    required bool reconcile,
+    required bool reconcile, bool Function()? reviewOwnerCurrent, bool Function()? reviewInputCurrent, VoidCallback? onReviewNativeChange,
   }) async {
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
+
     data.customerCollectionBusy = true;
     notifyListeners();
     try {
@@ -7647,11 +7793,14 @@ class WorkSession extends ChangeNotifier {
           expenses: _expenseCheckpointEntries(data),
           pending: request,
         );
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
         await journal.save(
           pendingCheckpoint,
           expectedRevision: data.ledgerCheckpointRevision,
         );
+        if(reviewOwnerCurrent?.call()==false)return false;
         data.ledgerCheckpointRevision = pendingCheckpoint.revision;
+        onReviewNativeChange?.call();
         if (!_isStoreScopeCurrent(
           data,
           request.workspaceId,
@@ -7668,13 +7817,15 @@ class WorkSession extends ChangeNotifier {
                 p.invoiceId == request.invoiceId,
           )
           .firstOrNull;
+    if(reviewOwnerCurrent?.call()==false || reviewInputCurrent?.call()==false)return false;
       data.collectionMayHaveSubmitted = true;
+      onReviewNativeChange?.call();
       final reply =
           await (reconcile
                   ? adapter.reconcileCollection(request)
                   : adapter.recordCollection(request))
               .timeout(const Duration(seconds: 15));
-      if (_disposed || request.accountScope != _contactAccountScope) {
+      if (reviewOwnerCurrent?.call()==false || _disposed || request.accountScope != _contactAccountScope) {
         return false;
       }
       final ledger = reply.customerLedgers
@@ -7724,23 +7875,29 @@ class WorkSession extends ChangeNotifier {
         moneyRegisters: _moneyRegisterCheckpointEntries(data),
         expenses: _expenseCheckpointEntries(data),
       );
+      if(reviewOwnerCurrent?.call()==false)return false;
+      reviewInputCurrent?.call();
       await journal.save(
         completed,
         expectedRevision: data.ledgerCheckpointRevision,
       );
-      data.ledgerCheckpointRevision = completed.revision;
+      if(reviewOwnerCurrent?.call()==false)return false;
+        data.ledgerCheckpointRevision = completed.revision;
+        onReviewNativeChange?.call();
       if (_disposed ||
           request.accountScope != _contactAccountScope ||
-          !applyWorkspaceFinance(reply)) {
+          !applyWorkspaceFinance(reply,onReviewNativeChange:onReviewNativeChange)) {
         throw StateError('Saved collection awaits projection recovery.');
       }
+      if(reviewOwnerCurrent?.call()==false)return false;
       data.pendingCustomerCollection = null;
+      onReviewNativeChange?.call();
       if (identical(data, _storeData)) {
         showNotice('Collection recorded against the invoice.');
       }
       return true;
     } catch (_) {
-      if (!_disposed && identical(data, _storeData)) {
+      if (reviewOwnerCurrent?.call()!=false && !_disposed && identical(data, _storeData)) {
         showNotice(
           'Collection not confirmed. Check its status before recording again.',
         );
@@ -8390,6 +8547,24 @@ class WorkSession extends ChangeNotifier {
       throw const WorkGatewayException('Saved allocation conflicts with this request. Keep both records for review.');
     }
     return found.single;
+  }
+
+  /// Read-only AI inspection of an already admitted native allocation basis.
+  /// Never resets recovery, projects inventory, repairs a draft or sends intent.
+  Future<bool> inspectWorkspaceSupplierAllocationCheckpoint(WorkspaceLedgerFormKey key) async {
+    final data = _storeData;
+    bool current() => _ledgerFormScopeCurrent(key) && identical(data, _storeData) && data.ledgerRecovered &&
+      key.kind == 'supplierAllocation' && !workspaceSupplierSaving && !data.inventoryReceiptBusy &&
+      !data.inventoryReceiptRecoveryPending && !data.customerCollectionBusy;
+    if (!current() || data.ledgerCheckpointStore == null) return false;
+    try {
+      final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+      return current() && saved != null && saved.valid &&
+        saved.finance.accountScope == key.account && saved.finance.workspaceId == key.store &&
+        saved.revision == data.ledgerCheckpointRevision &&
+        jsonEncode(saved.supplierLedgers[key.customer]?.toJson()) ==
+          jsonEncode(workspaceSupplierLedger(key.customer)?.toJson());
+    } on Object { return false; }
   }
 
   Future<bool> recoverWorkspaceSupplierAllocationStatus(WorkspaceLedgerFormKey key) async {
@@ -9644,6 +9819,7 @@ class WorkSession extends ChangeNotifier {
       _storeData.projectedOrderRevisions.containsKey(orderId) ||
       workspaceOrders.any((order) => order.id == orderId && order.isOperationalProjection);
 
+  WorkOrderCommand? workspacePendingOrderCommand(String orderId)=>_scopedOrderOperations?.pending(orderId);
   WorkOrderOperationState? workspaceOrderOperationState(String orderId) =>
       _scopedOrderOperations?.state(orderId);
   bool workspaceOrderCanAct(String orderId, WorkOrderAction action) =>
@@ -9749,7 +9925,9 @@ class WorkSession extends ChangeNotifier {
     String orderId,
     WorkOrderAction action, {
     String? reason,
+    bool Function()? inputCurrent,
   }) async {
+    if(inputCurrent?.call()==false)return false;
     final operations = _scopedOrderOperations;
     final order = operations?.order(orderId)?.order;
     if (operations == null ||
@@ -9782,16 +9960,17 @@ class WorkSession extends ChangeNotifier {
       showError('Choose a reason before rejecting the order.');
       return false;
     }
-    final applied = await operations.act(orderId, action, reason: reason);
-    _showScopedOrderResolution(operations, orderId, applied);
+    final applied = await operations.act(orderId, action, reason: reason,inputCurrent:inputCurrent);
+    if(inputCurrent?.call()!=false)_showScopedOrderResolution(operations, orderId, applied);
     return applied;
   }
 
-  Future<bool> retryWorkspaceOrderAction(String orderId) async {
+  Future<bool> retryWorkspaceOrderAction(String orderId,{bool Function()? inputCurrent}) async {
+    if(inputCurrent?.call()==false)return false;
     final operations = _scopedOrderOperations;
     if (operations == null) return false;
-    final applied = await operations.retry(orderId);
-    _showScopedOrderResolution(operations, orderId, applied);
+    final applied = await operations.retry(orderId,inputCurrent:inputCurrent);
+    if(inputCurrent?.call()!=false)_showScopedOrderResolution(operations, orderId, applied);
     return applied;
   }
 
@@ -9836,16 +10015,19 @@ class WorkSession extends ChangeNotifier {
           workspaceOrderOperationState(currentWorkspaceOrderId ?? '') !=
               WorkOrderOperationState.uncertain);
 
-  bool get orderTimeServiceAvailable =>
-      hasScopedWorkspaceOrder(currentWorkspaceOrderId ?? '')
+  bool get orderTimeServiceAvailable => workspaceOrderTimeServiceFor(currentWorkspaceOrderId ?? '');
+  bool workspaceOrderTimeServiceFor(String orderId) =>
+      hasScopedWorkspaceOrder(orderId)
       ? _scopedOrderOperations?.timeRequestsAvailable == true ||
-            workspaceOrderHasTimeRequest(currentWorkspaceOrderId ?? '')
+            workspaceOrderHasTimeRequest(orderId)
       : gateway is WorkOrderTimeGateway;
 
   Future<bool> requestWorkspaceOrderTime(
     String orderId,
-    int additionalMinutes,
-  ) async {
+    int additionalMinutes, {
+    bool Function()? inputCurrent,
+  }) async {
+    if(inputCurrent?.call()==false)return false;
     if (hasScopedWorkspaceOrder(orderId)) {
       final operations = _scopedOrderOperations;
       if (operations == null ||
@@ -9869,11 +10051,12 @@ class WorkSession extends ChangeNotifier {
         return false;
       }
       final applied = pending != null
-          ? await operations.retry(orderId)
+          ? await operations.retry(orderId,inputCurrent:inputCurrent)
           : await operations.act(
               orderId,
               WorkOrderAction.requestTime,
               additionalMinutes: additionalMinutes,
+              inputCurrent:inputCurrent,
             );
       if (identical(_scopedOrderOperations, operations) &&
           currentWorkspaceOrderId == orderId &&
@@ -9912,6 +10095,7 @@ class WorkSession extends ChangeNotifier {
       );
       return false;
     }
+    final hadPending=hasPendingOrderTime;
     final request = hasPendingOrderTime
         ? _pendingOrderTime!
         : WorkOrderTimeRequest(
@@ -9940,6 +10124,10 @@ class WorkSession extends ChangeNotifier {
     clearMessages();
     notifyListeners();
     try {
+      if(inputCurrent?.call()==false){
+        if(!hadPending&&current()){_pendingOrderTime=null;_orderTimeData=null;_orderTimeAccountScope=null;}
+        return false;
+      }
       final result = await (gateway as WorkOrderTimeGateway)
           .requestOrderTime(request)
           .timeout(const Duration(seconds: 15));
@@ -10736,6 +10924,8 @@ class WorkSession extends ChangeNotifier {
   String? get currentWorkspaceOrderId => _storeData.currentWorkspaceOrderId;
   set currentWorkspaceOrderId(String? value) =>
       _storeData.currentWorkspaceOrderId = value;
+  WorkspaceDeliveryAssignment? workspaceDeliveryAssignmentForOrder(String orderId)=>
+    currentWorkspaceOrderId==orderId?workspaceDeliveryAssignment:_deliveryByOrder[_orderScope(orderId)];
   WorkspaceDeliveryAssignment? get workspaceDeliveryAssignment =>
       _storeData.workspaceDeliveryAssignment;
   set workspaceDeliveryAssignment(WorkspaceDeliveryAssignment? value) =>
@@ -11286,8 +11476,9 @@ class WorkSession extends ChangeNotifier {
     return List<WorkspaceCustomerRecord>.unmodifiable(customers);
   }
 
-  List<WorkspaceCustomerRecord> get visibleWorkspaceCustomers {
-    final query = workspaceCustomerSearch.trim().toLowerCase();
+  List<WorkspaceCustomerRecord> get visibleWorkspaceCustomers=>workspaceCustomerSearchResults();
+  List<WorkspaceCustomerRecord> workspaceCustomerSearchResults({String? search,String? filter}) {
+    final query = (search??workspaceCustomerSearch).trim().toLowerCase();
     return workspaceCustomerBook
         .where((customer) {
           final searchMatch =
@@ -11295,7 +11486,7 @@ class WorkSession extends ChangeNotifier {
               '${customer.name} ${customer.mobile}'.toLowerCase().contains(
                 query,
               );
-          final filterMatch = switch (workspaceCustomerFilter) {
+          final filterMatch = switch (filter??workspaceCustomerFilter) {
             'Repeat' => customer.repeatCustomer,
             'Payment due' => customer.hasDues,
             'Following Store' => customer.followingStore,
@@ -11317,14 +11508,17 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void markWorkspaceCustomerContacted(String customerId) {
+  void markWorkspaceCustomerContacted(String customerId,{bool Function()? reviewCurrent,VoidCallback? onReviewNativeChange}) {
+    if(reviewCurrent?.call()==false)return;
     workspaceCustomerLastContactAt[customerId] = DateTime.now();
+    onReviewNativeChange?.call();
     notifyListeners();
   }
 
-  DateTime? get workspaceMoneyPeriodStart {
-    final now = DateTime.now();
-    return switch (workspaceMoneyPeriod) {
+  DateTime? get workspaceMoneyPeriodStart=>workspaceMoneyPeriodStartFor(workspaceMoneyPeriod);
+  DateTime? workspaceMoneyPeriodStartFor(String period,{DateTime? at}) {
+    final now = at??DateTime.now();
+    return switch (period) {
       'Today' => DateTime(now.year, now.month, now.day),
       'Week' => now.subtract(const Duration(days: 7)),
       'Month' => DateTime(now.year, now.month, 1),
@@ -11693,7 +11887,7 @@ class WorkSession extends ChangeNotifier {
 
   bool prepareRepeatWorkspaceOrder() => prepareRepeatWorkspaceOrderFor();
 
-  bool prepareRepeatWorkspaceOrderFor({String? customerId}) {
+  WorkspaceOrderRecord? workspaceRepeatOrderSource({String? customerId}) {
     final eligibleOrders = customerId == null
         ? visibleWorkspaceOrders
         : visibleWorkspaceOrders
@@ -11701,11 +11895,14 @@ class WorkSession extends ChangeNotifier {
                 (order) => workspaceCustomerId(order.customer) == customerId,
               )
               .toList(growable: false);
-    final source =
+    return
         eligibleOrders
             .where((order) => order.stage == 'Completed')
             .firstOrNull ??
         eligibleOrders.firstOrNull;
+  }
+  bool prepareRepeatWorkspaceOrderFor({String? customerId}) {
+    final source=workspaceRepeatOrderSource(customerId:customerId);
     if (source == null) {
       showError('No previous basket is available for this customer yet.');
       return false;
@@ -11786,13 +11983,14 @@ class WorkSession extends ChangeNotifier {
     return true;
   }
 
-  void activateWorkspace(WorkWorkspace workspace) {
+  void activateWorkspace(WorkWorkspace workspace, {bool Function()? current, bool Function()? storageCurrent, VoidCallback? onKnownChange}) {
+    if (current?.call() == false) return;
     if (hasPendingOrderTime) {
       showNotice('Confirm the time request before switching stores.');
       return;
     }
-    final current = activeWorkspace;
-    if (current == null || current.id == workspace.id) return;
+    final previousWorkspace = activeWorkspace;
+    if (previousWorkspace == null || previousWorkspace.id == workspace.id) return;
     if (_collection?.needsReconciliation == true) {
       showNotice('Confirming this collection. Please wait for the update.');
       return;
@@ -11808,7 +12006,7 @@ class WorkSession extends ChangeNotifier {
     _clearWorkspaceApplication();
     _clearCollection();
     otherWorkspaces.removeWhere((item) => item.id == workspace.id);
-    otherWorkspaces.add(current);
+    otherWorkspaces.add(previousWorkspace);
     activeWorkspace = workspace;
     workspaceId = workspace.id;
     workName = workspace.name;
@@ -11819,7 +12017,8 @@ class WorkSession extends ChangeNotifier {
     selectedFamilyId = selectedProfile?.familyId;
     reviewStage = WorkReviewStage.approved;
     remoteReviewStatus = WorkRemoteReviewStatus.approved;
-    _queueContactDraft();
+    _queueContactDraft(current: storageCurrent);
+    onKnownChange?.call();
     clearMessages();
     notifyListeners();
   }
@@ -12596,6 +12795,7 @@ class WorkSession extends ChangeNotifier {
   bool get workspacePickupPreferencesSaving => _pickupRecovery.pendingWrites > 0;
   Object get pickupPreferencesContext => (_contactAccountScope, activeWorkspace?.id, navigationScopeRevision);
   bool get workspacePickupPreferencesSaved => _pickupRecovery.saved;
+  Future<bool> get workspacePickupPreferencesWrite => _pickupRecovery.writes;
   String? get workspacePickupPreferencesError => _pickupRecovery.error;
 
   WorkPendingProofStore? _pickupPreferencesStore(String storeId) {
@@ -13141,6 +13341,12 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     if (!_stockEditAvailable()) return false;
+    final reviewDraft = retainedCounterDraft;
+    final ownReview = _counterSubmissionOrderId == order.id && counterDraftSubmitting &&
+      reviewDraft?.stage == WorkspaceCounterDraftStage.submitting && reviewDraft?.submissionOrderId == order.id &&
+      _counterReviewStockObservers.values.any((observer)=>observer.scope!=null&&observer.scope==_counterDraftScope&&
+        observer.generation==counterSaleGeneration&&observer.editor==reviewDraft?.id);
+    final reviewBefore = ownReview ? counterCatalogueReviewSignature : null;
     for (final entry in order.quantities.entries) {
       final product = workspaceCatalogueItems
           .where((item) => item.id == entry.key)
@@ -13178,6 +13384,12 @@ class WorkSession extends ChangeNotifier {
         referenceKind: WorkspaceStockReferenceKind.order,
         referenceId: order.id,
       );
+    }
+    if (ownReview) {
+      _counterReviewStockScope = _counterDraftScope;
+      _counterReviewStockGeneration = counterSaleGeneration;
+      _counterReviewStockTransition = (draftId: reviewDraft!.id,orderId: order.id,
+        before: reviewBefore!,after: counterCatalogueReviewSignature);
     }
     return true;
   }
@@ -13340,7 +13552,8 @@ class WorkSession extends ChangeNotifier {
     return invoice;
   }
 
-  Future<void> _requestWorkspaceDeliveryAssignment(String orderId) async {
+  Future<void> _requestWorkspaceDeliveryAssignment(String orderId,{bool Function()? inputCurrent}) async {
+    if(inputCurrent?.call()==false)return;
     if (hasScopedWorkspaceOrder(orderId)) {
       showError('Delivery updates for this order are not available yet.');
       return;
@@ -13356,6 +13569,7 @@ class WorkSession extends ChangeNotifier {
     workspaceOperationsSyncing = true;
     notifyListeners();
     try {
+      if(inputCurrent?.call()==false)return;
       final result = await gateway.requestDeliveryAssignment(
         workspaceId: id,
         orderId: orderId,
@@ -13383,7 +13597,8 @@ class WorkSession extends ChangeNotifier {
     }
   }
 
-  Future<bool> verifyWorkspaceHandover(String otp) async {
+  Future<bool> verifyWorkspaceHandover(String otp,{bool Function()? inputCurrent}) async {
+    if(inputCurrent?.call()==false)return false;
     if (hasScopedWorkspaceOrder(currentWorkspaceOrderId ?? '')) {
       showError('Handover confirmation for this order is not available yet.');
       return false;
@@ -13443,6 +13658,7 @@ class WorkSession extends ChangeNotifier {
     clearMessages();
     notifyListeners();
     try {
+      if(inputCurrent?.call()==false)return false;
       await gateway.verifyOrderHandover(
         workspaceId: id,
         orderId: order.id,
@@ -13467,7 +13683,8 @@ class WorkSession extends ChangeNotifier {
     }
   }
 
-  Future<bool> verifyWorkspacePickup(String code) async {
+  Future<bool> verifyWorkspacePickup(String code,{bool Function()? inputCurrent}) async {
+    if(inputCurrent?.call()==false)return false;
     if (hasScopedWorkspaceOrder(currentWorkspaceOrderId ?? '')) {
       showError('Collection confirmation for this order is not available yet.');
       return false;
@@ -13496,6 +13713,7 @@ class WorkSession extends ChangeNotifier {
     clearMessages();
     notifyListeners();
     try {
+      if(inputCurrent?.call()==false)return false;
       await gateway.verifyOrderHandover(
         workspaceId: id,
         orderId: order.id,
@@ -13520,7 +13738,8 @@ class WorkSession extends ChangeNotifier {
     }
   }
 
-  Future<void> retryWorkspaceDeliveryAssignment() async {
+  Future<void> retryWorkspaceDeliveryAssignment({bool Function()? inputCurrent}) async {
+    if(inputCurrent?.call()==false)return;
     final order = currentWorkspaceOrder;
     if (order == null ||
         workspaceOrderStage != 'Delivery requested' ||
@@ -13528,7 +13747,7 @@ class WorkSession extends ChangeNotifier {
       return;
     }
     workspaceOperationsSyncError = null;
-    await _requestWorkspaceDeliveryAssignment(order.id);
+    await _requestWorkspaceDeliveryAssignment(order.id,inputCurrent:inputCurrent);
   }
 
   Future<void> requestWorkspaceSettlement({int? amount}) async {
@@ -13828,6 +14047,11 @@ class WorkSession extends ChangeNotifier {
     _persistOperationalState('order-cancelled');
   }
 
+  /// Existing new-Counter form defaults, shared with ephemeral native review.
+  ({String customer,String source,String fulfilment,String payment,String address,WorkspaceBillingDetails billing,WorkspaceBillDiscount discount})
+    get workspaceCounterEmptyFields => (customer:'',source:'Counter',fulfilment:'At the shop',payment:'Cash',address:'',
+      billing:const WorkspaceBillingDetails(),discount:const WorkspaceBillDiscount.none());
+
   bool startNewWorkspaceOrder() {
     if (counterDraftSubmitting ||
         hasPendingOrderTime ||
@@ -13840,22 +14064,23 @@ class WorkSession extends ChangeNotifier {
       );
       return false;
     }
+    final empty = workspaceCounterEmptyFields;
     _counterSaleGeneration++;
     _rememberActiveOrder();
     _clearCollection();
     if (_counterRecovery?.record?.stage == WorkspaceCounterDraftStage.retired) {
       _counterRecovery?.customerInput = null;
     }
-    workspaceOrderCustomer = '';
+    workspaceOrderCustomer = empty.customer;
     workspaceOrderItems = '';
     workspaceOrderAmount = '';
     workspaceOrderNeedsDelivery = false;
-    workspaceOrderSource = 'Counter';
-    workspaceOrderFulfilment = 'At the shop';
-    workspaceOrderPayment = 'Cash';
-    workspaceOrderAddress = '';
-    workspaceOrderBillingDetails = const WorkspaceBillingDetails();
-    _storeData.counterDiscount = const WorkspaceBillDiscount.none();
+    workspaceOrderSource = empty.source;
+    workspaceOrderFulfilment = empty.fulfilment;
+    workspaceOrderPayment = empty.payment;
+    workspaceOrderAddress = empty.address;
+    workspaceOrderBillingDetails = empty.billing;
+    _storeData.counterDiscount = empty.discount;
     workspaceOrderStage = 'No order';
     workspaceOrderExtraMinutes = 0;
     workspaceOrderActionDeadline = null;
@@ -14292,6 +14517,14 @@ class WorkSession extends ChangeNotifier {
     return true;
   }
 
+  /// Pure projection of the existing Counter quantity rule; no edit or authority.
+  int? workspaceCounterAdjustedQuantity(String productId,int current,int change) {
+    final product = workspaceCatalogueItems.where((item) => item.id == productId).firstOrNull;
+    if (product == null || change > 0 && !product.canSellAtCounter) return null;
+    final maximum = product.stockMode == WorkspaceStockMode.availabilityOnly ? 99 : product.stock;
+    return (current + change).clamp(0,maximum);
+  }
+
   void adjustWorkspaceOrderQuantity(String productId, int change) {
     if (counterDraftEditingBlocked) return;
     if (!_canEditCounterOrder(allowCompletedInvoice: false)) return;
@@ -14304,10 +14537,8 @@ class WorkSession extends ChangeNotifier {
       return;
     }
     final current = workspaceOrderQuantities[productId] ?? 0;
-    final maximum = product.stockMode == WorkspaceStockMode.availabilityOnly
-        ? 99
-        : product.stock;
-    final next = (current + change).clamp(0, maximum);
+    final next = workspaceCounterAdjustedQuantity(productId,current,change);
+    if (next == null) return;
     if (next == 0) {
       workspaceOrderQuantities.remove(productId);
     } else {
@@ -14579,6 +14810,32 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? get workspaceApplicationAccountScope => _contactAccountScope;
+  String? get workspaceApplicationId => _workspaceApplicationId;
+  bool get workspaceApplicationCanNavigate => _canChangeWorkspaceApplication;
+  List<WorkProfileOption> get storeWorkspaceApplicationProfiles => List.unmodifiable(
+    workProfiles.where((profile) => profile.familyId == 'products-trade'));
+  bool workspaceApplicationIsStoreProfile(String? profileId) =>
+    storeWorkspaceApplicationProfiles.any((profile) => profile.id == profileId);
+  String? workspaceApplicationProfileId(String id) {
+    final application = _workspaceApplications[id];
+    return application?.scope == _contactAccountScope ? application?.details['profileId'] as String? : null;
+  }
+  String get workspaceApplicationStorageIdentity => jsonEncode([_contactAccountScope, _workspaceApplicationId, selectedProfile?.id, reviewCaseId, _profileSubmissionKey]);
+  String get workspaceApplicationSource => jsonEncode({
+    'account': _contactAccountScope, 'application': _workspaceApplicationId,
+    'details': _applicationDetails(), 'submitted': submittedProfile == null ? null : _savedSubmission(submittedProfile!), 'case': reviewCaseId, 'submission': _profileSubmissionKey,
+    'status': remoteReviewStatus?.name, 'stage': reviewStage.name, 'reason': reviewReason,
+    'refresh': reviewStatusNeedsRefresh, 'navigation': navigationScopeRevision,
+    'initialLoaded': initialWorkspaceStateLoaded,
+    'active': activeWorkspace == null ? null : [activeWorkspace!.id, activeWorkspace!.name,
+      activeWorkspace!.profileId, activeWorkspace!.verified, activeWorkspace!.area],
+    'workspaces': [for (final value in otherWorkspaces) [value.id, value.name, value.profileId, value.verified, value.area]],
+    'applications': [for (final value in _workspaceApplications.values)
+      if (value.scope == _contactAccountScope) {'id': value.id, 'details': value.details,
+        'case': value.caseId, 'refresh': value.needsStatusRefresh}],
+  });
+
   Map<String, Object?> _applicationDetails() => {
     'profileId': selectedProfile?.id,
     'personName': authorizedPersonName,
@@ -14695,7 +14952,8 @@ class WorkSession extends ChangeNotifier {
       _collection?.busy != true &&
       _collection?.needsReconciliation != true;
 
-  bool resumeWorkspaceApplication(String id) {
+  bool resumeWorkspaceApplication(String id, {bool Function()? current, bool Function()? storageCurrent, VoidCallback? onKnownChange}) {
+    if (current?.call() == false) return false;
     final application = _workspaceApplications[id];
     if (application == null || application.scope != _contactAccountScope) {
       showError('This application is unavailable. Refresh your Workspaces.');
@@ -14707,7 +14965,8 @@ class WorkSession extends ChangeNotifier {
     }
     _rememberWorkspaceApplication();
     _restoreWorkspaceApplication(application);
-    _queueContactDraft();
+    _queueContactDraft(current: storageCurrent);
+    onKnownChange?.call();
     clearMessages();
     notifyListeners();
     return true;
@@ -14828,14 +15087,16 @@ class WorkSession extends ChangeNotifier {
     gstProofReference = null;
   }
 
-  bool startAnotherWork() {
+  bool startAnotherWork({bool Function()? current, bool Function()? storageCurrent, VoidCallback? onKnownChange}) {
+    if (current?.call() == false) return false;
     if (!_canChangeWorkspaceApplication) {
       showNotice('Finishing your current update. Please wait.');
       return false;
     }
     _rememberWorkspaceApplication();
     _clearWorkspaceApplication();
-    _queueContactDraft();
+    _queueContactDraft(current: storageCurrent);
+    onKnownChange?.call();
     clearMessages();
     notifyListeners();
     return true;
@@ -14854,7 +15115,8 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void selectProfile(String profileId) {
+  void selectProfile(String profileId, {bool Function()? current, bool Function()? storageCurrent, VoidCallback? onKnownChange}) {
+    if (current?.call() == false) return;
     if (busy) return;
     final nextProfile = workProfiles.firstWhere(
       (profile) => profile.id == profileId,
@@ -14867,7 +15129,8 @@ class WorkSession extends ChangeNotifier {
       declarationAccepted = false;
     }
     selectedProfile = nextProfile;
-    _queueContactDraft();
+    _queueContactDraft(current: storageCurrent);
+    onKnownChange?.call();
     clearMessages();
     notifyListeners();
   }
@@ -14940,14 +15203,17 @@ class WorkSession extends ChangeNotifier {
     _queueContactDraft();
   }
 
-  void saveBusinessRelationship(String value) {
+  void saveBusinessRelationship(String value, {bool Function()? current, bool Function()? storageCurrent, VoidCallback? onKnownChange}) {
+    if (current?.call() == false) return;
     if (businessRelationship != value) declarationAccepted = false;
     businessRelationship = value;
-    _queueContactDraft();
+    _queueContactDraft(current: storageCurrent);
+    onKnownChange?.call();
     notifyListeners();
   }
 
-  void _queueContactDraft() {
+  void _queueContactDraft({bool Function()? current}) {
+    if (current?.call() == false) return;
     final store = contactDraftStore;
     final scope = store?.accountScope;
     if (_disposed || (_contactDraftScopeKnown && scope != _contactDraftScope)) {
@@ -14960,6 +15226,7 @@ class WorkSession extends ChangeNotifier {
     _contactDraftScope = scope;
     _contactDraftRevision++;
     _queuedContactDraft = (
+      current: current,
       scope: scope,
       draft: {
         'version': 2,
@@ -15045,7 +15312,7 @@ class WorkSession extends ChangeNotifier {
     }
     return _contactDraftWrite = _drainContactDraft().whenComplete(() {
       _contactDraftWrite = null;
-      if (_queuedContactDraft != null) unawaited(flushContactDraft());
+      if (_queuedContactDraft != null && _queuedContactDraft!.current?.call() != false) unawaited(flushContactDraft());
     });
   }
 
@@ -15053,16 +15320,17 @@ class WorkSession extends ChangeNotifier {
     final store = contactDraftStore!;
     while (_queuedContactDraft != null) {
       final pending = _queuedContactDraft!;
+      if (pending.current?.call() == false) return; // Retain this exact undispatched native draft; no retry spin.
       _queuedContactDraft = null;
       try {
         await store.save(pending.scope, pending.draft);
-        if (pending.scope == store.accountScope &&
+        if (pending.current?.call() != false && pending.scope == store.accountScope &&
             contactDraftMessage != null) {
           contactDraftMessage = null;
           notifyListeners();
         }
       } on Object {
-        if (!_disposed && pending.scope == store.accountScope) {
+        if (pending.current?.call() != false && !_disposed && pending.scope == store.accountScope) {
           contactDraftMessage =
               'Your changes could not be saved on this phone. Keep this page open and try again.';
           notifyListeners();
@@ -15648,7 +15916,9 @@ class WorkSession extends ChangeNotifier {
     required String name,
     required String area,
     required String activity,
+    bool Function()? current, bool Function()? storageCurrent, VoidCallback? onKnownChange,
   }) {
+    if (current?.call() == false) return;
     if (workName != name.trim() ||
         workArea != area.trim() ||
         primaryActivity != activity.trim()) {
@@ -15657,7 +15927,8 @@ class WorkSession extends ChangeNotifier {
     workName = name.trim();
     workArea = area.trim();
     primaryActivity = activity.trim();
-    _queueContactDraft();
+    _queueContactDraft(current: storageCurrent);
+    onKnownChange?.call();
     clearMessages();
     notifyListeners();
   }
@@ -15913,41 +16184,54 @@ class WorkSession extends ChangeNotifier {
     if (current()) notifyListeners();
   }
 
-  Future<bool> addProof(String proofId, WorkProofSource source) async {
+  Future<bool> addProof(String proofId, WorkProofSource source, {bool Function()? ownerCurrent, bool Function()? inputCurrent, bool Function()? storageCurrent, VoidCallback? onKnownChange}) async {
+    if (ownerCurrent?.call() == false || inputCurrent?.call() == false) return false;
     if (busy) return false;
     _rememberWorkspaceApplication();
     final applicationId = _workspaceApplicationId;
     final accountScope = _contactAccountScope;
     final profileId = selectedProfile?.id;
     bool current() =>
-        !_disposed &&
+        ownerCurrent?.call() != false && !_disposed &&
         applicationId == _workspaceApplicationId &&
         accountScope == _contactAccountScope &&
         profileId == selectedProfile?.id;
+    final nativeOperation = Object(); _workspaceApplicationNativeOperation = nativeOperation;
     busy = true;
     clearMessages();
     notifyListeners();
+    var uploadIssued = false, proofAcknowledged = false;
+    Map<String, Object?>? pendingDraft;
     final store = pendingProofStore;
     final scope = store?.accountScope;
     try {
+      if (!current() || inputCurrent?.call() == false) return false;
       if (store != null) {
         if (scope == null) {
           throw const WorkGatewayException(
             'Sign in again before adding a document.',
           );
         }
-        await store.save(scope, _pendingDocumentDraft(proofId, source));
+        pendingDraft = _pendingDocumentDraft(proofId, source);
+        await store.save(scope, pendingDraft);
         if (!current() || scope != store.accountScope) return false;
       }
+      if (inputCurrent?.call() == false) return false;
       final proof = await proofPicker.pick(source);
       if (!current() || (store != null && scope != store.accountScope)) {
         return false;
       }
       if (proof == null) return false;
-      final reference = await gateway.saveProof(proofId, proof);
+      if (inputCurrent?.call() == false) return false;
+      uploadIssued = true;
+      final reference = gateway is AuthenticatedWorkGateway && (ownerCurrent != null || inputCurrent != null)
+        ? await (gateway as AuthenticatedWorkGateway).saveProof(proofId, proof, current: () => ownerCurrent?.call() != false && inputCurrent?.call() != false, originalCurrent: ownerCurrent)
+        : await gateway.saveProof(proofId, proof);
       if (!current() || (store != null && scope != store.accountScope)) {
         return false;
       }
+      inputCurrent?.call(); // Latch private retirement before accepting this already-issued native ACK.
+      proofAcknowledged = true;
       addedProofs[proofId] = reference;
       pickedProofs[proofId] = proof;
       _removedProofs.remove(proofId);
@@ -15957,6 +16241,7 @@ class WorkSession extends ChangeNotifier {
       declarationAccepted = false;
       // The document row reports the attachment without moving the whole page.
       noticeMessage = null;
+      onKnownChange?.call();
       return true;
     } on WorkGatewayException catch (error) {
       if (current() && !error.cancelled) errorMessage = error.message;
@@ -15967,25 +16252,31 @@ class WorkSession extends ChangeNotifier {
       }
       return false;
     } finally {
-      if (current() &&
+      if (current() && (ownerCurrent == null && inputCurrent == null || !uploadIssued || proofAcknowledged) &&
           store != null &&
           scope != null &&
           scope == store.accountScope) {
         try {
-          await store.clear(scope);
+          if (store is SecureWorkPendingProofStore && (ownerCurrent != null || inputCurrent != null)) {
+            await store.clear(scope, current: current, expectedDraft: pendingDraft);
+          } else { await store.clear(scope); }
         } on Object {
           /* Retain recovery until storage is available. */
         }
       }
       if (current()) {
-        _queueContactDraft();
+        _queueContactDraft(current: storageCurrent);
+        onKnownChange?.call();
         busy = false;
         notifyListeners();
+      } else if ((ownerCurrent != null || inputCurrent != null) && identical(_workspaceApplicationNativeOperation, nativeOperation)) {
+        busy = false; if (!_disposed) notifyListeners();
       }
     }
   }
 
-  void removeProof(String proofId) {
+  void removeProof(String proofId, {bool Function()? current, bool Function()? storageCurrent, VoidCallback? onKnownChange}) {
+    if (current?.call() == false) return;
     final reference = addedProofs[proofId];
     if (busy ||
         reference == null ||
@@ -16001,7 +16292,8 @@ class WorkSession extends ChangeNotifier {
     addedProofs.remove(proofId);
     pickedProofs.remove(proofId);
     declarationAccepted = false;
-    _queueContactDraft();
+    _queueContactDraft(current: storageCurrent);
+    onKnownChange?.call();
     clearMessages();
     notifyListeners();
   }
@@ -16024,13 +16316,15 @@ class WorkSession extends ChangeNotifier {
                 .label
       : null;
 
-  bool undoProofRemoval(String proofId) {
+  bool undoProofRemoval(String proofId, {bool Function()? current, bool Function()? storageCurrent, VoidCallback? onKnownChange}) {
+    if (current?.call() == false) return false;
     if (!canUndoProofRemoval(proofId)) return false;
     final removed = _removedProofs.remove(proofId)!;
     addedProofs[proofId] = removed.reference;
     if (removed.file != null) pickedProofs[proofId] = removed.file!;
     declarationAccepted = false;
-    _queueContactDraft();
+    _queueContactDraft(current: storageCurrent);
+    onKnownChange?.call();
     clearMessages();
     notifyListeners();
     return true;
@@ -16042,7 +16336,8 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool beginReviewCorrection() {
+  bool beginReviewCorrection({bool Function()? current, bool Function()? storageCurrent, VoidCallback? onKnownChange}) {
+    if (current?.call() == false) return false;
     if (reviewStatusNeedsRefresh) {
       showError(
         'Wait for the current application update before making changes.',
@@ -16090,7 +16385,8 @@ class WorkSession extends ChangeNotifier {
     }
     reviewCorrectionDraft = true;
     declarationAccepted = false;
-    _queueContactDraft();
+    _queueContactDraft(current: storageCurrent);
+    onKnownChange?.call();
     clearMessages();
     notifyListeners();
     return true;
@@ -16119,7 +16415,8 @@ class WorkSession extends ChangeNotifier {
     );
   }
 
-  Future<bool> submitProfile() async {
+  Future<bool> submitProfile({bool Function()? ownerCurrent, bool Function()? inputCurrent, bool Function()? storageCurrent, VoidCallback? onKnownChange}) async {
+    if (ownerCurrent?.call() == false || inputCurrent?.call() == false) return false;
     if (reviewStatusNeedsRefresh && reviewCaseId != null) {
       showError('Check your application update before submitting changes.');
       return false;
@@ -16147,20 +16444,26 @@ class WorkSession extends ChangeNotifier {
     if (busy) return false;
     final requestedScope = _contactAccountScope;
     final submission = _currentProfileSubmission();
-    _queueContactDraft();
+    onKnownChange?.call(); // The native controller allocated/reused this exact original key.
+    _queueContactDraft(current: storageCurrent);
+    onKnownChange?.call();
     final requestedApplication = _workspaceApplicationId;
     bool current() =>
-        !_disposed &&
+        ownerCurrent?.call() != false && !_disposed &&
         requestedApplication == _workspaceApplicationId &&
         requestedScope == _contactAccountScope &&
         selectedProfile?.id == submission.profileId &&
         reviewCaseId == existingCaseId;
+    final nativeOperation = Object(); _workspaceApplicationNativeOperation = nativeOperation;
     busy = true;
     clearMessages();
     notifyListeners();
     try {
+      if (!current() || inputCurrent?.call() == false) return false;
       final result = existingCaseId == null
-          ? await gateway.submitProfile(submission)
+          ? gateway is AuthenticatedWorkGateway && (ownerCurrent != null || inputCurrent != null)
+            ? await (gateway as AuthenticatedWorkGateway).submitProfile(submission, current: () => ownerCurrent?.call() != false && inputCurrent?.call() != false)
+            : await gateway.submitProfile(submission)
           : await gateway.submitCorrection(existingCaseId, submission);
       if (!current()) return false;
       if (result.caseId.trim().isEmpty ||
@@ -16176,6 +16479,7 @@ class WorkSession extends ChangeNotifier {
           'The response could not be matched to this application. Please retry.',
         );
       }
+      inputCurrent?.call(); // Observe foreign input without discarding an exact original known ACK.
       submittedProfile = submission;
       reviewCaseId = result.caseId;
       subscriptionPlan = result.plan;
@@ -16186,7 +16490,9 @@ class WorkSession extends ChangeNotifier {
       reviewCorrectionDraft = false;
       // The acknowledged case changes the pre-request guard. Save the exact
       // validated result here, before leaving this synchronous success block.
-      _queueContactDraft();
+      onKnownChange?.call();
+      _queueContactDraft(current: storageCurrent);
+      onKnownChange?.call();
       noticeMessage = existingCaseId == null
           ? 'Application submitted.'
           : 'Your updated information was submitted.';
@@ -16195,8 +16501,8 @@ class WorkSession extends ChangeNotifier {
       if (current()) errorMessage = error.message;
       return false;
     } finally {
-      busy = false;
-      if (current()) _queueContactDraft();
+      if (ownerCurrent == null && inputCurrent == null || identical(_workspaceApplicationNativeOperation, nativeOperation)) busy = false;
+      if (current()) { _queueContactDraft(current: storageCurrent); onKnownChange?.call(); }
       if (!_disposed) notifyListeners();
     }
   }
@@ -16263,13 +16569,16 @@ class WorkSession extends ChangeNotifier {
     }, success: 'GST certificate added to your Workspace review.');
   }
 
-  Future<bool> checkReview() async {
+  Future<bool> checkReview({bool Function()? ownerCurrent, bool Function()? inputCurrent, bool Function()? storageCurrent, VoidCallback? onKnownChange}) async {
+    if (ownerCurrent?.call() == false || inputCurrent?.call() == false) return false;
+    var acknowledged = false;
     if (reviewCaseId == null) {
       errorMessage = 'Submit the work profile before checking review.';
       notifyListeners();
       return false;
     }
     if (busy) return false;
+    final nativeOperation = Object(); _workspaceApplicationNativeOperation = nativeOperation;
     busy = true;
     clearMessages();
     notifyListeners();
@@ -16278,13 +16587,16 @@ class WorkSession extends ChangeNotifier {
     final requestedProfile = selectedProfile?.id;
     final requestedApplication = _workspaceApplicationId;
     bool current() =>
-        !_disposed &&
+        ownerCurrent?.call() != false && !_disposed &&
         requestedApplication == _workspaceApplicationId &&
         reviewCaseId == requestedCase &&
         requestedScope == _contactAccountScope &&
         requestedProfile == selectedProfile?.id;
     try {
-      final result = await gateway.checkReview(requestedCase);
+      if (!current() || inputCurrent?.call() == false) return false;
+      final result = gateway is AuthenticatedWorkGateway && (ownerCurrent != null || inputCurrent != null)
+        ? await (gateway as AuthenticatedWorkGateway).checkReview(requestedCase, current: () => ownerCurrent?.call() != false && inputCurrent?.call() != false)
+        : await gateway.checkReview(requestedCase);
       if (!current()) return false;
       if (result.caseId != requestedCase ||
           (result.profileId != null && result.profileId != requestedProfile)) {
@@ -16300,6 +16612,8 @@ class WorkSession extends ChangeNotifier {
           retryable: true,
         );
       }
+      inputCurrent?.call(); // Known original result is retained; retired presentation stays retired.
+      acknowledged = true;
       subscriptionPlan = result.plan;
       reviewReason = result.reason;
       remoteReviewStatus = result.status;
@@ -16370,8 +16684,9 @@ class WorkSession extends ChangeNotifier {
       }
       return false;
     } finally {
-      busy = false;
-      if (current()) _queueContactDraft();
+      if (ownerCurrent == null && inputCurrent == null || identical(_workspaceApplicationNativeOperation, nativeOperation)) busy = false;
+      if (acknowledged && ownerCurrent?.call() != false) onKnownChange?.call();
+      if (current()) { _queueContactDraft(current: storageCurrent); onKnownChange?.call(); }
       if (!_disposed) notifyListeners();
     }
   }

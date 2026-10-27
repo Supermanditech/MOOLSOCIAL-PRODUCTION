@@ -1357,3 +1357,48 @@ class WorkEmptyState extends StatelessWidget {
     );
   }
 }
+
+typedef WorkWorkspaceApplicationRow = ({String id, String name, String status, String profileLabel});
+
+/// Rendering of the original Workspace/application chooser; callers retain native effects.
+class WorkWorkspaceApplicationChooserBody extends StatelessWidget {
+  const WorkWorkspaceApplicationChooserBody({required this.choices, required this.applications,
+    required this.currentId, required this.onWorkspace, required this.onApplication,
+    this.onRequest, this.bottomInset = 0, this.showSocialHint = true, this.allowCurrentOpen = false, super.key});
+  final List<WorkWorkspace> choices;
+  final List<WorkWorkspaceApplicationRow> applications;
+  final String? currentId;
+  final Future<void> Function(WorkWorkspace) onWorkspace;
+  final Future<void> Function(WorkWorkspaceApplicationRow) onApplication;
+  final VoidCallback? onRequest;
+  final double bottomInset;
+  final bool showSocialHint, allowCurrentOpen;
+  @override Widget build(BuildContext context) => ListView(
+    key: const Key('work-workspace-switcher-sheet'), shrinkWrap: true, padding: EdgeInsets.zero,
+    children: [
+      const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 8), child: Text('Choose your Workspace',
+        style: TextStyle(color: MoolColors.navy, fontSize: 19, fontWeight: FontWeight.w800))),
+      for (final workspace in choices) ListTile(key: ValueKey('work-switch-${workspace.id}'),
+        leading: Icon(workspace.id == currentId ? Icons.check_circle_rounded : Icons.storefront_outlined, color: MoolColors.navy),
+        title: Text(workspace.name), subtitle: Text('${workspace.profileLabel} · ${workspace.area}'),
+        selected: workspace.id == currentId,
+        onTap: workspace.id == currentId && !allowCurrentOpen ? null : () => onWorkspace(workspace)),
+      if (applications.isNotEmpty) ...[
+        const Divider(),
+        const Padding(padding: EdgeInsets.fromLTRB(16, 4, 16, 8), child: Text('Applications',
+          style: TextStyle(color: MoolColors.navy, fontWeight: FontWeight.w700))),
+        for (final application in applications) ListTile(key: ValueKey('work-resume-${application.id}'),
+          leading: const Icon(Icons.description_outlined, color: MoolColors.navy),
+          title: Text(application.name), subtitle: Text('${application.profileLabel} · ${application.status}'),
+          onTap: () => onApplication(application)),
+      ],
+      if (showSocialHint) ...[
+        const Divider(height: 16),
+        const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('Create content anytime from Social.',
+          style: TextStyle(color: MoolColors.muted, fontSize: 12))),
+      ],
+      if (onRequest != null) Padding(padding: EdgeInsets.fromLTRB(16, 8, 16, bottomInset + 12),
+        child: OutlinedButton.icon(key: const Key('work-switch-add-workspace'), onPressed: onRequest,
+          icon: const Icon(Icons.add_business_outlined, size: 18), label: const Text('Request another Workspace'))),
+    ]);
+}

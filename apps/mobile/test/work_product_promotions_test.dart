@@ -267,7 +267,77 @@ StorePromotionController controller(
   validateSelection: validate ?? (_, current) async => current(),
   now: now ?? () => at,
 );
+class _OfferHeldCouponPending extends CouponPending {
+  Completer<void>? readGate;
+  final readEntered = Completer<void>();
+  @override Future<StoreCouponIntent?> read(StorePromotionScope scope) async {
+    if (!readEntered.isCompleted) readEntered.complete();
+    await readGate?.future; return super.read(scope);
+  }
+}
+class _OfferGuardedCouponProvider extends CouponProvider {
+  final entered = Completer<void>();
+  Completer<void>? beforeTransport;
+  @override Future<StoreCouponResult> saveCoupon(StoreCouponIntent original, bool Function() current) async {
+    if (!entered.isCompleted) entered.complete();
+    await beforeTransport?.future;
+    if (!current()) return const StoreCouponResult(StorePromotionResultState.unknown);
+    return super.saveCoupon(original, current);
+  }
+}
+void registerOfferControllerOwnerTests() {
+  Future<StoreCouponIntent> seed(CouponPending pending) async {
+    final gateway = CouponProvider()..unknown = true;
+    final controller = StoreCouponController(scope: scope, gateway: gateway, pendingStore: pending, context: () => 1, now: () => at);
+    try {
+      final campaign = StoreCouponCampaign(id: 'coupon-guarded', storeId: scope.store, revision: 1, name: 'HOST guarded coupon',
+        percentage: false, discount: 100, minimumSpendMinor: 0, maximumSavingMinor: 100,
+        startsAt: at.subtract(const Duration(days: 1)), endsAt: at.add(const Duration(days: 7)), totalUses: 100, usesPerCustomer: 1);
+      expect(await controller.refresh(campaign.id), isTrue);
+      expect((await controller.submit(campaign.id, StoreCouponInput.fromCampaign(campaign, active: true),
+        fundingAcknowledged: true, inputCurrent: () => true)).state, StorePromotionResultState.unknown);
+      return controller.pending!;
+    } finally { controller.dispose(); }
+  }
+  test('FE-OFFER310 retry rechecks actual captured current after pending restore without replacing original', () async {
+    final pending = _OfferHeldCouponPending(); final original = await seed(pending);
+    pending.readGate = Completer<void>();
+    final gateway = CouponProvider(); var current = true;
+    final controller = StoreCouponController(scope: scope, gateway: gateway, pendingStore: pending, context: () => 1, now: () => at);
+    try {
+      final retry = controller.retryOriginal(fundingAcknowledged: true, inputCurrent: () => current);
+      await Future<void>.value(); current = false; pending.readGate!.complete();
+      expect((await retry).state, StorePromotionResultState.unknown);
+      expect(gateway.writes, isEmpty); expect(controller.pending!.fingerprint, original.fingerprint);
+      expect(pending.original!.idempotencyKey, original.idempotencyKey);
+    } finally { if (!pending.readGate!.isCompleted) pending.readGate!.complete(); controller.dispose(); }
+  });
+  test('FE-OFFER310 exact-original gateway receives the live inputCurrent guard through transport wait', () async {
+    final pending = CouponPending(), gateway = _OfferGuardedCouponProvider()..beforeTransport = Completer<void>();
+    final original = await seed(pending); var current = true;
+    final controller = StoreCouponController(scope: scope, gateway: gateway, pendingStore: pending, context: () => 1, now: () => at);
+    try {
+      final retry = controller.retryOriginal(fundingAcknowledged: true, inputCurrent: () => current);
+      await gateway.entered.future; current = false; gateway.beforeTransport!.complete();
+      expect((await retry).state, StorePromotionResultState.unknown);
+      expect(gateway.writes, isEmpty); expect(controller.pending!.fingerprint, original.fingerprint);
+    } finally { if (!gateway.beforeTransport!.isCompleted) gateway.beforeTransport!.complete(); controller.dispose(); }
+  });
+  test('FE-OFFER310 manual default retry retains exact key CAS and terms without replacement', () async {
+    final pending = CouponPending(), gateway = CouponProvider(); final original = await seed(pending);
+    final controller = StoreCouponController(scope: scope, gateway: gateway, pendingStore: pending, context: () => 1, now: () => at);
+    try {
+      expect((await controller.retryOriginal(fundingAcknowledged: true)).state, StorePromotionResultState.saved);
+      expect(gateway.writes, hasLength(1)); expect(gateway.writes.single.fingerprint, original.fingerprint);
+      expect(gateway.writes.single.idempotencyKey, original.idempotencyKey); expect(gateway.writes.single.expectedRevision, original.expectedRevision);
+      expect(controller.pending, isNull);
+    } finally { controller.dispose(); }
+  });
+}
+
+
 void main() {
+  registerOfferControllerOwnerTests();
   BuyV2StoreOfferSku offerSku(String id, {String store = 'store-one'}) =>
     BuyV2StoreOfferSku(storeId: store, skuId: id, title: 'Host $id', sellUnit: '1 L');
   BuyV2StoreOfferTerms offerTerms({BuyV2StoreOfferKind kind = BuyV2StoreOfferKind.productDiscount}) {

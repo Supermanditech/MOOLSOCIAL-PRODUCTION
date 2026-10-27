@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -21,6 +22,48 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/features/work/widgets/workspace_purchase_originals.dart';
 
 // Isolated contract fixtures; no native storage, real order or provider calls.
+class OrderDocumentSourceFixture extends ChangeNotifier implements WorkspaceOrderDocumentSource {
+  OrderDocumentSourceFixture({this.accountUserId = 'buyer-1'});
+  @override final String accountUserId;
+  @override bool isCurrent = true;
+  @override Object? lifetime = Object();
+  int revision = 1, reads = 0, copies = 0;
+  bool empty = false;
+  Future<WorkspaceOrderDocumentsRead?> Function(WorkspaceOrderDocumentTarget)? onRead;
+  Future<Uint8List?> Function()? onCopy;
+  static Uint8List get image => base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9XkAAAAASUVORK5CYII=');
+  WorkspaceOrderDocument document({String id = 'doc-order', String kind = 'purchaseOrder', List<String> links = const []}) =>
+    WorkspaceOrderDocument(id: id, kind: kind, number: kind == 'orderConfirmation' ? 'OC/2026/014' : 'PO/2026/014', revision: revision,
+      printedTitle: kind == 'orderConfirmation' ? 'Order confirmation' : 'Purchase order',
+      date: DateTime.utc(2026, 10, 25), particulars: const {'issuer': 'Host fixture buyer', 'recipient': 'Host fixture supplier',
+        'paymentTerms': 'Against delivery', 'deliveryTerms': 'Supplier delivery'}, linkedDocumentIds: links,
+      copy: WorkspaceOrderDocumentCopy(fileName: 'order.png', contentType: 'image/png', sizeBytes: image.length,
+        sha256Hex: sha256.convert(image).toString()));
+  WorkspaceOrderDocumentsRead snapshot(WorkspaceOrderDocumentTarget target) => WorkspaceOrderDocumentsRead(
+    targetBinding: target.binding, revision: revision, documents: empty ? [] : [document()]);
+  @override Future<WorkspaceOrderDocumentsRead?> read(WorkspaceOrderDocumentTarget target) async {
+    reads++; return onRead == null ? snapshot(target) : onRead!(target);
+  }
+  @override Future<Uint8List?> readCopy(WorkspaceOrderDocumentTarget target, WorkspaceOrderDocument document) async {
+    copies++; return onCopy == null ? image : onCopy!();
+  }
+}
+
+// Read-only host document history; never installed into device providers.
+WorkspaceOrderDocument orderChangeFixture({String kind = 'orderAmendment',
+  WorkspaceOrderDocumentChanges? changes, String id = 'doc-change', List<String> links = const ['doc-order']}) =>
+  WorkspaceOrderDocument(id: id, kind: kind, number: kind == 'orderCancellation' ? 'CN/2026/014' : 'AM/2026/014',
+    printedTitle: kind == 'orderCancellation' ? 'Order cancellation' : 'Order amendment', revision: 1,
+    date: DateTime.utc(2026, 10, 25), particulars: const {'issuer': 'Host fixture supplier'}, linkedDocumentIds: links,
+    changes: changes ?? WorkspaceOrderDocumentChanges(previousDocumentId: 'doc-order', previousDocumentRevision: 1,
+      reason: kind == 'orderCancellation' ? 'Supplier cannot supply the balance' : 'Revised delivery and quantity', effectiveAt: DateTime.utc(2026, 10, 25, 12),
+      recordedAt: DateTime.utc(2026, 10, 25, 11), recordedBy: 'Supplier authorised operator',
+      outcome: kind == 'orderCancellation' ? 'Partial cancellation recorded' : 'Amendment recorded',
+      terms: kind == 'orderCancellation' ? const [] : const [WorkspaceOrderTermChange(label: 'Delivery date', before: '26 October 2026', after: '27 October 2026')],
+      lines: [WorkspaceOrderLineChange(lineId: 'line-one', name: 'Flour · 25 kg bag',
+        action: kind == 'orderCancellation' ? 'cancelled' : 'amended', before: '10 bags',
+        after: kind == 'orderCancellation' ? '2 bags cancelled; 8 bags remain' : '8 bags')]));
+
 class DeviceSourceFixture extends ChangeNotifier implements WorkspacePurchasedUnitSource {
   DeviceSourceFixture({this.accountUserId = 'owner-1'});
   @override final String accountUserId;
@@ -450,6 +493,142 @@ Map<String, dynamic> restockClosureResponse(WorkspaceGoodsArrivalCommand command
 }
 
 void main() {
+  test('F2CHANGE immutable printed particulars bind full history', () {
+    final source = OrderDocumentSourceFixture();
+    final target = WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer,
+      realm: 'evaluation', reference: operationalReference());
+    WorkspaceOrderDocumentsRead read(WorkspaceOrderDocument d) => WorkspaceOrderDocumentsRead(targetBinding: target.binding,
+      revision: 2, documents: [source.document(), d]);
+    final amendment = orderChangeFixture(), first = read(orderChangeFixture());
+    expect(first.validFor(target), isTrue);
+    expect(read(orderChangeFixture(kind: 'orderCancellation')).validFor(target), isTrue);
+    final changed = read(orderChangeFixture(changes: WorkspaceOrderDocumentChanges(previousDocumentId: 'doc-order',
+      previousDocumentRevision: 1, reason: 'Another printed reason')));
+    expect(changed.fingerprint, isNot(first.fingerprint));
+    expect(() => amendment.changes!.lines.clear(), throwsUnsupportedError);
+    expect(() => amendment.changes!.terms.clear(), throwsUnsupportedError);
+    expect(source.document().number, 'PO/2026/014');
+  });
+  for (final invalid in ['missing', 'revision', 'unlinked', 'self', 'cycle']) {
+    test('F2CHANGE rejects invalid previous document $invalid', () {
+      final source = OrderDocumentSourceFixture();
+      final target = WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', reference: operationalReference());
+      final previous = invalid == 'missing' ? 'doc-missing' : invalid == 'self' ? 'doc-change' : 'doc-order';
+      final first = invalid == 'cycle' ? orderChangeFixture(id: 'doc-order', links: ['doc-change'],
+        changes: WorkspaceOrderDocumentChanges(previousDocumentId: 'doc-change', previousDocumentRevision: 1)) : source.document();
+      final second = orderChangeFixture(links: invalid == 'unlinked' ? [] : [previous],
+        changes: WorkspaceOrderDocumentChanges(previousDocumentId: previous, previousDocumentRevision: invalid == 'revision' ? 2 : 1));
+      expect(WorkspaceOrderDocumentsRead(targetBinding: target.binding, revision: 2, documents: [first, second]).validFor(target), isFalse);
+    });
+  }
+  test('F2CHANGE validates absent partial malformed and wrong-kind particulars', () {
+    expect(WorkspaceOrderDocumentChanges().valid, isFalse);
+    expect(WorkspaceOrderDocumentChanges(reason: 'Printed reason only').valid, isTrue);
+    expect(WorkspaceOrderDocumentChanges(previousDocumentRevision: 1).valid, isFalse);
+    expect(WorkspaceOrderDocumentChanges(reason: ' ').valid, isFalse);
+    expect(WorkspaceOrderDocumentChanges(reason: 'bad\u0000text').valid, isFalse);
+    expect(WorkspaceOrderDocumentChanges(recordedAt: DateTime(2026)).valid, isFalse);
+    expect(WorkspaceOrderDocumentChanges(terms: const [WorkspaceOrderTermChange(label: 'Payment')]).valid, isFalse);
+    expect(WorkspaceOrderDocumentChanges(terms: const [WorkspaceOrderTermChange(label: 'Payment', before: 'Advance'),
+      WorkspaceOrderTermChange(label: 'payment', after: 'Delivery')]).valid, isFalse);
+    expect(WorkspaceOrderDocumentChanges(lines: const [WorkspaceOrderLineChange(lineId: 'line-one', name: 'Flour', action: 'invented', before: '10 bags')]).valid, isFalse);
+    expect(orderChangeFixture(kind: 'supplierInvoice').valid, isFalse);
+    expect(orderChangeFixture(changes: WorkspaceOrderDocumentChanges(reason: 'No line particulars')).valid, isTrue);
+    final terms = [const WorkspaceOrderTermChange(label: 'Payment', after: 'Delivery')];
+    final changes = WorkspaceOrderDocumentChanges(terms: terms); terms.clear(); expect(changes.terms, hasLength(1));
+  });
+  test('F2CHANGE changed amendment during copy read rejects original', () async {
+    final source = OrderDocumentSourceFixture();
+    var reason = 'Initial reason';
+    source.onRead = (target) async => WorkspaceOrderDocumentsRead(targetBinding: target.binding, revision: 2,
+      documents: [source.document(), orderChangeFixture(changes: WorkspaceOrderDocumentChanges(previousDocumentId: 'doc-order',
+        previousDocumentRevision: 1, reason: reason))]);
+    final gateway = projectionGateway(Transport()..data = purchaseResponse(), orderDocumentSource: source);
+    final target = WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer,
+      realm: 'evaluation', reference: operationalReference());
+    final record = (await gateway.readOrderDocuments(target: target))!;
+    source.onCopy = () async { reason = 'Replaced reason'; return OrderDocumentSourceFixture.image; };
+    expect(await gateway.readOrderDocumentCopy(target: target, recorded: record, documentId: 'doc-order'), isNull);
+  });
+  for (final role in WorkspaceOrderIdentityRole.values) {
+    test('F2DOC exact original authorises ${role.name} read and copy', () async {
+      final account = role == WorkspaceOrderIdentityRole.buyer ? 'buyer-1' : 'owner-1';
+      final source = OrderDocumentSourceFixture(accountUserId: account);
+      final wire = Transport()..data = purchaseResponse(role: role.name);
+      final gateway = projectionGateway(wire, account: account, orderDocumentSource: source);
+      final target = WorkspaceOrderDocumentTarget(accountUserId: account, role: role, realm: 'evaluation', reference: operationalReference());
+      final result = await gateway.readOrderDocuments(target: target);
+      expect(result, isNotNull); expect(result!.documents.single.number, 'PO/2026/014');
+      expect(await gateway.readOrderDocumentCopy(target: target, recorded: result, documentId: 'doc-order'), OrderDocumentSourceFixture.image);
+      expect(source.copies, 1);
+    });
+  }
+  test('F2DOC absent source differs from complete empty read', () async {
+    final wire = Transport()..data = purchaseResponse();
+    final target = WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer,
+      realm: 'evaluation', reference: operationalReference());
+    expect(await projectionGateway(wire).readOrderDocuments(target: target), isNull); expect(wire.calls, 0);
+    final source = OrderDocumentSourceFixture()..empty = true;
+    expect((await projectionGateway(wire, orderDocumentSource: source).readOrderDocuments(target: target))!.documents, isEmpty);
+  });
+  for (final change in ['account', 'realm', 'store', 'reference', 'binding', 'closed', 'lifetime', 'error']) {
+    test('F2DOC rejects mismatched or retired read $change', () async {
+      final source = OrderDocumentSourceFixture();
+      final wire = Transport()..data = purchaseResponse();
+      final gateway = projectionGateway(wire, orderDocumentSource: source);
+      final reference = operationalReference();
+      final target = WorkspaceOrderDocumentTarget(accountUserId: change == 'account' ? 'buyer-2' : 'buyer-1',
+        role: WorkspaceOrderIdentityRole.buyer, realm: change == 'realm' ? 'other' : 'evaluation',
+        buyingStoreId: change == 'store' ? 'other-store' : null,
+        reference: change == 'reference' ? WorkspacePurchaseReference(purchaseId: reference.purchaseId, storeId: reference.storeId,
+          orderId: reference.orderId, sourceRevision: 'other-revision', originalFingerprint: reference.originalFingerprint) : reference);
+      source.onRead = (target) async {
+        if (change == 'closed') source.isCurrent = false;
+        if (change == 'lifetime') source.lifetime = Object();
+        if (change == 'error') throw StateError('Host source unavailable');
+        if (change == 'binding') return WorkspaceOrderDocumentsRead(targetBinding: 'other-binding', revision: 1, documents: [source.document()]);
+        return source.snapshot(target);
+      };
+      expect(await gateway.readOrderDocuments(target: target), isNull);
+    });
+  }
+  for (final change in ['bytes', 'digest', 'revision', 'access', 'parent', 'account-return']) {
+    test('F2DOC copy rejects changed original or access $change', () async {
+      bool current = true;
+      Object? life = Object();
+      final source = OrderDocumentSourceFixture();
+      final wire = Transport()..data = purchaseResponse();
+      final gateway = projectionGateway(wire, lifetime: () => life, orderDocumentSource: source);
+      final target = WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', reference: operationalReference());
+      final record = (await gateway.readOrderDocuments(target: target))!;
+      source.onCopy = () async {
+        if (change == 'bytes') return Uint8List(0);
+        if (change == 'digest') { final bad = OrderDocumentSourceFixture.image; bad[15] ^= 1; return bad; }
+        if (change == 'revision') source.revision++;
+        if (change == 'access') source.isCurrent = false;
+        if (change == 'parent') current = false;
+        if (change == 'account-return') life = Object();
+        return OrderDocumentSourceFixture.image;
+      };
+      expect(await gateway.readOrderDocumentCopy(target: target, recorded: record, documentId: 'doc-order', inputCurrent: () => current), isNull);
+    });
+  }
+  test('F2DOC validates document links, metadata, types and immutable lists', () {
+    final source = OrderDocumentSourceFixture(), target = WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1',
+      role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: operationalReference());
+    WorkspaceOrderDocumentsRead read(List<WorkspaceOrderDocument> docs) => WorkspaceOrderDocumentsRead(targetBinding: target.binding, revision: 1, documents: docs);
+    expect(read([source.document(links: ['missing-doc'])]).validFor(target), isFalse);
+    expect(read([source.document(), source.document()]).validFor(target), isFalse);
+    expect(read([source.document(kind: 'invented-type')]).validFor(target), isFalse);
+    expect(read([source.document(links: ['doc-confirm']), source.document(id: 'doc-confirm', kind: 'orderConfirmation')]).validFor(target), isTrue);
+    final docs = [source.document()], result = read(docs); docs.clear();
+    expect(result.documents, hasLength(1)); expect(() => result.documents.clear(), throwsUnsupportedError);
+    expect(() => result.documents.single.particulars.clear(), throwsUnsupportedError);
+    expect(const WorkspaceOrderDocumentCopy(fileName: '../wrong.pdf', contentType: 'application/pdf', sizeBytes: 5,
+      sha256Hex: 'invalid').valid, isFalse);
+  });
   for (final scenario in ['current', 'not-owner', 'expired', 'wrong-realm', 'wrong-line', 'retired', 'original']) {
     test('PF08 INBOX private accepted reports exact owner scope=$scenario', () async {
       final wire = Transport()..data = purchaseResponse(role: 'seller'), source = DeviceInboxFixture();
@@ -4327,6 +4506,7 @@ AuthenticatedWorkspaceOrderIdentityGateway projectionGateway(
   Object? Function()? lifetime,
   WorkspacePurchasedWarrantyReader? purchasedWarrantyReader,
   WorkspacePurchasedUnitSource? purchasedUnitSource,
+  WorkspaceOrderDocumentSource? orderDocumentSource,
 }) => AuthenticatedWorkspaceOrderIdentityGateway(
   endpoint: Uri.parse(
     'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace',
@@ -4337,6 +4517,7 @@ AuthenticatedWorkspaceOrderIdentityGateway projectionGateway(
   transport: wire,
   purchasedWarrantyReader: purchasedWarrantyReader,
   purchasedUnitSource: purchasedUnitSource,
+  orderDocumentSource: orderDocumentSource,
 );
 
 WorkspacePurchaseReference operationalReference() {

@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../work_models.dart';
+import '../work_session.dart';
 
 import '../../../core/design/mool_colors.dart';
 
@@ -497,3 +501,332 @@ TimeOfDay? parseStoreHours(String value) {
 
 String storeHoursValue(TimeOfDay time) =>
     '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+
+/// Frontend-only supplied values. Identity and permission are native owners.
+class StoreSettingsInitialData {
+  StoreSettingsInitialData._(this.actionId, this.fields);
+  final String actionId;
+  final Map<String, Object?> fields;
+  static const publicText = {'legalName', 'street', 'city', 'state', 'pinCode',
+    'publicContactPhone', 'billingAddress', 'pan', 'cin', 'fssai', 'signatory',
+    'returnSummary', 'returnConditions'};
+  static Set<String> keys(String action) => switch (action) {
+    'AI-ACT-317' => {'workspaceId'},
+    'AI-ACT-318' => {'acceptingOrders', 'fulfilmentMode', 'busyMinutes', 'reopensAt'},
+    'AI-ACT-319' => {'openingTime', 'closingTime', 'maximumActiveOrders', 'alertSound',
+      'alertVibration', 'preparationMinutes', 'fulfilmentPreference'},
+    'AI-ACT-320' => {...publicText, 'businessType', 'retailChannelEnabled',
+      'wholesaleChannelEnabled', 'wholesalePaymentTerms', 'returnRemedies',
+      'returnWindowDays', 'dispatchDays'},
+    'AI-ACT-321' => {},
+    'AI-ACT-322' => {'city', 'area', 'pincode', 'pickupEnabled'},
+    'AI-ACT-323' => {'mode'},
+    'AI-ACT-324' => {'address', 'payeeName', 'merchantCode'},
+    'AI-ACT-326' => {'staffAccessEnabled', 'counterCount'},
+    'AI-ACT-327' => {'visibleToCustomers'},
+    'AI-ACT-328' => {'alertId'},
+    _ => throw const FormatException('This Store task is unavailable.'),
+  };
+  factory StoreSettingsInitialData.fromFields(String action, Map<String, Object?> fields) {
+    final allowed = keys(action);
+    if (fields.keys.any((key) => !allowed.contains(key))) {
+      throw const FormatException('Use only the supported Store fields.');
+    }
+    const booleans = {'acceptingOrders', 'alertSound', 'alertVibration', 'pickupEnabled',
+      'staffAccessEnabled', 'visibleToCustomers', 'retailChannelEnabled', 'wholesaleChannelEnabled'};
+    const integers = {'busyMinutes', 'preparationMinutes', 'maximumActiveOrders',
+      'counterCount', 'returnWindowDays', 'dispatchDays'};
+    for (final entry in fields.entries) {
+      final key = entry.key, value = entry.value;
+      if (booleans.contains(key)) {
+        if (value is! bool) throw const FormatException('Choose an on/off value.');
+      } else if (integers.contains(key)) {
+        if (key == 'returnWindowDays' && value == null) continue;
+        if (value is! int || value < 0 || key == 'counterCount' && (value < 1 || value > 20) ||
+            {'dispatchDays', 'returnWindowDays'}.contains(key) && value > 365) {
+          throw const FormatException('Check the whole-number setting.');
+        }
+      } else if (key == 'wholesalePaymentTerms') {
+        if (value is! List || value.any((v) => v is! Map ||
+            v.keys.any((k) => !const {'kind', 'advancePercent', 'netDays'}.contains(k)))) {
+          throw const FormatException('Choose supported payment terms.');
+        }
+        WorkspacePaymentTerm.decodeList(value);
+      } else if (key == 'returnRemedies') {
+        if (value is! List || value.any((v) => v is! String ||
+            !WorkspaceStorePublicationDetails.remedies.contains(v)) || value.toSet().length != value.length) {
+          throw const FormatException('Choose supported return remedies.');
+        }
+      } else if (value is! String || value.length > 2000 || RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]').hasMatch(value)) {
+        throw const FormatException('Enter a supported text value.');
+      }
+      if ({'openingTime', 'closingTime'}.contains(key) &&
+          !WorkspaceStorePublicationDetails.validTradingTime(value as String)) {
+        throw const FormatException('Choose a valid trading time.');
+      }
+      if ({'fulfilmentMode', 'fulfilmentPreference'}.contains(key) &&
+          !const {'Delivery and pickup', 'Pickup only', 'Delivery only'}.contains(value)) {
+        throw const FormatException('Choose a supported fulfilment preference.');
+      }
+      if (key == 'mode' && !WorkspaceInvoiceDeliveryMode.values.any((mode) => mode.name == value)) {
+        throw const FormatException('Choose a supported invoice preference.');
+      }
+      if (key == 'businessType' && !WorkspaceStorePublicationDetails.businessTypes.containsKey(value)) {
+        throw const FormatException('Choose a supported business type.');
+      }
+    }
+    if (action == 'AI-ACT-317' && (fields['workspaceId'] is! String || (fields['workspaceId'] as String).isEmpty) ||
+        action == 'AI-ACT-328' && (fields['alertId'] is! String || (fields['alertId'] as String).isEmpty) ||
+        action != 'AI-ACT-321' && fields.isEmpty) {
+      throw const FormatException('Choose the setting to review.');
+    }
+    // Raw partial text is preserved; native validators validate the complete form.
+    Object? freeze(Object? value) => value is List ? List<Object?>.unmodifiable(value.map(freeze))
+      : value is Map ? Map<String, Object?>.unmodifiable({for (final entry in value.entries) entry.key as String: freeze(entry.value)}) : value;
+    return StoreSettingsInitialData._(action, Map.unmodifiable({for (final entry in fields.entries) entry.key: freeze(entry.value)}));
+  }
+}
+
+class StoreSettingsReviewScope {
+  StoreSettingsReviewScope({required bool Function() current, required bool Function() sourceCurrent,
+    this.readSource, this.readOperation, this.destinationFingerprint, this.invoiceMode, this.changes, this.sourceChanges})
+    : _ownerCurrent = current, _originalCurrent = sourceCurrent {
+    _baseline = readSource == null ? null : _copy(readSource!());
+    _originalOperation = readOperation?.call();
+    sourceChanges?.addListener(_observeSource);
+    if (!identical(changes, sourceChanges)) changes?.addListener(_observeSource);
+  }
+  final bool Function() _ownerCurrent;
+  final bool Function() _originalCurrent;
+  final Map<String, Object?> Function()? readSource;
+  final String? Function()? readOperation;
+  Map<String, Object?>? _baseline, _attempt;
+  List<Map<String, Object?>> _attemptStates = [];
+  String? _originalOperation, _ownOperation, _resolvingOperation;
+  bool _sourceRetired = false, _disposed = false;
+  final String? destinationFingerprint;
+  final String? invoiceMode;
+  final Listenable? changes;
+  final Listenable? sourceChanges;
+  bool current() {
+    if (_disposed) return false;
+    if (!_ownerCurrent()) { dispose(); return false; }
+    return true;
+  }
+  void _observeSource() { try { if (current()) sourceCurrent(); } on Object { _sourceRetired = true; } }
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    sourceChanges?.removeListener(_observeSource);
+    if (!identical(changes, sourceChanges)) changes?.removeListener(_observeSource);
+  }
+  static Map<String, Object?> _copy(Map<String, Object?> value) => Map<String, Object?>.from(jsonDecode(jsonEncode(value)) as Map);
+  static Object? _ordered(Object? value) => value is Map
+    ? {for (final key in value.keys.cast<String>().toList()..sort()) key: _ordered(value[key])}
+    : value is List ? value.map(_ordered).toList() : value;
+  static bool _equal(Object? a, Object? b) => jsonEncode(_ordered(a)) == jsonEncode(_ordered(b));
+  bool get _fieldsCurrent => readSource == null ? _originalCurrent() :
+    _equal(readSource!(), _baseline) || _attemptStates.any((state) => _equal(readSource!(), state));
+  bool sourceCurrent() {
+    if (!current() || _sourceRetired) return false;
+    final admitted = _fieldsCurrent && (readOperation == null || readOperation!() == _originalOperation ||
+      _ownOperation != null && readOperation!() == _ownOperation || readOperation!() == null &&
+      _resolvingOperation != null && {_originalOperation, _ownOperation}.contains(_resolvingOperation));
+    if (!admitted) _sourceRetired = true;
+    return admitted;
+  }
+  bool get mayApply => current() && sourceCurrent();
+  /// Exact admitted payload remains retryable if native memory changes before
+  /// a failed durable write. No other field/revision or different retry enters.
+  bool beginAttempt(Map<String, Object?> target, {List<Map<String, Object?>> intermediate = const []}) {
+    if (!mayApply) return false;
+    if (readSource == null) return true;
+    final next = {..._baseline!, ..._copy(target)};
+    if (_attempt != null) return _equal(_attempt, next);
+    _attempt = next;
+    _attemptStates = [for (final state in intermediate) {..._baseline!, ..._copy(state)}, next];
+    return true;
+  }
+  void completeAttempt() {
+    if (!current() || _sourceRetired || _attempt == null || readSource == null || !_equal(readSource!(), _attempt)) return;
+    _baseline = _copy(readSource!()); _attempt = null; _attemptStates = [];
+  }
+  bool admitOriginal(String fingerprint) {
+    if (!mayApply || readOperation == null || readOperation!() != null || _originalOperation != null || _ownOperation != null) return false;
+    _ownOperation = fingerprint; return true;
+  }
+  /// The original controller calls this only after its exact known result and
+  /// journal cleanup, immediately before its own pending-clear notification.
+  void admitOriginalResolution(String fingerprint) {
+    if (!current() || _sourceRetired || !_fieldsCurrent ||
+        !{_originalOperation, _ownOperation}.contains(fingerprint)) return;
+    _resolvingOperation = fingerprint;
+  }
+  void completeOriginal() {
+    if (!current() || _sourceRetired || !_fieldsCurrent || readOperation == null || readOperation!() != null ||
+        _ownOperation == null && _originalOperation == null) return;
+    _ownOperation = null; _originalOperation = null; _resolvingOperation = null;
+  }
+}
+
+String storeUpiFingerprint(WorkspaceUpiDestination? destination) => jsonEncode(
+  destination == null ? null : [destination.address, destination.payeeName, destination.merchantCode]);
+
+class _StoreUpiDraft {
+  const _StoreUpiDraft(this.address, this.payee, this.merchant, this.baseline, this.attempt, this.unknown);
+  final String address, payee, merchant;
+  final WorkspaceUpiDestination? baseline, attempt;
+  final bool unknown;
+}
+final _storeUpiDrafts = <Object, _StoreUpiDraft>{};
+bool storeUpiDestinationHasDraft(WorkSession session) => _storeUpiDrafts.containsKey(
+  (session, session.storeUpiScope, session.navigationScopeRevision, session.publicationPreferencesContext));
+
+/// Keeps the existing State/draft alive while retiring private rendered fields.
+class StoreSettingsReviewFrame extends StatelessWidget {
+  const StoreSettingsReviewFrame({required this.session, required this.scope, required this.child, super.key});
+  final WorkSession session;
+  final StoreSettingsReviewScope? scope;
+  final Widget child;
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: Listenable.merge([session, scope?.changes]),
+    builder: (context, _) {
+      final active = scope?.current() != false;
+      return Stack(fit: StackFit.expand, children: [
+        Offstage(offstage: !active, child: ExcludeFocus(excluding: !active, child: child)),
+        if (!active) const Center(child: Text('Your Store or account changed. Your entries are kept. Reopen this task.')),
+      ]);
+    });
+}
+
+/// One native editor for manual Settings and AI Review; never verifies a bank.
+class StoreUpiDestinationEditor extends StatefulWidget {
+  const StoreUpiDestinationEditor({required this.session, this.initialData, this.reviewScope, super.key});
+  final WorkSession session;
+  final StoreSettingsInitialData? initialData;
+  final StoreSettingsReviewScope? reviewScope;
+  @override State<StoreUpiDestinationEditor> createState() => _StoreUpiDestinationEditorState();
+}
+class _StoreUpiDestinationEditorState extends State<StoreUpiDestinationEditor> {
+  late final _owner = widget.session;
+  late final _scope = _owner.storeUpiScope;
+  late final _navigation = _owner.navigationScopeRevision;
+  late final _principal = _owner.publicationPreferencesContext;
+  final _address = TextEditingController(), _payee = TextEditingController(), _merchant = TextEditingController();
+  late final StoreSettingsReviewScope _presentationScope;
+  WorkspaceUpiDestination? _baseline, _attempt;
+  WorkspaceUpiDestination? _checkedSaved;
+  bool _checkedDifferent = false;
+  bool _busy = true, _loaded = false, _unknown = false;
+  String? _message;
+  late final _draftKey = (_owner, _scope, _navigation, _principal);
+  bool get _current => mounted && identical(_owner, widget.session) && _scope != null &&
+    _scope == _owner.storeUpiScope && _navigation == _owner.navigationScopeRevision &&
+    _principal == _owner.publicationPreferencesContext && widget.reviewScope?.current() != false;
+  bool _same(WorkspaceUpiDestination? a, WorkspaceUpiDestination? b) => a?.address == b?.address &&
+    a?.payeeName == b?.payeeName && a?.merchantCode == b?.merchantCode;
+  WorkspaceUpiDestination _candidate() => WorkspaceUpiDestination(account: _scope!.account,
+    store: _scope.store, address: _address.text, payeeName: _payee.text, merchantCode: _merchant.text);
+  void _remember() {
+    if (!_loaded) return;
+    if (!_unknown && _same(_candidate(), _baseline)) { _storeUpiDrafts.remove(_draftKey); return; }
+    _storeUpiDrafts[_draftKey] = _StoreUpiDraft(_address.text, _payee.text, _merchant.text, _baseline, _attempt, _unknown);
+  }
+  @override void initState() {
+    super.initState();
+    _presentationScope = StoreSettingsReviewScope(current: () => _current, sourceCurrent: () => true, changes: widget.reviewScope?.changes);
+    final draft = _storeUpiDrafts[_draftKey];
+    if (draft != null) {
+      _address.text = draft.address; _payee.text = draft.payee; _merchant.text = draft.merchant;
+      _baseline = draft.baseline; _attempt = draft.attempt; _unknown = draft.unknown; _loaded = true;
+    }
+    for (final field in [_address, _payee, _merchant]) { field.addListener(_remember); }
+    unawaited(_load(check: _unknown));
+  }
+  Future<void> _load({bool check = false}) async {
+    if (!_current) return;
+    setState(() { _busy = true; _message = null; });
+    try {
+      final saved = await _owner.loadStoreUpiDestination(_scope!);
+      if (!_current) return;
+      if (check) {
+        if (_attempt != null && _same(saved, _attempt)) {
+          _baseline = saved; _unknown = false; _attempt = null;
+          _message = 'UPI details saved on this device.';
+        } else {
+          _checkedSaved = saved; _checkedDifferent = true;
+          _message = 'Saved details do not match the attempted save. Your entries are kept. Compare them before trying again.';
+        }
+      } else if (!_loaded && widget.reviewScope?.sourceCurrent() != false &&
+          (widget.reviewScope?.destinationFingerprint == null ||
+           widget.reviewScope!.destinationFingerprint == storeUpiFingerprint(saved))) {
+        _baseline = saved;
+        final fields = widget.initialData?.fields ?? const <String, Object?>{};
+        _address.text = fields['address'] as String? ?? saved?.address ?? '';
+        _payee.text = fields['payeeName'] as String? ?? saved?.payeeName ?? '';
+        _merchant.text = fields['merchantCode'] as String? ?? saved?.merchantCode ?? '';
+        _loaded = true;
+      } else if (!_loaded) { _message = 'Saved details changed. Reopen this task. Your entries are kept.'; }
+    } on Object {
+      if (_current) _message = check ? 'The save is unconfirmed. Check saved details again. Your entries are kept.'
+        : 'Could not open saved UPI details. Try again.';
+    } finally { if (_current) { _remember(); setState(() => _busy = false); } }
+  }
+  Future<void> _save() async {
+    if (!_current || !_loaded || _busy || _unknown || widget.reviewScope?.mayApply == false) return;
+    final candidate = _candidate();
+    if (!candidate.valid) return;
+    setState(() { _busy = true; _message = null; });
+    try {
+      final latest = await _owner.loadStoreUpiDestination(_scope!);
+      if (!_current || widget.reviewScope?.mayApply == false) return;
+      if (!_same(latest, _baseline)) {
+        _unknown = true; _attempt = null; _checkedSaved = latest; _checkedDifferent = true;
+        _remember();
+        _message = 'Saved UPI details changed. Your entries are kept. Compare them before saving again.';
+        return;
+      }
+      _attempt = candidate; _unknown = true;
+      _remember();
+      await _owner.saveStoreUpiDestination(candidate, current: () => _current && widget.reviewScope?.mayApply != false,
+        expectedDestinationFingerprint: storeUpiFingerprint(_baseline));
+      if (!_current) return;
+      final actual = await _owner.loadStoreUpiDestination(_scope);
+      if (!_current) return;
+      if (_same(actual, candidate)) {
+        _baseline = actual; _attempt = null; _unknown = false;
+        _message = 'UPI details saved on this device.';
+      } else { _message = 'The save is unconfirmed. Check saved details. Your entries are kept.'; }
+    } on Object {
+      if (_current) _message = 'The save is unconfirmed. Check saved details. Your entries are kept.';
+    } finally { if (_current) { _remember(); setState(() => _busy = false); } }
+  }
+  @override void dispose() { _remember(); _presentationScope.dispose(); _address.dispose(); _payee.dispose(); _merchant.dispose(); super.dispose(); }
+  @override Widget build(BuildContext context) => StoreSettingsReviewFrame(session: _owner,
+    scope: _presentationScope,
+    child: StoreSettingsForm(title: 'Store UPI details',
+      detail: _message ?? (_busy ? 'Opening saved details…' : 'Payment destination on this device. Bank and payee verification are separate.'),
+      fields: [
+        StoreSettingsInput(id: 'work-upi-address', label: 'UPI ID', controller: _address,
+          validate: (value) => value != null && value.length <= 256 && RegExp(r'^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+$').hasMatch(value) ? null : 'Enter a valid UPI ID.'),
+        StoreSettingsInput(id: 'work-upi-payee', label: 'Payee name', controller: _payee,
+          validate: (value) => value != null && value.trim().isNotEmpty && value == value.trim() && value.length <= 100 &&
+            !RegExp(r'[\x00-\x1f\x7f]').hasMatch(value) ? null : 'Enter the payee name without extra spaces.'),
+        StoreSettingsInput(id: 'work-upi-merchant', label: 'Merchant code (optional)', controller: _merchant, numeric: true,
+          validate: (value) => value == null || value.isEmpty || RegExp(r'^\d{4}$').hasMatch(value) ? null : 'Enter a 4-digit merchant code.'),
+      ], saveKey: 'work-upi-save', saveLabel: _busy ? 'Saving…' : 'Save UPI details',
+      saveEnabled: _current && _loaded && !_busy && !_unknown && widget.reviewScope?.mayApply != false, onSave: _save,
+      trailing: !_loaded || _unknown ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        TextButton(key: const Key('work-upi-check'), onPressed: _busy ? null : () => _load(check: _unknown),
+          child: Text(_unknown ? 'Check saved details' : 'Try again')),
+        if (_checkedDifferent) ...[
+          Text(_checkedSaved == null ? 'No UPI destination is saved on this device.'
+            : 'Saved on this device: ${_checkedSaved!.address} · ${_checkedSaved!.payeeName}'),
+          TextButton(key: const Key('work-upi-review-again'), onPressed: _busy ? null : () {
+            if (!_current) return;
+            setState(() { _baseline = _checkedSaved; _unknown = false; _attempt = null; _checkedDifferent = false;
+              _message = 'Your entries are kept. Review them before saving again.'; });
+            _remember();
+          }, child: const Text('Review my entries again')),
+        ],
+      ]) : null));
+}

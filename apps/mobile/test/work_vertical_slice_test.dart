@@ -125,7 +125,7 @@ void main() {
     expect(decoded.toJson(), original.toJson());
     expect(decoded.discount, 1050);
     expect(() => decodeStoreCouponCampaigns(encodeStoreCouponCampaigns([original]), 'other'), throwsFormatException);
-    expect(() => decodeStoreCouponCampaigns('{"schemaVersion":2,"campaigns":[]}', 'host-store'), throwsFormatException);
+    expect(() => decodeStoreCouponCampaigns('{"schemaVersion":3,"campaigns":[]}', 'host-store'), throwsFormatException);
     expect(() => decodeStoreCouponCampaigns(encodeStoreCouponCampaigns([original, original]), 'host-store'), throwsFormatException);
     expect(() => coupon('host-store', percentage: true, discount: 10001), throwsFormatException);
     expect(() => coupon('host-store', perCustomer: 101), throwsFormatException);
@@ -172,7 +172,7 @@ void main() {
     final owner = _testWorkSession(offerDraftStoreFactory: (_) => storage)..seedVerifiedWorkspace();
     addTearDown(owner.dispose); final store = owner.activeWorkspace!.id;
     storage.saved = {'schemaVersion': 1, 'storeId': store, 'fields': {
-      'title': 'Original', 'storeCouponCampaignsV1': '{"schemaVersion":2,"campaigns":[]}'}};
+      'title': 'Original', 'storeCouponCampaignsV1': '{"schemaVersion":3,"campaigns":[]}'}};
     final original = jsonEncode(storage.saved);
     expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: store), isFalse);
     expect(await owner.saveWorkspaceStoreCouponCampaign(coupon(store), expectedStoreId: store), isFalse);
@@ -251,11 +251,14 @@ void main() {
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: ListView(children: [StoreCouponCampaignPanel(session: owner)]))));
       await tester.pumpAndSettle();
       expect(find.text('Diwali savings'), findsOneWidget);
-      expect(find.textContaining('Saved draft · not published'), findsOneWidget);
+      expect(find.text('Private drafts · Publishing unavailable.'), findsOneWidget);
+      expect(find.descendant(
+        of: find.byKey(const ValueKey('work-coupon-diwali-one')),
+        matching: find.textContaining('Store-wide · Draft')), findsOneWidget);
       await tester.ensureVisible(find.byTooltip('Edit Diwali savings'));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Edit Diwali savings')); await tester.pumpAndSettle();
-      expect(find.text('Edit Store coupon'), findsOneWidget);
+      expect(find.text('Edit coupon'), findsOneWidget);
       expect(find.byKey(const Key('work-coupon-name')), findsOneWidget);
       expect(find.text('Diwali savings'), findsWidgets);
       expect(tester.takeException(), isNull);
@@ -836,6 +839,7 @@ void main() {
     await tester.tap(find.byKey(const Key('work-dashboard-settings')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-store-status-business-profile')), findsNothing);
+    expect(find.byKey(const Key('work-store-status-tools')), findsNothing);
     expect(find.text('Open business profile'), findsNothing);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -849,14 +853,68 @@ void main() {
     expect(find.byKey(const Key('work-dashboard-profile')), findsOneWidget);
     await tester.tap(find.byKey(const Key('work-dashboard-profile')));
     await tester.pumpAndSettle();
-    final operations = find.text('Operations');
-    expect(operations, findsOneWidget);
-    await tester.ensureVisible(operations);
-    await tester.tap(operations);
+    expect(find.text('Operations'), findsNothing);
+    expect(find.text('My details'), findsOneWidget);
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    await tapVisible(tester, const Key('work-dashboard-settings'));
+    await tapVisible(tester, const Key('work-store-status-tools'));
     expect(find.text('Store settings'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
+  }
+
+  testWidgets('PROFILE Store tools rejects a retained callback after Store change', (tester) async {
+    final work = _testWorkSession()..seedVerifiedWorkspace();
+    await mount(tester, route: '/app/work/workspace/dashboard', workSession: work);
+    await tapVisible(tester, const Key('work-dashboard-settings'));
+    final tools = find.byKey(const Key('work-store-status-tools'));
+    final retained = tester.widget<TextButton>(tools).onPressed!;
+    work.activeWorkspace = const WorkWorkspace(id: 'profile-tools-host-b', name: 'Host Store B',
+      profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Delhi', verified: true);
+    retained();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-store-status-panel')), findsOneWidget);
+    expect(find.byKey(const Key('work-business-settings')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('PROFILE Store tools opens once and ignores a retired sheet callback', (tester) async {
+    final work = _testWorkSession()..seedVerifiedWorkspace();
+    await mount(tester, route: '/app/work/workspace/dashboard', workSession: work);
+    await tapVisible(tester, const Key('work-dashboard-settings'));
+    final tools = find.byKey(const Key('work-store-status-tools'));
+    expect(tester.getSize(tools).height, greaterThanOrEqualTo(48));
+    final retained = tester.widget<TextButton>(tools).onPressed!;
+    retained(); retained();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-store-status-panel')), findsNothing);
+    expect(find.byKey(const Key('work-business-settings')), findsOneWidget);
+    retained();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-business-settings')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('PROFILE saved live Store overview retains tools at $scale', (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final work = _testWorkSession()..seedVerifiedWorkspace()
+        ..reviewStage = WorkReviewStage.live
+        ..remoteReviewStatus = WorkRemoteReviewStatus.live;
+      await mount(tester, route: '/app/work/workspace/dashboard', workSession: work,
+        size: const Size(320, 568));
+      expect(find.byKey(const Key('work-store-full-name')), findsOneWidget);
+      expect(tester.getSize(find.byKey(const Key('work-dashboard-settings'))).height,
+        greaterThanOrEqualTo(48));
+      await tapVisible(tester, const Key('work-dashboard-settings'));
+      await tapVisible(tester, const Key('work-store-status-tools'));
+      await tapVisible(tester, const Key('work-business-settings'));
+      expect(find.text('Store settings'), findsWidgets);
+      expect(work.reviewStage, WorkReviewStage.live);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (final scale in [1.0, 2.0]) {
@@ -870,7 +928,7 @@ void main() {
         city: 'Chennai', street: 'Host saved Store lane', pinCode: '600001'));
       await mount(tester, route: '/app/work/workspace/dashboard', workSession: work,
         size: const Size(320, 568));
-      for (final key in ['work-dashboard-profile', 'global-profile-quick-operations',
+      for (final key in ['work-dashboard-settings', 'work-store-status-tools',
         'work-business-settings']) {
         await tapVisible(tester, Key(key));
       }
@@ -939,7 +997,7 @@ void main() {
       work.workspaceOfferDraft.addAll(fields);
       await mount(tester, route: '/app/work/workspace/dashboard', workSession: work,
         size: const Size(320, 568));
-      for (final key in ['work-dashboard-profile', 'global-profile-quick-operations',
+      for (final key in ['work-dashboard-settings', 'work-store-status-tools',
         'work-business-grow', 'work-growth-offers']) {
         await tapVisible(tester, Key(key));
       }
@@ -977,7 +1035,7 @@ void main() {
         return session;
       }
       Future<void> offers() async {
-        for (final key in ['work-dashboard-profile', 'global-profile-quick-operations',
+        for (final key in ['work-dashboard-settings', 'work-store-status-tools',
           'work-business-grow', 'work-growth-offers']) {
           await tapVisible(tester, Key(key));
         }
@@ -1048,7 +1106,7 @@ void main() {
       work.workspaceCatalogueItems.clear();
       await mount(tester, route: '/app/work/workspace/dashboard', workSession: work,
         size: const Size(320, 568));
-      for (final key in ['work-dashboard-profile', 'global-profile-quick-operations',
+      for (final key in ['work-dashboard-settings', 'work-store-status-tools',
         'work-business-grow', 'work-growth-offers']) {
         await tapVisible(tester, Key(key));
       }

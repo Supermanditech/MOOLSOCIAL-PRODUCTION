@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
@@ -8,7 +9,7 @@ import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
 import 'work_customer_feedback.dart';
 import 'work_models.dart' show WorkspaceRestockPurchaseOriginal, WorkspaceSupplierGoodsReceipt, WorkspacePurchasedUnitRow,
-  WorkspacePurchasedUnitPublishCommand, WorkspacePurchasedUnitMismatchCommand, WorkspaceIssueRecord;
+  WorkspacePurchasedUnitPublishCommand, WorkspacePurchasedUnitMismatchCommand, WorkspaceIssueRecord, WorkspacePurchaseInvoiceAttachment;
 
 enum WorkspaceOrderIdentityState { linked, unlinked, unavailable }
 
@@ -107,6 +108,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
     required this.transport,
     this.purchasedWarrantyReader,
     this.purchasedUnitSource,
+    this.orderDocumentSource,
   }) : _ownerLifetime = lifetime() {
     if (endpoint.scheme != 'https' ||
         endpoint.host !=
@@ -129,7 +131,49 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
   /// Proposed frontend supplement only. No warranty endpoint is configured here.
   final WorkspacePurchasedWarrantyReader? purchasedWarrantyReader;
   final WorkspacePurchasedUnitSource? purchasedUnitSource;
+  /// Frontend read supplement only; no document endpoint or issuer is installed.
+  final WorkspaceOrderDocumentSource? orderDocumentSource;
   bool get isCurrent => _ownerLifetime != null && lifetime() == _ownerLifetime;
+
+  Future<WorkspaceOrderDocumentsRead?> readOrderDocuments({
+    required WorkspaceOrderDocumentTarget target, bool Function()? inputCurrent,
+  }) async {
+    final source = orderDocumentSource, owner = orderDocumentSource?.lifetime;
+    bool current() => isCurrent && inputCurrent?.call() != false && target.valid &&
+      target.accountUserId == accountUserId && source != null && source.isCurrent &&
+      owner != null && source.lifetime == owner && source.accountUserId == accountUserId;
+    if (!current()) return null;
+    try {
+      final original = await readReferencedOrder(role: target.role, realm: target.realm,
+        reference: target.reference, buyingStoreId: target.buyingStoreId, inputCurrent: current);
+      if (!current() || original == null) return null;
+      final result = await source!.read(target);
+      return current() && result != null && result.validFor(target) ? result : null;
+    } on Object { return null; }
+  }
+
+  Future<Uint8List?> readOrderDocumentCopy({required WorkspaceOrderDocumentTarget target,
+    required WorkspaceOrderDocumentsRead recorded, required String documentId,
+    bool Function()? inputCurrent}) async {
+    final source = orderDocumentSource, owner = orderDocumentSource?.lifetime;
+    bool current() => isCurrent && inputCurrent?.call() != false && source != null &&
+      source.isCurrent && owner != null && source.lifetime == owner && source.accountUserId == accountUserId;
+    if (!current() || !recorded.validFor(target)) return null;
+    try {
+      final fresh = await readOrderDocuments(target: target, inputCurrent: current);
+      if (!current() || fresh == null || fresh.fingerprint != recorded.fingerprint) return null;
+      final matches = fresh.documents.where((doc) => doc.id == documentId).toList();
+      if (matches.length != 1 || matches.single.copy == null) return null;
+      final document = matches.single, copy = matches.single.copy!;
+      final result = await source!.readCopy(target, document);
+      if (!current() || result == null) return null;
+      // Copy immediately: a provider must not mutate bytes during the final read.
+      final bytes = Uint8List.fromList(result);
+      if (!copy.matches(bytes)) return null;
+      final checked = await readOrderDocuments(target: target, inputCurrent: current);
+      return current() && checked?.fingerprint == recorded.fingerprint ? bytes : null;
+    } on Object { return null; }
+  }
 
   Future<WorkspacePurchasedWarrantyRead?> readPurchasedWarranty({
     required WorkspaceOrderIdentityRole role,
@@ -1497,6 +1541,167 @@ class WorkspacePurchaseReferencePage {
   final String coverage;
   final List<WorkspacePurchaseReference> references;
   final String? nextCursor;
+}
+
+/// Proposed private, read-only document integration. Implementations authenticate
+/// the viewer, authorise the exact order and notify on revision/access changes.
+/// No issuing, uploading, accounting or guessed HTTP operation is provided.
+abstract interface class WorkspaceOrderDocumentSource {
+  String get accountUserId;
+  bool get isCurrent;
+  Object? get lifetime;
+  void addListener(void Function() listener);
+  void removeListener(void Function() listener);
+  Future<WorkspaceOrderDocumentsRead?> read(WorkspaceOrderDocumentTarget target);
+  Future<Uint8List?> readCopy(WorkspaceOrderDocumentTarget target, WorkspaceOrderDocument document);
+}
+
+class WorkspaceOrderDocumentTarget {
+  const WorkspaceOrderDocumentTarget({required this.accountUserId, required this.role,
+    required this.realm, required this.reference, this.buyingStoreId});
+  final String accountUserId, realm;
+  final WorkspaceOrderIdentityRole role;
+  final WorkspacePurchaseReference reference;
+  final String? buyingStoreId;
+  bool get valid => _id(accountUserId) && reference.valid &&
+    const ['evaluation', 'production'].contains(realm) &&
+    (buyingStoreId == null || role == WorkspaceOrderIdentityRole.buyer && _id(buyingStoreId));
+  String get binding => _goodsFingerprint([accountUserId, role.name, realm, buyingStoreId, reference.toJson()]);
+}
+
+class WorkspaceOrderDocumentCopy {
+  const WorkspaceOrderDocumentCopy({required this.fileName, required this.contentType,
+    required this.sizeBytes, required this.sha256Hex});
+  final String fileName, contentType, sha256Hex;
+  final int sizeBytes;
+  bool get valid => _purchaseText(fileName) && !RegExp(r'[/\\]').hasMatch(fileName) &&
+    const ['application/pdf', 'image/png', 'image/jpeg'].contains(contentType) &&
+    sizeBytes >= 5 && sizeBytes <= 10 * 1024 * 1024 && RegExp(r'^[a-f0-9]{64}$').hasMatch(sha256Hex);
+  Map<String, Object> toJson() => {'fileName': fileName, 'contentType': contentType,
+    'sizeBytes': sizeBytes, 'sha256': sha256Hex};
+  bool matches(Uint8List bytes) {
+    if (!valid || bytes.length != sizeBytes || sha256.convert(bytes).toString() != sha256Hex) return false;
+    if (contentType == 'application/pdf') return String.fromCharCodes(bytes.take(5)) == '%PDF-';
+    if (contentType == 'image/jpeg') return bytes[0] == 255 && bytes[1] == 216 && bytes[2] == 255;
+    const png = [137, 80, 78, 71, 13, 10, 26, 10];
+    return bytes.length >= png.length && List.generate(png.length, (i) => bytes[i] == png[i]).every((v) => v);
+  }
+}
+
+bool _orderChangeText(String? value) => value == null || value.isNotEmpty &&
+  value == value.trim() && value.length <= 2000 && !RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]').hasMatch(value);
+bool _orderChangeDate(DateTime? value) => value == null || value.isUtc && value.year >= 2000 && value.year <= 2100;
+
+class WorkspaceOrderTermChange {
+  const WorkspaceOrderTermChange({required this.label, this.before, this.after});
+  final String label;
+  final String? before, after;
+  bool get valid => _purchaseText(label) && (before != null || after != null) && _orderChangeText(before) && _orderChangeText(after);
+  Map<String, Object?> toJson() => {'label': label, 'before': before, 'after': after};
+}
+
+class WorkspaceOrderLineChange {
+  const WorkspaceOrderLineChange({required this.lineId, required this.name, required this.action, this.before, this.after});
+  final String lineId, name, action;
+  /// Explicit printed quantities/rates/particulars, not recalculated Stock data.
+  final String? before, after;
+  static const actionLabels = {'amended': 'Item amended in document', 'added': 'Item added in document', 'cancelled': 'Item cancelled in document'};
+  bool get valid => _id(lineId) && _purchaseText(name) && actionLabels.containsKey(action) &&
+    (before != null || after != null) && _orderChangeText(before) && _orderChangeText(after);
+  Map<String, Object?> toJson() => {'lineId': lineId, 'name': name, 'action': action, 'before': before, 'after': after};
+}
+
+/// Read-only particulars of a specific amendment/cancellation document. These
+/// facts neither revise the immutable original nor establish current order state.
+class WorkspaceOrderDocumentChanges {
+  WorkspaceOrderDocumentChanges({this.previousDocumentId, this.previousDocumentRevision,
+    this.reason, this.effectiveAt, this.recordedAt, this.recordedBy, this.outcome,
+    List<WorkspaceOrderTermChange> terms = const [], List<WorkspaceOrderLineChange> lines = const []})
+    : terms = List.unmodifiable(terms), lines = List.unmodifiable(lines);
+  final String? previousDocumentId, reason, recordedBy, outcome;
+  final int? previousDocumentRevision;
+  final DateTime? effectiveAt, recordedAt;
+  final List<WorkspaceOrderTermChange> terms;
+  final List<WorkspaceOrderLineChange> lines;
+  bool get valid => (previousDocumentId == null ? previousDocumentRevision == null :
+      _id(previousDocumentId) && previousDocumentRevision != null && previousDocumentRevision! > 0) &&
+    [reason, recordedBy, outcome].every(_orderChangeText) && _orderChangeDate(effectiveAt) && _orderChangeDate(recordedAt) &&
+    terms.every((v) => v.valid) && lines.every((v) => v.valid) &&
+    terms.map((v) => v.label.toLowerCase()).toSet().length == terms.length &&
+    lines.map((v) => v.lineId).toSet().length == lines.length &&
+    (previousDocumentId != null || reason != null || effectiveAt != null || recordedAt != null ||
+      recordedBy != null || outcome != null || terms.isNotEmpty || lines.isNotEmpty);
+  Map<String, Object?> toJson() => {'previousDocumentId': previousDocumentId, 'previousDocumentRevision': previousDocumentRevision,
+    'reason': reason, 'effectiveAt': effectiveAt?.toIso8601String(), 'recordedAt': recordedAt?.toIso8601String(),
+    'recordedBy': recordedBy, 'outcome': outcome, 'terms': terms.map((v) => v.toJson()).toList(), 'lines': lines.map((v) => v.toJson()).toList()};
+}
+
+/// Display only the particulars explicitly supplied with this issued document.
+/// Never derive its number, legal status or terms from current Store settings.
+class WorkspaceOrderDocument {
+  WorkspaceOrderDocument({required this.id, required this.kind, required this.number,
+    required this.revision, required this.date, required Map<String, String> particulars,
+    List<String> linkedDocumentIds = const [], this.copy, this.printedTitle, this.changes})
+    : particulars = Map.unmodifiable(particulars), linkedDocumentIds = List.unmodifiable(linkedDocumentIds);
+  final String id, kind, number;
+  final String? printedTitle;
+  final int revision;
+  final DateTime date;
+  final Map<String, String> particulars;
+  final List<String> linkedDocumentIds;
+  final WorkspaceOrderDocumentCopy? copy;
+  final WorkspaceOrderDocumentChanges? changes;
+  static const labels = {'issuer': 'Issued by', 'recipient': 'Issued to',
+    'reference': 'Order reference', 'paymentTerms': 'Payment terms',
+    'deliveryTerms': 'Delivery terms', 'remarks': 'Remarks'};
+  bool get valid => _id(id) && WorkspacePurchaseInvoiceAttachment.documentTypes.contains(kind) &&
+    _purchaseText(number) && (printedTitle == null || _purchaseText(printedTitle)) && revision > 0 && date.isUtc && date.year >= 2000 && date.year <= 2100 &&
+    particulars.keys.every(labels.containsKey) && particulars.values.every(_purchaseText) &&
+    linkedDocumentIds.every((id) => _id(id) && id != this.id) &&
+    linkedDocumentIds.toSet().length == linkedDocumentIds.length && (copy == null || copy!.valid) &&
+    (changes == null || const ['orderAmendment', 'orderCancellation'].contains(kind) && changes!.valid);
+  Map<String, Object?> toJson() => {'id': id, 'kind': kind, 'number': number, 'printedTitle': printedTitle,
+    'revision': revision, 'date': date.toIso8601String(),
+    'particulars': {for (final key in labels.keys) if (particulars.containsKey(key)) key: particulars[key]},
+    'linkedDocumentIds': linkedDocumentIds, 'copy': copy?.toJson(), 'changes': changes?.toJson()};
+}
+
+class WorkspaceOrderDocumentsRead {
+  WorkspaceOrderDocumentsRead({required this.targetBinding, required this.revision,
+    required List<WorkspaceOrderDocument> documents}) : documents = List.unmodifiable(documents);
+  final String targetBinding;
+  final int revision;
+  /// Complete authorised list for this exact order; null read means unavailable.
+  final List<WorkspaceOrderDocument> documents;
+  String get fingerprint => _goodsFingerprint([targetBinding, revision, documents.map((d) => d.toJson()).toList()]);
+  bool validFor(WorkspaceOrderDocumentTarget target) {
+    final ids = documents.map((d) => d.id).toSet();
+    if (!target.valid || targetBinding != target.binding || revision <= 0 || ids.length != documents.length ||
+        !documents.every((d) => d.valid && d.linkedDocumentIds.every(ids.contains))) {
+      return false;
+    }
+    final byId = {for (final document in documents) document.id: document};
+    for (final document in documents) {
+      final previous = document.changes?.previousDocumentId;
+      if (previous != null && (!document.linkedDocumentIds.contains(previous) || previous == document.id ||
+          byId[previous]?.revision != document.changes!.previousDocumentRevision)) {
+        return false;
+      }
+    }
+    // A previous-version chain must not loop, even when every individual link
+    // names a permitted document. Iterative traversal also avoids stack growth.
+    final resolved = <String>{};
+    for (final document in documents) {
+      final path = <String>{};
+      String? current = document.id;
+      while (current != null && !resolved.contains(current)) {
+        if (!path.add(current)) return false;
+        current = byId[current]?.changes?.previousDocumentId;
+      }
+      resolved.addAll(path);
+    }
+    return true;
+  }
 }
 
 /// Frontend proposal for a separately authorised, purchase-bound warranty read.

@@ -167,7 +167,11 @@ void main() {
 
     expect(find.byKey(const Key('global-security-v2')), findsOne);
     expect(find.text('Test Member'), findsOne);
-    expect(find.text('Google · Email'), findsOne);
+    expect(find.byKey(const Key('global-security-methods')), findsNothing);
+    expect(find.text('Google · Email'), findsNothing);
+    expect(journey.isAuthenticated, isTrue);
+    expect(journey.accountIdentity!.signInMethods, ['Google', 'Email']);
+    expect(find.byKey(const Key('global-security-sign-out')), findsOneWidget);
     expect(find.text('member@example.com'), findsOne);
     expect(find.textContaining('Orders'), findsNothing);
     expect(find.textContaining('Payments'), findsNothing);
@@ -196,6 +200,8 @@ void main() {
     );
 
     expect(find.text('Sign in'), findsOne);
+    expect(find.text('Use email or mobile to sign in'), findsOneWidget);
+    expect(find.text('Use your email or mobile OTP'), findsNothing);
     expect(find.text('Sign out'), findsNothing);
     expect(find.byKey(const Key('global-security-methods')), findsNothing);
     expect(find.byKey(const Key('global-security-recovery')), findsNothing);

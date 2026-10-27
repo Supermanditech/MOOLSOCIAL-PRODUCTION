@@ -1,7 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import '../../assistant/mool_assistant.dart';
+import '../../../ui_v2/assistant/mool_assistant_v2.dart' show MoolAssistantRouteBoundNativeAdapter;
+import '../work_document_preview.dart';
+import '../work_stock_export.dart' show storeTradeDocumentLabel;
 import '../work_order_identity_gateway.dart';
 import '../work_catalogue_gateway.dart';
 import '../work_models.dart' show WorkspacePurchasedUnitRow, WorkspacePurchasedUnitDraft, WorkspacePurchasedUnitDraftKey, WorkspacePurchasedUnitPublishCommand,
@@ -11,8 +17,9 @@ import '../work_services.dart' show WorkPurchasedUnitDraftStore, SecureWorkPurch
 /// Shared quotation surface, deliberately separate from purchased orders.
 class WorkspaceBulkQuotes extends StatefulWidget {
   const WorkspaceBulkQuotes({super.key, required this.access, this.storeId, this.onClose,
-    this.request, this.requestLines = const [], this.inputCurrent, this.onUseForCart});
+    this.request, this.requestLines = const [], this.inputCurrent, this.onUseForCart,this.readOnlyQuote});
   final WorkspaceBulkQuoteAccess access;
+  final WorkspaceBulkQuote? readOnlyQuote;
   final String? storeId;
   final VoidCallback? onClose;
   final WorkspaceBulkQuoteIntent? request;
@@ -31,16 +38,26 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
   Object _detailVisit = Object();
   Timer? _expiry;
   WorkspaceBulkQuoteAccess get access => widget.access;
-  bool _current(int generation) => mounted && generation == _generation && access.active;
+  bool _current(int generation) => mounted && generation == _generation && access.active && _readOnlyCurrent;
   WorkspaceBulkQuoteController? get controller => _store == null || !access.active ? null : access.forStore(_store!);
+  bool get _readOnlyCurrent {
+    final quote=widget.readOnlyQuote;if(quote==null)return true;
+    if(!access.active || widget.inputCurrent?.call()==false)return false;
+    final owner=controller;
+    return owner!=null && owner.active && owner.initialized && !owner.busy && owner.pending.isEmpty && identical(owner.head(quote.quoteId),quote);
+  }
+  VoidCallback? get _closeReadOnly {
+    if(_acting || !_readOnlyCurrent)return null;
+    return (){if(!mounted || !_readOnlyCurrent)return;widget.onClose?.call();};
+  }
   @override void initState() {
     super.initState(); WidgetsBinding.instance.addObserver(this); _selectRequest();
     WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) unawaited(_load()); });
   }
-  void _selectRequest() { _detailVisit = Object(); _store = widget.request?.storeId; _quoteId = widget.request?.quoteId; }
+  void _selectRequest() { _detailVisit = Object(); _store = widget.readOnlyQuote?.storeId ?? widget.request?.storeId; _quoteId = widget.readOnlyQuote?.quoteId ?? widget.request?.quoteId; }
   @override void didUpdateWidget(covariant WorkspaceBulkQuotes old) {
     super.didUpdateWidget(old);
-    if (!identical(old.access, access) || old.storeId != widget.storeId || old.request?.fingerprint != widget.request?.fingerprint) {
+    if (!identical(old.access, access) || old.storeId != widget.storeId || old.request?.fingerprint != widget.request?.fingerprint || !identical(old.readOnlyQuote,widget.readOnlyQuote)) {
       _generation++; _expiry?.cancel(); _rows.clear(); _pending.clear(); _cursor = null; _termsAccepted = false; _selectRequest();
       _loading = false; _acting = false; _sending = false; _error = null;
       WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) unawaited(_load()); });
@@ -48,7 +65,7 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
   }
   @override void dispose() { _generation++; _expiry?.cancel(); WidgetsBinding.instance.removeObserver(this); super.dispose(); }
   @override void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && access.active) {
+    if (state == AppLifecycleState.resumed && access.active && widget.readOnlyQuote==null) {
       setState(() {}); if (_quoteId != null) unawaited(_refresh());
     }
   }
@@ -60,7 +77,8 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
     _expiry = Timer(delay, () { if (_current(generation)) setState(() { _termsAccepted = false; }); });
   }
   Future<void> _load({bool more = false}) async {
-    if (_loading || !access.active) return;
+    if (_loading || !access.active || widget.inputCurrent?.call()==false && widget.readOnlyQuote!=null) return;
+    if(widget.readOnlyQuote!=null){_armExpiry();return;}
     final generation = _generation, originalAccess = access;
     setState(() { _loading = true; _error = null; });
     try {
@@ -94,6 +112,7 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
     finally { if (_current(generation)) setState(() { _loading = false; }); }
   }
   Future<void> _refresh() async {
+    if(widget.readOnlyQuote!=null)return;
     final owner = controller, id = _quoteId, generation = _generation;
     if (owner == null || id == null || owner.busy || _acting) return;
     final previous = owner.head(id)?.revision;
@@ -104,6 +123,7 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
     setState(() { if (previous != owner.head(id)?.revision) _termsAccepted = false; }); _armExpiry();
   }
   Future<void> _open(String store, String id) async {
+    if(widget.readOnlyQuote!=null)return;
     setState(() { _detailVisit = Object(); _store = store; _quoteId = id; _termsAccepted = false; _error = null; }); await _refresh();
   }
   Future<bool> _confirm(String title, String body) async => await showDialog<bool>(context: context,
@@ -111,6 +131,7 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
       actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Not now')),
         FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Confirm'))])) == true;
   Future<void> _useForCart(WorkspaceBulkQuote quote, Object visit, Future<bool> Function(WorkspaceBulkQuote) callback) async {
+    if(widget.readOnlyQuote!=null)return;
     final originalAccess = access, generation = _generation;
     bool current() => _current(generation) && identical(_detailVisit, visit) && identical(access, originalAccess) &&
       identical(widget.onUseForCart, callback) && _quoteId == quote.quoteId && _store == quote.storeId &&
@@ -138,6 +159,7 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
       account: access.account, realm: access.realm, now: access.gateway.gateway.now());
   }
   Future<void> _act(String kind, {required Object visit, WorkspaceBulkQuoteIntent? original, WorkspaceBulkQuote? quote}) async {
+    if(widget.readOnlyQuote!=null)return;
     final generation = _generation, owner = controller, originalAccess = access;
     if (_acting || owner == null || owner.busy || !_current(generation)) return;
     bool displayedCurrent() => _current(generation) && identical(access, originalAccess) && identical(_detailVisit, visit) &&
@@ -182,9 +204,9 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
     'requested' => 'Awaiting supplier', 'offered' => until?.isAfter(access.gateway.gateway.now().toUtc()) == false ? 'Offer expired' : 'Ready to review',
     'accepted' => 'Prices agreed', 'withdrawn' => 'Closed', _ => 'Check status'};
   Widget _detail() {
-    final owner = controller!, quote = owner.head(_quoteId!), request = widget.request;
+    final owner = controller!, quote = widget.readOnlyQuote ?? owner.head(_quoteId!), request = widget.request;
     final visit = _detailVisit, useForCart = widget.onUseForCart;
-    final pending = owner.pending.where((p) => p.quoteId == _quoteId).toList();
+    final pending = widget.readOnlyQuote==null?owner.pending.where((p) => p.quoteId == _quoteId).toList():<WorkspaceBulkQuoteIntent>[];
     final isNew = quote == null && pending.isEmpty && request?.quoteId == _quoteId;
     final original = pending.firstOrNull ?? (request?.quoteId == _quoteId ? request : null);
     final presentation = original?.presentation;
@@ -210,7 +232,7 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
         for (final policy in policies.values) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text('${policy['title']}\n${policy['body']}')),
         if (quote.state == 'accepted') const Padding(padding: EdgeInsets.symmetric(vertical: 8),
           child: Text('Prices agreed. This is not a placed order. Final tax, delivery charges and permitted payment terms must be confirmed before ordering.')),
-        if (quote.accepted && quote.validUntil?.isAfter(access.gateway.gateway.now().toUtc()) != true && widget.onUseForCart != null)
+        if (quote.accepted && quote.validUntil?.isAfter(access.gateway.gateway.now().toUtc()) != true && (widget.onUseForCart != null || widget.readOnlyQuote!=null))
           const Text('This saved agreement has expired. Remove it from Cart if selected, then review the current listed prices.'),
       ] else if (presentation != null) ...[
         for (final row in presentation['lines'] as List) ListTile(contentPadding: EdgeInsets.zero,
@@ -223,11 +245,11 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
           subtitle: Text([if (line.variant?.isNotEmpty == true) line.variant!, '${line.quantity} × ${line.pack}'].join(' · '))),
         const Text('The supplier will quote product prices. Taxes, delivery charges and payment terms are confirmed separately.'),
       ] else const Text('Your saved request is awaiting confirmation. Check its status before making changes.'),
-      if (mustReadTerms && quote?.offerCurrent(access.gateway.gateway.now()) == true && access.role == 'buyer' && pending.isEmpty)
+      if (widget.readOnlyQuote==null && mustReadTerms && quote?.offerCurrent(access.gateway.gateway.now()) == true && access.role == 'buyer' && pending.isEmpty)
         CheckboxListTile(contentPadding: EdgeInsets.zero, value: _termsAccepted, onChanged: _acting ? null : (v) => setState(() { _termsAccepted = v == true; }),
           title: const Text('I have read the supplier terms shown above.')),
       const SizedBox(height: 8),
-      Wrap(spacing: 8, runSpacing: 8, children: [
+      if(widget.readOnlyQuote==null)Wrap(spacing: 8, runSpacing: 8, children: [
         if (quote?.accepted == true && access.role == 'buyer' && useForCart != null)
           FilledButton(onPressed: _acting || quote!.validUntil?.isAfter(access.gateway.gateway.now().toUtc()) != true
             ? null : () => _useForCart(quote, visit, useForCart), child: const Text('Use for this Cart')),
@@ -248,12 +270,13 @@ class _WorkspaceBulkQuotesState extends State<WorkspaceBulkQuotes> with WidgetsB
   }
   @override Widget build(BuildContext context) {
     if (!access.active) return const Center(child: Text('Sign in again to view your quotes.'));
+    if(!_readOnlyCurrent)return const Center(child:Text('This saved quote is unavailable. Reopen the current selection.'));
     return Material(type: MaterialType.transparency, child: ListView(padding: const EdgeInsets.all(12), children: [
-      Row(children: [if (_quoteId != null || widget.onClose != null) IconButton(tooltip: widget.request != null ? 'Back to Cart' : _quoteId != null ? 'All Bulk quotes' : 'Back to orders',
-        onPressed: _acting ? null : () { if (_quoteId != null && widget.request == null) { setState(() { _quoteId = null; _store = null; }); unawaited(_load()); }
+      Row(children: [if (_quoteId != null || widget.onClose != null) IconButton(tooltip: widget.readOnlyQuote!=null?'Back to purchase':widget.request != null ? 'Back to Cart' : _quoteId != null ? 'All Bulk quotes' : 'Back to orders',
+        onPressed: widget.readOnlyQuote!=null?_closeReadOnly:_acting ? null : () { if (_quoteId != null && widget.request == null) { setState(() { _quoteId = null; _store = null; }); unawaited(_load()); }
           else { widget.onClose?.call(); } }, icon: const Icon(Icons.arrow_back_rounded)),
         const Expanded(child: Text('Bulk quotes', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700))),
-        IconButton(tooltip: 'Refresh quotes', onPressed: _loading || _acting ? null : () => _quoteId == null ? _load() : _refresh(), icon: const Icon(Icons.refresh_rounded))]),
+        if(widget.readOnlyQuote==null)IconButton(tooltip: 'Refresh quotes', onPressed: _loading || _acting ? null : () => _quoteId == null ? _load() : _refresh(), icon: const Icon(Icons.refresh_rounded))]),
       const Text('Review product prices before placing a Bulk order.'), const SizedBox(height: 12),
       if (_loading || _sending) const LinearProgressIndicator(),
       if (_error != null) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(_error!, key: const ValueKey('bulk-quote-error'))),
@@ -376,9 +399,11 @@ class WorkspacePurchaseOriginals extends StatefulWidget {
     this.buyingStoreId,
     this.onRatePurchasedItem,
     this.onReceivePurchasedOrder,
-    this.onOpenDeviceCase,
+    this.onOpenDeviceCase, this.capturedCurrent,this.initialRead,
   });
   final AuthenticatedWorkspaceOrderIdentityGateway gateway;
+  final bool Function()? capturedCurrent;
+  final ({WorkspacePurchaseReference reference,WorkspacePurchaseOrder original})? initialRead;
   final WorkspaceOrderIdentityRole role;
   final String realm;
   final String? storeId;
@@ -410,7 +435,16 @@ class _WorkspacePurchaseOriginalsState
       _loaded = false,
       _retryMore = false;
   bool _current(int generation) =>
-      mounted && generation == _generation && widget.gateway.isCurrent;
+      mounted && generation == _generation && widget.gateway.isCurrent &&
+      widget.capturedCurrent?.call() != false;
+  @override void initState(){
+    super.initState();_assistantOriginalIndices.add(this);
+    final read=widget.initialRead;
+    if(read!=null&&read.reference.valid&&read.original.orderId==read.reference.orderId&&
+       read.original.storeId==read.reference.storeId&&read.original.originalFingerprint==read.reference.originalFingerprint){
+      _references.add(read.reference);_details[read.reference.orderId]=read.original;_loaded=true;
+    }
+  }
   @override
   void didUpdateWidget(covariant WorkspacePurchaseOriginals oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -513,6 +547,7 @@ class _WorkspacePurchaseOriginalsState
 
   @override
   void dispose() {
+    _assistantOriginalIndices.remove(this);
     _generation++;
     super.dispose();
   }
@@ -650,6 +685,7 @@ class _WorkspacePurchaseOriginalsState
     return Material(
       type: MaterialType.transparency,
       child: ExpansionTile(
+        initiallyExpanded:widget.initialRead!=null,
         key: PageStorageKey((
           widget.gateway,
           widget.role,
@@ -708,6 +744,7 @@ class _WorkspacePurchaseOriginalsState
                 KeyedSubtree(
                   key: ValueKey('original-order-${reference.orderId}'),
                   child: ExpansionTile(
+                    initiallyExpanded:widget.initialRead?.reference.orderId==reference.orderId,
                     key: PageStorageKey((
                       widget.gateway,
                       widget.role,
@@ -749,6 +786,10 @@ class _WorkspacePurchaseOriginalsState
                           _receivingAction(reference, details),
                         _orderUpdate(reference),
                         WorkspaceOriginalFulfilmentForOrder(original: details),
+                        WorkspaceOrderDocumentsForOrder(gateway: widget.gateway,
+                          target: WorkspaceOrderDocumentTarget(accountUserId: widget.gateway.accountUserId,
+                            role: widget.role, realm: widget.realm, buyingStoreId: widget.buyingStoreId, reference: reference),
+                          inputCurrent: () => _current(generation) && identical(_details[reference.orderId], details)),
                         if (details.supplierQuote case final agreed?) ...[
                           _BulkMoney(key: ValueKey('original-supplier-quote-${reference.orderId}'),
                             label: 'Agreed Bulk product prices', amount: agreed.merchandiseMinor),
@@ -877,12 +918,14 @@ class _WorkspacePurchaseOriginalsState
 /// Read-only accepted buyer statements, available only to the supplier owner.
 class WorkspaceReceivedDeviceReportPanel extends StatefulWidget {
   const WorkspaceReceivedDeviceReportPanel({super.key, required this.gateway, required this.realm,
-    required this.reference, required this.line, this.inputCurrent, this.onOpenCase});
+    required this.reference, required this.line, this.inputCurrent, this.onOpenCase,this.initialRead,this.initialReportId});
   final AuthenticatedWorkspaceOrderIdentityGateway gateway;
   final String realm;
   final WorkspacePurchaseReference reference;
   final WorkspacePurchasedSkuLine line;
   final bool Function()? inputCurrent;
+  final WorkspaceReceivedDeviceReports? initialRead;
+  final String? initialReportId;
   final Future<bool> Function(WorkspaceDeviceCaseHandoff)? onOpenCase;
   @override State<WorkspaceReceivedDeviceReportPanel> createState() => _WorkspaceReceivedDeviceReportPanelState();
 }
@@ -912,7 +955,21 @@ class _WorkspaceReceivedDeviceReportPanelState extends State<WorkspaceReceivedDe
       return _current(_generation) && grant != null && _source!.ownerAccessCurrent(grant) && grant.allows(_target, DateTime.now().toUtc()); }
     on Object { return false; }
   }
-  @override void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); _bind(); }
+  @override void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); _bind();
+    final read=widget.initialRead;
+    if(read!=null&&read.original!=null&&read.validFor(_target,read.original!)){
+      _open=true;_record=read;_revision=read.revision;_reports.addEntries(read.reports.map((r)=>MapEntry(r.id,r)));
+      _pages[null]=jsonEncode([read.reports.map((r)=>[r.id,r.fingerprint,r.supportCase?.revision,
+        r.supportCase?.updatedAt.toUtc().toIso8601String(),r.supportCase?.purchaseContext?.fingerprint]).toList(),read.complete,read.nextCursor]);
+      for(final report in read.reports){_history[report.id]=report.fingerprint;if(report.supportCase case final issue?)_cases[issue.cacheId]=issue;}
+      final id=widget.initialReportId;
+      if(id!=null)WidgetsBinding.instance.addPostFrameCallback((_){
+        if(!_current(_generation)||!_authorised)return;
+        final reports=_reports.values.where((r)=>r.id==id&&r.supportCase!=null);
+        if(reports.length==1)unawaited(_openCase(reports.single));
+      });
+    }
+  }
   void _bind() {
     final source = widget.gateway.purchasedUnitSource;
     _source = source is WorkspaceReceivedDeviceReportSource ? source : null;
@@ -1024,7 +1081,7 @@ class _WorkspaceReceivedDeviceReportPanelState extends State<WorkspaceReceivedDe
 /// never publish supplier records or submit buyer mismatch reports.
 class WorkspacePurchasedUnitsForLine extends StatefulWidget {
   const WorkspacePurchasedUnitsForLine({super.key, required this.gateway, required this.role, required this.realm,
-    required this.reference, required this.line, this.buyingStoreId, this.inputCurrent, this.draftStore, this.onOpenDeviceCase});
+    required this.reference, required this.line, this.buyingStoreId, this.inputCurrent, this.draftStore, this.onOpenDeviceCase,this.initialRead});
   final AuthenticatedWorkspaceOrderIdentityGateway gateway;
   final WorkspaceOrderIdentityRole role;
   final String realm;
@@ -1032,6 +1089,7 @@ class WorkspacePurchasedUnitsForLine extends StatefulWidget {
   final WorkspacePurchaseReference reference;
   final WorkspacePurchasedSkuLine line;
   final bool Function()? inputCurrent;
+  final WorkspaceUnitAssistantRead? initialRead;
   final WorkPurchasedUnitDraftStore? draftStore;
   final Future<bool> Function(WorkspaceDeviceCaseHandoff)? onOpenDeviceCase;
   @override State<WorkspacePurchasedUnitsForLine> createState() => _WorkspacePurchasedUnitsForLineState();
@@ -1127,6 +1185,37 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
   }
   @override void initState() {
     super.initState(); WidgetsBinding.instance.addObserver(this); widget.gateway.purchasedUnitSource?.addListener(_sourceChanged);
+    final initial=widget.initialRead;
+    if(initial!=null&&initial.record.validFor(_target)){
+      _expanded=true;_record=initial.record;_latest=initial.record;
+      if(initial.actionId!='AI-ACT-393'){
+        final saved=initial.draft;
+        _editing=true;_draftReady=true;_localRevision=saved?.revision;_publishedRevision=saved?.publishedRevision??initial.record.revision;
+        _rows=List.of(saved?.rows??initial.record.rows);_report=saved?.report??(widget.role==WorkspaceOrderIdentityRole.buyer?
+          WorkspacePurchasedUnitMismatchDraft(sourceFingerprint:initial.record.fingerprint):null);
+        _command=saved?.pending;_draftStatus=saved==null?'Private draft · not shared':'Saved on this device · not shared';
+        if(initial.actionId=='AI-ACT-394'){
+          _checkedCopy=saved;
+          final prepared=List<WorkspacePurchasedUnitRow>.of(_rows);
+          for(final value in initial.fields['rows'] as List){
+            final fields=value as Map,id=fields['id'] as String?;
+            final index=id==null?-1:prepared.indexWhere((row)=>row.id==id);
+            final original=index<0?null:prepared[index];
+            final row=WorkspacePurchasedUnitRow(id:original?.id??'device-${_operationId()}',
+              serial:fields.containsKey('serial')?fields['serial'] as String:original?.serial??'',
+              imei1:fields.containsKey('imei1')?fields['imei1'] as String:original?.imei1??'',
+              imei2:fields.containsKey('imei2')?fields['imei2'] as String:original?.imei2??'');
+            if(index<0){prepared.add(row);}else{prepared[index]=row;}
+          }
+          _rows=prepared;
+          _reviewCopy=true;_editVersion++;_draftStatus='Review the supplied device details before saving.';
+        }else if(initial.actionId=='AI-ACT-396'){
+          _checkedCopy=saved;_rows=List.of(initial.record.rows);_report=WorkspacePurchasedUnitMismatchDraft(sourceFingerprint:initial.record.fingerprint,
+            selected:(initial.fields['selectedIds'] as List).cast<String>(),note:initial.fields['note'] as String);
+          _reviewCopy=true;_editVersion++;_draftStatus='Review the supplied mismatch details before saving.';
+        }
+      }
+    }
   }
   @override void didUpdateWidget(covariant WorkspacePurchasedUnitsForLine oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -1437,7 +1526,7 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
     final visit = _generation, draftVisit = _draftVisit, checkedCopy = _checkedCopy, record = _current(_generation) ? _record : null,
       pending = _command, review = _reviewCommand;
     final canEdit = _canEdit, unavailable = !_current(_generation) || _unavailable;
-    return PageStorage(bucket: _storage, child: ExpansionTile(key: ValueKey(_owner), tilePadding: EdgeInsets.zero,
+    return PageStorage(bucket: _storage, child: ExpansionTile(key: ValueKey(_owner), initiallyExpanded:widget.initialRead!=null, tilePadding: EdgeInsets.zero,
       title: const Text('Device details', style: TextStyle(fontSize: 13)), onExpansionChanged: (open) {
         if (!_current(visit)) return;
         _expanded = open;
@@ -1607,11 +1696,253 @@ class _WorkspacePurchasedUnitsForLineState extends State<WorkspacePurchasedUnits
   }
 }
 
+/// Shared private document reader for buyer and supplier order originals.
+class WorkspaceOrderDocumentsForOrder extends StatefulWidget {
+  const WorkspaceOrderDocumentsForOrder({super.key, required this.gateway, required this.target, this.inputCurrent,this.initialRead,this.initialDocumentId});
+  final AuthenticatedWorkspaceOrderIdentityGateway gateway;
+  final WorkspaceOrderDocumentTarget target;
+  final bool Function()? inputCurrent;
+  final WorkspaceOrderDocumentsRead? initialRead;
+  final String? initialDocumentId;
+  @override State<WorkspaceOrderDocumentsForOrder> createState() => _WorkspaceOrderDocumentsForOrderState();
+}
+
+class _WorkspaceOrderDocumentsForOrderState extends State<WorkspaceOrderDocumentsForOrder> with WidgetsBindingObserver {
+  final _storage = PageStorageBucket();
+  final _access = ValueNotifier<int>(0);
+  int _generation = 0;
+  bool _expanded = false, _loading = false, _unavailable = false;
+  WorkspaceOrderDocumentsRead? _record, _latest;
+  Object get _identity => (widget.gateway, widget.gateway.orderDocumentSource,
+    widget.gateway.orderDocumentSource?.lifetime, widget.target.binding);
+  late Object _owner = _identity;
+  bool _current(int generation) {
+    final source = widget.gateway.orderDocumentSource;
+    return mounted && generation == _generation && _owner == _identity && widget.gateway.isCurrent &&
+      widget.target.valid && widget.inputCurrent?.call() != false && (source == null ||
+        source.isCurrent && source.lifetime != null && source.accountUserId == widget.gateway.accountUserId);
+  }
+  @override void initState() {
+    super.initState(); WidgetsBinding.instance.addObserver(this);
+    final read=widget.initialRead;
+    if(read!=null&&read.validFor(widget.target)){_expanded=true;_record=read;_latest=read;}
+    widget.gateway.orderDocumentSource?.addListener(_sourceChanged);
+  }
+  void _retire() {
+    _generation++; _loading = false; _record = null; _unavailable = _expanded;
+    _access.value++;
+  }
+  void _sourceChanged() {
+    if (!mounted) return;
+    setState(() { _retire(); if (_owner != _identity) { _owner = _identity; _latest = null; } });
+  }
+  @override void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed && mounted) setState(_retire);
+  }
+  @override void didUpdateWidget(covariant WorkspaceOrderDocumentsForOrder oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.gateway.orderDocumentSource, widget.gateway.orderDocumentSource)) {
+      oldWidget.gateway.orderDocumentSource?.removeListener(_sourceChanged);
+      widget.gateway.orderDocumentSource?.addListener(_sourceChanged);
+    }
+    if (_owner != _identity || widget.inputCurrent?.call() == false) {
+      _retire();
+      if (_owner != _identity) { _owner = _identity; _latest = null; _expanded = false; }
+    }
+  }
+  @override void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.gateway.orderDocumentSource?.removeListener(_sourceChanged);
+    _generation++; _access.dispose(); super.dispose();
+  }
+  Future<void> _read() async {
+    final generation = _generation;
+    if (!_current(generation) || !_expanded || _loading) return;
+    setState(() { _loading = true; _unavailable = false; _record = null; });
+    final result = await widget.gateway.readOrderDocuments(target: widget.target,
+      inputCurrent: () => _current(generation) && _expanded);
+    if (!_current(generation) || !_expanded) return;
+    final previous = _latest;
+    final accepted = result != null && (previous == null || result.revision > previous.revision ||
+      result.revision == previous.revision && result.fingerprint == previous.fingerprint);
+    setState(() { _loading = false; _unavailable = !accepted; _record = accepted ? result : null; if (accepted) _latest = result; });
+  }
+  void _open(WorkspaceOrderDocumentsRead record, WorkspaceOrderDocument document) {
+    final generation = _generation;
+    bool current() => _current(generation) && _expanded && identical(_record, record);
+    if (!current() || document.copy == null) return;
+    final gateway = widget.gateway, target = widget.target, copy = document.copy!;
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => WorkspaceOriginalCopyViewer(
+      title: 'Order document', fileName: copy.fileName, contentType: copy.contentType,
+      owner: _access, isCurrent: current,
+      read: () async {
+        if (!current()) throw StateError('Retired document');
+        final bytes = await gateway.readOrderDocumentCopy(target: target, recorded: record,
+          documentId: document.id, inputCurrent: current);
+        if (bytes == null || !current()) throw StateError('Unavailable document');
+        return bytes;
+      })));
+  }
+  @override Widget build(BuildContext context) {
+    final generation = _generation, record = _current(_generation) ? _record : null;
+    final unavailable = !_current(_generation) || _unavailable;
+    return PageStorage(bucket: _storage, child: ExpansionTile(key: ValueKey(_owner), initiallyExpanded:widget.initialRead!=null, tilePadding: EdgeInsets.zero,
+      title: const Text('Order documents', style: TextStyle(fontSize: 13)),
+      subtitle: const Text('View order details and linked copies.', style: TextStyle(fontSize: 12)),
+      onExpansionChanged: (expanded) {
+        if (!_current(generation)) return;
+        _expanded = expanded;
+        if (!expanded) _retire();
+        final visit = _generation;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_current(visit)) return;
+          setState(() {}); if (_expanded) unawaited(_read());
+        });
+      },
+      children: [Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (_loading && !unavailable) const LinearProgressIndicator(minHeight: 2),
+        if (unavailable) ...[
+          const Text('Documents for this order are unavailable.'),
+          Align(alignment: Alignment.centerLeft, child: TextButton(onPressed: _loading || !_current(generation) ? null : () {
+            if (_current(generation) && _expanded) unawaited(_read());
+          }, child: const Text('Retry documents'))),
+        ],
+        if (record != null && record.documents.isEmpty) const Text('No documents are linked to this order.'),
+        if (record != null) for (final document in record.documents)
+          ExpansionTile(key: ValueKey((record.fingerprint, document.id)), initiallyExpanded:widget.initialDocumentId==document.id, tilePadding: EdgeInsets.zero,
+            title: Text(document.number, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            subtitle: Text('${document.printedTitle ?? storeTradeDocumentLabel(document.kind)} · ${MaterialLocalizations.of(context).formatShortDate(document.date)}',
+              style: const TextStyle(fontSize: 12)),
+            children: [Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (final field in WorkspaceOrderDocument.labels.entries)
+                if (document.particulars[field.key] case final value?) Padding(padding: const EdgeInsets.only(bottom: 4),
+                  child: Text('${field.value}: $value')),
+              if (const ['orderAmendment', 'orderCancellation'].contains(document.kind))
+                _WorkspaceOrderChangeParticulars(document: document, record: record, onOpen: (previous) => _open(record, previous)),
+              if (document.linkedDocumentIds.any((id) => id != document.changes?.previousDocumentId))
+                Text('Linked documents: ${document.linkedDocumentIds.where((id) => id != document.changes?.previousDocumentId).map((id) => record.documents.singleWhere((doc) => doc.id == id).number).join(', ')}'),
+              if (document.copy != null) Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+                onPressed: () => _open(record, document), icon: const Icon(Icons.description_outlined, size: 18), label: const Text('View original')))
+              else const Text('Original copy has not been supplied.'),
+            ])]),
+      ])]));
+  }
+}
+
+class _WorkspaceOrderChangeParticulars extends StatelessWidget {
+  const _WorkspaceOrderChangeParticulars({required this.document, required this.record, required this.onOpen});
+  final WorkspaceOrderDocument document;
+  final WorkspaceOrderDocumentsRead record;
+  final ValueChanged<WorkspaceOrderDocument> onOpen;
+  @override Widget build(BuildContext context) {
+    final changes = document.changes;
+    final previous = changes?.previousDocumentId == null ? null : record.documents.singleWhere((d) => d.id == changes!.previousDocumentId);
+    final style = Theme.of(context).textTheme.bodySmall;
+    String date(DateTime at) => MaterialLocalizations.of(context).formatShortDate(at.toLocal());
+    String timestamp(DateTime at) => '${date(at)} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(at.toLocal()),
+      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context))}';
+    Widget fact(String label, String value) => Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('$label: $value', style: style));
+    Iterable<Widget> comparison(String? before, String? after) sync* {
+      yield fact('Before', before ?? 'Not supplied');
+      yield fact('In this document', after ?? 'Not supplied');
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(document.kind == 'orderCancellation' ? 'Cancellation particulars' : 'Amendment particulars',
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+      const Padding(padding: EdgeInsets.only(bottom: 6), child: Text('Current order status is shown separately.', style: TextStyle(fontSize: 12))),
+      if (changes == null) Text('Change details have not been supplied.', style: style)
+      else ...[
+        if (previous != null) fact('Previous document', '${previous.number} · Revision ${previous.revision}')
+        else Text('Previous document has not been linked.', style: style),
+        if (changes.reason case final reason?) fact('Reason', reason),
+        if (changes.effectiveAt case final at?) fact('Effective from', timestamp(at)),
+        if (changes.recordedAt case final at?) fact('Recorded on', timestamp(at)),
+        if (changes.recordedBy case final actor?) fact('Recorded by', actor),
+        if (changes.outcome case final outcome?) fact('Document outcome', outcome),
+        for (final term in changes.terms) ...[
+          Text(term.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          ...comparison(term.before, term.after),
+        ],
+        for (final line in changes.lines) ...[
+          Text(line.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(WorkspaceOrderLineChange.actionLabels[line.action]!, style: style),
+          ...comparison(line.before, line.after),
+        ],
+        if (changes.terms.isEmpty && changes.lines.isEmpty) Text('Affected items or terms have not been supplied.', style: style),
+        if (previous != null && previous.copy != null) Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+          onPressed: () => onOpen(previous), icon: const Icon(Icons.history, size: 18), label: const Text('View previous original'))),
+      ],
+    ]);
+  }
+}
+
+/// Local-byte viewer shared with receiving and purchase/payment copies. Its
+/// caller supplies the original access check; no path/URL or upload is accepted.
+class WorkspaceOriginalCopyViewer extends StatefulWidget {
+  const WorkspaceOriginalCopyViewer({super.key, required this.title, required this.fileName,
+    required this.contentType, required this.read, required this.isCurrent, required this.owner,
+    this.unavailableText = 'Return to the order and refresh its documents.',
+    this.errorText = 'This original could not be opened. Return to the order to refresh, or retry.',this.embedded=false});
+  final String title, fileName, contentType, unavailableText, errorText;
+  final Future<Uint8List> Function() read;
+  final bool Function() isCurrent;
+  final Listenable owner;
+  final bool embedded;
+  @override State<WorkspaceOriginalCopyViewer> createState() => _WorkspaceOriginalCopyViewerState();
+}
+
+class _WorkspaceOriginalCopyViewerState extends State<WorkspaceOriginalCopyViewer> {
+  final _pdf = WorkPdfPreview();
+  Uint8List? _bytes, _pageBytes;
+  int _page = 0, _pages = 1, _generation = 0;
+  bool _loading = true;
+  String? _error;
+  bool get _current => mounted && widget.isCurrent();
+  void _changed() {
+    if (!_current && mounted) { _generation++; setState(() { _bytes = null; _pageBytes = null; _loading = false; }); }
+  }
+  @override void initState() { super.initState(); widget.owner.addListener(_changed); unawaited(_load(0)); }
+  @override void dispose() { widget.owner.removeListener(_changed); _generation++; _pdf.dispose(); super.dispose(); }
+  Future<void> _load(int page) async {
+    if (!_current) return;
+    final visit = ++_generation;
+    bool current() => _current && visit == _generation;
+    setState(() { _loading = true; _error = null; _bytes = null; _pageBytes = null; });
+    try {
+      final bytes = await widget.read();
+      if (!current()) return;
+      if (widget.contentType == 'application/pdf') {
+        final rendered = await _pdf.render(bytes, page: page);
+        if (!current()) return;
+        _pageBytes = rendered.bytes; _pages = rendered.pageCount; _page = page;
+      }
+      _bytes = bytes;
+    } on Object { if (current()) _error = widget.errorText; }
+    finally { if (current()) setState(() => _loading = false); }
+  }
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: widget.owner, builder: (context, _) => Scaffold(
+    appBar: widget.embedded?null:AppBar(title: Text(widget.title)),
+    body: !_current ? Center(child: Text(widget.unavailableText)) : Column(children: [
+      Padding(padding: const EdgeInsets.all(8), child: Text(widget.fileName, maxLines: 2, overflow: TextOverflow.ellipsis)),
+      if (_loading) const LinearProgressIndicator(),
+      if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Column(children: [
+        Text(_error!), TextButton(onPressed: _loading ? null : () => _load(_page), child: const Text('Retry copy'))])),
+      if (_bytes != null && _error == null) Expanded(child: InteractiveViewer(minScale: .5, maxScale: 8,
+        child: Center(child: Image(image: ResizeImage(MemoryImage(_pageBytes ?? _bytes!), width: 1280, height: 2048, policy: ResizeImagePolicy.fit),
+          fit: BoxFit.contain, errorBuilder: (_, _, _) => const Text('This copy could not be displayed.'))))),
+      if (_bytes != null && _pages > 1) Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
+        TextButton(onPressed: _loading || _page == 0 ? null : () => _load(_page - 1), child: const Text('Previous page')),
+        Text('${_page + 1} / $_pages'),
+        TextButton(onPressed: _loading || _page + 1 >= _pages ? null : () => _load(_page + 1), child: const Text('Next page')),
+      ]),
+    ])));
+}
+
 /// Read-only recorded warranty supplement. Collapse/replacement retires pending
 /// reads; nothing is persisted into the immutable order or payment originals.
 class WorkspaceOriginalWarrantyForLine extends StatefulWidget {
   const WorkspaceOriginalWarrantyForLine({super.key, required this.gateway, required this.role, required this.realm,
-    required this.reference, required this.line, this.buyingStoreId, this.inputCurrent});
+    required this.reference, required this.line, this.buyingStoreId, this.inputCurrent,this.initialRead});
   final AuthenticatedWorkspaceOrderIdentityGateway gateway;
   final WorkspaceOrderIdentityRole role;
   final String realm;
@@ -1619,6 +1950,7 @@ class WorkspaceOriginalWarrantyForLine extends StatefulWidget {
   final WorkspacePurchaseReference reference;
   final WorkspacePurchasedSkuLine line;
   final bool Function()? inputCurrent;
+  final WorkspacePurchasedWarrantyRead? initialRead;
   @override State<WorkspaceOriginalWarrantyForLine> createState() => _WorkspaceOriginalWarrantyForLineState();
 }
 
@@ -1637,6 +1969,10 @@ class _WorkspaceOriginalWarrantyForLineState extends State<WorkspaceOriginalWarr
       (reader == null || reader.isCurrent && reader.lifetime != null && reader.accountUserId == widget.gateway.accountUserId) &&
       widget.inputCurrent?.call() != false;
   }
+  @override void initState(){super.initState();final read=widget.initialRead;
+    final target=WorkspacePurchasedWarrantyTarget(accountUserId:widget.gateway.accountUserId,role:widget.role,realm:widget.realm,
+      reference:widget.reference,line:widget.line,buyingStoreId:widget.buyingStoreId);
+    if(read!=null&&read.validFor(target)){_expanded=true;_record=read;_latest=read;}}
   @override void didUpdateWidget(covariant WorkspaceOriginalWarrantyForLine oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (_owner != _identity) {
@@ -1665,7 +2001,7 @@ class _WorkspaceOriginalWarrantyForLineState extends State<WorkspaceOriginalWarr
     final unavailable = !_current(_generation) || _unavailable;
     final style = Theme.of(context).textTheme.bodySmall;
     String date(DateTime at) => MaterialLocalizations.of(context).formatFullDate(at.toLocal());
-    return PageStorage(bucket: _storage, child: ExpansionTile(key: ValueKey(_owner), tilePadding: EdgeInsets.zero,
+    return PageStorage(bucket: _storage, child: ExpansionTile(key: ValueKey(_owner), initiallyExpanded:widget.initialRead!=null, tilePadding: EdgeInsets.zero,
       childrenPadding: const EdgeInsets.only(bottom: 8),
       title: const Text('Warranty details', style: TextStyle(fontSize: 13)),
       onExpansionChanged: (expanded) {
@@ -1843,4 +2179,276 @@ String _money(int minor) {
     head = head.substring(0, head.length - length);
   }
   return '₹${groups.join(',')}.${(minor % 100).toString().padLeft(2, '0')}';
+}
+
+/// Frozen original read selected from an authenticated native purchase index.
+/// It is not a model-supplied reference, recipient or access grant.
+class WorkspaceOriginalAssistantTarget {
+  const WorkspaceOriginalAssistantTarget({required this.gateway,required this.role,required this.realm,
+    required this.reference,this.lineId,this.buyingStoreId,this.onOpenCase,this.draftStore});
+  final AuthenticatedWorkspaceOrderIdentityGateway gateway;
+  final WorkspaceOrderIdentityRole role;
+  final String realm;
+  final WorkspacePurchaseReference reference;
+  final String? lineId,buyingStoreId;
+  final Future<bool> Function(WorkspaceDeviceCaseHandoff)? onOpenCase;
+  final WorkPurchasedUnitDraftStore? draftStore;
+  String get entityId=>lineId==null?reference.orderId:jsonEncode([reference.orderId,lineId]);
+  String get binding=>WorkspaceOrderDocumentTarget(accountUserId:gateway.accountUserId,role:role,
+    realm:realm,reference:reference,buyingStoreId:buyingStoreId).binding;
+}
+
+/// Exact current original references retained by mounted native index owners.
+/// This is a read projection, never a substitute provider or mutable cache.
+final _assistantOriginalIndices=<_WorkspacePurchaseOriginalsState>{};
+WorkspacePurchaseReference? workspaceAssistantOriginalReference({required AuthenticatedWorkspaceOrderIdentityGateway gateway,
+    required WorkspaceOrderIdentityRole role,required String realm,required String storeId,required String orderId}){
+  final refs=<WorkspacePurchaseReference>[];
+  for(final owner in _assistantOriginalIndices){
+    final w=owner.widget;
+    if(!owner._current(owner._generation)||!identical(w.gateway,gateway)||w.role!=role||w.realm!=realm||
+       (role==WorkspaceOrderIdentityRole.seller?w.storeId!=storeId:w.buyingStoreId!=storeId))continue;
+    refs.addAll(owner._references.where((r)=>r.orderId==orderId));
+  }
+  if(refs.isEmpty)return null;
+  final first=refs.first;
+  return refs.every((r)=>jsonEncode(r.toJson())==jsonEncode(first.toJson()))?first:null;
+}
+
+class WorkspaceOrderOriginalNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter,
+    MoolAssistantRouteBoundNativeAdapter {
+  WorkspaceOrderOriginalNativeAdapter({required this.actionId,required this.navigator,required this.currentContext,
+    required this.currentOwner,required this.ownerChanges,required this.resolve});
+  @override final String actionId;
+  final NavigatorState navigator;
+  final MoolAssistantContext? Function() currentContext;
+  final bool Function() currentOwner;
+  final Listenable ownerChanges;
+  final WorkspaceOriginalAssistantTarget? Function(String) resolve;
+  Route<void>? _assistantRoute;NavigatorState? _assistantNavigator;
+  WorkspaceOriginalAssistantTarget? _target;
+  WorkspacePurchaseOrder? _original;
+  WorkspacePurchasedSkuLine? _line;
+  WorkspaceOrderDocumentsRead? _documents;
+  WorkspacePurchasedWarrantyRead? _warranty;
+  WorkspacePurchasedUnitsRead? _units;
+  WorkspaceReceivedDeviceReports? _reports;
+  WorkspacePurchasedUnitDraft? _draft;
+  WorkPurchasedUnitDraftStore? _draftStore;
+  Object? _binding,_witness;int _revision=0;bool _opened=false;
+  @override void bindAssistantRoute(Route<void> route,NavigatorState owner){
+    if(_assistantRoute!=null||!identical(owner,navigator))throw StateError('Original owner route changed');
+    _assistantRoute=route;_assistantNavigator=owner;
+  }
+  bool get _assistantCurrent=>_assistantRoute?.isCurrent==true&&_assistantRoute?.isActive==true&&
+      identical(_assistantRoute?.navigator,_assistantNavigator);
+  bool _scope(Object binding)=>navigator.mounted&&currentOwner()&&currentContext()?.binding==binding&&
+      currentContext()?.inWorkspace==true&&currentContext()?.storeWorkspace==true&&currentContext()?.workspaceApproved==true;
+  bool _targetCurrent(WorkspaceOriginalAssistantTarget t,Object binding){
+    final ctx=currentContext(),again=resolve(t.entityId);
+    return _scope(binding)&&ctx?.workspaceId!=null&&t.gateway.isCurrent&&again!=null&&
+      identical(again.gateway,t.gateway)&&again.binding==t.binding&&again.lineId==t.lineId&&
+      (t.role==WorkspaceOrderIdentityRole.seller?t.reference.storeId==ctx!.workspaceId:
+        t.buyingStoreId==ctx!.workspaceId)&&t.reference.valid;
+  }
+  static const supported=['AI-ACT-274','AI-ACT-389','AI-ACT-390','AI-ACT-391','AI-ACT-392','AI-ACT-393',
+    'AI-ACT-394','AI-ACT-395','AI-ACT-396','AI-ACT-397','AI-ACT-398','AI-ACT-399','AI-ACT-400'];
+  @override Set<String> get allowedFields=>switch(actionId){
+    'AI-ACT-390'||'AI-ACT-391'=>const {'documentId','documentRevision'},
+    'AI-ACT-394'=>const {'rows'},'AI-ACT-396'=>const {'selectedIds','note'},
+    'AI-ACT-400'=>const {'reportId'},_=>const {},};
+  @override String? validateFields(Map<String,Object?> fields){
+    if(fields.keys.any((key)=>!allowedFields.contains(key)))return 'Some original details are not supported.';
+    if(actionId=='AI-ACT-390'||actionId=='AI-ACT-391'){
+      if(fields['documentId'] is! String||(fields['documentId'] as String).trim().isEmpty||
+         fields['documentRevision'] is! int||(fields['documentRevision'] as int)<=0)return 'Choose the exact original document and revision.';
+    }
+    if(actionId=='AI-ACT-400'&&(fields['reportId'] is! String||(fields['reportId'] as String).trim().isEmpty))return 'Choose the linked device report.';
+    if(actionId=='AI-ACT-394'){
+      final rows=fields['rows'];if(rows is! List||rows.isEmpty||rows.length>1000)return 'Add the printed device identifiers.';
+      for(final row in rows){if(row is! Map||row.isEmpty||row.keys.any((k)=>!const {'id','serial','imei1','imei2'}.contains(k))||
+        row.values.any((v)=>v is! String)||!WorkspacePurchasedUnitRow(id:row['id'] as String? ?? 'device-review',
+          serial:row['serial'] as String? ?? '',imei1:row['imei1'] as String? ?? '',imei2:row['imei2'] as String? ?? '').validDraft)
+        return 'Check the original serial and IMEI text.';}
+    }
+    if(actionId=='AI-ACT-396'){
+      final ids=fields['selectedIds'];if(ids is! List||ids.isEmpty||ids.any((id)=>id is! String)||ids.toSet().length!=ids.length||fields['note'] is! String)
+        return 'Select the affected devices and describe the mismatch.';
+    }
+    return null;
+  }
+  List<Object?> _sourceWitness(WorkspaceOriginalAssistantTarget t)=>[
+    t.gateway,t.gateway.lifetime(),t.gateway.orderDocumentSource,t.gateway.orderDocumentSource?.lifetime,t.gateway.orderDocumentSource?.isCurrent,
+    t.gateway.purchasedWarrantyReader,t.gateway.purchasedWarrantyReader?.lifetime,t.gateway.purchasedWarrantyReader?.isCurrent,
+    t.gateway.purchasedUnitSource,t.gateway.purchasedUnitSource?.lifetime,t.gateway.purchasedUnitSource?.isCurrent,t.binding,t.lineId,
+    _original?.originalFingerprint,_documents?.fingerprint,_warranty?.fingerprint,_units?.fingerprint,
+    _units?.ownerAccess?.expiresAt,_units?.reportAccess?.expiresAt,
+    _reports==null?null:_reportsWitness(_reports!),
+    _draft==null?null:jsonEncode(_draft!.toJson()),
+  ];
+  String _reportsWitness(WorkspaceReceivedDeviceReports reports,{bool includeAccess=true})=>jsonEncode([reports.revision,includeAccess?reports.ownerAccess.expiresAt.toUtc().toIso8601String():null,
+    reports.reports.map((r)=>[r.id,r.fingerprint,if(r.supportCase case final issue?)[issue.id,issue.revision,
+      issue.updatedAt.toUtc().toIso8601String(),issue.state.name,issue.reason,issue.nextStep,issue.resolution,
+      issue.permittedResponses.map((r)=>r.name).toList(),issue.purchaseContext?.fingerprint]]).toList(),reports.complete,reports.nextCursor]);
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId)async{
+    if(!supported.contains(actionId)||_opened||entityId==null||!_scope(context.binding)||!_assistantCurrent)return null;
+    final t=resolve(entityId);if(t==null||!_targetCurrent(t,context.binding))return null;
+    final buyer=const {'AI-ACT-396','AI-ACT-399'}.contains(actionId);
+    if((t.role==WorkspaceOrderIdentityRole.buyer)!=buyer||
+       (const {'AI-ACT-274','AI-ACT-389','AI-ACT-390','AI-ACT-391'}.contains(actionId)?t.lineId!=null:t.lineId==null))return null;
+    bool current()=>_assistantCurrent&&_targetCurrent(t,context.binding)&&!_opened;
+    final original=await t.gateway.readReferencedOrder(role:t.role,realm:t.realm,reference:t.reference,buyingStoreId:t.buyingStoreId,inputCurrent:current);
+    if(!current()||original==null)return null;
+    WorkspacePurchasedSkuLine? line;
+    if(t.lineId!=null){final matches=original.lines.where((v)=>v.lineId==t.lineId);if(matches.length!=1)return null;line=matches.single;}
+    WorkspaceOrderDocumentsRead? documents;WorkspacePurchasedWarrantyRead? warranty;WorkspacePurchasedUnitsRead? units;
+    WorkspaceReceivedDeviceReports? reports;WorkspacePurchasedUnitDraft? draft;WorkPurchasedUnitDraftStore? draftStore;
+    if(const {'AI-ACT-389','AI-ACT-390','AI-ACT-391'}.contains(actionId)){
+      documents=await t.gateway.readOrderDocuments(target:WorkspaceOrderDocumentTarget(accountUserId:t.gateway.accountUserId,
+        role:t.role,realm:t.realm,reference:t.reference,buyingStoreId:t.buyingStoreId),inputCurrent:current);
+      if(!current()||documents==null)return null;
+    }
+    if(actionId=='AI-ACT-392'){
+      warranty=await t.gateway.readPurchasedWarranty(role:t.role,realm:t.realm,reference:t.reference,line:line!,buyingStoreId:t.buyingStoreId,inputCurrent:current);
+      if(!current()||warranty==null)return null;
+    }
+    if(const {'AI-ACT-393','AI-ACT-394','AI-ACT-395','AI-ACT-396','AI-ACT-397','AI-ACT-398','AI-ACT-399','AI-ACT-400'}.contains(actionId)){
+      units=await t.gateway.readPurchasedUnits(role:t.role,realm:t.realm,reference:t.reference,line:line!,buyingStoreId:t.buyingStoreId,inputCurrent:current);
+      if(!current()||units==null)return null;
+    }
+    if(actionId=='AI-ACT-397'||actionId=='AI-ACT-400'){
+      reports=await t.gateway.readReceivedDeviceReports(realm:t.realm,reference:t.reference,line:line!,inputCurrent:current);
+      if(!current()||reports==null)return null;
+    }
+    if(const {'AI-ACT-394','AI-ACT-395','AI-ACT-396','AI-ACT-398','AI-ACT-399'}.contains(actionId)){
+      final source=t.gateway.purchasedUnitSource!,key=WorkspacePurchasedUnitDraftKey(account:t.gateway.accountUserId,realm:t.realm,
+        store:t.reference.storeId,binding:units!.target.binding),read=units;
+      bool authorised()=>t.gateway.isCurrent&&source.isCurrent&&source.lifetime!=null&&source.accountUserId==t.gateway.accountUserId&&
+        _deviceDraftAccess(source,read.target,read.ownerAccess,read.reportAccess);
+      if(!units.complete||!authorised())return null;
+      if(const {'AI-ACT-395','AI-ACT-398'}.contains(actionId)&&source is! WorkspacePurchasedUnitPublisher)return null;
+      draftStore=t.draftStore??SecureWorkPurchasedUnitDraftStore(accountScope:()=>authorised()?t.gateway.accountUserId:null,
+        targetScope:()=>authorised()?key.identity:null);
+      draft=await draftStore.read(key);
+      if(!current()||!authorised()||draft!=null&&(!draft.valid||draft.key.identity!=key.identity||
+        (t.role==WorkspaceOrderIdentityRole.buyer)!=(draft.report!=null)))return null;
+      if((actionId=='AI-ACT-395'&&(draft==null||draft.pending!=null||draft.publishedRevision!=units.revision||!draft.rows.every((r)=>r.ready)))||
+        (actionId=='AI-ACT-398'&&draft?.pending==null)||(actionId=='AI-ACT-399'&&draft?.report?.pending==null)||
+        (const {'AI-ACT-394','AI-ACT-396'}.contains(actionId)&&(draft?.pending!=null||draft?.report?.pending!=null||draft?.report?.recorded==true)))return null;
+    }
+    if(_target?.binding==t.binding&&_target?.lineId==t.lineId&&identical(_target?.gateway,t.gateway)){
+      if(documents!=null&&_documents!=null&&(documents.revision<_documents!.revision||documents.revision==_documents!.revision&&documents.fingerprint!=_documents!.fingerprint)||
+         warranty!=null&&_warranty!=null&&(warranty.revision<_warranty!.revision||warranty.revision==_warranty!.revision&&warranty.fingerprint!=_warranty!.fingerprint)||
+         units!=null&&_units!=null&&(units.revision<_units!.revision||units.revision==_units!.revision&&units.fingerprint!=_units!.fingerprint)||
+         reports!=null&&_reports!=null&&(reports.revision<_reports!.revision||reports.revision==_reports!.revision&&_reportsWitness(reports,includeAccess:false)!=_reportsWitness(_reports!,includeAccess:false))||
+         _draft!=null&&(draft==null||draft.revision<_draft!.revision||draft.revision==_draft!.revision&&jsonEncode(draft.toJson())!=jsonEncode(_draft!.toJson())))return null;
+    }
+    _original=original;_line=line;_documents=documents;_warranty=warranty;_units=units;_reports=reports;_draft=draft;_draftStore=draftStore;
+    final witness=_sourceWitness(t);if(_binding!=context.binding||_target?.entityId!=t.entityId||!listEquals(_witness as List<Object?>?,witness)){
+      _binding=context.binding;_target=t;_witness=List<Object?>.unmodifiable(witness);_revision++;
+    }
+    return MoolAssistantNativeSnapshot(binding:context.binding,sourceRevision:'original-native:$actionId:$_revision',permitted:true,entityId:entityId);
+  }
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() current)=>
+    openOwnedReview(p,isCurrent:current,ownerChanges:ownerChanges);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,
+      {required bool Function() isCurrent,required Listenable ownerChanges})async{
+    final t=_target,original=_original;
+    if(t==null||original==null||_opened||!_assistantCurrent||!isCurrent()||validateFields(p.fields)!=null||p.actionId!=actionId||
+      p.sourceRevision!='original-native:$actionId:$_revision'||p.entityId!=t.entityId||!_targetCurrent(t,p.binding)||
+      !p.validUntil.isAfter(DateTime.now()))return MoolAssistantReviewResult.stale;
+    WorkspaceOrderDocument? document;
+    if(actionId=='AI-ACT-390'||actionId=='AI-ACT-391'){
+      final matches=_documents!.documents.where((d)=>d.id==p.fields['documentId']&&d.revision==p.fields['documentRevision']);
+      if(matches.length!=1)return MoolAssistantReviewResult.unavailable;document=matches.single;
+      if(actionId=='AI-ACT-390'&&document.copy==null||actionId=='AI-ACT-391'&&!const {'orderAmendment','orderCancellation'}.contains(document.kind))return MoolAssistantReviewResult.unavailable;
+    }
+    if(actionId=='AI-ACT-400'&&!_reports!.reports.any((r)=>r.id==p.fields['reportId']&&r.supportCase!=null))return MoolAssistantReviewResult.unavailable;
+    if(actionId=='AI-ACT-400'&&t.onOpenCase==null)return MoolAssistantReviewResult.unavailable;
+    if(actionId=='AI-ACT-394'){
+      final baseline=_draft?.rows??_units!.rows;
+      final rows=p.fields['rows'] as List;
+      if(baseline.length+rows.where((value)=>(value as Map)['id']==null).length>1000)return MoolAssistantReviewResult.unavailable;
+      final allowed=baseline.map((row)=>row.id).toSet(),ids=<String>{};
+      for(final row in p.fields['rows'] as List){final id=(row as Map)['id'];
+        if(id!=null&&(!allowed.contains(id)||!ids.add(id as String)))return MoolAssistantReviewResult.unavailable;}
+    }
+    if(actionId=='AI-ACT-396'){
+      final report=WorkspacePurchasedUnitMismatchDraft(sourceFingerprint:_units!.fingerprint,
+        note:p.fields['note'] as String,selected:(p.fields['selectedIds'] as List).cast<String>());
+      final key=WorkspacePurchasedUnitDraftKey(account:t.gateway.accountUserId,realm:t.realm,store:t.reference.storeId,binding:_units!.target.binding);
+      if(!report.validFor(key,_units!.revision,_units!.rows))return MoolAssistantReviewResult.unavailable;
+    }
+    final changes=ValueNotifier<int>(0);bool sourceRetired=false;
+    void sourceChanged(){sourceRetired=true;changes.value++;}
+    t.gateway.orderDocumentSource?.addListener(sourceChanged);t.gateway.purchasedUnitSource?.addListener(sourceChanged);
+    final deadlines=[p.validUntil,if(_units?.ownerAccess case final grant?)grant.expiresAt,
+      if(_units?.reportAccess case final grant?)grant.expiresAt,if(_reports case final reports?)reports.ownerAccess.expiresAt]..sort();
+    final deadline=deadlines.first;
+    bool current()=>!sourceRetired&&isCurrent()&&deadline.isAfter(DateTime.now())&&_targetCurrent(t,p.binding)&&
+      listEquals(_witness as List<Object?>?,_sourceWitness(t));
+    _opened=true;
+    try{
+      if(!current())return MoolAssistantReviewResult.stale;
+      await navigator.push<void>(MaterialPageRoute(builder:(_)=>_WorkspaceOriginalNativeReview(
+        title:p.title,current:current,changes:Listenable.merge([ownerChanges,this.ownerChanges,changes]),validUntil:deadline,scrollBody:actionId!='AI-ACT-390',
+        body:(capturedCurrent)=>_originalBody(t,original,document,p,capturedCurrent,changes))));
+      return current()?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    }finally{
+      _opened=false;t.gateway.orderDocumentSource?.removeListener(sourceChanged);t.gateway.purchasedUnitSource?.removeListener(sourceChanged);changes.dispose();
+    }
+  }
+  Widget _originalBody(WorkspaceOriginalAssistantTarget t,WorkspacePurchaseOrder original,WorkspaceOrderDocument? document,
+      MoolAssistantProposal p,bool Function() current,Listenable changes){
+    final target=WorkspaceOrderDocumentTarget(accountUserId:t.gateway.accountUserId,role:t.role,realm:t.realm,reference:t.reference,buyingStoreId:t.buyingStoreId);
+    if(actionId=='AI-ACT-274')return WorkspacePurchaseOriginals(gateway:t.gateway,role:t.role,realm:t.realm,
+      storeId:t.role==WorkspaceOrderIdentityRole.seller?t.reference.storeId:null,buyingStoreId:t.buyingStoreId,
+      capturedCurrent:current,initialRead:(reference:t.reference,original:original));
+    if(actionId=='AI-ACT-389'||actionId=='AI-ACT-391')return WorkspaceOrderDocumentsForOrder(gateway:t.gateway,target:target,
+      inputCurrent:current,initialRead:_documents,initialDocumentId:document?.id);
+    if(actionId=='AI-ACT-390')return WorkspaceOriginalCopyViewer(title:'Order document',fileName:document!.copy!.fileName,
+      contentType:document.copy!.contentType,owner:changes,isCurrent:current,embedded:true,read:()async{
+        if(!current())throw StateError('Original document retired');
+        final bytes=await t.gateway.readOrderDocumentCopy(target:target,recorded:_documents!,documentId:document.id,inputCurrent:current);
+        if(!current()||bytes==null)throw StateError('Original document unavailable');return bytes;
+      });
+    if(actionId=='AI-ACT-392')return WorkspaceOriginalWarrantyForLine(gateway:t.gateway,role:t.role,realm:t.realm,
+      reference:t.reference,line:_line!,buyingStoreId:t.buyingStoreId,inputCurrent:current,initialRead:_warranty);
+    if(actionId=='AI-ACT-397'||actionId=='AI-ACT-400')return WorkspaceReceivedDeviceReportPanel(gateway:t.gateway,
+      realm:t.realm,reference:t.reference,line:_line!,inputCurrent:current,onOpenCase:t.onOpenCase,
+      initialRead:_reports,initialReportId:p.fields['reportId'] as String?);
+    return WorkspacePurchasedUnitsForLine(gateway:t.gateway,role:t.role,realm:t.realm,reference:t.reference,line:_line!,
+      buyingStoreId:t.buyingStoreId,inputCurrent:current,draftStore:_draftStore,
+      initialRead:WorkspaceUnitAssistantRead(record:_units!,draft:_draft,actionId:actionId,fields:p.fields));
+  }
+}
+
+class _WorkspaceOriginalNativeReview extends StatefulWidget{
+  const _WorkspaceOriginalNativeReview({required this.title,required this.current,required this.changes,required this.validUntil,required this.body,this.scrollBody=true});
+  final String title;final bool Function() current;final Listenable changes;final DateTime validUntil;
+  final Widget Function(bool Function()) body;
+  final bool scrollBody;
+  @override State<_WorkspaceOriginalNativeReview> createState()=>_WorkspaceOriginalNativeReviewState();
+}
+class _WorkspaceOriginalNativeReviewState extends State<_WorkspaceOriginalNativeReview>{
+  Route<dynamic>? _route;Timer? _expiry;bool _retired=false,_closing=false;
+  bool get _current=>mounted&&!_retired&&!_closing&&widget.current()&&_route?.isCurrent==true;
+  @override void initState(){super.initState();widget.changes.addListener(_changed);
+    final duration=widget.validUntil.difference(DateTime.now());_expiry=Timer(duration.isNegative?Duration.zero:duration,_retire);}
+  @override void didChangeDependencies(){super.didChangeDependencies();_route??=ModalRoute.of(context);}
+  void _changed(){if(!mounted||_closing)return;if(!widget.current())_retire();else setState((){});}
+  void _retire(){if(!mounted||_retired||_closing)return;_retired=true;WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_close();});WidgetsBinding.instance.ensureVisualUpdate();}
+  void _close(){if(!mounted||_closing)return;_closing=true;final route=_route;if(route?.isActive!=true)return;
+    if(route!.isCurrent)Navigator.of(context).pop();else Navigator.of(context).removeRoute(route);}
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(widget.title,maxLines:1,overflow:TextOverflow.ellipsis),leading:BackButton(onPressed:_close)),
+    body:!widget.current()||_retired?const SizedBox.shrink():Navigator(onGenerateRoute:(_)=>MaterialPageRoute<void>(builder:(_)=>
+      widget.scrollBody?SingleChildScrollView(padding:const EdgeInsets.all(12),child:widget.body(()=>_current)):widget.body(()=>_current))));
+  @override void dispose(){_expiry?.cancel();widget.changes.removeListener(_changed);super.dispose();}
+}
+
+@immutable
+class WorkspaceUnitAssistantRead{
+  WorkspaceUnitAssistantRead({required this.record,required this.draft,required this.actionId,required Map<String,Object?> fields}):fields=Map.unmodifiable(fields);
+  final WorkspacePurchasedUnitsRead record;final WorkspacePurchasedUnitDraft? draft;
+  final String actionId;final Map<String,Object?> fields;
 }

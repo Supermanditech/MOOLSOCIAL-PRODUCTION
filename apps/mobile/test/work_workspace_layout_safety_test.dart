@@ -1,4 +1,9 @@
+import 'package:moolsocial/features/work/work_customer_feedback.dart' as sales02_feedback;
+import 'package:moolsocial/features/work/screens/work_onboarding_screens.dart' as work_setup;
 import 'dart:async';
+import 'package:moolsocial/features/assistant/mool_assistant.dart' as scope_contract;
+import 'package:moolsocial/ui_v2/assistant/mool_assistant_v2.dart'
+    show MoolAssistantHost, MoolAssistantWorkspaceScope, MoolAssistantNativeScope, MoolAssistantPage, MoolAssistantNativeMediaPicker, MoolAssistantRouteBoundNativeAdapter;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -13,6 +18,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart'
     show FlutterSecureStorage;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart' as settings_storage
+    show AppleOptions, AndroidOptions, LinuxOptions, WebOptions, WindowsOptions;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart' show SharedPreferences;
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -21,6 +28,7 @@ import 'package:shared_preferences_platform_interface/types.dart';
 import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/chat/chat_services.dart';
+import 'package:moolsocial/features/chat/chat_models.dart' show ChatAttachmentKind;
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
@@ -34,6 +42,8 @@ import 'package:moolsocial/core/design/mool_design_system.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/assistant/mool_assistant.dart'
+    show MoolAssistantReviewResult;
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_document_preview.dart';
 import 'package:moolsocial/features/work/work_publication.dart';
@@ -47,6 +57,7 @@ import 'work_order_identity_gateway_test.dart' as purchase_fixture;
 import 'ui_v2/buy/buy_v2_discovery_refinement_test.dart' show BuyTestEligibilityFacts;
 import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
 import 'package:moolsocial/features/work/work_order_identity_gateway.dart';
+import 'package:moolsocial/features/work/widgets/workspace_purchase_originals.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart' show SocialContentResponse;
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
@@ -56,6 +67,9 @@ import 'package:moolsocial/features/work/widgets/work_widgets.dart';
 import 'package:moolsocial/features/work/widgets/store_settings_widgets.dart';
 import 'package:moolsocial/features/work/widgets/store_publication_settings.dart';
 import 'package:moolsocial/features/work/widgets/store_product_thumbnail.dart';
+import 'package:moolsocial/features/work/widgets/store_product_promotions.dart';
+import 'work_product_promotions_test.dart' as promotion_fixture;
+import 'package:moolsocial/features/work/work_product_promotions.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
 import 'package:moolsocial/features/work/screens/store_add_product_sheet.dart';
 import 'package:moolsocial/features/work/screens/work_invoice_pdf_screen.dart';
@@ -1220,7 +1234,7 @@ class _InvoiceDeliveryFixtureStore
   }
 
   @override
-  Future<void> save(WorkspaceInvoiceDeliveryPreference preference) async {
+  Future<void> save(WorkspaceInvoiceDeliveryPreference preference, {bool Function()? current, WorkspaceInvoiceDeliveryMode? expectedOriginalMode}) async {
     await holdSave?.future;
     if (failSave) throw StateError('write unavailable');
     values['${preference.account}/${preference.store}'] = preference;
@@ -1257,6 +1271,26 @@ class _AnalyticsInventoryFixtureStore implements WorkInventoryStore {
 
 // Isolated host inventory for purchase-editor routing and persistence checks.
 // It never shares the platform secure-storage queue with another test.
+// Isolated host-only product input/persistence fixture; never a runtime provider.
+class _ProductPrefillInventory extends _PurchaseInventoryFixtureStore {
+  int saves = 0;
+  Completer<void>? readGate, readEntered;
+  @override
+  Future<WorkspaceSavedInventory?> read(String account, String store, {required bool qa}) async {
+    final value = await super.read(account, store, qa: qa);
+    if (readGate != null) {
+      if (readEntered?.isCompleted == false) readEntered!.complete();
+      await readGate!.future;
+    }
+    return value;
+  }
+  @override
+  Future<void> save(WorkspaceSavedInventory inventory, {required int? expectedRevision}) async {
+    saves++;
+    await super.save(inventory, expectedRevision: expectedRevision);
+  }
+}
+
 class _PurchaseInventoryFixtureStore implements WorkInventoryStore {
   final values = <(String, String, bool), String>{};
   @override
@@ -1364,6 +1398,96 @@ class _LedgerFormFixtureStore implements WorkLedgerFormDraftStore {
 }
 
 // Host-only held read over the real guarded encrypted draft owner.
+// File-scope isolated host fixture over the existing real guarded secure store.
+// FILE SCOPE: isolated actual guarded form storage fixture, never a provider.
+// Isolated read transport ordering; same native key/revision/field values.
+class _ReorderedAllocationReadStore extends _AssistantSupplierAllocationStore {
+  @override
+  Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key) async {
+    final saved = await super.read(key);
+    if (key.kind == 'supplierAllocation' && saved != null && allocationReads == 2) {
+      return WorkspaceLedgerFormDraft(key: saved.key, revision: saved.revision,
+        fields: {for (final entry in saved.fields.entries.toList().reversed) entry.key: entry.value});
+    }
+    return saved;
+  }
+}
+
+class _AssistantSupplierAllocationStore extends _AssistantSupplierMoneyStore {
+  int allocationReads = 0;
+  int? holdAllocationRead;
+  Completer<void>? allocationGate, allocationEntered;
+  @override
+  Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key) async {
+    if (key.kind == 'supplierAllocation') {
+      allocationReads++;
+      if (allocationReads == holdAllocationRead) {
+        allocationEntered?.complete();
+        await allocationGate!.future;
+      }
+    }
+    return super.read(key);
+  }
+}
+
+class _AssistantSupplierMoneyStore extends _HeldSupplierMoneyDraftStore {
+  int saves = 0, moneyReads = 0;
+  int? holdReadNumber;
+  Completer<void>? readGate, readEntered;
+  @override
+  Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key) async {
+    if (key.kind == 'supplierMoney') {
+      moneyReads++;
+      if (moneyReads == holdReadNumber) {
+        readEntered?.complete();
+        await readGate!.future;
+      }
+    }
+    return super.read(key);
+  }
+  @override
+  Future<void> save(WorkspaceLedgerFormDraft draft, {required int? expectedRevision}) async {
+    saves++;
+    await super.save(draft, expectedRevision: expectedRevision);
+  }
+}
+
+// File-scope host fixture; retains real secure-store credit/refund draft guards.
+// Isolated native secure-store instrumentation; no runtime provider or bypass.
+class _AssistantAdjustmentRecoveryStore extends _AssistantCreditRefundStore {
+  final reads = <String, int>{};
+  String? holdKind;
+  int? holdRead;
+  Completer<void>? recoveryGate, recoveryEntered;
+  @override
+  Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key) async {
+    reads[key.kind] = (reads[key.kind] ?? 0) + 1;
+    if (key.kind == holdKind && reads[key.kind] == holdRead) {
+      recoveryEntered?.complete(); await recoveryGate!.future;
+    }
+    return super.read(key);
+  }
+}
+
+class _AssistantCreditRefundStore extends _HeldSupplierMoneyDraftStore {
+  int saves = 0, creditReads = 0;
+  int? holdCreditRead;
+  Completer<void>? readGate, readEntered;
+  @override
+  Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key) async {
+    if (key.kind == 'supplierCredit') {
+      creditReads++;
+      if (creditReads == holdCreditRead) { readEntered?.complete(); await readGate!.future; }
+    }
+    return super.read(key);
+  }
+  @override
+  Future<void> save(WorkspaceLedgerFormDraft draft, {required int? expectedRevision}) async {
+    saves++;
+    await super.save(draft, expectedRevision: expectedRevision);
+  }
+}
+
 class _HeldSupplierMoneyDraftStore extends SecureWorkLedgerFormDraftStore {
   _HeldSupplierMoneyDraftStore()
     : super(
@@ -2324,7 +2448,5569 @@ class _NativeRestockPreview {
   }
 }
 
+// An isolated account-principal contract fixture, never runtime authentication.
+// JourneySession still performs its real generation/principal acceptance checks.
+class _NativeScopePrincipalFixture extends ReviewAuthenticatedAccountIdentityGateway
+    implements AuthenticatedAccountPrincipalSource {
+  _NativeScopePrincipalFixture() : super(identity: const AuthenticatedAccountIdentity(
+    firebaseUserId: 'host-native-scope-user',
+    firebaseProjectId: 'host-native-scope-project',
+    displayName: 'HOST native scope contact',
+    phoneNumber: '+919876543210',
+    signInMethods: ['HOST contract fixture'],
+  ));
+  @override ({String projectId, String? tenantId, String userId})?
+      get currentFirebasePrincipal => identity?.firebasePrincipal;
+  // Completion is a principal-source failure in JourneySession; keep this live
+  // until the fixture disposes instead of using Stream.empty().
+  final changes = StreamController<void>.broadcast();
+  @override Stream<void> get firebasePrincipalChanges => changes.stream;
+  @override String get persistenceEnvironment => 'host-native-scope-environment';
+}
+
+// Extend the actual existing isolated storage fixtures, without new providers.
+class _NativeScopeProofStore extends _ContactDraftFixtureStore {
+  _NativeScopeProofStore(String account) { accountScope = account; }
+  int reads = 0, saves = 0, clears = 0;
+  @override Future<Map<String, Object?>?> read(String scope) {
+    reads++;
+    return super.read(scope);
+  }
+  @override Future<void> save(String scope, Map<String, Object?> draft) {
+    saves++;
+    return super.save(scope, draft);
+  }
+  @override Future<void> clear(String scope) {
+    clears++;
+    return super.clear(scope);
+  }
+}
+
+class _NativeScopePurchaseStore extends _PurchaseEntryFixtureStore {
+  int reads = 0, saves = 0;
+  @override Future<WorkspacePurchaseEntryBook?> read(
+    String account, String store, {required bool qa}
+  ) {
+    reads++;
+    return super.read(account, store, qa: qa);
+  }
+  @override Future<void> save(WorkspacePurchaseEntryBook value, {required int? expectedRevision}) {
+    saves++;
+    return super.save(value, expectedRevision: expectedRevision);
+  }
+}
+
+class _NativeScopeInventoryStore extends _ProductPrefillInventory {
+  int reads = 0;
+  @override Future<WorkspaceSavedInventory?> read(String account, String store, {required bool qa}) {
+    reads++;
+    return super.read(account, store, qa: qa);
+  }
+}
+
+class _AuthenticatedNativeScopeFixture {
+  _AuthenticatedNativeScopeFixture({this.makeWork, this.reportStorage, _NativeScopeInventoryStore? inventory})
+    : inventory = inventory ?? _NativeScopeInventoryStore();
+  final WorkSession Function(_NativeScopeProofStore contact, _NativeScopePurchaseStore purchase,
+    _NativeScopeInventoryStore inventory, _NativeScopeProofStore trading)? makeWork;
+  final principal = _NativeScopePrincipalFixture();
+  final mode = ValueNotifier<String>('store');
+  late final JourneySession journey;
+  late final WorkSession work;
+  late final _NativeScopeProofStore contact, trading;
+  final purchase = _NativeScopePurchaseStore();
+  final _NativeScopeInventoryStore inventory;
+  final PageStorageBucket? reportStorage;
+  Widget _reportScopeStorage(Widget child) => reportStorage == null ? child : PageStorage(bucket: reportStorage!, child: child);
+  final core = BuySession();
+  late final BuyV2Session buy;
+  late final GoRouter router;
+
+  Future<void> ready() async {
+    FlutterSecureStorage.setMockInitialValues({});
+    journey = JourneySession(
+      store: MemoryJourneyStore(snapshot: const JourneySnapshot(
+        languageCode: 'en', areaMode: 'skipped', setupComplete: true)),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountIdentityGateway: principal,
+    );
+    await journey.start();
+    final account = journey.authenticatedBuyPersistenceIdentity;
+    expect(journey.accountIdentity?.firebasePrincipal, principal.currentFirebasePrincipal);
+    expect(journey.navigationAuthenticationGeneration, isNotNull);
+    expect(account, (environment: 'host-native-scope-environment',
+      projectId: 'host-native-scope-project', tenantId: null,
+      userId: 'host-native-scope-user'));
+    if (account == null) throw StateError('HOST principal acceptance was not established');
+    contact = _NativeScopeProofStore(account.userId);
+    trading = _NativeScopeProofStore(account.userId);
+    work = makeWork?.call(contact, purchase, inventory, trading) ?? WorkSession(
+      contactDraftStore: contact,
+      purchaseEntryStore: purchase,
+      inventoryStore: inventory,
+      tradingPreferencesStoreFactory: (_) => trading,
+      catalogueReference: workspaceMasterCatalogue,
+    );
+    // Real account recovery first, then existing isolated reviewed-Store seed.
+    expect(await work.recoverWorkspaceAccount(accountReady: true), isTrue);
+    work
+      ..seedVerifiedWorkspace()
+      ..retailerSetupSaved = true
+      ..reviewStage = WorkReviewStage.live
+      ..remoteReviewStatus = WorkRemoteReviewStatus.live
+      ..reviewStatusNeedsRefresh = false;
+    expect(work.workspaceAccountCurrent(accountReady: true), isTrue);
+    expect(work.workspaceApprovalMatchesAccount(account), isTrue);
+    expect(work.workspaceStoreAuthoringAvailable, isTrue);
+    // Different data shapes are intentional: record for authenticated context,
+    // String user ID for this native private storage namespace.
+    expect(account, isNot(contact.accountScope));
+    expect(work.workspaceSupplierScope?.$1, account.userId);
+    buy = BuyV2Session(core: core, reviewDataEnabled: false,
+      commerceAdapter: const BuyV2UnavailableCommerceAdapter());
+    router = GoRouter(initialLocation: '/app/work/workspace/dashboard', routes: [
+      GoRoute(path: '/app/work/workspace/dashboard', builder: (_, _) =>
+        MoolAssistantWorkspaceScope(readWorkspace: readWorkspace,
+          child: _reportScopeStorage(WorkWorkspaceDashboardScreen(session: work, procurementSession: buy,
+            accountIdentity: journey.accountIdentity,
+            accountAuthenticated: journey.isAuthenticated,
+            accountRecoveryReady: journey.isAuthenticated,
+            initialSection: 'dashboard')))),
+    ]);
+  }
+
+  scope_contract.MoolAssistantWorkspace? readWorkspace() {
+    if (mode.value == 'buyer') return null;
+    final store = work.activeWorkspace, revision = work.navigationScopeRevision;
+    if (store == null || revision == null) return null;
+    final account = journey.authenticatedBuyPersistenceIdentity;
+    return scope_contract.MoolAssistantWorkspace(
+      id: store.id, name: store.name, profile: store.profileId, revision: revision,
+      isStore: work.workspaceStoreAuthoringAvailable,
+      approved: work.workspaceApprovalMatchesAccount(account),
+      approvalAccountScope: account,
+    );
+  }
+
+  scope_contract.MoolAssistantContext readContext() => scope_contract.MoolAssistantContext(
+    accountScope: journey.authenticatedBuyPersistenceIdentity,
+    authenticationRevision: journey.navigationAuthenticationGeneration,
+  ).withWorkspace(readWorkspace());
+
+  Widget get app => MaterialApp.router(theme: MoolTheme.light(), routerConfig: router,
+    debugShowCheckedModeBanner: false,
+    builder: (_, child) => MoolAssistantHost(
+      readContext: () => scope_contract.MoolAssistantContext(
+        accountScope: journey.authenticatedBuyPersistenceIdentity,
+        authenticationRevision: journey.navigationAuthenticationGeneration),
+      contextChanges: Listenable.merge([journey, work, mode]),
+      child: child!,
+    ));
+
+  List<scope_contract.MoolAssistantNativeAdapter> adapters(WidgetTester tester) {
+    final finder = find.byType(MoolAssistantNativeScope);
+    expect(finder, findsOneWidget);
+    final element = tester.element(finder);
+    return tester.widget<MoolAssistantNativeScope>(finder).readAdapters(element).toList();
+  }
+
+  Object get writes => (contact.saves, contact.clears, trading.saves, trading.clears,
+    purchase.saves, inventory.saves);
+  Future<void> dispose() async {
+    router.dispose();
+    buy.dispose();
+    core.dispose();
+    work.dispose();
+    journey.dispose();
+    await principal.changes.close();
+    mode.dispose();
+  }
+}
+
+// Paste fixture classes before main(), then call this inside existing main().
+// File-scope isolated instrumentation of the actual original save boundaries.
+class _ListingConsentInventoryStore extends _NativeScopeInventoryStore {
+  Completer<void>? saveGate, saveEntered;
+  @override
+  Future<void> save(WorkspaceSavedInventory value, {required int? expectedRevision}) async {
+    if (saveGate != null) {
+      if (saveEntered?.isCompleted == false) saveEntered!.complete();
+      await saveGate!.future;
+    }
+    await super.save(value, expectedRevision: expectedRevision);
+  }
+}
+
+// Count entry into the separate listing boundary, not an invented gateway reply.
+// The real WorkSession owns inventory; this host-only override posts nothing.
+class _ListingConsentWorkSession extends WorkSession {
+  _ListingConsentWorkSession(_NativeScopeProofStore contact,
+    _NativeScopePurchaseStore purchase, _NativeScopeInventoryStore inventory,
+    _NativeScopeProofStore trading) : super(contactDraftStore: contact,
+      purchaseEntryStore: purchase, inventoryStore: inventory,
+      tradingPreferencesStoreFactory: (_) => trading, catalogueReference: workspaceMasterCatalogue);
+  int listingRequests = 0;
+  @override
+  Future<bool> requestWorkspaceProductListing(String productId, {required bool listed, bool Function()? current}) async {
+    if (current?.call() == false) return false;
+    listingRequests++;
+    return false;
+  }
+}
+
+// File-scope registration; call once inside existing main().
+void registerPostInventoryListingConsentTests() {
+  for (final boundary in ['identity', 'approval', 'unchanged owner']) {
+    testWidgets('FE-PRODUCT-01 post-inventory listing retains original $boundary consent', (tester) async {
+      final inventory = _ListingConsentInventoryStore();
+      final f = _AuthenticatedNativeScopeFixture(inventory: inventory,
+        makeWork: (contact, purchase, inventory, trading) =>
+          _ListingConsentWorkSession(contact, purchase, inventory, trading));
+      await f.ready();
+      final work = f.work as _ListingConsentWorkSession;
+      try {
+        await tester.pumpWidget(f.app);
+        await tester.pumpAndSettle();
+        final adapter = f.adapters(tester).singleWhere((a) => a.actionId == 'AI-ACT-214');
+        final owner = f.readContext();
+        final target = work.workspaceCatalogueItems.firstWhere((p) => p.publicListing && p.retailEnabled);
+        final snapshot = await adapter.snapshot(owner, target.id);
+        expect(snapshot, isNotNull);
+        await work.workspaceInventorySaved;
+        final beforeSaves = inventory.saves, store = work.activeWorkspace!.id;
+        final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-listing-owner-$boundary',
+          actionId: 'AI-ACT-214', binding: owner.binding, requestRevision: 0,
+          entitlementRevision: 'HOST-native-bridge-fixture', sourceRevision: snapshot!.sourceRevision,
+          validUntil: DateTime.now().add(const Duration(hours: 1)),
+          title: 'Review original product', summary: 'HOST original owner review', entityId: target.id,
+          fields: {...StoreProductInitialData.referenceFields(target),
+            'sellingPrice': workspacePriceInputFromMinor(target.sellingPriceMinor)});
+        unawaited(adapter.openReview(proposal, () => true));
+        await tester.pumpAndSettle();
+        final visibility = find.byKey(const Key('work-product-public'));
+        await tester.ensureVisible(visibility);
+        await tester.tap(find.descendant(of: visibility, matching: find.byType(Switch)));
+        await tester.pumpAndSettle();
+        inventory.saveGate = Completer<void>(); inventory.saveEntered = Completer<void>();
+        await tester.ensureVisible(find.byKey(const Key('work-product-save')));
+        await tester.tap(find.byKey(const Key('work-product-save')));
+        await tester.pump();
+        await inventory.saveEntered!.future;
+        expect(work.listingRequests, 0, reason: 'A listing cannot start before inventory resolves.');
+        if (boundary == 'identity') {
+          f.principal.identity = null;
+          f.principal.changes.add(null);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 50));
+          expect(f.journey.authenticatedBuyPersistenceIdentity, isNull);
+        } else if (boundary == 'approval') {
+          work.remoteReviewStatus = WorkRemoteReviewStatus.pending;
+          work.reviewStage = WorkReviewStage.gstPending;
+          work.notifyListeners();
+          await tester.pump();
+          expect(f.readContext().binding, isNot(owner.binding));
+        }
+        expect(work.activeWorkspace!.id, store, reason: 'Store-ID-only checking must not pass a changed owner.');
+        inventory.saveGate!.complete();
+        await tester.pumpAndSettle();
+        expect(inventory.saves, beforeSaves + 1, reason: 'Original inventory save must finish; no rollback.');
+        expect(work.workspaceCatalogueItems.any((p) => p.id == target.id), isTrue);
+        expect(work.listingRequests, boundary == 'unchanged owner' ? 1 : 0);
+        if (boundary != 'unchanged owner') {
+          expect(find.text('Store access changed. Check saved stock in the original Store before changing listing.'), findsOneWidget);
+        }
+        expect(tester.takeException(), isNull);
+      } finally {
+        if (inventory.saveGate?.isCompleted == false) inventory.saveGate!.complete();
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await f.dispose();
+      }
+    });
+  }
+}
+
+
+// Isolated host composition of original secure drafts, directory CAS and checkpoint.
+class _SupAccountOneForms extends SecureWorkLedgerFormDraftStore {
+  _SupAccountOneForms() : super(accountScope: () => 'host-native-scope-user',
+    storage: const FlutterSecureStorage());
+  int saves = 0, reads = 0;
+  int? holdRead;
+  Completer<void>? readGate;
+  @override Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key) async {
+    reads++;
+    if (reads == holdRead) await readGate!.future;
+    return super.read(key);
+  }
+  @override Future<void> save(WorkspaceLedgerFormDraft draft, {required int? expectedRevision}) async {
+    saves++;
+    return super.save(draft, expectedRevision: expectedRevision);
+  }
+}
+
+bool _eightHostFontsLoaded=false;
+Future<void> _loadEightHostFonts(WidgetTester tester) async {
+  if(const String.fromEnvironment('MOOL_AI_EIGHT_CAPTURE_DIR').isEmpty||_eightHostFontsLoaded)return;
+  await tester.runAsync(() async {
+    final font=FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'));
+    await font.load();
+  });
+  _eightHostFontsLoaded=true;
+}
+
+Future<void> _captureEightHost(WidgetTester tester,Finder target,String name) async {
+  const folder=String.fromEnvironment('MOOL_AI_EIGHT_CAPTURE_DIR');
+  if(folder.isEmpty)return;
+  expect(target,findsOneWidget);
+  RenderObject boundary=tester.element(target).findRenderObject()!;
+  while(!boundary.isRepaintBoundary){final parent=boundary.parent;if(parent==null)throw StateError('No painted capture boundary');boundary=parent;}
+  final layer=boundary.debugLayer;
+  if(layer is! OffsetLayer||boundary.debugNeedsPaint)throw StateError('Native HOST frame is not ready for capture');
+  final image=(await tester.runAsync(()=>layer.toImage(boundary.paintBounds,pixelRatio:1)))!;
+  try {await tester.runAsync(() async {
+    final png=await image.toByteData(format:ui.ImageByteFormat.png);
+    final directory=Directory(folder);await directory.create(recursive:true);
+    final file=File('${directory.path}/$name.png');if(await file.exists())throw StateError('Preserve prior HOST capture');
+    await file.writeAsBytes(png!.buffer.asUint8List(),flush:true);
+  });}finally{image.dispose();}
+}
+
+class _SupAccountOneFixture {
+  final entry = _SupplierPrefillStore();
+  final forms = _SupAccountOneForms();
+  final checkpoint = _LedgerCheckpointFixtureStore();
+  late final _AuthenticatedNativeScopeFixture native;
+  late final WorkspaceSupplierProfile supplier;
+  WorkspaceSupplierOpeningRecord? opening;
+  WorkSession get work => native.work;
+  Future<void> ready(WidgetTester tester, {bool saved = false, bool posted = false, bool expense = false}) async {
+    native = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) =>
+      WorkSession(contactDraftStore: contact, purchaseEntryStore: entry, inventoryStore: inventory,
+        ledgerFormDraftStore: forms, tradingPreferencesStoreFactory: (_) => trading,
+        catalogueReference: workspaceMasterCatalogue));
+    await native.ready();
+    if (expense) {
+      // Exact original QA expense gateway, never a runtime provider or override.
+      expect(work.loadStoreReviewSeed(0), isTrue);
+      work.workspaceId = work.activeWorkspace!.id;
+      expect(work.canRecordStoreReviewExpense, isTrue);
+    }
+    final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc().subtract(const Duration(days: 1));
+    supplier = WorkspaceSupplierProfile(id: 'HOST-opening-supplier', name: 'HOST opening supplier',
+      createdAt: at, updatedAt: at);
+    if (saved || posted) {
+      opening = WorkspaceSupplierOpeningRecord(id: 'HOST-original-opening', basisId: 'HOST-original-basis',
+        account: scope.$1, store: scope.$2, qa: scope.$3, supplierId: supplier.id, revision: 1,
+        asOfDate: at.toIso8601String().substring(0, 10), savedAt: at, amountMinor: 2000,
+        supplierCredit: false, sourceNote: 'HOST original unmodified note');
+    }
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 1, profiles: [supplier], openingRecords: [if (opening != null) opening!]);
+    final finance = expense ? work.workspaceFinance! : WorkspaceFinanceSnapshot(accountScope: scope.$1, workspaceId: scope.$2,
+      revision: 1, asOf: DateTime.now(), salesTodayMinor: 0, duesMinor: 0, availableMinor: 0,
+      heldMinor: 0, requestedMinor: 0, paidOutMinor: 0, feesMinor: 0, deliveryAdjustmentsMinor: 0,
+      refundsMinor: 0, taxWithheldMinor: 0, payments: const [], payouts: const [], historyComplete: true);
+    if (!expense) expect(work.applyWorkspaceFinance(finance), isTrue);
+    expect(work.bindCustomerCollectionGateway(accountScope: scope.$1, storeId: scope.$2,
+      adapter: StoreReviewCustomerCollectionGateway(finance), checkpointStore: checkpoint), isTrue);
+    expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+    expect(await work.recoverCustomerLedger(), isTrue);
+    if (posted) {
+      expect(await work.confirmWorkspaceSupplierOpeningRecord(opening!, scope: scope,
+        expectedRevision: 1, confirmedAt: DateTime.now()), isTrue);
+    }
+    await tester.pumpWidget(native.app);
+    await tester.pumpAndSettle();
+  }
+  Map<String, Object?> openingFields() => {
+    'supplierId': supplier.id, 'openingId': opening?.id, 'openingRevision': opening?.revision,
+    'directoryRevision': work.workspacePurchaseEntryRevision!,
+    'asOfDate': DateTime.now().toUtc().subtract(const Duration(days: 1)).toIso8601String().substring(0, 10),
+    'amount': '0012.50', 'sourceNote': 'HOST proposed મૂળ note',
+    'amountKnown': true, 'supplierCredit': false, 'billInclusions': <String, Object?>{},
+  };
+  final expenseFields = <String, Object?>{'amount': '0012.50', 'reference': 'HOST-EXP-001',
+    'channel': 'Cash', 'category': 'Repair', 'note': 'HOST expense મૂળ note'};
+  scope_contract.MoolAssistantNativeAdapter adapter(WidgetTester tester, String action) =>
+    native.adapters(tester).where((a) => a.actionId == action).single;
+  Future<scope_contract.MoolAssistantNativeSnapshot?> snapshot(WidgetTester tester, String action) =>
+    adapter(tester, action).snapshot(native.readContext(), action == 'AI-ACT-270' ? null : supplier.id);
+  Future<void> open(WidgetTester tester,
+    String action, {Map<String, Object?>? fields}) async {
+    final a = adapter(tester, action), read = await snapshot(tester, action);
+    expect(read, isNotNull);
+    final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-opening-$action', actionId: action,
+      binding: native.readContext().binding, requestRevision: 0, entitlementRevision: 'HOST-fixture-only',
+      sourceRevision: read!.sourceRevision, validUntil: DateTime.now().add(const Duration(hours: 1)),
+      title: 'HOST native review', summary: 'Original controls own the result', entityId: read.entityId,
+      fields: fields ?? (action == 'AI-ACT-270' ? expenseFields :
+        action == 'AI-ACT-257' || action == 'AI-ACT-381' ? openingFields() : const {}));
+    // Wrapper avoids awaiting the native route while pumping it.
+    unawaited(a.openReview(proposal, () => true));
+  }
+  Future<void> close(WidgetTester tester) async {
+    if (forms.readGate?.isCompleted == false) forms.readGate!.complete();
+    if (entry.readGate?.isCompleted == false) entry.readGate!.complete();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await native.dispose();
+  }
+}
+
+void registerSupplierAccountOneNativeTests() {
+  Future<({WorkspaceMoneyRegisterSnapshot register,String entity})> moneySource(_SupAccountOneFixture f,WidgetTester tester,{int revision=1,String reference='HOST-MONEY-REF'}) async {
+    final scope=f.work.workspaceSupplierScope!,now=DateTime.now();f.work.workspaceMoneyPeriod='Week';
+    final prior=f.work.workspaceMoneyRegisters.where((r)=>r.registerId=='HOST-account').singleOrNull;
+    final entry=prior?.entries.first??WorkspaceMoneyRegisterEntry(id:'HOST-original-money',reference:reference,occurredAt:now.subtract(const Duration(minutes:1)),deltaMinor:-1230);
+    // Authoritative confirmed entries are immutable: advance the source revision
+    // by appending a new event rather than rewriting an old event's provenance.
+    final register=WorkspaceMoneyRegisterSnapshot(accountScope:scope.$1,workspaceId:scope.$2,registerId:'HOST-account',label:'HOST supplied account',revision:revision,
+      openingAt:prior?.openingAt??now.subtract(const Duration(hours:1)),asOf:now,openingMinor:10000,historyComplete:true,
+      entries:prior==null?[entry]:[...prior.entries,WorkspaceMoneyRegisterEntry(id:'HOST-appended-$revision',reference:reference,occurredAt:prior.asOf,deltaMinor:-100)]);
+    expect(await f.work.saveWorkspaceMoneyRegister(register),isTrue);await tester.pumpAndSettle();
+    return(register:register,entity:jsonEncode(['register',register.registerId,entry.id]));
+  }
+  scope_contract.MoolAssistantProposal moneyProposal(_SupAccountOneFixture f,scope_contract.MoolAssistantNativeSnapshot snap,String entity)=>scope_contract.MoolAssistantProposal(
+    id:'HOST-271-readonly',actionId:'AI-ACT-271',binding:f.native.readContext().binding,requestRevision:0,entitlementRevision:'HOST-fixture-only',sourceRevision:snap.sourceRevision,
+    validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:entity,title:'Review recorded entry',summary:'HOST original readonly source',fields:const{});
+  for(final scale in [1.0,2.0]) {
+    testWidgets('FE-SUPACCOUNT271 exact recorded entry readonly source remains stable and compact scale$scale',(tester)async {
+      await _loadEightHostFonts(tester);
+      tester.view.physicalSize=const Size(320,568);tester.view.devicePixelRatio=1;tester.platformDispatcher.textScaleFactorTestValue=scale;
+      addTearDown((){tester.view.resetPhysicalSize();tester.view.resetDevicePixelRatio();tester.platformDispatcher.clearTextScaleFactorTestValue();});
+      final f=_SupAccountOneFixture();try {
+        await f.ready(tester,posted:true);final source=await moneySource(f,tester),a=f.adapter(tester,'AI-ACT-271');
+        final one=await a.snapshot(f.native.readContext(),source.entity),two=await a.snapshot(f.native.readContext(),source.entity);
+        expect(one,isNotNull);expect(two!.sourceRevision,one!.sourceRevision,reason:'Rolling Week timestamps must not invalidate an unchanged source.');
+        final before=(f.entry.saveAttempts,f.forms.saves,f.checkpoint.saveAttempts),records=jsonEncode(f.work.workspaceMoneyRegisters.map((r)=>r.toJson()).toList());
+        final result=a.openReview(moneyProposal(f,one,source.entity),()=>true);await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-money-entry-details')),findsOneWidget);expect(find.text('HOST supplied account'),findsOneWidget);expect(find.text('HOST-MONEY-REF'),findsOneWidget);
+        await _captureEightHost(tester,find.byKey(const Key('work-money-entry-details')),'HOST-money-entry-scale$scale');
+        final amount=find.text('12.30');await tester.ensureVisible(amount);await tester.pumpAndSettle();expect(amount,findsOneWidget);
+        expect((f.entry.saveAttempts,f.forms.saves,f.checkpoint.saveAttempts),before);expect(jsonEncode(f.work.workspaceMoneyRegisters.map((r)=>r.toJson()).toList()),records);
+        final close=find.byKey(const Key('work-money-entry-close'));await tester.ensureVisible(close);await tester.pumpAndSettle();await tester.tap(close);await tester.pumpAndSettle();
+        expect(await result,scope_contract.MoolAssistantReviewResult.opened);expect(tester.takeException(),isNull);
+      }finally{await f.close(tester);}
+    });
+  }
+  for(final cause in ['source changed','buyer ABA','foreign route']) {
+    testWidgets('FE-SUPACCOUNT271 $cause retires or covers exact readonly entry without writes',(tester)async {
+      final f=_SupAccountOneFixture();try {
+        await f.ready(tester,posted:true);final source=await moneySource(f,tester),a=f.adapter(tester,'AI-ACT-271');
+        final snap=await a.snapshot(f.native.readContext(),source.entity);expect(snap,isNotNull);
+        final result=a.openReview(moneyProposal(f,snap!,source.entity),()=>true);await tester.pumpAndSettle();
+        final close=find.byKey(const Key('work-money-entry-close')),callback=tester.widget<IconButton>(close).onPressed!;
+        final navigator=Navigator.of(tester.element(close),rootNavigator:true),before=(f.entry.saveAttempts,f.forms.saves,f.checkpoint.saveAttempts);
+        if(cause=='source changed') {
+          await moneySource(f,tester,revision:2,reference:'HOST changed original');
+          expect(find.text('HOST-MONEY-REF'),findsNothing);
+          await moneySource(f,tester,revision:3);expect(find.text('HOST-MONEY-REF'),findsNothing,reason:'Old review may not revive after source restoration.');
+        }else if(cause=='buyer ABA') {
+          f.native.mode.value='buyer';f.native.mode.value='store';await tester.pumpAndSettle();expect(find.text('HOST-MONEY-REF'),findsNothing);
+        }else {
+          final foreign=MaterialPageRoute<void>(builder:(_)=>const Scaffold(body:Text('HOST foreign money route')));
+          unawaited(navigator.push(foreign));await tester.pumpAndSettle();callback();await tester.pumpAndSettle();expect(find.text('HOST foreign money route'),findsOneWidget);
+          navigator.removeRoute(foreign);await tester.pumpAndSettle();
+        }
+        expect((f.entry.saveAttempts,f.forms.saves,f.checkpoint.saveAttempts),(before.$1,before.$2,before.$3+(cause=='source changed'?2:0)),reason:'Only the two explicit source-fixture updates may checkpoint.');
+        unawaited(result);
+      }finally{await f.close(tester);}
+    });
+  }
+  testWidgets('FE-SUPACCOUNT271 missing entry and stale snapshot cannot open replacement details',(tester)async {
+    final f=_SupAccountOneFixture();try {
+      await f.ready(tester,posted:true);final source=await moneySource(f,tester),a=f.adapter(tester,'AI-ACT-271');
+      expect(await a.snapshot(f.native.readContext(),'not-original'),isNull);
+      expect(await a.snapshot(f.native.readContext(),jsonEncode(['register','wrong', 'HOST-original-money'])),isNull);
+      final snap=await a.snapshot(f.native.readContext(),source.entity);await moneySource(f,tester,revision:2,reference:'Updated original');
+      final before=(f.entry.saveAttempts,f.forms.saves,f.checkpoint.saveAttempts);
+      expect(await a.openReview(moneyProposal(f,snap!,source.entity),()=>true),scope_contract.MoolAssistantReviewResult.stale);
+      expect(find.byKey(const Key('work-money-entry-details')),findsNothing);expect((f.entry.saveAttempts,f.forms.saves,f.checkpoint.saveAttempts),before);
+      expect(a.validateFields({'amount':'999'}),isNotNull);
+    }finally{await f.close(tester);}
+  });
+  for(final boundary in ['Close','Cancel','request edit','paid access','expiry','foreign Cancel']) {
+  testWidgets('FE-SUPACCOUNT271 actual Host $boundary retires private entry without source tick',(tester)async {
+    final f=_SupAccountOneFixture();final access=_ReceivingAssistantAccess();try {
+      await f.ready(tester,posted:true);final source=await moneySource(f,tester);
+      await tester.pumpWidget(MaterialApp.router(theme:MoolTheme.light(),routerConfig:f.native.router,builder:(_,child)=>MoolAssistantHost(readContext:f.native.readContext,
+        contextChanges:Listenable.merge([f.native.journey,f.work,f.native.mode]),entitlements:access,child:child!)));await tester.pumpAndSettle();
+      final a=f.adapter(tester,'AI-ACT-271'),nativeContext=tester.element(find.byType(MoolAssistantNativeScope));
+      final opened=MoolAssistantHost.maybeOf(nativeContext)!.open(nativeContext);await tester.pumpAndSettle();
+      final c=tester.widget<MoolAssistantPage>(find.byType(MoolAssistantPage)).controller;
+      await c.refreshAccess();c.setDraft('Show this recorded money entry');final snap=await a.snapshot(c.context,source.entity);expect(snap,isNotNull);
+      expect(c.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-real271',actionId:'AI-ACT-271',binding:c.context.binding,requestRevision:c.requestRevision,
+        entitlementRevision:c.entitlementRevision!,sourceRevision:snap!.sourceRevision,validUntil:DateTime.now().add(boundary=='expiry'?const Duration(seconds:2):const Duration(minutes:5)),entityId:source.entity,
+        title:'View recorded money',summary:'HOST exact original entry',fields:const{})),isTrue);
+      final before=(f.entry.saveAttempts,f.forms.saves,f.checkpoint.saveAttempts);await tester.pumpAndSettle();final review=find.widgetWithText(FilledButton,'Review');
+      await tester.ensureVisible(review);await tester.pumpAndSettle();await tester.tap(review);await tester.pumpAndSettle();expect(find.byKey(const Key('work-money-entry-details')),findsOneWidget);
+      if(boundary=='Close')await tester.tap(find.byKey(const Key('work-money-entry-close')));
+      else {
+        final navigator=Navigator.of(tester.element(find.byKey(const Key('work-money-entry-close'))),rootNavigator:true);
+        MaterialPageRoute<void>? foreign;
+        if(boundary=='foreign Cancel'){foreign=MaterialPageRoute<void>(builder:(_)=>const Scaffold(body:Text('HOST foreign privacy route')));unawaited(navigator.push(foreign));await tester.pumpAndSettle();}
+        if(boundary=='Cancel'||boundary=='foreign Cancel')c.cancelProposal();
+        if(boundary=='request edit')c.setDraft('Different request while original entry open');
+        if(boundary=='paid access')access.revoke();
+        if(boundary=='expiry'){await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:2100)));await tester.pump(const Duration(seconds:3));}
+        await tester.pumpAndSettle();
+        if(foreign!=null){expect(find.text('HOST foreign privacy route'),findsOneWidget);navigator.removeRoute(foreign);await tester.pumpAndSettle();}
+        expect(find.byKey(const Key('work-money-entry-details')),findsNothing);
+        expect(find.text('HOST-MONEY-REF'),findsNothing);
+        expect(find.text('This money entry has changed. Close and reopen it.'),findsOneWidget);
+        await tester.tap(find.widgetWithText(TextButton,'Close'));await tester.pumpAndSettle();
+      }
+      await tester.pumpAndSettle();expect(find.byType(MoolAssistantPage),findsOneWidget);
+      expect(tester.widget<MoolAssistantPage>(find.byType(MoolAssistantPage)).controller,same(c));expect((f.entry.saveAttempts,f.forms.saves,f.checkpoint.saveAttempts),before);
+      unawaited(opened);
+    }finally{await f.close(tester);access.dispose();}
+  });
+  }
+  test('FE-SUPACCOUNT-01 typed raw fields are immutable and closed', () {
+    final fields = <String, Object?>{'supplierId': 'HOST', 'openingId': null, 'openingRevision': null,
+      'directoryRevision': 1, 'asOfDate': '2026-10-25', 'amount': '0012.50', 'sourceNote': 'મૂળ',
+      'amountKnown': true, 'supplierCredit': false, 'billInclusions': <String, Object?>{'copy': 'unknown'}};
+    final parsed = StoreSupplierOpeningInitialData.fromFields(fields);
+    (fields['billInclusions']! as Map)['copy'] = 'included';
+    expect(parsed.amount, '0012.50');
+    expect(parsed.relations['copy'], WorkspaceOpeningBillInclusion.unknown);
+    expect(() => parsed.relations.clear(), throwsUnsupportedError);
+    expect(() => StoreSupplierOpeningInitialData.fromFields({...fields, 'post': true}), throwsFormatException);
+    expect(() => StoreExpenseInitialData.fromFields({'amount': '1', 'reference': 'x', 'channel': 'model-method',
+      'category': 'Repair', 'note': ''}), throwsFormatException);
+  });
+
+  testWidgets('FE-SUPACCOUNT-01 new opening raw prefill and cancellation never write', (tester) async {
+    final f = _SupAccountOneFixture(); await f.ready(tester);
+    try {
+      final before = (f.entry.saveAttempts, f.forms.saves, f.checkpoint.saveAttempts);
+      expect(await f.snapshot(tester, 'AI-ACT-270'), isNull);
+      await f.open(tester, 'AI-ACT-257'); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('work-opening-amount'))).controller!.text, '0012.50');
+      expect(tester.widget<TextField>(find.byKey(const Key('work-opening-note'))).controller!.text, 'HOST proposed મૂળ note');
+      expect((f.entry.saveAttempts, f.forms.saves, f.checkpoint.saveAttempts), before);
+      await tester.tap(find.byKey(const Key('work-opening-close'))); await tester.pumpAndSettle();
+      await tester.tap(find.text('Discard changes')); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-opening-dues-form')), findsNothing);
+      expect((f.entry.saveAttempts, f.forms.saves, f.checkpoint.saveAttempts), before);
+    } finally { await f.close(tester); }
+  });
+
+  for (final action in ['AI-ACT-257', 'AI-ACT-381']) {
+    testWidgets('FE-SUPACCOUNT-01 $action original Save appends once and never posts', (tester) async {
+      final f = _SupAccountOneFixture(); await f.ready(tester, saved: action == 'AI-ACT-381');
+      try {
+        final original = f.opening?.toJson(), checkpointBefore = f.checkpoint.saveAttempts;
+        await f.open(tester, action); await tester.pumpAndSettle();
+        final save = find.byKey(const Key('work-opening-save'));
+        await tester.scrollUntilVisible(save, 250,
+          scrollable: find.descendant(of: find.byKey(const Key('work-opening-dues-form')),
+            matching: find.byType(Scrollable)).first);
+        await tester.ensureVisible(save); await tester.tap(save); await tester.pumpAndSettle();
+        expect(f.entry.saveAttempts, 1);
+        expect(f.work.workspaceSupplierOpeningRecord(f.supplier.id)!.amountMinor, 1250);
+        if (original != null) expect(f.work.workspaceSupplierOpeningRecords.first.toJson(), original);
+        expect(f.checkpoint.saveAttempts, checkpointBefore);
+        expect(f.work.workspaceSupplierLedger(f.supplier.id)?.openingRecord, isNull);
+      } finally { await f.close(tester); }
+    });
+  }
+
+  testWidgets('FE-SUPACCOUNT-01 opening confirmation waits for original two controls', (tester) async {
+    final f = _SupAccountOneFixture(); await f.ready(tester, saved: true);
+    try {
+      final before = f.checkpoint.saveAttempts;
+      await f.open(tester, 'AI-ACT-258'); await tester.pumpAndSettle();
+      expect(f.entry.saveAttempts, 0); expect(f.checkpoint.saveAttempts, before);
+      final confirm = find.byKey(const Key('work-opening-confirm'));
+      await tester.scrollUntilVisible(confirm, 250,
+        scrollable: find.descendant(of: find.byKey(const Key('work-opening-dues-form')),
+          matching: find.byType(Scrollable)).first);
+      await tester.ensureVisible(confirm); await tester.tap(confirm); await tester.pumpAndSettle();
+      expect(f.checkpoint.saveAttempts, before);
+      await tester.tap(find.byKey(const Key('work-opening-confirm-accept'))); await tester.pumpAndSettle();
+      expect(f.checkpoint.saveAttempts, before + 1);
+      expect(f.work.workspaceSupplierLedger(f.supplier.id)!.openingRecord!.id, f.opening!.id);
+    } finally { await f.close(tester); }
+  });
+
+  testWidgets('FE-SUPACCOUNT-01 posted correction unavailable and ledger read never posts', (tester) async {
+    final f = _SupAccountOneFixture(); await f.ready(tester, posted: true);
+    try {
+      expect(await f.snapshot(tester, 'AI-ACT-381'), isNull);
+      final before = (f.entry.saveAttempts, f.forms.saves, f.checkpoint.saveAttempts);
+      await f.open(tester, 'AI-ACT-268'); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-opening-save')), findsNothing);
+      expect((f.entry.saveAttempts, f.forms.saves, f.checkpoint.saveAttempts), before);
+      final paymentEntry = f.native.adapters(tester).singleWhere((a) => a.actionId == 'AI-ACT-271');
+      expect(await paymentEntry.snapshot(f.native.readContext(), null), isNull);
+      expect((f.entry.saveAttempts, f.forms.saves, f.checkpoint.saveAttempts), before);
+    } finally { await f.close(tester); }
+  });
+
+  testWidgets('FE-SUPACCOUNT-01 stale directory and overlapping opening refuse handoff', (tester) async {
+    final f = _SupAccountOneFixture(); await f.ready(tester);
+    try {
+      final fields = f.openingFields(); fields['directoryRevision'] = 999;
+      final a = f.adapter(tester, 'AI-ACT-257'), read = (await f.snapshot(tester, 'AI-ACT-257'))!;
+      final stale = scope_contract.MoolAssistantProposal(id: 'HOST-stale', actionId: a.actionId,
+        binding: f.native.readContext().binding, requestRevision: 0, entitlementRevision: 'HOST',
+        sourceRevision: read.sourceRevision, validUntil: DateTime.now().add(const Duration(hours: 1)),
+        title: 'HOST', summary: 'HOST', entityId: f.supplier.id, fields: fields);
+      expect(await a.openReview(stale, () => true), MoolAssistantReviewResult.stale);
+      await f.open(tester, 'AI-ACT-257'); await tester.pumpAndSettle();
+      expect(await f.snapshot(tester, 'AI-ACT-257'), isNull);
+      expect(f.entry.saveAttempts, 0); expect(f.forms.saves, 0);
+    } finally { await f.close(tester); }
+  });
+
+  for (final retirement in ['principal', 'approval']) {
+    testWidgets('FE-SUPACCOUNT-01 hydrated opening hides on $retirement retirement and cannot save', (tester) async {
+      final f = _SupAccountOneFixture(); await f.ready(tester);
+      try {
+        await f.open(tester, 'AI-ACT-257'); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-opening-amount')), findsOneWidget);
+        if (retirement == 'principal') { f.native.principal.identity = null; f.native.principal.changes.add(null); }
+        else { f.work.remoteReviewStatus = WorkRemoteReviewStatus.pending; f.work.notifyListeners(); }
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-opening-amount')), findsNothing);
+        expect(find.byKey(const Key('work-opening-save')), findsNothing);
+        expect(f.entry.saveAttempts, 0); expect(f.forms.saves, 0);
+      } finally { await f.close(tester); }
+    });
+  }
+
+  testWidgets('FE-SUPACCOUNT-01 expense raw prefill uses original QA owner and no Review write', (tester) async {
+    final f = _SupAccountOneFixture(); await f.ready(tester, expense: true);
+    try {
+      final before = (f.entry.saveAttempts, f.forms.saves, f.checkpoint.saveAttempts);
+      await f.open(tester, 'AI-ACT-270'); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('store-expense-amount'))).controller!.text, '0012.50');
+      expect(tester.widget<TextField>(find.byKey(const Key('store-expense-reference'))).controller!.text, 'HOST-EXP-001');
+      expect(tester.widget<TextField>(find.byKey(const Key('store-expense-note'))).controller!.text, 'HOST expense મૂળ note');
+      expect((f.entry.saveAttempts, f.forms.saves, f.checkpoint.saveAttempts), before);
+      expect(f.work.workspaceExpenses, isEmpty);
+    } finally { await f.close(tester); }
+  });
+
+  testWidgets('FE-SUPACCOUNT-01 expense authoritative second read preserves concurrent saved input', (tester) async {
+    final f = _SupAccountOneFixture(); await f.ready(tester, expense: true);
+    try {
+      f.forms.holdRead = f.forms.reads + 2; f.forms.readGate = Completer<void>();
+      await f.open(tester, 'AI-ACT-270'); await tester.pump(); await tester.pump(const Duration(milliseconds: 400));
+      final key = f.work.expenseFormKey()!;
+      final saved = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: const {
+        'amount': '9.00', 'reference': 'HOST-other-original', 'channel': 'Cash', 'category': 'Salary', 'note': 'Kept original'});
+      await f.forms.save(saved, expectedRevision: null);
+      f.forms.readGate!.complete(); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('store-expense-amount'))).controller!.text, '9.00');
+      expect(f.forms.saves, 1); expect(f.work.workspaceExpenses, isEmpty);
+      expect((await f.forms.read(key))!.fields, saved.fields);
+    } finally { await f.close(tester); }
+  });
+}
+
+// Depends only on the isolated FE-SUPACCOUNT-01 fixture insertion. No provider.
+void registerNativeSupplierMoneyOwnerRetirementTests() {
+  for (final retirement in ['principal', 'approval']) {
+    testWidgets('NATIVE-MONEY-RETIRE hydrated $retirement retirement hides private input and rejects new autosave', (tester) async {
+      final f = _SupAccountOneFixture(); await f.ready(tester, posted: true);
+      try {
+        await f.open(tester, 'AI-ACT-260', fields: {
+          'supplierId': f.supplier.id, 'openingId': f.opening!.id,
+          'openingRevision': f.opening!.revision, 'amount': '12.50',
+          'reference': 'HOST initial private reference', 'channel': 'Cash',
+          'occurredOn': f.opening!.asOfDate,
+        });
+        await tester.pumpAndSettle();
+        final amountFinder = find.byKey(const Key('supplier-payment-amount'));
+        final referenceFinder = find.byKey(const Key('supplier-payment-reference'));
+        expect(amountFinder, findsOneWidget); expect(f.forms.saves, 0);
+        // Establish a real original secure draft before retiring the host owner.
+        await tester.ensureVisible(referenceFinder);
+        await tester.enterText(referenceFinder, 'HOST retained original reference');
+        await tester.pumpAndSettle();
+        final key = f.work.supplierMoneyFormKey(f.supplier.id, advance: true)!;
+        final saved = (await f.forms.read(key))!;
+        final writes = f.forms.saves, checkpoints = f.checkpoint.saveAttempts;
+        final oldInput = tester.widget<TextField>(amountFinder);
+        final oldCallback = oldInput.onChanged!;
+        if (retirement == 'principal') {
+          f.native.principal.identity = null;
+          f.native.principal.changes.add(null);
+        } else {
+          f.work.remoteReviewStatus = WorkRemoteReviewStatus.pending;
+          f.work.notifyListeners();
+        }
+        await tester.pumpAndSettle();
+        // This intentionally keeps native account/store/draft identity unchanged.
+        // Existing WorkSession guards still own a real namespace switch; this
+        // case covers host owner/consent retirement over that same native Store.
+        expect(f.work.supplierMoneyFormKey(f.supplier.id, advance: true), key);
+        // A callback already captured by the old focused editor must not create
+        // another draft revision after owner retirement, even before repaint.
+        oldInput.controller!.text = '99.00'; oldCallback('99.00');
+        await tester.pumpAndSettle();
+        expect(f.forms.saves, writes);
+        final retained = (await f.forms.read(key))!;
+        expect(retained.revision, saved.revision); expect(retained.fields, saved.fields);
+        expect(f.checkpoint.saveAttempts, checkpoints);
+        expect(amountFinder, findsNothing); expect(referenceFinder, findsNothing);
+        expect(find.byKey(const Key('supplier-money-supplier')), findsNothing);
+      } finally { await f.close(tester); }
+    });
+  }
+}
+
+// Existing actual-auth scope and SupAcct01 fixtures; no runtime provider.
+void registerNativeSupplierOwnerCallbackTests() {
+  Future<WorkspacePurchaseSavedCopy> prepareAllocation(_SupAccountOneFixture f) async {
+    final work = f.work, scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
+    final day = at.toIso8601String().substring(0, 10), product = work.workspaceCatalogueItems.first;
+    final draft = WorkspacePurchaseEntryDraft(id: 'HOST-nested-owner-bill', supplierId: f.supplier.id,
+      invoiceReference: 'HOST-NESTED-OWNER', invoiceDate: '${day.substring(8)}/${day.substring(5, 7)}/${day.substring(0, 4)}',
+      createdAt: at, updatedAt: at, goods: [{'productId': product.id, 'name': product.title,
+        'pack': product.pack, 'quantity': '2', 'cost': '50'}], details: const {'invoiceTotal': '100'});
+    final copy = WorkspacePurchaseSavedCopy(id: 'HOST-nested-owner-copy', storeName: 'HOST Store',
+      revision: 1, savedAt: at, supplier: f.supplier, draft: draft, labels: const {});
+    // Authoritative host directory fixture, followed by original native posting.
+    f.entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 2, profiles: [f.supplier], draft: draft, copies: [copy], openingRecords: [f.opening!]);
+    expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+    expect(await work.confirmWorkspacePurchaseBill(copy, scope: scope, expectedPurchaseRevision: 2,
+      expectedLedgerRevision: work.workspaceSupplierLedger(f.supplier.id)!.revision,
+      openingTreatment: WorkspaceOpeningBillInclusion.excluded, confirmedAt: at), isTrue);
+    expect(await work.recordWorkspaceSupplierMoney(f.supplier.id, accountScope: scope.$1,
+      workspaceId: scope.$2, expectedRevision: work.workspaceSupplierLedger(f.supplier.id)!.revision,
+      entry: WorkspaceSupplierLedgerEntry(operationId: 'HOST-nested-owner-advance', reference: 'HOST advance',
+        origin: WorkspaceSupplierEntryOrigin.supplierAccount, kind: WorkspaceSupplierEntryKind.advance,
+        amountMinor: 1000, paymentMethod: 'Cash', postedAt: at,
+        moneyReview: WorkspaceSupplierMoneyReview(occurredOn: day, openingId: f.opening!.id,
+          openingRevision: f.opening!.revision, notIncludedInOpening: true))), isTrue);
+    return copy;
+  }
+  Future<void> openAllocation(WidgetTester tester, _SupAccountOneFixture f, WorkspacePurchaseSavedCopy copy) async {
+    final a = f.adapter(tester, 'AI-ACT-262'), ctx = f.native.readContext();
+    final read = (await a.snapshot(ctx, copy.id))!;
+    unawaited(a.openReview(scope_contract.MoolAssistantProposal(id: 'HOST-nested-owner', actionId: a.actionId,
+      binding: ctx.binding, requestRevision: 0, entitlementRevision: 'HOST', sourceRevision: read.sourceRevision,
+      validUntil: DateTime.now().add(const Duration(hours: 1)), title: 'HOST', summary: 'HOST', entityId: copy.id,
+      fields: {'supplierId': f.supplier.id, 'copyId': copy.id, 'copyRevision': copy.revision,
+        'openingId': f.opening!.id, 'openingRevision': f.opening!.revision,
+        'sourceKind': 'accountAdvance', 'sourceId': 'HOST-nested-owner-advance', 'amount': '10.00'}), () => true));
+    await tester.pumpAndSettle();
+  }
+  Future<void> retire(WidgetTester tester, _SupAccountOneFixture f, String kind) async {
+    if (kind == 'principal') { f.native.principal.identity = null; f.native.principal.changes.add(null); }
+    else { f.work.remoteReviewStatus = WorkRemoteReviewStatus.pending; f.work.notifyListeners(); }
+    await tester.pumpAndSettle();
+  }
+  for (final kind in ['principal', 'approval']) {
+    testWidgets('NATIVE-OWNER-CALLBACK nested allocation Money inherits $kind retirement', (tester) async {
+      final f = _SupAccountOneFixture(); await f.ready(tester, posted: true);
+      try {
+        final copy = await prepareAllocation(f); await openAllocation(tester, f, copy);
+        final apply = find.byKey(const Key('supplier-allocation-submit'));
+        await tester.ensureVisible(apply); await tester.tap(apply); await tester.pumpAndSettle();
+        expect(find.text('Link another amount'), findsOneWidget);
+        // Explicit original final allocation consumed the original available advance.
+        await tester.ensureVisible(apply); await tester.tap(apply); await tester.pumpAndSettle();
+        final record = find.byKey(const Key('supplier-allocation-record-advance'));
+        await tester.ensureVisible(record); await tester.tap(record); await tester.pumpAndSettle();
+        final amountFinder = find.byKey(const Key('supplier-payment-amount'));
+        final oldInput = tester.widget<TextField>(amountFinder), callback = tester.widget<TextField>(amountFinder).onChanged!;
+        final writes = f.forms.saves, checkpoints = f.checkpoint.saveAttempts;
+        await retire(tester, f, kind);
+        oldInput.controller!.text = '9.00'; callback('9.00'); await tester.pumpAndSettle();
+        expect(f.forms.saves, writes); expect(f.checkpoint.saveAttempts, checkpoints);
+        expect(amountFinder, findsNothing);
+      } finally { await f.close(tester); }
+    });
+    for (final form in ['Money', 'Allocation']) {
+    testWidgets('NATIVE-OWNER-CALLBACK $form copy callbacks reject $kind retirement', (tester) async {
+      final f = _SupAccountOneFixture(); await f.ready(tester, posted: true);
+      try {
+        if (form == 'Allocation') {
+          final copy = await prepareAllocation(f); await openAllocation(tester, f, copy);
+        } else {
+        await f.open(tester, 'AI-ACT-260', fields: {'supplierId': f.supplier.id,
+          'openingId': f.opening!.id, 'openingRevision': f.opening!.revision, 'amount': '10.00',
+          'reference': 'HOST copy owner', 'channel': 'Cash', 'occurredOn': f.opening!.asOfDate});
+        }
+        await tester.pumpAndSettle();
+        final copiesFinder = find.byWidgetPredicate((widget) => widget.runtimeType.toString() == '_SupplierPaymentDraftCopies');
+        final dynamic copies = tester.widget(copiesFinder);
+        expect(copies.isCurrent(), isTrue);
+        final writes = f.forms.saves, checkpoints = f.checkpoint.saveAttempts;
+        await retire(tester, f, kind);
+        // Exact callbacks supplied to the existing async copy/canRetain owner.
+        expect(copies.isCurrent(), isFalse);
+        expect(await copies.onChanged(copies.value), isFalse);
+        expect(f.forms.saves, writes); expect(f.checkpoint.saveAttempts, checkpoints);
+      } finally { await f.close(tester); }
+    });
+    }
+    testWidgets('NATIVE-OWNER-CALLBACK confirmed Money reset rejects $kind retirement', (tester) async {
+      final f = _SupAccountOneFixture(); await f.ready(tester, posted: true);
+      try {
+        await f.open(tester, 'AI-ACT-260', fields: {'supplierId': f.supplier.id,
+          'openingId': f.opening!.id, 'openingRevision': f.opening!.revision, 'amount': '10.00',
+          'reference': 'HOST confirmed owner', 'channel': 'Cash', 'occurredOn': f.opening!.asOfDate});
+        await tester.pumpAndSettle();
+        final excluded = find.byKey(const Key('supplier-money-opening-excluded'));
+        await tester.ensureVisible(excluded); await tester.tap(excluded); await tester.pumpAndSettle();
+        final submit = find.byKey(const Key('supplier-money-submit'));
+        await tester.ensureVisible(submit); await tester.tap(submit); await tester.pumpAndSettle();
+        expect(find.text('Record another advance'), findsOneWidget);
+        final callback = tester.widget<FilledButton>(submit).onPressed!;
+        final key = f.work.supplierMoneyFormKey(f.supplier.id, advance: true)!;
+        final saved = (await f.forms.read(key))!, checkpoints = f.checkpoint.saveAttempts;
+        expect(saved.supplierMoneyAttempt, isNotNull);
+        await retire(tester, f, kind);
+        callback(); await tester.pumpAndSettle();
+        final retained = (await f.forms.read(key))!;
+        expect(retained.revision, saved.revision); expect(retained.fields, saved.fields);
+        expect(f.checkpoint.saveAttempts, checkpoints);
+      } finally { await f.close(tester); }
+    });
+  }
+}
+
+// File-scope host-only instrumentation; original WorkSession owns mutations.
+class _AssistantStockHistoryGateway implements WorkStockHistoryGateway {
+  final queries = <WorkspaceStockHistoryQuery>[];
+  @override
+  Future<WorkspaceStockHistoryPage> readStockHistory(WorkspaceStockHistoryQuery query,
+    {String? cursor, String? snapshotId}) async {
+    queries.add(query);
+    return WorkspaceStockHistoryPage(query: query, snapshotId: 'HOST-empty-stock-history',
+      records: const [], cursor: cursor, totalCount: 0);
+  }
+}
+
+class _AssistantStockWorkSession extends WorkSession {
+  _AssistantStockWorkSession(_NativeScopeProofStore contact, _NativeScopePurchaseStore purchase,
+    _NativeScopeInventoryStore inventory, _NativeScopeProofStore trading,
+    {WorkStockHistoryGateway? history}) : super(contactDraftStore: contact, purchaseEntryStore: purchase,
+      inventoryStore: inventory, tradingPreferencesStoreFactory: (_) => trading,
+      catalogueReference: workspaceMasterCatalogue, stockHistoryGateway: history);
+  int refreshCalls = 0, adjustmentCalls = 0;
+  final adjustments = <(String, int, String)>[];
+  @override Future<bool> refreshWorkspaceStoreStock() {
+    refreshCalls++;
+    return super.refreshWorkspaceStoreStock();
+  }
+  @override bool updateWorkspaceStock({required String productId, required int quantity,
+    required String reason, WorkspaceStockMovementKind kind = WorkspaceStockMovementKind.adjustment}) {
+    adjustmentCalls++; adjustments.add((productId, quantity, reason));
+    return super.updateWorkspaceStock(productId: productId, quantity: quantity, reason: reason, kind: kind);
+  }
+}
+
+Future<scope_contract.MoolAssistantProposal> stockAssistantProposal(WidgetTester tester,
+  _AuthenticatedNativeScopeFixture f, String actionId, {String? entityId, Map<String, Object?> fields = const {}}) async {
+  final adapter = f.adapters(tester).singleWhere((adapter) => adapter.actionId == actionId);
+  final ctx = f.readContext(), snapshot = await adapter.snapshot(f.readContext(), entityId);
+  expect(snapshot, isNotNull);
+  return scope_contract.MoolAssistantProposal(id: 'HOST-stock-$actionId', actionId: actionId,
+    binding: ctx.binding, requestRevision: 0, entitlementRevision: 'HOST-native-owner-fixture',
+    sourceRevision: snapshot!.sourceRevision, validUntil: DateTime.now().add(const Duration(hours: 1)),
+    title: 'Review original Stock', summary: 'HOST native Stock controls', entityId: entityId, fields: fields);
+}
+
+Map<String, Object?> stockAdjustmentFields(WorkSession work, WorkspaceCatalogueItem product,
+  {String? quantity, String reason = 'ગણતરી સુધારો · counted'}) => {
+  'inventoryRevision': work.workspaceInventoryRevision, 'sourceCanonicalId': product.canonicalId,
+  'sourceSku': product.sku, 'sourcePack': product.pack, 'sourceStock': product.stock,
+  'quantity': quantity ?? '00${product.stock + 2}', 'reason': reason,
+};
+
+Future<({Completer<MoolAssistantReviewResult> result, WorkspaceCatalogueItem product})>
+openStockAdjustment(WidgetTester tester, _AuthenticatedNativeScopeFixture f,
+  {String? quantity, String reason = 'ગણતરી સુધારો · counted'}) async {
+  // Explicit native fixture setup, before proposal/snapshot; never a Review hook.
+  expect(await f.work.loadWorkspaceInventory(retry: true), isTrue);
+  expect(await f.work.workspaceInventorySaved, isTrue);
+  final adapter = f.adapters(tester).singleWhere((adapter) => adapter.actionId == 'AI-ACT-233');
+  final ctx = f.readContext();
+  final product = f.work.workspaceCatalogueItems.firstWhere((p) => p.stockMode == WorkspaceStockMode.exactQuantity);
+  final snapshot = await adapter.snapshot(ctx, product.id); expect(snapshot, isNotNull);
+  final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-stock-adjust', actionId: 'AI-ACT-233',
+    binding: ctx.binding, requestRevision: 0, entitlementRevision: 'HOST-native-owner-fixture',
+    sourceRevision: snapshot!.sourceRevision, validUntil: DateTime.now().add(const Duration(hours: 1)),
+    title: 'Review Stock quantity', summary: 'HOST original SKU and reason', entityId: product.id,
+    fields: stockAdjustmentFields(f.work, product, quantity: quantity, reason: reason));
+  final result = Completer<MoolAssistantReviewResult>();
+  unawaited(adapter.openReview(proposal, () => true).then(result.complete));
+  await tester.pumpAndSettle();
+  return (result: result, product: product);
+}
+
+void registerAssistantStockNativeTests() {
+  test('FE-STOCK-01 typed quantity and half-open history preserve original inputs', () {
+    final data = StoreStockAdjustmentInitialData.fromFields({'inventoryRevision': 7,
+      'sourceCanonicalId': 'canonical', 'sourceSku': 'SKU-ગુજરાતી', 'sourcePack': '1 kg',
+      'sourceStock': 4, 'quantity': '0006', 'reason': 'મૂળ ગણતરી'});
+    expect(data.quantity, '0006'); expect(data.reason, 'મૂળ ગણતરી');
+    final history = StoreStockHistoryInitialData.fromFields({'from': '2026-10-01T00:00:00Z',
+      'until': '2026-10-27T00:00:00Z'});
+    expect(history.from, DateTime.utc(2026, 10, 1)); expect(history.until, DateTime.utc(2026, 10, 27));
+    expect(StoreStockHistoryInitialData.fromFields({'from': '2026-10-01T00:00:00Z'}).until, isNull);
+    for (final invalid in <Map<String, Object?>>[
+      {'from': '2026-10-27T00:00:00Z', 'until': '2026-10-01T00:00:00Z'},
+      {'from': '2026-10-01'}, {'valuation': 'invented'},
+    ]) { expect(() => StoreStockHistoryInitialData.fromFields(invalid), throwsFormatException); }
+    expect(() => StoreStockAdjustmentInitialData.fromFields({'inventoryRevision': 7,
+      'sourceCanonicalId': 'c', 'sourceSku': 's', 'sourcePack': 'p', 'sourceStock': 4,
+      'quantity': 6, 'reason': 'counted'}), throwsFormatException);
+  });
+
+  for (final action in ['AI-ACT-231', 'AI-ACT-407', 'AI-ACT-408']) {
+    testWidgets('FE-STOCK-01 $action opens original view controls with no report or export effect', (tester) async {
+      final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) =>
+        _AssistantStockWorkSession(contact, purchase, inventory, trading));
+      await f.ready();
+      try {
+        await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+        final work = f.work as _AssistantStockWorkSession;
+        final before = f.writes, reads = f.inventory.reads;
+        final adapter = f.adapters(tester).singleWhere((a) => a.actionId == action);
+        final proposal = await stockAssistantProposal(tester, f, action);
+        expect(await adapter.openReview(proposal, () => true), MoolAssistantReviewResult.returnToOwner);
+        await tester.pumpAndSettle();
+        expect(work.refreshCalls, 0); expect(work.adjustmentCalls, 0);
+        expect(f.inventory.reads, reads, reason: 'Opening current Stock must not perform a durable refresh/report synchronisation.');
+        expect(f.writes, before);
+        if (action == 'AI-ACT-231') {
+          expect(find.byKey(const Key('work-stock-recovery-scroll')).evaluate().isNotEmpty ||
+            find.byKey(const Key('work-catalogue-list')).evaluate().isNotEmpty, isTrue);
+        } else {
+          expect(find.byType(StoreStockDownloadControls), findsOneWidget);
+          expect(find.byKey(const Key('work-stock-print')), findsOneWidget);
+          expect(find.text('Preparing…'), findsNothing);
+        }
+        expect(tester.takeException(), isNull);
+      } finally { await tester.pumpWidget(const SizedBox.shrink()); await f.dispose(); }
+    });
+  }
+
+  testWidgets('FE-STOCK-01 232 uses native scoped history loader with exact original product and UTC bounds', (tester) async {
+    final history = _AssistantStockHistoryGateway();
+    final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) =>
+      _AssistantStockWorkSession(contact, purchase, inventory, trading, history: history));
+    await f.ready();
+    try {
+      await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+      final product = f.work.workspaceCatalogueItems.first;
+      final before = f.writes;
+      final adapter = f.adapters(tester).singleWhere((a) => a.actionId == 'AI-ACT-232');
+      final proposal = await stockAssistantProposal(tester, f, 'AI-ACT-232', entityId: product.id,
+        fields: {'from': '2026-10-01T00:00:00Z', 'until': '2026-10-27T00:00:00Z'});
+      expect(await adapter.openReview(proposal, () => true), MoolAssistantReviewResult.returnToOwner);
+      await tester.pumpAndSettle();
+      expect(history.queries, hasLength(1));
+      expect(history.queries.single.productId, product.id);
+      expect(history.queries.single.from, DateTime.utc(2026, 10, 1));
+      expect(history.queries.single.until, DateTime.utc(2026, 10, 27));
+      expect(history.queries.single.accountScope, f.work.workspaceStockHistoryScope()!.accountScope);
+      expect(f.writes, before);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); await f.dispose(); }
+  });
+
+  testWidgets('FE-STOCK-01 233 original quantity reason hydrate and discard without mutation', (tester) async {
+    final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) =>
+      _AssistantStockWorkSession(contact, purchase, inventory, trading));
+    await f.ready();
+    try {
+      await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+      final work = f.work as _AssistantStockWorkSession;
+      final opened = await openStockAdjustment(tester, f);
+      expect(tester.widget<TextField>(find.byKey(const Key('work-product-stock'))).controller!.text, '00${opened.product.stock + 2}');
+      expect(tester.widget<TextField>(find.byKey(const Key('work-stock-adjustment-reason'))).controller!.text, 'ગણતરી સુધારો · counted');
+      expect(work.adjustmentCalls, 0);
+      expect(work.workspaceCatalogueItems.singleWhere((p) => p.id == opened.product.id).stock, opened.product.stock);
+      await tester.tap(find.byKey(const Key('work-product-cancel'))); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-product-discard-edits'))); await tester.pumpAndSettle();
+      expect(await opened.result.future, MoolAssistantReviewResult.opened);
+      expect(work.adjustmentCalls, 0);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); await f.dispose(); }
+  });
+
+  testWidgets('FE-STOCK-01 233 native Save calls original quantity reason operation exactly once', (tester) async {
+    final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) =>
+      _AssistantStockWorkSession(contact, purchase, inventory, trading));
+    await f.ready();
+    try {
+      await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+      final work = f.work as _AssistantStockWorkSession;
+      final opened = await openStockAdjustment(tester, f);
+      final save = find.byKey(const Key('work-product-save'));
+      await tester.ensureVisible(save); await tester.tap(save); await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(await opened.result.future, MoolAssistantReviewResult.opened);
+      expect(work.adjustmentCalls, 1);
+      expect(work.adjustments.single, (opened.product.id, opened.product.stock + 2, 'ગણતરી સુધારો · counted'));
+      expect(work.workspaceCatalogueItems.singleWhere((p) => p.id == opened.product.id).stock, opened.product.stock + 2);
+      expect(work.workspaceStockMovements.any((m) => m.productId == opened.product.id &&
+        m.reason == 'ગણતરી સુધારો · counted' && m.quantityDelta == 2 && m.kind == WorkspaceStockMovementKind.adjustment), isTrue);
+      expect(work.refreshCalls, 0);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); await f.dispose(); }
+  });
+
+  for (final boundary in ['SKU changed', 'approval retired', 'invalid quantity', 'missing reason']) {
+    testWidgets('FE-STOCK-01 233 keeps original native adjustment safe for $boundary', (tester) async {
+      final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) =>
+        _AssistantStockWorkSession(contact, purchase, inventory, trading));
+      await f.ready();
+      try {
+        await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+        final work = f.work as _AssistantStockWorkSession;
+        final opened = await openStockAdjustment(tester, f,
+          quantity: boundary == 'invalid quantity' ? 'not-a-number' : null,
+          reason: boundary == 'missing reason' ? '' : 'ગણતરી સુધારો · counted');
+        final save = find.byKey(const Key('work-product-save'));
+        final retainedSave = tester.widget<FilledButton>(save).onPressed!;
+        final originalReason = tester.widget<TextField>(find.byKey(const Key('work-stock-adjustment-reason'))).controller!;
+        if (boundary == 'SKU changed') {
+          final index = work.workspaceCatalogueItems.indexWhere((p) => p.id == opened.product.id);
+          work.workspaceCatalogueItems[index] = opened.product.copyWith(sku: 'HOST-concurrent-SKU');
+        } else if (boundary == 'approval retired') {
+          work.remoteReviewStatus = WorkRemoteReviewStatus.pending;
+          work.reviewStage = WorkReviewStage.gstPending;
+          work.notifyListeners(); await tester.pump();
+        }
+        if (boundary == 'approval retired') {
+          // Scope retirement may hide the original editor. Its previously
+          // captured native final callback must still reject the retired owner.
+          expect(save, findsNothing);
+          expect(find.byKey(const Key('work-stock-adjustment-reason')), findsNothing);
+          expect(tester.widget<TextField>(find.byKey(const Key('work-stock-adjustment-reason'), skipOffstage: false))
+            .controller, same(originalReason));
+          retainedSave(); await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.byKey(const Key('work-stock-owner-retired-close')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-product-unsaved-dialog')), findsOneWidget,
+            reason: 'Stale Close must pass through the original native PopScope.');
+          await tester.tap(find.byKey(const Key('work-product-keep-editing')));
+          await tester.pumpAndSettle();
+          expect(save, findsNothing);
+          expect(originalReason.text, 'ગણતરી સુધારો · counted');
+        } else {
+          await tester.ensureVisible(save);
+          await tester.tap(save); await tester.pumpAndSettle();
+        }
+        expect(work.adjustmentCalls, 0);
+        expect(work.workspaceCatalogueItems.singleWhere((p) => p.id == opened.product.id).stock, opened.product.stock);
+        if (boundary != 'approval retired') expect(save, findsOneWidget);
+      } finally { await tester.pumpWidget(const SizedBox.shrink()); await f.dispose(); }
+    });
+  }
+}
+
+
+// File scope in work_workspace_layout_safety_test.dart. Existing imports/helpers.
+class _ProductSnapshotColdSession extends WorkSession {
+  _ProductSnapshotColdSession(_NativeScopeProofStore contact, _NativeScopePurchaseStore purchase,
+    _NativeScopeInventoryStore inventory, _NativeScopeProofStore trading)
+    : super(contactDraftStore: contact, purchaseEntryStore: purchase, inventoryStore: inventory,
+      tradingPreferencesStoreFactory: (_) => trading, catalogueReference: workspaceMasterCatalogue);
+  int loadCalls = 0;
+  bool forbidLoad = false;
+  // HOST unavailable-load fixture: keep the dashboard's independent startup
+  // admission cold until its original Load is explicitly admitted below.
+  bool holdNativeLoad = true;
+  @override Future<bool> loadWorkspaceInventory({bool retry = false}) {
+    loadCalls++;
+    if (forbidLoad) throw StateError('AI snapshot must not invoke native Load/Recover');
+    if (holdNativeLoad) return Future.value(false);
+    return super.loadWorkspaceInventory(retry: retry);
+  }
+}
+// Call once inside existing main().
+void registerAppliedProductColdSourceTests() {
+  testWidgets('FE-PRODUCT applied snapshots never cold-load or queue admission writes', (tester) async {
+    final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) =>
+      _ProductSnapshotColdSession(contact, purchase, inventory, trading));
+    await f.ready();
+    try {
+      await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+      final work = f.work as _ProductSnapshotColdSession;
+      expect(work.localInventoryEnabled, isTrue);
+      expect(work.workspaceInventoryLoaded, isFalse);
+      final before = f.writes, loads = work.loadCalls;
+      work.forbidLoad = true;
+      for (final action in ['AI-ACT-213','AI-ACT-214','AI-ACT-221']) {
+        final adapter = f.adapters(tester).singleWhere((adapter) => adapter.actionId == action);
+        expect(await adapter.snapshot(f.readContext(), workspaceMasterCatalogue.first.id), isNull);
+      }
+      await tester.pumpAndSettle();
+      expect(work.loadCalls, loads); expect(f.writes, before);
+      // Explicit original native admission is HOST setup, before the proposal.
+      work.forbidLoad = false;
+      work.holdNativeLoad = false;
+      expect(await work.loadWorkspaceInventory(retry: true), isTrue);
+      expect(await work.workspaceInventorySaved, isTrue);
+      final admitted = work.workspaceCatalogueItems.first, admittedLoads = work.loadCalls;
+      final admittedWrites = f.writes;
+      work.forbidLoad = true;
+      for (final action in ['AI-ACT-214','AI-ACT-221']) {
+        final adapter = f.adapters(tester).singleWhere((adapter) => adapter.actionId == action);
+        expect(await adapter.snapshot(f.readContext(), admitted.id), isNotNull);
+      }
+      expect(work.loadCalls, admittedLoads); expect(f.writes, admittedWrites);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); await f.dispose(); }
+  });
+}
+
+// FILE SCOPE in work_workspace_layout_safety_test.dart; existing imports only.
+// Actual admitted HOST actor is _AuthenticatedNativeScopeFixture's Firebase
+// principal/record identity. Native private stores use its separate String UID.
+class _PurchaseColdOwnerSession extends WorkSession {
+  _PurchaseColdOwnerSession(_NativeScopeProofStore contact, _OpeningPostingFixtureStore book,
+    _NativeScopeInventoryStore inventory, _NativeScopeProofStore trading, WorkLedgerFormDraftStore forms,
+    {WorkPurchaseInvoiceCapture? capture})
+    : super(contactDraftStore: contact, purchaseEntryStore: book, inventoryStore: inventory,
+      purchaseInvoiceCapture: capture, ledgerFormDraftStore: forms, tradingPreferencesStoreFactory: (_) => trading,
+      catalogueReference: workspaceMasterCatalogue);
+  bool holdNativeAdmission = true, forbidAdmission = false, holdBookAdmission = false;
+  int inventoryAdmissions = 0, ledgerAdmissions = 0, bookAdmissions = 0;
+  @override Future<bool> loadWorkspaceSuppliers({bool retry = false}) {
+    bookAdmissions++;
+    if (forbidAdmission) throw StateError('AI initial open must not admit a supplier book');
+    if (holdBookAdmission) return Future.value(false);
+    return super.loadWorkspaceSuppliers(retry: retry);
+  }
+  @override Future<bool> loadWorkspaceInventory({bool retry = false}) {
+    inventoryAdmissions++;
+    if (forbidAdmission) throw StateError('AI initial open must not admit Stock/report sources');
+    if (holdNativeAdmission) return Future.value(false);
+    return super.loadWorkspaceInventory(retry: retry);
+  }
+  @override Future<bool> recoverCustomerLedger() {
+    ledgerAdmissions++;
+    if (forbidAdmission) throw StateError('AI initial open must not recover/project a ledger');
+    if (holdNativeAdmission) return Future.value(false);
+    return super.recoverCustomerLedger();
+  }
+}
+class _PurchaseNativeForms extends SecureWorkLedgerFormDraftStore {
+  _PurchaseNativeForms(String? Function() account)
+    : super(accountScope: account, storage: const FlutterSecureStorage());
+  int saves = 0;
+  Completer<void>? holdSave;
+  bool failSave = false;
+  @override Future<void> save(WorkspaceLedgerFormDraft draft, {required int? expectedRevision}) async {
+    saves++; await holdSave?.future;
+    if (failSave) throw StateError('HOST receiving save not acknowledged');
+    return super.save(draft, expectedRevision: expectedRevision);
+  }
+}
+class _PurchaseColdOwnerHarness {
+  _PurchaseColdOwnerHarness({this.admitBook = true, WorkPurchaseInvoiceCapture? capture}) {
+    native = _AuthenticatedNativeScopeFixture(makeWork: (contact, ignoredBook, inventory, trading) {
+      forms = _PurchaseNativeForms(() => contact.accountScope);
+      return _PurchaseColdOwnerSession(contact, book, inventory, trading, forms, capture: capture)..holdBookAdmission = !admitBook;
+    });
+  }
+  late final _AuthenticatedNativeScopeFixture native;
+  final bool admitBook;
+  final book = _SupplierPrefillStore();
+  final checkpoint = _LedgerCheckpointFixtureStore();
+  late final _PurchaseNativeForms forms;
+  late final WorkspaceSupplierProfile supplier;
+  late final WorkspacePurchaseSavedCopy copy;
+  late final WorkspaceSupplierOpeningRecord opening;
+  _PurchaseColdOwnerSession get work => native.work as _PurchaseColdOwnerSession;
+  Object get writes => (book.saveAttempts, checkpoint.saveAttempts, native.inventory.saves, forms.saves);
+  Object get admissionCalls => (work.inventoryAdmissions, work.ledgerAdmissions, work.bookAdmissions);
+  Future<void> ready(WidgetTester tester, {bool expense = false, bool openingRecord = true, bool openingCredit = false, bool captureRoot = false}) async {
+    await native.ready();
+    if (expense) {
+      // Exact existing HOST expense gateway setup, before snapshot/proposal.
+      expect(work.loadStoreReviewSeed(0), isTrue);
+      work.workspaceId = work.activeWorkspace!.id;
+      expect(work.canRecordStoreReviewExpense, isTrue);
+    }
+    final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc().subtract(const Duration(days: 1));
+    final day = at.toLocal().toIso8601String().substring(0, 10);
+    supplier = WorkspaceSupplierProfile(id: 'HOST-captured-purchase-supplier',
+      name: 'HOST captured supplier', phone: '+919876543210', createdAt: at, updatedAt: at);
+    final draft = WorkspacePurchaseEntryDraft(id: 'HOST-captured-purchase-draft', supplierId: supplier.id,
+      invoiceReference: 'HOST-CAPTURED-01', invoiceDate: '${day.substring(8)}/${day.substring(5, 7)}/${day.substring(0, 4)}',
+      createdAt: at, updatedAt: at, goods: const [{'productId': '', 'name': 'HOST printed item',
+        'pack': '1 kg', 'quantity': '1', 'cost': '100'}], details: const {'invoiceTotal': '100'});
+    copy = WorkspacePurchaseSavedCopy(id: 'HOST-captured-copy', storeName: 'HOST Store',
+      revision: 1, savedAt: at, supplier: supplier, draft: draft, labels: const {});
+    opening = WorkspaceSupplierOpeningRecord(id: 'HOST-captured-opening', basisId: 'HOST-captured-basis',
+      account: scope.$1, store: scope.$2, qa: scope.$3, supplierId: supplier.id, revision: 1,
+      asOfDate: day, savedAt: at, amountMinor: openingCredit ? 2500 : 0, supplierCredit: openingCredit,
+      sourceNote: openingCredit ? 'HOST original advance' : 'HOST confirmed zero',
+      bills: [WorkspaceOpeningBillLink(copyId: copy.id, copyRevision: copy.revision, draftId: draft.id,
+        inclusion: WorkspaceOpeningBillInclusion.excluded)]);
+    book.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 1, profiles: [supplier], draft: draft, copies: [copy], openingRecords: [if (openingRecord) opening]);
+    if (admitBook) expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+    final finance = expense ? work.workspaceFinance! : WorkspaceFinanceSnapshot(accountScope: scope.$1, workspaceId: scope.$2,
+      revision: 1, asOf: DateTime.now(), salesTodayMinor: 0, duesMinor: 0, availableMinor: 0,
+      heldMinor: 0, requestedMinor: 0, paidOutMinor: 0, feesMinor: 0, deliveryAdjustmentsMinor: 0,
+      refundsMinor: 0, taxWithheldMinor: 0, payments: const [], payouts: const [], historyComplete: true);
+    if (!expense) expect(work.applyWorkspaceFinance(finance), isTrue);
+    expect(work.bindCustomerCollectionGateway(accountScope: scope.$1, storeId: scope.$2,
+      adapter: StoreReviewCustomerCollectionGateway(finance), checkpointStore: checkpoint), isTrue);
+    await tester.pumpWidget(captureRoot
+      ? RepaintBoundary(key:const Key('ocr-financial-root-capture'),child:native.app)
+      : native.app); await tester.pumpAndSettle();
+    expect(work.workspaceSuppliersLoaded, admitBook);
+    if (!expense) expect(work.workspaceInventoryLoaded, isFalse);
+    expect(work.workspaceInvoiceHistoryLoaded, isFalse);
+  }
+  Future<void> admitAccounting() async {
+    work..forbidAdmission = false..holdNativeAdmission = false;
+    expect(await work.loadWorkspaceInventory(retry: true), isTrue);
+    expect(await work.recoverCustomerLedger(), isTrue);
+    final scope = work.workspaceSupplierScope!;
+    if (work.workspaceSupplierLedger(supplier.id)?.openingRecord == null) {
+      expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope,
+        expectedRevision: work.workspacePurchaseEntryRevision!, confirmedAt: DateTime.now().toUtc()), isTrue);
+    }
+    final ledger = work.workspaceSupplierLedger(supplier.id)!;
+    if (!ledger.purchaseBills.containsKey(copy.draft.id)) {
+      expect(await work.confirmWorkspacePurchaseBill(copy, scope: scope,
+        expectedPurchaseRevision: work.workspacePurchaseEntryRevision!, expectedLedgerRevision: ledger.revision,
+        openingTreatment: WorkspaceOpeningBillInclusion.excluded, confirmedAt: DateTime.now().toUtc()), isTrue);
+    }
+    expect(await work.workspaceInventorySaved, isTrue);
+  }
+  Future<Completer<MoolAssistantReviewResult>> open(WidgetTester tester, String action,
+    {String? entity, Map<String, Object?> fields = const {}}) async {
+    final adapter = native.adapters(tester).singleWhere((adapter) => adapter.actionId == action);
+    final ctx = native.readContext(), snapshot = await adapter.snapshot(native.readContext(), entity);
+    expect(snapshot, isNotNull);
+    final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-cold-$action', actionId: action,
+      binding: ctx.binding, requestRevision: 0, entitlementRevision: 'HOST-native-owner-fixture',
+      sourceRevision: snapshot!.sourceRevision, validUntil: DateTime.now().add(const Duration(hours: 1)),
+      title: 'Review original purchase', summary: 'HOST current original owner', entityId: entity, fields: fields);
+    final result = Completer<MoolAssistantReviewResult>();
+    unawaited(adapter.openReview(proposal, () => true).then(result.complete));
+    await tester.pumpAndSettle();
+    return result;
+  }
+  Future<void> retirePrincipal(WidgetTester tester) async {
+    final namespace = work.workspaceSupplierScope;
+    native.principal.identity = null; native.principal.changes.add(null);
+    await tester.pump(); await tester.pump(const Duration(milliseconds: 50)); await tester.pumpAndSettle();
+    expect(native.journey.authenticatedBuyPersistenceIdentity, isNull);
+    expect(work.workspaceSupplierScope, namespace,
+      reason: 'Same String Store namespace must not pass a changed authenticated principal.');
+  }
+  Future<void> dispose(WidgetTester tester) async {
+    final held = forms.holdSave;
+    if (held != null && !held.isCompleted) held.complete();
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink()); await native.dispose();
+  }
+}
+
+Future<Completer<MoolAssistantReviewResult>> _openPurchaseNativeReceiving(
+    WidgetTester tester, _PurchaseColdOwnerHarness h) async {
+  final result = await h.open(tester, 'AI-ACT-269');
+  final category = find.byKey(const Key('purchase-category-Goods received & returns'));
+  await tester.ensureVisible(category); await tester.tap(category); await tester.pumpAndSettle();
+  final receive = find.byKey(const Key('purchase-action-receive'));
+  await tester.ensureVisible(receive); await tester.tap(receive); await tester.pumpAndSettle();
+  expect(find.byKey(const Key('work-receive-header')), findsOneWidget);
+  return result;
+}
+
+
+// HOST ONLY: actual registered adapter + real controller-minted selected input.
+class _Act228ImportInventory extends _NativeScopeInventoryStore {
+  Completer<void>? saveGate, saveEntered;
+  @override Future<void> save(WorkspaceSavedInventory value, {required int? expectedRevision}) async {
+    // Hold only the actual original native import write, not startup reports.
+    if (saveGate != null && value.products.any((p) => p.sku == 'HOST-ATTACHED-228')) {
+      if (saveEntered?.isCompleted == false) saveEntered!.complete();
+      await saveGate!.future;
+    }
+    await super.save(value, expectedRevision: expectedRevision);
+  }
+}
+
+class _Act228NativeImportHarness {
+  _Act228NativeImportHarness({_NativeScopeInventoryStore? inventory})
+    : native = _AuthenticatedNativeScopeFixture(inventory: inventory);
+  final _AuthenticatedNativeScopeFixture native;
+  final access = _ReceivingAssistantAccess();
+  final repick = _EntryFilePicker()..fail = true;
+  FilePickerPlatform? originalPicker;
+  scope_contract.MoolAssistantController? controller;
+  scope_contract.MoolAssistantNativeSnapshot? snapshot;
+  int selectedPickerCalls = 0;
+  static const row = <String, String>{'title': 'HOST attached rice', 'brand': 'HOST native import',
+    'pack': '1 kg', 'purchasePrice': '40', 'sellingPrice': '50', 'stock': '2', 'sku': 'HOST-ATTACHED-228'};
+  static Uint8List input(String extension) => Uint8List.fromList(utf8.encode(extension == 'json'
+    ? jsonEncode([row]) : '${row.keys.join(',')}\n${row.values.join(',')}\n'));
+  Future<void> ready(WidgetTester tester, {String extension = 'csv', String? mime, Uint8List? bytes}) async {
+    await native.ready();
+    expect(await native.work.loadWorkspaceInventory(retry: true), isTrue);
+    expect(await native.work.workspaceInventorySaved, isTrue);
+    expect(await native.work.loadWorkspaceProductDefaults(expectedStoreId: native.work.activeWorkspace!.id), isTrue);
+    await tester.pumpWidget(native.app); await tester.pumpAndSettle();
+    final adapters = native.adapters(tester);
+    final adapter = adapters.singleWhere((item) => item.actionId == 'AI-ACT-228');
+    expect(adapter, isA<scope_contract.MoolAssistantSelectedDocumentAdapter>());
+    snapshot = await adapter.snapshot(native.readContext(), null);
+    expect(snapshot, isNotNull);
+    controller = scope_contract.MoolAssistantController(currentContext: native.readContext,
+      contextChanges: Listenable.merge([native.journey, native.work, native.mode]), entitlements: access,
+      nativeAdapters: adapters, mediaPicker: MoolAssistantNativeMediaPicker(documents: () async {
+        selectedPickerCalls++;
+        return WorkPickedProof(fileName: 'HOST-selected.$extension',
+          contentType: mime ?? (extension == 'json' ? 'application/json' : 'text/csv'), bytes: bytes ?? input(extension));
+      }));
+    await controller!.refreshAccess(); controller!.setDraft('Review my attached product file');
+    await controller!.pickMedia(ChatAttachmentKind.document);
+    expect(controller!.selectedDocumentReferences.single.source, WorkProofSource.upload);
+    originalPicker = FilePickerPlatform.instance; FilePickerPlatform.instance = repick;
+  }
+  scope_contract.MoolAssistantProposal proposal({String? ref, Map<String, Object?>? fields}) => scope_contract.MoolAssistantProposal(
+    id: 'HOST-selected-import', actionId: 'AI-ACT-228', binding: controller!.context.binding,
+    requestRevision: controller!.requestRevision, entitlementRevision: controller!.entitlementRevision!,
+    sourceRevision: snapshot!.sourceRevision, validUntil: DateTime.now().add(const Duration(minutes: 5)),
+    title: 'Review selected file', summary: 'Use the actual selected native file.',
+    fields: fields ?? {'attachmentRef': ref ?? controller!.selectedDocumentReferences.single.id});
+  Future<({Future<scope_contract.MoolAssistantReviewResult> result})> begin(WidgetTester tester) async {
+    expect(controller!.receiveProposal(proposal()), isTrue);
+    final result = controller!.reviewProposal();
+    // Native route and I/O must finish before hit-testing original grid controls.
+    for (var i = 0; i < 60 && find.byType(StoreProductImportReviewScreen).evaluate().isEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pumpAndSettle();
+    expect(find.byType(StoreProductImportReviewScreen).hitTestable(), findsOneWidget);
+    return (result: result);
+  }
+  Future<void> retire(WidgetTester tester, String reason) async {
+    if (reason == 'request') controller!.setDraft('A changed request');
+    if (reason == 'remove') controller!.removeSelectedAttachment(0);
+    if (reason == 'account') {
+      native.principal.identity = null; native.principal.changes.add(null);
+    }
+    if (reason == 'dispose') {
+      controller!.dispose(); controller = null;
+    }
+    await tester.pumpAndSettle();
+  }
+  Future<void> dispose(WidgetTester tester) async {
+    if (originalPicker != null) FilePickerPlatform.instance = originalPicker!;
+    await tester.pumpWidget(const SizedBox.shrink()); controller?.dispose(); access.dispose(); await native.dispose();
+  }
+}
+
+void registerAct228NativeSelectedImportTests() {
+  test('ACT228 attachment reference is optional and rejects model CSV or paths', () {
+    expect(StoreProductNativeInitial.fromFields('AI-ACT-228', {}).attachmentRef, isNull);
+    expect(StoreProductNativeInitial.fromFields('AI-ACT-228', {'attachmentRef': 'att-${List.filled(32, '1').join()}'}).attachmentRef, isNotNull);
+    for (final fields in <Map<String, Object?>>[{'attachmentRef': ''}, {'attachmentRef': null},
+      {'attachmentRef': '/private/products.csv'}, {'csv': 'title,stock\ninvented,999'}, {'products': []}]) {
+      expect(() => StoreProductNativeInitial.fromFields('AI-ACT-228', fields), throwsFormatException);
+    }
+  });
+  for (final extension in ['csv', 'json']) {
+    for (final save in [false, true]) {
+      testWidgets('ACT228 actual selected $extension native grid ${save ? 'Save only on original control' : 'Cancel adds nothing'}', (tester) async {
+        final h = _Act228NativeImportHarness();
+        try {
+          await h.ready(tester, extension: extension);
+          final before = h.native.writes, owned = jsonEncode(h.native.work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+          final inventorySaves = h.native.inventory.saves;
+          final pending = await h.begin(tester);
+          final screen = tester.widget<StoreProductImportReviewScreen>(find.byType(StoreProductImportReviewScreen));
+          expect(screen.fileName, 'HOST-selected.$extension');
+          expect(screen.review.rows.where((r) => r.product != null), hasLength(1));
+          expect(screen.review.rows.single.product!.title, _Act228NativeImportHarness.row['title']);
+          expect(h.native.writes, before); expect(h.repick.calls, 0); expect(h.selectedPickerCalls, 1);
+          expect(await h.controller!.reviewProposal(), scope_contract.MoolAssistantReviewResult.unavailable,
+            reason: 'A duplicate explicit Review must not push a second native importer.');
+          expect(find.byType(StoreProductImportReviewScreen), findsOneWidget);
+          if (save) {
+            final button = find.byKey(const Key('work-import-save'));
+            expect(tester.widget<FilledButton>(button).onPressed, isNotNull);
+            await tester.tap(button); await tester.pumpAndSettle();
+            expect(h.native.work.workspaceCatalogueItems.where((p) => p.sku == 'HOST-ATTACHED-228'), hasLength(1));
+            expect(await h.native.work.workspaceInventorySaved, isTrue);
+            expect(h.native.inventory.saves, greaterThan(inventorySaves));
+            expect(h.native.work.workspaceCatalogueItems.singleWhere((p) => p.sku == 'HOST-ATTACHED-228').publicListing, isFalse);
+          } else {
+            await tester.pageBack(); await tester.pumpAndSettle();
+            expect(h.native.writes, before);
+            expect(jsonEncode(h.native.work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), owned);
+          }
+          expect(find.byType(StoreProductImportReviewScreen), findsNothing,
+            reason: 'Native Save must acknowledge and close; fail before awaiting a still-open review.');
+          await pending.result; expect(h.repick.calls, 0);
+          expect(h.controller!.receiveProposal(h.proposal()), isFalse, reason: 'Consumed proposal IDs cannot replay.');
+        } finally { await h.dispose(tester); }
+      });
+    }
+  }
+  testWidgets('ACT228 omitted attachmentRef preserves original manual picker cancellation', (tester) async {
+    final h = _Act228NativeImportHarness();
+    try {
+      await h.ready(tester); h.repick.fail = false;
+      final before = h.native.writes;
+      expect(h.controller!.receiveProposal(h.proposal(fields: const {})), isTrue);
+      final result = h.controller!.reviewProposal(); await tester.pumpAndSettle();
+      expect(await result, scope_contract.MoolAssistantReviewResult.cancelled);
+      expect(h.repick.calls, 1); expect(h.repick.extensions, ['csv', 'json']);
+      expect(find.byType(StoreProductImportReviewScreen), findsNothing); expect(h.native.writes, before);
+    } finally { await h.dispose(tester); }
+  });
+  for (final failure in ['wrong reference', 'wrong MIME', 'name MIME mismatch', 'malformed CSV', 'malformed JSON', 'invalid UTF8', 'oversize']) {
+    testWidgets('ACT228 selected $failure never silently repicks or saves', (tester) async {
+      final h = _Act228NativeImportHarness();
+      try {
+        await h.ready(tester, extension: failure == 'malformed JSON' ? 'json' : 'csv', mime: failure == 'wrong MIME' ? 'application/pdf'
+          : failure == 'name MIME mismatch' ? 'application/json' : null,
+          bytes: failure == 'invalid UTF8' ? Uint8List.fromList([0xff, 0xfe])
+            : failure == 'malformed CSV' ? Uint8List.fromList(utf8.encode('title,stock\n"unterminated'))
+            : failure == 'malformed JSON' ? Uint8List.fromList(utf8.encode('[invalid'))
+            : failure == 'oversize' ? Uint8List(10 * 1024 * 1024 + 1) : null);
+        final before = h.native.writes;
+        expect(h.controller!.receiveProposal(h.proposal(ref: failure == 'wrong reference' ? 'att-${List.filled(32, '0').join()}' : null)), isTrue);
+        final result = h.controller!.reviewProposal();
+        await tester.pumpAndSettle(); await result;
+        expect(find.byType(StoreProductImportReviewScreen), findsNothing);
+        expect(h.native.writes, before); expect(h.repick.calls, 0); expect(h.selectedPickerCalls, 1);
+      } finally { await h.dispose(tester); }
+    });
+  }
+  for (final retirement in ['request', 'remove', 'account', 'dispose']) {
+    testWidgets('ACT228 $retirement retirement prevents retained original Save from importing', (tester) async {
+      final h = _Act228NativeImportHarness();
+      try {
+        await h.ready(tester); await h.begin(tester);
+        final button = tester.widget<FilledButton>(find.byKey(const Key('work-import-save'))).onPressed!;
+        final before = h.native.writes;
+        await h.retire(tester, retirement);
+        expect(find.byKey(const Key('work-import-save')), findsNothing);
+        button(); await tester.pumpAndSettle();
+        expect(h.native.writes, before); expect(h.repick.calls, 0);
+        expect(h.native.work.workspaceCatalogueItems.where((p) => p.sku == 'HOST-ATTACHED-228'), isEmpty);
+      } finally { await h.dispose(tester); }
+    });
+  }
+  for (final correction in [false, true]) {
+    for (final retirement in ['request', 'remove', 'account', 'dispose']) {
+      testWidgets('ACT228 native ${correction ? 'Correct invalid row' : 'Edit valid row'} $retirement hides private fields and refuses retained Apply', (tester) async {
+        final h = _Act228NativeImportHarness();
+        try {
+          await h.ready(tester, extension: 'json', bytes: correction
+            ? Uint8List.fromList(utf8.encode(jsonEncode([{..._Act228NativeImportHarness.row, 'stock': '-1'}]))) : null);
+          await h.begin(tester);
+          final editor = find.byKey(Key(correction ? 'work-import-correct-1' : 'work-import-edit-1'));
+          await tester.ensureVisible(editor); await tester.tap(editor); await tester.pumpAndSettle();
+          expect(find.text(correction ? 'Correct product · Row 1' : 'Review product'), findsOneWidget);
+          final title = find.byKey(const Key('work-product-title'));
+          await tester.ensureVisible(title); await tester.enterText(title, 'HOST private nested import edit');
+          if (correction) {
+            final stock = find.byKey(const Key('work-product-stock'));
+            await tester.ensureVisible(stock); await tester.enterText(stock, '2');
+          }
+          FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+          final original = tester.widget<TextField>(title).controller!;
+          final apply = find.byKey(const Key('work-product-save'));
+          await tester.ensureVisible(apply);
+          final captured = tester.widget<FilledButton>(apply).onPressed;
+          expect(captured, isNotNull); expect(find.text('Apply to import'), findsOneWidget);
+          final writes = h.native.writes;
+          await h.retire(tester, retirement);
+          expect(title, findsNothing); expect(apply, findsNothing);
+          expect(find.text('HOST private nested import edit'), findsNothing);
+          expect(tester.testTextInput.isVisible, isFalse);
+          final hiddenTitle = find.byKey(const Key('work-product-title'), skipOffstage: false);
+          expect(tester.widget<TextField>(hiddenTitle).controller, same(original));
+          expect(original.text, 'HOST private nested import edit');
+          captured!(); await tester.pumpAndSettle();
+          // Applying after retirement must not finish/pop this retained editor,
+          // deliver a corrected row to the grid, or write original Store stock.
+          expect(tester.widget<TextField>(hiddenTitle).controller, same(original));
+          expect(original.text, 'HOST private nested import edit');
+          expect(apply, findsNothing); expect(h.native.writes, writes); expect(h.repick.calls, 0);
+          expect(h.native.work.workspaceCatalogueItems.where((p) => p.sku == 'HOST-ATTACHED-228'), isEmpty);
+          expect(tester.takeException(), isNull);
+        } finally { await h.dispose(tester); }
+      });
+    }
+  }
+  testWidgets('ACT228 dispatched native Save acknowledges retirement without popping an unrelated top route', (tester) async {
+    final inventory = _Act228ImportInventory();
+    final h = _Act228NativeImportHarness(inventory: inventory);
+    try {
+      await h.ready(tester); await h.begin(tester);
+      final navigator = Navigator.of(tester.element(find.byType(StoreProductImportReviewScreen)));
+      final before = inventory.saves;
+      inventory.saveGate = Completer<void>(); inventory.saveEntered = Completer<void>();
+      await tester.tap(find.byKey(const Key('work-import-save')));
+      for (var i = 0; i < 60 && !inventory.saveEntered!.isCompleted; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(inventory.saveEntered!.isCompleted, isTrue, reason: 'The original user Save must actually dispatch before retirement.');
+      expect(h.native.work.workspaceCatalogueItems.where((p) => p.sku == 'HOST-ATTACHED-228'), hasLength(1));
+      h.controller!.setDraft('A request changed while the original Save is pending');
+      await tester.pump();
+      unawaited(navigator.push<void>(MaterialPageRoute<void>(builder: (_) => const Scaffold(
+        body: Center(child: Text('HOST unrelated route', key: Key('act228-unrelated-route')))))));
+      await tester.pumpAndSettle();
+      inventory.saveGate!.complete(); await tester.pumpAndSettle();
+      expect(await h.native.work.workspaceInventorySaved, isTrue);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('act228-unrelated-route')).hitTestable(), findsOneWidget);
+      expect(find.byType(StoreProductImportReviewScreen, skipOffstage: false), findsOneWidget);
+      expect(h.native.work.workspaceCatalogueItems.where((p) => p.sku == 'HOST-ATTACHED-228'), hasLength(1),
+        reason: 'Retirement must not undo an original user Save already dispatched.');
+      expect(inventory.saves, greaterThan(before)); expect(h.repick.calls, 0);
+      expect(tester.takeException(), isNull);
+    } finally {
+      if (inventory.saveGate != null && !inventory.saveGate!.isCompleted) inventory.saveGate!.complete();
+      await tester.pump(); await h.dispose(tester);
+    }
+  });
+}
+
+
+// HOST-only accepted native actor/source fixtures. Never injected into runtime.
+class _OfferHostGateway extends promotion_fixture.Provider implements StoreStructuredCouponGateway {
+  @override bool get storeCouponTermsSupported => true;
+  @override bool get structuredCouponTermsSupported => true;
+  final couponWrites = <StoreCouponIntent>[];
+  StoreCouponRecord? head;
+  bool unknown = false;
+  @override Future<StoreCouponRecord?> readCoupon(StorePromotionScope scope, String id, bool Function() current) async =>
+    current() && head?.couponId == id ? head : null;
+  @override Future<StoreCouponPage> listCoupons(StorePromotionScope scope, bool Function() current, {String? after, int limit = 20}) async => StoreCouponPage([], null);
+  @override Future<StoreCouponResult> saveCoupon(StoreCouponIntent original, bool Function() current) async {
+    if (!current()) return const StoreCouponResult(StorePromotionResultState.notSent);
+    couponWrites.add(original);
+    final at = DateTime.now().toUtc();
+    head = StoreCouponRecord.decode(original.input.structured ? {
+      'schemaVersion': 2, 'storeCouponTermsVersion': 2, 'accountId': original.scope.account,
+      'realm': original.scope.realm, 'storeId': original.scope.store, 'couponId': original.couponId,
+      'revision': original.expectedRevision + 1, 'observedAt': at.toIso8601String(), 'coupon': original.input.toJson(),
+    } : {...original.input.toJson(), 'schemaVersion': 1, 'realm': original.scope.realm,
+      'storeId': original.scope.store, 'couponId': original.couponId,
+      'revision': original.expectedRevision + 1, 'observedAt': at.toIso8601String()}, original.scope, at);
+    return StoreCouponResult(unknown ? StorePromotionResultState.unknown : StorePromotionResultState.saved, record: head);
+  }
+  @override Future<StoreCouponResult> reconcileCoupon(StoreCouponIntent original, bool Function() current) async =>
+    current() && head?.acknowledges(original) == true ? StoreCouponResult(StorePromotionResultState.saved, record: head)
+      : const StoreCouponResult(StorePromotionResultState.unknown);
+}
+class _OfferHostDraft extends _NativeScopeProofStore {
+  _OfferHostDraft(super.account);
+  bool unknown = false;
+  @override Future<void> save(String scope, Map<String, Object?> value) async {
+    await super.save(scope, value);
+    if (unknown) throw StateError('HOST durable write without acknowledgement');
+  }
+}
+class _OfferHostHarness {
+  _OfferHostHarness({this.connected = true}) {
+    native = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) {
+      draft = _OfferHostDraft(contact.accountScope);
+      return WorkSession(contactDraftStore: contact, purchaseEntryStore: purchase, inventoryStore: inventory,
+        tradingPreferencesStoreFactory: (_) => trading, offerDraftStoreFactory: (_) => draft,
+        productPromotionGateway: connected ? gateway : null, productPromotionRealm: connected ? 'evaluation' : null,
+        storeCouponPendingStoreFactory: (_) => pending, catalogueReference: workspaceMasterCatalogue);
+    });
+  }
+  final bool connected;
+  final gateway = _OfferHostGateway(), pending = promotion_fixture.CouponPending();
+  final access = _ReceivingAssistantAccess();
+  late final _AuthenticatedNativeScopeFixture native;
+  late final _OfferHostDraft draft;
+  scope_contract.MoolAssistantController? controller;
+  late final StoreCouponCampaign campaign;
+  Object get writes => (native.writes, draft.saves, gateway.couponWrites.length);
+  Future<void> ready(WidgetTester tester, {bool customers = false}) async {
+    await native.ready();
+    if (customers) { expect(native.work.loadStoreReviewSeed(12), isTrue); native.work.workspaceId = native.work.activeWorkspace!.id; }
+    expect(await native.work.loadWorkspaceInventory(retry: true), isTrue);
+    expect(await native.work.workspaceInventorySaved, isTrue);
+    final store = native.work.activeWorkspace!.id;
+    expect(await native.work.loadWorkspaceOfferDraft(expectedStoreId: store), isTrue);
+    final now = DateTime.now();
+    campaign = StoreCouponCampaign(id: 'HOST-offer-original', storeId: store, revision: 1,
+      name: 'HOST होली offer', percentage: false, discount: 100, minimumSpendMinor: 0,
+      maximumSavingMinor: 100, startsAt: now.subtract(const Duration(days: 1)),
+      endsAt: now.add(const Duration(days: 7)), totalUses: 100, usesPerCustomer: 1);
+    expect(await native.work.saveWorkspaceStoreCouponCampaign(campaign, expectedStoreId: store), isTrue);
+    await tester.pumpWidget(native.app); await tester.pumpAndSettle();
+    final adapters = native.adapters(tester);
+    expect(adapters.map((a) => a.actionId), containsAll(['AI-ACT-308','AI-ACT-309','AI-ACT-310']));
+    controller = scope_contract.MoolAssistantController(currentContext: native.readContext,
+      contextChanges: Listenable.merge([native.work, native.journey, native.mode]), entitlements: access, nativeAdapters: adapters);
+    await controller!.refreshAccess(); controller!.setDraft('Review the actual Store coupon');
+  }
+  Future<({Future<MoolAssistantReviewResult> result})> open(WidgetTester tester, String action,
+    {String? entity, Map<String, Object?> fields = const {}}) async {
+    final c = controller!, adapter = native.adapters(tester).singleWhere((a) => a.actionId == action);
+    final snapshot = await adapter.snapshot(c.context, entity); expect(snapshot, isNotNull);
+    expect(c.receiveProposal(scope_contract.MoolAssistantProposal(id: 'HOST-offer-$action', actionId: action,
+      binding: c.context.binding, requestRevision: c.requestRevision, entitlementRevision: c.entitlementRevision!,
+      sourceRevision: snapshot!.sourceRevision, validUntil: DateTime.now().add(const Duration(minutes: 5)),
+      entityId: entity, title: 'Review original Store coupon', summary: 'HOST original form/source only.', fields: fields)), isTrue);
+    final result = c.reviewProposal(); await tester.pumpAndSettle();
+    return (result: result);
+  }
+  Future<void> retire(WidgetTester tester, String reason) async {
+    if (reason == 'cancel') controller!.cancelProposal();
+    if (reason == 'request') controller!.setDraft('A different request');
+    if (reason == 'dispose') { controller!.dispose(); controller = null; }
+    if (reason == 'account') { native.principal.identity = null; native.principal.changes.add(null); }
+    await tester.pumpAndSettle();
+  }
+  Future<void> dispose(WidgetTester tester) async {
+    await tester.pumpWidget(const SizedBox.shrink()); controller?.dispose(); access.dispose(); await native.dispose();
+  }
+}
+
+void registerOfferNativeTests() {
+  test('FE-OFFER typed raw fields preserve Unicode and reject effect/identity injection', () {
+    expect(StoreCouponReviewInitial.fromFields({'name': 'होली બચત', 'discount': '12.50'}).values['name'], 'होली બચત');
+    for (final fields in <Map<String, Object?>>[{}, {'campaignId': 'invented'}, {'revision': 999}, {'funding': true},
+      {'publish': true}, {'discount': '१२.५०'}, {'channels': ['retail','retail']}, {'startsAt': '2026-02-31T00:00:00'},
+      {'tiers': [{'minimumQuantity': 10, 'priceMinor': 100}, {'minimumQuantity': 9, 'priceMinor': 90}]}]) {
+      expect(() => StoreCouponReviewInitial.fromFields(fields), throwsFormatException);
+    }
+  });
+  testWidgets('FE-OFFER308 actual coupon manager filters actual private rows without writes', (tester) async {
+    final h = _OfferHostHarness();
+    try {
+      await h.ready(tester); final writes = h.writes;
+      final opened = await h.open(tester, 'AI-ACT-308', fields: {'query': 'होली'});
+      expect(tester.widget<TextField>(find.byKey(const Key('work-coupon-search'))).controller!.text, 'होली');
+      expect(find.byKey(ValueKey('work-coupon-${h.campaign.id}')), findsOneWidget);
+      expect(find.textContaining('Draft'), findsWidgets); expect(h.writes, writes);
+      await tester.tap(find.byTooltip('Close coupons')); await tester.pumpAndSettle(); await opened.result;
+    } finally { await h.dispose(tester); }
+  });
+  for (final save in [false, true]) {
+    testWidgets('FE-OFFER309 original editor edit preserves campaign identity ${save ? 'native Save only' : 'original Leave protects supplied input'}', (tester) async {
+      final h = _OfferHostHarness();
+      try {
+        await h.ready(tester); final writes = h.writes;
+        final opened = await h.open(tester, 'AI-ACT-309', entity: h.campaign.id, fields: {'name': 'નવું होली coupon', 'discount': '2.50'});
+        expect(tester.widget<TextFormField>(find.byKey(const Key('work-coupon-name'))).controller!.text, 'નવું होली coupon');
+        expect(tester.widget<TextFormField>(find.byKey(const Key('work-coupon-discount'))).controller!.text, '2.50');
+        expect(h.writes, writes);
+        if (save) {
+          await tester.tap(find.byKey(const Key('work-coupon-save'))); await tester.pumpAndSettle();
+          expect(find.byTooltip('Close coupon editor'), findsNothing);
+          final saved = h.native.work.workspaceStoreCouponCampaigns.single;
+          expect(saved.id, h.campaign.id); expect(saved.revision, 2); expect(saved.discount, 250);
+          expect(h.gateway.couponWrites, isEmpty); expect(h.draft.saves, greaterThan(1));
+        } else {
+          await tester.tap(find.byTooltip('Close coupon editor')); await tester.pumpAndSettle();
+          expect(find.text('Leave unsaved changes?'), findsOneWidget);
+          await tester.tap(find.text('Keep editing')); await tester.pumpAndSettle();
+          expect(tester.widget<TextFormField>(find.byKey(const Key('work-coupon-name'))).controller!.text, 'નવું होली coupon');
+          await tester.tap(find.byTooltip('Close coupon editor')); await tester.pumpAndSettle();
+          await tester.tap(find.text('Leave')); await tester.pumpAndSettle(); expect(h.writes, writes);
+        }
+        await opened.result;
+      } finally { await h.dispose(tester); }
+    });
+  }
+  for (final reason in ['cancel','request','account','dispose']) {
+    testWidgets('FE-OFFER309 real $reason signal hides private form and refuses retained Save', (tester) async {
+      final h = _OfferHostHarness();
+      try {
+        await h.ready(tester); await h.open(tester, 'AI-ACT-309', entity: h.campaign.id, fields: {'name': 'HOST private changed input'});
+        final name = tester.widget<TextFormField>(find.byKey(const Key('work-coupon-name'))).controller!;
+        final save = tester.widget<FilledButton>(find.byKey(const Key('work-coupon-save'))).onPressed!;
+        final writes = h.writes; await h.retire(tester, reason);
+        expect(find.byKey(const Key('work-coupon-name')), findsNothing); expect(name.text, 'HOST private changed input');
+        expect(tester.testTextInput.isVisible, isFalse); save(); await tester.pumpAndSettle(); expect(h.writes, writes);
+      } finally { await h.dispose(tester); }
+    });
+  }
+  testWidgets('FE-OFFER309 new original campaign owns its generated identity and supplied exact dates', (tester) async {
+    final h = _OfferHostHarness();
+    try {
+      await h.ready(tester); final start = DateTime.now().toUtc().add(const Duration(days: 1)), end = DateTime.now().toUtc().add(const Duration(days: 8));
+      final before = h.draft.saves;
+      final opened = await h.open(tester, 'AI-ACT-309', fields: {'name': 'નવી होली बचत', 'discount': '2.50',
+        'minimumSpend': '0', 'startsAt': start.toIso8601String(), 'endsAt': end.toIso8601String(),
+        'totalUses': '10', 'usesPerCustomer': '1'});
+      expect(h.draft.saves, before);
+      await tester.tap(find.byKey(const Key('work-coupon-save'))); await tester.pumpAndSettle();
+      expect(find.byTooltip('Close coupon editor'), findsNothing); await opened.result;
+      final saved = h.native.work.workspaceStoreCouponCampaigns.singleWhere((c) => c.id != h.campaign.id);
+      expect(saved.id, startsWith('coupon-')); expect(saved.revision, 1); expect(saved.name, 'નવી होली बचत');
+      expect(saved.startsAt.toUtc(), start); expect(saved.endsAt.toUtc(), end); expect(saved.discount, 250);
+      expect(h.draft.saves, before + 1); expect(h.gateway.couponWrites, isEmpty);
+    } finally { await h.dispose(tester); }
+  });
+  for (final kind in ['quantityPrice','extraQuantity','nextPurchase']) {
+    testWidgets('FE-OFFER309 $kind fills its actual native controls without save or eligibility claims', (tester) async {
+      final h = _OfferHostHarness();
+      try {
+        await h.ready(tester); final sku = h.native.work.workspaceCatalogueItems.first, writes = h.writes;
+        await h.open(tester, 'AI-ACT-309', fields: {'name': 'HOST structured $kind', 'kind': kind, 'skuIds': [sku.id],
+          'channels': ['retail'], if (kind == 'quantityPrice') 'tiers': [{'minimumQuantity': 10, 'priceMinor': 9000}],
+          if (kind == 'extraQuantity') ...{'buyQuantity':'10', 'rewardSkuId':sku.id, 'rewardQuantity':'1'},
+          if (kind == 'nextPurchase') ...{'discount':'5.25', 'nextPurchaseDays':'14'}});
+        expect(find.text('1 selected SKU'), findsOneWidget);
+        if (kind == 'quantityPrice') {
+          final tiers = find.byKey(const Key('work-coupon-tiers')); await tester.ensureVisible(tiers); await tester.tap(tiers); await tester.pumpAndSettle();
+          final fields = tester.widgetList<TextFormField>(find.descendant(of: find.byKey(const Key('work-coupon-tier-rows')), matching: find.byType(TextFormField))).toList();
+          expect(fields.first.controller!.text, '10'); expect(fields.last.controller!.text, '90');
+        } else {
+          final key = kind == 'extraQuantity' ? 'work-coupon-buy-quantity' : 'work-coupon-next-days';
+          final field = find.byKey(Key(key)); await tester.scrollUntilVisible(field, 180, scrollable: find.descendant(of: find.byKey(const Key('work-coupon-editor')), matching: find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down)).first);
+          expect(tester.widget<TextFormField>(field).controller!.text, kind == 'extraQuantity' ? '10' : '14');
+        }
+        expect(h.writes, writes); expect(h.native.work.workspaceStoreCouponCampaigns, hasLength(1));
+      } finally { await h.dispose(tester); }
+    });
+  }
+  testWidgets('FE-OFFER309 unknown private Save requires original readback and never republishes or resaves', (tester) async {
+    final h = _OfferHostHarness();
+    try {
+      await h.ready(tester); h.draft.unknown = true;
+      final before = h.draft.saves;
+      final opened = await h.open(tester, 'AI-ACT-309', entity: h.campaign.id, fields: {'name': 'HOST uncertain private draft'});
+      await tester.tap(find.byKey(const Key('work-coupon-save'))); await tester.pumpAndSettle();
+      expect(find.text('Check saved coupon'), findsOneWidget);
+      expect(h.native.work.workspaceStoreCouponRecoveryRequired, isTrue);
+      expect(h.draft.saves, before + 1); expect(h.gateway.couponWrites, isEmpty);
+      h.draft.unknown = false;
+      await tester.tap(find.byKey(const Key('work-coupon-save'))); await tester.pumpAndSettle();
+      expect(find.byTooltip('Close coupon editor'), findsNothing); await opened.result;
+      expect(h.draft.saves, before + 1); expect(h.gateway.couponWrites, isEmpty);
+      expect(h.native.work.workspaceStoreCouponCampaigns.single.name, 'HOST uncertain private draft');
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('FE-OFFER309 source revision rejects a real intervening original campaign edit', (tester) async {
+    final h = _OfferHostHarness();
+    try {
+      await h.ready(tester);
+      final adapter = h.native.adapters(tester).singleWhere((a) => a.actionId == 'AI-ACT-309');
+      final c = h.controller!, original = (await adapter.snapshot(h.native.readContext(), h.campaign.id))!;
+      final changed = StoreCouponCampaign.fromJson({...h.campaign.toJson(), 'revision': 2, 'name': 'HOST original changed elsewhere'}, h.campaign.storeId);
+      expect(await h.native.work.saveWorkspaceStoreCouponCampaign(changed, expectedStoreId: changed.storeId), isTrue);
+      final writes = h.writes;
+      expect(c.receiveProposal(scope_contract.MoolAssistantProposal(id: 'HOST-stale-coupon', actionId: 'AI-ACT-309',
+        binding: c.context.binding, requestRevision: c.requestRevision, entitlementRevision: c.entitlementRevision!,
+        sourceRevision: original.sourceRevision, validUntil: DateTime.now().add(const Duration(minutes: 5)),
+        entityId: h.campaign.id, title: 'Review original coupon', summary: 'HOST stale source test', fields: const {'name': 'HOST stale suggestion'})), isTrue);
+      final result = c.reviewProposal(); await tester.pumpAndSettle();
+      expect(await result, MoolAssistantReviewResult.stale); expect(find.byKey(const Key('work-coupon-editor')), findsNothing);
+      expect(h.native.work.workspaceStoreCouponCampaigns.single.name, changed.name); expect(h.writes, writes);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('FE-OFFER309 actual owned SKU and buyer IDs populate original native selectors without save', (tester) async {
+    final h = _OfferHostHarness();
+    try {
+      await h.ready(tester, customers: true);
+      final sku = h.native.work.workspaceCatalogueItems.first, buyer = h.native.work.workspaceCustomerBook.first;
+      final writes = h.writes;
+      await h.open(tester, 'AI-ACT-309', fields: {'name': 'HOST buyer offer', 'kind': 'buyerDiscount',
+        'skuIds': [sku.id], 'buyerIds': [buyer.id], 'channels': ['retail'], 'discount': '3.25'});
+      expect(find.text('1 selected SKU'), findsOneWidget); expect(find.textContaining(sku.title), findsWidgets);
+      final buyers = find.byKey(const Key('work-coupon-buyers')); await tester.scrollUntilVisible(buyers, 180, scrollable: find.descendant(of: find.byKey(const Key('work-coupon-editor')), matching: find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down)).first); await tester.tap(buyers); await tester.pumpAndSettle();
+      expect(find.text(buyer.name), findsWidgets);
+      final tile = tester.widgetList<CheckboxListTile>(find.byType(CheckboxListTile)).firstWhere((tile) => tile.title is Text && (tile.title as Text).data == buyer.name);
+      expect(tile.value, isTrue); expect(h.writes, writes);
+    } finally { await h.dispose(tester); }
+  });
+  for (final operation in ['publish','pause']) {
+    testWidgets('FE-OFFER310 $operation funding stays unchecked and only native final button writes once', (tester) async {
+      final h = _OfferHostHarness();
+      try {
+        await h.ready(tester);
+        if (operation == 'pause') {
+          final publisher = h.native.work.workspaceStoreCoupons!;
+          expect(await publisher.refresh(h.campaign.id), isTrue);
+          expect((await publisher.submit(h.campaign.id, StoreCouponInput.fromCampaign(h.campaign, active: true),
+            fundingAcknowledged: true, inputCurrent: () => true)).state, StorePromotionResultState.saved);
+        }
+        final before = h.gateway.couponWrites.length;
+        await h.open(tester, 'AI-ACT-310', entity: h.campaign.id, fields: {'operation': operation});
+        final funding = find.byType(CheckboxListTile); expect(tester.widget<CheckboxListTile>(funding).value, isFalse);
+        expect(h.pending.original, isNull, reason: 'Review cannot journal an unconfirmed publication intent.');
+        final label = operation == 'pause' ? 'Pause coupon' : 'Publish coupon terms';
+        final button = find.ancestor(of: find.text(label), matching: operation == 'pause' ? find.byType(OutlinedButton) : find.byType(FilledButton));
+        expect(operation == 'pause' ? tester.widget<OutlinedButton>(button).onPressed : tester.widget<FilledButton>(button).onPressed, isNull);
+        expect(h.gateway.couponWrites.length, before);
+        await tester.tap(funding); await tester.pumpAndSettle();
+        final captured = operation == 'pause' ? tester.widget<OutlinedButton>(button).onPressed! : tester.widget<FilledButton>(button).onPressed!;
+        await tester.ensureVisible(button); await tester.tap(button); await tester.pumpAndSettle();
+        expect(h.gateway.couponWrites.length, before + 1); expect(h.gateway.couponWrites.last.couponId, h.campaign.id);
+        expect(h.gateway.couponWrites.last.input.active, operation == 'publish');
+        captured(); await tester.pumpAndSettle(); expect(h.gateway.couponWrites.length, before + 1);
+      } finally { await h.dispose(tester); }
+    });
+  }
+  testWidgets('FE-OFFER309 nested actual buyer picker hides private rows on real cancellation and refuses retained Use', (tester) async {
+    final h = _OfferHostHarness();
+    try {
+      await h.ready(tester, customers: true);
+      final buyer = h.native.work.workspaceCustomerBook.first;
+      await h.open(tester, 'AI-ACT-309', fields: {'name': 'HOST private selected buyer', 'kind': 'buyerDiscount', 'buyerIds': [buyer.id], 'discount': '1.25'});
+      final pick = find.byKey(const Key('work-coupon-buyers')); await tester.ensureVisible(pick); await tester.tap(pick); await tester.pumpAndSettle();
+      expect(find.text(buyer.name), findsWidgets);
+      final use = tester.widget<FilledButton>(find.ancestor(of: find.text('Use selection'), matching: find.byType(FilledButton))).onPressed!;
+      final writes = h.writes; await h.retire(tester, 'cancel');
+      expect(find.text(buyer.name), findsNothing); expect(find.byKey(const Key('work-coupon-reference-search')), findsNothing);
+      use(); await tester.pumpAndSettle();
+      expect(find.text('Your Store session changed. Reopen this selection.'), findsOneWidget);
+      expect(h.writes, writes); expect(h.native.work.workspaceStoreCouponCampaigns, hasLength(1));
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('FE-OFFER310 uncertain original is preserved and retired Retry cannot send', (tester) async {
+    final h = _OfferHostHarness();
+    try {
+      await h.ready(tester); h.gateway.unknown = true;
+      final publisher = h.native.work.workspaceStoreCoupons!;
+      expect(await publisher.refresh(h.campaign.id), isTrue);
+      await publisher.submit(h.campaign.id, StoreCouponInput.fromCampaign(h.campaign, active: true), fundingAcknowledged: true, inputCurrent: () => true);
+      final original = publisher.pending!, writes = h.gateway.couponWrites.length;
+      await h.open(tester, 'AI-ACT-310', entity: h.campaign.id, fields: {'operation': 'publish'});
+      expect(find.text('Original coupon: ${h.campaign.name}'), findsOneWidget);
+      final funding = find.byType(CheckboxListTile); expect(tester.widget<CheckboxListTile>(funding).value, isFalse);
+      await tester.tap(funding); await tester.pumpAndSettle();
+      final button = find.ancestor(of: find.text('Retry exact original update'), matching: find.byType(OutlinedButton));
+      final retry = tester.widget<OutlinedButton>(button).onPressed!;
+      await h.retire(tester, 'cancel'); retry(); await tester.pumpAndSettle();
+      expect(h.gateway.couponWrites.length, writes); expect(publisher.pending!.fingerprint, original.fingerprint);
+      expect(h.pending.original!.idempotencyKey, original.idempotencyKey);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('FE-OFFER310 unavailable publisher still reviews exact original terms truthfully', (tester) async {
+    final h = _OfferHostHarness(connected: false);
+    try {
+      await h.ready(tester); final writes = h.writes;
+      await h.open(tester, 'AI-ACT-310', entity: h.campaign.id, fields: {'operation': 'pause'});
+      expect(find.text(h.campaign.name), findsOneWidget);
+      expect(find.textContaining('Public status unavailable'), findsOneWidget);
+      expect(tester.widget<FilledButton>(find.ancestor(of: find.text('Pause'), matching: find.byType(FilledButton))).onPressed, isNull);
+      expect(find.byType(CheckboxListTile), findsNothing); expect(h.writes, writes);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('FE-OFFER309 missing owned refs fail before opening or saving a blank form', (tester) async {
+    final h = _OfferHostHarness();
+    try {
+      await h.ready(tester); final writes = h.writes;
+      final opened = await h.open(tester, 'AI-ACT-309', fields: {'name': 'HOST missing source', 'skuIds': ['HOST-not-owned']});
+      expect(await opened.result, MoolAssistantReviewResult.unavailable);
+      expect(find.byKey(const Key('work-coupon-editor')), findsNothing); expect(h.writes, writes);
+    } finally { await h.dispose(tester); }
+  });
+  for (final boundary in ['buyer','unapproved','Store changed']) {
+    testWidgets('FE-OFFER308-310 $boundary neither registers nor reads the old private Store source', (tester) async {
+      final h = _OfferHostHarness();
+      try {
+        await h.ready(tester);
+        final old = h.native.adapters(tester).where((a) => const {'AI-ACT-308','AI-ACT-309','AI-ACT-310'}.contains(a.actionId)).toList();
+        final ctx = h.native.readContext();
+        if (boundary == 'buyer') h.native.mode.value = 'buyer';
+        if (boundary == 'unapproved') { h.native.work.remoteReviewStatus = WorkRemoteReviewStatus.pending; h.native.work.reviewStage = WorkReviewStage.gstPending; }
+        if (boundary == 'Store changed') h.native.work.activeWorkspace = const WorkWorkspace(id: 'HOST-unapproved-offer-store',
+          name: 'HOST different Store', profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery', area: 'HOST area', verified: true);
+        h.native.work.notifyListeners(); await tester.pumpAndSettle();
+        expect(h.native.adapters(tester).where((a) => const {'AI-ACT-308','AI-ACT-309','AI-ACT-310'}.contains(a.actionId)), isEmpty);
+        final writes = h.writes, reads = h.draft.reads;
+        for (final adapter in old) expect(await adapter.snapshot(ctx, adapter.actionId == 'AI-ACT-310' ? h.campaign.id : null), isNull);
+        expect(h.writes, writes); expect(h.draft.reads, reads);
+      } finally { await h.dispose(tester); }
+    });
+  }
+}
+
+
+// HOST-only native journals/counters. Not runtime integrations or financial proof.
+class _SalesNativeJournal extends _CounterDraftFixtureStore {
+  int saves = 0;
+  bool loseReply = false;
+  @override Future<void> save(WorkspaceCounterDraft value,{required int? expectedRevision}) async {
+    saves++; await super.save(value,expectedRevision: expectedRevision);
+    if (loseReply) throw StateError('HOST saved journal reply lost');
+  }
+}
+class _SalesNativeSession extends WorkSession {
+  _SalesNativeSession({required super.contactDraftStore,required super.purchaseEntryStore,required super.inventoryStore,
+    required super.tradingPreferencesStoreFactory,required super.counterDraftStore}) : super(catalogueReference: workspaceMasterCatalogue);
+  int detailsCalls = 0,quantityCalls = 0,submitCalls = 0,freshCalls = 0;
+  bool rejectQuantity = false,failBeforeSubmit = false;
+  int stockSignatureReads=0,stockObserverStarts=0,stockObserverEnds=0;
+  final stockObservers=<Object>{};
+  @override String get counterCatalogueReviewSignature {stockSignatureReads++;return super.counterCatalogueReviewSignature;}
+  @override Object observeCounterReviewStock() {stockObserverStarts++;final token=super.observeCounterReviewStock();stockObservers.add(token);return token;}
+  @override void endCounterReviewStockObservation(Object token) {stockObserverEnds++;stockObservers.remove(token);super.endCounterReviewStockObservation(token);}
+  @override bool startNewWorkspaceOrder() { freshCalls++; return super.startNewWorkspaceOrder(); }
+  @override void updateWorkspaceCounterDetails({String? customer,WorkspaceBillingDetails? billingDetails,String? billingCustomer,
+    String? source,String? fulfilment,String? payment,String? address}) {
+    detailsCalls++; super.updateWorkspaceCounterDetails(customer: customer,billingDetails: billingDetails,billingCustomer: billingCustomer,
+      source: source,fulfilment: fulfilment,payment: payment,address: address);
+  }
+  @override void adjustWorkspaceOrderQuantity(String id,int change) {
+    quantityCalls++; if (rejectQuantity) return; super.adjustWorkspaceOrderQuantity(id,change);
+  }
+  @override Future<({String orderId,WorkspaceCustomerInvoice? invoice})?> submitWorkspaceCounterBill({String? expectedReview}) {
+    submitCalls++;if(failBeforeSubmit)throw StateError("HOST original native submit failed before dispatch");return super.submitWorkspaceCounterBill(expectedReview: expectedReview);
+  }
+}
+class _SalesNativeHarness {
+  _SalesNativeHarness() {
+    native = _AuthenticatedNativeScopeFixture(makeWork: (contact,purchase,inventory,trading) =>
+      _SalesNativeSession(contactDraftStore: contact,purchaseEntryStore: purchase,inventoryStore: inventory,
+        tradingPreferencesStoreFactory: (_) => trading,counterDraftStore: journal));
+  }
+  final journal = _SalesNativeJournal(),access = _ReceivingAssistantAccess();
+  late final _AuthenticatedNativeScopeFixture native;
+  scope_contract.MoolAssistantController? controller;
+  late WorkspaceCatalogueItem product;
+  _SalesNativeSession get work => native.work as _SalesNativeSession;
+  Object get writes => (native.writes,journal.saves,work.detailsCalls,work.quantityCalls,work.submitCalls,work.freshCalls,
+    work.workspaceInvoices.length,work.workspaceOrders.length,work.workspaceCatalogueItems.map((p) => (p.id,p.stock)).toList().toString());
+  Future<void> ready(WidgetTester tester,{bool saved = false,bool pending = false}) async {
+    await native.ready();
+    expect(await work.loadWorkspaceInventory(retry: true),isTrue);
+    expect(await work.workspaceInventorySaved,isTrue);
+    product = work.workspaceCatalogueItems.firstWhere((p) => p.canSellAtCounter && (p.stockMode == WorkspaceStockMode.availabilityOnly || p.stock > 0));
+    if (saved || pending) journal.value = WorkspaceCounterDraft(account: native.contact.accountScope,store: work.activeWorkspace!.id,
+      id: 'HOST-sales-original',revision: 1,stage: pending ? WorkspaceCounterDraftStage.submitting : WorkspaceCounterDraftStage.editing,
+      customer: '9829012345',billingDetails: const WorkspaceBillingDetails(name: 'मूल ગ્રાહક'),source: 'Counter',
+      fulfilment: 'At the shop',payment: 'Customer due',address: '',submissionOrderId: pending ? 'HOST-original-attempt' : null,
+      lines: [WorkspaceOrderItemSnapshot(productId: product.id,name: product.title,pack: product.pack,quantity: 1,
+        unitPricePaise: product.sellingPriceMinor,lineTotalPaise: product.sellingPriceMinor)]);
+    await work.loadWorkspaceCounterDraft(shouldRestore: () => false);
+    await tester.pumpWidget(native.app); await tester.pumpAndSettle();
+    expect(native.adapters(tester).map((a) => a.actionId),containsAll(['AI-ACT-288','AI-ACT-289','AI-ACT-290','AI-ACT-291','AI-ACT-292','AI-ACT-293','AI-ACT-295','AI-ACT-382','AI-ACT-383','AI-ACT-384','AI-ACT-385','AI-ACT-386']));
+    controller = scope_contract.MoolAssistantController(currentContext: native.readContext,
+      contextChanges: Listenable.merge([work,native.journey,native.mode]),entitlements: access,nativeAdapters: native.adapters(tester));
+    await controller!.refreshAccess(); controller!.setDraft('Review this exact original sale');
+  }
+  Future<({Future<MoolAssistantReviewResult> result})> open(WidgetTester tester,String action,
+    {Map<String,Object?> fields = const {},String? entity}) async {
+    final c = controller!,a = native.adapters(tester).singleWhere((a) => a.actionId == action);
+    final snapshot = await a.snapshot(c.context,entity); expect(snapshot,isNotNull);
+    expect(c.receiveProposal(scope_contract.MoolAssistantProposal(id: 'HOST-sales-$action',actionId: action,
+      binding: c.context.binding,requestRevision: c.requestRevision,entitlementRevision: c.entitlementRevision!,
+      sourceRevision: snapshot!.sourceRevision,validUntil: DateTime.now().add(const Duration(minutes: 5)),entityId: entity,
+      title: 'Review original sale',summary: 'HOST original native controls',fields: fields)),isTrue);
+    final result = c.reviewProposal(); await tester.pumpAndSettle(); return (result: result);
+  }
+  Map<String,Object?> get fields => {'customer':'9829012345','name':'किरण પટેલ','address':'12 બજાર માર્ગ',
+    'payment':'Customer due','items':[{'skuId':product.id,'quantity':1}]};
+  WorkspaceCustomerInvoice invoice({bool counter = true}) {
+    // Isolated native HOST snapshot, never a runtime producer or payment proof.
+    final at=DateTime.now(),minor=product.sellingPriceMinor;
+    final value=WorkspaceCustomerInvoice(id:'HOST-SALES-INVOICE',orderId:'HOST-SALES-ORDER',customer:'9829012345',
+      sellerName:'HOST Store',billingDetails:const WorkspaceBillingDetails(name:'કિરણ जी'),items:product.title,
+      amount:minor~/100,remainderPaise:minor%100,payment:'Customer due',issuedAt:at);
+    work.workspaceInvoices.add(value);
+    work.workspaceOrders.add(WorkspaceOrderRecord(id:value.orderId,customer:value.customer,items:value.items,
+      quantities:{product.id:1},amount:value.amount,remainderPaise:value.remainderPaise,source:counter?'Counter':'Phone',
+      fulfilment:'At the shop',payment:value.payment,address:'',stage:'Completed',needsDelivery:false,createdAt:at,
+      itemSnapshots:[WorkspaceOrderItemSnapshot(productId:product.id,name:product.title,pack:product.pack,quantity:1,unitPricePaise:minor,lineTotalPaise:minor)]));
+    final scope=work.workspaceSupplierScope!;
+    expect(work.applyWorkspaceFinance(WorkspaceFinanceSnapshot(accountScope:scope.$1,workspaceId:scope.$2,revision:1,asOf:at,
+      salesTodayMinor:0,duesMinor:0,availableMinor:0,heldMinor:0,requestedMinor:0,paidOutMinor:0,feesMinor:0,
+      deliveryAdjustmentsMinor:0,refundsMinor:0,taxWithheldMinor:0,payments:const [],payouts:const [],historyComplete:true)),isTrue);
+    return value;
+  }
+
+  Future<void> retire(WidgetTester tester,String reason) async {
+    if (reason == 'cancel') controller!.cancelProposal();
+    if (reason == 'request') controller!.setDraft('Different request');
+    if (reason == 'dispose') { controller!.dispose();controller = null; }
+    if (reason == 'principal') { native.principal.identity = null;native.principal.changes.add(null); }
+    if (reason == 'buyer') native.mode.value = 'buyer';
+    await tester.pumpAndSettle();
+  }
+  Future<void> dispose(WidgetTester tester) async {
+    await tester.pumpWidget(const SizedBox.shrink());controller?.dispose();access.dispose();await native.dispose();
+  }
+}
+
+void registerSales01NativeTests() {
+  test('Sales01 typed original fields preserve Unicode and reject effects/duplicate or invented facts',() {
+    final parsed = StoreCounterReviewInitial.fromFields('AI-ACT-289',{'name':'કિરણ जी','items':[{'skuId':'sku-original','quantity':2}]});
+    expect(parsed.values['name'],'કિરણ जी');expect(parsed.quantities,{'sku-original':2});
+    expect(() => parsed.quantities['invented']=3,throwsUnsupportedError);
+    for (final fields in <Map<String,Object?>>[{}, {'price':'1'}, {'paid':true}, {'tax':'18'}, {'invoiceId':'invented'},
+      {'items':[{'skuId':'a','quantity':1},{'skuId':'a','quantity':2}]},{'items':[{'skuId':'a','quantity':1.5}]},
+      {'items':[{'skuId':'a','quantity':0}]},{'customer':'not-a-mobile'},{'payment':'Paid online'}]) {
+      expect(() => StoreCounterReviewInitial.fromFields('AI-ACT-289',fields),throwsFormatException);
+    }
+    expect(StoreCounterReviewInitial.fromFields('AI-ACT-290',{'kind':'fixed','value':'12.50'}).discount!.value,1250);
+    expect(() => StoreCounterReviewInitial.fromFields('AI-ACT-290',{'kind':'percentage','value':'१२'}),throwsFormatException);
+    expect(() => StoreCounterReviewInitial.fromFields('AI-ACT-385',{'barcode':'model-code'}),throwsFormatException);
+  });
+  testWidgets('Sales01 Review fills original customer/product/bill controls without hydration writes',(tester) async {
+    final h = _SalesNativeHarness();try {
+      await h.ready(tester); final before=h.writes;
+      final review=await h.open(tester,'AI-ACT-289',fields:h.fields);
+      expect(find.byKey(const Key('work-dashboard-counter-order-screen')),findsOneWidget);
+      expect(find.text('किरण પટેલ'),findsWidgets);
+      expect(h.work.workspaceOrderQuantities,isEmpty);expect(h.work.workspaceOrderCustomer,isEmpty);expect(h.writes,before);
+      await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();
+      expect(find.byKey(ValueKey('work-review-item-${h.product.id}')),findsOneWidget);
+      expect(find.byKey(const Key('work-counter-discount-editor')),findsOneWidget);expect(h.writes,before);
+      await tester.pageBack();await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-order-discard-dialog')),findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-order-keep-editing')));await tester.pumpAndSettle();expect(h.writes,before);
+      await tester.pageBack();await tester.pumpAndSettle();await tester.tap(find.byKey(const Key('work-order-discard')));await tester.pumpAndSettle();
+      await review.result;expect(h.writes,before);expect(h.journal.value,isNull);
+    } finally { await h.dispose(tester); }
+  });
+  for (final reason in ['cancel','request','dispose','principal','buyer']) {
+    testWidgets('Sales01 $reason hides retained native private fields and refuses captured Create invoice',(tester) async {
+      final h=_SalesNativeHarness();try {
+        await h.ready(tester);await h.open(tester,'AI-ACT-289',fields:h.fields);
+        await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();
+        final callback=tester.widget<FilledButton>(find.byKey(const Key('work-order-save'))).onPressed!;final before=h.writes;
+        await h.retire(tester,reason);
+        expect(find.byKey(const Key('work-order-save')).hitTestable(),findsNothing);
+        expect(find.text('किरण પટેલ').hitTestable(),findsNothing);callback();await tester.pumpAndSettle();expect(h.writes,before);
+      } finally { await h.dispose(tester); }
+    });
+  }
+  testWidgets('Sales01 final native confirmation alone dispatches original journal and unknown is retained',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);h.journal.loseReply=true;final before=h.writes;
+      await h.open(tester,'AI-ACT-289',fields:h.fields);expect(h.writes,before);
+      await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();expect(h.writes,before);
+      await tester.tap(find.byKey(const Key('work-order-save')));await tester.pumpAndSettle();
+      expect(h.work.submitCalls,1);expect(h.journal.saves,greaterThan(0));expect(h.journal.value,isNotNull);
+      expect(h.work.workspaceInvoices,isEmpty);expect(h.work.counterDraftError,isNotNull);
+      final savedId=h.journal.value!.id,after=h.writes;await h.retire(tester,'cancel');await tester.pumpAndSettle();
+      expect(h.writes,after);expect(h.journal.value!.id,savedId);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 rejected middle setter retains saved original and local fields without submit/rollback',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);h.work.rejectQuantity=true;
+      await h.open(tester,'AI-ACT-289',fields:h.fields);await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-order-save')));await tester.pumpAndSettle();
+      expect(h.work.submitCalls,0);expect(h.work.quantityCalls,greaterThan(0));expect(h.journal.value,isNotNull);
+      expect(h.journal.value!.customer,'9829012345');expect(h.work.workspaceOrderQuantities,isEmpty);expect(h.work.workspaceInvoices,isEmpty);
+      expect(find.byKey(ValueKey('work-review-item-${h.product.id}')),findsOneWidget);
+      expect(find.textContaining('could not be fully saved'),findsOneWidget);
+    } finally { await h.dispose(tester); }
+  });
+  for (final action in ['AI-ACT-288','AI-ACT-290','AI-ACT-291','AI-ACT-292','AI-ACT-386']) {
+    testWidgets('Sales01 $action opens exact retained original without retry discard or save',(tester) async {
+      final h=_SalesNativeHarness();try {
+        await h.ready(tester,saved:true);final before=h.writes,original=h.journal.value!.toJson();
+        await h.open(tester,action,entity:h.journal.value!.id,fields:action=='AI-ACT-290'?{'kind':'percentage','value':'1'}:const {});
+        expect(h.writes,before);expect(h.journal.value!.toJson(),original);
+        if(action=='AI-ACT-290'||action=='AI-ACT-291') expect(find.byKey(const Key('work-order-save')),findsOneWidget);
+        if(action=='AI-ACT-292') {
+          final discard=find.byKey(const Key('work-counter-draft-discard'));
+          await tester.scrollUntilVisible(discard,180,scrollable:find.descendant(of:find.byKey(const Key('work-counter-draft-recovery')),matching:find.byType(Scrollable)).first);
+          expect(discard.hitTestable(),findsOneWidget);expect(find.text('Discard bill'),findsOneWidget);
+        }
+      } finally { await h.dispose(tester); }
+    });
+  }
+  testWidgets('Sales01 original pending attempt is not automatically retried or discarded',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester,pending:true);final before=h.writes,original=h.journal.value!.toJson();
+      await h.open(tester,'AI-ACT-386',entity:h.journal.value!.id);
+      expect(find.byKey(const Key('work-counter-draft-retry')),findsOneWidget);expect(h.writes,before);expect(h.journal.value!.toJson(),original);
+      final callback=tester.widget<FilledButton>(find.byKey(const Key('work-counter-draft-retry'))).onPressed!;
+      await h.retire(tester,'cancel');callback();await tester.pumpAndSettle();expect(h.writes,before);expect(h.journal.value!.toJson(),original);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 exact foreign native draft change retires proposed inputs',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);await h.open(tester,'AI-ACT-289',fields:h.fields);
+      h.work.updateWorkspaceCounterDetails(customer:'9876543210');await tester.pumpAndSettle();final after=h.writes;
+      expect(find.byKey(const Key('work-order-review')).hitTestable(),findsNothing);expect(h.work.workspaceOrderCustomer,'9876543210');expect(h.writes,after);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 native SKU rule rejects missing/unavailable or excess requested quantity before opening',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);final c=h.controller!,a=h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-289');
+      for(final id in ['HOST-foreign-sku',h.product.id]) {
+        final snapshot=await a.snapshot(c.context,null);expect(snapshot,isNotNull);
+        expect(c.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-invalid-$id',actionId:a.actionId,binding:c.context.binding,
+          requestRevision:c.requestRevision,entitlementRevision:c.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+          validUntil:DateTime.now().add(const Duration(minutes:5)),title:'Review',summary:'HOST',fields:{'items':[{'skuId':id,'quantity':2147483647}]})),isTrue);
+        final before=h.writes;expect(await c.reviewProposal(),MoolAssistantReviewResult.unavailable);expect(h.writes,before);
+        expect(find.byKey(const Key('work-order-save')),findsNothing);
+      }
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 Counter invoice keeps original Chat/WhatsApp restriction and exact PDF source',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);final invoice=h.invoice();await tester.pumpAndSettle();final before=h.writes;
+      for(final action in ['AI-ACT-382','AI-ACT-383']) {
+        final a=h.native.adapters(tester).singleWhere((a)=>a.actionId==action);
+        expect(await a.snapshot(h.controller!.context,invoice.id),isNull);
+      }
+      expect(h.writes,before);
+    } finally { await h.dispose(tester); }
+  });
+  for(final action in ['AI-ACT-293','AI-ACT-295','AI-ACT-384']) {
+    testWidgets('Sales01 $action binds actual invoice/order and opens original read-only controls without writes',(tester) async {
+      final h=_SalesNativeHarness();try {
+        await h.ready(tester);final invoice=h.invoice();await tester.pumpAndSettle();final before=h.writes;
+        await h.open(tester,action,entity:invoice.id);
+        if(action=='AI-ACT-293') {
+          expect(find.byKey(const Key('work-invoice-visible-reference')),findsOneWidget);
+          expect(find.text('Invoice No.: ${invoice.id}'),findsOneWidget);
+          expect(find.byKey(const Key('work-invoice-share-chat')),findsNothing);
+          expect(find.byKey(const Key('work-invoice-share-whatsapp')),findsNothing);
+        } else {
+          final screen=tester.widget<WorkInvoicePdfScreen>(find.byType(WorkInvoicePdfScreen));
+          expect(screen.request.invoice.id,invoice.id);expect(screen.request.invoice.orderId,invoice.orderId);
+          expect(screen.request.accountId,h.native.contact.accountScope);expect(screen.request.items.single.productId,h.product.id);
+          expect(find.byKey(const Key('invoice-pdf-print')),findsOneWidget);
+        }
+        expect(h.writes,before);await h.retire(tester,'cancel');expect(h.writes,before);
+        expect(find.byKey(const Key('invoice-pdf-print')).hitTestable(),findsNothing);
+      } finally { await h.dispose(tester); }
+    });
+  }
+  for(final action in ['AI-ACT-382','AI-ACT-383']) {
+    testWidgets('Sales01 $action preserves the existing non-Counter native sharing controls and explicit user boundary',(tester) async {
+      final h=_SalesNativeHarness();try {
+        await h.ready(tester);final invoice=h.invoice(counter:false);await tester.pumpAndSettle();final before=h.writes;
+        await h.open(tester,action,entity:invoice.id);
+        final key=Key(action=='AI-ACT-382'?'work-invoice-share-chat':'work-invoice-share-whatsapp');
+        expect(find.byKey(key),findsOneWidget);expect(invoice.sharedChannels,isEmpty);expect(h.writes,before);
+        await h.retire(tester,'cancel');expect(find.byKey(key).hitTestable(),findsNothing);expect(h.writes,before);
+      } finally { await h.dispose(tester); }
+    });
+  }
+  testWidgets('Sales01 scanner opens actual permission fallback and accepts only original user-entered code without draft writes',(tester) async {
+    const channel=MethodChannel('flutter.baseflow.com/permissions/methods');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,(call) async =>
+      call.method=='requestPermissions'?<int,int>{for(final id in call.arguments as List) id as int:0}:0);
+    addTearDown(()=>tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,null));
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);final before=h.writes;await h.open(tester,'AI-ACT-385');
+      final panel=find.byKey(const Key('buy-manual-code-panel'));expect(panel,findsOneWidget);expect(h.writes,before);
+      final code=h.product.sku.isNotEmpty?h.product.sku:h.product.canonicalId;
+      await tester.enterText(find.descendant(of:panel,matching:find.byType(TextField)),code);
+      await tester.tap(find.byKey(const Key('buy-use-product-code')));await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-dashboard-counter-order-screen')),findsOneWidget);
+      expect(h.work.workspaceOrderQuantities,isEmpty);expect(h.writes,before);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 native Discard confirmation alone retires the exact unfinished bill',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester,saved:true);final original=h.journal.value!,before=h.writes;
+      final review=await h.open(tester,'AI-ACT-292',entity:original.id);expect(h.writes,before);
+      final discard=find.byKey(const Key('work-counter-draft-discard'));
+      await tester.scrollUntilVisible(discard,180,scrollable:find.descendant(of:find.byKey(const Key('work-counter-draft-recovery')),matching:find.byType(Scrollable)).first);
+      expect(discard.hitTestable(),findsOneWidget);
+      await tester.tap(discard);await tester.pumpAndSettle();expect(h.writes,before);
+      await tester.tap(find.widgetWithText(FilledButton,'Discard'));await tester.pumpAndSettle();await review.result;
+      expect(h.journal.value!.id,original.id);expect(h.journal.value!.stage,WorkspaceCounterDraftStage.retired);
+      expect(h.work.submitCalls,0);expect(h.work.workspaceInvoices,isEmpty);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 native pure preview calculations match original rules without setters or storage',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);final before=h.writes;
+      final next=h.work.workspaceCounterAdjustedQuantity(h.product.id,0,1);expect(next,1);
+      expect(h.work.workspaceCounterSubtotalFor({h.product.id:1}),h.product.sellingPriceMinor);
+      expect(h.work.workspaceCounterAdjustedQuantity('HOST-missing',0,1),isNull);
+      expect(h.writes,before);expect(h.work.workspaceOrderQuantities,isEmpty);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 retired manual scanner rejects captured original Use without popping another native route',(tester) async {
+    const channel=MethodChannel('flutter.baseflow.com/permissions/methods');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,(call) async =>
+      call.method=='requestPermissions'?<int,int>{for(final id in call.arguments as List) id as int:0}:0);
+    addTearDown(()=>tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,null));
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);await h.open(tester,'AI-ACT-385');
+      final panel=find.byKey(const Key('buy-manual-code-panel'));
+      await tester.enterText(find.descendant(of:panel,matching:find.byType(TextField)),h.product.sku);
+      final use=tester.widget<FilledButton>(find.byKey(const Key('buy-use-product-code'))).onPressed!;
+      // Capture the real scanner navigator while its native route is current.
+      final navigator=Navigator.of(tester.element(panel));
+      await h.retire(tester,'cancel');final before=h.writes;
+      unawaited(navigator.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST unrelated native route')))));
+      await tester.pumpAndSettle();use();await tester.pumpAndSettle();
+      expect(find.text('HOST unrelated native route'),findsOneWidget);expect(h.writes,before);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 active original Counter owner is reused and transferred staging outlives proposal completion',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);await openCounterSaleFromSales(tester);await tester.pumpAndSettle();final before=h.writes;
+      final review=await h.open(tester,'AI-ACT-289',fields:h.fields);expect(await review.result,MoolAssistantReviewResult.returnToOwner);
+      expect(find.byKey(const Key('work-dashboard-counter-order-screen')),findsOneWidget);expect(h.writes,before);
+      h.controller!.setDraft('A new assistant request after transfer');await tester.pumpAndSettle();
+      expect(find.text('किरण પટેલ').hitTestable(),findsWidgets);expect(h.writes,before);
+      await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();
+      final save=tester.widget<FilledButton>(find.byKey(const Key('work-order-save'))).onPressed!;
+      await h.retire(tester,'principal');final retired=h.writes;
+      expect(find.byKey(const Key('work-order-save')).hitTestable(),findsNothing);save();await tester.pumpAndSettle();expect(h.writes,retired);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 existing native dirty discount blocks overwrite and keeps its exact raw input',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester,saved:true);await openCounterSaleFromSales(tester);await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();
+      final input=find.byKey(const Key('work-counter-discount-value'));await tester.ensureVisible(input);
+      await tester.enterText(input,'12.');await tester.pumpAndSettle();final before=h.writes;
+      final a=h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-290');
+      expect(await a.snapshot(h.controller!.context,h.journal.value?.id),isNull);
+      expect(tester.widget<TextField>(input).controller!.text,'12.');expect(h.writes,before);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 original Back protects transferred unsaved entries without autosaving proposal',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);await openCounterSaleFromSales(tester);await tester.pumpAndSettle();
+      final before=h.writes;final review=await h.open(tester,'AI-ACT-289',fields:h.fields);await review.result;
+      for(var i=0;i<3 && find.byKey(const Key('work-order-discard-dialog')).evaluate().isEmpty;i++) {
+        await tester.tap(find.byKey(const Key('work-back')));await tester.pumpAndSettle();
+      }
+      expect(find.byKey(const Key('work-order-discard-dialog')),findsOneWidget);expect(h.writes,before);
+      await tester.tap(find.byKey(const Key('work-order-keep-editing')));await tester.pumpAndSettle();expect(h.writes,before);
+      expect(h.work.workspaceOrderQuantities,isEmpty);expect(h.journal.value,isNull);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 actual native price revision retires proposed bill without a stale final dispatch',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);await h.open(tester,'AI-ACT-289',fields:h.fields);
+      await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();
+      final save=tester.widget<FilledButton>(find.byKey(const Key('work-order-save'))).onPressed!;
+      expect(h.work.addOrUpdateWorkspaceProduct(h.product.copyWith(sellingPriceMinor:h.product.sellingPriceMinor+1)),isTrue);
+      expect(await h.work.workspaceInventorySaved,isTrue);await tester.pumpAndSettle();final changed=h.writes;
+      expect(find.byKey(const Key('work-order-save')).hitTestable(),findsNothing);save();await tester.pumpAndSettle();expect(h.writes,changed);
+      expect(h.work.submitCalls,0);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 actual native Store switch hides old original fields and stale final cannot write new Store',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);await h.open(tester,'AI-ACT-289',fields:h.fields);
+      await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();
+      final save=tester.widget<FilledButton>(find.byKey(const Key('work-order-save'))).onPressed!;
+      expect(h.work.loadStoreReviewSeed(0),isTrue);h.work.workspaceId=h.work.activeWorkspace!.id;
+      await tester.pumpAndSettle();final changed=h.writes;
+      expect(find.byKey(const Key('work-order-save')).hitTestable(),findsNothing);save();await tester.pumpAndSettle();expect(h.writes,changed);expect(h.work.submitCalls,0);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 changing supplied customer preserves old saved original and clears its billing identity in local review',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester,saved:true);final original=h.journal.value!.toJson(),before=h.writes;
+      await h.open(tester,'AI-ACT-289',fields:{'customer':'9876543210'});
+      expect(find.text('मूल ગ્રાહક').hitTestable(),findsNothing);
+      expect(find.text('+91 9876543210'),findsOneWidget);expect(h.journal.value!.toJson(),original);expect(h.writes,before);
+    } finally { await h.dispose(tester); }
+  });
+
+  testWidgets('Sales01 new sale Review preserves selected saved order until original Create invoice starts native draft',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);final original=h.invoice();h.work.selectWorkspaceOrder(original.orderId);await tester.pumpAndSettle();
+      final before=h.writes,starts=h.work.freshCalls;
+      await h.open(tester,'AI-ACT-289',fields:h.fields);
+      expect(h.work.currentWorkspaceOrderId,original.orderId);expect(h.work.freshCalls,starts);expect(h.writes,before);
+      await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();expect(h.writes,before);
+      await tester.tap(find.byKey(const Key('work-order-save')));await tester.pumpAndSettle();
+      expect(h.work.freshCalls,starts+1);expect(h.work.submitCalls,1);expect(h.journal.saves,greaterThan(0));
+      expect(h.work.workspaceInvoices.any((value)=>value.id==original.id&&value.orderId==original.orderId),isTrue);
+    } finally { await h.dispose(tester); }
+  });
+  testWidgets('Sales01 explicit discard of transferred local review removes cached owner and stale Create cannot affect reopened form',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);await openCounterSaleFromSales(tester);await tester.pumpAndSettle();
+      final before=h.writes,review=await h.open(tester,'AI-ACT-289',fields:h.fields);await review.result;
+      await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();
+      final save=tester.widget<FilledButton>(find.byKey(const Key('work-order-save'))).onPressed!;
+      for(var i=0;i<4 && find.byKey(const Key('work-order-discard-dialog')).evaluate().isEmpty;i++) {
+        await tester.tap(find.byKey(const Key('work-back')));await tester.pumpAndSettle();
+      }
+      expect(find.byKey(const Key('work-order-discard-dialog')),findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-order-discard')));await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-sales-home')),findsOneWidget);expect(h.writes,before);
+      await openCounterSaleFromSales(tester);await tester.pumpAndSettle();final reopened=h.writes;
+      expect(tester.widget<TextField>(find.byKey(const Key('work-order-customer'))).controller!.text,isEmpty);
+      save();await tester.pumpAndSettle();expect(h.writes,reopened);expect(h.work.submitCalls,0);expect(h.journal.value,isNull);
+    } finally { await h.dispose(tester); }
+  });
+
+  for (final delivery in [false,true]) {
+    testWidgets('Sales01 actual native ${delivery ? "delivery" : "invoice"} success survives its own journal and Stock notifications',(tester) async {
+      final h=_SalesNativeHarness();try {
+        await h.ready(tester);
+        h.product=h.work.workspaceCatalogueItems.firstWhere((p)=>p.canSellAtCounter&&p.stockMode==WorkspaceStockMode.exactQuantity&&p.stock>1);
+        // Existing nonempty history is produced by the original native edit,
+        // not by forging a transition/witness or directly adding a movement.
+        expect(h.work.addOrUpdateWorkspaceProduct(h.product.copyWith(stock:h.product.stock+1),stockReason:'HOST counted quantity before Review'),isTrue);
+        expect(await h.work.workspaceInventorySaved,isTrue);await tester.pumpAndSettle();
+        h.product=h.work.workspaceCatalogueItems.singleWhere((p)=>p.id==h.product.id);
+        final history=h.work.workspaceStockMovements;expect(history,isNotEmpty);
+        final signature=jsonDecode(h.work.counterCatalogueReviewSignature) as List;
+        expect(signature[3],[for(final m in history) [m.id,m.productId,m.productLabel,m.kind.name,
+          m.quantityDelta,m.reason,m.occurredAt.toUtc().toIso8601String(),m.referenceKind?.name,m.referenceId]]);
+        final stock=h.product.stock;
+        final review=await h.open(tester,'AI-ACT-289',fields:{...h.fields,if(delivery)'fulfilment':'Own delivery'});
+        final before=h.writes;
+        await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();expect(h.writes,before);
+        await tester.tap(find.byKey(const Key('work-order-save')));await tester.pumpAndSettle();
+        expect(h.work.submitCalls,1);expect(h.journal.value!.stage,WorkspaceCounterDraftStage.retired);
+        final order=h.work.currentWorkspaceOrder!;
+        expect(order.quantities,{h.product.id:1});
+        if(delivery) {
+          expect(order.stage,'Confirmed');expect(order.fulfilment,'Own delivery');
+          expect(await review.result,MoolAssistantReviewResult.returnToOwner);
+          expect(find.byKey(const Key('work-orders-destination')),findsOneWidget);
+          expect(h.work.workspaceInvoices.where((i)=>i.orderId==order.id),isEmpty);
+        } else {
+          expect(order.stage,'Completed');expect(order.stockReserved,isTrue);
+          final invoice=h.work.workspaceInvoices.singleWhere((i)=>i.orderId==order.id);
+          // Counter uses its original central invoice, not Orders' inline invoice.
+          expect(find.byKey(const Key('work-invoice-title')),findsOneWidget);
+          expect(find.text('Invoice created'),findsOneWidget);
+          final invoiceSurface=find.byKey(ValueKey(invoice.id));expect(invoiceSurface,findsOneWidget);
+          final details=find.byKey(const Key('work-invoice-details'));
+          await tester.scrollUntilVisible(details,180,scrollable:find.descendant(of:invoiceSurface,matching:find.byType(Scrollable)).first);
+          await tester.tap(details);await tester.pumpAndSettle();
+          expect(find.text(invoice.id),findsOneWidget);
+          expect(h.work.workspaceCatalogueItems.singleWhere((p)=>p.id==h.product.id).stock,stock-1);
+          final witness=h.work.counterReviewStockTransition!;
+          expect(witness.orderId,order.id);expect(witness.draftId,h.journal.value!.id);
+          expect(witness.after,h.work.counterCatalogueReviewSignature);expect(witness.after,isNot(witness.before));
+          final after=jsonDecode(witness.after) as List,before=jsonDecode(witness.before) as List;
+          final movements=after[3] as List;expect(movements.length,(before[3] as List).length+1);
+          final reservation=movements.first as List;
+          expect(reservation[1],h.product.id);expect(reservation[3],WorkspaceStockMovementKind.reserved.name);
+          expect(reservation[4],-1);expect(reservation[7],WorkspaceStockReferenceKind.order.name);expect(reservation[8],order.id);
+          expect(DateTime.parse(reservation[6] as String).isUtc,isTrue);
+        }
+      } finally { await h.dispose(tester); }
+    });
+  }
+  for(final departure in ['buyer','principal','store','catalogue']) {
+    testWidgets('Sales01 transferred native owner irreversibly retires on $departure ABA before a frame',(tester) async {
+      final h=_SalesNativeHarness();try {
+        await h.ready(tester);await openCounterSaleFromSales(tester);await tester.pumpAndSettle();
+        final review=await h.open(tester,'AI-ACT-289',fields:h.fields);expect(await review.result,MoolAssistantReviewResult.returnToOwner);
+        await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();
+        final create=tester.widget<FilledButton>(find.byKey(const Key('work-order-save'))).onPressed!;
+        if(departure=='buyer') { h.native.mode.value='buyer';h.native.mode.value='store'; }
+        if(departure=='principal') {
+          final original=h.native.principal.identity;
+          h.native.principal.identity=null;h.native.principal.changes.add(null);await tester.idle();
+          h.native.principal.identity=original;h.native.principal.changes.add(null);await tester.idle();
+        }
+        if(departure=='store') {
+          final original=h.work.activeWorkspace!;
+          expect(h.work.loadStoreReviewSeed(0),isTrue);h.work.workspaceId=h.work.activeWorkspace!.id;
+          h.work.activateWorkspace(original);expect(h.work.activeWorkspace!.id,original.id);
+        }
+        if(departure=='catalogue') {
+          expect(h.work.addOrUpdateWorkspaceProduct(h.product.copyWith(sellingPriceMinor:h.product.sellingPriceMinor+1)),isTrue);
+          expect(h.work.addOrUpdateWorkspaceProduct(h.product),isTrue);
+          // The intentional native edit/revert queued two real inventory writes.
+          // Await their durable acknowledgements without building a Flutter frame.
+          expect(await h.work.workspaceInventorySaved,isTrue);await tester.idle();
+        }
+        // No pump/build occurred between departure and restoration.
+        final before=h.writes;create();await tester.pumpAndSettle();
+        expect(h.writes,before);expect(h.work.submitCalls,0);
+        expect(find.byKey(const Key('work-order-save')).hitTestable(),findsNothing);
+      } finally { await h.dispose(tester); }
+    });
+  }
+  testWidgets('Sales01 retained unsaved dialog callbacks cannot pop a covering unrelated native route',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);await h.open(tester,'AI-ACT-289',fields:h.fields);
+      await tester.pageBack();await tester.pumpAndSettle();
+      final dialog=find.byKey(const Key('work-order-discard-dialog'));
+      final keep=tester.widget<TextButton>(find.byKey(const Key('work-order-keep-editing'))).onPressed!;
+      final discard=tester.widget<TextButton>(find.byKey(const Key('work-order-discard'))).onPressed!;
+      final navigator=Navigator.of(tester.element(dialog));
+      unawaited(navigator.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST covered dialog route')))));
+      await tester.pumpAndSettle();final before=h.writes;
+      keep();discard();await tester.pumpAndSettle();
+      expect(find.text('HOST covered dialog route'),findsOneWidget);expect(h.writes,before);
+      navigator.pop();await tester.pumpAndSettle();expect(dialog,findsOneWidget);
+      keep();await tester.pumpAndSettle();expect(dialog,findsNothing);expect(h.writes,before);
+    } finally { await h.dispose(tester); }
+  });
+  Future<void> expectSalesPerfNativeInvoice(WidgetTester tester,_SalesNativeHarness h) async {
+    final order=h.work.currentWorkspaceOrder!;
+    expect(order.stage,'Completed');expect(order.stockReserved,isTrue);
+    final invoice=h.work.workspaceInvoices.singleWhere((value)=>value.orderId==order.id);
+    expect(find.text('Invoice created'),findsOneWidget);
+    final surface=find.byKey(ValueKey(invoice.id));expect(surface,findsOneWidget);
+    final details=find.byKey(const Key('work-invoice-details'));
+    await tester.scrollUntilVisible(details,180,scrollable:find.descendant(of:surface,matching:find.byType(Scrollable)).first);
+    await tester.tap(details);await tester.pumpAndSettle();expect(find.text(invoice.id),findsOneWidget);
+  }
+  Future<void> prepareSalesPerfOriginal(WidgetTester tester,_SalesNativeHarness h) async {
+    await h.ready(tester);
+    h.product=h.work.workspaceCatalogueItems.firstWhere((p)=>p.canSellAtCounter&&p.stockMode==WorkspaceStockMode.exactQuantity&&p.stock>1);
+    h.work.updateWorkspaceCounterDetails(customer:'9829012345',billingCustomer:'9829012345',
+      billingDetails:const WorkspaceBillingDetails(name:'HOST original manual customer'),
+      source:'Counter',fulfilment:'At the shop',payment:'Customer due',address:'');
+    h.work.adjustWorkspaceOrderQuantity(h.product.id,1);await h.work.workspaceCounterDraftWrites;
+    expect(h.work.retainedCounterDraft!.stage,WorkspaceCounterDraftStage.editing);
+    await openCounterSaleFromSales(tester);await tester.pumpAndSettle();
+  }
+  testWidgets('Sales01 unowned original manual native final sale captures no AI Stock witness or full signature',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await prepareSalesPerfOriginal(tester,h);
+      await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();
+      final reads=h.work.stockSignatureReads;
+      expect(h.work.stockObserverStarts,0);expect(h.work.counterReviewStockTransition,isNull);
+      await tester.tap(find.byKey(const Key('work-order-save')));await tester.pumpAndSettle();
+      expect(h.work.submitCalls,1);expect(h.journal.value!.stage,WorkspaceCounterDraftStage.retired);
+      await expectSalesPerfNativeInvoice(tester,h);
+      expect(h.work.stockSignatureReads,reads);expect(h.work.stockObserverStarts,0);
+      expect(h.work.stockObserverEnds,0);expect(h.work.stockObservers,isEmpty);expect(h.work.counterReviewStockTransition,isNull);
+    } finally {await h.dispose(tester);}
+  });
+  testWidgets('Sales01 exact transferred291 original native final success observes only its own Stock and releases token',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await prepareSalesPerfOriginal(tester,h);
+      final review=await h.open(tester,'AI-ACT-291',entity:h.journal.value!.id);
+      expect(await review.result,MoolAssistantReviewResult.returnToOwner);
+      final stock=h.work.workspaceCatalogueItems.singleWhere((p)=>p.id==h.product.id).stock;
+      await tester.tap(find.byKey(const Key('work-order-save')));await tester.pumpAndSettle();
+      expect(h.work.submitCalls,1);expect(h.work.stockObserverStarts,1);expect(h.work.stockObserverEnds,1);expect(h.work.stockObservers,isEmpty);
+      expect(h.journal.value!.stage,WorkspaceCounterDraftStage.retired);await expectSalesPerfNativeInvoice(tester,h);
+      final order=h.work.currentWorkspaceOrder!,witness=h.work.counterReviewStockTransition!;
+      expect(witness.orderId,order.id);expect(witness.draftId,h.journal.value!.id);expect(witness.after,h.work.counterCatalogueReviewSignature);
+      if(h.product.stockMode==WorkspaceStockMode.exactQuantity)expect(h.work.workspaceCatalogueItems.singleWhere((p)=>p.id==h.product.id).stock,stock-1);
+    } finally {await h.dispose(tester);}
+  });
+  for(final failure in ['error','unknown']) {
+    testWidgets('Sales01 native $failure releases its exact Stock observation without clearing original journal recovery',(tester) async {
+      final h=_SalesNativeHarness();try {
+        await h.ready(tester);await h.open(tester,'AI-ACT-289',fields:h.fields);
+        await tester.tap(find.byKey(const Key('work-order-review')));await tester.pumpAndSettle();
+        h.work.failBeforeSubmit=failure=='error';h.journal.loseReply=failure=='unknown';
+        await tester.tap(find.byKey(const Key('work-order-save')));await tester.pumpAndSettle();
+        expect(h.work.stockObserverStarts,1);expect(h.work.stockObserverEnds,1);expect(h.work.stockObservers,isEmpty);
+        expect(h.work.workspaceInvoices,isEmpty);expect(h.journal.value,isNotNull);
+        expect(h.journal.value!.customer,'9829012345');expect(h.work.counterReviewStockTransition,isNull);
+        expect(find.byKey(ValueKey('work-review-item-${h.product.id}')),findsOneWidget);
+      } finally {await h.dispose(tester);}
+    });
+  }
+
+  testWidgets('Sales01 actual Host covered Counter Review returns to its original mounted native owner',(tester) async {
+    final h=_SalesNativeHarness();try {
+      await h.ready(tester);
+      await tester.pumpWidget(MaterialApp.router(theme:MoolTheme.light(),routerConfig:h.native.router,
+        builder:(_,child)=>MoolAssistantHost(readContext:h.native.readContext,
+          contextChanges:Listenable.merge([h.native.journey,h.work,h.native.mode]),entitlements:h.access,child:child!)));
+      await tester.pumpAndSettle();await openCounterSaleFromSales(tester);await tester.pumpAndSettle();
+      // The customer stage intentionally has no later items-screen key.
+      final counterOwner=find.byWidgetPredicate((widget)=>widget.runtimeType.toString()=='_CounterOrderSurface');
+      expect(counterOwner,findsOneWidget);final originalElement=tester.element(counterOwner);
+      final adapter=h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-289');
+      final nativeContext=tester.element(find.byType(MoolAssistantNativeScope));
+      final opened=MoolAssistantHost.maybeOf(nativeContext)!.open(nativeContext);await tester.pumpAndSettle();
+      expect(find.byType(MoolAssistantPage),findsOneWidget);
+      final c=tester.widget<MoolAssistantPage>(find.byType(MoolAssistantPage)).controller;
+      await c.refreshAccess();c.setDraft('Prepare this exact original Counter sale');
+      final snapshot=await adapter.snapshot(c.context,null);expect(snapshot,isNotNull);
+      expect(c.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-Sales-real-host',actionId:'AI-ACT-289',
+        binding:c.context.binding,requestRevision:c.requestRevision,entitlementRevision:c.entitlementRevision!,
+        sourceRevision:snapshot!.sourceRevision,validUntil:DateTime.now().add(const Duration(minutes:5)),
+        title:'Review original Counter sale',summary:'HOST original fields only',fields:h.fields)),isTrue);
+      await tester.pumpAndSettle();final before=h.writes;
+      final review=find.widgetWithText(FilledButton,'Review');await tester.ensureVisible(review);await tester.tap(review);await tester.pumpAndSettle();
+      // Without a History service the original explicit draft barrier still
+      // owns leaving AI mode; discarding that request must retain native input.
+      expect(find.text('Keep your request?'),findsOneWidget);
+      await tester.tap(find.text('Discard draft'));await tester.pumpAndSettle();
+      expect(find.byType(MoolAssistantPage),findsNothing);await opened;
+      expect(counterOwner,findsOneWidget);expect(identical(tester.element(counterOwner),originalElement),isTrue);
+      expect(find.text('किरण પટેલ').hitTestable(),findsWidgets);expect(h.writes,before);
+      // The original native owner survives successful AI handoff, while its
+      // original Create invoice remains an explicit separate user action.
+      expect(h.work.submitCalls,0);
+    } finally { await h.dispose(tester); }
+  });
+
+}
+
+
+
+void registerAuthenticatedNativeScopeTests() {
+  const expected = {'AI-ACT-311', 'AI-ACT-235', 'AI-ACT-213', 'AI-ACT-214'};
+
+  testWidgets('HOST native scope registers approved account-bound Store capabilities and snapshots do not save', (tester) async {
+    final f = _AuthenticatedNativeScopeFixture();
+    await f.ready();
+    try {
+      await tester.pumpWidget(f.app);
+      await tester.pumpAndSettle();
+      final adapters = f.adapters(tester);
+      expect(adapters.map((adapter) => adapter.actionId), containsAll(expected));
+      final context = f.readContext();
+      expect(context.signedIn && context.inWorkspace && context.storeWorkspace, isTrue);
+      expect(context.accountScope, f.journey.authenticatedBuyPersistenceIdentity);
+      expect(context.accountScope, isNot(f.work.workspaceSupplierScope?.$1));
+      final before = f.writes;
+      final addTarget = f.work.referenceCatalogue.firstWhere((item) =>
+        !f.work.workspaceCatalogueItems.any((stock) => stock.id == item.id ||
+          stock.sku.trim().toLowerCase() == item.sku.trim().toLowerCase()));
+      final editTarget = f.work.workspaceCatalogueItems.first;
+      for (final id in expected) {
+        final adapter = adapters.singleWhere((value) => value.actionId == id);
+        final entity = id == 'AI-ACT-213' ? addTarget.id
+            : id == 'AI-ACT-214' ? editTarget.id : null;
+        final snapshot = await adapter.snapshot(context, entity);
+        expect(snapshot, isNotNull, reason: id);
+        expect(snapshot!.permitted, isTrue, reason: id);
+        expect(snapshot.binding, context.binding, reason: id);
+        expect(snapshot.entityId, entity, reason: id);
+        expect(snapshot.sourceRevision, isNotEmpty, reason: id);
+      }
+      await tester.pumpAndSettle();
+      expect(f.writes, before, reason: 'Registration/native snapshots may read, never save.');
+      expect(f.purchase.reads, greaterThan(0));
+      expect(f.inventory.reads, greaterThan(0));
+      expect(f.trading.reads, greaterThan(0));
+      expect(tester.takeException(), isNull);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await f.dispose();
+    }
+  });
+
+  for (final boundary in ['unapproved', 'buyer', 'changed Store']) {
+    testWidgets('HOST native scope excludes protected capabilities for $boundary and retires old snapshots', (tester) async {
+      final f = _AuthenticatedNativeScopeFixture();
+      await f.ready();
+      try {
+        await tester.pumpWidget(f.app);
+        await tester.pumpAndSettle();
+        final original = f.adapters(tester);
+        final oldContext = f.readContext();
+        expect(original.map((adapter) => adapter.actionId), containsAll(expected));
+        final addEntity = f.work.referenceCatalogue.firstWhere((item) =>
+          !f.work.workspaceCatalogueItems.any((stock) => stock.id == item.id ||
+            stock.sku.trim().toLowerCase() == item.sku.trim().toLowerCase())).id;
+        final editEntity = f.work.workspaceCatalogueItems.first.id;
+        if (boundary == 'unapproved') {
+          f.work.remoteReviewStatus = WorkRemoteReviewStatus.pending;
+          f.work.reviewStage = WorkReviewStage.gstPending;
+        } else if (boundary == 'buyer') {
+          f.mode.value = 'buyer';
+        } else {
+          // This target has not acquired the original Store's approval record.
+          f.work.activeWorkspace = const WorkWorkspace(id: 'HOST-other-store',
+            name: 'HOST other Store', profileLabel: 'Grocery / Kirana Shop',
+            profileId: 'retailer-grocery', area: 'HOST area', verified: true);
+        }
+        f.work.notifyListeners();
+        await tester.pumpAndSettle();
+        expect(f.adapters(tester).where((adapter) => expected.contains(adapter.actionId)), isEmpty);
+        final before = f.writes;
+        final readsBefore = (f.purchase.reads, f.inventory.reads, f.trading.reads);
+        for (final id in ['AI-ACT-311', 'AI-ACT-235']) {
+          final old = original.singleWhere((adapter) => adapter.actionId == id);
+          expect(await old.snapshot(oldContext, null), isNull, reason: id);
+        }
+        // Product receivers also reject the old binding before any source load.
+        for (final id in ['AI-ACT-213', 'AI-ACT-214']) {
+          final old = original.singleWhere((adapter) => adapter.actionId == id);
+          expect(await old.snapshot(oldContext, id == 'AI-ACT-213' ? addEntity : editEntity),
+            isNull, reason: id);
+        }
+        expect(f.writes, before);
+        expect((f.purchase.reads, f.inventory.reads, f.trading.reads), readsBefore,
+          reason: 'An old binding must fail before native source reads.');
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await f.dispose();
+      }
+    });
+  }
+}
+
+// HOST ONLY. Insert before main() in work_workspace_layout_safety_test.dart and
+// call registerReceivingNativeAssistantTests() inside main(). Apply companion
+// receiving_native_test_support.diff for the MoolAssistantPage import. Existing
+// makeWork/inventory fixture injections are reused without changing them.
+
+class _ReceivingAssistantAccess extends ChangeNotifier
+    implements scope_contract.MoolAssistantEntitlementSource {
+  bool active=true;
+  void revoke(){active=false;notifyListeners();}
+  @override Future<scope_contract.MoolAssistantEntitlement> read(Object account) async =>
+    scope_contract.MoolAssistantEntitlement(accountScope: account,
+      access: active?scope_contract.MoolAssistantAccess.active:scope_contract.MoolAssistantAccess.revoked, revision: active?'HOST-receiving-contract':'HOST-receiving-revoked',
+      validUntil: DateTime.now().add(const Duration(hours: 1)));
+}
+
+class _ReceivingAssistantForms extends _LedgerFormFixtureStore {
+  int writes = 0;
+  @override Future<void> save(WorkspaceLedgerFormDraft value, {required int? expectedRevision}) {
+    writes++;
+    return super.save(value, expectedRevision: expectedRevision);
+  }
+  String get signature => jsonEncode([for (final value in drafts.values)
+    [value.key.toString(), value.revision, value.fields]]);
+}
+
+class _ReceivingAssistantHarness {
+  final forms = _ReceivingAssistantForms();
+  final access = _ReceivingAssistantAccess();
+  final entry = _OpeningPostingFixtureStore();
+  final checkpoint = _LedgerCheckpointFixtureStore();
+  bool _nativeReady = false, _controllerCreated = false, _directoryCreated = false;
+  late final _AuthenticatedNativeScopeFixture native;
+  late final Directory directory;
+  late final Uint8List bytes;
+  late final WorkspaceSupplierProfile supplier;
+  late final scope_contract.MoolAssistantController controller;
+  late final scope_contract.MoolAssistantNativeAdapter adapter;
+  late final scope_contract.MoolAssistantNativeSnapshot snapshot;
+  Completer<String>? heldRecognition;
+  String? recognizedOverride;
+  int nativePickerCalls = 0, selectedPickerCalls = 0, recognitionCalls = 0;
+  static const recognized = 'Invoice No: HOST-ARRIVAL\nxyz: 123\nxyz: 456\nExtra heading = ABC\nReceived qty: 999';
+
+  Future<void> ready(WidgetTester tester, WorkProofSource origin) async {
+    await tester.runAsync(() async {
+      directory = await Directory.systemTemp.createTemp('host-receiving-ai-');
+      _directoryCreated = true;
+      bytes = await _catalogueTestPhoto();
+    });
+    final capture = WorkPurchaseInvoiceCapture(currentScope: () => native.work.workspaceSupplierScope,
+      supportDirectory: () async => directory,
+      recognize: (_) async { recognitionCalls++; return heldRecognition == null ? recognizedOverride??recognized : await heldRecognition!.future; },
+      picker: _ReceivingDocumentPicker((_) async { nativePickerCalls++; return null; }));
+    native = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) =>
+      WorkSession(contactDraftStore: contact, purchaseEntryStore: entry,
+        inventoryStore: inventory, purchaseInvoiceCapture: capture, ledgerFormDraftStore: forms,
+        tradingPreferencesStoreFactory: (_) => trading, catalogueReference: workspaceMasterCatalogue));
+    await native.ready();
+    _nativeReady = true;
+    final scope = native.work.workspaceSupplierScope!, at = DateTime.utc(2026, 10, 22);
+    supplier = WorkspaceSupplierProfile(id: 'HOST-arrival-supplier', name: 'HOST arrival supplier',
+      createdAt: at, updatedAt: at);
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2,
+      qa: scope.$3, revision: 1, profiles: [supplier]);
+    // Same admitted native receiving fixture composition as postingOpeningFixture:
+    // revision-guarded entry owner + exact Store finance/checkpoint recovery.
+    // This host setup supplies no production adapter or runtime entitlement.
+    final finance = WorkspaceFinanceSnapshot(accountScope: scope.$1, workspaceId: scope.$2,
+      revision: 1, asOf: DateTime.now(), salesTodayMinor: 0, duesMinor: 0,
+      availableMinor: 0, heldMinor: 0, requestedMinor: 0, paidOutMinor: 0,
+      feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0,
+      taxWithheldMinor: 0, payments: const [], payouts: const [], historyComplete: true);
+    expect(native.work.applyWorkspaceFinance(finance), isTrue);
+    expect(native.work.bindCustomerCollectionGateway(accountScope: scope.$1, storeId: scope.$2,
+      adapter: StoreReviewCustomerCollectionGateway(finance), checkpointStore: checkpoint), isTrue);
+    await tester.pumpWidget(native.app);
+    await tester.pumpAndSettle();
+    Future<void> tapKey(String key) async {
+      final target = find.byKey(Key(key));
+      await Scrollable.ensureVisible(tester.element(target));
+      await tester.pumpAndSettle();
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+    }
+    await tapKey('work-store-stock');
+    await tapKey('work-incoming-purchases');
+    await tapKey('work-purchase-action-centre-open');
+    final category = find.byKey(const ValueKey('purchase-category-group-Goods received & returns'), skipOffstage: false);
+    await Scrollable.ensureVisible(tester.element(category));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('purchase-category-Goods received & returns')));
+    await tester.pumpAndSettle();
+    await tapKey('purchase-action-receive');
+    await tapKey('work-receive-supplier');
+    await tester.tap(find.text(supplier.name).last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
+    expect(native.work.workspaceSupplierOpeningConfirmationAvailable, isTrue);
+    expect(native.work.supplierReceivingInputFormKey(supplier.id), isNotNull,
+      reason: 'The actual native receiving draft owner must be available before assistant registration.');
+    final adapters = native.adapters(tester);
+    expect(adapters.where((value) => value.actionId == 'AI-ACT-241'), hasLength(1));
+    adapter = adapters.singleWhere((value) => value.actionId == 'AI-ACT-241');
+    snapshot = (await adapter.snapshot(native.readContext(), null))!;
+    controller = scope_contract.MoolAssistantController(currentContext: native.readContext,
+      contextChanges: Listenable.merge([native.journey, native.work, native.mode]),
+      entitlements: access, nativeAdapters: adapters,
+      attachments: _ReceivingDocumentPicker((_) async {
+        selectedPickerCalls++;
+        return WorkPickedProof(fileName: 'HOST-selected-arrival.png', contentType: 'image/png', bytes: bytes);
+      }));
+    _controllerCreated = true;
+    await controller.refreshAccess();
+    controller.setDraft('Review the selected arrival copy');
+    await controller.pickAttachment(origin);
+    expect(controller.selectedDocumentReferences.single.source, origin);
+  }
+
+  scope_contract.MoolAssistantProposal proposal({String? reference}) => scope_contract.MoolAssistantProposal(
+    id: 'HOST-arrival-review', actionId: 'AI-ACT-241', binding: controller.context.binding,
+    requestRevision: controller.requestRevision, entitlementRevision: controller.entitlementRevision!,
+    sourceRevision: snapshot.sourceRevision, validUntil: DateTime.now().add(const Duration(minutes: 5)),
+    title: 'Review arrival copy', summary: 'Review the selected original in its native receiving form.',
+    fields: {'attachmentRef': reference ?? controller.selectedDocumentReferences.single.id});
+
+  Future<({Future<scope_contract.MoolAssistantReviewResult> result})> begin(WidgetTester tester) async {
+    expect(controller.receiveProposal(proposal()), isTrue);
+    final root = Navigator.of(tester.element(find.byKey(const Key('work-goods-receiving'))), rootNavigator: true);
+    unawaited(root.push<void>(MaterialPageRoute(builder: (_) => MoolAssistantPage(controller: controller))));
+    await tester.pumpAndSettle();
+    final result = controller.reviewProposal();
+    // Do not pumpAndSettle a held OCR Future. Native I/O runs in runAsync.
+    for (var attempt = 0; attempt < 60; attempt++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 25)));
+      await tester.pump();
+      if (find.byKey(const Key('work-receive-fields-list')).evaluate().isNotEmpty ||
+          heldRecognition != null && recognitionCalls > 0 || !controller.reviewBusy) break;
+    }
+    if (heldRecognition == null) {
+      final fields = find.byKey(const Key('work-receive-fields-list'));
+      // Existence is the first build of the new MaterialPageRoute, not its
+      // completed slide transition. Settle only after native fields exist.
+      if (fields.evaluate().isNotEmpty) await tester.pumpAndSettle();
+      final diagnostics = 'reviewBusy=${controller.reviewBusy}; notice=${controller.proposalNotice}; '
+        'recognitionCalls=$recognitionCalls; nativePickerCalls=$nativePickerCalls; '
+        'selectedPickerCalls=$selectedPickerCalls; formWrites=${forms.writes}; '
+        'supplierRecovery=${native.work.workspaceSupplierRecoveryError}; '
+        'ledgerRecovery=${native.work.customerLedgerRecoveryError}; '
+        'inventoryRecovery=${native.work.workspaceInventoryError}';
+      expect(tester.takeException(), isNull, reason: diagnostics);
+      expect(fields, findsOneWidget, reason: 'The actual native fields route must be built. $diagnostics');
+      expect(ModalRoute.of(tester.element(fields))?.isCurrent, isTrue,
+        reason: 'The native fields route must be above AI. $diagnostics');
+      expect(fields.hitTestable(), findsOneWidget,
+        reason: 'The completed native route must accept input. $diagnostics');
+    }
+    return (result: result);
+  }
+
+  Future<void> close(WidgetTester tester) async {
+    if (heldRecognition?.isCompleted == false) heldRecognition!.complete(recognized);
+    if (_controllerCreated) controller.dispose();
+    access.dispose();
+    await tester.pumpWidget(const SizedBox.shrink());
+    if (_nativeReady) await native.dispose();
+    if (_directoryCreated) {
+      await tester.runAsync(() async { if (await directory.exists()) await directory.delete(recursive: true); });
+    }
+  }
+}
+
+void registerReceivingNativeAssistantTests() {
+  for (final origin in [WorkProofSource.camera, WorkProofSource.gallery, WorkProofSource.upload]) {
+    testWidgets('HOST AI receiving $origin stages original fields above AI; only native Save persists', (tester) async {
+      final f = _ReceivingAssistantHarness();
+      try {
+        await f.ready(tester, origin);
+        final before = f.forms.signature, writes = f.forms.writes, stockWrites = f.native.inventory.saves;
+        final book = jsonEncode(f.entry.value!.toJson());
+        final review = (await f.begin(tester)).result;
+        expect(find.byKey(const Key('work-receive-fields-list')).hitTestable(), findsOneWidget);
+        expect(find.byType(MoolAssistantPage), findsNothing, reason: 'Native review is above the AI route.');
+        expect(find.byKey(const Key('work-receive-fields-keep')).hitTestable(), findsOneWidget);
+        expect(f.forms.signature, before);
+        expect(f.forms.writes, writes);
+        expect(f.nativePickerCalls, 0);
+        expect(f.selectedPickerCalls, 1);
+        expect(f.recognitionCalls, 1);
+        await tester.tap(find.byKey(const Key('work-receive-fields-keep')));
+        await tester.pumpAndSettle();
+        expect(await review, MoolAssistantReviewResult.opened);
+        final saved = f.forms.drafts.values.singleWhere((value) => value.fields.containsKey('documents'));
+        final copy = WorkspacePurchaseInvoiceAttachment.fromJson((jsonDecode(saved.fields['documents']!) as List).single);
+        expect(copy.source, origin.name);
+        expect(copy.digest, crypto.sha256.convert(f.bytes).toString());
+        expect(copy.detectedText, _ReceivingAssistantHarness.recognized);
+        expect(copy.extractedFields, isNotEmpty);
+        expect(copy.extractedFields.every((field) => field.sourceDigest == copy.digest && field.sourcePage == 1), isTrue);
+        expect(copy.extractedFields.any((field) => field.label.toLowerCase().contains('xyz')), isTrue);
+        expect(f.forms.writes, writes + 1);
+        expect(jsonEncode(f.entry.value!.toJson()), book, reason: 'No receipt/quantity posting.');
+        expect(f.native.inventory.saves, stockWrites);
+        expect(tester.takeException(), isNull);
+      } finally { await f.close(tester); }
+    });
+  }
+
+  testWidgets('HOST AI receiving Cancel keeps original receipt and draft untouched', (tester) async {
+    final f = _ReceivingAssistantHarness();
+    try {
+      await f.ready(tester, WorkProofSource.gallery);
+      final before = f.forms.signature, writes = f.forms.writes;
+      final review = (await f.begin(tester)).result;
+      expect(find.byKey(const Key('work-receive-fields-list')), findsOneWidget);
+      final value = find.byWidgetPredicate((widget) => widget is TextField &&
+        widget.key is ValueKey<String> &&
+        (widget.key! as ValueKey<String>).value.startsWith('work-receive-field-value-')).first;
+      await tester.ensureVisible(value);
+      await tester.enterText(value, 'HOST edited staged value');
+      expect(f.forms.signature, before);
+      expect(f.forms.writes, writes);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.text('Discard field changes?'), findsOneWidget);
+      await tester.tap(find.text('Discard changes'));
+      await tester.pumpAndSettle();
+      expect(await review, MoolAssistantReviewResult.opened);
+      expect(f.forms.signature, before);
+      expect(f.forms.writes, writes);
+      expect(f.entry.value!.goodsReceiptDrafts, isEmpty);
+      expect(f.nativePickerCalls, 0);
+    } finally { await f.close(tester); }
+  });
+
+  testWidgets('HOST AI receiving unknown opaque reference cannot retain, scan, or save', (tester) async {
+    final f = _ReceivingAssistantHarness();
+    try {
+      await f.ready(tester, WorkProofSource.gallery);
+      final before = f.forms.signature, writes = f.forms.writes;
+      expect(f.controller.receiveProposal(f.proposal(reference: 'att-${List.filled(32, '0').join()}')), isTrue);
+      expect(await f.controller.reviewProposal(), MoolAssistantReviewResult.stale);
+      expect(f.recognitionCalls, 0);
+      expect(f.nativePickerCalls, 0);
+      expect(f.forms.signature, before);
+      expect(f.forms.writes, writes);
+      expect(find.byKey(const Key('work-receive-fields-list')), findsNothing);
+    } finally { await f.close(tester); }
+  });
+
+  for (final change in ['request', 'remove', 'Store', 'account', 'input']) {
+    testWidgets('HOST AI receiving late OCR after $change cannot stage or save', (tester) async {
+      final f = _ReceivingAssistantHarness();
+      try {
+        await f.ready(tester, WorkProofSource.camera);
+        f.heldRecognition = Completer<String>();
+        final before = f.forms.signature, writes = f.forms.writes;
+        final input = tester.widget<TextField>(find.byKey(const Key('work-receive-reference'))).controller!;
+        final review = (await f.begin(tester)).result;
+        expect(f.recognitionCalls, 1);
+        switch (change) {
+          case 'request': f.controller.setDraft('A newer request'); break;
+          case 'remove': f.controller.removeSelectedAttachment(0); break;
+          case 'Store': f.native.mode.value = 'buyer'; break;
+          case 'account':
+            f.native.principal.identity = const AuthenticatedAccountIdentity(
+              firebaseUserId: 'HOST-other-account', firebaseProjectId: 'host-native-scope-project',
+              displayName: 'HOST other account', phoneNumber: '+919876543211', signInMethods: ['HOST contract fixture']);
+            f.native.principal.changes.add(null);
+            await tester.pump();
+            break;
+          case 'input': input.text = 'HOST-newer-manual-input'; break;
+        }
+        f.heldRecognition!.complete(_ReceivingAssistantHarness.recognized);
+        await tester.pumpAndSettle();
+        expect(await tester.runAsync(() => review), MoolAssistantReviewResult.stale);
+        expect(find.byKey(const Key('work-receive-fields-list')), findsNothing);
+        expect(f.forms.signature, before);
+        expect(f.forms.writes, writes);
+        expect(f.entry.value!.goodsReceiptDrafts, isEmpty);
+      } finally { await f.close(tester); }
+    });
+  }
+}
+
+// Isolated host form fixture, never an OPPO provider or payment result.
+class _SettingsUpiSession extends WorkSession {
+  Object principal = Object();
+  int navigation = 1, saves = 0, reads = 0;
+  bool failRead = false, failAfterWrite = false;
+  Completer<void>? readGate;
+  WorkspaceUpiDestination? saved;
+  @override ({String account, String store})? get storeUpiScope => (account: 'host-owner', store: 'host-store');
+  @override int get navigationScopeRevision => navigation;
+  @override Object get publicationPreferencesContext => principal;
+  void retire() { principal = Object(); notifyListeners(); }
+  void signal() => notifyListeners();
+  @override Future<WorkspaceUpiDestination?> loadStoreUpiDestination(({String account, String store}) scope) async {
+    reads++; final gate = readGate; readGate = null; await gate?.future;
+    if (failRead) throw StateError('host read unavailable');
+    return saved;
+  }
+  @override Future<void> saveStoreUpiDestination(WorkspaceUpiDestination destination,
+      {bool Function()? current, String? expectedDestinationFingerprint}) async {
+    if (current?.call() == false) throw StateError('retired');
+    if (expectedDestinationFingerprint != null && expectedDestinationFingerprint != storeUpiFingerprint(saved)) {
+      throw StateError('changed original');
+    }
+    saves++; saved = destination;
+    if (failAfterWrite) throw StateError('host outcome not acknowledged');
+  }
+}
+const _settingsHostDestination = WorkspaceUpiDestination(account: 'host-owner', store: 'host-store',
+  address: 'original@host', payeeName: 'Original payee');
+
+class _SettingsQueueStorage extends FlutterSecureStorage {
+  final rows = <String, String>{};
+  final entered = Completer<void>(), release = Completer<void>();
+  int writes = 0;
+  @override Future<String?> read({required String key, settings_storage.AppleOptions? iOptions, settings_storage.AndroidOptions? aOptions,
+    settings_storage.LinuxOptions? lOptions, settings_storage.WebOptions? webOptions, settings_storage.AppleOptions? mOptions, settings_storage.WindowsOptions? wOptions}) async => rows[key];
+  @override Future<void> write({required String key, required String? value, settings_storage.AppleOptions? iOptions, settings_storage.AndroidOptions? aOptions,
+    settings_storage.LinuxOptions? lOptions, settings_storage.WebOptions? webOptions, settings_storage.AppleOptions? mOptions, settings_storage.WindowsOptions? wOptions}) async {
+    writes++;
+    if (writes == 1) { entered.complete(); await release.future; }
+    rows[key] = value!;
+  }
+}
+class _SettingsPublicJournal implements WorkspacePublicDetailsJournal {
+  WorkspacePublicDetailsIntent? original;
+  Completer<void>? readGate, saveGate;
+  @override Future<WorkspacePublicDetailsIntent?> readPending(WorkspacePublicDetailsScope scope) async {
+    await readGate?.future; return original;
+  }
+  @override Future<void> savePending(WorkspacePublicDetailsIntent value) async {
+    await saveGate?.future; original = value;
+  }
+  @override Future<void> removePending(WorkspacePublicDetailsIntent value) async { original = null; }
+}
+class _SettingsPublicGateway implements WorkspacePublicDetailsOwnerGateway {
+  int writes = 0;
+  WorkspacePublicDetailsWriteState outcome = WorkspacePublicDetailsWriteState.saved;
+  @override Future<WorkspacePublicDetailsRecord?> readPublicDetailsOwned({required String storeId, required bool Function() current}) async => null;
+  @override Future<WorkspacePublicDetailsWriteResult> writePublicDetails(WorkspacePublicDetailsIntent original,
+      {required bool Function() current, bool reconcile = false}) async {
+    if (!current()) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
+    writes++;
+    if (outcome != WorkspacePublicDetailsWriteState.saved) return WorkspacePublicDetailsWriteResult(outcome);
+    return WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.saved,
+      WorkspacePublicDetailsRecord(realm: original.realm, storeId: original.storeId,
+        revision: original.expectedRevision + 1, publishedAt: DateTime(2026, 10, 26), details: original.details));
+  }
+}
+
+class _SettingsPublicationSession extends WorkSession {
+  _SettingsPublicationSession(this.publisher) { workspaceId = 'store'; }
+  final WorkspacePublicDetailsController publisher;
+  int detailSaves = 0;
+  WorkspaceStorePublicationDetails details = const WorkspaceStorePublicationDetails(
+    street: 'Host road', city: 'Jaipur', state: 'Rajasthan', pinCode: '302001', publicContactPhone: '+919000000001',
+    openingTime: '09:00', closingTime: '21:00');
+  @override Object get publicationPreferencesContext => this;
+  @override int get navigationScopeRevision => 1;
+  @override bool get publicationPreferencesPersistenceAvailable => false;
+  @override WorkspaceStorePublicationDetails get workspacePublicationDetails => details;
+  @override WorkspacePublicDetailsController? get workspacePublicDetailsPublisher => publisher;
+  @override WorkspacePublicDetailsFields? get workspacePublicDetailsFieldsForPublishing =>
+    WorkspacePublicDetailsFields.fromSettings(details);
+  @override Future<bool> loadWorkspacePublicDetailsInputs() async => true;
+  @override bool saveWorkspacePublicationDetails(WorkspaceStorePublicationDetails value,
+      {String? expectedStoreId, int? expectedNavigationRevision}) {
+    detailSaves++; details = value; notifyListeners(); return true;
+  }
+  void signal() => notifyListeners();
+}
+
+class _SettingsCountingNotifier extends ChangeNotifier {
+  final listeners = <VoidCallback>{};
+  @override void addListener(VoidCallback value) { listeners.add(value); super.addListener(value); }
+  @override void removeListener(VoidCallback value) { listeners.remove(value); super.removeListener(value); }
+}
+
+
+class _SettingsFailingTradingStore extends _NativeScopeProofStore {
+  _SettingsFailingTradingStore(super.account);
+  bool failSave = false;
+  @override Future<void> save(String scope, Map<String, Object?> draft) {
+    if (failSave) { saves++; return Future.error(StateError('isolated native trading write failure')); }
+    return super.save(scope, draft);
+  }
+}
+
+class _SettingsListenerSession extends WorkSession {
+  _SettingsListenerSession({super.contactDraftStore, super.purchaseEntryStore, super.inventoryStore,
+    super.catalogueReference});
+  final settingsListeners = <VoidCallback>{};
+  @override void addListener(VoidCallback listener) { settingsListeners.add(listener); super.addListener(listener); }
+  @override void removeListener(VoidCallback listener) { settingsListeners.remove(listener); super.removeListener(listener); }
+}
+
+void registerSettingsReviewRegressionTests() {
+  test('AI-SETTINGS closed schemas cover exactly the eleven approved IDs', () {
+    final examples = <String, Map<String, Object?>>{
+      'AI-ACT-317': {'workspaceId': 'permitted-store'},
+      'AI-ACT-318': {'acceptingOrders': false, 'busyMinutes': 15, 'reopensAt': 'Tomorrow'},
+      'AI-ACT-319': {'openingTime': '09:00', 'maximumActiveOrders': 0, 'alertSound': false},
+      'AI-ACT-320': {'legalName': 'श्री गणेश', 'businessType': 'wholesaler', 'dispatchDays': 2,
+        'wholesalePaymentTerms': [], 'returnRemedies': ['Replacement']},
+      'AI-ACT-321': {},
+      'AI-ACT-322': {'city': 'Jaipur', 'area': 'बाजार', 'pincode': '302001', 'pickupEnabled': true},
+      'AI-ACT-323': {'mode': 'whatsapp'},
+      'AI-ACT-324': {'address': 'store@host', 'payeeName': 'મહાદેવ', 'merchantCode': ''},
+      'AI-ACT-326': {'staffAccessEnabled': true, 'counterCount': 3},
+      'AI-ACT-327': {'visibleToCustomers': false},
+      'AI-ACT-328': {'alertId': 'exact-current-alert'},
+    };
+    for (final entry in examples.entries) {
+      final value = StoreSettingsInitialData.fromFields(entry.key, entry.value);
+      expect(value.fields, entry.value);
+      expect(() => value.fields['owner'] = 'other', throwsUnsupportedError);
+    }
+    expect(examples.length, 11);
+  });
+  test('AI-SETTINGS identity, private inputs and unsupported/confusable fields are rejected', () {
+    for (final fields in [
+      {'account': 'other'}, {'store': 'other'}, {'address': 'x', 'payeeName': 12},
+      {'аddress': 'confusable@host'}, {'address': null}, {'bankVerified': true},
+    ]) {
+      expect(() => StoreSettingsInitialData.fromFields('AI-ACT-324', fields), throwsFormatException);
+    }
+    expect(() => StoreSettingsInitialData.fromFields('AI-ACT-321', {'publish': true}), throwsFormatException);
+    expect(() => StoreSettingsInitialData.fromFields('AI-ACT-319', {'maximumActiveOrders': -1}), throwsFormatException);
+    expect(() => StoreSettingsInitialData.fromFields('AI-ACT-326', {'counterCount': 21}), throwsFormatException);
+    expect(() => StoreSettingsInitialData.fromFields('AI-ACT-323', {'mode': 'sendNow'}), throwsFormatException);
+    expect(() => StoreSettingsInitialData.fromFields('AI-ACT-322', {'deliveryFee': 0}), throwsFormatException);
+  });
+  test('AI-SETTINGS raw partial UPI values remain editable without normalization', () {
+    final initial = StoreSettingsInitialData.fromFields('AI-ACT-324', {'payeeName': '  हिन्दी નામ  '});
+    expect(initial.fields['payeeName'], '  हिन्दी નામ  ');
+    expect(initial.fields.containsKey('address'), isFalse);
+  });
+  for (final action in ['AI-ACT-322', 'AI-ACT-326']) {
+    test('AI-SETTINGS $action own failed payload remains retryable; ACK advances only its exact baseline', () {
+      var state = <String, Object?>{'first': 'old', 'second': 'unchanged', 'foreign': 1};
+      final scope = StoreSettingsReviewScope(current: () => true, sourceCurrent: () => true, readSource: () => state);
+      expect(scope.beginAttempt({'first': 'native edit'}), isTrue);
+      state = {...state, 'first': 'native edit'}; // native in-memory transition before a failed device write
+      expect(scope.mayApply, isTrue); expect(scope.beginAttempt({'first': 'native edit'}), isTrue);
+      expect(scope.beginAttempt({'first': 'different retry'}), isFalse);
+      scope.completeAttempt(); expect(scope.beginAttempt({'second': 'next acknowledged section'}), isTrue);
+      state = {...state, 'foreign': 2}; expect(scope.mayApply, isFalse);
+      expect(scope.beginAttempt({'second': 'next acknowledged section'}), isFalse);
+    });
+  }
+  test('AI-SETTINGS original admission accepts only its minted pending identity and never a foreign original', () {
+    String? pending;
+    final scope = StoreSettingsReviewScope(current: () => true, sourceCurrent: () => true,
+      readSource: () => {'saved': 'exact'}, readOperation: () => pending);
+    expect(scope.admitOriginal('native-original'), isTrue); pending = 'native-original'; expect(scope.mayApply, isTrue);
+    pending = 'foreign-original'; expect(scope.mayApply, isFalse); expect(scope.admitOriginal('foreign-original'), isFalse);
+    pending = null; scope.completeOriginal(); expect(scope.mayApply, isFalse);
+    expect(scope.admitOriginal('next-native-original'), isFalse);
+  });
+  Future<void> mount(WidgetTester tester, _SettingsUpiSession session,
+      {StoreSettingsInitialData? initial, StoreSettingsReviewScope? scope}) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreUpiDestinationEditor(
+      session: session, initialData: initial, reviewScope: scope))));
+    await tester.pumpAndSettle();
+  }
+  String field(WidgetTester tester, String id) => tester.widget<TextFormField>(find.byKey(Key(id))).controller!.text;
+  Future<void> save(WidgetTester tester) async {
+    final control = find.byKey(const Key('work-upi-save'));
+    await tester.ensureVisible(control); await tester.tap(control); await tester.pumpAndSettle();
+  }
+  testWidgets('AI-SETTINGS UPI presentation owns one subscription across typing Save and rebuild, releases on close', (tester) async {
+    final session = _SettingsUpiSession()..saved = _settingsHostDestination; addTearDown(session.dispose);
+    final owner = _SettingsCountingNotifier(); addTearDown(owner.dispose);
+    final scope = StoreSettingsReviewScope(current: () => true, sourceCurrent: () => true, changes: owner);
+    addTearDown(scope.dispose);
+    final baseline = owner.listeners.length;
+    await mount(tester, session, scope: scope);
+    final opened = owner.listeners.length; expect(opened, greaterThan(baseline));
+    for (final value in ['Owner one', 'Owner two', 'Owner three']) {
+      await tester.enterText(find.byKey(const Key('work-upi-payee')), value);
+      session.signal(); owner.notifyListeners(); await tester.pumpAndSettle();
+      expect(owner.listeners.length, opened);
+    }
+    await save(tester); expect(session.saves, 1); expect(owner.listeners.length, opened);
+    session.signal(); owner.notifyListeners(); await tester.pumpAndSettle();
+    expect(owner.listeners.length, opened);
+    await tester.pumpWidget(const SizedBox()); await tester.pump();
+    expect(owner.listeners.length, baseline);
+  });
+  testWidgets('AI-SETTINGS Review overlays only supplied native fields and never saves', (tester) async {
+    final session = _SettingsUpiSession()..saved = _settingsHostDestination; addTearDown(session.dispose);
+    await mount(tester, session, initial: StoreSettingsInitialData.fromFields('AI-ACT-324', {'payeeName': 'महादेव'}));
+    expect(field(tester, 'work-upi-address'), 'original@host');
+    expect(field(tester, 'work-upi-payee'), 'महादेव'); expect(session.saves, 0);
+    await tester.pumpWidget(const SizedBox()); expect(session.saves, 0);
+  });
+  testWidgets('AI-SETTINGS native Save writes once and confirms by actual readback', (tester) async {
+    final session = _SettingsUpiSession()..saved = _settingsHostDestination; addTearDown(session.dispose);
+    await mount(tester, session, initial: StoreSettingsInitialData.fromFields('AI-ACT-324', {'payeeName': 'महादेव'}));
+    await save(tester); expect(session.saves, 1); expect(session.saved!.payeeName, 'महादेव');
+    expect(find.text('UPI details saved on this device.'), findsOneWidget); expect(session.reads, greaterThanOrEqualTo(3));
+  });
+  testWidgets('AI-SETTINGS native validators reject an invalid supplied UPI without saving', (tester) async {
+    final session = _SettingsUpiSession()..saved = _settingsHostDestination; addTearDown(session.dispose);
+    await mount(tester, session, initial: StoreSettingsInitialData.fromFields('AI-ACT-324', {'address': 'not-a-upi-id'}));
+    await save(tester); expect(session.saves, 0); expect(find.text('Enter a valid UPI ID.'), findsOneWidget);
+  });
+  testWidgets('AI-SETTINGS concurrent saved destination blocks replacement and preserves text', (tester) async {
+    final session = _SettingsUpiSession()..saved = _settingsHostDestination; addTearDown(session.dispose);
+    await mount(tester, session, initial: StoreSettingsInitialData.fromFields('AI-ACT-324', {'payeeName': 'My edit'}));
+    session.saved = const WorkspaceUpiDestination(account: 'host-owner', store: 'host-store', address: 'changed@host', payeeName: 'Changed');
+    await save(tester); expect(session.saves, 0); expect(field(tester, 'work-upi-payee'), 'My edit');
+    expect(find.textContaining('Saved UPI details changed.'), findsOneWidget);
+  });
+  testWidgets('AI-SETTINGS concurrent UPI mismatch close/reopen compares actual saved source and permits explicit native recovery', (tester) async {
+    final session = _SettingsUpiSession()..saved = _settingsHostDestination; addTearDown(session.dispose);
+    await mount(tester, session, initial: StoreSettingsInitialData.fromFields('AI-ACT-324', {'payeeName': 'My retained edit'}));
+    session.saved = const WorkspaceUpiDestination(account: 'host-owner', store: 'host-store', address: 'new@host', payeeName: 'New saved source');
+    await save(tester); expect(session.saves, 0);
+    await tester.pumpWidget(const SizedBox()); await tester.pump();
+    await mount(tester, session); expect(field(tester, 'work-upi-payee'), 'My retained edit');
+    expect(find.textContaining('new@host'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('work-upi-review-again')));
+    await tester.tap(find.byKey(const Key('work-upi-review-again'))); await tester.pumpAndSettle();
+    await save(tester); expect(session.saves, 1); expect(session.saved!.payeeName, 'My retained edit');
+    expect(session.saved!.address, 'original@host');
+  });
+  testWidgets('AI-SETTINGS same Store principal retirement during native pre-save read dispatches nothing', (tester) async {
+    final session = _SettingsUpiSession()..saved = _settingsHostDestination; addTearDown(session.dispose);
+    await mount(tester, session, initial: StoreSettingsInitialData.fromFields('AI-ACT-324', {'payeeName': 'My edit'}));
+    final gate = Completer<void>(); session.readGate = gate;
+    await tester.ensureVisible(find.byKey(const Key('work-upi-save')));
+    await tester.tap(find.byKey(const Key('work-upi-save'))); await tester.pump();
+    session.retire(); gate.complete(); await tester.pumpAndSettle();
+    expect(session.saves, 0); expect(find.byKey(const Key('work-upi-payee')), findsNothing);
+    expect(find.textContaining('Your Store or account changed.'), findsOneWidget);
+  });
+  testWidgets('AI-SETTINGS unknown native save keeps attempt and read-only recovery confirms without resending', (tester) async {
+    final session = _SettingsUpiSession()..saved = _settingsHostDestination..failAfterWrite = true; addTearDown(session.dispose);
+    await mount(tester, session, initial: StoreSettingsInitialData.fromFields('AI-ACT-324', {'payeeName': 'My edit'}));
+    await save(tester); expect(session.saves, 1); expect(field(tester, 'work-upi-payee'), 'My edit');
+    expect(find.textContaining('The save is unconfirmed.'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('work-upi-check')));
+    await tester.tap(find.byKey(const Key('work-upi-check'))); await tester.pumpAndSettle();
+    expect(session.saves, 1); expect(find.text('UPI details saved on this device.'), findsOneWidget);
+  });
+  testWidgets('AI-SETTINGS closing and reopening same native owner retains an unsaved draft', (tester) async {
+    final session = _SettingsUpiSession()..saved = _settingsHostDestination; addTearDown(session.dispose);
+    await mount(tester, session);
+    await tester.enterText(find.byKey(const Key('work-upi-payee')), 'Unfinished native edit');
+    await tester.pumpWidget(const SizedBox()); await tester.pump();
+    await mount(tester, session); expect(field(tester, 'work-upi-payee'), 'Unfinished native edit');
+    expect(session.saves, 0);
+  });
+  testWidgets('AI-SETTINGS source retirement while opening never fills private native inputs', (tester) async {
+    final session = _SettingsUpiSession()..saved = _settingsHostDestination; addTearDown(session.dispose);
+    var current = true;
+    final gate = Completer<void>(); session.readGate = gate;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreUpiDestinationEditor(session: session,
+      reviewScope: StoreSettingsReviewScope(current: () => current, sourceCurrent: () => current)))));
+    await tester.pump(); current = false; gate.complete(); session.signal(); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-upi-payee')), findsNothing); expect(session.saves, 0);
+  });
+  testWidgets('AI-SETTINGS compact native editor remains scrollable at narrow width and enlarged text', (tester) async {
+    final session = _SettingsUpiSession()..saved = _settingsHostDestination; addTearDown(session.dispose);
+    await tester.binding.setSurfaceSize(const Size(320, 600)); addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(MaterialApp(home: MediaQuery(data: const MediaQueryData(size: Size(320, 600),
+      textScaler: TextScaler.linear(1.8)), child: Scaffold(body: StoreUpiDestinationEditor(session: session)))));
+    await tester.pumpAndSettle(); await tester.ensureVisible(find.byKey(const Key('work-upi-save')));
+    expect(tester.takeException(), isNull); expect(find.byKey(const Key('work-upi-save')), findsOneWidget);
+  });
+  for (final invoice in [false, true]) {
+    test('AI-SETTINGS ${invoice ? 'invoice' : 'UPI'} queued retirement suppresses only the new write', () async {
+      final storage = _SettingsQueueStorage(); var current = true;
+      final WorkUpiDestinationStore upi = SecureWorkUpiDestinationStore(accountScope: () => 'queue-owner', storeScope: () => 'queue-store', storage: storage);
+      final WorkInvoiceDeliveryPreferenceStore delivery = SecureWorkInvoiceDeliveryPreferenceStore(accountScope: () => 'queue-owner', storeScope: () => 'queue-store', storage: storage);
+      const value = WorkspaceUpiDestination(account: 'queue-owner', store: 'queue-store', address: 'store@host', payeeName: 'Host');
+      const preference = WorkspaceInvoiceDeliveryPreference(account: 'queue-owner', store: 'queue-store', mode: WorkspaceInvoiceDeliveryMode.automatic);
+      final first = invoice ? delivery.save(preference) : upi.save(value);
+      await storage.entered.future;
+      final second = invoice ? delivery.save(preference, current: () => current) : upi.save(value, current: () => current);
+      final check = expectLater(second, throwsA(isA<WorkGatewayException>()));
+      current = false; storage.release.complete(); await first; await check;
+      expect(storage.writes, 1); expect(storage.rows.length, 1);
+    });
+    test('AI-SETTINGS ${invoice ? 'invoice' : 'UPI'} queued source change blocks replacement', () async {
+      final storage = _SettingsQueueStorage();
+      final upi = SecureWorkUpiDestinationStore(accountScope: () => 'source-owner', storeScope: () => 'source-store', storage: storage);
+      final delivery = SecureWorkInvoiceDeliveryPreferenceStore(accountScope: () => 'source-owner', storeScope: () => 'source-store', storage: storage);
+      const value = WorkspaceUpiDestination(account: 'source-owner', store: 'source-store', address: 'store@host', payeeName: 'Host');
+      const preference = WorkspaceInvoiceDeliveryPreference(account: 'source-owner', store: 'source-store', mode: WorkspaceInvoiceDeliveryMode.automatic);
+      final first = invoice ? delivery.save(preference) : upi.save(value);
+      await storage.entered.future;
+      final second = invoice ? delivery.save(preference, expectedOriginalMode: WorkspaceInvoiceDeliveryMode.off)
+        : upi.save(value, expectedDestinationFingerprint: storeUpiFingerprint(null));
+      final check = expectLater(second, throwsA(isA<WorkGatewayException>()));
+      storage.release.complete(); await first; await check; expect(storage.writes, 1);
+    });
+    test('AI-SETTINGS ${invoice ? 'invoice' : 'UPI'} omitted manual guard preserves queued saves', () async {
+      final storage = _SettingsQueueStorage();
+      final upi = SecureWorkUpiDestinationStore(accountScope: () => 'manual-owner', storeScope: () => 'manual-store', storage: storage);
+      final delivery = SecureWorkInvoiceDeliveryPreferenceStore(accountScope: () => 'manual-owner', storeScope: () => 'manual-store', storage: storage);
+      const value = WorkspaceUpiDestination(account: 'manual-owner', store: 'manual-store', address: 'store@host', payeeName: 'Host');
+      const preference = WorkspaceInvoiceDeliveryPreference(account: 'manual-owner', store: 'manual-store');
+      final first = invoice ? delivery.save(preference) : upi.save(value); await storage.entered.future;
+      final second = invoice ? delivery.save(preference) : upi.save(value);
+      storage.release.complete(); await first; await second; expect(storage.writes, 2);
+    });
+  }
+  const publicFields = WorkspacePublicDetailsFields(street: 'Host road', city: 'Jaipur', state: 'Rajasthan', pinCode: '302001',
+    publicContactPhone: '+919000000001', openingTime: '09:00', closingTime: '21:00');
+  const original = WorkspacePublicDetailsIntent(ownerAccountId: 'owner', realm: 'production', storeId: 'store',
+    expectedRevision: 0, idempotencyKey: 'host-original-settings', details: publicFields);
+  for (final unknownFirst in [false, true]) {
+    testWidgets('AI-SETTINGS actual 321 view admits its own new original ${unknownFirst ? 'and native unknown retry' : 'through successful native publish'}', (tester) async {
+      final journal = _SettingsPublicJournal(), gateway = _SettingsPublicGateway();
+      final controller = WorkspacePublicDetailsController(scope: original.scope, gateway: gateway, journal: journal,
+        context: () => 'owner', now: () => DateTime(2026, 10, 26, 12));
+      final session = _SettingsPublicationSession(controller);
+      addTearDown(session.dispose); addTearDown(controller.dispose);
+      final scope = StoreSettingsReviewScope(current: () => true, sourceCurrent: () => true,
+        readSource: () => {'savedPublicDetails': session.workspacePublicDetailsFieldsForPublishing!.toJson()},
+        readOperation: () => controller.pending?.fingerprint, sourceChanges: Listenable.merge([session, controller]));
+      addTearDown(scope.dispose);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
+        child: StorePublicationSettings(session: session, reviewScope: scope)))));
+      await tester.pumpAndSettle(); expect(gateway.writes, 0); expect(session.detailSaves, 0);
+      await tester.ensureVisible(find.byKey(const PageStorageKey('work-publication-address-section')));
+      await tester.tap(find.byKey(const PageStorageKey('work-publication-address-section'))); await tester.pumpAndSettle();
+      gateway.outcome = unknownFirst ? WorkspacePublicDetailsWriteState.unknown : WorkspacePublicDetailsWriteState.saved;
+      await tester.ensureVisible(find.byKey(const Key('work-publication-update-public')));
+      await tester.tap(find.byKey(const Key('work-publication-update-public'))); await tester.pumpAndSettle();
+      expect(gateway.writes, 1); expect(scope.mayApply, isTrue);
+      if (unknownFirst) {
+        final fingerprint = controller.pending!.fingerprint;
+        gateway.outcome = WorkspacePublicDetailsWriteState.notFound;
+        await tester.tap(find.byKey(const Key('work-publication-check-public'))); await tester.pumpAndSettle();
+        gateway.outcome = WorkspacePublicDetailsWriteState.saved;
+        await tester.tap(find.byKey(const Key('work-publication-retry-public-original'))); await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, 'Retry original')); await tester.pumpAndSettle();
+        expect(gateway.writes, 3); expect(journal.original, isNull); expect(fingerprint, isNotEmpty);
+      }
+      expect(controller.pending, isNull); expect(controller.lastAcknowledged, isNotNull); expect(scope.mayApply, isTrue);
+    });
+  }
+  testWidgets('AI-SETTINGS 320 native address then terms saves accept only their own acknowledged source groups', (tester) async {
+    final controller = WorkspacePublicDetailsController(scope: original.scope, gateway: _SettingsPublicGateway(),
+      journal: _SettingsPublicJournal(), context: () => 'owner', now: () => DateTime(2026, 10, 26, 12));
+    final session = _SettingsPublicationSession(controller); addTearDown(session.dispose); addTearDown(controller.dispose);
+    final scope = StoreSettingsReviewScope(current: () => true, sourceCurrent: () => true,
+      readSource: () => session.details.toJson(), sourceChanges: session);
+    addTearDown(scope.dispose);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: StorePublicationSettings(
+      session: session, reviewScope: scope, initialData: StoreSettingsInitialData.fromFields('AI-ACT-320',
+        {'legalName': 'Native address edit', 'returnSummary': 'Native terms edit'}))))));
+    await tester.pumpAndSettle(); expect(session.detailSaves, 0);
+    await tester.ensureVisible(find.byKey(const PageStorageKey('work-publication-address-section')));
+    await tester.tap(find.byKey(const PageStorageKey('work-publication-address-section'))); await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('work-publication-save-address')));
+    await tester.tap(find.byKey(const Key('work-publication-save-address'))); await tester.pumpAndSettle();
+    expect(session.detailSaves, 1); expect(session.details.legalName, 'Native address edit'); expect(scope.mayApply, isTrue);
+    await tester.ensureVisible(find.byKey(const PageStorageKey('work-publication-terms-section')));
+    await tester.tap(find.byKey(const PageStorageKey('work-publication-terms-section'))); await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('work-publication-save-terms')));
+    await tester.tap(find.byKey(const Key('work-publication-save-terms'))); await tester.pumpAndSettle();
+    expect(session.detailSaves, 2); expect(session.details.returnSummary, 'Native terms edit'); expect(scope.mayApply, isTrue);
+    final acknowledged = session.details;
+    session.details = WorkspaceStorePublicationDetails.fromJson({...session.details.toJson(), 'city': 'Foreign change'});
+    session.signal();
+    session.details = acknowledged; session.signal(); await tester.pump();
+    await tester.tap(find.byKey(const Key('work-publication-save-terms'))); await tester.pumpAndSettle(); expect(session.detailSaves, 2);
+  });
+  testWidgets('AI-SETTINGS actual 321 existing-original ACK clears its notified pending source without retiring the native owner', (tester) async {
+    final journal = _SettingsPublicJournal()..original = original, gateway = _SettingsPublicGateway();
+    final controller = WorkspacePublicDetailsController(scope: original.scope, gateway: gateway, journal: journal,
+      context: () => 'owner', now: () => DateTime(2026, 10, 26, 12));
+    final session = _SettingsPublicationSession(controller);
+    addTearDown(session.dispose); addTearDown(controller.dispose);
+    await controller.restore();
+    final scope = StoreSettingsReviewScope(current: () => true, sourceCurrent: () => true,
+      readSource: () => {'savedPublicDetails': session.workspacePublicDetailsFieldsForPublishing!.toJson()},
+      readOperation: () => controller.pending?.fingerprint, sourceChanges: Listenable.merge([session, controller]));
+    addTearDown(scope.dispose);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: StorePublicationSettings(session: session, reviewScope: scope)))));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const PageStorageKey('work-publication-address-section')));
+    await tester.tap(find.byKey(const PageStorageKey('work-publication-address-section'))); await tester.pumpAndSettle();
+    expect(gateway.writes, 0);
+    await tester.ensureVisible(find.byKey(const Key('work-publication-check-public')));
+    await tester.tap(find.byKey(const Key('work-publication-check-public'))); await tester.pumpAndSettle();
+    expect(gateway.writes, 1); expect(controller.pending, isNull); expect(journal.original, isNull);
+    expect(scope.mayApply, isTrue);
+  });
+  for (final retry in [false, true]) {
+  test('AI-SETTINGS 321 ${retry ? 'retry' : 'reconcile'} exact ACK consumes its pending source without false unknown', () async {
+    final journal = _SettingsPublicJournal()..original = original, gateway = _SettingsPublicGateway();
+    final controller = WorkspacePublicDetailsController(scope: original.scope, gateway: gateway, journal: journal, context: () => 'owner', now: () => DateTime(2026, 10, 26, 12));
+    addTearDown(controller.dispose);
+    await controller.restore(); controller.originalNotFound = true;
+    final result = retry
+      ? await controller.retryOriginal(current: () => true, inputCurrent: () => journal.original?.fingerprint == original.fingerprint)
+      : await controller.reconcile(current: () => true, inputCurrent: () => journal.original?.fingerprint == original.fingerprint);
+    expect(result.state, WorkspacePublicDetailsWriteState.saved); expect(controller.pending, isNull);
+    expect(journal.original, isNull); expect(gateway.writes, 1);
+  });
+  }
+  test('AI-SETTINGS 321 retirement during original retry journal save prevents dispatch', () async {
+    final gate = Completer<void>(), journal = _SettingsPublicJournal()..original = original;
+    final gateway = _SettingsPublicGateway(); var current = true;
+    final controller = WorkspacePublicDetailsController(scope: original.scope, gateway: gateway, journal: journal, context: () => 'owner', now: () => DateTime(2026, 10, 26, 12));
+    addTearDown(controller.dispose);
+    await controller.restore(); controller.originalNotFound = true; journal.saveGate = gate;
+    final result = controller.retryOriginal(current: () => current, inputCurrent: () => true);
+    await Future<void>.delayed(Duration.zero); current = false; gate.complete();
+    expect((await result).state, WorkspacePublicDetailsWriteState.unknown); expect(gateway.writes, 0);
+    expect(journal.original?.fingerprint, original.fingerprint);
+  });
+  for (final sourceOnly in [false, true]) {
+    test('AI-SETTINGS 321 ${sourceOnly ? 'source' : 'owner'} retirement during restore preserves original and never dispatches', () async {
+      final gate = Completer<void>(), journal = _SettingsPublicJournal()..original = original..readGate = gate;
+      final gateway = _SettingsPublicGateway(); var current = true;
+      final controller = WorkspacePublicDetailsController(scope: original.scope, gateway: gateway, journal: journal, context: () => 'owner', now: () => DateTime(2026, 10, 26, 12));
+      addTearDown(controller.dispose);
+      final result = controller.reconcile(current: () => sourceOnly || current, inputCurrent: () => !sourceOnly || current);
+      await Future<void>.delayed(Duration.zero); current = false; gate.complete();
+      expect((await result).state, WorkspacePublicDetailsWriteState.unknown); expect(gateway.writes, 0);
+      expect(journal.original?.fingerprint, original.fingerprint);
+    });
+  }
+
+}
+
+class _ReportReadTrackingSession extends WorkSession {
+  _ReportReadTrackingSession({super.contactDraftStore, super.purchaseEntryStore, super.inventoryStore, super.catalogueReference});
+  int inventoryReads = 0, ledgerReads = 0, operationReads = 0, commodityAdmissions = 0;
+  @override bool get workspaceCommodityPriceAttentionConfigured => true;
+  @override Future<void> loadWorkspaceCommodityPriceAttention({bool force = false}) async { commodityAdmissions++; }
+  @override Future<bool> loadWorkspaceInventory({bool retry = false}) { inventoryReads++; return super.loadWorkspaceInventory(retry: retry); }
+  @override Future<bool> recoverCustomerLedger() { ledgerReads++; return super.recoverCustomerLedger(); }
+  @override Future<bool> loadWorkspaceOperationalOrders({bool more = false}) { operationReads++; return super.loadWorkspaceOperationalOrders(more: more); }
+  List<int> get reads => [inventoryReads, ledgerReads, operationReads, commodityAdmissions];
+}
+
+class _ReportLifecycleHarness extends StatelessWidget {
+  const _ReportLifecycleHarness({required this.app, required this.mirror, required this.bucket});
+  final Widget app;
+  final ValueNotifier<Widget?> mirror;
+  final PageStorageBucket bucket;
+  @override Widget build(BuildContext context) => Directionality(textDirection: TextDirection.ltr,
+    child: ValueListenableBuilder<Widget?>(valueListenable: mirror, child: app,
+      builder: (context, native, app) => Stack(children: [Positioned.fill(child: app!),
+        if (native != null) Positioned.fill(child: MaterialApp(theme: MoolTheme.light(),
+          home: Scaffold(body: PageStorage(bucket: bucket, child: native)))),
+      ])));
+}
+
+class _ReportCountingPageStorage extends PageStorageBucket {
+  int writes = 0;
+  @override void writeState(BuildContext context, dynamic data, {Object? identifier}) {
+    writes++; super.writeState(context, data, identifier: identifier);
+  }
+}
+
+// HOST only: authenticated existing fixture and native secure stores, no runtime provider.
+class _Receiving251Work extends WorkSession {
+  _Receiving251Work({required super.contactDraftStore,required super.purchaseEntryStore,
+    required super.inventoryStore,required super.tradingPreferencesStoreFactory})
+    :super(catalogueReference:workspaceMasterCatalogue);
+  bool forbidAdmission=false;int admissions=0;
+  void _admission(){admissions++;if(forbidAdmission)throw StateError('HOST read-only Review admitted native state');}
+  @override Future<bool> loadWorkspaceInventory({bool retry=false}){_admission();return super.loadWorkspaceInventory(retry:retry);}
+  @override Future<bool> loadWorkspaceSuppliers({bool retry=false}){_admission();return super.loadWorkspaceSuppliers(retry:retry);}
+  @override Future<bool> recoverCustomerLedger(){_admission();return super.recoverCustomerLedger();}
+}
+class _Receiving251Fixture {
+  late final _AuthenticatedNativeScopeFixture native;
+  late final _Receiving251Work work;
+  late final SecureWorkPurchaseEntryStore purchase;
+  late final SecureWorkInventoryStore inventory;
+  final checkpoint=_LedgerCheckpointFixtureStore();
+  final wire=purchase_fixture.Transport();
+  late AuthenticatedWorkspaceOrderIdentityGateway reader;
+  late WorkspaceRestockPurchaseOriginal original;
+  late Map<String,dynamic> details,refs,group;
+  Object lifetime=Object();bool includeGroup=true,malformed=false;
+  bool ready=false;int notifications=0;
+  void changed(){notifications++;}
+  Future<void> start() async {
+    native=_AuthenticatedNativeScopeFixture(makeWork:(contact,_,unusedInventory,trading){
+      purchase=SecureWorkPurchaseEntryStore(accountScope:()=>contact.accountScope);
+      inventory=SecureWorkInventoryStore(accountScope:()=>contact.accountScope);
+      work=_Receiving251Work(contactDraftStore:contact,purchaseEntryStore:purchase,inventoryStore:inventory,
+        tradingPreferencesStoreFactory:(_)=>trading);return work;
+    });
+    await native.ready();ready=true;
+    final scope=work.workspaceSupplierScope!,at=DateTime.now().toUtc();
+    expect(await work.loadWorkspaceInventory(),isTrue);
+    final saved=WorkspaceSavedInventory(account:scope.$1,store:scope.$2,qa:scope.$3,revision:1,savedAt:at,
+      products:work.workspaceCatalogueItems,movements:work.workspaceStockMovements);
+    await inventory.save(saved,expectedRevision:null);
+    expect(await work.loadWorkspaceInventory(retry:true),isTrue);
+    final supplier=WorkspaceSupplierProfile(id:'HOST-receive251-supplier',name:'HOST original supplier',createdAt:at,updatedAt:at);
+    await purchase.save(WorkspacePurchaseEntryBook(account:scope.$1,store:scope.$2,qa:scope.$3,revision:1,profiles:[supplier]),expectedRevision:null);
+    expect(await work.loadWorkspaceSuppliers(retry:true),isTrue);
+    final finance=WorkspaceFinanceSnapshot(accountScope:scope.$1,workspaceId:scope.$2,revision:1,asOf:at,
+      salesTodayMinor:0,duesMinor:0,availableMinor:0,heldMinor:0,requestedMinor:0,paidOutMinor:0,feesMinor:0,
+      deliveryAdjustmentsMinor:0,refundsMinor:0,taxWithheldMinor:0,payments:const [],payouts:const [],historyComplete:true);
+    expect(work.applyWorkspaceFinance(finance),isTrue);
+    expect(work.bindCustomerCollectionGateway(accountScope:scope.$1,storeId:scope.$2,
+      adapter:StoreReviewCustomerCollectionGateway(finance),checkpointStore:checkpoint),isTrue);
+    expect(await work.recoverCustomerLedger(),isTrue);
+    details=purchase_fixture.purchaserPurchaseResponse();refs=purchase_fixture.purchaserReferenceResponse();
+    details['viewerUserId']=scope.$1;details['orders'][0]['original']['purchaser']['storeId']=scope.$2;
+    purchase_fixture.rehashPurchaseOrder(details['orders'][0]);
+    refs['viewerUserId']=scope.$1;refs['buyingStoreId']=scope.$2;
+    refs['references'][0]['originalFingerprint']=details['orders'][0]['originalFingerprint'];
+    wire.respond=(body){
+      switch(body['operation']) {
+        case 'readBuyerPurchaseProjection':return details;
+        case 'listBuyerPurchaseReferences':return refs;
+        case 'readBuyerGoodsReceiving':return {'schemaVersion':1,'realm':'evaluation','viewerUserId':scope.$1,
+          'buyingStoreId':scope.$2,'group':malformed?{'revision':-1}:includeGroup?group:null};
+        default:throw StateError('Read fixture refused non-read operation ${body['operation']}');
+      }
+    };
+    reader=purchase_fixture.projectionGateway(wire,account:scope.$1,lifetime:()=>lifetime);
+    work.bindOriginalPurchaseReader(reader,'evaluation');
+    final projection=await reader.readPurchaseProjection(role:WorkspaceOrderIdentityRole.buyer,realm:'evaluation',
+      purchaseId:'purchase-v2',buyingStoreId:scope.$2);
+    expect(projection,isNotNull);
+    original=WorkspaceRestockPurchaseOriginal.fromJson({'schemaVersion':1,'realm':'evaluation','accountScope':scope.$1,
+      'buyingStoreId':scope.$2,'reference':refs['references'][0],'lines':[for(final line in projection!.orders.single.lines)
+        {'lineId':line.lineId,'quantityMilli':line.quantityMilli,'quantityUnit':line.quantityUnit}]});
+    final product=work.workspaceCatalogueItems.firstWhere((p)=>p.stockMode==WorkspaceStockMode.exactQuantity);
+    final receipt=WorkspaceSupplierGoodsReceipt(id:'HOST-receive251-arrival',expectedDeliveryId:original.deliveryGroupId,
+      reference:'HOST exact original receiving',deliveredOn:at.toIso8601String().substring(0,10),recordedAt:at,
+      recordedUtcOffsetMinutes:0,restockOriginal:original,lines:[for(final line in projection.orders.single.lines)
+        WorkspaceSupplierGoodsReceiptLine(sourceLineId:line.lineId,productId:product.id,productLabel:product.title,
+          purchaseUnit:line.quantityUnit,stockUnit:product.pack,unitsPerPack:1,deliveredMilli:1000,acceptedMilli:1000,
+          damagedMilli:0,shortMilli:0,expectedMilli:line.quantityMilli)]);
+    final command=WorkspaceGoodsArrivalCommand(supplierId:supplier.id,receipt:receipt);
+    group=(purchase_fixture.restockArrivalResponse(command)['group'] as Map).cast<String,dynamic>();
+    wire.requests.clear();work.addListener(changed);notifications=0;work.forbidAdmission=true;
+  }
+  Future<String> fingerprint() async {
+    final scope=work.workspaceSupplierScope!,cached=work.workspaceRestockReceiving(original);
+    final raw=await const FlutterSecureStorage().readAll();
+    final keys=raw.keys.toList()..sort();
+    return jsonEncode({
+      'privateStorage':{for(final key in keys)key:raw[key]},
+      'inventory':(await inventory.read(scope.$1,scope.$2,qa:scope.$3))?.toJson(),
+      'sourceBook':(await purchase.read(scope.$1,scope.$2,qa:scope.$3))?.toJson(),
+      'inventorySignature':work.workspaceRestockStockReviewSignature,
+      'inventoryLoaded':work.workspaceInventoryLoaded,'inventoryRevision':work.workspaceInventoryRevision,
+      'sourceLoaded':work.workspaceSuppliersLoaded,'sourceRevision':work.workspacePurchaseEntryRevision,
+      'cachedOriginal':cached?.original.toJson(),'cachedGroup':cached?.group?.toJson(),
+      'baselineMissing':work.workspaceRestockBaselineMissing,'recoveryPending':work.workspaceGoodsReceiptRecoveryPending,
+      'conflict':work.workspaceRestockStockConflict?.toJson(),
+      'checkpoint':checkpoint.value?.toJson(),'checkpointWrites':checkpoint.saveAttempts,
+    });
+  }
+  void expectReadOperationsOnly(){expect(wire.requests.map((r)=>r['operation']).toSet(),
+    everyElement(isIn(['readBuyerPurchaseProjection','readBuyerGoodsReceiving'])));}
+  Future<void> close() async {
+    wire.beforePost=null;wire.pending?.complete();wire.pending=null;
+    if(ready){work.forbidAdmission=false;work.removeListener(changed);await native.dispose();ready=false;}
+  }
+}
+
+void registerReceiving251ReadOnlyTests(){
+  for(final hasGroup in [true,false]) {
+    test('HOST-RECEIVE251 pure authenticated read ${hasGroup?'recorded':'no-record'} preserves source cache Stock and checkpoint',() async {
+      final f=_Receiving251Fixture();addTearDown(f.close);await f.start();f.includeGroup=hasGroup;
+      final before=await f.fingerprint(),admissions=f.work.admissions;
+      final read=await f.work.readWorkspaceRestockReceivingForReview(f.original);
+      expect(read,isNotNull);expect(jsonEncode(read!.original.toJson()),jsonEncode(f.original.toJson()));
+      expect(read.group!=null,hasGroup);if(hasGroup)expect(read.group!.toJson(),f.group);
+      expect(await f.fingerprint(),before);expect(f.work.workspaceRestockReceiving(f.original),isNull);
+      expect(f.work.admissions,admissions);expect(f.notifications,0);f.expectReadOperationsOnly();
+    });
+  }
+  for(final mode in ['malformed','unavailable']) {
+    test('HOST-RECEIVE251 $mode status is unverified without cache admission',() async {
+      final f=_Receiving251Fixture();addTearDown(f.close);await f.start();
+      f.malformed=mode=='malformed';f.wire.fail=mode=='unavailable';
+      final before=await f.fingerprint(),admissions=f.work.admissions;
+      expect(await f.work.readWorkspaceRestockReceivingForReview(f.original),isNull);
+      expect(await f.fingerprint(),before);expect(f.notifications,0);expect(f.work.admissions,admissions);
+      expect(f.work.workspaceRestockReceiving(f.original),isNull);f.expectReadOperationsOnly();
+    });
+  }
+  for(final stage in ['readBuyerPurchaseProjection','readBuyerGoodsReceiving']) {
+    for(final retirement in ['reader-retired','reader-ABA']) {
+      test('HOST-RECEIVE251 late $stage rejects $retirement without a late cache or write',() async {
+        final f=_Receiving251Fixture();addTearDown(f.close);await f.start();
+        final entered=Completer<void>(),release=Completer<void>();addTearDown((){if(!release.isCompleted)release.complete();});
+        f.wire.beforePost=(body) async {if(body['operation']==stage){if(!entered.isCompleted)entered.complete();await release.future;}};
+        final pending=f.work.readWorkspaceRestockReceivingForReview(f.original);
+        await entered.future;
+        if(retirement=='reader-retired'){f.lifetime=Object();}
+        else {
+          final replacement=purchase_fixture.projectionGateway(f.wire,account:f.original.accountScope);
+          f.work.bindOriginalPurchaseReader(replacement,'evaluation');f.work.bindOriginalPurchaseReader(f.reader,'evaluation');
+        }
+        // Deliberate native authority retirement may clear caches; compare after
+        // that event to isolate effects from the now-obsolete async result.
+        final afterRetirement=await f.fingerprint(),admissions=f.work.admissions,notifications=f.notifications;
+        release.complete();expect(await pending,isNull);
+        expect(await f.fingerprint(),afterRetirement);expect(f.work.admissions,admissions);expect(f.notifications,notifications);
+        f.expectReadOperationsOnly();
+      });
+    }
+  }
+  for(final stage in ['readBuyerPurchaseProjection','readBuyerGoodsReceiving']) {
+    test('HOST-RECEIVE251 input retirement during $stage stops continuation without state admission',() async {
+      final f=_Receiving251Fixture();addTearDown(f.close);await f.start();bool inputCurrent=true;
+      final entered=Completer<void>(),release=Completer<void>();addTearDown((){if(!release.isCompleted)release.complete();});
+      f.wire.beforePost=(body) async {if(body['operation']==stage){if(!entered.isCompleted)entered.complete();await release.future;}};
+      final before=await f.fingerprint(),admissions=f.work.admissions;
+      final pending=f.work.readWorkspaceRestockReceivingForReview(f.original,inputCurrent:()=>inputCurrent);
+      await entered.future;inputCurrent=false;release.complete();expect(await pending,isNull);
+      if(stage=='readBuyerPurchaseProjection')expect(f.wire.requests.where((r)=>r['operation']=='readBuyerGoodsReceiving'),isEmpty);
+      expect(await f.fingerprint(),before);expect(f.work.admissions,admissions);expect(f.notifications,0);f.expectReadOperationsOnly();
+    });
+  }
+  test('HOST-RECEIVE251 mismatched original account fails before any request or native admission',() async {
+    final f=_Receiving251Fixture();addTearDown(f.close);await f.start();
+    final wrong=WorkspaceRestockPurchaseOriginal.fromJson({...f.original.toJson(),'accountScope':'HOST-other-account'});
+    final before=await f.fingerprint(),calls=f.wire.calls,admissions=f.work.admissions;
+    expect(await f.work.readWorkspaceRestockReceivingForReview(wrong),isNull);
+    expect(await f.fingerprint(),before);expect(f.wire.calls,calls);expect(f.work.admissions,admissions);expect(f.notifications,0);
+  });
+  test('HOST-RECEIVE251 disposed owner cannot start another authenticated read',() async {
+    final f=_Receiving251Fixture();addTearDown(f.close);await f.start();await f.close();
+    final before=await const FlutterSecureStorage().readAll(),calls=f.wire.calls;
+    expect(await f.work.readWorkspaceRestockReceivingForReview(f.original),isNull);
+    expect(await const FlutterSecureStorage().readAll(),before);expect(f.wire.calls,calls);
+  });
+  test('HOST-RECEIVE251 original explicit recovery still admits its verified native baseline',() async {
+    final f=_Receiving251Fixture();addTearDown(f.close);await f.start();f.includeGroup=false;
+    final before=await f.fingerprint();
+    expect(await f.work.readWorkspaceRestockReceivingForReview(f.original),isNotNull);
+    expect(await f.fingerprint(),before);expect(f.work.workspaceRestockReceiving(f.original),isNull);
+    f.work.forbidAdmission=false;
+    expect(await f.work.recoverWorkspaceRestockReceiving(f.original),isTrue);
+    expect(f.work.workspaceRestockReceiving(f.original),isNotNull);
+    expect(f.work.workspaceRestockReceiving(f.original)!.group,isNull);
+    expect(f.notifications,greaterThan(0));expect(await f.fingerprint(),isNot(before));f.expectReadOperationsOnly();
+  });
+}
+
+// HOST-only wrappers over the actual authenticated fixture and guarded native
+// encrypted stores. They supply no runtime model/commerce/OCR source or grant.
+class _ReceivingRemainingForms extends SecureWorkLedgerFormDraftStore {
+  _ReceivingRemainingForms(String? Function() account):super(accountScope:account);
+  int saves=0,reads=0;Completer<void>? readGate,activeReadGate,readEntered;
+  @override Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key) async {
+    reads++;final value=await super.read(key);
+    final gate=readGate;if(gate!=null){readGate=null;activeReadGate=gate;if(readEntered?.isCompleted==false)readEntered!.complete();await gate.future;activeReadGate=null;}
+    return value;
+  }
+  @override Future<void> save(WorkspaceLedgerFormDraft value,{required int? expectedRevision}) async {
+    saves++;await super.save(value,expectedRevision:expectedRevision);
+  }
+}
+class _ReceivingRemainingInventory extends SecureWorkInventoryStore {
+  _ReceivingRemainingInventory(String? Function() account):super(accountScope:account);
+  int reads=0,saves=0,projections=0;
+  @override Future<WorkspaceSavedInventory?> read(String account,String store,{required bool qa}) {
+    reads++;return super.read(account,store,qa:qa);
+  }
+  @override Future<void> save(WorkspaceSavedInventory value,{required int? expectedRevision}) {
+    saves++;return super.save(value,expectedRevision:expectedRevision);
+  }
+  @override Future<bool> projectReceipt(String account,String store,{required bool qa,required int? expectedRevision,
+    required Future<WorkspaceSavedInventory?> Function(WorkspaceSavedInventory?) commit}) {
+    projections++;return super.projectReceipt(account,store,qa:qa,expectedRevision:expectedRevision,commit:commit);
+  }
+}
+class _ReceivingRemainingWork extends WorkSession {
+  _ReceivingRemainingWork({required super.contactDraftStore,required super.purchaseEntryStore,required super.inventoryStore,
+    required super.ledgerFormDraftStore,required super.tradingPreferencesStoreFactory,super.purchaseInvoiceCapture}):super(catalogueReference:workspaceMasterCatalogue);
+  bool forbidCold=false;int ledgerRecoveries=0,inventoryLoads=0;
+  @override Future<bool> saveWorkspaceGoodsReceiptDraft(WorkspaceSupplierGoodsReceipt receipt, {
+    required String supplierId, required (String, String, bool) scope,
+    required int expectedRevision, List<WorkspacePurchaseInvoiceAttachment> documents=const [],
+  }) {
+    WorkspaceSupplierGoodsReceipt.fromJson(receipt.toJson());
+    return super.saveWorkspaceGoodsReceiptDraft(receipt, supplierId:supplierId,
+      scope:scope, expectedRevision:expectedRevision, documents:documents);
+  }
+  @override Future<bool> loadWorkspaceInventory({bool retry=false}) {
+    inventoryLoads++;if(forbidCold)throw StateError('HOST proposal tried cold inventory admission');
+    return super.loadWorkspaceInventory(retry:retry);
+  }
+  @override Future<bool> recoverCustomerLedger() {
+    ledgerRecoveries++;if(forbidCold)throw StateError('HOST proposal tried cold ledger recovery');
+    return super.recoverCustomerLedger();
+  }
+}
+class _ReceivingRemainingHost {
+  _ReceivingRemainingHost({this.capture,_SupplierPrefillStore? entry}):entry=entry??_SupplierPrefillStore();final WorkPurchaseInvoiceCapture? capture;
+  final _SupplierPrefillStore entry;
+  final access=_ReceivingAssistantAccess(),checkpoint=_LedgerCheckpointFixtureStore();
+  late final _AuthenticatedNativeScopeFixture native;
+  late final _ReceivingRemainingForms forms;
+  late final _ReceivingRemainingInventory inventory;
+  late final _ReceivingRemainingWork work;
+  late final WorkspaceSupplierProfile supplier;
+  late final WorkspaceSupplierOpeningRecord opening;
+  late final WorkspacePurchaseSavedCopy copy;
+  late final WorkspaceSupplierGoodsReceipt receipt;
+  late WorkspaceCatalogueItem product;
+  scope_contract.MoolAssistantController? controller;
+  bool _ready=false;
+  Object get writes=>(entry.saveAttempts,forms.saves,inventory.saves,inventory.projections,checkpoint.saveAttempts);
+  Widget get app=>MaterialApp.router(theme:MoolTheme.light(),routerConfig:native.router,
+    builder:(_,child)=>MoolAssistantHost(readContext:native.readContext,
+      contextChanges:Listenable.merge([native.journey,work,native.mode]),entitlements:access,child:child!));
+  Future<void> ready(WidgetTester tester,{bool arrival=false,bool reviewedReceipt=false,bool postedReceipt=false}) async {
+    native=_AuthenticatedNativeScopeFixture(makeWork:(contact,_,unusedInventory,trading) {
+      forms=_ReceivingRemainingForms(()=>contact.accountScope);inventory=_ReceivingRemainingInventory(()=>contact.accountScope);
+      work=_ReceivingRemainingWork(contactDraftStore:contact,purchaseEntryStore:entry,inventoryStore:inventory,
+        ledgerFormDraftStore:forms,tradingPreferencesStoreFactory:(_)=>trading,purchaseInvoiceCapture:capture);return work;
+    });
+    await native.ready();_ready=true;
+    final scope=work.workspaceSupplierScope!,at=DateTime.now().toUtc(),day=at.toLocal().toIso8601String().substring(0,10);
+    final printed='${day.substring(8)}/${day.substring(5,7)}/${day.substring(0,4)}';
+    supplier=WorkspaceSupplierProfile(id:'HOST-rem-receiving-supplier',name:'HOST मूल પુરવઠાકાર',createdAt:at,updatedAt:at);
+    expect(await work.loadWorkspaceInventory(retry:true),isTrue);
+    product=work.workspaceCatalogueItems.first.copyWith(stockMode:WorkspaceStockMode.exactQuantity);
+    expect(work.addOrUpdateWorkspaceProduct(product.copyWith(stock:product.stock+10)),isTrue);expect(await work.workspaceInventorySaved,isTrue);
+    product=work.workspaceCatalogueItems.singleWhere((p)=>p.id==product.id);
+    final bill=WorkspacePurchaseEntryDraft(id:'HOST-rem-receiving-bill',supplierId:supplier.id,invoiceReference:'HOST-RECEIVING-BILL',
+      invoiceDate:printed,createdAt:at,updatedAt:at,goods:[{'productId':product.id,'name':product.title,'pack':product.pack,'quantity':'5','cost':'10'}],
+      details:const {'invoiceTotal':'50'});
+    copy=WorkspacePurchaseSavedCopy(id:'HOST-rem-receiving-copy',storeName:'HOST Store',revision:1,savedAt:at,supplier:supplier,draft:bill,labels:const {});
+    opening=WorkspaceSupplierOpeningRecord(id:'HOST-rem-receiving-opening',basisId:'HOST-rem-receiving-basis',
+      account:scope.$1,store:scope.$2,qa:scope.$3,supplierId:supplier.id,revision:2,asOfDate:day,savedAt:at,
+      amountMinor:0,supplierCredit:false,sourceNote:'HOST original confirmed zero',
+      bills:[WorkspaceOpeningBillLink(copyId:copy.id,copyRevision:copy.revision,draftId:bill.id,inclusion:WorkspaceOpeningBillInclusion.excluded)]);
+    receipt=WorkspaceSupplierGoodsReceipt(id:'HOST-rem-receiving-receipt',expectedDeliveryId:'HOST-rem-receiving-group',
+      reference:'HOST original arrival',deliveredOn:day,recordedAt:at,lines:[WorkspaceSupplierGoodsReceiptLine(
+        sourceLineId:'HOST-rem-receiving-line',productId:product.id,productLabel:product.title,purchaseUnit:product.pack,stockUnit:product.pack,
+        unitsPerPack:1,deliveredMilli:3000,acceptedMilli:2000,damagedMilli:1000,shortMilli:2000,expectedMilli:5000)]);
+    entry.value=WorkspacePurchaseEntryBook(account:scope.$1,store:scope.$2,qa:scope.$3,revision:reviewedReceipt||postedReceipt?3:2,profiles:[supplier],copies:[copy],openingRecords:[opening],
+      goodsReceiptDrafts:[if(reviewedReceipt||postedReceipt)WorkspaceSupplierGoodsReceiptDraft(supplierId:supplier.id,revision:3,receipt:receipt)]);
+    WorkspaceSupplierProfile.fromJson(supplier.toJson());
+    WorkspacePurchaseSavedCopy.fromJson(copy.toJson());
+    WorkspaceSupplierOpeningRecord.fromJson(opening.toJson());
+    WorkspacePurchaseEntryBook.fromJson(entry.value!.toJson());
+    final finance=WorkspaceFinanceSnapshot(accountScope:scope.$1,workspaceId:scope.$2,revision:1,asOf:at,
+      salesTodayMinor:0,duesMinor:0,availableMinor:0,heldMinor:0,requestedMinor:0,paidOutMinor:0,feesMinor:0,
+      deliveryAdjustmentsMinor:0,refundsMinor:0,taxWithheldMinor:0,payments:const [],payouts:const [],historyComplete:true);
+    expect(work.applyWorkspaceFinance(finance),isTrue);
+    expect(work.bindCustomerCollectionGateway(accountScope:scope.$1,storeId:scope.$2,
+      adapter:StoreReviewCustomerCollectionGateway(finance),checkpointStore:checkpoint),isTrue);
+    expect(await work.loadWorkspaceSuppliers(retry:true),isTrue);
+    expect(await work.confirmWorkspaceSupplierOpeningRecord(opening,scope:scope,expectedRevision:entry.value!.revision,confirmedAt:at),isTrue);
+    expect(await work.confirmWorkspacePurchaseBill(copy,scope:scope,expectedPurchaseRevision:work.workspacePurchaseEntryRevision!,
+      expectedLedgerRevision:work.workspaceSupplierLedger(supplier.id)!.revision,openingTreatment:WorkspaceOpeningBillInclusion.excluded,confirmedAt:at),isTrue);
+    if(postedReceipt)expect(await work.confirmWorkspaceSupplierGoodsReceipt(receipt,supplierId:supplier.id,scope:scope,
+      expectedPurchaseRevision:work.workspacePurchaseEntryRevision!,expectedSupplierRevision:work.workspaceSupplierLedger(supplier.id)!.revision,
+      requireSavedReview:true),WorkspaceGoodsReceiptSaveResult.saved);
+    await tester.pumpWidget(app);await tester.pumpAndSettle();
+    if(arrival)await openArrival(tester);
+    controller=scope_contract.MoolAssistantController(currentContext:native.readContext,
+      contextChanges:Listenable.merge([native.journey,work,native.mode]),entitlements:access,nativeAdapters:native.adapters(tester));
+    await controller!.refreshAccess();controller!.setDraft('Review exact original receiving fields');
+  }
+  Future<void> reveal(WidgetTester tester,Finder finder) async {
+    if(finder.evaluate().isEmpty){
+      final lists=find.byWidgetPredicate((widget)=>widget is Scrollable&&widget.axisDirection==AxisDirection.down).evaluate().where((element)=>
+        ModalRoute.of(element)?.isCurrent==true&&element.findAncestorWidgetOfExactType<EditableText>()==null).toList();
+      expect(lists,isNotEmpty,reason:'An actual current vertical native list must own $finder.');
+      final receiving=find.byKey(const Key('work-goods-receiving')).evaluate().where((element)=>ModalRoute.of(element)?.isCurrent==true).toList();
+      final Element scrollElement=receiving.isNotEmpty
+        ?find.descendant(of:find.byElementPredicate((element)=>identical(element,receiving.single)),matching:find.byType(Scrollable)).evaluate().first
+        :lists.last;
+      await tester.scrollUntilVisible(finder,180,scrollable:find.byElementPredicate((element)=>identical(element,scrollElement)),maxScrolls:30);
+    }
+    expect(finder,findsOneWidget,reason:'The actual native target must be materialized before hit-testing.');
+    await tester.ensureVisible(finder);await tester.pumpAndSettle();
+  }
+  Future<void> tap(WidgetTester tester,String key) async {final f=find.byKey(Key(key));await reveal(tester,f);await tester.tap(f);await tester.pumpAndSettle();}
+  Future<void> openArrival(WidgetTester tester) async {
+    await tap(tester,'work-store-stock');await tap(tester,'work-incoming-purchases');await tap(tester,'work-purchase-action-centre-open');
+    final group=find.byKey(const ValueKey('purchase-category-group-Goods received & returns'),skipOffstage:false);
+    await Scrollable.ensureVisible(tester.element(group));await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('purchase-category-Goods received & returns')));await tester.pumpAndSettle();
+    await tap(tester,'purchase-action-receive');await tap(tester,'work-receive-supplier');await tester.tap(find.text(supplier.name).last);await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-goods-receiving')),findsOneWidget);
+  }
+  Future<void> openOriginalBill(WidgetTester tester) async {
+    await tap(tester,'work-store-stock');await tap(tester,'work-incoming-purchases');await tap(tester,'work-purchase-action-centre-open');
+    final group=find.byKey(const ValueKey('purchase-category-group-Supplier bills'),skipOffstage:false);
+    await Scrollable.ensureVisible(tester.element(group));await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('purchase-category-Supplier bills')));await tester.pumpAndSettle();
+    await tap(tester,'purchase-action-record-bill');await tap(tester,'work-purchase-supplier-section');await tap(tester,'work-purchase-select-supplier');
+    await tester.tap(find.text(supplier.name).last);await tester.pumpAndSettle();
+    await tap(tester,'work-purchase-invoice-section');
+    final reference=find.byKey(const Key('work-purchase-reference'));await reveal(tester,reference);
+    await tester.enterText(reference,'HOST original printed bill');await tester.pumpAndSettle();
+    final date=find.byKey(const Key('work-purchase-date'));await reveal(tester,date);
+    final now=DateTime.now();await tester.enterText(date,'${now.day.toString().padLeft(2,'0')}/${now.month.toString().padLeft(2,'0')}/${now.year}');await tester.pumpAndSettle();
+  }
+  Future<WorkspaceLedgerFormDraft> input() async=>(await forms.read(work.supplierReceivingInputFormKey(supplier.id)!))!;
+  Future<String> arrivalId() async=>(await input()).fields['arrivalId']!;
+  Future<String> lineId() async=>((jsonDecode((await input()).fields['input']!) as List)[2] as List)[0] as String;
+  Future<({Future<MoolAssistantReviewResult> result})> open(WidgetTester tester,String action,String entity,Map<String,Object?> fields) async {
+    final c=controller!,adapter=native.adapters(tester).singleWhere((a)=>a.actionId==action);
+    final snapshot=await adapter.snapshot(c.context,entity);
+    expect(snapshot,isNotNull,reason:action);
+    expect(c.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-rem-$action',actionId:action,binding:c.context.binding,
+      requestRevision:c.requestRevision,entitlementRevision:c.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+      validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:entity,title:'Review original receiving source',summary:'HOST native raw fields only',fields:fields)),isTrue);
+    final result=c.reviewProposal();await tester.pumpAndSettle();return(result:result);
+  }
+  String field(WidgetTester tester,String key)=>tester.widget<TextField>(find.byKey(Key(key))).controller!.text;
+  void releaseCold(){if(_ready)work.forbidCold=false;}
+  Future<void> expandLot(WidgetTester tester,int index) async {
+    final input=find.byKey(Key('work-receive-batch-$index'));
+    if(input.evaluate().isEmpty){final tile=find.byKey(ValueKey('work-receive-lot-$index'));await reveal(tester,tile);await tester.tap(tile);await tester.pumpAndSettle();}
+    await reveal(tester,input);
+  }
+  Future<void> close(WidgetTester tester) async {
+    if(!_ready){access.dispose();return;}
+    if(forms.readGate?.isCompleted==false)forms.readGate!.complete();if(forms.activeReadGate?.isCompleted==false)forms.activeReadGate!.complete();
+    await tester.pumpWidget(const SizedBox.shrink());controller?.dispose();access.dispose();if(_ready)await native.dispose();
+  }
+}
+
+
+void registerReceivingRemainingNativeTests() {
+  test('Receiving remaining schema preserves Unicode/raw decimals and rejects effect flags and raw source paths',() {
+    final initial=StoreReceivingReviewInitial.fromFields('AI-ACT-238',{'reference':'મૂળ चालान १२','items':[{'productId':'sku-real','delivered':'1.500','batch':'किरण-જથ્થો'}]});
+    expect(initial.text('reference'),'મૂળ चालान १२');expect(initial.items.single['delivered'],'1.500');
+    expect(()=>initial.items.single['delivered']='999',throwsUnsupportedError);
+    for(final fields in <Map<String,Object?>>[{}, {'post':true},{'stock':999},{'sourceDigest':'fabricated'},{'path':'/private/original'},
+      {'items':[{'lineId':'same','productId':'a'},{'lineId':'same','productId':'b'}]}]) {
+      expect(()=>StoreReceivingReviewInitial.fromFields('AI-ACT-238',fields),throwsFormatException);
+    }
+    expect(()=>StoreReceivingReviewInitial.fromFields('AI-ACT-248',{'billLineIndex':0,'deliveryId':'real','receiptLineId':'line','quantity':'1','attributionReviewed':true}),throwsFormatException);
+    expect(()=>StoreReceivingReviewInitial.fromFields('AI-ACT-245',{'billLineIndex':0,'receiptId':'real','receiptLineId':'line','conversionReviewed':true}),throwsFormatException);
+    expect(()=>StoreReceivingReviewInitial.fromFields('AI-ACT-404',{'fieldId':'printed','delivered':'999'}),throwsFormatException);
+  });
+  testWidgets('Receiving238 stages original fields without cold load/autosave; original Review then Record alone persist and project Stock',(tester) async {
+    final f=_ReceivingRemainingHost();try {
+      await f.ready(tester,arrival:true);final before=f.writes,book=jsonEncode(f.entry.value!.toJson());
+      f.work.forbidCold=true;final loads=(f.work.inventoryLoads,f.work.ledgerRecoveries);
+      final result=await f.open(tester,'AI-ACT-238',f.supplier.id,{'reference':'મૂળ चालान १२','date':'24/10/2026','items':[
+        {'productId':f.product.id,'delivered':'1.500','damaged':'0.500','expected':'2','short':'0.500','batch':'किरण-જથ્થો','expiry':'As printed 10/27','mrp':'125.50'}]});
+      expect(await result.result,MoolAssistantReviewResult.returnToOwner);expect(f.writes,before);expect(jsonEncode(f.entry.value!.toJson()),book);
+      expect((f.work.inventoryLoads,f.work.ledgerRecoveries),loads);
+      expect(f.field(tester,'work-receive-reference'),'મૂળ चालान १२');
+      await f.reveal(tester,find.byKey(const Key('work-receive-delivered-0')));expect(f.field(tester,'work-receive-delivered-0'),'1.500');
+      expect(f.field(tester,'work-receive-damaged-0'),'0.500');await f.expandLot(tester,0);expect(f.field(tester,'work-receive-batch-0'),'किरण-જથ્થો');
+      expect(f.writes,before);f.work.forbidCold=false;
+      await f.tap(tester,'work-receive-review');
+      final saved=f.work.workspaceGoodsReceiptDrafts.singleWhere((r)=>r.receipt.reference=='મૂળ चालान १२');
+      expect(saved.receipt.lines.single.deliveredMilli,1500);expect(saved.receipt.lines.single.acceptedMilli,1000);
+      expect(saved.receipt.lines.single.lotDetails!.batch,'किरण-જથ્થો');expect(f.forms.saves,greaterThan(0));
+      final stock=f.work.workspaceCatalogueItems.singleWhere((p)=>p.id==f.product.id).stock,projects=f.inventory.projections;
+      expect(f.work.workspaceSupplierLedger(f.supplier.id)!.goodsReceipts.containsKey(saved.receipt.id),isFalse);
+      await f.tap(tester,'work-receive-confirm');
+      expect(f.work.workspaceSupplierLedger(f.supplier.id)!.goodsReceipts[saved.receipt.id]!.id,saved.receipt.id);
+      expect(f.work.workspaceCatalogueItems.singleWhere((p)=>p.id==f.product.id).stock,stock+1);
+      expect(f.inventory.projections,greaterThan(projects));expect(find.textContaining('Goods recorded'),findsWidgets);
+    }finally{f.releaseCold();await f.close(tester);}
+  });
+  for(final action in ['AI-ACT-239','AI-ACT-240','AI-ACT-246','AI-ACT-401']) {
+    testWidgets('Receiving $action fills only its exact original row/type and does not save on Review',(tester) async {
+      final f=_ReceivingRemainingHost();try {
+        await f.ready(tester,arrival:true);final arrival=await f.arrivalId(),line=await f.lineId(),before=f.writes;
+        final fields=<String,Object?>{
+          if(action=='AI-ACT-239')'items':[{'productId':f.product.id,'delivered':'2.000','unit':f.product.pack,'factor':'1'}],
+          if(action=='AI-ACT-240'||action=='AI-ACT-246')'lineId':line,
+          if(action=='AI-ACT-240')'productId':f.product.id,
+        };
+        if(action=='AI-ACT-246'){fields.addAll({'batch':'છાપેલું-१२','manufactured':'As printed: 2026','expiry':'અજ્ઞાત / see copy','mrp':'10.25'});}
+        if(action=='AI-ACT-401')fields['documentType']=WorkspacePurchaseInvoiceAttachment.receivingDocumentTypes.first;
+        f.work.forbidCold=true;final result=await f.open(tester,action,arrival,fields);expect(await result.result,MoolAssistantReviewResult.returnToOwner);
+        expect(f.writes,before);
+        if(action=='AI-ACT-239'){await f.reveal(tester,find.byKey(const Key('work-receive-delivered-1')));expect(f.field(tester,'work-receive-delivered-1'),'2.000');}
+        if(action=='AI-ACT-240'){await f.reveal(tester,find.byKey(const Key('work-receive-unit-0')));expect(f.field(tester,'work-receive-unit-0'),f.product.pack);expect(f.field(tester,'work-receive-factor-0'),'1');}
+        if(action=='AI-ACT-246'){await f.expandLot(tester,0);expect(f.field(tester,'work-receive-batch-0'),'છાપેલું-१२');}
+        if(action=='AI-ACT-401'){expect(find.text(storeTradeDocumentLabel(fields['documentType']! as String)),findsWidgets);}
+        expect(f.writes,before);
+      }finally{f.releaseCold();await f.close(tester);}
+    });
+  }
+  testWidgets('Receiving preparation original Close Keep/Discard retains original saved input without proposal autosave',(tester) async {
+    final f=_ReceivingRemainingHost();try {
+      await f.ready(tester,arrival:true);final original=await f.input(),before=f.writes;
+      await f.open(tester,'AI-ACT-238',f.supplier.id,{'reference':'Unsaved प्रस्ताव / ડ્રાફ્ટ'});
+      final back=find.descendant(of:find.byKey(const Key('work-receive-header')),matching:find.widgetWithText(TextButton,'Close'));expect(back,findsOneWidget);await tester.tap(back);await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-receiving-preparation-leave')),findsOneWidget);expect(f.writes,before);
+      await tester.tap(find.text('Keep editing'));await tester.pumpAndSettle();expect(f.field(tester,'work-receive-reference'),'Unsaved प्रस्ताव / ડ્રાફ્ટ');
+      await tester.tap(back);await tester.pumpAndSettle();await tester.tap(find.text('Discard changes'));await tester.pumpAndSettle();
+      final kept=(await f.forms.read(original.key))!;expect(kept.key,original.key);expect(kept.revision,original.revision);expect(kept.fields,original.fields);expect(f.writes,before);
+    }finally{await f.close(tester);}
+  });
+  for(final boundary in ['buyer ABA','principal ABA','SKU ABA']) {
+    testWidgets('Receiving transferred $boundary irreversibly hides private fields and rejects retained native Review',(tester) async {
+      final f=_ReceivingRemainingHost();try {
+        await f.ready(tester,arrival:true);await f.open(tester,'AI-ACT-238',f.supplier.id,{'reference':'Private original owner','items':[{'productId':f.product.id,'delivered':'1'}]});
+        await f.reveal(tester,find.byKey(const Key('work-receive-review')));
+        final review=tester.widget<FilledButton>(find.byKey(const Key('work-receive-review'))).onPressed!;
+        if(boundary=='buyer ABA'){f.native.mode.value='buyer';f.native.mode.value='store';}
+        if(boundary=='principal ABA'){final old=f.native.principal.identity;f.native.principal.identity=null;f.native.principal.changes.add(null);await tester.idle();f.native.principal.identity=old;f.native.principal.changes.add(null);await tester.idle();}
+        if(boundary=='SKU ABA'){expect(f.work.addOrUpdateWorkspaceProduct(f.product.copyWith(sellingPriceMinor:f.product.sellingPriceMinor+1)),isTrue);expect(f.work.addOrUpdateWorkspaceProduct(f.product),isTrue);expect(await f.work.workspaceInventorySaved,isTrue);await tester.idle();}
+        final before=f.writes;review();await tester.pumpAndSettle();
+        expect(f.writes,before);expect(find.byKey(const Key('work-receive-review')).hitTestable(),findsNothing);
+        expect(find.text('Private original owner').hitTestable(),findsNothing);
+      }finally{await f.close(tester);}
+    });
+  }
+  testWidgets('Receiving transferred native fields survive completed proposal retirement while native owner remains current',(tester) async {
+    final f=_ReceivingRemainingHost();try {
+      await f.ready(tester,arrival:true);await f.open(tester,'AI-ACT-238',f.supplier.id,{'reference':'Original native retained'});
+      final before=f.writes;f.controller!.setDraft('A different assistant request');f.controller!.dispose();f.controller=null;await tester.pumpAndSettle();
+      expect(f.field(tester,'work-receive-reference'),'Original native retained');
+      await f.reveal(tester,find.byKey(const Key('work-receive-review')));
+      expect(tester.widget<FilledButton>(find.byKey(const Key('work-receive-review'))).onPressed,isNotNull);expect(f.writes,before);
+    }finally{await f.close(tester);}
+  });
+  testWidgets('Receiving actual dirty native controller blocks overwrite and preserves exact raw input',(tester) async {
+    final f=_ReceivingRemainingHost();try {
+      await f.ready(tester,arrival:true);final field=tester.widget<TextField>(find.byKey(const Key('work-receive-reference')));
+      field.controller!.text='Unsaved native १२.';final before=f.writes;
+      final a=f.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-238');
+      expect(await a.snapshot(f.controller!.context,f.supplier.id),isNull);expect(field.controller!.text,'Unsaved native १२.');expect(f.writes,before);
+    }finally{await f.close(tester);}
+  });
+  testWidgets('Receiving late real original input read cannot open or mutate after owner retirement',(tester) async {
+    final f=_ReceivingRemainingHost();try {
+      await f.ready(tester);final adapter=f.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-238'),c=f.controller!;
+      final snap=await adapter.snapshot(c.context,f.supplier.id);expect(snap,isNotNull);
+      expect(c.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-receiving-late-read',actionId:'AI-ACT-238',binding:c.context.binding,
+        requestRevision:c.requestRevision,entitlementRevision:c.entitlementRevision!,sourceRevision:snap!.sourceRevision,validUntil:DateTime.now().add(const Duration(minutes:5)),
+        entityId:f.supplier.id,title:'Review original arrival',summary:'HOST late read',fields:const {'reference':'Never applied'})),isTrue);
+      f.forms.readGate=Completer<void>();f.forms.readEntered=Completer<void>();final result=c.reviewProposal();await f.forms.readEntered!.future;
+      f.native.mode.value='buyer';final before=f.writes;f.forms.activeReadGate!.complete();await tester.pumpAndSettle();
+      expect(await result,MoolAssistantReviewResult.stale);expect(f.writes,before);expect(find.text('Never applied'),findsNothing);
+    }finally{await f.close(tester);}
+  });
+}
+
+
+void registerReceivingRemainingFamilyTests(){
+  testWidgets('Receiving245 original reconciliation raw fields require native conversion review then native Save and Confirm',(tester) async {
+    final f=_ReceivingRemainingHost();try {
+      await f.ready(tester,postedReceipt:true);final before=f.writes,book=jsonEncode(f.entry.value!.toJson());
+      final stock=f.work.workspaceCatalogueItems.singleWhere((p)=>p.id==f.product.id).stock;
+      final allocations=f.work.workspaceSupplierLedger(f.supplier.id)!.billGoodsAllocations.length;
+      f.work.forbidCold=true;
+      final shown=await f.open(tester,'AI-ACT-245',f.copy.id,{'billLineIndex':0,'receiptId':f.receipt.id,
+        'receiptLineId':f.receipt.lines.single.sourceLineId,'quantity':'1.000','free':'0','accepted':'0.750','damaged':'0.250','numerator':'1','denominator':'1'});
+      expect(f.field(tester,'work-bill-goods-quantity'),'1.000');expect(f.field(tester,'work-bill-goods-accepted'),'0.750');
+      final check=find.byKey(const Key('work-bill-goods-conversion'));await f.reveal(tester,check);
+      expect(tester.widget<CheckboxListTile>(check).value,isFalse);expect(f.writes,before);expect(jsonEncode(f.entry.value!.toJson()),book);
+      expect(f.work.workspaceSupplierLedger(f.supplier.id)!.billGoodsAllocations.length,allocations);
+      f.releaseCold();await tester.tap(check);await tester.pumpAndSettle();await f.tap(tester,'work-bill-goods-save');
+      expect(f.entry.saveAttempts,greaterThan(0));expect(f.work.workspaceSupplierLedger(f.supplier.id)!.billGoodsAllocations.length,allocations);
+      expect(f.work.workspaceCatalogueItems.singleWhere((p)=>p.id==f.product.id).stock,stock);
+      await f.tap(tester,'work-bill-goods-confirm');
+      expect(f.work.workspaceSupplierLedger(f.supplier.id)!.billGoodsAllocations.length,allocations+1);
+      expect(f.work.workspaceCatalogueItems.singleWhere((p)=>p.id==f.product.id).stock,stock);
+      final close=find.byType(BackButton).last;await tester.tap(close);await tester.pumpAndSettle();expect(await shown.result,MoolAssistantReviewResult.opened);
+    }finally{await f.close(tester);}
+  });
+  testWidgets('Receiving247 native return Review writes no input until original Review and actual goods confirmation',(tester) async {
+    final f=_ReceivingRemainingHost();try {
+      await f.ready(tester,postedReceipt:true);final before=f.writes;
+      final stock=f.work.workspaceCatalogueItems.singleWhere((p)=>p.id==f.product.id).stock;
+      f.work.forbidCold=true;
+      final shown=await f.open(tester,'AI-ACT-247',f.receipt.id,{'reference':'મૂળ પરત १२','reason':'Original physical return','returnedOn':f.receipt.deliveredOn,
+        'items':[{'receiptLineId':f.receipt.lines.single.sourceLineId,'accepted':'1.000','damaged':'0.250'}]});
+      expect(f.field(tester,'supplier-return-reference'),'મૂળ પરત १२');expect(f.field(tester,'supplier-return-reason'),'Original physical return');
+      final accepted=find.byKey(ValueKey(('supplier-return-accepted',f.receipt.lines.single.sourceLineId)));
+      expect(tester.widget<TextField>(accepted).controller!.text,'1.000');expect(f.writes,before);
+      f.releaseCold();await f.tap(tester,'supplier-return-confirm');
+      expect(find.text('Review saved · confirm return'),findsOneWidget);
+      expect(f.work.workspaceCatalogueItems.singleWhere((p)=>p.id==f.product.id).stock,stock);
+      final saved=await f.forms.read(f.work.supplierGoodsReturnFormKey(f.supplier.id,f.receipt.id)!);
+      expect(saved!.fields['attempt'],isNotEmpty);
+      await f.tap(tester,'supplier-return-confirm');
+      expect(find.text('Goods returned · Stock updated'),findsOneWidget);
+      expect(f.work.workspaceCatalogueItems.singleWhere((p)=>p.id==f.product.id).stock,stock-1);
+      await f.tap(tester,'supplier-return-close');expect(await shown.result,MoolAssistantReviewResult.opened);
+    }finally{await f.close(tester);}
+  });
+  testWidgets('Receiving248 raw missing qty never checks original attribution or records automatically',(tester) async {
+    final f=_ReceivingRemainingHost();try {
+      await f.ready(tester,postedReceipt:true);final before=f.writes;
+      final stock=f.work.workspaceCatalogueItems.singleWhere((p)=>p.id==f.product.id).stock;
+      final claims=f.work.workspaceSupplierLedger(f.supplier.id)!.shortageClaims.length;
+      f.work.forbidCold=true;
+      final shown=await f.open(tester,'AI-ACT-248',f.copy.id,{'billLineIndex':0,'deliveryId':f.receipt.expectedDeliveryId,
+        'receiptLineId':f.receipt.lines.single.sourceLineId,'quantity':'1.000'});
+      expect(f.field(tester,'supplier-shortage-quantity'),'1.000');
+      final reviewed=find.byKey(const Key('supplier-shortage-match'));await f.reveal(tester,reviewed);
+      expect(tester.widget<CheckboxListTile>(reviewed).value,isFalse);expect(f.writes,before);
+      expect(f.work.workspaceSupplierLedger(f.supplier.id)!.shortageClaims.length,claims);
+      f.releaseCold();await tester.tap(reviewed);await tester.pumpAndSettle();await f.tap(tester,'supplier-shortage-submit');
+      expect(find.text('Shortage recorded · no credit or refund applied'),findsOneWidget);
+      expect(f.work.workspaceSupplierLedger(f.supplier.id)!.shortageClaims.length,claims+1);
+      expect(f.work.workspaceCatalogueItems.singleWhere((p)=>p.id==f.product.id).stock,stock);
+      await tester.tap(find.widgetWithText(TextButton,'Close').last);await tester.pumpAndSettle();expect(await shown.result,MoolAssistantReviewResult.opened);
+    }finally{await f.close(tester);}
+  });
+  for(final action in ['AI-ACT-245','AI-ACT-247','AI-ACT-248']) {
+    testWidgets('Receiving$action retained original final callback rejects proposal retirement and cannot close an unrelated route',(tester) async {
+      final f=_ReceivingRemainingHost();try {
+        await f.ready(tester,postedReceipt:true);
+        final fields=<String,Object?>{
+          if(action=='AI-ACT-245')...{'billLineIndex':0,'receiptId':f.receipt.id,'receiptLineId':f.receipt.lines.single.sourceLineId,'quantity':'1','accepted':'1'},
+          if(action=='AI-ACT-247')...{'reference':'Retain private native text','reason':'Physical return','returnedOn':f.receipt.deliveredOn,
+            'items':[{'receiptLineId':f.receipt.lines.single.sourceLineId,'accepted':'0.500'}]},
+          if(action=='AI-ACT-248')...{'billLineIndex':0,'deliveryId':f.receipt.expectedDeliveryId,'receiptLineId':f.receipt.lines.single.sourceLineId,'quantity':'1.000'},
+        };
+        final shown=await f.open(tester,action,action=='AI-ACT-247'?f.receipt.id:f.copy.id,fields);
+        final key=action=='AI-ACT-245'?'work-bill-goods-save':action=='AI-ACT-247'?'supplier-return-confirm':'supplier-shortage-submit';
+        final button=find.byKey(Key(key));await f.reveal(tester,button);
+        final widget=tester.widget(button);final callback=widget is FilledButton?widget.onPressed:(widget as TextButton).onPressed;
+        final input=action=='AI-ACT-245'?'work-bill-goods-quantity':action=='AI-ACT-247'?'supplier-return-reference':'supplier-shortage-quantity';
+        final control=tester.widget<TextField>(find.byKey(Key(input))).controller!,text=tester.widget<TextField>(find.byKey(Key(input))).controller!.text;
+        final navigator=Navigator.of(tester.element(button),rootNavigator:true),before=f.writes;
+        f.controller!.cancelProposal();await tester.pumpAndSettle();
+        expect(find.byKey(Key(input)),findsNothing);expect(control.text,text);callback?.call();await tester.pumpAndSettle();expect(f.writes,before);
+        unawaited(navigator.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST unrelated receiving route')))));await tester.pumpAndSettle();
+        callback?.call();await tester.pumpAndSettle();expect(find.text('HOST unrelated receiving route'),findsOneWidget);expect(f.writes,before);
+        // Unmounting below retires the actual held native review Future without creating a replacement attempt.
+        unawaited(shown.result);
+      }finally{await f.close(tester);}
+    });
+  }
+  for(final action in ['AI-ACT-245','AI-ACT-247','AI-ACT-248']) {
+    testWidgets('Receiving$action unavailable exact native line rejects before opening an empty replacement form',(tester) async {
+      final f=_ReceivingRemainingHost();try {
+        await f.ready(tester,postedReceipt:true);final before=f.writes;
+        final fields=<String,Object?>{
+          if(action=='AI-ACT-245')...{'billLineIndex':0,'receiptId':f.receipt.id,'receiptLineId':'HOST-wrong-line','quantity':'1','accepted':'1'},
+          if(action=='AI-ACT-247')...{'reference':'Not applied','items':[{'receiptLineId':'HOST-wrong-line','accepted':'1'}]},
+          if(action=='AI-ACT-248')...{'billLineIndex':0,'deliveryId':f.receipt.expectedDeliveryId,'receiptLineId':'HOST-wrong-line','quantity':'1'},
+        };
+        final shown=await f.open(tester,action,action=='AI-ACT-247'?f.receipt.id:f.copy.id,fields);
+        expect(await shown.result,MoolAssistantReviewResult.unavailable);expect(f.writes,before);
+        expect(find.byKey(const Key('supplier-return-reference')),findsNothing);expect(find.byKey(const Key('supplier-shortage-quantity')),findsNothing);
+        expect(find.byKey(const Key('work-bill-goods-quantity')),findsNothing);
+      }finally{await f.close(tester);}
+    });
+  }
+  testWidgets('Receiving244 original recorded receipt status opens read-only without input or Stock recovery writes',(tester) async {
+    final f=_ReceivingRemainingHost();try {
+      await f.ready(tester,postedReceipt:true);final before=f.writes;f.work.forbidCold=true;
+      final shown=await f.open(tester,'AI-ACT-244',f.receipt.id,const {});
+      expect(find.byKey(const Key('work-goods-receiving')),findsOneWidget);expect(find.text('Goods recorded'),findsWidgets);expect(f.writes,before);
+      expect(find.text('Delivery ${f.receipt.reference}'),findsOneWidget);
+      expect(find.byKey(const Key('work-receive-saved-supplier')),findsOneWidget);
+      expect(find.byKey(const Key('work-receive-reference')),findsNothing,reason:'Recorded native receipt renders retained text rather than editable reference input.');
+      await tester.tap(find.byType(BackButton).last);await tester.pumpAndSettle();expect(await shown.result,MoolAssistantReviewResult.opened);expect(f.writes,before);
+    }finally{await f.close(tester);}
+  });
+  testWidgets('Receiving250 resumes the exact native saved return attempt without minting or resaving it',(tester) async {
+    final f=_ReceivingRemainingHost();try {
+      await f.ready(tester,postedReceipt:true);
+      final first=await f.open(tester,'AI-ACT-247',f.receipt.id,{'reference':'HOST retained return','reason':'Native goods handback','returnedOn':f.receipt.deliveredOn,
+        'items':[{'receiptLineId':f.receipt.lines.single.sourceLineId,'accepted':'1.000'}]});
+      await f.tap(tester,'supplier-return-confirm');
+      final key=f.work.supplierGoodsReturnFormKey(f.supplier.id,f.receipt.id)!,saved=await f.forms.read(f.work.supplierGoodsReturnFormKey(f.supplier.id,f.receipt.id)!);
+      expect(saved!.fields['attempt'],isNotEmpty);final attempt=saved.fields['attempt'];
+      await f.tap(tester,'supplier-return-close');expect(await first.result,MoolAssistantReviewResult.opened);
+      f.controller!.setDraft('Recover exact original saved return');final before=f.writes;f.work.forbidCold=true;
+      final shown=await f.open(tester,'AI-ACT-250',f.receipt.id,const {});
+      expect(find.text('Review saved · confirm return'),findsOneWidget);expect(f.field(tester,'supplier-return-reference'),'HOST retained return');expect(f.writes,before);
+      final reread=await f.forms.read(key);expect(reread!.revision,saved.revision);expect(reread.fields['attempt'],attempt);
+      f.releaseCold();await f.tap(tester,'supplier-return-confirm');
+      expect(find.text('Goods returned · Stock updated'),findsOneWidget);
+      expect((await f.forms.read(key))!.fields['attempt'],attempt);
+      await f.tap(tester,'supplier-return-close');expect(await shown.result,MoolAssistantReviewResult.opened);
+    }finally{await f.close(tester);}
+  });
+  testWidgets('Receiving249 reopens the exact original shortage attempt and reads status without recovery or a new record',(tester) async {
+    final f=_ReceivingRemainingHost();try {
+      await f.ready(tester,postedReceipt:true);
+      final first=await f.open(tester,'AI-ACT-248',f.copy.id,{'billLineIndex':0,'deliveryId':f.receipt.expectedDeliveryId,
+        'receiptLineId':f.receipt.lines.single.sourceLineId,'quantity':'1.000'});
+      final reviewed=find.byKey(const Key('supplier-shortage-match'));await f.reveal(tester,reviewed);await tester.tap(reviewed);await tester.pumpAndSettle();
+      await f.tap(tester,'supplier-shortage-submit');
+      final key=f.work.supplierShortageRecoveryFormKey(f.copy)!,saved=await f.forms.read(f.work.supplierShortageRecoveryFormKey(f.copy)!);
+      expect(saved!.fields['attempt'],isNotEmpty);final claims=f.work.workspaceSupplierLedger(f.supplier.id)!.shortageClaims.length;
+      await tester.tap(find.widgetWithText(TextButton,'Close').last);await tester.pumpAndSettle();expect(await first.result,MoolAssistantReviewResult.opened);
+      f.controller!.setDraft('Read original shortage status');final before=f.writes;f.work.forbidCold=true;
+      final shown=await f.open(tester,'AI-ACT-249',f.copy.id,const {});
+      expect(find.text('Shortage recorded · no credit or refund applied'),findsOneWidget);expect(f.writes,before);
+      final reread=await f.forms.read(key);expect(reread!.revision,saved.revision);expect(reread.fields['attempt'],saved.fields['attempt']);
+      expect(f.work.workspaceSupplierLedger(f.supplier.id)!.shortageClaims.length,claims);
+      await tester.tap(find.widgetWithText(TextButton,'Close').last);await tester.pumpAndSettle();expect(await shown.result,MoolAssistantReviewResult.opened);expect(f.writes,before);
+    }finally{await f.close(tester);}
+  });
+  testWidgets('Receiving actual Host covered arrival Review returns to the identical original owner with no saved fields',(tester) async {
+    final f=_ReceivingRemainingHost();try {
+      await f.ready(tester,arrival:true);
+      final owner=find.byWidgetPredicate((widget)=>widget.runtimeType.toString()=='_StoreReceiveGoodsSurface');
+      expect(owner,findsOneWidget);final original=tester.element(owner),entity=await f.arrivalId();
+      final adapter=f.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-239');
+      final nativeContext=tester.element(find.byType(MoolAssistantNativeScope));
+      final opened=MoolAssistantHost.maybeOf(nativeContext)!.open(nativeContext);await tester.pumpAndSettle();
+      final c=tester.widget<MoolAssistantPage>(find.byType(MoolAssistantPage)).controller;
+      await c.refreshAccess();c.setDraft('Prepare a line in this exact arrival');
+      final snapshot=await adapter.snapshot(c.context,entity);expect(snapshot,isNotNull);
+      expect(c.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-real-receiving-host',actionId:'AI-ACT-239',binding:c.context.binding,
+        requestRevision:c.requestRevision,entitlementRevision:c.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+        validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:entity,title:'Review original receiving line',summary:'HOST native input only',
+        fields:{'items':[{'productId':f.product.id,'delivered':'1.250'}]})),isTrue);
+      await tester.pumpAndSettle();final before=f.writes;
+      await tester.tap(find.widgetWithText(FilledButton,'Review'));await tester.pumpAndSettle();
+      expect(find.text('Keep your request?'),findsOneWidget);await tester.tap(find.text('Discard draft'));await tester.pumpAndSettle();await opened;
+      expect(find.byType(MoolAssistantPage),findsNothing);expect(owner,findsOneWidget);expect(identical(tester.element(owner),original),isTrue);
+      await f.reveal(tester,find.byKey(const Key('work-receive-delivered-1')));expect(f.field(tester,'work-receive-delivered-1'),'1.250');expect(f.writes,before);
+    }finally{await f.close(tester);}
+  });
+}
+
+
+class _ReceivingRemainingEvidence {
+  final old=_ReceivingAssistantHarness();
+  WorkspacePurchaseInvoiceAttachment get copy=>WorkspacePurchaseInvoiceAttachment.fromJson(
+    (jsonDecode(old.forms.drafts.values.singleWhere((d)=>d.fields.containsKey('documents')).fields['documents']!) as List).single);
+  Future<void> ready(WidgetTester tester,WorkProofSource source) async {
+    await old.ready(tester,source);final initial=await old.begin(tester);
+    await tester.tap(find.byKey(const Key('work-receive-fields-keep')));await tester.pumpAndSettle();expect(await initial.result,MoolAssistantReviewResult.opened);
+    if(find.byType(MoolAssistantPage).evaluate().isNotEmpty){
+      await tester.tap(find.byKey(const Key('mool-assistant-back')));await tester.pumpAndSettle();
+      if(find.text('Keep your request?').evaluate().isNotEmpty){await tester.tap(find.text('Discard draft'));await tester.pumpAndSettle();}
+    }
+    expect(find.byKey(const Key('work-goods-receiving')),findsOneWidget);
+  }
+  Future<({Future<MoolAssistantReviewResult> result})> open(WidgetTester tester,String action,Map<String,Object?> fields) async {
+    final c=old.controller;c.setDraft('Review exact linked original printed details');
+    final s=await old.native.adapters(tester).singleWhere((a)=>a.actionId==action).snapshot(c.context,copy.digest);
+    expect(s,isNotNull);
+    expect(c.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-linked-$action',actionId:action,binding:c.context.binding,
+      requestRevision:c.requestRevision,entitlementRevision:c.entitlementRevision!,sourceRevision:s!.sourceRevision,
+      validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:copy.digest,title:'Review exact original copy',summary:'HOST native metadata only',fields:fields)),isTrue);
+    final future=c.reviewProposal();
+    for(var i=0;i<60;i++){
+      await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));await tester.pump();
+      if(find.byKey(const Key('work-receive-fields-list')).evaluate().isNotEmpty||!c.reviewBusy)break;
+    }
+    await tester.pumpAndSettle();return(result:future);
+  }
+  Future<void> revealFields(WidgetTester tester,Finder field) async {
+    final list=find.byKey(const Key('work-receive-fields-list'));expect(list,findsOneWidget);
+    final scrollable=find.descendant(of:list,matching:find.byType(Scrollable)).first;
+    if(field.evaluate().isEmpty)await tester.scrollUntilVisible(field,180,scrollable:scrollable,maxScrolls:30);
+    expect(field,findsOneWidget,reason:'Materialize the actual source-linked native field before reading its controller.');
+    await tester.ensureVisible(field);await tester.pumpAndSettle();
+  }
+  Future<MoolAssistantReviewResult> saveFields(WidgetTester tester,Future<MoolAssistantReviewResult> review) async {
+    bool done=false;MoolAssistantReviewResult? result;Object? failure;StackTrace? failureStack;
+    final completed=review.then<void>((value){result=value;done=true;},onError:(Object error,StackTrace stack){failure=error;failureStack=stack;done=true;});
+    final save=find.byKey(const Key('work-receive-fields-keep'));expect(save.hitTestable(),findsOneWidget);
+    await tester.tap(save);
+    // Native beforeKeep reads the actual private file. pumpAndSettle alone does
+    // not drive filesystem IO and awaiting the route Future here would hang.
+    for(var attempt=0;attempt<60&&!done;attempt++){
+      await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));await tester.pump();
+    }
+    expect(done,isTrue,reason:'Actual native Save must finish after bounded real IO; busy=${old.controller.reviewBusy}, notice=${old.controller.proposalNotice}, formWrites=${old.forms.writes}.');
+    await completed;if(failure!=null)Error.throwWithStackTrace(failure!,failureStack!);
+    await tester.pumpAndSettle();expect(find.byKey(const Key('work-receive-fields-list')),findsNothing);
+    expect(result,isNotNull);return result!;
+  }
+}
+void registerReceivingRemainingEvidenceTests(){
+  test('Receiving404 native editability keeps inherited and unchecked receipt fields locked',() {
+    expect(StoreReceivingReviewInitial.canMapLineField('expected',arrives:true,inherited:false,restockLinked:false),isTrue);
+    expect(StoreReceivingReviewInitial.canMapLineField('expected',arrives:true,inherited:true,restockLinked:false),isFalse);
+    expect(StoreReceivingReviewInitial.canMapLineField('expected',arrives:true,inherited:false,restockLinked:true),isFalse);
+    for(final field in ['expected','delivered','damaged','short','batch','manufactured','expiry','mrp']) {
+      expect(StoreReceivingReviewInitial.canMapLineField(field,arrives:false,inherited:false,restockLinked:false),isFalse);
+      expect(StoreReceivingReviewInitial.canMapLineField(field,arrives:false,inherited:true,restockLinked:true),isFalse);
+    }
+    for(final field in ['delivered','damaged','short','batch','manufactured','expiry','mrp']) {
+      expect(StoreReceivingReviewInitial.canMapLineField(field,arrives:true,inherited:true,restockLinked:true),isTrue,
+        reason:'An arriving inherited item still permits physical quantity and printed lot details.');
+    }
+    for(final field in ['supplierId','stock','gst','price']) {
+      expect(StoreReceivingReviewInitial.canMapLineField(field,arrives:true,inherited:false,restockLinked:false),isFalse);
+    }
+  });
+  for(final origin in [WorkProofSource.camera,WorkProofSource.gallery,WorkProofSource.upload]) {
+    testWidgets('Receiving402 $origin adds editable source-linked extra fields; only original native Save persists',(tester) async {
+      final f=_ReceivingRemainingEvidence();try {
+        await f.ready(tester,origin);final original=f.copy,before=f.old.forms.signature,writes=f.old.forms.writes;
+        final result=await f.open(tester,'AI-ACT-402',{'heading':'મૂળ अतिरिक्त','value':'Printed raw १२.५०'});
+        expect(find.byKey(const Key('work-receive-fields-list')).hitTestable(),findsOneWidget);
+        final label=find.byWidgetPredicate((w)=>w is TextField&&w.controller?.text=='મૂળ अतिरिक्त');await f.revealFields(tester,label);expect(label,findsOneWidget);
+        final value=find.byWidgetPredicate((w)=>w is TextField&&w.controller?.text=='Printed raw १२.५०');await f.revealFields(tester,value);expect(value,findsOneWidget);
+        expect(f.old.forms.signature,before);expect(f.old.forms.writes,writes);expect(f.old.nativePickerCalls,0);expect(f.old.selectedPickerCalls,1);
+        await tester.ensureVisible(value);await tester.enterText(value,'Original user correction १२.५');await tester.pumpAndSettle();
+        expect(await f.saveFields(tester,result.result),MoolAssistantReviewResult.opened);
+        final saved=f.copy,extra=saved.extractedFields.singleWhere((v)=>v.label=='મૂળ अतिरिक्त');
+        expect(saved.digest,original.digest);expect(saved.source,origin.name);expect(saved.fileName,original.fileName);
+        expect(extra.value,'Original user correction १२.५');expect(extra.sourceDigest,original.digest);expect(extra.sourcePage,1);expect(extra.reviewed,isFalse);
+        expect(saved.extractedFields.where((v)=>v.id!=extra.id).map((v)=>v.toJson()).toList(),original.extractedFields.map((v)=>v.toJson()).toList());
+        expect(f.old.forms.writes,writes+1);
+      }finally{await f.old.close(tester);}
+    });
+  }
+  testWidgets('Receiving402 Cancel keeps original copy and input exactly unchanged',(tester) async {
+    final f=_ReceivingRemainingEvidence();try {
+      await f.ready(tester,WorkProofSource.gallery);final before=f.old.forms.signature,writes=f.old.forms.writes;
+      final result=await f.open(tester,'AI-ACT-402',{'heading':'Unsaved extra','value':'Never saved'});
+      await tester.tap(find.byType(BackButton).last);await tester.pumpAndSettle();expect(await result.result,MoolAssistantReviewResult.opened);
+      expect(f.old.forms.signature,before);expect(f.old.forms.writes,writes);
+    }finally{await f.old.close(tester);}
+  });
+  testWidgets('Receiving402 retired proposal hides private fields and captured Save cannot write or pop unrelated route',(tester) async {
+    final f=_ReceivingRemainingEvidence();try {
+      await f.ready(tester,WorkProofSource.gallery);final result=await f.open(tester,'AI-ACT-402',{'heading':'Private retained extra','value':'Retained १२.'});
+      final save=tester.widget<TextButton>(find.byKey(const Key('work-receive-fields-keep'))).onPressed!;
+      final field=find.byWidgetPredicate((w)=>w is TextField&&w.controller?.text=='Retained १२.');
+      await f.revealFields(tester,field);
+      final controller=tester.widget<TextField>(field).controller!,navigator=Navigator.of(tester.element(field),rootNavigator:true);
+      final before=f.old.forms.signature,writes=f.old.forms.writes;
+      f.old.controller.cancelProposal();await tester.pumpAndSettle();expect(field,findsNothing);expect(controller.text,'Retained १२.');
+      save();await tester.pumpAndSettle();expect(f.old.forms.signature,before);expect(f.old.forms.writes,writes);
+      final close=tester.widget<TextButton>(find.byKey(const Key('receiving-native-retired-close'))).onPressed!;
+      unawaited(navigator.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST unrelated fields route')))));await tester.pumpAndSettle();
+      close();save();await tester.pumpAndSettle();expect(find.text('HOST unrelated fields route'),findsOneWidget);expect(f.old.forms.signature,before);
+      unawaited(result.result);
+    }finally{await f.old.close(tester);}
+  });
+  testWidgets('Receiving402 missing actual private file prevents native Save and retains original metadata',(tester) async {
+    final f=_ReceivingRemainingEvidence();try {
+      await f.ready(tester,WorkProofSource.gallery);final result=await f.open(tester,'AI-ACT-402',{'heading':'Copy-linked extra','value':'Read this original'});
+      final before=f.old.forms.signature,writes=f.old.forms.writes;
+      await tester.runAsync(() async {for(final file in f.old.directory.listSync(recursive:true).whereType<File>()){await file.delete();}});
+      await tester.tap(find.byKey(const Key('work-receive-fields-keep')));
+      for(var i=0;i<20;i++){await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));await tester.pump();}
+      await tester.pumpAndSettle();expect(find.text('This original saved copy could not be verified. Your field edits are kept.'),findsOneWidget);
+      expect(f.old.forms.signature,before);expect(f.old.forms.writes,writes);expect(find.byKey(const Key('work-receive-fields-list')),findsOneWidget);
+      unawaited(result.result);
+    }finally{await f.old.close(tester);}
+  });
+  testWidgets('Receiving404 stages actual original copy-field edits; original Save preserves provenance without semantic receipt mapping',(tester) async {
+    final f=_ReceivingRemainingEvidence();try {
+      await f.ready(tester,WorkProofSource.gallery);
+      final copy=f.copy,field=f.copy.extractedFields.first;
+      final reference=tester.widget<TextField>(find.byKey(const Key('work-receive-reference'))).controller!.text;
+      final before=f.old.forms.signature,writes=f.old.forms.writes;
+      final shown=await f.open(tester,'AI-ACT-404',{'fieldId':field.id,'heading':'મૂળ heading corrected','value':'Original printed १२.५०'});
+      final heading=find.byKey(Key('work-receive-field-label-${field.id}')),value=find.byKey(Key('work-receive-field-value-${field.id}'));
+      await f.revealFields(tester,heading);await f.revealFields(tester,value);
+      expect(tester.widget<TextField>(heading).controller!.text,'મૂળ heading corrected');expect(tester.widget<TextField>(value).controller!.text,'Original printed १२.५०');
+      expect(f.old.forms.signature,before);expect(f.old.forms.writes,writes);
+      expect(tester.widget<CheckboxListTile>(find.byKey(Key('work-receive-field-check-${field.id}'))).value,isFalse);
+      expect(await f.saveFields(tester,shown.result),MoolAssistantReviewResult.opened);
+      final edited=f.copy.extractedFields.singleWhere((v)=>v.id==field.id);
+      expect(edited.label,'મૂળ heading corrected');expect(edited.value,'Original printed १२.५०');expect(edited.sourceDigest,field.sourceDigest);expect(edited.sourcePage,field.sourcePage);
+      expect(edited.section,field.section);expect(edited.itemIndex,field.itemIndex);expect(edited.summaryIndex,field.summaryIndex);expect(edited.reviewed,isFalse);
+      expect(f.copy.digest,copy.digest);expect(f.copy.source,copy.source);expect(f.old.forms.writes,writes+1);
+      expect(tester.widget<TextField>(find.byKey(const Key('work-receive-reference'))).controller!.text,reference);
+      final delivered=find.byKey(const Key('work-receive-delivered-0'));
+      final receivingScroll=find.descendant(of:find.byKey(const Key('work-goods-receiving')),matching:find.byType(Scrollable)).first;
+      if(delivered.evaluate().isEmpty)await tester.scrollUntilVisible(delivered,180,scrollable:receivingScroll,maxScrolls:30);
+      expect(delivered,findsOneWidget);await tester.ensureVisible(delivered);await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(delivered).controller!.text,isNot('999'));
+    }finally{await f.old.close(tester);}
+  });
+  test('Receiving404 mapping accepts only explicit existing targets and original printed values',() {
+    for(final field in ['reference','date']) {
+      expect(StoreReceivingReviewInitial.fromFields('AI-ACT-404',{'fieldId':'source','receiptField':field}).text('receiptField'),field);
+    }
+    for(final field in ['expected','delivered','damaged','short','batch','manufactured','expiry','mrp']) {
+      expect(()=>StoreReceivingReviewInitial.fromFields('AI-ACT-404',{'fieldId':'source','receiptField':field}),throwsFormatException);
+      expect(StoreReceivingReviewInitial.fromFields('AI-ACT-404',{'fieldId':'source','receiptField':field,'lineId':'original-line'}).text('lineId'),'original-line');
+    }
+    for(final invalid in [
+      {'fieldId':'source','receiptField':'supplierId'},
+      {'fieldId':'source','receiptField':'reference','value':'invented'},
+      {'fieldId':'source','receiptField':'reference','heading':'invented'},
+      {'fieldId':'source','receiptField':'reference','lineId':'other'},
+      {'fieldId':'source','lineId':'other'},
+    ]) {expect(()=>StoreReceivingReviewInitial.fromFields('AI-ACT-404',invalid),throwsFormatException);}
+  });
+  for(final scale in [1.0,2.0]) {
+    testWidgets('Receiving404 mapping actual printed reference requires native Use and never saves or posts scale$scale',(tester)async {
+      await _loadEightHostFonts(tester);
+      tester.view.physicalSize=const Size(320,568);tester.view.devicePixelRatio=1;
+      tester.platformDispatcher.textScaleFactorTestValue=scale;
+      addTearDown((){tester.view.resetPhysicalSize();tester.view.resetDevicePixelRatio();tester.platformDispatcher.clearTextScaleFactorTestValue();});
+      final f=_ReceivingRemainingEvidence();try {
+        await f.ready(tester,WorkProofSource.gallery);
+        final field=f.copy.extractedFields.first,before=f.old.forms.signature,writes=f.old.forms.writes,copy=f.copy;
+        final reference=find.byKey(const Key('work-receive-reference'));
+        final old=tester.widget<TextField>(reference).controller!.text;
+        final shown=await f.open(tester,'AI-ACT-404',{'fieldId':field.id,'receiptField':'reference'});
+        expect(find.byKey(const Key('work-receive-map-review')),findsOneWidget);
+        expect(find.byKey(const Key('work-receive-map-source')),findsOneWidget);
+        expect(tester.widget<TextField>(reference).controller!.text,old);
+        expect(f.old.forms.signature,before);expect(f.old.forms.writes,writes);
+        await _captureEightHost(tester,find.byKey(const Key('work-receive-map-review')),'HOST-receipt-map-scale$scale');
+        final use=find.byKey(const Key('work-receive-map-use'));
+        await tester.ensureVisible(use);await tester.pumpAndSettle();expect(use.hitTestable(),findsOneWidget);
+        await tester.tap(use);
+        bool done=false;MoolAssistantReviewResult? result;final completed=shown.result.then((v){result=v;done=true;});
+        for(var i=0;i<80&&!done;i++){await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));await tester.pump();}
+        expect(done,isTrue);await completed;await tester.pumpAndSettle();
+        expect(result,MoolAssistantReviewResult.returnToOwner);
+        expect(tester.widget<TextField>(reference).controller!.text,field.value);
+        expect(f.old.forms.signature,before);expect(f.old.forms.writes,writes);
+        expect(f.copy.toJson(),copy.toJson());expect(tester.takeException(),isNull);
+      }finally{await f.old.close(tester);}
+    });
+  }
+  for(final mode in ['cancel','request edit','missing original']) {
+    testWidgets('Receiving404 mapping $mode preserves original receipt and saved copy',(tester)async {
+      final f=_ReceivingRemainingEvidence();try {
+        await f.ready(tester,WorkProofSource.gallery);final field=f.copy.extractedFields.first;
+        final reference=find.byKey(const Key('work-receive-reference')),old=tester.widget<TextField>(reference).controller!.text;
+        final before=f.old.forms.signature,writes=f.old.forms.writes;
+        final shown=await f.open(tester,'AI-ACT-404',{'fieldId':field.id,'receiptField':'reference'});
+        final use=find.byKey(const Key('work-receive-map-use'));
+        final callback=tester.widget<TextButton>(use).onPressed!;
+        final navigator=Navigator.of(tester.element(use),rootNavigator:true);
+        if(mode=='cancel')await tester.tap(find.byKey(const Key('work-receive-map-cancel')));
+        if(mode=='request edit') {
+          f.old.controller.setDraft('Changed request');await tester.pumpAndSettle();
+          unawaited(navigator.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST other map route')))));await tester.pumpAndSettle();
+          callback();await tester.pumpAndSettle();expect(find.text('HOST other map route'),findsOneWidget);
+        }
+        if(mode=='missing original') {
+          await tester.runAsync(()async{for(final file in f.old.directory.listSync(recursive:true).whereType<File>()){await file.delete();}});
+          await tester.tap(use);
+        }
+        for(var i=0;i<50;i++){await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:20)));await tester.pump();if(!f.old.controller.reviewBusy)break;}
+        await tester.pumpAndSettle();
+        if(mode!='request edit')expect(await shown.result,mode=='cancel'?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.unavailable);
+        else unawaited(shown.result);
+        expect(f.old.forms.signature,before);expect(f.old.forms.writes,writes);
+        expect(tester.widget<TextField>(find.byKey(const Key('work-receive-reference'),skipOffstage:false)).controller!.text,old);
+      }finally{await f.old.close(tester);}
+    });
+  }
+  for(final target in [<String,Object?>{'receiptField':'date'},<String,Object?>{'receiptField':'delivered','lineId':'not-original'}]) {
+    testWidgets('Receiving404 mapping unavailable target $target never opens a blank review',(tester)async {
+      final f=_ReceivingRemainingEvidence();try {
+        await f.ready(tester,WorkProofSource.gallery);final field=f.copy.extractedFields.first,before=f.old.forms.signature;
+        final shown=await f.open(tester,'AI-ACT-404',{'fieldId':field.id,...target});
+        expect(await shown.result,MoolAssistantReviewResult.unavailable);expect(find.byKey(const Key('work-receive-map-review')),findsNothing);expect(f.old.forms.signature,before);
+      }finally{await f.old.close(tester);}
+    });
+  }
+  testWidgets('Receiving404 actual composer Review transfers mapped input to original owner and Close discards without saving',(tester)async {
+    final f=_ReceivingRemainingEvidence();try {
+      await f.ready(tester,WorkProofSource.gallery);
+      final copy=f.copy,field=f.copy.extractedFields.first;
+      final before=f.old.forms.signature,writes=f.old.forms.writes;
+      await tester.pumpWidget(MaterialApp.router(theme:MoolTheme.light(),routerConfig:f.old.native.router,
+        builder:(_,child)=>MoolAssistantHost(readContext:f.old.native.readContext,
+          contextChanges:Listenable.merge([f.old.native.journey,f.old.native.work,f.old.native.mode]),
+          entitlements:f.old.access,child:child!)));await tester.pumpAndSettle();
+      final owner=find.byWidgetPredicate((widget)=>widget.runtimeType.toString()=='_StoreReceiveGoodsSurface');
+      final original=tester.element(owner);
+      final adapter=f.old.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-404');
+      final nativeContext=tester.element(find.byType(MoolAssistantNativeScope));
+      final opened=MoolAssistantHost.maybeOf(nativeContext)!.open(nativeContext);await tester.pumpAndSettle();
+      final c=tester.widget<MoolAssistantPage>(find.byType(MoolAssistantPage)).controller;
+      await c.refreshAccess();c.setDraft('Copy this original printed number to the receipt');
+      final snapshot=await adapter.snapshot(c.context,copy.digest);expect(snapshot,isNotNull);
+      expect(c.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-real-404-map',actionId:'AI-ACT-404',
+        binding:c.context.binding,requestRevision:c.requestRevision,entitlementRevision:c.entitlementRevision!,
+        sourceRevision:snapshot!.sourceRevision,validUntil:DateTime.now().add(const Duration(minutes:5)),
+        entityId:copy.digest,title:'Use original printed detail',summary:'HOST original field mapping',
+        fields:{'fieldId':field.id,'receiptField':'reference'})),isTrue);
+      await tester.pumpAndSettle();final review=find.widgetWithText(FilledButton,'Review');
+      await tester.ensureVisible(review);await tester.pumpAndSettle();expect(review.hitTestable(),findsOneWidget);await tester.tap(review);
+      for(var i=0;i<80&&find.byKey(const Key('work-receive-map-review')).evaluate().isEmpty;i++){await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));await tester.pump();}
+      await tester.pumpAndSettle();expect(find.byKey(const Key('work-receive-map-review')),findsOneWidget);expect(f.old.forms.signature,before);
+      await tester.tap(find.byKey(const Key('work-receive-map-use')));
+      for(var i=0;i<80&&c.reviewBusy;i++){await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));await tester.pump();}
+      await tester.pumpAndSettle();
+      expect(find.text('Keep your request?'),findsOneWidget);await tester.tap(find.text('Discard draft'));await tester.pumpAndSettle();await opened;
+      expect(find.byType(MoolAssistantPage),findsNothing);expect(identical(tester.element(owner),original),isTrue);
+      expect(tester.widget<TextField>(find.byKey(const Key('work-receive-reference'))).controller!.text,field.value);
+      expect(f.old.forms.signature,before);expect(f.old.forms.writes,writes);
+      final close=find.descendant(of:find.byKey(const Key('work-receive-header')),matching:find.widgetWithText(TextButton,'Close'));
+      await tester.tap(close);await tester.pumpAndSettle();expect(find.byKey(const Key('work-receiving-preparation-leave')),findsOneWidget);
+      await tester.tap(find.text('Keep editing'));await tester.pumpAndSettle();expect(f.old.forms.signature,before);
+      await tester.tap(close);await tester.pumpAndSettle();await tester.tap(find.text('Discard changes'));await tester.pumpAndSettle();
+      expect(f.old.forms.signature,before);expect(f.old.forms.writes,writes);
+    }finally{await f.old.close(tester);}
+  });
+  for(final target in ['date','delivered','batch']) {
+    testWidgets('Receiving404 exact selected $target uses native editability without Stock or draft save',(tester)async {
+      final f=_ReceivingRemainingEvidence();try {
+        f.old.recognizedOverride='Received on: 22/10/2026\nReceived qty: 9.500\nBatch: B-10';
+        await f.ready(tester,WorkProofSource.gallery);
+        String? lineId;
+        if(target!='date') {
+          final product=catalogue_fixture.listingItem();
+          expect(f.old.native.work.addOrUpdateWorkspaceProduct(product,stockEntryMethod:WorkspaceStockEntryMethod.manual),isTrue);
+          expect(await f.old.native.work.workspaceInventorySaved,isTrue);await tester.pumpAndSettle();
+          final choose=find.byKey(const ValueKey('work-receive-product-0'));
+          final scroll=find.descendant(of:find.byKey(const Key('work-goods-receiving')),matching:find.byType(Scrollable)).first;
+          if(choose.evaluate().isEmpty)await tester.scrollUntilVisible(choose,180,scrollable:scroll,maxScrolls:30);
+          await tester.ensureVisible(choose);await tester.pumpAndSettle();await tester.tap(choose);await tester.pumpAndSettle();
+          final option=find.byKey(ValueKey('work-receive-stock-option-${product.id}'));
+          await tester.ensureVisible(option);await tester.pumpAndSettle();await tester.tap(option);await tester.pumpAndSettle();
+          final saved=f.old.forms.drafts.values.singleWhere((d)=>d.fields.containsKey('documents'));
+          final raw=jsonDecode(saved.fields['input']!) as List;lineId=(raw[2] as List).first as String;
+
+
+        }
+        final wanted=target=='date'?'22/10/2026':target=='delivered'?'9.500':'B-10';
+        final field=f.copy.extractedFields.singleWhere((v)=>v.value==wanted);
+        final before=f.old.forms.signature,writes=f.old.forms.writes,stock=f.old.native.work.workspaceInventoryRevision,copy=f.copy.toJson();
+        final shown=await f.open(tester,'AI-ACT-404',{'fieldId':field.id,'receiptField':target,if(lineId!=null)'lineId':lineId});
+
+        expect(find.byKey(const Key('work-receive-map-review')),findsOneWidget);
+        await tester.tap(find.byKey(const Key('work-receive-map-use')));
+        bool done=false;MoolAssistantReviewResult? result;final completed=shown.result.then((v){result=v;done=true;});
+        for(var i=0;i<80&&!done;i++){await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));await tester.pump();}
+        expect(done,isTrue);await completed;await tester.pumpAndSettle();expect(result,MoolAssistantReviewResult.returnToOwner);
+        if(target=='batch') {
+          final lot=find.byKey(const ValueKey('work-receive-lot-0'));
+          final scroll=find.descendant(of:find.byKey(const Key('work-goods-receiving')),matching:find.byType(Scrollable)).first;
+          if(lot.evaluate().isEmpty)await tester.scrollUntilVisible(lot,180,scrollable:scroll,maxScrolls:30);
+          await tester.ensureVisible(lot);await tester.pumpAndSettle();await tester.tap(lot);await tester.pumpAndSettle();
+        }
+        final key=target=='date'?'work-receive-date':target=='delivered'?'work-receive-delivered-0':'work-receive-batch-0';
+        final input=find.byKey(Key(key));
+        if(input.evaluate().isEmpty) {
+          final scroll=find.descendant(of:find.byKey(const Key('work-goods-receiving')),matching:find.byType(Scrollable)).first;
+          await tester.scrollUntilVisible(input,180,scrollable:scroll,maxScrolls:30);
+        }
+        await tester.ensureVisible(input);await tester.pumpAndSettle();expect(tester.widget<TextField>(input).controller!.text,wanted);
+        expect(f.old.forms.signature,before);expect(f.old.forms.writes,writes);expect(f.copy.toJson(),copy);
+        expect(f.old.native.work.workspaceInventoryRevision,stock);expect(tester.takeException(),isNull);
+      }finally{await f.old.close(tester);}
+    });
+  }
+  testWidgets('Receiving404 unknown original field cannot open a blank editor or change receipt input',(tester) async {
+    final f=_ReceivingRemainingEvidence();try {
+      await f.ready(tester,WorkProofSource.gallery);final before=f.old.forms.signature;
+      final shown=await f.open(tester,'AI-ACT-404',{'fieldId':'HOST-no-original-field','value':'Never applied'});
+      expect(await shown.result,MoolAssistantReviewResult.unavailable);expect(f.old.forms.signature,before);expect(find.byKey(const Key('work-receive-fields-list')),findsNothing);
+    }finally{await f.old.close(tester);}
+  });
+}
+
+
+class _ReceivingTaxEvidenceHost {
+  late final Directory directory;late final Uint8List bytes;late final _ReceivingRemainingHost host;
+  bool directoryReady=false,hostReady=false;int nativeSelections=0;
+  String get digest=>crypto.sha256.convert(bytes).toString();
+  Future<void> ready(WidgetTester tester) async {
+    await tester.runAsync(() async {directory=await Directory.systemTemp.createTemp('host-receiving-tax-');directoryReady=true;bytes=await _catalogueTestPhoto();});
+    final capture=WorkPurchaseInvoiceCapture(currentScope:()=>host.work.workspaceSupplierScope,supportDirectory:()async=>directory,
+      recognize:(_) async=>'',picker:_ReceivingDocumentPicker((_)async{nativeSelections++;return WorkPickedProof(fileName:'HOST-native-tax.png',contentType:'image/png',bytes:bytes);}));
+    host=_ReceivingRemainingHost(capture:capture);hostReady=true;await host.ready(tester);await host.openOriginalBill(tester);
+    final camera=find.byKey(const Key('work-purchase-camera'));
+    if(camera.evaluate().isEmpty){
+      final list=tester.widget<ListView>(find.byKey(const Key('work-record-purchase')));
+      final scroll=find.byWidgetPredicate((w)=>w is Scrollable&&identical(w.controller,list.controller));
+      expect(scroll,findsOneWidget);
+      await tester.scrollUntilVisible(camera,-180,scrollable:scroll,maxScrolls:30);
+    }
+    await host.tap(tester,'work-purchase-camera');
+    final adapter=host.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-403');
+    scope_contract.MoolAssistantNativeSnapshot? snapshot;
+    for(var attempt=0;attempt<60;attempt++){
+      await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));await tester.pump();
+      snapshot=await adapter.snapshot(host.controller!.context,digest);if(snapshot!=null)break;
+    }
+    await tester.pumpAndSettle();expect(snapshot,isNotNull);expect(nativeSelections,1);
+  }
+  Future<MoolAssistantReviewResult> completeReview(WidgetTester tester, Future<MoolAssistantReviewResult> review) async {
+    bool done=false;MoolAssistantReviewResult? result;Object? failure;StackTrace? failureStack;
+    final completed=review.then<void>((value){result=value;done=true;},onError:(Object error,StackTrace stack){failure=error;failureStack=stack;done=true;});
+    // The native handoff reads the actual private copy. Drive filesystem IO
+    // outside fake async; never replace the native read or provenance checks.
+    for(var attempt=0;attempt<60&&!done;attempt++){
+      await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));await tester.pump();
+    }
+    expect(done,isTrue,reason:'Original printed-tax handoff must complete after bounded real IO; busy=${host.controller!.reviewBusy}, notice=${host.controller!.proposalNotice}.');
+    await completed;if(failure!=null)Error.throwWithStackTrace(failure!,failureStack!);
+    await tester.pumpAndSettle();expect(result,isNotNull);return result!;
+  }
+  Future<void> close(WidgetTester tester)async{
+    if(hostReady)await host.close(tester);
+    if(directoryReady)await tester.runAsync(()async{if(await directory.exists())await directory.delete(recursive:true);});
+  }
+}
+void registerReceivingRemainingTaxTests(){
+  testWidgets('Receiving403 native printed-tax row keeps actual private-copy identity and original Save draft only persists',(tester)async{
+    final f=_ReceivingTaxEvidenceHost();try{
+      await f.ready(tester);final h=f.host,before=h.writes;h.work.forbidCold=true;
+      final shown=await h.open(tester,'AI-ACT-403',f.digest,{'taxRow':{'label':'मूળ HSN / GST','hsn':'1006','taxableValue':'0012.50','cgst':'0.31','sgst':'0.31'}});
+      expect(await f.completeReview(tester,shown.result),MoolAssistantReviewResult.returnToOwner);
+      final label=find.byKey(const Key('purchase-tax-label-0'));await h.reveal(tester,label);
+      expect(tester.widget<TextField>(label).controller!.text,'मूળ HSN / GST');expect(h.field(tester,'purchase-tax-taxable-0'),'0012.50');
+      expect(h.writes,before);expect(h.work.workspacePurchaseEntryDraft,isNull);expect(f.nativeSelections,1);
+      await tester.enterText(label,'Original native correction');await tester.pumpAndSettle();h.releaseCold();await h.tap(tester,'work-purchase-draft-save');
+      for(var attempt=0;attempt<60&&(h.work.workspacePurchaseEntryDraft==null||find.byKey(const Key('work-record-purchase')).evaluate().isNotEmpty);attempt++){
+        await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));await tester.pump();
+      }
+      await tester.pumpAndSettle();expect(find.byKey(const Key('work-record-purchase')),findsNothing,reason:'Original Save draft must finish actual copy IO and close its native form.');
+      final saved=h.work.workspacePurchaseEntryDraft;expect(saved,isNotNull);expect(saved!.printedTaxRows.single['label'],'Original native correction');
+      expect(saved.printedTaxRows.single['taxableValue'],'0012.50');
+      final evidence=saved.additionalFields.singleWhere((field)=>field.section=='tax'&&field.summaryIndex==0);
+      expect(evidence.sourceDigest,f.digest);expect(evidence.sourcePage,1);expect(evidence.reviewed,isFalse);
+      expect(saved.attachments.single.digest,f.digest);expect(saved.attachments.single.source,WorkProofSource.camera.name);
+      expect(h.work.workspaceSupplierLedger(h.supplier.id)!.purchaseBills.length,1,reason:'Saving this draft creates no new financial bill.');
+    }finally{await f.close(tester);}
+  });
+  testWidgets('Receiving403 actor ABA hides native private tax inputs and captured original Save cannot write',(tester)async{
+    final f=_ReceivingTaxEvidenceHost();try{
+      await f.ready(tester);final h=f.host;
+      final shown=await h.open(tester,'AI-ACT-403',f.digest,{'taxRow':{'label':'Retain private original row','taxableValue':'12.50'}});expect(await f.completeReview(tester,shown.result),MoolAssistantReviewResult.returnToOwner);
+      final label=find.byKey(const Key('purchase-tax-label-0'));await h.reveal(tester,label);final controller=tester.widget<TextField>(label).controller!;
+      final save=find.byKey(const Key('work-purchase-draft-save'));await h.reveal(tester,save);
+      final button=tester.widget(save);final callback=button is FilledButton?button.onPressed:(button as TextButton).onPressed;
+      final before=h.writes;h.native.mode.value='buyer';h.native.mode.value='store';await tester.pumpAndSettle();
+      expect(label,findsNothing);expect(find.byKey(const Key('work-purchase-draft-save')),findsNothing);expect(controller.text,'Retain private original row');
+      callback?.call();await tester.pumpAndSettle();expect(h.writes,before);expect(h.work.workspacePurchaseEntryDraft,isNull);
+    }finally{await f.close(tester);}
+  });
+  testWidgets('Receiving403 actual native Full screen viewer retires on actor change and its Close cannot pop unrelated route',(tester)async{
+    final f=_ReceivingTaxEvidenceHost();try{
+      await f.ready(tester);final h=f.host;
+      final shown=await h.open(tester,'AI-ACT-403',f.digest,{'taxRow':{'label':'Original source tax','cgst':'0.31'}});expect(await f.completeReview(tester,shown.result),MoolAssistantReviewResult.returnToOwner);
+      await h.tap(tester,'work-purchase-preview');expect(find.byKey(const Key('purchase-full-screen-preview')),findsOneWidget);
+      final close=tester.widget<TextButton>(find.byKey(const Key('purchase-full-screen-close'))).onPressed!;
+      final navigator=Navigator.of(tester.element(find.byKey(const Key('purchase-full-screen-preview'))),rootNavigator:true),before=h.writes;
+      h.native.mode.value='buyer';h.native.mode.value='store';await tester.pumpAndSettle();
+      expect(find.text('This purchase is no longer available. Close the preview.'),findsOneWidget);
+      unawaited(navigator.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST unrelated tax viewer route')))));await tester.pumpAndSettle();
+      close();await tester.pumpAndSettle();expect(find.text('HOST unrelated tax viewer route'),findsOneWidget);expect(h.writes,before);
+    }finally{await f.close(tester);}
+  });
+}
+
+
+void registerReceivingRemainingContinuationTests(){
+  testWidgets('Receiving243 restores the actual saved consumer counting draft without empty-input save or supplier Stock effects',(tester)async{
+    final h=_ReceivingRemainingHost();try{
+      await h.ready(tester);final scope=h.work.workspaceSupplierScope!,at=DateTime.now().toUtc();
+      final record=WorkspacePurchaseRecord(accountScope:scope.$1,workspaceId:scope.$2,supplierId:h.supplier.id,supplierName:h.supplier.name,
+        orderId:'HOST-RECEIVE243-ORDER',shipmentId:'HOST-RECEIVE243-SHIP',revision:1,createdAt:at,updatedAt:at,
+        stage:WorkspaceSupplyStage.arriving,amountMinor:5000,itemSummary:'HOST original supplier goods',paymentLabel:'Payment pending',
+        receiptState:WorkspaceReceiptState.awaiting,lines:[WorkspacePurchaseLine(id:'HOST-source-count-line',productId:'HOST-supplier-product',
+          name:'HOST original supplier goods',pack:'1 kg',orderedPacks:5,unitPriceMinor:1000)]);
+      expect(h.work.applyWorkspacePurchases(accountScope:scope.$1,storeId:scope.$2,feedRevision:1,records:[record],complete:true),isTrue);
+      await h.work.loadWorkspaceReceiptDraft(record);
+      await h.work.saveWorkspaceReceiptDraft(record,countedPacks:const {'HOST-source-count-line':'1.'},problems:const {},note:'Original native unfinished count');
+      await tester.pumpAndSettle();final draft=h.work.workspaceReceiptDraft(record)!;
+      final privateBefore=Map<String,String>.of(await const FlutterSecureStorage().readAll()),before=h.writes;
+      h.work.forbidCold=true;final shown=await h.open(tester,'AI-ACT-243',record.shipmentId,const {});
+      final field=find.byKey(const ValueKey('work-receipt-count-HOST-source-count-line'));expect(field,findsOneWidget);
+      final text=tester.widget<TextField>(field);expect(text.controller!.text,'1.');
+      expect(h.work.workspaceReceiptDraft(record)!.revision,draft.revision);expect(h.writes,before);
+      expect(await const FlutterSecureStorage().readAll(),privateBefore);
+      expect(h.work.workspacePurchases.singleWhere((p)=>p.shipmentId==record.shipmentId).receiptState,WorkspaceReceiptState.awaiting);
+      await tester.enterText(field,'2.000');await tester.pumpAndSettle();
+      expect(h.work.workspaceReceiptDraft(record)!.countedPacks['HOST-source-count-line'],'2.000');
+      final afterNative=Map<String,String>.of(await const FlutterSecureStorage().readAll());expect(afterNative,isNot(privateBefore));
+      expect(h.work.workspaceReceiptDraft(record)!.revision,greaterThan(draft.revision));
+      final callback=text.onChanged;
+      final revised=WorkspacePurchaseRecord(accountScope:record.accountScope,workspaceId:record.workspaceId,supplierId:record.supplierId,
+        supplierName:record.supplierName,orderId:record.orderId,shipmentId:record.shipmentId,revision:2,createdAt:record.createdAt,
+        updatedAt:record.updatedAt,stage:record.stage,amountMinor:record.amountMinor,itemSummary:record.itemSummary,
+        paymentLabel:record.paymentLabel,receiptState:record.receiptState,lines:record.lines);
+      expect(h.work.applyWorkspacePurchases(accountScope:scope.$1,storeId:scope.$2,feedRevision:2,records:[revised],complete:true),isTrue);
+      await tester.pumpAndSettle();
+      expect(field,findsNothing);callback?.call('999');await tester.pumpAndSettle();expect(await const FlutterSecureStorage().readAll(),afterNative);expect(h.writes,before);
+      await tester.tap(find.byType(BackButton).last);await tester.pumpAndSettle();expect(await shown.result,MoolAssistantReviewResult.stale);
+    }finally{await h.close(tester);}
+  });
+  testWidgets('Receiving251 actual unknown Restock arrival reads native status without Stock admission; original Recover alone finishes same attempt',(tester)async{
+    final f=_Receiving251Fixture();final access=_ReceivingAssistantAccess();scope_contract.MoolAssistantController? controller;
+    try{
+      await f.start();f.work.forbidAdmission=false;f.includeGroup=false;
+      expect(await f.work.recoverWorkspaceRestockReceiving(f.original),isTrue);
+      final scope=f.work.workspaceSupplierScope!,at=DateTime.now().toUtc(),book=await f.purchase.read(f.work.workspaceSupplierScope!.$1,f.work.workspaceSupplierScope!.$2,qa:f.work.workspaceSupplierScope!.$3);
+      final supplier=book!.profiles.single,product=f.work.workspaceCatalogueItems.firstWhere((p)=>p.stockMode==WorkspaceStockMode.exactQuantity);
+      final receipt=WorkspaceSupplierGoodsReceipt(id:f.work.newWorkspaceGoodsReceiptId(),expectedDeliveryId:f.original.deliveryGroupId,
+        reference:'HOST actual native unknown arrival',deliveredOn:at.toIso8601String().substring(0,10),recordedAt:at,recordedUtcOffsetMinutes:0,
+        restockOriginal:f.original,lines:[for(final line in f.original.lines.entries)WorkspaceSupplierGoodsReceiptLine(sourceLineId:line.key,
+          productId:product.id,productLabel:product.title,purchaseUnit:line.value.quantityUnit,stockUnit:product.pack,unitsPerPack:1,
+          deliveredMilli:1000,acceptedMilli:1000,damagedMilli:0,shortMilli:0,expectedMilli:line.value.quantityMilli)]);
+      Map<String,dynamic>? committed;int records=0,reconciles=0;bool recoverAllowed=false;
+      final readResponse=f.wire.respond!;
+      f.wire.respond=(body){
+        if(body['operation']=='recordBuyerGoodsArrival'){
+          records++;final command=WorkspaceGoodsArrivalCommand.fromJson(Map<String,Object?>.of(body)..remove('operation'));
+          committed=purchase_fixture.restockArrivalResponse(command);f.group=(committed!['group'] as Map).cast<String,dynamic>();f.includeGroup=true;
+          throw StateError('HOST actual native acknowledgement lost after commit');
+        }
+        if(body['operation']=='reconcileBuyerGoodsArrival'){
+          reconciles++;if(!recoverAllowed)throw StateError('HOST exact attempt status temporarily unavailable');return committed!;
+        }
+        return readResponse(body);
+      };
+      expect(await f.work.saveWorkspaceGoodsReceiptDraft(receipt,supplierId:supplier.id,scope:scope,expectedRevision:f.work.workspacePurchaseEntryRevision!),isTrue);
+      expect(await f.work.confirmWorkspaceSupplierGoodsReceipt(receipt,supplierId:supplier.id,scope:scope,
+        expectedPurchaseRevision:f.work.workspacePurchaseEntryRevision!,expectedSupplierRevision:0,requireSavedReview:true),WorkspaceGoodsReceiptSaveResult.statusUnknown);
+      expect(f.work.workspaceRestockAttempt(receipt.id),isNotNull);expect(records,1);
+      await tester.pumpWidget(MaterialApp.router(theme:MoolTheme.light(),routerConfig:f.native.router,
+        builder:(_,child)=>MoolAssistantHost(readContext:f.native.readContext,contextChanges:Listenable.merge([f.native.journey,f.work,f.native.mode]),entitlements:access,child:child!)));
+      await tester.pumpAndSettle();
+      controller=scope_contract.MoolAssistantController(currentContext:f.native.readContext,
+        contextChanges:Listenable.merge([f.native.journey,f.work,f.native.mode]),entitlements:access,nativeAdapters:f.native.adapters(tester));
+      await controller.refreshAccess();controller.setDraft('Read exact original receiving status');
+      final snapshot=await f.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-251').snapshot(controller.context,receipt.id);
+      expect(snapshot,isNotNull);final before=await f.fingerprint(),stock=f.work.workspaceCatalogueItems.singleWhere((p)=>p.id==product.id).stock;
+      final recordsBefore=records,reconcilesBefore=reconciles;
+      f.work.forbidAdmission=true;
+      expect(controller.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-native251',actionId:'AI-ACT-251',binding:controller.context.binding,
+        requestRevision:controller.requestRevision,entitlementRevision:controller.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+        validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:receipt.id,title:'Review original unknown arrival',summary:'HOST accepted native read only',fields:const {})),isTrue);
+      final review=controller.reviewProposal();
+      for(var i=0;i<60;i++){await tester.pump(const Duration(milliseconds:50));if(find.byKey(const Key('work-receive-header')).evaluate().isNotEmpty)break;}
+      await tester.pumpAndSettle();expect(find.byKey(const Key('work-receive-header')).hitTestable(),findsOneWidget);
+      final status=find.byKey(const Key('work-receive-status'));
+      final receivingScroll=find.descendant(of:find.byKey(const Key('work-goods-receiving')),matching:find.byType(Scrollable)).first;
+      if(status.evaluate().isEmpty)await tester.scrollUntilVisible(status,180,scrollable:receivingScroll,maxScrolls:30);
+      await tester.ensureVisible(status);await tester.pumpAndSettle();
+      expect(tester.widget<Text>(status).data,'Receiving status unverified · recover before retrying');
+      expect(await f.fingerprint(),before);expect(records,recordsBefore);expect(reconciles,reconcilesBefore);
+      expect(f.work.workspaceCatalogueItems.singleWhere((p)=>p.id==product.id).stock,stock);
+      f.work.forbidAdmission=false;recoverAllowed=true;
+      final confirm=find.byKey(const Key('work-receive-confirm'));await tester.ensureVisible(confirm);await tester.tap(confirm);await tester.pumpAndSettle();
+      expect(find.text('Goods recorded'),findsWidgets);expect(records,1);expect(reconciles,greaterThan(reconcilesBefore));
+      expect(f.work.workspaceRestockAttempt(receipt.id)!.command.receipt.id,receipt.id);
+      expect(f.work.workspaceCatalogueItems.singleWhere((p)=>p.id==product.id).stock,stock+receipt.lines.fold<int>(0,(n,line)=>n+line.acceptedMilli)/1000);
+      await tester.tap(find.byType(BackButton).last);await tester.pumpAndSettle();expect(await review,MoolAssistantReviewResult.opened);
+    }finally{
+      if(f.ready)f.work.forbidAdmission=false;controller?.dispose();access.dispose();await tester.pumpWidget(const SizedBox.shrink());await f.close();
+    }
+  });
+}
+
+
+class _ReceivingHeldReviewEntry extends _SupplierPrefillStore {
+  Completer<void>? holdReview,entered;
+  @override Future<void> save(WorkspacePurchaseEntryBook book,{required int? expectedRevision})async{
+    await super.save(book,expectedRevision:expectedRevision);
+    final gate=holdReview;
+    if(book.goodsReceiptDrafts.isNotEmpty&&gate!=null){
+      if(entered?.isCompleted==false)entered!.complete();await gate.future;
+    }
+  }
+}
+class _ReceivingHeldCopyRead extends WorkPurchaseInvoiceCapture {
+  _ReceivingHeldCopyRead({required super.currentScope,required super.supportDirectory,required super.picker,super.recognize});
+  Completer<void>? holdRead,entered;
+  @override Future<Uint8List> read((String,String,bool)scope,String draftId,WorkspacePurchaseInvoiceAttachment attachment)async{
+    final bytes=await super.read(scope,draftId,attachment);
+    if(holdRead case final gate?){if(entered?.isCompleted==false)entered!.complete();await gate.future;}
+    return bytes;
+  }
+}
+void registerReceivingRetentionBoundaryTests(){
+  testWidgets('Receiving retained exact durable input closes after retired held copy read or review-save without flushing another owner',(tester)async{
+    for(final stage in ['copy-read','review-save']){
+      final entry=_ReceivingHeldReviewEntry();late final _ReceivingRemainingHost h;
+      late final Directory directory;bool directoryReady=false,hostCreated=false;_ReceivingHeldCopyRead? capture;
+      try{
+        late Uint8List bytes;
+        await tester.runAsync(()async{directory=await Directory.systemTemp.createTemp('host-receiving-retention-');directoryReady=true;bytes=await _catalogueTestPhoto();});
+        capture=_ReceivingHeldCopyRead(currentScope:()=>h.work.workspaceSupplierScope,supportDirectory:()async=>directory,
+          picker:_ReceivingDocumentPicker((_)async=>WorkPickedProof(fileName:'HOST-actual-retained-copy.png',contentType:'image/png',bytes:bytes)),recognize:(_)async=>'');
+        h=_ReceivingRemainingHost(capture:capture,entry:entry);hostCreated=true;await h.ready(tester,arrival:true);
+        await h.tap(tester,'work-receive-copy-camera');
+        for(var i=0;i<60;i++){
+          await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));await tester.pump();
+          if((await h.input()).fields.containsKey('documents'))break;
+        }
+        await tester.pumpAndSettle();expect((await h.input()).fields['documents'],isNotNull);
+        final day=DateTime.now(),shown=await h.open(tester,'AI-ACT-238',h.supplier.id,{'reference':'HOST exact retained $stage',
+          'date':'${day.day.toString().padLeft(2,'0')}/${day.month.toString().padLeft(2,'0')}/${day.year}',
+          'items':[{'productId':h.product.id,'delivered':'1','damaged':'0','expected':'1','short':'0'}]});
+        expect(await shown.result,MoolAssistantReviewResult.returnToOwner);
+        final entered=Completer<void>(),release=Completer<void>();
+        if(stage=='copy-read'){capture.entered=entered;capture.holdRead=release;}else{entry.entered=entered;entry.holdReview=release;}
+        final review=find.byKey(const Key('work-receive-review'));await h.reveal(tester,review);
+        tester.widget<FilledButton>(review).onPressed!();
+        for(var i=0;i<60&&!entered.isCompleted;i++){await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));await tester.pump();}
+        expect(entered.isCompleted,isTrue,reason:'Hold the actual original $stage after acknowledged input save.');
+        final retained=await h.input();expect(retained.fields['input'],contains('HOST exact retained $stage'));
+        expect(h.work.workspaceSupplierLedger(h.supplier.id)!.goodsReceipts,isEmpty);
+        h.native.mode.value='buyer';h.native.mode.value='store';await tester.pump();
+        release.complete();
+        for(var i=0;i<20;i++){await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));await tester.pump();}
+        await tester.pumpAndSettle();
+        final beforeClose=h.writes,bookBefore=jsonEncode(entry.value!.toJson());
+        final close=find.byKey(const Key('receiving-native-retired-close'));expect(close,findsOneWidget);
+        await tester.tap(close);await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-goods-receiving')),findsNothing);
+        expect(h.writes,beforeClose);expect(jsonEncode(entry.value!.toJson()),bookBefore);
+        final after=await h.input();expect(after.key,retained.key);expect(after.revision,retained.revision);expect(after.fields,retained.fields);
+        final saved=entry.value!.goodsReceiptDrafts;
+        if(stage=='review-save')expect(saved.single.receipt.id,retained.fields['arrivalId']);else expect(saved,isEmpty);
+        expect(h.work.workspaceSupplierLedger(h.supplier.id)!.goodsReceipts,isEmpty);
+        expect(await tester.runAsync(()=>directory.list(recursive:true).where((f)=>f is File).isEmpty),isFalse);
+      }finally{
+        if(capture?.holdRead?.isCompleted==false)capture!.holdRead!.complete();if(entry.holdReview?.isCompleted==false)entry.holdReview!.complete();
+        if(hostCreated)await h.close(tester);if(directoryReady)await tester.runAsync(()async{if(await directory.exists())await directory.delete(recursive:true);});
+      }
+    }
+  });
+  testWidgets('Receiving retained Review and Record reject foreign cover without retiring original form or changing input',(tester)async{
+    for(final action in ['review','record']){
+      final h=_ReceivingRemainingHost();try{
+        await h.ready(tester,arrival:true);final day=DateTime.now();
+        final shown=await h.open(tester,'AI-ACT-238',h.supplier.id,{'reference':'HOST route ownership $action',
+          'date':'${day.day.toString().padLeft(2,'0')}/${day.month.toString().padLeft(2,'0')}/${day.year}',
+          'items':[{'productId':h.product.id,'delivered':'1','damaged':'0','expected':'1','short':'0'}]});
+        expect(await shown.result,MoolAssistantReviewResult.returnToOwner);
+        if(action=='record')await h.tap(tester,'work-receive-review');
+        final finder=find.byKey(Key(action=='review'?'work-receive-review':'work-receive-confirm'));await h.reveal(tester,finder);
+        final widget=tester.widget(finder),callback=tester.widget(finder) is FilledButton?(tester.widget(finder) as FilledButton).onPressed:(tester.widget(finder) as TextButton).onPressed;
+        expect(callback,isNotNull);final navigator=Navigator.of(tester.element(finder),rootNavigator:true),before=h.writes;
+        final fields=await h.input(),book=jsonEncode(h.entry.value!.toJson());
+        unawaited(navigator.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST foreign receiving cover')))));await tester.pumpAndSettle();
+        callback!();await tester.pumpAndSettle();expect(find.text('HOST foreign receiving cover'),findsOneWidget);
+        expect(h.writes,before);expect(jsonEncode(h.entry.value!.toJson()),book);expect((await h.input()).fields,fields.fields);
+        expect(h.work.workspaceSupplierLedger(h.supplier.id)!.goodsReceipts,isEmpty);
+        navigator.pop();await tester.pumpAndSettle();expect(finder.hitTestable(),findsOneWidget);
+        final restored=tester.widget(finder);expect(restored is FilledButton?restored.onPressed:(restored as TextButton).onPressed,isNotNull);
+        expect(widget.runtimeType,restored.runtimeType);expect(h.writes,before);
+      }finally{await h.close(tester);}
+    }
+  });
+}
+
+
+
+class _Sales02Journal extends _LedgerCheckpointFixtureStore {
+  Completer<void>? holdSave,entered;
+  @override Future<void> save(WorkspaceLedgerCheckpoint value,{required int? expectedRevision})async{
+    final gate=holdSave;holdSave=null;if(gate!=null){entered?.complete();await gate.future;}
+    await super.save(value,expectedRevision:expectedRevision);
+  }
+}
+class _Sales02Forms extends _LedgerFormFixtureStore {
+  int reads=0,writes=0;
+  @override Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key){reads++;return super.read(key);}
+  @override Future<void> save(WorkspaceLedgerFormDraft value,{required int? expectedRevision}){writes++;return super.save(value,expectedRevision:expectedRevision);}
+}
+class _Sales02Work extends WorkSession {
+  _Sales02Work({required super.contactDraftStore,required super.purchaseEntryStore,required super.inventoryStore,
+    required super.tradingPreferencesStoreFactory,required super.counterDraftStore,required super.ledgerFormDraftStore,
+    required super.customerFeedbackAdapter,required super.customerFeedbackPendingStoreFactory}):super(catalogueReference:workspaceMasterCatalogue);
+  int ledgerRecoveries=0,counterRecoveries=0,aiSourceReads=0;
+  @override Future<bool> recoverCustomerLedger(){ledgerRecoveries++;return super.recoverCustomerLedger();}
+  @override Future<void> loadWorkspaceCounterDraft({bool retry=false,bool Function()? shouldRestore}){counterRecoveries++;return super.loadWorkspaceCounterDraft(retry:retry,shouldRestore:shouldRestore);}
+  @override Object get workspaceCustomerActionSource {aiSourceReads++;return super.workspaceCustomerActionSource;}
+}
+class _Sales02Gateway extends StoreReviewCustomerCollectionGateway {
+  _Sales02Gateway(WorkspaceFinanceSnapshot finance):super(finance);
+  int collections=0,returns=0,refunds=0,collectionChecks=0,returnChecks=0,refundChecks=0;
+  String? dropAck;
+  @override Future<WorkspaceFinanceSnapshot> recordCollection(WorkspaceCustomerCollection request)async{collections++;final reply=await super.recordCollection(request);if(dropAck=='collection'){dropAck=null;throw StateError('HOST original acknowledgement lost');}return reply;}
+  @override Future<WorkspaceFinanceSnapshot> recordReturn(WorkspaceCustomerReturn request,WorkspaceOrderRecord order)async{returns++;final reply=await super.recordReturn(request,order);if(dropAck=='return'){dropAck=null;throw StateError('HOST original acknowledgement lost');}return reply;}
+  @override Future<WorkspaceFinanceSnapshot> recordRefund(WorkspaceCustomerRefund request)async{refunds++;final reply=await super.recordRefund(request);if(dropAck=='refund'){dropAck=null;throw StateError('HOST original acknowledgement lost');}return reply;}
+  @override Future<WorkspaceFinanceSnapshot> reconcileCollection(WorkspaceCustomerCollection request){collectionChecks++;return super.reconcileCollection(request);}
+  @override Future<WorkspaceFinanceSnapshot> reconcileReturn(WorkspaceCustomerReturn request){returnChecks++;return super.reconcileReturn(request);}
+  @override Future<WorkspaceFinanceSnapshot> reconcileRefund(WorkspaceCustomerRefund request){refundChecks++;return super.reconcileRefund(request);}
+}
+class _Sales02FeedbackStore implements sales02_feedback.StoreFeedbackPendingStore {
+  sales02_feedback.StoreFeedbackCommand? value;int reads=0,saves=0,clears=0;
+  @override Future<sales02_feedback.StoreFeedbackCommand?> readPending(sales02_feedback.StoreFeedbackScope scope)async{reads++;return value?.scope==scope?value:null;}
+  @override Future<void> savePending(sales02_feedback.StoreFeedbackCommand command)async{saves++;value=command;}
+  @override Future<void> removePending(sales02_feedback.StoreFeedbackCommand original)async{clears++;expect(value?.operationId,original.operationId);value=null;}
+}
+class _Sales02FeedbackAdapter implements sales02_feedback.StoreFeedbackAdapter {
+  String? orderId;int loads=0,sends=0,checks=0;bool dropAck=false;
+  final replies=<String,sales02_feedback.StoreFeedbackResult>{};
+  @override bool get commandRecoveryReady=>true;
+  @override Future<sales02_feedback.StoreFeedbackPage> load(sales02_feedback.StoreFeedbackScope scope,{String? cursor})async{loads++;return sales02_feedback.StoreFeedbackPage(scope:scope,coverage:sales02_feedback.StoreFeedbackCoverage.complete,
+    entries:[sales02_feedback.StoreFeedbackEntry(storeId:scope.store,id:'HOST-SALES02-FEEDBACK',version:'v1',kind:sales02_feedback.StoreFeedbackKind.overallOrder,
+      authorLabel:'HOST customer',text:'HOST original purchase-linked feedback',orderId:orderId,canReport:true)]);}
+  @override Future<sales02_feedback.StoreFeedbackResult> submit(sales02_feedback.StoreFeedbackCommand command)async{sends++;final result=sales02_feedback.StoreFeedbackResult(command:command,outcome:sales02_feedback.StoreFeedbackOutcome.accepted);replies[command.operationId]=result;
+    if(dropAck){dropAck=false;throw StateError('HOST original acknowledgement lost');}return result;}
+  @override Future<sales02_feedback.StoreFeedbackResult> reconcile(sales02_feedback.StoreFeedbackCommand command)async{checks++;return replies[command.operationId]??sales02_feedback.StoreFeedbackResult(command:command,outcome:sales02_feedback.StoreFeedbackOutcome.unknown);}
+}
+class _Sales02Fixture {
+  final journal=_Sales02Journal(),forms=_Sales02Forms(),counter=_CounterDraftFixtureStore();
+  final feedback=_Sales02FeedbackAdapter(),feedbackStore=_Sales02FeedbackStore(),access=_ReceivingAssistantAccess();
+  late final _AuthenticatedNativeScopeFixture host;late _Sales02Gateway gateway;late WorkspaceCatalogueItem product;
+  late WorkspaceCustomerInvoice creditInvoice,targetInvoice;scope_contract.MoolAssistantController? controller;
+  final owner=ChangeNotifier();bool live=true;
+  _Sales02Work get work=>host.work as _Sales02Work;
+  WorkspacePaymentRecord payment(String invoice)=>work.workspaceFinance!.payments.singleWhere((row)=>row.invoiceId==invoice);
+  WorkspaceCustomerLedger ledger(String invoice)=>work.workspaceFinance!.customerLedgers.singleWhere((row)=>row.customerId==payment(invoice).customerId);
+  WorkspaceCustomerLedgerEntry get receipt=>ledger(creditInvoice.id).entries.firstWhere((row)=>row.invoiceId==creditInvoice.id&&row.kind==WorkspaceLedgerEntryKind.collection);
+  Object get effects=>(journal.saveAttempts,forms.writes,gateway.collections,gateway.returns,gateway.refunds,gateway.collectionChecks,gateway.returnChecks,gateway.refundChecks,
+    feedback.sends,feedback.checks,feedbackStore.saves,feedbackStore.clears,work.ledgerRecoveries,work.counterRecoveries);
+  Future<void> ready(WidgetTester tester)async{
+    host=_AuthenticatedNativeScopeFixture(makeWork:(contact,purchase,inventory,trading)=>_Sales02Work(contactDraftStore:contact,purchaseEntryStore:purchase,inventoryStore:inventory,
+      tradingPreferencesStoreFactory:(_)=>trading,counterDraftStore:counter,ledgerFormDraftStore:forms,customerFeedbackAdapter:feedback,customerFeedbackPendingStoreFactory:(_)=>feedbackStore));
+    await host.ready();expect(await work.loadWorkspaceInventory(retry:true),isTrue);expect(await work.workspaceInventorySaved,isTrue);
+    product=work.workspaceCatalogueItems.firstWhere((row)=>row.canSellAtCounter&&(row.stockMode==WorkspaceStockMode.availabilityOnly||row.stock>=3)&&work.workspaceCounterAdjustedQuantity(row.id,0,1)==1);
+    final native=work.workspaceSupplierScope!,at=DateTime.now().toUtc();
+    final finance=WorkspaceFinanceSnapshot(accountScope:native.$1,workspaceId:native.$2,revision:1,asOf:at,salesTodayMinor:0,duesMinor:0,availableMinor:0,
+      heldMinor:0,requestedMinor:0,paidOutMinor:0,feesMinor:0,deliveryAdjustmentsMinor:0,refundsMinor:0,taxWithheldMinor:0,payments:const [],payouts:const [],historyComplete:true);
+    expect(work.applyWorkspaceFinance(finance),isTrue);gateway=_Sales02Gateway(finance);
+    expect(work.bindCustomerCollectionGateway(accountScope:native.$1,storeId:native.$2,adapter:gateway,checkpointStore:journal),isTrue);
+    expect(await work.recoverCustomerLedger(),isTrue);
+    await work.loadWorkspaceCounterDraft();
+    creditInvoice=await createInvoice(2);
+    expect(await work.recordCustomerCollection(customerId:payment(creditInvoice.id).customerId,invoiceId:creditInvoice.id,amountMinor:payment(creditInvoice.id).dueMinor,channel:WorkspacePaymentChannel.cash),isTrue);
+    expect(await work.recordCustomerReturn(invoiceId:creditInvoice.id,lines:[WorkspaceCustomerReturnLine(productId:product.id,quantity:1,restockQuantity:0)],reason:'HOST original verified return',reasonCode:WorkspaceCustomerReturn.reasonLabels.keys.first),isTrue);
+    targetInvoice=await createInvoice(1);await work.workspaceInventorySaved;await work.workspaceCounterDraftWrites;
+    feedback.orderId=targetInvoice.orderId;await work.workspaceCustomerFeedback!.load();
+    await tester.pumpWidget(host.app);await tester.pumpAndSettle();
+    controller=scope_contract.MoolAssistantController(currentContext:host.readContext,contextChanges:Listenable.merge([work,host.journey,host.mode]),entitlements:access,nativeAdapters:host.adapters(tester));
+    await controller!.refreshAccess();controller!.setDraft('Review the exact original customer action');
+  }
+  Future<WorkspaceCustomerInvoice> createInvoice(int quantity)async{
+    expect(work.startNewWorkspaceOrder(),isTrue);expect(work.prepareWorkspaceOrder(source:'Counter',fulfilment:'At the shop'),isTrue);
+    work.updateWorkspaceCounterDetails(customer:'HOST કિરણ · 9829012345',billingDetails:const WorkspaceBillingDetails(name:'किरण પટેલ'),payment:'Customer due');
+    work.adjustWorkspaceOrderQuantity(product.id,quantity);await work.workspaceCounterDraftWrites;
+    final result=await work.submitWorkspaceCounterBill();expect(result?.invoice,isNotNull);return result!.invoice!;
+  }
+  scope_contract.MoolAssistantNativeAdapter adapter(WidgetTester tester,String id)=>host.adapters(tester).singleWhere((row)=>row.actionId==id);
+  Future<scope_contract.MoolAssistantProposal> proposal(WidgetTester tester,String id,{Map<String,Object?> fields=const {},String? entity,String suffix=''})async{
+    final snapshot=await adapter(tester,id).snapshot(host.readContext(),entity);expect(snapshot,isNotNull);
+    return scope_contract.MoolAssistantProposal(id:'HOST-sales02-$id-$suffix',actionId:id,binding:host.readContext().binding,requestRevision:controller!.requestRevision,
+      entitlementRevision:controller!.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:entity,
+      title:'Review original customer record',summary:'HOST-only native preparation',fields:fields);
+  }
+  Future<scope_contract.MoolAssistantReviewResult> direct(WidgetTester tester,scope_contract.MoolAssistantProposal proposal)=>
+    (adapter(tester,proposal.actionId) as scope_contract.MoolAssistantOwnerAwareNativeAdapter).openOwnedReview(proposal,isCurrent:()=>live,ownerChanges:owner);
+  Future<void> unknown(String kind)async{
+    gateway.dropAck=kind;
+    if(kind=='collection')expect(await work.recordCustomerCollection(customerId:payment(targetInvoice.id).customerId,invoiceId:targetInvoice.id,amountMinor:1,channel:WorkspacePaymentChannel.cash),isFalse);
+    if(kind=='return')expect(await work.recordCustomerReturn(invoiceId:targetInvoice.id,lines:[WorkspaceCustomerReturnLine(productId:product.id,quantity:1,restockQuantity:0)],reason:'HOST original returned item'),isFalse);
+    if(kind=='refund')expect(await work.recordCustomerRefund(customerId:payment(creditInvoice.id).customerId,invoiceId:creditInvoice.id,amountMinor:1,channel:WorkspacePaymentChannel.cash,sourceCollectionId:receipt.id),isFalse);
+  }
+  Future<void> dispose(WidgetTester tester)async{await tester.pumpWidget(const SizedBox.shrink());controller?.dispose();owner.dispose();access.dispose();await host.dispose();}
+}
+void registerSales02NativeTests(){
+  test('AI-SALES02 fourteen closed schemas preserve raw fields and reject invented authority',(){
+    for(final id in ['294','296','297','298','299','300','301','302','303','304','305','307','387','388']){
+      expect(()=>StoreCustomerActionInitialData.fromFields('AI-ACT-$id',{'verifiedBankReceipt':'yes'}),throwsFormatException);
+    }
+    expect(StoreCustomerActionInitialData.fromFields('AI-ACT-299',{'amount':'0001.25','reference':'ગુજરાતी · हिन्दी'}).fields['amount'],'0001.25');
+    expect(()=>StoreCustomerActionInitialData.fromFields('AI-ACT-387',{'period':'All future payments'}),throwsFormatException);
+  });
+  for(final id in ['294','296','297','298','299','300','301','302','303','304','305','307','387','388']){
+    testWidgets('AI-SALES02 ACT$id native Review stages original values with zero record/recovery dispatch',(tester)async{
+      final f=_Sales02Fixture();await f.ready(tester);try {
+      if(id=='300')await f.unknown('collection');if(id=='302')await f.unknown('return');if(id=='304')await f.unknown('refund');
+      await tester.pumpAndSettle();
+      final customer=f.payment(f.targetInvoice.id).customerId;
+      final fields=<String,Object?>{};String? entity;
+      switch(id){
+        case '294':fields['period']='Month';
+        case '296':fields['search']='9829012345';
+        case '297':fields.addAll({'customerId':customer,'period':'Recorded history'});entity=customer;
+        case '298':fields['customerId']=customer;entity=customer;
+        case '299':fields.addAll({'invoiceId':f.targetInvoice.id,'amount':'0.01','channel':'cash','reference':'HOST कापी'});entity=f.targetInvoice.id;
+        case '300':entity=f.work.pendingCustomerCollection!.operationId;
+        case '301':fields.addAll({'invoiceId':f.targetInvoice.id,'items':{f.product.id:{'quantity':'1','sellable':'0'}},'reason':'माल પરત','reasonCode':WorkspaceCustomerReturn.reasonLabels.keys.first});entity=f.targetInvoice.id;
+        case '302':entity=f.work.pendingCustomerReturn!.request.operationId;
+        case '303':fields.addAll({'invoiceId':f.creditInvoice.id,'amount':'0.01','sourceCollectionId':f.receipt.id,'reference':'HOST actual refund'});entity=f.creditInvoice.id;
+        case '304':entity=f.work.pendingCustomerRefund!.operationId;
+        case '305':fields.addAll({'customerId':customer,'targetInvoiceId':f.targetInvoice.id,'sourceInvoiceId':f.creditInvoice.id,'amount':'0.01'});entity=f.targetInvoice.id;
+        case '307':fields['invoiceId']=f.targetInvoice.id;entity=f.targetInvoice.id;
+        case '387':fields['period']='Week';
+        case '388':fields.addAll({'feedbackId':'HOST-SALES02-FEEDBACK','reportText':'ગુજરાતી · This is the original report'});entity='HOST-SALES02-FEEDBACK';
+      }
+      final proposal=await f.proposal(tester,'AI-ACT-$id',fields:fields,entity:entity),effects=f.effects,loads=f.feedback.loads;
+      final result=f.direct(tester,proposal);await tester.pumpAndSettle();
+      expect(find.byTooltip('Close customer review'),findsOneWidget);expect(f.effects,effects);expect(f.feedback.loads,loads);
+      if(id=='299')expect(tester.widget<TextField>(find.byKey(const Key('collection-amount'))).controller!.text,'0.01');
+      if(id=='301')expect(find.text('माल પરત'),findsOneWidget);
+      if(id=='303')expect(tester.widget<TextField>(find.byKey(const Key('refund-amount'))).controller!.text,'0.01');
+      if(id=='305')expect(tester.widget<TextField>(find.byKey(const Key('customer-credit-amount'))).controller!.text,'0.01');
+      if(id=='388')expect(tester.widget<TextField>(find.byKey(const Key('work-feedback-text'))).controller!.text,'ગુજરાતી · This is the original report');
+      await tester.tap(find.byTooltip('Close customer review'));await tester.pumpAndSettle();
+      expect(await result,scope_contract.MoolAssistantReviewResult.returnToOwner);expect(f.effects,effects);expect(tester.takeException(),isNull);
+      } finally { await f.dispose(tester); }
+    });
+  }
+  testWidgets('AI-SALES02 no source witness in manual flows and native review listener ends on Close',(tester)async{
+    final f=_Sales02Fixture();await f.ready(tester);try {
+    expect(f.work.aiSourceReads,0);f.work.notifyListeners();await tester.pumpAndSettle();expect(f.work.aiSourceReads,0);
+    final result=f.direct(tester,await f.proposal(tester,'AI-ACT-299',fields:{'invoiceId':f.targetInvoice.id,'amount':'0.01'},entity:f.targetInvoice.id));await tester.pumpAndSettle();
+    expect(f.work.aiSourceReads,greaterThan(0));await tester.tap(find.byTooltip('Close customer review'));await tester.pumpAndSettle();await result;
+    final count=f.work.aiSourceReads;f.work.notifyListeners();await tester.pumpAndSettle();expect(f.work.aiSourceReads,count);
+    } finally { await f.dispose(tester); }
+  });
+  testWidgets('AI-SALES02 actual source change-notify-restore-notify retires native Save',(tester)async{
+    final f=_Sales02Fixture();await f.ready(tester);try {
+    final result=f.direct(tester,await f.proposal(tester,'AI-ACT-299',fields:{'invoiceId':f.targetInvoice.id,'amount':'0.01'},entity:f.targetInvoice.id));await tester.pumpAndSettle();
+    final customer=f.payment(f.targetInvoice.id).customerId,old=f.work.workspaceCustomerLastContactAt[customer],effects=f.effects;
+    f.work.workspaceCustomerLastContactAt[customer]=DateTime(2020);f.work.notifyListeners();
+    if(old==null){f.work.workspaceCustomerLastContactAt.remove(customer);}else{f.work.workspaceCustomerLastContactAt[customer]=old;}f.work.notifyListeners();await tester.pumpAndSettle();
+    expect(find.byKey(const Key('collection-amount')),findsNothing);expect(find.textContaining('Your Store or account changed.'),findsOneWidget);expect(f.effects,effects);
+    await tester.tap(find.byTooltip('Close customer review'));await tester.pumpAndSettle();expect(await result,scope_contract.MoolAssistantReviewResult.stale);
+    } finally { await f.dispose(tester); }
+  });
+  testWidgets('AI-SALES02 saved draft conflict and exact-proposal recovery do not overwrite stored human input',(tester)async{
+    final f=_Sales02Fixture();await f.ready(tester);try {
+    final key=f.work.ledgerFormKey(f.payment(f.targetInvoice.id),'collection')!;
+    await f.work.saveLedgerForm(WorkspaceLedgerFormDraft(key:key,revision:1,fields:const {'amount':'1.00','channel':'cash','reference':'original human'}),expectedRevision:null);
+    final p=await f.proposal(tester,'AI-ACT-299',fields:{'invoiceId':f.targetInvoice.id,'amount':'0.01'},entity:f.targetInvoice.id),writes=f.forms.writes;
+    var result=f.direct(tester,p);await tester.pumpAndSettle();expect(find.text('Saved details found'),findsOneWidget);
+    await tester.tap(find.text('Review new details'));await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('collection-amount')),'0.02');await tester.pump();
+    await tester.tap(find.byTooltip('Close customer review'));await tester.pumpAndSettle();await result;
+    result=f.direct(tester,p);await tester.pumpAndSettle();expect(tester.widget<TextField>(find.byKey(const Key('collection-amount'))).controller!.text,'0.02');
+    expect((await f.work.readLedgerForm(key))!.fields['amount'],'1.00');expect(f.forms.writes,writes);
+    await tester.tap(find.byTooltip('Close customer review'));await tester.pumpAndSettle();await result;
+    } finally { await f.dispose(tester); }
+  });
+  testWidgets('AI-SALES02 real controller cancellation after native pending journal prevents next gateway dispatch',(tester)async{
+    final f=_Sales02Fixture();await f.ready(tester);try {
+    final c=f.controller!,p=await f.proposal(tester,'AI-ACT-299',fields:{'invoiceId':f.targetInvoice.id,'amount':'0.01'},entity:f.targetInvoice.id);
+    expect(c.receiveProposal(p),isTrue);final result=c.reviewProposal();await tester.pumpAndSettle();
+    final before=f.gateway.collections;f.journal.holdSave=Completer<void>();f.journal.entered=Completer<void>();final gate=f.journal.holdSave!;
+    await tester.ensureVisible(find.byKey(const Key('collection-confirm')));await tester.tap(find.byKey(const Key('collection-confirm')));await tester.pump();await f.journal.entered!.future;
+    final original=f.work.pendingCustomerCollection!;c.cancelProposal();await tester.pump();gate.complete();await tester.pumpAndSettle();
+    expect(f.gateway.collections,before);expect(f.journal.value!.pending!.operationId,original.operationId);expect(f.work.pendingCustomerCollection!.operationId,original.operationId);
+    await tester.tap(find.byTooltip('Close customer review'));await tester.pumpAndSettle();await result;
+    } finally { await f.dispose(tester); }
+  });
+  for(final kind in ['collection','return','refund']){
+    testWidgets('AI-SALES02 original $kind status uses immutable pending id and admits own known ACK',(tester)async{
+      final f=_Sales02Fixture();await f.ready(tester);try {await f.unknown(kind);await tester.pumpAndSettle();
+      final id=kind=='collection'?'300':kind=='return'?'302':'304';
+      final operation=kind=='collection'?f.work.pendingCustomerCollection!.operationId:kind=='return'?f.work.pendingCustomerReturn!.request.operationId:f.work.pendingCustomerRefund!.operationId;
+      final before=(f.gateway.collections,f.gateway.returns,f.gateway.refunds),result=f.direct(tester,await f.proposal(tester,'AI-ACT-$id',entity:operation));await tester.pumpAndSettle();
+      final text=kind=='collection'?'Check collection status':kind=='return'?'Check return status':'Check refund status';
+      final button=find.text(text);expect(button,findsOneWidget);await tester.ensureVisible(button);await tester.tap(button);await tester.pumpAndSettle();
+      expect((f.gateway.collections,f.gateway.returns,f.gateway.refunds),before);expect(find.textContaining('Your Store or account changed.'),findsNothing);
+      if(kind=='collection')expect(f.work.pendingCustomerCollection,isNull);if(kind=='return')expect(f.work.pendingCustomerReturn,isNull);if(kind=='refund')expect(f.work.pendingCustomerRefund,isNull);
+      await tester.tap(find.byTooltip('Close customer review'));await tester.pumpAndSettle();expect(await result,scope_contract.MoolAssistantReviewResult.returnToOwner);
+      } finally { await f.dispose(tester); }
+    });
+  }
+  testWidgets('AI-SALES02 original feedback report retains unknown attempt and reconciles its own known acknowledgement',(tester)async{
+    final f=_Sales02Fixture();await f.ready(tester);try {
+    final p=await f.proposal(tester,'AI-ACT-388',fields:{'feedbackId':'HOST-SALES02-FEEDBACK','reportText':'Original purchase report'},entity:'HOST-SALES02-FEEDBACK');
+    var result=f.direct(tester,p);await tester.pumpAndSettle();f.feedback.dropAck=true;
+    final send=find.byKey(const Key('work-feedback-send'));await tester.ensureVisible(send);await tester.tap(send);await tester.pumpAndSettle();
+    final original=f.work.existingWorkspaceCustomerFeedback!.pending!;
+    expect(f.feedback.sends,1);expect(f.feedbackStore.value!.operationId,original.operationId);
+    await tester.tap(find.byTooltip('Close customer review'));await tester.pumpAndSettle();await result;
+    result=f.direct(tester,await f.proposal(tester,'AI-ACT-388',fields:{'feedbackId':'HOST-SALES02-FEEDBACK'},entity:'HOST-SALES02-FEEDBACK',suffix:'recover'));
+    await tester.pumpAndSettle();final check=find.byKey(const Key('work-feedback-check-request'));await tester.ensureVisible(check);await tester.tap(check);await tester.pumpAndSettle();
+    expect(f.feedback.sends,1);expect(f.feedback.checks,1);expect(f.feedbackStore.value,isNull);expect(f.work.existingWorkspaceCustomerFeedback!.pending,isNull);
+    expect(find.textContaining('Your Store or account changed.'),findsNothing);
+    await tester.tap(find.byTooltip('Close customer review'));await tester.pumpAndSettle();await result;
+    } finally { await f.dispose(tester); }
+  });
+  testWidgets('AI-SALES02 queued feedback storage retires before a new write while manual original remains recoverable',(tester)async{
+    final storage=_SettingsQueueStorage(),store=SecureStoreFeedbackPendingStore(storage:storage,currentAccount:()=>'HOST-SALES02-QUEUE');
+    const command=sales02_feedback.StoreFeedbackCommand(scope:(account:'HOST-SALES02-QUEUE',store:'STORE'),reviewId:'review',version:'v1',operationId:'original',
+      action:sales02_feedback.StoreFeedbackAction.report,audience:sales02_feedback.StoreFeedbackAudience.moderation,content:'Original report');
+    final original=store.savePending(command);await storage.entered.future;bool current=true;
+    final queued=store.savePendingCurrent(command,current:()=>current);final rejection=expectLater(queued,throwsA(isA<StateError>()));
+    current=false;storage.release.complete();await original;await rejection;
+    expect(storage.writes,1);expect((await store.readPending(command.scope))!.operationId,command.operationId);
+    await expectLater(store.removePendingCurrent(command,current:()=>false),throwsA(isA<StateError>()));expect(storage.writes,1);
+    await store.removePending(command);expect(storage.writes,2);expect(await store.readPending(command.scope),isNull);
+  });
+  for(final id in ['299','301','303','305']){
+    testWidgets('AI-SALES02 ACT$id prepared native final control commits the exact original outcome once',(tester)async{
+      final f=_Sales02Fixture();await f.ready(tester);try {
+      final target=f.targetInvoice.id,credit=f.creditInvoice.id,customer=f.payment(target).customerId;
+      final before=(f.gateway.collections,f.gateway.returns,f.gateway.refunds),saves=f.journal.saveAttempts;
+      final due=f.payment(target).dueMinor,available=f.ledger(credit).invoiceBalance(credit)!.availableCreditMinor;
+      final notes=f.ledger(target).entries.where((row)=>row.invoiceId==target&&row.kind==WorkspaceLedgerEntryKind.creditNote).length;
+      final refunds=f.ledger(credit).entries.where((row)=>row.invoiceId==credit&&row.kind==WorkspaceLedgerEntryKind.refund).length;
+      final fields=<String,Object?>{};String entity=target;
+      if(id=='299')fields.addAll({'invoiceId':target,'amount':'0.01','channel':'cash','reference':'Original cash receipt'});
+      if(id=='301')fields.addAll({'invoiceId':target,'items':{f.product.id:{'quantity':'1','sellable':'0'}},'reason':'Original returned item','reasonCode':WorkspaceCustomerReturn.reasonLabels.keys.first});
+      if(id=='303'){entity=credit;fields.addAll({'invoiceId':credit,'amount':'0.01','sourceCollectionId':f.receipt.id,'reference':'Original refund receipt'});}
+      if(id=='305')fields.addAll({'customerId':customer,'sourceInvoiceId':credit,'targetInvoiceId':target,'amount':'0.01'});
+      final result=f.direct(tester,await f.proposal(tester,'AI-ACT-$id',fields:fields,entity:entity,suffix:'native-positive'));
+      await tester.pumpAndSettle();expect((f.gateway.collections,f.gateway.returns,f.gateway.refunds),before);expect(f.journal.saveAttempts,saves);
+      final confirm=id=='301'?find.text('Confirm return'):find.byKey(Key(id=='299'?'collection-confirm':id=='303'?'refund-confirm':'customer-credit-confirm'));
+      expect(confirm,findsOneWidget);await tester.ensureVisible(confirm);await tester.tap(confirm);await tester.pumpAndSettle();
+      expect(find.textContaining('Your Store or account changed.'),findsNothing);expect(find.byTooltip('Close customer review'),findsNothing);
+      expect(await result,scope_contract.MoolAssistantReviewResult.returnToOwner);
+      expect(f.journal.saveAttempts,greaterThan(saves));
+      expect((f.gateway.collections,f.gateway.returns,f.gateway.refunds),(before.$1+(id=='299'?1:0),before.$2+(id=='301'?1:0),before.$3+(id=='303'?1:0)));
+      if(id=='299'){expect(f.payment(target).dueMinor,due-1);expect(f.work.pendingCustomerCollection,isNull);}
+      if(id=='301'){expect(f.ledger(target).entries.where((row)=>row.invoiceId==target&&row.kind==WorkspaceLedgerEntryKind.creditNote).length,notes+1);expect(f.work.pendingCustomerReturn,isNull);}
+      if(id=='303'){expect(f.ledger(credit).invoiceBalance(credit)!.availableCreditMinor,available-1);expect(f.ledger(credit).entries.where((row)=>row.invoiceId==credit&&row.kind==WorkspaceLedgerEntryKind.refund).length,refunds+1);expect(f.work.pendingCustomerRefund,isNull);}
+      if(id=='305'){expect(f.payment(target).dueMinor,due-1);expect(f.ledger(credit).invoiceBalance(credit)!.availableCreditMinor,available-1);expect(f.ledger(target).entries.any((row)=>row.invoiceId==target&&row.kind==WorkspaceLedgerEntryKind.creditReceived&&row.amountMinor==1),isTrue);}
+      expect(tester.takeException(),isNull);
+      } finally { await f.dispose(tester); }
+    });
+  }
+}
+
+Future<Uint8List> _financialRootAdditionalPhoto(Color color) async {
+  final recorder=ui.PictureRecorder(),canvas=Canvas(recorder);
+  canvas.drawRect(const Rect.fromLTWH(0,0,4,4),Paint()..color=color);
+  final picture=recorder.endRecording();final image=await picture.toImage(4,4);
+  try{return (await image.toByteData(format:ui.ImageByteFormat.png))!.buffer.asUint8List();}
+  finally{image.dispose();picture.dispose();}
+}
+
+// Wait on the actual native copy busy UI while allowing private Windows file
+// futures to progress. A timeout is a test failure, never permission to clean
+// up a directory while an admitted copy writer is still running.
+Future<void> _drainFinancialRootCopyIO(WidgetTester tester,String prefix) async {
+  final owner=find.byKey(Key('$prefix-supporting-copies'),skipOffstage:false);
+  Finder progress()=>find.descendant(of:owner,
+    matching:find.byType(LinearProgressIndicator,skipOffstage:false));
+  await tester.pump();
+  for(var attempt=0;attempt<300&&progress().evaluate().isNotEmpty;attempt++){
+    await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:25)));
+    await tester.pump();
+  }
+  expect(progress(),findsNothing,reason:'Native supporting-copy IO must release its own busy lease before settling or cleanup.');
+  await tester.pump();
+}
+
+Future<void> _captureFinancialRootDiagnostic(WidgetTester tester,String name) async {
+  const folder=String.fromEnvironment('MOOL_OCR_ROOT_DIAGNOSTIC_DIR');
+  if(folder.isEmpty)return;
+  final root=find.byKey(const Key('ocr-financial-root-capture'));
+  expect(root,findsOneWidget);
+  final boundary=tester.renderObject<RenderRepaintBoundary>(root);
+  final image=(await tester.runAsync(()=>boundary.toImage(pixelRatio:1)))!;
+  try{
+    await tester.runAsync(() async {
+      final bytes=await image.toByteData(format:ui.ImageByteFormat.png);
+      final directory=Directory(folder);await directory.create(recursive:true);
+      await File('${directory.path}/$name.png').writeAsBytes(bytes!.buffer.asUint8List(),flush:true);
+    });
+    debugPrintSynchronously('OCR_ROOT_CAPTURE $folder/$name.png');
+  }finally{image.dispose();}
+}
+
+class _FinancialRootAccess extends _ReceivingAssistantAccess {
+  scope_contract.MoolAssistantAccess state=scope_contract.MoolAssistantAccess.active;
+  @override Future<scope_contract.MoolAssistantEntitlement> read(Object account) async =>
+    scope_contract.MoolAssistantEntitlement(accountScope:account,access:state,
+      revision:'HOST-financial-root-${state.name}',validUntil:DateTime.now().add(const Duration(hours:1)));
+  void revoke(){state=scope_contract.MoolAssistantAccess.revoked;notifyListeners();}
+}
+
+
+// Isolated HOST-only strict wire fixture. Uses the actual app/router/native
+// adapter and original Buy reader; no synthetic runtime provider or publication.
+class _Published230Host {
+  _Published230Host(this.channel, {this.fault});
+  final BuyV2OfferClass channel;
+  final String? fault;
+  late _AuthenticatedNativeScopeFixture native;
+  late AuthenticatedWorkspaceCatalogueGateway api;
+  late catalogue_fixture.OwnerTransport transport;
+  final operations = <String>[];
+  Completer<void>? entered, release;
+  late scope_contract.MoolAssistantController controller;
+  final access = _ReceivingAssistantAccess();
+  late scope_contract.MoolAssistantNativeAdapter adapter;
+  late scope_contract.MoolAssistantNativeSnapshot snapshot;
+  late GoRouter actualRouter;
+  late WorkspaceCatalogueItem product;
+  bool controllerCreated = false;
+  int publicReads = 0;
+  String get store => native.work.activeWorkspace!.id;
+  Map<String, dynamic> publicPage() {
+    final data = jsonDecode(jsonEncode(catalogue_fixture.page())) as Map<String,dynamic>;
+    data['storeId']=store; data['listingReadbackVersion']=1;data['listingCoverage']='complete';data['mediaReadbackVersion']=1;
+    data['publicStore']={'id':store,'name':'Host Store','profileId':'retailer-grocery'};
+    final row=catalogue_fixture.row(data);
+    final channels=row['channels'] as List;
+    if(channel!=BuyV2OfferClass.retail)channels.add({...Map<String,dynamic>.from(channels.first as Map),
+      'kind':channel.name,'offerId':'host-trade-offer','priceMinor':25000,'minimumOrder':10});
+    row['listings']=[for(final raw in channels)BuyV2PublicListingIdentity(
+      listingId:'listing-${((raw as Map)['kind']=='retail'?'a':'b')*64}',realm:'production',storeId:store,
+      skuId:'sku-one',canonicalProductId:'canonical-one',verifiedPackId:fault=='pack mismatch'?'pack-other':'pack-one',
+      channel:BuyV2OfferClass.values.singleWhere((c)=>c.name==raw['kind'])).toJson()];
+    if(fault=='pack mismatch')row['verifiedPackId']='pack-other';
+    row['supplierPolicy']={'schemaVersion':1,'realm':'production','storeId':store,'skuId':'sku-one',
+      'observedAt':catalogue_fixture.at.toIso8601String(),'state':'ready','revision':1,'requiresAcceptance':true,
+      'policy':{'id':'host-policy-sku-one','storeId':store,'revision':'policy-v1','title':'Host supplier terms',
+        'body':'HOST source terms','productIds':['sku-one'],'requiresAcceptance':true,
+        'validUntil':catalogue_fixture.at.add(const Duration(hours:1)).toIso8601String()}};
+    return data;
+  }
+  Map<String,dynamic> ownedPage() {
+    final row=jsonDecode(jsonEncode(catalogue_fixture.row(publicPage()))) as Map<String,dynamic>;
+    row.remove('listings');row.remove('supplierPolicy');row['verifiedPackId']='pack-one';
+    for(final c in row['channels'] as List){(c as Map)..remove('revision')..remove('validUntil');}
+    row.addAll({'schemaVersion':1,'storeId':store,'revision':1,'publicListing':true,
+      'provenance':{'entryMethod':product.stockEntry!.method.name,'sourceRecordId':product.stockEntry!.productId}});
+    return {'schemaVersion':1,'realm':'production','storeId':store,'items':[row],'nextCursor':null};
+  }
+  Future<void> ready(WidgetTester tester) async {
+    // Isolated host persistence for the real signed-in Root Buy owner.
+    final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+    SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+    addTearDown(() => SharedPreferencesAsyncPlatform.instance = previousPreferences);
+    transport=catalogue_fixture.OwnerTransport((body)async{
+      final op=body['operation'] as String;operations.add(op);
+      if(op=='listStoreCatalogueSkus')return SocialContentResponse(statusCode:200,body:jsonEncode({'ok':true,'data':ownedPage()}));
+      if(op=='readPublicStoreCatalogue'){
+        publicReads++;
+        if(entered?.isCompleted==false)entered!.complete();
+        if(release!=null)await release!.future;
+        if(fault=='read failure')return const SocialContentResponse(statusCode:503,body:'{}');
+        final data=publicPage();
+        if(fault=='missing')data['items']=[];
+        if(fault=='wrong store')data['storeId']='other-store';
+        if(fault=='wrong channel'){
+          catalogue_fixture.row(data)['channels']=(catalogue_fixture.row(data)['channels'] as List).where((c)=>(c as Map)['kind']!='bulk').toList();
+          catalogue_fixture.row(data)['listings']=(catalogue_fixture.row(data)['listings'] as List).where((c)=>(c as Map)['channel']!='bulk').toList();
+        }
+        return SocialContentResponse(statusCode:200,body:jsonEncode({'ok':true,'data':data}));
+      }
+      // Unknown reads are unavailable; any command is a failure, never mocked success.
+      expect(op, isNot(anyOf('bindReviewedStoreCatalogueSku','submitStoreProduct','publishStoreStockSnapshot')));
+      return const SocialContentResponse(statusCode:503,body:'{}');
+    });
+    api=AuthenticatedWorkspaceCatalogueGateway(endpoint:Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials:catalogue_fixture.Credentials(),transport:transport,now:()=>catalogue_fixture.at);
+    native=_AuthenticatedNativeScopeFixture(makeWork:(contact,purchase,inventory,trading)=>WorkSession(
+      gateway:const UnavailableWorkGateway(),catalogueGateway:api,contactDraftStore:contact,purchaseEntryStore:purchase,
+      inventoryStore:inventory,tradingPreferencesStoreFactory:(_)=>trading,catalogueReference:workspaceMasterCatalogue));
+    await native.ready();
+    expect(await native.work.loadWorkspaceInventory(retry:true),isTrue);
+    product=catalogue_fixture.listingItem().copyWith(publicListing:true,
+      wholesaleOffer:channel==BuyV2OfferClass.retail?null:WorkspaceWholesaleOffer(priceRupees:250,minimumPacks:10,
+        enabled:true,saleType:channel==BuyV2OfferClass.bulk?BuyV2WholesaleSaleType.bulk:BuyV2WholesaleSaleType.wholesale));
+    // Original manual entry authors the exact current Stock provenance.
+    expect(native.work.addOrUpdateWorkspaceProduct(product,stockEntryMethod:WorkspaceStockEntryMethod.manual),isTrue);
+    expect(await native.work.workspaceInventorySaved,isTrue);
+    product=native.work.workspaceCatalogueItems.singleWhere((p)=>p.id==product.id);
+    expect(product.stockEntry?.method,WorkspaceStockEntryMethod.manual);
+    expect(product.stockEntry?.valid,isTrue);
+    expect(product.stockEntry?.productId,product.id);
+    expect(product.stockEntry?.quantity,product.stock);
+    await tester.pumpWidget(MoolSocialApp(session:native.journey,workSession:native.work,
+      initialLocation:'/app/work/workspace/dashboard'));
+    await tester.pumpAndSettle();
+    actualRouter=tester.widget<MaterialApp>(find.byType(MaterialApp)).routerConfig! as GoRouter;
+    final ownerControl=find.text('Store overview');
+    expect(ownerControl.hitTestable(),findsOneWidget);
+    final ownerContext=tester.element(ownerControl);
+    final scope=ownerContext.getInheritedWidgetOfExactType<MoolAssistantNativeScope>()!;
+    final adapters=scope.readAdapters(ownerContext).toList(growable:false);
+    adapter=adapters.singleWhere((a)=>a.actionId=='AI-ACT-230');
+    snapshot=(await adapter.snapshot(native.readContext(),product.id))!;
+    controller=scope_contract.MoolAssistantController(currentContext:native.readContext,
+      contextChanges:Listenable.merge([native.journey,native.work,native.mode]),entitlements:access,nativeAdapters:adapters);
+    controllerCreated=true;await controller.refreshAccess();controller.setDraft('Show the real published product');
+  }
+  scope_contract.MoolAssistantProposal proposal()=>scope_contract.MoolAssistantProposal(id:'HOST-published-230',
+    actionId:'AI-ACT-230',binding:controller.context.binding,requestRevision:controller.requestRevision,
+    entitlementRevision:controller.entitlementRevision!,sourceRevision:snapshot.sourceRevision,
+    validUntil:DateTime.now().add(const Duration(minutes:5)),title:'View published product',summary:'Open its current public listing.',
+    entityId:product.id,fields:{...StoreProductInitialData.referenceFields(product),'channel':channel.name});
+  Future<void> openComposer(WidgetTester tester)async{
+    final ownerControl=find.text('Store overview');
+    expect(ownerControl.hitTestable(),findsOneWidget);
+    final ownerContext=tester.element(ownerControl);
+    final root=Navigator.of(ownerContext,rootNavigator:true);
+    expect(ownerContext.getInheritedWidgetOfExactType<MoolAssistantHost>(),isNotNull);
+    final route=MaterialPageRoute<void>(settings:const RouteSettings(name:'mool-assistant'),builder:(_)=>MoolAssistantPage(controller:controller));
+    if(adapter is MoolAssistantRouteBoundNativeAdapter)(adapter as MoolAssistantRouteBoundNativeAdapter).bindAssistantRoute(route,root);
+    unawaited(root.push<void>(route));
+    await tester.pumpAndSettle();expect(controller.receiveProposal(proposal()),isTrue);await tester.pumpAndSettle();
+  }
+  Future<void> tapReview(WidgetTester tester,{bool settle=true})async{
+    final button=find.descendant(of:find.byKey(const ValueKey('assistant-proposal-HOST-published-230')),
+      matching:find.widgetWithText(FilledButton,'Review'));
+    await tester.ensureVisible(button);await tester.pumpAndSettle();await tester.tap(button);
+    if(settle)await tester.pumpAndSettle();else await tester.pump();
+  }
+  String get saved=>jsonEncode([for(final p in native.work.workspaceCatalogueItems)p.toInventoryJson()]);
+  Future<void> dispose(WidgetTester tester)async{
+    if(release?.isCompleted==false)release!.complete();
+    await tester.pumpWidget(const SizedBox.shrink());await tester.pump();
+    if(controllerCreated)controller.dispose();access.dispose();await native.dispose();
+  }
+}
+
 void main() {
+
+  for(final channel in BuyV2OfferClass.values){
+    testWidgets('FE-PRODUCT-01 ACT230 ${channel.name} native Review opens original authenticated public reader',(tester)async{
+      final h=_Published230Host(channel);try{await h.ready(tester);final before=h.saved,writes=h.native.writes;
+        await h.openComposer(tester);await h.tapReview(tester);
+        if(h.actualRouter.state.uri.path!='/app/buy')debugPrint('HOST230REVIEW '+jsonEncode({'operations':h.operations,'publicReads':h.publicReads,
+          'busy':h.controller.reviewBusy,'notice':h.controller.proposalNotice}));
+        expect(h.actualRouter.state.uri.path,'/app/buy');
+        expect(h.actualRouter.state.uri.queryParameters['workspaceProduct'],h.product.id);
+        final buy=tester.widget<BuyV2Screen>(find.byType(BuyV2Screen).last).session;
+        expect(buy.selectedProduct, isNotNull);expect(buy.selectedProduct!.sourceSkuId,h.product.id);
+        expect(buy.selectedProduct!.storeId,h.store);expect(buy.selectedProduct!.offerClass,channel);
+        expect(buy.selectedProduct!.publicListingIdentity!.verifiedPackId,'pack-one');
+        expect(buy.selectedProduct!.canonicalId,'canonical-one');
+        expect(find.byType(SavedStoreProductCustomerPreview),findsNothing);
+        expect(h.publicReads,greaterThanOrEqualTo(2),reason:'Original router independently re-reads publication.');
+        expect(h.saved,before);expect(h.native.writes,writes);
+        expect(h.operations.every((op)=>const {'listStoreCatalogueSkus','readPublicStoreCatalogue'}.contains(op)),isTrue);
+        h.actualRouter.pop();await tester.pumpAndSettle();expect(tester.takeException(),isNull);
+      }finally{await h.dispose(tester);}});
+  }
+  for(final fault in ['missing','read failure','wrong store','pack mismatch','wrong channel']){
+    testWidgets('FE-PRODUCT-01 ACT230 $fault never substitutes local draft or opens private preview',(tester)async{
+      final h=_Published230Host(BuyV2OfferClass.bulk,fault:fault);try{await h.ready(tester);final before=h.saved,writes=h.native.writes;
+        await h.openComposer(tester);await h.tapReview(tester);
+        expect(h.actualRouter.state.uri.path,'/app/work/workspace/dashboard');
+        expect(find.byType(SavedStoreProductCustomerPreview),findsNothing);expect(find.byType(BuyV2Screen),findsNothing);
+        expect(h.saved,before);expect(h.native.writes,writes);expect(tester.takeException(),isNull);
+      }finally{await h.dispose(tester);}});
+  }
+  for(final reason in ['request','actor','Store','SKU','foreign cover']){
+    testWidgets('FE-PRODUCT-01 ACT230 held public read retires on $reason without navigation or writes',(tester)async{
+      final h=_Published230Host(BuyV2OfferClass.retail);try{await h.ready(tester);h.entered=Completer<void>();h.release=Completer<void>();
+        await h.openComposer(tester);await h.tapReview(tester,settle:false);
+        for(var i=0;i<20&&!h.entered!.isCompleted;i++)await tester.pump(const Duration(milliseconds:20));
+        expect(h.entered!.isCompleted,isTrue);
+        if(reason=='foreign cover'){unawaited(h.actualRouter.routerDelegate.navigatorKey.currentState!.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST unrelated modal')))));await tester.pumpAndSettle();}
+        if(reason=='request')h.controller.setDraft('A different request');
+        if(reason=='actor'){h.native.principal.identity=null;h.native.principal.changes.add(null);}
+        if(reason=='Store')h.native.work.activeWorkspace=const WorkWorkspace(id:'other-store',name:'Other Store',profileLabel:'Grocery',profileId:'retailer-grocery',area:'Jaipur',verified:true);
+        if(reason=='SKU')h.native.work.workspaceCatalogueItems[0]=h.product.copyWith(title:'Changed original product');
+        final before=h.saved,writes=h.native.writes;h.release!.complete();await tester.pumpAndSettle();
+        expect(h.actualRouter.state.uri.path,isNot('/app/buy'));expect(find.byType(SavedStoreProductCustomerPreview),findsNothing);
+        expect(h.saved,before);expect(h.native.writes,writes);expect(tester.takeException(),isNull);
+      }finally{await h.dispose(tester);}});
+  }
+  testWidgets('FE-PRODUCT-01 ACT230 validates closed original refs/channel and rejects stale local source',(tester)async{
+    final h=_Published230Host(BuyV2OfferClass.retail);try{await h.ready(tester);final p=h.proposal();
+      expect(await h.adapter.snapshot(const scope_contract.MoolAssistantContext(accountScope:null,authenticationRevision:null),h.product.id),isNull);
+      expect(h.adapter.validateFields({...p.fields,'channel':'automatic'}),isNotNull);
+      expect(h.adapter.validateFields({...p.fields,'url':'https://invented.example/'}),isNotNull);
+      expect(h.adapter.validateFields({...p.fields}..remove('sourcePack')),isNotNull);
+      h.native.work.workspaceCatalogueItems[0]=h.product.copyWith(title:'Changed source');
+      final before=h.saved;
+      expect(await h.adapter.openReview(p,()=>true),scope_contract.MoolAssistantReviewResult.stale);
+      expect(h.publicReads,0);expect(h.saved,before);
+    }finally{await h.dispose(tester);}});
+
+  registerOrder02DashboardNativeTests();
+  registerSales02NativeTests();
+  registerReceivingRemainingNativeTests();
+  registerReceivingRemainingFamilyTests();
+  registerReceivingRemainingEvidenceTests();
+  registerReceivingRemainingTaxTests();
+  registerReceivingRemainingContinuationTests();
+  registerReceivingRetentionBoundaryTests();
+  registerReceiving251ReadOnlyTests();
+  _settlementNativeTests();
+  _work02NativeTests();
+  for (final row in <(String, Map<String, Object?>)>[
+    ('AI-ACT-312', {}), ('AI-ACT-313', {'periodDays': 7}),
+    ('AI-ACT-314', {'periodDays': 30}), ('AI-ACT-411', {'sectionId': 'money', 'periodDays': 7}),
+  ]) {
+    testWidgets('AI-REPORT ${row.$1} actual analytics owner prepares without inventory/ledger recovery or export', (tester) async {
+      late _ReportReadTrackingSession tracked;
+      final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, _) => tracked =
+        _ReportReadTrackingSession(contactDraftStore: contact, purchaseEntryStore: purchase,
+          inventoryStore: inventory, catalogueReference: workspaceMasterCatalogue));
+      await f.ready(); addTearDown(f.dispose);
+      await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+      final reads = tracked.reads, writes = f.writes;
+      final original = FilePickerPlatform.instance, picker = _PurchaseOriginalSaveFixture();
+      FilePickerPlatform.instance = picker; addTearDown(() => FilePickerPlatform.instance = original);
+      final proposal = await stockAssistantProposal(tester, f, row.$1, fields: row.$2);
+      expect(tracked.reads, reads); expect(f.writes, writes);
+      final adapter = f.adapters(tester).singleWhere((value) => value.actionId == row.$1);
+      final opened = adapter.openReview(proposal, () => true); await tester.pumpAndSettle();
+      final dynamic analytics = tester.widget(find.byWidgetPredicate((widget) => widget.runtimeType.toString() == '_StoreAnalyticsPresentation').last);
+      if (row.$2['periodDays'] != null) expect(analytics.periodDays, row.$2['periodDays']);
+      if (row.$2['sectionId'] != null) expect(find.byKey(Key('store-analytics-detail-${row.$2['sectionId']}')), findsOneWidget);
+      expect(tracked.reads, reads); expect(f.writes, writes); expect(picker.calls, 0);
+      await tester.tap(find.byTooltip('Close reports')); await tester.pumpAndSettle(); await opened;
+      expect(picker.calls, 0); expect(f.writes, writes);
+      expect(tracked.commodityAdmissions, greaterThan(reads[3]), reason: 'Closing the report returns the original visible manual board; its native refresh remains active.');
+    });
+  }
+  testWidgets('AI-REPORT owner-aware notification seam retires a covered native review without export or draft reset', (tester) async {
+    final f = _AuthenticatedNativeScopeFixture(); await f.ready(); addTearDown(f.dispose);
+    await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+    final proposal = await stockAssistantProposal(tester, f, 'AI-ACT-313', fields: {'periodDays': 7});
+    final adapter = f.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-313') as scope_contract.MoolAssistantOwnerAwareNativeAdapter;
+    var current = true; final changes = ChangeNotifier(); addTearDown(changes.dispose);
+    final original = FilePickerPlatform.instance, picker = _PurchaseOriginalSaveFixture();
+    FilePickerPlatform.instance = picker; addTearDown(() => FilePickerPlatform.instance = original);
+    final opened = adapter.openOwnedReview(proposal, isCurrent: () => current, ownerChanges: changes);
+    await tester.pumpAndSettle();
+    final export = tester.widget<IconButton>(find.byKey(const Key('store-analytics-export')).last).onPressed!;
+    current = false; changes.notifyListeners(); await tester.pumpAndSettle();
+    expect(find.text('Your Store or account changed. Your entries are kept. Reopen this task.'), findsOneWidget);
+    export(); await tester.pumpAndSettle(); expect(picker.calls, 0);
+    await tester.tap(find.byTooltip('Close reports')); await tester.pumpAndSettle();
+    expect(await opened, scope_contract.MoolAssistantReviewResult.stale);
+  });
+  testWidgets('AI-REPORT notified foreign source then restoration cannot revive captured native export', (tester) async {
+    final f = _AuthenticatedNativeScopeFixture(); await f.ready(); addTearDown(f.dispose);
+    await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+    final proposal = await stockAssistantProposal(tester, f, 'AI-ACT-314');
+    final adapter = f.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-314');
+    final original = FilePickerPlatform.instance, picker = _PurchaseOriginalSaveFixture();
+    FilePickerPlatform.instance = picker; addTearDown(() => FilePickerPlatform.instance = original);
+    final opened = adapter.openReview(proposal, () => true); await tester.pumpAndSettle();
+    final export = tester.widget<IconButton>(find.byKey(const Key('store-analytics-export')).last).onPressed!;
+    final originalInvoices = f.work.workspaceInvoices.toList();
+    f.work.workspaceInvoices.add(WorkspaceCustomerInvoice(id: 'HOST-foreign', orderId: 'HOST-other', customer: 'અન્ય', items: 'original', amount: 1, payment: 'Cash', issuedAt: DateTime.now()));
+    f.work.notifyListeners();
+    f.work.workspaceInvoices..clear()..addAll(originalInvoices); f.work.notifyListeners();
+    await tester.pumpAndSettle(); export(); await tester.pumpAndSettle(); expect(picker.calls, 0);
+    await tester.tap(find.byTooltip('Close reports')); await tester.pumpAndSettle(); expect(await opened, scope_contract.MoolAssistantReviewResult.stale);
+  });
+  testWidgets('AI-REPORT exact unsupported Store-link source stays unavailable without invented URL', (tester) async {
+    final f = _AuthenticatedNativeScopeFixture(); await f.ready(); addTearDown(f.dispose);
+    await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+    final adapter = f.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-412');
+    expect(await adapter.snapshot(f.readContext(), null), isNull);
+    expect(adapter.allowedFields, isEmpty);
+  });
+
+  for (final action in ['AI-ACT-315', 'AI-ACT-409', 'AI-ACT-410']) {
+    testWidgets('AI-REPORT $action original statement owner opens honestly without source recovery or native effects', (tester) async {
+      late _ReportReadTrackingSession tracked;
+      final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, _) => tracked =
+        _ReportReadTrackingSession(contactDraftStore: contact, purchaseEntryStore: purchase,
+          inventoryStore: inventory, catalogueReference: workspaceMasterCatalogue));
+      await f.ready(); addTearDown(f.dispose);
+      await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+      final reads = tracked.reads, writes = f.writes;
+      final original = FilePickerPlatform.instance, picker = _PurchaseOriginalSaveFixture();
+      FilePickerPlatform.instance = picker; addTearDown(() => FilePickerPlatform.instance = original);
+      final proposal = await stockAssistantProposal(tester, f, action);
+      final adapter = f.adapters(tester).singleWhere((value) => value.actionId == action);
+      final opened = adapter.openReview(proposal, () => true); await tester.pumpAndSettle();
+      expect(find.byTooltip('Close reports'), findsOneWidget);
+      if (action != 'AI-ACT-315') expect(find.byType(StoreCustomerReportsPanel), findsOneWidget);
+      expect(tracked.reads, reads); expect(f.writes, writes); expect(picker.calls, 0);
+      if (find.byTooltip('Close statement').evaluate().isNotEmpty) { await tester.tap(find.byTooltip('Close statement')); await tester.pumpAndSettle(); }
+      await tester.tap(find.byTooltip('Close reports')); await tester.pumpAndSettle(); await opened;
+    });
+  }
+  testWidgets('AI-REPORT compact enlarged native period/detail review has working Close and no hidden custom range', (tester) async {
+    tester.view.physicalSize = const Size(320, 720); tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+    addTearDown(() { tester.view.resetPhysicalSize(); tester.view.resetDevicePixelRatio(); tester.platformDispatcher.clearTextScaleFactorTestValue(); });
+    final f = _AuthenticatedNativeScopeFixture(); await f.ready(); addTearDown(f.dispose);
+    await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+    final proposal = await stockAssistantProposal(tester, f, 'AI-ACT-313', fields: {'periodDays': 30});
+    final adapter = f.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-313');
+    final opened = adapter.openReview(proposal, () => true); await tester.pumpAndSettle();
+    expect(find.text('Last 30 days'), findsWidgets); expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('store-analytics-period-picker')).last); await tester.pumpAndSettle();
+    expect(find.text('Today'), findsWidgets); expect(find.text('Last 7 days'), findsWidgets); expect(find.text('Custom dates'), findsNothing);
+    await tester.tap(find.text('Last 7 days').last); await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byTooltip('Close reports')); await tester.pumpAndSettle(); await opened;
+  });
+
+  testWidgets('AI-REPORT sales custom range fills the original register and opens its native statement without posting', (tester) async {
+    final f = _AuthenticatedNativeScopeFixture(); await f.ready(); addTearDown(f.dispose);
+    await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+    final nativeScope = f.work.workspaceStockHistoryScope()!;
+    final finance = WorkspaceFinanceSnapshot(accountScope: nativeScope.accountScope, workspaceId: nativeScope.workspaceId,
+      revision: 1, asOf: DateTime.now(), salesTodayMinor: 0, duesMinor: 0, availableMinor: 0,
+      heldMinor: 0, requestedMinor: 0, paidOutMinor: 0, feesMinor: 0, deliveryAdjustmentsMinor: 0,
+      refundsMinor: 0, taxWithheldMinor: 0, payments: const [], payouts: const [], historyComplete: false);
+    final checkpoint = _LedgerCheckpointFixtureStore();
+    expect(f.work.applyWorkspaceFinance(finance), isTrue);
+    expect(f.work.bindCustomerCollectionGateway(accountScope: nativeScope.accountScope, storeId: nativeScope.workspaceId,
+      adapter: StoreReviewCustomerCollectionGateway(finance), checkpointStore: checkpoint), isTrue);
+    expect(await f.work.recoverCustomerLedger(), isTrue);
+    expect(f.work.workspaceInvoiceHistoryLoaded, isTrue);
+    expect(checkpoint.saveAttempts, 0);
+    // This isolated host register is the complete supplied native source, not a search subset.
+    f.work.workspaceInvoices..clear()..add(WorkspaceCustomerInvoice(id: 'HOST-report-invoice', orderId: 'HOST-report-order',
+      customer: 'ગ્રાહક', items: 'HOST original bill', amount: 12, payment: 'Cash', issuedAt: DateTime(2026, 9, 5)));
+    f.work.notifyListeners(); await tester.pumpAndSettle();
+    final source = f.work.workspaceStockHistoryScope()!;
+    expect(() => StoreSalesStatement(accountId: source.accountScope, storeId: source.workspaceId,
+      storeName: f.work.activeWorkspace!.name, from: DateTime(2026, 9, 1), until: DateTime(2026, 9, 11),
+      generatedAt: DateTime.now(), invoices: f.work.workspaceInvoices), returnsNormally);
+    final writes = f.writes;
+    final proposal = await stockAssistantProposal(tester, f, 'AI-ACT-315', fields: {
+      'statementKind': 'sales', 'period': 'Custom range', 'from': '2026-09-01', 'to': '2026-09-10'});
+    final adapter = f.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-315');
+    final opened = adapter.openReview(proposal, () => true); await tester.pumpAndSettle();
+    expect(find.byType(StoreSalesStatementPanel), findsOneWidget, reason: tester.widgetList<Text>(find.byType(Text)).map((value) => value.data).whereType<String>().take(25).join(' | '));
+    final panel = tester.widget<StoreSalesStatementPanel>(find.byType(StoreSalesStatementPanel));
+    expect(panel.statement.from, DateTime(2026, 9, 1)); expect(panel.statement.until, DateTime(2026, 9, 11));
+    expect(f.writes, writes); expect(checkpoint.saveAttempts, 0);
+    await tester.tap(find.byTooltip('Close statement')); await tester.pumpAndSettle();
+    final dynamic register = tester.widget(find.byWidgetPredicate((value) => value.runtimeType.toString() == '_StoreStatementSurface').last);
+    expect(register.initialReport.fields['period'], 'Custom range');
+    await tester.tap(find.byTooltip('Close reports')); await tester.pumpAndSettle(); await opened;
+  });
+
+  testWidgets('AI-REPORT prepared analytics performs no autonomous commodity admission or PageStorage write across timers lifecycle and retirement', (tester) async {
+    late _ReportReadTrackingSession tracked;
+    final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, _) => tracked =
+      _ReportReadTrackingSession(contactDraftStore: contact, purchaseEntryStore: purchase,
+        inventoryStore: inventory, catalogueReference: workspaceMasterCatalogue));
+    await f.ready(); addTearDown(f.dispose);
+    final mirror = ValueNotifier<Widget?>(null); addTearDown(mirror.dispose);
+    final bucket = _ReportCountingPageStorage();
+    await tester.pumpWidget(_ReportLifecycleHarness(app: f.app, mirror: mirror, bucket: bucket)); await tester.pumpAndSettle();
+    // Remove the manual dashboard board so its legitimate clocks cannot be mistaken for the prepared owner.
+    await tester.tap(find.byKey(const Key('work-store-orders'))); await tester.pumpAndSettle();
+    final proposal = await stockAssistantProposal(tester, f, 'AI-ACT-313', fields: {'periodDays': 7});
+    final adapter = f.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-313') as scope_contract.MoolAssistantOwnerAwareNativeAdapter;
+    var current = true; final changes = ChangeNotifier(); addTearDown(changes.dispose);
+    final opened = adapter.openOwnedReview(proposal, isCurrent: () => current, ownerChanges: changes);
+    await tester.pumpAndSettle();
+    final board = find.byWidgetPredicate((value) => value.runtimeType.toString() == '_StoreOperatingBoard').last;
+    // Mount this same admitted native widget through a normal framework rebuild.
+    // The original app/owner remains mounted; no provider or ownership predicate is replaced.
+    mirror.value = tester.widget<Widget>(board);
+    await tester.pumpAndSettle();
+    var writes = bucket.writes;
+    final admissions = tracked.commodityAdmissions;
+    await tester.pump(const Duration(seconds: 31));
+    expect(tracked.commodityAdmissions, admissions); expect(bucket.writes, writes);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(tracked.commodityAdmissions, admissions); expect(bucket.writes, writes);
+    final now = DateTime.now();
+    final beyondScheduledMidnight = DateTime(now.year, now.month, now.day + 1).difference(now) + const Duration(minutes: 1);
+    await tester.pump(beyondScheduledMidnight);
+    expect(tracked.commodityAdmissions, admissions); expect(bucket.writes, writes);
+    // The original native period tap remains the one admitted period persistence path.
+    await tester.tap(find.byKey(const Key('store-analytics-period-picker')).last); await tester.pumpAndSettle();
+    await tester.tap(find.text('Last 30 days').last); await tester.pumpAndSettle();
+    expect(bucket.writes, greaterThan(writes)); writes = bucket.writes;
+    expect(tracked.commodityAdmissions, admissions);
+    current = false; changes.notifyListeners(); await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 61));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(tracked.commodityAdmissions, admissions); expect(bucket.writes, writes);
+    mirror.value = null; await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Close reports')); await tester.pumpAndSettle();
+    expect(await opened, scope_contract.MoolAssistantReviewResult.stale);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('AI-REPORT manual dashboard keeps original commodity clock and resume period persistence', (tester) async {
+    late _ReportReadTrackingSession tracked;
+    final bucket = _ReportCountingPageStorage();
+    final f = _AuthenticatedNativeScopeFixture(reportStorage: bucket, makeWork: (contact, purchase, inventory, _) => tracked =
+      _ReportReadTrackingSession(contactDraftStore: contact, purchaseEntryStore: purchase,
+        inventoryStore: inventory, catalogueReference: workspaceMasterCatalogue));
+    await f.ready(); addTearDown(f.dispose);
+    await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+    final admissions = tracked.commodityAdmissions;
+    await tester.pump(const Duration(seconds: 31)); await tester.pumpAndSettle();
+    expect(tracked.commodityAdmissions, greaterThan(admissions));
+    final writes = bucket.writes;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle(); expect(bucket.writes, greaterThan(writes));
+    await tester.pumpWidget(const SizedBox());
+  });
+  registerSettingsReviewRegressionTests();
+// Insert inside main() in apps/mobile/test/work_workspace_layout_safety_test.dart.
+// Existing imports and _Lf20TradingFixtureStore/_ContactDraftFixtureStore suffice.
+// Tests use public native form hooks; production authorization is unchanged.
+
+test('ACT219 accepts exact native facts and rejects malformed defaults', () {
+  final supplied = StoreProductDefaultsInitialData.fromFields({
+    'stockMode': 'availabilityOnly',
+    'lowStockThreshold': '00017',
+    'customerListingRequested': false,
+  });
+  expect(supplied.fields['lowStockThreshold'], '00017');
+  expect(() => supplied.fields['stockMode'] = 'exactQuantity', throwsUnsupportedError);
+  for (final fields in <Map<String, Object?>>[
+    {}, {'stock': '7'}, {'stockMode': 'automatic'},
+    {'lowStockThreshold': '١٧'}, {'lowStockThreshold': '-1'},
+    {'lowStockThreshold': '1000000000'}, {'lowStockThreshold': 17},
+    {'customerListingRequested': 'false'},
+  ]) {
+    expect(() => StoreProductDefaultsInitialData.fromFields(fields), throwsFormatException);
+  }
+});
+
+for (final readOnly in [false, true]) {
+  testWidgets('ACT218/219 native defaults readOnly=$readOnly never save on opening', (tester) async {
+    final storage = _Lf20TradingFixtureStore();
+    final work = WorkSession(gateway: ReviewWorkGateway(),
+      contactDraftStore: _ContactDraftFixtureStore(), tradingPreferencesStoreFactory: (_) => storage)
+      ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+    addTearDown(work.dispose);
+    final id = work.activeWorkspace!.id;
+    await work.loadWorkspaceProductDefaults(expectedStoreId: id);
+    final before = work.workspaceProductDefaults.toJson();
+    final persisted = storage.value;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
+      child: StoreSettingsStyle(child: StoreProductDefaultsSection(session: work,
+        initiallyExpanded: true, readOnly: readOnly,
+        initialData: readOnly ? null : StoreProductDefaultsInitialData.fromFields({
+          'stockMode': 'availabilityOnly', 'lowStockThreshold': '00017',
+          'customerListingRequested': true,
+        }), reviewOwnerCurrent: () => true, prefillCurrent: () => true))))));
+    await tester.pumpAndSettle();
+    final low = find.byKey(const Key('work-default-low-stock'));
+    final count = tester.widget<Switch>(find.byKey(const Key('work-default-stock-count')));
+    final listing = tester.widget<Switch>(find.byKey(const Key('work-default-customer-listing')));
+    expect(count.value, readOnly ? before['stockMode'] == 'exactQuantity' : false);
+    expect(listing.value, readOnly ? before['customerListingRequested'] : true);
+    expect(tester.widget<TextField>(low).controller!.text,
+      readOnly ? '${before['lowStockThreshold']}' : '00017');
+    expect(work.workspaceProductDefaults.toJson(), before);
+    expect(storage.value, persisted);
+    final save = find.byKey(const Key('work-defaults-save'));
+    if (readOnly) {
+      expect(count.onChanged, isNull);
+      expect(listing.onChanged, isNull);
+      expect(tester.widget<TextField>(low).onSubmitted, isNull);
+      expect(tester.widget<FilledButton>(save).onPressed, isNull);
+    } else {
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(work.workspaceProductDefaults.stockMode, WorkspaceStockMode.availabilityOnly);
+      expect(work.workspaceProductDefaults.lowStockThreshold, 17);
+      expect(work.workspaceProductDefaults.customerListingRequested, isTrue);
+      expect(work.workspaceProductDefaultsSaved, isTrue);
+    }
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+}
+
+testWidgets('ACT219 changed defaults decline Save while retaining supplied entries', (tester) async {
+  final work = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: _ContactDraftFixtureStore())
+    ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+  addTearDown(work.dispose);
+  await work.loadWorkspaceProductDefaults(expectedStoreId: work.activeWorkspace!.id);
+  await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
+    child: StoreSettingsStyle(child: StoreProductDefaultsSection(session: work,
+      initiallyExpanded: true, initialData: StoreProductDefaultsInitialData.fromFields({'lowStockThreshold': '17'}),
+      reviewOwnerCurrent: () => true, prefillCurrent: () => true))))));
+  await tester.pumpAndSettle();
+  expect(work.saveWorkspaceProductDefaults(const WorkspaceProductDefaults(lowStockThreshold: 23),
+    expectedStoreId: work.activeWorkspace!.id,
+    expectedNavigationRevision: work.navigationScopeRevision), isTrue);
+  final save = find.byKey(const Key('work-defaults-save'));
+  await tester.ensureVisible(save);
+  await tester.tap(save);
+  await tester.pumpAndSettle();
+  expect(work.workspaceProductDefaults.lowStockThreshold, 23);
+  expect(tester.widget<TextField>(find.byKey(const Key('work-default-low-stock'))).controller!.text, '17');
+  expect(find.textContaining('Saved defaults changed.'), findsOneWidget);
+  await tester.pumpWidget(const SizedBox.shrink());
+});
+
+testWidgets('ACT219 cannot replace an already dirty original defaults editor', (tester) async {
+  final work = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: _ContactDraftFixtureStore())
+    ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+  addTearDown(work.dispose);
+  await work.loadWorkspaceProductDefaults(expectedStoreId: work.activeWorkspace!.id);
+  late BuildContext owner;
+  await tester.pumpWidget(MaterialApp(home: Scaffold(body: Builder(builder: (context) {
+    owner = context;
+    return SingleChildScrollView(child: StoreSettingsStyle(child: StoreProductDefaultsSection(
+      session: work, initiallyExpanded: true)));
+  }))));
+  await tester.pumpAndSettle();
+  final low = find.byKey(const Key('work-default-low-stock'));
+  await tester.ensureVisible(low);
+  await tester.enterText(low, '29');
+  expect(await showStoreProductDefaultsReview(owner, work, readOnly: false,
+    initialData: StoreProductDefaultsInitialData.fromFields({'lowStockThreshold': '17'}),
+    isCurrent: () => true, ownerCurrent: () => true), MoolAssistantReviewResult.stale);
+  expect(tester.widget<TextField>(low).controller!.text, '29');
+  expect(find.text('Review product defaults'), findsNothing);
+  expect(work.workspaceProductDefaults.lowStockThreshold, isNot(29));
+  await tester.pumpWidget(const SizedBox.shrink());
+});
+
+// Actual admitted authenticated Store fixture / original native route. No
+// synthetic owner predicate: changes retire the real trusted source binding.
+for (final change in ['Store', 'account']) {
+  testWidgets('ACT219 route keeps dirty entries and hides them after real $change retirement', (tester) async {
+    final f = _AuthenticatedNativeScopeFixture();
+    await f.ready();
+    try {
+      await tester.pumpWidget(f.app);
+      await tester.pumpAndSettle();
+      final context = f.readContext();
+      final adapter = f.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-219');
+      final snapshot = (await adapter.snapshot(context, null))!;
+      final writes = f.trading.saves;
+      final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-default-route-$change',
+        actionId: adapter.actionId, binding: context.binding, requestRevision: 0,
+        entitlementRevision: 'HOST-native-owner-only', sourceRevision: snapshot.sourceRevision,
+        validUntil: DateTime.now().add(const Duration(minutes: 5)), title: 'Review defaults',
+        summary: 'Use the supplied native count.', fields: {'lowStockThreshold': '17'});
+      final result = adapter.openReview(proposal, () => true);
+      await tester.pumpAndSettle();
+      final low = find.byKey(const Key('work-default-low-stock'));
+      expect(low, findsOneWidget);
+      final originalController = tester.widget<TextField>(low).controller!;
+      expect(originalController.text, '17');
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.text('Discard default changes?'), findsOneWidget);
+      await tester.tap(find.text('Keep editing'));
+      await tester.pumpAndSettle();
+      expect(originalController.text, '17');
+      expect(f.trading.saves, writes);
+      if (change == 'Store') {
+        f.work.activeWorkspace = null;
+        f.work.notifyListeners();
+      } else {
+        f.principal.identity = null;
+        f.principal.changes.add(null);
+      }
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Close this review and reopen Product controls.'), findsOneWidget);
+      expect(find.byKey(const Key('work-default-low-stock')), findsNothing);
+      expect(find.byKey(const Key('work-defaults-save')), findsNothing);
+      expect(originalController.text, '17', reason: 'Retirement hides rather than silently discards local entries.');
+      expect(f.trading.saves, writes);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(await result, MoolAssistantReviewResult.stale);
+      expect(find.text('Discard default changes?'), findsNothing);
+      expect(f.trading.saves, writes);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await f.dispose();
+    }
+  });
+}
+  registerAct228NativeSelectedImportTests();
+  registerOfferNativeTests();
+  registerOrder273NativeTests();
+  registerOrderEffectNativeTests();
+  registerOrder276NativeTests();
+  registerOrderIssueNativeTests();
+  registerOrderPhysicalNativeTests();
+  registerOrderPackingNativeTests();
+  registerOrderLegacyEffectNativeTests();
+  registerOrder276ExtraNativeTests();
+  registerOrderFollowupNativeTests();
+  registerOrderIssueNestedNativeTests();
+  registerRestock234NativeTests();
+  registerSales01NativeTests();
+  registerReceivingNativeAssistantTests();
+  registerAuthenticatedNativeScopeTests();
+  registerAssistantStockNativeTests();
+  registerAppliedProductColdSourceTests();
+  registerNativeSupplierOwnerCallbackTests();
+  registerSupplierAccountOneNativeTests();
+  registerNativeSupplierMoneyOwnerRetirementTests();
+  registerPostInventoryListingConsentTests();
   group('PAYMENTCOPY private input copies', () {
     for (final source in WorkspaceSupplierMoneySourceKind.values) {
       test('ALLOCATIONCOPY exact ${source.name} input copies freeze and archive', () async {
@@ -9616,8 +15302,13 @@ void main() {
       openStoreHeaderAction(tester, 'work-dashboard-alerts');
 
   Future<void> openStoreTools(WidgetTester tester) async {
-    await openStoreProfile(tester);
-    final operations = find.byKey(const Key('global-profile-quick-operations'));
+    if (find.byKey(const Key('work-dashboard-profile')).evaluate().isEmpty) {
+      await tester.tap(find.byKey(const Key('work-store-home')));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+    await tester.pumpAndSettle();
+    final operations = find.byKey(const Key('work-store-status-tools'));
     await tester.ensureVisible(operations);
     await tester.tap(operations);
     await tester.pumpAndSettle();
@@ -11107,9 +16798,9 @@ void main() {
   // Preserve intent parity while exercising the actual single entry point.
   Future<Finder> purchaseRegisterAction(
     WidgetTester tester,
-    String intent,
+    String intent, {WorkSession? owner}
   ) async {
-    final work = tester
+    final work = owner ?? tester
         .widget<MoolSocialApp>(find.byType(MoolSocialApp))
         .workSession!;
     final action = switch (intent) {
@@ -11195,8 +16886,8 @@ void main() {
     return target;
   }
 
-  Future<void> openPurchaseEntryFromList(WidgetTester tester) async {
-    final action = await purchaseRegisterAction(tester, 'work-purchase-record');
+  Future<void> openPurchaseEntryFromList(WidgetTester tester, {WorkSession? owner}) async {
+    final action = await purchaseRegisterAction(tester, 'work-purchase-record', owner: owner);
     await revealPurchaseAction(tester, action);
     await tester.tap(action);
     await tester.pumpAndSettle();
@@ -19585,6 +25276,2581 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+
+  Future<Completer<MoolAssistantReviewResult>> mountSupplierPrefill(
+    WidgetTester tester, WorkSession work, {
+    bool Function()? isCurrent, bool settle = true,
+  }) async {
+    final result = Completer<MoolAssistantReviewResult>();
+    final scope = work.workspaceSupplierScope!;
+    final revision = work.workspacePurchaseEntryRevision;
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(
+      builder: (context) => Scaffold(body: TextButton(
+        key: const Key('host-open-supplier-prefill'),
+        onPressed: () async {
+          result.complete(await showStoreSupplierAddReview(context, work,
+            initialData: StoreSupplierInitialData.fromFields(const {
+              'name': 'HOST suggested supplier', 'phone': '+91 98765 43210',
+              'address': 'Jodhpur, Rajasthan 342001', 'gstin': '',
+            }), expectedScope: scope, expectedRevision: revision,
+            isCurrent: isCurrent ?? () => true));
+        }, child: const Text('Open host supplier review'))))));
+    await tester.tap(find.byKey(const Key('host-open-supplier-prefill')));
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+    }
+    return result;
+  }
+
+  void seedSupplierPrefillBook(_SupplierPrefillStore entry, WorkSession work) {
+    final scope = work.workspaceSupplierScope!, at = DateTime.utc(2026, 10, 26);
+    final supplier = WorkspaceSupplierProfile(id: 'host-original-supplier',
+      name: 'HOST original supplier', createdAt: at, updatedAt: at);
+    final draft = WorkspacePurchaseEntryDraft(id: 'host-existing-purchase',
+      supplierId: supplier.id, invoiceReference: 'HOST-KEEP', invoiceDate: '',
+      createdAt: at, updatedAt: at, goods: const [],
+      details: const {'notes': 'Keep this existing purchase draft'});
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2,
+      qa: scope.$3, revision: 1, profiles: [supplier], draft: draft);
+  }
+
+  Future<WorkSession> productPrefillWork(_ProductPrefillInventory inventory, {bool loadInventory = true}) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final work = postingOpeningFixture(_OpeningPostingFixtureStore(),
+      _LedgerCheckpointFixtureStore(), inventory: true, inventoryStore: inventory);
+    expect(work.localInventoryEnabled, isTrue);
+    if (loadInventory) {
+      expect(await work.loadWorkspaceInventory(retry: true), isTrue);
+      await work.workspaceInventorySaved;
+    }
+    return work;
+  }
+
+  Future<Completer<MoolAssistantReviewResult>> mountProductPrefill(
+    WidgetTester tester, WorkSession work, WorkspaceCatalogueItem product, {
+    bool adding = false, Map<String, String> inputs = const {
+      'purchasePrice': '12.50', 'sellingPrice': '14.75', 'mrp': '15.00', 'stock': '6',
+    }, bool Function()? ownerCurrent, bool settle = true,
+  }) async {
+    final result = Completer<MoolAssistantReviewResult>();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(
+      builder: (context) => Scaffold(body: TextButton(
+        key: const Key('host-open-product-prefill'), onPressed: () async {
+          result.complete(await showStoreProductInitialReview(context, work,
+            adding: adding, entityId: product.id,
+            initialData: StoreProductInitialData.fromFields({
+              ...StoreProductInitialData.referenceFields(product), ...inputs,
+            }), isCurrent: () => true, ownerCurrent: ownerCurrent));
+        }, child: const Text('Open host product review'))))));
+    await tester.tap(find.byKey(const Key('host-open-product-prefill')));
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    return result;
+  }
+
+// INSERT inside existing main(), after productPrefillWork/mountProductPrefill.
+// Existing imports and isolated original inventory fixtures are sufficient.
+Future<Completer<MoolAssistantReviewResult>> mountRemainingProductReview(
+  WidgetTester tester, WorkSession work, WorkspaceCatalogueItem product,
+  StoreProductNativeInitial initial, {ValueNotifier<bool>? owner}) async {
+  final result = Completer<MoolAssistantReviewResult>();
+  await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(builder: (context) =>
+    Scaffold(body: TextButton(key: const Key('host-open-remaining-product'), onPressed: () async {
+      result.complete(await showStoreProductNativeReview(context, work, product: product, initial: initial,
+        prefillCurrent: () => owner?.value != false, ownerCurrent: () => owner?.value != false,
+        ownerChanges: owner ?? work));
+    }, child: const Text('Open original product controls'))))));
+  await tester.tap(find.byKey(const Key('host-open-remaining-product')));
+  await tester.pumpAndSettle();
+  return result;
+}
+
+test('FE-PRODUCT remaining native fields reject raw sources and retain exact refs', () {
+  final product = workspaceMasterCatalogue.first;
+  final refs = StoreProductInitialData.referenceFields(product);
+  final dimensions = <Map<String, Object?>>[
+    {'label': 'Colour', 'kind': 'colour', 'options': 'Blue\nGreen'},
+  ];
+  final initial = StoreProductNativeInitial.fromFields('AI-ACT-215', {...refs, 'dimensions': dimensions});
+  dimensions.single['options'] = 'Changed';
+  expect(initial.dimensions.single.options, 'Blue\nGreen');
+  expect(initial.matches(product), isTrue);
+  expect(initial.matches(product.copyWith(sku: 'HOST-wrong-SKU')), isFalse);
+  expect(() => initial.dimensions.clear(), throwsUnsupportedError);
+  for (final fields in <Map<String, Object?>>[
+    {...refs, 'attachmentRef': 'att-${'a' * 32}', 'path': '/host/source.png'},
+    {...refs, 'attachmentRef': 'att-${'a' * 32}', 'bytes': [1, 2, 3]},
+    {...refs, 'attachmentRef': 'att-${'a' * 32}', 'attachmentＲef': 'confusable'},
+    {...refs, 'attachmentRef': 'att-bad'},
+  ]) {
+    expect(() => StoreProductNativeInitial.fromFields('AI-ACT-216', fields), throwsFormatException);
+  }
+  expect(() => StoreProductNativeInitial.fromFields('AI-ACT-215', {...refs, 'dimensions': [
+    {'dimensionId': 'original', 'label': 'Colour', 'kind': 'colour', 'options': 'Blue'},
+    {'dimensionId': 'original', 'label': 'Size', 'kind': 'size', 'options': 'M'},
+  ]}), throwsFormatException);
+  expect(() => StoreProductNativeInitial.fromFields('AI-ACT-215', {...refs, 'dimensions': [
+    {'familyId': 'model-family', 'label': 'Colour', 'kind': 'colour', 'options': 'Blue'},
+  ]}), throwsFormatException);
+  expect(() => StoreProductNativeInitial.fromFields('AI-ACT-370', {...refs,
+    'warranty': {'Guaranteed refund': 'No native warranty field'}}), throwsFormatException);
+  expect(StoreProductNativeInitial.actions, isNot(contains('AI-ACT-229')));
+  expect(StoreProductNativeInitial.actions, isNot(contains('AI-ACT-230')));
+});
+
+testWidgets('FE-PRODUCT 215 fills original options; native Use keeps group unsaved until Save', (tester) async {
+  final inventory = _ProductPrefillInventory();
+  final work = await productPrefillWork(inventory);
+  try {
+    final target = work.workspaceCatalogueItems.firstWhere((item) => item.variantMembership == null);
+    final before = jsonEncode([for (final item in work.workspaceCatalogueItems) item.toInventoryJson()]);
+    final saves = inventory.saves;
+    final initial = StoreProductNativeInitial.fromFields('AI-ACT-215', {
+      ...StoreProductInitialData.referenceFields(target),
+      'dimensions': [{'label': 'Colour', 'kind': 'colour', 'options': 'Blue\nGreen'}],
+    });
+    final result = await mountRemainingProductReview(tester, work, target, initial);
+    expect(find.descendant(of: find.byType(AlertDialog),
+      matching: find.text('New product group')), findsOneWidget);
+    expect(tester.widgetList<TextFormField>(find.byType(TextFormField)).map((field) => field.initialValue),
+      containsAll(['Colour', 'Blue\nGreen']));
+    expect(jsonEncode([for (final item in work.workspaceCatalogueItems) item.toInventoryJson()]), before);
+    expect(inventory.saves, saves);
+    await tester.tap(find.text('Use these options'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(jsonEncode([for (final item in work.workspaceCatalogueItems) item.toInventoryJson()]), before);
+    await tester.tap(find.byKey(const Key('work-product-cancel')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-product-discard-edits')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-product-discard-edits')));
+    await tester.pumpAndSettle();
+    expect(await result.future, MoolAssistantReviewResult.opened);
+    expect(jsonEncode([for (final item in work.workspaceCatalogueItems) item.toInventoryJson()]), before);
+  } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+});
+
+for (final apply in [false, true]) {
+  testWidgets('FE-PRODUCT 370 original warranty ${apply ? 'Use fields stages only' : 'Cancel leaves saved SKU intact'}', (tester) async {
+    final inventory = _ProductPrefillInventory();
+    final work = await productPrefillWork(inventory);
+    try {
+      final original = work.workspaceCatalogueItems.firstWhere((item) => item.variantMembership == null);
+      expect(work.addOrUpdateWorkspaceProduct(original.copyWith(categoryId: 'other')), isTrue);
+      await work.workspaceInventorySaved;
+      final target = work.workspaceCatalogueItems.singleWhere((item) => item.id == original.id);
+      final before = jsonEncode(target.toInventoryJson()), saves = inventory.saves;
+      final initial = StoreProductNativeInitial.fromFields('AI-ACT-370', {
+        ...StoreProductInitialData.referenceFields(target),
+        'warranty': {'Warranty issuer': 'Manufacturer on supplied card', 'Warranty duration': '12 months'},
+      });
+      await mountRemainingProductReview(tester, work, target, initial);
+      expect(tester.widget<TextField>(find.byKey(const Key('work-product-guided-Warranty issuer')))
+        .controller!.text, 'Manufacturer on supplied card');
+      expect(tester.widget<TextField>(find.byKey(const Key('work-product-guided-Warranty duration')))
+        .controller!.text, '12 months');
+      expect(inventory.saves, saves);
+      await tester.tap(find.byKey(Key(apply ? 'work-product-guided-apply' : 'work-product-guided-cancel')));
+      await tester.pumpAndSettle();
+      expect(inventory.saves, saves);
+      expect(jsonEncode(work.workspaceCatalogueItems.singleWhere((item) => item.id == target.id).toInventoryJson()), before);
+      await tester.tap(find.byKey(const Key('work-product-cancel')));
+      await tester.pumpAndSettle();
+      if (apply) {
+        expect(find.byKey(const Key('work-product-discard-edits')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('work-product-discard-edits')));
+        await tester.pumpAndSettle();
+      }
+      expect(inventory.saves, saves);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+  });
+}
+
+testWidgets('FE-PRODUCT 226 native Counter confirmation is shown but Review and Cancel never retire SKU', (tester) async {
+  final inventory = _ProductPrefillInventory(), owner = ValueNotifier(true);
+  final work = await productPrefillWork(inventory);
+  try {
+    final target = work.workspaceCatalogueItems.firstWhere((item) => item.counterSaleAllowed);
+    final before = jsonEncode(target.toInventoryJson()), saves = inventory.saves;
+    await mountRemainingProductReview(tester, work, target, StoreProductNativeInitial.fromFields('AI-ACT-226',
+      StoreProductInitialData.referenceFields(target)), owner: owner);
+    expect(find.text('Pause Counter sale?'), findsOneWidget);
+    expect(inventory.saves, saves);
+    expect(jsonEncode(work.workspaceCatalogueItems.singleWhere((item) => item.id == target.id).toInventoryJson()), before);
+    await tester.tap(find.byKey(const Key('work-product-retire-cancel')));
+    await tester.pumpAndSettle();
+    expect(inventory.saves, saves);
+    expect(work.workspaceCatalogueItems.singleWhere((item) => item.id == target.id).counterSaleAllowed, isTrue);
+  } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); owner.dispose(); }
+});
+
+testWidgets('FE-PRODUCT owner retirement removes exact native dialog and retained confirm cannot write', (tester) async {
+  final inventory = _ProductPrefillInventory(), owner = ValueNotifier(true);
+  final work = await productPrefillWork(inventory);
+  try {
+    final target = work.workspaceCatalogueItems.firstWhere((item) => item.counterSaleAllowed);
+    final saves = inventory.saves;
+    await mountRemainingProductReview(tester, work, target, StoreProductNativeInitial.fromFields('AI-ACT-226',
+      StoreProductInitialData.referenceFields(target)), owner: owner);
+    final retained = tester.widget<TextButton>(find.byKey(const Key('work-product-retire-confirm'))).onPressed!;
+    owner.value = false;
+    await tester.pumpAndSettle();
+    expect(find.text('Pause Counter sale?'), findsNothing);
+    expect(find.byKey(const Key('work-product-save')), findsNothing);
+    retained();
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(inventory.saves, saves);
+    expect(work.workspaceCatalogueItems.singleWhere((item) => item.id == target.id).counterSaleAllowed, isTrue);
+  } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); owner.dispose(); }
+});
+
+testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store and excludes Buyer', (tester) async {
+  final f = _AuthenticatedNativeScopeFixture();
+  await f.ready();
+  try {
+    // Explicit native HOST setup, before proposal/snapshot. Review must not run
+    // the native load because it can queue a durable Stock report.
+    expect(await f.work.loadWorkspaceInventory(retry: true), isTrue);
+    expect(await f.work.workspaceInventorySaved, isTrue);
+    await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+    final ids = f.adapters(tester).map((adapter) => adapter.actionId).toSet();
+    expect(ids, containsAll(StoreProductNativeInitial.actions));
+    expect(ids, isNot(contains('AI-ACT-229')));
+    expect(ids, contains('AI-ACT-230')); // Registered original-public-reader adapter; no private preview.
+    final adapter = f.adapters(tester).singleWhere((adapter) => adapter.actionId == 'AI-ACT-215');
+    final ctx = f.readContext(), product = f.work.workspaceCatalogueItems.first;
+    final writes = f.writes;
+    final snapshot = await adapter.snapshot(ctx, product.id);
+    expect(snapshot, isNotNull);
+    expect(f.writes, writes);
+    f.mode.value = 'buyer'; await tester.pumpAndSettle();
+    expect(f.adapters(tester).map((adapter) => adapter.actionId), isNot(contains('AI-ACT-215')));
+    expect(f.adapters(tester).map((adapter) => adapter.actionId), isNot(contains('AI-ACT-230')));
+    expect(await adapter.snapshot(ctx, product.id), isNull);
+  } finally { await tester.pumpWidget(const SizedBox.shrink()); await f.dispose(); }
+});
+
+  // Insert inside main(), after existing productPrefillWork/mountProductPrefill.
+  test('FE-PRODUCT-01 221 closes raw sale prices over original channels', () {
+    final references = <String, Object?>{
+      'sourceCanonicalId': 'host-canonical', 'sourceSku': 'host-sku', 'sourcePack': '1 pack',
+      'sourceRetailEnabled': true, 'sourceWholesaleEnabled': true,
+    };
+    final fields = <String, Object?>{...references, 'sellingPrice': '0014.75',
+      'wholesalePrice': '14.250', 'wholesaleTiers': '10:14.00; 20:13.75',
+      'priceChangesFrequently': 'yes', 'priceValidityMinutes': '0075'};
+    final initial = StoreProductInitialData.salePrices(fields);
+    fields['sellingPrice'] = 'changed';
+    expect(initial.inputs['sellingPrice'], '0014.75');
+    expect(initial.inputs['wholesaleTiers'], '10:14.00; 20:13.75');
+    expect(initial.inputs['priceValidityMinutes'], '0075');
+    expect(() => initial.inputs['sellingPrice'] = '1', throwsUnsupportedError);
+    for (final extra in <String, Object?>{
+      'stock': '9', 'purchasePrice': '10', 'mrp': '20', 'sellingChannels': 'both',
+      'sku': 'replacement', 'pack': 'different', 'gstPercent': '18',
+    }.entries) {
+      expect(() => StoreProductInitialData.salePrices({...references,
+        'sellingPrice': '14.75', extra.key: extra.value}), throwsFormatException);
+    }
+    for (final invalid in <Map<String, Object?>>[
+      {...references, 'sellingPrice': 1475},
+      {...references, 'priceValidityMinutes': '75'},
+      {...references, 'sourceRetailEnabled': false, 'sellingPrice': '14.75'},
+      {...references, 'sourceWholesaleEnabled': false, 'wholesalePrice': '14.25'},
+      {'sellingPrice': '14.75'},
+    ]) { expect(() => StoreProductInitialData.salePrices(invalid), throwsFormatException); }
+    // Native parsing/validation happens at the original final Save, not preparation.
+    expect(StoreProductInitialData.salePrices({...references,
+      'sellingPrice': 'not-money'}).inputs['sellingPrice'], 'not-money');
+  });
+
+  testWidgets('FE-PRODUCT-01 221 uses original price field and cancellation writes nothing', (tester) async {
+    final inventory = _ProductPrefillInventory();
+    final work = await productPrefillWork(inventory);
+    try {
+      final target = work.workspaceCatalogueItems.firstWhere((p) => p.retailEnabled);
+      final initial = StoreProductInitialData.salePrices({
+        ...StoreProductInitialData.referenceFields(target), 'sellingPrice': '0014.75',
+      });
+      final before = jsonEncode([for (final p in work.workspaceCatalogueItems) p.toInventoryJson()]);
+      final saves = inventory.saves;
+      final result = await mountProductPrefill(tester, work, target, inputs: initial.inputs);
+      expect(tester.widget<TextField>(find.byKey(const Key('work-product-selling-price')))
+        .controller!.text, '0014.75');
+      expect(inventory.saves, saves);
+      expect(jsonEncode([for (final p in work.workspaceCatalogueItems) p.toInventoryJson()]), before);
+      await tester.tap(find.byKey(const Key('work-product-cancel')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-product-discard-edits')));
+      await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+      expect(inventory.saves, saves);
+      expect(jsonEncode([for (final p in work.workspaceCatalogueItems) p.toInventoryJson()]), before);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+  });
+
+  testWidgets('FE-PRODUCT-01 221 retains native invalid-price validation', (tester) async {
+    final inventory = _ProductPrefillInventory();
+    final work = await productPrefillWork(inventory);
+    try {
+      final target = work.workspaceCatalogueItems.firstWhere((p) => p.retailEnabled);
+      final initial = StoreProductInitialData.salePrices({
+        ...StoreProductInitialData.referenceFields(target), 'sellingPrice': 'not-money',
+      });
+      final before = jsonEncode(target.toInventoryJson()), saves = inventory.saves;
+      await mountProductPrefill(tester, work, target, inputs: initial.inputs);
+      await tester.tap(find.byKey(const Key('work-product-save')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-product-save')), findsOneWidget);
+      expect(inventory.saves, saves);
+      expect(jsonEncode(work.workspaceCatalogueItems.singleWhere((p) => p.id == target.id)
+        .toInventoryJson()), before);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+  });
+
+  test('FE-PRODUCT-01 typed native raw inputs are immutable and explicit', () {
+    final product = workspaceMasterCatalogue.first;
+    final fields = <String, Object?>{
+      ...StoreProductInitialData.referenceFields(product),
+      'purchasePrice': '12.50', 'sellingPrice': '14.75', 'stock': '006',
+      'sellingChannels': 'both', 'quantityPerPack': '25.000',
+      'wholesalePrice': '14.25', 'wholesaleTiers': '10:14.00; 20:13.75',
+    };
+    final initial = StoreProductInitialData.fromFields(fields);
+    fields['purchasePrice'] = 'changed';
+    expect(initial.inputs['purchasePrice'], '12.50');
+    expect(initial.inputs['stock'], '006');
+    expect(initial.inputs['wholesaleTiers'], '10:14.00; 20:13.75');
+    expect(initial.matches(product), isTrue);
+    expect(initial.matches(product.copyWith(sku: 'different')), isFalse);
+    expect(() => initial.inputs['stock'] = '1', throwsUnsupportedError);
+    for (final invalid in <Map<String, Object?>>[
+      {...fields, 'stock': 6}, {...fields, 'imagePath': '/invented.jpg'},
+      {...fields, 'sourceRetailEnabled': 'true'}, {'sellingPrice': '14.75'},
+    ]) { expect(() => StoreProductInitialData.fromFields(invalid), throwsFormatException); }
+  });
+
+  testWidgets('FE-PRODUCT-01 Edit prefills native prices and stock without writing', (tester) async {
+    final inventory = _ProductPrefillInventory();
+    final work = await productPrefillWork(inventory);
+    try {
+      final target = work.workspaceCatalogueItems.firstWhere(
+        (p) => p.stockMode == WorkspaceStockMode.exactQuantity);
+      final before = jsonEncode([for (final p in work.workspaceCatalogueItems) p.toInventoryJson()]);
+      final saves = inventory.saves;
+      final result = await mountProductPrefill(tester, work, target);
+      String input(String key) => tester.widget<TextField>(find.byKey(Key(key))).controller!.text;
+      expect(input('work-product-purchase-price'), '12.50');
+      expect(input('work-product-selling-price'), '14.75');
+      expect(input('work-product-stock'), '6');
+      expect(inventory.saves, saves);
+      expect(jsonEncode([for (final p in work.workspaceCatalogueItems) p.toInventoryJson()]), before);
+      await tester.tap(find.byKey(const Key('work-product-cancel')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-product-discard-edits')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-product-discard-edits')));
+      await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+      expect(inventory.saves, saves);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+  });
+
+  testWidgets('FE-PRODUCT-01 existing dirty native editor is never replaced', (tester) async {
+    final inventory = _ProductPrefillInventory();
+    final work = await productPrefillWork(inventory);
+    try {
+      final target = work.workspaceCatalogueItems.first;
+      await mountProductPrefill(tester, work, target, inputs: {'title': 'HOST proposed title'});
+      final title = find.byKey(const Key('work-product-title'));
+      await tester.enterText(title, 'HOST manually corrected title');
+      final launch = tester.element(find.byKey(
+        const Key('host-open-product-prefill'), skipOffstage: false));
+      expect(await showStoreProductInitialReview(launch, work, adding: false,
+        entityId: target.id, initialData: StoreProductInitialData.fromFields({
+          ...StoreProductInitialData.referenceFields(target), 'title': 'HOST replacement',
+        }), isCurrent: () => true), MoolAssistantReviewResult.stale);
+      expect(tester.widget<TextField>(title).controller!.text, 'HOST manually corrected title');
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+  });
+
+  testWidgets('FE-PRODUCT-01 owner change during native inventory await blocks Save', (tester) async {
+    final inventory = _ProductPrefillInventory();
+    // Workspace seeding starts a read in a microtask, before mounting. Hold
+    // that first read so Save awaits it before addOrUpdate or CAS persistence.
+    inventory.readGate = Completer<void>();
+    inventory.readEntered = Completer<void>();
+    final work = await productPrefillWork(inventory, loadInventory: false);
+    var current = true;
+    try {
+      final target = work.workspaceCatalogueItems.first;
+      await mountProductPrefill(tester, work, target, ownerCurrent: () => current, settle: false);
+      final before = jsonEncode([for (final p in work.workspaceCatalogueItems) p.toInventoryJson()]);
+      final saves = inventory.saves;
+      await tester.tap(find.byKey(const Key('work-product-save')));
+      await tester.pump();
+      await inventory.readEntered!.future;
+      expect(inventory.saves, saves);
+      current = false;
+      inventory.readGate!.complete();
+      await tester.pumpAndSettle();
+      expect(inventory.saves, saves);
+      expect(jsonEncode([for (final p in work.workspaceCatalogueItems) p.toInventoryJson()]), before);
+      expect(find.byKey(const Key('work-product-save')), findsOneWidget);
+    } finally {
+      if (inventory.readGate?.isCompleted == false) inventory.readGate!.complete();
+      inventory.readGate = null;
+      await tester.pumpWidget(const SizedBox.shrink()); work.dispose();
+    }
+  });
+
+  testWidgets('FE-PRODUCT-01 original native validation rejects invalid proposed price', (tester) async {
+    final inventory = _ProductPrefillInventory();
+    final work = await productPrefillWork(inventory);
+    try {
+      final target = work.workspaceCatalogueItems.first;
+      final before = jsonEncode(target.toInventoryJson()), saves = inventory.saves;
+      await mountProductPrefill(tester, work, target, inputs: {'purchasePrice': 'not-money'});
+      await tester.tap(find.byKey(const Key('work-product-save')));
+      await tester.pumpAndSettle();
+      expect(find.text('Enter purchase price.'), findsWidgets);
+      expect(inventory.saves, saves);
+      expect(jsonEncode(work.workspaceCatalogueItems.firstWhere((p) => p.id == target.id).toInventoryJson()), before);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+  });
+
+  testWidgets('FE-PRODUCT-01 changed original source cannot be overwritten by stale input', (tester) async {
+    final inventory = _ProductPrefillInventory();
+    final work = await productPrefillWork(inventory);
+    try {
+      final target = work.workspaceCatalogueItems.first;
+      await mountProductPrefill(tester, work, target);
+      final index = work.workspaceCatalogueItems.indexWhere((p) => p.id == target.id);
+      // Isolated fixture readback simulates another original-owner update.
+      final latest = target.copyWith(sellingPriceMinor: target.sellingPriceMinor + 1);
+      work.workspaceCatalogueItems[index] = latest;
+      final saves = inventory.saves;
+      await tester.tap(find.byKey(const Key('work-product-save')));
+      await tester.pumpAndSettle();
+      expect(find.text('Product details changed. Close and reopen this product before saving.'), findsOneWidget);
+      expect(inventory.saves, saves);
+      expect(work.workspaceCatalogueItems[index].sellingPriceMinor, latest.sellingPriceMinor);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+  });
+
+  testWidgets('FE-PRODUCT-01 Add commits only after original final Save', (tester) async {
+    final inventory = _ProductPrefillInventory();
+    final work = await productPrefillWork(inventory);
+    try {
+      final target = work.referenceCatalogue.firstWhere((candidate) =>
+        candidate.retailEnabled && candidate.wholesaleOffer == null &&
+        !work.workspaceCatalogueItems.any((p) => p.id == candidate.id || p.sku == candidate.sku));
+      final count = work.workspaceCatalogueItems.length, saves = inventory.saves;
+      final result = await mountProductPrefill(tester, work, target, adding: true);
+      expect(work.workspaceCatalogueItems.length, count);
+      expect(inventory.saves, saves);
+      await tester.tap(find.byKey(const Key('work-product-save')));
+      await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+      final saved = work.workspaceCatalogueItems.singleWhere((p) => p.id == target.id);
+      expect(saved.canonicalId, target.canonicalId);
+      expect(saved.pack, target.pack);
+      expect(saved.purchasePriceMinor, 1250);
+      expect(saved.sellingPriceMinor, 1475);
+      expect(saved.stock, 6);
+      expect(inventory.saves, greaterThan(saves));
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+  });
+
+  testWidgets('FE-SUPPLIER-01 prefill opens existing Add without writes or selection', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _SupplierPrefillStore();
+    final work = postingOpeningFixture(entry, _LedgerCheckpointFixtureStore());
+    try {
+      seedSupplierPrefillBook(entry, work);
+      expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      final before = jsonEncode(entry.value!.toJson());
+      final result = await mountSupplierPrefill(tester, work);
+      expect(find.byKey(const Key('work-add-supplier-form')), findsOneWidget);
+      String value(String key) => tester.widget<TextFormField>(
+        find.byKey(Key(key))).controller!.text;
+      expect(value('work-add-supplier-name'), 'HOST suggested supplier');
+      expect(value('work-add-supplier-phone'), '+919876543210');
+      expect(value('work-add-supplier-address'), 'Jodhpur, Rajasthan 342001');
+      expect(entry.saveAttempts, 0);
+      expect(jsonEncode(entry.value!.toJson()), before);
+      expect(work.workspacePurchaseEntryDraft!.supplierId, 'host-original-supplier');
+      expect(result.isCompleted, isFalse);
+      await tester.tap(find.byTooltip('Back to suppliers'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Leave entry')); await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Close supplier list')); await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+      expect(entry.saveAttempts, 0);
+      expect(jsonEncode(entry.value!.toJson()), before);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink()); work.dispose();
+    }
+  });
+
+  testWidgets('FE-SUPPLIER-01 dirty form rejects a second prefill', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _SupplierPrefillStore();
+    final work = postingOpeningFixture(entry, _LedgerCheckpointFixtureStore());
+    try {
+      expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      await mountSupplierPrefill(tester, work);
+      final name = find.byKey(const Key('work-add-supplier-name'));
+      await tester.enterText(name, 'HOST manually corrected supplier');
+      final launch = tester.element(find.byKey(
+        const Key('host-open-supplier-prefill'), skipOffstage: false));
+      expect(await showStoreSupplierAddReview(launch, work,
+        initialData: const StoreSupplierInitialData(name: 'HOST replacement'),
+        expectedScope: work.workspaceSupplierScope!,
+        expectedRevision: work.workspacePurchaseEntryRevision,
+        isCurrent: () => true), MoolAssistantReviewResult.stale);
+      expect(tester.widget<TextFormField>(name).controller!.text,
+          'HOST manually corrected supplier');
+      expect(entry.saveAttempts, 0);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink()); work.dispose();
+    }
+  });
+
+  testWidgets('FE-SUPPLIER-01 stale async prefill never hydrates the form', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _SupplierPrefillStore();
+    final work = postingOpeningFixture(entry, _LedgerCheckpointFixtureStore());
+    var current = true;
+    try {
+      expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      entry.readGate = Completer<void>();
+      await mountSupplierPrefill(tester, work, isCurrent: () => current, settle: false);
+      current = false;
+      entry.readGate!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Supplier details changed. Close and ask again.'), findsOneWidget);
+      expect(find.byKey(const Key('work-add-supplier-form')), findsNothing);
+      expect(find.byKey(const Key('work-add-supplier-save')), findsNothing);
+      expect(entry.saveAttempts, 0);
+    } finally {
+      if (entry.readGate?.isCompleted == false) entry.readGate!.complete();
+      await tester.pumpWidget(const SizedBox.shrink()); work.dispose();
+    }
+  });
+
+  testWidgets('FE-SUPPLIER-01 explicit Save preserves the original purchase draft', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _SupplierPrefillStore();
+    final work = postingOpeningFixture(entry, _LedgerCheckpointFixtureStore());
+    try {
+      seedSupplierPrefillBook(entry, work);
+      expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      final draftBefore = jsonEncode(entry.value!.draft!.toJson());
+      final result = await mountSupplierPrefill(tester, work);
+      expect(entry.saveAttempts, 0);
+      final save = find.byKey(const Key('work-add-supplier-save'));
+      await tester.ensureVisible(save); await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+      expect(entry.saveAttempts, 1);
+      expect(entry.value!.profiles.length, 2);
+      expect(jsonEncode(entry.value!.draft!.toJson()), draftBefore);
+      expect(work.workspacePurchaseEntryDraft!.supplierId, 'host-original-supplier');
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink()); work.dispose();
+    }
+  });
+
+  void seedSupplierLookupEditBook(_SupplierPrefillStore entry, WorkSession work) {
+    final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc().subtract(const Duration(days: 1));
+    final original = WorkspaceSupplierProfile(id: 'HOST-original-private-supplier',
+      name: 'HOST મૂળ સપ્લાયર', phone: '+919876543210', address: 'HOST original address', createdAt: at, updatedAt: at);
+    final other = WorkspaceSupplierProfile(id: 'HOST-other-private-supplier',
+      name: 'HOST other supplier', phone: '+919111111111', createdAt: at, updatedAt: at);
+    final draft = WorkspacePurchaseEntryDraft(id: 'HOST-canonical-purchase-link', supplierId: original.id,
+      invoiceReference: 'HOST-LINK-KEPT', invoiceDate: '', createdAt: at, updatedAt: at,
+      goods: const [], details: const {'notes': 'HOST preserve original supplier selection'});
+    final copy = WorkspacePurchaseSavedCopy(id: 'HOST-canonical-saved-copy', storeName: 'HOST Store',
+      revision: 1, savedAt: at, supplier: original, draft: draft, labels: const {});
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 1, profiles: [original, other], draft: draft, copies: [copy]);
+  }
+
+  Future<Completer<MoolAssistantReviewResult>> mountSupplierLookupEdit(
+    WidgetTester tester, WorkSession work, {String? query, Map<String, Object?> edits = const {
+      'phone': '+91 92222 22222'}, bool Function()? ownerCurrent, bool settle = true,
+  }) async {
+    final scope = work.workspaceSupplierScope!, revision = work.workspacePurchaseEntryRevision;
+    final original = work.workspaceSuppliers.first;
+    final result = Completer<MoolAssistantReviewResult>();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(builder: (context) => Scaffold(
+      body: TextButton(key: const Key('host-open-supplier-existing'), onPressed: () async {
+        final opened = query != null
+          ? await showStoreSupplierLookupReview(context, work, query: query, expectedScope: scope,
+            expectedRevision: revision, isCurrent: () => true, ownerCurrent: ownerCurrent)
+          : await showStoreSupplierEditReview(context, work, originalProfile: original,
+            initialData: StoreSupplierEditInitialData.fromFields(edits), expectedScope: scope,
+            expectedRevision: revision, isCurrent: () => true, ownerCurrent: ownerCurrent);
+        result.complete(opened);
+      }, child: const Text('Open host supplier existing review'))))));
+    await tester.tap(find.byKey(const Key('host-open-supplier-existing')));
+    if (settle) await tester.pumpAndSettle();
+    else { await tester.pump(); await tester.pump(const Duration(milliseconds: 350)); }
+    return result;
+  }
+
+  test('FE-SUPPLIER-01 Edit partial fields cannot propose original identity metadata', () {
+    final edits = StoreSupplierEditInitialData.fromFields({'phone': '+91 92222 22222'});
+    expect(edits.fields, {'phone': '+91 92222 22222'});
+    expect(() => edits.fields['id'] = 'new', throwsUnsupportedError);
+    for (final invalid in <Map<String, Object?>>[
+      {}, {'phone': 123}, {'id': 'new-id'}, {'createdAt': 'invented'}, {'updatedAt': 'invented'},
+    ]) { expect(() => StoreSupplierEditInitialData.fromFields(invalid), throwsFormatException); }
+  });
+
+  testWidgets('FE-SUPPLIER-01 lookup seeds native search only and ignores result assignment', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _SupplierEditReplyStore();
+    final work = postingOpeningFixture(entry, _LedgerCheckpointFixtureStore());
+    try {
+      seedSupplierLookupEditBook(entry, work); expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      final before = jsonEncode(entry.value!.toJson());
+      final result = await mountSupplierLookupEdit(tester, work, query: '91 111');
+      expect(tester.widget<TextField>(find.byKey(const Key('work-supplier-search'))).controller!.text, '91 111');
+      expect(find.byKey(const ValueKey('work-supplier-choice-HOST-other-private-supplier')), findsOneWidget);
+      expect(find.byKey(const ValueKey('work-supplier-choice-HOST-original-private-supplier')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('work-supplier-choice-HOST-other-private-supplier')));
+      await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+      expect(entry.saveAttempts, 0);
+      expect(jsonEncode(entry.value!.toJson()), before);
+      expect(work.workspacePurchaseEntryDraft!.supplierId, 'HOST-original-private-supplier');
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+  });
+
+  testWidgets('FE-SUPPLIER-01 Edit preserves ID createdAt and original purchase links', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _SupplierEditReplyStore();
+    final work = postingOpeningFixture(entry, _LedgerCheckpointFixtureStore());
+    try {
+      seedSupplierLookupEditBook(entry, work); expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      final original = work.workspaceSuppliers.first;
+      final draftBefore = jsonEncode(entry.value!.draft!.toJson());
+      final copyBefore = jsonEncode(entry.value!.copies.single.toJson());
+      final result = await mountSupplierLookupEdit(tester, work);
+      expect(find.text('Edit supplier'), findsOneWidget);
+      expect(tester.widget<TextFormField>(find.byKey(const Key('work-add-supplier-name'))).controller!.text, original.name);
+      expect(entry.saveAttempts, 0);
+      final save = find.byKey(const Key('work-add-supplier-save'));
+      await tester.ensureVisible(save); await tester.tap(save); await tester.pumpAndSettle();
+      final saved = work.workspaceSuppliers.singleWhere((p) => p.id == original.id);
+      expect(saved.createdAt, original.createdAt);
+      expect(saved.name, original.name); expect(saved.phone, '+919222222222');
+      expect(work.workspaceSuppliers.length, 2);
+      expect(entry.saveAttempts, 1);
+      expect(jsonEncode(entry.value!.draft!.toJson()), draftBefore);
+      expect(jsonEncode(entry.value!.copies.single.toJson()), copyBefore);
+      expect(result.isCompleted, isFalse, reason: 'Edit Save must not return a selection to the caller.');
+      expect(find.byKey(const Key('work-supplier-search')), findsOneWidget);
+      await tester.tap(find.byTooltip('Close supplier list')); await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+  });
+
+  testWidgets('FE-SUPPLIER-01 native duplicate and stale directory guards survive Edit', (tester) async {
+    for (final stale in [false, true]) {
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _SupplierEditReplyStore();
+      final work = postingOpeningFixture(entry, _LedgerCheckpointFixtureStore());
+      try {
+        seedSupplierLookupEditBook(entry, work); expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+        await mountSupplierLookupEdit(tester, work, edits: stale
+          ? {'name': 'HOST proposed new name'} : {'phone': work.workspaceSuppliers.last.phone});
+        if (stale) {
+          entry.value = WorkspacePurchaseEntryBook.fromJson({...entry.value!.toJson(), 'revision': 2});
+          expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+        }
+        final before = jsonEncode(entry.value!.toJson());
+        final save = find.byKey(const Key('work-add-supplier-save'));
+        await tester.ensureVisible(save); await tester.tap(save); await tester.pumpAndSettle();
+        expect(entry.saveAttempts, 0);
+        expect(jsonEncode(entry.value!.toJson()), before);
+        expect(find.byKey(const Key('work-add-supplier-error')), findsOneWidget);
+        expect(find.textContaining(stale ? 'Supplier records changed' : 'already belong'), findsOneWidget);
+      } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+    }
+  });
+
+  testWidgets('FE-SUPPLIER-01 Edit lost reply retries same committed profile without duplication', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _SupplierEditReplyStore();
+    final work = postingOpeningFixture(entry, _LedgerCheckpointFixtureStore());
+    try {
+      seedSupplierLookupEditBook(entry, work); expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      final original = work.workspaceSuppliers.first;
+      await mountSupplierLookupEdit(tester, work);
+      entry.loseNextReply = true;
+      final save = find.byKey(const Key('work-add-supplier-save'));
+      await tester.ensureVisible(save); await tester.tap(save); await tester.pumpAndSettle();
+      expect(find.text('Check saved supplier'), findsOneWidget);
+      final attempted = entry.payloads.single.profiles.singleWhere((p) => p.id == original.id);
+      expect(attempted.createdAt, original.createdAt);
+      expect(entry.saveAttempts, 1);
+      await tester.tap(save); await tester.pumpAndSettle();
+      expect(entry.saveAttempts, 1, reason: 'Native identical-profile readback must not write another identity.');
+      expect(work.workspaceSuppliers.length, 2);
+      expect(work.workspaceSuppliers.singleWhere((p) => p.id == original.id).toJson(), attempted.toJson());
+      expect(work.workspacePurchaseEntryDraft!.supplierId, original.id);
+      expect(find.byKey(const Key('work-supplier-search')), findsOneWidget);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+  });
+
+  testWidgets('FE-SUPPLIER-01 native Edit action retains dirty fields against another proposal', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _SupplierEditReplyStore();
+    final work = postingOpeningFixture(entry, _LedgerCheckpointFixtureStore());
+    try {
+      seedSupplierLookupEditBook(entry, work); expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      await mountSupplierLookupEdit(tester, work, query: '');
+      await tester.tap(find.byKey(const ValueKey('work-supplier-edit-HOST-original-private-supplier')));
+      await tester.pumpAndSettle();
+      final name = find.byKey(const Key('work-add-supplier-name'));
+      await tester.enterText(name, 'HOST manually corrected name');
+      final launch = tester.element(find.byKey(const Key('host-open-supplier-existing'), skipOffstage: false));
+      expect(await showStoreSupplierEditReview(launch, work, originalProfile: work.workspaceSuppliers.first,
+        initialData: StoreSupplierEditInitialData.fromFields({'name': 'HOST replacement'}),
+        expectedScope: work.workspaceSupplierScope!, expectedRevision: work.workspacePurchaseEntryRevision,
+        isCurrent: () => true), MoolAssistantReviewResult.stale);
+      expect(tester.widget<TextFormField>(name).controller!.text, 'HOST manually corrected name');
+      expect(entry.saveAttempts, 0);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
+  });
+
+  testWidgets('FE-SUPPLIER-01 owner change during Edit read cannot hydrate old profile', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _SupplierEditReplyStore();
+    final work = postingOpeningFixture(entry, _LedgerCheckpointFixtureStore());
+    var current = true;
+    try {
+      seedSupplierLookupEditBook(entry, work); expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      entry.readGate = Completer<void>();
+      final result = await mountSupplierLookupEdit(tester, work, ownerCurrent: () => current, settle: false);
+      current = false; entry.readGate!.complete(); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-add-supplier-name')), findsNothing);
+      expect(entry.saveAttempts, 0);
+      expect(find.text('Return to the Store where you started. Saved and unsaved input is kept.'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Close')); await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.stale);
+    } finally {
+      if (entry.readGate?.isCompleted == false) entry.readGate!.complete();
+      await tester.pumpWidget(const SizedBox.shrink()); work.dispose();
+    }
+  });
+
+  Future<({WorkSession work, WorkspaceSupplierProfile supplier,
+    WorkspaceSupplierOpeningRecord opening, _LedgerCheckpointFixtureStore checkpoint})>
+  supplierMoneyInitialFixture(_AssistantSupplierMoneyStore forms) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
+    final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+    final scope = work.workspaceSupplierScope!;
+    final at = DateTime.now().toUtc().subtract(const Duration(days: 1));
+    final supplier = WorkspaceSupplierProfile(id: 'HOST-ai-money-supplier',
+      name: 'HOST AI money supplier', createdAt: at, updatedAt: at);
+    final opening = WorkspaceSupplierOpeningRecord(id: 'HOST-ai-money-opening',
+      basisId: 'HOST-ai-money-basis', account: scope.$1, store: scope.$2, qa: scope.$3,
+      supplierId: supplier.id, revision: 1,
+      asOfDate: at.toLocal().toIso8601String().substring(0, 10), savedAt: at,
+      amountMinor: 0, supplierCredit: false, sourceNote: 'HOST confirmed zero');
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2,
+      qa: scope.$3, revision: 1, profiles: [supplier], openingRecords: [opening]);
+    expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+    expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope,
+      expectedRevision: 1, confirmedAt: at.add(const Duration(seconds: 1))), isTrue);
+    expect(work.supplierMoneyFormKey(supplier.id, advance: true), isNotNull);
+    return (work: work, supplier: supplier, opening: opening, checkpoint: checkpoint);
+  }
+
+  StoreSupplierMoneyInitialData supplierMoneyInitialData(String supplierId,
+    WorkspaceSupplierOpeningRecord opening) => StoreSupplierMoneyInitialData.fromFields({
+    'supplierId': supplierId, 'openingId': opening.id, 'openingRevision': opening.revision,
+    'amount': '12.50', 'reference': 'HOST-proposed-reference', 'channel': 'NEFT',
+    'occurredOn': opening.asOfDate,
+  });
+
+  Future<Completer<MoolAssistantReviewResult>> mountSupplierMoneyInitial(
+    WidgetTester tester, WorkSession work, String supplierId,
+    WorkspaceSupplierOpeningRecord opening, {
+    bool Function()? ownerCurrent, bool settle = true,
+  }) async {
+    final result = Completer<MoolAssistantReviewResult>();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(
+      builder: (context) => Scaffold(body: TextButton(
+        key: const Key('host-open-supplier-money-initial'),
+        onPressed: () async => result.complete(await showStoreSupplierMoneyInitialReview(
+          context, work, actionId: 'AI-ACT-260', entityId: supplierId,
+          initialData: supplierMoneyInitialData(supplierId, opening),
+          isCurrent: () => true, ownerCurrent: ownerCurrent)),
+        child: const Text('Open host supplier money review'))))));
+    await tester.tap(find.byKey(const Key('host-open-supplier-money-initial')));
+    if (settle) { await tester.pumpAndSettle(); }
+    else { await tester.pump(); await tester.pump(const Duration(milliseconds: 350)); }
+    return result;
+  }
+
+  Future<({WorkSession work, WorkspacePurchaseSavedCopy copy,
+    WorkspaceSupplierOpeningRecord opening, _LedgerCheckpointFixtureStore checkpoint})>
+  supplierAllocationInitialFixture(_AssistantSupplierAllocationStore forms) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
+    final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+    final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
+    final day = at.toLocal().toIso8601String().substring(0, 10);
+    final supplier = WorkspaceSupplierProfile(id: 'HOST-ai-allocation-supplier',
+      name: 'HOST allocation supplier', createdAt: at, updatedAt: at);
+    final product = work.workspaceCatalogueItems.first;
+    final draft = WorkspacePurchaseEntryDraft(id: 'HOST-ai-allocation-bill', supplierId: supplier.id,
+      invoiceReference: 'HOST-AI-ALLOC-01',
+      invoiceDate: '${day.substring(8)}/${day.substring(5, 7)}/${day.substring(0, 4)}',
+      createdAt: at, updatedAt: at, goods: [{'productId': product.id, 'name': product.title,
+        'pack': product.pack, 'quantity': '2', 'cost': '50'}], details: {'invoiceTotal': '100'});
+    final copy = WorkspacePurchaseSavedCopy(id: 'HOST-ai-allocation-copy', storeName: 'HOST Store',
+      revision: 1, savedAt: at, supplier: supplier, draft: draft, labels: const {});
+    final opening = WorkspaceSupplierOpeningRecord(id: 'HOST-ai-allocation-opening',
+      basisId: 'HOST-ai-allocation-basis', account: scope.$1, store: scope.$2, qa: scope.$3,
+      supplierId: supplier.id, revision: 2, asOfDate: day, savedAt: at,
+      amountMinor: 0, supplierCredit: false, sourceNote: 'HOST confirmed zero', bills: [
+        WorkspaceOpeningBillLink(copyId: copy.id, copyRevision: 1, draftId: draft.id,
+          inclusion: WorkspaceOpeningBillInclusion.excluded)]);
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 3, profiles: [supplier], draft: draft, copies: [copy], openingRecords: [opening]);
+    expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+    expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope,
+      expectedRevision: 3, confirmedAt: at), isTrue);
+    expect(await work.confirmWorkspacePurchaseBill(copy, scope: scope,
+      expectedPurchaseRevision: 3, expectedLedgerRevision: 1,
+      openingTreatment: WorkspaceOpeningBillInclusion.excluded, confirmedAt: at), isTrue);
+    expect(await work.recordWorkspaceSupplierMoney(supplier.id, accountScope: scope.$1,
+      workspaceId: scope.$2, expectedRevision: 2, entry: WorkspaceSupplierLedgerEntry(
+        operationId: 'HOST-ai-allocation-source', reference: 'HOST-AI-ADV-01',
+        origin: WorkspaceSupplierEntryOrigin.supplierAccount, kind: WorkspaceSupplierEntryKind.advance,
+        amountMinor: 10000, paymentMethod: 'Cash', postedAt: at,
+        moneyReview: WorkspaceSupplierMoneyReview(occurredOn: day, openingId: opening.id,
+          openingRevision: opening.revision, notIncludedInOpening: true))), isTrue);
+    expect(work.supplierAllocationFormKey(copy), isNotNull);
+    return (work: work, copy: copy, opening: opening, checkpoint: checkpoint);
+  }
+
+  StoreSupplierAllocationInitialData supplierAllocationInitialData(WorkspacePurchaseSavedCopy copy,
+    WorkspaceSupplierOpeningRecord opening, {String amount = '0017.50'}) =>
+    StoreSupplierAllocationInitialData.fromFields({'supplierId': copy.supplier.id,
+      'copyId': copy.id, 'copyRevision': copy.revision,
+      'openingId': opening.id, 'openingRevision': opening.revision,
+      'sourceKind': 'accountAdvance', 'sourceId': 'HOST-ai-allocation-source', 'amount': amount});
+
+  Future<Completer<MoolAssistantReviewResult>> mountSupplierAllocationInitial(
+    WidgetTester tester, WorkSession work, WorkspacePurchaseSavedCopy copy,
+    WorkspaceSupplierOpeningRecord opening, {String actionId = 'AI-ACT-262',
+    String? operationId, bool Function()? ownerCurrent, bool settle = true,
+    String amount = '0017.50'}) async {
+    final result = Completer<MoolAssistantReviewResult>();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(
+      builder: (context) => Scaffold(body: TextButton(
+        key: const Key('host-open-supplier-allocation-initial'), onPressed: () async {
+          result.complete(await showStoreSupplierAllocationReview(context, work,
+            actionId: actionId, entityId: copy.id,
+            initialData: actionId == 'AI-ACT-262' ? supplierAllocationInitialData(copy, opening, amount: amount) : null,
+            operationId: operationId, isCurrent: () => true, ownerCurrent: ownerCurrent));
+        }, child: const Text('Open host allocation review'))))));
+    await tester.tap(find.byKey(const Key('host-open-supplier-allocation-initial')));
+    if (settle) { await tester.pumpAndSettle(); }
+    else { await tester.pump(); await tester.pump(const Duration(milliseconds: 350)); }
+    return result;
+  }
+
+  for (final action in ['AI-ACT-263', 'AI-ACT-377']) {
+    for (final change in ['operation', 'fields', 'revision']) {
+      testWidgets('FE-SUPACCOUNT-02 $action rejects changed recovery $change on second read', (tester) async {
+        final forms = _AssistantSupplierAllocationStore(), f = await supplierAllocationInitialFixture(forms);
+        try {
+          final key = f.work.supplierAllocationFormKey(f.copy)!;
+          final intent = WorkspaceSupplierMoneyAllocationIntent(operationId: 'HOST-original-allocation',
+            accountScope: key.account, workspaceId: key.store, supplierId: key.customer,
+            sourceKind: WorkspaceSupplierMoneySourceKind.accountAdvance, sourceId: 'HOST-ai-allocation-source',
+            openingId: f.opening.id, openingRevision: f.opening.revision,
+            billId: f.copy.draft.id, copyId: f.copy.id, copyRevision: f.copy.revision,
+            amountMinor: 700, requestedAt: DateTime.now().toUtc());
+          final originalFields = <String, String>{'amount': '7.00', 'sourceKind': intent.sourceKind.name,
+            'sourceId': intent.sourceId, 'attempt': jsonEncode(intent.intentToJson())};
+          await forms.save(WorkspaceLedgerFormDraft(key: key, revision: 1, fields: originalFields), expectedRevision: null);
+          forms.holdAllocationRead = forms.allocationReads + 2;
+          forms.allocationEntered = Completer<void>(); forms.allocationGate = Completer<void>();
+          await mountSupplierAllocationInitial(tester, f.work, f.copy, f.opening,
+            actionId: action, operationId: intent.operationId, settle: false);
+          await forms.allocationEntered!.future;
+          final replacementIntent = WorkspaceSupplierMoneyAllocationIntent.fromJson({
+            ...intent.intentToJson(),
+            if (change == 'operation') 'operationId': 'HOST-concurrent-allocation',
+            if (change == 'fields') 'amountMinor': 800,
+          });
+          final replacement = WorkspaceLedgerFormDraft(key: key, revision: 2, fields: {
+            ...originalFields, if (change == 'fields') 'amount': '8.00',
+            'attempt': jsonEncode(replacementIntent.intentToJson())});
+          expect(replacement.valid, isTrue);
+          // The original secure store refuses changing a frozen attempt.
+          // A same-fields revision advance is the valid first/second-read race.
+          if (change == 'revision') {
+            await forms.save(replacement, expectedRevision: 1);
+          } else {
+            await expectLater(forms.save(replacement, expectedRevision: 1),
+              throwsA(isA<WorkGatewayException>().having((error) => error.message,
+                'message', 'This payment attempt is retained. Verify its saved status before recording another.')));
+          }
+          final saves = forms.saves, posts = f.checkpoint.saveAttempts;
+          forms.allocationGate!.complete();
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('supplier-allocation-status')),
+            change == 'revision' ? findsNothing : findsOneWidget);
+          expect(find.text('Saved allocation could not be read. Keep the request and retry recovery.'),
+            change == 'revision' ? findsOneWidget : findsNothing);
+          expect((await forms.read(key))!.fields, change == 'revision' ? replacement.fields : originalFields);
+          expect((await forms.read(key))!.revision, change == 'revision' ? 2 : 1);
+          expect(forms.saves, saves, reason: 'Review must not overwrite the concurrent native draft.');
+          expect(f.checkpoint.saveAttempts, posts, reason: 'Review must not retry either attempt.');
+          expect(f.work.workspaceSupplierLedger(f.copy.supplier.id)!.billMoneyAllocations, isEmpty);
+          expect(tester.takeException(), isNull);
+        } finally {
+          if (forms.allocationGate?.isCompleted == false) forms.allocationGate!.complete();
+          await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose();
+        }
+      });
+    }
+  }
+
+  testWidgets('FE-SUPACCOUNT-02 recovery accepts same key revision fields in different map order', (tester) async {
+    final forms = _ReorderedAllocationReadStore(), f = await supplierAllocationInitialFixture(forms);
+    try {
+      final key = f.work.supplierAllocationFormKey(f.copy)!;
+      final intent = WorkspaceSupplierMoneyAllocationIntent(operationId: 'HOST-order-independent-allocation',
+        accountScope: key.account, workspaceId: key.store, supplierId: key.customer,
+        sourceKind: WorkspaceSupplierMoneySourceKind.accountAdvance, sourceId: 'HOST-ai-allocation-source',
+        openingId: f.opening.id, openingRevision: f.opening.revision, billId: f.copy.draft.id,
+        copyId: f.copy.id, copyRevision: f.copy.revision, amountMinor: 700, requestedAt: DateTime.now().toUtc());
+      final original = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {
+        'amount': '7.00', 'sourceKind': intent.sourceKind.name, 'sourceId': intent.sourceId,
+        'attempt': jsonEncode(intent.intentToJson())});
+      await forms.save(original, expectedRevision: null);
+      final saves = forms.saves, posts = f.checkpoint.saveAttempts;
+      final result = await mountSupplierAllocationInitial(tester, f.work, f.copy, f.opening,
+        actionId: 'AI-ACT-263', operationId: intent.operationId);
+      expect(forms.allocationReads, 2);
+      expect(find.byKey(const Key('supplier-allocation-status')), findsOneWidget);
+      expect(find.text('Saved allocation could not be read. Keep the request and retry recovery.'), findsNothing);
+      expect(tester.widget<TextField>(find.byKey(const Key('supplier-allocation-amount'))).controller!.text, '7.00');
+      expect(forms.saves, saves); expect(f.checkpoint.saveAttempts, posts);
+      await tester.tap(find.byKey(const Key('supplier-allocation-close')));
+      await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+      expect(forms.saves, saves); expect(f.checkpoint.saveAttempts, posts);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  test('FE-SUPACCOUNT-02 allocation schema closes native references and raw text', () {
+    final fields = <String, Object?>{'supplierId': 's', 'copyId': 'c', 'copyRevision': 1,
+      'openingId': 'o', 'openingRevision': 2, 'sourceKind': 'accountAdvance',
+      'sourceId': 'native-source', 'amount': '0017.50'};
+    final data = StoreSupplierAllocationInitialData.fromFields(fields);
+    fields['amount'] = 'changed';
+    expect(data.amount, '0017.50');
+    expect(data.sourceKind, WorkspaceSupplierMoneySourceKind.accountAdvance);
+    for (final invalid in <Map<String, Object?>>[
+      {...fields, 'amount': 1750}, {...fields, 'sourceKind': 'invented-credit'},
+      {...fields, 'operationId': 'new-operation'}, {...fields, 'copyRevision': '1'},
+      {...fields, 'sourceId': ''},
+    ]) { expect(() => StoreSupplierAllocationInitialData.fromFields(invalid), throwsFormatException); }
+  });
+
+  testWidgets('FE-SUPACCOUNT-02 allocation Review and Close create no input or ledger writes', (tester) async {
+    final forms = _AssistantSupplierAllocationStore(), f = await supplierAllocationInitialFixture(forms);
+    try {
+      final saves = forms.saves, posts = f.checkpoint.saveAttempts;
+      final before = jsonEncode(f.work.workspaceSupplierLedger(f.copy.supplier.id)!.toJson());
+      final result = await mountSupplierAllocationInitial(tester, f.work, f.copy, f.opening);
+      expect(tester.widget<TextField>(find.byKey(const Key('supplier-allocation-amount'))).controller!.text, '0017.50');
+      expect(find.byKey(const Key('supplier-allocation-selected-source')), findsOneWidget);
+      expect(forms.saves, saves); expect(f.checkpoint.saveAttempts, posts);
+      await tester.tap(find.byKey(const Key('supplier-allocation-close')));
+      await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+      expect(forms.saves, saves); expect(f.checkpoint.saveAttempts, posts);
+      expect(jsonEncode(f.work.workspaceSupplierLedger(f.copy.supplier.id)!.toJson()), before);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-SUPACCOUNT-02 allocation refuses an existing draft without replacing it', (tester) async {
+    final forms = _AssistantSupplierAllocationStore(), f = await supplierAllocationInitialFixture(forms);
+    try {
+      final key = f.work.supplierAllocationFormKey(f.copy)!;
+      final existing = WorkspaceLedgerFormDraft(key: key, revision: 1,
+        fields: {'amount': '7.00', 'sourceKind': 'accountAdvance', 'sourceId': 'HOST-ai-allocation-source'});
+      await forms.save(existing, expectedRevision: null);
+      final saves = forms.saves, posts = f.checkpoint.saveAttempts;
+      final result = await mountSupplierAllocationInitial(tester, f.work, f.copy, f.opening);
+      expect(await result.future, MoolAssistantReviewResult.stale);
+      expect(find.byKey(const Key('supplier-allocation-amount')), findsNothing);
+      expect((await forms.read(key))!.fields, existing.fields);
+      expect(forms.saves, saves); expect(f.checkpoint.saveAttempts, posts);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  for (final action in ['AI-ACT-263', 'AI-ACT-377']) {
+    testWidgets('FE-SUPACCOUNT-02 $action restores exact frozen allocation without retry', (tester) async {
+      final forms = _AssistantSupplierAllocationStore(), f = await supplierAllocationInitialFixture(forms);
+      try {
+        final key = f.work.supplierAllocationFormKey(f.copy)!;
+        final intent = WorkspaceSupplierMoneyAllocationIntent(operationId: 'HOST-ai-frozen-allocation',
+          accountScope: key.account, workspaceId: key.store, supplierId: key.customer,
+          sourceKind: WorkspaceSupplierMoneySourceKind.accountAdvance, sourceId: 'HOST-ai-allocation-source',
+          openingId: f.opening.id, openingRevision: f.opening.revision,
+          billId: f.copy.draft.id, copyId: f.copy.id, copyRevision: f.copy.revision,
+          amountMinor: 700, requestedAt: DateTime.now().toUtc());
+        final saved = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {
+          'amount': '7.00', 'sourceKind': intent.sourceKind.name, 'sourceId': intent.sourceId,
+          'attempt': jsonEncode(intent.intentToJson())});
+        expect(saved.valid, isTrue);
+        await forms.save(saved, expectedRevision: null);
+        final saves = forms.saves, posts = f.checkpoint.saveAttempts;
+        final result = await mountSupplierAllocationInitial(tester, f.work, f.copy, f.opening,
+          actionId: action, operationId: intent.operationId);
+        expect(find.byKey(const Key('supplier-allocation-status')), findsOneWidget);
+        expect(find.text('Retry same allocation'), findsOneWidget);
+        expect((await forms.read(key))!.fields, saved.fields);
+        expect(forms.saves, saves); expect(f.checkpoint.saveAttempts, posts);
+        await tester.tap(find.byKey(const Key('supplier-allocation-close')));
+        await tester.pumpAndSettle();
+        expect(await result.future, MoolAssistantReviewResult.opened);
+        expect(forms.saves, saves); expect(f.checkpoint.saveAttempts, posts);
+      } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+    });
+  }
+
+  testWidgets('FE-SUPACCOUNT-02 allocation owner change during second read does not inject or save', (tester) async {
+    final forms = _AssistantSupplierAllocationStore(), f = await supplierAllocationInitialFixture(forms);
+    var owner = true;
+    try {
+      forms.holdAllocationRead = forms.allocationReads + 2;
+      forms.allocationEntered = Completer<void>(); forms.allocationGate = Completer<void>();
+      final saves = forms.saves, posts = f.checkpoint.saveAttempts;
+      await mountSupplierAllocationInitial(tester, f.work, f.copy, f.opening,
+        ownerCurrent: () => owner, settle: false);
+      await forms.allocationEntered!.future;
+      owner = false; forms.allocationGate!.complete();
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('supplier-allocation-amount'))).controller!.text, isEmpty);
+      expect(forms.saves, saves); expect(f.checkpoint.saveAttempts, posts);
+    } finally {
+      if (forms.allocationGate?.isCompleted == false) forms.allocationGate!.complete();
+      await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose();
+    }
+  });
+
+  testWidgets('FE-SUPACCOUNT-02 allocation keeps capacity validation and original final control', (tester) async {
+    final forms = _AssistantSupplierAllocationStore(), f = await supplierAllocationInitialFixture(forms);
+    try {
+      final saves = forms.saves, posts = f.checkpoint.saveAttempts;
+      await mountSupplierAllocationInitial(tester, f.work, f.copy, f.opening, amount: '99999.00');
+      await tester.ensureVisible(find.byKey(const Key('supplier-allocation-submit')));
+      await tester.tap(find.byKey(const Key('supplier-allocation-submit')));
+      await tester.pumpAndSettle();
+      expect(f.work.workspaceSupplierLedger(f.copy.supplier.id)!.billMoneyAllocations, isEmpty);
+      expect(forms.saves, saves); expect(f.checkpoint.saveAttempts, posts);
+      await tester.enterText(find.byKey(const Key('supplier-allocation-amount')), '17.50');
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('supplier-allocation-submit')));
+      await tester.tap(find.byKey(const Key('supplier-allocation-submit')));
+      await tester.pumpAndSettle();
+      final saved = f.work.workspaceSupplierLedger(f.copy.supplier.id)!.billMoneyAllocations.values.single;
+      expect(saved.amountMinor, 1750);
+      expect(saved.copyId, f.copy.id);
+      expect(saved.sourceId, 'HOST-ai-allocation-source');
+      expect(f.checkpoint.saveAttempts, greaterThan(posts));
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-SUPACCOUNT-02 Review prefills raw native inputs with no draft or ledger write', (tester) async {
+    final forms = _AssistantSupplierMoneyStore();
+    final f = await supplierMoneyInitialFixture(forms);
+    try {
+      final writes = forms.saves, posts = f.checkpoint.saveAttempts;
+      final before = jsonEncode(f.work.workspaceSupplierLedger(f.supplier.id)!.toJson());
+      final result = await mountSupplierMoneyInitial(tester, f.work, f.supplier.id, f.opening);
+      expect(tester.widget<TextField>(find.byKey(const Key('supplier-payment-amount'))).controller!.text, '12.50');
+      expect(tester.widget<TextField>(find.byKey(const Key('supplier-payment-reference'))).controller!.text, 'HOST-proposed-reference');
+      expect(find.byKey(const ValueKey('supplier-payment-method-NEFT')), findsOneWidget);
+      expect(tester.widget<CheckboxListTile>(find.byKey(const Key('supplier-money-opening-excluded'))).value, isFalse);
+      expect(forms.saves, writes);
+      expect(f.checkpoint.saveAttempts, posts);
+      expect(jsonEncode(f.work.workspaceSupplierLedger(f.supplier.id)!.toJson()), before);
+      await tester.tap(find.byKey(const Key('supplier-money-close')));
+      await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+      expect(forms.saves, writes);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-SUPACCOUNT-02 any existing saved input prevents AI prefill', (tester) async {
+    final forms = _AssistantSupplierMoneyStore();
+    final f = await supplierMoneyInitialFixture(forms);
+    try {
+      final key = f.work.supplierMoneyFormKey(f.supplier.id, advance: true)!;
+      final existing = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {
+        'amount': '7.00', 'reference': 'HOST-existing', 'channel': 'Cash',
+        'occurredOn': f.opening.asOfDate, 'notIncludedInOpening': 'false',
+      });
+      await forms.save(existing, expectedRevision: null);
+      final writes = forms.saves, posts = f.checkpoint.saveAttempts;
+      final result = await mountSupplierMoneyInitial(tester, f.work, f.supplier.id, f.opening);
+      expect(await result.future, MoolAssistantReviewResult.unavailable);
+      expect(find.byKey(const Key('supplier-payment-amount')), findsNothing);
+      expect((await forms.read(key))!.fields, existing.fields);
+      expect(forms.saves, writes);
+      expect(f.checkpoint.saveAttempts, posts);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-SUPACCOUNT-02 active dirty original form rejects another suggestion', (tester) async {
+    final forms = _AssistantSupplierMoneyStore();
+    final f = await supplierMoneyInitialFixture(forms);
+    try {
+      await mountSupplierMoneyInitial(tester, f.work, f.supplier.id, f.opening);
+      final amount = find.byKey(const Key('supplier-payment-amount'));
+      await tester.enterText(amount, '9.25'); await tester.pumpAndSettle();
+      final writes = forms.saves;
+      final launch = tester.element(find.byKey(
+        const Key('host-open-supplier-money-initial'), skipOffstage: false));
+      expect(await showStoreSupplierMoneyInitialReview(launch, f.work,
+        actionId: 'AI-ACT-260', entityId: f.supplier.id,
+        initialData: supplierMoneyInitialData(f.supplier.id, f.opening),
+        isCurrent: () => true), MoolAssistantReviewResult.stale);
+      expect(tester.widget<TextField>(amount).controller!.text, '9.25');
+      expect(forms.saves, writes);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-SUPACCOUNT-02 owner change during second draft read never hydrates', (tester) async {
+    final forms = _AssistantSupplierMoneyStore();
+    final f = await supplierMoneyInitialFixture(forms);
+    var current = true;
+    try {
+      forms.holdReadNumber = forms.moneyReads + 2;
+      forms.readGate = Completer<void>(); forms.readEntered = Completer<void>();
+      final writes = forms.saves, posts = f.checkpoint.saveAttempts;
+      await mountSupplierMoneyInitial(tester, f.work, f.supplier.id, f.opening,
+        ownerCurrent: () => current, settle: false);
+      await forms.readEntered!.future;
+      current = false; forms.readGate!.complete();
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('supplier-payment-amount'))).controller!.text, isEmpty);
+      expect(forms.saves, writes);
+      expect(f.checkpoint.saveAttempts, posts);
+    } finally {
+      if (forms.readGate?.isCompleted == false) forms.readGate!.complete();
+      await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose();
+    }
+  });
+
+  testWidgets('FE-SUPACCOUNT-02 saved input arriving during load is preserved', (tester) async {
+    final forms = _AssistantSupplierMoneyStore();
+    final f = await supplierMoneyInitialFixture(forms);
+    try {
+      forms.holdReadNumber = forms.moneyReads + 2;
+      forms.readGate = Completer<void>(); forms.readEntered = Completer<void>();
+      await mountSupplierMoneyInitial(tester, f.work, f.supplier.id, f.opening, settle: false);
+      await forms.readEntered!.future;
+      final key = f.work.supplierMoneyFormKey(f.supplier.id, advance: true)!;
+      await forms.save(WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {
+        'amount': '7.00', 'reference': 'HOST-arrived-original', 'channel': 'Cash',
+        'occurredOn': f.opening.asOfDate, 'notIncludedInOpening': 'false',
+      }), expectedRevision: null);
+      final writes = forms.saves;
+      forms.readGate!.complete(); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('supplier-payment-amount'))).controller!.text, '7.00');
+      expect(find.text('Suggestion was not applied. Existing supplier input and saved attempts are kept.'), findsOneWidget);
+      expect(forms.saves, writes);
+      expect((await forms.read(key))!.fields['reference'], 'HOST-arrived-original');
+    } finally {
+      if (forms.readGate?.isCompleted == false) forms.readGate!.complete();
+      await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose();
+    }
+  });
+
+  testWidgets('FE-SUPACCOUNT-02 original consent and final button own all posting', (tester) async {
+    final forms = _AssistantSupplierMoneyStore();
+    final f = await supplierMoneyInitialFixture(forms);
+    try {
+      final writes = forms.saves, posts = f.checkpoint.saveAttempts;
+      await mountSupplierMoneyInitial(tester, f.work, f.supplier.id, f.opening);
+      final submit = find.byKey(const Key('supplier-money-submit'));
+      await tester.ensureVisible(submit); await tester.tap(submit); await tester.pumpAndSettle();
+      expect(forms.saves, writes);
+      expect(f.checkpoint.saveAttempts, posts);
+      expect(find.text('Enter the amount, payment reference and date. Confirm it is not already included in the starting balance.'), findsOneWidget);
+      final consent = find.byKey(const Key('supplier-money-opening-excluded'));
+      await tester.ensureVisible(consent); await tester.tap(consent); await tester.pumpAndSettle();
+      expect(forms.saves, greaterThan(writes), reason: 'Only the original user checkbox autosaves these fields.');
+      await tester.ensureVisible(submit); await tester.tap(submit); await tester.pumpAndSettle();
+      expect(f.checkpoint.saveAttempts, greaterThan(posts));
+      final advance = f.work.workspaceSupplierLedger(f.supplier.id)!.entries.singleWhere(
+        (e) => e.kind == WorkspaceSupplierEntryKind.advance);
+      expect(advance.amountMinor, 1250);
+      expect(advance.reference, 'HOST-proposed-reference');
+      expect(advance.paymentMethod, 'NEFT');
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  Future<({WorkSession work, WorkspaceSupplierProfile supplier, WorkspacePurchaseSavedCopy copy,
+    WorkspaceSupplierOpeningRecord opening, _LedgerCheckpointFixtureStore checkpoint})>
+  creditRefundInitialFixture(_AssistantCreditRefundStore forms, {bool refund = false}) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
+    final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+    final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc().subtract(const Duration(days: 1));
+    final day = at.toIso8601String().substring(0, 10);
+    final printed = '${day.substring(8)}/${day.substring(5, 7)}/${day.substring(0, 4)}';
+    final supplier = WorkspaceSupplierProfile(id: 'HOST-ai-adjustment-supplier',
+      name: 'HOST ક્રેડિટ supplier', createdAt: at, updatedAt: at);
+    final bill = WorkspacePurchaseEntryDraft(id: 'HOST-ai-adjustment-bill', supplierId: supplier.id,
+      invoiceReference: 'HOST-ADJUSTMENT-BILL', invoiceDate: printed, createdAt: at, updatedAt: at,
+      goods: const [{'productId': '', 'name': 'HOST original goods', 'pack': '1 kg', 'quantity': '1', 'cost': '100'}],
+      details: const {'invoiceTotal': '100'});
+    final copy = WorkspacePurchaseSavedCopy(id: 'HOST-ai-adjustment-copy', storeName: 'HOST Store',
+      revision: 1, savedAt: at, supplier: supplier, draft: bill, labels: const {});
+    final opening = WorkspaceSupplierOpeningRecord(id: 'HOST-ai-adjustment-opening',
+      basisId: 'HOST-ai-adjustment-basis', account: scope.$1, store: scope.$2, qa: scope.$3,
+      supplierId: supplier.id, revision: 2, asOfDate: day, savedAt: at,
+      amountMinor: refund ? 10000 : 0, supplierCredit: refund, sourceNote: 'HOST confirmed original',
+      bills: [WorkspaceOpeningBillLink(copyId: copy.id, copyRevision: copy.revision,
+        draftId: bill.id, inclusion: WorkspaceOpeningBillInclusion.excluded)]);
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 2, profiles: [supplier], copies: [copy], openingRecords: [opening]);
+    expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+    expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope,
+      expectedRevision: 2, confirmedAt: at), isTrue);
+    if (!refund) {
+      expect(await work.confirmWorkspacePurchaseBill(copy, scope: scope,
+        expectedPurchaseRevision: work.workspacePurchaseEntryRevision!,
+        expectedLedgerRevision: work.workspaceSupplierLedger(supplier.id)!.revision,
+        openingTreatment: WorkspaceOpeningBillInclusion.excluded, confirmedAt: at), isTrue);
+      expect(work.supplierCreditFormKey(copy), isNotNull);
+    }
+    return (work: work, supplier: supplier, copy: copy, opening: opening, checkpoint: checkpoint);
+  }
+
+  StoreSupplierCreditInitialData creditInitialData(WorkspacePurchaseSavedCopy copy,
+    WorkspaceSupplierOpeningRecord opening, String treatment) {
+    final document = WorkspaceSupplierCreditDocumentInput(treatment: treatment, reasonCode: 'tax',
+      taxRows: const [{'rate': '5', 'taxable': '10.00', 'cgst': '0.25', 'sgst': '0.25', 'igst': '0', 'cess': '0'}],
+      particulars: const {'supplierName': 'HOST મૂળ નામ', 'invoiceReferences': 'HOST-ADJUSTMENT-BILL',
+        'signatureDetails': 'As printed; no validation claim'});
+    final day = opening.asOfDate;
+    return StoreSupplierCreditInitialData.fromFields({
+      'supplierId': copy.supplier.id, 'copyId': copy.id, 'billId': copy.draft.id,
+      'copyRevision': copy.revision, 'openingId': opening.id, 'openingRevision': opening.revision,
+      'reference': 'HOST-CN-ગુજરાતી', 'amount': '10.50', 'reason': 'મૂળ કારણ',
+      'occurredOn': '${day.substring(8)}/${day.substring(5, 7)}/${day.substring(0, 4)}',
+      'documentInput': document.toJson(), 'supports': const [],
+    });
+  }
+
+  StoreSupplierRefundInitialData refundInitialData(String supplierId, WorkspaceSupplierOpeningRecord opening,
+    {String? sourceId}) {
+    final day = opening.asOfDate;
+    return StoreSupplierRefundInitialData.fromFields({
+      'supplierId': supplierId, 'openingId': opening.id, 'openingRevision': opening.revision,
+      'sourceKind': WorkspaceSupplierRefundSourceKind.openingAdvance.name,
+      'sourceId': sourceId ?? opening.id, 'amount': '12.50', 'reference': 'HOST-REFUND-મૂળ',
+      'channel': 'UPI', 'occurredOn': '${day.substring(8)}/${day.substring(5, 7)}/${day.substring(0, 4)}',
+    });
+  }
+
+  Future<Completer<MoolAssistantReviewResult>> mountCreditInitial(WidgetTester tester, WorkSession work,
+    WorkspacePurchaseSavedCopy copy, WorkspaceSupplierOpeningRecord opening, {
+    String treatment = 'gst', bool Function()? ownerCurrent, bool settle = true,
+  }) async {
+    final result = Completer<MoolAssistantReviewResult>();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(builder: (context) => Scaffold(
+      body: TextButton(key: const Key('host-open-credit-initial'), onPressed: () async => result.complete(
+        await showStoreSupplierCreditInitialReview(context, work,
+          actionId: treatment == 'gst' ? 'AI-ACT-375' : 'AI-ACT-376', entityId: copy.id,
+          initialData: creditInitialData(copy, opening, treatment),
+          isCurrent: () => true, ownerCurrent: ownerCurrent)), child: const Text('Open credit draft'))))));
+    await tester.tap(find.byKey(const Key('host-open-credit-initial')));
+    if (settle) await tester.pumpAndSettle();
+    else { await tester.pump(); await tester.pump(const Duration(milliseconds: 350)); }
+    return result;
+  }
+
+  Future<Completer<MoolAssistantReviewResult>> mountRefundInitial(WidgetTester tester, WorkSession work,
+    String supplierId, WorkspaceSupplierOpeningRecord opening, {String? proposedSourceId}) async {
+    final result = Completer<MoolAssistantReviewResult>();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(builder: (context) => Scaffold(
+      body: TextButton(key: const Key('host-open-refund-initial'), onPressed: () async => result.complete(
+        await showStoreSupplierRefundInitialReview(context, work,
+          entityId: storeSupplierRefundSourceReference(supplierId: supplierId,
+            sourceKind: WorkspaceSupplierRefundSourceKind.openingAdvance, sourceId: opening.id),
+          initialData: refundInitialData(supplierId, opening, sourceId: proposedSourceId),
+          isCurrent: () => true)), child: const Text('Open refund received'))))));
+    await tester.tap(find.byKey(const Key('host-open-refund-initial')));
+    await tester.pumpAndSettle();
+    return result;
+  }
+
+  // Actual registered financial action -> controller-minted attachment ->
+  // original native form -> original Add copy. No component adapter factory.
+  for (final action in ['259','260','261','262','264','266','375','376']) {
+    for (final outcome in ['add','cancel','unknown reference','no attachment',
+      if(['260','262','266','376'].contains(action))...['request edit','actor ABA','covered','expiry',
+        'held add','stale input','cancel proposal','access revoke','foreground','owner disposed','native limits']]) {
+      testWidgets('FE-OCR-01 ROOT $action $outcome uses registered financial native journey', (tester) async {
+        final compactLarge=outcome=='add'&&['260','262','266','376'].contains(action);
+        var diagnosticPhase='fixture';
+        if(compactLarge){
+          final previousErrorHandler=FlutterError.onError;
+          FlutterError.onError=(details){
+            try{
+              debugPrintSynchronously('OCR_ROOT_LAYOUT action=$action phase=$diagnosticPhase context=${details.context} exception=${details.exceptionAsString()}');
+              final collector=details.informationCollector?.call();
+              if(collector!=null)for(final node in collector){debugPrintSynchronously(node.toStringDeep());}
+            }finally{
+              if(previousErrorHandler!=null)previousErrorHandler(details);else FlutterError.presentError(details);
+            }
+          };
+          addTearDown((){FlutterError.onError=previousErrorHandler;});
+          tester.view.devicePixelRatio=1;tester.view.physicalSize=const Size(320,568);
+          tester.platformDispatcher.textScaleFactorTestValue=2;
+          addTearDown((){tester.view.resetPhysicalSize();tester.view.resetDevicePixelRatio();
+            tester.platformDispatcher.clearTextScaleFactorTestValue();});
+        }
+        final directory = await tester.runAsync(() => Directory.systemTemp.createTemp('host-financial-root-'));
+        final bytes = (await tester.runAsync(_catalogueTestPhoto))!;
+        final retainGate=['held add','stale input'].contains(outcome)?Completer<void>():null;
+        var scans=0, nativePicks=0;
+        WorkPickedProof? nextNativeProof;
+        late final _PurchaseColdOwnerHarness h;
+        final capture = WorkPurchaseInvoiceCapture(currentScope:()=>h.work.workspaceSupplierScope,
+          supportDirectory: () async {await retainGate?.future;return directory!;},
+          recognize: (_) async { scans++; return 'not requested'; },
+          picker: _ReceivingDocumentPicker((_) async { nativePicks++; return nextNativeProof; }));
+        h=_PurchaseColdOwnerHarness(capture: capture);
+        scope_contract.MoolAssistantController? controller;
+        final access=_FinancialRootAccess();
+        try {
+          diagnosticPhase='original fixture';
+          await h.ready(tester, openingCredit: true, captureRoot: compactLarge); await h.admitAccounting(); await tester.pumpAndSettle();
+          final work=h.work, copy=h.copy, opening=h.opening;
+          final money=['259','260','261'].contains(action), allocation=action=='262', refund=action=='266';
+          final entity=refund ? storeSupplierRefundSourceReference(supplierId:h.supplier.id,
+            sourceKind:WorkspaceSupplierRefundSourceKind.openingAdvance,sourceId:opening.id)
+            : ['260','261'].contains(action) ? h.supplier.id : copy.id;
+          final day=opening.asOfDate;
+          final fields=<String,Object?>{};
+          if(money) fields.addAll({'supplierId':h.supplier.id,'openingId':opening.id,
+            'openingRevision':opening.revision,if(action=='259')'copyId':copy.id,
+            'amount':'1.25','reference':'HOST original financial reference','channel':'Cash','occurredOn':day});
+          if(allocation) fields.addAll({'supplierId':h.supplier.id,'copyId':copy.id,'copyRevision':copy.revision,
+            'openingId':opening.id,'openingRevision':opening.revision,'sourceKind':'openingAdvance',
+            'sourceId':opening.id,'amount':'1.25'});
+          if(refund) fields.addAll({'supplierId':h.supplier.id,'openingId':opening.id,'openingRevision':opening.revision,
+            'sourceKind':'openingAdvance','sourceId':opening.id,'amount':'1.25',
+            'reference':'HOST original financial reference','channel':'UPI',
+            'occurredOn':'${day.substring(8)}/${day.substring(5,7)}/${day.substring(0,4)}'});
+          if(!money&&!allocation&&!refund){
+            final initial=creditInitialData(copy,opening,action=='375'?'gst':'commercial');
+            fields.addAll({'supplierId':initial.supplierId,'copyId':initial.copyId,'billId':initial.billId,
+              'copyRevision':initial.copyRevision,'openingId':initial.openingId,'openingRevision':initial.openingRevision,
+              ...initial.inputs,'documentInput':initial.documentInput.toJson(),'supports':const []});
+          }
+          final formKey=money ? work.supplierMoneyFormKey(h.supplier.id,copy:action=='259'?copy:null,advance:action=='260')!
+            : allocation ? work.supplierAllocationFormKey(copy)!
+            : refund ? work.supplierRefundRecoveryFormKey(supplierId:h.supplier.id,
+                sourceKind:WorkspaceSupplierRefundSourceKind.openingAdvance,sourceId:opening.id,openingRevision:opening.revision)!
+            : work.supplierCreditFormKey(copy)!;
+          final adapters=h.native.adapters(tester);
+          final adapter=adapters.singleWhere((a)=>a.actionId=='AI-ACT-$action');
+          expect(adapter,isA<scope_contract.MoolAssistantSelectedDocumentAdapter>());
+          final snapshot=await adapter.snapshot(h.native.readContext(),entity);expect(snapshot,isNotNull);
+          controller=scope_contract.MoolAssistantController(currentContext:h.native.readContext,
+            contextChanges:Listenable.merge([h.native.journey,work,h.native.mode]),entitlements:access,nativeAdapters:adapters,
+            attachments:_ReceivingDocumentPicker((source) async {
+              if(source!=WorkProofSource.gallery)throw StateError('HOST original must use the real Photos path.');
+              return WorkPickedProof(fileName:'HOST-root-original.png',contentType:'image/png',bytes:bytes);
+            }));
+          await controller.refreshAccess();controller.setDraft('Use my original supporting document');
+          await controller.pickAttachment(WorkProofSource.gallery);
+          final reference=controller.selectedDocumentReferences.single.id;
+          final navigator=Navigator.of(tester.element(find.byType(WorkWorkspaceDashboardScreen)),rootNavigator:true);
+          final route=MaterialPageRoute<void>(builder:(_)=>MoolAssistantPage(controller:controller!));
+          for(final a in adapters){if(a is MoolAssistantRouteBoundNativeAdapter)a.bindAssistantRoute(route,navigator);}
+          diagnosticPhase='composer';
+          unawaited(navigator.push(route));await tester.pumpAndSettle();
+          final writes=h.writes, ledger=jsonEncode(work.workspaceSupplierLedger(h.supplier.id)!.toJson());
+          final before=await work.readLedgerForm(formKey);expect(before,isNull);
+          final proposal=scope_contract.MoolAssistantProposal(id:'HOST-root-$action',actionId:'AI-ACT-$action',
+            binding:controller.context.binding,requestRevision:controller.requestRevision,
+            entitlementRevision:controller.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+            validUntil:DateTime.now().add(outcome=='expiry'?const Duration(seconds:10):const Duration(minutes:5)),title:'Review supplier document',
+            summary:'Use the selected original.',entityId:entity,fields:{...fields,
+              if(outcome!='no attachment')'attachmentRef':outcome=='unknown reference'
+                ? 'att-${List.filled(32,'0').join()}' : reference});
+          expect(controller.receiveProposal(proposal),isTrue);
+          await tester.pumpAndSettle();
+          final reviewButton=find.descendant(of:find.byKey(ValueKey('assistant-proposal-${proposal.id}')),
+            matching:find.widgetWithText(FilledButton,'Review'));
+          await tester.ensureVisible(reviewButton);await tester.pumpAndSettle();
+          expect(reviewButton.hitTestable(),findsOneWidget,reason:'The real AI Review control must be tappable before opening the native financial form.');
+          if(compactLarge)await _captureFinancialRootDiagnostic(tester,'$action-before-review');
+          diagnosticPhase='Review tap';await tester.tap(reviewButton);
+          if(retainGate!=null){
+            await tester.pump();await tester.pump(const Duration(milliseconds:80));
+            expect(controller.reviewBusy,isTrue);expect(h.writes,writes);
+            if(outcome=='stale input'){
+              final key=money?'supplier-payment-amount':allocation?'supplier-allocation-amount':refund?'supplier-refund-amount':'supplier-credit-amount';
+              final input=tester.widget<TextField>(find.byKey(Key(key),skipOffstage:false));
+              // Change the actual domain-owned text controller, even when its
+              // UI is disabled by this operation's lease. No draft injection.
+              input.controller!.text='2.50';
+              // No intervening parent frame may be needed to detect changed input.
+            }
+            retainGate.complete();
+          }
+          for(var i=0;i<70&&find.text('Add supporting copy').evaluate().isEmpty;i++){
+            await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:15)));await tester.pump();
+            if(outcome=='unknown reference'&&!controller.reviewBusy)break;
+            if(outcome=='no attachment'&&find.text('Supporting copies · optional').evaluate().isNotEmpty)break;
+          }
+          await tester.pumpAndSettle();
+          if(outcome=='stale input'){
+            expect(find.text('Add supporting copy'),findsNothing);
+            final saved=await work.readLedgerForm(formKey);
+            expect(saved?.supplierSupportingCopies?.active??[],isEmpty);
+            expect(jsonEncode(work.workspaceSupplierLedger(h.supplier.id)!.toJson()),ledger);
+            expect(jsonEncode(saved?.fields??{}),isNot(contains(reference)));
+            expect(scans,0);expect(nativePicks,0);expect(tester.takeException(),isNull);return;
+          }
+          expect(h.writes,writes,reason:'Review opens the actual form and never saves or posts.');
+          expect(await work.readLedgerForm(formKey),isNull);
+          expect(jsonEncode(work.workspaceSupplierLedger(h.supplier.id)!.toJson()),ledger);
+          expect(scans,0);expect(nativePicks,0);
+          if(outcome=='unknown reference'){
+            expect(find.text('Add supporting copy'),findsNothing);expect(controller.reviewBusy,isFalse);return;
+          }
+          final amountKey=money?'supplier-payment-amount':allocation?'supplier-allocation-amount':refund?'supplier-refund-amount':'supplier-credit-amount';
+          final originalCloseKey=money?'supplier-money-close':allocation?'supplier-allocation-close':refund?'supplier-refund-close':'supplier-credit-close';
+          expect(find.byKey(Key(originalCloseKey),skipOffstage:false),findsOneWidget,
+            reason:'The registered action must own its actual existing financial form beneath the copy review.');
+          if(!compactLarge){
+            expect(find.byKey(Key(amountKey),skipOffstage:false),findsOneWidget,
+              reason:'The registered action must populate its real existing financial form.');
+            expect(tester.widget<TextField>(find.byKey(Key(amountKey),skipOffstage:false)).controller!.text,
+              !money&&!allocation&&!refund?'10.50':'1.25',reason:'The original form must be prefilled, not blank navigation.');
+          }
+          if(outcome=='no attachment'){
+            expect(find.text('Add supporting copy'),findsNothing);return;
+          }
+          diagnosticPhase='staged fields';
+          expect(find.text('Add supporting copy'),findsOneWidget);
+          if(compactLarge)await _captureFinancialRootDiagnostic(tester,'$action-staged-fields');
+          final add=find.byKey(const Key('work-receive-fields-keep'));
+          expect(find.descendant(of:add,matching:find.text('Add copy')),findsOneWidget);
+          if(compactLarge){
+            expect(add.hitTestable(),findsOneWidget);
+            final target=tester.getRect(add);
+            expect(target.width,greaterThanOrEqualTo(48));expect(target.height,greaterThanOrEqualTo(48));
+            expect(target.left,greaterThanOrEqualTo(0));expect(target.right,lessThanOrEqualTo(320));
+            expect(target.top,greaterThanOrEqualTo(0));expect(target.bottom,lessThanOrEqualTo(568));
+            expect(tester.takeException(),isNull,reason:'Actual staged Add copy must fit 320 portrait at text scale 2.');
+          }
+          final originalAddCallback=tester.widget<TextButton>(add).onPressed!;
+          if(['request edit','actor ABA','covered','expiry','cancel proposal','access revoke','foreground','owner disposed'].contains(outcome)){
+            final retainedAdd=tester.widget<TextButton>(add).onPressed!;
+            Route<void>? foreign;
+            if(outcome=='covered'){
+              foreign=MaterialPageRoute<void>(builder:(_)=>const Scaffold(body:Text('HOST unrelated root cover')));
+              unawaited(navigator.push(foreign));await tester.pumpAndSettle();
+            }
+            if(outcome=='request edit')controller.setDraft('A different supplier request');
+            if(outcome=='cancel proposal')controller.cancelProposal();
+            if(outcome=='access revoke'){access.revoke();await controller.refreshAccess();}
+            if(outcome=='foreground')controller.setForeground(false);
+            if(outcome=='owner disposed'){
+              final ownerRoute=ModalRoute.of(tester.element(find.byKey(Key(amountKey),skipOffstage:false)))!;
+              navigator.removeRoute(ownerRoute);
+            }
+            if(outcome=='expiry')await tester.pump(const Duration(seconds:11));
+            if(outcome=='actor ABA'){
+              final identity=h.native.principal.identity;
+              h.native.principal.identity=null;h.native.principal.changes.add(null);
+              await tester.pump();await tester.pump(const Duration(milliseconds:50));
+              h.native.principal.identity=identity;h.native.principal.changes.add(null);
+              await tester.pump();await tester.pump(const Duration(milliseconds:50));
+            }
+            await tester.pumpAndSettle();retainedAdd();await tester.pumpAndSettle();
+            if(foreign!=null){expect(foreign.isCurrent,isTrue);expect(find.text('HOST unrelated root cover'),findsOneWidget);}
+            else expect(find.byKey(const Key('work-receive-fields-list'),skipOffstage:false),findsNothing);
+            expect(await work.readLedgerForm(formKey),isNull);expect(h.writes,writes);
+            expect(jsonEncode(work.workspaceSupplierLedger(h.supplier.id)!.toJson()),ledger);
+            expect(tester.takeException(),isNull);return;
+          }
+          if(outcome=='cancel'){
+            await tester.tap(find.byType(BackButton).last);await tester.pumpAndSettle();
+            expect(await work.readLedgerForm(formKey),isNull);expect(h.writes,writes);return;
+          }
+          diagnosticPhase='View original';
+          await tester.tap(find.text('View original'));
+          for(var i=0;i<15;i++){await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:20)));await tester.pump();}
+          await tester.pumpAndSettle();expect(find.byType(WorkspaceOriginalCopyViewer),findsOneWidget);
+          expect(find.byType(Image),findsWidgets);
+          if(compactLarge)await _captureFinancialRootDiagnostic(tester,'$action-original-viewer');
+          diagnosticPhase='Back from original';await tester.pageBack();await tester.pumpAndSettle();
+          diagnosticPhase='Add copy';await tester.tap(add);
+          for(var i=0;i<40&&(await work.readLedgerForm(formKey))?.supplierSupportingCopies?.active.isEmpty!=false;i++){
+            await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:15)));await tester.pump();
+          }
+          await tester.pumpAndSettle();
+          if(compactLarge){
+            diagnosticPhase='financial scroll';
+            await _captureFinancialRootDiagnostic(tester,'$action-after-native-add');
+            // The covered original can defer deep fields at narrow widths. After
+            // native Add returns, expose its actual field through its own scroll.
+            final originalClose=find.byKey(Key(originalCloseKey));
+            expect(originalClose,findsOneWidget);
+            final nativeColumn=find.ancestor(of:originalClose,matching:find.byType(Column)).first;
+            final nativeScroll=find.descendant(of:nativeColumn,matching:find.byType(Scrollable)).first;
+            final originalAmount=find.byKey(Key(amountKey));
+            await tester.scrollUntilVisible(originalAmount,120,maxScrolls:30,scrollable:nativeScroll);
+            await tester.pumpAndSettle();await tester.ensureVisible(originalAmount);await tester.pumpAndSettle();
+            expect(originalAmount.hitTestable(),findsOneWidget);
+            expect(tester.widget<TextField>(originalAmount).controller!.text,
+              !money&&!allocation&&!refund?'10.50':'1.25',reason:'Actual native Add must retain the proposed financial amount unchanged.');
+            expect(tester.takeException(),isNull);
+          }
+          final saved=await work.readLedgerForm(formKey);expect(saved,isNotNull);
+          final copies=saved!.supplierSupportingCopies!;expect(copies.active,hasLength(1));
+          final retained=copies.active.single;
+          expect(retained.fileName,'HOST-root-original.png');expect(retained.source,WorkProofSource.gallery.name);
+          expect(retained.digest,crypto.sha256.convert(bytes).toString());
+          expect(await tester.runAsync(()=>capture.read(work.workspaceSupplierScope!,copies.captureId,retained)),bytes);
+          expect(saved.fields.containsKey('attachmentRef'),isFalse);
+          expect(jsonEncode(saved.fields),isNot(contains(reference)),reason:'Selection metadata must never enter financial draft fields.');
+          expect(jsonEncode(work.workspaceSupplierLedger(h.supplier.id)!.toJson()),ledger);
+          expect(scans,0);expect(nativePicks,0);expect(tester.takeException(),isNull);
+          if(outcome=='native limits'){
+            // Capacity is exercised only after the real new-input Add has saved
+            // this original draft; never inject a saved draft into new-input AI.
+            final prefix=money?'supplier-payment':allocation?'supplier-allocation':refund?'supplier-refund':'supplier-credit';
+            final expand=find.byKey(Key('$prefix-supporting-copies'));
+            await tester.ensureVisible(expand);await tester.tap(find.descendant(of:expand,matching:find.text('Supporting copies · optional')));
+            await tester.pumpAndSettle();
+            final camera=find.byKey(Key('$prefix-copy-camera'));
+            await tester.ensureVisible(camera);await tester.pumpAndSettle();
+            final savedBeforeDuplicate=h.forms.saves;
+            nextNativeProof=WorkPickedProof(fileName:'HOST-root-duplicate.png',contentType:'image/png',bytes:bytes);
+            await tester.tap(camera);
+            await _drainFinancialRootCopyIO(tester,prefix);await tester.pumpAndSettle();
+            expect((await work.readLedgerForm(formKey))!.supplierSupportingCopies!.active,hasLength(1));
+            expect(h.forms.saves,savedBeforeDuplicate);
+            final retainedCamera=tester.widget<TextButton>(camera).onPressed!;
+            for(final color in [const Color(0xffa82233),const Color(0xff2255bb)]){
+              final extra=(await tester.runAsync(()=>_financialRootAdditionalPhoto(color)))!;
+              nextNativeProof=WorkPickedProof(fileName:'HOST-root-extra-${color.toARGB32()}.png',contentType:'image/png',bytes:extra);
+              await tester.ensureVisible(camera);await tester.tap(camera);
+              await _drainFinancialRootCopyIO(tester,prefix);await tester.pumpAndSettle();
+            }
+            final full=await work.readLedgerForm(formKey);expect(full!.supplierSupportingCopies!.active,hasLength(3));
+            expect(tester.widget<TextButton>(camera).onPressed,isNull);
+            final fullBytes=jsonEncode(full.toJson()),fullSaves=h.forms.saves;
+            nextNativeProof=WorkPickedProof(fileName:'HOST-root-fourth.png',contentType:'image/png',
+              bytes:(await tester.runAsync(()=>_financialRootAdditionalPhoto(const Color(0xff22bb55))))!);
+            retainedCamera();originalAddCallback();
+            await _drainFinancialRootCopyIO(tester,prefix);await tester.pumpAndSettle();
+            expect(jsonEncode((await work.readLedgerForm(formKey))!.toJson()),fullBytes);
+            expect(h.forms.saves,fullSaves);expect(scans,0);
+            expect(jsonEncode(work.workspaceSupplierLedger(h.supplier.id)!.toJson()),ledger);
+            expect(tester.takeException(),isNull);
+          }
+        }finally{
+          diagnosticPhase='cleanup';
+          if(retainGate?.isCompleted==false)retainGate!.complete();
+          if(outcome=='native limits'){
+            final prefix=['259','260','261'].contains(action)?'supplier-payment':action=='262'?'supplier-allocation':action=='266'?'supplier-refund':'supplier-credit';
+            await _drainFinancialRootCopyIO(tester,prefix);
+          }
+          controller?.dispose();access.dispose();await h.dispose(tester);
+          if(directory!=null)await tester.runAsync(()=>directory.delete(recursive:true));
+        }
+      });
+    }
+  }
+
+  for (final origin in [WorkProofSource.camera, WorkProofSource.gallery, WorkProofSource.upload]) {
+    for (final outcome in ['original', 'retain failure', 'unknown reference']) {
+      testWidgets('FE-OCR-01 actual Purchase selected original $origin $outcome uses existing native source reader', (tester) async {
+        final directory = await tester.runAsync(() => Directory.systemTemp.createTemp('host-purchase-selected-'));
+        final bytes = (await tester.runAsync(_catalogueTestPhoto))!;
+        late _AuthenticatedNativeScopeFixture native;
+        var ready = false, failRetain = false, nativePicks = 0, scans = 0;
+        scope_contract.MoolAssistantController? controller;
+        final access = _ReceivingAssistantAccess();
+        try {
+          final capture = WorkPurchaseInvoiceCapture(currentScope: () => native.work.workspaceSupplierScope,
+            supportDirectory: () async {
+              if (failRetain) throw const WorkGatewayException('HOST private retention unavailable');
+              return directory!;
+            }, recognize: (_) async { scans++; return 'not requested'; },
+            picker: _ReceivingDocumentPicker((_) async { nativePicks++; return null; }));
+          native = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) =>
+            WorkSession(contactDraftStore: contact, purchaseEntryStore: purchase, inventoryStore: inventory,
+              purchaseInvoiceCapture: capture, tradingPreferencesStoreFactory: (_) => trading,
+              catalogueReference: workspaceMasterCatalogue));
+          await native.ready(); ready = true;
+          final scope = native.work.workspaceSupplierScope!;
+          native.purchase.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+            revision: 1, profiles: const []);
+          expect(await native.work.loadWorkspaceSuppliers(retry: true), isTrue);
+          await tester.pumpWidget(native.app); await tester.pumpAndSettle();
+          await openPurchaseList(tester); await openPurchaseEntryFromList(tester, owner: native.work);
+          final adapters = native.adapters(tester);
+          final adapter = adapters.singleWhere((value) => value.actionId == 'AI-ACT-241');
+          expect(adapter, isA<scope_contract.MoolAssistantSelectedDocumentAdapter>());
+          final snapshot = (await adapter.snapshot(native.readContext(), null))!;
+          final original = jsonEncode(native.purchase.value!.toJson()), saves = native.purchase.saves;
+          controller = scope_contract.MoolAssistantController(currentContext: native.readContext,
+            contextChanges: Listenable.merge([native.journey, native.work, native.mode]), entitlements: access,
+            nativeAdapters: adapters, attachments: _ReceivingDocumentPicker((_) async => WorkPickedProof(
+              fileName: 'HOST-original-ગુજરાતી.png', contentType: 'image/png', bytes: bytes)));
+          await controller.refreshAccess(); controller.setDraft('Review my original supplier invoice');
+          await controller.pickAttachment(origin);
+          final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-purchase-selected', actionId: 'AI-ACT-241',
+            binding: controller.context.binding, requestRevision: controller.requestRevision,
+            entitlementRevision: controller.entitlementRevision!, sourceRevision: snapshot.sourceRevision,
+            validUntil: DateTime.now().add(const Duration(minutes: 5)), title: 'Review supplier document',
+            summary: 'Open the selected original in Purchase entry.', fields: {'attachmentRef': outcome == 'unknown reference'
+              ? 'att-00000000000000000000000000000000' : controller.selectedDocumentReferences.single.id});
+          expect(controller.receiveProposal(proposal), isTrue);
+          final navigator = Navigator.of(tester.element(find.byKey(const Key('work-record-purchase'))), rootNavigator: true);
+          final aiRoute = MaterialPageRoute<void>(settings: const RouteSettings(name: 'mool-assistant'),
+            builder: (_) => MoolAssistantPage(controller: controller!));
+          unawaited(navigator.push(aiRoute)); await tester.pumpAndSettle();
+          failRetain = outcome == 'retain failure';
+          final result = controller.reviewProposal();
+          for (var i=0;i<70&&controller.reviewBusy;i++) {
+            await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds:20))); await tester.pump();
+          }
+          await tester.pumpAndSettle();
+          expect(await result, outcome == 'original' ? scope_contract.MoolAssistantReviewResult.returnToOwner
+              : outcome == 'unknown reference' ? scope_contract.MoolAssistantReviewResult.stale
+              : scope_contract.MoolAssistantReviewResult.unavailable);
+          expect(native.purchase.saves, saves); expect(jsonEncode(native.purchase.value!.toJson()), original);
+          expect(nativePicks, 0); expect(scans, 0);
+          navigator.pop(); await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-record-purchase')), findsOneWidget);
+          if (outcome == 'original') {
+            expect(find.byKey(const Key('purchase-review-original')), findsOneWidget);
+            final retained = (await tester.runAsync(() async => directory!.listSync(recursive: true).whereType<File>().toList()))!;
+            expect(retained, isNotEmpty);
+            final preserved = await tester.runAsync(() async =>
+              Future.wait(retained.map((file) async => crypto.sha256.convert(await file.readAsBytes()).toString())));
+            expect(preserved, contains(crypto.sha256.convert(bytes).toString()));
+          }
+          expect(tester.takeException(), isNull);
+        } finally {
+          controller?.dispose(); await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+          if (ready) await native.dispose(); access.dispose();
+          if (directory != null) await tester.runAsync(() => directory.delete(recursive: true));
+        }
+      });
+    }
+  }
+
+
+  testWidgets('FE-SUPACCOUNT-03 GST and commercial credit prefill never write or post', (tester) async {
+    for (final treatment in ['gst', 'commercial']) {
+      final forms = _AssistantCreditRefundStore();
+      final f = await creditRefundInitialFixture(forms);
+      try {
+        final writes = forms.saves, posts = f.checkpoint.saveAttempts;
+        final before = jsonEncode(f.work.workspaceSupplierLedger(f.supplier.id)!.toJson());
+        await mountCreditInitial(tester, f.work, f.copy, f.opening, treatment: treatment);
+        expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-reference'))).controller!.text, 'HOST-CN-ગુજરાતી');
+        expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-amount'))).controller!.text, '10.50');
+        expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const Key('supplier-credit-type'))).initialValue, treatment);
+        expect(find.text(treatment == 'gst' ? 'GST adjusted' : 'GST unchanged'), findsOneWidget);
+        if (treatment == 'gst') {
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-tax-0-taxable'))).controller!.text, '10.00');
+        }
+        expect(forms.saves, writes);
+        expect(f.checkpoint.saveAttempts, posts);
+        expect(jsonEncode(f.work.workspaceSupplierLedger(f.supplier.id)!.toJson()), before);
+      } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+    }
+  });
+
+  testWidgets('FE-SUPACCOUNT-03 original credit final button saves only a document draft', (tester) async {
+    final forms = _AssistantCreditRefundStore();
+    final f = await creditRefundInitialFixture(forms);
+    try {
+      final posts = f.checkpoint.saveAttempts;
+      final before = jsonEncode(f.work.workspaceSupplierLedger(f.supplier.id)!.toJson());
+      await mountCreditInitial(tester, f.work, f.copy, f.opening);
+      final submit = find.byKey(const Key('supplier-credit-submit'));
+      await tester.ensureVisible(submit); await tester.tap(submit); await tester.pumpAndSettle();
+      expect(forms.saves, greaterThan(0));
+      final saved = (await forms.read(f.work.supplierCreditFormKey(f.copy)!))!;
+      expect(saved.fields['reference'], 'HOST-CN-ગુજરાતી');
+      expect(saved.supplierCreditDocumentInput!.treatment, 'gst');
+      expect(saved.supplierCreditDocumentInput!.taxRows.single['taxable'], '10.00');
+      expect(saved.supplierCreditIntent, isNull);
+      expect(f.checkpoint.saveAttempts, posts);
+      expect(jsonEncode(f.work.workspaceSupplierLedger(f.supplier.id)!.toJson()), before);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-SUPACCOUNT-03 refund prefill is distinct from original money received confirmation', (tester) async {
+    final forms = _AssistantCreditRefundStore();
+    final f = await creditRefundInitialFixture(forms, refund: true);
+    try {
+      final writes = forms.saves, posts = f.checkpoint.saveAttempts;
+      final before = jsonEncode(f.work.workspaceSupplierLedger(f.supplier.id)!.toJson());
+      await mountRefundInitial(tester, f.work, f.supplier.id, f.opening);
+      expect(tester.widget<TextField>(find.byKey(const Key('supplier-refund-amount'))).controller!.text, '12.50');
+      expect(tester.widget<TextField>(find.byKey(const Key('supplier-refund-reference'))).controller!.text, 'HOST-REFUND-મૂળ');
+      expect(forms.saves, writes); expect(f.checkpoint.saveAttempts, posts);
+      expect(jsonEncode(f.work.workspaceSupplierLedger(f.supplier.id)!.toJson()), before);
+      final submit = find.byKey(const Key('supplier-refund-submit'));
+      await tester.ensureVisible(submit); await tester.tap(submit); await tester.pumpAndSettle();
+      expect(f.checkpoint.saveAttempts, greaterThan(posts));
+      final refund = f.work.workspaceSupplierLedger(f.supplier.id)!.refunds.values.single;
+      expect(refund.intent.amountMinor, 1250);
+      expect(refund.intent.reference, 'HOST-REFUND-મૂળ');
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-SUPACCOUNT-03 existing saved credit draft prevents replacement', (tester) async {
+    final forms = _AssistantCreditRefundStore();
+    final f = await creditRefundInitialFixture(forms);
+    try {
+      final key = f.work.supplierCreditFormKey(f.copy)!;
+      final original = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {
+        'reference': 'HOST-original-credit', 'amount': '1.00', 'reason': '', 'occurredOn': '', 'supports': '[]',
+      });
+      await forms.save(original, expectedRevision: null);
+      final writes = forms.saves;
+      final result = await mountCreditInitial(tester, f.work, f.copy, f.opening);
+      expect(await result.future, MoolAssistantReviewResult.unavailable);
+      expect(find.byKey(const Key('supplier-credit-reference')), findsNothing);
+      expect((await forms.read(key))!.fields, original.fields);
+      expect(forms.saves, writes);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-SUPACCOUNT-03 changed owner during form read cannot hydrate credit', (tester) async {
+    final forms = _AssistantCreditRefundStore();
+    final f = await creditRefundInitialFixture(forms);
+    var current = true;
+    try {
+      forms.holdCreditRead = forms.creditReads + 2;
+      forms.readGate = Completer<void>(); forms.readEntered = Completer<void>();
+      final writes = forms.saves, posts = f.checkpoint.saveAttempts;
+      await mountCreditInitial(tester, f.work, f.copy, f.opening, ownerCurrent: () => current, settle: false);
+      await forms.readEntered!.future;
+      current = false; forms.readGate!.complete(); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-reference'))).controller!.text, isEmpty);
+      expect(forms.saves, writes); expect(f.checkpoint.saveAttempts, posts);
+    } finally {
+      if (forms.readGate?.isCompleted == false) forms.readGate!.complete();
+      await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose();
+    }
+  });
+
+  testWidgets('FE-SUPACCOUNT-03 unknown proposed refund source cannot select funds', (tester) async {
+    final forms = _AssistantCreditRefundStore();
+    final f = await creditRefundInitialFixture(forms, refund: true);
+    try {
+      final writes = forms.saves, posts = f.checkpoint.saveAttempts;
+      final result = await mountRefundInitial(tester, f.work, f.supplier.id, f.opening,
+        proposedSourceId: 'not-an-original-source');
+      expect(await result.future, MoolAssistantReviewResult.stale);
+      expect(find.byKey(const Key('supplier-refund-amount')), findsNothing);
+      expect(forms.saves, writes); expect(f.checkpoint.saveAttempts, posts);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  Future<({WorkSession work, WorkspaceSupplierGoodsReceipt receipt, String supplierId,
+    _LedgerCheckpointFixtureStore checkpoint})>
+  supplierReturnRecoveryFixture(_AssistantAdjustmentRecoveryStore forms) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
+    final work = postingOpeningFixture(entry, checkpoint, inventory: true,
+      inventoryStore: _ReceivingProjectionFailureFixture(), moneyStore: forms);
+    final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
+    final day = at.toLocal().toIso8601String().substring(0, 10);
+    final supplier = WorkspaceSupplierProfile(id: 'HOST-ai-return-supplier',
+      name: 'HOST original return supplier', createdAt: at, updatedAt: at);
+    final opening = WorkspaceSupplierOpeningRecord(id: 'HOST-ai-return-opening',
+      basisId: 'HOST-ai-return-basis', account: scope.$1, store: scope.$2, qa: scope.$3,
+      supplierId: supplier.id, revision: 1, asOfDate: day, savedAt: at,
+      amountMinor: 0, supplierCredit: false, sourceNote: 'HOST confirmed zero');
+    expect(await work.loadWorkspaceInventory(), isTrue);
+    final product = work.workspaceCatalogueItems.first.copyWith(stockMode: WorkspaceStockMode.exactQuantity);
+    expect(work.addOrUpdateWorkspaceProduct(product.copyWith(stock: product.stock + 1)), isTrue);
+    expect(await work.workspaceInventorySaved, isTrue);
+    final receipt = WorkspaceSupplierGoodsReceipt(id: 'HOST-ai-return-receipt',
+      expectedDeliveryId: 'HOST-ai-return-delivery', reference: 'HOST original delivery',
+      deliveredOn: day, recordedAt: at, lines: [WorkspaceSupplierGoodsReceiptLine(
+        sourceLineId: 'HOST-ai-return-line', productId: product.id, productLabel: product.title,
+        purchaseUnit: product.pack, stockUnit: product.pack, unitsPerPack: 1,
+        deliveredMilli: 3000, acceptedMilli: 2000, damagedMilli: 1000, shortMilli: 0, expectedMilli: 3000)]);
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 1, profiles: [supplier], openingRecords: [opening], goodsReceiptDrafts: [
+        WorkspaceSupplierGoodsReceiptDraft(supplierId: supplier.id, revision: 1, receipt: receipt)]);
+    expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+    expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope,
+      expectedRevision: 1, confirmedAt: at), isTrue);
+    expect(await work.confirmWorkspaceSupplierGoodsReceipt(receipt, supplierId: supplier.id,
+      scope: scope, expectedPurchaseRevision: 1, expectedSupplierRevision: 1, requireSavedReview: true),
+      WorkspaceGoodsReceiptSaveResult.saved);
+    return (work: work, receipt: receipt, supplierId: supplier.id, checkpoint: checkpoint);
+  }
+
+  Future<Completer<MoolAssistantReviewResult>> mountAdjustmentRecovery(WidgetTester tester,
+    WorkSession work, String actionId, String entityId, String operationId, {bool settle = true}) async {
+    final result = Completer<MoolAssistantReviewResult>();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(
+      builder: (context) => Scaffold(body: TextButton(key: const Key('host-open-adjustment-recovery'),
+        onPressed: () async => result.complete(await showStoreSupplierAdjustmentRecoveryReview(context, work,
+          actionId: actionId, entityId: entityId, operationId: operationId, isCurrent: () => true)),
+        child: const Text('Open original adjustment recovery'))))));
+    await tester.tap(find.byKey(const Key('host-open-adjustment-recovery')));
+    if (settle) { await tester.pumpAndSettle(); }
+    else { await tester.pump(); await tester.pump(const Duration(milliseconds: 350)); }
+    return result;
+  }
+
+  for (final action in ['AI-ACT-265', 'AI-ACT-267', 'AI-ACT-378', 'AI-ACT-380', 'AI-ACT-379']) {
+    for (final mode in ['original', 'revision changed']) {
+      testWidgets('FE-SUPACCOUNT-03 $action restores only original recovery $mode', (tester) async {
+        final forms = _AssistantAdjustmentRecoveryStore();
+        late final WorkSession work;
+        late final _LedgerCheckpointFixtureStore checkpoint;
+        late final WorkspaceLedgerFormKey key;
+        late final String entityId, operationId, statusKey;
+        late final Map<String, String> fields;
+        if (action == 'AI-ACT-380') {
+          final f = await supplierReturnRecoveryFixture(forms);
+          work = f.work; checkpoint = f.checkpoint;
+          key = work.supplierGoodsReturnFormKey(f.supplierId, f.receipt.id)!;
+          final line = f.receipt.lines.single;
+          final intent = WorkspaceSupplierGoodsReturnIntent(operationId: 'HOST-frozen-return-recovery',
+            accountScope: key.account, workspaceId: key.store, supplierId: key.customer,
+            receiptId: f.receipt.id, reference: 'HOST-RETURN-01', reason: 'HOST original return',
+            returnedOn: f.receipt.deliveredOn, requestedAt: DateTime.now().toUtc(), lines: [
+              WorkspaceSupplierGoodsReturnLine(receiptLineId: line.sourceLineId, productId: line.productId,
+                productLabel: line.productLabel, purchaseUnit: line.purchaseUnit, stockUnit: line.stockUnit,
+                unitsPerPack: line.unitsPerPack, acceptedMilli: 1000, damagedMilli: 0)]);
+          operationId = intent.operationId;
+          entityId = storeSupplierReturnSourceReference(supplierId: f.supplierId, receiptId: f.receipt.id);
+          statusKey = 'supplier-return-status';
+          fields = {'reference': intent.reference, 'reason': intent.reason, 'returnedOn': intent.returnedOn,
+            'items': jsonEncode(intent.lines.map((line) => line.toJson()).toList()), 'attempt': jsonEncode(intent.toJson())};
+        } else {
+          final refund = action != 'AI-ACT-265' && action != 'AI-ACT-379';
+          final f = await creditRefundInitialFixture(forms, refund: refund);
+          work = f.work; checkpoint = f.checkpoint;
+          if (refund) {
+            final intent = WorkspaceSupplierRefundIntent(operationId: 'HOST-frozen-refund-recovery',
+              accountScope: work.workspaceSupplierScope!.$1, workspaceId: work.workspaceSupplierScope!.$2,
+              supplierId: f.supplier.id, qa: work.workspaceSupplierScope!.$3,
+              openingId: f.opening.id, openingRevision: f.opening.revision,
+              sourceKind: WorkspaceSupplierRefundSourceKind.openingAdvance, sourceId: f.opening.id,
+              amountMinor: 1250, reference: 'HOST-REFUND-01', occurredOn: f.opening.asOfDate,
+              paymentMethod: 'UPI', requestedAt: DateTime.now().toUtc());
+            key = intent.formKey; operationId = intent.operationId;
+            entityId = storeSupplierRefundSourceReference(supplierId: f.supplier.id,
+              sourceKind: intent.sourceKind, sourceId: intent.sourceId);
+            statusKey = 'supplier-refund-status';
+            fields = {'amount': '12.50', 'reference': intent.reference, 'channel': intent.paymentMethod,
+              'occurredOn': intent.occurredOn, 'sourceKind': intent.sourceKind.name,
+              'sourceId': intent.sourceId, 'attempt': jsonEncode(intent.toJson())};
+          } else {
+            key = work.supplierCreditFormKey(f.copy)!;
+            final support = WorkspaceSupplierCreditSupport(kind: WorkspaceSupplierCreditSupportKind.arrivalDamage,
+              receiptId: 'HOST-retained-credit-receipt', receiptLineId: 'HOST-retained-credit-line',
+              billLineIndex: 0, quantityMilli: 1000);
+            // An isolated structurally valid retained request, never posting proof.
+            final intent = WorkspaceSupplierCreditIntent(operationId: 'HOST-frozen-credit-recovery',
+              accountScope: key.account, workspaceId: key.store, supplierId: key.customer,
+              billId: f.copy.draft.id, copyId: f.copy.id, copyRevision: f.copy.revision,
+              openingId: f.opening.id, openingRevision: f.opening.revision,
+              reference: 'HOST-CN-01', occurredOn: f.opening.asOfDate, reason: 'HOST original reason',
+              amountMinor: 700, requestedAt: DateTime.now().toUtc(), supports: [support]);
+            operationId = intent.operationId; entityId = f.copy.id; statusKey = 'supplier-credit-status';
+            fields = {'reference': intent.reference, 'amount': '7.00', 'reason': intent.reason,
+              'occurredOn': intent.occurredOn, 'supports': jsonEncode([support.toJson()]),
+              'attempt': jsonEncode(intent.toJson())};
+          }
+        }
+        try {
+          final original = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: fields);
+          expect(original.valid, isTrue);
+          await forms.save(original, expectedRevision: null);
+          final initialPosts = checkpoint.saveAttempts;
+          if (mode == 'revision changed') {
+            forms.holdKind = key.kind; forms.holdRead = (forms.reads[key.kind] ?? 0) + 2;
+            forms.recoveryGate = Completer<void>(); forms.recoveryEntered = Completer<void>();
+          }
+          await mountAdjustmentRecovery(tester, work, action, entityId, operationId,
+            settle: mode == 'original');
+          if (mode == 'revision changed') {
+            await forms.recoveryEntered!.future;
+            // This legal same-fields revision preserves the immutable native attempt.
+            await forms.save(WorkspaceLedgerFormDraft(key: key, revision: 2, fields: fields), expectedRevision: 1);
+            forms.recoveryGate!.complete();
+          }
+          final saves = forms.saves;
+          await tester.pumpAndSettle();
+          expect(find.byKey(Key(statusKey)), mode == 'original' ? findsOneWidget : findsNothing);
+          expect(forms.saves, saves, reason: 'Restoration must not save, reset or retry a native request.');
+          expect(checkpoint.saveAttempts, initialPosts);
+          expect((await forms.read(key))!.fields, original.fields);
+          expect((await forms.read(key))!.revision, mode == 'original' ? 1 : 2);
+          expect(tester.takeException(), isNull);
+        } finally {
+          if (forms.recoveryGate?.isCompleted == false) forms.recoveryGate!.complete();
+          await tester.pumpWidget(const SizedBox.shrink()); work.dispose();
+        }
+      });
+    }
+  }
+
+  // INSIDE main(), after existing postingOpeningFixture / supplier-return helper.
+  Future<({WorkSession work, _SupplierPrefillStore entry, _LedgerCheckpointFixtureStore checkpoint,
+    WorkspaceSupplierProfile supplier, WorkspacePurchaseSavedCopy copy})>
+  purchaseAssistantFixture({bool saved = false, bool unfinished = false, bool opening = false}) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _SupplierPrefillStore(), checkpoint = _LedgerCheckpointFixtureStore();
+    final work = postingOpeningFixture(entry, checkpoint);
+    final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc().subtract(const Duration(days: 1));
+    final day = at.toLocal().toIso8601String().substring(0, 10);
+    final supplier = WorkspaceSupplierProfile(id: 'HOST-native-purchase-supplier',
+      name: 'HOST મૂળ સપ્લાયર', phone: '+919876543210', address: 'HOST native address', createdAt: at, updatedAt: at);
+    final draft = WorkspacePurchaseEntryDraft(id: 'HOST-original-purchase-draft', supplierId: supplier.id,
+      invoiceReference: 'HOST-ORIGINAL-01', invoiceDate: '${day.substring(8)}/${day.substring(5, 7)}/${day.substring(0, 4)}',
+      createdAt: at, updatedAt: at, goods: const [{'productId': '', 'name': 'HOST original item',
+        'pack': '1 kg', 'quantity': '1', 'cost': '100'}], details: const {'invoiceTotal': '100'});
+    final copy = WorkspacePurchaseSavedCopy(id: 'HOST-native-purchase-copy', storeName: 'HOST Store',
+      revision: 1, savedAt: at, supplier: supplier, draft: draft, labels: const {});
+    final balance = WorkspaceSupplierOpeningRecord(id: 'HOST-native-purchase-opening',
+      basisId: 'HOST-native-purchase-basis', account: scope.$1, store: scope.$2, qa: scope.$3,
+      supplierId: supplier.id, revision: 1, asOfDate: day, savedAt: at,
+      amountMinor: 0, supplierCredit: false, sourceNote: 'HOST confirmed zero', bills: [
+        WorkspaceOpeningBillLink(copyId: copy.id, copyRevision: copy.revision, draftId: draft.id,
+          inclusion: WorkspaceOpeningBillInclusion.excluded)]);
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 1, profiles: [supplier], draft: saved || unfinished ? draft : null,
+      copies: saved ? [copy] : const [], openingRecords: opening ? [balance] : const []);
+    expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+    if (opening) {
+      // Explicit original HOST admission, before the proposed AI review.
+      expect(await work.recoverCustomerLedger(), isTrue);
+      expect(await work.confirmWorkspaceSupplierOpeningRecord(balance, scope: scope,
+        expectedRevision: 1, confirmedAt: at), isTrue);
+    }
+    return (work: work, entry: entry, checkpoint: checkpoint, supplier: supplier, copy: copy);
+  }
+
+  StorePurchaseEntryInitialData purchaseAssistantInitial(String supplierId, {String? name}) =>
+    StorePurchaseEntryInitialData.fromFields({'supplierId': supplierId,
+      if (name != null) 'name': name, 'invoiceReference': 'HOST/ગુજરાતી-01', 'invoiceDate': '26/10/2026',
+      'details': {'documentType': 'GST invoice', 'invoiceTotal': '0031.25',
+        'paidAmount': '005.50', 'paymentMethod': 'UPI', 'notes': 'मूल बिल · Romanised maal'},
+      'goods': [{'name': 'મૂળ ચોખા', 'pack': '2.5 kg bag', 'quantity': '02.500', 'cost': '0012.50',
+        'hsn': '1006', 'gstRate': '5.00', 'batch': 'HOST-બેચ-01'}],
+      'printedTaxRows': [{'label': 'HOST printed GST', 'taxableValue': '0031.25', 'cgst': '0.78', 'sgst': '0.78'}]});
+
+  Future<Completer<MoolAssistantReviewResult>> mountPurchaseAssistant(WidgetTester tester,
+    WorkSession work, {required String actionId, String? entityId, StorePurchaseEntryInitialData? initial,
+    String? query, bool Function()? ownerCurrent}) async {
+    final result = Completer<MoolAssistantReviewResult>();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(builder: (context) =>
+      Scaffold(body: TextButton(key: const Key('host-open-purchase-assistant'), onPressed: () async {
+        result.complete(await showStorePurchaseAssistantReview(context, work, actionId: actionId,
+          entityId: entityId, initialData: initial, query: query, isCurrent: () => true, ownerCurrent: ownerCurrent));
+      }, child: const Text('Open original purchase review'))))));
+    await tester.tap(find.byKey(const Key('host-open-purchase-assistant')));
+    await tester.pumpAndSettle();
+    return result;
+  }
+
+  test('FE-PURCHASE-01 closed raw bill input retains deep immutable original values', () {
+    final row = <String, Object?>{'name': 'મૂળ માલ', 'quantity': '02.500', 'cost': '0012.50'};
+    final details = <String, Object?>{'invoiceTotal': '0031.25', 'paymentMethod': 'UPI'};
+    final initial = StorePurchaseEntryInitialData.fromFields({'supplierId': 'native-supplier',
+      'invoiceReference': 'HOST/ગુજરાતી', 'details': details, 'goods': [row]});
+    row['cost'] = 'changed'; details['invoiceTotal'] = 'changed';
+    expect(initial.goods!.single['cost'], '0012.50');
+    expect(initial.details['invoiceTotal'], '0031.25');
+    expect(() => initial.goods!.single['cost'] = '1', throwsUnsupportedError);
+    expect(() => initial.details['invoiceTotal'] = '1', throwsUnsupportedError);
+    for (final invalid in <Map<String, Object?>>[
+      {'supplierId': 's'}, {'supplierId': 's', 'invoiceReference': 1},
+      {'supplierId': 's', 'attachments': ['/invented/path']},
+      {'supplierId': 's', 'details': {'paymentMethod': 'invented method'}},
+      {'supplierId': 's', 'goods': [{'productId': 'model-assigned-stock'}]},
+      {'supplierId': 's', 'goods': [{'sourceProductId': 'native-id', 'name': 'partial references'}]},
+    ]) { expect(() => StorePurchaseEntryInitialData.fromFields(invalid), throwsFormatException); }
+  });
+
+  testWidgets('FE-PURCHASE-01 252 hydrates original raw bill fields with no write and native discard', (tester) async {
+    final f = await purchaseAssistantFixture();
+    try {
+      final writes = f.entry.saveAttempts, posts = f.checkpoint.saveAttempts;
+      final result = await mountPurchaseAssistant(tester, f.work, actionId: 'AI-ACT-252',
+        initial: purchaseAssistantInitial(f.supplier.id));
+      String input(String key) => tester.widget<TextField>(find.byKey(Key(key))).controller!.text;
+      expect(input('work-purchase-reference'), 'HOST/ગુજરાતી-01');
+      expect(input('work-purchase-item-0'), 'મૂળ ચોખા');
+      expect(input('work-purchase-quantity-0'), '02.500');
+      expect(input('work-purchase-cost-0'), '0012.50');
+      expect(f.entry.saveAttempts, writes); expect(f.checkpoint.saveAttempts, posts);
+      expect(f.work.workspacePurchaseEntryDraft, isNull);
+      await tester.tap(find.byTooltip('Back to AI request'));
+      await tester.pumpAndSettle();
+      expect(find.text('Leave purchase draft?'), findsOneWidget);
+      await tester.tap(find.text('Discard changes'));
+      await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+      expect(f.entry.saveAttempts, writes); expect(f.checkpoint.saveAttempts, posts);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-PURCHASE-01 252 original Save alone retains raw bill and supplier link', (tester) async {
+    final f = await purchaseAssistantFixture();
+    try {
+      final writes = f.entry.saveAttempts, posts = f.checkpoint.saveAttempts;
+      final stock = f.work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+      final result = await mountPurchaseAssistant(tester, f.work, actionId: 'AI-ACT-252',
+        initial: purchaseAssistantInitial(f.supplier.id));
+      await tester.ensureVisible(find.byKey(const Key('work-purchase-draft-save')));
+      await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
+      await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+      final saved = f.work.workspacePurchaseEntryDraft!;
+      expect(saved.supplierId, f.supplier.id);
+      expect(saved.invoiceReference, 'HOST/ગુજરાતી-01');
+      expect(saved.goods.single['quantity'], '02.500');
+      expect(saved.goods.single['cost'], '0012.50');
+      expect(saved.details['invoiceTotal'], '0031.25');
+      expect(saved.details['paidAmount'], '005.50');
+      expect(f.entry.saveAttempts, writes + 1);
+      expect(f.checkpoint.saveAttempts, posts, reason: 'Bill draft text must not record payment or confirm a ledger bill.');
+      expect(f.work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-PURCHASE-01 252 refuses an unfinished saved bill and keeps original input', (tester) async {
+    final f = await purchaseAssistantFixture(unfinished: true);
+    try {
+      final before = jsonEncode(f.work.workspacePurchaseEntryDraft!.toJson()), writes = f.entry.saveAttempts;
+      final result = await mountPurchaseAssistant(tester, f.work, actionId: 'AI-ACT-252',
+        initial: purchaseAssistantInitial(f.supplier.id));
+      expect(await result.future, MoolAssistantReviewResult.stale);
+      expect(find.byKey(const Key('work-purchase-reference')), findsNothing);
+      expect(jsonEncode(f.work.workspacePurchaseEntryDraft!.toJson()), before);
+      expect(f.entry.saveAttempts, writes);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-PURCHASE-01 252 native owner retirement blocks original Save without replacing draft', (tester) async {
+    final f = await purchaseAssistantFixture(); var owner = true;
+    try {
+      final writes = f.entry.saveAttempts;
+      await mountPurchaseAssistant(tester, f.work, actionId: 'AI-ACT-252',
+        initial: purchaseAssistantInitial(f.supplier.id), ownerCurrent: () => owner);
+      final retainedSave = tester.widget<ButtonStyleButton>(find.byKey(const Key('work-purchase-draft-save'))).onPressed!;
+      owner = false;
+      f.work.notifyListeners(); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-purchase-draft-save')), findsNothing);
+      retainedSave();
+      await tester.pumpAndSettle();
+      expect(f.entry.saveAttempts, writes);
+      expect(f.work.workspacePurchaseEntryDraft, isNull);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-PURCHASE-01 253 native lookup seeds Unicode query without selection or writes', (tester) async {
+    final f = await purchaseAssistantFixture(saved: true);
+    try {
+      final writes = f.entry.saveAttempts, posts = f.checkpoint.saveAttempts;
+      final result = await mountPurchaseAssistant(tester, f.work, actionId: 'AI-ACT-253', query: 'મૂળ');
+      expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-search'))).controller!.text, 'મૂળ');
+      expect(find.byKey(ValueKey('work-purchase-copy-${f.copy.id}')), findsOneWidget);
+      expect(f.work.focusedWorkspacePurchaseId, isNull);
+      expect(f.entry.saveAttempts, writes); expect(f.checkpoint.saveAttempts, posts);
+      await tester.tap(find.byTooltip('Back to AI request')); await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  for (final action in ['AI-ACT-254', 'AI-ACT-255']) {
+    testWidgets('FE-PURCHASE-01 $action opens exact original saved bill document controls only', (tester) async {
+      final f = await purchaseAssistantFixture(saved: true);
+      try {
+        final writes = f.entry.saveAttempts, posts = f.checkpoint.saveAttempts;
+        await mountPurchaseAssistant(tester, f.work, actionId: action, entityId: f.copy.id);
+        expect(find.byKey(const Key('work-purchase-saved-copy'), skipOffstage: false), findsOneWidget);
+        if (action == 'AI-ACT-254') {
+          expect(find.byKey(const Key('purchase-full-screen-preview')), findsNothing,
+            reason: 'Read document focuses the native inline view; fullscreen remains an explicit native control.');
+          expect(find.byKey(const Key('purchase-preview-full-screen')), findsWidgets);
+        } else {
+          expect(find.byKey(const Key('purchase-recorded-download')), findsWidgets);
+        }
+        expect(f.entry.saveAttempts, writes); expect(f.checkpoint.saveAttempts, posts);
+        expect(f.work.workspacePurchaseCopies.single.id, f.copy.id);
+      } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+    });
+  }
+
+  testWidgets('FE-PURCHASE-01 256 opens native confirmation and only final consent posts bill', (tester) async {
+    final f = await purchaseAssistantFixture(saved: true, opening: true);
+    try {
+      final posts = f.checkpoint.saveAttempts;
+      await mountPurchaseAssistant(tester, f.work, actionId: 'AI-ACT-256', entityId: f.copy.id);
+      expect(f.checkpoint.saveAttempts, posts);
+      expect(f.work.workspaceSupplierLedger(f.supplier.id)!.purchaseBills, isEmpty);
+      await tester.ensureVisible(find.byKey(const Key('work-purchase-bill-confirm')));
+      await tester.tap(find.byKey(const Key('work-purchase-bill-confirm'))); await tester.pumpAndSettle();
+      expect(find.text('Confirm supplier bill?'), findsOneWidget);
+      expect(f.checkpoint.saveAttempts, posts);
+      await tester.tap(find.byKey(const Key('work-purchase-bill-confirm-accept'))); await tester.pumpAndSettle();
+      expect(f.work.workspaceSupplierLedger(f.supplier.id)!.purchaseBills[f.copy.draft.id]!.copy.id, f.copy.id);
+      expect(f.checkpoint.saveAttempts, posts + 1);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-PURCHASE-01 269 opens original available action centre without business writes', (tester) async {
+    final f = await purchaseAssistantFixture();
+    try {
+      final writes = f.entry.saveAttempts, posts = f.checkpoint.saveAttempts;
+      await mountPurchaseAssistant(tester, f.work, actionId: 'AI-ACT-269');
+      expect(find.byKey(const ValueKey('purchase-category-group-Supplier bills')), findsOneWidget);
+      expect(f.entry.saveAttempts, writes); expect(f.checkpoint.saveAttempts, posts);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+  testWidgets('FE-PURCHASE-01 272 traces exact native receiving movement with no writes', (tester) async {
+    final forms = _AssistantAdjustmentRecoveryStore(), f = await supplierReturnRecoveryFixture(forms);
+    try {
+      if (f.work.localInventoryEnabled && !f.work.workspaceInventoryLoaded) {
+        expect(await f.work.loadWorkspaceInventory(retry: true), isTrue);
+        expect(await f.work.workspaceInventorySaved, isTrue);
+      }
+      final movement = f.work.workspaceStockMovements.firstWhere((movement) =>
+        movement.referenceKind == WorkspaceStockReferenceKind.manualSupplierReceipt &&
+        f.work.workspaceReceivingForStockMovement(movement)?.$1.id == f.receipt.id);
+      final posts = f.checkpoint.saveAttempts, writes = forms.saves;
+      final stock = f.work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+      final result = await mountPurchaseAssistant(tester, f.work, actionId: 'AI-ACT-272', entityId: movement.id);
+      expect(find.text('Receiving details'), findsOneWidget);
+      expect(find.text(f.receipt.reference), findsOneWidget);
+      expect(forms.saves, writes); expect(f.checkpoint.saveAttempts, posts);
+      expect(f.work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
+      await tester.tap(find.byTooltip('Close receiving details')); await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.opened);
+    } finally { await tester.pumpWidget(const SizedBox.shrink()); f.work.dispose(); }
+  });
+
+
+  // INSIDE existing main(). Support file is FILE SCOPE. No new imports.
+  for (final action in ['AI-ACT-252','AI-ACT-254','AI-ACT-255','AI-ACT-269']) {
+    testWidgets('FE-PURCHASE cold $action opens only admitted bill book without report/inventory admission', (tester) async {
+      final h = _PurchaseColdOwnerHarness();
+      try {
+        await h.ready(tester);
+        final calls = h.admissionCalls, writes = h.writes;
+        h.work.forbidAdmission = true;
+        await h.open(tester, action, entity: action == 'AI-ACT-254' || action == 'AI-ACT-255' ? h.copy.id : null,
+          fields: action == 'AI-ACT-252' ? {'supplierId': h.supplier.id,
+            'invoiceReference': 'HOST supplied cold bill',
+            'goods': [{'name': 'HOST printed cold goods', 'pack': '1 kg', 'quantity': '1', 'cost': '100'}]} : const {});
+        expect(h.admissionCalls, calls,
+          reason: 'Neither report-queuing Load/Recover Stock nor ledger projection may run from initial AI review.');
+        expect(h.writes, writes);
+        expect(h.work.workspaceInventoryLoaded, isFalse); expect(h.work.workspaceInvoiceHistoryLoaded, isFalse);
+        if (action == 'AI-ACT-252') {
+          expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-reference')))
+            .controller!.text, 'HOST supplied cold bill');
+        } else if (action == 'AI-ACT-269') {
+          expect(find.byKey(const ValueKey('purchase-category-group-Supplier bills')), findsOneWidget);
+        } else {
+          expect(find.byKey(const Key('work-purchase-saved-copy'), skipOffstage: false), findsOneWidget);
+        }
+      } finally { await h.dispose(tester); }
+    });
+  }
+
+  testWidgets('FE-PURCHASE cold ledger/Stock references remain unavailable without automatic admission', (tester) async {
+    final h = _PurchaseColdOwnerHarness();
+    try {
+      await h.ready(tester); final calls = h.admissionCalls, writes = h.writes;
+      h.work.forbidAdmission = true;
+      final ctx = h.native.readContext();
+      for (final item in [('AI-ACT-256', h.copy.id), ('AI-ACT-272', 'HOST-not-admitted-movement'),
+        ('AI-ACT-265', h.copy.id), ('AI-ACT-267', h.copy.id), ('AI-ACT-378', h.copy.id),
+        ('AI-ACT-380', h.copy.id), ('AI-ACT-379', h.copy.id)]) {
+        final adapter = h.native.adapters(tester).singleWhere((adapter) => adapter.actionId == item.$1);
+        expect(await adapter.snapshot(ctx, item.$2), isNull);
+      }
+      final initial = StorePurchaseEntryInitialData.fromFields({'supplierId': h.supplier.id,
+        'invoiceReference': 'HOST with a Stock reference', 'goods': [{
+          'name': 'HOST supplied printed item', 'sourceProductId': 'HOST-not-admitted-SKU',
+          'sourceSku': 'HOST original SKU', 'sourcePack': '1 kg', 'quantity': '1', 'cost': '100'}]});
+      expect(initial.usesStockReferences, isTrue); expect(initial.referencesCurrent(h.work), isFalse);
+      expect(h.admissionCalls, calls); expect(h.writes, writes);
+    } finally { await h.dispose(tester); }
+  });
+
+  for (final action in ['AI-ACT-253','AI-ACT-269']) {
+    testWidgets('FE-PURCHASE $action original nested bill Back keeps/discards through actual native key', (tester) async {
+      final h = _PurchaseColdOwnerHarness();
+      try {
+        await h.ready(tester);
+        final writes = h.writes;
+        final result = await h.open(tester, action, fields: action == 'AI-ACT-253' ? {'query': 'HOST'} : const {});
+        if (action == 'AI-ACT-253') {
+          await tester.ensureVisible(find.byKey(ValueKey('work-purchase-copy-${h.copy.id}')));
+          await tester.tap(find.byKey(ValueKey('work-purchase-copy-${h.copy.id}'))); await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-purchase-saved-copy')), findsOneWidget);
+          await tester.tap(find.byTooltip('Back to AI request')); await tester.pumpAndSettle();
+          expect(result.isCompleted, isFalse);
+          expect(find.byKey(const Key('work-purchase-search')), findsOneWidget);
+          await tester.tap(find.byKey(const Key('work-purchase-action-centre-open'))); await tester.pumpAndSettle();
+        }
+        await tester.ensureVisible(find.byKey(const Key('purchase-category-Supplier bills')));
+        await tester.tap(find.byKey(const Key('purchase-category-Supplier bills'))); await tester.pumpAndSettle();
+        await tester.ensureVisible(find.byKey(const Key('purchase-action-edit')));
+        await tester.tap(find.byKey(const Key('purchase-action-edit'))); await tester.pumpAndSettle();
+        await usePurchaseControl(tester, 'work-purchase-invoice-section');
+        final reference = find.byKey(const Key('work-purchase-reference'));
+        await tester.ensureVisible(reference); await tester.enterText(reference, 'HOST unsaved native edit');
+        await tester.tap(find.byTooltip('Back to AI request')); await tester.pumpAndSettle();
+        expect(find.text('Leave purchase draft?'), findsOneWidget);
+        await tester.tap(find.text('Keep editing')); await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(reference).controller!.text, 'HOST unsaved native edit');
+        expect(result.isCompleted, isFalse); expect(h.writes, writes);
+        await tester.tap(find.byTooltip('Back to AI request')); await tester.pumpAndSettle();
+        await tester.tap(find.text('Discard changes')); await tester.pumpAndSettle();
+        expect(result.isCompleted, isFalse, reason: 'Inner native Back returns to this actual register first.');
+        expect(h.work.workspacePurchaseEntryDraft!.invoiceReference, h.copy.draft.invoiceReference);
+        expect(h.writes, writes);
+        await tester.tap(find.byTooltip('Back to AI request')); await tester.pumpAndSettle();
+        expect(await result.future, MoolAssistantReviewResult.opened);
+      } finally { await h.dispose(tester); }
+    });
+  }
+
+  testWidgets('FE-PURCHASE 253 actual linked row reacts to selection and native Back', (tester) async {
+    final h = _PurchaseColdOwnerHarness();
+    try {
+      await h.ready(tester);
+      final scope = h.work.workspaceSupplierScope!, at = DateTime.now().toUtc();
+      final record = WorkspacePurchaseRecord(accountScope: scope.$1, workspaceId: scope.$2,
+        supplierId: h.supplier.id, supplierName: 'HOST linked supplier', orderId: 'HOST-LINK-ORDER',
+        shipmentId: 'HOST-LINK-SHIP', revision: 1, createdAt: at, updatedAt: at,
+        stage: WorkspaceSupplyStage.arriving, amountMinor: 10000, itemSummary: 'HOST linked item',
+        paymentLabel: 'Payment pending', receiptState: WorkspaceReceiptState.awaiting, lines: const []);
+      expect(h.work.applyWorkspacePurchases(accountScope: scope.$1, storeId: scope.$2,
+        feedRevision: 1, records: [record], complete: true), isTrue);
+      await tester.pumpAndSettle();
+      final writes = h.writes;
+      final result = await h.open(tester, 'AI-ACT-253', fields: {'query': 'HOST-LINK'});
+      final row = find.byKey(ValueKey('work-purchase-${record.shipmentId}'));
+      await tester.ensureVisible(row); await tester.tap(row); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-purchase-stage')), findsOneWidget);
+      expect(find.textContaining(record.orderId), findsWidgets);
+      expect(h.work.focusedWorkspacePurchaseId, record.shipmentId);
+      expect(result.isCompleted, isFalse);
+      await tester.tap(find.byKey(const Key('work-purchase-back'))); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-purchase-search')), findsOneWidget);
+      expect(row, findsOneWidget); expect(result.isCompleted, isFalse); expect(h.writes, writes);
+    } finally { await h.dispose(tester); }
+  });
+
+  testWidgets('FE-PURCHASE retired 269 pristine Receive closes without any writes', (tester) async {
+    final h = _PurchaseColdOwnerHarness();
+    try {
+      await h.ready(tester); await h.admitAccounting(); await tester.pumpAndSettle();
+      final result = await _openPurchaseNativeReceiving(tester, h);
+      final writes = h.writes;
+      await h.retirePrincipal(tester);
+      await tester.tap(find.byKey(const Key('work-purchase-owner-retired-close')).last);
+      await tester.pumpAndSettle();
+      expect(result.isCompleted, isTrue);
+      expect(find.byKey(const Key('work-purchase-owner-retired-close')), findsNothing);
+      expect(h.writes, writes);
+    } finally { await h.dispose(tester); }
+  });
+
+  for (final failed in [false, true]) {
+    testWidgets('FE-PURCHASE retired Receive ${failed ? 'pending failed input stays protected' : 'exact saved input closes without flush'}', (tester) async {
+      final h = _PurchaseColdOwnerHarness();
+      try {
+        await h.ready(tester); await h.admitAccounting(); await tester.pumpAndSettle();
+        final result = await _openPurchaseNativeReceiving(tester, h);
+        await tester.tap(find.byKey(const Key('work-receive-supplier'))); await tester.pumpAndSettle();
+        await tester.tap(find.text(h.supplier.name).last); await tester.pumpAndSettle();
+        h.forms.failSave = failed;
+        final reference = find.byKey(const Key('work-receive-reference'));
+        await tester.ensureVisible(reference); await tester.enterText(reference, 'HOST retained native arrival');
+        await tester.pumpAndSettle();
+        final controller = tester.widget<TextField>(reference).controller!;
+        await tester.scrollUntilVisible(find.byKey(const Key('work-receive-input-status')), -150,
+          scrollable: find.descendant(of: find.byKey(const Key('work-goods-receiving')),
+            matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
+              widget.axisDirection == AxisDirection.down)));
+        await tester.pumpAndSettle();
+        expect(find.text(failed ? 'Input is not saved yet. Retry saving before leaving.'
+          : 'Draft saved · Stock unchanged'), findsOneWidget);
+        final key = h.work.supplierReceivingInputFormKey(h.supplier.id)!;
+        final retained = await h.work.readLedgerForm(key);
+        final writes = h.writes;
+        await h.retirePrincipal(tester);
+        expect(reference, findsNothing);
+        await tester.tap(find.byKey(const Key('work-purchase-owner-retired-close')).last);
+        await tester.pumpAndSettle();
+        expect(h.writes, writes, reason: 'Retired Close must never retry/flush the old input under another owner.');
+        expect(result.isCompleted, !failed);
+        if (failed) {
+          expect(controller.text, 'HOST retained native arrival');
+          expect(find.byKey(const Key('work-purchase-owner-retired-close')), findsWidgets);
+        } else {
+          expect(retained, isNotNull);
+          expect((await h.work.readLedgerForm(key))!.fields, retained!.fields);
+        }
+      } finally { await h.dispose(tester); }
+    });
+  }
+
+  testWidgets('FE-PURCHASE nested selector hides private inputs for changed principal with same String Store', (tester) async {
+    final h = _PurchaseColdOwnerHarness();
+    try {
+      await h.ready(tester);
+      await h.open(tester, 'AI-ACT-252', fields: {'supplierId': h.supplier.id, 'invoiceReference': 'HOST selected owner'});
+      await tester.ensureVisible(find.byKey(const Key('work-purchase-select-supplier')));
+      await tester.tap(find.byKey(const Key('work-purchase-select-supplier'))); await tester.pumpAndSettle();
+      final search = find.byKey(const Key('work-supplier-search'));
+      await tester.enterText(search, 'HOST private search');
+      final original = tester.widget<TextField>(search).controller!;
+      final writes = h.writes;
+      await h.retirePrincipal(tester);
+      expect(search, findsNothing); expect(find.byKey(const Key('work-purchase-reference')), findsNothing);
+      expect(original.text, 'HOST private search'); expect(h.writes, writes);
+      expect(tester.testTextInput.isVisible, isFalse);
+    } finally { await h.dispose(tester); }
+  });
+
+  testWidgets('FE-PURCHASE fullscreen saved bill wakes for actual principal retirement', (tester) async {
+    final h = _PurchaseColdOwnerHarness();
+    try {
+      await h.ready(tester);
+      await h.open(tester, 'AI-ACT-254', entity: h.copy.id);
+      final fullScreen = find.byKey(const Key('purchase-preview-full-screen'));
+      await tester.ensureVisible(fullScreen); await tester.tap(fullScreen); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('purchase-full-screen-preview')), findsOneWidget);
+      expect(find.textContaining(h.copy.draft.invoiceReference), findsWidgets);
+      final writes = h.writes;
+      await h.retirePrincipal(tester);
+      expect(find.textContaining(h.copy.draft.invoiceReference), findsNothing);
+      expect(find.text('This purchase is no longer available. Close the preview.'), findsOneWidget);
+      expect(h.writes, writes);
+    } finally { await h.dispose(tester); }
+  });
+
+  testWidgets('FE-PURCHASE nested payment retains its actual input but retired final callback cannot post', (tester) async {
+    final h = _PurchaseColdOwnerHarness();
+    try {
+      await h.ready(tester); await h.admitAccounting(); await tester.pumpAndSettle();
+      await h.open(tester, 'AI-ACT-255', entity: h.copy.id);
+      await tester.ensureVisible(find.byKey(const Key('work-purchase-record-payment')));
+      await tester.tap(find.byKey(const Key('work-purchase-record-payment'))); await tester.pumpAndSettle();
+      final amount = find.byKey(const Key('supplier-payment-amount'));
+      await tester.enterText(amount, '1.00');
+      await tester.enterText(find.byKey(const Key('supplier-payment-reference')), 'HOST actual payment input');
+      final excluded = find.byKey(const Key('supplier-money-opening-excluded'));
+      if (excluded.evaluate().isNotEmpty) { await tester.ensureVisible(excluded); await tester.tap(excluded); }
+      await tester.pumpAndSettle();
+      final original = tester.widget<TextField>(amount).controller!;
+      final submit = tester.widget<FilledButton>(find.byKey(const Key('supplier-money-submit'))).onPressed;
+      expect(submit, isNotNull);
+      final writes = h.writes;
+      final ledger = jsonEncode(h.work.workspaceSupplierLedger(h.supplier.id)!.toJson());
+      await h.retirePrincipal(tester);
+      expect(amount, findsNothing); expect(find.byKey(const Key('supplier-money-submit')), findsNothing);
+      expect(tester.widget<TextField>(find.byKey(const Key('supplier-payment-amount'), skipOffstage: false))
+        .controller, same(original));
+      submit!(); await tester.pumpAndSettle();
+      expect(h.writes, writes); expect(jsonEncode(h.work.workspaceSupplierLedger(h.supplier.id)!.toJson()), ledger);
+      expect(tester.takeException(), isNull);
+    } finally { await h.dispose(tester); }
+  });
+
+  // INSERT inside existing main(), after the Purchase cold-owner tests/support.
+  // Uses actual authenticated HOST actor plus original native stores and controls.
+  testWidgets('AI financial snapshots never cold-admit ledger/inventory/report sources', (tester) async {
+    final h = _PurchaseColdOwnerHarness();
+    try {
+      await h.ready(tester); final calls = h.admissionCalls, writes = h.writes;
+      h.work.forbidAdmission = true;
+      for (final action in ['AI-ACT-259','AI-ACT-260','AI-ACT-261','AI-ACT-262','AI-ACT-263',
+        'AI-ACT-264','AI-ACT-265','AI-ACT-266','AI-ACT-267','AI-ACT-375','AI-ACT-376',
+        'AI-ACT-377','AI-ACT-378','AI-ACT-379','AI-ACT-380','AI-ACT-258']) {
+        final adapter = h.native.adapters(tester).singleWhere((adapter) => adapter.actionId == action);
+        final entity = action == 'AI-ACT-260' || action == 'AI-ACT-261' || action == 'AI-ACT-258'
+          ? h.supplier.id : h.copy.id;
+        expect(await adapter.snapshot(h.native.readContext(), entity), isNull, reason: action);
+      }
+      expect(h.admissionCalls, calls); expect(h.writes, writes);
+      expect(h.work.workspaceInvoiceHistoryLoaded, isFalse);
+    } finally { await h.dispose(tester); }
+  });
+
+  for (final action in ['AI-ACT-257','AI-ACT-381']) {
+    testWidgets('AI $action independently fills original book-only opening without claiming posting', (tester) async {
+      final h = _PurchaseColdOwnerHarness();
+      try {
+        await h.ready(tester, openingRecord: action == 'AI-ACT-381');
+        final calls = h.admissionCalls, writes = h.writes;
+        h.work.forbidAdmission = true;
+        await h.open(tester, action, entity: h.supplier.id, fields: {
+          'supplierId': h.supplier.id,
+          'openingId': action == 'AI-ACT-381' ? h.opening.id : null,
+          'openingRevision': action == 'AI-ACT-381' ? h.opening.revision : null,
+          'directoryRevision': h.work.workspacePurchaseEntryRevision!, 'asOfDate': h.opening.asOfDate,
+          'amount': '0012.50', 'sourceNote': 'HOST supplied original source',
+          'amountKnown': true, 'supplierCredit': false, 'billInclusions': <String,Object?>{},
+        });
+        expect(tester.widget<TextField>(find.byKey(const Key('work-opening-amount'))).controller!.text, '0012.50');
+        expect(find.text('Supplier account status unavailable'), findsOneWidget);
+        expect(h.admissionCalls, calls); expect(h.writes, writes);
+        expect(h.work.workspaceInvoiceHistoryLoaded, isFalse);
+      } finally { await h.dispose(tester); }
+    });
+  }
+
+  testWidgets('AI 268 shows original balance unavailable view without cold ledger recovery', (tester) async {
+    final h = _PurchaseColdOwnerHarness();
+    try {
+      await h.ready(tester); final calls = h.admissionCalls, writes = h.writes;
+      h.work.forbidAdmission = true;
+      await h.open(tester, 'AI-ACT-268', entity: h.supplier.id);
+      expect(find.text('Supplier account balance unavailable'), findsOneWidget);
+      expect(h.admissionCalls, calls); expect(h.writes, writes);
+      expect(h.work.workspaceInvoiceHistoryLoaded, isFalse);
+    } finally { await h.dispose(tester); }
+  });
+
+  testWidgets('AI 270 fills original expense input independently of cold ledger posting', (tester) async {
+    final h = _PurchaseColdOwnerHarness(admitBook: false);
+    try {
+      await h.ready(tester, expense: true);
+      final calls = h.admissionCalls, writes = h.writes;
+      h.work.forbidAdmission = true;
+      await h.open(tester, 'AI-ACT-270', fields: {'amount': '0012.50', 'reference': 'HOST-EXP-COLD',
+        'channel': 'Cash', 'category': 'Repair', 'note': 'HOST supplied expense text'});
+      expect(tester.widget<TextField>(find.byKey(const Key('store-expense-amount'))).controller!.text, '0012.50');
+      expect(tester.widget<TextField>(find.byKey(const Key('store-expense-reference'))).controller!.text, 'HOST-EXP-COLD');
+      expect(h.admissionCalls, calls); expect(h.writes, writes);
+      expect(h.work.workspaceSuppliersLoaded, isFalse);
+      expect(h.work.workspaceInvoiceHistoryLoaded, isFalse);
+    } finally { await h.dispose(tester); }
+  });
+
+  testWidgets('AI warm money initial load never repeats native ledger admission', (tester) async {
+    final h = _PurchaseColdOwnerHarness();
+    try {
+      await h.ready(tester); await h.admitAccounting(); await tester.pumpAndSettle();
+      final calls = h.admissionCalls, writes = h.writes;
+      h.work.forbidAdmission = true;
+      await h.open(tester, 'AI-ACT-260', entity: h.supplier.id, fields: {
+        'supplierId': h.supplier.id, 'openingId': h.opening.id, 'openingRevision': h.opening.revision,
+        'amount': '0001.25', 'reference': 'HOST supplied advance', 'channel': 'Cash', 'occurredOn': h.opening.asOfDate,
+      });
+      expect(tester.widget<TextField>(find.byKey(const Key('supplier-payment-amount'))).controller!.text, '0001.25');
+      expect(h.admissionCalls, calls); expect(h.writes, writes);
+    } finally { await h.dispose(tester); }
+  });
+
+  for (final action in ['AI-ACT-264','AI-ACT-375','AI-ACT-376']) {
+    testWidgets('AI $action warm native credit initial load stays read-only', (tester) async {
+      final h = _PurchaseColdOwnerHarness();
+      try {
+        await h.ready(tester); await h.admitAccounting(); await tester.pumpAndSettle();
+        final data = creditInitialData(h.copy, h.opening, action == 'AI-ACT-375' ? 'gst' : 'commercial');
+        final calls = h.admissionCalls, writes = h.writes;
+        h.work.forbidAdmission = true;
+        await h.open(tester, action, entity: h.copy.id, fields: {
+          'supplierId': data.supplierId, 'copyId': data.copyId, 'billId': data.billId,
+          'copyRevision': data.copyRevision, 'openingId': data.openingId, 'openingRevision': data.openingRevision,
+          ...data.inputs, 'documentInput': data.documentInput.toJson(), 'supports': const [],
+        });
+        expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-reference'))).controller!.text,
+          data.inputs['reference']);
+        expect(h.admissionCalls, calls); expect(h.writes, writes);
+      } finally { await h.dispose(tester); }
+    });
+  }
+
+  testWidgets('AI allocation inspects original checkpoint without reset/recover or source replacement', (tester) async {
+    final h = _PurchaseColdOwnerHarness();
+    try {
+      await h.ready(tester); await h.admitAccounting();
+      final scope = h.work.workspaceSupplierScope!, ledger = h.work.workspaceSupplierLedger(h.supplier.id)!;
+      expect(await h.work.recordWorkspaceSupplierMoney(h.supplier.id, accountScope: scope.$1,
+        workspaceId: scope.$2, expectedRevision: ledger.revision, entry: WorkspaceSupplierLedgerEntry(
+          operationId: 'HOST-cold-allocation-source', reference: 'HOST original advance',
+          origin: WorkspaceSupplierEntryOrigin.supplierAccount, kind: WorkspaceSupplierEntryKind.advance,
+          amountMinor: 1000, paymentMethod: 'Cash', postedAt: DateTime.now().toUtc(),
+          moneyReview: WorkspaceSupplierMoneyReview(occurredOn: h.opening.asOfDate,
+            openingId: h.opening.id, openingRevision: h.opening.revision, notIncludedInOpening: true))), isTrue);
+      expect(await h.work.recoverCustomerLedger(), isTrue); await tester.pumpAndSettle();
+      final key = h.work.supplierAllocationFormKey(h.copy)!;
+      final calls = h.admissionCalls, writes = h.writes;
+      h.work.forbidAdmission = true;
+      expect(await h.work.inspectWorkspaceSupplierAllocationCheckpoint(key), isTrue);
+      expect(h.work.workspaceInvoiceHistoryLoaded, isTrue);
+      await h.open(tester, 'AI-ACT-262', entity: h.copy.id, fields: {
+        'supplierId': h.supplier.id, 'copyId': h.copy.id, 'copyRevision': h.copy.revision,
+        'openingId': h.opening.id, 'openingRevision': h.opening.revision,
+        'sourceKind': 'accountAdvance', 'sourceId': 'HOST-cold-allocation-source', 'amount': '0001.25',
+      });
+      expect(tester.widget<TextField>(find.byKey(const Key('supplier-allocation-amount'))).controller!.text, '0001.25');
+      expect(h.admissionCalls, calls); expect(h.writes, writes);
+      final saved = h.checkpoint.value; h.checkpoint.value = null;
+      try {
+        expect(await h.work.inspectWorkspaceSupplierAllocationCheckpoint(key), isFalse);
+        expect(h.work.workspaceInvoiceHistoryLoaded, isTrue, reason: 'Inspection must not reset/recover the native ledger.');
+        expect(h.admissionCalls, calls); expect(h.writes, writes);
+      } finally { h.checkpoint.value = saved; }
+    } finally { await h.dispose(tester); }
+  });
 
   testWidgets('SUPPLIERDIRECTORYUI invalid fields cancel and uncertain save recovery', (tester) async {
     FlutterSecureStorage.setMockInitialValues({});
@@ -30413,14 +38679,7 @@ void main() {
           await openRecordedSales(tester);
           await tester.pumpAndSettle();
         } else if (surface == 'credit') {
-          await tester.tap(find.byKey(const Key('work-dashboard-profile')));
-          await tester.pumpAndSettle();
-          final operations = find.byKey(
-            const Key('global-profile-quick-operations'),
-          );
-          await reveal(tester, operations);
-          await tester.tap(operations);
-          await tester.pumpAndSettle();
+          await openStoreTools(tester);
         }
         final action = find.byKey(
           Key(switch (surface) {
@@ -51170,6 +59429,163 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final action in ['AI-ACT-318', 'AI-ACT-319', 'AI-ACT-327']) {
+    testWidgets('AI-SETTINGS $action original status Apply retries its exact failed native durable attempt', (tester) async {
+      late _SettingsFailingTradingStore trading;
+      final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, _) {
+        trading = _SettingsFailingTradingStore(contact.accountScope);
+        return WorkSession(contactDraftStore: contact, purchaseEntryStore: purchase, inventoryStore: inventory,
+          tradingPreferencesStoreFactory: (_) => trading, catalogueReference: workspaceMasterCatalogue);
+      });
+      await f.ready(); addTearDown(f.dispose);
+      await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+      final fields = switch (action) {
+        'AI-ACT-318' => <String, Object?>{'acceptingOrders': false, 'busyMinutes': 15, 'reopensAt': 'Tomorrow'},
+        'AI-ACT-319' => <String, Object?>{'openingTime': '09:00', 'closingTime': '21:00', 'maximumActiveOrders': 7},
+        _ => <String, Object?>{'visibleToCustomers': false},
+      };
+      final proposal = await stockAssistantProposal(tester, f, action, fields: fields);
+      final adapter = f.adapters(tester).singleWhere((value) => value.actionId == action);
+      expect(await adapter.openReview(proposal, () => true), MoolAssistantReviewResult.returnToOwner);
+      await tester.pumpAndSettle(); expect(trading.saves, 0);
+      // For visibility, exercise the native hours field too, so there is a real
+      // durable preference attempt rather than only an in-session flag.
+      if (action == 'AI-ACT-327') {
+        final dynamic native = tester.widget(find.byWidgetPredicate((value) => value.runtimeType.toString() == '_WorkspaceStatusSurface'));
+        native.onOpeningTimeChanged('09:15'); await tester.pump();
+      }
+      trading.failSave = true;
+      await tester.tap(find.byKey(const Key('work-status-save'))); await tester.pumpAndSettle();
+      expect(trading.saves, 1); expect(f.work.workspaceTradingPreferencesSaved, isFalse);
+      expect(find.byKey(const Key('work-status-save')), findsOneWidget);
+      trading.failSave = false;
+      await tester.tap(find.byKey(const Key('work-status-save'))); await tester.pumpAndSettle();
+      expect(trading.saves, 2); expect(f.work.workspaceTradingPreferencesSaved, isTrue);
+      if (action == 'AI-ACT-318') { expect(f.work.workspaceAcceptingOrders, isFalse); expect(f.work.workspaceBusyMinutes, 15); }
+      if (action == 'AI-ACT-319') expect(f.work.workspaceMaximumActiveOrders, 7);
+      if (action == 'AI-ACT-327') expect(f.work.workspaceVisibleToCustomers, isFalse);
+    });
+  }
+  testWidgets('AI-SETTINGS actual status native Apply refuses a notified foreign change even after values are restored', (tester) async {
+    final f = _AuthenticatedNativeScopeFixture(); await f.ready(); addTearDown(f.dispose);
+    await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+    final proposal = await stockAssistantProposal(tester, f, 'AI-ACT-319',
+      fields: {'openingTime': '09:00', 'closingTime': '21:00', 'maximumActiveOrders': 7});
+    final adapter = f.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-319');
+    await adapter.openReview(proposal, () => true); await tester.pumpAndSettle();
+    final original = f.work.workspaceMaximumActiveOrders;
+    final writes = f.writes;
+    f.work.workspaceMaximumActiveOrders = original + 100;
+    f.work.notifyListeners();
+    f.work.workspaceMaximumActiveOrders = original;
+    f.work.notifyListeners();
+    // No explicit source check while the foreign value exists: only real
+    // native notifications may retire the captured review before this tap.
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-status-save'))); await tester.pumpAndSettle();
+    expect(f.writes, writes); expect(f.work.workspaceMaximumActiveOrders, original);
+    expect(find.byKey(const Key('work-status-save')), findsOneWidget);
+  });
+  testWidgets('AI-SETTINGS captured Store A callbacks and Apply cannot mutate Store B after manual status reopen', (tester) async {
+    final f = _AuthenticatedNativeScopeFixture(); await f.ready(); addTearDown(f.dispose);
+    await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+    final proposal = await stockAssistantProposal(tester, f, 'AI-ACT-318', fields: {'acceptingOrders': true});
+    final adapter = f.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-318');
+    await adapter.openReview(proposal, () => true); await tester.pumpAndSettle();
+    final dynamic old = tester.widget(find.byWidgetPredicate((value) => value.runtimeType.toString() == '_WorkspaceStatusSurface'));
+    final apply = tester.widgetList<WorkPrimaryButton>(find.byType(WorkPrimaryButton)).singleWhere((value) => value.keyName == 'work-status-save').onPressed!;
+    // Native route handoff, then change the fixture Store on the same State.
+    old.onPaymentControls(); await tester.pumpAndSettle();
+    f.work.workspaceId = 'host-settings-store-B';
+    f.work.activeWorkspace = const WorkWorkspace(id: 'host-settings-store-B', name: 'Host B',
+      profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery', area: 'Host', verified: true);
+    f.work.notifyListeners(); await tester.pumpAndSettle();
+    final dynamic operation = tester.widget(find.byWidgetPredicate((value) => value.runtimeType.toString() == '_WorkspaceOperationSurface'));
+    operation.onOpenRoute('/app/work/workspace/dashboard'); await tester.pumpAndSettle();
+    final dynamic before = tester.widget(find.byWidgetPredicate((value) => value.runtimeType.toString() == '_WorkspaceStatusSurface'));
+    final snapshot = [before.openingTime, before.acceptingOrders, before.visibleToCustomers, before.maximumActiveOrders];
+    final writes = f.writes;
+    old.onOpeningTimeChanged('06:06'); old.onAcceptingChanged(false); old.onVisibilityChanged(false);
+    old.onMaximumActiveOrdersChanged(99); apply(); await tester.pumpAndSettle();
+    final dynamic after = tester.widget(find.byWidgetPredicate((value) => value.runtimeType.toString() == '_WorkspaceStatusSurface'));
+    expect([after.openingTime, after.acceptingOrders, after.visibleToCustomers, after.maximumActiveOrders], snapshot);
+    expect(f.writes, writes); expect(f.work.activeWorkspace!.id, 'host-settings-store-B');
+  });
+
+  for (final finish in ['save', 'back', 'retire']) {
+    testWidgets('AI-SETTINGS transferred status detaches source observation on native $finish', (tester) async {
+      late _SettingsListenerSession tracked;
+      final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, _) {
+        tracked = _SettingsListenerSession(contactDraftStore: contact, purchaseEntryStore: purchase,
+          inventoryStore: inventory, catalogueReference: workspaceMasterCatalogue);
+        return tracked;
+      });
+      await f.ready(); addTearDown(f.dispose);
+      await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+      final proposal = await stockAssistantProposal(tester, f, 'AI-ACT-319', fields: const {'openingTime': '07:20'});
+      final adapter = f.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-319');
+      final before = tracked.settingsListeners.toSet();
+      expect(await adapter.openReview(proposal, () => true), MoolAssistantReviewResult.returnToOwner);
+      await tester.pumpAndSettle();
+      final transferred = tracked.settingsListeners.difference(before);
+      expect(transferred, isNotEmpty);
+      // Core has already returned; temporary dialog coverage must keep the native observer.
+      final modal = showDialog<void>(context: tester.element(find.byKey(const Key('work-status-save'))),
+        builder: (context) => AlertDialog(actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Continue settings'))]));
+      await tester.pumpAndSettle(); expect(tracked.settingsListeners.containsAll(transferred), isTrue);
+      await tester.tap(find.text('Continue settings')); await modal; await tester.pumpAndSettle();
+      if (finish == 'save') {
+        await tester.tap(find.byKey(const Key('work-status-save'))); await tester.pumpAndSettle();
+      } else if (finish == 'back') {
+        await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+        final discard = find.byKey(const Key('work-settings-discard-dialog'));
+        expect(discard, findsOneWidget);
+        expect(tracked.settingsListeners.containsAll(transferred), isTrue,
+          reason: 'Unsaved native input stays owned until the user confirms leaving.');
+        await tester.tap(find.descendant(of: discard, matching: find.text('Discard')));
+        await tester.pumpAndSettle();
+      } else {
+        f.work.workspaceId = 'host-settings-retired';
+        f.work.activeWorkspace = const WorkWorkspace(id: 'host-settings-retired', name: 'Host retired',
+          profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery', area: 'Host', verified: true);
+        f.work.notifyListeners();
+        await tester.pumpAndSettle();
+        expect(tracked.settingsListeners.intersection(transferred), isEmpty);
+      }
+      if (finish != 'retire') expect(tracked.settingsListeners.intersection(transferred), isEmpty);
+    });
+  }
+
+  for (final finish in ['dismiss', 'back']) {
+    testWidgets('AI-SETTINGS transferred alert detaches observation after native $finish', (tester) async {
+      late _SettingsListenerSession tracked;
+      final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, _) => tracked =
+        _SettingsListenerSession(contactDraftStore: contact, purchaseEntryStore: purchase,
+          inventoryStore: inventory, catalogueReference: workspaceMasterCatalogue));
+      await f.ready(); addTearDown(f.dispose);
+      f.work.retailerSetupSaved = true; f.work.workspaceAcceptingOrders = false;
+      f.work.dismissedWorkspaceAlerts.remove('store-paused'); f.work.notifyListeners();
+      await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+      final proposal = await stockAssistantProposal(tester, f, 'AI-ACT-328', fields: {'alertId': 'store-paused'}, entityId: 'store-paused');
+      final adapter = f.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-328');
+      final before = tracked.settingsListeners.toSet();
+      expect(await adapter.openReview(proposal, () => true), MoolAssistantReviewResult.returnToOwner);
+      await tester.pumpAndSettle();
+      final transferred = tracked.settingsListeners.difference(before); expect(transferred, isNotEmpty);
+      if (finish == 'dismiss') {
+        await tester.tap(find.byKey(const Key('work-alert-dismiss-store-paused')));
+      } else {
+        await tester.binding.handlePopRoute();
+      }
+      await tester.pumpAndSettle();
+      expect(tracked.settingsListeners.intersection(transferred), isEmpty);
+      expect(f.work.dismissedWorkspaceAlerts.contains('store-paused'), finish == 'dismiss');
+      expect(find.text('Your Store or account changed. Reopen alerts.'), findsNothing);
+      expect(find.byKey(const Key('work-alert-dismiss-store-paused')), findsNothing);
+      expect(find.byKey(const Key('work-store-home')), findsOneWidget);
+    });
+  }
+
   for (final scale in [1.0, 2.0]) {
     testWidgets(
       'AP030 stock keyboard retains focus and settings have no rail $scale',
@@ -52797,13 +61213,7 @@ void main() {
           if (surface == 'product') {
             // The global saved-record search remains in Customer records;
             // Stock search intentionally searches only Stock products.
-            await openStoreProfile(tester);
-            final operations = find.byKey(
-              const Key('global-profile-quick-operations'),
-            );
-            await reveal(tester, operations);
-            await tester.tap(operations);
-            await tester.pumpAndSettle();
+            await openStoreTools(tester);
             final customers = find.byKey(const Key('work-business-customers'));
             await reveal(tester, customers);
             expect(customers.hitTestable(), findsOneWidget);
@@ -53501,14 +61911,7 @@ void main() {
         // The approved single profile entry is on Store home, not Orders.
         await tester.tap(find.byKey(const Key('work-store-home')));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('work-dashboard-profile')));
-        await tester.pumpAndSettle();
-        final operations = find.byKey(
-          const Key('global-profile-quick-operations'),
-        );
-        await reveal(tester, operations);
-        await tester.tap(operations);
-        await tester.pumpAndSettle();
+        await openStoreTools(tester);
         final customers = find.byKey(const Key('work-business-customers'));
         await reveal(tester, customers);
         expect(customers.hitTestable(), findsOneWidget);
@@ -60285,6 +68688,34 @@ void main() {
     }
   }
 
+  for (final condition in ['approved', 'pending', 'wrong-store', 'stale', 'no-owner', 'read-failed', 'signed-out']) {
+    testWidgets('PROFILE-F05 Store Profile approval $condition', (tester) async {
+      final work = liveStore();
+      final controller = await prepareStoreProcurement(work);
+      final workspace = work.activeWorkspace!;
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        procurementFactory: () => controller,
+        dashboardAccountAuthenticated: condition != 'signed-out',
+        wrapper: (child) => MoolAssistantWorkspaceScope(readWorkspace: () {
+          if (condition == 'read-failed') throw StateError('host source unavailable');
+          return scope_contract.MoolAssistantWorkspace(
+            id: condition == 'wrong-store' ? 'different-store' : workspace.id,
+            name: workspace.name, profile: workspace.profileId,
+            revision: work.navigationScopeRevision! + (condition == 'stale' ? 1 : 0),
+            approved: condition != 'pending', isStore: true,
+            approvalAccountScope: condition == 'no-owner' ? null : 'isolated-host-account',
+          );
+        }, child: child),
+      );
+      await openStoreProfile(tester);
+      expect(find.byKey(const Key('global-profile-approved-workspace')),
+        condition == 'approved' ? findsOneWidget : findsNothing);
+      expect(find.byKey(const Key('global-profile-quick-actions')),
+        findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final authenticated in [false, true]) {
     testWidgets('FVC004 Store profile reflects account state $authenticated', (
       tester,
@@ -60304,8 +68735,8 @@ void main() {
         authenticated ? findsNothing : findsOneWidget,
       );
       expect(
-        find.text('Active'),
-        authenticated ? findsWidgets : findsOneWidget,
+        find.text('Signed in'),
+        authenticated ? findsWidgets : findsNothing,
       );
       expect(tester.takeException(), isNull);
     });
@@ -71581,42 +80012,22 @@ void main() {
       );
       const oilQuery = 'Fortune Sunflower Oil 1 L pouch';
       expect(find.text('Wholesale and Bulk'), findsNothing);
-      final storeName = find.byKey(const Key('work-store-full-name'));
-      expect(tester.widget<Text>(storeName).data, work.activeWorkspace!.name);
-      expect(tester.widget<Text>(storeName).maxLines, 2);
-      expect(
-        tester.renderObject<RenderParagraph>(storeName).textScaler.scale(1),
-        scale,
-      );
-      expect(
-        tester.widget<Semantics>(find.byKey(const Key('work-procurement-buyer-context'))).properties.label,
-        contains('Buying for ${work.activeWorkspace!.name}'),
-      );
+      expect(find.byKey(const Key('work-store-full-name')), findsNothing,
+        reason: 'Approved shared Restock header omits the duplicate Store-name row.');
+      expect(find.byKey(const Key('work-procurement-buyer-context')), findsNothing);
       expect(find.byType(AppBar), findsOneWidget);
       expect(
-        tester
-            .getSize(find.byKey(const Key('work-dashboard-inline-header')))
-            .height,
-        greaterThanOrEqualTo(tester.getSize(storeName).height),
-      );
-      expect(
-        tester.getSize(find.byKey(const Key('work-back'))).height,
+        tester.getSize(find.byKey(const ValueKey('buy-restock-back'))).height,
         greaterThanOrEqualTo(48),
-      );
-      expect(
-        tester.getRect(storeName).top,
-        greaterThanOrEqualTo(0),
-        reason:
-            'The full Store name must remain inside the visible shared header.',
       );
       expect(buy.query, oilQuery);
       expect(consumer.query, consumerQuery);
       expect(consumer.cartTotal, consumerCart);
       expect(buy.procurementScopeCurrent, isTrue);
       expect(buy.destination, BuyV2Destination.wholesale);
-      expect(buy.selectedFilter, 'nearby');
+      expect(buy.selectedFilter, isNull, reason: 'The approved Store Restock channel policy clears the removed location/supplier filter.');
       expect(buy.quantityFor(cartProduct.id), cartQuantity);
-      final searchControl = find.byKey(const Key('work-dashboard-search'));
+      final searchControl = find.byKey(const ValueKey('buy-search-control'));
       expect(
         find.descendant(of: searchControl, matching: find.text(oilQuery)),
         findsOneWidget,
@@ -71625,7 +80036,7 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.tap(searchControl);
       await tester.pumpAndSettle();
-      final search = find.byKey(const Key('work-dashboard-search-field'));
+      final search = find.byKey(const ValueKey('buy-search-field'));
       expect(tester.widget<TextField>(search).controller!.text, oilQuery);
       await tester.enterText(search, 'sunflower oil');
       tester.view.viewInsets = const FakeViewPadding(bottom: 220);
@@ -71639,11 +80050,19 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       await captureStoreView(tester, 'restock-search-keyboard-$scale');
-      buy.showSavedProducts(true);
+      // Saved controls belong to the original catalogue, not search results.
+      await tester.enterText(search, '');
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.tap(find.byKey(const ValueKey('buy-search-close')));
+      await tester.pumpAndSettle();
+      final savedControl = find.byKey(const ValueKey('buy-saved-products-button'));
+      expect(savedControl, findsOneWidget);
+      await tester.ensureVisible(savedControl);
+      await tester.tap(savedControl);
       await tester.pumpAndSettle();
       final savedEmpty = find.text('No saved products yet');
       final statusScroll = find.descendant(
-        of: find.byKey(const Key('buy-catalogue-status-scroll')),
+        of: find.ancestor(of: savedEmpty, matching: find.byType(SingleChildScrollView)).first,
         matching: find.byType(Scrollable),
       ).first;
       await tester.scrollUntilVisible(
@@ -71657,7 +80076,13 @@ void main() {
       expect(savedEmpty.hitTestable(), findsOneWidget);
       expect(buy.quantityFor(cartProduct.id), cartQuantity);
       expect(tester.takeException(), isNull);
-      buy.showSavedProducts(false);
+      await tester.ensureVisible(savedControl);
+      await tester.tap(savedControl);
+      await tester.tap(searchControl);
+      await tester.pumpAndSettle();
+      await tester.enterText(search, 'sunflower oil');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+      await tester.pumpAndSettle();
       final commerce = buy.commerceAdapter as _StorePurchaseCommerce;
       commerce.unavailable = true;
       await buy.restoreCommerce();
@@ -71677,7 +80102,7 @@ void main() {
       tester.view.viewInsets = FakeViewPadding.zero;
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('work-back')));
+      await tester.tap(find.byKey(const ValueKey('buy-restock-back')));
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('work-stock-statement-screen')),
@@ -71712,23 +80137,26 @@ void main() {
       await tester.pumpAndSettle();
       expect(buy.query, 'Store Brand Daily grocery product 3 4 kg pack');
       expect(
-        tester.widget<TextField>(search).controller!.text,
-        buy.query,
+        find.descendant(of: searchControl, matching: find.text(buy.query)),
+        findsOneWidget,
         reason:
             'The shared search field must show the newly opened stock product.',
       );
       expect(buy.quantityFor(cartProduct.id), cartQuantity);
-      expect(buy.selectedFilter, 'nearby');
+      expect(buy.selectedFilter, isNull, reason: 'The approved Store Restock channel policy clears the removed location/supplier filter.');
       await captureStoreView(tester, 'restock-second-product-search-$scale');
       expect(tester.takeException(), isNull);
       final emptyScroll = find.byKey(
         const ValueKey('buy-empty-products-scroll'),
       );
       expect(emptyScroll, findsOneWidget);
+      expect(buy.hasNarrowedProductSearchScope, isFalse,
+        reason: 'Approved Restock policy removed the previous supplier/location filter.');
       final clearSearch = find.descendant(
         of: emptyScroll,
-        matching: find.widgetWithText(TextButton, 'Clear search and filters'),
+        matching: find.widgetWithText(TextButton, 'Clear search'),
       );
+      expect(clearSearch, findsOneWidget);
       await tester.ensureVisible(clearSearch);
       await tester.pumpAndSettle();
       final floatingCart = find.byKey(
@@ -71795,7 +80223,7 @@ void main() {
             'cart=${tester.getRect(find.byKey(const ValueKey('buy-mini-cart-drag-handle')))}',
       );
       expect(tester.getSize(clearSearch).height, greaterThanOrEqualTo(48));
-      expect(tester.getSize(floatingCart), const Size(48, 48));
+      expect(tester.getSize(floatingCart), const Size(44, 44));
       expect(floatingCart.hitTestable(), findsOneWidget);
       final recoveryRect = tester.getRect(clearSearch);
       final visibleRect = tester.getRect(emptyScroll);
@@ -71812,13 +80240,26 @@ void main() {
             'clear=$recoveryRect cart=$cartRect viewport=$visibleRect',
       );
       expect(clearSearch.hitTestable(), findsOneWidget);
-      final overlayRect = tester.getRect(
+      // Restock delegates Cart to the existing shared Store navigation rail.
+      // Its content overlay is intentionally absent in this native route.
+      expect(
         find.byKey(const ValueKey('buy-embedded-compact-cart-overlay')),
+        findsNothing,
       );
-      expect(cartRect.left, greaterThanOrEqualTo(overlayRect.left));
-      expect(cartRect.right, lessThanOrEqualTo(overlayRect.right));
-      expect(cartRect.top, greaterThanOrEqualTo(overlayRect.top));
-      expect(cartRect.bottom, lessThanOrEqualTo(overlayRect.bottom));
+      final cartRail = find.byKey(
+        const Key('moolsocial-compact-destination-rail'),
+      );
+      expect(cartRail, findsOneWidget);
+      expect(
+        find.descendant(of: cartRail, matching: floatingCart),
+        findsOneWidget,
+      );
+      final railRect = tester.getRect(cartRail);
+      expect(cartRect.left, greaterThanOrEqualTo(railRect.left));
+      expect(cartRect.right, lessThanOrEqualTo(railRect.right));
+      expect(cartRect.top, greaterThanOrEqualTo(railRect.top));
+      expect(cartRect.bottom, lessThanOrEqualTo(railRect.bottom));
+      expect(visibleRect.bottom, lessThanOrEqualTo(railRect.top));
       await tester.pump(const Duration(milliseconds: 200));
       await tester.pumpAndSettle();
       expect(tester.getRect(clearSearch), recoveryRect);
@@ -71835,12 +80276,20 @@ void main() {
         findsNothing,
       );
       expect(tester.takeException(), isNull);
+      await tester.tap(searchControl);
+      await tester.pumpAndSettle();
       expect(
         tester.widget<TextField>(search).controller!.text,
         isEmpty,
         reason:
             'Clearing Restock search must also clear the visible shared field.',
       );
+      // Confirm the cleared shared input above, then use the actual Close
+      // control to return to catalogue content before inspecting promotions.
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.tap(find.byKey(const ValueKey('buy-search-close')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-search-field')), findsNothing);
       await captureStoreView(tester, 'restock-cleared-catalogue-$scale');
       expect(
         find.byKey(const ValueKey('buy-promotion-wholesale-shop')),
@@ -71856,6 +80305,14 @@ void main() {
           ),
         ]) {
           final promotion = find.byKey(ValueKey(key));
+          if (promotion.evaluate().isEmpty) {
+            final catalogue = find.byKey(PageStorageKey(
+              'buy-${buy.destination.name}-${buy.selectedCategoryId}'
+              '-${buy.saleTypeSignature}-all',
+            ));
+            final scroll = find.descendant(of: catalogue, matching: find.byType(Scrollable)).first;
+            await tester.scrollUntilVisible(promotion, 160, scrollable: scroll, maxScrolls: 30);
+          }
           await tester.ensureVisible(promotion);
           await tester.pumpAndSettle();
           for (final copy in [title, detail]) {
@@ -71877,6 +80334,8 @@ void main() {
       }
       // OPPO: search recovery, then Bulk and Android Back must detach the
       // catalogue without leaving inherited-widget dependents behind.
+      await tester.tap(searchControl);
+      await tester.pumpAndSettle();
       await tester.tap(search);
       await tester.enterText(search, 'zzqav12');
       tester.view.viewInsets = const FakeViewPadding(bottom: 220);
@@ -71884,9 +80343,14 @@ void main() {
       // Android keyboard dismissal does not necessarily relinquish focus.
       tester.view.viewInsets = FakeViewPadding.zero;
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('work-dashboard-search-clear')));
+      await tester.tap(find.byKey(const ValueKey('buy-search-clear')));
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(search).controller!.text, isEmpty);
+      // Empty query still has the original search overlay open. Bulk belongs
+      // to the catalogue header, reached through its actual Close control.
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.tap(find.byKey(const ValueKey('buy-search-close')));
+      await tester.pumpAndSettle();
       final bulkTab = find.text('Bulk');
       final catalogueScroll = find.descendant(
         of: find.byKey(PageStorageKey(
@@ -85248,7 +93712,7 @@ class _UpiDestinationFixtureStore implements WorkUpiDestinationStore {
   Future<WorkspaceUpiDestination?> read(String account, String store) async =>
       _destinations[(account, store)];
   @override
-  Future<void> save(WorkspaceUpiDestination destination) async {
+  Future<void> save(WorkspaceUpiDestination destination, {bool Function()? current, String? expectedDestinationFingerprint}) async {
     _destinations[(destination.account, destination.store)] = destination;
   }
 }
@@ -85311,6 +93775,39 @@ class _ReceiptDraftFixtureStore implements WorkReceiptDraftStore {
       throw StateError('Fixture revision conflict');
     }
     values[draft.key] = WorkspaceReceiptDraft.fromJson(draft.toJson())!;
+  }
+}
+
+// Isolated host supplier-prefill storage fixture; never a runtime provider.
+// File-scope host-only storage owner; simulates a committed profile reply loss.
+class _SupplierEditReplyStore extends _SupplierPrefillStore {
+  bool loseNextReply = false;
+  final payloads = <WorkspacePurchaseEntryBook>[];
+  @override
+  Future<void> save(WorkspacePurchaseEntryBook book, {required int? expectedRevision}) async {
+    payloads.add(book);
+    await super.save(book, expectedRevision: expectedRevision);
+    if (loseNextReply) { loseNextReply = false; throw StateError('HOST reply lost after original save'); }
+  }
+}
+
+class _SupplierPrefillStore extends _OpeningPostingFixtureStore {
+  int saveAttempts = 0;
+  Completer<void>? readGate;
+  @override
+  Future<WorkspacePurchaseEntryBook?> read(
+    String account, String store, {required bool qa}
+  ) async {
+    final saved = await super.read(account, store, qa: qa);
+    await readGate?.future;
+    return saved;
+  }
+  @override
+  Future<void> save(WorkspacePurchaseEntryBook book, {
+    required int? expectedRevision,
+  }) async {
+    saveAttempts++;
+    await super.save(book, expectedRevision: expectedRevision);
   }
 }
 
@@ -85487,4 +93984,1629 @@ class _ContactDraftFixtureStore implements WorkPendingProofStore {
   Future<void> clear(String scope) async {
     value = null;
   }
+}
+
+
+void _work02NativeTests() {
+  test('AI-WORK02 exact nine closed preparation schemas retain Unicode text only', () {
+    const ids = ['AI-ACT-187','AI-ACT-188','AI-ACT-189','AI-ACT-190','AI-ACT-191','AI-ACT-192','AI-ACT-193','AI-ACT-194','AI-ACT-195'];
+    for (final id in ids) {
+      expect(() => work_setup.WorkspaceSetupInitialData.fromFields(id, {'approved': true}), throwsFormatException);
+      expect(() => work_setup.WorkspaceSetupInitialData.fromFields(id, {'privateToken': 'x'}), throwsFormatException);
+    }
+    final details = work_setup.WorkspaceSetupInitialData.fromFields('AI-ACT-190', {'name': 'सूर्य ट्रेडर्स', 'area': 'जयपुर', 'activity': 'किराना'});
+    expect(details.fields['name'], 'सूर्य ट्रेडर्स');
+    expect(() => details.fields['name'] = 'changed', throwsUnsupportedError);
+    expect(() => work_setup.WorkspaceSetupInitialData.fromFields('AI-ACT-188', {'applicationId': ' '}), throwsFormatException);
+  });
+  test('AI-WORK02 scope observes source ABA and never revives; exact own ACK remains current', () {
+    final changes = _Work02Signal(); var source = 'original', storage = 'application-A', owner = true;
+    final scope = work_setup.WorkspaceSetupReviewScope(ownerCurrent: () => owner, storageCurrent: () => owner,
+      storageOwnerCurrent: () => owner, readSource: () => source, readStorageIdentity: () => storage,
+      changes: changes, ownerKey: Object());
+    expect(changes.listeners, 1);
+    source = 'own-known-ack'; scope.acceptNativeChange(); changes.notifyListeners(); expect(scope.current(), isTrue);
+    source = 'foreign'; changes.notifyListeners(); source = 'own-known-ack'; changes.notifyListeners();
+    expect(scope.current(), isFalse); expect(changes.listeners, 0);
+    scope.acceptNativeChange(); expect(scope.current(), isFalse);
+    scope.dispose(); changes.dispose();
+  });
+  testWidgets('AI-WORK02 actual details Review is ephemeral until native Continue', (tester) async {
+    final f = await _Work02NativeFixture.create(); addTearDown(f.dispose);
+    final saved = (f.work.workName, f.work.workArea, f.work.primaryActivity), writes = f.store.saves;
+    await tester.pumpWidget(f.details({'name':'Surya Traders','area':'Jaipur','activity':'Groceries'}));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-name'))).controller!.text, 'Surya Traders');
+    expect((f.work.workName, f.work.workArea, f.work.primaryActivity), saved); expect(f.store.saves, writes);
+    await tester.enterText(find.byKey(const Key('work-name')), 'Edited Surya Traders'); await tester.pump();
+    expect(f.work.workName, saved.$1); expect(f.store.saves, writes);
+    final next = find.text('Continue to documents'); await tester.ensureVisible(next); await tester.tap(next); await tester.pumpAndSettle();
+    expect(f.work.workName, 'Edited Surya Traders'); expect(f.work.workArea, 'Jaipur'); expect(f.work.primaryActivity, 'Groceries');
+    expect(f.scope.current(), isTrue); await f.work.flushContactDraft(); expect(f.store.saves, greaterThan(writes));
+    expect(f.work.reviewCaseId, isNull); expect(f.work.declarationAccepted, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('AI-WORK02 actual native field change-notify-restore-notify blocks stale Save', (tester) async {
+    final f = await _Work02NativeFixture.create(); addTearDown(f.dispose);
+    await tester.pumpWidget(f.details({'name':'Surya Traders','area':'Jaipur','activity':'Groceries'})); await tester.pumpAndSettle();
+    final baseline = f.work.workArea, writes = f.store.saves;
+    f.work.workArea = 'Foreign edit'; f.work.notifyListeners();
+    f.work.workArea = baseline; f.work.notifyListeners(); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-name')), findsNothing);
+    expect(find.textContaining('Your application or account changed.'), findsOneWidget);
+    expect(find.text('Continue to documents'), findsNothing); expect(f.store.saves, writes);
+    expect(f.work.workName, isNot('Surya Traders'));
+  });
+  testWidgets('AI-WORK02 native prepared Close keeps raw draft without autosaving', (tester) async {
+    final f = await _Work02NativeFixture.create(); addTearDown(f.dispose);
+    await tester.pumpWidget(MaterialApp(theme:MoolTheme.light(), home:Builder(builder:(context) => TextButton(
+      onPressed:() => Navigator.of(context).push<void>(MaterialPageRoute(builder:(_) => f.detailsBody({'name':'Surya Traders','area':'Jaipur','activity':'Groceries'}, close:() => Navigator.of(f.routeContext!).pop()))), child:const Text('Open')))));
+    await tester.tap(find.text('Open')); await tester.pumpAndSettle();
+    final writes = f.store.saves;
+    await tester.enterText(find.byKey(const Key('work-name')), 'Unsaved exact draft'); await tester.pump();
+    await tester.tap(find.byTooltip('Close application')); await tester.pumpAndSettle();
+    expect(f.store.saves, writes); expect(f.work.workName, isNot('Unsaved exact draft'));
+    await tester.tap(find.text('Open')); await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-name'))).controller!.text, 'Unsaved exact draft');
+    expect(f.store.saves, writes);
+  });
+  testWidgets('AI-WORK02 proof Review does not choose files upload submit or accept declaration', (tester) async {
+    final f = await _Work02NativeFixture.create(); addTearDown(f.dispose);
+    final writes=f.store.saves; await tester.pumpWidget(f.details({},step:1)); await tester.pumpAndSettle();
+    expect(f.store.saves,writes); expect(f.work.addedProofs,isEmpty); expect(f.work.pickedProofs,isEmpty);
+    expect(f.work.declarationAccepted,isFalse); expect(f.work.reviewCaseId,isNull);
+    expect(f.scope.current(),isTrue); expect(tester.takeException(),isNull);
+  });
+  testWidgets('AI-WORK02 native chooser offers only the four actual trade application candidates', (tester) async {
+    final f=await _Work02NativeFixture.create(selectProfile:false); addTearDown(f.dispose);
+    final writes=f.store.saves;
+    await tester.pumpWidget(MaterialApp(theme:MoolTheme.light(),home:work_setup.WorkChooseActivityScreen(session:f.work,
+      preparedScope:f.scope,permittedProfiles:f.work.storeWorkspaceApplicationProfiles.map((p)=>p.id).toSet(),onPreparedClose:(){},onNativeRoute:(_){f.routes++;})));
+    await tester.pumpAndSettle();
+    expect(f.work.storeWorkspaceApplicationProfiles.map((p)=>p.id).toSet(), {'retailer-grocery','retailer-speciality','wholesaler','manufacturer'});
+    expect(f.work.selectedProfile,isNull); expect(f.store.saves,writes); expect(f.routes,0);
+    expect(find.textContaining('Care'),findsNothing); expect(find.textContaining('Food'),findsNothing);
+    expect(tester.takeException(),isNull);
+  });
+  testWidgets('AI-WORK02 public native adapter opens real details; real owner signal hides retired private fields', (tester) async {
+    final f=await _Work02NativeFixture.create(); addTearDown(f.dispose);
+    final nav=GlobalKey<NavigatorState>(); await tester.pumpWidget(MaterialApp(theme:MoolTheme.light(),navigatorKey:nav,home:const Scaffold(body:Text('Original Buy'))));
+    final coordinator=work_setup.WorkspaceSetupNativeCoordinator(), owner=_Work02Signal(); addTearDown(coordinator.dispose); addTearDown(owner.dispose);
+    final actor=Object(); var live=true;
+    final context=scope_contract.MoolAssistantContext(accountScope:'host-work02',authenticationRevision:1);
+    final adapters=work_setup.workspaceSetupNativeAdapters(session:f.work,navigator:nav.currentState!,coordinator:coordinator,
+      currentContext:()=>context,accountIdentity:()=>actor,accountAuthenticated:()=>true,nativeAccountCurrent:()=>f.work.workspaceApplicationAccountScope=='host-work02',
+      isRootCurrent:()=>true,isNavigationCurrent:()=>true,approvedWorkspacesCurrent:()=>false,changes:f.work,onNativeRoute:(_){f.routes++;});
+    expect(adapters.map((a)=>a.actionId).toSet(), {for(var i=187;i<=195;i++) 'AI-ACT-$i'});
+    final a=adapters.singleWhere((a)=>a.actionId=='AI-ACT-190'); final source=await a.snapshot(context,null); expect(source,isNotNull);
+    final proposal=scope_contract.MoolAssistantProposal(id:'HOST-work02',actionId:a.actionId,binding:context.binding,
+      requestRevision:1,entitlementRevision:'host-entitlement',sourceRevision:source!.sourceRevision,validUntil:DateTime.now().add(const Duration(minutes:5)),
+      title:'Review application details',summary:'Review native details.',fields:{'name':'Surya Traders','area':'Jaipur','activity':'Groceries'});
+    final writes=f.store.saves;
+    final result=(a as scope_contract.MoolAssistantOwnerAwareNativeAdapter).openOwnedReview(proposal,isCurrent:()=>live,ownerChanges:owner);
+    await tester.pumpAndSettle(); expect(find.byKey(const Key('work-name')),findsOneWidget); expect(f.store.saves,writes);
+    live=false; owner.notifyListeners(); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-name')),findsNothing); expect(find.textContaining('Your application or account changed.'),findsOneWidget);
+    await tester.tap(find.byTooltip('Close application')); await tester.pumpAndSettle();
+    expect(await result,scope_contract.MoolAssistantReviewResult.stale); expect(f.routes,0); expect(f.store.saves,writes);
+    // This exercises the documented real ownerChanges seam reaction, not controller cancellation.
+  });
+
+  testWidgets('AI-WORK02 distinct proposals preserve their own native drafts and reopen exact original', (tester) async {
+    final f=await _Work02AdapterFixture.create(tester); addTearDown(f.dispose);
+    final a=await f.proposal('proposal-A','Name A'), b=await f.proposal('proposal-B','Name B');
+    final writes=f.native.store.saves;
+    final first=f.open(a); await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-name')),'Edited Name A'); await tester.pump();
+    await tester.tap(find.byTooltip('Close application')); await tester.pumpAndSettle();
+    expect(await first,scope_contract.MoolAssistantReviewResult.returnToOwner);
+    final second=f.open(b); await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-name'))).controller!.text,'Name B');
+    await tester.enterText(find.byKey(const Key('work-name')),'Edited Name B'); await tester.pump();
+    await tester.tap(find.byTooltip('Close application')); await tester.pumpAndSettle(); await second;
+    final reopenedA=f.open(a); await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-name'))).controller!.text,'Edited Name A');
+    await tester.tap(find.byTooltip('Close application')); await tester.pumpAndSettle(); await reopenedA;
+    final reopenedB=f.open(b); await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-name'))).controller!.text,'Edited Name B');
+    f.live=false; f.owner.notifyListeners(); await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Close application')); await tester.pumpAndSettle();
+    expect(await reopenedB,scope_contract.MoolAssistantReviewResult.stale);
+    expect(f.native.store.saves,writes); expect(f.native.work.workName,isNot('Edited Name A'));
+    expect(f.native.work.workName,isNot('Edited Name B'));
+  });
+  testWidgets('AI-WORK02 captured Close and transfer cannot pop or navigate a covered retired or disposed route', (tester) async {
+    final f=await _Work02AdapterFixture.create(tester); addTearDown(f.dispose);
+    final result=f.open(await f.proposal('route-owner','Original proposed name')); await tester.pumpAndSettle();
+    final native=tester.widget<work_setup.WorkProfileProofScreen>(find.byType(work_setup.WorkProfileProofScreen));
+    final close=native.onPreparedClose!, transfer=native.onNativeRoute!;
+    final cover=f.navigator.currentState!.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('Unrelated cover'))));
+    await tester.pumpAndSettle();
+    close(); transfer('/app/work/workspace/dashboard'); await tester.pumpAndSettle();
+    expect(find.text('Unrelated cover'),findsOneWidget); expect(f.native.routes,0);
+    f.live=false; f.owner.notifyListeners(); await tester.pumpAndSettle();
+    close(); transfer('/app/work/workspace/dashboard'); await tester.pumpAndSettle();
+    expect(find.text('Unrelated cover'),findsOneWidget); expect(f.native.routes,0);
+    f.navigator.currentState!.pop(); await tester.pumpAndSettle(); await cover;
+    transfer('/app/work/workspace/dashboard'); await tester.pumpAndSettle();
+    expect(find.textContaining('Your application or account changed.'),findsOneWidget); expect(f.native.routes,0);
+    close(); await tester.pumpAndSettle(); expect(await result,scope_contract.MoolAssistantReviewResult.stale);
+    close(); transfer('/app/work/workspace/dashboard'); await tester.pumpAndSettle();
+    expect(find.text('Original Buy'),findsOneWidget); expect(f.native.routes,0); expect(tester.takeException(),isNull);
+  });
+}
+class _Work02AdapterFixture {
+  _Work02AdapterFixture(this.native);
+  final _Work02NativeFixture native; final navigator=GlobalKey<NavigatorState>();
+  final coordinator=work_setup.WorkspaceSetupNativeCoordinator(),owner=_Work02Signal();
+  final principal=Object(); bool live=true;
+  final context=scope_contract.MoolAssistantContext(accountScope:'host-work02',authenticationRevision:1);
+  late scope_contract.MoolAssistantOwnerAwareNativeAdapter adapter;
+  static Future<_Work02AdapterFixture> create(WidgetTester tester) async {
+    final f=_Work02AdapterFixture(await _Work02NativeFixture.create());
+    await tester.pumpWidget(MaterialApp(theme:MoolTheme.light(),navigatorKey:f.navigator,home:const Scaffold(body:Text('Original Buy'))));
+    f.adapter=work_setup.workspaceSetupNativeAdapters(session:f.native.work,navigator:f.navigator.currentState!,coordinator:f.coordinator,
+      currentContext:()=>f.context,accountIdentity:()=>f.principal,accountAuthenticated:()=>true,nativeAccountCurrent:()=>f.native.work.workspaceApplicationAccountScope=='host-work02',
+      isRootCurrent:()=>true,isNavigationCurrent:()=>true,approvedWorkspacesCurrent:()=>false,changes:f.native.work,onNativeRoute:(_){f.native.routes++;})
+      .singleWhere((a)=>a.actionId=='AI-ACT-190') as scope_contract.MoolAssistantOwnerAwareNativeAdapter;
+    return f;
+  }
+  Future<scope_contract.MoolAssistantProposal> proposal(String id,String name) async {
+    final source=await adapter.snapshot(context,null); expect(source,isNotNull);
+    return scope_contract.MoolAssistantProposal(id:id,actionId:adapter.actionId,binding:context.binding,
+      requestRevision:1,entitlementRevision:'host-entitlement',sourceRevision:source!.sourceRevision,
+      validUntil:DateTime.now().add(const Duration(minutes:5)),title:'Review application details',summary:'Review original native fields.',
+      fields:{'name':name,'area':'Jaipur','activity':'Groceries'});
+  }
+  Future<scope_contract.MoolAssistantReviewResult> open(scope_contract.MoolAssistantProposal proposal)=>adapter.openOwnedReview(proposal,isCurrent:()=>live,ownerChanges:owner);
+  void dispose(){coordinator.dispose();owner.dispose();native.dispose();}
+}
+class _Work02Signal extends ChangeNotifier {
+  int listeners=0;
+  @override void addListener(VoidCallback callback){listeners++;super.addListener(callback);}
+  @override void removeListener(VoidCallback callback){listeners--;super.removeListener(callback);}
+}
+class _Work02NativeFixture {
+  _Work02NativeFixture(this.work,this.store);
+  final WorkSession work; final _NativeScopeProofStore store;
+  late work_setup.WorkspaceSetupReviewScope scope; final Object key=Object(); BuildContext? routeContext; int routes=0;
+  static Future<_Work02NativeFixture> create({bool selectProfile=true}) async {
+    final store=_NativeScopeProofStore('host-work02'); final work=WorkSession(contactDraftStore:store);
+    await work.recoverWorkspaceAccount(accountReady:true); work.selectFamily('products-trade');
+    if(selectProfile)work.selectProfile('retailer-grocery'); await work.flushContactDraft();
+    final f=_Work02NativeFixture(work,store);
+    f.scope=work_setup.WorkspaceSetupReviewScope(ownerCurrent:()=>true,storageCurrent:()=>true,storageOwnerCurrent:()=>true,
+      readSource:()=>work.workspaceApplicationSource,readStorageIdentity:()=>work.workspaceApplicationStorageIdentity,changes:work,ownerKey:f.key);
+    return f;
+  }
+  Widget details(Map<String,Object?> fields,{int step=0})=>MaterialApp(theme:MoolTheme.light(),home:detailsBody(fields,step:step));
+  Widget detailsBody(Map<String,Object?> fields,{int step=0,VoidCallback? close})=>Builder(builder:(context){routeContext=context;return work_setup.WorkProfileProofScreen(
+    session:work,preparedScope:scope,initialData:work_setup.WorkspaceSetupInitialData.fromFields('AI-ACT-190',fields),initialStep:step,
+    onPreparedClose:close??(){},onNativeRoute:(_){routes++;});});
+  void dispose(){scope.dispose();work.dispose();}
+}
+
+
+void _settlementNativeTests(){
+  test('AI-SETTLEMENT316 raw typed amount rejects private and fabricated authority fields',(){
+    expect(StoreSettlementInitialData.fromFields({'amount':'000250'}).amount,'000250');
+    expect(()=>StoreSettlementInitialData.fromFields({'amount':250}),throwsFormatException);
+    for(final key in ['bankAccount','approved','dueDate','reference','paid','supplierId']){
+      expect(()=>StoreSettlementInitialData.fromFields({key:'invented'}),throwsFormatException);
+    }
+  });
+  testWidgets('AI-SETTLEMENT316 native raw amount preparation never dispatches legacy request or invents due date',(tester)async{
+    final f=await _SettlementNativeFixture.create(tester);addTearDown(f.dispose);
+    final original=(f.host.work.workspaceSettlementBalance,f.host.work.workspaceSettlementRequested,f.host.work.workspaceSettlementReference);
+    final result=f.open(await f.proposal('raw','000250'));await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-settlement-request-amount'))).controller!.text,'000250');
+    expect(find.text('Expected by'),findsNothing);
+    expect(find.text('Saved review details · not a verified payout balance'),findsOneWidget);
+    expect(find.text('Payout requests are currently unavailable. No request has been sent.'),findsOneWidget);
+    expect(tester.widget<FilledButton>(find.byKey(const Key('work-settlement-confirm'))).onPressed,isNull);
+    expect(f.gateway.settlementCalls,0);
+    expect((f.host.work.workspaceSettlementBalance,f.host.work.workspaceSettlementRequested,f.host.work.workspaceSettlementReference),original);
+    await tester.tap(find.byTooltip('Close settlement review'));await tester.pumpAndSettle();
+    expect(await result,scope_contract.MoolAssistantReviewResult.returnToOwner);expect(f.gateway.settlementCalls,0);
+  });
+  testWidgets('AI-SETTLEMENT316 exact proposal recovers raw native amount without replacing another proposal',(tester)async{
+    final f=await _SettlementNativeFixture.create(tester);addTearDown(f.dispose);
+    final a=await f.proposal('A','250'),b=await f.proposal('B','500');
+    var result=f.open(a);await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-settlement-request-amount')),'275');await tester.pump();
+    await tester.tap(find.byTooltip('Close settlement review'));await tester.pumpAndSettle();await result;
+    result=f.open(b);await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-settlement-request-amount'))).controller!.text,'500');
+    await tester.tap(find.byTooltip('Close settlement review'));await tester.pumpAndSettle();await result;
+    result=f.open(a);await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-settlement-request-amount'))).controller!.text,'275');
+    await tester.tap(find.byTooltip('Close settlement review'));await tester.pumpAndSettle();await result;
+    expect(f.gateway.settlementCalls,0);
+  });
+  testWidgets('AI-SETTLEMENT316 actual changed-notify-restored-notify source cannot confirm or revive',(tester)async{
+    final f=await _SettlementNativeFixture.create(tester);addTearDown(f.dispose);
+    final result=f.open(await f.proposal('source','250'));await tester.pumpAndSettle();
+    final old=f.host.work.workspacePayoutBankName;
+    f.host.work.workspacePayoutBankName='Changed saved recipient';f.host.work.notifyListeners();
+    f.host.work.workspacePayoutBankName=old;f.host.work.notifyListeners();await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-settlement-request-amount')),findsNothing);
+    expect(find.textContaining('Your Store or account changed.'),findsOneWidget);
+    expect(f.gateway.settlementCalls,0);
+    await tester.tap(find.byTooltip('Close settlement review'));await tester.pumpAndSettle();expect(await result,scope_contract.MoolAssistantReviewResult.stale);
+  });
+  testWidgets('AI-SETTLEMENT316 source ABA before Review invalidates original snapshot',(tester)async{
+    final f=await _SettlementNativeFixture.create(tester);addTearDown(f.dispose);
+    final proposal=await f.proposal('before-review','250');final old=f.host.work.workspaceSettlementBalance;
+    f.host.work.workspaceSettlementBalance=old+1;f.host.work.notifyListeners();f.host.work.workspaceSettlementBalance=old;f.host.work.notifyListeners();
+    expect(await f.open(proposal),scope_contract.MoolAssistantReviewResult.stale);await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-settlement-review')),findsNothing);expect(f.gateway.settlementCalls,0);
+  });
+  testWidgets('AI-SETTLEMENT316 real owner signal seam retires private review and covered Close is inert',(tester)async{
+    final f=await _SettlementNativeFixture.create(tester);addTearDown(f.dispose);
+    final result=f.open(await f.proposal('owner','250'));await tester.pumpAndSettle();
+    final close=tester.widget<IconButton>(find.byWidgetPredicate((widget) => widget is IconButton && widget.tooltip == 'Close settlement review')).onPressed!;
+    final navigator=Navigator.of(tester.element(find.byKey(const Key('work-settlement-review'))),rootNavigator:true);
+    final cover=navigator.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('Settlement unrelated cover'))));await tester.pumpAndSettle();
+    close();await tester.pumpAndSettle();expect(find.text('Settlement unrelated cover'),findsOneWidget);
+    f.live=false;f.changes.notifyListeners();await tester.pumpAndSettle();
+    navigator.pop();await tester.pumpAndSettle();await cover;
+    expect(find.byKey(const Key('work-settlement-request-amount')),findsNothing);
+    close();await tester.pumpAndSettle();expect(await result,scope_contract.MoolAssistantReviewResult.stale);
+    close();await tester.pumpAndSettle();expect(f.gateway.settlementCalls,0);expect(tester.takeException(),isNull);
+    // Notification-seam reaction; not a claim of actual controller cancellation qualification.
+  });
+  testWidgets('AI-SETTLEMENT316 omitted prepared scope preserves original manual native final handler',(tester)async{
+    final f=await _SettlementNativeFixture.create(tester);addTearDown(f.dispose);
+    await tester.tap(find.byKey(const Key('work-dashboard-settings')));await tester.pumpAndSettle();
+    final tools=find.byKey(const Key('work-store-status-tools'));await tester.ensureVisible(tools);await tester.tap(tools);await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-business-money')));await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-money-request-settlement')));await tester.pumpAndSettle();
+    expect(find.text('Expected by'),findsOneWidget);expect(f.gateway.settlementCalls,0);
+    final confirm=find.byKey(const Key('work-settlement-confirm'));await tester.ensureVisible(confirm);
+    expect(tester.widget<FilledButton>(confirm).onPressed,isNotNull);await tester.tap(confirm);await tester.pumpAndSettle();
+    expect(f.gateway.settlementCalls,1);
+    // Existing isolated ReviewWorkGateway result proves native manual behavior only, not a production payout.
+  });
+}
+class _SettlementNativeFixture{
+  _SettlementNativeFixture(this.host,this.gateway);
+  final _AuthenticatedNativeScopeFixture host;final ReviewWorkGateway gateway;
+  final changes=ChangeNotifier();bool live=true;late scope_contract.MoolAssistantOwnerAwareNativeAdapter adapter;
+  static Future<_SettlementNativeFixture> create(WidgetTester tester)async{
+    final gateway=ReviewWorkGateway();
+    final host=_AuthenticatedNativeScopeFixture(makeWork:(contact,purchase,inventory,trading)=>WorkSession(gateway:gateway,
+      contactDraftStore:contact,purchaseEntryStore:purchase,inventoryStore:inventory,tradingPreferencesStoreFactory:(_)=>trading,catalogueReference:workspaceMasterCatalogue));
+    await host.ready();host.work..workspaceSettlementBalance=17820..workspacePayoutBankName='HOST saved bank'..workspacePayoutAccountEnding='1234';
+    await tester.pumpWidget(host.app);await tester.pumpAndSettle();
+    final f=_SettlementNativeFixture(host,gateway);
+    f.adapter=host.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-316') as scope_contract.MoolAssistantOwnerAwareNativeAdapter;
+    return f;
+  }
+  Future<scope_contract.MoolAssistantProposal> proposal(String id,String amount)async{
+    final ctx=host.readContext(),snapshot=await adapter.snapshot(host.readContext(),null);expect(snapshot,isNotNull);
+    return scope_contract.MoolAssistantProposal(id:'HOST-settlement-$id',actionId:'AI-ACT-316',binding:ctx.binding,
+      requestRevision:1,entitlementRevision:'HOST-entitlement',sourceRevision:snapshot!.sourceRevision,validUntil:DateTime.now().add(const Duration(minutes:5)),
+      title:'Review Store payout request',summary:'Prepare only the original native amount.',fields:{'amount':amount});
+  }
+  Future<scope_contract.MoolAssistantReviewResult> open(scope_contract.MoolAssistantProposal proposal)=>adapter.openOwnedReview(proposal,isCurrent:()=>live,ownerChanges:changes);
+  Future<void> dispose()async{changes.dispose();await host.dispose();}
+}
+
+final class _Restock234Commerce extends BuyV2UnavailableCommerceAdapter {
+  int reads=0;
+  @override Future<BuyV2CommerceSnapshot> refresh(){reads++;return super.refresh();}
+}
+class _Restock234Bookmarks extends _StorePurchaseBookmarks {
+  Completer<void>? readGate;
+  int reads=0;
+  @override Future<WorkProcurementBookmark?> read(String account,String store)async{
+    reads++;if(readGate!=null)await readGate!.future;
+    return super.read(account,store);
+  }
+}
+class _Restock234Access extends _ReceivingAssistantAccess{
+  bool active=true;
+  void revoke(){active=false;notifyListeners();}
+  @override Future<scope_contract.MoolAssistantEntitlement> read(Object account)async=>scope_contract.MoolAssistantEntitlement(
+    accountScope:account,access:active?scope_contract.MoolAssistantAccess.active:scope_contract.MoolAssistantAccess.unavailable,
+    revision:active?'HOST-restock-active':'HOST-restock-revoked',validUntil:DateTime.now().add(const Duration(hours:1)));
+}
+class _Restock234Host {
+  final native=_AuthenticatedNativeScopeFixture(),access=_Restock234Access(),bookmarks=_Restock234Bookmarks();
+  final cores=<BuySession>[];
+  final commerce=_Restock234Commerce();
+  late final WorkProcurementController procurement;
+  late final GoRouter router;
+  scope_contract.MoolAssistantController? assistant;
+  int creations=0;
+  Object get effects=>(native.writes,bookmarks.reads,bookmarks.writes,creations);
+  Future<void> ready(WidgetTester tester,{bool connected=true})async{
+    await native.ready();
+    procurement=WorkProcurementController(currentAccountId:()=>native.work.contactDraftStore?.accountScope,
+      currentStoreId:()=>native.work.activeWorkspace?.id,currentProfileId:()=>native.work.activeWorkspace?.profileId,
+      storeApproved:()=>native.work.activeWorkspace?.verified==true,
+      bookmarks:bookmarks,stateStoreFactory:_StorePurchaseState.new,
+      sessionFactory:(identity,state){creations++;final core=BuySession();cores.add(core);
+        return BuyV2Session(core:core,procurementIdentity:identity,customerStateStore:state,reviewDataEnabled:false,
+          commerceAdapter:commerce);});
+    router=GoRouter(initialLocation:'/app/work/workspace/dashboard',routes:[GoRoute(path:'/app/work/workspace/dashboard',builder:(_,_)=>
+      MoolAssistantWorkspaceScope(readWorkspace:native.readWorkspace,child:WorkWorkspaceDashboardScreen(session:native.work,
+        procurementSession:native.buy,useStoreProcurement:connected,procurementControllerFactory:()=>procurement,
+        accountIdentity:native.journey.accountIdentity,accountAuthenticated:true,accountRecoveryReady:true,initialSection:'dashboard')))]);
+    await tester.pumpWidget(MaterialApp.router(theme:MoolTheme.light(),routerConfig:router,builder:(_,child)=>
+      MoolAssistantHost(readContext:()=>scope_contract.MoolAssistantContext(accountScope:native.journey.authenticatedBuyPersistenceIdentity,
+        authenticationRevision:native.journey.navigationAuthenticationGeneration),
+        contextChanges:Listenable.merge([native.journey,native.work,native.mode]),child:child!)));
+    await tester.pumpAndSettle();
+    assistant=scope_contract.MoolAssistantController(currentContext:native.readContext,
+      contextChanges:Listenable.merge([native.journey,native.work,native.mode]),entitlements:access,nativeAdapters:native.adapters(tester));
+    await assistant!.refreshAccess();assistant!.setDraft('Restock my Store');
+  }
+  scope_contract.MoolAssistantNativeAdapter adapter(WidgetTester tester)=>native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-234');
+  Future<({Future<MoolAssistantReviewResult> result})> open(WidgetTester tester,{String channel='bulk',String query='HOST नमस्ते મસાલા',String? entity})async{
+    final c=assistant!,snapshot=await adapter(tester).snapshot(c.context,entity);expect(snapshot,isNotNull);
+    expect(c.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-restock234',actionId:'AI-ACT-234',
+      binding:c.context.binding,requestRevision:c.requestRevision,entitlementRevision:c.entitlementRevision!,
+      sourceRevision:snapshot!.sourceRevision,validUntil:DateTime.now().add(const Duration(minutes:5)),
+      entityId:entity,title:'Review Restock',summary:'HOST exact Store inputs',fields:{'channel':channel,'query':query})),isTrue);
+    final result=c.reviewProposal();await tester.pumpAndSettle();return(result:result);
+  }
+  Future<void> dispose(WidgetTester tester)async{
+    if(bookmarks.readGate?.isCompleted==false)bookmarks.readGate!.complete();
+    await tester.pumpWidget(const SizedBox.shrink());assistant?.dispose();access.dispose();router.dispose();
+    for(final core in cores)core.dispose();await native.dispose();
+  }
+}
+void registerRestock234NativeTests(){
+  testWidgets('FE-RESTOCK234 synchronous retirement from native session notification prevents its first commerce read',(tester)async{
+    final h=_Restock234Host();try{
+      await h.ready(tester);final opened=await h.open(tester);
+      void retireOnSession(){if(h.procurement.session!=null)h.assistant!.cancelProposal();}
+      h.procurement.addListener(retireOnSession);
+      tester.widget<FilledButton>(find.byKey(const Key('work-restock-review-continue'))).onPressed!();
+      await tester.pumpAndSettle();h.procurement.removeListener(retireOnSession);
+      expect(await opened.result,MoolAssistantReviewResult.stale);
+      expect(h.bookmarks.writes,1,reason:'Explicit Continue already saved its original bookmark; do not roll back that truthful outcome.');
+      expect(h.creations,1);expect(h.commerce.reads,0);
+      expect(h.native.buy.itemCount,0);
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-RESTOCK234 Review stages channel and Unicode query with no bookmark restore or writes',(tester)async{
+    final h=_Restock234Host();try{
+      await h.ready(tester);final before=h.effects,publicQuery=h.native.buy.query;
+      final opened=await h.open(tester);expect(find.text('Bulk suppliers'),findsOneWidget);
+      expect(tester.widget<Text>(find.byKey(const Key('work-restock-review-query'))).data,'HOST नमस्ते મસાલા');
+      expect(h.effects,before);expect(h.procurement.session,isNull);expect(h.native.buy.query,publicQuery);
+      await tester.tap(find.byType(BackButton).last);await tester.pumpAndSettle();await opened.result;
+      expect(h.effects,before);expect(h.procurement.session,isNull);
+    }finally{await h.dispose(tester);}
+  });
+  for(final channel in ['wholesale','bulk']){
+    testWidgets('FE-RESTOCK234 $channel Continue enters only the original Store-owned session once',(tester)async{
+      final h=_Restock234Host();try{
+        await h.ready(tester);final publicQuery=h.native.buy.query;
+        final opened=await h.open(tester,channel:channel,query:'HOST exact search');
+        final button=tester.widget<FilledButton>(find.byKey(const Key('work-restock-review-continue'))).onPressed!;
+        button();button();await tester.pumpAndSettle();
+        expect(await opened.result,MoolAssistantReviewResult.returnToOwner);
+        expect(h.bookmarks.writes,1);expect(h.creations,1);expect(h.procurement.scopeCurrent,isTrue);
+        final purchase=h.procurement.session!;expect(identical(purchase,h.native.buy),isFalse);
+        expect(purchase.procurementContext!.storeId,h.native.work.activeWorkspace!.id);
+        expect(purchase.procurementContext!.accountId,h.native.work.contactDraftStore!.accountScope);
+        expect(purchase.wholesaleSaleType.name,channel);expect(purchase.query,'HOST exact search');
+        expect(h.native.buy.query,publicQuery);expect(h.native.buy.itemCount,0);
+      }finally{await h.dispose(tester);}
+    });
+  }
+  for(final cause in ['cancel','request','paid','account']){
+    testWidgets('FE-RESTOCK234 $cause retirement prevents a retained Continue before any save',(tester)async{
+      final h=_Restock234Host();try{
+        await h.ready(tester);final opened=await h.open(tester),before=h.effects;
+        final button=tester.widget<FilledButton>(find.byKey(const Key('work-restock-review-continue'))).onPressed!;
+        if(cause=='cancel')h.assistant!.cancelProposal();
+        if(cause=='request')h.assistant!.setDraft('A different request');
+        if(cause=='paid')h.access.revoke();
+        if(cause=='account'){h.native.principal.identity=null;h.native.principal.changes.add(null);}
+        await tester.pumpAndSettle();button();await tester.pumpAndSettle();
+        expect(h.effects,before);expect(h.procurement.session,isNull);expect(await opened.result,MoolAssistantReviewResult.stale);
+      }finally{await h.dispose(tester);}
+    });
+  }
+  testWidgets('FE-RESTOCK234 rejects missing Store controller instead of using the personal session',(tester)async{
+    final h=_Restock234Host();try{
+      await h.ready(tester,connected:false);final before=h.effects;
+      expect(await h.adapter(tester).snapshot(h.native.readContext(),null),isNull);expect(h.effects,before);
+      expect(h.native.buy.isStoreProcurement,isFalse);
+    }finally{await h.dispose(tester);h.procurement.dispose();}
+  });
+  testWidgets('FE-RESTOCK234 missing exact product is unavailable and cannot fall back to personal products',(tester)async{
+    final h=_Restock234Host();try{
+      await h.ready(tester);final before=h.effects;
+      expect(await h.adapter(tester).snapshot(h.native.readContext(),'HOST-missing-original-product'),isNull);
+      expect(h.effects,before);expect(h.procurement.session,isNull);
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-RESTOCK234 native admission retired during original bookmark read does not save or create',(tester)async{
+    final h=_Restock234Host();try{
+      await h.ready(tester);final opened=await h.open(tester),reads=h.bookmarks.reads;h.bookmarks.readGate=Completer<void>();
+      tester.widget<FilledButton>(find.byKey(const Key('work-restock-review-continue'))).onPressed!();await tester.pump();
+      expect(h.bookmarks.reads,reads+1);h.assistant!.cancelProposal();await tester.pump();
+      h.bookmarks.readGate!.complete();await tester.pumpAndSettle();
+      expect(await opened.result,MoolAssistantReviewResult.stale);expect(h.bookmarks.writes,0);expect(h.creations,0);
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-RESTOCK234 retained Continue under an unrelated modal does not enter Store purchase',(tester)async{
+    final h=_Restock234Host();try{
+      await h.ready(tester);final opened=await h.open(tester),before=h.effects;
+      final retained=tester.widget<FilledButton>(find.byKey(const Key('work-restock-review-continue'))).onPressed!;
+      unawaited(h.router.routerDelegate.navigatorKey.currentState!.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST foreign route')))));
+      await tester.pumpAndSettle();retained();await tester.pump();expect(h.effects,before);expect(find.text('HOST foreign route'),findsOneWidget);
+      await h.router.routerDelegate.navigatorKey.currentState!.maybePop();await tester.pumpAndSettle();
+      await tester.tap(find.byType(BackButton).last);await tester.pumpAndSettle();await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+}
+
+class _Order273Host {
+  final native=_AuthenticatedNativeScopeFixture(),access=_ReceivingAssistantAccess();
+  late final scope_contract.MoolAssistantController controller;
+  Future<void> ready(WidgetTester tester)async{
+    await native.ready();await tester.pumpWidget(native.app);await tester.pumpAndSettle();
+    controller=scope_contract.MoolAssistantController(currentContext:native.readContext,
+      contextChanges:Listenable.merge([native.work,native.journey,native.mode]),entitlements:access,nativeAdapters:native.adapters(tester));
+    await controller.refreshAccess();controller.setDraft('Find my Store orders');
+  }
+  scope_contract.MoolAssistantNativeAdapter adapter(WidgetTester tester)=>native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-273');
+  Future<scope_contract.MoolAssistantProposal> proposal(WidgetTester tester,String status)async{
+    final snapshot=await adapter(tester).snapshot(controller.context,null);expect(snapshot,isNotNull);
+    return scope_contract.MoolAssistantProposal(id:'HOST-order273',actionId:'AI-ACT-273',binding:controller.context.binding,
+      requestRevision:controller.requestRevision,entitlementRevision:controller.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+      validUntil:DateTime.now().add(const Duration(minutes:5)),title:'Review order status',summary:'HOST original status board',fields:{'status':status});
+  }
+  Future<void> dispose(WidgetTester tester)async{
+    await tester.pumpWidget(const SizedBox.shrink());controller.dispose();access.dispose();await native.dispose();
+  }
+}
+void registerOrder273NativeTests(){
+  for(final status in ['Live','New','Packing','Ready','Delivery','Attention','Done']){
+    testWidgets('FE-ORDER273 $status populates original status board without business writes',(tester)async{
+      final h=_Order273Host();try{
+        await h.ready(tester);final before=h.native.writes;
+        expect(h.controller.receiveProposal(await h.proposal(tester,status)),isTrue);
+        expect(await h.controller.reviewProposal(),MoolAssistantReviewResult.returnToOwner);await tester.pumpAndSettle();
+        expect(h.native.work.workspaceOrderFilter,status);expect(find.byKey(const Key('work-orders-destination')),findsOneWidget);
+        expect(h.native.writes,before);expect(tester.takeException(),isNull);
+      }finally{await h.dispose(tester);}
+    });
+  }
+  testWidgets('FE-ORDER273 rejects unsupported arbitrary period and unknown actions instead of inventing filter',(tester)async{
+    final h=_Order273Host();try{
+      await h.ready(tester);final adapter=h.adapter(tester),before=h.native.writes,status=h.native.work.workspaceOrderFilter;
+      for(final fields in <Map<String,Object?>>[{'status':'All'},{'status':'Live','from':'2026-10-01'},{'status':'Done','accept':true},{}])
+        expect(adapter.validateFields(fields),isNotNull);
+      expect(await adapter.snapshot(h.controller.context,'HOST-order-id'),isNull);expect(h.native.writes,before);
+      expect(h.native.work.workspaceOrderFilter,status);
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER273 changed native source invalidates an old proposal without replacing current filter',(tester)async{
+    final h=_Order273Host();try{
+      await h.ready(tester);final p=await h.proposal(tester,'New');h.native.work.setWorkspaceOrderFilter('Done');
+      final before=h.native.writes;expect(h.controller.receiveProposal(p),isTrue);
+      expect(await h.controller.reviewProposal(),MoolAssistantReviewResult.stale);await tester.pumpAndSettle();
+      expect(h.native.work.workspaceOrderFilter,'Done');expect(h.native.writes,before);
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER273 buyer context cannot use a retained approved Store status adapter',(tester)async{
+    final h=_Order273Host();try{
+      await h.ready(tester);final adapter=h.adapter(tester),ctx=h.native.readContext(),before=h.native.writes;
+      h.native.mode.value='buyer';await tester.pumpAndSettle();
+      expect(await adapter.snapshot(ctx,null),isNull);expect(h.native.writes,before);
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER273 cancelled prepared status does not change original board filter',(tester)async{
+    final h=_Order273Host();try{
+      await h.ready(tester);final before=h.native.writes,status=h.native.work.workspaceOrderFilter;
+      expect(h.controller.receiveProposal(await h.proposal(tester,'New')),isTrue);h.controller.cancelProposal();
+      await h.controller.reviewProposal();await tester.pumpAndSettle();
+      expect(h.native.work.workspaceOrderFilter,status);expect(h.native.writes,before);
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER273 original filtered board remains usable at narrow enlarged text',(tester)async{
+    tester.view.physicalSize=const Size(320,700);tester.view.devicePixelRatio=1;
+    tester.platformDispatcher.textScaleFactorTestValue=2;
+    addTearDown(tester.view.reset);addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final h=_Order273Host();try{
+      await h.ready(tester);expect(h.controller.receiveProposal(await h.proposal(tester,'Attention')),isTrue);
+      expect(await h.controller.reviewProposal(),MoolAssistantReviewResult.returnToOwner);await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-orders-destination')),findsOneWidget);expect(tester.takeException(),isNull);
+    }finally{await h.dispose(tester);}
+  });
+}
+
+class _OrderEffectJournal extends _OrderJournalFixture{
+  _OrderEffectJournal():super(null);
+  int saves=0,removes=0;Completer<void>? hold;
+  @override Future<void> savePending(WorkOrderCommand value)async{saves++;await super.savePending(value);if(hold!=null)await hold!.future;}
+  @override Future<void> removePending(WorkOrderCommand value)async{removes++;await super.removePending(value);}
+}
+class _OrderEffectGateway extends WorkspaceOperationalOrderCommandGateway{
+  _OrderEffectGateway({required super.gateway,required super.accountScope,required super.workspaceId}):super(realm:'evaluation');
+  final submitted=<WorkOrderCommand>[],reconciled=<WorkOrderCommand>[];
+  final responses=<Completer<WorkOrderReply>>[],replies=<Completer<WorkOrderReply>>[];
+  @override Future<WorkOrderReply> submitOrderCommand(WorkOrderCommand command){submitted.add(command);final reply=Completer<WorkOrderReply>();responses.add(reply);return reply.future;}
+  @override Future<WorkOrderReply> reconcileOrderCommand(WorkOrderCommand command){reconciled.add(command);final reply=Completer<WorkOrderReply>();replies.add(reply);return reply.future;}
+}
+class _OrderEffectHost{
+  final native=_AuthenticatedNativeScopeFixture(),access=_OrderEffectAccess(),journal=_OrderEffectJournal();
+  late final _OrderEffectGateway gateway;
+  late final WorkOrderOperations operations;
+  late final scope_contract.MoolAssistantController controller;
+  bool controllerInitialized=false;
+  late WorkspaceOrderRecord original;
+  late Map<String,dynamic> raw;
+  Future<WorkspaceOrderRecord> record(String stage,{int revision=1,String? reason})async{
+    final data=Map<String,dynamic>.from(raw)..['stage']=stage..['revision']=revision
+      ..['permittedActions']=stage=='Confirmed'?['accept','reject']:stage=='Preparing'?['ready']:<String>[]
+      ..['rejectionReason']=reason;
+    final wire=purchase_fixture.Transport()..data=data;
+    final identity=purchase_fixture.projectionGateway(wire,account:native.work.contactDraftStore!.accountScope!);
+    final ref=WorkspacePurchaseReference(purchaseId:data['purchaseId'],storeId:data['storeId'],orderId:data['orderId'],
+      originalFingerprint:data['originalFingerprint'],sourceRevision:data['sourceRevision']);
+    final snapshot=await AuthenticatedWorkspaceOrderOperationsGateway(identity).read(role:WorkspaceOrderIdentityRole.seller,realm:'evaluation',reference:ref);
+    expect(snapshot,isNotNull);return WorkspaceOrderRecord.fromOperational(snapshot!);
+  }
+  WorkOrderReply reply(WorkspaceOrderRecord order,{String operation=''})=>WorkOrderReply(
+    accountScope:operations.accountScope,workspaceId:operations.workspaceId,orderId:order.id,operationId:operation,
+    revision:order.operational!.revision,state:WorkOrderReplyState.applied,order:order);
+  Future<void> ready(WidgetTester tester,{bool packed=false})async{
+    await native.ready();raw=purchase_fixture.operationalResponse(role:'seller');
+    raw['viewerUserId']=native.work.contactDraftStore!.accountScope!;raw['storeId']=native.work.activeWorkspace!.id;
+    final rehash=<String,dynamic>{'factsVersion':2,'storeId':raw['storeId'],'orderId':raw['orderId'],'original':raw['original']};
+    purchase_fixture.rehashPurchaseOrder(rehash);raw['originalFingerprint']=rehash['originalFingerprint'];
+    final now=DateTime.fromMillisecondsSinceEpoch(DateTime.now().millisecondsSinceEpoch,isUtc:true);raw['placedAt']=now.subtract(const Duration(minutes:1)).toIso8601String();
+    raw['acceptanceDeadline']=now.add(const Duration(minutes:5)).toIso8601String();
+    raw['fulfilmentDeadline']=now.add(const Duration(hours:1)).toIso8601String();
+    gateway=_OrderEffectGateway(gateway:AuthenticatedWorkspaceOrderOperationsGateway(purchase_fixture.projectionGateway(
+      purchase_fixture.Transport(),account:native.work.contactDraftStore!.accountScope!)),
+      accountScope:native.work.contactDraftStore!.accountScope!,workspaceId:native.work.activeWorkspace!.id);
+    operations=WorkOrderOperations(accountScope:native.work.contactDraftStore!.accountScope!,
+      workspaceId:native.work.activeWorkspace!.id,gateway:gateway,pendingStore:journal);
+    expect(await operations.restore(),isTrue);original=await record(packed?'Preparing':'Confirmed');
+    operations.observe(reply(original));expect(native.work.bindWorkspaceOrderOperations(operations),isTrue);
+    if(packed){expect(native.work.selectWorkspaceOrder(original.id),isTrue);
+      for(final line in native.work.workspacePackingLinesForOrder(original)){
+        native.work.setWorkspaceOrderPackingLine(storeId:operations.workspaceId,orderId:original.id,
+          lineId:line.id,quantity:line.quantity,packed:true,expectedOperational:original.operational);
+      }
+      expect(native.work.workspacePackingComplete,isTrue);
+    }
+    await tester.pumpWidget(native.app);await tester.pumpAndSettle();
+    controller=scope_contract.MoolAssistantController(currentContext:native.readContext,
+      contextChanges:Listenable.merge([native.work,native.journey,native.mode]),entitlements:access,nativeAdapters:native.adapters(tester));
+    controllerInitialized=true;
+    await controller.refreshAccess();controller.setDraft('Review my exact original Store order');
+  }
+  Object get effects=>(native.writes,journal.saves,journal.removes,gateway.submitted.length,gateway.reconciled.length);
+  Future<({Future<MoolAssistantReviewResult> result})> open(WidgetTester tester,{String action='AI-ACT-275',String operation='accept'})async{
+    final adapter=native.adapters(tester).singleWhere((a)=>a.actionId==action),snapshot=await native.adapters(tester).singleWhere((a)=>a.actionId==action).snapshot(controller.context,original.id);
+    expect(snapshot,isNotNull);expect(adapter.validateFields(action=='AI-ACT-281'?{}:{'operation':operation}),isNull);
+    expect(controller.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-effect-$action',actionId:action,binding:controller.context.binding,
+      requestRevision:controller.requestRevision,entitlementRevision:controller.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+      validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:original.id,title:'Review original order',summary:'HOST exact source',
+      fields:action=='AI-ACT-281'?{}:{'operation':operation})),isTrue);
+    final result=controller.reviewProposal();await tester.pumpAndSettle();return(result:result);
+  }
+  Future<void> tap(WidgetTester tester,Finder finder)async{await tester.ensureVisible(finder);await tester.pumpAndSettle();await tester.tap(finder);await tester.pumpAndSettle();}
+  Future<void> complete(WidgetTester tester,String stage,{String? reason})async{
+    final command=gateway.submitted.single;
+    gateway.responses.single.complete(reply(await record(stage,revision:2,reason:reason),operation:command.operationId));
+    await tester.pumpAndSettle();
+  }
+  Future<void> dispose(WidgetTester tester)async{
+    if(journal.hold?.isCompleted==false)journal.hold!.complete();
+    for(final pending in [...gateway.responses,...gateway.replies])if(!pending.isCompleted)pending.completeError(StateError('HOST ended unknown request'));
+    await tester.pumpAndSettle();await tester.pumpWidget(const SizedBox.shrink());if(controllerInitialized)controller.dispose();access.dispose();await native.dispose();
+  }
+}
+class _OrderEffectAccess extends _ReceivingAssistantAccess{
+  bool active=true;void revoke(){active=false;notifyListeners();}
+  @override Future<scope_contract.MoolAssistantEntitlement> read(Object account)async=>scope_contract.MoolAssistantEntitlement(
+    accountScope:account,access:active?scope_contract.MoolAssistantAccess.active:scope_contract.MoolAssistantAccess.revoked,
+    revision:active?'HOST-order-active':'HOST-order-revoked',validUntil:DateTime.now().add(const Duration(hours:1)));
+}
+void registerOrderEffectNativeTests(){
+  testWidgets('FE-ORDER275 original Accept only dispatches once after native tap and preserves acknowledged exact order',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester);final before=h.effects,selected=h.native.work.currentWorkspaceOrderId;
+      final opened=await h.open(tester);expect(h.effects,before);expect(h.native.work.currentWorkspaceOrderId,selected);
+      final accept=find.byKey(Key('work-operational-accept-${h.original.id}'));
+      final retained=tester.widget<FilledButton>(accept).onPressed!;retained();retained();await tester.pumpAndSettle();
+      expect(h.gateway.submitted,hasLength(1));expect(h.gateway.submitted.single.action,WorkOrderAction.accept);
+      expect(h.gateway.submitted.single.purchaseReference!.originalFingerprint,h.original.operational!.reference.originalFingerprint);
+      await h.complete(tester,'Preparing');await opened.result;
+      expect(h.operations.pending(h.original.id),isNull);expect(h.journal.command,isNull);
+      expect(h.native.work.workspaceOrders.single.stage,'Preparing');expect(h.gateway.submitted,hasLength(1));
+    }finally{await h.dispose(tester);}});
+  testWidgets('FE-ORDER275 original Reject requires its native reason confirmation and no Review save',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester);final before=h.effects;
+      final opened=await h.open(tester,operation:'reject');expect(h.effects,before);
+      await h.tap(tester,find.byKey(Key('work-operational-reject-${h.original.id}')));
+      expect(find.byKey(const Key('work-reject-order-dialog')),findsOneWidget);expect(h.gateway.submitted,isEmpty);
+      await h.tap(tester,find.widgetWithText(RadioListTile<String>,'Product unavailable'));
+      await h.tap(tester,find.widgetWithText(FilledButton,'Reject order'));expect(h.gateway.submitted.single.reason,'Product unavailable');
+      await h.complete(tester,'Rejected',reason:'Product unavailable');await opened.result;expect(h.journal.command,isNull);
+    }finally{await h.dispose(tester);}});
+  testWidgets('FE-ORDER281 existing packed source permits only original Mark ready without model packing assertions',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester,packed:true);final before=h.effects;
+      final opened=await h.open(tester,action:'AI-ACT-281');expect(h.effects,before);
+      expect(find.byType(CheckboxListTile),findsNothing);
+      final originalLine=h.original.operational!.original.lines.single;
+      expect(find.textContaining(originalLine.name),findsWidgets);expect(find.textContaining(originalLine.packLabel),findsWidgets);
+      expect(find.textContaining('100.51'),findsWidgets);
+      await h.tap(tester,find.byKey(Key('work-operational-ready-${h.original.id}')));
+      expect(h.gateway.submitted.single.action,WorkOrderAction.ready);await h.complete(tester,'Ready');await opened.result;
+      expect(h.native.work.workspaceOrders.single.stage,'Ready');expect(h.journal.command,isNull);
+    }finally{await h.dispose(tester);}});
+  for(final reason in ['cancel','request','paid','account']){
+    testWidgets('FE-ORDER275 $reason retirement rejects an older native Accept callback without any pending write',(tester)async{
+      final h=_OrderEffectHost();try{await h.ready(tester);final opened=await h.open(tester),before=h.effects;
+        final retained=tester.widget<FilledButton>(find.byKey(Key('work-operational-accept-${h.original.id}'))).onPressed!;
+        if(reason=='cancel')h.controller.cancelProposal();if(reason=='request')h.controller.setDraft('Different request');
+        if(reason=='paid')h.access.revoke();if(reason=='account'){h.native.principal.identity=null;h.native.principal.changes.add(null);}
+        await tester.pumpAndSettle();retained();await tester.pumpAndSettle();expect(h.effects,before);
+        expect(h.operations.pending(h.original.id),isNull);expect(await opened.result,MoolAssistantReviewResult.stale);
+      }finally{await h.dispose(tester);}});
+  }
+  testWidgets('FE-ORDER275 native busy listener retirement before pending write removes only the unissued new command',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester);final opened=await h.open(tester);
+      h.operations.addListener((){if(h.operations.state(h.original.id)==WorkOrderOperationState.submitting)h.controller.cancelProposal();});
+      await h.tap(tester,find.byKey(Key('work-operational-accept-${h.original.id}')));await opened.result;
+      expect(h.journal.saves,0);expect(h.gateway.submitted,isEmpty);expect(h.operations.pending(h.original.id),isNull);
+    }finally{await h.dispose(tester);}});
+  testWidgets('FE-ORDER275 retirement during durable pending save preserves original operation and blocks fresh service dispatch',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester);final opened=await h.open(tester);h.journal.hold=Completer<void>();
+      await h.tap(tester,find.byKey(Key('work-operational-accept-${h.original.id}')));expect(h.journal.saves,1);
+      final original=h.journal.command!;h.controller.cancelProposal();await tester.pump();h.journal.hold!.complete();await tester.pumpAndSettle();await opened.result;
+      expect(h.gateway.submitted,isEmpty);expect(h.operations.pending(h.original.id),same(original));expect(h.journal.command,same(original));
+      expect(h.operations.state(h.original.id),WorkOrderOperationState.uncertain);expect(h.gateway.reconciled,isEmpty);
+    }finally{await h.dispose(tester);}});
+  testWidgets('FE-ORDER275 issued unknown result is retained after assistant retirement and never automatically retried',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester);final opened=await h.open(tester);
+      await h.tap(tester,find.byKey(Key('work-operational-accept-${h.original.id}')));final original=h.gateway.submitted.single;
+      h.controller.cancelProposal();await tester.pump();h.gateway.responses.single.completeError(StateError('HOST network unknown'));
+      await tester.pumpAndSettle();await opened.result;expect(h.operations.pending(h.original.id),same(original));
+      expect(h.journal.command,same(original));expect(h.gateway.submitted,hasLength(1));expect(h.gateway.reconciled,isEmpty);
+    }finally{await h.dispose(tester);}});
+  testWidgets('FE-ORDER275 retained native Accept under a foreign route cannot dispatch',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester);final opened=await h.open(tester),before=h.effects;
+      final retained=tester.widget<FilledButton>(find.byKey(Key('work-operational-accept-${h.original.id}'))).onPressed!;
+      unawaited(h.native.router.routerDelegate.navigatorKey.currentState!.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST unrelated order route')))));
+      await tester.pumpAndSettle();retained();await tester.pumpAndSettle();expect(h.effects,before);
+      expect(find.text('HOST unrelated order route'),findsOneWidget);h.controller.cancelProposal();await tester.pumpAndSettle();await opened.result;
+      expect(find.text('HOST unrelated order route'),findsOneWidget);
+    }finally{await h.dispose(tester);}});
+  testWidgets('FE-ORDER275 original nested rejection cannot send after paid authority retirement',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester);final opened=await h.open(tester,operation:'reject');
+      await h.tap(tester,find.byKey(Key('work-operational-reject-${h.original.id}')));
+      await h.tap(tester,find.widgetWithText(RadioListTile<String>,'Product unavailable'));
+      final retained=tester.widget<FilledButton>(find.widgetWithText(FilledButton,'Reject order')).onPressed!,before=h.effects;
+      h.access.revoke();await tester.pumpAndSettle();retained();await tester.pumpAndSettle();
+      expect(h.effects,before);expect(h.gateway.submitted,isEmpty);
+      final close=find.byKey(const Key('work-purchase-owner-retired-close'));
+      if(close.evaluate().isNotEmpty){await tester.tap(close);await tester.pumpAndSettle();}await opened.result;
+    }finally{await h.dispose(tester);}});
+  testWidgets('FE-ORDER275 optional guard keeps original manual native default dispatch and acknowledged cleanup',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester);expect(h.native.work.selectWorkspaceOrder(h.original.id),isTrue);
+      final posted=h.native.work.submitWorkspaceOrderAction(h.original.id,WorkOrderAction.accept);await tester.pumpAndSettle();
+      expect(h.gateway.submitted,hasLength(1));await h.complete(tester,'Preparing');expect(await posted,isTrue);
+      expect(h.operations.pending(h.original.id),isNull);expect(h.journal.command,isNull);expect(h.journal.removes,1);
+    }finally{await h.dispose(tester);}});
+}
+
+// Isolated HOST sources mounted through the actual dashboard and native index.
+// Original source readers and retained index provide references; no model target
+// is injected into dashboard state or into the runtime application.
+class _Order02DashboardHost {
+  _Order02DashboardHost({this.buyer=false,this.personalOnly=false});
+  final bool buyer,personalOnly;
+  final issueGateway=purchase_fixture.DeviceCaseGatewayFixture();
+  late final _AuthenticatedNativeScopeFixture native;
+  late purchase_fixture.Transport wire;
+  late purchase_fixture.DeviceSourceFixture units;
+  late AuthenticatedWorkspaceOrderIdentityGateway reader;
+  late WorkspacePurchaseReference reference;
+  late WorkspacePurchaseOrder original;
+  WorkProcurementController? procurement;
+  late GoRouter router;
+  final cores=<BuySession>[];
+  scope_contract.MoolAssistantController? assistant;
+  late final List<scope_contract.MoolAssistantNativeAdapter> adapters;
+  final access=_ReceivingAssistantAccess();
+  String get entity=>jsonEncode([reference.orderId,original.lines.single.lineId]);
+  Future<void> ready(WidgetTester tester)async{
+    native=_AuthenticatedNativeScopeFixture(makeWork:(contact,purchase,inventory,trading)=>WorkSession(
+      contactDraftStore:contact,purchaseEntryStore:purchase,inventoryStore:inventory,
+      tradingPreferencesStoreFactory:(_)=>trading,catalogueReference:workspaceMasterCatalogue,
+      issueCommandGateway:issueGateway));
+    await native.ready();final account=native.work.contactDraftStore!.accountScope!,store=native.work.activeWorkspace!.id;
+    final data=buyer?purchase_fixture.purchaserPurchaseResponse():purchase_fixture.purchaseResponse(role:'seller');
+    data['viewerUserId']=account;
+    final record=data['orders'][0] as Map<String,dynamic>;
+    if(buyer){record['original']['purchaser']['storeId']=store;}else{record['storeId']=store;}
+    purchase_fixture.rehashPurchaseOrder(record);
+    wire=purchase_fixture.Transport()..data=data;
+    units=buyer?purchase_fixture.DeviceReporterFixture(accountUserId:account):purchase_fixture.DeviceInboxFixture(accountUserId:account);
+    if(!buyer){units.revision=1;units.rows=const [WorkspacePurchasedUnitRow(id:'HOST-dashboard-device',serial:'HOST original supplier serial')];}
+    reader=purchase_fixture.projectionGateway(wire,account:account,purchasedUnitSource:units);
+    reference=WorkspacePurchaseReference(purchaseId:data['purchaseId'],storeId:record['storeId'],orderId:record['orderId'],
+      sourceRevision:data['sourceRevision'],originalFingerprint:record['originalFingerprint']);
+    original=(await reader.readReferencedOrder(role:buyer?WorkspaceOrderIdentityRole.buyer:WorkspaceOrderIdentityRole.seller,
+      realm:'evaluation',reference:reference,buyingStoreId:buyer?store:null))!;
+    if(!buyer)native.work.bindOriginalPurchaseReader(reader,'evaluation');
+    if(buyer&&!personalOnly){
+      procurement=WorkProcurementController(currentAccountId:()=>account,currentStoreId:()=>native.work.activeWorkspace?.id,
+        currentProfileId:()=>native.work.activeWorkspace?.profileId,storeApproved:()=>native.work.activeWorkspace?.verified==true,
+        bookmarks:_StorePurchaseBookmarks(),stateStoreFactory:_StorePurchaseState.new,
+        originalPurchaseReader:()=>reader,originalPurchaseRealm:()=>'evaluation',
+        sessionFactory:(identity,state){final core=BuySession();cores.add(core);return BuyV2Session(core:core,
+          procurementIdentity:identity,customerStateStore:state,reviewDataEnabled:false,
+          commerceAdapter:const BuyV2UnavailableCommerceAdapter(),purchaseReader:reader,purchaseRealm:'evaluation');});
+      expect(await procurement!.open(purpose:BuyV2ProcurementPurpose.restock,returnTo:'dashboard'),isTrue);
+    }
+    router=GoRouter(initialLocation:'/app/work/workspace/dashboard',routes:[GoRoute(path:'/app/work/workspace/dashboard',builder:(_,_)=>
+      MoolAssistantWorkspaceScope(readWorkspace:native.readWorkspace,child:WorkWorkspaceDashboardScreen(session:native.work,
+        procurementSession:native.buy,useStoreProcurement:procurement!=null,procurementControllerFactory:()=>procurement!,
+        accountIdentity:native.journey.accountIdentity,accountAuthenticated:true,accountRecoveryReady:true,initialSection:'dashboard')))]);
+    await tester.pumpWidget(MaterialApp.router(theme:MoolTheme.light(),routerConfig:router,builder:(_,child)=>
+      MoolAssistantHost(readContext:()=>scope_contract.MoolAssistantContext(accountScope:native.journey.authenticatedBuyPersistenceIdentity,
+        authenticationRevision:native.journey.navigationAuthenticationGeneration),contextChanges:Listenable.merge([native.journey,native.work,native.mode]),
+        child:Stack(children:[child!,Offstage(offstage:true,child:WorkspacePurchaseOriginals(gateway:reader,
+          role:buyer?WorkspaceOrderIdentityRole.buyer:WorkspaceOrderIdentityRole.seller,realm:'evaluation',
+          storeId:buyer?null:store,buyingStoreId:buyer?store:null,initialRead:(reference:reference,original:original)))]))));
+    await tester.pumpAndSettle();
+    adapters=native.adapters(tester);
+    final navigator=router.routerDelegate.navigatorKey.currentState!;
+    final assistantRoute=MaterialPageRoute<void>(builder:(_)=>const Scaffold(body:Text('HOST actual dashboard assistant cover')));
+    for(final adapter in adapters){if(adapter is MoolAssistantRouteBoundNativeAdapter)adapter.bindAssistantRoute(assistantRoute,navigator);}
+    unawaited(navigator.push<void>(assistantRoute));await tester.pumpAndSettle();
+    assistant=scope_contract.MoolAssistantController(currentContext:native.readContext,
+      contextChanges:Listenable.merge([native.journey,native.work,native.mode]),entitlements:access,nativeAdapters:adapters);
+    await assistant!.refreshAccess();assistant!.setDraft('Review exact original Store device record');
+  }
+  Future<({Future<scope_contract.MoolAssistantReviewResult> result})> open(WidgetTester tester,String action,{Map<String,Object?> fields=const {}})async{
+    final adapter=adapters.singleWhere((a)=>a.actionId==action),c=assistant!;
+    final snapshot=await adapter.snapshot(c.context,entity);expect(snapshot,isNotNull);
+    expect(c.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-dashboard-$action',actionId:action,binding:c.context.binding,
+      requestRevision:c.requestRevision,entitlementRevision:c.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,entityId:entity,
+      validUntil:DateTime.now().add(const Duration(minutes:3)),title:'Review linked original',summary:'HOST actual dashboard owner',fields:fields)),isTrue);
+    final result=c.reviewProposal();await tester.pumpAndSettle();return(result:result);
+  }
+  Future<void> close(WidgetTester tester)async{
+    await tester.pumpWidget(const SizedBox.shrink());assistant?.dispose();access.dispose();router.dispose();
+    units.dispose();for(final core in cores)core.dispose();await native.dispose();
+  }
+  Future<VoidCallback> prepareNativeResponse(WidgetTester tester)async{
+    final dropdown=find.byType(DropdownButtonFormField<WorkspaceIssueResponse>);
+    await tester.ensureVisible(dropdown);await tester.tap(dropdown);await tester.pumpAndSettle();
+    await tester.tap(find.text(WorkspaceIssueResponse.provideDetails.label).last);await tester.pumpAndSettle();
+    final note=find.byKey(const Key('work-issue-response-note-HOST-DEVICE-CASE'));
+    await tester.ensureVisible(note);await tester.enterText(note,'HOST original Store explanation');await tester.pumpAndSettle();
+    FocusManager.instance.primaryFocus?.unfocus();await tester.pumpAndSettle();
+    final send=find.byKey(const Key('work-issue-send-response-HOST-DEVICE-CASE'));await tester.ensureVisible(send);
+    final callback=tester.widget<FilledButton>(send).onPressed;expect(callback,isNotNull);return callback!;
+  }
+}
+
+void registerOrder02DashboardNativeTests(){
+  testWidgets('ORDER02-DASHBOARD 400 retained case response cannot dispatch beneath a foreign route or after Done',(tester)async{
+    final h=_Order02DashboardHost();try{await h.ready(tester);
+      final pending=await h.open(tester,'AI-ACT-400',fields:{'reportId':'HOST-REPORT-1'});
+      final send=await h.prepareNativeResponse(tester);
+      final done=tester.widget<TextButton>(find.widgetWithText(TextButton,'Done')).onPressed!;
+      unawaited(h.router.routerDelegate.navigatorKey.currentState!.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST foreign response owner')))));
+      await tester.pumpAndSettle();send();await tester.pumpAndSettle();
+      expect(h.issueGateway.submitted,isEmpty);expect(h.issueGateway.checked,isEmpty);expect(find.text('HOST foreign response owner'),findsOneWidget);
+      await h.router.routerDelegate.navigatorKey.currentState!.maybePop();await tester.pumpAndSettle();done();await tester.pumpAndSettle();
+      send();await tester.pumpAndSettle();expect(h.issueGateway.submitted,isEmpty);expect(tester.takeException(),isNull);
+      await tester.tap(find.byType(BackButton).first);await tester.pumpAndSettle();await pending.result;
+    }finally{await h.close(tester);}
+  });
+  testWidgets('ORDER02-DASHBOARD 400 already issued native response retains its exact acknowledgement beneath a cover',(tester)async{
+    final h=_Order02DashboardHost();final entered=Completer<WorkIssueCommand>(),reply=Completer<WorkIssueReply>();
+    try{await h.ready(tester);h.issueGateway.onSubmit=(command){entered.complete(command);return reply.future;};
+      final pending=await h.open(tester,'AI-ACT-400',fields:{'reportId':'HOST-REPORT-1'});
+      final send=await h.prepareNativeResponse(tester);send();await tester.pump();final command=await entered.future;
+      expect(h.issueGateway.submitted,hasLength(1));
+      unawaited(h.router.routerDelegate.navigatorKey.currentState!.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST cover after original issue')))));
+      await tester.pumpAndSettle();reply.complete(h.issueGateway.reply(command));await tester.pumpAndSettle();
+      final issue=h.native.work.workspaceIssuesFor(WorkspaceIssueTarget.customerOrder,h.reference.orderId).single;
+      expect(h.native.work.workspaceIssueResponse(issue)!.reply!.matches(command),isTrue);
+      expect(find.text('HOST cover after original issue'),findsOneWidget);
+      send();await tester.pump();expect(h.issueGateway.submitted,hasLength(1));
+      await h.router.routerDelegate.navigatorKey.currentState!.maybePop();await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton,'Done'));await tester.pumpAndSettle();
+      await tester.tap(find.byType(BackButton).first);await tester.pumpAndSettle();await pending.result;
+    }finally{if(!reply.isCompleted&&entered.isCompleted)reply.complete(h.issueGateway.reply(await entered.future));await h.close(tester);}
+  });
+  testWidgets('ORDER02-DASHBOARD 400 opens actual linked Store case dialog and Done returns only to its original review',(tester)async{
+    final h=_Order02DashboardHost();try{await h.ready(tester);
+      final pending=await h.open(tester,'AI-ACT-400',fields:{'reportId':'HOST-REPORT-1'});
+      expect(find.byKey(const Key('work-device-report-case')),findsOneWidget);expect(find.text('Buyer device report'),findsOneWidget);
+      expect(h.issueGateway.submitted,isEmpty);expect(h.issueGateway.checked,isEmpty);
+      final done=tester.widget<TextButton>(find.widgetWithText(TextButton,'Done')).onPressed!;
+      unawaited(h.router.routerDelegate.navigatorKey.currentState!.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST unrelated device case owner')))));
+      await tester.pumpAndSettle();done();await tester.pump();expect(find.text('HOST unrelated device case owner'),findsOneWidget);
+      await h.router.routerDelegate.navigatorKey.currentState!.maybePop();await tester.pumpAndSettle();
+      done();await tester.pumpAndSettle();expect(find.byKey(const Key('work-device-report-case')),findsNothing);
+      expect(h.issueGateway.submitted,isEmpty);expect(h.issueGateway.checked,isEmpty);
+      await tester.tap(find.byType(BackButton).first);await tester.pumpAndSettle();await pending.result;
+    }finally{await h.close(tester);}
+  });
+  testWidgets('ORDER02-DASHBOARD actual Store procurement buyer index enables396 and exact399 without borrowing seller or personal scope',(tester)async{
+    final h=_Order02DashboardHost(buyer:true);try{await h.ready(tester);
+      final before=h.native.writes,source=h.units as purchase_fixture.DeviceReporterFixture;
+      final pending=await h.open(tester,'AI-ACT-396',fields:{'selectedIds':['supplier-device-A'],'note':'મૂળ dashboard mismatch'});
+      expect(find.textContaining('મૂળ dashboard mismatch'),findsWidgets);expect(h.native.writes,before);expect(source.reports,isEmpty);
+      await tester.tap(find.byType(BackButton).first);await tester.pumpAndSettle();await pending.result;
+      final status=h.adapters.singleWhere((a)=>a.actionId=='AI-ACT-399');
+      expect(await status.snapshot(h.assistant!.context,h.entity),isNull,reason:'No exact pending report may be invented.');
+      final read=(await h.reader.readPurchasedUnits(role:WorkspaceOrderIdentityRole.buyer,realm:'evaluation',reference:h.reference,
+        line:h.original.lines.single,buyingStoreId:h.native.work.activeWorkspace!.id))!;
+      final key=WorkspacePurchasedUnitDraftKey(account:h.reader.accountUserId,realm:'evaluation',store:h.reference.storeId,binding:read.target.binding);
+      final command=WorkspacePurchasedUnitMismatchCommand(key:key,operationId:'c'*32,sourceRevision:read.revision,
+        sourceFingerprint:read.fingerprint,note:'HOST exact retained buyer mismatch',rows:read.rows);
+      final saved=WorkspacePurchasedUnitDraft(key:key,revision:1,publishedRevision:read.revision,rows:read.rows,
+        report:WorkspacePurchasedUnitMismatchDraft(sourceFingerprint:read.fingerprint,note:command.note,
+          selected:read.rows.map((row)=>row.id).toList(),pending:command));
+      expect(saved.valid,isTrue);
+      final storage=SecureWorkPurchasedUnitDraftStore(accountScope:()=>h.reader.accountUserId,targetScope:()=>key.identity);
+      await storage.save(saved,expectedRevision:null);
+      h.assistant!.setDraft('Check this exact already pending device report');
+      final beforeReview=Map<String,String>.of(await const FlutterSecureStorage().readAll());
+      final checking=await h.open(tester,'AI-ACT-399');
+      expect(Map<String,String>.of(await const FlutterSecureStorage().readAll()),beforeReview);
+      expect(source.checks,isEmpty);expect(source.reports,isEmpty);
+      final check=find.widgetWithText(TextButton,'Check report status');await tester.ensureVisible(check);await tester.tap(check);await tester.pumpAndSettle();
+      expect(source.checks,hasLength(1));expect(source.checks.single.toJson(),command.toJson());expect(source.reports,isEmpty);
+      await tester.tap(find.byType(BackButton).first);await tester.pumpAndSettle();await checking.result;
+    }finally{await h.close(tester);}
+  });
+  testWidgets('ORDER02-DASHBOARD personal buyer index cannot grant Store procurement report actions',(tester)async{
+    final h=_Order02DashboardHost(buyer:true,personalOnly:true);try{await h.ready(tester);
+      for(final action in ['AI-ACT-396','AI-ACT-399']){
+        final found=h.adapters.where((a)=>a.actionId==action);
+        if(found.isNotEmpty)expect(await found.single.snapshot(h.assistant!.context,h.entity),isNull);
+      }
+      expect((h.units as purchase_fixture.DeviceReporterFixture).reports,isEmpty);expect(h.issueGateway.submitted,isEmpty);
+    }finally{await h.close(tester);}
+  });
+}
+
+class _Order276Host{
+  final native=_AuthenticatedNativeScopeFixture(),access=_OrderEffectAccess(),gateway=_ScopedTimingFixtureGateway(),journal=_OrderEffectJournal();
+  late WorkOrderOperations operations;late WorkspaceOrderRecord original;late scope_contract.MoolAssistantController controller;
+  Future<void> ready(WidgetTester tester,{bool pending=false})async{
+    await native.ready();final now=DateTime.now();
+    original=WorkspaceOrderRecord(id:'HOST-time-order',customer:'HOST original customer',items:'HOST supplied item',quantities:const {},
+      amount:100,source:'MoolSocial',fulfilment:'Delivery',payment:'Payment status unavailable',address:'HOST original address',
+      stage:'Confirmed',needsDelivery:true,createdAt:now.subtract(const Duration(minutes:1)),
+      actionDeadline:now.add(const Duration(minutes:5)),fulfilmentDeadline:now.add(const Duration(minutes:30)));
+    if(pending)journal.command=WorkOrderCommand(accountScope:native.work.contactDraftStore!.accountScope!,workspaceId:native.work.activeWorkspace!.id,
+      orderId:original.id,operationId:'HOST-original-time-operation',expectedRevision:1,action:WorkOrderAction.requestTime,
+      additionalMinutes:5,expectedAcceptanceDeadline:original.actionDeadline);
+    operations=WorkOrderOperations(accountScope:native.work.contactDraftStore!.accountScope!,workspaceId:native.work.activeWorkspace!.id,
+      gateway:gateway,pendingStore:journal);expect(await operations.restore(),isTrue);
+    operations.observe(WorkOrderReply(accountScope:operations.accountScope,workspaceId:operations.workspaceId,orderId:original.id,
+      operationId:'',revision:1,state:WorkOrderReplyState.applied,order:original));
+    expect(native.work.bindWorkspaceOrderOperations(operations),isTrue);
+    await tester.pumpWidget(native.app);await tester.pumpAndSettle();
+    controller=scope_contract.MoolAssistantController(currentContext:native.readContext,
+      contextChanges:Listenable.merge([native.work,native.journey,native.mode]),entitlements:access,nativeAdapters:native.adapters(tester));
+    await controller.refreshAccess();controller.setDraft('Request more time for this exact order');
+  }
+  Object get effects=>(native.writes,journal.saves,journal.removes,gateway.submitted.length,gateway.reconciled.length);
+  Future<({Future<MoolAssistantReviewResult> result})> open(WidgetTester tester,{int minutes=5})async{
+    final adapter=native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-276'),snapshot=await native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-276').snapshot(controller.context,original.id);
+    expect(snapshot,isNotNull);expect(adapter.validateFields({'minutes':minutes}),isNull);
+    expect(controller.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-time-proposal',actionId:'AI-ACT-276',binding:controller.context.binding,
+      requestRevision:controller.requestRevision,entitlementRevision:controller.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+      validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:original.id,title:'Review original time request',summary:'HOST original time sheet',fields:{'minutes':minutes})),isTrue);
+    final result=controller.reviewProposal();await tester.pumpAndSettle();return(result:result);
+  }
+  Future<void> close(WidgetTester tester)async{
+    final retired=find.byKey(const Key('work-purchase-owner-retired-close'));
+    if(retired.evaluate().isNotEmpty){await tester.tap(retired);}else{
+      await tester.tap(find.descendant(of:find.byKey(const Key('work-order-time-sheet')),matching:find.byTooltip('Close')));
+    }
+    await tester.pumpAndSettle();
+  }
+  Future<void> dispose(WidgetTester tester)async{
+    if(journal.hold?.isCompleted==false)journal.hold!.complete();
+    for(final p in [...gateway.responses,...gateway.replies])if(!p.isCompleted)p.completeError(StateError('HOST unknown'));
+    await tester.pumpAndSettle();await tester.pumpWidget(const SizedBox.shrink());controller.dispose();access.dispose();await native.dispose();
+  }
+}
+void registerOrder276NativeTests(){
+  for(final minutes in [2,5]){
+    testWidgets('FE-ORDER276 $minutes minutes prefill appears in original time sheet with no request or pending save',(tester)async{
+      final h=_Order276Host();try{await h.ready(tester);final before=h.effects;
+        final opened=await h.open(tester,minutes:minutes);expect(h.effects,before);
+        expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip,'+$minutes min')).selected,isTrue);
+        expect(h.native.work.currentWorkspaceOrderId,h.original.id);await h.close(tester);await opened.result;
+        expect(h.effects,before);expect(h.journal.command,isNull);
+      }finally{await h.dispose(tester);}});
+  }
+  testWidgets('FE-ORDER276 native Request time dispatches exact minutes once and shows original acknowledged deadlines',(tester)async{
+    final h=_Order276Host();try{await h.ready(tester);final opened=await h.open(tester);
+      final request=find.byKey(const Key('work-order-time-request'));await tester.ensureVisible(request);await tester.pumpAndSettle();
+      final retained=tester.widget<FilledButton>(request).onPressed!;retained();retained();await tester.pumpAndSettle();
+      expect(h.gateway.submitted,hasLength(1));final cmd=h.gateway.submitted.single;
+      expect(cmd.action,WorkOrderAction.requestTime);expect(cmd.additionalMinutes,5);expect(cmd.expectedAcceptanceDeadline,h.original.actionDeadline);
+      h.gateway.responses.single.complete(WorkOrderReply(accountScope:cmd.accountScope,workspaceId:cmd.workspaceId,orderId:cmd.orderId,
+        operationId:cmd.operationId,revision:2,state:WorkOrderReplyState.applied,order:h.original.copyWith(
+          actionDeadline:h.original.actionDeadline!.add(const Duration(minutes:5)),
+          fulfilmentDeadline:h.original.actionDeadline!.add(const Duration(minutes:15)))));
+      await tester.pumpAndSettle();expect(find.text('Time confirmed'),findsOneWidget);expect(h.journal.command,isNull);
+      expect(h.native.work.currentWorkspaceOrder!.actionDeadline,h.original.actionDeadline!.add(const Duration(minutes:5)));
+      await h.close(tester);await opened.result;expect(h.gateway.submitted,hasLength(1));
+    }finally{await h.dispose(tester);}});
+  for(final cause in ['cancel','paid','account']){
+    testWidgets('FE-ORDER276 $cause retirement prevents retained Request time callback',(tester)async{
+      final h=_Order276Host();try{await h.ready(tester);final opened=await h.open(tester),before=h.effects;
+        final retained=tester.widget<FilledButton>(find.byKey(const Key('work-order-time-request'))).onPressed!;
+        if(cause=='cancel')h.controller.cancelProposal();if(cause=='paid')h.access.revoke();
+        if(cause=='account'){h.native.principal.identity=null;h.native.principal.changes.add(null);}
+        await tester.pumpAndSettle();retained();await tester.pumpAndSettle();expect(h.effects,before);
+        await h.close(tester);expect(await opened.result,MoolAssistantReviewResult.stale);
+      }finally{await h.dispose(tester);}});
+  }
+  testWidgets('FE-ORDER276 original pending amount wins and Review never automatically retries',(tester)async{
+    final h=_Order276Host();try{await h.ready(tester,pending:true);final original=h.journal.command!,before=h.effects;
+      final opened=await h.open(tester,minutes:2);expect(h.effects,before);
+      expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip,'+5 min')).selected,isTrue);
+      expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip,'+2 min')).onSelected,isNull);
+      expect(h.operations.pending(h.original.id),same(original));await h.close(tester);await opened.result;
+      expect(h.effects,before);expect(h.gateway.reconciled,isEmpty);
+    }finally{await h.dispose(tester);}});
+  testWidgets('FE-ORDER276 native busy retirement prevents new pending persistence and service dispatch',(tester)async{
+    final h=_Order276Host();try{await h.ready(tester);final opened=await h.open(tester);
+      h.operations.addListener((){if(h.operations.state(h.original.id)==WorkOrderOperationState.submitting)h.controller.cancelProposal();});
+      final request=find.byKey(const Key('work-order-time-request'));await tester.ensureVisible(request);await tester.pumpAndSettle();await tester.tap(request);await tester.pumpAndSettle();
+      expect(h.journal.saves,0);expect(h.gateway.submitted,isEmpty);expect(h.operations.pending(h.original.id),isNull);
+      await h.close(tester);await opened.result;
+    }finally{await h.dispose(tester);}});
+}
+
+class _OrderIssueDraftStore extends _IssueDraftFixtureStore {
+  int writes=0;Completer<void>? hold;
+  @override Future<void> save(WorkspaceIssueDraft draft)async{writes++;if(hold!=null)await hold!.future;await super.save(draft);}
+}
+class _OrderIssueJournal extends _IssueCommandFixtureStore {
+  int writes=0;Completer<void>? hold;
+  @override Future<void> save(WorkIssueSubmission value)async{writes++;if(hold!=null)await hold!.future;await super.save(value);}
+}
+class _OrderIssueGateway extends _IssueResponseFixtureGateway {
+  bool lose=false,waiting=false;
+  @override Future<WorkIssueReply> submitIssueResponse(WorkIssueCommand command){
+    if(!lose){waiting=true;return super.submitIssueResponse(command);}submitted.add(command);return Future.error(StateError('HOST lost acknowledgement'));
+  }
+}
+class _OrderIssueHost {
+  final drafts=_OrderIssueDraftStore(),journal=_OrderIssueJournal(),gateway=_OrderIssueGateway(),access=_OrderEffectAccess();
+  late final _AuthenticatedNativeScopeFixture native;
+  late final scope_contract.MoolAssistantController controller;
+  late WorkspaceIssueRecord issue;
+  WorkSession get work=>native.work;
+  Object get effects=>(native.writes,drafts.writes,journal.writes,gateway.submitted.length,gateway.reconciled.length);
+  Future<void> ready(WidgetTester tester)async{
+    native=_AuthenticatedNativeScopeFixture(makeWork:(contact,purchase,inventory,trading)=>WorkSession(
+      contactDraftStore:contact,purchaseEntryStore:purchase,inventoryStore:inventory,tradingPreferencesStoreFactory:(_)=>trading,
+      catalogueReference:workspaceMasterCatalogue,issueDraftStore:drafts,issueCommandStore:journal,issueCommandGateway:gateway));
+    await native.ready();
+    work.workspaceOrders.add(WorkspaceOrderRecord(id:'HOST-ORDER-ISSUE',customer:'HOST કિરણ',items:'HOST sealed oil',
+      quantities:const {'oil-fortune-1l':1},amount:100,source:'App',fulfilment:'Delivery',payment:'Payment pending',address:'HOST Jaipur',
+      stage:'Preparing',needsDelivery:true,createdAt:DateTime.now().toUtc()));
+    issue=WorkspaceIssueRecord(accountScope:work.contactDraftStore!.accountScope!,workspaceId:work.activeWorkspace!.id,
+      id:'HOST-ORDER-ISSUE-CASE',referenceId:'HOST-ORDER-ISSUE',target:WorkspaceIssueTarget.customerOrder,
+      kind:WorkspaceIssueKind.packingShortage,state:WorkspaceIssueState.retailerReview,revision:1,updatedAt:DateTime.now().toUtc(),
+      reason:'HOST original sealed pack damaged',nextStep:'Review affected original item',
+      permittedResponses:const [WorkspaceIssueResponse.provideDetails,WorkspaceIssueResponse.declineRequest],
+      lines:const [WorkspaceIssueLine(lineId:'oil-fortune-1l',productId:'oil-fortune-1l',name:'HOST sealed oil',pack:'1 l',orderedQuantity:1,affectedQuantity:1)]);
+    expect(work.applyWorkspaceIssues(accountScope:issue.accountScope,storeId:issue.workspaceId,feedRevision:1,records:[issue]),isTrue);
+    await tester.pumpWidget(native.app);await tester.pumpAndSettle();
+    controller=scope_contract.MoolAssistantController(currentContext:native.readContext,
+      contextChanges:Listenable.merge([work,native.journey,native.mode]),entitlements:access,nativeAdapters:native.adapters(tester));
+    await controller.refreshAccess();controller.setDraft('Review this original order issue');
+  }
+  Future<({Future<MoolAssistantReviewResult> result})> open(WidgetTester tester,{String action='AI-ACT-277',Map<String,Object?>? fields})async{
+    final snapshot=await native.adapters(tester).singleWhere((a)=>a.actionId==action).snapshot(controller.context,issue.id);
+    expect(snapshot,isNotNull);
+    expect(controller.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-issue-$action',actionId:action,binding:controller.context.binding,
+      requestRevision:controller.requestRevision,entitlementRevision:controller.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+      validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:issue.id,title:'Review original order response',summary:'HOST original fields',
+      fields:fields??(action=='AI-ACT-279'?{}:{'response':'provideDetails','note':'मूळ sealed pack · મૂળ १२.५०'}))),isTrue);
+    final result=controller.reviewProposal();await tester.pumpAndSettle();return(result:result);
+  }
+  Future<void> tap(WidgetTester tester,String key)async{final finder=find.byKey(Key(key));await tester.ensureVisible(finder);await tester.pumpAndSettle();await tester.tap(finder);await tester.pumpAndSettle();}
+  Future<void> unknown()async{
+    await work.loadWorkspaceIssueDraft(issue);await work.loadWorkspaceIssueResponse(issue);
+    await work.saveWorkspaceIssueDraft(issue,response:WorkspaceIssueResponse.provideDetails,note:'HOST original retained response');
+    gateway.lose=true;
+    expect(await work.sendWorkspaceIssueResponse(issue,expectedDraft:work.workspaceIssueDraft(issue)!),isFalse);
+    gateway.lose=false;
+    expect(work.workspaceIssueResponse(issue)?.pending,isTrue);
+  }
+  Future<void> dispose(WidgetTester tester)async{
+    if(drafts.hold?.isCompleted==false)drafts.hold!.complete();if(journal.hold?.isCompleted==false)journal.hold!.complete();
+    if(gateway.waiting&&!gateway.result.isCompleted)gateway.result.completeError(StateError('HOST unfinished acknowledgement'));
+    await tester.pumpAndSettle();await tester.pumpWidget(const SizedBox.shrink());controller.dispose();access.dispose();await native.dispose();
+  }
+}
+void registerOrderIssueNativeTests(){
+  for(final action in ['AI-ACT-277','AI-ACT-278']){
+    testWidgets('FE-ORDER-ISSUE $action stages exact original response fields without autosave or send',(tester)async{
+      final h=_OrderIssueHost();try{await h.ready(tester);final before=h.effects,opened=await h.open(tester,action:action);
+        expect(h.effects,before);expect(h.work.workspaceIssueDraft(h.issue),isNull);
+        expect(tester.widget<TextField>(find.byKey(Key('work-issue-response-note-${h.issue.id}'))).controller!.text,'मूळ sealed pack · મૂળ १२.५०');
+        expect(find.text('HOST sealed oil'),findsOneWidget);expect(find.text('HOST original sealed pack damaged'),findsOneWidget);
+        await tester.tap(find.byType(BackButton).last);await tester.pumpAndSettle();expect(await opened.result,MoolAssistantReviewResult.opened);expect(h.effects,before);
+      }finally{await h.dispose(tester);}
+    });
+  }
+  testWidgets('FE-ORDER-ISSUE 277 explicit native Save draft alone persists exact reviewed values',(tester)async{
+    final h=_OrderIssueHost();try{await h.ready(tester);final opened=await h.open(tester);
+      final field=find.byKey(Key('work-issue-response-note-${h.issue.id}'));await tester.enterText(field,'ગુજરાતી corrected · 0001.25');await tester.pumpAndSettle();
+      expect(h.drafts.writes,0);await h.tap(tester,'work-issue-keep-draft-${h.issue.id}');
+      expect(h.drafts.writes,1);expect(h.drafts.values[h.issue.draftKey]!.note,'ગુજરાતી corrected · 0001.25');expect(h.gateway.submitted,isEmpty);expect(h.journal.writes,0);
+      await tester.tap(find.byType(BackButton).last);await tester.pumpAndSettle();await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER-ISSUE 278 original Send persists then dispatches exact native command once',(tester)async{
+    final h=_OrderIssueHost();try{await h.ready(tester);final opened=await h.open(tester,action:'AI-ACT-278');
+      await h.tap(tester,'work-issue-send-response-${h.issue.id}');expect(h.gateway.submitted.length,1);
+      final command=h.gateway.submitted.single;expect(command.draft.note,'मूळ sealed pack · મૂળ १२.५०');expect(command.key,h.issue.draftKey);
+      expect(h.drafts.writes,1);expect(h.journal.values[h.issue.draftKey]!.pending,isTrue);
+      h.gateway.result.complete(WorkIssueReply(key:command.key,operationId:command.operationId,commandDigest:command.digest,
+        state:WorkIssueReplyState.applied,revision:2));await tester.pumpAndSettle();
+      expect(h.work.workspaceIssueResponse(h.issue)!.pending,isFalse);expect(h.gateway.submitted.length,1);
+      await tester.tap(find.byType(BackButton).last);await tester.pumpAndSettle();await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+  for(final cause in ['cancel','request','paid','account']){
+    testWidgets('FE-ORDER-ISSUE actual $cause retirement rejects retained original Save callback',(tester)async{
+      final h=_OrderIssueHost();try{await h.ready(tester);final opened=await h.open(tester),before=h.effects;
+        final save=tester.widget<TextButton>(find.byKey(Key('work-issue-keep-draft-${h.issue.id}'))).onPressed!;
+        if(cause=='cancel')h.controller.cancelProposal();if(cause=='request')h.controller.setDraft('Different task');
+        if(cause=='paid')h.access.revoke();if(cause=='account')h.native.mode.value='buyer';
+        await tester.pumpAndSettle();save();await tester.pumpAndSettle();expect(h.effects,before);expect(await opened.result,MoolAssistantReviewResult.stale);
+      }finally{await h.dispose(tester);}
+    });
+  }
+  testWidgets('FE-ORDER-ISSUE retained native Save under unrelated cover does not persist or pop cover',(tester)async{
+    final h=_OrderIssueHost();try{await h.ready(tester);final opened=await h.open(tester),before=h.effects;
+      final save=tester.widget<TextButton>(find.byKey(Key('work-issue-keep-draft-${h.issue.id}'))).onPressed!;
+      final navigator=Navigator.of(tester.element(find.byType(BackButton).last));unawaited(navigator.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST unrelated order issue cover')))));
+      await tester.pumpAndSettle();save();await tester.pumpAndSettle();expect(h.effects,before);expect(find.text('HOST unrelated order issue cover'),findsOneWidget);
+      h.controller.cancelProposal();await tester.pumpAndSettle();expect(find.text('HOST unrelated order issue cover'),findsOneWidget);await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER-ISSUE changed saved human draft is never overwritten by captured proposal',(tester)async{
+    final h=_OrderIssueHost();try{await h.ready(tester);final opened=await h.open(tester);
+      await h.work.saveWorkspaceIssueDraft(h.issue,response:WorkspaceIssueResponse.provideDetails,note:'HOST newer human response');await tester.pumpAndSettle();
+      final writes=h.drafts.writes;await h.tap(tester,'work-issue-keep-draft-${h.issue.id}');
+      expect(h.drafts.writes,writes);expect(h.work.workspaceIssueDraft(h.issue)!.note,'HOST newer human response');
+      expect(find.text('The saved response changed. Close and review it again.'),findsOneWidget);h.controller.cancelProposal();await tester.pumpAndSettle();await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER-ISSUE cancellation during draft persistence stops a new response dispatch',(tester)async{
+    final h=_OrderIssueHost();try{await h.ready(tester);final opened=await h.open(tester,action:'AI-ACT-278');h.drafts.hold=Completer<void>();
+      await h.tap(tester,'work-issue-send-response-${h.issue.id}');expect(h.drafts.writes,1);h.controller.cancelProposal();await tester.pump();
+      h.drafts.hold!.complete();await tester.pumpAndSettle();expect(h.gateway.submitted,isEmpty);expect(h.journal.writes,0);await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER-ISSUE 279 opens exact original pending status without automatic retry and original Check reconciles same command',(tester)async{
+    final h=_OrderIssueHost();try{await h.ready(tester);await h.unknown();final pending=h.work.workspaceIssueResponse(h.issue)!.command,before=h.effects;
+      final opened=await h.open(tester,action:'AI-ACT-279');expect(h.effects,before);expect(find.text('HOST original retained response'),findsOneWidget);
+      await h.tap(tester,'work-issue-check-response-${h.issue.id}');expect(h.gateway.reconciled.single.operationId,pending.operationId);expect(h.gateway.submitted.length,1);
+      expect(h.work.workspaceIssueResponse(h.issue)!.pending,isFalse);await tester.tap(find.byType(BackButton).last);await tester.pumpAndSettle();await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER-ISSUE 279 refuses invented pending and unknown response authority',(tester)async{
+    final h=_OrderIssueHost();try{await h.ready(tester);final a=h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-279');
+      expect(await a.snapshot(h.controller.context,h.issue.id),isNull);expect(a.validateFields({'retry':true}),isNotNull);
+      final prepare=h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-277');expect(prepare.validateFields({'note':'HOST','paid':true}),isNotNull);
+    }finally{await h.dispose(tester);}
+  });
+}
+
+void registerOrderIssueNestedNativeTests(){
+  for(final cause in ['cancel','paid','account']){
+    testWidgets('FE-ORDER-ISSUE owned nested decline $cause retirement closes only its dialog and retained controls cannot send',(tester)async{
+      final h=_OrderIssueHost();try{await h.ready(tester);final opened=await h.open(tester,action:'AI-ACT-278',fields:const {'response':'declineRequest','note':'HOST actual decline reason'});
+        await h.tap(tester,'work-issue-send-response-${h.issue.id}');expect(find.byKey(const Key('work-issue-decline-confirmation')),findsOneWidget);
+        final send=tester.widget<FilledButton>(find.widgetWithText(FilledButton,'Send decline')).onPressed!,keep=tester.widget<TextButton>(find.widgetWithText(TextButton,'Keep editing')).onPressed!;
+        final before=h.effects;if(cause=='cancel')h.controller.cancelProposal();if(cause=='paid')h.access.revoke();if(cause=='account')h.native.mode.value='buyer';
+        await tester.pumpAndSettle();expect(find.byKey(const Key('work-issue-decline-confirmation')),findsNothing);send();keep();await tester.pumpAndSettle();
+        expect(h.effects,before);expect(h.gateway.submitted,isEmpty);expect(await opened.result,MoolAssistantReviewResult.stale);
+      }finally{await h.dispose(tester);}
+    });
+  }
+  testWidgets('FE-ORDER-ISSUE nested decline callbacks under a foreign route never pop that route and retirement removes only owned dialogs',(tester)async{
+    final h=_OrderIssueHost();try{await h.ready(tester);final opened=await h.open(tester,action:'AI-ACT-278',fields:const {'response':'declineRequest','note':'HOST actual decline reason'});
+      await h.tap(tester,'work-issue-send-response-${h.issue.id}');final dialog=find.byKey(const Key('work-issue-decline-confirmation'));
+      final navigator=Navigator.of(tester.element(dialog)),send=tester.widget<FilledButton>(find.widgetWithText(FilledButton,'Send decline')).onPressed!,keep=tester.widget<TextButton>(find.widgetWithText(TextButton,'Keep editing')).onPressed!;
+      unawaited(navigator.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST unrelated decline cover')))));await tester.pumpAndSettle();
+      final before=h.effects;send();keep();await tester.pumpAndSettle();expect(find.text('HOST unrelated decline cover'),findsOneWidget);expect(h.effects,before);
+      h.controller.cancelProposal();await tester.pumpAndSettle();await opened.result;expect(find.text('HOST unrelated decline cover'),findsOneWidget);expect(h.gateway.submitted,isEmpty);
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER-ISSUE explicit original nested Send decline confirms exact draft once and accepts its original ACK',(tester)async{
+    final h=_OrderIssueHost();try{await h.ready(tester);final opened=await h.open(tester,action:'AI-ACT-278',fields:const {'response':'declineRequest','note':'HOST actual decline reason'});
+      await h.tap(tester,'work-issue-send-response-${h.issue.id}');expect(h.gateway.submitted,isEmpty);
+      final send=tester.widget<FilledButton>(find.widgetWithText(FilledButton,'Send decline')).onPressed!;send();send();await tester.pumpAndSettle();
+      expect(h.gateway.submitted,hasLength(1));final command=h.gateway.submitted.single;expect(command.draft.response,WorkspaceIssueResponse.declineRequest);expect(command.draft.note,'HOST actual decline reason');
+      h.gateway.result.complete(WorkIssueReply(key:command.key,operationId:command.operationId,commandDigest:command.digest,state:WorkIssueReplyState.applied,revision:2));
+      await tester.pumpAndSettle();expect(h.work.workspaceIssueResponse(h.issue)!.pending,isFalse);h.controller.cancelProposal();await tester.pumpAndSettle();await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+}
+
+class _OrderPhysicalHost {
+  final gateway=_HeldHandoverGateway(),access=_OrderEffectAccess();
+  late final _AuthenticatedNativeScopeFixture native;
+  late final scope_contract.MoolAssistantController controller;
+  late WorkspaceOrderRecord original;
+  Future<void> ready(WidgetTester tester,String action)async{
+    native=_AuthenticatedNativeScopeFixture(makeWork:(contact,purchase,inventory,trading)=>WorkSession(
+      gateway:gateway,contactDraftStore:contact,purchaseEntryStore:purchase,inventoryStore:inventory,tradingPreferencesStoreFactory:(_)=>trading,
+      catalogueReference:workspaceMasterCatalogue));await native.ready();
+    await native.work.loadWorkspaceInventory(retry:true);await native.work.workspaceInventorySaved;
+    original=WorkspaceOrderRecord(id:'HOST-physical-$action',customer:'HOST कિરણ',items:'HOST exact oil',quantities:const {'oil-fortune-1l':1},
+      amount:100,source:'App',fulfilment:action=='AI-ACT-282'?'Customer pickup':'Own delivery',payment:'Cash',address:'HOST Jodhpur',
+      stage:action=='AI-ACT-282'?'Ready for pickup':'Delivery requested',needsDelivery:action=='AI-ACT-283',createdAt:DateTime.now().toUtc());
+    native.work.workspaceOrders.add(original);expect(native.work.selectWorkspaceOrder(original.id),isTrue);
+    if(action=='AI-ACT-283')native.work.workspaceDeliveryAssignment=WorkspaceDeliveryAssignment(orderId:original.id,partnerName:'HOST original driver',
+      vehicleLabel:'HOST original vehicle',eta:DateTime.now().add(const Duration(minutes:10)),stage:'Picked up');
+    await tester.pumpWidget(native.app);await tester.pumpAndSettle();
+    controller=scope_contract.MoolAssistantController(currentContext:native.readContext,
+      contextChanges:Listenable.merge([native.work,native.journey,native.mode]),entitlements:access,nativeAdapters:native.adapters(tester));
+    await controller.refreshAccess();controller.setDraft('Review exact physical handover');
+  }
+  Future<({Future<MoolAssistantReviewResult> result})> open(WidgetTester tester,String action)async{
+    final a=native.adapters(tester).singleWhere((a)=>a.actionId==action),snapshot=await native.adapters(tester).singleWhere((a)=>a.actionId==action).snapshot(controller.context,original.id);
+    expect(snapshot,isNotNull);expect(a.validateFields({'otp':'123456'}),isNotNull,reason:'The model cannot supply physical customer proof.');
+    expect(controller.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-physical-$action',actionId:action,binding:controller.context.binding,
+      requestRevision:controller.requestRevision,entitlementRevision:controller.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+      validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:original.id,title:'Review exact handover',summary:'HOST original code form',fields:const {})),isTrue);
+    final result=controller.reviewProposal();await tester.pumpAndSettle();return(result:result);
+  }
+  Future<void> dispose(WidgetTester tester)async{
+    if(gateway.handoverCalls>0&&!gateway.response.isCompleted)gateway.response.complete();
+    await tester.pumpAndSettle();await tester.pumpWidget(const SizedBox.shrink());controller.dispose();access.dispose();await native.dispose();
+  }
+}
+void registerOrderPhysicalNativeTests(){
+  for(final action in ['AI-ACT-282','AI-ACT-283']){
+    final field=action=='AI-ACT-282'?'work-pickup-code':'work-handover-otp',confirm=action=='AI-ACT-282'?'work-pickup-confirm':'work-handover-confirm';
+    testWidgets('FE-ORDER-PHYSICAL $action original proof field is blank and Review creates no completion or request',(tester)async{
+      final h=_OrderPhysicalHost();try{await h.ready(tester,action);final before=h.native.writes,opened=await h.open(tester,action);
+        expect(find.byKey(Key(field)),findsOneWidget);expect(h.gateway.handoverCalls,0);expect(h.native.work.workspaceInvoices,isEmpty);
+        final input=tester.widget<TextField>(find.byKey(Key(field)));expect(input.controller?.text??'',isEmpty);
+        expect(h.native.writes,before);await tester.binding.handlePopRoute();await tester.pumpAndSettle();await opened.result;
+        expect(h.native.work.currentWorkspaceOrder!.stage,h.original.stage);expect(h.gateway.handoverCalls,0);
+      }finally{await h.dispose(tester);}
+    });
+    for(final cause in ['cancel','request','paid']){
+      testWidgets('FE-ORDER-PHYSICAL $action actual $cause retirement prevents retained confirmation',(tester)async{
+        final h=_OrderPhysicalHost();try{await h.ready(tester,action);final opened=await h.open(tester,action);await tester.enterText(find.byKey(Key(field)),'123456');
+          final button=tester.widget<FilledButton>(find.byKey(Key(confirm))).onPressed!;
+          if(cause=='cancel')h.controller.cancelProposal();if(cause=='request')h.controller.setDraft('Different task');if(cause=='paid')h.access.revoke();
+          await tester.pumpAndSettle();button();await tester.pumpAndSettle();expect(h.gateway.handoverCalls,0);expect(h.native.work.workspaceInvoices,isEmpty);
+          await tester.tap(find.byKey(const Key('work-purchase-owner-retired-close')));await tester.pumpAndSettle();await opened.result;
+        }finally{await h.dispose(tester);}
+      });
+    }
+    testWidgets('FE-ORDER-PHYSICAL $action explicit native proof alone dispatches once and original acknowledgement completes same order',(tester)async{
+      final h=_OrderPhysicalHost();try{await h.ready(tester,action);final opened=await h.open(tester,action);await tester.enterText(find.byKey(Key(field)),'123456');
+        final button=tester.widget<FilledButton>(find.byKey(Key(confirm))).onPressed!;button();button();await tester.pumpAndSettle();
+        expect(h.gateway.handoverCalls,1);expect(h.gateway.observedOrderId,h.original.id);expect(h.native.work.workspaceInvoices,isEmpty);
+        h.gateway.response.complete();await tester.pumpAndSettle();
+        expect(h.native.work.currentWorkspaceOrder!.stage,'Completed');expect(h.native.work.workspaceInvoices.single.orderId,h.original.id);
+        // Pickup's original successful path may open its original invoice sheet.
+        h.controller.cancelProposal();await tester.pumpAndSettle();unawaited(opened.result);
+      }finally{await h.dispose(tester);}
+    });
+    testWidgets('FE-ORDER-PHYSICAL $action synchronous retirement at native busy notification stops provider call',(tester)async{
+      final h=_OrderPhysicalHost();try{await h.ready(tester,action);final opened=await h.open(tester,action);await tester.enterText(find.byKey(Key(field)),'123456');
+        void retire(){if(h.native.work.workspaceHandoverBusy)h.controller.cancelProposal();}h.native.work.addListener(retire);
+        tester.widget<FilledButton>(find.byKey(Key(confirm))).onPressed!();await tester.pumpAndSettle();h.native.work.removeListener(retire);
+        expect(h.gateway.handoverCalls,0);expect(h.native.work.workspaceInvoices,isEmpty);await tester.tap(find.byKey(const Key('work-purchase-owner-retired-close')));await tester.pumpAndSettle();await opened.result;
+      }finally{await h.dispose(tester);}
+    });
+  }
+}
+
+void registerOrderPackingNativeTests(){
+  Future<({Future<MoolAssistantReviewResult> result})> open(WidgetTester tester,_OrderEffectHost h,{int? quantity,bool packed=false})async{
+    final snapshot=await h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-280').snapshot(h.controller.context,h.original.id);
+    expect(snapshot,isNotNull);final line=h.native.work.workspacePackingLinesForOrder(h.original).first;
+    expect(h.controller.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-original-packing',actionId:'AI-ACT-280',binding:h.controller.context.binding,
+      requestRevision:h.controller.requestRevision,entitlementRevision:h.controller.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+      validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:h.original.id,title:'Review original packed item',summary:'HOST exact whole-line quantity',
+      fields:{'lineId':line.id,'quantity':quantity??line.quantity,'packed':packed})),isTrue);
+    final result=h.controller.reviewProposal();await tester.pumpAndSettle();return(result:result);
+  }
+  for(final scale in [1.0,2.0]){
+    testWidgets('FE-ORDER280 exact original line quantity and checkbox remain visible; explicit native tap alone changes packed state scale$scale',(tester)async{
+      tester.view.physicalSize=const Size(320,700);tester.view.devicePixelRatio=1;tester.platformDispatcher.textScaleFactorTestValue=scale;
+      addTearDown(tester.view.reset);addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final h=_OrderEffectHost();try{await h.ready(tester,packed:true);final before=h.effects,line=h.native.work.workspacePackingLinesForOrder(h.original).first;
+        final opened=await open(tester,h);expect(h.effects,before);expect(h.native.work.workspacePackingLinesForOrder(h.original).first.packed,isTrue);
+        expect(find.textContaining(line.label),findsWidgets);final box=find.byKey(Key('work-operational-pack-${line.id}'));
+        await tester.ensureVisible(box);await tester.pumpAndSettle();expect(tester.widget<CheckboxListTile>(box).value,isTrue);
+        final change=tester.widget<CheckboxListTile>(box).onChanged!;change(false);change(false);await tester.pumpAndSettle();
+        expect(h.native.work.workspacePackingLinesForOrder(h.original).first.packed,isFalse);expect(h.gateway.submitted,isEmpty);expect(h.journal.saves,0);
+        expect(await opened.result,MoolAssistantReviewResult.opened);expect(tester.takeException(),isNull);
+      }finally{await h.dispose(tester);}
+    });
+  }
+  for(final cause in ['cancel','request','paid','account']){
+    testWidgets('FE-ORDER280 $cause retirement rejects retained packing callback',(tester)async{
+      final h=_OrderEffectHost();try{await h.ready(tester,packed:true);final line=h.native.work.workspacePackingLinesForOrder(h.original).first;
+        final opened=await open(tester,h),before=h.effects;final box=find.byKey(Key('work-operational-pack-${line.id}'));
+        await tester.ensureVisible(box);await tester.pumpAndSettle();final callback=tester.widget<CheckboxListTile>(box).onChanged!;
+        if(cause=='cancel')h.controller.cancelProposal();if(cause=='request')h.controller.setDraft('Another task');if(cause=='paid')h.access.revoke();if(cause=='account')h.native.mode.value='buyer';
+        await tester.pumpAndSettle();callback(false);await tester.pumpAndSettle();expect(h.effects,before);expect(h.native.work.workspacePackingLinesForOrder(h.original).first.packed,isTrue);await opened.result;
+      }finally{await h.dispose(tester);}
+    });
+  }
+  testWidgets('FE-ORDER280 foreign packing change and restore retires original prepared checkbox',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester,packed:true);final line=h.native.work.workspacePackingLinesForOrder(h.original).first,opened=await open(tester,h);
+      final box=find.byKey(Key('work-operational-pack-${line.id}'));await tester.ensureVisible(box);await tester.pumpAndSettle();final callback=tester.widget<CheckboxListTile>(box).onChanged!;
+      h.native.work.setWorkspaceOrderPackingLine(storeId:h.operations.workspaceId,orderId:h.original.id,lineId:line.id,quantity:line.quantity,packed:false,expectedOperational:h.original.operational);
+      h.native.work.setWorkspaceOrderPackingLine(storeId:h.operations.workspaceId,orderId:h.original.id,lineId:line.id,quantity:line.quantity,packed:true,expectedOperational:h.original.operational);
+      await tester.pumpAndSettle();callback(false);await tester.pumpAndSettle();expect(h.native.work.workspacePackingLinesForOrder(h.original).first.packed,isTrue);expect(await opened.result,MoolAssistantReviewResult.stale);
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER280 unsupported partial quantity cannot be substituted for original line',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester,packed:true);final line=h.native.work.workspacePackingLinesForOrder(h.original).first,before=h.effects;
+      final opened=await open(tester,h,quantity:line.quantity+1);expect(await opened.result,MoolAssistantReviewResult.unavailable);expect(h.effects,before);
+      final adapter=h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-280');expect(adapter.validateFields({'lineId':line.id,'quantity':'0.5','packed':true}),isNotNull);
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER280 original legacy whole-line checkbox retains exact existing quantity contract',(tester)async{
+    final h=_OrderPhysicalHost();try{await h.ready(tester,'AI-ACT-282');final old=h.original,newOrder=old.copyWith(stage:'Preparing');
+      final work=h.native.work,index=work.workspaceOrders.indexWhere((order)=>order.id==old.id);work.workspaceOrders[index]=newOrder;work.workspaceOrderStage='Preparing';h.original=newOrder;
+      h.controller.setDraft('Review existing packed line');final line=work.workspacePackingLinesForOrder(newOrder).first;
+      final snapshot=await h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-280').snapshot(h.controller.context,newOrder.id);
+      expect(snapshot,isNotNull);expect(h.controller.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-legacy-packing',actionId:'AI-ACT-280',binding:h.controller.context.binding,
+        requestRevision:h.controller.requestRevision,entitlementRevision:h.controller.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+        validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:newOrder.id,title:'Review original item',summary:'HOST exact line',fields:{'lineId':line.id,'quantity':line.quantity,'packed':true})),isTrue);
+      final result=h.controller.reviewProposal();await tester.pumpAndSettle();expect(work.workspacePackingLinesForOrder(newOrder).first.packed,isFalse);
+      final box=find.byKey(Key('work-order-pack-${newOrder.id}-${line.id}'));await tester.ensureVisible(box);await tester.pumpAndSettle();tester.widget<CheckboxListTile>(box).onChanged!(true);
+      await tester.pumpAndSettle();expect(work.workspacePackingLinesForOrder(newOrder).first.packed,isTrue);expect(h.gateway.handoverCalls,0);expect(await result,MoolAssistantReviewResult.opened);
+    }finally{await h.dispose(tester);}
+  });
+}
+
+Future<({Future<MoolAssistantReviewResult> result})> _openLegacyOrderEffect(WidgetTester tester,_OrderPhysicalHost h,String operation)async{
+  final work=h.native.work,old=h.original;
+  final order=old.copyWith(stage:operation=='ready'?'Preparing':'Confirmed',actionDeadline:DateTime.now().add(const Duration(minutes:5)));
+  work.workspaceOrders[work.workspaceOrders.indexWhere((r)=>r.id==old.id)]=order;work.workspaceOrderStage=order.stage;h.original=order;
+  if(operation=='ready')for(final line in work.workspacePackingLinesForOrder(order)){
+    work.setWorkspaceOrderPackingLine(storeId:work.activeWorkspace!.id,orderId:order.id,lineId:line.id,quantity:line.quantity,packed:true);
+  }
+  h.controller.setDraft('Review exact original $operation');
+  final action=operation=='ready'?'AI-ACT-281':'AI-ACT-275',adapter=h.native.adapters(tester).singleWhere((a)=>a.actionId==action);
+  final snapshot=await adapter.snapshot(h.controller.context,order.id);expect(snapshot,isNotNull);
+  expect(h.controller.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-legacy-$operation',actionId:action,binding:h.controller.context.binding,
+    requestRevision:h.controller.requestRevision,entitlementRevision:h.controller.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+    validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:order.id,title:'Review exact original order',summary:'HOST native legacy action',
+    fields:operation=='ready'?const {}:{'operation':operation})),isTrue);
+  final result=h.controller.reviewProposal();await tester.pumpAndSettle();return(result:result);
+}
+Finder _legacyEffectButton(_OrderPhysicalHost h,String operation)=>find.byKey(operation=='ready'?Key('work-order-ready-${h.original.id}'):
+  Key(operation=='accept'?'work-activity-order-accept':'work-activity-order-reject'));
+void registerOrderLegacyEffectNativeTests(){
+  for(final operation in ['accept','reject','ready']){
+    testWidgets('FE-ORDER-LEGACY $operation Review is nonposting and original native control performs exact same order once',(tester)async{
+      final h=_OrderPhysicalHost();try{await h.ready(tester,'AI-ACT-282');final opened=await _openLegacyOrderEffect(tester,h,operation),before=h.native.writes;
+        expect(h.native.work.currentWorkspaceOrder!.stage,operation=='ready'?'Preparing':'Confirmed');expect(h.gateway.handoverCalls,0);
+        expect(find.byKey(const Key('work-order-more-time-HOST-physical-AI-ACT-282')),findsNothing);
+        final button=_legacyEffectButton(h,operation);await tester.ensureVisible(button);await tester.pumpAndSettle();expect(h.native.writes,before);
+        if(operation=='reject'){
+          await tester.tap(button);await tester.pumpAndSettle();expect(h.native.work.currentWorkspaceOrder!.stage,'Confirmed');
+          await tester.tap(find.text('Product unavailable'));await tester.pumpAndSettle();
+          await tester.tap(find.widgetWithText(FilledButton,'Reject order'));await tester.pumpAndSettle();
+        }else{
+          final callback=operation=='accept'?tester.widget<FilledButton>(button).onPressed!:tester.widget<FilledButton>(button).onPressed!;
+          callback();callback();await tester.pumpAndSettle();
+        }
+        expect(h.native.work.currentWorkspaceOrder!.id,h.original.id);
+        expect(h.native.work.currentWorkspaceOrder!.stage,operation=='accept'?'Preparing':operation=='reject'?'Cancelled':h.original.needsDelivery?'Ready':'Ready for pickup');
+        expect(h.native.work.workspaceInvoices,isEmpty);expect(h.gateway.handoverCalls,0);await opened.result;
+      }finally{await h.dispose(tester);}
+    });
+    for(final cause in ['cancel','request','paid']){
+      testWidgets('FE-ORDER-LEGACY $operation $cause retirement blocks retained original action',(tester)async{
+        final h=_OrderPhysicalHost();try{await h.ready(tester,'AI-ACT-282');final opened=await _openLegacyOrderEffect(tester,h,operation);
+          final button=_legacyEffectButton(h,operation);await tester.ensureVisible(button);await tester.pumpAndSettle();
+          final callback=operation=='reject'?tester.widget<TextButton>(button).onPressed!:tester.widget<FilledButton>(button).onPressed!;
+          final before=h.native.writes,stage=h.native.work.currentWorkspaceOrder!.stage;
+          if(cause=='cancel')h.controller.cancelProposal();if(cause=='request')h.controller.setDraft('Another request');if(cause=='paid')h.access.revoke();
+          await tester.pumpAndSettle();callback();await tester.pumpAndSettle();expect(h.native.writes,before);
+          expect(h.native.work.currentWorkspaceOrder!.stage,stage);expect(h.gateway.handoverCalls,0);await opened.result;
+        }finally{await h.dispose(tester);}
+      });
+    }
+  }
+  for(final scale in [1.0,2.0]){
+    testWidgets('FE-ORDER-LEGACY ready original read-only item information stays visible without unrelated packing mutations scale$scale',(tester)async{
+      tester.view.physicalSize=const Size(320,700);tester.view.devicePixelRatio=1;tester.platformDispatcher.textScaleFactorTestValue=scale;
+      addTearDown(tester.view.reset);addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final h=_OrderPhysicalHost();try{await h.ready(tester,'AI-ACT-282');final opened=await _openLegacyOrderEffect(tester,h,'ready');
+        expect(find.byType(CheckboxListTile),findsNothing);expect(find.textContaining(h.original.items),findsWidgets);
+        final ready=_legacyEffectButton(h,'ready');await tester.ensureVisible(ready);await tester.pumpAndSettle();expect(tester.takeException(),isNull);
+        h.controller.cancelProposal();await tester.pumpAndSettle();await opened.result;
+      }finally{await h.dispose(tester);}
+    });
+  }
+}
+
+class _Order276LegacyHost{
+  final gateway=_TimingFixtureGateway(),access=_OrderEffectAccess();
+  late _AuthenticatedNativeScopeFixture native;late scope_contract.MoolAssistantController controller;late WorkspaceOrderRecord original;
+  Future<void> ready(WidgetTester tester)async{
+    native=_AuthenticatedNativeScopeFixture(makeWork:(contact,purchase,inventory,trading)=>WorkSession(gateway:gateway,
+      contactDraftStore:contact,purchaseEntryStore:purchase,inventoryStore:inventory,tradingPreferencesStoreFactory:(_)=>trading));
+    await native.ready();original=WorkspaceOrderRecord(id:'HOST-legacy-time',customer:'HOST original buyer',items:'HOST original supplied item',
+      quantities:const {},amount:100,source:'App',fulfilment:'Delivery',payment:'Cash',address:'HOST Jodhpur',stage:'Confirmed',needsDelivery:true,
+      createdAt:DateTime.now(),actionDeadline:DateTime.now().add(const Duration(minutes:5)));
+    native.work.workspaceOrders.add(original);expect(native.work.selectWorkspaceOrder(original.id),isTrue);
+    await tester.pumpWidget(native.app);await tester.pumpAndSettle();
+    controller=scope_contract.MoolAssistantController(currentContext:native.readContext,contextChanges:Listenable.merge([native.work,native.journey,native.mode]),
+      entitlements:access,nativeAdapters:native.adapters(tester));await controller.refreshAccess();controller.setDraft('More time for original order');
+  }
+  Future<({Future<MoolAssistantReviewResult> result})> open(WidgetTester tester,int minutes)async{
+    final a=native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-276'),s=await native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-276').snapshot(controller.context,original.id);
+    expect(s,isNotNull);expect(controller.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-direct-time',actionId:a.actionId,binding:controller.context.binding,
+      requestRevision:controller.requestRevision,entitlementRevision:controller.entitlementRevision!,sourceRevision:s!.sourceRevision,
+      validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:original.id,title:'Review original time request',summary:'HOST existing direct service',fields:{'minutes':minutes})),isTrue);
+    final result=controller.reviewProposal();await tester.pumpAndSettle();return(result:result);
+  }
+  Future<void> dispose(WidgetTester tester)async{
+    controller.cancelProposal();await tester.pumpAndSettle();await tester.pumpWidget(const SizedBox.shrink());controller.dispose();access.dispose();await native.dispose();
+  }
+}
+void registerOrder276ExtraNativeTests(){
+  for(final minutes in [2,5]){
+    testWidgets('FE-ORDER276 original direct service $minutes minute native confirmation preserves actual request',(tester)async{
+      final h=_Order276LegacyHost();try{await h.ready(tester);final opened=await h.open(tester,minutes),before=h.native.writes;
+        expect(h.gateway.requests,isEmpty);expect(h.native.writes,before);expect(h.native.work.hasPendingOrderTime,isFalse);
+        final callback=tester.widget<FilledButton>(find.byKey(const Key('work-order-time-request'))).onPressed!;callback();callback();await tester.pumpAndSettle();
+        expect(h.gateway.requests,hasLength(1));expect(h.gateway.requests.single.orderId,h.original.id);expect(h.gateway.requests.single.additionalMinutes,minutes);
+        expect(h.native.work.currentWorkspaceOrder!.actionDeadline,h.original.actionDeadline!.add(Duration(minutes:minutes)));
+        h.controller.cancelProposal();await tester.pumpAndSettle();await tester.tap(find.byKey(const Key('work-purchase-owner-retired-close')));await tester.pumpAndSettle();await opened.result;
+      }finally{await h.dispose(tester);}
+    });
+  }
+  testWidgets('FE-ORDER276 original direct service synchronous busy retirement cannot dispatch or leave new pending request',(tester)async{
+    final h=_Order276LegacyHost();try{await h.ready(tester);final opened=await h.open(tester,2);
+      void retire(){if(h.native.work.orderTimeRequestBusy)h.controller.cancelProposal();}h.native.work.addListener(retire);
+      tester.widget<FilledButton>(find.byKey(const Key('work-order-time-request'))).onPressed!();await tester.pumpAndSettle();h.native.work.removeListener(retire);
+      expect(h.gateway.requests,isEmpty);expect(h.native.work.hasPendingOrderTime,isFalse);await tester.tap(find.byKey(const Key('work-purchase-owner-retired-close')));await tester.pumpAndSettle();await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER276 expiry retires retained original Request time without pending save',(tester)async{
+    final h=_Order276Host();try{await h.ready(tester);final a=h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-276'),s=await h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-276').snapshot(h.controller.context,h.original.id);
+      expect(h.controller.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-short-time',actionId:a.actionId,binding:h.controller.context.binding,
+        requestRevision:h.controller.requestRevision,entitlementRevision:h.controller.entitlementRevision!,sourceRevision:s!.sourceRevision,
+        validUntil:DateTime.now().add(const Duration(seconds:2)),entityId:h.original.id,title:'Review more time',summary:'HOST expiry',fields:const {'minutes':2})),isTrue);
+      final result=h.controller.reviewProposal();await tester.pumpAndSettle();final callback=tester.widget<FilledButton>(find.byKey(const Key('work-order-time-request'))).onPressed!;
+      final before=h.effects;await tester.pump(const Duration(seconds:3));await tester.pumpAndSettle();callback();await tester.pumpAndSettle();
+      expect(h.effects,before);await h.close(tester);expect(await result,MoolAssistantReviewResult.stale);
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER276 foreign covering route blocks retained Request and is not popped by retirement',(tester)async{
+    final h=_Order276Host();try{await h.ready(tester);final opened=await h.open(tester),before=h.effects;
+      final callback=tester.widget<FilledButton>(find.byKey(const Key('work-order-time-request'))).onPressed!;
+      final navigator=h.native.router.routerDelegate.navigatorKey.currentState!;
+      unawaited(navigator.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST foreign time route')))));
+      await tester.pumpAndSettle();callback();await tester.pumpAndSettle();expect(h.effects,before);h.controller.cancelProposal();await tester.pumpAndSettle();
+      expect(find.text('HOST foreign time route'),findsOneWidget);
+      // The original sheet retains its draft; the user first leaves the foreign
+      // page, then explicitly closes that original retained-input surface.
+      navigator.pop();await tester.pumpAndSettle();await h.close(tester);await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER276 retirement while original journal save is held preserves pending identity without dispatch',(tester)async{
+    final h=_Order276Host();try{await h.ready(tester);final opened=await h.open(tester);h.journal.hold=Completer<void>();
+      tester.widget<FilledButton>(find.byKey(const Key('work-order-time-request'))).onPressed!();await tester.pumpAndSettle();expect(h.journal.saves,1);
+      final original=h.journal.command!;h.controller.cancelProposal();await tester.pump();h.journal.hold!.complete();await tester.pumpAndSettle();
+      expect(h.gateway.submitted,isEmpty);expect(h.operations.pending(h.original.id),same(original));expect(h.journal.command,same(original));
+      expect(h.operations.state(h.original.id),WorkOrderOperationState.uncertain);expect(h.gateway.reconciled,isEmpty);await h.close(tester);await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+  for(final outcome in ['ack','unknown']){
+    testWidgets('FE-ORDER276 issued original $outcome after retirement retains truthful native result without retry',(tester)async{
+      final h=_Order276Host();try{await h.ready(tester);final opened=await h.open(tester);
+        tester.widget<FilledButton>(find.byKey(const Key('work-order-time-request'))).onPressed!();await tester.pumpAndSettle();final original=h.gateway.submitted.single;
+        h.controller.cancelProposal();await tester.pump();
+        if(outcome=='ack')h.gateway.responses.single.complete(WorkOrderReply(accountScope:original.accountScope,workspaceId:original.workspaceId,
+          orderId:original.orderId,operationId:original.operationId,revision:2,state:WorkOrderReplyState.applied,
+          order:h.original.copyWith(actionDeadline:h.original.actionDeadline!.add(const Duration(minutes:5)))));
+        else h.gateway.responses.single.completeError(StateError('HOST unknown request-time result'));
+        await tester.pumpAndSettle();expect(h.gateway.submitted,hasLength(1));expect(h.gateway.reconciled,isEmpty);
+        if(outcome=='ack'){expect(h.operations.pending(h.original.id),isNull);expect(h.journal.command,isNull);}
+        else{expect(h.operations.pending(h.original.id),same(original));expect(h.journal.command,same(original));}
+        await h.close(tester);await opened.result;
+      }finally{await h.dispose(tester);}
+    });
+  }
+}
+
+Future<({Future<MoolAssistantReviewResult> result})> _openOrderFollowup(WidgetTester tester,_AuthenticatedNativeScopeFixture native,
+  scope_contract.MoolAssistantController controller,WorkspaceOrderRecord order,String action,{Map<String,Object?> fields=const {}})async{
+  final adapter=native.adapters(tester).singleWhere((a)=>a.actionId==action),snapshot=await native.adapters(tester).singleWhere((a)=>a.actionId==action).snapshot(controller.context,order.id);
+  expect(snapshot,isNotNull);expect(adapter.validateFields(fields),isNull);
+  expect(controller.receiveProposal(scope_contract.MoolAssistantProposal(id:'HOST-followup-$action',actionId:action,binding:controller.context.binding,
+    requestRevision:controller.requestRevision,entitlementRevision:controller.entitlementRevision!,sourceRevision:snapshot!.sourceRevision,
+    validUntil:DateTime.now().add(const Duration(minutes:5)),entityId:order.id,title:'Review original Store action',summary:'HOST exact native original',fields:fields)),isTrue);
+  final result=controller.reviewProposal();await tester.pumpAndSettle();return(result:result);
+}
+class _OrderFollowupHost{
+  final gateway=_DeliveryBookingFixtureGateway(),access=_OrderEffectAccess();late _AuthenticatedNativeScopeFixture native;
+  late scope_contract.MoolAssistantController controller;late WorkspaceOrderRecord original;
+  Future<void> ready(WidgetTester tester,String action)async{
+    native=_AuthenticatedNativeScopeFixture(makeWork:(contact,purchase,inventory,trading)=>WorkSession(gateway:gateway,contactDraftStore:contact,
+      purchaseEntryStore:purchase,inventoryStore:inventory,tradingPreferencesStoreFactory:(_)=>trading,catalogueReference:workspaceMasterCatalogue));
+    await native.ready();await native.work.loadWorkspaceInventory(retry:true);await native.work.workspaceInventorySaved;
+    original=WorkspaceOrderRecord(id:'HOST-followup-$action',customer:'HOST original repeat buyer',items:'HOST original oil',quantities:const {'oil-fortune-1l':1},
+      amount:100,source:'App',fulfilment:action=='AI-ACT-284'?'Own delivery':'Customer pickup',payment:'Cash',address:'HOST Jodhpur',
+      stage:action=='AI-ACT-284'?'Delivery requested':action=='AI-ACT-287'?'Completed':'Confirmed',needsDelivery:action=='AI-ACT-284',
+      createdAt:DateTime.now(),actionDeadline:DateTime.now().add(const Duration(minutes:5)));
+    native.work.workspaceOrders.add(original);expect(native.work.selectWorkspaceOrder(original.id),isTrue);
+    if(action=='AI-ACT-284')native.work.workspaceOperationsSyncError='HOST retry original assignment';
+    await tester.pumpWidget(native.app);await tester.pumpAndSettle();
+    controller=scope_contract.MoolAssistantController(currentContext:native.readContext,contextChanges:Listenable.merge([native.work,native.journey,native.mode]),
+      entitlements:access,nativeAdapters:native.adapters(tester));await controller.refreshAccess();controller.setDraft('Review exact original followup');
+  }
+  Object get effects=>(native.writes,gateway.requests.length,native.work.currentWorkspaceOrderId,jsonEncode(native.work.workspaceOrderQuantities));
+  Future<void> dispose(WidgetTester tester)async{
+    if(gateway.requests.isNotEmpty&&!gateway.response.isCompleted)gateway.response.completeError(const WorkGatewayException('HOST ended assignment'));
+    controller.cancelProposal();await tester.pumpAndSettle();await tester.pumpWidget(const SizedBox.shrink());controller.dispose();access.dispose();await native.dispose();
+  }
+}
+Future<void> _closeFollowupRetired(WidgetTester tester)async{
+  final close=find.byKey(const Key('work-purchase-owner-retired-close'));
+  if(close.evaluate().isNotEmpty){await tester.ensureVisible(close);await tester.pumpAndSettle();await tester.tap(close);await tester.pumpAndSettle();}
+}
+void registerOrderFollowupNativeTests(){
+  for(final action in ['AI-ACT-284','AI-ACT-285','AI-ACT-287']){
+    testWidgets('FE-ORDER-FOLLOWUP $action Review preserves original order and does not dispatch, cancel or create repeat basket',(tester)async{
+      final h=_OrderFollowupHost();try{await h.ready(tester,action);final before=h.effects;
+        final opened=await _openOrderFollowup(tester,h.native,h.controller,h.original,action);
+        expect(h.effects,before);expect(h.native.work.currentWorkspaceOrder!.id,h.original.id);expect(h.gateway.requests,isEmpty);
+        h.controller.cancelProposal();await tester.pumpAndSettle();await _closeFollowupRetired(tester);await opened.result;expect(h.effects,before);
+      }finally{await h.dispose(tester);}
+    });
+    for(final cause in ['cancel','paid']){
+      testWidgets('FE-ORDER-FOLLOWUP $action $cause retirement prevents exact retained native confirmation',(tester)async{
+        final h=_OrderFollowupHost();try{await h.ready(tester,action);
+          final opened=await _openOrderFollowup(tester,h.native,h.controller,h.original,action,fields:action=='AI-ACT-285'?const {'reason':'Product unavailable'}:const {});
+          VoidCallback callback;
+          if(action=='AI-ACT-284')callback=tester.widget<TextButton>(find.byKey(const Key('work-delivery-retry'))).onPressed!;
+          else if(action=='AI-ACT-285')callback=tester.widget<FilledButton>(find.widgetWithText(FilledButton,'Reject order')).onPressed!;
+          else{
+            await tester.tap(find.byKey(Key('work-customer-${h.native.work.workspaceCustomerId(h.original.customer)}')));await tester.pumpAndSettle();
+            callback=tester.widget<InkWell>(find.byKey(const Key('work-customer-repeat'))).onTap!;
+          }
+          final before=h.effects;if(cause=='cancel')h.controller.cancelProposal();else h.access.revoke();await tester.pumpAndSettle();
+          callback();await tester.pumpAndSettle();expect(h.effects,before);expect(h.gateway.requests,isEmpty);
+          await _closeFollowupRetired(tester);await opened.result;
+        }finally{await h.dispose(tester);}
+      });
+    }
+  }
+  testWidgets('FE-ORDER284 explicit original Try again dispatches once and authoritative assignment is retained after original ACK',(tester)async{
+    final h=_OrderFollowupHost();try{await h.ready(tester,'AI-ACT-284');final opened=await _openOrderFollowup(tester,h.native,h.controller,h.original,'AI-ACT-284');
+      final button=find.byKey(const Key('work-delivery-retry'));await tester.ensureVisible(button);await tester.pumpAndSettle();final callback=tester.widget<TextButton>(button).onPressed!;
+      callback();callback();await tester.pumpAndSettle();expect(h.gateway.requests,hasLength(1));expect(h.gateway.requests.single.order,h.original.id);
+      h.gateway.response.complete(WorkDeliveryAssignmentResult(partnerName:'HOST original rider',vehicleLabel:'Bike',eta:DateTime.now().add(const Duration(minutes:10)),stage:'Assigned'));
+      await tester.pumpAndSettle();expect(h.native.work.workspaceDeliveryAssignment!.orderId,h.original.id);
+      expect(h.native.work.workspaceDeliveryAssignment!.partnerName,'HOST original rider');expect(await opened.result,MoolAssistantReviewResult.opened);
+    }finally{await h.dispose(tester);}
+  });
+  for(final changed in ['address','assignment']){
+    testWidgets('FE-ORDER284 synchronous busy notification $changed change cannot dispatch newly changed unreviewed inputs',(tester)async{
+      final h=_OrderFollowupHost();try{await h.ready(tester,'AI-ACT-284');final opened=await _openOrderFollowup(tester,h.native,h.controller,h.original,'AI-ACT-284');
+        var replaced=false;void replace(){if(replaced||!h.native.work.workspaceOperationsSyncing)return;replaced=true;
+          if(changed=='address'){
+            h.native.work.workspaceOrders[h.native.work.workspaceOrders.indexWhere((r)=>r.id==h.original.id)]=h.original.copyWith(address:'HOST different address');
+            h.native.work.workspaceOrderAddress='HOST different address';
+          }else{h.native.work.workspaceDeliveryAssignment=WorkspaceDeliveryAssignment(orderId:h.original.id,partnerName:'HOST different driver',vehicleLabel:'Other',eta:DateTime.now(),stage:'Assigned');}}
+        h.native.work.addListener(replace);tester.widget<TextButton>(find.byKey(const Key('work-delivery-retry'))).onPressed!();await tester.pumpAndSettle();h.native.work.removeListener(replace);
+        expect(replaced,isTrue);expect(h.gateway.requests,isEmpty);expect(h.native.work.workspaceOperationsSyncing,isFalse);await _closeFollowupRetired(tester);await opened.result;
+      }finally{await h.dispose(tester);}
+    });
+  }
+  testWidgets('FE-ORDER285 prefilled original reason never cancels before original confirmation and writes same order once',(tester)async{
+    final h=_OrderFollowupHost();try{await h.ready(tester,'AI-ACT-285');final opened=await _openOrderFollowup(tester,h.native,h.controller,h.original,'AI-ACT-285',fields:const {'reason':'Product unavailable'});
+      expect(h.native.work.currentWorkspaceOrder!.stage,'Confirmed');await tester.tap(find.widgetWithText(FilledButton,'Reject order'));await tester.pumpAndSettle();
+      expect(h.native.work.currentWorkspaceOrder!.id,h.original.id);expect(h.native.work.currentWorkspaceOrder!.stage,'Cancelled');expect(h.gateway.requests,isEmpty);await _closeFollowupRetired(tester);await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER287 explicit original Repeat action alone prepares existing counter basket from the exact original customer source',(tester)async{
+    final h=_OrderFollowupHost();try{await h.ready(tester,'AI-ACT-287');final opened=await _openOrderFollowup(tester,h.native,h.controller,h.original,'AI-ACT-287');
+      expect(h.native.work.currentWorkspaceOrderId,h.original.id);expect(find.byKey(Key('work-customer-call-${h.native.work.workspaceCustomerId(h.original.customer)}')),findsNothing);
+      await tester.tap(find.byKey(Key('work-customer-${h.native.work.workspaceCustomerId(h.original.customer)}')));await tester.pumpAndSettle();
+      expect(find.text('Send offer'),findsNothing);await tester.tap(find.byKey(const Key('work-customer-repeat')));await tester.pumpAndSettle();
+      expect(h.native.work.workspaceOrderQuantities['oil-fortune-1l'],1);expect(h.native.work.workspaceOrders.single.id,h.original.id);
+      expect(h.native.work.workspaceOrders.single.stage,'Completed');expect(h.gateway.requests,isEmpty);await _closeFollowupRetired(tester);await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER287 retained native Repeat callback after its customer sheet is disposed cannot navigate or prepare a basket',(tester)async{
+    final h=_OrderFollowupHost();try{await h.ready(tester,'AI-ACT-287');final opened=await _openOrderFollowup(tester,h.native,h.controller,h.original,'AI-ACT-287');
+      await tester.tap(find.byKey(Key('work-customer-${h.native.work.workspaceCustomerId(h.original.customer)}')));await tester.pumpAndSettle();
+      final repeatFinder=find.byKey(const Key('work-customer-repeat')),retiredElement=tester.element(find.byKey(const Key('work-customer-repeat')));
+      final callback=tester.widget<InkWell>(repeatFinder).onTap!;
+      await tester.binding.handlePopRoute();await tester.pumpAndSettle();expect(retiredElement.mounted,isFalse);expect(repeatFinder,findsNothing);
+      final before=h.effects;callback();await tester.pumpAndSettle();expect(tester.takeException(),isNull);expect(h.effects,before);
+      expect(h.native.work.currentWorkspaceOrderId,h.original.id);expect(h.gateway.requests,isEmpty);
+      h.controller.cancelProposal();await tester.pumpAndSettle();await _closeFollowupRetired(tester);await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER287 same-turn catalogue change after native Repeat confirmation cannot prepare unreviewed changed basket',(tester)async{
+    final h=_OrderFollowupHost();try{await h.ready(tester,'AI-ACT-287');final opened=await _openOrderFollowup(tester,h.native,h.controller,h.original,'AI-ACT-287');
+      await tester.tap(find.byKey(Key('work-customer-${h.native.work.workspaceCustomerId(h.original.customer)}')));await tester.pumpAndSettle();
+      final repeat=tester.widget<InkWell>(find.byKey(const Key('work-customer-repeat'))).onTap!;
+      final id=h.native.work.currentWorkspaceOrderId,before=jsonEncode(h.native.work.workspaceOrderQuantities);repeat();
+      final index=h.native.work.workspaceCatalogueItems.indexWhere((p)=>p.id=='oil-fortune-1l'),original=h.native.work.workspaceCatalogueItems[index];
+      h.native.work.workspaceCatalogueItems[index]=original.copyWith(stock:original.stock+1);
+      await tester.pumpAndSettle();expect(h.native.work.currentWorkspaceOrderId,id);expect(jsonEncode(h.native.work.workspaceOrderQuantities),before);expect(h.gateway.requests,isEmpty);h.controller.cancelProposal();await tester.pumpAndSettle();await _closeFollowupRetired(tester);await opened.result;
+    }finally{await h.dispose(tester);}
+  });
+  for(final confirm in [false,true]){
+    testWidgets('FE-ORDER281 Ready exact original order desk handoff keeps Arrange delivery native confirm$confirm',(tester)async{
+      final h=_OrderFollowupHost();try{await h.ready(tester,'AI-ACT-284');final old=h.original,ready=old.copyWith(stage:'Ready');
+        h.native.work.workspaceOrders[h.native.work.workspaceOrders.indexWhere((r)=>r.id==old.id)]=ready;h.native.work.workspaceOrderStage='Ready';h.original=ready;
+        h.controller.setDraft('Advance exact ready delivery order');final before=h.effects;
+        final opened=await _openOrderFollowup(tester,h.native,h.controller,ready,'AI-ACT-281');expect(await opened.result,MoolAssistantReviewResult.returnToOwner);
+        expect(h.effects,before);expect(h.gateway.requests,isEmpty);expect(find.textContaining(ready.customer),findsWidgets);
+        final arrange=find.ancestor(of:find.text('Arrange delivery'),matching:find.byWidgetPredicate((widget)=>widget is FilledButton));await tester.ensureVisible(arrange);await tester.pumpAndSettle();
+        expect(h.native.work.currentWorkspaceOrderId,ready.id);expect(h.native.work.workspaceOrders.single.stage,'Ready');
+        if(confirm){await tester.tap(arrange);await tester.pumpAndSettle();expect(h.gateway.requests,hasLength(1));expect(h.gateway.requests.single.order,ready.id);
+          h.gateway.response.complete(WorkDeliveryAssignmentResult(partnerName:'HOST original rider',vehicleLabel:'Bike',eta:DateTime.now(),stage:'Assigned'));
+          await tester.pumpAndSettle();expect(h.native.work.workspaceDeliveryAssignment!.orderId,ready.id);}
+      }finally{await h.dispose(tester);}
+    });
+  }
+  for(final cause in ['review','cancel','confirm']){
+    testWidgets('FE-ORDER286 original interrupted attempt $cause keeps exact persisted operation and never resubmits it',(tester)async{
+      final h=_OrderEffectHost();try{await h.ready(tester);final pending=h.operations.act(h.original.id,WorkOrderAction.accept);await tester.pumpAndSettle();
+        final original=h.gateway.submitted.single;h.gateway.responses.single.completeError(StateError('HOST interrupted original'));expect(await pending,isFalse);
+        await tester.pumpAndSettle();h.controller.setDraft('Check original interrupted attempt');final before=h.effects;
+        final opened=await _openOrderFollowup(tester,h.native,h.controller,h.original,'AI-ACT-286');expect(h.effects,before);
+        final button=find.byKey(Key('work-order-operation-retry-${h.original.id}'));await tester.ensureVisible(button);await tester.pumpAndSettle();
+        final callback=tester.widget<TextButton>(button).onPressed!;
+        if(cause=='confirm'){
+          callback();callback();await tester.pumpAndSettle();expect(h.gateway.submitted,hasLength(1));expect(h.gateway.reconciled,hasLength(1));
+          expect(h.gateway.reconciled.single,same(original));h.gateway.replies.single.complete(h.reply(await h.record('Preparing',revision:2),operation:original.operationId));
+          await tester.pumpAndSettle();expect(h.operations.pending(h.original.id),isNull);expect(h.journal.command,isNull);
+        }else{
+          h.controller.cancelProposal();await tester.pumpAndSettle();if(cause=='cancel'){callback();await tester.pumpAndSettle();}
+          expect(h.effects,before);expect(h.operations.pending(h.original.id),same(original));expect(h.journal.command,same(original));
+        }
+        await _closeFollowupRetired(tester);await opened.result;
+      }finally{await h.dispose(tester);}
+    });
+  }
+  testWidgets('FE-ORDER286 synchronous reconciling notification source change prevents dispatch while retaining original pending identity',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester);final attempt=h.operations.act(h.original.id,WorkOrderAction.accept);await tester.pumpAndSettle();
+      final original=h.gateway.submitted.single;h.gateway.responses.single.completeError(StateError('HOST interrupted original'));expect(await attempt,isFalse);await tester.pumpAndSettle();
+      final next=await h.record('Preparing',revision:2);h.controller.setDraft('Check original attempt');final opened=await _openOrderFollowup(tester,h.native,h.controller,h.original,'AI-ACT-286');
+      var replaced=false;bool? observed;void replace(){if(!replaced&&h.operations.state(h.original.id)==WorkOrderOperationState.reconciling){replaced=true;observed=h.operations.observe(h.reply(next));}}
+      h.operations.addListener(replace);tester.widget<TextButton>(find.byKey(Key('work-order-operation-retry-${h.original.id}'))).onPressed!();await tester.pumpAndSettle();h.operations.removeListener(replace);
+      expect(replaced,isTrue);expect(observed,isTrue);expect(h.gateway.reconciled,isEmpty);expect(h.gateway.submitted,hasLength(1));expect(h.operations.pending(h.original.id),same(original));expect(h.journal.command,same(original));await _closeFollowupRetired(tester);await opened.result;
+    }finally{await h.dispose(tester);}
+  });
 }

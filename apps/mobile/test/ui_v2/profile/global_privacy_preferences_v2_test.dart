@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
@@ -423,8 +424,15 @@ void main() {
             tone: tone,
             openSettings: () async => opened,
           );
-          final title = find.text('Privacy & preferences');
-          expect(tester.widget<AppBar>(find.byType(AppBar)).toolbarHeight, 64);
+          final title = find.text(
+            tone == GlobalProfileSurfaceTone.light
+                ? 'Preferences'
+                : 'Privacy & preferences',
+          );
+          expect(
+            tester.widget<AppBar>(find.byType(AppBar)).toolbarHeight,
+            tone == GlobalProfileSurfaceTone.light ? 56 : 64,
+          );
           expect(
             tester.renderObject<RenderParagraph>(title).didExceedMaxLines,
             isFalse,
@@ -497,16 +505,28 @@ void main() {
             ).toString(),
           );
           await tester.pumpAndSettle();
-          final account = find.text('MoolSocial account');
-          expect(
-            tester.renderObject<RenderParagraph>(account).didExceedMaxLines,
-            isFalse,
-          );
-          final hero = find.byKey(const Key('global-security-hero'));
-          expect(
-            tester.getRect(hero).contains(tester.getRect(account).center),
-            isTrue,
-          );
+          if (tone == GlobalProfileSurfaceTone.socialDark) {
+            final account = find.text('MoolSocial account');
+            expect(
+              tester.renderObject<RenderParagraph>(account).didExceedMaxLines,
+              isFalse,
+            );
+            final hero = find.byKey(const Key('global-security-hero'));
+            expect(
+              tester.getRect(hero).contains(tester.getRect(account).center),
+              isTrue,
+            );
+          } else {
+            expect(find.byKey(const Key('global-security-hero')), findsNothing);
+            expect(
+              find.byKey(const Key('global-security-sign-in')),
+              findsOneWidget,
+            );
+            expect(
+              find.byKey(const Key('global-security-methods')),
+              findsNothing,
+            );
+          }
           await captureR66Visual(tester, 'r5-a11y-$label-security');
           await tester.tap(find.byKey(const Key('global-security-back')));
           await tester.pumpAndSettle();
@@ -541,8 +561,9 @@ void main() {
       find.text(
         'Choose your language and service area for a more relevant experience.',
       ),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(find.byKey(const Key('global-preferences-hero')), findsNothing);
     expect(find.textContaining('main action'), findsNothing);
 
     await tester.tap(find.byKey(const Key('global-preferences-language')));
@@ -641,17 +662,58 @@ void main() {
     expect(privacyCalls, 1);
   });
 
-  test('debug hot reload reconstructs the router at its current location', () {
-    final source = File('lib/app/moolsocial_app.dart').readAsStringSync();
-    expect(source, contains('late GoRouter _router = _createRouter'));
-    expect(source, contains('void reassemble()'));
-    expect(
-      source,
-      contains('_router.routeInformationProvider.value.uri.toString()'),
-    );
-    expect(source, contains('_router = _createRouter(location)'));
-    expect(source, contains('previousRouter.dispose()'));
-  });
+  testWidgets(
+    'debug hot reload retains the actual Security location and return',
+    (tester) async {
+      final store = MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'manual',
+          areaLabel: 'Jodhpur',
+          setupComplete: true,
+        ),
+      );
+      final journey = JourneySession(
+        store: store,
+        otpGateway: ReviewOtpGateway(signedIn: false),
+        allowGuestReady: true,
+      );
+      final work = WorkSession();
+      addTearDown(journey.dispose);
+      addTearDown(work.dispose);
+      await journey.start();
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          workSession: work,
+          uiReviewOnly: true,
+          initialLocation: '/app/account/security?return=%2Fapp%2Fwork%2Fearn',
+        ),
+      );
+      await tester.pumpAndSettle();
+      final before = GoRouterState.of(
+        tester.element(find.byKey(const Key('global-security-v2'))),
+      ).uri;
+      var reassembled = false;
+      unawaited(
+        tester.binding.reassembleApplication().then((_) => reassembled = true),
+      );
+      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(reassembled, isTrue);
+      final after = GoRouterState.of(
+        tester.element(find.byKey(const Key('global-security-v2'))),
+      ).uri;
+      expect(after, before);
+      expect(journey.isAuthenticated, isFalse);
+      expect(store.snapshot?.languageCode, 'en');
+      expect(store.snapshot?.areaLabel, 'Jodhpur');
+      await tester.tap(find.byKey(const Key('global-security-back')));
+      await tester.pumpAndSettle();
+      expect(find.byType(WorkEarnScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   test('global profile destinations share one sleek native Back control', () {
     for (final path in const [

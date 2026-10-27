@@ -7,6 +7,10 @@ import 'package:go_router/go_router.dart';
 import '../core/design/moolsocial_brand_motion.dart';
 import '../core/design/mool_theme.dart';
 import '../features/book/book_session.dart';
+import '../features/assistant/mool_assistant.dart';
+import '../ui_v2/buy/buy_v2_views.dart' show buyShopReviewNativeAdapters, buyBrowseNativeAdapters, buyCartReviewNativeAdapters, buyShop04NativeAdapters, buyShop06NativeAdapters,buyShop05NativeAdapters;
+import '../ui_v2/buy/buy_v2_screen.dart'
+    show BuyCartQuantityNativeAdapter, BuySearchNativeAdapter, buyShopFormNativeAdapters;
 import '../features/buy/buy_session.dart';
 import '../features/buy/buy_v2_session.dart';
 import '../features/captain/captain_session.dart';
@@ -23,8 +27,10 @@ import '../features/ride/ride_session.dart';
 import '../features/shared/shared_session.dart';
 import '../features/shared/social_create_draft_repository.dart';
 import '../features/work/work_session.dart';
+import '../features/work/screens/work_onboarding_screens.dart' show WorkspaceSetupNativeCoordinator, workspaceSetupNativeAdapters;
 import '../features/work/work_services.dart' show SecureWorkBulkQuoteJournal;
 import '../ui_v2/launch/launch_interruption_guard.dart';
+import '../ui_v2/assistant/mool_assistant_v2.dart';
 import '../ui_v2/launch/launch_presentation_gate.dart';
 import '../ui_v2/motion/mool_buy_tap_acknowledgement.dart';
 import '../ui_v2/social/social_v2_consumer.dart';
@@ -133,6 +139,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   late final RideSession _rideSession = widget.rideSession ?? RideSession();
   late final SharedSession _sharedSession =
       widget.sharedSession ?? SharedSession();
+  late final WorkspaceSetupNativeCoordinator _workspaceSetupNative = WorkspaceSetupNativeCoordinator();
   late final WorkSession _workSession = widget.workSession ?? WorkSession();
   late final LaunchPresentationGate _launchPresentationGate =
       LaunchPresentationGate();
@@ -306,6 +313,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
 
   @override
   void dispose() {
+    _workspaceSetupNative.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _session.removeListener(_handleAuthenticationBoundary);
     _router.dispose();
@@ -374,19 +382,125 @@ class _MoolSocialAppState extends State<MoolSocialApp>
       title: 'MoolSocial',
       theme: MoolTheme.light(),
       routerConfig: _router,
-      builder: (context, child) => MoolSocialBrandMotionScope(
-        cadence: _brandCadence,
-        child: Listener(
-          behavior: HitTestBehavior.translucent,
-          onPointerDown: (_) => _brandCadence.noteActivity(),
-          child: MoolBuyTapAcknowledgement(
-            isBuyActive: () => _router
-                .routerDelegate
-                .currentConfiguration
-                .matches
-                .any((match) => match.matchedLocation.startsWith('/app/buy')),
-            routeChanges: _router.routerDelegate,
-            child: child ?? const SizedBox.shrink(),
+      builder: (context, child) => MoolAssistantHost(
+        readContext: () => MoolAssistantContext(
+          accountScope: _session.authenticatedBuyPersistenceIdentity,
+          authenticationRevision: _session.navigationAuthenticationGeneration,
+        ),
+        contextChanges: Listenable.merge([_session, _workSession]),
+        child: MoolAssistantNativeScope(
+          readAdapters: (assistantContext) {
+            final buy = _buyRoot.current;
+            final router = _router;
+            final navigator = Navigator.of(assistantContext, rootNavigator: true);
+            final workspaceScope = assistantContext
+                .getInheritedWidgetOfExactType<MoolAssistantWorkspaceScope>();
+            MoolAssistantContext currentContext() => MoolAssistantContext(
+              accountScope: _session.authenticatedBuyPersistenceIdentity,
+              authenticationRevision: _session.navigationAuthenticationGeneration,
+            ).withWorkspace(workspaceScope?.readWorkspace());
+            bool rootCurrent() => mounted && navigator.mounted &&
+                identical(_router, router) && identical(_buyRoot.current, buy);
+            final buyFormLocation = router.state.uri;
+            final buyFormPageKey = router.state.pageKey;
+            bool buyFormRootCurrent() => rootCurrent() &&
+                buyFormLocation.path.startsWith('/app/buy') &&
+                router.state.uri == buyFormLocation && router.state.pageKey == buyFormPageKey;
+            final setupLocation = router.state.uri, setupPageKey = router.state.pageKey;
+            return [
+              if (workspaceScope == null) ...workspaceSetupNativeAdapters(
+                session: _workSession, navigator: navigator, coordinator: _workspaceSetupNative,
+                currentContext: currentContext, accountIdentity: () => _session.accountIdentity,
+                accountAuthenticated: () => _session.isAuthenticated && _session.accountIdentity?.firebasePrincipal != null,
+                nativeAccountCurrent: () => _session.authenticatedBuyPersistenceIdentity?.userId == _workSession.workspaceApplicationAccountScope,
+                approvedWorkspacesCurrent: () => _workSession.workspaceApprovalMatchesAccount(_session.authenticatedBuyPersistenceIdentity),
+                isRootCurrent: rootCurrent,
+                isNavigationCurrent: () => rootCurrent() && router.state.uri == setupLocation && router.state.pageKey == setupPageKey,
+                changes: Listenable.merge([_session, _workSession, router.routerDelegate]),
+                onNativeRoute: (route) { if (route == '/app/work/workspace/dashboard') router.go(route); else unawaited(router.push<void>(route)); }),
+              BuySearchNativeAdapter(
+                session: buy,
+                navigator: navigator,
+                currentContext: currentContext,
+                isRootCurrent: rootCurrent,
+                scopeOwner: _session,
+                accountIdentity: () => _session.accountIdentity,
+                accountAuthenticated: () => _session.isAuthenticated,
+              ),
+              if (workspaceScope == null && buyFormRootCurrent()) BuyCartQuantityNativeAdapter(
+                context: assistantContext,
+                session: buy,
+                navigator: navigator,
+                currentContext: currentContext,
+                isRootCurrent: buyFormRootCurrent,
+                scopeOwner: Listenable.merge([_session, buy, router.routerDelegate]),
+              ),
+              if (workspaceScope == null && buyFormRootCurrent()) ...buyShopFormNativeAdapters(
+                session: buy, navigator: navigator, currentContext: currentContext,
+                isRootCurrent: buyFormRootCurrent,
+                scopeOwner: Listenable.merge([_session, buy, router.routerDelegate]),
+                accountIdentity: () => _session.accountIdentity,
+                accountAuthenticated: () => _session.isAuthenticated,
+              ),
+              if (workspaceScope == null && buyFormRootCurrent()) ...buyShopReviewNativeAdapters(
+                session: buy, navigator: navigator, currentContext: currentContext,
+                isRootCurrent: buyFormRootCurrent,
+                scopeOwner: Listenable.merge([_session, buy, router.routerDelegate]),
+                accountIdentity: () => _session.accountIdentity,
+                accountAuthenticated: () => _session.isAuthenticated,
+              ),
+              if (workspaceScope == null && buyFormRootCurrent()) ...buyBrowseNativeAdapters(
+                session: buy, navigator: navigator, currentContext: currentContext,
+                isRootCurrent: buyFormRootCurrent,
+                scopeOwner: Listenable.merge([_session, buy, router.routerDelegate]),
+                accountIdentity: () => _session.accountIdentity,
+                accountAuthenticated: () => _session.isAuthenticated,
+              ),
+              if (workspaceScope == null && buyFormRootCurrent()) ...buyCartReviewNativeAdapters(
+                session: buy, navigator: navigator, currentContext: currentContext,
+                isRootCurrent: buyFormRootCurrent,
+                scopeOwner: Listenable.merge([_session, buy, router.routerDelegate]),
+                accountIdentity: () => _session.accountIdentity,
+                accountAuthenticated: () => _session.isAuthenticated,
+              ),
+              if (workspaceScope == null && buyFormRootCurrent()) ...buyShop04NativeAdapters(
+                session: buy, navigator: navigator, currentContext: currentContext,
+                isRootCurrent: buyFormRootCurrent,
+                scopeOwner: Listenable.merge([_session, buy, router.routerDelegate]),
+                accountIdentity: () => _session.accountIdentity,
+                accountAuthenticated: () => _session.isAuthenticated,
+              ),
+              if (workspaceScope == null && buyFormRootCurrent()) ...buyShop05NativeAdapters(
+                session: buy, navigator: navigator, currentContext: currentContext,
+                isRootCurrent: buyFormRootCurrent,
+                scopeOwner: Listenable.merge([_session, buy, router.routerDelegate]),
+                accountIdentity: () => _session.accountIdentity,
+                accountAuthenticated: () => _session.isAuthenticated,
+              ),
+              if (workspaceScope == null && buyFormRootCurrent()) ...buyShop06NativeAdapters(
+                session: buy, navigator: navigator, currentContext: currentContext,
+                isRootCurrent: buyFormRootCurrent,
+                scopeOwner: Listenable.merge([_session, buy, router.routerDelegate]),
+                accountIdentity: () => _session.accountIdentity,
+                accountAuthenticated: () => _session.isAuthenticated,
+              ),
+            ];
+          },
+          child: MoolSocialBrandMotionScope(
+            cadence: _brandCadence,
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (_) => _brandCadence.noteActivity(),
+              child: MoolBuyTapAcknowledgement(
+                isBuyActive: () => _router
+                    .routerDelegate
+                    .currentConfiguration
+                    .matches
+                    .any((match) => match.matchedLocation.startsWith('/app/buy')),
+                routeChanges: _router.routerDelegate,
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
           ),
         ),
       ),

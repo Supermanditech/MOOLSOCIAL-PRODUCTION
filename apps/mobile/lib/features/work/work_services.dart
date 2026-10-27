@@ -379,7 +379,9 @@ class WorkProcurementController extends ChangeNotifier {
     required String returnTo,
     bool restoreOnly = false,
     BuyV2ProcurementContext? exactContext,
+    bool Function()? inputCurrent,
   }) async {
+    if(inputCurrent?.call()==false)return false;
     final account = currentAccountId(), store = currentStoreId(), profile = currentProfileId?.call();
     openFailureMessage = null;
     if (_disposed ||
@@ -405,6 +407,7 @@ class WorkProcurementController extends ChangeNotifier {
     final epoch = ++_epoch;
     bool current() =>
         !_disposed &&
+        inputCurrent?.call()!=false &&
         epoch == _epoch &&
         storeApproved() &&
         currentAccountId() == account &&
@@ -488,6 +491,7 @@ class WorkProcurementController extends ChangeNotifier {
     );
     session = opened;
     notifyListeners();
+    if (!current() || session != opened) return false;
     await opened.restoreCommerce();
     if (!current() || session != opened) return false;
     await opened.restoreCustomerState();
@@ -1186,11 +1190,12 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
   }
 
   @override
-  Future<void> clear(String scope) async {
-    if (await read(scope) != null && scope == accountScope) {
-      await _storage
-          .delete(key: _scopedKey(scope))
-          .timeout(const Duration(seconds: 10));
+  Future<void> clear(String scope, {bool Function()? current, Map<String, Object?>? expectedDraft}) async {
+    if (current?.call() == false) return;
+    final saved = await read(scope);
+    if (current?.call() == false || expectedDraft != null && jsonEncode(saved) != jsonEncode(expectedDraft)) return;
+    if (saved != null && scope == accountScope) {
+      await _storage.delete(key: _scopedKey(scope)).timeout(const Duration(seconds: 10));
     }
   }
 }
@@ -1933,7 +1938,7 @@ abstract interface class WorkInvoiceDeliveryPreferenceStore {
     String account,
     String store,
   );
-  Future<void> save(WorkspaceInvoiceDeliveryPreference preference);
+  Future<void> save(WorkspaceInvoiceDeliveryPreference preference, {bool Function()? current, WorkspaceInvoiceDeliveryMode? expectedOriginalMode});
 }
 
 /// Device-local encrypted preference only. No outbox, recipient or delivery claim.
@@ -2012,27 +2017,33 @@ class SecureWorkInvoiceDeliveryPreferenceStore
   ) => _exclusive(_key(account, store), () => _read(account, store));
 
   @override
-  Future<void> save(WorkspaceInvoiceDeliveryPreference preference) =>
+  Future<void> save(WorkspaceInvoiceDeliveryPreference preference, {bool Function()? current, WorkspaceInvoiceDeliveryMode? expectedOriginalMode}) =>
       _exclusive(_key(preference.account, preference.store), () async {
+        if (current?.call() == false) throw const WorkGatewayException('Reopen invoice delivery settings. Your choice is kept.');
         _check(preference.account, preference.store);
         if (!preference.valid) {
           throw const WorkGatewayException(
             'Check your invoice delivery preference.',
           );
         }
-        await _read(preference.account, preference.store);
+        final previous = await _read(preference.account, preference.store);
+        if (expectedOriginalMode != null && (previous?.mode ?? WorkspaceInvoiceDeliveryMode.off) != expectedOriginalMode) {
+          throw const WorkGatewayException('Saved invoice preference changed. Your choice is kept. Reopen this task.');
+        }
+        if (current?.call() == false) throw const WorkGatewayException('Reopen invoice delivery settings. Your choice is kept.');
         _check(preference.account, preference.store);
         await _storage.write(
           key: _key(preference.account, preference.store),
           value: jsonEncode(preference.toJson()),
         );
+        if (current?.call() == false) throw const WorkGatewayException('Reopen invoice delivery settings. Your choice is kept.');
         _check(preference.account, preference.store);
       });
 }
 
 abstract interface class WorkUpiDestinationStore {
   Future<WorkspaceUpiDestination?> read(String account, String store);
-  Future<void> save(WorkspaceUpiDestination destination);
+  Future<void> save(WorkspaceUpiDestination destination, {bool Function()? current, String? expectedDestinationFingerprint});
 }
 
 /// Device-local retailer settings. Never supplies bank verification or a
@@ -2104,18 +2115,25 @@ class SecureWorkUpiDestinationStore implements WorkUpiDestinationStore {
       _exclusive(_key(account, store), () => _read(account, store));
 
   @override
-  Future<void> save(WorkspaceUpiDestination destination) =>
+  Future<void> save(WorkspaceUpiDestination destination, {bool Function()? current, String? expectedDestinationFingerprint}) =>
       _exclusive(_key(destination.account, destination.store), () async {
+        if (current?.call() == false) throw const WorkGatewayException('Reopen your Store UPI details. Your entries are kept.');
         _checkScope(destination.account, destination.store);
         if (!destination.valid) {
           throw const WorkGatewayException('Check your Store UPI details.');
         }
-        await _read(destination.account, destination.store);
+        final previous = await _read(destination.account, destination.store);
+        if (expectedDestinationFingerprint != null && expectedDestinationFingerprint != jsonEncode(
+            previous == null ? null : [previous.address, previous.payeeName, previous.merchantCode])) {
+          throw const WorkGatewayException('Saved UPI details changed. Your entries are kept. Reopen before saving.');
+        }
+        if (current?.call() == false) throw const WorkGatewayException('Reopen your Store UPI details. Your entries are kept.');
         _checkScope(destination.account, destination.store);
         await _storage.write(
           key: _key(destination.account, destination.store),
           value: jsonEncode(destination.toJson()),
         );
+        if (current?.call() == false) throw const WorkGatewayException('Reopen your Store UPI details. Your entries are kept.');
         _checkScope(destination.account, destination.store);
       });
 }
@@ -2233,10 +2251,22 @@ class WorkPurchaseInvoiceCapture {
     final picked = await picker.pick(source);
     _check(scope);
     if (picked == null) return null;
-    final bytes = picked.bytes;
-    if (bytes.isEmpty || bytes.length > 10 * 1024 * 1024) {
+    return retainSelectedForDraft(scope, draftId, picked, source: source,
+      canRetain: canRetain ?? (_) => true);
+  }
+
+  /// Retain the actual already-selected input using the same native validation.
+  /// No picker, OCR, proposal quantities, save or Stock command is invoked.
+  Future<WorkspacePurchaseInvoiceAttachment> retainSelectedForDraft(
+      (String, String, bool) scope, String draftId, WorkPickedProof picked, {
+      required WorkProofSource source,
+      required bool Function(WorkspacePurchaseInvoiceAttachment) canRetain}) async {
+    _check(scope);
+    final input = picked.bytes;
+    if (input.isEmpty || input.length > 10 * 1024 * 1024) {
       throw const WorkGatewayException('Choose an invoice photo or PDF up to 10 MB.');
     }
+    final bytes = Uint8List.fromList(input);
     final mime = bytes.length >= 5 && ascii.decode(bytes.take(5).toList(), allowInvalid: true) == '%PDF-'
       ? 'application/pdf' : bytes.length >= 3 && bytes[0] == 255 && bytes[1] == 216 && bytes[2] == 255
       ? 'image/jpeg' : bytes.length >= 8 && listEquals(bytes.take(8).toList(), [137,80,78,71,13,10,26,10])
@@ -2256,7 +2286,7 @@ class WorkPurchaseInvoiceCapture {
       contentType: mime, byteLength: bytes.length, source: source.name);
     void checkCandidate() {
       _check(scope);
-      if (canRetain != null && !canRetain(a)) {
+      if (!canRetain(a)) {
         throw const WorkGatewayException('This copy exceeds the current draft-copy limit or its Store context changed. Earlier copies are kept.');
       }
     }
@@ -2382,6 +2412,13 @@ class WorkPurchaseInvoiceCapture {
       return pages;
     } finally { renderer.dispose(); }
   }
+  // BE-06 / founder-approved 2026-10-26: connect Google Document AI Enterprise
+  // OCR in the BACKEND phase for multilingual documents, layout/provenance,
+  // rotation and blur/glare quality results. This local reader is Latin-only.
+  // Reuse actor/Store/original-copy scope and editable native field review;
+  // recognition must not imply receipt mapping, tax, Stock or financial posting.
+  // Qualify authentic Indian-language/mixed-script documents and native hardware.
+  // https://docs.cloud.google.com/document-ai/docs/enterprise-document-ocr
   static Future<String> _nativeRecognize(String path) async {
     final recognizer = invoice_ocr.TextRecognizer(script: invoice_ocr.TextRecognitionScript.latin);
     try { return (await recognizer.processImage(invoice_ocr.InputImage.fromFilePath(path))).text; }
@@ -4798,7 +4835,7 @@ class SecureWorkOrderPendingStore implements WorkOrderPendingStore {
 
 /// Encrypted intent only, not a feedback feed or a server outcome. Native work
 /// stays serialized across replacement controllers, including timed-out callers.
-class SecureStoreFeedbackPendingStore implements StoreFeedbackPendingStore {
+class SecureStoreFeedbackPendingStore implements StoreFeedbackOwnerGuardedPendingStore {
   SecureStoreFeedbackPendingStore({FlutterSecureStorage? storage,
     String? Function()? currentAccount})
       : _storage = storage ?? const FlutterSecureStorage(),
@@ -4842,7 +4879,8 @@ class SecureStoreFeedbackPendingStore implements StoreFeedbackPendingStore {
     if (command.scope != scope) throw const FormatException('Wrong feedback owner');
     return command;
   }
-  Future<void> _write(StoreFeedbackScope scope, StoreFeedbackCommand? command) async {
+  Future<void> _write(StoreFeedbackScope scope,StoreFeedbackCommand? command,{bool Function()? current}) async {
+    if(current?.call()==false)throw StateError('Feedback owner changed before device write');
     _check(scope);
     await _storage.write(key: _key(scope), value: jsonEncode({
       'version': 1, 'accountScope': scope.account, 'workspaceId': scope.store,
@@ -4854,26 +4892,32 @@ class SecureStoreFeedbackPendingStore implements StoreFeedbackPendingStore {
   Future<StoreFeedbackCommand?> readPending(StoreFeedbackScope scope) =>
       _serial(scope, () => _read(scope));
   @override
-  Future<void> savePending(StoreFeedbackCommand command) =>
+  Future<void> savePending(StoreFeedbackCommand command,{bool Function()? current}) =>
       _serial(command.scope, () async {
+        if(current?.call()==false)throw StateError('Feedback owner changed before queued write');
         if (!command.valid) throw const FormatException('Invalid feedback request');
         final previous = await _read(command.scope);
+        if(current?.call()==false)throw StateError('Feedback owner changed before device write');
         if (previous != null) {
           if (_same(previous, command)) return;
           throw const FormatException('Another feedback request remains pending');
         }
-        await _write(command.scope, command);
+        await _write(command.scope,command,current:current);
       });
   @override
-  Future<void> removePending(StoreFeedbackCommand original) =>
+  Future<void> removePending(StoreFeedbackCommand original,{bool Function()? current}) =>
       _serial(original.scope, () async {
+        if(current?.call()==false)throw StateError('Feedback owner changed before queued clear');
         final previous = await _read(original.scope);
+        if(current?.call()==false)throw StateError('Feedback owner changed before device clear');
         if (previous == null) return;
         if (!_same(previous, original)) {
           throw const FormatException('A different feedback request remains pending');
         }
-        await _write(original.scope, null);
+        await _write(original.scope,null,current:current);
       });
+  @override Future<void> savePendingCurrent(StoreFeedbackCommand command,{required bool Function() current})=>savePending(command,current:current);
+  @override Future<void> removePendingCurrent(StoreFeedbackCommand original,{required bool Function() current})=>removePending(original,current:current);
 }
 
 /// One encrypted original listing request per account/Store/realm. No inventory
@@ -5876,7 +5920,9 @@ class WorkOrderOperations extends ChangeNotifier {
     WorkOrderAction action, {
     String? reason,
     int? additionalMinutes,
+    bool Function()? inputCurrent,
   }) {
+    if(inputCurrent?.call()==false)return Future.value(false);
     final snapshot = _orders[orderId];
     if (_disposed ||
         !recoveryReady ||
@@ -5910,10 +5956,11 @@ class WorkOrderOperations extends ChangeNotifier {
       purchaseRealm: snapshot.order!.operational?.realm,
     );
     _pending[orderId] = command;
-    return _run(command, reconcile: false);
+    return _run(command, reconcile: false,inputCurrent:inputCurrent);
   }
 
-  Future<bool> retry(String orderId) {
+  Future<bool> retry(String orderId,{bool Function()? inputCurrent}) {
+    if(inputCurrent?.call()==false)return Future.value(false);
     final command = _pending[orderId];
     if (_disposed ||
         !recoveryReady ||
@@ -5921,10 +5968,22 @@ class WorkOrderOperations extends ChangeNotifier {
         _states[orderId] != WorkOrderOperationState.uncertain) {
       return Future.value(false);
     }
-    return _run(command, reconcile: true);
+    return _run(command, reconcile: true,inputCurrent:inputCurrent);
   }
 
-  Future<bool> _run(WorkOrderCommand command, {required bool reconcile}) async {
+  Future<bool> _run(WorkOrderCommand command, {required bool reconcile,bool Function()? inputCurrent}) async {
+    if(inputCurrent?.call()==false){
+      if(!reconcile&&identical(_pending[command.orderId],command)){_pending.remove(command.orderId);_states.remove(command.orderId);}
+      return false;
+    }
+    var pendingMayPersist=false;
+    bool admitted(){
+      if(inputCurrent?.call()!=false)return true;
+      if(!reconcile&&!pendingMayPersist&&identical(_pending[command.orderId],command)){
+        _pending.remove(command.orderId);_states.remove(command.orderId);
+      }
+      return false;
+    }
     _states[command.orderId] = reconcile
         ? WorkOrderOperationState.reconciling
         : WorkOrderOperationState.submitting;
@@ -5932,11 +5991,13 @@ class WorkOrderOperations extends ChangeNotifier {
     bool current() =>
         !_disposed && identical(_pending[command.orderId], command);
     try {
-      if (!current()) return false;
+      if (!current()||!admitted()) return false;
       if (!reconcile && pendingStore != null) {
+        pendingMayPersist=true;
         await pendingStore!.savePending(command).timeout(timeout);
         if (!current()) return false;
       }
+      if(!admitted())return false;
       final reply =
           await (reconcile
                   ? gateway.reconcileOrderCommand(command)
@@ -6281,6 +6342,10 @@ class AuthenticatedWorkGateway implements WorkGateway {
   final SocialContentTransport transport;
   final WorkProofUploadTransport proofUploadTransport;
   final Random random;
+  void _ensureNativeCurrent(bool Function()? current) {
+    if (current?.call() == false) throw const WorkGatewayException(
+      'Your application or account changed. Reopen this task.', cancelled: true);
+  }
 
   @override
   Future<List<WorkReviewResult>> loadFeed() async {
@@ -6328,14 +6393,14 @@ class AuthenticatedWorkGateway implements WorkGateway {
     'code': code,
   }, mutation: true);
   @override
-  Future<String> saveProof(String proofId, WorkPickedProof proof) async {
+  Future<String> saveProof(String proofId, WorkPickedProof proof, {bool Function()? current, bool Function()? originalCurrent}) async {
     final prepared = _map(
       await _invoke('prepareProofUpload', {
         'proofId': proofId,
         'fileName': proof.fileName,
         'contentType': proof.contentType,
         'sizeBytes': proof.bytes.length,
-      }, mutation: true),
+      }, mutation: true, current: current),
     );
     final uploadUrl = Uri.tryParse(_requiredString(prepared['uploadUrl']));
     final expiresAt = DateTime.tryParse(_requiredString(prepared['expiresAt']));
@@ -6350,11 +6415,13 @@ class AuthenticatedWorkGateway implements WorkGateway {
     final headers = _map(
       prepared['requiredHeaders'],
     ).map((key, value) => MapEntry(key, _requiredString(value)));
+    _ensureNativeCurrent(originalCurrent ?? current);
     await proofUploadTransport.put(
       url: uploadUrl,
       headers: headers,
       bytes: proof.bytes,
     );
+    _ensureNativeCurrent(originalCurrent ?? current);
     return _requiredString(
       _map(
         await _invoke('confirmProofUpload', {
@@ -6363,13 +6430,13 @@ class AuthenticatedWorkGateway implements WorkGateway {
           'fileName': proof.fileName,
           'contentType': proof.contentType,
           'sizeBytes': proof.bytes.length,
-        }, mutation: true),
+        }, mutation: true, current: originalCurrent ?? current),
       )['proofReference'],
     );
   }
 
   @override
-  Future<WorkReviewResult> submitProfile(WorkProfileSubmission value) async =>
+  Future<WorkReviewResult> submitProfile(WorkProfileSubmission value, {bool Function()? current}) async =>
       _decodeReview(
         _map(
           await _invoke('submitProfile', {
@@ -6388,7 +6455,7 @@ class AuthenticatedWorkGateway implements WorkGateway {
             'connectedProviderAccount': value.connectedProviderAccount,
             'alternateMobileVerified': value.alternateMobileVerified,
             'idempotencyKey': value.idempotencyKey,
-          }, mutation: true),
+          }, mutation: true, current: current),
         ),
       );
   @override
@@ -6400,8 +6467,8 @@ class AuthenticatedWorkGateway implements WorkGateway {
     retryable: false,
   );
   @override
-  Future<WorkReviewResult> checkReview(String caseId) async =>
-      _decodeReview(_map(await _invoke('reviewStatus', {'caseId': caseId})));
+  Future<WorkReviewResult> checkReview(String caseId, {bool Function()? current}) async =>
+      _decodeReview(_map(await _invoke('reviewStatus', {'caseId': caseId}, current: current)));
   @override
   Future<String> submitGst(
     String caseId,
@@ -6533,21 +6600,22 @@ class AuthenticatedWorkGateway implements WorkGateway {
     String operation,
     Map<String, Object?> body, {
     bool mutation = false,
+    bool Function()? current,
   }) async {
+    _ensureNativeCurrent(current);
+    final idToken = await credentials.firebaseIdToken();
+    _ensureNativeCurrent(current);
+    final appCheck = await credentials.appCheckToken(mutation
+      ? SocialAppCheckTokenMode.limitedUse : SocialAppCheckTokenMode.standard);
+    _ensureNativeCurrent(current);
     final response = await transport.postJson(
       endpoint,
       headers: {
         'accept': 'application/json',
-        'authorization': 'Bearer ${await credentials.firebaseIdToken()}',
-        'x-firebase-appcheck': await credentials.appCheckToken(
-          mutation
-              ? SocialAppCheckTokenMode.limitedUse
-              : SocialAppCheckTokenMode.standard,
-        ),
-        'x-request-id': List<int>.generate(
-          16,
-          (_) => random.nextInt(256),
-        ).map((value) => value.toRadixString(16).padLeft(2, '0')).join(),
+        'authorization': 'Bearer $idToken',
+        'x-firebase-appcheck': appCheck,
+        'x-request-id': List<int>.generate(16, (_) => random.nextInt(256))
+          .map((value) => value.toRadixString(16).padLeft(2, '0')).join(),
       },
       body: {'operation': operation, ...body},
     );

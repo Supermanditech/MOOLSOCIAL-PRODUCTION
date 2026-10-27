@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:crypto/crypto.dart' as crypto;
+import '../../assistant/mool_assistant.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -19,10 +22,108 @@ double _workViewBottomInset(BuildContext context) {
   return view.viewPadding.bottom / view.devicePixelRatio;
 }
 
+/// Preparation is limited to the existing account-scoped native application.
+class WorkspaceSetupInitialData {
+  WorkspaceSetupInitialData._(this.actionId, Map<String, Object?> values) : fields = Map.unmodifiable(values);
+  final String actionId;
+  final Map<String, Object?> fields;
+  static Set<String> keys(String action) => switch (action) {
+    'AI-ACT-187' || 'AI-ACT-192' => {},
+    'AI-ACT-188' => {'applicationId'},
+    'AI-ACT-189' => {'profileId'},
+    'AI-ACT-190' => {'name', 'area', 'activity'},
+    'AI-ACT-191' => {'proofId'},
+    'AI-ACT-193' || 'AI-ACT-194' => {'caseId'},
+    'AI-ACT-195' => {'workspaceId'},
+    _ => throw const FormatException('This Workspace task is unavailable.'),
+  };
+  factory WorkspaceSetupInitialData.fromFields(String action, Map<String, Object?> values) {
+    if (values.keys.any((key) => !keys(action).contains(key)) || values.values.any((value) => value is! String)) {
+      throw const FormatException('Use the existing Workspace application fields.');
+    }
+    for (final key in const ['applicationId', 'profileId', 'proofId', 'caseId', 'workspaceId']) {
+      if (values.containsKey(key) && (values[key] as String).trim().isEmpty) throw const FormatException('Choose the original application record.');
+    }
+    return WorkspaceSetupInitialData._(action, values);
+  }
+}
+
+/// Source changes are observed at notification time; restoration never revives an old review.
+class WorkspaceSetupReviewScope extends ChangeNotifier {
+  WorkspaceSetupReviewScope({required bool Function() ownerCurrent, required bool Function() storageCurrent, required bool Function() storageOwnerCurrent,
+    required String Function() readSource, required String Function() readStorageIdentity, required this.changes, required this.ownerKey})
+      : _owner = ownerCurrent, _storageOwner = storageCurrent, _storageActor = storageOwnerCurrent, _readSource = readSource, _baseline = readSource(), _readStorageIdentity = readStorageIdentity, _storageBaseline = readStorageIdentity() {
+    changes.addListener(_observe);
+  }
+  final bool Function() _owner, _storageOwner, _storageActor;
+  final String Function() _readSource, _readStorageIdentity;
+  final Listenable changes;
+  final Object ownerKey;
+  String _baseline, _storageBaseline;
+  bool _retired = false, _disposed = false, _observing = true;
+  bool ownerCurrent() => !_disposed && _owner();
+  bool storageCurrent() => _storageOwner() && _readStorageIdentity() == _storageBaseline;
+  bool storageOwnerCurrent() => _storageActor();
+  bool current() {
+    if (!_retired && (_disposed || !_owner() || _readSource() != _baseline)) { _retired = true; _detach(); }
+    return !_retired;
+  }
+  void _detach() { if (!_observing) return; _observing = false; changes.removeListener(_observe); }
+  void _observe() { current(); if (!_disposed) notifyListeners(); }
+  // Called only at a validated, synchronous original-native mutation/ACK point,
+  // before its notification. It cannot revive an already observed foreign change.
+  void acceptNativeChange() {
+    // A known native ACK still owns its scoped persistence after the UI closes.
+    // It never revives the retired presentation or starts another operation.
+    if (_storageActor()) _storageBaseline = _readStorageIdentity();
+    if (!_disposed && !_retired && _owner()) _baseline = _readSource();
+  }
+  @override void dispose() { if (_disposed) return; _detach(); _disposed = true; _retired = true; notifyListeners(); super.dispose(); }
+}
+class WorkspaceSetupReviewFrame extends StatelessWidget {
+  const WorkspaceSetupReviewFrame({required this.scope, required this.child, super.key});
+  final WorkspaceSetupReviewScope scope;
+  final Widget child;
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: scope, builder: (context, _) {
+    final current = scope.current();
+    return Stack(fit: StackFit.expand, children: [
+      Offstage(offstage: !current, child: ExcludeFocus(excluding: !current, child: child)),
+      if (!current) const Center(child: Text('Your application or account changed. Your entries are kept. Reopen this task.')),
+    ]);
+  });
+}
+
+final _workspaceProofEditors = <_WorkProfileProofScreenState>{};
+final _workspacePreparedDetails = <Object, ({String name, String area, String activity})>{};
+bool workspaceApplicationHasOpenDirtyEditor(WorkSession session) => _workspaceProofEditors.any((state) =>
+  state.mounted && identical(state.widget.session, session) && state._detailsDirty);
+Widget _workspacePreparedClosed(WorkSession session, VoidCallback? close) => WorkPageScaffold(
+  session: session, title: 'Workspace application', subtitle: '', showHeaderChat: false,
+  showTrailingAction: close != null, showBottomNavigation: false, onBack: close,
+  trailing: close == null ? null : IconButton(tooltip: 'Close application', onPressed: close, icon: const Icon(Icons.close)),
+  body: const Center(child: Text('Your application or account changed. Your entries are kept. Reopen this task.')));
+
+class _WorkspacePreparedPrivateSurface extends StatelessWidget {
+  const _WorkspacePreparedPrivateSurface({required this.scope, required this.child, required this.close});
+  final WorkspaceSetupReviewScope? scope;
+  final Widget child;
+  final VoidCallback close;
+  @override Widget build(BuildContext context) => scope == null ? child : AnimatedBuilder(animation: scope!,
+    builder: (context, _) => scope!.current() ? child : Padding(padding: const EdgeInsets.all(16),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Your application or account changed. Reopen this task.'),
+        TextButton(onPressed: close, child: const Text('Close'))])));
+}
+
 class WorkChooseActivityScreen extends StatefulWidget {
-  const WorkChooseActivityScreen({required this.session, super.key});
+  const WorkChooseActivityScreen({required this.session, this.preparedScope, this.permittedProfiles, this.requestedProfile, this.onPreparedClose, this.onNativeRoute, super.key});
 
   final WorkSession session;
+  final WorkspaceSetupReviewScope? preparedScope;
+  final Set<String>? permittedProfiles;
+  final String? requestedProfile;
+  final VoidCallback? onPreparedClose;
+  final ValueChanged<String>? onNativeRoute;
 
   @override
   State<WorkChooseActivityScreen> createState() =>
@@ -40,6 +141,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
   bool _entryRedirectQueued = false;
 
   bool _matches(WorkProfileOption option) {
+    if (widget.permittedProfiles != null && !widget.permittedProfiles!.contains(option.id)) return false;
     final query = _workspaceQuery.replaceAll('saloon', 'salon');
     return option.label.toLowerCase().contains(query);
   }
@@ -47,9 +149,10 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.preparedScope != null) { _categoryId = 'products-trade'; _expandedProfileId = widget.requestedProfile; }
     _searchFocus.addListener(_refreshSearch);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) widget.session.loadInitialWorkspaceState();
+      if (mounted && widget.preparedScope == null) widget.session.loadInitialWorkspaceState();
     });
   }
 
@@ -67,9 +170,10 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: widget.session,
+      animation: Listenable.merge([widget.session, widget.preparedScope]),
       builder: (context, _) {
-        final ordinaryEntry =
+        if (widget.preparedScope?.current() == false) return _workspacePreparedClosed(widget.session, widget.onPreparedClose);
+        final ordinaryEntry = widget.preparedScope == null &&
             GoRouterState.of(context).uri.queryParameters['entry'] ==
             'workspaces';
         if (ordinaryEntry &&
@@ -91,7 +195,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
             subtitle: '',
             activeLocalAction: 'workspace',
             showHeaderChat: false,
-            showTrailingAction: false,
+            showTrailingAction: widget.onPreparedClose != null,
             showMessageBanner: false,
             body: Center(
               child: SingleChildScrollView(
@@ -177,16 +281,28 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
         }
 
         void chooseWorkspace(WorkProfileOption option) {
+          if (widget.preparedScope?.current() == false || widget.permittedProfiles != null && !widget.permittedProfiles!.contains(option.id)) return;
+          void openNative(String route) {
+            if (widget.preparedScope?.current() == false) return;
+            if (widget.onNativeRoute != null) widget.onNativeRoute!(route); else context.push(route);
+          }
           if (resumeApplication) {
-            context.push('/app/work/workspace/proof');
+            openNative('/app/work/workspace/proof');
             return;
           }
-          widget.session.selectProfile(option.id);
-          context.push('/app/work/workspace/requirements');
+          String? application;
+          bool storageCurrent() => widget.preparedScope?.storageOwnerCurrent() != false &&
+            widget.session.selectedProfile?.id == option.id &&
+            ((application ??= widget.session.workspaceApplicationId) == widget.session.workspaceApplicationId);
+          widget.session.selectProfile(option.id, current: widget.preparedScope?.current,
+            storageCurrent: widget.preparedScope == null ? null : storageCurrent,
+            onKnownChange: widget.preparedScope?.acceptNativeChange);
+          openNative('/app/work/workspace/requirements');
         }
 
         return WorkPageScaffold(
           session: widget.session,
+          showBottomNavigation: widget.preparedScope == null,
           title: 'Grow with MoolSocial',
           headerHeight: 56,
           headerTitle: TextField(
@@ -234,7 +350,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
               _expandedProfileId != null ||
               family != null ||
               Navigator.of(context).canPop(),
-          onBack: _expandedProfileId != null
+          onBack: widget.preparedScope != null ? widget.onPreparedClose : _expandedProfileId != null
               ? collapseBenefits
               : family == null
               ? null
@@ -253,7 +369,9 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
           showHeaderChat: false,
           showTrailingAction: true,
           hideNavigationWhenKeyboardVisible: true,
-          trailing: PopupMenuButton<String>(
+          trailing: widget.onPreparedClose != null
+              ? IconButton(tooltip: 'Close application', onPressed: widget.onPreparedClose, icon: const Icon(Icons.close))
+              : PopupMenuButton<String>(
             key: const Key('work-workspace-category'),
             tooltip: 'Business categories',
             requestFocus: false,
@@ -272,7 +390,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: '', child: Text('All businesses')),
-              for (final id in widget.session.familyIds)
+              for (final id in widget.session.familyIds.where((id) => widget.permittedProfiles == null || widget.session.profilesForFamily(id).any((profile) => widget.permittedProfiles!.contains(profile.id))))
                 PopupMenuItem(
                   value: id,
                   child: Text(widget.session.familyLabel(id)),
@@ -357,7 +475,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
-              if (focusedOption == null)
+              if (focusedOption == null && widget.preparedScope == null)
                 OutlinedButton.icon(
                   key: const Key('work-profile-not-shown'),
                   onPressed: () => _showUnsupportedRequest(context),
@@ -1621,9 +1739,14 @@ class _ContactRow extends StatelessWidget {
 }
 
 class WorkProfileProofScreen extends StatefulWidget {
-  const WorkProfileProofScreen({required this.session, super.key});
+  const WorkProfileProofScreen({required this.session, this.preparedScope, this.initialData, this.initialStep, this.onPreparedClose, this.onNativeRoute, super.key});
 
   final WorkSession session;
+  final WorkspaceSetupReviewScope? preparedScope;
+  final WorkspaceSetupInitialData? initialData;
+  final int? initialStep;
+  final VoidCallback? onPreparedClose;
+  final ValueChanged<String>? onNativeRoute;
 
   @override
   State<WorkProfileProofScreen> createState() => _WorkProfileProofScreenState();
@@ -1664,12 +1787,26 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
   @override
   void initState() {
     super.initState();
+    _workspaceProofEditors.add(this);
     if (widget.session.reviewCaseId != null) _step = 3;
     if (widget.session.recoveredDocumentStep) {
       _step = 1;
       _correctionMode = widget.session.reviewCorrectionDraft;
       _correctionInstruction = widget.session.reviewReason;
-      widget.session.recoveredDocumentStep = false;
+      if (widget.preparedScope == null) widget.session.recoveredDocumentStep = false;
+    }
+    if (widget.preparedScope != null) {
+      _step = widget.initialStep ?? _step;
+      final kept = _workspacePreparedDetails[widget.preparedScope!.ownerKey], fields = widget.initialData?.fields;
+      _name.text = kept?.name ?? fields?['name'] as String? ?? _name.text;
+      _area.text = kept?.area ?? fields?['area'] as String? ?? _area.text;
+      _activity.text = kept?.activity ?? fields?['activity'] as String? ?? _activity.text;
+      final proofId = fields?['proofId'] as String?;
+      if (proofId != null) WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || widget.preparedScope?.current() == false) return;
+        final target = _proofAnchors[proofId]?.currentContext;
+        if (target != null) Scrollable.ensureVisible(target, alignment: 0.15);
+      });
     }
     WidgetsBinding.instance.addObserver(this);
     for (final focus in [_nameFocus, _areaFocus, _activityFocus]) {
@@ -1684,11 +1821,13 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
 
   void _scheduleReviewRefresh(Duration interval) {
     _reviewTimer?.cancel();
+    if (widget.preparedScope != null) return;
     _reviewTimer = Timer.periodic(interval, (_) => _refreshReview());
   }
 
   @override
   void dispose() {
+    _retainPreparedDetails(); _workspaceProofEditors.remove(this);
     WidgetsBinding.instance.removeObserver(this);
     _reviewTimer?.cancel();
     widget.session.removeListener(_onReviewChanged);
@@ -1705,11 +1844,37 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
     super.dispose();
   }
 
-  void _saveFields() {
+  bool get _detailsDirty => _name.text.trim() != widget.session.workName ||
+    _area.text.trim() != widget.session.workArea || _activity.text.trim() != widget.session.primaryActivity;
+  void _retainPreparedDetails() {
+    final scope = widget.preparedScope;
+    if (scope == null) return;
+    if (!_detailsDirty) { _workspacePreparedDetails.remove(scope.ownerKey); return; }
+    _workspacePreparedDetails[scope.ownerKey] = (name: _name.text, area: _area.text, activity: _activity.text);
+  }
+  void _nativeGo(String route) {
+    if (widget.preparedScope?.current() == false) return;
+    _retainPreparedDetails();
+    if (widget.onNativeRoute != null) { widget.onNativeRoute!(route); return; }
+    context.go(route);
+  }
+  void _nativePush(String route) {
+    if (widget.preparedScope?.current() == false) return;
+    _retainPreparedDetails();
+    if (widget.onNativeRoute != null) { widget.onNativeRoute!(route); return; }
+    context.push(route);
+  }
+
+  void _saveFields({bool nativeSave = false}) {
+    if (widget.preparedScope?.current() == false) return;
+    if (widget.preparedScope != null && !nativeSave) {
+      _retainPreparedDetails(); setState(() => _showDetailsErrors = false); return;
+    }
     widget.session.saveDetails(
       name: _name.text,
       area: _area.text,
-      activity: _activity.text,
+      activity: _activity.text, current: widget.preparedScope?.current,
+      storageCurrent: widget.preparedScope?.storageCurrent, onKnownChange: widget.preparedScope?.acceptNativeChange,
     );
     _revealFocusedDetail();
   }
@@ -1745,11 +1910,12 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
   void didChangeMetrics() => _revealFocusedDetail();
 
   void _goBack() {
+    if (widget.preparedScope != null && (_step == 0 || _step >= 3 || !widget.preparedScope!.current())) { _retainPreparedDetails(); widget.onPreparedClose?.call(); return; }
     if (_step == 0) _saveFields();
     FocusManager.instance.primaryFocus?.unfocus();
     _resetScroll();
     if (_step >= 3) {
-      context.go(
+      _nativeGo(
         widget.session.hasVerifiedWorkspace
             ? '/app/work/workspace/dashboard'
             : '/app/work/workspace/choose',
@@ -1770,7 +1936,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
           _correctionMode = false;
         });
       } else {
-        context.go('/app/work/workspace/choose');
+        _nativeGo('/app/work/workspace/choose');
       }
       return;
     }
@@ -1781,13 +1947,13 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go('/app/work/workspace/contact');
+      _nativeGo('/app/work/workspace/contact');
     }
   }
 
   void _beginCorrection(int step) {
     final instruction = widget.session.reviewReason?.trim();
-    if (!widget.session.beginReviewCorrection()) return;
+    if (!widget.session.beginReviewCorrection(current: widget.preparedScope?.current, storageCurrent: widget.preparedScope?.storageCurrent, onKnownChange: widget.preparedScope?.acceptNativeChange)) return;
     setState(() {
       _step = step;
       _correctionMode = true;
@@ -1805,6 +1971,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
   }
 
   void _refreshReview() {
+    if (widget.preparedScope != null) return;
     if (!mounted ||
         !_appActive ||
         _step != 3 ||
@@ -1842,6 +2009,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
   }
 
   void _onReviewChanged() {
+    if (widget.preparedScope != null) return;
     if (!mounted ||
         _step != 3 ||
         _redirectQueued ||
@@ -1856,7 +2024,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
       _redirectQueued = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && ModalRoute.of(context)?.isCurrent == true) {
-          context.go('/app/work/workspace/dashboard');
+          _nativeGo('/app/work/workspace/dashboard');
         }
       });
     }
@@ -1865,8 +2033,10 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: widget.session,
-      builder: (context, _) => WorkPageScaffold(
+      animation: Listenable.merge([widget.session, widget.preparedScope]),
+      builder: (context, _) => widget.preparedScope?.current() == false
+        ? _workspacePreparedClosed(widget.session, widget.onPreparedClose)
+        : WorkPageScaffold(
         session: widget.session,
         title: _step == 3 ? 'Application status' : 'Complete your Workspace',
         subtitle:
@@ -1902,7 +2072,9 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
         activeLocalAction: 'workspace',
         hideNavigationWhenKeyboardVisible: true,
         showHeaderChat: false,
-        showTrailingAction: false,
+        showTrailingAction: widget.onPreparedClose != null,
+        trailing: widget.onPreparedClose == null ? null : IconButton(tooltip: 'Close application', onPressed: widget.onPreparedClose, icon: const Icon(Icons.close)),
+        showBottomNavigation: widget.preparedScope == null,
         onBack: _goBack,
         bottomAction: switch (_step) {
           0 when MediaQuery.viewInsetsOf(context).bottom > 0 => null,
@@ -1912,7 +2084,8 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                 ? 'Save and return to review'
                 : 'Continue to documents',
             onPressed: () {
-              _saveFields();
+              if (widget.preparedScope?.current() == false) return;
+              _saveFields(nativeSave: true);
               setState(() => _showDetailsErrors = true);
               final invalidFocus = widget.session.detailsNameError != null
                   ? _nameFocus
@@ -1959,6 +2132,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                 : 'Submit for review',
             busy: widget.session.busy,
             onPressed: () async {
+              if (widget.preparedScope?.current() == false) return;
               if (!widget.session.declarationAccepted) {
                 widget.session.clearMessages();
                 setState(() => _showDeclarationError = true);
@@ -1976,8 +2150,8 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                 });
                 return;
               }
-              final submitted = await widget.session.submitProfile();
-              if (submitted && mounted) {
+              final submitted = await widget.session.submitProfile(ownerCurrent: widget.preparedScope?.storageCurrent, inputCurrent: widget.preparedScope?.current, storageCurrent: widget.preparedScope?.storageCurrent, onKnownChange: widget.preparedScope?.acceptNativeChange);
+              if (submitted && mounted && widget.preparedScope?.current() != false) {
                 _resetScroll();
                 setState(() {
                   _step = 3;
@@ -1990,7 +2164,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
             icon: Icons.send_rounded,
           ),
           _ => _InlineReviewAction(
-            session: widget.session,
+            session: widget.session, preparedScope: widget.preparedScope, onNativeRoute: widget.onNativeRoute,
             onUpdateDetails: () => _beginCorrection(0),
           ),
         },
@@ -2114,7 +2288,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                               )
                               .toList(),
                       onChanged: (value) =>
-                          widget.session.saveBusinessRelationship(value ?? ''),
+                          widget.session.saveBusinessRelationship(value ?? '', current: widget.preparedScope?.current, storageCurrent: widget.preparedScope?.storageCurrent, onKnownChange: widget.preparedScope?.acceptNativeChange),
                     ),
                   ),
                 ],
@@ -2173,10 +2347,10 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                   file: widget.session.pickedProofs[proof.id],
                   onAdd: () => _showProofSource(context, proof),
                   onView: () => _showDocument(context, proof),
-                  onRemove: () => widget.session.removeProof(proof.id),
+                  onRemove: () => widget.session.removeProof(proof.id, current: widget.preparedScope?.current, storageCurrent: widget.preparedScope?.storageCurrent, onKnownChange: widget.preparedScope?.acceptNativeChange),
                   removedName: widget.session.removedProofName(proof.id),
                   onUndo: widget.session.canUndoProofRemoval(proof.id)
-                      ? () => widget.session.undoProofRemoval(proof.id)
+                      ? () => widget.session.undoProofRemoval(proof.id, current: widget.preparedScope?.current, storageCurrent: widget.preparedScope?.storageCurrent, onKnownChange: widget.preparedScope?.acceptNativeChange)
                       : null,
                 ),
                 const SizedBox(height: MoolSpacing.xs),
@@ -2213,6 +2387,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                             ),
                           ),
                           onChanged: (value) {
+                            if (widget.preparedScope?.current() == false) return;
                             widget.session.setDeclaration(value ?? false);
                             if (value == true) {
                               setState(() => _showDeclarationError = false);
@@ -2242,7 +2417,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
               ),
             ] else ...[
               _InlineWorkspaceReviewStatus(
-                session: widget.session,
+                session: widget.session, preparedScope: widget.preparedScope,
                 onAddDocuments: () => _beginCorrection(1),
                 onUpdateDetails: () => _beginCorrection(0),
                 onReviewChanges: () => _beginCorrection(2),
@@ -2303,7 +2478,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
             onEdit: () {
               session.setDeclaration(false);
               setState(() => _showDeclarationError = false);
-              context.push('/app/work/workspace/contact?return=review');
+              _nativePush('/app/work/workspace/contact?return=review');
             },
             children: [
               _ReviewRow(
@@ -2346,6 +2521,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
   }
 
   Future<void> _showDocument(BuildContext context, WorkProofRequirement proof) {
+    if (widget.preparedScope?.current() == false) return Future.value();
     final bottomInset = _workViewBottomInset(context);
     final file = widget.session.pickedProofs[proof.id];
     return showModalBottomSheet<void>(
@@ -2358,15 +2534,16 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
           constraints: BoxConstraints(
             maxHeight: MediaQuery.sizeOf(sheetContext).height * .75,
           ),
-          child: WorkDocumentPreview(
+          child: _WorkspacePreparedPrivateSurface(scope: widget.preparedScope, close: () => Navigator.pop(sheetContext), child: WorkDocumentPreview(
             label: proof.label,
             file: file,
             onClose: () => Navigator.of(sheetContext).pop(),
             onReplace: () {
+              if (widget.preparedScope?.current() == false) return;
               Navigator.of(sheetContext).pop();
               _showProofSource(context, proof);
             },
-          ),
+          )),
         ),
       ),
     );
@@ -2376,6 +2553,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
     BuildContext context,
     WorkProofRequirement proof,
   ) async {
+    if (widget.preparedScope?.current() == false) return;
     final render = _proofAnchors[proof.id]?.currentContext?.findRenderObject();
     final viewport = render == null
         ? null
@@ -2390,11 +2568,11 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
       showDragHandle: false,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) =>
-          _ProofSourceSheet(session: widget.session, proof: proof),
+          _ProofSourceSheet(session: widget.session, proof: proof, preparedScope: widget.preparedScope),
     );
-    if (added != true || !mounted || _step != 1 || rowOffset == null) return;
+    if (added != true || !mounted || widget.preparedScope?.current() == false || _step != 1 || rowOffset == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _step != 1 || !_scroll.hasClients) return;
+      if (!mounted || widget.preparedScope?.current() == false || _step != 1 || !_scroll.hasClients) return;
       _scroll.jumpTo(
         rowOffset.clamp(
           _scroll.position.minScrollExtent,
@@ -2698,9 +2876,10 @@ class _DocumentPreviewState extends State<WorkDocumentPreview> {
 }
 
 class _ProofSourceSheet extends StatefulWidget {
-  const _ProofSourceSheet({required this.session, required this.proof});
+  const _ProofSourceSheet({required this.session, required this.proof, this.preparedScope});
 
   final WorkSession session;
+  final WorkspaceSetupReviewScope? preparedScope;
   final WorkProofRequirement proof;
 
   @override
@@ -2712,13 +2891,13 @@ class _ProofSourceSheetState extends State<_ProofSourceSheet> {
   String? _error;
 
   Future<void> _pick(String id, WorkProofSource source) async {
-    if (_busySource != null) return;
+    if (_busySource != null || widget.preparedScope?.current() == false) return;
     setState(() {
       _busySource = id;
       _error = null;
     });
-    final added = await widget.session.addProof(widget.proof.id, source);
-    if (!mounted) return;
+    final added = await widget.session.addProof(widget.proof.id, source, ownerCurrent: widget.preparedScope?.storageCurrent, inputCurrent: widget.preparedScope?.current, storageCurrent: widget.preparedScope?.storageCurrent, onKnownChange: widget.preparedScope?.acceptNativeChange);
+    if (!mounted || widget.preparedScope?.current() == false) return;
     if (added) {
       Navigator.of(context).pop(true);
       return;
@@ -2734,7 +2913,13 @@ class _ProofSourceSheetState extends State<_ProofSourceSheet> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => AnimatedBuilder(animation: widget.preparedScope ?? widget.session,
+    builder: (context, _) => widget.preparedScope?.current() == false
+      ? Padding(padding: const EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Your application or account changed. Reopen this task.'),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]))
+      : _buildSource(context));
+  Widget _buildSource(BuildContext context) {
     final reportedBottom = _workViewBottomInset(context);
     final safeBottom = reportedBottom < 24 ? 24.0 : reportedBottom;
     const sources =
@@ -2964,9 +3149,15 @@ class _ProofSourceTile extends StatelessWidget {
 class _InlineReviewAction extends StatelessWidget {
   const _InlineReviewAction({
     required this.session,
-    required this.onUpdateDetails,
+    required this.onUpdateDetails, this.preparedScope, this.onNativeRoute,
   });
   final WorkSession session;
+  final WorkspaceSetupReviewScope? preparedScope;
+  final ValueChanged<String>? onNativeRoute;
+  void _openNative(BuildContext context, String route) {
+    if (preparedScope?.current() == false) return;
+    if (onNativeRoute != null) onNativeRoute!(route); else context.push(route);
+  }
   final VoidCallback onUpdateDetails;
   @override
   Widget build(BuildContext context) {
@@ -2982,9 +3173,10 @@ class _InlineReviewAction extends StatelessWidget {
         label: 'Contact MoolSocial',
         icon: Icons.chat_bubble_outline,
         onPressed: () {
+          if (preparedScope?.current() == false) return;
           final caseId = session.reviewCaseId;
           final business = session.submittedProfile?.name ?? session.workName;
-          context.push(
+          _openNative(context,
             Uri(
               path: '/app/chat/thread/workspace-support',
               queryParameters: {
@@ -3007,7 +3199,7 @@ class _InlineReviewAction extends StatelessWidget {
         keyName: 'work-inline-review-check',
         label: 'Retry update',
         busy: session.busy,
-        onPressed: session.checkReview,
+        onPressed: () => session.checkReview(ownerCurrent: preparedScope?.storageCurrent, inputCurrent: preparedScope?.current, storageCurrent: preparedScope?.storageCurrent, onKnownChange: preparedScope?.acceptNativeChange),
       );
     }
     return const SizedBox.shrink();
@@ -3065,9 +3257,10 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
     required this.session,
     required this.onAddDocuments,
     required this.onUpdateDetails,
-    required this.onReviewChanges,
+    required this.onReviewChanges, this.preparedScope,
   });
   final WorkSession session;
+  final WorkspaceSetupReviewScope? preparedScope;
   final VoidCallback onAddDocuments, onUpdateDetails, onReviewChanges;
   @override
   Widget build(BuildContext context) {
@@ -3251,6 +3444,7 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
                 ),
               ],
             ),
+          if (preparedScope == null)
           if (session.gateway case final ReviewWorkGateway gateway)
             if (session.reviewCaseId case final String caseId)
               if (gateway.canSelectDeviceReviewCase(caseId))
@@ -3856,15 +4050,19 @@ class _ReviewRow extends StatelessWidget {
 }
 
 class WorkVerificationStatusScreen extends StatelessWidget {
-  const WorkVerificationStatusScreen({required this.session, super.key});
+  const WorkVerificationStatusScreen({required this.session, this.preparedScope, this.onPreparedClose, this.onNativeRoute, super.key});
 
   final WorkSession session;
+  final WorkspaceSetupReviewScope? preparedScope;
+  final VoidCallback? onPreparedClose;
+  final ValueChanged<String>? onNativeRoute;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: session,
+      animation: Listenable.merge([session, preparedScope]),
       builder: (context, _) {
+        if (preparedScope?.current() == false) return _workspacePreparedClosed(session, onPreparedClose);
         final approved = {
           WorkReviewStage.approved,
           WorkReviewStage.live,
@@ -3878,7 +4076,7 @@ class WorkVerificationStatusScreen extends StatelessWidget {
           title: approved
               ? 'Work approved'
               : rejected
-              ? 'Changes needed'
+              ? preparedScope == null ? 'Changes needed' : 'Application not approved'
               : suspended
               ? 'Workspace unavailable'
               : 'Work profile review',
@@ -3886,20 +4084,23 @@ class WorkVerificationStatusScreen extends StatelessWidget {
           fallbackBackRoute: '/app/work/workspace/choose',
           activeLocalAction: 'workspace',
           showHeaderChat: false,
-          showTrailingAction: false,
+          showTrailingAction: onPreparedClose != null,
+          trailing: onPreparedClose == null ? null : IconButton(tooltip: 'Close application', onPressed: onPreparedClose, icon: const Icon(Icons.close)),
+          onBack: onPreparedClose, showBottomNavigation: preparedScope == null,
           bottomAction: approved
               ? WorkPrimaryButton(
                   keyName: 'work-open-ready',
                   label: 'Open Workspace dashboard',
-                  onPressed: () => context.go('/app/work/workspace/dashboard'),
+                  onPressed: () { if (preparedScope?.current() == false) return; if (onNativeRoute != null) onNativeRoute!('/app/work/workspace/dashboard'); else context.go('/app/work/workspace/dashboard'); },
                 )
               : rejected
               ? WorkPrimaryButton(
                   keyName: 'work-revise-profile',
-                  label: 'Review and resubmit',
+                  label: 'View review instructions',
                   onPressed: () {
+                    if (preparedScope?.current() == false) return;
                     session.reviseRejectedProfile();
-                    context.go('/app/work/workspace/proof');
+                    if (onNativeRoute != null) onNativeRoute!('/app/work/workspace/proof'); else context.go('/app/work/workspace/proof');
                   },
                   icon: Icons.edit_outlined,
                 )
@@ -3907,8 +4108,7 @@ class WorkVerificationStatusScreen extends StatelessWidget {
               ? WorkPrimaryButton(
                   keyName: 'work-suspended-support',
                   label: 'Open support Chat',
-                  onPressed: () =>
-                      context.go('/app/chat/inbox?return=/app/work/status'),
+                  onPressed: () { if (preparedScope?.current() == false) return; const route = '/app/chat/inbox?return=/app/work/status'; if (onNativeRoute != null) onNativeRoute!(route); else context.go(route); },
                   icon: Icons.support_agent_rounded,
                 )
               : WorkPrimaryButton(
@@ -3916,8 +4116,9 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                   label: 'Check review update',
                   busy: session.busy,
                   onPressed: () async {
-                    final ready = await session.checkReview();
-                    if (ready && context.mounted) {
+                    if (preparedScope?.current() == false) return;
+                    final ready = await session.checkReview(ownerCurrent: preparedScope?.storageCurrent, inputCurrent: preparedScope?.current, storageCurrent: preparedScope?.storageCurrent, onKnownChange: preparedScope?.acceptNativeChange);
+                    if (ready && context.mounted && preparedScope == null) {
                       context.go('/app/work/workspace/dashboard');
                     }
                   },
@@ -4006,7 +4207,7 @@ class WorkVerificationStatusScreen extends StatelessWidget {
               const SizedBox(height: MoolSpacing.md),
               const _StatusSteps(),
               const SizedBox(height: MoolSpacing.md),
-              if (!approved && !rejected && !suspended)
+              if (preparedScope == null && !approved && !rejected && !suspended)
                 WorkCard(
                   color: const Color(0xFFFFF4E5),
                   child: Column(
@@ -4829,4 +5030,143 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
       );
     },
   );
+}
+
+class WorkspaceSetupNativeCoordinator extends ChangeNotifier {
+  bool open = false, alive = true;
+  @override void dispose() { alive = false; notifyListeners(); super.dispose(); }
+}
+List<MoolAssistantNativeAdapter> workspaceSetupNativeAdapters({
+  required WorkSession session, required NavigatorState navigator, required WorkspaceSetupNativeCoordinator coordinator,
+  required MoolAssistantContext Function() currentContext, required Object? Function() accountIdentity,
+  required bool Function() accountAuthenticated, required bool Function() nativeAccountCurrent,
+  required bool Function() isRootCurrent, required bool Function() isNavigationCurrent, required bool Function() approvedWorkspacesCurrent, required Listenable changes, required ValueChanged<String> onNativeRoute,
+}) => [for (final id in const ['AI-ACT-187', 'AI-ACT-188', 'AI-ACT-189', 'AI-ACT-190', 'AI-ACT-191', 'AI-ACT-192', 'AI-ACT-193', 'AI-ACT-194', 'AI-ACT-195'])
+  _WorkspaceSetupAdapter(actionId: id, session: session, navigator: navigator, coordinator: coordinator,
+    readContext: currentContext, accountIdentity: accountIdentity, accountAuthenticated: accountAuthenticated,
+    nativeAccountCurrent: nativeAccountCurrent, isRootCurrent: isRootCurrent, isNavigationCurrent: isNavigationCurrent, approvedWorkspacesCurrent: approvedWorkspacesCurrent, changes: changes, onNativeRoute: onNativeRoute)];
+class _WorkspaceSetupAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  const _WorkspaceSetupAdapter({required this.actionId, required this.session, required this.navigator,
+    required this.coordinator, required this.readContext, required this.accountIdentity,
+    required this.accountAuthenticated, required this.nativeAccountCurrent, required this.isRootCurrent, required this.isNavigationCurrent, required this.approvedWorkspacesCurrent,
+    required this.changes, required this.onNativeRoute});
+  @override final String actionId;
+  final WorkSession session;
+  final NavigatorState navigator;
+  final WorkspaceSetupNativeCoordinator coordinator;
+  final MoolAssistantContext Function() readContext;
+  final Object? Function() accountIdentity;
+  final bool Function() accountAuthenticated, nativeAccountCurrent, isRootCurrent, isNavigationCurrent, approvedWorkspacesCurrent;
+  final Listenable changes;
+  final ValueChanged<String> onNativeRoute;
+  @override Set<String> get allowedFields => WorkspaceSetupInitialData.keys(actionId);
+  @override String? validateFields(Map<String, Object?> fields) {
+    try { WorkspaceSetupInitialData.fromFields(actionId, fields); return null; }
+    on FormatException catch (error) { return error.message; }
+  }
+  bool get _permitted => coordinator.alive && navigator.mounted && isRootCurrent() && isNavigationCurrent() &&
+    accountAuthenticated() && accountIdentity() != null && nativeAccountCurrent() &&
+    readContext().signedIn && !readContext().inWorkspace &&
+    session.workspaceAccountCurrent(accountReady: true) && !session.workspaceAccountRecoveryPending && !session.workspaceAccountRecoveryFailed;
+  String get _source => session.workspaceApplicationSource;
+  String get _revision => 'workspace-application:${crypto.sha256.convert(utf8.encode(_source))}';
+  List<WorkWorkspace> get _workspaces => !approvedWorkspacesCurrent() ? const [] : [if (session.activeWorkspace != null) session.activeWorkspace!, ...session.otherWorkspaces]
+    .where((value) => value.verified && session.workspaceApplicationIsStoreProfile(value.profileId)).toList(growable: false);
+  List<WorkWorkspaceApplicationRow> get _applications => session.savedWorkspaceApplications.where((value) =>
+    session.workspaceApplicationIsStoreProfile(session.workspaceApplicationProfileId(value.id))).toList(growable: false);
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context, String? entityId) async {
+    if (!_permitted || context.binding != readContext().binding) return null;
+    if (actionId == 'AI-ACT-188' && (entityId == null || !_applications.any((value) => value.id == entityId))) return null;
+    if (actionId == 'AI-ACT-195' && (entityId == null || !session.initialWorkspaceStateLoaded || !_workspaces.any((value) => value.id == entityId))) return null;
+    if (const {'AI-ACT-190', 'AI-ACT-191', 'AI-ACT-192', 'AI-ACT-193', 'AI-ACT-194'}.contains(actionId) &&
+        (!session.workspaceApplicationIsStoreProfile(session.selectedProfile?.id) || session.workspaceApplicationId == null)) return null;
+    if (const {'AI-ACT-193', 'AI-ACT-194'}.contains(actionId) && (session.reviewCaseId == null || entityId != null && entityId != session.reviewCaseId)) return null;
+    if (actionId == 'AI-ACT-194' && (session.reviewStatusNeedsRefresh || session.reviewReason?.trim().isNotEmpty != true)) return null;
+    if (actionId == 'AI-ACT-189' && session.reviewCaseId != null && !session.hasVerifiedWorkspace && !session.workspaceApplicationIsStoreProfile(session.selectedProfile?.id)) return null;
+    if (const {'AI-ACT-190', 'AI-ACT-191'}.contains(actionId) && (session.reviewStatusNeedsRefresh || session.reviewCaseId != null && !session.reviewCorrectionDraft)) return null;
+    if (workspaceApplicationHasOpenDirtyEditor(session)) return null;
+    return MoolAssistantNativeSnapshot(binding: context.binding, sourceRevision: _revision, permitted: true, entityId: entityId);
+  }
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) => _open(proposal, isCurrent, null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,
+    {required bool Function() isCurrent, required Listenable ownerChanges}) => _open(proposal, isCurrent, ownerChanges);
+  Future<MoolAssistantReviewResult> _open(MoolAssistantProposal proposal, bool Function() requestCurrent, Listenable? ownerChanges) async {
+    if (!_permitted || coordinator.open || !requestCurrent() || proposal.actionId != actionId || validateFields(proposal.fields) != null) return MoolAssistantReviewResult.unavailable;
+    final context = readContext(), principal = accountIdentity(), nativeAccount = session.workspaceApplicationAccountScope;
+    final native = await snapshot(context, proposal.entityId);
+    if (!requestCurrent() || native == null || native.sourceRevision != proposal.sourceRevision || native.binding != proposal.binding) return MoolAssistantReviewResult.stale;
+    final initial = WorkspaceSetupInitialData.fromFields(actionId, proposal.fields), fields = initial.fields;
+    for (final key in const ['applicationId', 'workspaceId', 'caseId']) {
+      if (fields[key] != null && proposal.entityId != null && fields[key] != proposal.entityId) return MoolAssistantReviewResult.unavailable;
+    }
+    String? exact(String key) {
+      final value = fields[key] as String?;
+      return value ?? proposal.entityId;
+    }
+    final application = actionId == 'AI-ACT-188' ? exact('applicationId') : session.workspaceApplicationId;
+    final workspace = actionId == 'AI-ACT-195' ? exact('workspaceId') : null;
+    if (actionId == 'AI-ACT-188' && !_applications.any((value) => value.id == application) ||
+        actionId == 'AI-ACT-195' && !_workspaces.any((value) => value.id == workspace)) return MoolAssistantReviewResult.unavailable;
+    if (const {'AI-ACT-193', 'AI-ACT-194'}.contains(actionId) && (exact('caseId') ?? session.reviewCaseId) != session.reviewCaseId) return MoolAssistantReviewResult.unavailable;
+    if (fields['profileId'] != null && !session.storeWorkspaceApplicationProfiles.any((value) => value.id == fields['profileId'])) return MoolAssistantReviewResult.unavailable;
+    if (actionId == 'AI-ACT-189' && session.reviewCaseId != null && !session.hasVerifiedWorkspace && fields['profileId'] != null && fields['profileId'] != session.selectedProfile?.id) return MoolAssistantReviewResult.unavailable;
+    if (fields['proofId'] != null && !session.selectedWorkspaceDocuments.any((value) => value.id == fields['proofId'])) return MoolAssistantReviewResult.unavailable;
+    bool actorCurrent() => coordinator.alive && navigator.mounted && isRootCurrent() && accountAuthenticated() &&
+      identical(accountIdentity(), principal) && nativeAccountCurrent() && session.workspaceApplicationAccountScope == nativeAccount &&
+      readContext().binding == context.binding;
+    bool storageCurrent() => actorCurrent() && session.workspaceApplicationId == application;
+    final scope = WorkspaceSetupReviewScope(ownerCurrent: () => actorCurrent() && isNavigationCurrent() && requestCurrent(), storageCurrent: storageCurrent, storageOwnerCurrent: actorCurrent,
+      readSource: () => _source, readStorageIdentity: () => session.workspaceApplicationStorageIdentity, changes: Listenable.merge([changes, coordinator, ownerChanges]),
+      ownerKey: (session, principal, context.binding, native.sourceRevision, proposal.id, proposal.requestRevision, proposal.entitlementRevision));
+    var transferred = false;
+    final needsNewApplication = session.hasVerifiedWorkspace &&
+      (session.reviewStage != WorkReviewStage.drafting || session.reviewCaseId != null);
+    final choosingProfile = ValueNotifier<bool>(actionId == 'AI-ACT-189' && !needsNewApplication);
+    coordinator.open = true;
+    try {
+      await navigator.push<void>(MaterialPageRoute<void>(builder: (routeContext) => ValueListenableBuilder<bool>(valueListenable: choosingProfile, builder: (routeContext, chooseProfile, _) {
+        bool routeCurrent() => routeContext.mounted && ModalRoute.of(routeContext)?.isCurrent == true;
+        void close() { if (!routeCurrent()) return; Navigator.pop(routeContext); }
+        void nativeRoute(String route) {
+          if (!scope.current() || !routeCurrent()) return;
+          transferred = true; close(); onNativeRoute(route);
+        }
+        if (chooseProfile) return WorkChooseActivityScreen(session: session, preparedScope: scope,
+          permittedProfiles: Set.unmodifiable(session.reviewCaseId != null && !session.hasVerifiedWorkspace ? {session.selectedProfile!.id} : session.storeWorkspaceApplicationProfiles.map((value) => value.id).toSet()),
+          requestedProfile: fields['profileId'] as String?, onPreparedClose: close, onNativeRoute: nativeRoute);
+        if (const {'AI-ACT-187', 'AI-ACT-188', 'AI-ACT-189', 'AI-ACT-195'}.contains(actionId)) {
+          final rows = actionId == 'AI-ACT-189' ? <WorkWorkspaceApplicationRow>[] : actionId == 'AI-ACT-188' ? _applications.where((value) => value.id == application).toList() : actionId == 'AI-ACT-195' ? <WorkWorkspaceApplicationRow>[] : _applications;
+          final stores = actionId == 'AI-ACT-189' ? <WorkWorkspace>[] : actionId == 'AI-ACT-195' ? _workspaces.where((value) => value.id == workspace).toList() : actionId == 'AI-ACT-188' ? <WorkWorkspace>[] : _workspaces;
+          return Scaffold(appBar: AppBar(title: const Text('Workspaces'), automaticallyImplyLeading: false,
+            actions: [IconButton(tooltip: 'Close Workspaces', onPressed: close, icon: const Icon(Icons.close))]),
+            body: WorkspaceSetupReviewFrame(scope: scope, child: (actionId == 'AI-ACT-189' || session.initialWorkspaceStateLoaded || rows.isNotEmpty || stores.isNotEmpty)
+              ? WorkWorkspaceApplicationChooserBody(choices: stores, applications: rows, currentId: session.activeWorkspace?.id,
+                  showSocialHint: false, allowCurrentOpen: true,
+                  onRequest: const {'AI-ACT-187', 'AI-ACT-189'}.contains(actionId) ? () {
+                    if (!scope.current()) return;
+                    if (session.startAnotherWork(current: scope.current, storageCurrent: scope.storageOwnerCurrent, onKnownChange: scope.acceptNativeChange)) choosingProfile.value = true;
+                  } : null,
+                  onWorkspace: (selected) async {
+                    if (!scope.current() || !_workspaces.any((value) => identical(value, selected))) return;
+                    if (selected.id != session.activeWorkspace?.id) session.activateWorkspace(selected, current: scope.current,
+                      storageCurrent: () => actorCurrent() && session.activeWorkspace?.id == selected.id, onKnownChange: scope.acceptNativeChange);
+                    if (scope.current() && session.activeWorkspace?.id == selected.id) nativeRoute('/app/work/workspace/dashboard');
+                  },
+                  onApplication: (selected) async {
+                    if (!scope.current() || !_applications.any((value) => value.id == selected.id)) return;
+                    final resumed = session.resumeWorkspaceApplication(selected.id, current: scope.current,
+                      storageCurrent: () => actorCurrent() && session.workspaceApplicationId == selected.id, onKnownChange: scope.acceptNativeChange);
+                    if (resumed && scope.current()) nativeRoute(session.workspaceApplicationRoute);
+                  })
+              : const Center(child: Text('Your original Workspace records are not loaded. Open Workspaces in the app to load them, then reopen this task.'))));
+        }
+        if (actionId == 'AI-ACT-193') return WorkVerificationStatusScreen(session: session, preparedScope: scope,
+          onPreparedClose: close, onNativeRoute: nativeRoute);
+        return WorkProfileProofScreen(session: session, preparedScope: scope, initialData: initial,
+          initialStep: switch (actionId) { 'AI-ACT-191' => 1, 'AI-ACT-192' => session.reviewCaseId != null && !session.reviewCorrectionDraft ? 3 : 2, 'AI-ACT-194' => 3, _ => 0 },
+          onPreparedClose: close, onNativeRoute: nativeRoute);
+      })));
+      return transferred || scope.current() ? MoolAssistantReviewResult.returnToOwner : MoolAssistantReviewResult.stale;
+    } finally { scope.dispose(); choosingProfile.dispose(); coordinator.open = false; }
+  }
 }

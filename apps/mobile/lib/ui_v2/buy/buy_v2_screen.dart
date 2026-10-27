@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -15,6 +16,7 @@ import '../../core/design/mool_design_system.dart';
 import '../../core/design/mool_motion_primitives.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
+import '../../features/assistant/mool_assistant.dart';
 import '../../features/buy/buy_v2_session.dart';
 import '../../features/journey01/journey_services.dart';
 import '../../features/work/work_order_identity_gateway.dart';
@@ -300,6 +302,7 @@ class BuyV2Screen extends StatefulWidget {
     this.initialDestination = BuyV2Destination.shop,
     this.initialOffersActive = false,
     this.initialView = BuyV2View.catalogue,
+    this.searchReviewDraft,
     this.initialCartScope = BuyV2CartScope.all,
     this.productId,
     this.orderId,
@@ -332,6 +335,7 @@ class BuyV2Screen extends StatefulWidget {
   final BuyV2Destination initialDestination;
   final bool initialOffersActive;
   final BuyV2View initialView;
+  final BuySearchReviewDraft? searchReviewDraft;
   final BuyV2CartScope initialCartScope;
   final String? productId;
   final String? orderId;
@@ -380,6 +384,12 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   int _quickTrackerNavigationSequence = 0;
   bool _searchOpen = false;
   bool _searchAutofocus = true;
+  BuySearchReviewDraft? _searchReviewDraft;
+  Route<dynamic>? _searchReviewRoute;
+  bool _searchReviewDraftDirty = false;
+  bool _searchReviewDraftAccepted = false;
+  String? _searchReviewSubmittedValue;
+  Timer? _searchReviewExpiryTimer;
   // The pager retains its data and offsets; this retains the return surface.
   ({
     BuyV2Destination destination,
@@ -433,16 +443,74 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       _storeBrowseAnchors.isEmpty ? null : _storeBrowseAnchors.values.last;
   BuyV2NavigationMotionDirection _surfaceMotionDirection =
       BuyV2NavigationMotionDirection.replace;
+  BuyShop04NativeOwner? _shop04NativeOwner;
+  bool _shop04OwnerVisible() {
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true ||
+        !TickerMode.valuesOf(context).enabled || _searchOpen ||
+        _searchReviewDraft != null || widget.embeddedStore) return false;
+    var hidden = false;
+    context.visitAncestorElements((element) {
+      if (element.widget case Offstage(offstage: true)) hidden = true;
+      return !hidden;
+    });
+    return !hidden;
+  }
+  void _bindShop04NativeOwner() {
+    if (!mounted || _shop04NativeOwner != null) return;
+    final nativeNavigator = Navigator.maybeOf(context);
+    final rootNavigator = Navigator.maybeOf(context, rootNavigator: true);
+    final nativeRoute = ModalRoute.of(context);
+    // This bridge captures the existing root Buy owner only. A nested/foreign
+    // navigator needs its own admitted original owner; never infer that grant.
+    if (nativeNavigator == null || nativeRoute == null ||
+        !identical(nativeNavigator, rootNavigator)) return;
+    final session = widget.session;
+    final identity = widget.accountIdentity;
+    final authenticated = widget.accountAuthenticated;
+    final invoice = _gstInvoiceController;
+    final owner = BuyShop04NativeOwner(
+      session: session, navigator: nativeNavigator, route: nativeRoute,
+      invoiceController: invoice,
+      paymentHandoff: widget.resolvedPaymentHandoff,
+      invoiceDownloader: widget.invoiceDownloader,collectionCameraBuilder:widget.collectionCameraBuilder,
+      current: () => mounted && identical(widget.session, session) &&
+          widget.accountIdentity == identity &&
+          widget.accountAuthenticated == authenticated &&
+          identical(_gstInvoiceController, invoice) && !widget.embeddedStore,
+      admitted: _shop04OwnerVisible,
+    );
+    _shop04NativeOwner = owner;
+    bindBuyShop04NativeOwner(owner);
+  }
+  void _retireShop04NativeOwner() {
+    _shop04NativeOwner?.retire();
+    _shop04NativeOwner = null;
+  }
+
   late BuyV2GstInvoiceController _gstInvoiceController;
   int _gstProfileRevision = 0;
   late BuyV2Destination _lastSearchDestination;
-  late final TextEditingController _searchController = TextEditingController(
-    text: widget.session.query,
-  );
+  late final TextEditingController _searchController;
 
   @override
   void initState() {
     super.initState();
+    final candidate = widget.searchReviewDraft;
+    if (candidate != null && candidate.claim()) {
+      _searchReviewDraft = candidate;
+      _searchReviewDraftAccepted = candidate.initiallyAccepted;
+      _searchOpen = true;
+      _searchAutofocus = false;
+      candidate.scopeOwner.addListener(_searchReviewOwnerChanged);
+      final remaining = candidate.validUntil.difference(DateTime.now());
+      _searchReviewExpiryTimer = Timer(
+        remaining.isNegative ? Duration.zero : remaining,
+        _expireSearchReviewDraft,
+      );
+    }
+    _searchController = TextEditingController(
+      text: _searchReviewDraft?.query ?? widget.session.query,
+    );
     // Render the requested Offers surface on the first frame. Deferred session
     // restoration may not notify when its catalogue state is already current.
     _offersActive = widget.initialOffersActive;
@@ -486,6 +554,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _bindShop04NativeOwner();
+    _searchReviewRoute ??= ModalRoute.of(context);
     final isCurrent = ModalRoute.of(context)?.isCurrent ?? true;
     final pending = _storeQuestionReturn;
     if (pending == null) return;
@@ -506,6 +576,16 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   @override
   void didUpdateWidget(covariant BuyV2Screen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session ||
+        oldWidget.accountIdentity != widget.accountIdentity ||
+        oldWidget.accountAuthenticated != widget.accountAuthenticated ||
+        oldWidget.embeddedStore != widget.embeddedStore ||
+        oldWidget.paymentHandoff != widget.paymentHandoff ||
+        oldWidget.invoiceDownloader != widget.invoiceDownloader ||
+        oldWidget.session.gstInvoiceProfileStore != widget.session.gstInvoiceProfileStore) {
+      // Retire before the original invoice controller can be disposed.
+      _retireShop04NativeOwner();
+    }
     if (oldWidget.session != widget.session ||
         oldWidget.accountIdentity != widget.accountIdentity ||
         oldWidget.accountAuthenticated != widget.accountAuthenticated) {
@@ -532,6 +612,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       _quickTrackerMinimized = true;
     }
     if (oldWidget.session != widget.session) {
+      _retireSearchReviewDraft(clearInput: true);
       _searchProductReturn = null;
       _storeQuestionReturn = null;
       _storeQuestionWasCovered = false;
@@ -562,6 +643,81 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         oldWidget.recoveryKind != widget.recoveryKind) {
       _applyInitialState();
     }
+    _bindShop04NativeOwner();
+  }
+
+
+
+  void _setSearchOpen(bool value) {
+    if (!value && _searchReviewDraft != null &&
+        !_searchReviewDraftDirty && !_searchReviewDraftAccepted) {
+      _retireSearchReviewDraft(clearInput: true);
+    }
+    setState(() {
+      _searchOpen = value;
+      _searchAutofocus = value;
+    });
+  }
+
+  void _updateSearchFromUser(String value) {
+    if (_searchReviewDraft != null) {
+      _searchReviewDraftDirty = true;
+      _searchReviewDraftAccepted = false;
+      _searchReviewSubmittedValue = null;
+    }
+    widget.session.updateQuery(value);
+  }
+
+  bool _submitSearchFromUser(String value) {
+    final draft = _searchReviewDraft;
+    final normalized = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (draft != null &&
+        _searchReviewDraftAccepted &&
+        _searchReviewSubmittedValue == normalized &&
+        widget.session.query == normalized) {
+      return true;
+    }
+    if (draft != null) _searchReviewDraftAccepted = true;
+    final accepted = widget.session.submitSearch(value);
+    if (draft != null) {
+      _searchReviewDraftAccepted = accepted;
+      _searchReviewSubmittedValue = accepted ? normalized : null;
+    }
+    return accepted;
+  }
+
+  void _searchReviewOwnerChanged() {
+    final draft = _searchReviewDraft;
+    if (draft == null || draft.isOwnerCurrent()) return;
+    _retireSearchReviewDraft(clearInput: true);
+    final route = _searchReviewRoute;
+    if (route != null && route.isActive) {
+      Navigator.of(context, rootNavigator: true).removeRoute(route);
+    }
+  }
+
+  void _expireSearchReviewDraft() {
+    if (!mounted || _searchReviewDraft == null) return;
+    if (!_searchReviewDraftDirty && !_searchReviewDraftAccepted) {
+      _retireSearchReviewDraft(clearInput: true);
+      setState(() {});
+    }
+  }
+
+  void _retireSearchReviewDraft({required bool clearInput}) {
+    final draft = _searchReviewDraft;
+    if (draft == null) return;
+    _searchReviewDraft = null;
+    draft.scopeOwner.removeListener(_searchReviewOwnerChanged);
+    _searchReviewExpiryTimer?.cancel();
+    _searchReviewExpiryTimer = null;
+    _searchReviewDraftDirty = false;
+    _searchReviewDraftAccepted = false;
+    _searchReviewSubmittedValue = null;
+    if (clearInput) {
+      _searchController.clear();
+      _searchOpen = false;
+    }
   }
 
   bool get _hasExplicitBuyRoute =>
@@ -571,6 +727,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       widget.initialView != BuyV2View.catalogue;
 
   Future<void> _restoreSessionState() async {
+    if (widget.searchReviewDraft != null) return;
     final session = widget.session;
     final gstController = _gstInvoiceController;
     bool current() =>
@@ -605,6 +762,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   void _applyInitialState({bool afterRestore = false}) {
+    if (widget.searchReviewDraft != null) return;
     _searchProductReturn = null;
     if (widget.session.isStoreProcurement &&
         _hasExplicitBuyRoute &&
@@ -891,7 +1049,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         _searchAutofocus = false;
       }
     }
-    if (_searchController.text != widget.session.query) {
+    if (_searchController.text != widget.session.query &&
+        !(_searchReviewDraft != null &&
+            (_searchReviewDraftDirty ||
+                _searchReviewDraftAccepted ||
+                _searchReviewDraft!.isCurrent()))) {
       _searchController.value = TextEditingValue(
         text: widget.session.query,
         selection: TextSelection.collapsed(offset: widget.session.query.length),
@@ -938,21 +1100,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         opened.selectedProductId == productId && opened.procurementScopeCurrent;
     _financeSheetOpen = true;
     try {
-      await showMoolBusinessFinanceSheet(context,
+      await showBuyV2PurchaseFinanceSheet(context, opened,
         scopeOwner: Listenable.merge([opened, _financeOwner,
           ?opened.collectionIdentity, ?opened.procurementIdentity]),
         isCurrent: current,
         storeName: opened.isStoreProcurement ? widget.financeStoreName ?? 'Your Store' : null,
         contactName: ownContact?.displayName,
         callbackNumber: ownContact?.phoneNumber,
-        origin: view == BuyV2View.product ? 'product' : 'cart',
-        buyingStoreId: procurement?.storeId,
-        productIds: view == BuyV2View.product && productId != null ? [productId]
-          : opened.cartLines.where((line) => line.product.destination == BuyV2Destination.wholesale)
-            .map((line) => line.product.id).toSet().toList(growable: false),
-        purchaseLabel: view == BuyV2View.product && opened.selectedProduct != null
-          ? '${opened.selectedProduct!.customerTitle} · ${opened.selectedProduct!.pack}'
-          : 'Wholesale / Bulk Cart',
       );
     } finally {
       _financeSheetOpen = false;
@@ -1249,6 +1403,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _retireShop04NativeOwner();
     WidgetsBinding.instance.removeObserver(this);
     _financeOwner.value++;
     _financeOwner.dispose();
@@ -1257,6 +1412,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     _cartAcknowledgementTimer?.cancel();
     _quickTrackerCollapseTimer?.cancel();
     widget.session.removeListener(_sessionChanged);
+    _retireSearchReviewDraft(clearInput: false);
+    _searchReviewExpiryTimer?.cancel();
     _searchController.dispose();
     _rootProductScrollController.dispose();
     _parkedCartNavigationScrollController.dispose();
@@ -1317,7 +1474,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
               unawaited(_moolNavigationController.close());
             } else if (_searchOpen) {
               FocusScope.of(context).unfocus();
-              setState(() => _searchOpen = false);
+              _setSearchOpen(false);
             } else if (session.canHandleBack) {
               if (_offersActive &&
                   session.productReturnsToCatalogue &&
@@ -1388,10 +1545,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                 controller: _searchController,
                                 open: _searchOpen,
                                 autofocus: _searchAutofocus,
-                                onOpenChanged: (value) => setState(() {
-                                  _searchOpen = value;
-                                  _searchAutofocus = value;
-                                }),
+                                onOpenChanged: _setSearchOpen,
+                                onQueryChanged: _updateSearchFromUser,
+                                onSubmitQuery: _submitSearchFromUser,
                                 onLocation: () =>
                                     (session.isStoreProcurement &&
                                         session.procurementContext?.purpose !=
@@ -3612,11 +3768,525 @@ class _BuyNavigationSurfaceOwnerState
   }
 }
 
+
+/// Native form revision for AI-ACT-001; not an inventory snapshot.
+const String buySearchNativeFormRevision = 'buy_v2_screen.search.v1';
+
+/// Additional Buyer-only original-form adapters. Store scopes preserve their
+/// existing inherited registrations; no Workspace capability is granted here.
+Iterable<MoolAssistantNativeAdapter> buyShopFormNativeAdapters({
+  required BuyV2Session session, required NavigatorState navigator,
+  required MoolAssistantContext Function() currentContext,
+  required bool Function() isRootCurrent, required Listenable scopeOwner,
+  required AuthenticatedAccountIdentity? Function() accountIdentity,
+  required bool Function() accountAuthenticated,
+}) {
+  if (!isRootCurrent() || !currentContext().signedIn || currentContext().inWorkspace) return const [];
+  return [for (final id in const ['AI-ACT-025', 'AI-ACT-026', 'AI-ACT-340', 'AI-ACT-341'])
+    BuyShopFormNativeAdapter(actionId: id, session: session, navigator: navigator,
+      currentContext: currentContext, isRootCurrent: isRootCurrent,
+      scopeOwner: scopeOwner, accountIdentity: accountIdentity,
+      accountAuthenticated: accountAuthenticated)];
+}
+
+class BuyShopFormNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  BuyShopFormNativeAdapter({required this.actionId, required this.session,
+    required this.navigator, required this.currentContext, required this.isRootCurrent,
+    required this.scopeOwner, required this.accountIdentity, required this.accountAuthenticated});
+  @override final String actionId;
+  final BuyV2Session session;
+  final NavigatorState navigator;
+  final MoolAssistantContext Function() currentContext;
+  final bool Function() isRootCurrent;
+  final Listenable scopeOwner;
+  final AuthenticatedAccountIdentity? Function() accountIdentity;
+  final bool Function() accountAuthenticated;
+  Object? _binding, _ownerAtSnapshot;
+  String? _entityAtSnapshot;
+  List<BuyV2Address> _addressesAtSnapshot = const [];
+  int _version = 0;
+  bool get _finance => actionId == 'AI-ACT-340';
+  bool get _editing => actionId == 'AI-ACT-026';
+  bool get _request => actionId == 'AI-ACT-341';
+  Object get _owner => (session.customerStateStore?.ownerScope,
+    session.collectionIdentity?.value?.accountId, session.collectionIdentity?.value?.sessionId,
+    session.procurementContext?.customerStateOwnerScope,
+    session.navigationMotionSequence, session.destination, session.view,
+    session.selectedAddressId, _finance ? buyV2PurchaseFinanceContextKey(session) : null);
+  bool _actorCurrent(Object binding) => navigator.mounted && isRootCurrent() &&
+    accountAuthenticated() && accountIdentity()?.firebasePrincipal != null &&
+    currentContext().signedIn && !currentContext().inWorkspace &&
+    currentContext().binding == binding && !session.isStoreProcurement && session.procurementScopeCurrent &&
+    !session.customerStateRecoveryPending;
+  bool _sameInput(Object binding, String? entity) => _actorCurrent(binding) &&
+    _binding == binding && _entityAtSnapshot == entity && _ownerAtSnapshot == _owner &&
+    !session.cartChangesBlocked &&
+    (_finance || listEquals(session.addresses, _addressesAtSnapshot));
+  BuyV2Address? _address(String? id) => session.addresses.where((value) => value.id == id).singleOrNull;
+  String get _revision => '${_finance ? moolBusinessFinanceFormRevision : _request ? 'buy-address-request-form-v1' : 'buy-address-form-v1'}:$actionId:$_version';
+  @override Set<String> get allowedFields => _finance
+      ? MoolBusinessFinancePrefill.allowedFields : _request
+        ? BuyV2AddressRequestInitialData.allowedFields : BuyV2AddressInitialData.allowedFields;
+  @override String? validateFields(Map<String, Object?> fields) {
+    try {
+      if (_finance) { MoolBusinessFinancePrefill.fromFields(fields); }
+      else if (_request) { BuyV2AddressRequestInitialData.fromFields(fields); }
+      else {
+        final initial = BuyV2AddressInitialData.fromFields(fields);
+        if (!_editing && !initial.hasSuppliedValue) return 'Add an address detail to review.';
+      }
+      return null;
+    } on FormatException catch (error) { return error.message; }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(
+    MoolAssistantContext context, String? entityId,
+  ) async {
+    if (!const {'AI-ACT-025', 'AI-ACT-026', 'AI-ACT-340', 'AI-ACT-341'}.contains(actionId) ||
+        !_actorCurrent(context.binding) || session.cartChangesBlocked ||
+        (_editing ? entityId == null || _address(entityId) == null : entityId != null) ||
+        (_finance ? !buyV2PurchaseFinanceAvailable(session) || buyV2PurchaseFinanceFormOpen(session)
+            : buyV2AddressFormOpen(session) || buyV2AddressRequestFormOpen(session))) return null;
+    if (!_sameInput(context.binding, entityId)) {
+      _binding = context.binding; _ownerAtSnapshot = _owner; _entityAtSnapshot = entityId;
+      _addressesAtSnapshot = List.of(session.addresses); _version++;
+    }
+    return MoolAssistantNativeSnapshot(binding: context.binding,
+      sourceRevision: _revision, entityId: entityId, permitted: true);
+  }
+  @override Future<MoolAssistantReviewResult> openReview(
+    MoolAssistantProposal proposal, bool Function() isCurrent,
+  ) => openOwnedReview(proposal,isCurrent:isCurrent,ownerChanges:scopeOwner);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(
+    MoolAssistantProposal proposal,
+    {required bool Function() isCurrent,required Listenable ownerChanges}
+  ) async {
+    if (!isCurrent() || proposal.actionId != actionId || validateFields(proposal.fields) != null ||
+        proposal.sourceRevision != _revision || !_sameInput(proposal.binding, proposal.entityId) ||
+        (_finance ? !buyV2PurchaseFinanceAvailable(session) || buyV2PurchaseFinanceFormOpen(session)
+            : buyV2AddressFormOpen(session) || buyV2AddressRequestFormOpen(session))) return MoolAssistantReviewResult.stale;
+    final existing = _editing ? _address(proposal.entityId) : null;
+    if (_editing && existing == null) return MoolAssistantReviewResult.unavailable;
+    bool current() => isCurrent() && _sameInput(proposal.binding, proposal.entityId);
+    final owner = Listenable.merge([if(!identical(ownerChanges,scopeOwner))ownerChanges, scopeOwner, session, ?session.collectionIdentity, ?session.procurementIdentity]);
+    if (_finance) {
+      final identity = accountIdentity();
+      await showBuyV2PurchaseFinanceSheet(navigator.context, session,
+        scopeOwner: owner, isCurrent: current,
+        contactName: identity?.displayName, callbackNumber: identity?.phoneNumber,
+        prefill: MoolBusinessFinancePrefill.fromFields(proposal.fields));
+    } else if (_request) {
+      await showBuyV2AddressRequestInitialReview(navigator.context, session,
+        initialData: BuyV2AddressRequestInitialData.fromFields(proposal.fields),
+        scopeOwner: owner, isCurrent: current);
+    } else {
+      await showBuyV2AddressInitialReview(navigator.context, session,
+        initialData: BuyV2AddressInitialData.fromFields(proposal.fields),
+        existingAddress: existing, scopeOwner: owner, isCurrent: current);
+    }
+    // An explicit native Save may legitimately change addresses/selected ID.
+    // Only actor/root ownership is checked after the native form has completed.
+    return isCurrent() && _actorCurrent(proposal.binding)
+        ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+  }
+}
+
+/// Opens the original BuyV2Screen search field without changing Buy state.
+class BuySearchNativeAdapter implements MoolAssistantNativeAdapter {
+  BuySearchNativeAdapter({
+    required this.session,
+    required this.navigator,
+    required this.currentContext,
+    required this.isRootCurrent,
+    required this.scopeOwner,
+    required this.accountIdentity,
+    required this.accountAuthenticated,
+  });
+
+  final BuyV2Session session;
+  final NavigatorState navigator;
+  final MoolAssistantContext Function() currentContext;
+  final bool Function() isRootCurrent;
+  final Listenable scopeOwner;
+  final AuthenticatedAccountIdentity? Function() accountIdentity;
+  final bool Function() accountAuthenticated;
+  String? _queryAtSnapshot;
+  BuyV2Destination? _destinationAtSnapshot;
+  String? _saleTypeAtSnapshot;
+
+  String _sourceRevision(BuyV2Destination destination, String saleType) =>
+      '$buySearchNativeFormRevision|${destination.name}|$saleType';
+
+  @override
+  String get actionId => 'AI-ACT-001';
+
+  @override
+  Set<String> get allowedFields => const {'query'};
+
+  @override
+  String? validateFields(Map<String, Object?> fields) {
+    if (fields.length != 1 || fields['query'] is! String) {
+      return 'Enter a product search.';
+    }
+    final query = (fields['query'] as String)
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ');
+    return query.length < 2 || query.length > 80
+        ? 'Use 2 to 80 characters.'
+        : null;
+  }
+
+  @override
+  Future<MoolAssistantNativeSnapshot?> snapshot(
+    MoolAssistantContext context,
+    String? entityId,
+  ) async {
+    if (entityId != null || !context.signedIn || context.inWorkspace ||
+        context.binding != currentContext().binding || !isRootCurrent() ||
+        !session.procurementScopeCurrent ||
+        session.view != BuyV2View.catalogue ||
+        (session.destination != BuyV2Destination.shop &&
+            session.destination != BuyV2Destination.wholesale)) return null;
+    _queryAtSnapshot = session.query;
+    _destinationAtSnapshot = session.destination;
+    _saleTypeAtSnapshot = session.saleTypeSignature;
+    return MoolAssistantNativeSnapshot(
+      binding: context.binding,
+      sourceRevision: _sourceRevision(
+        _destinationAtSnapshot!,
+        _saleTypeAtSnapshot!,
+      ),
+      permitted: true,
+    );
+  }
+
+  @override
+  Future<MoolAssistantReviewResult> openReview(
+    MoolAssistantProposal proposal,
+    bool Function() isCurrent,
+  ) async {
+    if (!isCurrent() || !navigator.mounted || !isRootCurrent() ||
+        proposal.entityId != null ||
+        _destinationAtSnapshot == null ||
+        _saleTypeAtSnapshot == null ||
+        proposal.sourceRevision != _sourceRevision(
+          _destinationAtSnapshot!,
+          _saleTypeAtSnapshot!,
+        ) ||
+        session.destination != _destinationAtSnapshot ||
+        session.saleTypeSignature != _saleTypeAtSnapshot ||
+        session.view != BuyV2View.catalogue ||
+        proposal.binding != currentContext().binding ||
+        currentContext().inWorkspace || !session.procurementScopeCurrent ||
+        _queryAtSnapshot == null || session.query != _queryAtSnapshot ||
+        validateFields(proposal.fields) != null) {
+      return MoolAssistantReviewResult.stale;
+    }
+    final query = (proposal.fields['query'] as String)
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ');
+    final existing = _queryAtSnapshot!.trim();
+    if (existing.isNotEmpty && existing != query) {
+      return MoolAssistantReviewResult.stale;
+    }
+    final binding = proposal.binding;
+    final validUntil = proposal.validUntil;
+    bool ownerBindingCurrent() {
+      final current = currentContext();
+      return navigator.mounted && isRootCurrent() &&
+          current.binding == binding && !current.inWorkspace &&
+          session.procurementScopeCurrent &&
+          session.destination == _destinationAtSnapshot &&
+          session.saleTypeSignature == _saleTypeAtSnapshot &&
+          session.view == BuyV2View.catalogue;
+    }
+    bool draftCurrent() => ownerBindingCurrent() &&
+        validUntil.isAfter(DateTime.now());
+    if (!isCurrent() || !draftCurrent()) {
+      return MoolAssistantReviewResult.stale;
+    }
+    final draft = BuySearchReviewDraft(
+      query: query,
+      binding: binding,
+      requestRevision: proposal.requestRevision,
+      validUntil: validUntil,
+      nonce: Object(),
+      initiallyAccepted: existing.isNotEmpty,
+      scopeOwner: scopeOwner,
+      isOwnerCurrent: ownerBindingCurrent,
+      isCurrent: draftCurrent,
+    );
+    await navigator.push<void>(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'buy-assistant-search-review'),
+        builder: (_) => BuyV2Screen(
+          key: ValueKey<Object>(('assistant-buy-search', draft.nonce)),
+          session: session,
+          accountIdentity: accountIdentity(),
+          accountAuthenticated: accountAuthenticated(),
+          initialDestination: _destinationAtSnapshot!,
+          initialView: BuyV2View.catalogue,
+          searchReviewDraft: draft,
+        ),
+      ),
+    );
+    if (!isCurrent() || !isRootCurrent()) {
+      return MoolAssistantReviewResult.stale;
+    }
+    return MoolAssistantReviewResult.opened;
+  }
+}
+
+
+/// Revision of the existing native Cart quantity form, not catalogue inventory.
+const String buyCartQuantityFormRevision = 'buy_v2_views.quantity_editor.v1';
+
+/// Opens the original quantity editor for one exact, current public Buy Cart line.
+class BuyCartQuantityNativeAdapter implements MoolAssistantNativeAdapter {
+  BuyCartQuantityNativeAdapter({
+    required this.context,
+    required this.session,
+    required this.navigator,
+    required this.currentContext,
+    required this.isRootCurrent,
+    required this.scopeOwner,
+  });
+
+  final BuildContext context;
+  final BuyV2Session session;
+  final NavigatorState navigator;
+  final MoolAssistantContext Function() currentContext;
+  final bool Function() isRootCurrent;
+  final Listenable scopeOwner;
+  BuyV2CartLine? _lineAtSnapshot;
+  String? _sourceRevisionAtSnapshot;
+  BuyV2Destination? _destinationAtSnapshot;
+  String? _saleTypeAtSnapshot;
+
+  bool _supportedDestination(BuyV2Destination value) =>
+      value == BuyV2Destination.shop || value == BuyV2Destination.wholesale;
+
+  bool _eligibleProduct(BuyV2Product value) =>
+      _supportedDestination(value.destination) && !value.requiresPrescription;
+
+  bool _nativeSurfaceCurrent() =>
+      _destinationAtSnapshot != null &&
+      !session.isStoreProcurement &&
+      session.view == BuyV2View.cart &&
+      session.destination == _destinationAtSnapshot &&
+      _supportedDestination(session.destination) &&
+      session.saleTypeSignature == _saleTypeAtSnapshot;
+
+  @override
+  String get actionId => 'AI-ACT-018';
+
+  @override
+  Set<String> get allowedFields => const {'quantity'};
+
+  String? _lineRevision(BuyV2CartLine line) {
+    final product = line.product;
+    final terms = product.packTerms;
+    if (terms == null) return null;
+    return '$buyCartQuantityFormRevision|${jsonEncode([
+      _destinationAtSnapshot?.name,
+      _saleTypeAtSnapshot,
+      session.view.name,
+      product.id,
+      product.canonicalId,
+      product.destination.name,
+      product.requiresPrescription,
+      product.storeId,
+      product.sourceSkuId,
+      product.publicListingIdentity?.toJson(),
+      product.offerClass?.name,
+      terms.skuId,
+      terms.revision,
+      terms.commodityPriceRevision,
+      line.quantity,
+      line.scheduledFulfilment?.toJson(),
+    ])}';
+  }
+
+  BuyV2Product? _currentProduct(BuyV2CartLine line) {
+    final retained = line.product;
+    final latest = session.findProduct(retained.id);
+    if (latest == null ||
+        !_eligibleProduct(latest) ||
+        !_eligibleProduct(retained) ||
+        latest.id != retained.id ||
+        latest.canonicalId != retained.canonicalId ||
+        latest.destination != retained.destination ||
+        latest.requiresPrescription != retained.requiresPrescription ||
+        latest.storeId != retained.storeId ||
+        latest.sourceSkuId != retained.sourceSkuId ||
+        latest.offerClass != retained.offerClass ||
+        latest.publicListingIdentity != retained.publicListingIdentity ||
+        latest.packTerms?.revision != retained.packTerms?.revision ||
+        latest.packTerms?.commodityPriceRevision !=
+            retained.packTerms?.commodityPriceRevision ||
+        !latest.hasValidMoney ||
+        !latest.hasValidPackTerms ||
+        latest.packTerms?.pricingCurrentAt(session.catalogueNow()) != true ||
+        (latest.publicListingIdentity != null &&
+            (!latest.publicListingIdentity!.valid ||
+                !latest.hasValidPublicListingIdentity)) ||
+        session.productFactsFor(latest).stale) {
+      return null;
+    }
+    return latest;
+  }
+
+  bool _lineIsCurrent(
+    BuyV2CartLine line,
+    String id,
+    String sourceRevision,
+    int quantity,
+  ) {
+    if (!navigator.mounted ||
+        !context.mounted ||
+        !isRootCurrent() ||
+        !session.procurementScopeCurrent ||
+        session.cartChangesBlocked ||
+        !_nativeSurfaceCurrent() ||
+        !identical(session.cartLineFor(id), line) ||
+        session.quantityFor(id) != line.quantity ||
+        line.product.id != id ||
+        !_eligibleProduct(line.product) ||
+        _lineRevision(line) != sourceRevision ||
+        _currentProduct(line) == null ||
+        session.cartQuantityError(id, '$quantity') != null) {
+      return false;
+    }
+    return true;
+  }
+
+  @override
+  String? validateFields(Map<String, Object?> fields) {
+    if (fields.length != 1 || fields['quantity'] is! int) {
+      return 'Enter a whole number of packs.';
+    }
+    final quantity = fields['quantity'] as int;
+    if (quantity < 1 || quantity > 9007199254740991) {
+      return 'This quantity is too large to calculate.';
+    }
+    return null;
+  }
+
+  @override
+  Future<MoolAssistantNativeSnapshot?> snapshot(
+    MoolAssistantContext context,
+    String? entityId,
+  ) async {
+    final root = currentContext();
+    if (entityId == null ||
+        entityId.trim().isEmpty ||
+        entityId != entityId.trim() ||
+        !context.signedIn ||
+        context.inWorkspace ||
+        context.binding != root.binding ||
+        root.inWorkspace ||
+        !_supportedDestination(session.destination) ||
+        session.isStoreProcurement ||
+        session.view != BuyV2View.cart ||
+        !isRootCurrent() ||
+        !session.procurementScopeCurrent ||
+        session.cartChangesBlocked) {
+      return null;
+    }
+    final line = session.cartLineFor(entityId);
+    if (line == null ||
+        line.quantity < 1 ||
+        session.quantityFor(entityId) != line.quantity ||
+        !_eligibleProduct(line.product)) {
+      return null;
+    }
+    _destinationAtSnapshot = session.destination;
+    _saleTypeAtSnapshot = session.saleTypeSignature;
+    if (_currentProduct(line) == null ||
+        session.cartQuantityError(entityId, '${line.quantity}') != null) {
+      return null;
+    }
+    final revision = _lineRevision(line);
+    if (revision == null) return null;
+    _lineAtSnapshot = line;
+    _sourceRevisionAtSnapshot = revision;
+    return MoolAssistantNativeSnapshot(
+      binding: context.binding,
+      entityId: entityId,
+      sourceRevision: revision,
+      permitted: true,
+    );
+  }
+
+  @override
+  Future<MoolAssistantReviewResult> openReview(
+    MoolAssistantProposal proposal,
+    bool Function() isCurrent,
+  ) async {
+    final line = _lineAtSnapshot;
+    final id = proposal.entityId;
+    final revision = _sourceRevisionAtSnapshot;
+    if (!isCurrent() ||
+        line == null ||
+        id == null ||
+        id != line.product.id ||
+        revision == null ||
+        proposal.sourceRevision != revision ||
+        proposal.binding != currentContext().binding ||
+        currentContext().inWorkspace ||
+        !_nativeSurfaceCurrent() ||
+        !_eligibleProduct(line.product) ||
+        validateFields(proposal.fields) != null ||
+        !_lineIsCurrent(line, id, revision, proposal.fields['quantity'] as int)) {
+      return MoolAssistantReviewResult.stale;
+    }
+    final requestedQuantity = proposal.fields['quantity'] as int;
+    final binding = proposal.binding;
+    final validUntil = proposal.validUntil;
+    bool ownerCurrent() {
+      final current = currentContext();
+      return navigator.mounted &&
+          context.mounted &&
+          isRootCurrent() &&
+          current.binding == binding &&
+          !current.inWorkspace &&
+          session.procurementScopeCurrent &&
+          _nativeSurfaceCurrent() &&
+          _eligibleProduct(line.product) &&
+          validUntil.isAfter(DateTime.now());
+    }
+
+    if (!ownerCurrent() || !isCurrent()) {
+      return MoolAssistantReviewResult.stale;
+    }
+    await showBuyV2QuantityEditor(
+      context,
+      session,
+      line.product,
+      initialQuantity: requestedQuantity,
+      scopeOwner: scopeOwner,
+      isReviewCurrent: ownerCurrent,
+      reviewValidUntil: validUntil,
+      reviewTheme: BuyV2ThemeSpec.resolve(line.product.destination, session.view),
+      refinedCommerce: true,
+      beforeSave: (quantity) async =>
+          isCurrent() &&
+          ownerCurrent() &&
+          _lineIsCurrent(line, id, revision, quantity),
+    );
+    if (!isCurrent() || !ownerCurrent()) {
+      return MoolAssistantReviewResult.stale;
+    }
+    return MoolAssistantReviewResult.opened;
+  }
+}
+
 class _BuySearchBand extends StatelessWidget {
   const _BuySearchBand({
     required this.session,
     required this.offersActive,
     required this.controller,
+    required this.onQueryChanged,
+    required this.onSubmitQuery,
     required this.open,
     this.autofocus = true,
     required this.onOpenChanged,
@@ -3629,6 +4299,8 @@ class _BuySearchBand extends StatelessWidget {
   final BuyV2Session session;
   final bool offersActive;
   final TextEditingController controller;
+  final ValueChanged<String> onQueryChanged;
+  final bool Function(String) onSubmitQuery;
   final bool open;
   final bool autofocus;
   final ValueChanged<bool> onOpenChanged;
@@ -3722,7 +4394,7 @@ class _BuySearchBand extends StatelessWidget {
           curve: Curves.easeOutCubic,
           height: open
               ? (longQuery ? longQueryBandHeight : queryControlHeight + 12)
-              : restock ? 48 : 56,
+              : restock ? 53 : 56,
           padding: EdgeInsets.symmetric(horizontal: 8, vertical: restock ? 2 : 5),
           decoration: BoxDecoration(
             color: theme.canvas,
@@ -3736,7 +4408,7 @@ class _BuySearchBand extends StatelessWidget {
                   tooltip: 'Back to Stock',
                   onPressed: onBack,
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                  constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                   icon: const Icon(Icons.arrow_back_rounded, size: 20, color: BuyV2Colors.navy),
                 ),
               Expanded(
@@ -3783,7 +4455,7 @@ class _BuySearchBand extends StatelessWidget {
                                     key: const ValueKey('buy-search-field'),
                                     controller: controller,
                                     autofocus: autofocus,
-                                    onChanged: session.updateQuery,
+                                    onChanged: onQueryChanged,
                                     textInputAction: TextInputAction.search,
                                     minLines: 1,
                                     maxLines: 6,
@@ -3827,7 +4499,7 @@ class _BuySearchBand extends StatelessWidget {
                                           ),
                                     ),
                                     onSubmitted: (value) {
-                                      session.submitSearch(value);
+                                      onSubmitQuery(value);
                                       FocusScope.of(context).unfocus();
                                     },
                                   )
@@ -3882,7 +4554,7 @@ class _BuySearchBand extends StatelessWidget {
                           tooltip: 'Clear search',
                           onPressed: () {
                             controller.clear();
-                            session.updateQuery('');
+                            onQueryChanged('');
                           },
                           icon: const Icon(Icons.close_rounded, size: 20),
                           color: BuyV2Colors.muted,
@@ -3900,7 +4572,7 @@ class _BuySearchBand extends StatelessWidget {
                             tooltip: 'Finish search',
                             onPressed: () {
                               if (controller.text.trim().isNotEmpty) {
-                                session.submitSearch(controller.text);
+                                onSubmitQuery(controller.text);
                               }
                               FocusScope.of(context).unfocus();
                               onOpenChanged(false);

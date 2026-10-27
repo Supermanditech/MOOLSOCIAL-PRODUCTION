@@ -16,6 +16,7 @@ import 'package:moolsocial/features/work/work_document_preview.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  _work02GatewayTests();
   group('r6614 workspace contact mobile format', () {
     WorkSession contacts(ReviewWorkGateway gateway) =>
         WorkSession(gateway: gateway)
@@ -4224,3 +4225,129 @@ SocialContentResponse _ok(Object? data) => SocialContentResponse(
   statusCode: 200,
   body: jsonEncode({'ok': true, 'data': data}),
 );
+
+
+void _work02GatewayTests() {
+  for (final retiredActor in [false,true]) {
+    test('AI-WORK02 issued native submission retains exact ACK only for original actor retired=$retiredActor', () async {
+      final gateway=_DeferredSubmissionGateway();
+      final work=WorkSession(gateway:gateway)..selectProfile('retailer-grocery')
+        ..workName='Sharma Stores'..workArea='Jaipur'..primaryActivity='Groceries'
+        ..authorizedPersonName='Asha Sharma'..businessRelationship='Owner'
+        ..primaryMobile='9829012321'..contactEmail='asha@example.com'
+        ..primaryMobileVerified=true..contactEmailVerified=true..declarationAccepted=true;
+      addTearDown(work.dispose); var owner=true,input=true;
+      final pending=work.submitProfile(ownerCurrent:()=>owner,inputCurrent:()=>input);
+      input=false; owner=!retiredActor;
+      gateway.result.complete(const WorkReviewResult(caseId:'original-case',status:WorkRemoteReviewStatus.pending,plan:'free'));
+      expect(await pending,!retiredActor);
+      expect(work.reviewCaseId,retiredActor?isNull:'original-case');
+      expect(work.submittedProfile,retiredActor?isNull:isNotNull);
+      expect(work.busy,isFalse);
+    });
+  }
+  test('AI-WORK02 original status read result survives closed presentation under same actor', () async {
+    final gateway=_DeferredReviewGateway(); final work=WorkSession(gateway:gateway)..selectProfile('retailer-grocery')..reviewCaseId='original-case';
+    addTearDown(work.dispose); var input=true;
+    final pending=work.checkReview(ownerCurrent:()=>true,inputCurrent:()=>input);
+    input=false; gateway.result.complete(const WorkReviewResult(caseId:'original-case',status:WorkRemoteReviewStatus.pending,plan:'free'));
+    await pending; expect(work.reviewCaseId,'original-case'); expect(work.remoteReviewStatus,WorkRemoteReviewStatus.pending); expect(work.busy,isFalse);
+  });
+
+  for (final stage in ['id', 'app-check']) {
+    test('AI-WORK02 retired during $stage credential does not dispatch status POST', () async {
+      var live = true;
+      final wait = Completer<String>();
+      final entered = Completer<void>();
+      final credentials = _Work02Credentials(id: stage == 'id' ? () { entered.complete(); return wait.future; } : null,
+        app: stage == 'app-check' ? () { entered.complete(); return wait.future; } : null);
+      final transport = _Work02Transport((_) async => _ok({}));
+      final gateway = _work02Gateway(credentials, transport);
+      final result = gateway.checkReview('original-case', current: () => live);
+      final assertion = expectLater(result, throwsA(isA<WorkGatewayException>()));
+      await entered.future;
+      live = false; wait.complete(stage == 'id' ? 'firebase-id-test' : 'app-check-test');
+      await assertion;
+      expect(transport.bodies, isEmpty);
+    });
+  }
+  test('AI-WORK02 retirement after prepare blocks new PUT and preserves original prepare', () async {
+    var live = true;
+    final upload = _Work02Upload();
+    final transport = _Work02Transport((_) async { live = false; return _work02Prepared(); });
+    final gateway = _work02Gateway(_Work02Credentials(), transport, upload);
+    await expectLater(gateway.saveProof('shop-front', _work02Proof(), current: () => live, originalCurrent: () => live), throwsA(isA<WorkGatewayException>()));
+    expect(transport.bodies.map((e) => e['operation']), ['prepareProofUpload']);
+    expect(upload.puts, 0);
+  });
+  test('AI-WORK02 retirement during issued PUT prevents confirm without undoing PUT', () async {
+    var live = true;
+    final entered = Completer<void>(), finish = Completer<void>();
+    final upload = _Work02Upload(afterPut: () { entered.complete(); return finish.future; });
+    final transport = _Work02Transport((_) async => _work02Prepared());
+    final result = _work02Gateway(_Work02Credentials(), transport, upload)
+      .saveProof('shop-front', _work02Proof(), current: () => live, originalCurrent: () => live);
+    final assertion = expectLater(result, throwsA(isA<WorkGatewayException>()));
+    await entered.future; live = false; finish.complete(); await assertion;
+    expect(upload.puts, 1);
+    expect(transport.bodies.map((e) => e['operation']), ['prepareProofUpload']);
+  });
+  test('AI-WORK02 exact original prepare continues after presentation closes under same actor', () async {
+    var presentation = true;
+    final upload = _Work02Upload();
+    final transport = _Work02Transport((body) async {
+      if (body['operation'] == 'prepareProofUpload') { presentation = false; return _work02Prepared(); }
+      return _ok({'proofReference': 'original-confirmed'});
+    });
+    final result = await _work02Gateway(_Work02Credentials(), transport, upload)
+      .saveProof('shop-front', _work02Proof(), current: () => presentation, originalCurrent: () => true);
+    expect(result, 'original-confirmed'); expect(upload.puts, 1);
+    expect(transport.bodies.map((e) => e['operation']), ['prepareProofUpload', 'confirmProofUpload']);
+    expect(transport.bodies.last['uploadId'], '00000000-0000-4000-8000-000000000001');
+  });
+  test('AI-WORK02 retirement in confirm credential prevents second POST', () async {
+    var live = true, idCalls = 0;
+    final entered = Completer<void>(), credential = Completer<String>();
+    final transport = _Work02Transport((_) async => _work02Prepared());
+    final credentials = _Work02Credentials(id: () {
+      idCalls++; if (idCalls == 2) { entered.complete(); return credential.future; }
+      return Future.value('firebase-id-test');
+    });
+    final upload = _Work02Upload();
+    final result = _work02Gateway(credentials, transport, upload)
+      .saveProof('shop-front', _work02Proof(), current: () => live, originalCurrent: () => live);
+    final assertion = expectLater(result, throwsA(isA<WorkGatewayException>()));
+    await entered.future; live = false; credential.complete('firebase-id-test'); await assertion;
+    expect(upload.puts, 1); expect(transport.bodies.length, 1);
+  });
+  test('AI-WORK02 omitted guards preserve manual proof upload and native reference', () async {
+    final transport = _Work02Transport((body) async => body['operation'] == 'prepareProofUpload'
+      ? _work02Prepared() : _ok({'proofReference': 'manual-confirmed'}));
+    final upload = _Work02Upload();
+    expect(await _work02Gateway(_Work02Credentials(), transport, upload).saveProof('shop-front', _work02Proof()), 'manual-confirmed');
+    expect(upload.puts, 1); expect(transport.bodies.length, 2);
+  });
+}
+AuthenticatedWorkGateway _work02Gateway(SocialContentCredentials credentials, _Work02Transport transport, [_Work02Upload? upload]) => AuthenticatedWorkGateway(
+  endpoint: Uri.parse('https://example.invalid/moolSocialWorkspace'), credentials: credentials,
+  transport: transport, proofUploadTransport: upload ?? _Work02Upload(), random: Random(2));
+WorkPickedProof _work02Proof() => WorkPickedProof(fileName: 'original.pdf', contentType: 'application/pdf', bytes: Uint8List.fromList('%PDF-1.7'.codeUnits));
+SocialContentResponse _work02Prepared() => _ok({'uploadId': '00000000-0000-4000-8000-000000000001',
+  'uploadUrl': 'https://storage.googleapis.com/private-upload', 'expiresAt': '2099-08-29T09:05:00.000Z',
+  'requiredHeaders': {'content-type': 'application/pdf', 'content-length': '8'}});
+class _Work02Credentials implements SocialContentCredentials {
+  _Work02Credentials({this.id, this.app}); final Future<String> Function()? id, app;
+  @override Future<String> firebaseIdToken() => id?.call() ?? Future.value('firebase-id-test');
+  @override Future<String> appCheckToken(SocialAppCheckTokenMode mode) => app?.call() ?? Future.value('app-check-test');
+}
+class _Work02Transport implements SocialContentTransport {
+  _Work02Transport(this.respond); final Future<SocialContentResponse> Function(Map<String, Object?>) respond;
+  final bodies = <Map<String, Object?>>[];
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {required Map<String, String> headers, required Map<String, Object?> body}) {
+    bodies.add(Map.of(body)); return respond(body);
+  }
+}
+class _Work02Upload implements WorkProofUploadTransport {
+  _Work02Upload({this.afterPut}); final Future<void> Function()? afterPut; int puts = 0;
+  @override Future<void> put({required Uri url, required Map<String, String> headers, required Uint8List bytes}) async { puts++; await afterPut?.call(); }
+}

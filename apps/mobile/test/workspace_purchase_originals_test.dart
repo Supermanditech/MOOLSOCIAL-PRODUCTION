@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/rendering.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
+import 'package:moolsocial/features/assistant/mool_assistant.dart';
 import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -45,6 +46,205 @@ class _OrderPending implements WorkOrderPendingStore {
 }
 
 void main() {
+  registerOrder02LateAckTests();
+  registerOrder02BaselineCorrectionTests();
+  registerOrder02NativeTests();
+  for (final layout in [(360.0, 760.0, 1.0), (320.0, 640.0, 2.0), (720.0, 360.0, 1.0)]) {
+    for (final kind in ['orderAmendment', 'orderCancellation']) {
+      testWidgets('F2CHANGE $kind layout ${layout.$1} text${layout.$3}', (tester) async {
+        await tester.binding.setSurfaceSize(Size(layout.$1, layout.$2)); addTearDown(() => tester.binding.setSurfaceSize(null));
+        final source = fixtures.OrderDocumentSourceFixture();
+        source.onRead = (target) async => WorkspaceOrderDocumentsRead(targetBinding: target.binding, revision: 2,
+          documents: [source.document(), fixtures.orderChangeFixture(kind: kind)]);
+        final gateway = fixtures.projectionGateway(fixtures.Transport()..data = fixtures.purchaseResponse(), orderDocumentSource: source);
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: MediaQuery(data: MediaQueryData(
+          size: Size(layout.$1, layout.$2), textScaler: TextScaler.linear(layout.$3)), child: Scaffold(body: RepaintBoundary(
+            key: const ValueKey('change-evidence'), child: Material(color: MoolColors.canvas, child: SingleChildScrollView(
+              padding: const EdgeInsets.all(12), child: WorkspaceOrderDocumentsForOrder(gateway: gateway,
+                target: WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer,
+                  realm: 'evaluation', reference: fixtures.operationalReference())))))))));
+        await tester.tap(find.text('Order documents')); await tester.pumpAndSettle();
+        final number = kind == 'orderAmendment' ? 'AM/2026/014' : 'CN/2026/014';
+        await tester.ensureVisible(find.text(number)); await tester.tap(find.text(number)); await tester.pumpAndSettle();
+        expect(find.text('Previous document: PO/2026/014 · Revision 1'), findsOneWidget);
+        expect(find.text('Before: 10 bags'), findsOneWidget);
+        expect(find.text(kind == 'orderCancellation' ? 'In this document: 2 bags cancelled; 8 bags remain' : 'In this document: 8 bags'), findsOneWidget);
+        expect(find.text(kind == 'orderCancellation' ? 'Reason: Supplier cannot supply the balance' : 'Reason: Revised delivery and quantity'), findsOneWidget);
+        expect(find.text(kind == 'orderCancellation' ? 'Document outcome: Partial cancellation recorded' : 'Document outcome: Amendment recorded'), findsOneWidget);
+        expect(find.text('Current order status is shown separately.'), findsOneWidget);
+        expect(find.textContaining('Linked documents: PO/2026/014'), findsNothing);
+        expect(find.textContaining('Effective from:'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        const evidence = String.fromEnvironment('F2_CHANGE_EVIDENCE_DIR');
+        if (evidence.isNotEmpty) {
+          await tester.scrollUntilVisible(find.textContaining('Previous document:'), 100, scrollable: find.byType(Scrollable).first);
+          await tester.pumpAndSettle();
+          final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(const ValueKey('change-evidence')));
+          await tester.runAsync(() async {
+            final image = await boundary.toImage(pixelRatio: 1), bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+            await File('$evidence/$kind-${layout.$1}-${layout.$3}.png').writeAsBytes(bytes!.buffer.asUint8List()); image.dispose();
+          });
+        }
+        final previous = find.text('View previous original'); await tester.ensureVisible(previous); await tester.tap(previous); await tester.pumpAndSettle();
+        expect(find.byType(InteractiveViewer), findsOneWidget);
+        source.isCurrent = false; source.notifyListeners(); await tester.pumpAndSettle();
+        expect(find.byType(InteractiveViewer), findsNothing); expect(tester.takeException(), isNull);
+      });
+    }
+  }
+  for (final details in ['missing', 'partial', 'wrong-link']) {
+    testWidgets('F2CHANGE $details particulars remain truthful', (tester) async {
+      final source = fixtures.OrderDocumentSourceFixture();
+      source.onRead = (target) async => WorkspaceOrderDocumentsRead(targetBinding: target.binding, revision: 2, documents: [
+        WorkspaceOrderDocument(id: 'doc-change', kind: 'orderCancellation', number: 'CN/014', revision: 1,
+          date: DateTime.utc(2026, 10, 25), particulars: const {}, changes: details == 'missing' ? null :
+            WorkspaceOrderDocumentChanges(reason: 'Supplier could not supply', previousDocumentId: details == 'wrong-link' ? 'missing-doc' : null,
+              previousDocumentRevision: details == 'wrong-link' ? 1 : null))]);
+      final gateway = fixtures.projectionGateway(fixtures.Transport()..data = fixtures.purchaseResponse(), orderDocumentSource: source);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: WorkspaceOrderDocumentsForOrder(gateway: gateway,
+        target: WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer,
+          realm: 'evaluation', reference: fixtures.operationalReference()))))));
+      await tester.tap(find.text('Order documents')); await tester.pumpAndSettle();
+      if (details == 'wrong-link') {
+        expect(find.text('Documents for this order are unavailable.'), findsOneWidget); expect(find.text('CN/014'), findsNothing);
+      } else {
+        await tester.tap(find.text('CN/014')); await tester.pumpAndSettle();
+        expect(find.text(details == 'missing' ? 'Change details have not been supplied.' : 'Affected items or terms have not been supplied.'), findsOneWidget);
+        expect(find.text('View previous original'), findsNothing);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+  for (final role in WorkspaceOrderIdentityRole.values) {
+    testWidgets('F2DOC printed title stays original for ${role.name}', (tester) async {
+      final account = role == WorkspaceOrderIdentityRole.buyer ? 'buyer-1' : 'owner-1';
+      final source = fixtures.OrderDocumentSourceFixture(accountUserId: account);
+      final gateway = fixtures.projectionGateway(fixtures.Transport()..data = fixtures.purchaseResponse(role: role.name),
+        account: account, orderDocumentSource: source);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: WorkspaceOrderDocumentsForOrder(gateway: gateway,
+        target: WorkspaceOrderDocumentTarget(accountUserId: account, role: role, realm: 'evaluation', reference: fixtures.operationalReference())))));
+      await tester.tap(find.text('Order documents')); await tester.pumpAndSettle();
+      expect(find.textContaining('Purchase order ·'), findsOneWidget);
+      expect(find.textContaining('Sales order ·'), findsNothing);
+    });
+  }
+  testWidgets('F2DOC missing printed title uses neutral document type', (tester) async {
+    final source = fixtures.OrderDocumentSourceFixture();
+    source.onRead = (target) async => WorkspaceOrderDocumentsRead(targetBinding: target.binding, revision: 1,
+      documents: [WorkspaceOrderDocument(id: 'doc-order', kind: 'purchaseOrder', number: 'PO/014', revision: 1,
+        date: DateTime.utc(2026, 10, 25), particulars: const {})]);
+    final gateway = fixtures.projectionGateway(fixtures.Transport()..data = fixtures.purchaseResponse(), orderDocumentSource: source);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: WorkspaceOrderDocumentsForOrder(gateway: gateway,
+      target: WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', reference: fixtures.operationalReference())))));
+    await tester.tap(find.text('Order documents')); await tester.pumpAndSettle();
+    expect(find.textContaining('Purchase order / Sales order ·'), findsOneWidget);
+  });
+  for (final layout in [(360.0, 720.0, 1.0), (320.0, 640.0, 2.0), (720.0, 360.0, 1.0)]) {
+    testWidgets('F2DOC compact linked details ${layout.$1} text${layout.$3}', (tester) async {
+      await tester.binding.setSurfaceSize(Size(layout.$1, layout.$2));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final source = fixtures.OrderDocumentSourceFixture();
+      source.onRead = (target) async => WorkspaceOrderDocumentsRead(targetBinding: target.binding, revision: 1,
+        documents: [source.document(links: ['doc-confirm']), source.document(id: 'doc-confirm', kind: 'orderConfirmation')]);
+      final gateway = fixtures.projectionGateway(fixtures.Transport()..data = fixtures.purchaseResponse(), orderDocumentSource: source);
+      Widget page() => MaterialApp(theme: MoolTheme.light(), home: MediaQuery(
+        data: MediaQueryData(size: Size(layout.$1, layout.$2), textScaler: TextScaler.linear(layout.$3)),
+        child: Scaffold(body: RepaintBoundary(key: const ValueKey('f2-documents-evidence'),
+          child: Material(color: MoolColors.canvas, child: SingleChildScrollView(padding: const EdgeInsets.all(12), child: WorkspaceOrderDocumentsForOrder(gateway: gateway,
+            target: WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer,
+              realm: 'evaluation', reference: fixtures.operationalReference()), inputCurrent: () => true)))))));
+      await tester.pumpWidget(page());
+      await tester.tap(find.text('Order documents')); await tester.pumpAndSettle();
+      expect(find.text('PO/2026/014'), findsOneWidget);
+      await tester.tap(find.text('PO/2026/014').first); await tester.pumpAndSettle();
+      expect(find.text('Payment terms: Against delivery'), findsOneWidget);
+      expect(find.text('Linked documents: OC/2026/014'), findsOneWidget);
+      expect(find.textContaining('2026').evaluate().length, greaterThanOrEqualTo(3));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(page()); await tester.pumpAndSettle();
+      expect(find.text('Payment terms: Against delivery'), findsOneWidget);
+      const evidence = String.fromEnvironment('F2_DOCUMENT_EVIDENCE_DIR');
+      if (evidence.isNotEmpty) {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(const ValueKey('f2-documents-evidence')));
+        await tester.runAsync(() async {
+          final image = await boundary.toImage(pixelRatio: 1);
+          final data = await image.toByteData(format: ui.ImageByteFormat.png);
+          await File('$evidence/documents-${layout.$1}-${layout.$3}.png').writeAsBytes(data!.buffer.asUint8List());
+          image.dispose();
+        });
+      }
+      await tester.ensureVisible(find.text('View original').first); await tester.tap(find.text('View original').first);
+      await tester.pumpAndSettle();
+      expect(find.byType(InteractiveViewer), findsOneWidget); expect(find.text('This copy could not be displayed.'), findsNothing);
+      source.isCurrent = false; source.notifyListeners(); await tester.pumpAndSettle();
+      expect(find.byType(InteractiveViewer), findsNothing);
+      expect(find.text('Return to the order and refresh its documents.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+  for (final state in ['empty', 'unavailable', 'error']) {
+    testWidgets('F2DOC truthful $state and retry', (tester) async {
+      final source = fixtures.OrderDocumentSourceFixture()..empty = state == 'empty';
+      if (state == 'error') { source.onRead = (_) async => throw StateError('Host unavailable'); }
+      final gateway = fixtures.projectionGateway(fixtures.Transport()..data = fixtures.purchaseResponse(),
+        orderDocumentSource: state == 'unavailable' ? null : source);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: WorkspaceOrderDocumentsForOrder(gateway: gateway,
+        target: WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer,
+          realm: 'evaluation', reference: fixtures.operationalReference())))));
+      await tester.tap(find.text('Order documents')); await tester.pumpAndSettle();
+      if (state == 'empty') { expect(find.text('No documents are linked to this order.'), findsOneWidget); }
+      else {
+        expect(find.text('Documents for this order are unavailable.'), findsOneWidget);
+        expect(find.text('No documents are linked to this order.'), findsNothing);
+        source.onRead = null;
+        await tester.tap(find.text('Retry documents')); await tester.pumpAndSettle();
+        expect(find.text('PO/2026/014'), state == 'error' ? findsOneWidget : findsNothing);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+  for (final retirement in ['collapse', 'scope', 'source', 'background', 'dispose']) {
+    testWidgets('F2DOC pending read retires on $retirement', (tester) async {
+      final pending = Completer<WorkspaceOrderDocumentsRead?>(), source = fixtures.OrderDocumentSourceFixture();
+      WorkspaceOrderDocumentTarget? requested;
+      source.onRead = (target) { requested = target; return pending.future; };
+      final gateway = fixtures.projectionGateway(fixtures.Transport()..data = fixtures.purchaseResponse(), orderDocumentSource: source);
+      Widget page({String realm = 'evaluation'}) => MaterialApp(home: Scaffold(body: WorkspaceOrderDocumentsForOrder(gateway: gateway,
+        target: WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer,
+          realm: realm, reference: fixtures.operationalReference()))));
+      await tester.pumpWidget(page()); await tester.tap(find.text('Order documents'));
+      for (var i = 0; i < 5; i++) { await tester.pump(const Duration(milliseconds: 100)); }
+      expect(requested, isNotNull);
+      switch (retirement) {
+        case 'collapse': await tester.tap(find.text('Order documents'));
+        case 'scope': await tester.pumpWidget(page(realm: 'production'));
+        case 'source': source.lifetime = Object(); source.notifyListeners();
+        case 'background': tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+        case 'dispose': await tester.pumpWidget(const SizedBox());
+      }
+      pending.complete(source.snapshot(requested!)); await tester.pumpAndSettle();
+      expect(find.text('PO/2026/014'), findsNothing); expect(tester.takeException(), isNull);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    });
+  }
+  testWidgets('F2DOC rejects revision rollback and changed equal revision', (tester) async {
+    final source = fixtures.OrderDocumentSourceFixture()..revision = 3;
+    final gateway = fixtures.projectionGateway(fixtures.Transport()..data = fixtures.purchaseResponse(), orderDocumentSource: source);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: WorkspaceOrderDocumentsForOrder(gateway: gateway,
+      target: WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', reference: fixtures.operationalReference())))));
+    await tester.tap(find.text('Order documents')); await tester.pumpAndSettle(); expect(find.text('PO/2026/014'), findsOneWidget);
+    source.revision = 2; source.notifyListeners(); await tester.pumpAndSettle();
+    await tester.tap(find.text('Retry documents')); await tester.pumpAndSettle();
+    expect(find.text('Documents for this order are unavailable.'), findsOneWidget);
+    source.revision = 3; source.empty = true;
+    await tester.tap(find.text('Retry documents')); await tester.pumpAndSettle();
+    expect(find.text('No documents are linked to this order.'), findsNothing);
+    source.revision = 4;
+    await tester.tap(find.text('Retry documents')); await tester.pumpAndSettle();
+    expect(find.text('No documents are linked to this order.'), findsOneWidget);
+  });
   for (final changed in ['current', 'reader', 'store', 'realm', 'callback', 'closed', 'retired']) {
     testWidgets('LF-RESTOCK-ACTION exact Store original scope=$changed', (tester) async {
       Object? lifetime = Object();
@@ -1335,4 +1535,432 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+// Isolated native HOST fixtures; no runtime sources, grants or device data.
+class _Order02NativeHarness{
+  _Order02NativeHarness({this.buyer=false});
+  final bool buyer;
+  final navigator=GlobalKey<NavigatorState>(),changes=ValueNotifier<int>(0);
+  final draftStore=fixtures.DeviceDraftFixture();
+  late fixtures.Transport wire;
+  late fixtures.OrderDocumentSourceFixture documents;
+  late fixtures.WarrantyReaderFixture warranty;
+  late fixtures.DeviceSourceFixture units;
+  late AuthenticatedWorkspaceOrderIdentityGateway gateway;
+  late WorkspacePurchaseReference reference;
+  late WorkspacePurchaseOrder original;
+  late MoolAssistantContext context;
+  late Route<void> assistant;
+  bool active=true,proposal=true;int openedCases=0,sequence=0;
+  String get lineEntity=>jsonEncode([reference.orderId,original.lines.single.lineId]);
+  Future<void> ready(WidgetTester tester,{String source='publisher',double scale=1})async{
+    final data=buyer?fixtures.purchaserPurchaseResponse():fixtures.purchaseResponse(role:'seller');
+    wire=fixtures.Transport()..data=data;
+    final account=buyer?'buyer-1':'owner-1';documents=fixtures.OrderDocumentSourceFixture(accountUserId:account);
+    documents.onRead=(target)async=>WorkspaceOrderDocumentsRead(targetBinding:target.binding,revision:2,
+      documents:[documents.document(),fixtures.orderChangeFixture()]);
+    warranty=fixtures.WarrantyReaderFixture(accountUserId:account)..respond=(target)async=>fixtures.warrantyRead(target);
+    units=buyer?fixtures.DeviceReporterFixture():source=='inbox'?fixtures.DeviceInboxFixture():fixtures.DevicePublisherFixture();
+    if(!buyer){units.revision=1;units.rows=const [WorkspacePurchasedUnitRow(id:'HOST-existing-device',serial:'HOST supplier serial')];}
+    gateway=fixtures.projectionGateway(wire,account:account,purchasedUnitSource:units,purchasedWarrantyReader:warranty,orderDocumentSource:documents);
+    final raw=Map<String,Object?>.of(fixtures.referenceResponse(role:buyer?'buyer':'seller')['references'][0]);
+    raw['originalFingerprint']=data['orders'][0]['originalFingerprint'];reference=WorkspacePurchaseReference.fromJson(raw);
+    original=(await gateway.readReferencedOrder(role:buyer?WorkspaceOrderIdentityRole.buyer:WorkspaceOrderIdentityRole.seller,realm:'evaluation',
+      reference:reference,buyingStoreId:buyer?'buying-store':null))!;
+    context=MoolAssistantContext(accountScope:account,authenticationRevision:1,workspaceId:buyer?'buying-store':'store-one',
+      workspaceName:'HOST original Store',workspaceProfile:'retailer-grocery',workspaceRevision:1,storeWorkspace:true,workspaceApproved:true);
+    await tester.pumpWidget(MaterialApp(navigatorKey:navigator,theme:MoolTheme.light(),
+      builder:(context,child)=>MediaQuery(data:MediaQuery.of(context).copyWith(textScaler:TextScaler.linear(scale)),child:child!),
+      home:const Scaffold(body:Text('HOST native Store original owner'))));
+    await tester.pumpAndSettle();
+    assistant=MaterialPageRoute<void>(builder:(_)=>const Scaffold(body:Text('HOST assistant cover')));
+    unawaited(navigator.currentState!.push<void>(assistant));await tester.pumpAndSettle();
+  }
+  WorkspaceOriginalAssistantTarget? resolve(String entity){
+    if(!active||entity!=reference.orderId&&entity!=lineEntity)return null;
+    return WorkspaceOriginalAssistantTarget(gateway:gateway,role:buyer?WorkspaceOrderIdentityRole.buyer:WorkspaceOrderIdentityRole.seller,
+      realm:'evaluation',reference:reference,lineId:entity==lineEntity?original.lines.single.lineId:null,buyingStoreId:buyer?'buying-store':null,
+      draftStore:draftStore,onOpenCase:(handoff)async{if(!handoff.current)return false;openedCases++;return true;});
+  }
+  WorkspaceOrderOriginalNativeAdapter adapter(String action){
+    final a=WorkspaceOrderOriginalNativeAdapter(actionId:action,navigator:navigator.currentState!,currentContext:()=>context,
+      currentOwner:()=>active,ownerChanges:changes,resolve:resolve);
+    a.bindAssistantRoute(assistant,navigator.currentState!);return a;
+  }
+  Future<({WorkspaceOrderOriginalNativeAdapter adapter,Future<MoolAssistantReviewResult> result})> open(
+      WidgetTester tester,String action,{Map<String,Object?> fields=const {},bool line=true,Duration lifetime=const Duration(minutes:4)})async{
+    final a=adapter(action),entity=line?lineEntity:reference.orderId;
+    final snapshot=await a.snapshot(context,entity);expect(snapshot,isNotNull,reason:action);
+    final p=MoolAssistantProposal(id:'HOST-ORDER02-${++sequence}',actionId:action,binding:context.binding,
+      requestRevision:1,entitlementRevision:'HOST isolated paid',sourceRevision:snapshot!.sourceRevision,entityId:entity,
+      validUntil:DateTime.now().add(lifetime),title:'Original purchase details',summary:'HOST native original only',fields:fields);
+    final future=a.openOwnedReview(p,isCurrent:()=>proposal,ownerChanges:changes);await tester.pumpAndSettle();return(adapter:a,result:future);
+  }
+  Future<void> back(WidgetTester tester)async{
+    await tester.tap(find.byType(BackButton).first);await tester.pumpAndSettle();
+  }
+  void retire(){proposal=false;changes.value++;}
+  Future<void> close(WidgetTester tester)async{
+    await tester.pumpWidget(const SizedBox.shrink());await tester.pumpAndSettle();units.dispose();documents.dispose();changes.dispose();
+  }
+}
+
+void registerOrder02NativeTests(){
+  for(final hasSavedDraft in [false,true]){
+    testWidgets('ORDER02 394 partial identifier edit preserves all omitted rows and fields savedDraft=$hasSavedDraft',(tester)async{
+      final h=_Order02NativeHarness();try{await h.ready(tester);
+        h.units.rows=const [
+          WorkspacePurchasedUnitRow(id:'HOST-existing-device',serial:'HOST original A',imei1:'111111',imei2:'222222'),
+          WorkspacePurchasedUnitRow(id:'HOST-second-device',serial:'HOST original B',imei1:'333333',imei2:'444444')];
+        if(hasSavedDraft){
+          final target=h.resolve(h.lineEntity)!,read=(await h.gateway.readPurchasedUnits(role:target.role,realm:target.realm,
+            reference:h.reference,line:h.original.lines.single))!;
+          final key=WorkspacePurchasedUnitDraftKey(account:h.gateway.accountUserId,realm:target.realm,store:h.reference.storeId,binding:read.target.binding);
+          h.draftStore.saved=WorkspacePurchasedUnitDraft(key:key,revision:1,publishedRevision:read.revision,rows:const [
+            WorkspacePurchasedUnitRow(id:'HOST-existing-device',serial:'HOST saved A',imei1:'555555',imei2:'666666'),
+            WorkspacePurchasedUnitRow(id:'HOST-second-device',serial:'HOST saved B',imei1:'777777',imei2:'888888'),
+            WorkspacePurchasedUnitRow(id:'HOST-saved-only-device',serial:'HOST unmentioned private C',imei1:'999999',imei2:'101010')]);
+        }
+        final opened=await h.open(tester,'AI-ACT-394',fields:{'rows':[
+          {'id':'HOST-existing-device','serial':'મૂળ corrected A'},
+          if(hasSavedDraft){'id':'HOST-second-device','imei2':''}]});
+        expect(h.draftStore.writes,isEmpty);
+        final save=find.widgetWithText(TextButton,'Save kept edits');await tester.ensureVisible(save);await tester.tap(save);await tester.pumpAndSettle();
+        expect(h.draftStore.writes,hasLength(1));final rows=h.draftStore.saved!.rows;
+        expect(rows.map((row)=>row.id).toList(),hasSavedDraft?['HOST-existing-device','HOST-second-device','HOST-saved-only-device']:['HOST-existing-device','HOST-second-device']);
+        expect(rows.first.serial,'મૂળ corrected A');expect(rows.first.imei1,hasSavedDraft?'555555':'111111');expect(rows.first.imei2,hasSavedDraft?'666666':'222222');
+        expect(rows[1].serial,hasSavedDraft?'HOST saved B':'HOST original B');expect(rows[1].imei1,hasSavedDraft?'777777':'333333');
+        expect(rows[1].imei2,hasSavedDraft?'':'444444',reason:'Only an explicitly supplied empty field clears its native value.');
+        if(hasSavedDraft)expect(rows.last.toJson(),const WorkspacePurchasedUnitRow(id:'HOST-saved-only-device',serial:'HOST unmentioned private C',imei1:'999999',imei2:'101010').toJson());
+        expect((h.units as fixtures.DevicePublisherFixture).shares,isEmpty);await h.back(tester);await opened.result;
+      }finally{await h.close(tester);}
+    });
+  }
+  testWidgets('ORDER02 394 appending one new native row preserves the complete original device list',(tester)async{
+    final h=_Order02NativeHarness();try{await h.ready(tester);final original=h.units.rows.single;
+      final opened=await h.open(tester,'AI-ACT-394',fields:{'rows':[{'serial':'HOST genuinely additional printed device'}]});
+      expect(h.draftStore.writes,isEmpty);final save=find.widgetWithText(TextButton,'Save kept edits');await tester.ensureVisible(save);await tester.tap(save);await tester.pumpAndSettle();
+      final rows=h.draftStore.saved!.rows;expect(rows,hasLength(2));expect(rows.first.toJson(),original.toJson());
+      expect(rows.last.serial,'HOST genuinely additional printed device');expect(rows.last.id,isNot(original.id));
+      expect(h.draftStore.writes,hasLength(1));expect((h.units as fixtures.DevicePublisherFixture).shares,isEmpty);
+      await h.back(tester);await opened.result;
+    }finally{await h.close(tester);}
+  });
+  testWidgets('ORDER02 proposal expiry closes only its original native private review and rejects retained Save',(tester)async{
+    final h=_Order02NativeHarness();try{await h.ready(tester);
+      final opened=await h.open(tester,'AI-ACT-394',lifetime:const Duration(seconds:1),fields:{'rows':[{'serial':'HOST expiry private serial'}]});
+      final save=find.widgetWithText(TextButton,'Save kept edits');await tester.ensureVisible(save);
+      final retained=tester.widget<TextButton>(save).onPressed!;
+      await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:1100)));
+      await tester.pump(const Duration(seconds:2));await tester.pumpAndSettle();retained();await tester.pump();
+      expect(await opened.result,MoolAssistantReviewResult.stale);expect(h.draftStore.writes,isEmpty);
+      expect(find.textContaining('HOST expiry private serial'),findsNothing);expect(tester.takeException(),isNull);
+    }finally{await h.close(tester);}
+  });
+  testWidgets('ORDER02 retained original Save cannot write after actor retirement or pop an unrelated route',(tester)async{
+    final h=_Order02NativeHarness();try{await h.ready(tester);
+      final opened=await h.open(tester,'AI-ACT-394',fields:{'rows':[{'id':'HOST-existing-device','serial':'HOST exact private serial'}]});
+      final save=find.widgetWithText(TextButton,'Save kept edits');await tester.ensureVisible(save);
+      final retained=tester.widget<TextButton>(save).onPressed!;
+      unawaited(h.navigator.currentState!.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST unrelated retained Save owner')))));
+      await tester.pumpAndSettle();retained();await tester.pumpAndSettle();expect(h.draftStore.writes,isEmpty);
+      h.active=false;h.changes.value++;await tester.pumpAndSettle();retained();await tester.pumpAndSettle();
+      expect(h.draftStore.writes,isEmpty);expect(find.text('HOST unrelated retained Save owner'),findsOneWidget);
+      expect(await opened.result,MoolAssistantReviewResult.stale);expect(tester.takeException(),isNull);
+    }finally{await h.close(tester);}
+  });
+  testWidgets('ORDER02 held authenticated device read retires before native private editor can open',(tester)async{
+    final h=_Order02NativeHarness();final entered=Completer<void>(),release=Completer<void>();
+    try{await h.ready(tester);
+      (h.units as fixtures.DevicePublisherFixture).beforeRead=(){if(!entered.isCompleted)entered.complete();return release.future;};
+      final adapter=h.adapter('AI-ACT-394'),read=adapter.snapshot(h.context,h.lineEntity);
+      await entered.future;h.active=false;h.changes.value++;release.complete();
+      expect(await read,isNull);expect(h.draftStore.writes,isEmpty);
+      expect(find.widgetWithText(TextButton,'Save kept edits'),findsNothing);
+    }finally{if(!release.isCompleted)release.complete();await h.close(tester);}
+  });
+  testWidgets('ORDER02 original device Save already dispatched keeps its truthful private save after proposal retirement',(tester)async{
+    final h=_Order02NativeHarness();final release=Completer<void>();try{await h.ready(tester);
+      final opened=await h.open(tester,'AI-ACT-394',fields:{'rows':[{'id':'HOST-existing-device','serial':'HOST retained native private copy'}]});
+      h.draftStore.holdNextSave=release;
+      final save=find.widgetWithText(TextButton,'Save kept edits');await tester.ensureVisible(save);await tester.tap(save);await tester.pump();
+      expect(h.draftStore.holdNextSave,isNull,reason:'The original save has entered its own retained operation.');
+      h.retire();await tester.pumpAndSettle();release.complete();await tester.pumpAndSettle();
+      expect(await opened.result,MoolAssistantReviewResult.stale);
+      expect(h.draftStore.writes,hasLength(1));expect(h.draftStore.saved!.rows.single.serial,'HOST retained native private copy');
+      expect((h.units as fixtures.DevicePublisherFixture).shares,isEmpty);expect(tester.takeException(),isNull);
+    }finally{if(!release.isCompleted)release.complete();await h.close(tester);}
+  });
+  testWidgets('ORDER02 original Share unknown reply retains exact durable command and never claims shared',(tester)async{
+    final h=_Order02NativeHarness();try{await h.ready(tester);
+      final target=h.resolve(h.lineEntity)!,read=(await h.gateway.readPurchasedUnits(role:target.role,realm:target.realm,
+        reference:h.reference,line:h.original.lines.single))!;
+      final key=WorkspacePurchasedUnitDraftKey(account:h.gateway.accountUserId,realm:target.realm,store:h.reference.storeId,binding:read.target.binding);
+      h.draftStore.saved=WorkspacePurchasedUnitDraft(key:key,revision:1,publishedRevision:read.revision,rows:read.rows);
+      final source=h.units as fixtures.DevicePublisherFixture;
+      source.onShare=(target,command)async{await source.apply(target,command);return null;};
+      final opened=await h.open(tester,'AI-ACT-395');
+      final review=find.widgetWithText(TextButton,'Review and share device details');await tester.ensureVisible(review);await tester.tap(review);await tester.pumpAndSettle();
+      final share=find.widgetWithText(FilledButton,'Share device details');await tester.ensureVisible(share);await tester.tap(share);await tester.pumpAndSettle();
+      expect(source.shares,hasLength(1));expect(h.draftStore.saved!.pending,isNotNull);
+      expect(h.draftStore.saved!.pending!.toJson(),source.shares.single.toJson());
+      expect(find.text('Device details shared with the buyer.'),findsNothing);expect(source.checks,isEmpty);
+      await h.back(tester);await opened.result;
+    }finally{await h.close(tester);}
+  });
+  testWidgets('ORDER02 274 original order and389 linked documents reuse exact native frozen reader without effect',(tester)async{
+    final h=_Order02NativeHarness();try{await h.ready(tester);
+      var opened=await h.open(tester,'AI-ACT-274',line:false);
+      expect(find.text('Saved purchase details'),findsOneWidget);expect(find.text('दाल'),findsWidgets);
+      expect(h.draftStore.writes,isEmpty);await h.back(tester);expect(await opened.result,MoolAssistantReviewResult.opened);
+      opened=await h.open(tester,'AI-ACT-389',line:false);expect(find.text('Order documents'),findsOneWidget);
+      expect(find.text('PO/2026/014'),findsOneWidget);expect(h.draftStore.writes,isEmpty);await h.back(tester);await opened.result;
+    }finally{await h.close(tester);}
+  });
+  for(final action in ['AI-ACT-390','AI-ACT-391']){
+    testWidgets('ORDER02 $action exact current and previous revision keep native document identity',(tester)async{
+      final h=_Order02NativeHarness();try{await h.ready(tester);final before=h.documents.copies;
+        final result=await h.open(tester,action,line:false,fields:{'documentId':action=='AI-ACT-390'?'doc-order':'doc-change','documentRevision':1});
+        if(action=='AI-ACT-390'){
+          expect(find.text('order.png'),findsOneWidget);expect(h.documents.copies,before+1);
+        }else{expect(find.text('Previous document: PO/2026/014 · Revision 1'),findsOneWidget);expect(h.documents.copies,before);}
+        expect(h.draftStore.writes,isEmpty);await h.back(tester);await result.result;expect(tester.takeException(),isNull);
+      }finally{await h.close(tester);}
+    });
+  }
+  for(final action in ['AI-ACT-392','AI-ACT-393']){
+    testWidgets('ORDER02 $action native purchased terms and identifiers are recorded original facts only',(tester)async{
+      final h=_Order02NativeHarness();try{await h.ready(tester);final opened=await h.open(tester,action);
+        expect(find.text(action=='AI-ACT-392'?'Warranty details':'Device details'),findsOneWidget);
+        if(action=='AI-ACT-392')expect(find.textContaining('HOST original issuer'),findsWidgets);
+        else expect(find.textContaining('HOST supplier serial'),findsWidgets);
+        expect(h.draftStore.writes,isEmpty);await h.back(tester);await opened.result;expect(tester.takeException(),isNull);
+      }finally{await h.close(tester);}
+    });
+  }
+  testWidgets('ORDER02 394 supplied Unicode serial reaches original kept-edits review and native Save only persists once',(tester)async{
+    final h=_Order02NativeHarness();try{await h.ready(tester);
+      final opened=await h.open(tester,'AI-ACT-394',fields:{'rows':[{'id':'HOST-existing-device','serial':'મૂળ SERIAL-01','imei1':'123456789012345'}]});
+      expect(find.textContaining('મૂળ SERIAL-01'),findsWidgets);expect(h.draftStore.writes,isEmpty);
+      final save=find.widgetWithText(TextButton,'Save kept edits');await tester.ensureVisible(save);await tester.tap(save);await tester.pumpAndSettle();
+      expect(h.draftStore.writes,hasLength(1));expect(h.draftStore.saved!.rows.single.serial,'મૂળ SERIAL-01');
+      expect((h.units as fixtures.DevicePublisherFixture).shares,isEmpty);await h.back(tester);await opened.result;
+    }finally{await h.close(tester);}
+  });
+  testWidgets('ORDER02 394 private saved revision conflict keeps actual original recovery without overwriting',(tester)async{
+    final h=_Order02NativeHarness();try{await h.ready(tester);
+      final opened=await h.open(tester,'AI-ACT-394',fields:{'rows':[{'id':'HOST-existing-device','serial':'HOST proposed'}]});
+      final target=h.resolve(h.lineEntity)!,lineTarget=WorkspacePurchasedLineTarget(accountUserId:h.gateway.accountUserId,role:target.role,realm:target.realm,
+        reference:target.reference,line:h.original.lines.single);
+      h.draftStore.saved=WorkspacePurchasedUnitDraft(key:WorkspacePurchasedUnitDraftKey(account:h.gateway.accountUserId,realm:'evaluation',store:h.reference.storeId,binding:lineTarget.binding),
+        revision:1,publishedRevision:1,rows:const [WorkspacePurchasedUnitRow(id:'HOST-existing-device',serial:'HOST newer saved')]);
+      final save=find.widgetWithText(TextButton,'Save kept edits');await tester.ensureVisible(save);await tester.tap(save);await tester.pumpAndSettle();
+      expect(h.draftStore.writes,isEmpty);expect(h.draftStore.saved!.rows.single.serial,'HOST newer saved');
+      expect(find.textContaining('Draft save needs recovery'),findsOneWidget);await h.back(tester);await opened.result;
+    }finally{await h.close(tester);}
+  });
+  testWidgets('ORDER02 396 actual procurement buyer fields stay private until original Save and original Send',(tester)async{
+    final h=_Order02NativeHarness(buyer:true);try{await h.ready(tester);
+      final opened=await h.open(tester,'AI-ACT-396',fields:{'selectedIds':['supplier-device-A'],'note':'મૂળ device does not match'});
+      expect(find.textContaining('મૂળ device does not match'),findsWidgets);expect(h.draftStore.writes,isEmpty);
+      expect((h.units as fixtures.DeviceReporterFixture).reports,isEmpty);
+      final save=find.widgetWithText(TextButton,'Save kept edits');await tester.ensureVisible(save);await tester.tap(save);await tester.pumpAndSettle();
+      expect(h.draftStore.writes,hasLength(1));expect(h.draftStore.saved!.report!.note,'મૂળ device does not match');
+      expect((h.units as fixtures.DeviceReporterFixture).reports,isEmpty);await h.back(tester);await opened.result;
+    }finally{await h.close(tester);}
+  });
+  for(final action in ['AI-ACT-397','AI-ACT-400']){
+    testWidgets('ORDER02 $action received device report uses seller grant and exact existing case',(tester)async{
+      final h=_Order02NativeHarness();try{await h.ready(tester,source:'inbox');final opened=await h.open(tester,action,fields:action=='AI-ACT-400'?{'reportId':'HOST-REPORT-1'}:{});
+        expect(find.text('Report HOST-REPORT-1'),findsOneWidget);expect(h.openedCases,action=='AI-ACT-400'?1:0);expect(h.draftStore.writes,isEmpty);
+        await h.back(tester);await opened.result;expect(tester.takeException(),isNull);
+      }finally{await h.close(tester);}
+    });
+  }
+  for(final action in ['AI-ACT-395','AI-ACT-398','AI-ACT-399']){
+    testWidgets('ORDER02 $action absent exact private draft or pending command is unavailable without invented outcome',(tester)async{
+      final h=_Order02NativeHarness(buyer:action=='AI-ACT-399');try{await h.ready(tester);final adapter=h.adapter(action);
+        expect(await adapter.snapshot(h.context,h.lineEntity),isNull);expect(h.draftStore.writes,isEmpty);
+        if(h.units is fixtures.DevicePublisherFixture){expect((h.units as fixtures.DevicePublisherFixture).shares,isEmpty);expect((h.units as fixtures.DevicePublisherFixture).checks,isEmpty);}
+        if(h.units is fixtures.DeviceReporterFixture){expect((h.units as fixtures.DeviceReporterFixture).reports,isEmpty);expect((h.units as fixtures.DeviceReporterFixture).checks,isEmpty);}
+      }finally{await h.close(tester);}
+    });
+  }
+  for(final action in ['AI-ACT-395','AI-ACT-398','AI-ACT-399']){
+    testWidgets('ORDER02 $action original private command has zero Review dispatch and one explicit native action',(tester)async{
+      final h=_Order02NativeHarness(buyer:action=='AI-ACT-399');try{await h.ready(tester);
+        final target=h.resolve(h.lineEntity)!,role=target.role;
+        final read=(await h.gateway.readPurchasedUnits(role:role,realm:'evaluation',reference:h.reference,line:h.original.lines.single,
+          buyingStoreId:target.buyingStoreId))!;
+        final key=WorkspacePurchasedUnitDraftKey(account:h.gateway.accountUserId,realm:'evaluation',store:h.reference.storeId,binding:read.target.binding);
+        WorkspacePurchasedUnitPublishCommand? pending;WorkspacePurchasedUnitMismatchDraft? report;
+        if(action=='AI-ACT-398')pending=WorkspacePurchasedUnitPublishCommand(key:key,operationId:'a'*32,expectedRevision:read.revision,rows:read.rows);
+        if(action=='AI-ACT-399'){
+          final command=WorkspacePurchasedUnitMismatchCommand(key:key,operationId:'b'*32,sourceRevision:read.revision,
+            sourceFingerprint:read.fingerprint,note:'HOST original pending mismatch',rows:read.rows);
+          report=WorkspacePurchasedUnitMismatchDraft(sourceFingerprint:read.fingerprint,note:command.note,
+            selected:read.rows.map((r)=>r.id).toList(),pending:command);
+        }
+        final saved=WorkspacePurchasedUnitDraft(key:key,revision:1,publishedRevision:read.revision,rows:read.rows,pending:pending,report:report);
+        expect(saved.valid,isTrue);h.draftStore.saved=saved;
+        final opened=await h.open(tester,action);expect(h.draftStore.writes,isEmpty);
+        if(action=='AI-ACT-395'){
+          final source=h.units as fixtures.DevicePublisherFixture;expect(source.shares,isEmpty);
+          final review=find.widgetWithText(TextButton,'Review and share device details');await tester.ensureVisible(review);await tester.tap(review);await tester.pumpAndSettle();
+          expect(source.shares,isEmpty);final share=find.widgetWithText(FilledButton,'Share device details');await tester.ensureVisible(share);
+          final callback=tester.widget<FilledButton>(share).onPressed!;callback();callback();await tester.pumpAndSettle();expect(source.shares,hasLength(1));
+        }else if(action=='AI-ACT-398'){
+          final source=h.units as fixtures.DevicePublisherFixture;expect(source.checks,isEmpty);
+          final check=find.widgetWithText(TextButton,'Check sharing status');await tester.ensureVisible(check);await tester.tap(check);await tester.pumpAndSettle();
+          expect(source.checks,hasLength(1));expect(source.shares,isEmpty);
+        }else{
+          final source=h.units as fixtures.DeviceReporterFixture;expect(source.checks,isEmpty);expect(source.reports,isEmpty);
+          final check=find.widgetWithText(TextButton,'Check report status');await tester.ensureVisible(check);await tester.tap(check);await tester.pumpAndSettle();
+          expect(source.checks,hasLength(1));expect(source.reports,isEmpty);
+        }
+        await h.back(tester);await opened.result;expect(tester.takeException(),isNull);
+      }finally{await h.close(tester);}
+    });
+  }
+  for(final scale in [1.0,2.0]){
+    testWidgets('ORDER02 original warranty layout stays compact at320px text$scale',(tester)async{
+      final h=_Order02NativeHarness();try{
+        tester.view.physicalSize=const Size(320,568);tester.view.devicePixelRatio=1;
+        addTearDown(tester.view.resetPhysicalSize);addTearDown(tester.view.resetDevicePixelRatio);
+        await h.ready(tester,scale:scale);
+        final opened=await h.open(tester,'AI-ACT-392');
+        expect(find.textContaining('HOST original issuer'),findsWidgets);expect(h.draftStore.writes,isEmpty);expect(tester.takeException(),isNull);
+        await h.back(tester);await opened.result;
+      }finally{await h.close(tester);}
+    });
+  }
+  for(final kind in ['proposal','owner','source','foreign-route']){
+    testWidgets('ORDER02 captured original privacy and exact Close survive $kind retirement',(tester)async{
+      final h=_Order02NativeHarness();try{await h.ready(tester);final opened=await h.open(tester,'AI-ACT-394',fields:{'rows':[{'serial':'HOST private review'}]});
+        final close=tester.widget<BackButton>(find.byType(BackButton).first).onPressed!;
+        if(kind=='foreign-route')unawaited(h.navigator.currentState!.push<void>(MaterialPageRoute(builder:(_)=>const Scaffold(body:Text('HOST unrelated case route')))));
+        await tester.pumpAndSettle();
+        if(kind=='owner'){h.active=false;h.changes.value++;}else if(kind=='source'){h.units.rotateLifetime();}else{h.retire();}
+        await tester.pumpAndSettle();close();await tester.pumpAndSettle();
+        if(kind=='foreign-route')expect(find.text('HOST unrelated case route'),findsOneWidget);
+        expect(find.textContaining('HOST private review'),findsNothing);expect(h.draftStore.writes,isEmpty);expect(await opened.result,MoolAssistantReviewResult.stale);
+        expect(tester.takeException(),isNull);
+      }finally{await h.close(tester);}
+    });
+  }
+  testWidgets('ORDER02 buyer-only report actions never borrow the supplier Store grant',(tester)async{
+    final h=_Order02NativeHarness();try{await h.ready(tester);for(final action in ['AI-ACT-396','AI-ACT-399']){
+      expect(await h.adapter(action).snapshot(h.context,h.lineEntity),isNull);}
+      expect(h.draftStore.reads,0);expect(h.draftStore.writes,isEmpty);
+    }finally{await h.close(tester);}
+  });
+  testWidgets('ORDER02 exact document revision and closed field schemas reject model authority',(tester)async{
+    final h=_Order02NativeHarness();try{await h.ready(tester);
+      expect(h.adapter('AI-ACT-394').validateFields({'rows':[{'serial':123}]}),isNotNull);
+      expect(h.adapter('AI-ACT-394').validateFields({'rows':[{'serial':'HOST','ownerGranted':true}]}),isNotNull);
+      expect(h.adapter('AI-ACT-390').validateFields({'documentId':'doc-order','documentRevision':'1'}),isNotNull);
+      expect(h.adapter('AI-ACT-396').validateFields({'selectedIds':['a','a'],'note':'HOST'}),isNotNull);
+      expect(h.adapter('AI-ACT-400').validateFields({'reportId':'HOST-REPORT-1','newCase':true}),isNotNull);
+      final adapter=h.adapter('AI-ACT-390'),snapshot=await adapter.snapshot(h.context,h.reference.orderId);expect(snapshot,isNotNull);
+      final p=MoolAssistantProposal(id:'HOST wrong revision',actionId:'AI-ACT-390',binding:h.context.binding,requestRevision:1,
+        entitlementRevision:'HOST',sourceRevision:snapshot!.sourceRevision,entityId:h.reference.orderId,
+        validUntil:DateTime.now().add(const Duration(minutes:1)),title:'Original copy',summary:'HOST exact revision',fields:{'documentId':'doc-order','documentRevision':999});
+      expect(await adapter.openOwnedReview(p,isCurrent:()=>true,ownerChanges:h.changes),MoolAssistantReviewResult.unavailable);
+      expect(h.documents.copies,0);expect(h.draftStore.writes,isEmpty);
+    }finally{await h.close(tester);}
+  });
+  testWidgets('ORDER02 held authenticated document read cannot admit another Store owner',(tester)async{
+    final h=_Order02NativeHarness();try{await h.ready(tester);final gate=Completer<WorkspaceOrderDocumentsRead?>(),entered=Completer<void>();
+      h.documents.onRead=(target){entered.complete();return gate.future;};final adapter=h.adapter('AI-ACT-389');
+      final snapshot=adapter.snapshot(h.context,h.reference.orderId);await entered.future;h.active=false;h.changes.value++;
+      gate.complete(null);expect(await snapshot,isNull);expect(h.documents.copies,0);expect(h.draftStore.writes,isEmpty);
+    }finally{await h.close(tester);}
+  });
+  testWidgets('ORDER02 missing supplement and source rollback stay unavailable instead of borrowing catalogue data',(tester)async{
+    final h=_Order02NativeHarness();try{await h.ready(tester);final adapter=h.adapter('AI-ACT-389');
+      final first=await adapter.snapshot(h.context,h.reference.orderId);expect(first,isNotNull);
+      h.documents.onRead=(target)async=>WorkspaceOrderDocumentsRead(targetBinding:target.binding,revision:1,documents:[h.documents.document()]);
+      expect(await adapter.snapshot(h.context,h.reference.orderId),isNull);
+      h.documents.onRead=(_)async=>null;expect(await adapter.snapshot(h.context,h.reference.orderId),isNull);
+      h.warranty.respond=(_)async=>null;expect(await h.adapter('AI-ACT-392').snapshot(h.context,h.lineEntity),isNull);
+      expect(h.draftStore.writes,isEmpty);expect(h.documents.copies,0);
+    }finally{await h.close(tester);}
+  });
+}
+
+void registerOrder02BaselineCorrectionTests(){
+  testWidgets('ORDER02 394 published row removed from the saved native baseline cannot be implicitly restored',(tester)async{
+    final h=_Order02NativeHarness();try{await h.ready(tester);
+      final target=h.resolve(h.lineEntity)!,read=(await h.gateway.readPurchasedUnits(role:target.role,realm:target.realm,
+        reference:h.reference,line:h.original.lines.single))!;
+      final key=WorkspacePurchasedUnitDraftKey(account:h.gateway.accountUserId,realm:target.realm,store:h.reference.storeId,binding:read.target.binding);
+      h.draftStore.saved=WorkspacePurchasedUnitDraft(key:key,revision:1,publishedRevision:read.revision,
+        rows:const [WorkspacePurchasedUnitRow(id:'HOST-kept-private-device',serial:'HOST human kept this device')]);
+      final original=jsonEncode(h.draftStore.saved!.toJson());
+      final opened=await h.open(tester,'AI-ACT-394',fields:{'rows':[{'id':'HOST-existing-device','serial':'HOST old published row'}]});
+      expect(await opened.result,MoolAssistantReviewResult.unavailable);
+      expect(jsonEncode(h.draftStore.saved!.toJson()),original);expect(h.draftStore.writes,isEmpty);
+      expect(find.widgetWithText(TextButton,'Save kept edits'),findsNothing);
+      expect((h.units as fixtures.DevicePublisherFixture).shares,isEmpty);
+    }finally{await h.close(tester);}
+  });
+  testWidgets('ORDER02 394 appending beyond the original native device bound is unavailable before Review',(tester)async{
+    final h=_Order02NativeHarness();try{await h.ready(tester);
+      h.units.rows=List.generate(1000,(i)=>WorkspacePurchasedUnitRow(id:'HOST-device-$i',serial:'HOST original serial $i'));
+      final source=jsonEncode(h.units.rows.map((row)=>row.toJson()).toList());
+      final opened=await h.open(tester,'AI-ACT-394',fields:{'rows':[{'serial':'HOST extra exceeds existing native bound'}]});
+      expect(await opened.result,MoolAssistantReviewResult.unavailable);expect(h.draftStore.writes,isEmpty);
+      expect(jsonEncode(h.units.rows.map((row)=>row.toJson()).toList()),source);
+      expect(find.widgetWithText(TextButton,'Save kept edits'),findsNothing);
+      expect((h.units as fixtures.DevicePublisherFixture).shares,isEmpty);
+    }finally{await h.close(tester);}
+  });
+}
+
+void registerOrder02LateAckTests(){
+  testWidgets('ORDER02-LATE-ACK issued Share keeps exact original pending command after retirement and native Check alone recovers',(tester)async{
+    final h=_Order02NativeHarness();final entered=Completer<void>(),reply=Completer<WorkspacePurchasedUnitPublishReply?>();
+    WorkspacePurchasedLineTarget? sentTarget;
+    try{await h.ready(tester);
+      final target=h.resolve(h.lineEntity)!,read=(await h.gateway.readPurchasedUnits(role:target.role,realm:target.realm,
+        reference:h.reference,line:h.original.lines.single))!;
+      final key=WorkspacePurchasedUnitDraftKey(account:h.gateway.accountUserId,realm:target.realm,store:h.reference.storeId,binding:read.target.binding);
+      h.draftStore.saved=WorkspacePurchasedUnitDraft(key:key,revision:1,publishedRevision:read.revision,rows:read.rows);
+      final source=h.units as fixtures.DevicePublisherFixture;
+      source.onShare=(target,command){sentTarget=target;entered.complete();return reply.future;};
+      final opened=await h.open(tester,'AI-ACT-395');
+      final review=find.widgetWithText(TextButton,'Review and share device details');await tester.ensureVisible(review);await tester.tap(review);await tester.pumpAndSettle();
+      final share=find.widgetWithText(FilledButton,'Share device details');await tester.ensureVisible(share);await tester.tap(share);await tester.pump();await entered.future;
+      final command=source.shares.single;expect(h.draftStore.saved!.pending!.toJson(),command.toJson());
+      h.retire();await tester.pumpAndSettle();reply.complete(await source.apply(sentTarget!,command));await tester.pumpAndSettle();
+      expect(await opened.result,MoolAssistantReviewResult.stale);expect(h.draftStore.saved!.pending!.toJson(),command.toJson());
+      expect(source.shares,hasLength(1));expect(source.checks,isEmpty);
+      h.proposal=true;final recovery=await h.open(tester,'AI-ACT-398');
+      expect(source.shares,hasLength(1));expect(source.checks,isEmpty);
+      final check=find.widgetWithText(TextButton,'Check sharing status');await tester.ensureVisible(check);await tester.tap(check);await tester.pumpAndSettle();
+      expect(source.checks,hasLength(1));expect(source.checks.single.toJson(),command.toJson());expect(source.shares,hasLength(1));
+      expect(h.draftStore.saved!.pending,isNull);await h.back(tester);await recovery.result;
+    }finally{if(!reply.isCompleted)reply.complete(null);await h.close(tester);}
+  });
+  testWidgets('ORDER02-LATE-ACK issued mismatch keeps exact original pending report after retirement and native Check alone recovers',(tester)async{
+    final h=_Order02NativeHarness(buyer:true);final entered=Completer<void>(),reply=Completer<WorkspacePurchasedUnitReportReply?>();
+    WorkspacePurchasedLineTarget? sentTarget;
+    try{await h.ready(tester);final source=h.units as fixtures.DeviceReporterFixture;
+      source.onReport=(target,command){sentTarget=target;entered.complete();return reply.future;};
+      final opened=await h.open(tester,'AI-ACT-396',fields:{'selectedIds':['supplier-device-A'],'note':'HOST actual issued mismatch'});
+      final save=find.widgetWithText(TextButton,'Save kept edits');await tester.ensureVisible(save);await tester.tap(save);await tester.pumpAndSettle();
+      final review=find.widgetWithText(TextButton,'Review device report');await tester.ensureVisible(review);await tester.tap(review);await tester.pumpAndSettle();
+      final send=find.widgetWithText(FilledButton,'Send device report');await tester.ensureVisible(send);await tester.tap(send);await tester.pump();await entered.future;
+      final command=source.reports.single;expect(h.draftStore.saved!.report!.pending!.toJson(),command.toJson());
+      h.retire();await tester.pumpAndSettle();reply.complete(source.reply(sentTarget!,command));await tester.pumpAndSettle();
+      expect(await opened.result,MoolAssistantReviewResult.stale);expect(h.draftStore.saved!.report!.pending!.toJson(),command.toJson());
+      expect(source.reports,hasLength(1));expect(source.checks,isEmpty);
+      h.proposal=true;final recovery=await h.open(tester,'AI-ACT-399');expect(source.checks,isEmpty);
+      final check=find.widgetWithText(TextButton,'Check report status');await tester.ensureVisible(check);await tester.tap(check);await tester.pumpAndSettle();
+      expect(source.checks,hasLength(1));expect(source.checks.single.toJson(),command.toJson());expect(source.reports,hasLength(1));
+      expect(h.draftStore.saved!.report!.pending!.toJson(),command.toJson(),reason:'A recorded mismatch keeps its exact command as original audit evidence.');expect(h.draftStore.saved!.report!.recorded,isTrue);
+      await h.back(tester);await recovery.result;
+    }finally{if(!reply.isCompleted)reply.complete(null);await h.close(tester);}
+  });
 }

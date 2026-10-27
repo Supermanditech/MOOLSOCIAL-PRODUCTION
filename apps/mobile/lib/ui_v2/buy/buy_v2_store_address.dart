@@ -16,19 +16,38 @@ Uri? buyV2StoreMapUri(BuyV2StoreListing store) {
   });
 }
 
+/// Opens the platform phone application; it never places or confirms a call.
+Future<bool> buyV2OpenStoreContact(Uri uri) async => uri.scheme == 'tel' &&
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
+
 class BuyV2StoreAddress extends StatelessWidget {
   const BuyV2StoreAddress({
     super.key,
     required this.store,
     this.openMap,
-    this.showAddress = true,
+    this.showAddress = true, this.showContactAction = false, this.openContact, this.contactCurrent,
   });
 
   final BuyV2StoreListing store;
   final Future<bool> Function(Uri)? openMap;
   final bool showAddress;
+  final bool showContactAction;
+  final Future<bool> Function(Uri)? openContact;
+  final bool Function()? contactCurrent;
 
+  Future<void> _contact(BuildContext context) async {
+    final phone = store.publicContactPhone?.trim();
+    if (phone == null || phone.isEmpty || contactCurrent?.call() == false) return;
+    final uri = Uri(scheme: 'tel', path: phone);
+    var opened = false;
+    try { opened = await (openContact?.call(uri) ?? buyV2OpenStoreContact(uri)).timeout(const Duration(seconds: 15)); }
+    on Object { opened = false; }
+    if (!opened && context.mounted && contactCurrent?.call() != false) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open the phone app. Please try again.')));
+    }
+  }
   Future<void> _open(BuildContext context, Uri uri) async {
+    if (contactCurrent?.call() == false) return;
     var opened = false;
     try {
       opened =
@@ -83,6 +102,10 @@ class BuyV2StoreAddress extends StatelessWidget {
             key: ValueKey('buy-store-contact-${store.id}'),
             style: context.buyMeta.copyWith(fontSize: 12, height: 1.25),
           ),
+        if (showContactAction && store.publicContactPhone?.trim().isNotEmpty == true)
+          Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+            key: ValueKey('buy-store-call-${store.id}'), onPressed: () => _contact(context),
+            icon: const Icon(Icons.phone_outlined), label: const Text('Call store / supplier'))),
         if (showAddress && store.openingHoursLabel?.trim().isNotEmpty == true)
           Text(
             'Hours: ${store.openingHoursLabel!.trim()}',

@@ -35,21 +35,28 @@ Future<void> showBuyV2InvoicePage(
   BuildContext context, {
   required BuyV2Order order,
   BuyV2InvoiceDownloader? downloader,
+  bool Function()? capturedCurrent,
+  bool allowDownload = true,
 }) {
+  if (capturedCurrent?.call() == false) return Future.value();
   HapticFeedback.selectionClick();
   return Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
       settings: RouteSettings(name: '/app/buy/order/${order.id}/invoice'),
-      builder: (_) => BuyV2InvoicePage(order: order, downloader: downloader),
+      builder: (_) => BuyV2InvoicePage(order: order, downloader: downloader,
+        capturedCurrent: capturedCurrent, allowDownload: allowDownload),
     ),
   );
 }
 
 class BuyV2InvoicePage extends StatefulWidget {
-  const BuyV2InvoicePage({super.key, required this.order, this.downloader});
+  const BuyV2InvoicePage({super.key, required this.order, this.downloader,
+    this.capturedCurrent, this.allowDownload = true});
 
   final BuyV2Order order;
   final BuyV2InvoiceDownloader? downloader;
+  final bool Function()? capturedCurrent;
+  final bool allowDownload;
 
   @override
   State<BuyV2InvoicePage> createState() => _BuyV2InvoicePageState();
@@ -59,6 +66,8 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
   bool _downloading = false;
 
   Future<void> _download() async {
+    if (!widget.allowDownload || widget.capturedCurrent?.call() == false ||
+        (widget.capturedCurrent != null && ModalRoute.of(context)?.isCurrent == false)) return;
     final order = widget.order;
     final legalInvoiceReady = BuyV2InvoiceDocument(order: order).hasExactLines;
     if (_downloading || !legalInvoiceReady) return;
@@ -68,7 +77,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
     var outcome = BuyV2InvoiceDownloadOutcome.unavailable;
     try {
       final downloader = widget.downloader;
-      if (downloader != null) {
+      if (downloader != null && widget.capturedCurrent?.call() != false) {
         outcome = await downloader(BuyV2InvoiceDocument(order: widget.order));
       }
     } catch (_) {
@@ -77,6 +86,8 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
 
     if (!mounted) return;
     setState(() => _downloading = false);
+    if (widget.capturedCurrent?.call() == false ||
+        (widget.capturedCurrent != null && ModalRoute.of(context)?.isCurrent == false)) return;
     final message = switch (outcome) {
       BuyV2InvoiceDownloadOutcome.saved => 'Invoice saved to this device.',
       BuyV2InvoiceDownloadOutcome.cancelled => 'Invoice save cancelled.',
@@ -129,7 +140,14 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
         leading: IconButton(
           key: const ValueKey('buy-invoice-back'),
           tooltip: 'Back to order',
-          onPressed: Navigator.of(context).pop,
+          onPressed: widget.capturedCurrent == null
+              ? Navigator.of(context).pop
+              : () {
+                  if (widget.capturedCurrent!() &&
+                      ModalRoute.of(context)?.isCurrent == true) {
+                    Navigator.of(context).pop();
+                  }
+                },
           icon: const Icon(Icons.arrow_back_rounded),
         ),
         titleSpacing: 0,
@@ -593,7 +611,8 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                   child: FilledButton.icon(
                     style: BuyV2ActionStyle.button(),
                     key: ValueKey('buy-download-invoice-${order.id}'),
-                    onPressed: _downloading || !legalInvoiceReady
+                    onPressed: _downloading || !legalInvoiceReady || !widget.allowDownload ||
+                            widget.capturedCurrent?.call() == false
                         ? null
                         : _download,
                     icon: _downloading

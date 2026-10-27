@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 import 'buy_v2_catalogue_data.dart';
 
 /// Shared owner/public configuration, never a computed eligibility or saving.
@@ -279,6 +281,40 @@ enum BuyV2ShoppingIntent {
 /// value lets the fixed Buy body communicate that already-decided outcome; it
 /// must never be used to choose, delay or persist navigation.
 enum BuyV2NavigationMotionDirection { forward, back, replace }
+
+
+/// One-use, in-memory draft for the existing Buy search field.
+/// Its revision identifies the native form owner, not catalogue inventory.
+class BuySearchReviewDraft {
+  BuySearchReviewDraft({
+    required this.query,
+    required this.binding,
+    required this.requestRevision,
+    required this.validUntil,
+    required this.nonce,
+    this.initiallyAccepted = false,
+    required this.scopeOwner,
+    required this.isOwnerCurrent,
+    required this.isCurrent,
+  });
+
+  final String query;
+  final Object binding;
+  final int requestRevision;
+  final DateTime validUntil;
+  final Object nonce;
+  final bool initiallyAccepted;
+  final Listenable scopeOwner;
+  final bool Function() isOwnerCurrent;
+  final bool Function() isCurrent;
+  bool _claimed = false;
+
+  bool claim() {
+    if (_claimed || !isCurrent()) return false;
+    _claimed = true;
+    return true;
+  }
+}
 
 enum BuyV2View {
   catalogue,

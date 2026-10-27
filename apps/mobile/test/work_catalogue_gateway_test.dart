@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:moolsocial/features/assistant/mool_assistant.dart';
+import 'package:moolsocial/ui_v2/assistant/mool_assistant_v2.dart';
+import 'ui_v2/buy/buy_v2_screen_test.dart' show FixtureShop06HostRig;
 import 'dart:ui' as ui;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
@@ -1320,7 +1323,137 @@ const _bulkServiceCapture20261020 = r'''{"capturedAt":"2026-10-20T12:01:00.000Z"
 
 class _CartLocalHttpOverrides extends HttpOverrides {}
 
+// File-scope insertion in test/work_catalogue_gateway_test.dart.
+class AssistantVisibilityJournal implements WorkspaceStockVisibilityJournal {
+  AssistantVisibilityJournal(this.value);
+  WorkspaceStockVisibilityIntent? value;
+  int reads = 0, saves = 0, removes = 0;
+  @override Future<WorkspaceStockVisibilityIntent?> readPending(WorkspaceStoreStockScope scope) async {
+    reads++; return value;
+  }
+  @override Future<void> savePending(WorkspaceStockVisibilityIntent original) async { saves++; value = original; }
+  @override Future<void> removePending(WorkspaceStockVisibilityIntent original) async { removes++; value = null; }
+}
+
+// FILE SCOPE in test/work_catalogue_gateway_test.dart, after its existing fixtures.
+// Host-only delayed originals. Never bound to runtime or a device provider.
+class _ProductGuardProductJournal extends _ProductJournal {
+  Future<WorkspaceProductSubmissionIntent?> Function()? delayedRead;
+  int reads = 0, saves = 0, removes = 0;
+  @override Future<WorkspaceProductSubmissionIntent?> readPending(WorkspaceProductSubmissionScope scope) async {
+    reads++;
+    return delayedRead == null ? super.readPending(scope) : delayedRead!();
+  }
+  @override Future<void> savePending(WorkspaceProductSubmissionIntent original) async {
+    saves++;
+    await super.savePending(original);
+  }
+  @override Future<void> removePending(WorkspaceProductSubmissionIntent original) async {
+    removes++;
+    await super.removePending(original);
+  }
+}
+
+class _ProductGuardFamilyJournal extends _FamilyJournal {
+  Future<WorkspaceVariantFamilyIntent?> Function()? delayedRead;
+  @override Future<WorkspaceVariantFamilyIntent?> readPending(WorkspaceVariantFamilyScope scope) async =>
+      delayedRead == null ? super.readPending(scope) : delayedRead!();
+}
+
+class _ProductGuardCommodityCatalogue extends SessionCatalogue implements WorkspaceCommodityPriceGateway {
+  int priceReads = 0;
+  @override bool get commodityPriceReadbackSupported => true;
+  @override Future<WorkspaceCommodityPrice?> readCommodityPrice(String storeId, String skuId,
+      {required bool Function() current}) async {
+    priceReads++;
+    return null;
+  }
+}
+
+class _ProductGuardVisibilityJournal implements WorkspaceStockVisibilityJournal {
+  _ProductGuardVisibilityJournal(this.saved);
+  WorkspaceStockVisibilityIntent? saved;
+  Future<WorkspaceStockVisibilityIntent?> Function()? delayedRead;
+  int reads = 0, saves = 0, removes = 0;
+  @override Future<WorkspaceStockVisibilityIntent?> readPending(WorkspaceStoreStockScope scope) async {
+    reads++;
+    return delayedRead == null ? saved : delayedRead!();
+  }
+  @override Future<void> savePending(WorkspaceStockVisibilityIntent original) async {
+    saves++;
+    saved = original;
+  }
+  @override Future<void> removePending(WorkspaceStockVisibilityIntent original) async {
+    removes++;
+    expect(saved?.serverFingerprint, original.serverFingerprint);
+    saved = null;
+  }
+}
+
+class _ProductGuardHeldCredentials extends Credentials {
+  final entered = Completer<void>(), release = Completer<void>();
+  @override Future<String> firebaseIdToken() async {
+    if (!entered.isCompleted) entered.complete();
+    await release.future;
+    return super.firebaseIdToken();
+  }
+}
+
+// Isolated client/gateway contracts. No provider/runtime composition or real request.
+class _BrowseRefreshHeldCredentials extends Credentials {
+  final arrived=Completer<void>(),release=Completer<void>();
+  @override Future<String> firebaseIdToken() async {arrived.complete();await release.future;return super.firebaseIdToken();}
+}
+void registerBrowseRefreshOwnerTests() {
+  for(final point in ['entry','credentials','response','manual']) {
+    test('FE-SHOP-01 refresh captured owner $point preserves actual native gateway freshness and dispatch', () async {
+      final held=_BrowseRefreshHeldCredentials(),response=Completer<SocialContentResponse>(),sent=Completer<void>();
+      var current=point!='entry';final now=DateTime.utc(2026,10,26,12);
+      final transport=OwnerTransport((body) async {
+        expect(body['operation'],'requestPublicCommodityPriceRefresh');sent.complete();
+        return response.future;
+      });
+      final gateway=AuthenticatedWorkspaceCatalogueGateway(
+        endpoint:Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials:point=='credentials'?held:Credentials(),transport:transport,realm:'evaluation',now:()=>now,
+        commodityPriceReadbackSupported:true);
+      final source=WorkspaceStoreCatalogueSource(gateway:gateway,storeId:'HOST-store',current:()=>true);
+      final session=BuyV2Session(core:BuySession(),cataloguePageSource:source,reviewDataEnabled:true);
+      final id='listing-${List.filled(64,'a').join()}';
+      final base=session.product('w-rice-50kg');
+      final product=base.copyWith(id:id,storeId:'HOST-store',offerClass:BuyV2OfferClass.wholesale,
+        publicListingIdentity:BuyV2PublicListingIdentity(listingId:id,realm:'evaluation',storeId:'HOST-store',
+          skuId:'HOST-sku',canonicalProductId:base.canonicalId,verifiedPackId:'HOST-pack',channel:BuyV2OfferClass.wholesale),
+        packTerms:BuyV2PackTerms(skuId:id,revision:'HOST-pack-r1',sellUnit:'sack',pricingStoreId:'HOST-store',
+          priceObservedAt:now.subtract(const Duration(hours:1)),priceValidUntil:now.subtract(const Duration(minutes:1)),
+          commodityPriceRevision:1,priceChangesFrequently:true));
+      try {
+        session.showNotice('HOST previous native notice');
+        final pending=point=='manual'?session.requestCommodityPriceRefresh(product):session.requestCommodityPriceRefresh(product,isCurrent:()=>current);
+        if(point=='entry') {
+          expect(await pending,isFalse);expect(transport.calls,0);
+        } else if(point=='credentials') {
+          await held.arrived.future;current=false;held.release.complete();
+          expect(await pending,isFalse);expect(transport.calls,0);
+        } else {
+          await sent.future;if(point=='response')current=false;
+          response.complete(SocialContentResponse(statusCode:200,body:jsonEncode({'ok':true,'data':{
+            'schemaVersion':1,'realm':'evaluation','storeId':'HOST-store','skuId':'HOST-sku',
+            'priceRevision':1,'state':'recorded','orderingAvailable':false}})));
+          expect(await pending,point=='manual');expect(transport.calls,1);
+        }
+        expect(session.notice,point=='manual'?'Price refresh requested from the supplier.':'HOST previous native notice');
+      } finally {
+        if(!held.release.isCompleted)held.release.complete();
+        if(!response.isCompleted)response.complete(const SocialContentResponse(statusCode:503,body:'{}'));
+        session.dispose();session.core.dispose();
+      }
+    });
+  }
+}
+
 void main() {
+  registerBrowseRefreshOwnerTests();
   test('CARTSOURCE unavailable content does not retry from listener or getter', () async {
     final packet = jsonDecode(File(Platform.environment['CART_SOURCE_PACKET']!).readAsStringSync()) as Map<String, dynamic>;
     final data = packet['data'] as Map<String, dynamic>;
@@ -4108,6 +4241,114 @@ void main() {
     'version': 1, 'scope': {'account': stockScope.account, 'store': stockScope.store, 'realm': stockScope.realm, 'sku': stockScope.sku},
     'request': {...body}..remove('operation'), 'closing': body['operation'] == 'closeStoreStockVisibility'});
   SocialContentResponse visibilityResponse(Map<String, dynamic> data) => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+
+// INSERT inside work_catalogue_gateway_test.dart main(), after visibilityHead,
+// visibilityAck, visibilityOriginal, visibilityResponse helper declarations.
+// Reuses actual authenticated HTTP protocol fixture, no runtime provider added.
+for (final closing in [false, true]) {
+  test('FE-PRODUCT 371 Review reads ${closing ? 'closing' : 'unknown'} original without repair or reconcile', () async {
+    final base = WorkspaceStockVisibilityIntent(scope: stockScope, expectedRevision: 0,
+      idempotencyKey: 'HOST-visibility-original', visible: true,
+      binding: stockOriginal().input.binding, stockRevision: 1);
+    final original = closing ? base.forClosure() : base;
+    final journal = AssistantVisibilityJournal(original), operations = <String>[];
+    final transport = OwnerTransport((body) async {
+      operations.add(body['operation'] as String);
+      return visibilityResponse(visibilityHead());
+    });
+    final controller = WorkspaceStockVisibilityController(scope: stockScope,
+      gateway: stockGateway(transport, privacy: true), journal: journal, context: () => 'HOST-native-owner');
+    addTearDown(controller.dispose);
+    expect(await controller.readOnlyForReview(current: () => true), isTrue);
+    expect(operations, ['readStoreStockVisibility']);
+    expect((journal.reads, journal.saves, journal.removes), (1, 0, 0));
+    expect(controller.pending!.serverFingerprint, original.serverFingerprint);
+    expect(controller.pending!.closing, closing);
+    expect(controller.head!.visible, isFalse);
+  });
+}
+
+test('FE-PRODUCT 371 in-memory original is retained without silently repairing missing journal', () async {
+  final original = WorkspaceStockVisibilityIntent(scope: stockScope, expectedRevision: 0,
+    idempotencyKey: 'HOST-memory-original', visible: false);
+  final journal = AssistantVisibilityJournal(null), operations = <String>[];
+  final controller = WorkspaceStockVisibilityController(scope: stockScope,
+    gateway: stockGateway(OwnerTransport((body) async {
+      operations.add(body['operation'] as String); return visibilityResponse(visibilityHead());
+    }), privacy: true), journal: journal, context: () => 'HOST-native-owner');
+  addTearDown(controller.dispose);
+  controller.pending = original;
+  expect(await controller.readOnlyForReview(current: () => true), isTrue);
+  expect(controller.pending, same(original));
+  expect((journal.saves, journal.removes), (0, 0));
+  expect(operations, ['readStoreStockVisibility']);
+});
+
+testWidgets('FE-PRODUCT 371 mounting native review performs no load/write and displays real head', (tester) async {
+  final journal = AssistantVisibilityJournal(null), operations = <String>[];
+  var current = true;
+  final controller = WorkspaceStockVisibilityController(scope: stockScope,
+    gateway: stockGateway(OwnerTransport((body) async {
+      operations.add(body['operation'] as String); return visibilityResponse(visibilityHead(revision: 1, visible: true));
+    }), privacy: true), journal: journal, context: () => 'HOST-native-owner');
+  addTearDown(controller.dispose);
+  expect(await controller.readOnlyForReview(current: () => current), isTrue);
+  operations.clear(); final before = (journal.reads, journal.saves, journal.removes);
+  await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreStockQuantityVisibility(
+    controller: controller, loadOnOpen: false, requestedVisible: false, reviewCurrent: () => current))));
+  await tester.pumpAndSettle();
+  expect(operations, isEmpty); expect((journal.reads, journal.saves, journal.removes), before);
+  final toggle = tester.widget<SwitchListTile>(find.byKey(const Key('work-product-public-stock-quantity')));
+  expect(toggle.value, isTrue, reason: 'Requested private is a request; the switch still shows the actual confirmed head.');
+  expect(find.textContaining('Requested: keep exact quantity private.'), findsOneWidget);
+  final retained = tester.widget<TextButton>(find.byKey(const Key('work-product-public-stock-check'))).onPressed!;
+  current = false; retained(); await tester.pumpAndSettle();
+  expect(operations, isEmpty); expect((journal.reads, journal.saves, journal.removes), before);
+  await tester.pumpWidget(const SizedBox.shrink());
+});
+
+testWidgets('FE-PRODUCT 371 original Check alone may reconcile exact pending request', (tester) async {
+  final original = WorkspaceStockVisibilityIntent(scope: stockScope, expectedRevision: 0,
+    idempotencyKey: 'HOST-existing-visibility', visible: false);
+  final journal = AssistantVisibilityJournal(original), operations = <String>[], fingerprints = <String>[];
+  final controller = WorkspaceStockVisibilityController(scope: stockScope,
+    gateway: stockGateway(OwnerTransport((body) async {
+      final operation = body['operation'] as String; operations.add(operation);
+      if (operation == 'readStoreStockVisibility') return visibilityResponse(visibilityHead());
+      final command = visibilityOriginal(body); fingerprints.add(command.serverFingerprint);
+      return visibilityResponse(visibilityAck(command, state: 'not_found'));
+    }), privacy: true), journal: journal, context: () => 'HOST-native-owner');
+  addTearDown(controller.dispose);
+  expect(await controller.readOnlyForReview(current: () => true), isTrue);
+  operations.clear();
+  await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreStockQuantityVisibility(
+    controller: controller, loadOnOpen: false, reviewCurrent: () => true))));
+  await tester.pumpAndSettle(); expect(operations, isEmpty);
+  await tester.tap(find.byKey(const Key('work-product-public-stock-check'))); await tester.pumpAndSettle();
+  expect(operations, ['reconcileStoreStockVisibility', 'readStoreStockVisibility']);
+  expect(fingerprints, [original.serverFingerprint]);
+  expect(controller.pending!.serverFingerprint, original.serverFingerprint);
+  expect((journal.saves, journal.removes), (0, 0));
+  await tester.pumpWidget(const SizedBox.shrink());
+});
+
+test('FE-PRODUCT 371 a late owner head cannot become this form evidence or a command', () async {
+  final entered = Completer<void>(), release = Completer<void>();
+  final journal = AssistantVisibilityJournal(null), operations = <String>[];
+  var current = true;
+  final controller = WorkspaceStockVisibilityController(scope: stockScope,
+    gateway: stockGateway(OwnerTransport((body) async {
+      operations.add(body['operation'] as String); entered.complete(); await release.future;
+      return visibilityResponse(visibilityHead(revision: 1, visible: true));
+    }), privacy: true), journal: journal, context: () => 'HOST-native-owner');
+  addTearDown(controller.dispose);
+  final read = controller.readOnlyForReview(current: () => current);
+  try { await entered.future; current = false; }
+  finally { release.complete(); }
+  expect(await read, isFalse); expect(controller.head, isNull);
+  expect(operations, ['readStoreStockVisibility']); expect((journal.saves, journal.removes), (0, 0));
+});
+
   test('STOCK-PRIVACY authenticated gateway gates protocol, pins owner and uses mutation tokens only for save or close', () async {
     final original = WorkspaceStockVisibilityIntent(scope: stockScope, expectedRevision: 0, idempotencyKey: 'visibility-one',
       visible: true, binding: stockOriginal().input.binding, stockRevision: 1);
@@ -7643,6 +7884,350 @@ void main() {
     }
     return work;
   }
+// INSIDE main() in work_catalogue_gateway_test.dart immediately AFTER
+// ownerFamilySession() and BEFORE its first LF03 OWNER-FAMILY session test.
+// All original submission/family/listing/visibility helper declarations are in scope.
+
+test('AI-PRODUCT-GUARD 225 exact saved listing ACK consumes its own source and completes cleanup', () async {
+  final source = SessionCatalogue(), original = ownerIntent(), journal = BindingStore()..saved = ownerIntent();
+  final work = listingSession(source, journal); addTearDown(work.dispose);
+  source.check = (original) async => listingSaved(original);
+  expect(await work.restoreWorkspaceCatalogueListing(), isTrue);
+  final before = work.workspaceCatalogueItems.single.toInventoryJson();
+  bool exactOriginal() => work.workspaceCatalogueListingPendingRequestId == original.idempotencyKey;
+  expect(exactOriginal(), isTrue);
+  expect(await work.reconcileWorkspaceCatalogueListing(current: () => true, inputCurrent: exactOriginal), isTrue);
+  expect(exactOriginal(), isFalse, reason: 'Only the known native ACK consumed this exact pending original.');
+  expect(journal.saved, isNull); expect((source.reconciled, source.submitted), (1, 0));
+  expect(work.workspaceCatalogueItems.single.toInventoryJson(), before);
+});
+
+test('AI-PRODUCT-GUARD 374 exact group ACK clears its own pending source and returns native success', () async {
+  final source = _SessionFamilyCatalogue(), original = familyIntent(), journal = _FamilyJournal()..pending = familyIntent();
+  final work = ownerFamilySession(source, journal); addTearDown(work.dispose);
+  final publisher = work.workspaceVariantFamilyPublisher('family-one')!;
+  expect(await publisher.restore(), isTrue);
+  source.family.write = (intent, _) async =>
+    WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.submitted, familyCandidate(intent));
+  final before = [for (final item in work.workspaceCatalogueItems) item.toInventoryJson()];
+  bool exactOriginal() => publisher.pending?.idempotencyKey == original.idempotencyKey;
+  expect(exactOriginal(), isTrue);
+  expect(await work.checkWorkspaceVariantFamily('family-one', original: true,
+    current: () => true, inputCurrent: exactOriginal), isTrue);
+  expect(exactOriginal(), isFalse); expect(journal.pending, isNull);
+  expect(source.family.reconciled, hasLength(1)); expect(source.family.submitted, isEmpty);
+  expect([for (final item in work.workspaceCatalogueItems) item.toInventoryJson()], before);
+});
+
+test('AI-PRODUCT-GUARD 373 native processed photo retains its original identity and completes', () async {
+  final bytes = await mediaBytes(), original = _mediaOriginal(bytes), put = _MediaPut();
+  final journal = _MediaJournal()..saved = WorkspaceProductMediaRecovery(original);
+  final api = _MediaApi((_) => _mediaReply(original, bytes, state: 'processed'));
+  final source = _ProductMediaOwner()..media = _mediaGateway(api, put);
+  final work = productSession(source, _ProductJournal(), mediaJournal: journal); addTearDown(work.dispose);
+  final media = work.workspaceProductMedia('sku-one')!;
+  expect(await media.restore(), isTrue);
+  bool exactOriginal() => media.original?.idempotencyKey == original.idempotencyKey;
+  expect(await work.checkWorkspaceProductMedia('sku-one', current: exactOriginal), isTrue);
+  expect(exactOriginal(), isTrue, reason: 'Media keeps the native original after processed readback; it is not consumed.');
+  expect(media.result!.processed, isTrue); expect(media.fresh, isTrue);
+  expect(journal.saved!.result!.processed, isTrue); expect(put.calls, 0);
+  expect(api.bodies.map((body) => body['operation']).toList(), ['readStoreProductMedia']);
+});
+
+test('AI-PRODUCT-GUARD 373 owner retirement while obtaining credentials prevents dispatch', () async {
+  final bytes = await mediaBytes(), original = _mediaOriginal(bytes), put = _MediaPut();
+  final journal = _MediaJournal()..saved = WorkspaceProductMediaRecovery(original);
+  final credentials = _ProductGuardHeldCredentials();
+  final api = _MediaApi((_) => _mediaReply(original, bytes, state: 'processed'));
+  final source = _ProductMediaOwner()..media = _mediaGateway(api, put, credentials: credentials);
+  final work = productSession(source, _ProductJournal(), mediaJournal: journal); addTearDown(work.dispose);
+  final media = work.workspaceProductMedia('sku-one')!;
+  expect(await media.restore(), isTrue);
+  var ownerCurrent = true;
+  final task = work.checkWorkspaceProductMedia('sku-one',
+    current: () => ownerCurrent && media.original?.idempotencyKey == original.idempotencyKey);
+  await credentials.entered.future;
+  ownerCurrent = false; credentials.release.complete();
+  expect(await task, isFalse); expect(api.bodies, isEmpty); expect(put.calls, 0);
+  expect(journal.saved!.original.fingerprint, original.fingerprint); expect(journal.saved!.result, isNull);
+});
+
+for (final capability in ['Product', 'Family', 'Listing']) {
+  test('AI-PRODUCT-GUARD $capability source change before dispatch preserves the original under a valid actor', () async {
+    final entered = Completer<void>(), release = Completer<void>();
+    var inputCurrent = true;
+    if (capability == 'Product') {
+      final source = _ProductOwner(), original = submissionIntent();
+      final journal = _ProductGuardProductJournal()..pending = original;
+      journal.delayedRead = () async { entered.complete(); await release.future; return journal.pending; };
+      final controller = productController(source, journal); addTearDown(controller.dispose);
+      final task = controller.reconcile(current: () => true, inputCurrent: () => inputCurrent);
+      await entered.future; inputCurrent = false; release.complete();
+      expect((await task).state, WorkspaceProductSubmissionWriteState.unknown);
+      expect(source.reconciled, isEmpty); expect(source.submitted, isEmpty);
+      expect(journal.pending!.fingerprint, original.fingerprint); expect(journal.removes, 0);
+    } else if (capability == 'Family') {
+      final source = _FamilyOwner(), original = familyIntent();
+      final journal = _ProductGuardFamilyJournal()..pending = original;
+      journal.delayedRead = () async { entered.complete(); await release.future; return journal.pending; };
+      final controller = familyController(source, journal); addTearDown(controller.dispose);
+      final task = controller.reconcile(current: () => true, inputCurrent: () => inputCurrent);
+      await entered.future; inputCurrent = false; release.complete();
+      expect((await task).state, WorkspaceVariantFamilyWriteState.unknown);
+      expect(source.reconciled, isEmpty); expect(source.submitted, isEmpty);
+      expect(journal.pending!.fingerprint, original.fingerprint); expect(journal.removes, 0);
+    } else {
+      final source = ListingGateway(), original = ownerIntent(), journal = BindingStore()..saved = ownerIntent();
+      journal.read = () async { entered.complete(); await release.future; return journal.saved; };
+      final controller = WorkspaceCatalogueListingController(scope: listingScope, gateway: source,
+        pendingStore: journal, context: () => 'same native Store owner'); addTearDown(controller.dispose);
+      final task = controller.reconcile(current: () => true, inputCurrent: () => inputCurrent);
+      await entered.future; inputCurrent = false; release.complete();
+      expect((await task).state, WorkspaceCatalogueBindingState.unknown);
+      expect((source.reconciled, source.submitted), (0, 0)); expect(journal.saved!.toJson(), original.toJson());
+    }
+  });
+}
+
+test('AI-PRODUCT-GUARD Product recovery retirement during journal restore never dispatches', () async {
+  final source = _ProductOwner(), journal = _ProductGuardProductJournal()..pending = submissionIntent();
+  final entered = Completer<void>(), release = Completer<void>();
+  var current = true;
+  journal.delayedRead = () async { entered.complete(); await release.future; return journal.pending; };
+  final controller = productController(source, journal);
+  addTearDown(controller.dispose);
+  final task = controller.reconcile(current: () => current);
+  await entered.future;
+  current = false;
+  release.complete();
+  expect((await task).state, WorkspaceProductSubmissionWriteState.unknown);
+  expect(source.reconciled, isEmpty); expect(source.submitted, isEmpty);
+  expect(journal.pending!.fingerprint, submissionIntent().fingerprint);
+  expect((journal.saves, journal.removes), (0, 0));
+});
+
+test('AI-PRODUCT-GUARD Product original retry retires during journal save without a new send', () async {
+  final source = _ProductOwner(), original = submissionIntent();
+  final journal = _ProductGuardProductJournal()..pending = original;
+  final controller = productController(source, journal);
+  addTearDown(controller.dispose);
+  source.write = (_, _) async => const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.notFound);
+  await controller.reconcile();
+  expect(controller.canRetryOriginal, isTrue);
+  final entered = Completer<void>(), release = Completer<void>();
+  var current = true;
+  journal.beforeSave = () async { entered.complete(); await release.future; };
+  final task = controller.retryOriginal(current: () => current);
+  await entered.future;
+  current = false; release.complete();
+  expect((await task).state, WorkspaceProductSubmissionWriteState.unknown);
+  expect(source.submitted, isEmpty); expect(source.reconciled, hasLength(1));
+  expect(journal.pending!.fingerprint, original.fingerprint); expect(journal.removes, 0);
+});
+
+test('AI-PRODUCT-GUARD Product late read does not become another form head', () async {
+  final source = _ProductOwner(), journal = _ProductJournal(), controller = productController(source, journal);
+  addTearDown(controller.dispose);
+  final entered = Completer<void>(), release = Completer<void>();
+  var current = true;
+  source.readHead = () async { entered.complete(); await release.future; return submissionRecord(submissionIntent()); };
+  final task = controller.refresh(current: () => current);
+  await entered.future; current = false; release.complete();
+  expect(await task, isFalse);
+  expect(controller.headLoaded, isFalse); expect(controller.head, isNull);
+  expect(source.readScopes, hasLength(1)); expect(source.submitted, isEmpty); expect(source.reconciled, isEmpty);
+});
+
+test('AI-PRODUCT-GUARD Family recovery retirement during journal restore never dispatches', () async {
+  final source = _FamilyOwner(), original = familyIntent();
+  final journal = _ProductGuardFamilyJournal()..pending = original;
+  final entered = Completer<void>(), release = Completer<void>();
+  var current = true;
+  journal.delayedRead = () async { entered.complete(); await release.future; return journal.pending; };
+  final controller = familyController(source, journal);
+  addTearDown(controller.dispose);
+  final task = controller.reconcile(current: () => current);
+  await entered.future; current = false; release.complete();
+  expect((await task).state, WorkspaceVariantFamilyWriteState.unknown);
+  expect(source.reconciled, isEmpty); expect(source.submitted, isEmpty);
+  expect(journal.pending!.fingerprint, original.fingerprint);
+  expect((journal.saves, journal.removes), (0, 0));
+});
+
+test('AI-PRODUCT-GUARD Family original retry retires after journal save without dispatch', () async {
+  final source = _FamilyOwner(), original = familyIntent();
+  final journal = _ProductGuardFamilyJournal()..pending = original;
+  final controller = familyController(source, journal);
+  addTearDown(controller.dispose);
+  source.write = (_, _) async => const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.notFound);
+  await controller.reconcile();
+  expect(controller.canRetryOriginal, isTrue);
+  final entered = Completer<void>(), release = Completer<void>();
+  var current = true;
+  journal.beforeSave = () async { entered.complete(); await release.future; };
+  final task = controller.retryOriginal(current: () => current);
+  await entered.future; current = false; release.complete();
+  expect((await task).state, WorkspaceVariantFamilyWriteState.unknown);
+  expect(source.submitted, isEmpty); expect(source.reconciled, hasLength(1));
+  expect(journal.pending!.fingerprint, original.fingerprint); expect(journal.removes, 0);
+});
+
+test('AI-PRODUCT-GUARD Family late head is not adopted after UI retirement', () async {
+  final source = _FamilyOwner(), journal = _FamilyJournal(), controller = familyController(source, journal);
+  addTearDown(controller.dispose);
+  final entered = Completer<void>(), release = Completer<void>();
+  var current = true;
+  source.read = () async { entered.complete(); await release.future; return source.head; };
+  final task = controller.refresh(current: () => current);
+  await entered.future; current = false; release.complete();
+  expect(await task, isFalse); expect(controller.headLoaded, isFalse); expect(controller.head, isNull);
+  expect(source.submitted, isEmpty); expect(source.reconciled, isEmpty);
+});
+
+test('AI-PRODUCT-GUARD listing restore retirement preserves the exact original without dispatch', () async {
+  final source = ListingGateway(), original = ownerIntent(), journal = BindingStore()..saved = ownerIntent();
+  final entered = Completer<void>(), release = Completer<void>();
+  var current = true;
+  journal.read = () async { entered.complete(); await release.future; return journal.saved; };
+  final controller = WorkspaceCatalogueListingController(scope: listingScope, gateway: source,
+    pendingStore: journal, context: () => 'same native Store owner');
+  addTearDown(controller.dispose);
+  final task = controller.reconcile(current: () => current);
+  await entered.future; current = false; release.complete();
+  expect((await task).state, WorkspaceCatalogueBindingState.unknown);
+  expect((source.submitted, source.reconciled), (0, 0));
+  expect(journal.saved!.toJson(), original.toJson());
+});
+
+test('AI-PRODUCT-GUARD late listing receipt retains original when AI owner retired', () async {
+  final source = ListingGateway(), original = ownerIntent(), journal = BindingStore()..saved = ownerIntent();
+  final entered = Completer<void>(), release = Completer<void>();
+  var current = true;
+  source.check = (original) async { entered.complete(); await release.future; return listingSaved(original); };
+  final controller = WorkspaceCatalogueListingController(scope: listingScope, gateway: source,
+    pendingStore: journal, context: () => 'same native Store owner');
+  addTearDown(controller.dispose);
+  final task = controller.reconcile(current: () => current);
+  await entered.future; current = false; release.complete();
+  expect((await task).state, WorkspaceCatalogueBindingState.unknown);
+  expect(source.reconciled, 1); expect(source.submitted, 0);
+  expect(controller.pending!.toJson(), original.toJson()); expect(journal.saved!.toJson(), original.toJson());
+});
+
+test('AI-PRODUCT-GUARD WorkSession product recovery carries UI retirement beyond restore', () async {
+  final source = _ProductOwner(), journal = _ProductGuardProductJournal()..pending = submissionIntent();
+  final work = productSession(source, journal); addTearDown(work.dispose);
+  final entered = Completer<void>(), release = Completer<void>();
+  var current = true;
+  journal.delayedRead = () async { entered.complete(); await release.future; return journal.pending; };
+  final task = work.checkWorkspaceProductSubmission('sku-one', current: () => current);
+  await entered.future; current = false; release.complete();
+  expect(await task, isFalse); expect(source.reconciled, isEmpty); expect(source.submitted, isEmpty);
+  expect(journal.pending!.fingerprint, submissionIntent().fingerprint);
+});
+
+test('AI-PRODUCT-GUARD WorkSession family recovery carries UI retirement beyond restore', () async {
+  final source = _SessionFamilyCatalogue(), journal = _ProductGuardFamilyJournal()..pending = familyIntent();
+  final work = ownerFamilySession(source, journal); addTearDown(work.dispose);
+  final entered = Completer<void>(), release = Completer<void>();
+  var current = true;
+  journal.delayedRead = () async { entered.complete(); await release.future; return journal.pending; };
+  final task = work.checkWorkspaceVariantFamily('family-one', original: true, current: () => current);
+  await entered.future; current = false; release.complete();
+  expect(await task, isFalse); expect(source.family.reconciled, isEmpty); expect(source.family.submitted, isEmpty);
+  expect(journal.pending!.fingerprint, familyIntent().fingerprint);
+});
+
+for (final operation in ['listing recovery', 'price confirmation', 'post-save listing recovery']) {
+  test('AI-PRODUCT-GUARD WorkSession $operation cannot dispatch after UI retirement during restore', () async {
+    final source = _ProductGuardCommodityCatalogue(), original = ownerIntent(), journal = BindingStore()..saved = ownerIntent();
+    final work = listingSession(source, journal); addTearDown(work.dispose);
+    work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.single.copyWith(
+      wholesaleOffer: WorkspaceWholesaleOffer(priceMinor: 10025, minimumPacks: 1,
+        enabled: true, saleType: BuyV2WholesaleSaleType.bulk, priceValidityMinutes: 120));
+    final committed = work.workspaceCatalogueItems.single.toInventoryJson();
+    final entered = Completer<void>(), release = Completer<void>();
+    var current = true;
+    journal.read = () async { entered.complete(); await release.future; return journal.saved; };
+    final task = switch (operation) {
+      'listing recovery' => work.reconcileWorkspaceCatalogueListing(current: () => current),
+      'price confirmation' => work.confirmWorkspaceCommodityPrice('sku-one', validityMinutes: 120, current: () => current),
+      _ => work.requestWorkspaceProductListing('sku-one', listed: true, current: () => current),
+    };
+    await entered.future; current = false; release.complete();
+    expect(await task, isFalse); expect((source.submitted, source.reconciled, source.ownerReads, source.priceReads), (0, 0, 0, 0));
+    expect(journal.saved!.toJson(), original.toJson()); expect(work.workspaceCatalogueItems.single.toInventoryJson(), committed);
+    expect(work.workspaceOrders, isEmpty); expect(work.workspaceInvoices, isEmpty);
+  });
+}
+
+test('AI-PRODUCT-GUARD post-save listing read retirement keeps committed inventory and sends nothing', () async {
+  final source = SessionCatalogue(), journal = BindingStore(), work = listingSession(source, journal);
+  addTearDown(work.dispose);
+  work.retailerSetupSaved = true; work.reviewStage = WorkReviewStage.live;
+  // The original native inventory operation has already committed. This test
+  // then isolates the distinct follow-on listing read/dispatch boundary.
+  expect(work.addOrUpdateWorkspaceProduct(work.workspaceCatalogueItems.single.copyWith(title: 'HOST saved native change')), isTrue);
+  expect(await work.workspaceInventorySaved, isTrue);
+  final committed = work.workspaceCatalogueItems.single.toInventoryJson();
+  final originalRead = source.ownerRead, entered = Completer<void>(), release = Completer<void>();
+  var current = true;
+  source.ownerRead = () async { entered.complete(); await release.future; return originalRead(); };
+  final task = work.requestWorkspaceProductListing('sku-one', listed: true, current: () => current);
+  await entered.future; current = false; release.complete();
+  expect(await task, isFalse);
+  expect((source.submitted, source.reconciled), (0, 0)); expect(journal.saved, isNull);
+  expect(work.workspaceCatalogueItems.single.toInventoryJson(), committed);
+  expect(work.workspaceCatalogueItems.single.title, 'HOST saved native change');
+});
+
+for (final aiOwned in [false, true]) {
+  testWidgets('AI-PRODUCT-GUARD visibility ${aiOwned ? 'AI retirement stops dispatch' : 'manual close preserves original lifetime'}', (tester) async {
+    final original = WorkspaceStockVisibilityIntent(scope: stockScope, expectedRevision: 0,
+      idempotencyKey: 'HOST-existing-visibility-owner', visible: false);
+    final journal = _ProductGuardVisibilityJournal(original), operations = <String>[];
+    final entered = Completer<void>(), release = Completer<void>();
+    var current = true;
+    journal.delayedRead = () async { entered.complete(); await release.future; return journal.saved; };
+    final controller = WorkspaceStockVisibilityController(scope: stockScope,
+      gateway: stockGateway(OwnerTransport((body) async {
+        final op = body['operation'] as String; operations.add(op);
+        if (op == 'readStoreStockVisibility') return visibilityResponse(visibilityHead());
+        final command = visibilityOriginal(body);
+        expect(command.serverFingerprint, original.serverFingerprint);
+        return visibilityResponse(visibilityAck(command, state: 'not_found'));
+      }), privacy: true), journal: journal, context: () => 'same native Store owner');
+    addTearDown(controller.dispose);
+    try {
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreStockQuantityVisibility(
+        controller: controller, loadOnOpen: !aiOwned, reviewCurrent: aiOwned ? () => current : null))));
+      await tester.pump();
+      if (aiOwned) {
+        await tester.tap(find.byKey(const Key('work-product-public-stock-check')));
+        await tester.pump();
+      }
+      expect(entered.isCompleted, isTrue);
+      current = false;
+      await tester.pumpWidget(const SizedBox.shrink());
+      release.complete();
+      await tester.pumpAndSettle();
+      if (aiOwned) {
+        expect(operations, isEmpty);
+      } else {
+        expect(operations, ['reconcileStoreStockVisibility', 'readStoreStockVisibility']);
+        expect(controller.pending!.serverFingerprint, original.serverFingerprint);
+      }
+      expect((journal.saves, journal.removes), (0, 0));
+      expect(journal.saved!.serverFingerprint, original.serverFingerprint);
+      expect(tester.takeException(), isNull);
+    } finally {
+      if (!release.isCompleted) release.complete();
+      await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+    }
+  });
+}
+
   test('LF03 OWNER-FAMILY session submits all saved exact members without changing Stock or invoices', () async {
     final source = _SessionFamilyCatalogue(), journal = _FamilyJournal(), work = ownerFamilySession(source, journal);
     addTearDown(work.dispose);
@@ -8224,7 +8809,7 @@ void main() {
       supplierSelectionHost({_HostSupplierQuoteCheckout? quote, _ExactMoneyHostPreferences? preferences,
         BuyV2CommerceAdapter? commerceAdapter,
         bool couponsAvailable = false, bool includeSiblingBulk = false, Future<void> Function()? beforeCouponReply,
-        void Function(Map<String, dynamic>)? editListing, Future<void> Function()? beforeListingReply}) async {
+        void Function(Map<String, dynamic>)? editListing, Future<void> Function()? beforeListingReply,void Function(String operation)? observeOperation}) async {
     // Controlled host discovery/agreement fixture. No phone or live-service data.
     FlutterSecureStorage.setMockInitialValues({}); var clock = at, current = true;
     late Map<String, dynamic> accepted;
@@ -8232,6 +8817,7 @@ void main() {
       listingId: 'listing-${sha256.convert(utf8.encode(jsonEncode([1, 'production', 'store-one', 'sku-one', 'bulk'])))}',
       realm: 'production', storeId: 'store-one', skuId: 'sku-one', canonicalProductId: 'canonical-one', verifiedPackId: 'pack-one', channel: BuyV2OfferClass.bulk);
     final connection = discoveryGateway(OwnerTransport((body) async {
+      observeOperation?.call(body['operation'] as String);
       if (body['operation'] == 'readBulkSupplierQuote') { return SocialContentResponse(statusCode: 200,
         body: jsonEncode({'ok': true, 'data': accepted})); }
       if (couponsAvailable && body['operation'] == 'readPublicStoreCouponSnapshot') {
@@ -11592,6 +12178,44 @@ void main() {
       expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+  testWidgets('FE-SHOP-01 captured same selected product omits actual presentation and stock observer requests', (tester) async {
+    final entry=factoryEntry(publicPage()),presentations=<Map<String,Object?>>[],stockReads=<Map<String,Object?>>[];
+    final reporter=WorkspaceProductPresentationGateway(current:()=>true,displayed:(_)=>entry.readback,
+      gateway:AuthenticatedWorkspaceCatalogueGateway(
+        endpoint:Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials:Credentials(),now:()=>at,transport:OwnerTransport((body)async{
+          presentations.add(body);return const SocialContentResponse(statusCode:503,body:'{}');
+        })));
+    final reader=WorkspacePublicStockReader(gateway:publicStockApi(OwnerTransport((body)async{
+      stockReads.add(body);return const SocialContentResponse(statusCode:503,body:'{}');
+    }),privacy:true),displayed:(_)=>entry.readback,current:()=>true,now:()=>at);
+    // benefitSession owns this reader and disposes it with the native session.
+    final facts=_HostOperationalFacts((p)=>const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures:false).snapshotFor(p));
+    final session=await benefitSession(_HostMinorBenefits(),[entry.product],facts:facts,
+      stockReader:reader,presentations:reporter,reviewDataEnabled:false);
+    expect(session.openProduct(entry.product.id),isTrue);
+    expect(session.selectedProductId,entry.product.id);expect(session.view,BuyV2View.product);
+    expect(reporter.prepare(entry.product,List.filled(32,'a').join()),isNotNull);
+    expect(session.storeStockRequestIdentity(entry.product),isNotNull);
+    Future<void> show(bool captured)async {
+      await tester.pumpWidget(MaterialApp(theme:MoolTheme.light(),home:Scaffold(body:
+        BuyV2ThemeScope(spec:BuyV2ThemeSpec.resolve(entry.product.destination,BuyV2View.product),refinedCommerce:true,
+          child:BuyV2ProductView(session:session,capturedProduct:captured?entry.product:null,capturedCurrent:captured?()=>true:null)))));
+      await tester.pumpAndSettle();
+    }
+    await show(true);
+    expect(find.byType(BuyV2ProductView),findsOneWidget);
+    expect(presentations,isEmpty);expect(stockReads,isEmpty);
+    await tester.drag(find.byKey(PageStorageKey('buy-product-${entry.product.id}')),const Offset(0,-400));await tester.pumpAndSettle();
+    expect(presentations,isEmpty);expect(stockReads,isEmpty);
+    // Same real native contracts and selected product: manual null default still
+    // inserts both original observers, proving the negative did not lack a source.
+    await show(false);
+    expect(presentations,hasLength(1));expect(presentations.single['operation'],'recordPublicProductPresentation');
+    expect(stockReads,hasLength(1));expect(session.selectedProductId,entry.product.id);
+    await tester.pumpWidget(const SizedBox.shrink());expect(tester.takeException(),isNull);
+  });
+
   test('LF14 CART actual successful Add reports once; failed Add and Cart editing do not manufacture events', () async {
     final entry = factoryEntry(publicPage()), sent = <Map<String, Object?>>[], received = Completer<void>();
     final reporter = WorkspaceProductPresentationGateway(current: () => true, displayed: (_) => entry.readback,
@@ -16209,4 +16833,70 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  testWidgets('FE-SHOP-06 349 exact retained agreement opens actual readonly detail without recovery or writes',(tester)async{
+    final operations=<String>[];var writes=0;
+    final h=await supplierSelectionHost(observeOperation:operations.add,preferences:_ExactMoneyHostPreferences(beforeSet:(_,__)=>writes++));
+    final rig=FixtureShop06HostRig(h.session,user:'buyer-one');
+    try{
+      expect(await h.access.forStore(h.accepted.storeId).restore(),isTrue);
+      expect(await h.session.chooseSupplierQuote(h.accepted),isTrue);await rig.mount(tester,view:BuyV2View.cart);
+      final original=h.session.selectedSupplierQuotes.single,beforeWrites=writes,beforeOperations=List<String>.of(operations);
+      await rig.start(tester,'AI-ACT-349',entity:original.quoteId);
+      expect(writes,beforeWrites);expect(operations,beforeOperations);expect(h.session.selectedSupplierQuotes.single.quoteBinding,original.quoteBinding);
+      expect(find.text(h.accepted.lines.single.name),findsWidgets);expect(find.byKey(const ValueKey('bulk-quote-product-prices')),findsOneWidget);
+      for(final label in ['Use for this Cart','Accept quote','Close request','Check status','Retry original request'])expect(find.text(label),findsNothing);
+      expect(h.access.forStore(original.storeId).pending,isEmpty);await rig.close(tester);
+      expect(writes,beforeWrites);expect(operations,beforeOperations);
+    }finally{await rig.dispose(tester);h.dispose();}
+  });
+  testWidgets('FE-SHOP-06 348 only original remove clears the selected binding and preserves the supplier record',(tester)async{
+    final operations=<String>[];var writes=0;
+    final h=await supplierSelectionHost(observeOperation:operations.add,preferences:_ExactMoneyHostPreferences(beforeSet:(_,__)=>writes++));
+    final rig=FixtureShop06HostRig(h.session,user:'buyer-one');
+    try{
+      expect(await h.access.forStore(h.accepted.storeId).restore(),isTrue);
+      expect(await h.session.chooseSupplierQuote(h.accepted),isTrue);await rig.mount(tester,view:BuyV2View.cart);
+      final original=h.session.selectedSupplierQuotes.single,beforeWrites=writes,beforeOperations=List<String>.of(operations);
+      await rig.start(tester,'AI-ACT-348',entity:original.quoteId);
+      expect(writes,beforeWrites);expect(operations,beforeOperations);expect(h.session.selectedSupplierQuotes.single.quoteBinding,original.quoteBinding);
+      await rig.tap(tester,find.byTooltip('Remove selected supplier quote'));
+      expect(h.session.selectedSupplierQuotes,isEmpty);expect(writes,beforeWrites+1);expect(operations,beforeOperations);
+      expect(h.access.forStore(original.storeId).head(original.quoteId),same(h.accepted));
+      expect(h.access.forStore(original.storeId).pending,isEmpty);expect(await rig.review,MoolAssistantReviewResult.opened);
+    }finally{await rig.dispose(tester);h.dispose();}
+  });
+  testWidgets('FE-SHOP-06 348 principal retirement rejects captured remove in the unchanged native namespace',(tester)async{
+    var writes=0;final h=await supplierSelectionHost(preferences:_ExactMoneyHostPreferences(beforeSet:(_,__)=>writes++));
+    final rig=FixtureShop06HostRig(h.session,user:'buyer-one');
+    try{
+      expect(await h.access.forStore(h.accepted.storeId).restore(),isTrue);
+      expect(await h.session.chooseSupplierQuote(h.accepted),isTrue);await rig.mount(tester,view:BuyV2View.cart);
+      final original=h.session.selectedSupplierQuotes.single,namespace=h.session.customerStateStore!.ownerScope;
+      await rig.start(tester,'AI-ACT-348',entity:original.quoteId);
+      final retained=tester.widget<IconButton>(find.ancestor(of:find.byTooltip('Remove selected supplier quote'),matching:find.byType(IconButton)).first).onPressed!,beforeWrites=writes;
+      rig.retire();await tester.pumpAndSettle();retained();await tester.pump();
+      expect(writes,beforeWrites);expect(h.session.customerStateStore!.ownerScope,namespace);
+      expect(h.session.selectedSupplierQuotes.single.quoteBinding,original.quoteBinding);expect(await rig.review,MoolAssistantReviewResult.stale);
+    }finally{await rig.dispose(tester);h.dispose();}
+  });
+  testWidgets('FE-SHOP-06 349 expiry removes only its owned detail and preserves a foreign route',(tester)async{
+    var writes=0;final h=await supplierSelectionHost(preferences:_ExactMoneyHostPreferences(beforeSet:(_,__)=>writes++));
+    final rig=FixtureShop06HostRig(h.session,user:'buyer-one');
+    try{
+      expect(await h.access.forStore(h.accepted.storeId).restore(),isTrue);
+      expect(await h.session.chooseSupplierQuote(h.accepted),isTrue);await rig.mount(tester,view:BuyV2View.cart);
+      final original=h.session.selectedSupplierQuotes.single,beforeWrites=writes;
+      await rig.start(tester,'AI-ACT-349',entity:original.quoteId,lifetime:const Duration(seconds:1));
+      final close=tester.widget<IconButton>(find.ancestor(of:find.byTooltip('Back to purchase'),matching:find.byType(IconButton)).first).onPressed!;
+      unawaited(rig.navigator.currentState!.push<void>(MaterialPageRoute<void>(builder:(_)=>const Scaffold(body:Text('HOST unrelated native route')))));
+      await tester.pumpAndSettle();await tester.pump(const Duration(seconds:2));await tester.pumpAndSettle();
+      close();await tester.pump();
+      expect(find.text('HOST unrelated native route'),findsOneWidget);expect(await rig.review,MoolAssistantReviewResult.stale);expect(tester.takeException(),isNull);
+      await rig.navigator.currentState!.maybePop();await tester.pumpAndSettle();
+      expect(find.text('Bulk quotes'),findsNothing);expect(find.byType(MoolAssistantPage),findsOneWidget);
+      expect(h.session.selectedSupplierQuotes.single.quoteBinding,original.quoteBinding);expect(writes,beforeWrites);
+    }finally{await rig.dispose(tester);h.dispose();}
+  });
+
 }

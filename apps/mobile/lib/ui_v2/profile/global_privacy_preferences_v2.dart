@@ -38,7 +38,9 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
         appBar: AppBar(
           backgroundColor: palette.canvas,
           surfaceTintColor: Colors.transparent,
-          toolbarHeight: 64,
+          toolbarHeight: surfaceTone == GlobalProfileSurfaceTone.light
+              ? 56
+              : 64,
           leadingWidth: 56,
           leading: Padding(
             padding: const EdgeInsets.only(left: MoolSpacing.xs),
@@ -54,23 +56,31 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Privacy & preferences',
+                surfaceTone == GlobalProfileSurfaceTone.light
+                    ? 'Preferences'
+                    : 'Privacy & preferences',
                 style: TextStyle(
                   color: palette.ink,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
+                  fontSize: surfaceTone == GlobalProfileSurfaceTone.light
+                      ? 18
+                      : 17,
+                  fontWeight: surfaceTone == GlobalProfileSurfaceTone.light
+                      ? FontWeight.w700
+                      : FontWeight.w900,
                   letterSpacing: -.2,
                 ),
               ),
-              const SizedBox(height: 1),
-              Text(
-                'Your choices across MoolSocial',
-                style: TextStyle(
-                  color: palette.muted,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
+              if (surfaceTone == GlobalProfileSurfaceTone.socialDark) ...[
+                const SizedBox(height: 1),
+                Text(
+                  'Your choices across MoolSocial',
+                  style: TextStyle(
+                    color: palette.muted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -89,8 +99,10 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
                   MoolSpacing.xl,
                 ),
                 children: [
-                  _PreferencesHero(palette: palette),
-                  const SizedBox(height: MoolSpacing.md),
+                  if (surfaceTone == GlobalProfileSurfaceTone.socialDark) ...[
+                    _PreferencesHero(palette: palette),
+                    const SizedBox(height: MoolSpacing.md),
+                  ],
                   _PreferenceSection(
                     title: 'App preferences',
                     palette: palette,
@@ -698,21 +710,21 @@ class _PreferenceTile extends StatelessWidget {
         color: palette.control,
         borderRadius: BorderRadius.circular(11),
       ),
-      child: Icon(icon, color: palette.accent, size: 18),
+      child: Icon(icon, color: palette.accent, size: 22),
     ),
     title: Text(
       title,
       style: TextStyle(
         color: palette.ink,
-        fontSize: 12,
-        fontWeight: FontWeight.w900,
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
       ),
     ),
     subtitle: Text(
       value,
       style: TextStyle(
         color: palette.muted,
-        fontSize: 9.5,
+        fontSize: 12,
         height: 1.25,
         fontWeight: FontWeight.w600,
       ),

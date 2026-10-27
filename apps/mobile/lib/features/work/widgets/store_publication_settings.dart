@@ -7,9 +7,15 @@ import '../work_session.dart';
 import 'store_settings_widgets.dart';
 import 'store_payment_terms.dart';
 
+final _publicationSettingsEditors = <_StorePublicationSettingsState>{};
+bool storePublicationSettingsHasDraft(WorkSession session) => _publicationSettingsEditors.any(
+  (state) => state.mounted && identical(state.widget.session, session) && (!state._initialized || state._draftChanged));
+
 /// One-time provider inputs inside existing Business details, not a new route.
 class StorePublicationSettings extends StatefulWidget {
-  const StorePublicationSettings({required this.session, super.key});
+  const StorePublicationSettings({required this.session, this.initialData, this.reviewScope, super.key});
+  final StoreSettingsInitialData? initialData;
+  final StoreSettingsReviewScope? reviewScope;
   final WorkSession session;
   @override
   State<StorePublicationSettings> createState() =>
@@ -28,6 +34,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
   @override
   void initState() {
     super.initState();
+    _publicationSettingsEditors.add(this);
     _storeId = widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
     _scopeRevision = widget.session.navigationScopeRevision;
     _ownerSession = widget.session;
@@ -39,12 +46,12 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
       _load = _loadInputs();
     }
   }
-  bool get _contextCurrent => identical(widget.session, _ownerSession) &&
+  bool get _contextCurrent => widget.reviewScope?.current() != false && identical(widget.session, _ownerSession) &&
       _ownerContext == widget.session.publicationPreferencesContext;
   Future<bool> _loadInputs() async {
     final loaded = _storeId != null && await widget.session
         .loadWorkspacePublicationPreferences(expectedStoreId: _storeId);
-    if (loaded && mounted && _contextCurrent && !_initialized) {
+    if (loaded && mounted && _contextCurrent && widget.reviewScope?.mayApply != false && !_initialized) {
       _initializeInputs();
     }
     return loaded;
@@ -57,6 +64,15 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
         _fields[key]!.addListener(() { if (mounted) setState(() {}); });
       }
     }
+    final proposed = widget.initialData?.fields ?? const <String, Object?>{};
+    for (final key in _fields.keys) {
+      if (proposed.containsKey(key)) _fields[key]!.text = '${proposed[key] ?? ''}';
+    }
+    if (proposed['businessType'] != null) _businessType = proposed['businessType'] as String;
+    if (proposed['retailChannelEnabled'] != null) _retail = proposed['retailChannelEnabled'] as bool;
+    if (proposed['wholesaleChannelEnabled'] != null) _wholesale = proposed['wholesaleChannelEnabled'] as bool;
+    if (proposed.containsKey('wholesalePaymentTerms')) _wholesaleTerms = WorkspacePaymentTerm.decodeList(proposed['wholesalePaymentTerms']);
+    if (proposed.containsKey('returnRemedies')) { _remedies.clear(); _remedies.addAll((proposed['returnRemedies'] as List).cast<String>()); }
     _initialized = true;
   }
   late final WorkspaceStorePublicationDetails _initial;
@@ -94,13 +110,30 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
   static const _changedContextMessage =
       'Your Store changed. Reopen these details in the correct Store or account. Your entries are kept.';
   bool _canApply() {
-    if (!_contextCurrent) {
+    if (!_contextCurrent || widget.reviewScope?.mayApply == false) {
       setState(() { _failed = true; _message = _changedContextMessage; });
       return false;
     }
     return !widget.session.workspacePublicationPreferencesSaving;
   }
 
+  bool get _draftChanged {
+    if (!_initialized) return true;
+    final saved = widget.session.workspacePublicationDetails;
+    return _fields.entries.any((entry) => entry.value.text != '${saved.toJson()[entry.key] ?? ''}') ||
+      _businessType != saved.businessType || _retail != (saved.retailChannelEnabled ?? true) ||
+      _wholesale != (saved.wholesaleChannelEnabled ?? widget.session.workspaceCatalogueItems.any((item) => item.wholesaleOffer?.enabled == true)) ||
+      _wholesaleTerms.map((term) => term.toJson().toString()).join() != saved.wholesalePaymentTerms.map((term) => term.toJson().toString()).join() ||
+      _remedies.length != saved.returnRemedies.length || !_remedies.containsAll(saved.returnRemedies);
+  }
+  void _trackSettingsSave(bool accepted) {
+    final scope = widget.reviewScope;
+    if (!accepted || scope == null) return;
+    if (!widget.session.publicationPreferencesPersistenceAvailable) { scope.completeAttempt(); return; }
+    unawaited(widget.session.workspacePublicationPreferencesWrite.then((confirmed) {
+      if (mounted && _contextCurrent && confirmed && widget.session.workspacePublicationPreferencesSaved) scope.completeAttempt();
+    }));
+  }
   bool get _publicEditsUnsaved {
     final saved = widget.session.workspacePublicationDetails.toJson();
     return _publicKeys.any((key) => _fields[key]!.text.trim() != '${saved[key] ?? ''}');
@@ -121,7 +154,10 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
         FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Retry original'))]));
     if (confirmed == true && mounted && _contextCurrent && publisher.canRetryOriginal &&
         publisher.pending?.fingerprint == original && identical(publisher, _publisher)) {
-      await publisher.retryOriginal();
+      if (widget.reviewScope?.mayApply != false) {
+        final result = await publisher.retryOriginal(current: widget.reviewScope?.current, inputCurrent: widget.reviewScope?.sourceCurrent, onOriginalResolved: widget.reviewScope == null ? null : (original) => widget.reviewScope!.admitOriginalResolution(original.fingerprint));
+        if (publisher.pending == null && const {WorkspacePublicDetailsWriteState.saved, WorkspacePublicDetailsWriteState.rejected, WorkspacePublicDetailsWriteState.notSent}.contains(result.state)) widget.reviewScope?.completeOriginal();
+      }
     }
   }
   Widget _publicUpdateActions() {
@@ -152,7 +188,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
           Wrap(spacing: 8, runSpacing: 4, children: [
             TextButton(key: const Key('work-publication-check-public'),
               onPressed: publisher.busy || !_contextCurrent ? null : () async {
-                if (publisher.pending != null) { await publisher.reconcile(); }
+                if (publisher.pending != null) { final result = await publisher.reconcile(current: widget.reviewScope?.current, inputCurrent: widget.reviewScope?.sourceCurrent, onOriginalResolved: widget.reviewScope == null ? null : (original) => widget.reviewScope!.admitOriginalResolution(original.fingerprint)); if (publisher.pending == null && const {WorkspacePublicDetailsWriteState.saved, WorkspacePublicDetailsWriteState.rejected, WorkspacePublicDetailsWriteState.notSent}.contains(result.state)) widget.reviewScope?.completeOriginal(); }
                 else {
                   await widget.session.loadWorkspacePublicDetailsInputs();
                   if (mounted && _contextCurrent) await publisher.refresh();
@@ -161,8 +197,12 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
             if (!pending) FilledButton(key: const Key('work-publication-update-public'),
               onPressed: !publisher.canPublish || savedInputs == null || classificationMissing || _publicEditsUnsaved || !_contextCurrent
                 ? null : () async {
-                  await widget.session.publishWorkspacePublicDetails(inputCurrent: () => mounted &&
-                    _contextCurrent && !_publicEditsUnsaved && identical(publisher, _publisher));
+                  final result = await widget.session.publishWorkspacePublicDetails(current: widget.reviewScope?.current,
+                    admitOriginal: widget.reviewScope == null ? null : (original) => widget.reviewScope!.admitOriginal(original.fingerprint),
+                    onOriginalResolved: widget.reviewScope == null ? null : (original) => widget.reviewScope!.admitOriginalResolution(original.fingerprint),
+                    inputCurrent: () => mounted &&
+                    _contextCurrent && widget.reviewScope?.mayApply != false && !_publicEditsUnsaved && identical(publisher, _publisher));
+                  if (publisher.pending == null && const {WorkspacePublicDetailsWriteState.saved, WorkspacePublicDetailsWriteState.rejected, WorkspacePublicDetailsWriteState.notSent}.contains(result.state)) widget.reviewScope?.completeOriginal();
                 }, child: const Text('Update public details')),
             if (publisher.canRetryOriginal) OutlinedButton(key: const Key('work-publication-retry-public-original'),
               onPressed: _contextCurrent ? () => _retryPublicOriginal(publisher) : null,
@@ -182,11 +222,13 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
       'retailChannelEnabled': retail ?? _retail,
       'wholesaleChannelEnabled': wholesale ?? _wholesale,
     });
+    if (details.inputErrors.isEmpty && widget.reviewScope?.beginAttempt(details.toJson()) == false) return;
     final saved = widget.session.saveWorkspacePublicationDetails(
       details,
       expectedStoreId: _storeId,
       expectedNavigationRevision: _scopeRevision,
     );
+    _trackSettingsSave(saved);
     setState(() {
       if (saved) {
         _businessType = details.businessType;
@@ -202,6 +244,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
 
   @override
   void dispose() {
+    _publicationSettingsEditors.remove(this);
     for (final field in _fields.values) {
       field.dispose();
     }
@@ -254,11 +297,13 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
     }
     try {
       final details = WorkspaceStorePublicationDetails.fromJson(patch);
+      if (details.inputErrors.isEmpty && widget.reviewScope?.beginAttempt(details.toJson()) == false) return;
       final saved = widget.session.saveWorkspacePublicationDetails(
         details,
         expectedStoreId: _storeId,
         expectedNavigationRevision: _scopeRevision,
       );
+      _trackSettingsSave(saved);
       setState(() {
         _failed = !saved;
         _message = saved

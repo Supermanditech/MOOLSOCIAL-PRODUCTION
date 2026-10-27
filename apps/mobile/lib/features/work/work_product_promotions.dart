@@ -338,14 +338,15 @@ class StoreCouponController extends ChangeNotifier {
       return false;
     } finally {if (active) _emit();}
   }
-  Future<bool> refresh(String couponId) async {
-    if (!active || busy || !gateway.storeCouponTermsSupported) return false;
+  Future<bool> refresh(String couponId, {bool Function()? inputCurrent}) async {
+    bool current() => active && inputCurrent?.call() != false;
+    if (!current() || busy || !gateway.storeCouponTermsSupported) return false;
     _id(couponId); busy = true; _emit();
     try {
-      if (!await restore() || !active || pending != null) return false;
+      if (!await restore() || !current() || pending != null) return false;
       loadedCouponId = null;
-      final result = await gateway.readCoupon(scope, couponId, () => active).timeout(const Duration(seconds: 25));
-      if (!active) return false;
+      final result = await gateway.readCoupon(scope, couponId, current).timeout(const Duration(seconds: 25));
+      if (!current()) return false;
       if (result != null && (result.scope != scope || result.couponId != couponId || !supports(result.input))) throw const FormatException();
       currentRecord = result; loadedCouponId = couponId; message = null;
       return true;
@@ -395,17 +396,18 @@ class StoreCouponController extends ChangeNotifier {
       return StoreCouponResult(pending == null ? StorePromotionResultState.notSent : StorePromotionResultState.unknown);
     } finally {busy = false; _emit();}
   }
-  Future<StoreCouponResult> reconcile() async {
+  Future<StoreCouponResult> reconcile({bool Function()? inputCurrent}) async {
+    bool current() => active && inputCurrent?.call() != false;
     const unknown = StoreCouponResult(StorePromotionResultState.unknown);
-    if (!active || busy || !gateway.storeCouponTermsSupported) return unknown;
+    if (!current() || busy || !gateway.storeCouponTermsSupported) return unknown;
     busy = true; _emit();
     try {
-      if (!await restore() || !active || pending == null) return unknown;
+      if (!await restore() || !current() || pending == null) return unknown;
       final original = pending!;
       if (!supports(original.input)) {
         message = 'The original offer needs a compatible service. It remains held.'; return unknown;
       }
-      final result = await gateway.reconcileCoupon(original, () => active).timeout(const Duration(seconds: 25));
+      final result = await gateway.reconcileCoupon(original, current).timeout(const Duration(seconds: 25));
       if (result.state != StorePromotionResultState.saved) return unknown;
       return await _finish(original, result);
     } on Object {
@@ -415,17 +417,18 @@ class StoreCouponController extends ChangeNotifier {
   }
   /// Deliberate owner action only. Reuses the frozen ID/key/CAS/terms; an absent
   /// receipt is not rejection, and an unsent retry cannot erase a prior attempt.
-  Future<StoreCouponResult> retryOriginal({required bool fundingAcknowledged}) async {
+  Future<StoreCouponResult> retryOriginal({required bool fundingAcknowledged, bool Function()? inputCurrent}) async {
+    bool current() => active && inputCurrent?.call() != false;
     const unknown = StoreCouponResult(StorePromotionResultState.unknown);
-    if (!active || busy || !gateway.storeCouponTermsSupported || !fundingAcknowledged) return unknown;
+    if (!current() || busy || !gateway.storeCouponTermsSupported || !fundingAcknowledged) return unknown;
     busy = true; _emit();
     try {
-      if (!await restore() || !active || pending == null) return unknown;
+      if (!await restore() || !current() || pending == null) return unknown;
       final original = pending!;
       if (!supports(original.input)) {
         message = 'The original offer needs a compatible service. It remains held.'; return unknown;
       }
-      final result = await gateway.saveCoupon(original, () => active).timeout(const Duration(seconds: 25));
+      final result = await gateway.saveCoupon(original, current).timeout(const Duration(seconds: 25));
       if (result.state != StorePromotionResultState.saved) {
         if (active) message = 'The original update is still held. No replacement request was created; check its result again.';
         return unknown;

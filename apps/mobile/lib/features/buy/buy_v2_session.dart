@@ -1999,7 +1999,8 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
   }
 
   /// An outstanding durable purchase takes precedence over the new basket.
-  Future<bool> prepare(BuyV2CollectionBasket? requested) async {
+  Future<bool> prepare(BuyV2CollectionBasket? requested, {bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     if (_busy || _disposed) return false;
     final original = identity.value;
     if (original == null ||
@@ -2016,7 +2017,7 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    if (unresolved) return checkPayment();
+    if (unresolved) return checkPayment(isCurrent: isCurrent);
     intent = null;
     basket = requested;
     quote = null;
@@ -2024,10 +2025,11 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
     result = null;
     _begin();
     try {
+      if (isCurrent?.call() == false) return false;
       final retained = await pendingStore!
           .read(original.accountId)
           .timeout(timeout);
-      if (!_current(epoch, original)) return false;
+      if (!_current(epoch, original) || isCurrent?.call() == false) return false;
       if (retained != null) {
         if (retained.basket.identity.accountId != original.accountId) {
           throw const FormatException('Purchase account mismatch');
@@ -2054,7 +2056,7 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
               ? (gateway as BuyV2MinorCollectionCheckoutGateway).quoteMinor(requested)
               : gateway!.quote(requested))
           .timeout(timeout);
-      if (!_current(epoch, original)) return false;
+      if (!_current(epoch, original) || isCurrent?.call()==false) return false;
       final receivedAt = now();
       if (!received.isCurrentFor(requested, receivedAt)) {
         throw const FormatException('Collection quote changed');
@@ -2104,7 +2106,8 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
         );
   }
 
-  Future<bool> place(BuyV2CollectionBasket currentBasket) async {
+  Future<bool> place(BuyV2CollectionBasket currentBasket, {bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     if (!canPlace(currentBasket)) return false;
     final original = identity.value!;
     final epoch = _epoch;
@@ -2118,21 +2121,27 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
       quote: quote!,
     );
     if (canSubmitPayment?.call(reserved) == false) return false;
+    final previousPhase = phase;
     intent = reserved;
     _begin();
     try {
+      if (isCurrent?.call() == false) {
+        intent = null;
+        phase = previousPhase;
+        return false;
+      }
       final accepted = await pendingStore!.reserve(reserved).timeout(timeout);
       if (!_current(epoch, original)) return false;
       if (!accepted) {
         _unknown();
         return false;
       }
-      if (canSubmitPayment?.call(reserved) == false ||
+      if (isCurrent?.call() == false || canSubmitPayment?.call(reserved) == false ||
           !reserved.quote.isCurrentFor(reserved.basket, now()) ||
           !reserved.quote.isCurrentFor(
             reserved.basket,
             _quoteReceivedAt!.add(_quoteElapsed.elapsed),
-          )) {
+          ) || isCurrent?.call() == false) {
         _unknown();
         return false;
       }
@@ -2150,17 +2159,19 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
     }
   }
 
-  Future<bool> checkPayment() async {
+  Future<bool> checkPayment({bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     if (_busy || _disposed || !available) return false;
     final original = identity.value;
     if (original == null) return false;
     final epoch = _epoch;
     _begin();
     try {
+      if (isCurrent?.call() == false) return false;
       final retained = await pendingStore!
           .read(original.accountId)
           .timeout(timeout);
-      if (!_current(epoch, original)) return false;
+      if (!_current(epoch, original) || isCurrent?.call() == false) return false;
       if (retained == null ||
           retained.basket.identity.accountId != original.accountId) {
         _unknown();
@@ -2253,7 +2264,8 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> continuePayment(BuyV2PaymentHandoff handoff) async {
+  Future<bool> continuePayment(BuyV2PaymentHandoff handoff, {bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     final uri = paymentActionUri;
     final original = identity.value;
     if (_busy || _disposed || uri == null || original == null || !unresolved) {
@@ -2262,6 +2274,8 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
     final epoch = _epoch;
     _begin();
     try {
+      // Stop only an undispatched handoff. Once launched, original recovery runs.
+      if (isCurrent?.call() == false) return false;
       // Even an unsuccessful/uncertain app handoff keeps the same payment.
       await handoff(uri).timeout(timeout);
       if (!_current(epoch, original)) return false;
@@ -2836,14 +2850,16 @@ class BuyV2PurchaseOrderController extends ChangeNotifier {
     List<BuyV2CartLine> lines,
     BuyV2Address? address, {
     BuyV2StoreListing? collectionStore,
+    bool Function()? isCurrent,
   }) async {
+    if (isCurrent?.call()==false) return false;
     if ((address == null) == (collectionStore == null) ||
         (collectionStore != null && !collectionStore.hasCollectionAddress)) {
       return false;
     }
     if (_disposed || busy || identity.value == null) return false;
     // An uncertain issue must be resolved before preparing another draft.
-    if (needsReconciliation) return refresh();
+    if (needsReconciliation) return refresh(isCurrent:isCurrent);
     _lines = List.unmodifiable(lines);
     _address = address;
     _collectionStore = collectionStore;
@@ -2853,6 +2869,7 @@ class BuyV2PurchaseOrderController extends ChangeNotifier {
         address: address,
         collectionStore: collectionStore,
       ),
+      isCurrent:isCurrent,
     );
   }
 
@@ -2860,7 +2877,9 @@ class BuyV2PurchaseOrderController extends ChangeNotifier {
     List<BuyV2CartLine> lines,
     BuyV2Address? address, {
     BuyV2StoreListing? collectionStore,
+    bool Function()? isCurrent,
   }) async {
+    if (isCurrent?.call()==false) return false;
     final value = review;
     if (busy ||
         needsReconciliation ||
@@ -2878,6 +2897,7 @@ class BuyV2PurchaseOrderController extends ChangeNotifier {
       ),
       mutation: true,
       expected: value,
+      isCurrent:isCurrent,
     );
   }
 
@@ -2886,7 +2906,9 @@ class BuyV2PurchaseOrderController extends ChangeNotifier {
     List<BuyV2CartLine> lines,
     BuyV2Address? address, {
     BuyV2StoreListing? collectionStore,
+    bool Function()? isCurrent,
   }) async {
+    if (isCurrent?.call()==false) return false;
     final value = review;
     if (busy ||
         needsReconciliation ||
@@ -2909,15 +2931,17 @@ class BuyV2PurchaseOrderController extends ChangeNotifier {
       ),
       mutation: true,
       expected: value,
+      isCurrent:isCurrent,
     );
   }
 
-  Future<bool> refresh() async {
+  Future<bool> refresh({bool Function()? isCurrent}) async {
     final value = review;
     if (_disposed || busy || value == null) return false;
     return _run(
       () => adapter.refresh(requestId: value.requestId),
       expected: value,
+      isCurrent:isCurrent,
     );
   }
 
@@ -2941,7 +2965,9 @@ class BuyV2PurchaseOrderController extends ChangeNotifier {
     Future<BuyV2PurchaseOrderReview> Function() operation, {
     bool mutation = false,
     BuyV2PurchaseOrderReview? expected,
+    bool Function()? isCurrent,
   }) async {
+    if(isCurrent?.call()==false)return false;
     final owner = identity.value;
     if (_disposed ||
         busy ||
@@ -2950,14 +2976,23 @@ class BuyV2PurchaseOrderController extends ChangeNotifier {
       return false;
     }
     final epoch = _epoch;
+    final previousFresh=_reviewFresh,previousNeedsReconciliation=needsReconciliation;
+    final previousMessage=message;
     busy = true;
     _reviewFresh = false;
     message = null;
     if (mutation) needsReconciliation = true;
     notifyListeners();
     try {
+      // Native busy listeners may retire captured consent before dispatch.
+      if(isCurrent?.call()==false){
+        if(_current(epoch,owner)){
+          _reviewFresh=previousFresh;needsReconciliation=previousNeedsReconciliation;message=previousMessage;
+        }
+        return false;
+      }
       final next = await operation().timeout(timeout);
-      if (!_current(epoch, owner)) return false;
+      if (!_current(epoch, owner) || !mutation && isCurrent?.call()==false) return false;
       if (next.buyerAccountId != owner.accountId ||
           !next.matches(_lines, now()) ||
           _destinationKey(next.address, next.collectionStore) !=
@@ -2985,7 +3020,7 @@ class BuyV2PurchaseOrderController extends ChangeNotifier {
       needsReconciliation = false;
       return true;
     } on Object {
-      if (!_current(epoch, owner)) return false;
+      if (!_current(epoch, owner) || !mutation && isCurrent?.call()==false) return false;
       message = needsReconciliation
           ? 'Order agreement status needs checking. Do not submit again.'
           : 'Order agreement could not be checked. Try again.';
@@ -3468,6 +3503,22 @@ class BuyV2RootSessions {
     guest.dispose();
     unavailable.dispose();
   }
+}
+
+@immutable
+class BuyV2CheckoutReadProjection {
+  const BuyV2CheckoutReadProjection._({required this.scope,required this.lines,
+    required this.groups,required this.address,required this.paymentMethod,
+    required this.collectionSelected,required this.collectionStore,required this.sourceSnapshot});
+  final BuyV2CartScope scope;
+  final List<BuyV2CartLine> lines;
+  final List<BuyV2FulfilmentGroup> groups;
+  final BuyV2Address? address;
+  final String paymentMethod;
+  final bool collectionSelected;
+  final BuyV2StoreListing? collectionStore;
+  /// Native UI source values only. Never a transport payload or authority grant.
+  final List<Object?> sourceSnapshot;
 }
 
 class BuyV2Session extends ChangeNotifier {
@@ -5206,7 +5257,8 @@ class BuyV2Session extends ChangeNotifier {
       selectedCartBenefitsFor(cartDestinations).any((benefit) => benefit.kind == BuyV2CartBenefitKind.coupon &&
         lines.any((line) => benefit.appliesTo(line.product)));
   });
-  Future<bool> chooseStoreCoupon(BuyV2PublishedStoreCoupon coupon) async {
+  Future<bool> chooseStoreCoupon(BuyV2PublishedStoreCoupon coupon, {bool Function()? isCurrent}) async {
+    if(isCurrent?.call()==false)return false;
     if (_collectionDisposed || !procurementScopeCurrent || isStoreProcurement || _holdCartForPaymentResolution()) return false;
     final key = _couponStoreKey(coupon), lines = _couponStoreLines(coupon);
     if (lines.isEmpty) return false;
@@ -5246,7 +5298,7 @@ class BuyV2Session extends ChangeNotifier {
     _syncStoreCouponBasketInputs();
     final epoch = _storeCouponBasketEpochs[key];
     _storeCouponMessages.remove(key); notifyListeners();
-    bool current() => !_collectionDisposed && procurementScopeCurrent && !cartChangesBlocked &&
+    bool current() => isCurrent?.call()!=false && !_collectionDisposed && procurementScopeCurrent && !cartChangesBlocked &&
       owner == _currentCustomerOrderScope && _storeCouponApplyRequests[key] == sequence &&
       epoch == _storeCouponBasketEpochs[key] && reader.storeCouponEligibilityActive &&
       identical(_sourceForCatalogue(destination), source) &&
@@ -5819,11 +5871,11 @@ class BuyV2Session extends ChangeNotifier {
     if (notify && !_collectionDisposed) notifyListeners();
   }
 
-  Future<bool> refreshCollectionOrder(String orderId) =>
-      _runCollection(orderId);
+  Future<bool> refreshCollectionOrder(String orderId, {bool Function()? isCurrent}) =>
+      _runCollection(orderId, isCurrent: isCurrent);
 
-  Future<bool> authoriseCollection(String orderId, String qrPayload) =>
-      _runCollection(orderId, qrPayload: qrPayload);
+  Future<bool> authoriseCollection(String orderId,String qrPayload,{bool Function()? isCurrent})=>
+      _runCollection(orderId,qrPayload:qrPayload,isCurrent:isCurrent);
 
   String _newCollectionRequestId() {
     final random = math.Random.secure();
@@ -5843,7 +5895,8 @@ class BuyV2Session extends ChangeNotifier {
       intent.operationId.trim().isNotEmpty &&
       RegExp(r'^[a-f0-9]{64}$').hasMatch(intent.requestFingerprint);
 
-  Future<bool> _runCollection(String orderId, {String? qrPayload}) async {
+  Future<bool> _runCollection(String orderId, {String? qrPayload, bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     final context = _collectionContext(orderId);
     if (context == null) return false;
     final state = _collectionStates.putIfAbsent(
@@ -5872,6 +5925,7 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
     BuyV2CollectionPendingIntent? intent;
     try {
+      if (isCurrent?.call()==false) return false;
       // The durable adapter serializes reads after earlier reservations. The
       // transport is never called until a reservation has completed durably.
       intent = await pendingStore
@@ -5881,7 +5935,7 @@ class BuyV2Session extends ChangeNotifier {
             storeId: context.order.collection!.storeId,
           )
           .timeout(const Duration(seconds: 15));
-      if (!_collectionContextIsCurrent(context)) return false;
+      if (!_collectionContextIsCurrent(context) || isCurrent?.call()==false) return false;
       final original = state.pendingIntent;
       if (intent != null &&
           original != null &&
@@ -5955,6 +6009,7 @@ class BuyV2Session extends ChangeNotifier {
         );
       }
       if (intent != null) state.pendingIntent = intent;
+      if (isCurrent?.call() == false) return false;
       final result = await gateway
           .execute(request)
           .timeout(const Duration(seconds: 15));
@@ -6105,6 +6160,8 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2CartLine> get purchaseOrderLines => checkoutLines
       .where((line) => line.product.destination == BuyV2Destination.wholesale)
       .toList(growable: false);
+  bool get purchaseOrderNativeSourceAvailable => purchaseOrderAdapter != null &&
+      purchaseOrderAdapter is! _BuyV2DeviceReviewPurchaseOrderAdapter;
   bool get purchaseOrderRequired =>
       purchaseOrderAdapter != null && purchaseOrderLines.isNotEmpty;
   bool get purchaseOrderReviewRequired {
@@ -6139,7 +6196,8 @@ class BuyV2Session extends ChangeNotifier {
     );
   }
 
-  Future<bool> reviewPurchaseOrder() async {
+  Future<bool> reviewPurchaseOrder({bool Function()? isCurrent}) async {
+    if(isCurrent?.call()==false)return false;
     final address = collectionCheckoutSelected ? null : selectedAddressOrNull;
     final store = collectionCheckoutSelected ? collectionCheckoutStore : null;
     if (address == null && store == null) return false;
@@ -6147,11 +6205,13 @@ class BuyV2Session extends ChangeNotifier {
           purchaseOrderLines,
           address,
           collectionStore: store,
+          isCurrent:isCurrent,
         ) ??
         false;
   }
 
-  Future<bool> issuePurchaseOrder() async {
+  Future<bool> issuePurchaseOrder({bool Function()? isCurrent}) async {
+    if(isCurrent?.call()==false)return false;
     final address = collectionCheckoutSelected ? null : selectedAddressOrNull;
     final store = collectionCheckoutSelected ? collectionCheckoutStore : null;
     if (address == null && store == null) return false;
@@ -6159,11 +6219,13 @@ class BuyV2Session extends ChangeNotifier {
           purchaseOrderLines,
           address,
           collectionStore: store,
+          isCurrent:isCurrent,
         ) ??
         false;
   }
 
-  Future<bool> approvePurchaseOrderRevision(String documentId) async {
+  Future<bool> approvePurchaseOrderRevision(String documentId,{bool Function()? isCurrent}) async {
+    if(isCurrent?.call()==false)return false;
     final address = collectionCheckoutSelected ? null : selectedAddressOrNull;
     final store = collectionCheckoutSelected ? collectionCheckoutStore : null;
     if (address == null && store == null) return false;
@@ -6172,6 +6234,7 @@ class BuyV2Session extends ChangeNotifier {
           purchaseOrderLines,
           address,
           collectionStore: store,
+          isCurrent:isCurrent,
         ) ??
         false;
   }
@@ -7143,17 +7206,17 @@ class BuyV2Session extends ChangeNotifier {
         : _reviewDrafts[targetId == null ? productId : 'rating:$targetId'];
   }
 
-  void retainProductReviewDraft({
+  Future<bool> retainProductReviewDraft({
     required String productId,
     required int rating,
     required String comment,
     required String? ownerScope,
     String? targetId,
     Object? feedbackContext,
-  }) {
+  }) async {
     if (!_prepareProductFeedbackScope() || ownerScope != reviewDraftOwnerScope ||
         (feedbackContext != null && feedbackContext != _productFeedbackScope)) {
-      return;
+      return false;
     }
     _ensureReviewDraftOwner();
     final draft = BuyV2ProductReviewDraft(rating: rating, comment: comment);
@@ -7161,7 +7224,7 @@ class BuyV2Session extends ChangeNotifier {
             !(targetId != null &&
                 _ratingTargets[targetId]?.kind == BuyV2RatingKind.purchase)) ||
         !draft.valid) {
-      return;
+      return false;
     }
     final key = targetId == null ? productId : 'rating:$targetId';
     if (rating == 0 && comment.isEmpty) {
@@ -7169,7 +7232,15 @@ class BuyV2Session extends ChangeNotifier {
     } else {
       _reviewDrafts[key] = draft;
     }
-    _persistCustomerState();
+    final scope=_productFeedbackScope,store=customerStateStore;
+    final write=_persistCustomerState();
+    final saved=write!=null&&await _awaitPaymentWrite(write);
+    if(!saved||!_prepareProductFeedbackScope()||!identical(store,customerStateStore)||
+        ownerScope!=reviewDraftOwnerScope||scope!=_productFeedbackScope||
+        (feedbackContext!=null&&feedbackContext!=_productFeedbackScope))return false;
+    final current=_reviewDrafts[key];
+    return rating==0&&comment.isEmpty?current==null:
+      current?.rating==rating&&current?.comment==comment;
   }
 
   void _discardSubmittedReviewDraft(
@@ -7205,6 +7276,12 @@ class BuyV2Session extends ChangeNotifier {
     const ['evaluation', 'production'].contains(purchaseRealm);
   bool get privateStarsLoading => _privateStarsLoad != null;
   bool get privateStarsBusy => _privateStarsOperation != null;
+  // Pure loaded-source witness for a prepared original rating; never a read/load grant.
+  String get privateStarsNativeReviewSource=>jsonEncode([
+    for(final key in (_privateStarsTargets.keys.toList()..sort()))_privateStarsTargets[key]!.toJson(),
+    for(final key in (_privateStarsSaved.keys.toList()..sort()))[key,_privateStarsSaved[key]?.target.toJson(),_privateStarsSaved[key]?.stars,_privateStarsSaved[key]?.revision,_privateStarsSaved[key]?.updatedAt.toUtc().toIso8601String()],
+    for(final key in (_productStarAttempts.keys.toList()..sort()))_productStarAttempts[key]!.toJson(),
+  ]);
   bool get privateStarsHasMore => _privateStarsCursor != null;
   bool get privateStarsRecoveryFull => _productStarAttempts.length >= 100;
   Object? _preparePrivateStars() {
@@ -7342,7 +7419,8 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
-  Future<bool> savePrivateStars(String targetId, int stars) async {
+  Future<bool> savePrivateStars(String targetId,int stars,{bool Function()? capturedCurrent}) async {
+    if(capturedCurrent?.call()==false)return false;
     if (_preparePrivateStars() != null && privateStarsRecoveryFull) {
       privateStarsMessage = 'Check an earlier rating save before sending another. Your saved attempts are kept.';
       notifyListeners(); return false;
@@ -7354,14 +7432,16 @@ class BuyV2Session extends ChangeNotifier {
     final attempt = BuyV2ProductStarsAttempt.fromJson({'version': 1, 'target': target.toJson(),
       'operationId': operationId, 'expectedRevision': revision, 'stars': stars});
     _productStarAttempts[targetId] = attempt;
-    return _runPrivateStars(attempt);
+    return _runPrivateStars(attempt,capturedCurrent:capturedCurrent);
   }
-  Future<bool> checkPrivateStars(String targetId, {bool retryOriginal = false}) async {
+  Future<bool> checkPrivateStars(String targetId,{bool retryOriginal=false,bool Function()? capturedCurrent}) async {
+    if(capturedCurrent?.call()==false)return false;
     if (_preparePrivateStars() == null || privateStarsBusy || privateStarsLoading || customerStateRecoveryPending) return false;
     final attempt = _productStarAttempts[targetId]; if (attempt == null) return false;
-    return _runPrivateStars(attempt, reconcile: !retryOriginal);
+    return _runPrivateStars(attempt,reconcile:!retryOriginal,capturedCurrent:capturedCurrent);
   }
-  Future<bool> _runPrivateStars(BuyV2ProductStarsAttempt attempt, {bool reconcile = false}) async {
+  Future<bool> _runPrivateStars(BuyV2ProductStarsAttempt attempt,{bool reconcile=false,bool Function()? capturedCurrent}) async {
+    if(capturedCurrent?.call()==false)return false;
     final scope = _preparePrivateStars(), store = customerStateStore, reader = purchaseReader;
     if (scope == null || store == null || reader == null || privateStarsBusy ||
         _productReportJournalLoadedOwner != store.ownerScope) {
@@ -7396,6 +7476,7 @@ class BuyV2Session extends ChangeNotifier {
         if (current()) privateStarsMessage = 'This original purchase could not be checked for your Store. Your rating attempt is kept.';
         return false;
       }
+      if(capturedCurrent?.call()==false){retainOriginal();return false;}
       final result = await gateway.submitProductStars(target: target, stars: attempt.stars,
         expectedRevision: attempt.expectedRevision, operationId: attempt.operationId, reconcile: reconcile);
       if (!current()) {retainOriginal(); return false;}
@@ -7953,8 +8034,9 @@ class BuyV2Session extends ChangeNotifier {
     required String reviewedKey,
     required String reviewedScopeKey,
     required bool accept,
+    bool Function()? capturedCurrent,
   }) async {
-    if (_collectionDisposed) return false;
+    if (_collectionDisposed||capturedCurrent?.call()==false) return false;
     if (_orderRefreshOwnerScope != customerStateStore?.ownerScope) {
       _invalidateOrderRefreshes();
     }
@@ -7983,7 +8065,7 @@ class BuyV2Session extends ChangeNotifier {
     _replacementMessages.remove(orderId);
     notifyListeners();
     try {
-      if (!await refreshOrder(orderId) || !current()) {
+      if (!await refreshOrder(orderId,isCurrent:capturedCurrent) || !current()||capturedCurrent?.call()==false) {
         if (current()) {
           _replacementMessages[orderId] =
               'Refresh this order before choosing a replacement.';
@@ -8038,6 +8120,7 @@ class BuyV2Session extends ChangeNotifier {
                 .toString(),
           );
       _replacementRequests[orderId] = request;
+      if(capturedCurrent?.call()==false)return false;
       final result =
           await (orderResolutionAdapter as BuyV2ReplacementConsentAdapter)
               .decideReplacement(request);
@@ -8084,7 +8167,8 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
-  Future<bool> refreshOrder(String orderId) async {
+  Future<bool> refreshOrder(String orderId, {bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     if (_collectionDisposed) return false;
     final index = _orders.indexWhere((order) => order.id == orderId);
     if (index < 0) {
@@ -8093,7 +8177,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (_orders[index].collection != null) {
-      return refreshCollectionOrder(orderId);
+      return refreshCollectionOrder(orderId, isCurrent: isCurrent);
     }
     if (_orderRefreshOwnerScope != customerStateStore?.ownerScope) {
       _invalidateOrderRefreshes();
@@ -8111,12 +8195,14 @@ class BuyV2Session extends ChangeNotifier {
         ownerScope == customerStateStore?.ownerScope &&
         procurementEpoch == _procurementEpoch &&
         identical(_orderRefreshOperations[orderId], operation);
+    final previousRefreshState = _orderRefreshStates[orderId];
     _orderRefreshStates[orderId] = BuyV2CommerceLoadState.loading;
     _orderRefreshMessages.remove(orderId);
     notifyListeners();
     try {
+      if (isCurrent?.call()==false) return false;
       final result = await commerceAdapter.refreshOrder(orderId: orderId);
-      if (!currentRequest()) return false;
+      if (!currentRequest() || isCurrent?.call() == false) return false;
       final currentIndex = _orders.indexWhere((order) => order.id == orderId);
       if (currentIndex < 0 || !identical(_orders[currentIndex], original)) {
         _orderRefreshStates[orderId] = BuyV2CommerceLoadState.unavailable;
@@ -8162,7 +8248,7 @@ class BuyV2Session extends ChangeNotifier {
       notice = result.customerMessage;
       return true;
     } on Object {
-      if (!currentRequest()) return false;
+      if (!currentRequest() || isCurrent?.call() == false) return false;
       _orderRefreshStates[orderId] = BuyV2CommerceLoadState.offline;
       _orderRefreshMessages[orderId] =
           'Order could not refresh. Check your connection and try again.';
@@ -8170,6 +8256,13 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     } finally {
       if (currentRequest()) {
+        if (isCurrent?.call() == false) {
+          if (previousRefreshState == null) {
+            _orderRefreshStates.remove(orderId);
+          } else {
+            _orderRefreshStates[orderId] = previousRefreshState;
+          }
+        }
         _orderRefreshOperations.remove(orderId);
         notifyListeners();
       }
@@ -8475,8 +8568,9 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
-  Future<bool> startBalancePayment(String orderId) async {
-    if (!await _balanceRecoveryReady()) return false;
+  Future<bool> startBalancePayment(String orderId,{bool Function()? capturedCurrent}) async {
+    if(capturedCurrent?.call()==false)return false;
+    if (!await _balanceRecoveryReady()||capturedCurrent?.call()==false) return false;
     final adapter = balancePaymentAdapter;
     final order = _orders.where((o) => o.id == orderId).firstOrNull;
     final previous = balancePaymentFor(orderId);
@@ -8539,6 +8633,7 @@ class BuyV2Session extends ChangeNotifier {
         notice = 'Payment could not be safely started. Try saving again.';
         return false;
       }
+      if(capturedCurrent?.call()==false)return false;
       dispatched = true;
       _balancePaymentRequests[orderId] =
           (key: request.key, amountMinor: request.amountMinor, minorDispatch: request.minorDispatch, dispatched: true);
@@ -8593,8 +8688,9 @@ class BuyV2Session extends ChangeNotifier {
 
   Future<bool> continueBalancePayment(
     String orderId,
-    BuyV2PaymentHandoff handoff,
+    BuyV2PaymentHandoff handoff,{bool Function()? capturedCurrent}
   ) async {
+    if(capturedCurrent?.call()==false)return false;
     if (!await _balanceRecoveryReady()) return false;
     final order = _orders.where((o) => o.id == orderId).firstOrNull;
     final previous = balancePaymentFor(orderId);
@@ -8617,6 +8713,7 @@ class BuyV2Session extends ChangeNotifier {
       }
       var opened = false;
       try {
+        if(capturedCurrent?.call()==false)return false;
         opened = await handoff(uri);
       } on Object {
         opened = false;
@@ -8640,7 +8737,8 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
-  Future<bool> reconcileBalancePayment(String orderId) async {
+  Future<bool> reconcileBalancePayment(String orderId,{bool Function()? capturedCurrent}) async {
+    if(capturedCurrent?.call()==false)return false;
     if (!await _balanceRecoveryReady()) return false;
     final adapter = balancePaymentAdapter;
     final order = _orders.where((o) => o.id == orderId).firstOrNull;
@@ -8661,6 +8759,7 @@ class BuyV2Session extends ChangeNotifier {
     if (operation == null) return false;
     final current = operation.current;
     try {
+      if(capturedCurrent?.call()==false)return false;
       final result = await adapter.reconcilePayment(
         orderId: orderId,
         paymentReference: reference,
@@ -8901,7 +9000,8 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> confirmDeliveryReschedule(String orderId) async {
+  Future<bool> confirmDeliveryReschedule(String orderId,{bool Function()? capturedCurrent}) async {
+    if(capturedCurrent?.call()==false)return false;
     final order = _prepareDeliveryExceptionOrder(orderId);
     final adapter = deliveryExceptionAdapter;
     final snapshot = deliveryExceptionFor(orderId);
@@ -8922,7 +9022,7 @@ class BuyV2Session extends ChangeNotifier {
     bool current() => _deliveryExceptionCurrent(orderId, order, scope, operation);
     try {
       notifyListeners();
-      if (!current()) return false;
+      if (!current()||capturedCurrent?.call()==false) return false;
       final updated = await adapter.rescheduleDelivery(
         orderId: orderId, exceptionId: exceptionId, slot: slot,
       );
@@ -8947,7 +9047,8 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
-  Future<bool> disputeProofOfDelivery(String orderId) async {
+  Future<bool> disputeProofOfDelivery(String orderId,{bool Function()? capturedCurrent}) async {
+    if(capturedCurrent?.call()==false)return false;
     final order = _prepareDeliveryExceptionOrder(orderId);
     final adapter = deliveryExceptionAdapter;
     final snapshot = deliveryExceptionFor(orderId);
@@ -8967,7 +9068,7 @@ class BuyV2Session extends ChangeNotifier {
     bool current() => _deliveryExceptionCurrent(orderId, order, scope, operation);
     try {
       notifyListeners();
-      if (!current()) return false;
+      if (!current()||capturedCurrent?.call()==false) return false;
       final updated = await adapter.disputeProofOfDelivery(
         orderId: orderId, exceptionId: exceptionId, proofReference: proofReference,
       );
@@ -9054,7 +9155,8 @@ class BuyV2Session extends ChangeNotifier {
       snapshot?.state == BuyV2LiveDeliveryState.ready ||
       snapshot?.state == BuyV2LiveDeliveryState.delivered;
 
-  Future<bool> refreshLiveDelivery(String orderId) async {
+  Future<bool> refreshLiveDelivery(String orderId, {bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     final order = _prepareLiveDeliveryOrder(orderId);
     if (order == null || _liveDeliveryOperations.containsKey(orderId)) return false;
     final operation = Object();
@@ -9071,7 +9173,7 @@ class BuyV2Session extends ChangeNotifier {
     try {
       notifyListeners();
       // A listener may change owner/dispose the session before this read starts.
-      if (!current()) return false;
+      if (!current() || isCurrent?.call() == false) return false;
       if (adapter == null) {
         _liveDeliverySnapshots[orderId] = BuyV2LiveDeliverySnapshot(
           orderId: orderId,
@@ -9084,7 +9186,7 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
       final snapshot = await adapter.load(orderId: orderId);
-      if (!current()) return false;
+      if (!current() || isCurrent?.call() == false) return false;
       if (!_validLiveDeliverySnapshot(snapshot, orderId)) {
         const message =
             'Live delivery details are temporarily unavailable. Try again.';
@@ -9123,7 +9225,7 @@ class BuyV2Session extends ChangeNotifier {
       return snapshot.state == BuyV2LiveDeliveryState.ready ||
           snapshot.state == BuyV2LiveDeliveryState.delivered;
     } on Object {
-      if (!current()) return false;
+      if (!current() || isCurrent?.call() == false) return false;
       const message =
           'Live delivery could not refresh. Check your connection and try again.';
       if (_confirmedLiveDelivery(_liveDeliverySnapshots[orderId])) {
@@ -9213,7 +9315,10 @@ class BuyV2Session extends ChangeNotifier {
 
   String? get selectedAddressId => _selectedAddressId;
 
-  Future<void> restoreCommerce() async {
+  Future<void> restoreCommerce({bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return;
+    final previousLoadState=commerceLoadState;
+    final previousMessage=commerceMessage;
     if (_collectionDisposed) return;
     if (_orderRefreshOwnerScope != customerStateStore?.ownerScope) {
       _invalidateOrderRefreshes();
@@ -9239,7 +9344,7 @@ class BuyV2Session extends ChangeNotifier {
     commerceMessage = null;
     notifyListeners();
     try {
-      if (_collectionDisposed || feedbackScope != _currentCustomerOrderScope) return;
+      if (_collectionDisposed || feedbackScope != _currentCustomerOrderScope || isCurrent?.call()==false) return;
       final snapshot = await commerceAdapter.refresh();
       if (refreshSequence != _commerceRefreshSequence ||
           _collectionDisposed ||
@@ -9248,6 +9353,7 @@ class BuyV2Session extends ChangeNotifier {
           !procurementScopeCurrent) {
         return;
       }
+      if (isCurrent?.call()==false) return;
       if (snapshot.procurementAccessOnly) {
         final grant = snapshot.procurementBuyerGrant;
         final context = procurementContext;
@@ -9480,11 +9586,19 @@ class BuyV2Session extends ChangeNotifier {
           !procurementScopeCurrent) {
         return;
       }
+      if (isCurrent?.call()==false) return;
       commerceLoadState = BuyV2CommerceLoadState.offline;
       if (isStoreProcurement) _procurementBuyerGrant = null;
       commerceMessage =
           'Shop could not refresh. Check your connection and try again.';
     } finally {
+      if(isCurrent?.call()==false && refreshSequence==_commerceRefreshSequence &&
+          !_collectionDisposed && procurementEpoch==_procurementEpoch &&
+          feedbackScope==_currentCustomerOrderScope && procurementScopeCurrent){
+        commerceLoadState=previousLoadState;
+        commerceMessage=previousMessage;
+        notifyListeners();
+      }
       if (_procurementOfferRefreshSequence == refreshSequence) {
         _procurementOfferRefreshSequence = null;
       }
@@ -9492,8 +9606,10 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> retryCommerce() async {
-    await restoreCommerce();
+  Future<void> retryCommerce({bool Function()? isCurrent}) async {
+    if(isCurrent?.call()==false)return;
+    await restoreCommerce(isCurrent:isCurrent);
+    if(isCurrent?.call()==false)return;
     if (customerStateRecoveryPending &&
         commerceLoadState == BuyV2CommerceLoadState.ready) {
       await restoreCustomerState();
@@ -10986,6 +11102,9 @@ class BuyV2Session extends ChangeNotifier {
     return write;
   }
 
+  /// Read-only retained Cart rows, including deselected and display-filtered rows.
+  List<BuyV2CartLine> get allCartLines => List.unmodifiable(_cart.values);
+
   List<BuyV2CartLine> get cartLines {
     final lines = _linesForScope(
       usesMixedCartSelection ? BuyV2CartScope.all : cartScope,
@@ -11027,6 +11146,12 @@ class BuyV2Session extends ChangeNotifier {
       ),
     );
   }
+
+  /// Uncommitted Store choice, using original Checkout scope/line selection.
+  List<BuyV2CartLine> collectionCheckoutLinesFor(String storeId) =>
+      List.unmodifiable(_linesForScope(checkoutScope).where((line) =>
+          (isStoreProcurement || checkoutScope == BuyV2CartScope.medicine ||
+              cartProductSelected(line.product.id)) && line.product.storeId == storeId));
 
   bool get collectionCheckoutSelected => _collectionCheckoutSelected;
 
@@ -11173,7 +11298,8 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
-  Future<bool> prepareCollectionCheckout() async {
+  Future<bool> prepareCollectionCheckout({bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     if (view != BuyV2View.checkout ||
         checkoutBusy ||
         !collectionCheckoutSelected) {
@@ -11193,11 +11319,12 @@ class BuyV2Session extends ChangeNotifier {
             availablePaymentMethods.contains(selectedPayment)
         ? currentCollectionBasket
         : null;
-    final ready = await controller.prepare(basket);
+    final ready = await controller.prepare(basket, isCurrent: isCurrent);
     if (_collectionDisposed) return false;
     if (controller.phase == BuyV2CollectionCheckoutPhase.paid) {
       return _completeCollectionPurchase();
     }
+    if (isCurrent?.call()==false) return false;
     if (ready &&
         basket != null &&
         view == BuyV2View.checkout &&
@@ -11211,7 +11338,8 @@ class BuyV2Session extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> submitCollectionPurchase() async {
+  Future<bool> submitCollectionPurchase({bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     if (collectionCheckout?.unresolved != true && checkoutLines.any((line) => line.scheduledFulfilment != null)) {
       showNotice('Review your selected delivery window before switching to collection. Your Cart is unchanged.');
       return false;
@@ -11235,7 +11363,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     final basket = currentCollectionBasket;
     if (basket == null || collectionCheckout == null) return false;
-    final paid = await collectionCheckout!.place(basket);
+    final paid = await collectionCheckout!.place(basket, isCurrent: isCurrent);
     if (_collectionDisposed) return false;
     if (paid) return _completeCollectionPurchase();
     if (view == BuyV2View.checkout && collectionCheckoutSelected) {
@@ -11247,13 +11375,15 @@ class BuyV2Session extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> reconcileCollectionPurchase() async {
-    final paid = await collectionCheckout?.checkPayment() ?? false;
+  Future<bool> reconcileCollectionPurchase({bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
+    final paid = await collectionCheckout?.checkPayment(isCurrent: isCurrent) ?? false;
     return !_collectionDisposed && paid && _completeCollectionPurchase();
   }
 
-  Future<bool> continueCollectionPayment(BuyV2PaymentHandoff handoff) async {
-    final paid = await collectionCheckout?.continuePayment(handoff) ?? false;
+  Future<bool> continueCollectionPayment(BuyV2PaymentHandoff handoff, {bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
+    final paid = await collectionCheckout?.continuePayment(handoff, isCurrent: isCurrent) ?? false;
     return !_collectionDisposed && paid && _completeCollectionPurchase();
   }
 
@@ -12264,7 +12394,8 @@ class BuyV2Session extends ChangeNotifier {
     } on FormatException { return false; }
   }
 
-  Future<bool> refreshCheckoutQuote() async {
+  Future<bool> refreshCheckoutQuote({bool Function()? isCurrent}) async {
+    if (isCurrent?.call()==false) return false;
     if (_collectionDisposed || !procurementScopeCurrent) return false;
     final adapter = checkoutQuoteAdapter;
     final address = selectedAddressOrNull;
@@ -12343,12 +12474,14 @@ class BuyV2Session extends ChangeNotifier {
     }
     _checkoutQuote = null;
     _checkoutQuoteFingerprint = null;
+    final previousLoadState=checkoutQuoteLoadState;
+    final previousMessage=checkoutQuoteMessage;
     checkoutQuoteLoadState = BuyV2CommerceLoadState.loading;
     checkoutQuoteMessage = null;
     notifyListeners();
     try {
       // A synchronous loading listener may retire this owner or start a successor.
-      if (!currentContext()) return false;
+      if (!currentContext() || isCurrent?.call()==false) return false;
       if (!currentInputs()) { unavailable('Prices or choices changed. Check the total again.'); return false; }
       final supplierQuotes = _supplierQuotesForLines(checkoutLines);
       final snapshot = supplierQuotes.isNotEmpty ? await (adapter as BuyV2SupplierQuoteCheckoutAdapter).loadQuoteWithSupplierQuotesMinor(
@@ -12377,7 +12510,7 @@ class BuyV2Session extends ChangeNotifier {
           for (final group in groups) group.key: tipForGroup(group),
         },
       );
-      if (!currentContext()) return false;
+      if (!currentContext() || isCurrent?.call()==false) return false;
       if (!currentInputs()) { unavailable('Prices or choices changed. Check the total again.'); return false; }
       checkoutQuoteLoadState = snapshot.state;
       checkoutQuoteMessage = snapshot.customerMessage;
@@ -12404,7 +12537,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return true;
     } on Object {
-      if (!currentContext()) return false;
+      if (!currentContext() || isCurrent?.call()==false) return false;
       _checkoutQuote = null;
       _checkoutQuoteFingerprint = null;
       checkoutQuoteLoadState = BuyV2CommerceLoadState.unavailable;
@@ -12412,9 +12545,17 @@ class BuyV2Session extends ChangeNotifier {
       _invalidateCommercialPaymentTerms();
       notifyListeners();
       return false;
+    } finally {
+      // Cleanup belongs to the original native request, not to retired AI UI.
+      // Do not accept its response or disturb a successor request/owner.
+      if (isCurrent?.call()==false && currentContext() &&
+          checkoutQuoteLoadState==BuyV2CommerceLoadState.loading) {
+        checkoutQuoteLoadState=previousLoadState;
+        checkoutQuoteMessage=previousMessage;
+        notifyListeners();
+      }
     }
   }
-
   bool _validCheckoutQuote(
     BuyV2CheckoutQuote quote,
     List<BuyV2FulfilmentGroup> groups,
@@ -14175,8 +14316,10 @@ class BuyV2Session extends ChangeNotifier {
 
   /// Frontend history projection only; order facts and completion remain owned
   /// by their existing authoritative records and predicates.
-  List<BuyV2Order> get visibleOrderHistory {
-    final normalizedQuery = query.trim().toLowerCase();
+  List<BuyV2Order> get visibleOrderHistory =>
+      readOrderHistory(query,filterQuery:destination==BuyV2Destination.orders);
+  List<BuyV2Order> readOrderHistory(String text,{bool filterQuery=true}) {
+    final normalizedQuery = text.trim().toLowerCase();
     return orders
         .where(
           (order) =>
@@ -14186,7 +14329,7 @@ class BuyV2Session extends ChangeNotifier {
         .where((order) => order.destination != BuyV2Destination.medicine)
         .where(
           (order) =>
-              destination != BuyV2Destination.orders ||
+              !filterQuery ||
               normalizedQuery.isEmpty ||
               [
                 order.id,
@@ -15154,7 +15297,48 @@ class BuyV2Session extends ChangeNotifier {
     return openCheckout();
   }
 
-  bool openCheckout() {
+  /// Read projection of the exact scope/selection used by original openCheckout.
+  /// No navigation, presentation acknowledgement, quote, reservation or write.
+  BuyV2CheckoutReadProjection? readCheckoutFromCurrentCart() {
+    if (view != BuyV2View.cart || checkoutBusy || cartChangesBlocked ||
+        checkoutRequiresResolution || cartLines.isEmpty) return null;
+    final scope = usesMixedCartSelection ? BuyV2CartScope.all : cartScope;
+    final selectedCollection = _collectionBrowseStoreId != null
+        ? cartLines.any((line) => line.product.storeId == _collectionBrowseStoreId)
+        : _collectionCheckoutSelected;
+    final storeId = _collectionBrowseStoreId != null
+        ? selectedCollection ? _collectionBrowseStoreId : null
+        : _collectionCheckoutStoreId;
+    final lines = List<BuyV2CartLine>.unmodifiable(_linesForScope(scope).where((line) =>
+        (isStoreProcurement || scope == BuyV2CartScope.medicine || cartProductSelected(line.product.id)) &&
+        (!selectedCollection || line.product.storeId == storeId)));
+    if (lines.isEmpty) return null;
+    final store = selectedCollection ? _pagedStores[storeId] : null;
+    final source = <Object?>[view,cartScope,scope,usesMixedCartSelection,
+      _collectionBrowseStoreId,selectedCollection,storeId,store,selectedAddressOrNull,selectedPayment,
+      eligibilityLocationKey,lines.length,
+      for(final line in lines)...[
+        line,line.product.id,line.product.canonicalId,line.product.sourceSkuId,
+        line.product.storeId,line.product.variant,line.product.pack,line.product.offerClass,
+        line.product.packTerms,line.quantity,line.scheduledFulfilment,
+        for(final facts in [productFactsFor(line.product)])...[
+          facts.sourceId,facts.observedAt,facts.priceMinor,facts.deliveryPromise,facts.partner,
+          facts.orderabilityLabel,facts.stale,facts.eligibility?.sourceRevision,facts.eligibility?.expiresAt,
+        ],
+      ],
+    ];
+    return BuyV2CheckoutReadProjection._(scope:scope,lines:lines,
+      groups:List.unmodifiable(_fulfilmentGroupsFor(lines)),address:selectedAddressOrNull,
+      paymentMethod:selectedPayment,collectionSelected:selectedCollection,collectionStore:store,
+      sourceSnapshot:List.unmodifiable(source));
+  }
+  bool checkoutReadProjectionCurrent(BuyV2CheckoutReadProjection expected) {
+    final actual = readCheckoutFromCurrentCart();
+    return actual != null && listEquals(actual.sourceSnapshot,expected.sourceSnapshot);
+  }
+
+  bool openCheckout({bool Function()? isCurrent}) {
+    if (isCurrent?.call() == false) return false;
     if (_scheduledCartSave != null) {
       _holdCartForPaymentResolution();
       return false;
@@ -15222,9 +15406,11 @@ class BuyV2Session extends ChangeNotifier {
     notice = null;
     if (!checkoutRequiresResolution && !isStoreProcurement) {
       for (final line in checkoutLines) {
+        if (isCurrent?.call() == false) return false;
         refreshProductFacts(line.product.id);
       }
     }
+    if (isCurrent?.call() == false) return false;
     _captureCheckoutPromiseSnapshot();
     if (!retainingCheckout && !checkoutRequiresResolution) _prepareCheckoutPresentation();
     _invalidateAndRefreshCheckoutPricingContracts();
@@ -15803,7 +15989,9 @@ class BuyV2Session extends ChangeNotifier {
     required BuyV2OrderResolutionKind kind,
     required String reason,
     Map<String, int> itemQuantities = const {},
+    bool Function()? capturedCurrent,
   }) async {
+    if(capturedCurrent?.call()==false)return false;
     // Capture caller-owned selection before even recovery loading can yield.
     // Validation and dispatch must refer to the same purchased quantities.
     final quantities = Map<String, int>.unmodifiable(itemQuantities);
@@ -15811,6 +15999,7 @@ class BuyV2Session extends ChangeNotifier {
     // Legacy/review consumers without storage retain their in-session contract;
     // those consumers cannot claim durable command recovery.
     if (customerStateStore != null && !await _balanceRecoveryReady()) return false;
+    if(capturedCurrent?.call()==false)return false;
     final cleanReason = reason.trim();
     final order = _prepareOrderResolution(orderId);
     if (order == null) return false;
@@ -15872,6 +16061,7 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
       if (!current()) return false;
+      if(capturedCurrent?.call()==false)return false;
       if (hold != null) _orderResolutionKnownUnsent.remove(hold.storageKey);
       final result = await orderResolutionAdapter.submit(
         BuyV2OrderResolutionRequest(
@@ -16197,7 +16387,8 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
-  Future<bool> setTrackingAlerts(bool enabled) async {
+  Future<bool> setTrackingAlerts(bool enabled, {bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     if (trackingAlertsBusy || !trackingAlertsAvailable) return false;
     if (reviewDataEnabled) {
       trackingAlertsEnabled = enabled;
@@ -16208,17 +16399,20 @@ class BuyV2Session extends ChangeNotifier {
     trackingAlertsBusy = true;
     notifyListeners();
     try {
+      if (_collectionDisposed || isCurrent?.call()==false) return false;
       final result = await commerceAdapter.setOrderAlerts(enabled: enabled);
+      if (_collectionDisposed || isCurrent?.call() == false) return false;
       trackingAlertsAvailable = result.available;
       trackingAlertsEnabled = result.available && result.enabled;
       notice = result.customerMessage;
       return result.available && result.enabled == enabled;
     } on Object {
+      if (_collectionDisposed || isCurrent?.call() == false) return false;
       notice = 'Order alert preference could not be saved. Try again.';
       return false;
     } finally {
       trackingAlertsBusy = false;
-      notifyListeners();
+      if (!_collectionDisposed) notifyListeners();
     }
   }
 
@@ -16681,8 +16875,9 @@ class BuyV2Session extends ChangeNotifier {
   Future<bool> reportProductOnline({
     required String productId,
     required String reason,
+    bool Function()? inputCurrent,
   }) async {
-    if (!_prepareProductFeedbackScope()) return false;
+    if (inputCurrent?.call() == false || !_prepareProductFeedbackScope()) return false;
     if (reviewDataEnabled) {
       return reportProduct(productId: productId, reason: reason);
     }
@@ -16726,6 +16921,7 @@ class BuyV2Session extends ChangeNotifier {
       _productReportStates[key] = 'pending';
       notifyListeners();
       if (!current()) return false;
+      if (inputCurrent?.call() == false) return await cancelUnsent('Your report was not sent.');
       var confirmedWrite = false;
       final saved = await (_persistCustomerState(written: (value) => confirmedWrite = value) ?? Future<bool>.value(false))
           .catchError((Object _) => false);
@@ -16736,6 +16932,7 @@ class BuyV2Session extends ChangeNotifier {
       if (!_productReportsAvailable || commerceLoadState != BuyV2CommerceLoadState.ready || customerStateRecoveryPending) {
         return await cancelUnsent('Product reporting became unavailable. Your report was not sent.');
       }
+      if (inputCurrent?.call() == false) return await cancelUnsent('Your report was not sent.');
       final result = await commerceAdapter.reportProduct(
         product: product,
         reason: cleanReason,
@@ -17268,8 +17465,9 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> acceptSupplierPolicyAndAdd(
-    BuyV2SupplierPolicyAddIntent? expectedIntent,
-  ) async {
+    BuyV2SupplierPolicyAddIntent? expectedIntent, {
+    bool Function()? isCurrent,
+  }) async {
     final intent = pendingSupplierPolicyAdd;
     if (intent == null ||
         !identical(intent, expectedIntent) ||
@@ -17285,7 +17483,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     bool currentIntent() {
       final current = findProduct(intent.product.id);
-      return !_collectionDisposed &&
+      return isCurrent?.call()!=false && !_collectionDisposed &&
           identical(_pendingSupplierPolicyAdd, intent) &&
           customerStateStore?.ownerScope == owner &&
           identical(collectionIdentity?.value, intent.accountIdentity) &&
@@ -18370,10 +18568,11 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> submitOrder() {
+  Future<bool> submitOrder({bool Function()? isCurrent}) {
+    if (isCurrent?.call() == false) return Future.value(false);
     if (checkoutHasGroupedCommitment) {
       if (checkoutBusy) return Future.value(false);
-      return _submitNextGroupedPayment();
+      return _submitNextGroupedPayment(isCurrent: isCurrent);
     }
     if (!checkoutRequiresResolution && !_checkoutSupplierPoliciesCurrent()) {
       return Future<bool>.value(false);
@@ -18398,7 +18597,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     if (_holdCheckoutForCustomerRecovery()) return Future<bool>.value(false);
     if (collectionCheckoutSelected || collectionCheckout?.unresolved == true) {
-      return submitCollectionPurchase();
+      return submitCollectionPurchase(isCurrent: isCurrent);
     }
     if (selectedPayment == 'Purchase order' &&
         !purchaseOrderEligibleForCheckout) {
@@ -18419,20 +18618,21 @@ class BuyV2Session extends ChangeNotifier {
     }
     if (checkoutLines.any((line) => line.scheduledFulfilment != null) ||
         (reviewDataEnabled && const {'UPI', 'Card'}.contains(selectedPayment))) {
-      return _submitOrderAsync();
+      return _submitOrderAsync(isCurrent: isCurrent);
     }
     if (reviewDataEnabled) {
       if ((liveCartBenefitsEnabled && _hasSelectedCartBenefitReference) ||
           checkoutQuoteEnabled ||
           commercialPaymentTermsEnabled) {
-        return _submitReviewOrderWithContracts();
+        return _submitReviewOrderWithContracts(isCurrent: isCurrent);
       }
       return Future<bool>.value(confirmOrder());
     }
-    return _submitOrderAsync();
+    return _submitOrderAsync(isCurrent: isCurrent);
   }
 
-  Future<bool> _submitReviewOrderWithContracts() async {
+  Future<bool> _submitReviewOrderWithContracts({bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     if (liveCartBenefitsEnabled && _hasSelectedCartBenefitReference) {
       final eligible = await refreshCartBenefits();
       if (!eligible ||
@@ -18445,7 +18645,9 @@ class BuyV2Session extends ChangeNotifier {
       }
     }
     if (checkoutQuoteRequired) {
-      await refreshCheckoutQuote();
+      if (isCurrent?.call() == false) return false;
+      await refreshCheckoutQuote(isCurrent:isCurrent);
+      if (isCurrent?.call()==false) return false;
       if (checkoutQuoteReviewRequired) {
         notice =
             checkoutQuoteMessage ??
@@ -18455,6 +18657,7 @@ class BuyV2Session extends ChangeNotifier {
       }
     }
     if (commercialPaymentTermsEnabled) {
+      if (isCurrent?.call() == false) return false;
       await refreshCommercialPaymentTerms();
       if (checkoutPaymentTermsReviewRequired) {
         notice =
@@ -18464,11 +18667,13 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
     }
+    if (isCurrent?.call() == false) return false;
     return confirmOrder();
   }
 
   bool _commodityPriceRevalidationBusy = false;
-  Future<bool> requestCommodityPriceRefresh(BuyV2Product product) async {
+  Future<bool> requestCommodityPriceRefresh(BuyV2Product product, {bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     final source = cataloguePageSource;
     final connection = switch (source) {
       WorkspacePublicDiscoverySource value => value.gateway,
@@ -18477,7 +18682,8 @@ class BuyV2Session extends ChangeNotifier {
     };
     if (connection == null || _collectionDisposed || isStoreProcurement || cartChangesBlocked) return false;
     final identity = collectionIdentity?.value;
-    bool current() => !_collectionDisposed && collectionIdentity?.value == identity && identical(cataloguePageSource, source) && !cartChangesBlocked;
+    bool current() => isCurrent?.call() != false && !_collectionDisposed && collectionIdentity?.value == identity && identical(cataloguePageSource, source) && !cartChangesBlocked;
+    if (!current()) return false;
     final recorded = await connection.requestCommodityPriceRefresh(product, current: current);
     if (!current()) return false;
     notice = recorded ? 'Price refresh requested from the supplier.' : 'The price refresh request could not be confirmed. Check the product again.';
@@ -18614,19 +18820,21 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> _submitOrderAsync() async {
+  Future<bool> _submitOrderAsync({bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     if (checkoutBusy) return false;
     _checkoutPreflightBusy = true;
     notifyListeners();
     try {
-      return await _placeOrderAfterPreflight();
+      return await _placeOrderAfterPreflight(isCurrent: isCurrent);
     } finally {
       _checkoutPreflightBusy = false;
       if (!_collectionDisposed) notifyListeners();
     }
   }
 
-  Future<bool> _placeOrderAfterPreflight() async {
+  Future<bool> _placeOrderAfterPreflight({bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     if (checkoutRequiresResolution) {
       notice = 'Check the current payment before trying again.';
       notifyListeners();
@@ -18671,12 +18879,15 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
     }
+    if (isCurrent?.call() == false) return false;
     if (!await _refreshCommodityCartPrices(lines, duringCheckoutPreflight: true)) return false;
     if (_collectionDisposed || procurementEpoch != _procurementEpoch) return false;
     lines = checkoutLines;
     if (!_refreshCheckoutFactsForProduction(lines)) return false;
     if (checkoutQuoteRequired) {
-      await refreshCheckoutQuote();
+      if (isCurrent?.call() == false) return false;
+      await refreshCheckoutQuote(isCurrent:isCurrent);
+      if (isCurrent?.call()==false) return false;
       if (checkoutQuoteReviewRequired) {
         notice =
             checkoutQuoteMessage ??
@@ -18686,6 +18897,7 @@ class BuyV2Session extends ChangeNotifier {
       }
     }
     if (commercialPaymentTermsEnabled) {
+      if (isCurrent?.call() == false) return false;
       await refreshCommercialPaymentTerms();
       if (checkoutPaymentTermsReviewRequired) {
         notice =
@@ -18695,6 +18907,7 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
     }
+    if (isCurrent?.call() == false) return false;
     final groups = checkoutFulfilmentGroups;
     final refreshedSnapshot = _deliveryPromiseSnapshotFor(groups);
     if (_checkoutPromiseSnapshot.isEmpty) {
@@ -18768,7 +18981,7 @@ class BuyV2Session extends ChangeNotifier {
       // Transfer the preflight guard to the group's submitting/save guard
       // synchronously, before its first persistence await.
       _checkoutPreflightBusy = false;
-      return _beginGroupedCheckout(lines, address);
+      return _beginGroupedCheckout(lines, address, isCurrent: isCurrent);
     }
     final owner = _legacyOwnerScope;
     if (owner == null) {
@@ -18855,6 +19068,7 @@ class BuyV2Session extends ChangeNotifier {
       payment: payment,
       purchaseOrderAccountId: _pendingPurchaseOrderAccountId,
     );
+    if (isCurrent?.call()==false) return false;
     _legacyCheckoutAttempt = attempt;
     _checkoutIdempotencyKey = key;
     checkoutSubmissionState = BuyV2CheckoutSubmissionState.submitting;
@@ -18886,7 +19100,8 @@ class BuyV2Session extends ChangeNotifier {
           !catalogueNow().isBefore(originalQuote.validUntil)));
     final admissionChanged = isStoreProcurement &&
         (policyRevision != _procurementPolicyRevision || _localProcurementRestriction != null);
-    if (!retained || admissionChanged || stockChanged || !policiesCurrent || !_supplierTaxInputsCurrent(request) || !_supplierQuoteInputsCurrent(request) ||
+    final capturedOwnerRetired = isCurrent?.call() == false;
+    if (capturedOwnerRetired || !retained || admissionChanged || stockChanged || !policiesCurrent || !_supplierTaxInputsCurrent(request) || !_supplierQuoteInputsCurrent(request) ||
         agreementChanged ||
         (request.lines.any((line) => line.scheduledFulfilment != null) &&
           (!_selectedScheduledInputsCurrent(request) || checkoutQuoteReviewRequired || originalQuote == null)) ||
@@ -18895,12 +19110,15 @@ class BuyV2Session extends ChangeNotifier {
                 purchaseOrder?.review?.requestId !=
                     request.purchaseOrderRequestId ||
                 purchaseOrder?.review?.revision !=
-                    request.purchaseOrderRevision))) {
+                    request.purchaseOrderRevision)) ||
+        isCurrent?.call() == false) {
       // No connector operation has occurred; this preparation may safely retry.
       _legacyCheckoutAttempt = null;
       _checkoutIdempotencyKey = null;
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.failed;
-      notice = retained
+      notice = capturedOwnerRetired
+          ? 'Review this order again. No payment was started.'
+          : retained
           ? admissionChanged ? 'Your Store purchase eligibility changed. Review this purchase before payment.'
             : stockChanged ? 'Stock changed. Review the affected products before payment.'
             : !policiesCurrent ? 'Store policy changed. Review Checkout before payment.'
@@ -19141,8 +19359,10 @@ class BuyV2Session extends ChangeNotifier {
 
   Future<bool> _beginGroupedCheckout(
     List<BuyV2CartLine> lines,
-    BuyV2Address address,
-  ) async {
+    BuyV2Address address, {
+    bool Function()? isCurrent,
+  }) async {
+    if (isCurrent?.call() == false) return false;
     final owner = customerStateStore?.ownerScope;
     final quote = _checkoutQuote;
     if (owner == null || quote == null || !_validCheckoutPaymentGroups()) {
@@ -19186,6 +19406,7 @@ class BuyV2Session extends ChangeNotifier {
       }
       requests[group.id] = request;
     }
+    if (isCurrent?.call()==false) return false;
     _checkoutPaymentAttempt = BuyV2CheckoutPaymentAttempt(
       id: id,
       ownerScope: owner,
@@ -19224,7 +19445,7 @@ class BuyV2Session extends ChangeNotifier {
       ]),
     );
     checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
-    return _submitNextGroupedPayment();
+    return _submitNextGroupedPayment(isCurrent: isCurrent);
   }
 
   int _groupOperationSequence = 0;
@@ -19346,7 +19567,8 @@ class BuyV2Session extends ChangeNotifier {
     );
   }
 
-  Future<bool> _submitNextGroupedPayment() async {
+  Future<bool> _submitNextGroupedPayment({bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     final attempt = checkoutPaymentAttempt;
     var group = currentCheckoutPaymentGroup;
     if (attempt == null ||
@@ -19361,6 +19583,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     while (group != null) {
+      if (isCurrent?.call() == false) return false;
       final policyRevision = _procurementPolicyRevision;
       final request = group.request;
       if (isStoreProcurement && _localProcurementRestriction != null) {
@@ -19420,6 +19643,7 @@ class BuyV2Session extends ChangeNotifier {
         notifyListeners();
         return false;
       }
+      if (isCurrent?.call()==false) return false;
       final sequence = ++_groupOperationSequence;
       final identity = collectionIdentity?.value;
       final quoteAgreement = _checkoutQuoteAgreement(_checkoutQuote);
@@ -19451,7 +19675,17 @@ class BuyV2Session extends ChangeNotifier {
         checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
         _syncCheckoutGroupState();
         _checkoutIdempotencyKey = null;
-        notice = 'Checkout could not be saved. No new payment was started.';
+        notice = isCurrent?.call() == false
+            ? 'Review remaining checkout. No new payment was started.'
+            : 'Checkout could not be saved. No new payment was started.';
+        notifyListeners();
+        return false;
+      }
+      if (isCurrent?.call() == false) {
+        checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
+        _syncCheckoutGroupState();
+        _checkoutIdempotencyKey = null;
+        _persistCustomerState();
         notifyListeners();
         return false;
       }
@@ -19467,8 +19701,9 @@ class BuyV2Session extends ChangeNotifier {
       final taxCurrent = _supplierTaxInputsCurrent(request);
       final admissionChanged = isStoreProcurement &&
           (policyRevision != _procurementPolicyRevision || _localProcurementRestriction != null);
-      if (admissionChanged || stockChanged || !policiesCurrent || agreementChanged || !taxCurrent || !_supplierQuoteInputsCurrent(request) ||
-          request.lines.any((line) => line.scheduledFulfilment != null) && !_selectedScheduledInputsCurrent(request)) {
+      if (isCurrent?.call() == false || admissionChanged || stockChanged || !policiesCurrent || agreementChanged || !taxCurrent || !_supplierQuoteInputsCurrent(request) ||
+          request.lines.any((line) => line.scheduledFulfilment != null) && !_selectedScheduledInputsCurrent(request) ||
+          isCurrent?.call() == false) {
         checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
         _syncCheckoutGroupState(); _checkoutIdempotencyKey = null;
         notice = admissionChanged ? 'Your Store purchase eligibility changed. Review this purchase before payment.'
@@ -20201,7 +20436,8 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> continuePayment(BuyV2PaymentHandoff handoff) async {
+  Future<bool> continuePayment(BuyV2PaymentHandoff handoff, {bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
     if (!procurementScopeCurrent ||
         !checkoutRecoveryAmountKnown ||
         _lateSettlementNeedsReview ||
@@ -20225,7 +20461,7 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
     var opened = false;
     try {
-      opened = await handoff(uri);
+      if (isCurrent?.call() != false) opened = await handoff(uri);
     } on Object {
       opened = false;
     }
@@ -20321,7 +20557,9 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
-  Future<bool> _reconcileGroupedPayment() async {
+  Future<bool> _reconcileGroupedPayment({bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
+    final previousState = checkoutSubmissionState;
     final attempt = checkoutPaymentAttempt;
     final group = currentCheckoutPaymentGroup;
     if (attempt == null ||
@@ -20358,6 +20596,13 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
       if (!_groupOperationCurrent(attempt, group, sequence, identity)) {
+        return false;
+      }
+      if (isCurrent?.call() == false) {
+        // The existing attempt was not queried; preserve its recovery identity.
+        checkoutSubmissionState = previousState;
+        _persistCustomerState();
+        notifyListeners();
         return false;
       }
       final reference = group.paymentReference;
@@ -20424,12 +20669,14 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> reconcilePayment() async {
-    if (checkoutHasGroupedCommitment) return _reconcileGroupedPayment();
+  Future<bool> reconcilePayment({bool Function()? isCurrent}) async {
+    if (isCurrent?.call() == false) return false;
+    if (checkoutHasGroupedCommitment) return _reconcileGroupedPayment(isCurrent: isCurrent);
     if (!procurementScopeCurrent || checkoutBusy) return false;
     if (collectionCheckoutSelected || collectionCheckout?.unresolved == true) {
-      return reconcileCollectionPurchase();
+      return reconcileCollectionPurchase(isCurrent: isCurrent);
     }
+    final previousState = checkoutSubmissionState;
     final attempt = legacyCheckoutAttempt;
     final epoch = _procurementEpoch;
     final owner = _legacyOwnerScope;
@@ -20476,6 +20723,15 @@ class BuyV2Session extends ChangeNotifier {
         notifyListeners();
         return false;
       }
+    }
+    if (isCurrent?.call() == false) {
+      if (current()) {
+        // No connector read was dispatched; retain its original recoverable state.
+        checkoutSubmissionState = previousState;
+        _persistCustomerState();
+        notifyListeners();
+      }
+      return false;
     }
     BuyV2OrderPlacementResult result;
     try {

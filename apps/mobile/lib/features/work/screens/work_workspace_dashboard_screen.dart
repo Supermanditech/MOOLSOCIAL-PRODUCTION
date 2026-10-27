@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart' as assistant_hash;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -15,11 +17,16 @@ import '../../../shared/commerce/commerce_downloads.dart';
 import '../../../shared/commerce/commerce_downloads_screen.dart';
 import '../work_downloads.dart';
 import '../../../ui_v2/buy/buy_v2_screen.dart';
-import '../../../ui_v2/buy/buy_v2_views.dart' show showMoolBusinessFinanceSheet;
+import '../../../ui_v2/buy/buy_v2_views.dart'
+    show showMoolBusinessFinanceSheet, MoolBusinessFinancePrefill, moolBusinessFinanceFormRevision;
+import '../../../ui_v2/assistant/mool_assistant_v2.dart'
+    show MoolAssistantHost, MoolAssistantNativeScope, MoolAssistantWorkspaceScope, MoolAssistantRouteBoundNativeAdapter;
+import '../../assistant/mool_assistant.dart';
 import '../../../ui_v2/buy/buy_v2_scanner.dart';
 import '../../../ui_v2/profile/global_profile_panel_v2.dart';
 import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../../buy/buy_v2_models.dart';
+import '../../buy/buy_v2_customer_copy.dart';
 import '../../buy/buy_v2_session.dart';
 import '../../buy/buy_session.dart';
 import '../../buy/buy_models.dart';
@@ -35,7 +42,9 @@ import '../widgets/store_settings_widgets.dart';
 import '../widgets/store_publication_settings.dart';
 import '../widgets/store_payment_terms.dart';
 import '../widgets/store_product_promotions.dart';
+import '../work_product_promotions.dart' show encodeStoreCouponCampaigns;
 import '../widgets/store_customer_feedback.dart';
+import '../work_customer_feedback.dart';
 import '../widgets/workspace_purchase_originals.dart';
 import '../work_order_identity_gateway.dart';
 import '../widgets/store_product_thumbnail.dart';
@@ -51,15 +60,2321 @@ import '../work_services.dart';
 import '../work_catalogue_gateway.dart';
 import '../work_session.dart';
 
+class _StoreRestockNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  const _StoreRestockNativeAdapter({required this.read,required this.open});
+  final MoolAssistantNativeSnapshot? Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function(),Listenable?) open;
+  @override String get actionId=>'AI-ACT-234';
+  @override Set<String> get allowedFields=>const {'channel','query'};
+  @override String? validateFields(Map<String,Object?> fields){
+    if(fields.keys.any((key)=>!allowedFields.contains(key)) ||
+      !const {'wholesale','bulk'}.contains(fields['channel']) ||
+      fields.containsKey('query') && fields['query'] is! String)return 'Choose Wholesale or Bulk and check the product search.';
+    return null;
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId)async=>read(context,entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() current)=>
+    p.actionId!=actionId || validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,current,null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,{required bool Function() isCurrent,required Listenable ownerChanges})=>
+    p.actionId!=actionId || validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,isCurrent,ownerChanges);
+}
+
+/// Prepared original Restock inputs. Admission to the native Store session is
+/// explicit because its original controller persists the local basket bookmark.
+class _StoreRestockNativeReview extends StatefulWidget {
+  const _StoreRestockNativeReview({required this.store,required this.channel,required this.query,required this.product,
+    required this.current,required this.changes,required this.validUntil,required this.onContinue});
+  final String store,channel,query;
+  final BuyV2Product? product;
+  final bool Function() current;
+  final Listenable changes;
+  final DateTime validUntil;
+  final Future<bool> Function(bool Function()) onContinue;
+  @override State<_StoreRestockNativeReview> createState()=>_StoreRestockNativeReviewState();
+}
+class _StoreRestockNativeReviewState extends State<_StoreRestockNativeReview>{
+  Route<dynamic>? _route;Timer? _expiry;bool _busy=false,_retired=false,_closing=false;String? _error;
+  bool get _current=>mounted&&!_retired&&!_closing&&widget.current()&&widget.validUntil.isAfter(DateTime.now());
+  bool get _foreground=>_current&&_route?.isCurrent==true;
+  @override void initState(){super.initState();widget.changes.addListener(_changed);
+    final remaining=widget.validUntil.difference(DateTime.now());_expiry=Timer(remaining.isNegative?Duration.zero:remaining,_retire);}
+  @override void didChangeDependencies(){super.didChangeDependencies();_route??=ModalRoute.of(context);}
+  void _changed(){if(!mounted||_closing)return;if(!widget.current())_retire();else setState((){});}
+  void _retire(){if(!mounted||_retired||_closing)return;_retired=true;
+    WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_close(false);});WidgetsBinding.instance.ensureVisualUpdate();}
+  void _close(bool opened){if(!mounted||_closing)return;_closing=true;final route=_route;
+    if(route?.isActive!=true)return;
+    if(route!.isCurrent){Navigator.of(context).pop(opened);}else{Navigator.of(context).removeRoute(route);}}
+  Future<void> _continue()async{
+    if(_busy||!_foreground)return;setState(()=>_busy=true);
+    try{final opened=await widget.onContinue(()=>_foreground);
+      if(!mounted)return;if(opened&&_current){_close(true);}else if(!_current){_retire();}
+      else{setState(()=>_error='Restock could not be opened. Your existing Store basket is kept.');}
+    }on Object{if(_current)setState(()=>_error='Restock could not be opened. Your existing Store basket is kept.');}
+    finally{if(mounted)setState(()=>_busy=false);}
+  }
+  @override Widget build(BuildContext context)=>PopScope<bool>(canPop:_closing,onPopInvokedWithResult:(didPop,_){if(!didPop)_close(false);},
+    child:Scaffold(appBar:AppBar(title:const Text('Restock'),leading:BackButton(onPressed:()=>_close(false))),
+      body:!_current?const SizedBox.shrink():ListView(padding:const EdgeInsets.all(16),children:[
+        Text(widget.store,style:Theme.of(context).textTheme.titleMedium),const SizedBox(height:8),
+        Text(widget.channel=='bulk'?'Bulk suppliers':'Wholesale suppliers'),
+        if(widget.query.isNotEmpty)Padding(padding:const EdgeInsets.only(top:8),child:Text(widget.query,key:const Key('work-restock-review-query'))),
+        if(widget.product!=null)ListTile(contentPadding:EdgeInsets.zero,title:Text(widget.product!.customerTitle),subtitle:Text(widget.product!.pack)),
+        const SizedBox(height:12),const Text('Continue to your Store basket. Review products and quantities before ordering.'),
+        if(_error!=null)Padding(padding:const EdgeInsets.symmetric(vertical:8),child:Text(_error!)),
+        const SizedBox(height:12),FilledButton(key:const Key('work-restock-review-continue'),onPressed:_busy?null:_continue,
+          child:Text(_busy?'Opening Restock…':'Continue')),
+      ])));
+  @override void dispose(){_expiry?.cancel();widget.changes.removeListener(_changed);super.dispose();}
+}
+
+class _StoreOrderStatusNativeAdapter implements MoolAssistantNativeAdapter {
+  const _StoreOrderStatusNativeAdapter({required this.read,required this.open});
+  final MoolAssistantNativeSnapshot? Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function()) open;
+  @override String get actionId=>'AI-ACT-273';
+  @override Set<String> get allowedFields=>const {'status'};
+  static const statuses={'Live','New','Packing','Ready','Delivery','Attention','Done'};
+  @override String? validateFields(Map<String,Object?> fields)=>fields.keys.any((key)=>!allowedFields.contains(key))||
+    !statuses.contains(fields['status'])?'Choose an available order status. Date filtering is unavailable here.':null;
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entity)async=>read(context,entity);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() current)=>
+    p.actionId!=actionId||p.entityId!=null||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,current);
+}
+
+class _StoreOrderEffectAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  const _StoreOrderEffectAdapter({required this.actionId,required this.read,required this.open});
+  @override final String actionId;
+  final MoolAssistantNativeSnapshot? Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function(),Listenable?) open;
+  @override Set<String> get allowedFields=>actionId=='AI-ACT-275'?const {'operation'}:const {};
+  @override String? validateFields(Map<String,Object?> fields)=>fields.keys.any((key)=>!allowedFields.contains(key))||
+    actionId=='AI-ACT-275'&&!const {'accept','reject'}.contains(fields['operation'])?'Review the permitted order action.':null;
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx,String? entity)async=>read(ctx,entity);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() current)=>
+    p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,current,null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,{required bool Function() isCurrent,required Listenable ownerChanges})=>
+    p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,isCurrent,ownerChanges);
+}
+class _StoreOrderEffectScope extends InheritedWidget{
+  const _StoreOrderEffectScope({required this.operation,required this.current,required this.foreground,required this.perform,
+    required this.changes,this.packingLineId,this.packingQuantity,this.packingValue,required super.child});
+  final String operation;final String? packingLineId;final int? packingQuantity;final bool? packingValue;
+  final bool Function() current,foreground;
+  final Future<void> Function(Future<void> Function()) perform;
+  final Listenable changes;
+  bool permits(String value)=>value==operation&&current()&&foreground();
+  static _StoreOrderEffectScope? of(BuildContext context)=>context.dependOnInheritedWidgetOfExactType<_StoreOrderEffectScope>();
+  @override bool updateShouldNotify(_StoreOrderEffectScope old)=>true;
+}
+class _StoreOrderEffectReview extends StatefulWidget{
+  const _StoreOrderEffectReview({required this.session,required this.order,required this.operation,required this.current,
+    required this.changes,required this.validUntil,required this.track,this.packingLineId,this.packingQuantity,this.packingValue,this.contentBuilder});
+  final WorkSession session;final WorkspaceOrderRecord order;final String operation;
+  final String? packingLineId;final int? packingQuantity;final bool? packingValue;
+  final WidgetBuilder? contentBuilder;
+  final bool Function() current;final Listenable changes;final DateTime validUntil;
+  final ValueChanged<Future<void>> track;
+  @override State<_StoreOrderEffectReview> createState()=>_StoreOrderEffectReviewState();
+}
+class _StoreOrderEffectReviewState extends State<_StoreOrderEffectReview>{
+  Route<dynamic>? _route;Timer? _expiry;bool _busy=false,_retired=false,_closing=false;
+  bool get _owner=>mounted&&!_retired&&!_closing&&widget.current()&&widget.validUntil.isAfter(DateTime.now());
+  bool get _foreground=>_owner&&!_busy&&_route?.isCurrent==true;
+  @override void initState(){super.initState();widget.changes.addListener(_changed);
+    final d=widget.validUntil.difference(DateTime.now());_expiry=Timer(d.isNegative?Duration.zero:d,_retire);}
+  @override void didChangeDependencies(){super.didChangeDependencies();_route??=ModalRoute.of(context);}
+  void _changed(){if(!mounted||_closing)return;if(!_owner)_retire();else setState((){});}
+  void _retire(){if(!mounted||_retired||_closing)return;_retired=true;
+    WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_finish();});WidgetsBinding.instance.ensureVisualUpdate();}
+  void _finish(){if(!mounted||_closing)return;_closing=true;final route=_route;if(route?.isActive!=true)return;
+    if(route!.isCurrent)Navigator.of(context).pop();else Navigator.of(context).removeRoute(route);}
+  Future<void> _perform(Future<void> Function() original)async{
+    if(!_foreground)return;setState(()=>_busy=true);
+    final start=Completer<void>();
+    final operation=()async{await start.future;try{await original();}finally{_busy=false;if(mounted)_finish();}}();
+    widget.track(operation);start.complete();await operation;
+  }
+  @override Widget build(BuildContext context)=>PopScope(canPop:_closing,onPopInvokedWithResult:(didPop,_){if(!didPop)_finish();},
+    child:Scaffold(appBar:AppBar(title:const Text('Review order'),leading:BackButton(onPressed:_finish)),
+      body:!_owner?const SizedBox.shrink():_StoreOrderEffectScope(operation:widget.operation,current:()=>_owner,
+        foreground:()=>_foreground,perform:_perform,changes:widget.changes,
+        packingLineId:widget.packingLineId,packingQuantity:widget.packingQuantity,packingValue:widget.packingValue,
+        child:widget.contentBuilder!=null?Builder(builder:widget.contentBuilder!):ListView(padding:const EdgeInsets.all(16),children:[_LiveOrderTicket(session:widget.session,
+          order:widget.order,active:false,detailed:true,onOpenCollection:(){},onOpenDelivery:(){},onReview:(){})]))));
+  @override void dispose(){_expiry?.cancel();widget.changes.removeListener(_changed);super.dispose();}
+}
+
+class _StoreOrderTimeNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter{
+  const _StoreOrderTimeNativeAdapter({required this.read,required this.open});
+  final MoolAssistantNativeSnapshot? Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function(),Listenable?) open;
+  @override String get actionId=>'AI-ACT-276';
+  @override Set<String> get allowedFields=>const {'minutes'};
+  @override String? validateFields(Map<String,Object?> fields)=>fields.keys.any((key)=>key!='minutes')||
+    !const {2,5}.contains(fields['minutes'])?'Choose 2 or 5 additional minutes.':null;
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx,String? entity)async=>read(ctx,entity);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() current)=>
+    p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,current,null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,{required bool Function() isCurrent,required Listenable ownerChanges})=>
+    p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,isCurrent,ownerChanges);
+}
+
+class _StoreOrderIssueAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  const _StoreOrderIssueAdapter({required this.actionId,required this.read,required this.open});
+  @override final String actionId;
+  final MoolAssistantNativeSnapshot? Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function(),Listenable?) open;
+  @override Set<String> get allowedFields=>actionId=='AI-ACT-279'?const {}:const {'response','note'};
+  @override String? validateFields(Map<String,Object?> fields)=>
+    fields.keys.any((key)=>!allowedFields.contains(key)) || fields.containsKey('response')&&fields['response'] is! String ||
+    fields.containsKey('note')&&(fields['note'] is! String||!WorkspaceIssueDraft.acceptsNote(fields['note'] as String))
+      ?'Check the response and details.':null;
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx,String? entity)async=>read(ctx,entity);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() current)=>
+    p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,current,null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,{required bool Function() isCurrent,required Listenable ownerChanges})=>
+    p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,isCurrent,ownerChanges);
+}
+
+class _StoreIssueNativeReview extends StatefulWidget {
+  const _StoreIssueNativeReview({required this.session,required this.issue,required this.action,required this.current,
+    required this.changes,required this.until,required this.initialFields});
+  final WorkSession session;final WorkspaceIssueRecord issue;final String action;
+  final bool Function() current;final Listenable changes;final DateTime until;final Map<String,Object?> initialFields;
+  @override State<_StoreIssueNativeReview> createState()=>_StoreIssueNativeReviewState();
+}
+class _StoreIssueNativeReviewState extends State<_StoreIssueNativeReview> {
+  Route<dynamic>? _route;Timer? _expiry;bool _closed=false,_retired=false;final _dialogChanges=ValueNotifier<int>(0);
+  bool get _owner=>mounted&&!_closed&&!_retired&&widget.current()&&widget.until.isAfter(DateTime.now());
+  @override void initState(){super.initState();widget.changes.addListener(_changed);final d=widget.until.difference(DateTime.now());_expiry=Timer(d.isNegative?Duration.zero:d,_retire);}
+  @override void didChangeDependencies(){super.didChangeDependencies();_route??=ModalRoute.of(context);}
+  void _changed(){if(!mounted||_closed)return;if(!_owner)_retire();else setState((){});}
+  void _retire(){if(!mounted||_closed||_retired)return;_retired=true;_dialogChanges.value++;WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_close();});WidgetsBinding.instance.ensureVisualUpdate();}
+  void _close(){if(!mounted||_closed)return;_closed=true;_dialogChanges.value++;if(_route?.isActive!=true)return;
+    if(_route!.isCurrent)Navigator.of(context).pop();else Navigator.of(context).removeRoute(_route!);}
+  @override Widget build(BuildContext context)=>PopScope(canPop:_closed,onPopInvokedWithResult:(didPop,_){if(!didPop)_close();},
+    child:Scaffold(appBar:AppBar(title:const Text('Order response'),leading:BackButton(onPressed:_close)),
+      body:!_owner?const SizedBox.shrink():ListView(padding:const EdgeInsets.all(16),children:[
+        Text(widget.issue.referenceId,style:Theme.of(context).textTheme.titleMedium),
+        Text(widget.issue.kind.label),Text(widget.issue.reason),
+        for(final line in widget.issue.lines)ListTile(contentPadding:EdgeInsets.zero,title:Text(line.name),subtitle:Text('${line.pack} · ${line.affectedQuantity} of ${line.orderedQuantity} affected')),
+        _StoreIssueResponseEditor(session:widget.session,issue:widget.issue,ownerCurrent:()=>_owner,
+          stagedFields:widget.initialFields,stagedAction:widget.action,ownerChanges:Listenable.merge([widget.changes,_dialogChanges])),
+      ])));
+  @override void dispose(){_expiry?.cancel();widget.changes.removeListener(_changed);_dialogChanges.dispose();super.dispose();}
+}
+
+class _OwnedIssueDeclineDialog extends StatefulWidget{
+  const _OwnedIssueDeclineDialog({required this.ownerCurrent,required this.changes,required this.builder});
+  final bool Function() ownerCurrent;final Listenable changes;final Widget Function(ValueChanged<bool>) builder;
+  @override State<_OwnedIssueDeclineDialog> createState()=>_OwnedIssueDeclineDialogState();
+}
+class _OwnedIssueDeclineDialogState extends State<_OwnedIssueDeclineDialog>{
+  Route<dynamic>? _route;bool _retired=false,_closed=false;
+  bool get _owner=>mounted&&!_retired&&!_closed&&widget.ownerCurrent();
+  @override void initState(){super.initState();widget.changes.addListener(_changed);}
+  @override void didChangeDependencies(){super.didChangeDependencies();_route??=ModalRoute.of(context);if(!_owner)_retire();}
+  void _changed(){if(!_owner)_retire();}
+  void _retire(){if(!mounted||_retired||_closed)return;_retired=true;
+    WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)_finish(false,retired:true);});WidgetsBinding.instance.ensureVisualUpdate();}
+  void _finish(bool value,{bool retired=false}){
+    final route=_route;if(!mounted||_closed||route?.isActive!=true)return;
+    if(!retired&&(!_owner||route!.isCurrent!=true))return;
+    _closed=true;final navigator=Navigator.of(context);
+    if(route!.isCurrent)navigator.pop(value);else navigator.removeRoute(route,value);
+  }
+  @override Widget build(BuildContext context)=>widget.builder((value)=>_finish(value));
+  @override void dispose(){widget.changes.removeListener(_changed);super.dispose();}
+}
+
+class _StoreOrderPhysicalAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  const _StoreOrderPhysicalAdapter({required this.actionId,required this.read,required this.open});
+  @override final String actionId;
+  final MoolAssistantNativeSnapshot? Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function(),Listenable?) open;
+  @override Set<String> get allowedFields=>const {};
+  @override String? validateFields(Map<String,Object?> fields)=>fields.isEmpty?null:'Enter the physical confirmation code in the original form.';
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx,String? entity)async=>read(ctx,entity);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() current)=>
+    p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,current,null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,{required bool Function() isCurrent,required Listenable ownerChanges})=>
+    p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,isCurrent,ownerChanges);
+}
+
+class _StoreOrderPackingAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  const _StoreOrderPackingAdapter({required this.read,required this.open});
+  @override String get actionId=>'AI-ACT-280';
+  final MoolAssistantNativeSnapshot? Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function(),Listenable?) open;
+  @override Set<String> get allowedFields=>const {'lineId','quantity','packed'};
+  @override String? validateFields(Map<String,Object?> fields)=>fields.keys.any((key)=>!allowedFields.contains(key))||
+    fields['lineId'] is! String||(fields['lineId'] as String).isEmpty||fields['quantity'] is! int||(fields['quantity'] as int)<=0||
+    fields['packed'] is! bool?'Review the exact original item, quantity and packing state.':null;
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx,String? entity)async=>read(ctx,entity);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() current)=>
+    p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,current,null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,{required bool Function() isCurrent,required Listenable ownerChanges})=>
+    p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,isCurrent,ownerChanges);
+}
+
+class _StoreOrderFollowupAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  const _StoreOrderFollowupAdapter({required this.actionId,required this.read,required this.open});
+  @override final String actionId;
+  final MoolAssistantNativeSnapshot? Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function(),Listenable?) open;
+  @override Set<String> get allowedFields=>actionId=='AI-ACT-285'?const {'reason'}:const {};
+  @override String? validateFields(Map<String,Object?> fields)=>fields.keys.any((key)=>!allowedFields.contains(key))||
+    fields.containsKey('reason')&&!const ['Product unavailable','Cannot meet requested time','Delivery unavailable','Customer requested cancellation'].contains(fields['reason'])
+      ?'Review the original order action and reason.':null;
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx,String? entity)async=>read(ctx,entity);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() current)=>
+    p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,current,null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,{required bool Function() isCurrent,required Listenable ownerChanges})=>
+    p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,isCurrent,ownerChanges);
+}
+
+class StoreSettlementInitialData {
+  const StoreSettlementInitialData({this.amount});
+  final String? amount;
+  factory StoreSettlementInitialData.fromFields(Map<String,Object?> fields) {
+    if(fields.keys.any((key)=>key!='amount') || fields.values.any((value)=>value is! String)) {
+      throw const FormatException('Use the settlement amount shown in the original form.');
+    }
+    return StoreSettlementInitialData(amount:fields['amount'] as String?);
+  }
+}
+class _StoreSettlementNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  const _StoreSettlementNativeAdapter({required this.read,required this.open});
+  @override String get actionId=>'AI-ACT-316';
+  @override Set<String> get allowedFields=>{'amount'};
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function(),Listenable?) open;
+  @override String? validateFields(Map<String,Object?> fields){try{StoreSettlementInitialData.fromFields(fields);return null;}on FormatException catch(e){return e.message;}}
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId)=>read(context,entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal,bool Function() current)=>_open(proposal,current,null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,{required bool Function() isCurrent,required Listenable ownerChanges})=>_open(proposal,isCurrent,ownerChanges);
+  Future<MoolAssistantReviewResult> _open(MoolAssistantProposal proposal,bool Function() current,Listenable? changes)=>
+    proposal.actionId!=actionId || validateFields(proposal.fields)!=null ? Future.value(MoolAssistantReviewResult.unavailable) : open(proposal,current,changes);
+}
+
+class StoreCustomerActionInitialData {
+  StoreCustomerActionInitialData._(this.actionId,Map<String,Object?> fields):fields=Map.unmodifiable(fields);
+  final String actionId;
+  final Map<String,Object?> fields;
+  static Set<String> keys(String action)=>switch(action){
+    'AI-ACT-294'=>{'period','from','to'},
+    'AI-ACT-296'=>{'customerId','search'},
+    'AI-ACT-297'=>{'customerId','period','from','to'},
+    'AI-ACT-298'=>{'customerId'},
+    'AI-ACT-299'=>{'invoiceId','amount','reference','channel'},
+    'AI-ACT-300'||'AI-ACT-302'||'AI-ACT-304'=>{'operationId'},
+    'AI-ACT-301'=>{'invoiceId','items','reason','reasonCode'},
+    'AI-ACT-303'=>{'invoiceId','amount','reference','sourceCollectionId'},
+    'AI-ACT-305'=>{'customerId','sourceInvoiceId','targetInvoiceId','amount'},
+    'AI-ACT-307'=>{'invoiceId'},
+    'AI-ACT-387'=>{'period'},
+    'AI-ACT-388'=>{'feedbackId','reportText'},
+    _=>throw const FormatException('This customer action is unavailable.'),
+  };
+  factory StoreCustomerActionInitialData.fromFields(String action,Map<String,Object?> fields){
+    if(fields.keys.any((key)=>!keys(action).contains(key)))throw const FormatException('Use the original customer form fields.');
+    final copy=<String,Object?>{};
+    for(final entry in fields.entries){
+      if(entry.key=='items'){
+        final value=entry.value;
+        if(value is! Map<String,Object?> || value.isEmpty)throw const FormatException('Choose the original returned products.');
+        final items=<String,Object?>{};
+        for(final item in value.entries){
+          final row=item.value;
+          if(item.key.trim().isEmpty || row is! Map<String,Object?> || row.keys.any((key)=>key!='quantity'&&key!='sellable') ||
+            row.values.any((value)=>value is! String))throw const FormatException('Keep each returned quantity with its original product.');
+          items[item.key]=Map<String,Object?>.unmodifiable(row);
+        }
+        copy[entry.key]=Map<String,Object?>.unmodifiable(items);
+      }else{
+        if(entry.value is! String)throw const FormatException('Keep the supplied text and amounts in their original format.');
+        if(entry.key.endsWith('Id') && (entry.value as String).trim().isEmpty)throw const FormatException('Choose the original record.');
+        copy[entry.key]=entry.value;
+      }
+    }
+    if(action=='AI-ACT-294')StoreReportInitialData.fromFields('AI-ACT-315',{'statementKind':'sales',...copy});
+    if(action=='AI-ACT-297')StoreReportInitialData.fromFields('AI-ACT-409',copy);
+    if(action=='AI-ACT-387' && copy['period']!=null && !const {'Today','Week','Month','Financial year'}.contains(copy['period']))throw const FormatException('Choose an available money period.');
+    if(copy['channel']!=null && !const {'cash','directUpi','bankTransfer'}.contains(copy['channel']))throw const FormatException('Choose the original supported receipt method.');
+    if(copy['reasonCode']!=null && !WorkspaceCustomerReturn.reasonLabels.containsKey(copy['reasonCode']))throw const FormatException('Choose a supported return reason.');
+    return StoreCustomerActionInitialData._(action,copy);
+  }
+  Map<String,String> get nativeFormFields=>{
+    for(final entry in fields.entries)if(const {'amount','reference','channel','sourceCollectionId','reason','reasonCode'}.contains(entry.key))entry.key:entry.value as String,
+    if(fields['items'] case final Map<String,Object?> items)'items':jsonEncode({for(final entry in items.entries)
+      entry.key:[(entry.value as Map<String,Object?>)['quantity']??'',(entry.value as Map<String,Object?>)['sellable']??'']}),
+  };
+}
+
+class StoreCustomerActionReviewScope extends ChangeNotifier {
+  StoreCustomerActionReviewScope({required bool Function() ownerCurrent,required bool Function() requestCurrent,
+    required Object Function() readSource,Object Function()? readOriginalSource,required VoidCallback observeSource,required this.changes})
+    :_owner=ownerCurrent,_request=requestCurrent,_readSource=readSource,_readOriginal=readOriginalSource??readSource,_observeNative=observeSource,_originalBaseline=(readOriginalSource??readSource)(),_inputBaseline=readSource(),_commonSource=readOriginalSource==null{changes.addListener(_observe);}
+  final bool Function() _owner,_request;
+  final Object Function() _readSource,_readOriginal;
+  final VoidCallback _observeNative;
+  final Listenable changes;
+  Object _originalBaseline,_inputBaseline;
+  final bool _commonSource;
+  Object? _lastOriginalRead;
+  bool _originalRetired=false,_uiRetired=false,_disposed=false,_listening=true;
+  int _nativeLeases=0;
+  bool ownerCurrent(){
+    if(!_originalRetired){_lastOriginalRead=_readOriginal();if(!_owner()||_lastOriginalRead!=_originalBaseline)_originalRetired=true;}
+    return !_originalRetired;
+  }
+  bool _inputCurrent(bool originalCurrent){
+    if(!_uiRetired&&(_disposed||!originalCurrent||!_request()||(_commonSource?_lastOriginalRead:_readSource())!=_inputBaseline))_uiRetired=true;
+    return !_uiRetired;
+  }
+  bool current()=>_inputCurrent(ownerCurrent());
+  void _detach(){if(!_listening)return;_listening=false;changes.removeListener(_observe);}
+  void _observe(){_inputCurrent(ownerCurrent());if(!_disposed)notifyListeners();if(_originalRetired)_detach();}
+  // Only an admitted original native mutation/known ACK calls this before its
+  // first source notification. Request retirement never revives its private UI.
+  void acceptNativeChange(){
+    if(_originalRetired || !_owner())return;
+    _observeNative();_originalBaseline=_readOriginal();if(!_disposed&&!_uiRetired)_inputBaseline=_readSource();
+  }
+  Future<bool> runNative(Future<bool> Function() run)async{
+    if(!current())return false;_nativeLeases++;
+    try{return await run();}finally{_nativeLeases--;if(_disposed&&_nativeLeases==0)_detach();}
+  }
+  Future<void> runNativeVoid(Future<void> Function() run)async{
+    if(!current())return;_nativeLeases++;
+    try{await run();}finally{_nativeLeases--;if(_disposed&&_nativeLeases==0)_detach();}
+  }
+  @override void dispose(){
+    if(_disposed)return;_disposed=true;_uiRetired=true;if(_nativeLeases==0)_detach();notifyListeners();super.dispose();
+  }
+}
+class _StoreCustomerActionFrame extends StatelessWidget {
+  const _StoreCustomerActionFrame({required this.scope,required this.child,this.onRetiredClose});
+  final StoreCustomerActionReviewScope scope;final Widget child;final VoidCallback? onRetiredClose;
+  @override Widget build(BuildContext context)=>AnimatedBuilder(animation:scope,builder:(context,_){final active=scope.current();return Stack(fit:StackFit.expand,children:[
+    Offstage(offstage:!active,child:ExcludeFocus(excluding:!active,child:child)),
+    if(!active)Center(child:Column(mainAxisSize:MainAxisSize.min,children:[const Text('Your Store or account changed. Your entries are kept. Reopen this task.'),if(onRetiredClose!=null)TextButton(onPressed:onRetiredClose,child:const Text('Close'))])),
+  ]);});
+}
+
+void _closeCapturedCustomerReview<T>(BuildContext context,StoreCustomerActionReviewScope? scope,[T? result]){
+  if(scope!=null && (!context.mounted || ModalRoute.of(context)?.isCurrent!=true))return;
+  if(scope!=null&&result==true&&!scope.current())return;
+  Navigator.pop<T>(context,result);
+}
+
+class _CustomerPreparationCancelled { const _CustomerPreparationCancelled(); }
+
+class _StoreCustomerContactReview extends StatefulWidget {
+  const _StoreCustomerContactReview({required this.session,required this.customer,required this.scope});
+  final WorkSession session;final WorkspaceCustomerRecord customer;final StoreCustomerActionReviewScope scope;
+  @override State<_StoreCustomerContactReview> createState()=>_StoreCustomerContactReviewState();
+}
+class _StoreCustomerContactReviewState extends State<_StoreCustomerContactReview>{
+  bool recorded=false;
+  @override Widget build(BuildContext context)=>SingleChildScrollView(padding:const EdgeInsets.all(16),child:WorkCard(child:Column(
+    mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      Text(widget.customer.name,style:const TextStyle(fontSize:16,fontWeight:FontWeight.w700)),
+      if(widget.customer.mobile.trim().isNotEmpty)Text(widget.customer.mobile),const SizedBox(height:12),
+      const Text('Log a call or message you have already completed.'),const SizedBox(height:12),
+      WorkPrimaryButton(keyName:'customer-contact-log-confirm',label:recorded?'Contact recorded':'Record contact',onPressed:recorded?null:(){
+        if(!widget.scope.current()||ModalRoute.of(context)?.isCurrent!=true||recorded)return;
+        setState(()=>recorded=true);
+        widget.session.markWorkspaceCustomerContacted(widget.customer.id,reviewCurrent:widget.scope.current,onReviewNativeChange:widget.scope.acceptNativeChange);
+      }),
+    ])));
+}
+
+class _StoreCustomerMoneyPeriodReview extends StatefulWidget{
+  const _StoreCustomerMoneyPeriodReview({required this.session,required this.scope,this.initialPeriod});
+  final WorkSession session;final StoreCustomerActionReviewScope scope;final String? initialPeriod;
+  @override State<_StoreCustomerMoneyPeriodReview> createState()=>_StoreCustomerMoneyPeriodReviewState();
+}
+class _StoreCustomerMoneyPeriodReviewState extends State<_StoreCustomerMoneyPeriodReview>{
+  late String period=widget.initialPeriod??widget.session.workspaceMoneyPeriod;
+  final cutoff=DateTime.now();
+  @override Widget build(BuildContext context)=>Column(children:[
+    Align(alignment:Alignment.centerRight,child:PopupMenuButton<String>(key:const Key('work-money-period'),tooltip:'Choose statement period',
+      onSelected:(value){if(widget.scope.current()&&ModalRoute.of(context)?.isCurrent==true)setState(()=>period=value);},
+      itemBuilder:(_)=>const [PopupMenuItem(value:'Today',child:Text('Today')),PopupMenuItem(value:'Week',child:Text('Week')),
+        PopupMenuItem(value:'Month',child:Text('Month')),PopupMenuItem(value:'Financial year',child:Text('Financial year'))],
+      child:Padding(padding:const EdgeInsets.all(12),child:Row(mainAxisSize:MainAxisSize.min,children:[Text(period),const Icon(Icons.expand_more_rounded,size:18)])))),
+    Expanded(child:_StoreFinanceSurface(session:widget.session,section:'payments',reviewScope:widget.scope,
+      preparedPeriodStart:widget.session.workspaceMoneyPeriodStartFor(period,at:cutoff))),
+  ]);
+}
+
+Widget _customerCompletedReview(BuildContext context,StoreCustomerActionReviewScope scope,String title)=>Center(child:Padding(padding:const EdgeInsets.all(16),child:WorkCard(child:Column(mainAxisSize:MainAxisSize.min,children:[
+  const Icon(Icons.check_circle_outline),const SizedBox(height:8),Text(title),const SizedBox(height:8),TextButton(onPressed:()=>_closeCapturedCustomerReview(context,scope),child:const Text('Close')),
+]))));
+
+class _StoreCustomerActionAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  const _StoreCustomerActionAdapter({required this.actionId,required this.read,required this.open});
+  @override final String actionId;
+  @override Set<String> get allowedFields=>StoreCustomerActionInitialData.keys(actionId);
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,StoreCustomerActionInitialData,bool Function(),Listenable?) open;
+  @override String? validateFields(Map<String,Object?> fields){try{StoreCustomerActionInitialData.fromFields(actionId,fields);return null;}on FormatException catch(e){return e.message;}}
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId)=>read(context,entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal,bool Function() current)=>_open(proposal,current,null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,{required bool Function() isCurrent,required Listenable ownerChanges})=>_open(proposal,isCurrent,ownerChanges);
+  Future<MoolAssistantReviewResult> _open(MoolAssistantProposal proposal,bool Function() current,Listenable? changes){
+    if(proposal.actionId!=actionId || validateFields(proposal.fields)!=null)return Future.value(MoolAssistantReviewResult.unavailable);
+    return open(proposal,StoreCustomerActionInitialData.fromFields(actionId,proposal.fields),current,changes);
+  }
+}
+
+class _StoreReportNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  const _StoreReportNativeAdapter({required this.actionId, required this.read, required this.open});
+  @override final String actionId;
+  @override Set<String> get allowedFields => switch (actionId) {
+    'AI-ACT-312' || 'AI-ACT-412' => {},
+    'AI-ACT-313' || 'AI-ACT-314' => {'periodDays'},
+    'AI-ACT-315' => {'statementKind', 'customerId', 'period', 'from', 'to'},
+    'AI-ACT-409' || 'AI-ACT-410' => {'customerId', 'period', 'from', 'to'},
+    'AI-ACT-411' => {'sectionId', 'periodDays'},
+    _ => {},
+  };
+  @override String? validateFields(Map<String, Object?> fields) {
+    try { StoreReportInitialData.fromFields(actionId, fields); return null; }
+    on FormatException catch (error) { return error.message; }
+  }
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function(), Listenable?) open;
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context, String? entityId) => read(context, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) => proposal.actionId != actionId || validateFields(proposal.fields) != null ? Future.value(MoolAssistantReviewResult.unavailable) : open(proposal, isCurrent, null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,
+    {required bool Function() isCurrent, required Listenable ownerChanges}) => proposal.actionId != actionId || validateFields(proposal.fields) != null ? Future.value(MoolAssistantReviewResult.unavailable) : open(proposal, isCurrent, ownerChanges);
+}
+
+class _StoreSettingsNativeAdapter implements MoolAssistantNativeAdapter {
+  const _StoreSettingsNativeAdapter({required this.actionId, required this.readContext,
+    required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function()) open;
+  @override Set<String> get allowedFields => StoreSettingsInitialData.keys(actionId);
+  @override String? validateFields(Map<String, Object?> fields) {
+    try { StoreSettingsInitialData.fromFields(actionId, fields); return null; }
+    on FormatException catch (error) { return error.message; }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context, String? entityId) => readSnapshot(context, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) async {
+    if (!isCurrent()) return MoolAssistantReviewResult.stale;
+    if (proposal.actionId != actionId || validateFields(proposal.fields) != null) return MoolAssistantReviewResult.unavailable;
+    final context = readContext();
+    if (context == null) return MoolAssistantReviewResult.unavailable;
+    final original = await snapshot(context, proposal.entityId);
+    if (!isCurrent()) return MoolAssistantReviewResult.stale;
+    if (original == null || !original.permitted || original.binding != proposal.binding ||
+        original.entityId != proposal.entityId || original.sourceRevision != proposal.sourceRevision) {
+      return MoolAssistantReviewResult.stale;
+    }
+    return open(proposal, isCurrent);
+  }
+}
+
+/// Store-only presentation adapter. It cannot request a callback or grant access.
+class _StoreCouponNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  const _StoreCouponNativeAdapter({required this.actionId, required this.readContext,
+    required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function(), Listenable) open;
+  @override Set<String> get allowedFields => actionId == 'AI-ACT-309' ? StoreCouponReviewInitial.allowedFields
+    : actionId == 'AI-ACT-310' ? const {'operation'} : const {'query'};
+  @override String? validateFields(Map<String, Object?> fields) {
+    try {
+      if (actionId == 'AI-ACT-309') StoreCouponReviewInitial.fromFields(fields);
+      else if (actionId == 'AI-ACT-310') {
+        if (fields.length != 1 || !const {'publish','pause'}.contains(fields['operation'])) throw const FormatException('Choose Publish or Pause for the exact original coupon.');
+      } else if (fields.keys.any((key) => key != 'query') || fields.containsKey('query') && fields['query'] is! String) {
+        throw const FormatException('Use the original coupon search.');
+      }
+      return null;
+    } on FormatException catch (error) { return error.message; }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context, String? entity) => readSnapshot(context, entity);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) async =>
+    MoolAssistantReviewResult.unavailable;
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,
+    {required bool Function() isCurrent, required Listenable ownerChanges}) async {
+    if (!isCurrent() || readContext()?.binding != proposal.binding || proposal.actionId != actionId ||
+        validateFields(proposal.fields) != null) return MoolAssistantReviewResult.stale;
+    return open(proposal, isCurrent, ownerChanges);
+  }
+}
+
+
+class _StoreBusinessFinanceAdapter implements MoolAssistantNativeAdapter {
+  const _StoreBusinessFinanceAdapter({
+    required this.readContext, required this.readSnapshot, required this.open,
+  });
+  final MoolAssistantContext? Function() readContext;
+  final MoolAssistantNativeSnapshot? Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(
+    MoolBusinessFinancePrefill, bool Function(),
+  ) open;
+
+  @override String get actionId => 'AI-ACT-311';
+  @override Set<String> get allowedFields => MoolBusinessFinancePrefill.allowedFields;
+  @override String? validateFields(Map<String, Object?> fields) {
+    try {
+      MoolBusinessFinancePrefill.fromFields(fields);
+      return null;
+    } on FormatException catch (error) {
+      return error.message;
+    }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(
+    MoolAssistantContext context, String? entityId,
+  ) async => readSnapshot(context, entityId);
+
+  @override Future<MoolAssistantReviewResult> openReview(
+    MoolAssistantProposal proposal, bool Function() isCurrent,
+  ) async {
+    if (!isCurrent()) return MoolAssistantReviewResult.stale;
+    if (proposal.actionId != actionId || proposal.entityId != null ||
+        validateFields(proposal.fields) != null) return MoolAssistantReviewResult.unavailable;
+    final context = readContext();
+    if (context == null) return MoolAssistantReviewResult.unavailable;
+    final original = await snapshot(context, null);
+    if (!isCurrent()) return MoolAssistantReviewResult.stale;
+    if (original == null) return MoolAssistantReviewResult.unavailable;
+    if (!original.permitted || original.binding != proposal.binding ||
+        original.sourceRevision != proposal.sourceRevision) return MoolAssistantReviewResult.stale;
+    // Read the native owner synchronously again after the awaited snapshot.
+    final latest = readSnapshot(context, null);
+    if (latest == null || !latest.permitted || latest.binding != proposal.binding ||
+        latest.sourceRevision != proposal.sourceRevision) return MoolAssistantReviewResult.stale;
+    final prefill = MoolBusinessFinancePrefill.fromFields(proposal.fields);
+    final result = await open(prefill, isCurrent);
+    return isCurrent() ? result : MoolAssistantReviewResult.stale;
+  }
+}
+
+/// Add-only frontend adapter. Review opens the original form and never saves.
+class _StoreSupplierAddAdapter implements MoolAssistantNativeAdapter {
+  const _StoreSupplierAddAdapter({
+    required this.readContext, required this.readSnapshot, required this.open,
+  });
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(
+    MoolAssistantContext, String?,
+  ) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(
+    StoreSupplierInitialData, MoolAssistantProposal, bool Function(),
+  ) open;
+
+  @override String get actionId => 'AI-ACT-235';
+  @override Set<String> get allowedFields => StoreSupplierInitialData.allowedFields;
+  @override String? validateFields(Map<String, Object?> fields) {
+    try { StoreSupplierInitialData.fromFields(fields); return null; }
+    on FormatException catch (error) { return error.message.toString(); }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(
+    MoolAssistantContext context, String? entityId,
+  ) => readSnapshot(context, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(
+    MoolAssistantProposal proposal, bool Function() isCurrent,
+  ) async {
+    final trusted = readContext();
+    if (!isCurrent() || trusted == null || trusted.binding != proposal.binding ||
+        proposal.entityId != null || validateFields(proposal.fields) != null) {
+      return MoolAssistantReviewResult.stale;
+    }
+    return open(StoreSupplierInitialData.fromFields(proposal.fields), proposal, isCurrent);
+  }
+}
+
+/// Private selected capability passed explicitly through the existing financial
+/// native constructors. It is not a financial field or a persisted command.
+class StoreSupplierSelectedDocumentInput {
+  const StoreSupplierSelectedDocumentInput._(this.selected, this.validUntil, this.current);
+  final MoolAssistantSelectedDocument selected;
+  final DateTime validUntil;
+  final bool Function() current;
+}
+
+class _StoreFinancialSelectedDocumentAdapter implements MoolAssistantSelectedDocumentAdapter {
+  const _StoreFinancialSelectedDocumentAdapter({required this.original, required this.readContext, required this.open});
+  final MoolAssistantNativeAdapter original;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function(), StoreSupplierSelectedDocumentInput) open;
+  @override String get actionId => original.actionId;
+  @override Set<String> get allowedFields => {...original.allowedFields, 'attachmentRef'};
+  Map<String,Object?> clean(Map<String,Object?> fields) => {for(final entry in fields.entries) if(entry.key!='attachmentRef') entry.key:entry.value};
+  @override String? validateFields(Map<String,Object?> fields) {
+    if (fields.containsKey('attachmentRef') && (fields['attachmentRef'] is! String ||
+        !RegExp(r'^att-[a-f0-9]{32}$').hasMatch(fields['attachmentRef'] as String))) return 'Choose the original supporting document.';
+    return original.validateFields(clean(fields));
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId)=>original.snapshot(context,entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal,bool Function() current) =>
+    proposal.fields.containsKey('attachmentRef') ? Future.value(MoolAssistantReviewResult.unavailable) : original.openReview(proposal,current);
+  @override Future<MoolAssistantReviewResult> openSelectedDocumentReview(MoolAssistantProposal proposal,bool Function() current,
+      MoolAssistantSelectedDocument? Function(String) resolve) async {
+    if (!proposal.fields.containsKey('attachmentRef')) return original.openReview(proposal,current);
+    final context=readContext();
+    if(!current()||proposal.actionId!=actionId||context==null||context.binding!=proposal.binding||validateFields(proposal.fields)!=null) return MoolAssistantReviewResult.stale;
+    final source=await original.snapshot(context,proposal.entityId);
+    if(!current()||source==null||!source.permitted||source.binding!=proposal.binding||source.sourceRevision!=proposal.sourceRevision) return MoolAssistantReviewResult.stale;
+    final selected=resolve(proposal.fields['attachmentRef'] as String);
+    if(selected==null||!current()) return MoolAssistantReviewResult.unavailable;
+    final cleanProposal=MoolAssistantProposal(id:proposal.id,actionId:proposal.actionId,binding:proposal.binding,
+      requestRevision:proposal.requestRevision,entitlementRevision:proposal.entitlementRevision,sourceRevision:proposal.sourceRevision,
+      validUntil:proposal.validUntil,title:proposal.title,summary:proposal.summary,entityId:proposal.entityId,fields:clean(proposal.fields));
+    bool active()=>current()&&readContext()?.binding==proposal.binding;
+    return open(cleanProposal,active,StoreSupplierSelectedDocumentInput._(selected,proposal.validUntil,active));
+  }
+}
+
+Future<MoolAssistantReviewResult> _stageSupportingCopyInput(_SupplierPaymentDraftCopiesState owner,
+    StoreSupplierSelectedDocumentInput input) async {
+  final ownerRoute=owner._selectedOwnerRoute,navigator=owner._selectedNavigator;
+  if(ownerRoute==null||navigator==null||!navigator.mounted||!owner.mounted||!ownerRoute.isActive||!input.current()||!owner._selectedReady) return MoolAssistantReviewResult.stale;
+  Route<WorkspacePurchaseInvoiceAttachment>? reviewRoute;
+  Route<void>? originalRoute;
+  bool routeCurrent()=>owner.mounted&&navigator.mounted&&ownerRoute.isActive&&
+    (ownerRoute.isCurrent||reviewRoute?.isCurrent==true||originalRoute?.isCurrent==true);
+    final baseline = owner._selectedSource;
+    var retired = false, expired = false;
+    final expirySignal = ValueNotifier<int>(0);
+    bool current() => !retired && !expired && routeCurrent() && input.current() && owner._selectedSource == baseline &&
+        owner._selectedAllowed;
+    final changes = Listenable.merge([owner.widget.session, owner._selectionChanges, input.selected.ownerChanges, expirySignal]);
+    Timer? expiry;
+    void retire() {
+      if (current()) return;
+      retired = true; expiry?.cancel();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Remove only this preparation's exact private routes, including when
+        // a foreign modal covers them. Never pop or unfocus that foreign UI.
+        for (final route in <Route<dynamic>?>[originalRoute, reviewRoute]) {
+          if (route != null && route.isActive && identical(route.navigator, navigator)) navigator.removeRoute(route);
+        }
+      });
+    }
+    changes.addListener(retire);
+    final delay = input.validUntil.difference(DateTime.now());
+    expiry = Timer(delay.isNegative ? Duration.zero : delay, () { expired = true; expirySignal.value++; });
+    try {
+      return await owner._addSelectedOriginal(input.selected, current, changes, navigator, (route) => reviewRoute = route,
+        (route) => originalRoute = route);
+    } finally {
+      changes.removeListener(retire); expiry.cancel(); expirySignal.dispose();
+    }
+}
+
+/// Attaches the explicit selected document to a current native draft and opens it.
+/// Read text / Fill blank fields remain separate explicit native form actions.
+class _StoreInvoiceDocumentAdapter implements MoolAssistantSelectedDocumentAdapter {
+  const _StoreInvoiceDocumentAdapter({required this.readContext,
+    required this.readSnapshot, required this.open});
+  final MoolAssistantContext? Function() readContext;
+  final MoolAssistantNativeSnapshot? Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantSelectedDocument,
+    bool Function()) open;
+  @override String get actionId => 'AI-ACT-241';
+  @override Set<String> get allowedFields => const {'attachmentRef'};
+  @override String? validateFields(Map<String, Object?> fields) =>
+      fields.length == 1 && fields['attachmentRef'] is String &&
+      RegExp(r'^att-[a-f0-9]{32}$').hasMatch(fields['attachmentRef'] as String)
+      ? null : 'Choose the supplier document to review.';
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(
+    MoolAssistantContext context, String? entityId,
+  ) async => readSnapshot(context, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(
+    MoolAssistantProposal proposal, bool Function() isCurrent,
+  ) async => MoolAssistantReviewResult.unavailable;
+  @override Future<MoolAssistantReviewResult> openSelectedDocumentReview(
+    MoolAssistantProposal proposal, bool Function() isCurrent,
+    MoolAssistantSelectedDocument? Function(String reference) resolve,
+  ) async {
+    if (!isCurrent()) return MoolAssistantReviewResult.stale;
+    if (proposal.actionId != actionId || proposal.entityId != null ||
+        validateFields(proposal.fields) != null) return MoolAssistantReviewResult.unavailable;
+    final context = readContext();
+    if (context == null) return MoolAssistantReviewResult.unavailable;
+    final native = await snapshot(context, null);
+    if (!isCurrent()) return MoolAssistantReviewResult.stale;
+    final latest = readSnapshot(context, null);
+    if (native == null || latest == null || !latest.permitted ||
+        latest.binding != proposal.binding || latest.sourceRevision != proposal.sourceRevision ||
+        native.sourceRevision != latest.sourceRevision) return MoolAssistantReviewResult.stale;
+    final selected = resolve(proposal.fields['attachmentRef'] as String);
+    if (selected == null || !isCurrent()) return MoolAssistantReviewResult.stale;
+    final result = await open(selected, isCurrent);
+    return isCurrent() ? result : MoolAssistantReviewResult.stale;
+  }
+}
+
+/// Proposed native input text, with explicit references to the original SKU.
+/// No input here grants catalogue, tax, price, Stock or publication authority.
+@immutable
+class StoreProductInitialData {
+  StoreProductInitialData._(this.sourceCanonicalId, this.sourceSku, this.sourcePack,
+    this.sourceRetailEnabled, this.sourceWholesaleEnabled, Map<String, String> inputs)
+      : inputs = Map.unmodifiable(inputs);
+  final String sourceCanonicalId, sourceSku, sourcePack;
+  final bool sourceRetailEnabled, sourceWholesaleEnabled;
+  final Map<String, String> inputs;
+  static const referenceKeys = {'sourceCanonicalId', 'sourceSku', 'sourcePack',
+    'sourceRetailEnabled', 'sourceWholesaleEnabled'};
+  static const coreFields = {'title', 'brand', 'variant', 'pack', 'categoryId',
+    'sku', 'barcode', 'purchasePrice', 'sellingPrice', 'mrp', 'stock',
+    'lowStockThreshold', 'minimumOrder', 'deliveryPromise', 'unitPrice', 'origin',
+    'returnPolicy', 'composition', 'regulatoryNote', 'visualLabel'};
+  // Exactly the controllers present in the original native selling section.
+  // Legacy fixed-tax parser keys without native controllers are not added.
+  static const sellingFields = {'quantityPerPack', 'quantityUnit', 'unitsPerCase',
+    'sellingChannels', 'wholesaleSaleType', 'wholesalePrice', 'wholesaleMinimum',
+    'wholesaleIncrement', 'wholesaleTiers', 'priceChangesFrequently',
+    'priceValidityMinutes', 'gstPercent', 'gstBasis'};
+  static Set<String> get editableFields => {
+    ...coreFields, ...sellingFields, ...WorkspaceProductContent.labels.keys,
+    ...WorkspaceProductImport.packFieldLabels.keys,
+  };
+  static Set<String> get allowedFields => {...referenceKeys, ...editableFields};
+  static Map<String, Object?> referenceFields(WorkspaceCatalogueItem product) => {
+    'sourceCanonicalId': product.canonicalId, 'sourceSku': product.sku,
+    'sourcePack': product.pack, 'sourceRetailEnabled': product.retailEnabled,
+    'sourceWholesaleEnabled': product.wholesaleOffer?.enabled == true,
+  };
+  factory StoreProductInitialData.fromFields(Map<String, Object?> fields) {
+    if (!fields.keys.every(allowedFields.contains) ||
+        !referenceKeys.every(fields.containsKey)) {
+      throw const FormatException('Use the original product references and native fields.');
+    }
+    for (final key in ['sourceCanonicalId', 'sourceSku', 'sourcePack']) {
+      if (fields[key] is! String || (fields[key]! as String).trim().isEmpty) {
+        throw const FormatException('The original SKU and pack references are required.');
+      }
+    }
+    if (fields['sourceRetailEnabled'] is! bool || fields['sourceWholesaleEnabled'] is! bool) {
+      throw const FormatException('The original channel references are required.');
+    }
+    final inputs = <String, String>{};
+    for (final entry in fields.entries) {
+      if (referenceKeys.contains(entry.key)) continue;
+      if (entry.value is! String) {
+        throw const FormatException('Proposed native inputs must be text.');
+      }
+      inputs[entry.key] = entry.value! as String;
+    }
+    if (inputs.isEmpty) throw const FormatException('Include at least one proposed native input.');
+    return StoreProductInitialData._(fields['sourceCanonicalId']! as String,
+      fields['sourceSku']! as String, fields['sourcePack']! as String,
+      fields['sourceRetailEnabled']! as bool, fields['sourceWholesaleEnabled']! as bool, inputs);
+  }
+  // The sale-price action cannot change SKU, pack, channels, Stock or tax.
+  // Every value remains original native text until the editor's final Save.
+  static const salePriceFields = {'sellingPrice', 'wholesalePrice',
+    'wholesaleTiers', 'priceChangesFrequently', 'priceValidityMinutes'};
+  static Set<String> get salePriceAllowedFields => {...referenceKeys, ...salePriceFields};
+  factory StoreProductInitialData.salePrices(Map<String, Object?> fields) {
+    if (!fields.keys.every(salePriceAllowedFields.contains)) {
+      throw const FormatException('Supply only original SKU/channel references and sale-price inputs.');
+    }
+    final initial = StoreProductInitialData.fromFields(fields);
+    if (!initial.inputs.keys.any(const {'sellingPrice', 'wholesalePrice', 'wholesaleTiers'}.contains)) {
+      throw const FormatException('Include a proposed native sale price.');
+    }
+    if (initial.inputs.containsKey('sellingPrice') && !initial.sourceRetailEnabled ||
+        initial.inputs.keys.any((key) => key != 'sellingPrice') && !initial.sourceWholesaleEnabled) {
+      throw const FormatException('Use a sale channel already enabled on this exact SKU.');
+    }
+    return initial;
+  }
+  bool matches(WorkspaceCatalogueItem product) =>
+      sourceCanonicalId == product.canonicalId && sourceSku == product.sku &&
+      sourcePack == product.pack && sourceRetailEnabled == product.retailEnabled &&
+      sourceWholesaleEnabled == (product.wholesaleOffer?.enabled == true);
+}
+
+final _openProductEditors = Expando<Set<Object>>('native-product-editors');
+bool _productEditorOpen(WorkSession session) => _openProductEditors[session]?.isNotEmpty == true;
+
+WorkspaceCatalogueItem? _assistantProductTarget(WorkSession session, bool adding, String? entityId) =>
+    entityId == null ? null : (adding ? session.referenceCatalogue : session.workspaceCatalogueItems)
+      .where((item) => item.id == entityId).singleOrNull;
+
+String _assistantProductSignature(WorkSession session, WorkspaceCatalogueItem product) => assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+  product.toInventoryJson(), session.workspaceProductDefaults.toJson(),
+  [for (final family in session.workspaceVariantFamilies) family.toJson()],
+  [for (final item in session.workspaceCatalogueItems)
+    [item.id, item.sku, item.canonicalId, item.variant, item.pack, item.barcode]],
+]))).toString();
+
+/// Opens the original editor; only its final Save can mutate/persist a product.
+Future<MoolAssistantReviewResult> showStoreProductInitialReview(
+  BuildContext context, WorkSession session, {
+  required bool adding, required String entityId,
+  required StoreProductInitialData initialData,
+  required bool Function() isCurrent, bool Function()? ownerCurrent,
+}) async {
+  final target = _assistantProductTarget(session, adding, entityId);
+  final publication = session.publicationPreferencesContext;
+  final trading = session.tradingPreferencesContext;
+  bool owner() => context.mounted && ownerCurrent?.call() != false &&
+      session.publicationPreferencesContext == publication && session.tradingPreferencesContext == trading;
+  if (!owner() || !isCurrent() || _productEditorOpen(session) || target == null ||
+      !initialData.matches(target) || adding && session.workspaceCatalogueItems.any((item) =>
+        item.id == target.id || item.sku.trim().toLowerCase() == target.sku.trim().toLowerCase())) {
+    return MoolAssistantReviewResult.stale;
+  }
+  final signature = _assistantProductSignature(session, target);
+  bool sourceCurrent() {
+    final latest = _assistantProductTarget(session, adding, entityId);
+    return latest != null && _assistantProductSignature(session, latest) == signature;
+  }
+  final defaults = session.workspaceProductDefaults;
+  final product = !adding ? target : target.copyWith(
+    stockMode: defaults.stockMode, lowStockThreshold: defaults.lowStockThreshold,
+    purchasePrice: 0, sellingPrice: 0, unitPrice: '', stock: 0,
+    available: false, publicListing: defaults.customerListingRequested,
+    compliance: target.compliance == null ? null : WorkspaceProductCompliance.fromJson({
+      ...target.compliance!.toJson(), 'manufacturedOrPackedOn': null, 'bestBeforeOrUseBy': null,
+    }),
+  );
+  await Navigator.of(context).push<void>(MaterialPageRoute<void>(builder: (pageContext) => Scaffold(
+    appBar: AppBar(title: Text(adding ? 'Review product' : 'Edit product')),
+    body: SafeArea(child: _CatalogueProductEditor(session: session, product: product,
+      embeddedPage: true, initialData: initialData,
+      ownerCurrent: owner, sourceCurrent: sourceCurrent,
+      prefillCurrent: () => owner() && isCurrent(),
+      initialField: initialData.inputs.keys.first,
+      stockEntryMethod: adding ? WorkspaceStockEntryMethod.catalogue : null,
+      onDone: () => Navigator.of(pageContext).pop(),
+      onSaved: () => Navigator.of(pageContext).pop(),
+    )),
+  )));
+  return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+}
+
+class _StoreProductInitialAdapter implements MoolAssistantNativeAdapter {
+  const _StoreProductInitialAdapter({required this.actionId, required this.readContext,
+    required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(
+    StoreProductInitialData, MoolAssistantProposal, bool Function(),
+  ) open;
+  StoreProductInitialData _parse(Map<String, Object?> fields) => actionId == 'AI-ACT-221'
+      ? StoreProductInitialData.salePrices(fields) : StoreProductInitialData.fromFields(fields);
+  @override Set<String> get allowedFields => actionId == 'AI-ACT-221'
+      ? StoreProductInitialData.salePriceAllowedFields : StoreProductInitialData.allowedFields;
+  @override String? validateFields(Map<String, Object?> fields) {
+    try { _parse(fields); return null; }
+    on FormatException catch (error) { return error.message.toString(); }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entityId) =>
+      readSnapshot(ctx, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(
+    MoolAssistantProposal proposal, bool Function() isCurrent,
+  ) async {
+    final trusted = readContext();
+    if (!isCurrent() || trusted == null || trusted.binding != proposal.binding ||
+        proposal.entityId == null || validateFields(proposal.fields) != null) {
+      return MoolAssistantReviewResult.stale;
+    }
+    return open(_parse(proposal.fields), proposal, isCurrent);
+  }
+}
+
+/// Proposed text for the original supplier money input, never a payment command.
+@immutable
+class StoreSupplierMoneyInitialData {
+  StoreSupplierMoneyInitialData._(this.supplierId, this.openingId, this.openingRevision,
+    this.copyId, Map<String, String> inputs) : inputs = Map.unmodifiable(inputs);
+  final String supplierId, openingId;
+  final int openingRevision;
+  final String? copyId;
+  final Map<String, String> inputs;
+  static const allowedFields = {'supplierId', 'openingId', 'openingRevision', 'copyId',
+    'amount', 'reference', 'channel', 'occurredOn'};
+  static const nativeMethods = {'UPI', 'Cheque', 'Bank transfer', 'NEFT', 'RTGS', 'Cash'};
+  factory StoreSupplierMoneyInitialData.fromFields(Map<String, Object?> fields) {
+    if (!fields.keys.every(allowedFields.contains) ||
+        fields['supplierId'] is! String || fields['openingId'] is! String ||
+        fields['openingRevision'] is! int ||
+        (fields['copyId'] != null && fields['copyId'] is! String)) {
+      throw const FormatException('Use the original supplier and opening references.');
+    }
+    final inputs = <String, String>{};
+    for (final key in ['amount', 'reference', 'channel', 'occurredOn']) {
+      if (fields[key] is! String) throw const FormatException('Proposed payment inputs must be text.');
+      inputs[key] = fields[key]! as String;
+    }
+    if (!nativeMethods.contains(inputs['channel'])) {
+      throw const FormatException('Choose an existing native payment method.');
+    }
+    return StoreSupplierMoneyInitialData._(fields['supplierId']! as String,
+      fields['openingId']! as String, fields['openingRevision']! as int,
+      fields['copyId'] as String?, inputs);
+  }
+  bool matches(WorkSession session, _StoreSupplierMoneyTarget target) {
+    final opening = session.workspaceSupplierLedger(target.supplierId)?.openingRecord;
+    return supplierId == target.supplierId && openingId == opening?.id &&
+      openingRevision == opening?.revision && copyId == target.copy?.id;
+  }
+}
+
+final _openSupplierMoneyForms = Expando<Set<Object>>('native-supplier-money-forms');
+bool _supplierMoneyFormOpen(WorkSession session) => _openSupplierMoneyForms[session]?.isNotEmpty == true;
+
+_StoreSupplierMoneyTarget? _assistantSupplierMoneyTarget(WorkSession session,
+  String actionId, String? entityId) {
+  if (entityId == null) return null;
+  if (actionId == 'AI-ACT-259') {
+    final copy = session.workspacePurchaseCopies.where((copy) => copy.id == entityId).singleOrNull;
+    return copy == null ? null : _StoreSupplierMoneyTarget(supplierId: copy.supplier.id, copy: copy);
+  }
+  if (actionId != 'AI-ACT-260' && actionId != 'AI-ACT-261') return null;
+  final supplier = session.workspaceSuppliers.where((s) => s.id == entityId).singleOrNull;
+  return supplier == null ? null : _StoreSupplierMoneyTarget(
+    supplierId: supplier.id, advance: actionId == 'AI-ACT-260');
+}
+
+// AI read/open admission only. Native explicit Check/Retry keeps recovery.
+bool _assistantFinancialBookAdmitted(WorkSession source) => source.workspaceSuppliersLoaded &&
+  !source.workspaceSupplierSaving && !source.workspaceSupplierRecoveryRequired;
+bool _assistantFinancialLedgerAdmitted(WorkSession source) =>
+  _assistantFinancialBookAdmitted(source) && source.workspaceInvoiceHistoryLoaded;
+
+WorkspaceLedgerFormKey? _assistantSupplierMoneyKey(WorkSession session, _StoreSupplierMoneyTarget target) =>
+    session.supplierMoneyFormKey(target.supplierId, copy: target.copy, advance: target.advance);
+
+String? _assistantSupplierMoneySignature(WorkSession session, _StoreSupplierMoneyTarget target) {
+  if (!_assistantFinancialLedgerAdmitted(session)) return null;
+  final key = _assistantSupplierMoneyKey(session, target);
+  final ledger = session.workspaceSupplierLedger(target.supplierId);
+  if (key == null || ledger == null) return null;
+  return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    [key.account, key.store, key.customer, key.invoice, key.order, key.kind, key.ledgerRevision],
+    ledger.toJson(), target.copy?.toJson(), target.advance,
+  ]))).toString();
+}
+
+/// Read and open only. It does not save/flush a draft or submit a money record.
+Future<MoolAssistantReviewResult> showStoreSupplierMoneyInitialReview(
+  BuildContext context, WorkSession session, {
+  required String actionId, required String entityId,
+  required StoreSupplierMoneyInitialData initialData,
+  required bool Function() isCurrent, bool Function()? ownerCurrent, StoreSupplierSelectedDocumentInput? selectedDocument}) async {
+  final scope = session.workspaceSupplierScope;
+  final publication = session.publicationPreferencesContext;
+  bool owner() => context.mounted && ownerCurrent?.call() != false && scope != null &&
+      session.workspaceSupplierScope == scope && session.publicationPreferencesContext == publication;
+  if (!owner() || !isCurrent() || _supplierMoneyFormOpen(session)) return MoolAssistantReviewResult.stale;
+  if (!_assistantFinancialLedgerAdmitted(session) || !owner() || !isCurrent()) {
+    return MoolAssistantReviewResult.unavailable;
+  }
+  final target = _assistantSupplierMoneyTarget(session, actionId, entityId);
+  if (target == null || !initialData.matches(session, target)) return MoolAssistantReviewResult.stale;
+  final key = _assistantSupplierMoneyKey(session, target);
+  final signature = _assistantSupplierMoneySignature(session, target);
+  if (key == null || signature == null) return MoolAssistantReviewResult.unavailable;
+  try {
+    final saved = await session.readLedgerForm(key);
+    if (!owner() || !isCurrent() || _supplierMoneyFormOpen(session) ||
+        _assistantSupplierMoneySignature(session, target) != signature) return MoolAssistantReviewResult.stale;
+    if (saved != null) return MoolAssistantReviewResult.unavailable;
+  } on Object { return MoolAssistantReviewResult.unavailable; }
+  await _showSupplierMoneyEntry(context, session, target, initialData: initialData,
+    prefillKey: key, prefillSignature: signature,
+    prefillCurrent: () => owner() && isCurrent(), ownerCurrent: owner, readOnlyOpen: true, selectedDocument: selectedDocument);
+  return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+}
+
+class _StoreSupplierMoneyInitialAdapter implements MoolAssistantNativeAdapter {
+  const _StoreSupplierMoneyInitialAdapter({required this.actionId, required this.readContext,
+    required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(
+    StoreSupplierMoneyInitialData, MoolAssistantProposal, bool Function(),
+  ) open;
+  @override Set<String> get allowedFields => StoreSupplierMoneyInitialData.allowedFields;
+  @override String? validateFields(Map<String, Object?> fields) {
+    try { StoreSupplierMoneyInitialData.fromFields(fields); return null; }
+    on FormatException catch (error) { return error.message.toString(); }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entityId) =>
+      readSnapshot(ctx, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(
+    MoolAssistantProposal proposal, bool Function() isCurrent,
+  ) async {
+    final trusted = readContext();
+    if (!isCurrent() || trusted == null || trusted.binding != proposal.binding ||
+        proposal.entityId == null || validateFields(proposal.fields) != null) return MoolAssistantReviewResult.stale;
+    return open(StoreSupplierMoneyInitialData.fromFields(proposal.fields), proposal, isCurrent);
+  }
+}
+
+// External insertion fragment. Existing native sources/validators remain owners.
+@immutable
+class StoreSupplierAllocationInitialData {
+  StoreSupplierAllocationInitialData._(this.supplierId, this.copyId, this.copyRevision,
+    this.openingId, this.openingRevision, this.sourceKind, this.sourceId, this.amount);
+  final String supplierId, copyId, openingId, sourceId, amount;
+  final int copyRevision, openingRevision;
+  final WorkspaceSupplierMoneySourceKind sourceKind;
+  static const allowedFields = {'supplierId', 'copyId', 'copyRevision', 'openingId',
+    'openingRevision', 'sourceKind', 'sourceId', 'amount'};
+  factory StoreSupplierAllocationInitialData.fromFields(Map<String, Object?> fields) {
+    if (!fields.keys.every(allowedFields.contains) ||
+        !['supplierId', 'copyId', 'openingId', 'sourceKind', 'sourceId', 'amount']
+          .every((key) => fields[key] is String) ||
+        fields['copyRevision'] is! int || fields['openingRevision'] is! int) {
+      throw const FormatException('Use the exact native bill, opening and source references.');
+    }
+    final kind = WorkspaceSupplierMoneySourceKind.values
+      .where((kind) => kind.name == fields['sourceKind']).singleOrNull;
+    if (kind == null || ['supplierId', 'copyId', 'openingId', 'sourceId']
+        .any((key) => (fields[key]! as String).trim().isEmpty)) {
+      throw const FormatException('Choose an existing native allocation source.');
+    }
+    return StoreSupplierAllocationInitialData._(fields['supplierId']! as String,
+      fields['copyId']! as String, fields['copyRevision']! as int,
+      fields['openingId']! as String, fields['openingRevision']! as int,
+      kind, fields['sourceId']! as String, fields['amount']! as String);
+  }
+  bool matches(WorkSession session, WorkspacePurchaseSavedCopy copy) {
+    final ledger = session.workspaceSupplierLedger(copy.supplier.id), opening = ledger?.openingRecord;
+    return supplierId == copy.supplier.id && copyId == copy.id && copyRevision == copy.revision &&
+      openingId == opening?.id && openingRevision == opening?.revision &&
+      _supplierAllocationSources(ledger, copy).any((s) => s.$1 == sourceKind && s.$2 == sourceId);
+  }
+}
+
+typedef _AssistantSupplierAllocationRead = ({WorkspacePurchaseSavedCopy copy,
+  WorkspaceLedgerFormKey key, WorkspaceLedgerFormDraft? saved, String signature});
+
+Future<_AssistantSupplierAllocationRead?> _readAssistantSupplierAllocation(
+  WorkSession session, String entityId, bool Function() current,
+) async {
+  if (!current() || _supplierMoneyFormOpen(session)) return null;
+  if (!_assistantFinancialLedgerAdmitted(session) || !current()) return null;
+  final copy = session.workspacePurchaseCopies.where((c) => c.id == entityId).singleOrNull;
+  final key = copy == null ? null : session.supplierAllocationFormKey(copy);
+  if (copy == null || key == null || !await session.inspectWorkspaceSupplierAllocationCheckpoint(key) ||
+      !current()) return null;
+  try {
+    final saved = await session.readLedgerForm(key);
+    final ledger = session.workspaceSupplierLedger(copy.supplier.id);
+    if (!current() || _supplierMoneyFormOpen(session) || ledger == null ||
+        session.supplierAllocationFormKey(copy) != key) return null;
+    final signature = _assistantSupplierAllocationSignature(session, copy, saved);
+    return signature == null ? null : (copy: copy, key: key, saved: saved, signature: signature);
+  } on Object { return null; }
+}
+
+String? _assistantSupplierAllocationSignature(WorkSession session,
+  WorkspacePurchaseSavedCopy copy, WorkspaceLedgerFormDraft? saved) {
+  if (!_assistantFinancialLedgerAdmitted(session)) return null;
+  final key = session.supplierAllocationFormKey(copy), ledger = session.workspaceSupplierLedger(copy.supplier.id);
+  if (key == null || ledger == null) return null;
+  return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    [key.account, key.store, key.customer, key.invoice, key.order, key.kind, key.ledgerRevision],
+    copy.toJson(), ledger.toJson(), saved?.revision, saved?.fields,
+  ]))).toString();
+}
+
+bool _assistantAllocationRequestMatches(String actionId, _AssistantSupplierAllocationRead read,
+  StoreSupplierAllocationInitialData? initial, String? operationId, WorkSession session) {
+  if (actionId == 'AI-ACT-262') return read.saved == null && initial != null && initial.matches(session, read.copy);
+  if (actionId != 'AI-ACT-263' && actionId != 'AI-ACT-377') return false;
+  final saved = read.saved, intent = saved?.supplierAllocationIntent;
+  return initial == null && saved != null && saved.valid && intent != null &&
+    operationId != null && operationId == intent.operationId;
+}
+
+/// Open original allocation controls; no save, flush, posting, reset or retry.
+Future<MoolAssistantReviewResult> showStoreSupplierAllocationReview(BuildContext context,
+  WorkSession session, {required String actionId, required String entityId,
+  StoreSupplierAllocationInitialData? initialData, String? operationId, String? expectedSignature,
+  required bool Function() isCurrent, bool Function()? ownerCurrent, StoreSupplierSelectedDocumentInput? selectedDocument}) async {
+  if (selectedDocument != null && actionId != 'AI-ACT-262') return MoolAssistantReviewResult.unavailable;
+  final scope = session.workspaceSupplierScope, publication = session.publicationPreferencesContext;
+  bool owner() => context.mounted && ownerCurrent?.call() != false && scope != null &&
+    session.workspaceSupplierScope == scope && session.publicationPreferencesContext == publication;
+  final read = await _readAssistantSupplierAllocation(session, entityId, () => owner() && isCurrent());
+  if (read == null) return MoolAssistantReviewResult.unavailable;
+  if (!owner() || !isCurrent() || expectedSignature != null && expectedSignature != read.signature ||
+      !_assistantAllocationRequestMatches(actionId, read, initialData, operationId, session)) {
+    return MoolAssistantReviewResult.stale;
+  }
+  await _showSupplierAllocation(context, session, read.copy, initialData: initialData,
+    recoveryDraft: actionId == 'AI-ACT-263' || actionId == 'AI-ACT-377' ? read.saved : null,
+    prefillKey: read.key, prefillSignature: read.signature,
+    prefillCurrent: () => owner() && isCurrent(), ownerCurrent: owner, readOnlyOpen: true, selectedDocument: selectedDocument);
+  return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+}
+
+class _StoreSupplierAllocationAdapter implements MoolAssistantNativeAdapter {
+  const _StoreSupplierAllocationAdapter({required this.actionId, required this.readContext,
+    required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function()) open;
+  @override Set<String> get allowedFields => actionId == 'AI-ACT-262'
+    ? StoreSupplierAllocationInitialData.allowedFields : const {'operationId'};
+  @override String? validateFields(Map<String, Object?> fields) {
+    if (actionId == 'AI-ACT-262') {
+      try { StoreSupplierAllocationInitialData.fromFields(fields); return null; }
+      on FormatException catch (error) { return error.message.toString(); }
+    }
+    return fields.length == 1 && fields['operationId'] is String &&
+      (fields['operationId']! as String).trim().isNotEmpty ? null : 'Use the original saved allocation operation.';
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entityId) =>
+    readSnapshot(ctx, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal,
+    bool Function() isCurrent) async {
+    final trusted = readContext();
+    if (!isCurrent() || trusted == null || trusted.binding != proposal.binding ||
+        proposal.entityId == null || validateFields(proposal.fields) != null) return MoolAssistantReviewResult.stale;
+    return open(proposal, isCurrent);
+  }
+}
+
+/// Existing native-copy review only. No generated quantities or final effects.
+class _StoreReceiptDocumentReadAdapter implements MoolAssistantNativeAdapter {
+  const _StoreReceiptDocumentReadAdapter({required this.actionId,
+    required this.readContext, required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final MoolAssistantNativeSnapshot? Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(String, bool Function()) open;
+  @override Set<String> get allowedFields => const {'sourceDigest'};
+  @override String? validateFields(Map<String, Object?> fields) => fields.length == 1 &&
+      fields['sourceDigest'] is String && RegExp(r'^[a-f0-9]{64}$').hasMatch(fields['sourceDigest'] as String)
+      ? null : 'Choose the original receiving copy.';
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(
+    MoolAssistantContext context, String? entityId,
+  ) async => readSnapshot(context, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(
+    MoolAssistantProposal proposal, bool Function() isCurrent,
+  ) async {
+    if (!isCurrent()) return MoolAssistantReviewResult.stale;
+    if (proposal.actionId != actionId || validateFields(proposal.fields) != null ||
+        proposal.entityId != proposal.fields['sourceDigest']) return MoolAssistantReviewResult.unavailable;
+    final context = readContext();
+    if (context == null) return MoolAssistantReviewResult.unavailable;
+    final source = await snapshot(context, proposal.entityId);
+    if (!isCurrent()) return MoolAssistantReviewResult.stale;
+    final latest = readSnapshot(context, proposal.entityId);
+    if (source == null || latest == null || !latest.permitted ||
+        source.sourceRevision != latest.sourceRevision || latest.binding != proposal.binding ||
+        latest.entityId != proposal.entityId || latest.sourceRevision != proposal.sourceRevision)
+      return MoolAssistantReviewResult.stale;
+    final result = await open(proposal.entityId!, isCurrent);
+    return isCurrent() ? result : MoolAssistantReviewResult.stale;
+  }
+}
+
+@immutable
+class StoreSupplierCreditInitialData {
+  StoreSupplierCreditInitialData._(this.supplierId, this.copyId, this.billId,
+    this.copyRevision, this.openingId, this.openingRevision,
+    Map<String, String> inputs, this.documentInput, List<(String, String)> supports)
+      : inputs = Map.unmodifiable(inputs), supports = List.unmodifiable(supports);
+  final String supplierId, copyId, billId, openingId;
+  final int copyRevision, openingRevision;
+  final Map<String, String> inputs;
+  final WorkspaceSupplierCreditDocumentInput documentInput;
+  final List<(String, String)> supports;
+  static const allowedFields = {'supplierId', 'copyId', 'billId', 'copyRevision',
+    'openingId', 'openingRevision', 'reference', 'amount', 'reason', 'occurredOn',
+    'documentInput', 'supports'};
+  factory StoreSupplierCreditInitialData.fromFields(Map<String, Object?> fields) {
+    if (!fields.keys.every(allowedFields.contains)) throw const FormatException('Unsupported credit input.');
+    for (final key in ['supplierId', 'copyId', 'billId', 'openingId']) {
+      if (fields[key] is! String) throw const FormatException('Original bill and supplier references are required.');
+    }
+    if (fields['copyRevision'] is! int || fields['openingRevision'] is! int) {
+      throw const FormatException('Original bill and opening revisions are required.');
+    }
+    final inputs = <String, String>{};
+    for (final key in ['reference', 'amount', 'reason', 'occurredOn']) {
+      if (fields[key] is! String) throw const FormatException('Use text credit-note inputs.');
+      inputs[key] = fields[key]! as String;
+    }
+    final document = WorkspaceSupplierCreditDocumentInput.fromJson(fields['documentInput']);
+    final rawSupports = fields['supports'];
+    if (rawSupports is! List || rawSupports.length > 200) throw const FormatException('Use original goods references.');
+    final supports = <(String, String)>[];
+    for (final raw in rawSupports) {
+      if (raw is! Map || raw.length != 2 || raw['id'] is! String || raw['quantity'] is! String ||
+          supports.any((s) => s.$1 == raw['id'])) throw const FormatException('Use each original goods source once.');
+      supports.add((raw['id'] as String, raw['quantity'] as String));
+    }
+    return StoreSupplierCreditInitialData._(fields['supplierId']! as String,
+      fields['copyId']! as String, fields['billId']! as String, fields['copyRevision']! as int,
+      fields['openingId']! as String, fields['openingRevision']! as int, inputs, document, supports);
+  }
+  bool matches(WorkSession session, WorkspacePurchaseSavedCopy copy) {
+    final opening = session.workspaceSupplierLedger(copy.supplier.id)?.openingRecord;
+    return supplierId == copy.supplier.id && copyId == copy.id && billId == copy.draft.id &&
+      copyRevision == copy.revision && openingId == opening?.id && openingRevision == opening?.revision;
+  }
+  bool matchesAction(String actionId) => actionId == 'AI-ACT-264' ||
+    actionId == 'AI-ACT-375' && documentInput.treatment == 'gst' ||
+    actionId == 'AI-ACT-376' && documentInput.treatment == 'commercial';
+}
+
+@immutable
+class StoreSupplierRefundInitialData {
+  StoreSupplierRefundInitialData._(this.supplierId, this.openingId, this.openingRevision,
+    this.sourceKind, this.sourceId, this.copyId, this.copyRevision, Map<String, String> inputs)
+      : inputs = Map.unmodifiable(inputs);
+  final String supplierId, openingId, sourceKind, sourceId;
+  final int openingRevision;
+  final String? copyId;
+  final int? copyRevision;
+  final Map<String, String> inputs;
+  static const allowedFields = {'supplierId', 'openingId', 'openingRevision', 'sourceKind',
+    'sourceId', 'copyId', 'copyRevision', 'amount', 'reference', 'channel', 'occurredOn'};
+  factory StoreSupplierRefundInitialData.fromFields(Map<String, Object?> fields) {
+    if (!fields.keys.every(allowedFields.contains)) throw const FormatException('Unsupported refund input.');
+    for (final key in ['supplierId', 'openingId', 'sourceKind', 'sourceId']) {
+      if (fields[key] is! String) throw const FormatException('Original refund source references are required.');
+    }
+    if (fields['openingRevision'] is! int || fields['copyId'] != null && fields['copyId'] is! String ||
+        fields['copyRevision'] != null && fields['copyRevision'] is! int) {
+      throw const FormatException('Original refund source revisions are required.');
+    }
+    final inputs = <String, String>{};
+    for (final key in ['amount', 'reference', 'channel', 'occurredOn']) {
+      if (fields[key] is! String) throw const FormatException('Use text refund inputs.');
+      inputs[key] = fields[key]! as String;
+    }
+    if (!const {'Cash', 'UPI', 'Bank transfer'}.contains(inputs['channel'])) {
+      throw const FormatException('Choose an original native refund method.');
+    }
+    return StoreSupplierRefundInitialData._(fields['supplierId']! as String,
+      fields['openingId']! as String, fields['openingRevision']! as int,
+      fields['sourceKind']! as String, fields['sourceId']! as String,
+      fields['copyId'] as String?, fields['copyRevision'] as int?, inputs);
+  }
+  bool matches(_StoreSupplierRefundTarget target) => supplierId == target.supplierId &&
+      openingId == target.opening.id && openingRevision == target.opening.revision &&
+      sourceKind == target.sourceKind.name && sourceId == target.sourceId &&
+      copyId == target.copy?.id && copyRevision == target.copy?.revision;
+}
+
+final _openSupplierAdjustmentForms = Expando<Set<Object>>('native-credit-refund-forms');
+bool _supplierAdjustmentOpen(WorkSession session) => _openSupplierAdjustmentForms[session]?.isNotEmpty == true;
+String _assistantCreditSupportId(WorkspaceSupplierCreditSupport support) => jsonEncode([
+  support.kind.name, support.receiptId, support.receiptLineId, support.billLineIndex,
+  support.returnOperationId, support.shortageClaimId]);
+
+/// Opaque native selector identity; resolve only by enumerating original sources.
+String storeSupplierRefundSourceReference({required String supplierId,
+  required WorkspaceSupplierRefundSourceKind sourceKind, required String sourceId, String? copyId}) =>
+    jsonEncode([supplierId, sourceKind.name, sourceId, copyId]);
+String _assistantRefundEntity(_StoreSupplierRefundTarget target) => storeSupplierRefundSourceReference(
+  supplierId: target.supplierId, sourceKind: target.sourceKind, sourceId: target.sourceId, copyId: target.copy?.id);
+_StoreSupplierRefundTarget? _assistantRefundTarget(WorkSession session, String entityId) =>
+  [for (final supplier in session.workspaceSuppliers) ..._supplierRefundTargets(session, supplier.id)]
+    .where((target) => _assistantRefundEntity(target) == entityId).singleOrNull;
+
+String? _assistantCreditSignature(WorkSession session, WorkspacePurchaseSavedCopy copy) {
+  if (!_assistantFinancialLedgerAdmitted(session)) return null;
+  final key = session.supplierCreditFormKey(copy), ledger = session.workspaceSupplierLedger(copy.supplier.id);
+  return key == null || ledger == null ? null : assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    [key.account, key.store, key.customer, key.invoice, key.order, key.kind, key.ledgerRevision],
+    copy.toJson(), ledger.toJson(),
+  ]))).toString();
+}
+String? _assistantRefundSignature(WorkSession session, _StoreSupplierRefundTarget target) {
+  if (!_assistantFinancialLedgerAdmitted(session)) return null;
+  final key = target.key(session), ledger = session.workspaceSupplierLedger(target.supplierId);
+  return key == null || ledger == null ? null : assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    [key.account, key.store, key.customer, key.invoice, key.order, key.kind, key.ledgerRevision],
+    target.opening.toJson(), target.copy?.toJson(), target.sourceKind.name, target.sourceId, ledger.toJson(),
+  ]))).toString();
+}
+
+Future<MoolAssistantReviewResult> showStoreSupplierCreditInitialReview(
+  BuildContext context, WorkSession session, {required String actionId, required String entityId,
+  required StoreSupplierCreditInitialData initialData,
+  required bool Function() isCurrent, bool Function()? ownerCurrent, StoreSupplierSelectedDocumentInput? selectedDocument}) async {
+  final scope = session.workspaceSupplierScope, publication = session.publicationPreferencesContext;
+  bool owner() => context.mounted && ownerCurrent?.call() != false && scope != null &&
+    session.workspaceSupplierScope == scope && session.publicationPreferencesContext == publication;
+  if (!owner() || !isCurrent() || _supplierAdjustmentOpen(session)) return MoolAssistantReviewResult.stale;
+  if (!_assistantFinancialLedgerAdmitted(session) || !owner() || !isCurrent()) return MoolAssistantReviewResult.unavailable;
+  final copy = session.workspacePurchaseCopies.where((copy) => copy.id == entityId).singleOrNull;
+  if (copy == null || !initialData.matchesAction(actionId) || !initialData.matches(session, copy)) return MoolAssistantReviewResult.stale;
+  final key = session.supplierCreditFormKey(copy), signature = _assistantCreditSignature(session, copy);
+  if (key == null || signature == null) return MoolAssistantReviewResult.unavailable;
+  try {
+    final saved = await session.readLedgerForm(key);
+    if (!owner() || !isCurrent() || _supplierAdjustmentOpen(session) ||
+        _assistantCreditSignature(session, copy) != signature) return MoolAssistantReviewResult.stale;
+    if (saved != null) return MoolAssistantReviewResult.unavailable;
+  } on Object { return MoolAssistantReviewResult.unavailable; }
+  await _showSupplierCredit(context, session, copy, initialData: initialData,
+    prefillKey: key, prefillSignature: signature,
+    prefillCurrent: () => owner() && isCurrent(), ownerCurrent: owner, readOnlyOpen: true, selectedDocument: selectedDocument);
+  return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+}
+
+Future<MoolAssistantReviewResult> showStoreSupplierRefundInitialReview(
+  BuildContext context, WorkSession session, {required String entityId,
+  required StoreSupplierRefundInitialData initialData,
+  required bool Function() isCurrent, bool Function()? ownerCurrent, StoreSupplierSelectedDocumentInput? selectedDocument}) async {
+  final scope = session.workspaceSupplierScope, publication = session.publicationPreferencesContext;
+  bool owner() => context.mounted && ownerCurrent?.call() != false && scope != null &&
+    session.workspaceSupplierScope == scope && session.publicationPreferencesContext == publication;
+  if (!owner() || !isCurrent() || _supplierAdjustmentOpen(session)) return MoolAssistantReviewResult.stale;
+  if (!_assistantFinancialLedgerAdmitted(session) || !owner() || !isCurrent()) return MoolAssistantReviewResult.unavailable;
+  final target = _assistantRefundTarget(session, entityId);
+  if (target == null || !initialData.matches(target)) return MoolAssistantReviewResult.stale;
+  final key = target.key(session), signature = _assistantRefundSignature(session, target);
+  if (key == null || signature == null) return MoolAssistantReviewResult.unavailable;
+  try {
+    final saved = await session.readLedgerForm(key);
+    if (!owner() || !isCurrent() || _supplierAdjustmentOpen(session) ||
+        _assistantRefundSignature(session, target) != signature) return MoolAssistantReviewResult.stale;
+    if (saved != null) return MoolAssistantReviewResult.unavailable;
+  } on Object { return MoolAssistantReviewResult.unavailable; }
+  await _showSupplierRefund(context, session, target, initialData: initialData,
+    prefillKey: key, prefillSignature: signature,
+    prefillCurrent: () => owner() && isCurrent(), ownerCurrent: owner, readOnlyOpen: true, selectedDocument: selectedDocument);
+  return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+}
+
+class _StoreSupplierAdjustmentInitialAdapter implements MoolAssistantNativeAdapter {
+  const _StoreSupplierAdjustmentInitialAdapter({required this.actionId,
+    required this.readContext, required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function()) open;
+  @override Set<String> get allowedFields => actionId == 'AI-ACT-266'
+    ? StoreSupplierRefundInitialData.allowedFields : StoreSupplierCreditInitialData.allowedFields;
+  @override String? validateFields(Map<String, Object?> fields) {
+    try {
+      if (actionId == 'AI-ACT-266') { StoreSupplierRefundInitialData.fromFields(fields); }
+      else if (!StoreSupplierCreditInitialData.fromFields(fields).matchesAction(actionId)) {
+        return 'Use the original requested GST/commercial document type.';
+      }
+      return null;
+    } on FormatException catch (error) { return error.message.toString(); }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entityId) => readSnapshot(ctx, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) async {
+    final trusted = readContext();
+    if (!isCurrent() || trusted == null || proposal.entityId == null ||
+      trusted.binding != proposal.binding || validateFields(proposal.fields) != null) return MoolAssistantReviewResult.stale;
+    return open(proposal, isCurrent);
+  }
+}
+
+/// Opaque original goods-receipt selector identity. Never decode model data.
+String storeSupplierReturnSourceReference({required String supplierId, required String receiptId}) =>
+  jsonEncode([supplierId, receiptId]);
+
+typedef _AssistantAdjustmentRecovery = ({WorkspaceLedgerFormKey key,
+  WorkspaceLedgerFormDraft saved, String operationId, String signature,
+  WorkspacePurchaseSavedCopy? copy, _StoreSupplierRefundTarget? refund,
+  WorkspaceSupplierGoodsReceipt? receipt, String supplierId});
+
+Future<_AssistantAdjustmentRecovery?> _readAssistantAdjustmentRecovery(WorkSession session,
+  String actionId, String entityId, bool Function() current) async {
+  if (!current() || _supplierAdjustmentOpen(session) || _supplierMoneyFormOpen(session)) return null;
+  // AI recovery reads never admit inventory/ledger or enqueue a Stock report.
+  if (!session.workspaceSuppliersLoaded || session.workspaceSupplierSaving ||
+      session.workspaceSupplierRecoveryRequired || !session.workspaceInvoiceHistoryLoaded || !current()) return null;
+  WorkspacePurchaseSavedCopy? copy;
+  _StoreSupplierRefundTarget? refund;
+  WorkspaceSupplierGoodsReceipt? receipt;
+  WorkspaceLedgerFormKey? key;
+  String? supplierId;
+  if ((actionId == 'AI-ACT-265' || actionId == 'AI-ACT-379')) {
+    copy = session.workspacePurchaseCopies.where((c) => c.id == entityId).singleOrNull;
+    if (copy != null) { supplierId = copy.supplier.id; key = session.supplierCreditFormKey(copy); }
+  } else if (actionId == 'AI-ACT-267' || actionId == 'AI-ACT-378') {
+    refund = _assistantRefundTarget(session, entityId);
+    if (refund != null) { supplierId = refund.supplierId; key = refund.key(session); }
+  } else if (actionId == 'AI-ACT-380') {
+    final matches = [for (final supplier in session.workspaceSuppliers)
+      for (final item in session.workspaceSupplierLedger(supplier.id)?.goodsReceipts.values ??
+          const <WorkspaceSupplierGoodsReceipt>[])
+        if (storeSupplierReturnSourceReference(supplierId: supplier.id, receiptId: item.id) == entityId)
+          (supplier.id, item)];
+    if (matches.length == 1) {
+      supplierId = matches.single.$1; receipt = matches.single.$2;
+      key = session.supplierGoodsReturnFormKey(supplierId, receipt.id);
+    }
+  }
+  if (supplierId == null || key == null || !current()) return null;
+  try {
+    final saved = await session.readLedgerForm(key);
+    final ledger = session.workspaceSupplierLedger(supplierId);
+    if (!current() || _supplierAdjustmentOpen(session) || _supplierMoneyFormOpen(session) ||
+        saved == null || !saved.valid || ledger == null) return null;
+    final operationId = (actionId == 'AI-ACT-265' || actionId == 'AI-ACT-379') ? saved.supplierCreditIntent?.operationId
+      : actionId == 'AI-ACT-380' ? saved.supplierGoodsReturnIntent?.operationId
+      : saved.supplierRefundIntent?.operationId;
+    if (operationId == null) return null;
+    final signature = assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+      [key.account, key.store, key.customer, key.invoice, key.order, key.kind, key.ledgerRevision],
+      copy?.toJson(), refund?.opening.toJson(), refund?.copy?.toJson(),
+      refund?.sourceKind.name, refund?.sourceId, receipt?.toJson(), ledger.toJson(), saved.revision, saved.fields,
+    ]))).toString();
+    return (key: key, saved: saved, operationId: operationId, signature: signature,
+      copy: copy, refund: refund, receipt: receipt, supplierId: supplierId);
+  } on Object { return null; }
+}
+
+/// Restore only the exact original saved attempt. Final retry remains native.
+Future<MoolAssistantReviewResult> showStoreSupplierAdjustmentRecoveryReview(BuildContext context,
+  WorkSession session, {required String actionId, required String entityId, required String operationId,
+  String? expectedSignature, required bool Function() isCurrent, bool Function()? ownerCurrent}) async {
+  final scope = session.workspaceSupplierScope, publication = session.publicationPreferencesContext;
+  bool owner() => context.mounted && ownerCurrent?.call() != false && scope != null &&
+    session.workspaceSupplierScope == scope && session.publicationPreferencesContext == publication;
+  final read = await _readAssistantAdjustmentRecovery(session, actionId, entityId, () => owner() && isCurrent());
+  if (read == null) return MoolAssistantReviewResult.unavailable;
+  if (!owner() || !isCurrent() || operationId != read.operationId ||
+      expectedSignature != null && expectedSignature != read.signature) return MoolAssistantReviewResult.stale;
+  if ((actionId == 'AI-ACT-265' || actionId == 'AI-ACT-379')) {
+    await _showSupplierCredit(context, session, read.copy!, recoveryDraft: read.saved, ownerCurrent: owner, readOnlyOpen: true);
+  } else if (actionId == 'AI-ACT-380') {
+    await _showSupplierGoodsReturn(context, session, read.supplierId, read.receipt!,
+      recoveryDraft: read.saved, ownerCurrent: owner);
+  } else {
+    await _showSupplierRefund(context, session, read.refund!, recoveryDraft: read.saved, ownerCurrent: owner, readOnlyOpen: true);
+  }
+  return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+}
+
+class _StoreSupplierAdjustmentRecoveryAdapter implements MoolAssistantNativeAdapter {
+  const _StoreSupplierAdjustmentRecoveryAdapter({required this.actionId, required this.readContext,
+    required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function()) open;
+  @override Set<String> get allowedFields => const {'operationId'};
+  @override String? validateFields(Map<String, Object?> fields) => fields.length == 1 &&
+    fields['operationId'] is String && (fields['operationId']! as String).trim().isNotEmpty
+      ? null : 'Use the exact saved original operation.';
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entityId) =>
+    readSnapshot(ctx, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal,
+    bool Function() isCurrent) async {
+    final trusted = readContext();
+    if (!isCurrent() || trusted == null || proposal.entityId == null || trusted.binding != proposal.binding ||
+        validateFields(proposal.fields) != null) return MoolAssistantReviewResult.stale;
+    return open(proposal, isCurrent);
+  }
+}
+
+/// Raw inputs for the existing opening-dues controls. No ledger is constructed.
+class StoreSupplierOpeningInitialData {
+  StoreSupplierOpeningInitialData._(this.supplierId, this.openingId, this.openingRevision,
+    this.directoryRevision, this.asOfDate, this.amount, this.sourceNote,
+    this.amountKnown, this.supplierCredit, Map<String, WorkspaceOpeningBillInclusion> relations)
+    : relations = Map.unmodifiable(relations);
+  final String supplierId, asOfDate, amount, sourceNote;
+  final String? openingId;
+  final int? openingRevision;
+  final int directoryRevision;
+  final bool amountKnown, supplierCredit;
+  final Map<String, WorkspaceOpeningBillInclusion> relations;
+  static const allowedFields = {'supplierId', 'openingId', 'openingRevision',
+    'directoryRevision', 'asOfDate', 'amount', 'sourceNote', 'amountKnown',
+    'supplierCredit', 'billInclusions'};
+  factory StoreSupplierOpeningInitialData.fromFields(Map<String, Object?> fields) {
+    if (!fields.keys.every(allowedFields.contains) || fields['supplierId'] is! String ||
+        (fields['supplierId']! as String).isEmpty || fields['directoryRevision'] is! int ||
+        (fields['openingId'] != null && fields['openingId'] is! String) ||
+        (fields['openingRevision'] != null && fields['openingRevision'] is! int) ||
+        (fields['openingId'] == null) != (fields['openingRevision'] == null) ||
+        fields['asOfDate'] is! String || fields['amount'] is! String ||
+        fields['sourceNote'] is! String || fields['amountKnown'] is! bool ||
+        fields['supplierCredit'] is! bool || fields['billInclusions'] is! Map) {
+      throw const FormatException('Use original supplier references and raw opening inputs.');
+    }
+    final relations = <String, WorkspaceOpeningBillInclusion>{};
+    for (final entry in (fields['billInclusions']! as Map).entries) {
+      final options = WorkspaceOpeningBillInclusion.values.where((v) => v.name == entry.value);
+      if (entry.key is! String || options.length != 1) {
+        throw const FormatException('Choose an original saved bill and inclusion option.');
+      }
+      relations[entry.key as String] = options.single;
+    }
+    return StoreSupplierOpeningInitialData._(fields['supplierId']! as String,
+      fields['openingId'] as String?, fields['openingRevision'] as int?,
+      fields['directoryRevision']! as int, fields['asOfDate']! as String,
+      fields['amount']! as String, fields['sourceNote']! as String,
+      fields['amountKnown']! as bool, fields['supplierCredit']! as bool, relations);
+  }
+  bool matches(WorkSession session, String actionId, String supplier) {
+    final original = session.workspaceSupplierOpeningRecord(supplier);
+    final latestBills = session.workspaceLatestPurchaseCopies.where((c) => c.supplier.id == supplier);
+    final posted = session.workspaceSupplierLedger(supplier)?.openingRecord;
+    return supplierId == supplier && directoryRevision == session.workspacePurchaseEntryRevision &&
+      openingId == original?.id && openingRevision == original?.revision &&
+      (actionId == 'AI-ACT-257' ? original == null : actionId == 'AI-ACT-381' && original != null &&
+        (posted == null || jsonEncode(posted.toJson()) != jsonEncode(original.toJson()))) &&
+      relations.keys.every((id) => latestBills.any((copy) => copy.id == id));
+  }
+}
+
+class StoreExpenseInitialData {
+  StoreExpenseInitialData._(Map<String, String> inputs) : inputs = Map.unmodifiable(inputs);
+  final Map<String, String> inputs;
+  static const allowedFields = {'amount', 'reference', 'channel', 'category', 'note'};
+  static const nativeCategories = {'Shop expense', 'Delivery', 'Electricity', 'Salary', 'Repair', 'Other'};
+  factory StoreExpenseInitialData.fromFields(Map<String, Object?> fields) {
+    if (fields.length != allowedFields.length || !fields.keys.every(allowedFields.contains) ||
+        !fields.values.every((v) => v is String) ||
+        !StoreSupplierMoneyInitialData.nativeMethods.contains(fields['channel']) ||
+        !nativeCategories.contains(fields['category'])) {
+      throw const FormatException('Use raw expense inputs and existing native choices.');
+    }
+    return StoreExpenseInitialData._(fields.map((k, v) => MapEntry(k, v! as String)));
+  }
+}
+
+final _openSupplierOpeningForms = Expando<Set<Object>>('native-opening-forms');
+bool _supplierOpeningFormOpen(WorkSession session) => _openSupplierOpeningForms[session]?.isNotEmpty == true;
+
+typedef _StoreMoneyEntryView=({String entity,Map<String,String> fields,String signature});
+_StoreMoneyEntryView? _storeMoneyEntryView(WorkSession session,String? entity) {
+  if(entity==null)return null;
+  final scope=session.workspaceSupplierScope,finance=session.workspaceFinance;
+  if(scope==null||finance==null||!finance.valid||session.workspaceFinanceStale||
+    finance.accountScope!=scope.$1||finance.workspaceId!=scope.$2)return null;
+  final fields=<String,String>{};Object? facts;
+  Object? decoded;try{decoded=jsonDecode(entity);}on FormatException{decoded=null;}
+  if(decoded is List&&decoded.length==3&&decoded.first=='register'&&decoded.every((v)=>v is String)) {
+    if(jsonEncode(decoded)!=entity)return null;
+    final reference=List<String>.unmodifiable(decoded.cast<String>());
+    final register=session.workspaceMoneyRegisters.where((r)=>r.registerId==reference[1]&&r.valid).singleOrNull;
+    final entry=register?.entries.where((e)=>e.id==reference[2]&&e.valid).singleOrNull;
+    if(register==null||entry==null)return null;
+    final now=DateTime.now(),start=session.workspaceMoneyPeriodStart??register.openingAt;
+    final end=register.asOf.isBefore(now)?register.asOf:now;
+    if(entry.occurredAt.isBefore(start)||!entry.occurredAt.isBefore(end))return null;
+    fields.addAll({'Account':register.label,'Date':_registerDate(entry.occurredAt),
+      'Reference':entry.reference,'Reference ID':entry.id,
+      entry.deltaMinor>0?'Debit (₹)':'Credit (₹)':_formatStoreMinorAmount(entry.deltaMinor.abs())});
+    facts=[register.registerId,register.revision,register.openingAt.toUtc().toIso8601String(),
+      register.asOf.toUtc().toIso8601String(),register.openingMinor,register.historyComplete,entry.toJson()];
+  } else {
+    final entry=session.workspaceMoneyStatement?.entries.where((e)=>e.id==entity).singleOrNull;
+    if(entry==null)return null;
+    fields.addAll({'Date':_registerDate(entry.occurredAt),'Particulars':entry.party,'Entry type':entry.label,
+      'Reference':entry.reference,'Payment method':entry.method,
+      entry.incoming?'Money in (₹)':'Money out (₹)':_formatStoreMinorAmount(entry.amountMinor),'Status':entry.status});
+    facts=[entry.id,entry.label,entry.party,entry.reference,entry.method,entry.status,
+      entry.occurredAt.toUtc().toIso8601String(),entry.amountMinor,entry.incoming,entry.posted,entry.transfer];
+  }
+  fields.removeWhere((_,value)=>value.trim().isEmpty);
+  final signature=assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    [scope.$1,scope.$2,scope.$3],finance.revision,finance.asOf.toUtc().toIso8601String(),session.workspaceMoneyPeriod,facts,
+  ]))).toString();
+  return(entity:entity,fields:Map.unmodifiable(fields),signature:signature);
+}
+
+class _StoreMoneyEntryOwner extends StatefulWidget {
+  const _StoreMoneyEntryOwner({required this.current,required this.changes,required this.onClose,required this.child,this.validUntil});
+  final bool Function() current;
+  final Listenable changes;
+  final DateTime? validUntil;
+  final VoidCallback onClose;
+  final Widget child;
+  @override State<_StoreMoneyEntryOwner> createState()=>_StoreMoneyEntryOwnerState();
+}
+class _StoreMoneyEntryOwnerState extends State<_StoreMoneyEntryOwner> {
+  Timer? _expiry;bool _retired=false,_queued=false;
+  bool get _current=>mounted&&!_retired&&widget.current()&&(widget.validUntil?.isAfter(DateTime.now())??true);
+  @override void initState(){super.initState();widget.changes.addListener(_changed);
+    if(widget.validUntil case final until?){final remaining=until.difference(DateTime.now());_expiry=Timer(remaining.isNegative?Duration.zero:remaining,_retire);}}
+  void _changed(){if(!mounted)return;if(!_current)_retired=true;_refresh();}
+  void _retire(){if(!mounted)return;_retired=true;_refresh();}
+  void _refresh(){if(_queued)return;_queued=true;
+    WidgetsBinding.instance.addPostFrameCallback((_){_queued=false;if(mounted)setState((){});});
+    WidgetsBinding.instance.ensureVisualUpdate();}
+  @override Widget build(BuildContext context)=>_current?widget.child:Padding(padding:const EdgeInsets.all(16),
+    child:Column(mainAxisSize:MainAxisSize.min,children:[const Text('This money entry has changed. Close and reopen it.'),
+      TextButton(onPressed:widget.onClose,child:const Text('Close'))]));
+  @override void dispose(){_expiry?.cancel();widget.changes.removeListener(_changed);super.dispose();}
+}
+
+Future<MoolAssistantReviewResult> showStoreMoneyEntryDetails(BuildContext context,WorkSession session,String entity,{
+  String? expectedSignature,bool Function()? ownerCurrent,bool Function()? reviewCurrent,Listenable? ownerChanges,DateTime? validUntil,
+}) async {
+  final view=_storeMoneyEntryView(session,entity);
+  if(view==null||expectedSignature!=null&&view.signature!=expectedSignature)return MoolAssistantReviewResult.unavailable;
+  final scope=session.workspaceSupplierScope,publication=session.publicationPreferencesContext;
+  final changes=Listenable.merge([session,ownerChanges,context.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+  final lease=_ReceivingNativeLease(()=>context.mounted&&scope!=null&&scope==session.workspaceSupplierScope&&
+    publication==session.publicationPreferencesContext&&ownerCurrent?.call()!=false&&reviewCurrent?.call()!=false&&
+    (validUntil?.isAfter(DateTime.now())??true)&&
+    _storeMoneyEntryView(session,entity)?.signature==view.signature,changes);
+  try {
+    if(!lease.current)return MoolAssistantReviewResult.stale;
+    await showModalBottomSheet<void>(context:context,isScrollControlled:true,useRootNavigator:true,useSafeArea:true,builder:(sheet) {
+      void close(){if(sheet.mounted&&ModalRoute.of(sheet)?.isCurrent==true)Navigator.pop(sheet);}
+      final stacked=MediaQuery.sizeOf(sheet).width<400&&MediaQuery.textScalerOf(sheet).scale(14)>20;
+      return ConstrainedBox(constraints:BoxConstraints(maxHeight:MediaQuery.sizeOf(sheet).height*.85),
+        child:_StoreMoneyEntryOwner(current:()=>lease.current,changes:changes,onClose:close,validUntil:validUntil,
+          child:SingleChildScrollView(key:const Key('work-money-entry-details'),padding:const EdgeInsets.all(16),
+            child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+              Row(children:[Expanded(child:Text('Money entry',style:Theme.of(sheet).textTheme.titleMedium)),
+                IconButton(key:const Key('work-money-entry-close'),tooltip:'Close',onPressed:close,icon:const Icon(Icons.close))]),
+              for(final field in view.fields.entries)Padding(padding:const EdgeInsets.symmetric(vertical:6),
+                child:stacked?Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                  Text(field.key,style:Theme.of(sheet).textTheme.labelMedium),const SizedBox(height:2),SelectableText(field.value),
+                ]):Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                  Expanded(child:Text(field.key,style:Theme.of(sheet).textTheme.labelMedium)),
+                  const SizedBox(width:12),Expanded(flex:2,child:SelectableText(field.value,textAlign:TextAlign.end)),
+                ])),
+            ]))));
+    });
+    return lease.current?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+  }finally{lease.dispose();}
+}
+
+String? _supplierAccountAssistantSignature(WorkSession session, String actionId, String? entityId) {
+  if(actionId=='AI-ACT-271')return _storeMoneyEntryView(session,entityId)?.signature;
+  if (actionId == 'AI-ACT-270') {
+    final key = session.expenseFormKey();
+    if (entityId != null || key == null || !session.canRecordStoreReviewExpense) return null;
+    return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+      [key.account, key.store, key.customer, key.invoice, key.order, key.kind, key.ledgerRevision],
+      session.workspaceExpenses.map((e) => e.toJson()).toList(),
+    ]))).toString();
+  }
+  if (!_assistantFinancialBookAdmitted(session)) return null;
+  final supplier = session.workspaceSuppliers.where((s) => s.id == entityId).singleOrNull;
+  if (supplier == null || session.workspaceSupplierRecoveryRequired) return null;
+  final opening = session.workspaceSupplierOpeningRecord(supplier.id);
+  final ledger = session.workspaceInvoiceHistoryLoaded ? session.workspaceSupplierLedger(supplier.id) : null;
+  if (actionId == 'AI-ACT-257' && opening != null) return null;
+  if (actionId == 'AI-ACT-258' && (opening == null || !session.workspaceSupplierOpeningConfirmationAvailable ||
+      !session.workspaceInvoiceHistoryLoaded)) return null;
+
+  if (actionId == 'AI-ACT-381' && (opening == null ||
+      (ledger?.openingRecord != null && jsonEncode(ledger!.openingRecord!.toJson()) == jsonEncode(opening.toJson())))) return null;
+  return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    actionId, session.workspacePurchaseEntryRevision, supplier.toJson(), opening?.toJson(),
+    if (actionId == 'AI-ACT-258' || actionId == 'AI-ACT-268') [session.workspaceInvoiceHistoryLoaded, ledger?.toJson()],
+    session.workspaceLatestPurchaseCopies.where((c) => c.supplier.id == supplier.id).map((c) => c.toJson()).toList(),
+  ]))).toString();
+}
+
+/// Opens the existing owner; no draft save, confirmation, posting or correction occurs here.
+Future<MoolAssistantReviewResult> showStoreSupplierAccountReview(BuildContext context, WorkSession session, {
+  required String actionId, required String? entityId, required Map<String, Object?> fields,
+  required String expectedSignature, required bool Function() isCurrent, bool Function()? ownerCurrent,
+  Listenable? ownerChanges,DateTime? validUntil,
+}) async {
+  final scope = session.workspaceSupplierScope, publication = session.publicationPreferencesContext;
+  bool owner() => context.mounted && scope != null && ownerCurrent?.call() != false &&
+    scope == session.workspaceSupplierScope && publication == session.publicationPreferencesContext;
+  bool sourceCurrent() => owner() && _supplierAccountAssistantSignature(session, actionId, entityId) == expectedSignature;
+  if (!owner() || !isCurrent() || _supplierOpeningFormOpen(session) || _supplierMoneyFormOpen(session)) {
+    return MoolAssistantReviewResult.stale;
+  }
+  if (actionId != 'AI-ACT-270' && !_assistantFinancialBookAdmitted(session) || !owner() || !isCurrent() || !sourceCurrent()) {
+    return MoolAssistantReviewResult.stale;
+  }
+  if(actionId=='AI-ACT-271') {
+    if(entityId==null||fields.isNotEmpty)return MoolAssistantReviewResult.unavailable;
+    return showStoreMoneyEntryDetails(context,session,entityId,expectedSignature:expectedSignature,
+      ownerCurrent:owner,reviewCurrent:isCurrent,ownerChanges:ownerChanges,validUntil:validUntil);
+  }
+  if (actionId == 'AI-ACT-268') {
+    if (fields.isNotEmpty) return MoolAssistantReviewResult.unavailable;
+    final ledger = session.workspaceInvoiceHistoryLoaded ? session.workspaceSupplierLedger(entityId!) : null;
+    if (ledger != null) {
+      await _showSupplierStatement(context, session, ledger,
+        ownerCurrent: () => owner() && session.workspaceInvoiceHistoryLoaded, ownerChanges: ownerChanges);
+    } else {
+      // Existing native unavailable balance view; no invented statement/data.
+      await showModalBottomSheet<void>(context: context, useSafeArea: true,
+        builder: (sheetContext) => _supplierCapturedOwnerSheet(context, sheetContext, session, owner,
+          Padding(padding: const EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
+            _StoreSupplierLedgerSummary(session: session, ledger: null),
+            TextButton(onPressed: () { unawaited(Navigator.of(sheetContext).maybePop()); }, child: const Text('Close')),
+          ]))));
+    }
+  } else if (actionId == 'AI-ACT-270') {
+    final initial = StoreExpenseInitialData.fromFields(fields);
+    final key = session.expenseFormKey();
+    if (key == null) return MoolAssistantReviewResult.unavailable;
+    try {
+      final saved = await session.readLedgerForm(key);
+      if (!sourceCurrent() || !isCurrent() || _supplierMoneyFormOpen(session)) return MoolAssistantReviewResult.stale;
+      if (saved != null) return MoolAssistantReviewResult.unavailable;
+    } on Object { return MoolAssistantReviewResult.unavailable; }
+    await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true,
+      builder: (sheetContext) => AnimatedBuilder(animation: Listenable.merge([session, ownerChanges]),
+        child: _StoreMoneyEntrySheet(session: session, expenseInitialData: initial,
+          prefillKey: key, prefillSignature: expectedSignature,
+          prefillCurrent: () => sourceCurrent() && isCurrent(), ownerCurrent: owner, readOnlyOpen: true),
+        builder: (_, child) => Stack(children: [
+          Offstage(offstage: !owner(), child: ExcludeFocus(excluding: !owner(), child: child!)),
+          if (!owner()) Padding(padding: const EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Return to the Store where you started. Expense input is kept.'),
+            TextButton(onPressed: () { unawaited(Navigator.of(sheetContext).maybePop()); }, child: const Text('Close'))])),
+        ])));
+  } else {
+    if (entityId == null || !const ['AI-ACT-257', 'AI-ACT-258', 'AI-ACT-381'].contains(actionId)) {
+      return MoolAssistantReviewResult.unavailable;
+    }
+    final initial = actionId == 'AI-ACT-258' ? null : StoreSupplierOpeningInitialData.fromFields(fields);
+    if (initial != null && !initial.matches(session, actionId, entityId)) return MoolAssistantReviewResult.stale;
+    if (actionId == 'AI-ACT-258' && fields.isNotEmpty) return MoolAssistantReviewResult.unavailable;
+    final key = GlobalKey<_StoreSupplierOpeningState>();
+    await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true,
+      isDismissible: false, enableDrag: false, builder: (sheetContext) {
+        Future<void> leave() async {
+          if (await (key.currentState?.confirmLeave() ?? Future.value(true)) && sheetContext.mounted) {
+            Navigator.pop(sheetContext);
+          }
+        }
+        return PopScope(canPop: false, onPopInvokedWithResult: (didPop, _) async {
+          if (!didPop) await leave();
+        }, child: FractionallySizedBox(heightFactor: .95, child: AnimatedBuilder(
+          animation: Listenable.merge([session, ownerChanges]), builder: (ownerContext, child) => _StoreSupplierOpeningSurface(
+            key: key, session: session, initialSupplierId: entityId, initialData: initial,
+            initialActionId: actionId, ownerCurrent: owner, sourceCurrent: sourceCurrent,
+            // The original Close control already obtained confirmLeave consent.
+            onBack: () { if (sheetContext.mounted) Navigator.pop(sheetContext); }, readOnlyOpen: true))));
+      });
+  }
+  return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+}
+
+class _StoreSupplierAccountAdapter implements MoolAssistantNativeAdapter {
+  const _StoreSupplierAccountAdapter({required this.actionId, required this.readContext,
+    required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function()) open;
+  @override Set<String> get allowedFields => actionId == 'AI-ACT-270'
+    ? StoreExpenseInitialData.allowedFields : actionId == 'AI-ACT-257' || actionId == 'AI-ACT-381'
+      ? StoreSupplierOpeningInitialData.allowedFields : const {};
+  @override String? validateFields(Map<String, Object?> fields) {
+    try {
+      if (actionId == 'AI-ACT-270') { StoreExpenseInitialData.fromFields(fields); }
+      else if (actionId == 'AI-ACT-257' || actionId == 'AI-ACT-381') { StoreSupplierOpeningInitialData.fromFields(fields); }
+      else if (fields.isNotEmpty) { throw const FormatException('Use the original saved record.'); }
+      return null;
+    } on FormatException catch (error) { return error.message.toString(); }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entityId) => readSnapshot(ctx, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) async {
+    if (!isCurrent() || readContext()?.binding != proposal.binding || validateFields(proposal.fields) != null) {
+      return MoolAssistantReviewResult.stale;
+    }
+    return open(proposal, isCurrent);
+  }
+}
+
+class _StoreMoneyEntryAssistantAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  const _StoreMoneyEntryAssistantAdapter({required this.readContext,required this.readSnapshot,required this.open});
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext,String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function(),Listenable?) open;
+  @override String get actionId=>'AI-ACT-271';
+  @override Set<String> get allowedFields=>const {};
+  @override String? validateFields(Map<String,Object?> fields)=>fields.isEmpty?null:'Choose a recorded money entry.';
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx,String? entity)=>readSnapshot(ctx,entity);
+  Future<MoolAssistantReviewResult> _open(MoolAssistantProposal p,bool Function() current,Listenable? changes) async {
+    if(p.actionId!=actionId||!current()||readContext()?.binding!=p.binding||validateFields(p.fields)!=null)
+      return MoolAssistantReviewResult.stale;
+    return open(p,current,changes);
+  }
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() current)=>_open(p,current,null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,{required bool Function() isCurrent,required Listenable ownerChanges})=>_open(p,isCurrent,ownerChanges);
+}
+
+@immutable
+class StoreStockHistoryInitialData {
+  const StoreStockHistoryInitialData._(this.from, this.until);
+  final DateTime? from, until;
+  static const allowedFields = {'from', 'until'};
+  factory StoreStockHistoryInitialData.fromFields(Map<String, Object?> fields) {
+    if (!fields.keys.every(allowedFields.contains)) throw const FormatException('Use original Stock history filters.');
+    DateTime? read(String key) {
+      if (!fields.containsKey(key)) return null;
+      final raw = fields[key];
+      final value = raw is String ? DateTime.tryParse(raw) : null;
+      if (value == null || !value.isUtc) throw const FormatException('Use a precise UTC date/time for Stock history.');
+      return value;
+    }
+    final from = read('from'), until = read('until');
+    if (from != null && until != null && !from.isBefore(until)) {
+      throw const FormatException('Stock history end must follow its start.');
+    }
+    return StoreStockHistoryInitialData._(from, until);
+  }
+}
+
+/// Original quantity text/reason, with checked current native SKU/checkpoint refs.
+@immutable
+class StoreStockAdjustmentInitialData {
+  const StoreStockAdjustmentInitialData._(this.inventoryRevision, this.sourceCanonicalId,
+    this.sourceSku, this.sourcePack, this.sourceStock, this.quantity, this.reason);
+  final int? inventoryRevision;
+  final String sourceCanonicalId, sourceSku, sourcePack, quantity, reason;
+  final int sourceStock;
+  static const allowedFields = {'inventoryRevision', 'sourceCanonicalId', 'sourceSku',
+    'sourcePack', 'sourceStock', 'quantity', 'reason'};
+  factory StoreStockAdjustmentInitialData.fromFields(Map<String, Object?> fields) {
+    if (!fields.keys.every(allowedFields.contains) || !fields.containsKey('inventoryRevision') ||
+        fields['inventoryRevision'] != null && fields['inventoryRevision'] is! int || fields['sourceStock'] is! int ||
+        !['sourceCanonicalId', 'sourceSku', 'sourcePack', 'quantity', 'reason'].every((key) => fields[key] is String)) {
+      throw const FormatException('Use original Stock/SKU references and native quantity/reason text.');
+    }
+    return StoreStockAdjustmentInitialData._(fields['inventoryRevision'] as int?,
+      fields['sourceCanonicalId']! as String, fields['sourceSku']! as String, fields['sourcePack']! as String,
+      fields['sourceStock']! as int, fields['quantity']! as String, fields['reason']! as String);
+  }
+  bool matches(WorkSession session, WorkspaceCatalogueItem product) =>
+    inventoryRevision == session.workspaceInventoryRevision && sourceCanonicalId == product.canonicalId &&
+    sourceSku == product.sku && sourcePack == product.pack && sourceStock == product.stock &&
+    product.stockMode == WorkspaceStockMode.exactQuantity;
+}
+
+String? _assistantStockSignature(WorkSession session, String actionId, String? entityId) {
+  final product = entityId == null ? null : session.workspaceCatalogueItems.where((p) => p.id == entityId).singleOrNull;
+  if (entityId != null && product == null || actionId == 'AI-ACT-233' &&
+      (product == null || product.stockMode != WorkspaceStockMode.exactQuantity ||
+        session.localInventoryEnabled && !session.workspaceInventoryLoaded || session.workspaceInventoryError != null ||
+        session.workspaceGoodsReceiptBusy || session.workspaceGoodsReceiptRecoveryPending) ||
+      const {'AI-ACT-231', 'AI-ACT-407', 'AI-ACT-408'}.contains(actionId) && entityId != null) return null;
+  return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    actionId, entityId, session.workspaceInventoryRevision, session.workspaceInventoryLoaded,
+    session.workspaceInventoryError, session.workspaceGoodsReceiptBusy, session.workspaceGoodsReceiptRecoveryPending,
+    if (product != null) product.toInventoryJson()
+    else [for (final p in session.workspaceCatalogueItems) p.toInventoryJson()],
+  ]))).toString();
+}
+
+/// Original editor, existing final Save -> original updateWorkspaceStock only.
+Future<MoolAssistantReviewResult> showStoreStockAdjustmentReview(BuildContext context, WorkSession session,
+  {required String entityId, required StoreStockAdjustmentInitialData initialData,
+  required bool Function() isCurrent, bool Function()? ownerCurrent}) async {
+  final publication = session.publicationPreferencesContext, trading = session.tradingPreferencesContext;
+  bool owner() => context.mounted && ownerCurrent?.call() != false &&
+    session.publicationPreferencesContext == publication && session.tradingPreferencesContext == trading;
+  if (!owner() || !isCurrent() || _productEditorOpen(session)) return MoolAssistantReviewResult.stale;
+  // Original Load/Recover Stock may synchronise a durable Stock report. Review
+  // uses only the already-admitted native checkpoint; it never triggers that.
+  final product = session.workspaceCatalogueItems.where((p) => p.id == entityId).singleOrNull;
+  final signature = _assistantStockSignature(session, 'AI-ACT-233', entityId);
+  if (product == null || signature == null || !initialData.matches(session, product) || _productEditorOpen(session)) {
+    return MoolAssistantReviewResult.stale;
+  }
+  bool sourceCurrent() => owner() && _assistantStockSignature(session, 'AI-ACT-233', entityId) == signature;
+  await Navigator.of(context).push<void>(MaterialPageRoute<void>(builder: (pageContext) => Scaffold(
+    appBar: AppBar(title: const Text('Adjust Stock quantity')),
+    body: SafeArea(child: _stockCapturedOwnerPage(context, pageContext, session, owner,
+      _CatalogueProductEditor(session: session, product: product, embeddedPage: true,
+      initialField: 'stock', stockAdjustmentInitial: initialData,
+      stockAdjustmentCurrent: sourceCurrent, ownerCurrent: owner,
+      prefillCurrent: () => sourceCurrent() && isCurrent(),
+      onDone: () => Navigator.of(pageContext).pop(), onSaved: () => Navigator.of(pageContext).pop(),
+    ))),
+  )));
+  return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+}
+
+// This bounded page wrapper is only supplied by the AI review route. A null
+// owner returns the original widget directly; no manual editor path is changed.
+Widget _stockCapturedOwnerPage(BuildContext ownerContext, BuildContext pageContext,
+    WorkSession session, bool Function()? ownerCurrent, Widget child) {
+  final readOwner = ownerCurrent;
+  if (readOwner == null) return child;
+  var retired = false;
+  return AnimatedBuilder(
+    animation: Listenable.merge([session,
+      ownerContext.mounted
+        ? ownerContext.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges : null]),
+    child: child,
+    builder: (_, child) {
+      final current = readOwner();
+      if (!current && !retired) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (pageContext.mounted && !readOwner()) FocusScope.of(pageContext).unfocus();
+        });
+      }
+      retired = !current;
+      return Stack(fit: StackFit.expand, children: [
+        Offstage(offstage: !current,
+          child: ExcludeFocus(excluding: !current, child: child!)),
+        if (!current) Center(child: SingleChildScrollView(padding: const EdgeInsets.all(16),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Return to the Store where you started. Saved and unsaved Stock input is kept.'),
+            // Keep the original editor's PopScope: pending Save may refuse
+            // leaving; unsaved input still requires the original user discard.
+            TextButton(key: const Key('work-stock-owner-retired-close'),
+              onPressed: () { unawaited(Navigator.of(pageContext).maybePop()); },
+              child: const Text('Close')),
+          ]))),
+      ]);
+    });
+}
+
+class _StoreStockAssistantAdapter implements MoolAssistantNativeAdapter {
+  const _StoreStockAssistantAdapter({required this.actionId, required this.readContext,
+    required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function()) open;
+  @override Set<String> get allowedFields => actionId == 'AI-ACT-233' ? StoreStockAdjustmentInitialData.allowedFields
+    : actionId == 'AI-ACT-232' ? StoreStockHistoryInitialData.allowedFields : const {};
+  @override String? validateFields(Map<String, Object?> fields) {
+    try {
+      if (actionId == 'AI-ACT-233') { StoreStockAdjustmentInitialData.fromFields(fields); }
+      else if (actionId == 'AI-ACT-232') { StoreStockHistoryInitialData.fromFields(fields); }
+      else if (fields.isNotEmpty) { return 'Use the original Stock controls.'; }
+      return null;
+    } on FormatException catch (error) { return error.message.toString(); }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entityId) => readSnapshot(ctx, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) async {
+    final trusted = readContext();
+    if (!isCurrent() || trusted == null || trusted.binding != proposal.binding || validateFields(proposal.fields) != null) {
+      return MoolAssistantReviewResult.stale;
+    }
+    return open(proposal, isCurrent);
+  }
+}
+
+/// Text copied into the existing fresh bill form; original Save owns persistence.
+@immutable
+class StorePurchaseEntryInitialData {
+  StorePurchaseEntryInitialData._(this.supplierId, Map<String, String> header,
+    Map<String, String> details, List<Map<String, String>>? goods,
+    List<Map<String, String>>? printedTaxRows)
+      : header = Map.unmodifiable(header), details = Map.unmodifiable(details),
+        goods = goods == null ? null : List.unmodifiable(goods.map((row) => Map<String, String>.unmodifiable(row))),
+        printedTaxRows = printedTaxRows == null ? null : List.unmodifiable(printedTaxRows.map((row) => Map<String, String>.unmodifiable(row)));
+  final String supplierId;
+  final Map<String, String> header, details;
+  final List<Map<String, String>>? goods, printedTaxRows;
+  static const headerFields = {'name', 'phone', 'address', 'gstin', 'invoiceReference', 'invoiceDate'};
+  static const allowedFields = {'supplierId', ...headerFields, 'details', 'goods', 'printedTaxRows'};
+  static const productReferences = {'sourceProductId', 'sourceSku', 'sourcePack'};
+  // These are the existing native dropdown values, not inferred tax/payment facts.
+  static const nativeChoices = <String, Set<String>>{
+    'documentType': {'GST invoice', 'Bill of supply', 'Invoice-cum-bill of supply', 'Non-GST purchase bill', 'Other bill'},
+    'supplyNature': {'Goods', 'Services', 'Goods and services', 'Not stated'},
+    'billOfSupplyReason': {'Composition scheme', 'Exempt supply', 'Not stated'},
+    'reverseCharge': {'Yes', 'No'},
+    'eInvoiceStatus': {'IRN / QR shown', 'Supplier declaration shown', 'Not shown'},
+    'qrStatus': {'Shown on invoice', 'Not shown'},
+    'buyerRegistration': {'Registered', 'Unregistered', 'Not confirmed'},
+    'priceBasis': {'Before tax', 'Including tax'},
+    'taxTreatment': {'CGST + SGST', 'CGST + UTGST', 'IGST', 'No tax', 'CGST + SGST / UTGST'},
+    'receiptStatus': {'Received at Store', 'Awaiting delivery', 'Already added to Stock'},
+    'paymentStatus': {'Paid', 'Part paid', 'On credit'},
+    'paymentMethod': {'Cash', 'UPI', 'Bank transfer', 'Card', 'Other'},
+    'paymentQrStatus': {'Shown on invoice', 'Not shown'},
+    'signatureStatus': {'Signed on invoice', 'Electronic document', 'Not shown'},
+  };
+  factory StorePurchaseEntryInitialData.fromFields(Map<String, Object?> fields) {
+    if (!fields.keys.every(allowedFields.contains) || fields['supplierId'] is! String ||
+        (fields['supplierId']! as String).trim().isEmpty) {
+      throw const FormatException('Use an original supplier and native purchase fields.');
+    }
+    Map<String, String> textMap(Object? raw, Set<String> allowed) {
+      if (raw is! Map || !raw.keys.every(allowed.contains) || !raw.values.every((v) => v is String)) {
+        throw const FormatException('Use native raw text fields.');
+      }
+      return Map<String, String>.from(raw);
+    }
+    final header = <String, String>{};
+    for (final key in headerFields) {
+      if (!fields.containsKey(key)) continue;
+      if (fields[key] is! String) throw const FormatException('Use native raw text fields.');
+      header[key] = fields[key]! as String;
+    }
+    final details = fields.containsKey('details') ? textMap(fields['details'], WorkspacePurchaseEntryDraft.detailKeys) : <String, String>{};
+    for (final entry in details.entries) {
+      final choices = nativeChoices[entry.key];
+      if (entry.value.isNotEmpty && choices != null && !choices.contains(entry.value)) {
+        throw const FormatException('Choose an existing native bill option.');
+      }
+    }
+    List<Map<String, String>>? rows(String key, Set<String> allowed) {
+      if (!fields.containsKey(key)) return null;
+      final raw = fields[key];
+      if (raw is! List) throw const FormatException('Use original native rows.');
+      return [for (final row in raw) textMap(row, allowed)];
+    }
+    final goods = rows('goods', {'name', 'pack', 'quantity', 'cost',
+      ...WorkspacePurchaseEntryDraft.goodsExtraKeys, ...productReferences});
+    for (final row in goods ?? <Map<String, String>>[]) {
+      if (productReferences.any(row.containsKey) &&
+          !productReferences.every((key) => row[key]?.trim().isNotEmpty == true)) {
+        throw const FormatException('Use all original SKU/pack references for a Stock link.');
+      }
+    }
+    final tax = rows('printedTaxRows', WorkspacePurchaseEntryDraft.printedTaxKeys);
+    if (header.isEmpty && details.isEmpty && goods == null && tax == null) {
+      throw const FormatException('Include supplied bill fields.');
+    }
+    return StorePurchaseEntryInitialData._(fields['supplierId']! as String, header, details, goods, tax);
+  }
+  bool get usesStockReferences => goods?.any((row) => row['sourceProductId'] != null) == true;
+  bool referencesCurrent(WorkSession session) =>
+    (!usesStockReferences || _assistantPurchaseInventoryAdmitted(session)) &&
+    session.workspaceSuppliers.where((supplier) => supplier.id == supplierId).length == 1 &&
+    (goods ?? <Map<String, String>>[]).every((row) => row['sourceProductId'] == null ||
+      session.workspaceCatalogueItems.where((product) => product.id == row['sourceProductId'] &&
+        product.sku == row['sourceSku'] && product.pack == row['sourcePack']).length == 1);
+  List<Map<String, String>>? get nativeGoods => goods == null ? null : [for (final row in goods!) {
+    'productId': row['sourceProductId'] ?? '', 'name': row['name'] ?? '', 'pack': row['pack'] ?? '',
+    'quantity': row['quantity'] ?? '', 'cost': row['cost'] ?? '',
+    for (final key in WorkspacePurchaseEntryDraft.goodsExtraKeys) if (row.containsKey(key)) key: row[key]!,
+  }];
+}
+
+final _openPurchaseAssistantEditors = Expando<Set<Object>>('native-purchase-editors');
+bool _purchaseAssistantEditorOpen(WorkSession session) => _openPurchaseAssistantEditors[session]?.isNotEmpty == true;
+
+WorkspaceStockMovement? _assistantPurchaseMovement(WorkSession session, String? id) =>
+  id == null ? null : session.workspaceStockMovements.where((movement) => movement.id == id).singleOrNull;
+
+bool _assistantPurchaseInventoryAdmitted(WorkSession session) => !session.localInventoryEnabled ||
+  session.workspaceInventoryLoaded && session.workspaceInventoryError == null &&
+  !session.workspaceGoodsReceiptBusy && !session.workspaceGoodsReceiptRecoveryPending;
+
+String? _assistantPurchaseSourceSignature(WorkSession session, String actionId, String? entityId) {
+  final scope = session.workspaceSupplierScope;
+  if (scope == null || !session.workspaceSuppliersLoaded || session.workspaceSupplierSaving ||
+      session.workspaceSupplierRecoveryRequired) return null;
+  if (actionId == 'AI-ACT-256' && !session.workspaceInvoiceHistoryLoaded ||
+      actionId == 'AI-ACT-272' && !_assistantPurchaseInventoryAdmitted(session)) return null;
+  final copy = entityId == null ? null : session.workspacePurchaseCopies.where((copy) => copy.id == entityId).singleOrNull;
+  final movement = actionId == 'AI-ACT-272' ? _assistantPurchaseMovement(session, entityId) : null;
+  final linked = movement == null ? null : session.workspacePurchaseForStockMovement(movement);
+  final receiving = movement == null ? null : session.workspaceReceivingForStockMovement(movement);
+  if ((actionId == 'AI-ACT-252' && (entityId != null ||
+      session.workspacePurchaseEntryDraft != null && !session.workspacePurchaseDraftReviewed)) ||
+      (const {'AI-ACT-253', 'AI-ACT-269'}.contains(actionId) && entityId != null) ||
+      (const {'AI-ACT-254', 'AI-ACT-255', 'AI-ACT-256'}.contains(actionId) && copy == null) ||
+      (actionId == 'AI-ACT-272' && (movement == null || linked == null && receiving == null))) return null;
+  final ledger = copy == null ? null : session.workspaceSupplierLedger(copy.supplier.id);
+  return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    scope.$1, scope.$2, scope.$3, actionId, entityId, session.workspacePurchaseEntryRevision,
+    session.workspaceInvoiceHistoryLoaded,
+    session.workspacePurchaseEntryDraft?.toJson(), session.workspacePurchaseDraftReviewed,
+    [for (final supplier in session.workspaceSuppliers) supplier.toJson()],
+    if (actionId == 'AI-ACT-252') [for (final product in session.workspaceCatalogueItems) product.toInventoryJson()],
+    if (actionId == 'AI-ACT-253' || actionId == 'AI-ACT-269') [for (final item in session.workspacePurchaseCopies) item.toJson()],
+    if (actionId == 'AI-ACT-253' || actionId == 'AI-ACT-269') [for (final record in session.workspacePurchases)
+      [identityHashCode(record), record.shipmentId, record.revision]],
+    copy?.toJson(), if (actionId == 'AI-ACT-256') ledger?.toJson(),
+    if (movement != null) [movement.id, movement.productId, movement.productLabel, movement.kind.name,
+      movement.quantityDelta, movement.reason, movement.occurredAt.toUtc().toIso8601String(), movement.referenceKind?.name, movement.referenceId],
+    // Native linked projection is immutable; replacing its accepted object or
+    // revision retires this local read-owner version without inventing a serializer.
+    if (linked != null) [identityHashCode(linked), linked.accountScope, linked.workspaceId,
+      linked.supplierId, linked.orderId, linked.shipmentId, linked.revision],
+    receiving?.$1.toJson(), receiving?.$2.toJson(), receiving?.$3,
+  ]))).toString();
+}
+
+class _StorePurchaseAssistantAdapter implements MoolAssistantNativeAdapter {
+  const _StorePurchaseAssistantAdapter({required this.actionId, required this.readContext,
+    required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function()) open;
+  @override Set<String> get allowedFields => actionId == 'AI-ACT-252'
+    ? StorePurchaseEntryInitialData.allowedFields : actionId == 'AI-ACT-253' ? const {'query'} : const {};
+  @override String? validateFields(Map<String, Object?> fields) {
+    if (actionId == 'AI-ACT-252') {
+      try { StorePurchaseEntryInitialData.fromFields(fields); return null; }
+      on FormatException catch (error) { return error.message.toString(); }
+    }
+    return actionId == 'AI-ACT-253' ? fields.length == 1 && fields['query'] is String
+      ? null : 'Supply an original purchase search query.' : fields.isEmpty ? null : 'Use the exact original record.';
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entityId) =>
+    readSnapshot(ctx, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) async {
+    final trusted = readContext();
+    if (!isCurrent() || trusted == null || trusted.binding != proposal.binding || validateFields(proposal.fields) != null) {
+      return MoolAssistantReviewResult.stale;
+    }
+    return open(proposal, isCurrent);
+  }
+}
+
+/// Opens original purchase controls without admitting cold inventory or ledger.
+Future<MoolAssistantReviewResult> showStorePurchaseAssistantReview(BuildContext context,
+  WorkSession session, {required String actionId, String? entityId,
+  StorePurchaseEntryInitialData? initialData, String? query, String? expectedSignature,
+  required bool Function() isCurrent, bool Function()? ownerCurrent}) async {
+  final scope = session.workspaceSupplierScope, publication = session.publicationPreferencesContext;
+  bool owner() => context.mounted && ownerCurrent?.call() != false && scope != null &&
+    session.workspaceSupplierScope == scope && session.publicationPreferencesContext == publication;
+  if (!owner() || !isCurrent() || _purchaseAssistantEditorOpen(session)) return MoolAssistantReviewResult.stale;
+  if (!session.workspaceSuppliersLoaded || session.workspaceSupplierSaving || session.workspaceSupplierRecoveryRequired) {
+    return MoolAssistantReviewResult.unavailable;
+  }
+  if (actionId == 'AI-ACT-256' && !session.workspaceInvoiceHistoryLoaded ||
+      actionId == 'AI-ACT-272' && !_assistantPurchaseInventoryAdmitted(session) ||
+      actionId == 'AI-ACT-252' && initialData?.usesStockReferences == true && !_assistantPurchaseInventoryAdmitted(session)) {
+    return MoolAssistantReviewResult.unavailable;
+  }
+  final signature = _assistantPurchaseSourceSignature(session, actionId, entityId);
+  if (signature == null || expectedSignature != null && expectedSignature != signature ||
+      _purchaseAssistantEditorOpen(session)) return MoolAssistantReviewResult.stale;
+  if (actionId == 'AI-ACT-252' && (initialData == null || !initialData.referencesCurrent(session))) return MoolAssistantReviewResult.stale;
+  if (actionId == 'AI-ACT-253' && query == null) return MoolAssistantReviewResult.stale;
+  if (!const {'AI-ACT-252', 'AI-ACT-253', 'AI-ACT-254', 'AI-ACT-255', 'AI-ACT-256', 'AI-ACT-269', 'AI-ACT-272'}.contains(actionId)) {
+    return MoolAssistantReviewResult.unavailable;
+  }
+  bool sourceCurrent() => owner() && _assistantPurchaseSourceSignature(session, actionId, entityId) == signature;
+  final changes = Listenable.merge([session,
+    context.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+  final movement = actionId == 'AI-ACT-272' ? _assistantPurchaseMovement(session, entityId) : null;
+  if (movement != null && session.workspaceReceivingForStockMovement(movement) != null) {
+    await _showStoreReceivingMovementReference(context, session, movement, ownerCurrent: owner, ownerChanges: changes);
+    return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+  }
+  final copy = const {'AI-ACT-254', 'AI-ACT-255', 'AI-ACT-256'}.contains(actionId)
+    ? session.workspacePurchaseCopies.where((copy) => copy.id == entityId).singleOrNull : null;
+  final linked = movement == null ? null : session.workspacePurchaseForStockMovement(movement);
+  await Navigator.of(context).push<void>(MaterialPageRoute<void>(builder: (_) =>
+    _PurchaseAssistantReviewPage(ownerContext: context, session: session, actionId: actionId,
+      copy: copy, initialData: initialData, query: query, linkedShipment: linked?.shipmentId,
+      signature: signature, owner: owner, prefillCurrent: () => sourceCurrent() && isCurrent(), changes: changes)));
+  return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+}
+
+class _PurchaseAssistantReviewPage extends StatefulWidget {
+  const _PurchaseAssistantReviewPage({required this.ownerContext, required this.session, required this.actionId,
+    required this.copy, required this.initialData, required this.query, required this.linkedShipment,
+    required this.signature, required this.owner, required this.prefillCurrent, required this.changes});
+  final BuildContext ownerContext;
+  final WorkSession session;
+  final String actionId, signature;
+  final WorkspacePurchaseSavedCopy? copy;
+  final StorePurchaseEntryInitialData? initialData;
+  final String? query, linkedShipment;
+  final bool Function() owner, prefillCurrent;
+  final Listenable changes;
+  @override State<_PurchaseAssistantReviewPage> createState() => _PurchaseAssistantReviewPageState();
+}
+class _PurchaseAssistantReviewPageState extends State<_PurchaseAssistantReviewPage> {
+  final entry = GlobalKey<_StoreRecordPurchaseState>();
+  final receiving = GlobalKey<_StoreReceiveGoodsState>();
+  final register = GlobalKey<_StorePurchasesSurfaceState>();
+  bool leaving = false, allowPop = false;
+  bool ownerWasCurrent = true;
+  Widget? body;
+  bool get editor => widget.actionId == 'AI-ACT-252' || widget.copy != null;
+  void finish() {
+    if (!mounted) return;
+    setState(() => allowPop = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && ModalRoute.of(context)?.isCurrent == true) Navigator.of(context).pop();
+    });
+  }
+  Future<void> close() async {
+    if (leaving || allowPop) return;
+    leaving = true;
+    try {
+      if (!editor && await (register.currentState?._assistantBackWithin() ?? Future.value(false))) return;
+      if (!await (receiving.currentState?.confirmLeave() ?? Future.value(true))) return;
+      if (!await (entry.currentState?.confirmLeave() ?? Future.value(true))) return;
+      if (mounted) finish();
+    } finally { leaving = false; }
+  }
+  Widget buildBody() => editor ? _StoreRecordPurchaseSurface(key: entry, session: widget.session,
+    onBack: finish, savedCopy: widget.copy,
+    startNew: widget.actionId == 'AI-ACT-252' && widget.session.workspacePurchaseEntryDraft != null && widget.session.workspacePurchaseDraftReviewed,
+    assistantInitialData: widget.initialData, assistantSourceSignature: widget.signature,
+    assistantPrefillCurrent: widget.prefillCurrent, assistantOwnerCurrent: widget.owner,
+    assistantOwnerChanges: widget.changes, assistantReadOnlyOpen: true, assistantActionId: widget.actionId,
+  ) : _StorePurchasesSurface(key: register, session: widget.session,
+    purchaseEntryKey: entry, receivingKey: receiving,
+    assistantInitialQuery: widget.query, assistantOpenActions: widget.actionId == 'AI-ACT-269',
+    assistantShipmentId: widget.linkedShipment, assistantSourceCurrent: widget.prefillCurrent,
+    assistantOwnerCurrent: widget.owner, assistantOwnerChanges: widget.changes, assistantReadOnlyOpen: true);
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: widget.changes, builder: (_, _) {
+    // Rebuild the real register on native selection notifications while current.
+    // Retain its exact child when retired, so its Store-reset build cannot erase
+    // private unsaved nested fields underneath the retirement cover.
+    final current = widget.owner();
+    if (!current && ownerWasCurrent) WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !widget.owner()) FocusScope.of(context).unfocus();
+    });
+    ownerWasCurrent = current;
+    if (current || body == null) body = buildBody();
+    return PopScope(canPop: allowPop, onPopInvokedWithResult: (didPop, _) { if (!didPop) unawaited(close()); },
+      child: Scaffold(appBar: AppBar(title: Text(widget.actionId == 'AI-ACT-252' ? 'Review supplier bill'
+        : widget.copy != null ? 'Saved purchase bill' : 'Purchases'),
+        leading: IconButton(tooltip: 'Back to AI request', onPressed: () => unawaited(close()), icon: const Icon(Icons.arrow_back))),
+        body: SafeArea(child: _purchaseCapturedOwnerPage(widget.ownerContext, context, widget.session, widget.owner, body!))));
+  });
+}
+
+Widget _purchaseCapturedOwnerPage(BuildContext ownerContext, BuildContext pageContext,
+    WorkSession session, bool Function()? ownerCurrent, Widget child,{Listenable? ownerChanges,Listenable? capturedContextChanges,bool useCapturedContextChanges=false}) {
+  final readOwner = ownerCurrent;
+  if (readOwner == null) return child;
+  return AnimatedBuilder(animation: Listenable.merge([session,ownerChanges,
+    useCapturedContextChanges?capturedContextChanges:ownerContext.mounted ? ownerContext.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges : null]),
+    child: child, builder: (_, child) {
+      final current = readOwner();
+      return Stack(fit: StackFit.expand, children: [
+        Offstage(offstage: !current, child: ExcludeFocus(excluding: !current, child: child!)),
+        if (!current) Center(child: SingleChildScrollView(padding: const EdgeInsets.all(16), child:
+          Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Your Store or account changed. Purchase input is kept.'),
+            TextButton(key: const Key('work-purchase-owner-retired-close'),
+              onPressed: () { if(ownerChanges!=null&&(!pageContext.mounted||ModalRoute.of(pageContext)?.isCurrent!=true))return;unawaited(Navigator.of(pageContext).maybePop()); }, child: const Text('Close')),
+          ]))),
+      ]);
+    });
+}
+
 /// Compact, server-confirmed disclosure control. It never edits Stock quantity.
 class StoreStockQuantityVisibility extends StatefulWidget {
-  const StoreStockQuantityVisibility({super.key, required this.controller});
+  const StoreStockQuantityVisibility({super.key, required this.controller,
+    this.loadOnOpen = true, this.reviewCurrent, this.requestedVisible});
+  final bool loadOnOpen;
+  final bool Function()? reviewCurrent;
+  final bool? requestedVisible;
   final WorkspaceStockVisibilityController controller;
   @override State<StoreStockQuantityVisibility> createState() => _StoreStockQuantityVisibilityState();
 }
 class _StoreStockQuantityVisibilityState extends State<StoreStockQuantityVisibility> {
   void _load() => WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (mounted && widget.controller.active) unawaited(widget.controller.load());
+    if (widget.loadOnOpen && mounted && widget.controller.active && widget.reviewCurrent?.call() != false) unawaited(widget.controller.load(current: widget.reviewCurrent));
   });
   @override void initState() { super.initState(); _load(); }
   @override void didUpdateWidget(covariant StoreStockQuantityVisibility oldWidget) {
@@ -68,7 +2383,7 @@ class _StoreStockQuantityVisibilityState extends State<StoreStockQuantityVisibil
   }
   @override Widget build(BuildContext context) => AnimatedBuilder(animation: widget.controller, builder: (context, _) {
     final controller = widget.controller, head = controller.head, pending = controller.pending;
-    bool current() => mounted && identical(widget.controller, controller) && controller.active;
+    bool current() => mounted && identical(widget.controller, controller) && controller.active && widget.reviewCurrent?.call() != false;
     final confirmed = head != null && pending == null;
     final status = pending != null
       ? pending.closing ? 'Cancellation pending · visibility is unconfirmed.' : 'Change pending · visibility is unconfirmed.'
@@ -80,27 +2395,27 @@ class _StoreStockQuantityVisibilityState extends State<StoreStockQuantityVisibil
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SwitchListTile.adaptive(
         key: const Key('work-product-public-stock-quantity'), contentPadding: EdgeInsets.zero, dense: true,
-        title: const Text('Show available quantity publicly'), subtitle: Text(status),
+        title: const Text('Show available quantity publicly'), subtitle: Text('${widget.requestedVisible == null ? '' : widget.requestedVisible! ? 'Requested: show exact quantity. ' : 'Requested: keep exact quantity private. '}$status'),
         value: head?.visible ?? false,
         onChanged: controller.supported && !controller.busy && confirmed && (head.visible || head.enableSource != null)
-          ? (value) { if (current()) unawaited(controller.setVisible(value)); } : null,
+          ? (value) { if (current()) unawaited(controller.setVisible(value, current: widget.reviewCurrent == null ? null : current)); } : null,
       ),
       if (controller.busy) const LinearProgressIndicator(minHeight: 2),
       if (controller.error != null) Text(controller.error!, style: Theme.of(context).textTheme.bodySmall),
       Wrap(spacing: 8, children: [
         TextButton(key: const Key('work-product-public-stock-check'),
-          onPressed: controller.supported && !controller.busy ? () { if (current()) unawaited(controller.load()); } : null,
+          onPressed: controller.supported && !controller.busy ? () { if (current()) unawaited(controller.load(current: widget.reviewCurrent == null ? null : current)); } : null,
           child: const Text('Check visibility')),
         if (confirmed && head.visible && !head.effectiveVisible && head.enableSource != null)
           TextButton(key: const Key('work-product-public-stock-reconfirm'),
-            onPressed: controller.supported && !controller.busy ? () { if (current()) unawaited(controller.setVisible(true)); } : null,
+            onPressed: controller.supported && !controller.busy ? () { if (current()) unawaited(controller.setVisible(true, current: widget.reviewCurrent == null ? null : current)); } : null,
             child: const Text('Confirm public display')),
         if (pending != null) ...[
           TextButton(key: const Key('work-product-public-stock-retry'),
-            onPressed: controller.supported && !controller.busy ? () { if (current()) unawaited(controller.retry()); } : null,
+            onPressed: controller.supported && !controller.busy ? () { if (current()) unawaited(controller.retry(current: widget.reviewCurrent == null ? null : current)); } : null,
             child: Text(pending.closing ? 'Retry cancellation' : 'Retry change')),
           if (!pending.closing) TextButton(key: const Key('work-product-public-stock-cancel'),
-            onPressed: controller.supported && !controller.busy ? () { if (current()) unawaited(controller.cancelPending()); } : null,
+            onPressed: controller.supported && !controller.busy ? () { if (current()) unawaited(controller.cancelPending(current: widget.reviewCurrent == null ? null : current)); } : null,
             child: const Text('Cancel pending change')),
         ],
       ]),
@@ -745,6 +3060,7 @@ class _WorkWorkspaceDashboardScreenState
       widget.accountAuthenticated == visit.authenticated;
 
   void _searchScopeChanged() {
+    _refreshProductAssistantVersionOwner();
     if (!session.workspaceAccountCurrent(accountReady: _accountRecoveryReady)) {
       // Storage identity drift is not permission to keep showing the former
       // Store. Detach through its existing recovery owner, not a second reset.
@@ -790,6 +3106,30 @@ class _WorkWorkspaceDashboardScreenState
   }
   final ScrollController _alertsScroll = ScrollController();
   final _financeOwner = ValueNotifier<int>(0);
+  Object? _financeSnapshotOwner;
+  int _financeSnapshotRevision = 0;
+  int _financeFormRevision = 0;
+  Object? _purchaseAssistantOwner;
+  String? _purchaseAssistantDigest;
+  int _purchaseAssistantVersion = 0;
+  Object? _stockAssistantOwner;
+  String? _stockAssistantDigest;
+  int _stockAssistantVersion = 0;
+  Object? _supplierAdjustmentRecoveryOwner;
+  String? _supplierAdjustmentRecoveryDigest;
+  int _supplierAdjustmentRecoveryVersion = 0;
+  Object? _supplierAdjustmentAssistantOwner;
+  String? _supplierAdjustmentAssistantDigest;
+  int _supplierAdjustmentAssistantVersion = 0;
+  Object? _supplierAllocationAssistantOwner;
+  String? _supplierAllocationAssistantDigest;
+  int _supplierAllocationAssistantVersion = 0;
+  Object? _supplierMoneyAssistantOwner;
+  String? _supplierMoneyAssistantDigest;
+  int _supplierMoneyAssistantVersion = 0;
+  final Map<Object, (String, int)> _productAssistantVersions = {};
+  Object? _productAssistantVersionOwner;
+  int _productAssistantVersion = 0;
   bool _financeSheetOpen = false;
   bool _couponsSheetOpen = false;
   final ScrollController _settingsScroll = ScrollController();
@@ -893,6 +3233,8 @@ class _WorkWorkspaceDashboardScreenState
       text: session.workspaceSearchQuery,
     );
     session.addListener(_searchScopeChanged);
+    session.addListener(_settlementObserveSource);
+    _settlementObserveSource();
     WidgetsBinding.instance.addPostFrameCallback((_) {if (mounted) _searchScopeChanged();});
     _storeProcurement?.addListener(_observeProcurementQuery);
     _observeProcurementQuery();
@@ -934,7 +3276,11 @@ class _WorkWorkspaceDashboardScreenState
   @override
   void dispose() {
     session.removeListener(_searchScopeChanged);
+    session.removeListener(_settlementObserveSource);
     _financeOwner.value++;
+    _productAssistantVersions.clear();
+    _productAssistantVersionOwner = null;
+    _settingsReviewScope?.dispose(); _alertSettingsReviewScope?.dispose();
     _financeOwner.dispose();
     session.removeListener(_procurementIdentityChanged);
     _storeProcurement?.removeListener(_observeProcurementQuery);
@@ -988,8 +3334,253 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   @override
-  Widget build(BuildContext context) =>
-      ScaffoldMessenger(key: _workspaceMessengerKey, child: _buildDashboard());
+  Widget build(BuildContext context) {
+    final inherited = context.getInheritedWidgetOfExactType<MoolAssistantNativeScope>();
+    return MoolAssistantNativeScope(
+      readAdapters: (hostContext) {
+        final existing = inherited?.readAdapters(hostContext).toList() ??
+            <MoolAssistantNativeAdapter>[];
+        final trusted = _financeAssistantContext(hostContext);
+        final supplierSource = session;
+        final invoice = _purchaseEntryKey.currentState;
+        final receiving = _receivingKey.currentState;
+        final activeReceiving = receiving != null && _assistantReceivingOwnerActive(receiving);
+        MoolAssistantNativeSnapshot? receivingSnapshot(
+          MoolAssistantContext ctx, String? entity, String action,
+        ) {
+          final now = _financeAssistantContext(hostContext);
+          if (receiving == null || now == null || now.binding != ctx.binding ||
+              !_financePermitted(ctx) || !_assistantReceivingOwnerActive(receiving)) return null;
+          return receiving._assistantReceiptSnapshot(ctx, entity, action);
+        }
+        return [
+          ...existing,
+          if(trusted!=null&&_financePermitted(trusted))for(final action in const ['AI-ACT-284','AI-ACT-285','AI-ACT-286','AI-ACT-287'])
+            if(!existing.any((adapter)=>adapter.actionId==action))_StoreOrderFollowupAdapter(actionId:action,
+              read:(ctx,entity)=>_orderFollowupSnapshot(hostContext,supplierSource,action,ctx,entity),
+              open:(proposal,current,changes)=>_openOrderFollowupNative(hostContext,supplierSource,proposal,current,changes)),
+          if(trusted!=null&&_financePermitted(trusted)&&!existing.any((adapter)=>adapter.actionId=='AI-ACT-280'))
+            _StoreOrderPackingAdapter(read:(ctx,entity)=>_orderPackingSnapshot(hostContext,supplierSource,ctx,entity),
+              open:(proposal,current,changes)=>_openOrderPackingNative(hostContext,supplierSource,proposal,current,changes)),
+          if(trusted!=null&&_financePermitted(trusted))for(final action in const ['AI-ACT-282','AI-ACT-283'])
+            if(!existing.any((adapter)=>adapter.actionId==action))_StoreOrderPhysicalAdapter(actionId:action,
+              read:(ctx,entity)=>_orderPhysicalSnapshot(hostContext,supplierSource,action,ctx,entity),
+              open:(proposal,current,changes)=>_openOrderPhysicalNative(hostContext,supplierSource,proposal,current,changes)),
+          if(trusted!=null&&_financePermitted(trusted))for(final action in const ['AI-ACT-277','AI-ACT-278','AI-ACT-279'])
+            if(!existing.any((adapter)=>adapter.actionId==action))_StoreOrderIssueAdapter(actionId:action,
+              read:(ctx,entity)=>_orderIssueSnapshot(hostContext,supplierSource,action,ctx,entity),
+              open:(proposal,current,changes)=>_openOrderIssueNative(hostContext,supplierSource,proposal,current,changes)),
+          if(trusted!=null&&_financePermitted(trusted)&&!existing.any((adapter)=>adapter.actionId=='AI-ACT-276'))
+            _StoreOrderTimeNativeAdapter(read:(ctx,entity)=>_orderTimeSnapshot(hostContext,supplierSource,ctx,entity),
+              open:(proposal,current,changes)=>_openOrderTimeNative(hostContext,supplierSource,proposal,current,changes)),
+          for(final action in const ['AI-ACT-275','AI-ACT-281'])
+            if(trusted!=null&&_financePermitted(trusted)&&!existing.any((adapter)=>adapter.actionId==action))
+              _StoreOrderEffectAdapter(actionId:action,read:(ctx,entity)=>_orderEffectSnapshot(hostContext,supplierSource,action,ctx,entity),
+                open:(proposal,current,changes)=>_openOrderEffectNative(hostContext,supplierSource,proposal,current,changes)),
+          if(trusted!=null&&_financePermitted(trusted)&&!existing.any((adapter)=>adapter.actionId=='AI-ACT-273'))
+            _StoreOrderStatusNativeAdapter(read:(ctx,entity)=>_orderStatusSnapshot(hostContext,supplierSource,ctx,entity),
+              open:(proposal,current)=>_openOrderStatusNative(hostContext,supplierSource,proposal,current)),
+          if(trusted!=null&&_financePermitted(trusted)&&!existing.any((adapter)=>adapter.actionId=='AI-ACT-234'))
+            _StoreRestockNativeAdapter(read:(ctx,entity)=>_restockSnapshot(hostContext,supplierSource,ctx,entity),
+              open:(proposal,current,changes)=>_openRestockNative(hostContext,supplierSource,proposal,current,changes)),
+          if (trusted != null && _financePermitted(trusted))
+            for (final action in const ['AI-ACT-308', 'AI-ACT-309', 'AI-ACT-310'])
+              if (!existing.any((adapter) => adapter.actionId == action))
+                _StoreCouponNativeAdapter(actionId: action, readContext: () => _financeAssistantContext(hostContext),
+                  readSnapshot: (ctx, entity) => _couponNativeSnapshot(hostContext, ctx, action, entity),
+                  open: (proposal, current, changes) => _openCouponNative(hostContext, proposal, current, changes)),
+          if(trusted!=null&&_financePermitted(trusted))
+            for(final adapter in _orderOriginalNativeAdapters(hostContext))
+              if(!existing.any((old)=>old.actionId==adapter.actionId))adapter,
+          if (trusted != null && _financePermitted(trusted))
+            for (final adapter in _productNativeAdapters(hostContext))
+              if (!existing.any((old) => old.actionId == adapter.actionId)) adapter,
+          for(final action in StoreReceivingReviewInitial.actions)
+            if(trusted!=null&&_financePermitted(trusted)&&!existing.any((adapter)=>adapter.actionId==action))
+              _StoreReceivingNativeAdapter(actionId:action,
+                read:(ctx,entity)=>_receivingNativeSnapshot(hostContext,supplierSource,action,ctx,entity),
+                open:(proposal,initial,current,changes,assistantOwner)=>_openReceivingNative(hostContext,supplierSource,proposal,initial,current,changes,assistantOwner:assistantOwner)),
+          if (trusted != null && _financePermitted(trusted) && receiving != null &&
+              activeReceiving && receiving._assistantReceiptImportReady &&
+              !existing.any((adapter) => adapter.actionId == 'AI-ACT-241'))
+            _StoreInvoiceDocumentAdapter(
+              readContext: () => _financeAssistantContext(hostContext),
+              readSnapshot: (ctx, entity) => receivingSnapshot(ctx, entity, 'AI-ACT-241'),
+              open: (selected, current) => _assistantReceivingOwnerActive(receiving)
+                  ? receiving._assistantImportReceiptDocument(selected,
+                      () => current() && _assistantReceivingOwnerActive(receiving))
+                  : Future.value(MoolAssistantReviewResult.stale),
+            ),
+          if (trusted != null && _financePermitted(trusted) && receiving != null &&
+              activeReceiving && receiving._assistantReceiptReviewReady)
+            for (final action in const ['AI-ACT-242', 'AI-ACT-405', 'AI-ACT-406'])
+              if (!existing.any((adapter) => adapter.actionId == action))
+                _StoreReceiptDocumentReadAdapter(actionId: action,
+                  readContext: () => _financeAssistantContext(hostContext),
+                  readSnapshot: (ctx, entity) => receivingSnapshot(ctx, entity, action),
+                  open: (digest, current) => _assistantReceivingOwnerActive(receiving)
+                      ? receiving._assistantReviewReceiptDocument(action, digest,
+                          () => current() && _assistantReceivingOwnerActive(receiving))
+                      : Future.value(MoolAssistantReviewResult.stale),
+                ),
+          if (trusted != null && _financePermitted(trusted) && !activeReceiving && invoice != null &&
+              _assistantInvoiceOwnerActive(invoice) && invoice._assistantDocumentReady &&
+              !existing.any((adapter) => adapter.actionId == 'AI-ACT-241'))
+            _StoreInvoiceDocumentAdapter(
+              readContext: () => _financeAssistantContext(hostContext),
+              readSnapshot: (ctx, entity) {
+                final now = _financeAssistantContext(hostContext);
+                if (now == null || now.binding != ctx.binding || !_financePermitted(ctx) ||
+                    !_assistantInvoiceOwnerActive(invoice)) return null;
+                return invoice._assistantDocumentSnapshot(ctx, entity);
+              },
+              open: (selected, current) => _assistantInvoiceOwnerActive(invoice)
+                  ? invoice._attachAssistantDocument(selected,
+                      () => current() && _assistantInvoiceOwnerActive(invoice))
+                  : Future.value(MoolAssistantReviewResult.stale),
+            ),
+            for (final action in const ['AI-ACT-312', 'AI-ACT-313', 'AI-ACT-314', 'AI-ACT-315', 'AI-ACT-409', 'AI-ACT-410', 'AI-ACT-411', 'AI-ACT-412'])
+              if (trusted != null && _financePermitted(trusted) && !existing.any((adapter) => adapter.actionId == action))
+                _StoreReportNativeAdapter(actionId: action,
+                read: (ctx, entity) => _reportSnapshot(hostContext, supplierSource, action, ctx, entity),
+                open: (proposal, current, changes) => _openReportAssistant(hostContext, supplierSource, proposal, current, changes)),
+          if (trusted != null && _financePermitted(trusted) && !existing.any((adapter)=>adapter.actionId=='AI-ACT-316'))
+            _StoreSettlementNativeAdapter(read:(ctx,entity)=>_settlementSnapshot(hostContext,supplierSource,ctx,entity),
+              open:(proposal,current,changes)=>_openSettlementAssistant(hostContext,supplierSource,proposal,current,changes)),
+          for (final id in const ['AI-ACT-317', 'AI-ACT-318', 'AI-ACT-319', 'AI-ACT-320',
+            'AI-ACT-321', 'AI-ACT-322', 'AI-ACT-323', 'AI-ACT-324', 'AI-ACT-326', 'AI-ACT-327', 'AI-ACT-328'])
+            if (trusted != null && _financePermitted(trusted) && !existing.any((adapter) => adapter.actionId == id))
+              _StoreSettingsNativeAdapter(actionId: id,
+                readContext: () => _financeAssistantContext(hostContext),
+                readSnapshot: (ctx, entity) => _settingsAssistantSnapshot(hostContext, supplierSource, id, ctx, entity),
+                open: (proposal, current) => _showSettingsAssistant(hostContext, supplierSource, proposal, current)),
+          if (trusted != null && _financePermitted(trusted) &&
+              !existing.any((adapter) => adapter.actionId == 'AI-ACT-311'))
+            _StoreBusinessFinanceAdapter(
+              readContext: () => _financeAssistantContext(hostContext),
+              readSnapshot: (ctx, entity) => _financeSnapshot(hostContext, ctx, entity),
+              open: (prefill, current) => _showBusinessFinance(
+                prefill: prefill, reviewCurrent: current),
+            ),
+          if (trusted != null && _supplierAssistantPermitted(supplierSource, trusted) &&
+              !existing.any((adapter) => adapter.actionId == 'AI-ACT-235'))
+            _StoreSupplierAddAdapter(
+              readContext: () => _financeAssistantContext(hostContext),
+              readSnapshot: (ctx, entity) =>
+                _supplierAssistantSnapshot(hostContext, supplierSource, ctx, entity),
+              open: (initial, proposal, current) =>
+                _showSupplierAssistantAdd(hostContext, supplierSource, initial, proposal, current),
+            ),
+          for (final id in ['AI-ACT-218', 'AI-ACT-219'])
+            if (trusted != null && _financePermitted(trusted) &&
+                !existing.any((adapter) => adapter.actionId == id))
+              _StoreProductDefaultsAdapter(actionId: id,
+                readContext: () => _financeAssistantContext(hostContext),
+                readSnapshot: (ctx, entity) => _defaultsAssistantSnapshot(hostContext, supplierSource, ctx, entity),
+                open: (proposal, current) => _showDefaultsAssistantReview(hostContext, supplierSource, proposal, current)),
+          for (final id in ['AI-ACT-213', 'AI-ACT-214', 'AI-ACT-221'])
+            if (trusted != null && _financePermitted(trusted) &&
+                !existing.any((adapter) => adapter.actionId == id))
+              _StoreProductInitialAdapter(actionId: id,
+                readContext: () => _financeAssistantContext(hostContext),
+                readSnapshot: (ctx, entity) =>
+                  _productAssistantSnapshot(hostContext, supplierSource, id, ctx, entity),
+                open: (initial, proposal, current) =>
+                  _showProductAssistantInitial(hostContext, supplierSource, initial, proposal, current),
+              ),
+          for (final id in ['AI-ACT-236', 'AI-ACT-237'])
+            if (trusted != null && _supplierAssistantPermitted(supplierSource, trusted) &&
+                !existing.any((adapter) => adapter.actionId == id))
+              _StoreSupplierExistingAdapter(actionId: id,
+                readContext: () => _financeAssistantContext(hostContext),
+                readSnapshot: (ctx, entity) => id == 'AI-ACT-236'
+                  ? _supplierAssistantSnapshot(hostContext, supplierSource, ctx, entity)
+                  : _supplierEditAssistantSnapshot(hostContext, supplierSource, ctx, entity),
+                open: (proposal, current) =>
+                  _showSupplierExistingAssistant(hostContext, supplierSource, proposal, current),
+              ),
+          for (final id in ['AI-ACT-259', 'AI-ACT-260', 'AI-ACT-261'])
+            if (trusted != null && _financePermitted(trusted) &&
+                !existing.any((adapter) => adapter.actionId == id))
+              _financialSelectedAdapter(hostContext, supplierSource, _StoreSupplierMoneyInitialAdapter(actionId: id,
+                readContext: () => _financeAssistantContext(hostContext),
+                readSnapshot: (ctx, entity) =>
+                  _supplierMoneyAssistantSnapshot(hostContext, supplierSource, id, ctx, entity),
+                open: (initial, proposal, current) =>
+                  _showSupplierMoneyAssistantInitial(hostContext, supplierSource, initial, proposal, current),
+              )),
+          for (final id in ['AI-ACT-262', 'AI-ACT-263', 'AI-ACT-377'])
+            if (trusted != null && _financePermitted(trusted) &&
+                !existing.any((adapter) => adapter.actionId == id))
+              _financialSelectedAdapter(hostContext, supplierSource, _StoreSupplierAllocationAdapter(actionId: id,
+                readContext: () => _financeAssistantContext(hostContext),
+                readSnapshot: (ctx, entity) =>
+                  _supplierAllocationAssistantSnapshot(hostContext, supplierSource, id, ctx, entity),
+                open: (proposal, current) =>
+                  _showSupplierAllocationAssistant(hostContext, supplierSource, proposal, current),
+              )),
+          for (final id in ['AI-ACT-264', 'AI-ACT-266', 'AI-ACT-375', 'AI-ACT-376'])
+            if (trusted != null && _financePermitted(trusted) &&
+                !existing.any((adapter) => adapter.actionId == id))
+              _financialSelectedAdapter(hostContext, supplierSource, _StoreSupplierAdjustmentInitialAdapter(actionId: id,
+                readContext: () => _financeAssistantContext(hostContext),
+                readSnapshot: (ctx, entity) =>
+                  _supplierAdjustmentAssistantSnapshot(hostContext, supplierSource, id, ctx, entity),
+                open: (proposal, current) =>
+                  _showSupplierAdjustmentAssistantInitial(hostContext, supplierSource, proposal, current),
+              )),
+          for (final id in ['AI-ACT-265', 'AI-ACT-267', 'AI-ACT-378', 'AI-ACT-380', 'AI-ACT-379'])
+            if (trusted != null && _financePermitted(trusted) &&
+                !existing.any((adapter) => adapter.actionId == id))
+              _StoreSupplierAdjustmentRecoveryAdapter(actionId: id,
+                readContext: () => _financeAssistantContext(hostContext),
+                readSnapshot: (ctx, entity) =>
+                  _supplierAdjustmentRecoverySnapshot(hostContext, supplierSource, id, ctx, entity),
+                open: (proposal, current) =>
+                  _showSupplierAdjustmentRecoveryAssistant(hostContext, supplierSource, proposal, current),
+              ),
+          for (final id in ['AI-ACT-257', 'AI-ACT-258', 'AI-ACT-268', 'AI-ACT-270', 'AI-ACT-381'])
+            if (trusted != null && _financePermitted(trusted) &&
+                !existing.any((adapter) => adapter.actionId == id))
+              _StoreSupplierAccountAdapter(actionId: id,
+                readContext: () => _financeAssistantContext(hostContext),
+                readSnapshot: (ctx, entity) => _supplierAccountAssistantSnapshot(hostContext, supplierSource, id, ctx, entity),
+                open: (proposal, current) => _showSupplierAccountAssistant(hostContext, supplierSource, proposal, current)),
+          if(trusted!=null&&_financePermitted(trusted)&&!existing.any((adapter)=>adapter.actionId=='AI-ACT-271'))
+            _StoreMoneyEntryAssistantAdapter(readContext:()=>_financeAssistantContext(hostContext),
+              readSnapshot:(ctx,entity)=>_supplierAccountAssistantSnapshot(hostContext,supplierSource,'AI-ACT-271',ctx,entity),
+              open:(proposal,current,changes)=>_showSupplierAccountAssistant(hostContext,supplierSource,proposal,current,reviewChanges:changes)),
+          for (final id in ['AI-ACT-231', 'AI-ACT-232', 'AI-ACT-233', 'AI-ACT-407', 'AI-ACT-408'])
+            if (trusted != null && _financePermitted(trusted) &&
+                !existing.any((adapter) => adapter.actionId == id))
+              _StoreStockAssistantAdapter(actionId: id,
+                readContext: () => _financeAssistantContext(hostContext),
+                readSnapshot: (ctx, entity) => _stockAssistantSnapshot(hostContext, supplierSource, id, ctx, entity),
+                open: (proposal, current) => _showStockAssistant(hostContext, supplierSource, proposal, current),
+              ),
+          for(final id in _customerAssistantActions)
+            if(trusted!=null&&_financePermitted(trusted)&&!existing.any((adapter)=>adapter.actionId==id))
+              _StoreCustomerActionAdapter(actionId:id,
+                read:(ctx,entity)=>_customerActionSnapshot(hostContext,supplierSource,id,ctx,entity),
+                open:(proposal,initial,current,changes)=>_showCustomerAction(hostContext,supplierSource,proposal,initial,current,changes)),
+          for (final id in _salesAssistantActions)
+            if (trusted != null && _financePermitted(trusted) && !existing.any((adapter) => adapter.actionId == id))
+              _StoreSalesAssistantAdapter(actionId: id,
+                read: (ctx, entity) => _salesAssistantSnapshot(hostContext,supplierSource,id,ctx,entity),
+                open: (proposal,initial,current,changes) => _showSalesAssistant(hostContext,supplierSource,proposal,initial,current,changes)),
+          for (final id in ['AI-ACT-252', 'AI-ACT-253', 'AI-ACT-254', 'AI-ACT-255', 'AI-ACT-256', 'AI-ACT-269', 'AI-ACT-272'])
+            if (trusted != null && _financePermitted(trusted) &&
+                !existing.any((adapter) => adapter.actionId == id))
+              _StorePurchaseAssistantAdapter(actionId: id,
+                readContext: () => _financeAssistantContext(hostContext),
+                readSnapshot: (ctx, entity) => _purchaseAssistantSnapshot(hostContext, supplierSource, id, ctx, entity),
+                open: (proposal, current) => _showPurchaseAssistant(hostContext, supplierSource, proposal, current),
+              ),
+        ];
+      },
+      child: ScaffoldMessenger(key: _workspaceMessengerKey, child: _buildDashboard()),
+    );
+  }
 
   Widget _buildDashboard() {
     return AnimatedBuilder(
@@ -1302,6 +3893,15 @@ class _WorkWorkspaceDashboardScreenState
             ? 'Phone, Counter or Chat order with customer delivery'
             : _operation.subtitle,
     };
+    final statusOwner = session, statusStore = session.activeWorkspace?.id ?? session.workspaceId;
+    final statusNavigation = session.navigationScopeRevision, statusPrincipal = widget.accountIdentity;
+    final statusContext = session.publicationPreferencesContext, statusReview = _settingsReviewScope;
+    final statusDraftGeneration = _settingsDraftGeneration;
+    bool statusCurrent() => mounted && identical(session, statusOwner) && identical(widget.accountIdentity, statusPrincipal) &&
+      session.publicationPreferencesContext == statusContext && session.navigationScopeRevision == statusNavigation &&
+      (session.activeWorkspace?.id ?? session.workspaceId) == statusStore && identical(_settingsReviewScope, statusReview) &&
+      _settingsDraftGeneration == statusDraftGeneration && _view == _WorkspaceControlView.status && statusReview?.current() != false &&
+      !_settingsSaving && !session.workspaceTradingPreferencesSaving;
     final bottomAction = switch (_view) {
       _WorkspaceControlView.dashboard when _reviewedOrder == null => Wrap(
         alignment: WrapAlignment.center, spacing: 8, children: [
@@ -1315,7 +3915,7 @@ class _WorkWorkspaceDashboardScreenState
         label: _settingsSaving || session.workspaceTradingPreferencesSaving ? 'Saving…' : 'Apply settings',
         busy: _settingsSaving || session.workspaceTradingPreferencesSaving,
         icon: Icons.check_circle_outline_rounded,
-        onPressed: _saveAvailability,
+        onPressed: () => statusCurrent() ? _saveAvailability(reviewScope: statusReview, current: statusCurrent) : Future<void>.value(),
       ),
       _ => null,
     };
@@ -1659,6 +4259,13 @@ class _WorkWorkspaceDashboardScreenState
           ? Row(children: [
               Expanded(child: Text(workspace.name, key: const Key('work-store-full-name'),
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+              IconButton(
+                key: const Key('work-dashboard-settings'),
+                tooltip: 'Store status and tools',
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                onPressed: () => _showStoreSignals(context),
+                icon: const Icon(Icons.tune_rounded, size: 22),
+              ),
               MoolGlobalProfileShortcutV2(keyName: 'work-dashboard-profile',
                 freeStanding: true, onPressed: () => _openProfile(context, workspace)),
             ])
@@ -1884,7 +4491,7 @@ class _WorkWorkspaceDashboardScreenState
                     initialSalesTask: _salesTask ?? 'home',
                     salesOnly: true,
                     showNewSaleAction: true,
-                    counterContent: _salesTask == 'counter' || _counterKey.currentState != null
+                    counterContent: _salesTask == 'counter' || (_counterKey.currentState != null && !_counterKey.currentState!._assistantClosed)
                         ? counterSurface(true)
                         : const SizedBox.shrink(),
                     beforeSalesViewChange: () async => await (_counterKey.currentState?.flushForNavigation() ?? Future.value(true)),
@@ -1980,7 +4587,9 @@ class _WorkWorkspaceDashboardScreenState
                   _openSearchRecord(record, workspace.id, openScopedRoute),
             ),
           ),
-          _WorkspaceControlView.status => AbsorbPointer(
+          _WorkspaceControlView.status => _settingsReviewScope?.current() == false
+              ? const Center(child: Text('Your Store or account changed. Your entries are kept. Reopen settings.'))
+              : AbsorbPointer(
             absorbing: _settingsSaving,
             child: Form(
             key: _settingsForm,
@@ -1997,43 +4606,41 @@ class _WorkWorkspaceDashboardScreenState
               maximumActiveOrders: _draftMaximumActiveOrders,
               alertSound: _draftOrderAlertSound,
               alertVibration: _draftOrderAlertVibration,
-              onAcceptingChanged: (value) => setState(() {
+              onAcceptingChanged: (value) { if (!statusCurrent()) return; setState(() {
                 _draftAcceptingOrders = value;
                 if (!value && _draftReopensAt.isEmpty) {
                   _draftReopensAt = 'Tomorrow at 8:00 AM';
                 }
-              }),
-              onVisibilityChanged: (value) => setState(() {
+              }); },
+              onVisibilityChanged: (value) { if (!statusCurrent()) return; setState(() {
                 _draftVisibleToCustomers = value;
-              }),
-              onFulfilmentChanged: (value) => setState(() {
+              }); },
+              onFulfilmentChanged: (value) { if (!statusCurrent()) return; setState(() {
                 _draftFulfilmentMode = value;
-              }),
-              onBusyMinutesChanged: (value) => setState(() {
+              }); },
+              onBusyMinutesChanged: (value) { if (!statusCurrent()) return; setState(() {
                 _draftBusyMinutes = value;
-              }),
-              onReopensChanged: (value) => setState(() {
+              }); },
+              onReopensChanged: (value) { if (!statusCurrent()) return; setState(() {
                 _draftReopensAt = value;
-              }),
-              onOpeningTimeChanged: (value) => setState(() {
+              }); },
+              onOpeningTimeChanged: (value) { if (!statusCurrent()) return; setState(() {
                 _draftOpeningTime = value;
-              }),
-              onClosingTimeChanged: (value) => setState(() {
+              }); },
+              onClosingTimeChanged: (value) { if (!statusCurrent()) return; setState(() {
                 _draftClosingTime = value;
-              }),
-              onMaximumActiveOrdersChanged: (value) => setState(() {
+              }); },
+              onMaximumActiveOrdersChanged: (value) { if (!statusCurrent()) return; setState(() {
                 _draftMaximumActiveOrders = value;
-              }),
-              onAlertSoundChanged: (value) => setState(() {
+              }); },
+              onAlertSoundChanged: (value) { if (!statusCurrent()) return; setState(() {
                 _draftOrderAlertSound = value;
-              }),
-              onAlertVibrationChanged: (value) => setState(() {
+              }); },
+              onAlertVibrationChanged: (value) { if (!statusCurrent()) return; setState(() {
                 _draftOrderAlertVibration = value;
-              }),
-              onDeliveryControls: () =>
-                  _showOperation(_WorkspaceOperation.deliverySettings),
-              onPaymentControls: () =>
-                  _showOperation(_WorkspaceOperation.payments),
+              }); },
+              onDeliveryControls: () { if (statusCurrent()) _showOperation(_WorkspaceOperation.deliverySettings); },
+              onPaymentControls: () { if (statusCurrent()) _showOperation(_WorkspaceOperation.payments); },
             ),
           ),
           ),
@@ -2065,6 +4672,7 @@ class _WorkWorkspaceDashboardScreenState
             onOpenOrders: () => openScopedRoute('/app/retailer/orders'),
             onOpenStatus: _showStatus,
             onDismiss: session.dismissWorkspaceAlert,
+            onlyAlertId: _alertSettingsReviewId, reviewScope: _alertSettingsReviewScope, onReviewCompleted: _showDashboard,
           ),
           _WorkspaceControlView.procurement => AnimatedBuilder(
             animation: Listenable.merge([_activeProcurement, ?_storeProcurement]),
@@ -2300,6 +4908,7 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   void _showDashboard() {
+    _settingsReviewScope?.dispose(); _alertSettingsReviewScope?.dispose();
     _searchFocus.unfocus();
     _releaseDirectFilter();
     setState(() {
@@ -2317,6 +4926,21 @@ class _WorkWorkspaceDashboardScreenState
   void _showStoreSignals(BuildContext context) {
     final view = View.of(context);
     final bottomInset = view.viewPadding.bottom / view.devicePixelRatio;
+    final owner = session, workspace = session.activeWorkspace;
+    final navigation = session.navigationScopeRevision;
+    final principal = widget.accountIdentity;
+    final authenticated = widget.accountAuthenticated;
+    final showTools = _view == _WorkspaceControlView.dashboard &&
+        _reviewedOrder == null && owner.hasVerifiedWorkspace &&
+        owner.workspaceStoreAuthoringAvailable;
+    var toolsOpening = false;
+    bool current() => mounted && identical(owner, session) &&
+        identical(principal, widget.accountIdentity) &&
+        authenticated == widget.accountAuthenticated &&
+        owner.activeWorkspace?.id == workspace?.id &&
+        owner.navigationScopeRevision == navigation &&
+        owner.hasVerifiedWorkspace && owner.workspaceStoreAuthoringAvailable &&
+        _view == _WorkspaceControlView.dashboard && _reviewedOrder == null;
     showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
@@ -2339,14 +4963,43 @@ class _WorkWorkspaceDashboardScreenState
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'Store status',
-                      style: TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 16,
-                        height: 1.2,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 12,
+                      children: [
+                        const Text(
+                          'Store status',
+                          style: TextStyle(
+                            color: MoolColors.navy,
+                            fontSize: 16,
+                            height: 1.2,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        if (showTools) TextButton.icon(
+                          key: const Key('work-store-status-tools'),
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(48, 48),
+                            textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                          // Relocate the existing navigation, not its authority:
+                          // original Store forms retain all domain/write guards.
+                          onPressed: () async {
+                            if (toolsOpening || !current() || !context.mounted ||
+                                ModalRoute.of(context)?.isCurrent != true) return;
+                            toolsOpening = true;
+                            try {
+                              if (!await _confirmPurchaseNavigation() || !current() ||
+                                  !context.mounted || ModalRoute.of(context)?.isCurrent != true) return;
+                              Navigator.of(context).pop();
+                              _showOperation(_WorkspaceOperation.settings);
+                            } finally { toolsOpening = false; }
+                          },
+                          icon: const Icon(Icons.tune_rounded, size: 20),
+                          label: const Text('Store tools'),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     _ProductPreviewLine(
@@ -2573,7 +5226,556 @@ class _WorkWorkspaceDashboardScreenState
     }
   }
 
-  Future<void> _showStatus() async {
+  bool _settlementAssistantOpen=false;
+  String? _settlementSeenSource;
+  int _settlementSourceGeneration=0;
+  final _settlementPreparedDrafts=<Object,String>{};
+  String _settlementSource(WorkSession source)=>jsonEncode([
+    source.activeWorkspace?.id,source.workspaceFinanceUsesLegacyReview,source.workspaceFinanceStale,
+    source.workspaceSettlementBalance,source.workspaceSettlementEligible,source.workspaceSettlementRequested,source.workspaceSettlementReference,
+    source.workspacePlatformAdjustments,source.workspaceDeliveryAdjustments,source.workspaceRefunds,source.workspaceTaxWithheld,
+    source.workspacePayoutBankName,source.workspacePayoutAccountEnding,
+  ]);
+  void _settlementObserveSource(){final next=_settlementSource(session);if(next!=_settlementSeenSource){_settlementSeenSource=next;_settlementSourceGeneration++;}}
+  Future<MoolAssistantNativeSnapshot?> _settlementSnapshot(BuildContext host,WorkSession source,MoolAssistantContext ctx,String? entity) async {
+    if(!mounted || !host.mounted || !identical(source,session) || _financeAssistantContext(host)?.binding!=ctx.binding || !_financePermitted(ctx) || entity!=null) return null;
+    _settlementObserveSource();
+    return MoolAssistantNativeSnapshot(binding:ctx.binding,sourceRevision:'$_settlementSourceGeneration:${assistant_hash.sha256.convert(utf8.encode(_settlementSource(source)))}',permitted:true);
+  }
+  Future<MoolAssistantReviewResult> _openSettlementAssistant(BuildContext host,WorkSession source,MoolAssistantProposal proposal,bool Function() requestCurrent,Listenable? ownerChanges) async {
+    final ctx=_financeAssistantContext(host),principal=widget.accountIdentity;
+    if(ctx==null || _settlementAssistantOpen || !requestCurrent() || proposal.binding!=ctx.binding || !_financePermitted(ctx))return MoolAssistantReviewResult.stale;
+    final snapshot=await _settlementSnapshot(host,source,ctx,proposal.entityId);
+    if(!requestCurrent() || snapshot==null || snapshot.sourceRevision!=proposal.sourceRevision)return MoolAssistantReviewResult.stale;
+    final initial=StoreSettlementInitialData.fromFields(proposal.fields),navigation=source.navigationScopeRevision,
+      nativeContext=source.publicationPreferencesContext,generation=_settlementSourceGeneration,fingerprint=_settlementSource(source);
+    var retired=false;
+    bool current(){if(!retired && (!mounted || !host.mounted || !requestCurrent() || !identical(source,session) ||
+      !identical(principal,widget.accountIdentity) || source.navigationScopeRevision!=navigation || source.publicationPreferencesContext!=nativeContext ||
+      _financeAssistantContext(host)?.binding!=ctx.binding || !_financePermitted(ctx) || _settlementSourceGeneration!=generation || _settlementSource(source)!=fingerprint))retired=true;return !retired;}
+    final changes=Listenable.merge([source,_financeOwner,ownerChanges]);
+    final scope=StoreSettingsReviewScope(current:current,sourceCurrent:current,changes:changes,sourceChanges:changes);
+    final key=(source,principal,ctx.binding,proposal.sourceRevision,proposal.id,proposal.requestRevision,proposal.entitlementRevision);
+    _settlementAssistantOpen=true;
+    try{
+      if(!scope.current())return MoolAssistantReviewResult.stale;
+      await _showWorkspaceSettlementReview(host,source,initialData:StoreSettlementInitialData(amount:_settlementPreparedDrafts[key]??initial.amount),
+        reviewScope:scope,onPreparedDraft:(value)=>_settlementPreparedDrafts[key]=value);
+      return scope.current()?MoolAssistantReviewResult.returnToOwner:MoolAssistantReviewResult.stale;
+    }finally{scope.dispose();_settlementAssistantOpen=false;}
+  }
+
+  static const _customerAssistantActions=['AI-ACT-294','AI-ACT-296','AI-ACT-297','AI-ACT-298','AI-ACT-299','AI-ACT-300','AI-ACT-301','AI-ACT-302','AI-ACT-303','AI-ACT-304','AI-ACT-305','AI-ACT-307','AI-ACT-387','AI-ACT-388'];
+  bool _customerAssistantOpen=false;
+  Object? _customerSeenSource;
+  int _customerSourceGeneration=0;
+  final _customerPreparedDrafts=<Object,Map<String,String>>{};
+  Object _customerActionSource(WorkSession source){
+    final feedback=source.existingWorkspaceCustomerFeedback;
+    return (source.workspaceCustomerActionSource,
+      source.workspaceInvoiceHistoryLoaded,
+      jsonEncode([source.workspaceInvoices.map((row)=>row.toLedgerJson()).toList(),
+        source.workspaceOrders.map((order)=>[order.id,order.source,order.isCompleted,order.hasCompleteItemSnapshot,
+          order.itemSnapshots.map((line)=>[line.productId,line.name,line.pack,line.quantity,line.unitPricePaise,line.lineTotalPaise]).toList()]).toList(),
+        source.workspaceCustomerBook.map((row)=>[row.id,row.name,row.mobile]).toList(),
+        source.workspaceCustomerLastContactAt.entries.map((entry)=>[entry.key,entry.value.toIso8601String()]).toList(),
+        feedback?.entries.map((entry)=>[entry.id,entry.version,entry.kind.name,entry.orderId,entry.productId,entry.canReport,
+          entry.text,entry.stars,entry.ownerReply,feedback.bindingFor(entry.id)?.readEpoch,feedback.draft(entry.id,StoreFeedbackAction.report)]).toList()]),
+      feedback,feedback?.context(),feedback?.pending,feedback?.loading,feedback?.recoveryReady,feedback?.coverage);
+  }
+  // Snapshot comparison is requested by AI only. No dashboard/manual listener.
+  void _observeCustomerActionSource(){
+    final next=_customerActionSource(session);if(next!=_customerSeenSource){_customerSeenSource=next;_customerSourceGeneration++;}
+  }
+  Object _customerActionRead(WorkSession source)=>_customerActionSource(source);
+  WorkspaceCustomerInvoice? _customerActionInvoice(WorkSession source,String? id)=>source.workspaceInvoices.where((row)=>row.id==id).firstOrNull;
+  WorkspacePaymentRecord? _customerActionPayment(WorkSession source,String? id)=>source.workspaceFinance?.payments.where((row)=>row.invoiceId==id).firstOrNull;
+  Future<MoolAssistantNativeSnapshot?> _customerActionSnapshot(BuildContext host,WorkSession source,String action,MoolAssistantContext ctx,String? entity)async{
+    if(!mounted||!host.mounted||!identical(source,session)||_customerAssistantOpen||_financeAssistantContext(host)?.binding!=ctx.binding||!_financePermitted(ctx))return null;
+    if(action=='AI-ACT-294' && (!source.workspaceInvoiceHistoryLoaded || source.workspaceStockHistoryScope()==null || entity!=null))return null;
+    if(action=='AI-ACT-387' && entity!=null)return null;
+    if(const {'AI-ACT-299','AI-ACT-301','AI-ACT-303','AI-ACT-305','AI-ACT-307'}.contains(action) &&
+      (source.workspaceFinance==null||source.workspaceFinanceStale||entity!=null&&_customerActionPayment(source,entity)==null))return null;
+    if(const {'AI-ACT-296','AI-ACT-297','AI-ACT-298'}.contains(action) && entity!=null && !source.workspaceCustomerBook.any((row)=>row.id==entity))return null;
+    if(action=='AI-ACT-297' && (source.workspaceFinance==null||source.workspaceFinanceStale))return null;
+    final pending=action=='AI-ACT-300'?source.pendingCustomerCollection?.operationId:action=='AI-ACT-302'?source.pendingCustomerReturn?.request.operationId:action=='AI-ACT-304'?source.pendingCustomerRefund?.operationId:null;
+    if(const {'AI-ACT-300','AI-ACT-302','AI-ACT-304'}.contains(action)&&(pending==null||entity!=null&&entity!=pending))return null;
+    if(action=='AI-ACT-388'){
+      final feedback=source.existingWorkspaceCustomerFeedback;
+      if(feedback==null||!feedback.current||!feedback.actionsReady&&!(feedback.pending?.action==StoreFeedbackAction.report&&feedback.recoveryReady)||entity!=null&&!feedback.entries.any((row)=>row.id==entity&&row.orderId!=null&&row.canReport))return null;
+    }
+    _observeCustomerActionSource();
+    return MoolAssistantNativeSnapshot(binding:ctx.binding,sourceRevision:'$_customerSourceGeneration',permitted:true,entityId:entity);
+  }
+  Future<MoolAssistantReviewResult> _showCustomerAction(BuildContext host,WorkSession source,MoolAssistantProposal proposal,StoreCustomerActionInitialData initial,bool Function() requestCurrent,Listenable? ownerChanges)async{
+    final ctx=_financeAssistantContext(host),principal=widget.accountIdentity;
+    if(ctx==null||_customerAssistantOpen||!requestCurrent()||ctx.binding!=proposal.binding||!_financePermitted(ctx))return MoolAssistantReviewResult.stale;
+    final snapshot=await _customerActionSnapshot(host,source,proposal.actionId,ctx,proposal.entityId);
+    if(snapshot==null||!requestCurrent()||snapshot.sourceRevision!=proposal.sourceRevision)return MoolAssistantReviewResult.stale;
+    final navigation=source.navigationScopeRevision,nativeContext=source.publicationPreferencesContext,action=proposal.actionId,fields=initial.fields;
+    final entityKey=switch(action){'AI-ACT-296'||'AI-ACT-297'||'AI-ACT-298'=>'customerId',
+      'AI-ACT-300'||'AI-ACT-302'||'AI-ACT-304'=>'operationId','AI-ACT-305'=>'targetInvoiceId','AI-ACT-388'=>'feedbackId',_=>'invoiceId'};
+    if(fields[entityKey]!=null&&proposal.entityId!=null&&fields[entityKey]!=proposal.entityId)return MoolAssistantReviewResult.unavailable;
+    final target=fields[entityKey] as String? ?? proposal.entityId;
+    bool actorCurrent()=>mounted&&host.mounted&&identical(source,session)&&identical(principal,widget.accountIdentity)&&
+      source.navigationScopeRevision==navigation&&source.publicationPreferencesContext==nativeContext&&_financeAssistantContext(host)?.binding==ctx.binding&&_financePermitted(ctx);
+    final changes=Listenable.merge([source,_financeOwner,ownerChanges,source.existingWorkspaceCustomerFeedback]);
+    final scope=StoreCustomerActionReviewScope(ownerCurrent:actorCurrent,requestCurrent:requestCurrent,
+      readSource:()=>_customerActionRead(source),
+      readOriginalSource:action=='AI-ACT-388'?(){final feedback=source.existingWorkspaceCustomerFeedback;return(feedback,feedback?.scope,feedback?.context(),feedback?.pending);}
+        :const {'AI-ACT-299','AI-ACT-300','AI-ACT-301','AI-ACT-302','AI-ACT-303','AI-ACT-304','AI-ACT-305','AI-ACT-307'}.contains(action)?()=>source.workspaceCustomerActionSource:null,
+      observeSource:(){},changes:changes);
+    _customerAssistantOpen=true;var transferred=false;
+    try{
+      if(!scope.current())return MoolAssistantReviewResult.stale;
+      BuildContext? ownedSheet;
+      bool canUseNative(){final sheet=ownedSheet;return scope.current()&&sheet!=null&&sheet.mounted&&ModalRoute.of(sheet)?.isCurrent==true;}
+      void transfer(_WorkspaceOperation operation){final sheet=ownedSheet;if(!canUseNative()||sheet==null)return;transferred=true;Navigator.of(sheet).pop();_showOperation(operation);}
+      void closeReview(){final sheet=ownedSheet;if(sheet!=null&&sheet.mounted&&ModalRoute.of(sheet)?.isCurrent==true)Navigator.of(sheet).pop();}
+      void openCounter()=>transfer(_WorkspaceOperation.counterOrder);
+      void openOffers()=>transfer(_WorkspaceOperation.offers);
+      final prepared=await _prepareCustomerAction(source,proposal,initial,target,scope,openCounter:openCounter,openOffers:openOffers,closeReview:closeReview,canUseNative:canUseNative);
+      if(!scope.current())return MoolAssistantReviewResult.stale;
+      if(prepared==null)return MoolAssistantReviewResult.unavailable;
+      await showModalBottomSheet<void>(context:host,useSafeArea:true,isScrollControlled:true,showDragHandle:false,
+        builder:(sheet){ownedSheet=sheet;return SizedBox(height:MediaQuery.sizeOf(sheet).height*.94,child:Scaffold(
+          appBar:AppBar(title:Text(prepared.title),automaticallyImplyLeading:false,actions:[IconButton(tooltip:'Close customer review',icon:const Icon(Icons.close),
+            onPressed:(){if(sheet.mounted&&ModalRoute.of(sheet)?.isCurrent==true)Navigator.of(sheet).pop();})]),
+          body:_StoreCustomerActionFrame(scope:scope,child:prepared.body)));});
+      return transferred||scope.current()?MoolAssistantReviewResult.returnToOwner:MoolAssistantReviewResult.stale;
+    }on _CustomerPreparationCancelled{return MoolAssistantReviewResult.cancelled;}finally{scope.dispose();_customerAssistantOpen=false;}
+  }
+
+  Future<({String title,Widget body})?> _prepareCustomerAction(WorkSession source,MoolAssistantProposal proposal,
+    StoreCustomerActionInitialData initial,String? target,StoreCustomerActionReviewScope scope,{required VoidCallback openCounter,required VoidCallback openOffers,required VoidCallback closeReview,required bool Function() canUseNative})async{
+    final action=proposal.actionId,fields=initial.fields,workspace=source.activeWorkspace!;
+    final ctx=_financeAssistantContext(context);if(ctx==null||!scope.current())return null;
+    final key=(source,widget.accountIdentity,ctx.binding,proposal.sourceRevision,proposal.id,proposal.requestRevision,proposal.entitlementRevision);
+    if(action=='AI-ACT-294'){
+      final history=source.workspaceStockHistoryScope();if(history==null||!source.workspaceInvoiceHistoryLoaded)return null;
+      final now=DateTime.now();final today=DateUtils.dateOnly(now),period=fields['period'] as String? ?? 'Today';
+      final from=switch(period){'Week'=>DateTime(today.year,today.month,today.day-6),'Month'=>DateTime(today.year,today.month),
+        'Year'=>DateTime(today.year),'Custom range'=>DateTime.parse(fields['from'] as String),_=>today};
+      final last=period=='Custom range'?DateTime.parse(fields['to'] as String):today;
+      final statement=StoreSalesStatement(accountId:history.accountScope,storeId:history.workspaceId,
+        reviewOnly:const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY'),storeName:workspace.name,from:from,
+        until:DateTime(last.year,last.month,last.day+1),generatedAt:now,invoices:source.workspaceInvoices,
+        finance:!source.workspaceFinanceStale&&!source.workspaceFinanceUsesLegacyReview?source.workspaceFinance:null);
+      return(title:'Sales statement',body:StoreSalesStatementPanel(statement:statement,onClose:closeReview,changes:scope,isCurrent:scope.current));
+    }
+    if(action=='AI-ACT-296'){
+      if(target!=null&&!source.workspaceCustomerBook.any((row)=>row.id==target))return null;
+      return(title:'Customers',body:_CustomersDestinationSurface(session:source,customerId:target,preparedSearch:fields['search'] as String?,reviewScope:scope,
+        onRepeatBasket:(id){if(canUseNative()&&source.prepareRepeatWorkspaceOrderFor(customerId:id))openCounter();},onOffer:openOffers));
+    }
+    if(action=='AI-ACT-297'){
+      final finance=source.workspaceFinance;
+      if(target==null||finance==null||source.workspaceFinanceStale||!finance.customerLedgers.any((row)=>row.customerId==target))return null;
+      return(title:'Customer statement',body:SingleChildScrollView(padding:const EdgeInsets.all(12),child:StoreCustomerReportsPanel(
+        accountId:finance.accountScope,storeId:workspace.id,storeName:workspace.name,ledgers:finance.customerLedgers,
+        initialData:StoreReportInitialData.fromFields('AI-ACT-409',{...fields,'customerId':target}),scopeChanges:scope,isCurrent:scope.current)));
+    }
+    if(action=='AI-ACT-298'){
+      final customer=source.workspaceCustomerBook.where((row)=>row.id==target).firstOrNull;if(customer==null)return null;
+      return(title:'Record customer contact',body:_StoreCustomerContactReview(session:source,customer:customer,scope:scope));
+    }
+    if(action=='AI-ACT-387')return(title:'Money activity',body:_StoreCustomerMoneyPeriodReview(session:source,initialPeriod:fields['period'] as String?,scope:scope));
+    if(action=='AI-ACT-388'){
+      final feedback=source.existingWorkspaceCustomerFeedback;
+      final entry=feedback?.entries.where((row)=>row.id==target&&row.orderId!=null&&row.canReport).firstOrNull;
+      if(feedback==null||entry==null||!feedback.canAct(entry.id,StoreFeedbackAction.report)&&!(feedback.pending?.reviewId==entry.id&&feedback.pending?.action==StoreFeedbackAction.report&&feedback.recoveryReady))return null;
+      final prior=feedback.draft(entry.id,StoreFeedbackAction.report),proposed=fields['reportText'] as String?;
+      final draftKey=(key,entry.id,entry.version,prior);
+      var chosen=_customerPreparedDrafts[draftKey]?['reportText'];
+      if(chosen==null&&proposed!=null&&prior.trim().isNotEmpty&&proposed!=prior){
+        final useNew=await _resolveCustomerDraftChoice(scope);if(!scope.current())return null;if(useNew==null)throw const _CustomerPreparationCancelled();chosen=useNew?proposed:prior;
+      }
+      chosen??=proposed??prior;
+      return(title:'Report feedback',body:StoreCustomerFeedback(controller:feedback,orderId:entry.orderId,onClose:closeReview,
+        preparedReviewId:entry.id,preparedReportText:chosen,reviewCurrent:scope.current,reviewOwnerCurrent:scope.ownerCurrent,
+        onReviewNativeChange:scope.acceptNativeChange,reviewChanges:scope,runPreparedNative:scope.runNativeVoid,
+        onPreparedDraft:(text)=>_customerPreparedDrafts[draftKey]={'reportText':text}));
+    }
+    final finance=source.workspaceFinance;
+    if(finance==null||finance.workspaceId!=workspace.id||source.workspaceFinanceStale)return null;
+    if(const {'AI-ACT-300','AI-ACT-302','AI-ACT-304'}.contains(action)){
+      final collection=source.pendingCustomerCollection,returned=source.pendingCustomerReturn,refund=source.pendingCustomerRefund;
+      final operation=action=='AI-ACT-300'?collection?.operationId:action=='AI-ACT-302'?returned?.request.operationId:refund?.operationId;
+      final orderId=action=='AI-ACT-300'?collection?.orderId:action=='AI-ACT-302'?returned?.request.orderId:refund?.orderId;
+      final customerId=action=='AI-ACT-300'?collection?.customerId:action=='AI-ACT-302'?returned?.request.customerId:refund?.customerId;
+      if(operation==null||target!=null&&target!=operation)return null;
+      return(title:action=='AI-ACT-300'?'Payment status':action=='AI-ACT-302'?'Return status':'Refund status',
+        body:_StoreFinanceSurface(session:source,section:'payments',returnsOnly:action!='AI-ACT-300',reviewScope:scope,
+          focus:(accountScope:finance.accountScope,workspaceId:workspace.id,orderId:orderId,customerId:customerId,payoutId:null,operationId:operation)));
+    }
+    final payment=_customerActionPayment(source,target),invoice=_customerActionInvoice(source,target);
+    if(payment==null||invoice==null||payment.orderId!=invoice.orderId||!payment.valid)return null;
+    final ledger=finance.customerLedgers.where((row)=>row.customerId==payment.customerId&&row.accountScope==finance.accountScope&&row.workspaceId==workspace.id).firstOrNull;
+    if(ledger==null||!ledger.valid||!ledger.historyComplete)return null;
+    if(action=='AI-ACT-307'){
+      final order=source.workspaceOrders.where((row)=>row.id==invoice.orderId).firstOrNull;
+      if(order==null||!order.isCompleted||!order.hasCompleteItemSnapshot)return null;
+      final formKey=source.ledgerFormKey(payment,'return');if(formKey==null)return null;
+      final saved=await _readCustomerPreparedDraft(source,formKey,scope);if(!scope.current())return null;
+      final exchangeKey=(key,'exchange-return',formKey,saved?.revision,_customerDraftFingerprint(saved?.fields));
+      final exchangeFields=_customerPreparedDrafts[exchangeKey]??saved?.fields??{'items':'{}'};
+      return(title:'Review exchange',body:_StoreStatementSurface(session:source,salesOnly:true,showNewSaleAction:false,
+        preparedExchangeInvoiceId:invoice.id,onPreparedExit:closeReview,customerReviewScope:scope,reportCurrent:scope.current,reportChanges:scope,
+        preparedExchangeFields:exchangeFields,capturedExchangeDraft:saved,onExchangePreparedDraft:(value)=>_customerPreparedDrafts[exchangeKey]=Map.of(value),
+        beforeSalesViewChange:()async=>canUseNative(),onPrepareCounter:(stillCurrent)=>_prepareCounterSale(()=>scope.current()&&stillCurrent()),onNewSale:openCounter));
+    }
+    if(action=='AI-ACT-305'){
+      if(fields['customerId']!=null&&fields['customerId']!=payment.customerId)return null;
+      final from=fields['sourceInvoiceId'] as String?;
+      if(from!=null&&(from==payment.invoiceId||(ledger.invoiceBalance(from)?.availableCreditMinor??0)<=0))return null;
+      final raw=_customerPreparedDrafts[key]??{if(from!=null)'sourceInvoiceId':from,if(fields['amount']!=null)'amount':fields['amount'] as String};
+      return(title:'Use customer credit',body:_CustomerCreditApplication(session:source,ledger:ledger,payment:payment,
+        reviewScope:scope,preparedFields:raw,onPreparedDraft:(value)=>_customerPreparedDrafts[key]=Map.of(value)));
+    }
+    final kind=action=='AI-ACT-301'?'return':action=='AI-ACT-303'?'refund':'collection';
+    final formKey=source.ledgerFormKey(payment,kind);if(formKey==null)return null;
+    final saved=await _readCustomerPreparedDraft(source,formKey,scope);if(!scope.current())return null;
+    final draftKey=(key,formKey,saved?.revision,_customerDraftFingerprint(saved?.fields));
+    final supplied=initial.nativeFormFields;
+    if(kind=='collection'){
+      final counter=source.workspaceOrders.any((row)=>row.id==invoice.orderId&&row.source=='Counter');
+      final nativeChannel=counter&&invoice.payment=='Bank Transfer'?'bankTransfer':invoice.payment=='UPI'||payment.channel==WorkspacePaymentChannel.directUpi?'directUpi':'cash';
+      if(supplied['channel']!=null&&supplied['channel']!=nativeChannel)return null;
+      supplied['channel']=nativeChannel;
+    }
+    if(kind=='refund'&&supplied['sourceCollectionId']!=null&&!ledger.entries.any((entry)=>entry.id==supplied['sourceCollectionId']&&entry.invoiceId==invoice.id&&entry.orderId==invoice.orderId&&
+      entry.valid&&entry.kind==WorkspaceLedgerEntryKind.collection&&entry.state==WorkspaceLedgerPostingState.posted&&
+      const {WorkspacePaymentChannel.cash,WorkspacePaymentChannel.directUpi,WorkspacePaymentChannel.bankTransfer}.contains(entry.channel)))return null;
+    var raw=_customerPreparedDrafts[draftKey];
+    if(raw==null){
+      final old=saved?.fields??const <String,String>{};
+      if(old.isNotEmpty&&supplied.entries.any((entry)=>old[entry.key]!=entry.value)){
+        final useNew=await _resolveCustomerDraftChoice(scope);if(!scope.current())return null;if(useNew==null)throw const _CustomerPreparationCancelled();
+        raw=useNew?{...old,...supplied}:Map.of(old);
+      }else{raw={...old,...supplied};}
+      if(kind=='return'&&!raw.containsKey('items')&&!raw.containsKey('product'))raw['items']='{}';
+    }
+    void keep(Map<String,String> value)=>_customerPreparedDrafts[draftKey]=Map.of(value);
+    if(kind=='return'){
+      final order=source.workspaceOrders.where((row)=>row.id==payment.orderId).firstOrNull;
+      if(order==null||!order.isCompleted||!order.hasCompleteItemSnapshot)return null;
+      if(fields['items'] case final Map<String,Object?> items)if(items.keys.any((id)=>!order.itemSnapshots.any((row)=>row.productId==id)))return null;
+      return(title:'Review sales return',body:_CustomerReturnSheet(session:source,payment:payment,order:order,account:finance.accountScope,store:workspace.id,
+        reviewScope:scope,preparedFields:raw,capturedDraft:saved,onPreparedDraft:keep));
+    }
+    return(title:kind=='refund'?'Record customer refund':'Record money received',body:_CustomerCollectionSheet(session:source,payment:payment,
+      accountScope:finance.accountScope,storeId:workspace.id,refund:kind=='refund',counterSaleReceipt:kind=='collection'&&source.workspaceOrders.any((row)=>row.id==invoice.orderId&&row.source=='Counter'),reviewScope:scope,preparedFields:raw,capturedDraft:saved,onPreparedDraft:keep));
+  }
+  Future<bool?> _resolveCustomerDraftChoice(StoreCustomerActionReviewScope scope)async{
+    if(!scope.current())return null;
+    return showDialog<bool>(context:context,builder:(dialog)=>AlertDialog(title:const Text('Saved details found'),
+      content:const Text('Choose which details to review. Your saved draft will be kept until you confirm in the form.'),actions:[
+        TextButton(onPressed:(){if(dialog.mounted&&ModalRoute.of(dialog)?.isCurrent==true)Navigator.pop(dialog);},child:const Text('Cancel')),
+        TextButton(onPressed:(){if(scope.current()&&dialog.mounted&&ModalRoute.of(dialog)?.isCurrent==true)Navigator.pop(dialog,false);},child:const Text('Use saved draft')),
+        TextButton(onPressed:(){if(scope.current()&&dialog.mounted&&ModalRoute.of(dialog)?.isCurrent==true)Navigator.pop(dialog,true);},child:const Text('Review new details')),
+      ]));
+  }
+
+  Future<WorkspaceLedgerFormDraft?> _readCustomerPreparedDraft(WorkSession source,WorkspaceLedgerFormKey key,StoreCustomerActionReviewScope scope)async{
+    while(scope.current()){
+      try{return await source.readLedgerForm(key);}catch(_){
+        if(!scope.current())return null;
+        final retry=await showDialog<bool>(context:context,builder:(dialog)=>AlertDialog(title:const Text('Saved details unavailable'),
+          content:const Text("We couldn't open your saved details. Try again or return to the invoice. Your entries are kept."),actions:[
+            TextButton(onPressed:(){if(dialog.mounted&&ModalRoute.of(dialog)?.isCurrent==true)Navigator.pop(dialog,false);},child:const Text('Cancel')),
+            TextButton(onPressed:(){if(scope.current()&&dialog.mounted&&ModalRoute.of(dialog)?.isCurrent==true)Navigator.pop(dialog,true);},child:const Text('Try again')),
+          ]));
+        if(!scope.current())return null;if(retry!=true)throw const _CustomerPreparationCancelled();
+      }
+    }return null;
+  }
+
+  String _customerDraftFingerprint(Map<String,String>? fields){if(fields==null)return 'null';final keys=fields.keys.toList()..sort();return jsonEncode([for(final key in keys)[key,fields[key]]]);}
+
+  bool _reportAssistantOpen = false;
+  int _reportVersion = 0, _reportObjectVersion = 0;
+  final _reportObjects = Expando<int>();
+  int _reportObject(Object? value) {
+    if (value == null) return 0;
+    return _reportObjects[value] ??= ++_reportObjectVersion;
+  }
+  final _reportVersions = <Object, (String, int)>{};
+  Object? _reportHistorySource(WorkSession source) {
+    final query = source.workspaceStockHistoryScope();
+    return query == null ? null : {'account': query.accountScope, 'store': query.workspaceId,
+      'from': query.from?.toUtc().toIso8601String(), 'until': query.until?.toUtc().toIso8601String(),
+      'productId': query.productId};
+  }
+  String _reportSource(WorkSession source) => jsonEncode([
+    _reportHistorySource(source), source.workspaceInventoryRevision,
+    _reportObject(source.workspaceAnalyticsReaderIdentity), _reportObject(source.activeWorkspace), source.activeWorkspace?.name,
+    source.workspaceInventoryLoaded, source.workspaceInventoryError,
+    source.workspaceAcceptingOrders, source.workspaceVisibleToCustomers,
+    [for (final row in source.workspaceCatalogueItems) _reportObject(row)],
+    [for (final row in source.workspacePurchases) _reportObject(row)],
+    source.workspaceInvoiceHistoryLoaded, source.workspaceFinanceStale,
+    source.workspaceFinanceUsesLegacyReview, _reportObject(source.workspaceFinance),
+    source.workspaceFinance?.revision,
+    [for (final row in source.workspaceInvoices) _reportObject(row)],
+    [for (final row in source.workspaceOrders) _reportObject(row)],
+  ]);
+  Future<MoolAssistantNativeSnapshot?> _reportSnapshot(BuildContext host, WorkSession source,
+      String action, MoolAssistantContext ctx, String? entity) async {
+    if (action == 'AI-ACT-412' || !mounted || !host.mounted || !identical(source, session) ||
+        _financeAssistantContext(host)?.binding != ctx.binding || !_financePermitted(ctx) ||
+        source.workspaceStockHistoryScope() == null) return null;
+    if (const {'AI-ACT-312', 'AI-ACT-313', 'AI-ACT-314', 'AI-ACT-411'}.contains(action) && entity != null) return null;
+    if ((action == 'AI-ACT-315' || action == 'AI-ACT-409' || action == 'AI-ACT-410') && entity != null &&
+        !(source.workspaceFinance?.customerLedgers.any((row) => row.customerId == entity) ?? false)) return null;
+    final key = (source, widget.accountIdentity, source.navigationScopeRevision, source.publicationPreferencesContext, ctx.binding, action, entity), fingerprint = _reportSource(source);
+    final old = _reportVersions[key];
+    final revision = old?.$1 == fingerprint ? old!.$2 : ++_reportVersion;
+    _reportVersions[key] = (fingerprint, revision);
+    return MoolAssistantNativeSnapshot(binding: ctx.binding, sourceRevision: '$revision', permitted: true, entityId: entity);
+  }
+  Future<MoolAssistantReviewResult> _openReportAssistant(BuildContext host, WorkSession source,
+      MoolAssistantProposal proposal, bool Function() requestCurrent, Listenable? ownerChanges) async {
+    if (proposal.actionId == 'AI-ACT-412') return MoolAssistantReviewResult.unavailable;
+    final ctx = _financeAssistantContext(host), principal = widget.accountIdentity;
+    if (ctx == null || _reportAssistantOpen || !requestCurrent() || ctx.binding != proposal.binding || !_financePermitted(ctx)) return MoolAssistantReviewResult.stale;
+    final snapshot = await _reportSnapshot(host, source, proposal.actionId, ctx, proposal.entityId);
+    if (!requestCurrent() || snapshot == null || snapshot.sourceRevision != proposal.sourceRevision) return MoolAssistantReviewResult.stale;
+    final initial = StoreReportInitialData.fromFields(proposal.actionId, proposal.fields);
+    if (proposal.actionId == 'AI-ACT-315' && (initial.fields['statementKind'] ?? 'sales') == 'sales' && proposal.entityId != null) return MoolAssistantReviewResult.unavailable;
+    final fields = initial.fields, navigation = source.navigationScopeRevision,
+      nativeContext = source.publicationPreferencesContext, fingerprint = _reportSource(source);
+    final historyScope = source.workspaceStockHistoryScope()!, workspace = source.activeWorkspace!;
+    final customer = fields['customerId'] as String? ?? proposal.entityId;
+    if (fields['customerId'] != null && proposal.entityId != null && fields['customerId'] != proposal.entityId) return MoolAssistantReviewResult.stale;
+    if (customer != null && !(source.workspaceFinance?.customerLedgers.any((row) => row.customerId == customer) ?? false)) return MoolAssistantReviewResult.unavailable;
+    var retired = false;
+    bool current() {
+      if (!retired && (!mounted || !host.mounted || !requestCurrent() || !identical(source, session) ||
+          !identical(principal, widget.accountIdentity) || source.navigationScopeRevision != navigation ||
+          source.publicationPreferencesContext != nativeContext || _financeAssistantContext(host)?.binding != ctx.binding ||
+          !_financePermitted(ctx) || _reportSource(source) != fingerprint)) retired = true;
+      return !retired;
+    }
+    final changes = Listenable.merge([source, _financeOwner, ownerChanges]);
+    final scope = StoreSettingsReviewScope(current: current, sourceCurrent: current, changes: changes, sourceChanges: changes);
+    _reportAssistantOpen = true;
+    try {
+      if (!scope.current()) return MoolAssistantReviewResult.stale;
+      await showModalBottomSheet<void>(context: host, useSafeArea: true, isScrollControlled: true, showDragHandle: false,
+        builder: (sheet) {
+          void close() => Navigator.pop(sheet);
+          void handoff(VoidCallback open) { if (!scope.current()) return; close(); open(); }
+          Widget body;
+          if (const {'AI-ACT-312', 'AI-ACT-313', 'AI-ACT-314', 'AI-ACT-411'}.contains(proposal.actionId)) {
+            body = _StoreOperatingBoard(session: source, readOnlyPreparedSource: true, reviewCurrent: scope.current,
+              initialPeriodDays: fields['periodDays'] as int?, initialReport: fields['sectionId'] as String?,
+              onSales: () => handoff(() => _showOperation(_WorkspaceOperation.sales)),
+              onStock: () => handoff(() => _showOperation(_WorkspaceOperation.catalogue)),
+              onOrders: () => handoff(() => _showOperation(_WorkspaceOperation.orders)),
+              onSettlement: () => handoff(() => _showOperation(_WorkspaceOperation.payments)),
+              onDues: () => handoff(() => _showOperation(_WorkspaceOperation.dues)),
+              onReviewFinance: (focus) => handoff(() => _showOperation(_WorkspaceOperation.statement, focusedFinance: focus, returnView: _WorkspaceControlView.dashboard)),
+              onPurchase: (purchase) {
+                if (!scope.current()) return;
+                final original = source.workspacePurchases.where((row) => identical(row, purchase) && _homeReceiptNeedsReview(row)).firstOrNull;
+                if (original == null || !source.selectWorkspacePurchase(original.shipmentId)) return;
+                handoff(() => _showOperation(_WorkspaceOperation.sourcing));
+              });
+          } else if (proposal.actionId == 'AI-ACT-315' && (fields['statementKind'] ?? 'sales') == 'sales') {
+            body = _StoreStatementSurface(session: source, salesOnly: true, showNewSaleAction: false,
+              initialReport: initial, reportCurrent: scope.current, reportChanges: changes);
+          } else {
+            final customerInitial = StoreReportInitialData.fromFields(proposal.actionId,
+              {...fields, if (customer != null) 'customerId': customer});
+            body = SingleChildScrollView(padding: const EdgeInsets.all(12), child: StoreCustomerReportsPanel(
+              accountId: historyScope.accountScope, storeId: workspace.id, storeName: workspace.name,
+              ledgers: source.workspaceFinance?.customerLedgers ?? const [],
+              initialData: customerInitial, scopeChanges: changes,
+              isCurrent: () => scope.current() && !source.workspaceFinanceStale && !source.workspaceFinanceUsesLegacyReview));
+          }
+          return SizedBox(height: MediaQuery.sizeOf(sheet).height * .94,
+            child: Scaffold(appBar: AppBar(title: const Text('Reports'), automaticallyImplyLeading: false,
+              actions: [IconButton(tooltip: 'Close reports', onPressed: close, icon: const Icon(Icons.close))]),
+              body: StoreSettingsReviewFrame(session: source, scope: scope, child: body)));
+        });
+      return scope.current() ? MoolAssistantReviewResult.returnToOwner : MoolAssistantReviewResult.stale;
+    } finally { scope.dispose(); _reportAssistantOpen = false; }
+  }
+
+  bool _settingsAssistantOpen = false;
+  StoreSettingsReviewScope? _settingsReviewScope;
+  int _settingsDraftGeneration = 0;
+  StoreSettingsReviewScope? _alertSettingsReviewScope;
+  String? _alertSettingsReviewId;
+  final _settingsAssistantVersions = <Object, (String, int)>{};
+  int _settingsAssistantVersion = 0;
+  final _settingsAssistantDestinations = <String, String>{};
+  final _settingsAssistantInvoiceModes = <String, String>{};
+  Map<String, Object?>? _settingsAssistantFields(WorkSession source, String action) => switch (action) {
+    'AI-ACT-318' || 'AI-ACT-319' || 'AI-ACT-327' => {
+      'acceptingOrders': source.workspaceAcceptingOrders, 'visibleToCustomers': source.workspaceVisibleToCustomers,
+      'fulfilmentMode': source.workspaceFulfilmentMode, 'busyMinutes': source.workspaceBusyMinutes,
+      'reopensAt': source.workspaceReopensAt, 'openingTime': source.workspaceOpeningTime,
+      'closingTime': source.workspaceClosingTime, 'maximumActiveOrders': source.workspaceMaximumActiveOrders,
+      'alertSound': source.workspaceOrderAlertSound, 'alertVibration': source.workspaceOrderAlertVibration},
+    'AI-ACT-320' => {...source.workspacePublicationDetails.toJson(),
+      'nativeTradingHours': [source.workspaceOpeningTime, source.workspaceClosingTime]},
+    'AI-ACT-321' => {'savedPublicDetails': source.workspacePublicDetailsFieldsForPublishing?.toJson()},
+    'AI-ACT-322' => {'city': source.workspaceDeliveryCity, 'area': source.workspaceDeliveryArea,
+      'pincode': source.workspaceDeliveryPincode, 'pickupEnabled': source.workspacePickupEnabled},
+    'AI-ACT-326' => {'staffAccessEnabled': source.workspaceStaffAccessEnabled, 'counterCount': source.workspaceCounterCount},
+    _ => null,
+  };
+  String _settingsAssistantData(WorkSession source, String action) => jsonEncode(switch (action) {
+    'AI-ACT-317' => [for (final store in [if (source.activeWorkspace != null) source.activeWorkspace!, ...source.otherWorkspaces]) [store.id, store.name, store.profileLabel]],
+    'AI-ACT-318' || 'AI-ACT-319' || 'AI-ACT-327' => [source.workspaceAcceptingOrders,
+      source.workspaceVisibleToCustomers, source.workspaceFulfilmentMode, source.workspaceBusyMinutes,
+      source.workspaceReopensAt, source.workspaceOpeningTime, source.workspaceClosingTime,
+      source.workspaceMaximumActiveOrders, source.workspaceOrderAlertSound, source.workspaceOrderAlertVibration,
+      source.workspacePublicationReport.ready],
+    'AI-ACT-320' || 'AI-ACT-321' => [source.workspacePublicationDetails.toJson(),
+      source.workspacePublicDetailsFieldsForPublishing?.toJson(), source.workspacePublicDetailsPublisher?.pending?.fingerprint],
+    'AI-ACT-322' => [source.workspaceDeliveryCity, source.workspaceDeliveryArea, source.workspaceDeliveryPincode, source.workspacePickupEnabled],
+    'AI-ACT-326' => [source.workspaceStaffAccessEnabled, source.workspaceCounterCount],
+    'AI-ACT-328' => [for (final alert in _workspaceAlerts(source))
+      [alert.id, alert.title, alert.detail, alert.requiredAction]],
+    _ => action,
+  });
+  Future<MoolAssistantNativeSnapshot?> _settingsAssistantSnapshot(BuildContext hostContext,
+      WorkSession source, String action, MoolAssistantContext ctx, String? entity) async {
+    final principal = widget.accountIdentity, navigation = source.navigationScopeRevision,
+      owner = source.publicationPreferencesContext;
+    bool current() => mounted && hostContext.mounted && identical(source, session) &&
+      identical(principal, widget.accountIdentity) && source.navigationScopeRevision == navigation &&
+      source.publicationPreferencesContext == owner && _financePermitted(ctx) &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding;
+    if (!current() || _settingsAssistantOpen || _settingsSaving || _settingsOpening ||
+        _view == _WorkspaceControlView.status && _settingsDirty) return null;
+    if (action == 'AI-ACT-317') {
+      if (entity == null || ![if (source.activeWorkspace != null) source.activeWorkspace!, ...source.otherWorkspaces].any((store) => store.id == entity)) return null;
+    } else if (action == 'AI-ACT-328') {
+      if (entity == null || !_workspaceAlerts(source).any((alert) => alert.id == entity && !alert.requiredAction)) return null;
+    } else if (entity != null) { return null; }
+    if (const {'AI-ACT-318', 'AI-ACT-319', 'AI-ACT-327'}.contains(action) && source.tradingPreferencesPersistenceAvailable &&
+        (!await source.loadWorkspaceTradingPreferences(expectedStoreId: ctx.workspaceId!) || !current())) return null;
+    if (const {'AI-ACT-320', 'AI-ACT-321'}.contains(action)) {
+      if (storePublicationSettingsHasDraft(source)) return null;
+      if (source.publicationPreferencesPersistenceAvailable &&
+          (!await source.loadWorkspacePublicationPreferences(expectedStoreId: ctx.workspaceId!) || !current())) return null;
+      if (action == 'AI-ACT-320' || action == 'AI-ACT-321') {
+        final publisher = source.workspacePublicDetailsPublisher;
+        if (action == 'AI-ACT-321' && publisher == null) return null;
+        if (publisher != null) {
+          final loaded = await source.loadWorkspacePublicDetailsInputs();
+          if (!current() || action == 'AI-ACT-321' && !loaded) return null;
+        }
+        if (publisher != null && (!await publisher.restore() || !current())) return null;
+      }
+    }
+    if (action == 'AI-ACT-322' &&
+        (!await source.loadWorkspacePickupPreferences(expectedStoreId: ctx.workspaceId!) || !current())) return null;
+    String? destination;
+    String? invoice;
+    try {
+      if (action == 'AI-ACT-324') {
+        final scope = source.storeUpiScope;
+        if (scope == null) return null;
+        destination = storeUpiFingerprint(await source.loadStoreUpiDestination(scope));
+      }
+      if (action == 'AI-ACT-323') {
+        final scope = source.storeInvoiceDeliveryScope;
+        if (scope == null) return null;
+        invoice = (await source.loadInvoiceDeliveryPreference(scope)).mode.name;
+      }
+    } on Object { return null; }
+    if (!current()) return null;
+    if (action == 'AI-ACT-324' && storeUpiDestinationHasDraft(source)) return null;
+    final key = (source, principal, navigation, owner, ctx.binding, action, entity);
+    final signature = jsonEncode([_settingsAssistantData(source, action), destination, invoice]);
+    final previous = _settingsAssistantVersions[key];
+    if (previous == null || previous.$1 != signature) _settingsAssistantVersions[key] = (signature, ++_settingsAssistantVersion);
+    final revision = 'store-settings:${_settingsAssistantVersions[key]!.$2}';
+    if (destination != null) _settingsAssistantDestinations[revision] = destination;
+    if (invoice != null) _settingsAssistantInvoiceModes[revision] = invoice;
+    return MoolAssistantNativeSnapshot(binding: ctx.binding, sourceRevision: revision, permitted: true, entityId: entity);
+  }
+  Future<MoolAssistantReviewResult> _showSettingsAssistant(BuildContext hostContext,
+      WorkSession source, MoolAssistantProposal proposal, bool Function() reviewCurrent) async {
+    final ctx = _financeAssistantContext(hostContext), principal = widget.accountIdentity,
+      navigation = source.navigationScopeRevision, owner = source.publicationPreferencesContext;
+    if (ctx == null || !reviewCurrent() || ctx.binding != proposal.binding || !_financePermitted(ctx) || _settingsAssistantOpen) {
+      return MoolAssistantReviewResult.stale;
+    }
+    final initial = StoreSettingsInitialData.fromFields(proposal.actionId, proposal.fields);
+    final action = proposal.actionId, fields = initial.fields;
+    if (action == 'AI-ACT-317' && fields['workspaceId'] != proposal.entityId ||
+        action == 'AI-ACT-328' && fields['alertId'] != proposal.entityId) return MoolAssistantReviewResult.unavailable;
+    final fingerprint = _settingsAssistantData(source, action);
+    final settingsPublisher = const {'AI-ACT-320', 'AI-ACT-321'}.contains(action) ? source.workspacePublicDetailsPublisher : null;
+    bool current() => mounted && hostContext.mounted && identical(source, session) &&
+      identical(principal, widget.accountIdentity) && source.navigationScopeRevision == navigation &&
+      source.publicationPreferencesContext == owner && _financePermitted(ctx) &&
+      (!const {'AI-ACT-320', 'AI-ACT-321'}.contains(action) || identical(settingsPublisher, source.workspacePublicDetailsPublisher)) &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding;
+    final scope = StoreSettingsReviewScope(current: current,
+      sourceCurrent: () => current() && _settingsAssistantData(source, action) == fingerprint,
+      changes: _financeOwner,
+      sourceChanges: Listenable.merge([source, settingsPublisher]),
+      readSource: _settingsAssistantFields(source, action) == null ? null : () => _settingsAssistantFields(source, action)!,
+      readOperation: const {'AI-ACT-320', 'AI-ACT-321'}.contains(action)
+        ? () => source.workspacePublicDetailsPublisher?.pending?.fingerprint : null,
+      destinationFingerprint: _settingsAssistantDestinations[proposal.sourceRevision],
+      invoiceMode: _settingsAssistantInvoiceModes[proposal.sourceRevision]);
+    if (!scope.mayApply || !reviewCurrent()) { scope.dispose(); return MoolAssistantReviewResult.stale; }
+    if (_view == _WorkspaceControlView.status && _settingsDirty) { scope.dispose(); return MoolAssistantReviewResult.returnToOwner; }
+    if (const {'AI-ACT-318', 'AI-ACT-319', 'AI-ACT-327'}.contains(action)) {
+      await _showStatus(initialData: initial, reviewScope: scope);
+      if (!identical(_settingsReviewScope, scope)) { scope.dispose(); return MoolAssistantReviewResult.unavailable; }
+      return current() ? MoolAssistantReviewResult.returnToOwner : MoolAssistantReviewResult.stale;
+    }
+    if (action == 'AI-ACT-328') {
+      _alertSettingsReviewScope?.dispose();
+      setState(() { _alertSettingsReviewScope = scope; _alertSettingsReviewId = proposal.entityId; _view = _WorkspaceControlView.alerts; });
+      return MoolAssistantReviewResult.returnToOwner;
+    }
+    _settingsAssistantOpen = true;
+    try {
+      if (action == 'AI-ACT-317') {
+        await _showWorkspaceSwitcher(context, reviewScope: scope, selectedId: proposal.entityId);
+      } else {
+        final Widget child;
+        if (action == 'AI-ACT-320' || action == 'AI-ACT-321') {
+          if (storePublicationSettingsHasDraft(source)) return MoolAssistantReviewResult.returnToOwner;
+          child = SingleChildScrollView(padding: const EdgeInsets.all(12), child: StorePublicationSettings(
+            session: source, initialData: action == 'AI-ACT-320' ? initial : null, reviewScope: scope));
+        } else if (action == 'AI-ACT-322') {
+          if (_deliverySettingsEditors.any((state) => identical(state.widget.session, source) && state.mounted && state._pickupInputsChanged)) {
+            return MoolAssistantReviewResult.returnToOwner;
+          }
+          child = _WorkspaceDeliverySettingsSurface(session: source, initialData: initial, reviewScope: scope);
+        } else if (action == 'AI-ACT-326') {
+          if (_staffSettingsEditors.any((state) => identical(state.widget.session, source) && state.mounted && state._dirty)) {
+            return MoolAssistantReviewResult.returnToOwner;
+          }
+          child = _WorkspaceStaffSettingsSurface(session: source, initialData: initial, reviewScope: scope);
+        } else if (action == 'AI-ACT-323') {
+          child = SingleChildScrollView(child: _StoreInvoiceDeliveryPreferenceView(session: source,
+            scope: source.storeInvoiceDeliveryScope, settings: true, initialData: initial, reviewScope: scope));
+        } else if (action == 'AI-ACT-324') {
+          child = StoreUpiDestinationEditor(session: source, initialData: initial, reviewScope: scope);
+        } else { return MoolAssistantReviewResult.unavailable; }
+        await Navigator.of(context, rootNavigator: true).push<void>(MaterialPageRoute(builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Review Store settings')),
+          body: StoreSettingsReviewFrame(session: source, scope: scope, child: child))));
+      }
+      if (action == 'AI-ACT-317' && mounted && identical(principal, widget.accountIdentity) &&
+          identical(source, session) && source.activeWorkspace?.id == proposal.entityId) return MoolAssistantReviewResult.opened;
+      return current() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+    } finally { scope.dispose(); _settingsAssistantOpen = false; }
+  }
+
+  Future<void> _showStatus({StoreSettingsInitialData? initialData, StoreSettingsReviewScope? reviewScope}) async {
+    if (reviewScope?.mayApply == false || initialData != null && _view == _WorkspaceControlView.status && _settingsDirty) return;
     if (_settingsOpening || _settingsSaving) return;
     final owner = session, scope = session.tradingPreferencesContext;
     final storeId = session.activeWorkspace?.id ?? session.workspaceId;
@@ -2586,7 +5788,7 @@ class _WorkWorkspaceDashboardScreenState
       try {
         loaded = storeId != null && await session.loadWorkspaceTradingPreferences(expectedStoreId: storeId);
       } finally { _settingsOpening = false; }
-      if (!mounted || !identical(owner, session) || scope != session.tradingPreferencesContext ||
+      if (reviewScope?.mayApply == false || !mounted || !identical(owner, session) || scope != session.tradingPreferencesContext ||
           _view != originView || _operation != originOperation) { return; }
       if (!loaded) {
         session.showError(session.workspaceTradingPreferencesError ?? 'Saved Store hours and alerts could not be opened. Try again.');
@@ -2608,11 +5810,26 @@ class _WorkWorkspaceDashboardScreenState
       _draftMaximumActiveOrders = session.workspaceMaximumActiveOrders;
       _draftOrderAlertSound = session.workspaceOrderAlertSound;
       _draftOrderAlertVibration = session.workspaceOrderAlertVibration;
+      final fields = initialData?.fields ?? const <String, Object?>{};
+      _draftAcceptingOrders = fields['acceptingOrders'] as bool? ?? _draftAcceptingOrders;
+      _draftVisibleToCustomers = fields['visibleToCustomers'] as bool? ?? _draftVisibleToCustomers;
+      _draftFulfilmentMode = fields['fulfilmentMode'] as String? ?? fields['fulfilmentPreference'] as String? ?? _draftFulfilmentMode;
+      _draftBusyMinutes = fields['busyMinutes'] as int? ?? fields['preparationMinutes'] as int? ?? _draftBusyMinutes;
+      _draftReopensAt = fields['reopensAt'] as String? ?? _draftReopensAt;
+      _draftOpeningTime = fields['openingTime'] as String? ?? _draftOpeningTime;
+      _draftClosingTime = fields['closingTime'] as String? ?? _draftClosingTime;
+      _draftMaximumActiveOrders = fields['maximumActiveOrders'] as int? ?? _draftMaximumActiveOrders;
+      _draftOrderAlertSound = fields['alertSound'] as bool? ?? _draftOrderAlertSound;
+      _draftOrderAlertVibration = fields['alertVibration'] as bool? ?? _draftOrderAlertVibration;
+      if (!identical(_settingsReviewScope, reviewScope)) _settingsReviewScope?.dispose();
+      _settingsReviewScope = reviewScope;
+      _settingsDraftGeneration++;
       _view = _WorkspaceControlView.status;
     });
   }
 
   void _showAlerts() {
+    _alertSettingsReviewScope?.dispose(); _alertSettingsReviewScope = null; _alertSettingsReviewId = null;
     _searchFocus.unfocus();
     setState(() => _view = _WorkspaceControlView.alerts);
   }
@@ -2747,11 +5964,83 @@ class _WorkWorkspaceDashboardScreenState
     _showOperation(_WorkspaceOperation.paidWork);
   }
 
+  List<Object?>? _restockSnapshotOwner;int _restockSnapshotRevision=0;bool _restockNativeOpen=false;
+  List<Object?> _restockSource(WorkSession source,String? entity)=> [
+    source,widget.accountIdentity,widget.accountAuthenticated,source.navigationScopeRevision,source.publicationPreferencesContext,
+    _storeProcurement,_storeProcurement?.bookmark,_storeProcurement?.session,
+    _storeProcurement?.session?.destination,_storeProcurement?.session?.wholesaleSaleType,_storeProcurement?.session?.query,
+    _storeProcurement?.session?.selectedProductId,_storeProcurement?.session?.cartChangesBlocked,
+    _storeProcurement?.session?.checkoutRequiresResolution,
+    entity,entity==null?null:_storeProcurement?.session?.findProduct(entity),
+    for(final line in _storeProcurement?.session?.cartLines??const <BuyV2CartLine>[])...[
+      line.product,line.quantity,line.scheduledFulfilment,_storeProcurement?.session?.cartProductSelected(line.product.id)],
+  ];
+  bool _restockOwner(WorkSession source,MoolAssistantContext ctx)=>mounted&&identical(widget.session,source)&&
+    _financePermitted(ctx)&&_storeProcurement!=null&&!_leavingProcurement&&
+    _storeProcurement!.storeApproved()&&_storeProcurement!.currentAccountId()==source.contactDraftStore?.accountScope&&
+    _storeProcurement!.currentStoreId()==ctx.workspaceId&&_storeProcurement!.currentProfileId?.call()==source.activeWorkspace?.profileId;
+  MoolAssistantNativeSnapshot? _restockSnapshot(BuildContext host,WorkSession source,MoolAssistantContext ctx,String? entity){
+    final trusted=_financeAssistantContext(host);
+    if(!host.mounted||trusted?.binding!=ctx.binding||!_restockOwner(source,ctx)||_restockNativeOpen||_financeSheetOpen||_couponsSheetOpen)return null;
+    final controller=_storeProcurement!,purchase=controller.session;
+    if(entity!=null&&(!controller.scopeCurrent||purchase?.procurementContext?.purpose!=BuyV2ProcurementPurpose.restock||
+      purchase?.findProduct(entity)?.destination!=BuyV2Destination.wholesale))return null;
+    final witness=_restockSource(source,entity);
+    if(!listEquals(_restockSnapshotOwner,witness)){_restockSnapshotOwner=List.unmodifiable(witness);_restockSnapshotRevision++;}
+    return MoolAssistantNativeSnapshot(binding:ctx.binding,sourceRevision:'store-restock-inputs:$_restockSnapshotRevision',entityId:entity,permitted:true);
+  }
+  Future<MoolAssistantReviewResult> _openRestockNative(BuildContext host,WorkSession source,MoolAssistantProposal proposal,
+    bool Function() reviewCurrent,Listenable? authorityChanges)async{
+    final ctx=_financeAssistantContext(host),controller=_storeProcurement;
+    if(ctx==null||controller==null||!reviewCurrent()||proposal.binding!=ctx.binding||!_restockOwner(source,ctx)||
+      _restockNativeOpen||_financeSheetOpen||_couponsSheetOpen||!proposal.validUntil.isAfter(DateTime.now()))return MoolAssistantReviewResult.stale;
+    final currentSnapshot=_restockSnapshot(host,source,ctx,proposal.entityId);
+    if(currentSnapshot?.sourceRevision!=proposal.sourceRevision)return MoolAssistantReviewResult.stale;
+    final witness=_restockSource(source,proposal.entityId),router=GoRouter.of(host),uri=GoRouter.of(host).state.uri,page=GoRouter.of(host).state.pageKey;
+    final channel=proposal.fields['channel']=='bulk'?BuyV2WholesaleSaleType.bulk:BuyV2WholesaleSaleType.wholesale;
+    final query=proposal.fields['query'] as String? ?? '';
+    final originalPurchase=controller.session;
+    final product=proposal.entityId==null?null:originalPurchase?.findProduct(proposal.entityId!);
+    final productChannel=product?.publicListingIdentity?.channel??product?.offerClass;
+    if(product!=null&&(productChannel==null||productChannel!=(channel==BuyV2WholesaleSaleType.bulk?BuyV2OfferClass.bulk:BuyV2OfferClass.wholesale)))
+      return MoolAssistantReviewResult.unavailable;
+    bool admitting=false;
+    bool owner()=>mounted&&host.mounted&&reviewCurrent()&&proposal.validUntil.isAfter(DateTime.now())&&
+      identical(_storeProcurement,controller)&&_restockOwner(source,ctx)&&
+      _financeAssistantContext(host)?.binding==ctx.binding&&router.state.uri==uri&&router.state.pageKey==page&&
+      (product==null || identical(controller.session,originalPurchase)&&identical(originalPurchase?.findProduct(proposal.entityId!),product));
+    bool current()=>owner()&&(admitting||listEquals(_restockSource(source,proposal.entityId),witness));
+    _restockNativeOpen=true;
+    try{
+      final opened=await Navigator.of(host,rootNavigator:true).push<bool>(MaterialPageRoute(builder:(_)=>
+        _StoreRestockNativeReview(store:source.activeWorkspace!.name,channel:channel.name,query:query,product:product,
+          current:current,validUntil:proposal.validUntil,
+          changes:Listenable.merge([source,controller,?controller.session,_financeOwner,router.routerDelegate,?authorityChanges,
+            host.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]),
+          onContinue:(foreground)async{
+            if(!current()||!foreground())return false;admitting=true;
+            var opened=false;
+            try{await _showProcurement(productId:proposal.entityId,searchQuery:query,restockChannel:channel,
+              requireStoreOwner:true,inputCurrent:()=>owner()&&foreground(),onOpened:()=>opened=true);
+            }finally{if(!opened)admitting=false;}
+            return opened&&owner()&&controller.scopeCurrent&&identical(_activeProcurement,controller.session)&&
+              controller.session?.procurementContext?.purpose==BuyV2ProcurementPurpose.restock&&
+              _view==_WorkspaceControlView.procurement;
+          })));
+      return opened==true&&owner()?MoolAssistantReviewResult.returnToOwner:current()?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    }finally{_restockNativeOpen=false;}
+  }
+
   Future<void> _showProcurement({
     _WorkspaceOperation? returnOperation,
     String? productId,
     String? searchQuery,
+    BuyV2WholesaleSaleType? restockChannel,
+    bool requireStoreOwner=false,
+    bool Function()? inputCurrent,
+    VoidCallback? onOpened,
   }) async {
+    if(inputCurrent?.call()==false)return;
     // Keep the Stock entry as the return destination across native Back/restart.
     final returnTarget = returnOperation ??
         (_view == _WorkspaceControlView.operation &&
@@ -2760,6 +6049,7 @@ class _WorkWorkspaceDashboardScreenState
             : null);
     _searchFocus.unfocus();
     final controller = _storeProcurement;
+    if(requireStoreOwner&&controller==null)return;
     if (controller != null) {
       final opened = await controller.open(
         purpose: returnOperation == _WorkspaceOperation.direct
@@ -2768,8 +6058,9 @@ class _WorkWorkspaceDashboardScreenState
             ? BuyV2ProcurementPurpose.groupBulkBuying
             : BuyV2ProcurementPurpose.restock,
         returnTo: returnTarget?.name ?? 'dashboard',
+        inputCurrent:inputCurrent,
       );
-      if (!mounted) return;
+      if (!mounted||inputCurrent?.call()==false) return;
       if (!opened) {
         session.showError(
           controller.openFailureMessage ??
@@ -2778,6 +6069,10 @@ class _WorkWorkspaceDashboardScreenState
         return;
       }
     }
+    if(inputCurrent?.call()==false || requireStoreOwner &&
+      (controller==null || !controller.scopeCurrent || controller.session==null ||
+       !identical(controller.session,_activeProcurement) ||
+       controller.session!.procurementContext?.purpose!=BuyV2ProcurementPurpose.restock))return;
     session.clearMessages();
     if (returnOperation != _WorkspaceOperation.direct) _releaseDirectFilter();
     if (productId == null &&
@@ -2785,6 +6080,7 @@ class _WorkWorkspaceDashboardScreenState
             BuyV2ProcurementPurpose.restock) {
       _activeProcurement.openDestination(BuyV2Destination.wholesale);
     }
+    if(restockChannel!=null)_activeProcurement.chooseWholesaleSaleType(restockChannel);
     if (searchQuery != null) {
       _activeProcurement.updateQuery(searchQuery.trim());
     }
@@ -2795,6 +6091,7 @@ class _WorkWorkspaceDashboardScreenState
       _procurementProductId = productId;
       _view = _WorkspaceControlView.procurement;
     });
+    onOpened?.call();
     if (_procurementReady || _procurementRevealTimer != null) return;
     _procurementRevealTimer = Timer(const Duration(milliseconds: 650), () {
       if (!mounted) return;
@@ -2984,23 +6281,1782 @@ class _WorkWorkspaceDashboardScreenState
         oldWidget.accountIdentity != widget.accountIdentity ||
         oldWidget.accountAuthenticated != widget.accountAuthenticated) {
       _financeOwner.value++;
+      _productAssistantVersions.clear();
+      _productAssistantVersionOwner = null;
     }
     if (oldWidget.session != widget.session) {
       oldWidget.session.removeListener(_procurementIdentityChanged);
       session.addListener(_procurementIdentityChanged);
       oldWidget.session.removeListener(_searchScopeChanged);
+      oldWidget.session.removeListener(_settlementObserveSource);
       session.addListener(_searchScopeChanged);
+      session.addListener(_settlementObserveSource);
+      _settlementObserveSource();
     }
     _searchScopeChanged();
     _procurementIdentityChanged();
     _observeProcurementQuery();
   }
 
-  Future<void> _showBusinessFinance() async {
-    if (_financeSheetOpen || _couponsSheetOpen) return;
+  bool _assistantInvoiceOwnerActive(_StoreRecordPurchaseState expected) {
+    if (!mounted || !expected.mounted ||
+        _view != _WorkspaceControlView.operation ||
+        _operation != _WorkspaceOperation.sourcing || _focusedFinance != null ||
+        !identical(expected, _purchaseEntryKey.currentState) ||
+        !identical(expected.widget.session, session)) return false;
+    final register = expected.context.findAncestorStateOfType<_StorePurchasesSurfaceState>();
+    return register != null && identical(register, _purchasesKey.currentState) &&
+        !register.widget.statement && !register._receiveGoods &&
+        (register._recordPurchase || register._savedCopy != null) &&
+        !register._registerBindingChanged && register._ownsRegisterView &&
+        register._surfaceScope == session.workspaceSupplierScope &&
+        register._storeId == session.activeWorkspace?.id;
+  }
+
+  bool _assistantReceivingOwnerActive(_StoreReceiveGoodsState expected) {
+    if (!mounted || !expected.mounted ||
+        !identical(expected, _receivingKey.currentState) ||
+        !identical(expected.widget.session, session)) return false;
+    if (_view == _WorkspaceControlView.operation &&
+        _operation == _WorkspaceOperation.sourcing && _focusedFinance == null) {
+      final register = expected.context.findAncestorStateOfType<_StorePurchasesSurfaceState>();
+      return register != null && identical(register, _purchasesKey.currentState) &&
+          !register.widget.statement && register._receiveGoods &&
+          !register._registerBindingChanged && register._ownsRegisterView &&
+          register._surfaceScope == session.workspaceSupplierScope &&
+          register._storeId == session.activeWorkspace?.id;
+    }
+    if (_view == _WorkspaceControlView.procurement) {
+      final procurement = expected.context.findAncestorStateOfType<_StoreProcurementSurfaceState>();
+      return procurement != null && procurement.widget.ready &&
+          !procurement._openingReceiving && procurement._receivingOriginal != null &&
+          identical(procurement.widget.workSession, session) &&
+          identical(procurement.widget.session, _activeProcurement) &&
+          procurement.widget.session.isStoreProcurement &&
+          procurement.widget.session.procurementScopeCurrent &&
+          identical(procurement._receivingOriginal, expected.widget.initialRestockOriginal) &&
+          identical(procurement._receivingOrder, expected.widget.initialRestockOrder);
+    }
+    return false;
+  }
+
+// Insert inside _WorkWorkspaceDashboardScreenState. Existing IDs are not changed.
+final Map<Object, (String, int)> _nativeProductVersions = {};
+Object? _nativeProductVersionOwner;
+int _nativeProductVersion = 0;
+String _nativeProductSignature(WorkSession source, String action, String? entity) {
+  final product = _assistantProductTarget(source, false, entity);
+  final familyId = product?.variantMembership?.familyId;
+  final submission = product == null ? null : source.workspaceProductSubmission(product.id);
+  final media = product == null ? null : source.workspaceProductMedia(product.id);
+  final family = familyId == null ? null : source.workspaceVariantFamilyPublisher(familyId);
+  final visibility = action == 'AI-ACT-371' && product != null ? source.workspaceStockVisibility(product.id) : null;
+  return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    if (product != null) _assistantProductSignature(source, product),
+    if (StoreProductNativeInitial.catalogueActions.contains(action)) [
+      for (final item in source.workspaceCatalogueItems) item.toInventoryJson()],
+    if (action == 'AI-ACT-369' || action == 'AI-ACT-228') [
+      for (final item in source.referenceCatalogue) item.toInventoryJson()],
+    if (familyId != null) [for (final item in source.workspaceCatalogueItems)
+      if (item.variantMembership?.familyId == familyId) item.toInventoryJson()],
+    submission?.pending?.fingerprint, submission?.head?.fingerprint, submission?.headLoaded,
+    media?.original?.fingerprint, media?.result?.state, media?.fresh,
+    family?.pending?.fingerprint, family?.headLoaded,
+    source.workspaceCatalogueListingPendingSkuId, source.workspaceCatalogueListingPendingRequestId,
+    visibility?.head?.toJson(), visibility?.pending?.serverFingerprint,
+    if (action == 'AI-ACT-372') [
+      source.workspaceCommodityPriceAttentionError,
+      for (final item in source.workspaceCommodityPriceAttentionProducts) item.id],
+  ]))).toString();
+}
+String _nativeProductRevision(WorkSession source, String action, MoolAssistantContext ctx, String? entity) {
+  final owner = (source, widget.accountIdentity, widget.accountAuthenticated, ctx.binding,
+    source.publicationPreferencesContext, source.tradingPreferencesContext, source.navigationScopeRevision);
+  if (_nativeProductVersionOwner != owner) {
+    _nativeProductVersionOwner = owner; _nativeProductVersions.clear();
+  }
+  final key = (source, action, ctx.binding, entity, source.publicationPreferencesContext,
+    source.tradingPreferencesContext, source.navigationScopeRevision);
+  final signature = _nativeProductSignature(source, action, entity);
+  if (_nativeProductVersions[key]?.$1 != signature) {
+    _nativeProductVersions[key] = (signature, ++_nativeProductVersion);
+  }
+  return 'native-product:$action:${_nativeProductVersions[key]!.$2}';
+}
+bool _nativeProductReady(WorkSession source, String action, String? entity) {
+  if (StoreProductNativeInitial.catalogueActions.contains(action)) {
+    return entity == null && (action != 'AI-ACT-372' || source.workspaceCommodityPriceAttentionConfigured);
+  }
+  final product = _assistantProductTarget(source, false, entity);
+  if (product == null) return false;
+  final familyId = product.variantMembership?.familyId;
+  final submission = source.workspaceProductSubmission(product.id), media = source.workspaceProductMedia(product.id);
+  final family = familyId == null ? null : source.workspaceVariantFamilyPublisher(familyId);
+  return switch (action) {
+    'AI-ACT-215' => true,
+    'AI-ACT-216' => source.privateProductPhotos?.isCurrent() == true && !source.catalogueManagesProductPhoto(product),
+    'AI-ACT-217' => media != null && media.active && media.gateway.productMediaSupported &&
+      product.privatePhoto != null && product.privatePhoto!.matches(product) && submission?.head?.input.mediaPending == true,
+    'AI-ACT-220' => source.workspaceCommodityPriceAttentionConfigured && product.wholesaleOffer?.enabled == true &&
+      product.wholesaleOffer?.valid == true && product.wholesaleOffer?.saleType != null,
+    'AI-ACT-222' => source.localInventoryEnabled && source.workspaceCatalogueListingConnectionConfigured &&
+      source.workspaceCatalogueListingReady && !source.workspaceCatalogueListingPending,
+    'AI-ACT-223' => submission?.canSubmit == true && !source.workspaceSavedProductAlreadySubmitted(product.id),
+    'AI-ACT-224' => family != null && family.canSubmit,
+    'AI-ACT-225' => source.workspaceCatalogueListingPendingSkuId == product.id && !source.workspaceCatalogueListingPendingIsPriceConfirmation,
+    'AI-ACT-226' => product.counterSaleAllowed,
+    'AI-ACT-227' => !product.counterSaleAllowed,
+    'AI-ACT-370' => product.categoryId == 'other',
+    'AI-ACT-371' => source.workspaceStockVisibility(product.id)?.supported == true,
+    'AI-ACT-373' => media?.active == true && media?.original != null,
+    'AI-ACT-374' => family?.active == true && family?.pending != null,
+    _ => false,
+  };
+}
+  Iterable<MoolAssistantNativeAdapter> _orderOriginalNativeAdapters(BuildContext hostContext)sync*{
+    final trusted=_financeAssistantContext(hostContext),source=session;
+    if(trusted==null||!_financePermitted(trusted))return;
+    final store=trusted.workspaceId!,sellerReader=source.originalPurchaseReader;
+    final procurement=_storeProcurement,purchase=procurement?.session;
+    final buyerReader=procurement?.scopeCurrent==true&&purchase?.procurementScopeCurrent==true&&
+      purchase?.procurementContext?.storeId==store?purchase?.purchaseReader:null;
+    final navigation=source.navigationScopeRevision;
+    WorkspaceOriginalAssistantTarget? resolve(String entity,bool buyer){
+      if(!mounted||!hostContext.mounted||!identical(session,source)||source.navigationScopeRevision!=navigation||
+        _financeAssistantContext(hostContext)?.binding!=trusted.binding||!_financePermitted(trusted))return null;
+      String orderId=entity;String? lineId;
+      if(entity.startsWith('[')){
+        try{final parts=jsonDecode(entity);if(parts is! List||parts.length!=2||parts.any((v)=>v is! String)||jsonEncode(parts)!=entity)return null;
+          orderId=parts[0] as String;lineId=parts[1] as String;}on Object{return null;}
+      }
+      final role=buyer?WorkspaceOrderIdentityRole.buyer:WorkspaceOrderIdentityRole.seller;
+      final reader=buyer?buyerReader:sellerReader;
+      if(reader==null||!reader.isCurrent||reader.accountUserId!=widget.accountIdentity?.firebasePrincipal?.userId)return null;
+      final realm=buyer?purchase!.purchaseRealm:source.originalPurchaseRealm;
+      WorkspacePurchaseReference? reference=workspaceAssistantOriginalReference(gateway:reader,role:role,realm:realm,storeId:store,orderId:orderId);
+      if(buyer){
+        if(!identical(_storeProcurement,procurement)||procurement?.scopeCurrent!=true||!identical(procurement?.session,purchase)||
+          purchase?.procurementScopeCurrent!=true||purchase?.procurementContext?.storeId!=store||!identical(purchase?.purchaseReader,reader))return null;
+      }else{
+        if(!identical(source.originalPurchaseReader,reader))return null;
+        final matches=source.workspaceOrders.where((o)=>o.id==orderId&&o.operational!=null);
+        if(matches.length==1){final original=matches.single.operational!;
+          if(original.viewerRole!=role||original.viewerUserId!=reader.accountUserId||original.reference.storeId!=store||original.realm!=realm)return null;
+          if(reference!=null&&jsonEncode(reference.toJson())!=jsonEncode(original.reference.toJson()))return null;
+          reference=original.reference;
+        }
+      }
+      if(reference==null)return null;
+      return WorkspaceOriginalAssistantTarget(gateway:reader,role:role,realm:realm,reference:reference,lineId:lineId,
+        buyingStoreId:buyer?store:null,onOpenCase:buyer?null:(handoff)=>_openReceivedDeviceCase(hostContext,source,handoff,captureNativeRoute:true));
+    }
+    for(final action in WorkspaceOrderOriginalNativeAdapter.supported){
+      final buyer=const {'AI-ACT-396','AI-ACT-399'}.contains(action);
+      if((buyer?buyerReader:sellerReader)==null)continue;
+      yield WorkspaceOrderOriginalNativeAdapter(actionId:action,navigator:Navigator.of(hostContext,rootNavigator:true),
+        currentContext:()=>_financeAssistantContext(hostContext),
+        currentOwner:()=>mounted&&hostContext.mounted&&identical(session,source)&&source.navigationScopeRevision==navigation&&
+          _financeAssistantContext(hostContext)?.binding==trusted.binding&&_financePermitted(trusted),
+        ownerChanges:Listenable.merge([source,_financeOwner,?procurement,?purchase]),resolve:(entity)=>resolve(entity,buyer));
+    }
+  }
+
+Iterable<MoolAssistantNativeAdapter> _productNativeAdapters(BuildContext hostContext) sync* {
+  final source = session, router = GoRouter.of(hostContext);
+  final uri = router.state.uri, page = router.state.pageKey;
+  bool routeCurrent() => mounted && hostContext.mounted && identical(widget.session, source) &&
+    router.state.uri == uri && router.state.pageKey == page;
+  yield _StorePublishedProductAssistantAdapter(
+    nativeRoute: ModalRoute.of(hostContext), navigator: Navigator.of(hostContext, rootNavigator: true),
+    readSnapshot: (ctx, entity) => _publishedProductSnapshot(hostContext, source, ctx, entity, routeCurrent),
+    open: (proposal, current, changes) => _openPublishedProduct(hostContext, source, proposal, current, changes, routeCurrent));
+  for (final action in StoreProductNativeInitial.actions) {
+    final read = (MoolAssistantContext ctx, String? entity) =>
+      _productNativeSnapshot(hostContext, source, action, ctx, entity, routeCurrent);
+    Future<MoolAssistantReviewResult> open(StoreProductNativeInitial initial, MoolAssistantProposal proposal,
+      bool Function() current, MoolAssistantSelectedDocument? selected) =>
+      _openProductNative(hostContext, source, initial, proposal, current, selected, routeCurrent);
+    if (action == 'AI-ACT-228') {
+      yield _StoreProductSelectedImportAdapter(readContext: () => _financeAssistantContext(hostContext), readSnapshot: read, open: open);
+    } else if (action == 'AI-ACT-216') {
+      yield _StoreProductSelectedPhotoAdapter(readContext: () => _financeAssistantContext(hostContext), readSnapshot: read, open: open);
+    } else {
+      yield _StoreProductNativeAdapter(actionId: action, readContext: () => _financeAssistantContext(hostContext), readSnapshot: read, open: open);
+    }
+  }
+}
+// ACT230 reads the authentic published listing. Unpublished drafts have no
+// accepted preview service and must never use SavedStoreProductCustomerPreview.
+bool _publishedProductAssistantOpen = false;
+Future<MoolAssistantNativeSnapshot?> _publishedProductSnapshot(BuildContext host, WorkSession source,
+    MoolAssistantContext ctx, String? entity, bool Function() routeCurrent) async {
+  final gateway = source.catalogueGateway;
+  if (!routeCurrent() || !identical(source, session) || !_financePermitted(ctx) ||
+      _financeAssistantContext(host)?.binding != ctx.binding || entity == null ||
+      gateway is! AuthenticatedWorkspaceCatalogueGateway || source.gateway is ReviewWorkGateway ||
+      _productEditorOpen(source) || _financeSheetOpen || _couponsSheetOpen) return null;
+  final product = _assistantProductTarget(source, false, entity);
+  if (product == null) return null;
+  return MoolAssistantNativeSnapshot(binding: ctx.binding,
+    sourceRevision: _nativeProductRevision(source, 'AI-ACT-230', ctx, entity),
+    entityId: entity, permitted: true);
+}
+Future<MoolAssistantReviewResult> _openPublishedProduct(BuildContext host, WorkSession source,
+    MoolAssistantProposal proposal, bool Function() requestCurrent, Listenable? ownerChanges,
+    bool Function() routeCurrent) async {
+  if (_publishedProductAssistantOpen || !requestCurrent()) return MoolAssistantReviewResult.unavailable;
+  final ctx = _financeAssistantContext(host), product = _assistantProductTarget(source, false, proposal.entityId);
+  final gateway = source.catalogueGateway;
+  if(ctx==null||ctx.binding!=proposal.binding||!_financePermitted(ctx))return MoolAssistantReviewResult.stale;
+  if(_nativeProductRevision(source,'AI-ACT-230',ctx,proposal.entityId)!=proposal.sourceRevision)return MoolAssistantReviewResult.stale;
+  if (product == null || gateway is! AuthenticatedWorkspaceCatalogueGateway ||
+      source.gateway is ReviewWorkGateway || !mapEquals(
+        Map<String, Object?>.of(proposal.fields)..remove('channel'), StoreProductInitialData.referenceFields(product))) {
+    return MoolAssistantReviewResult.unavailable;
+  }
+  final channel = BuyV2OfferClass.values.where((value) => value.name == proposal.fields['channel']).singleOrNull;
+  if (channel == null || (channel == BuyV2OfferClass.retail ? !product.retailEnabled :
+      product.wholesaleOffer?.enabled != true || product.wholesaleOffer?.valid != true ||
+      product.wholesaleOffer?.saleType != (channel == BuyV2OfferClass.bulk ? BuyV2WholesaleSaleType.bulk : BuyV2WholesaleSaleType.wholesale))) {
+    return MoolAssistantReviewResult.unavailable;
+  }
+  final navigation = source.navigationScopeRevision, owner = source.publicationPreferencesContext;
+  final actor = widget.accountIdentity, store = source.activeWorkspace?.id;
+  final original = _assistantProductSignature(source, product), router = GoRouter.of(host);
+  var retired = false;
+  bool current() {
+    if (!retired && (!mounted || !host.mounted || !routeCurrent() || !requestCurrent() ||
+        !identical(source, session) || !identical(actor, widget.accountIdentity) ||
+        !identical(source.catalogueGateway, gateway) || source.gateway is ReviewWorkGateway ||
+        source.activeWorkspace?.id != store || source.navigationScopeRevision != navigation ||
+        source.publicationPreferencesContext != owner || !_financePermitted(ctx) ||
+        _financeAssistantContext(host)?.binding != ctx.binding ||
+        _nativeProductRevision(source, 'AI-ACT-230', ctx, proposal.entityId) != proposal.sourceRevision ||
+        (_assistantProductTarget(source, false, proposal.entityId) == null ||
+          _assistantProductSignature(source, _assistantProductTarget(source, false, proposal.entityId)!) != original))) retired = true;
+    return !retired && _assistantProductTarget(source, false, proposal.entityId) != null;
+  }
+  void changed() { current(); }
+  final changes = Listenable.merge([source, ownerChanges]);
+  _publishedProductAssistantOpen = true;
+  changes.addListener(changed);
+  try {
+    if (!current()) return MoolAssistantReviewResult.stale;
+    // Existing native reader verifies the saved mirror including canonical pack,
+    // SKU revision, channels, media and authored fields before reading publication.
+    final mirror = await source.readWorkspacePromotionSource(product.id, channel: channel.name);
+    if (!current()) return MoolAssistantReviewResult.stale;
+    if (mirror == null || mirror.storeId != store || mirror.realm != gateway.realm) return MoolAssistantReviewResult.unavailable;
+    final entry = await gateway.readPublicEntry(storeId: store!, skuId: product.id,
+      channel: channel, current: current);
+    if (!current()) return MoolAssistantReviewResult.stale;
+    final listing = entry?.product.publicListingIdentity;
+    if (entry == null || listing == null || !listing.matches(entry.product) || listing.realm != gateway.realm ||
+        listing.storeId != store || listing.skuId != product.id || listing.channel != channel ||
+        listing.canonicalProductId != mirror.canonicalProductId || listing.verifiedPackId != mirror.verifiedPackId ||
+        entry.readback.skuRevision != mirror.revision) return MoolAssistantReviewResult.unavailable;
+    final destination = channel == BuyV2OfferClass.retail ? BuyV2Destination.shop : BuyV2Destination.wholesale;
+    final location = Uri(path: '/app/buy', queryParameters: {'sub': destination.name, 'view': 'product',
+      'workspaceProduct': product.id, 'product': entry.product.id, 'return': router.state.uri.toString()}).toString();
+    if (!current()) return MoolAssistantReviewResult.stale;
+    // The original router re-reads the real public entry. No local provider,
+    // product projection, saved Cart replacement, publication or private preview.
+    await router.push<void>(location);
+    return MoolAssistantReviewResult.opened;
+  } on Object {
+    return current() ? MoolAssistantReviewResult.unavailable : MoolAssistantReviewResult.stale;
+  } finally {
+    changes.removeListener(changed);
+    _publishedProductAssistantOpen = false;
+  }
+}
+
+Future<MoolAssistantNativeSnapshot?> _productNativeSnapshot(BuildContext hostContext, WorkSession source,
+  String action, MoolAssistantContext ctx, String? entity, bool Function() routeCurrent) async {
+  bool current() => routeCurrent() && _financePermitted(ctx) &&
+    _financeAssistantContext(hostContext)?.binding == ctx.binding && !_financeSheetOpen && !_couponsSheetOpen && !_productEditorOpen(source);
+  if (!current() || !StoreProductNativeInitial.actions.contains(action) ||
+      (StoreProductNativeInitial.catalogueActions.contains(action) ? entity != null : entity == null)) return null;
+  // Native Load/Recover can enqueue a durable Stock report. Review does not run it.
+  if (source.localInventoryEnabled && (!source.workspaceInventoryLoaded || source.workspaceInventoryError != null ||
+      source.workspaceGoodsReceiptBusy || source.workspaceGoodsReceiptRecoveryPending)) return null;
+  final product = _assistantProductTarget(source, false, entity);
+  if (!StoreProductNativeInitial.catalogueActions.contains(action) && product == null) return null;
+  if (product != null) {
+    final submission = source.workspaceProductSubmission(product.id), media = source.workspaceProductMedia(product.id);
+    final familyId = product.variantMembership?.familyId;
+    final family = familyId == null ? null : source.workspaceVariantFamilyPublisher(familyId);
+    if (const {'AI-ACT-217','AI-ACT-223','AI-ACT-373'}.contains(action)) {
+      if (submission == null || !await submission.restore() || !current()) return null;
+      if (const {'AI-ACT-217','AI-ACT-223'}.contains(action) && submission.pending == null &&
+          (!await submission.refresh(current: current) || !current())) return null;
+      if (const {'AI-ACT-217','AI-ACT-373'}.contains(action) && (media == null || !await media.restore() || !current())) return null;
+    }
+    if (action == 'AI-ACT-224' || action == 'AI-ACT-374') {
+      if (family == null || !await family.restore() || !current()) return null;
+      if (action == 'AI-ACT-224' && family.pending == null && (!await family.refresh(current: current) || !current())) return null;
+    }
+    if (action == 'AI-ACT-222' || action == 'AI-ACT-225') {
+      if (!await source.restoreWorkspaceCatalogueListing() || !current()) return null;
+    }
+    if (action == 'AI-ACT-371') {
+      final visibility = source.workspaceStockVisibility(product.id);
+      if (visibility == null || !await visibility.readOnlyForReview(current: current) || !current()) return null;
+    }
+  }
+  if (action == 'AI-ACT-372') {
+    if (!source.workspaceCommodityPriceAttentionConfigured) return null;
+    await source.loadWorkspaceCommodityPriceAttention();
+    if (!current()) return null;
+  }
+  if (!current() || !_nativeProductReady(source, action, entity)) return null;
+  return MoolAssistantNativeSnapshot(binding: ctx.binding, sourceRevision: _nativeProductRevision(source, action, ctx, entity),
+    permitted: true, entityId: entity);
+}
+Future<MoolAssistantReviewResult> _openProductNative(BuildContext hostContext, WorkSession source,
+  StoreProductNativeInitial initial, MoolAssistantProposal proposal, bool Function() reviewCurrent,
+  MoolAssistantSelectedDocument? selected, bool Function() routeCurrent) async {
+  final ctx = _financeAssistantContext(hostContext), action = initial.actionId;
+  bool owner() => ctx != null && routeCurrent() && _financePermitted(ctx) &&
+    _financeAssistantContext(hostContext)?.binding == ctx.binding;
+  if (ctx == null || !owner() || !reviewCurrent() || proposal.binding != ctx.binding ||
+      proposal.sourceRevision != _nativeProductRevision(source, action, ctx, proposal.entityId) ||
+      !_nativeProductReady(source, action, proposal.entityId) || _productEditorOpen(source)) return MoolAssistantReviewResult.stale;
+  final changes = Listenable.merge([source, routerDelegateOf(hostContext),
+    hostContext.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges,
+    if (action == 'AI-ACT-228') selected?.ownerChanges]);
+  if (StoreProductNativeInitial.catalogueActions.contains(action)) {
+    if (action == 'AI-ACT-372') return _showProductPriceAttention(hostContext, source, owner, changes);
+    _showOperation(_WorkspaceOperation.catalogue);
+    await WidgetsBinding.instance.endOfFrame;
+    final catalogue = _catalogueKey.currentState;
+    bool catalogueOwner() => owner() && catalogue != null && catalogue.mounted &&
+      identical(_catalogueKey.currentState, catalogue) && identical(catalogue.widget.session, source) &&
+      _view == _WorkspaceControlView.operation && _operation == _WorkspaceOperation.catalogue;
+    if (!catalogueOwner() || !reviewCurrent()) return MoolAssistantReviewResult.stale;
+    if (action == 'AI-ACT-369') {
+      final opened = await catalogue!._scan(reviewCurrent: catalogueOwner, reviewChanges: changes);
+      return !owner() ? MoolAssistantReviewResult.stale : opened ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.cancelled;
+    }
+    var shown = false;
+    final error = await catalogue!._importCatalogue(selectedInput: selected?.proof,
+      reviewCurrent: selected == null ? catalogueOwner : () => catalogueOwner() && reviewCurrent(),
+      reviewChanges: changes, onReviewShown: () => shown = true);
+    if (!owner()) return MoolAssistantReviewResult.stale;
+    if (error != null) source.showError(error);
+    return shown ? MoolAssistantReviewResult.opened : error == null ? MoolAssistantReviewResult.cancelled : MoolAssistantReviewResult.unavailable;
+  }
+  final product = _assistantProductTarget(source, false, proposal.entityId);
+  if (product == null || !initial.matches(product)) return MoolAssistantReviewResult.stale;
+  final family = source.workspaceVariantFamilies.where((f) => f.id == product.variantMembership?.familyId).singleOrNull;
+  if (action == 'AI-ACT-215' && initial.dimensions.any((value) => value.dimensionId != null &&
+      (family == null || !family.dimensionIds.contains(value.dimensionId)))) return MoolAssistantReviewResult.unavailable;
+  if (action == 'AI-ACT-217' && product.privatePhoto?.sha256 != initial.sourcePhotoSha256) return MoolAssistantReviewResult.stale;
+  if (action == 'AI-ACT-225' && source.workspaceCatalogueListingPendingRequestId != initial.originalRequestId ||
+      action == 'AI-ACT-373' && source.workspaceProductMedia(product.id)?.original?.idempotencyKey != initial.originalRequestId ||
+      action == 'AI-ACT-374' && (family == null || source.workspaceVariantFamilyPublisher(family.id)?.pending?.idempotencyKey != initial.originalRequestId)) {
+    return MoolAssistantReviewResult.stale;
+  }
+  if (action == 'AI-ACT-216' && selected == null) return MoolAssistantReviewResult.unavailable;
+  return showStoreProductNativeReview(context, source, product: product, initial: initial, selected: selected,
+    prefillCurrent: () => owner() && reviewCurrent(), ownerCurrent: owner, ownerChanges: changes,
+    originalCurrent: () => switch (action) {
+      'AI-ACT-225' => source.workspaceCatalogueListingPendingRequestId == initial.originalRequestId &&
+        source.workspaceCatalogueListingPendingSkuId == product.id,
+      'AI-ACT-373' => source.workspaceProductMedia(product.id)?.original?.idempotencyKey == initial.originalRequestId,
+      'AI-ACT-374' => family != null && source.workspaceVariantFamilyPublisher(family.id)?.pending?.idempotencyKey == initial.originalRequestId,
+      _ => true,
+    });
+}
+Listenable routerDelegateOf(BuildContext context) => GoRouter.of(context).routerDelegate;
+
+// Dashboard State method. All records come from the verified owner read, including
+// truthful partial/empty results. The original stock list supplies paging/search.
+Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostContext,
+  WorkSession source, bool Function() current, Listenable changes) async {
+  if (!current()) return MoolAssistantReviewResult.stale;
+  final products = List<WorkspaceCatalogueItem>.unmodifiable(source.workspaceCommodityPriceAttentionProducts);
+  final error = source.workspaceCommodityPriceAttentionError;
+  await Navigator.of(hostContext, rootNavigator: true).push<void>(MaterialPageRoute(builder: (pageContext) =>
+    _StoreProductOwnerSurface(current: current, changes: changes, child: Scaffold(
+      appBar: AppBar(title: const Text('Supplier prices to check')),
+      body: SafeArea(child: StoreAddProductSheet(
+        embedded: true, stockOnly: true, catalogue: const [], ownedProducts: products,
+        isStoreCurrent: current,
+        stockEmptyMessage: error == null ? 'No supplier prices need confirmation in the returned records.'
+          : 'The supplier-price check is incomplete. Close and try again.',
+        stockListHeader: error == null ? null : Padding(padding: const EdgeInsets.all(16), child: Text(error)),
+        createProduct: (_) => throw StateError('This source view cannot create a product.'),
+        scanBarcode: () => current() ? showStoreProductScanner(pageContext, ownerCurrent: current, ownerChanges: changes) : Future.value(null),
+        onSelected: (product) async {
+          if (!current()) return;
+          final latest = _assistantProductTarget(source, false, product.id);
+          if (latest == null || _assistantProductSignature(source, latest) != _assistantProductSignature(source, product)) return;
+          final initial = StoreProductNativeInitial.fromFields('AI-ACT-220', StoreProductInitialData.referenceFields(latest));
+          await showStoreProductNativeReview(pageContext, source, product: latest, initial: initial,
+            prefillCurrent: current, ownerCurrent: current, ownerChanges: changes);
+        },
+      )),
+    ))));
+  return current() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+}
+
+
+  MoolAssistantNativeAdapter _financialSelectedAdapter(BuildContext hostContext,WorkSession source,MoolAssistantNativeAdapter original) {
+    if(!const {'AI-ACT-259','AI-ACT-260','AI-ACT-261','AI-ACT-262','AI-ACT-264','AI-ACT-266','AI-ACT-375','AI-ACT-376'}.contains(original.actionId)) return original;
+    return _StoreFinancialSelectedDocumentAdapter(original:original,readContext:()=>_financeAssistantContext(hostContext),
+      open:(proposal,current,selected) {
+        if(const {'AI-ACT-259','AI-ACT-260','AI-ACT-261'}.contains(proposal.actionId)) return _showSupplierMoneyAssistantInitial(hostContext,source,
+          StoreSupplierMoneyInitialData.fromFields(proposal.fields),proposal,current,selectedDocument:selected);
+        if(proposal.actionId=='AI-ACT-262') return _showSupplierAllocationAssistant(hostContext,source,proposal,current,selectedDocument:selected);
+        return _showSupplierAdjustmentAssistantInitial(hostContext,source,proposal,current,selectedDocument:selected);
+      });
+  }
+
+  MoolAssistantContext? _financeAssistantContext(BuildContext hostContext) {
+    if (!mounted || !hostContext.mounted) return null;
+    final host = hostContext.getInheritedWidgetOfExactType<MoolAssistantHost>();
+    final workspace = hostContext.getInheritedWidgetOfExactType<MoolAssistantWorkspaceScope>();
+    return host?.readContext().withWorkspace(workspace?.readWorkspace());
+  }
+
+  bool _salesCounterOwnerActive(_CounterOrderSurfaceState state) => mounted && state.mounted &&
+    identical(_counterKey.currentState,state) && identical(state.widget.session,session) &&
+    _view == _WorkspaceControlView.operation && (_operation == _WorkspaceOperation.counterOrder ||
+      _operation == _WorkspaceOperation.sales && _salesTask == 'counter' && _salesKey.currentState?._salesHubView == 'counter');
+
+  static const _salesAssistantActions = ['AI-ACT-288', 'AI-ACT-289', 'AI-ACT-290', 'AI-ACT-291', 'AI-ACT-292', 'AI-ACT-293', 'AI-ACT-295', 'AI-ACT-382', 'AI-ACT-383', 'AI-ACT-384', 'AI-ACT-385', 'AI-ACT-386'];
+  bool _salesAssistantOpen = false;
+  bool _salesInvoiceAction(String action) => const {'AI-ACT-293','AI-ACT-295','AI-ACT-382','AI-ACT-383','AI-ACT-384'}.contains(action);
+  String _salesDraftSignature(WorkSession source) => jsonEncode([
+    _counterKey.currentState?._nativeAssistantSignature,
+    source.counterDraftScopeForReview?.account,source.counterDraftScopeForReview?.store, source.counterSaleGeneration, source.currentWorkspaceOrderId,
+    source.retainedCounterDraft?.toJson(), source.counterBillReviewSignature,
+    source.workspaceOrderAddress, source.workspaceOrderSource, source.workspaceOrderFulfilment,
+    source.workspaceOrderPayment, source.counterCustomerInput, source.counterDraftError,
+    source.counterDraftLoaded, source.counterDraftNeedsReconciliation, source.counterDraftCatalogueChanged,
+  ]);
+  String _salesCatalogueSignature(WorkSession source) => jsonEncode([
+    source.workspaceInventoryRevision, source.workspaceInventoryLoaded,
+    for (final item in source.workspaceCatalogueItems)
+      [item.id,item.title,item.pack,item.sellingPriceMinor,item.stock,item.stockMode.name,item.available,item.barcode,item.sku,item.canonicalId],
+  ]);
+  WorkspaceCustomerInvoice? _salesAssistantInvoice(WorkSession source, String? entity) =>
+    entity == null ? null : source.workspaceInvoices.where((value) => value.id == entity).singleOrNull;
+  String _salesAssistantRevision(WorkSession source, String action, String? entity) =>
+    'counter-native:${assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+      source.counterDraftScopeForReview?.account,source.counterDraftScopeForReview?.store, action, entity,
+      _salesInvoiceAction(action) ? _salesAssistantInvoice(source, entity)?.toLedgerJson() : _salesDraftSignature(source),
+      if (!_salesInvoiceAction(action)) _salesCatalogueSignature(source),
+      if (_salesInvoiceAction(action)) [source.workspaceFinance?.accountScope,source.workspaceFinance?.workspaceId,source.workspaceFinance?.revision],
+      if (_salesInvoiceAction(action)) source.workspaceOrders.where((value) => value.id == _salesAssistantInvoice(source, entity)?.orderId).map((value) => [value.id,value.source,value.itemSnapshots.map((line) => [line.productId,line.name,line.pack,line.quantity,line.unitPricePaise,line.lineTotalPaise]).toList()]).toList(),
+    ])))}'; // Frontend source comparison, not an invented server revision.
+  Future<MoolAssistantNativeSnapshot?> _salesAssistantSnapshot(BuildContext hostContext, WorkSession source,
+    String action, MoolAssistantContext ctx, String? entity) async {
+    bool current() => mounted && hostContext.mounted && identical(widget.session, source) && _financePermitted(ctx) &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding && !_salesAssistantOpen;
+    if (!current()) return null;
+    if (_salesInvoiceAction(action)) {
+      final invoice = _salesAssistantInvoice(source, entity);
+      if (invoice == null || !invoice.validBillAmounts) return null;
+      final counter = source.workspaceOrders.any((order) => order.id == invoice.orderId && order.source == 'Counter');
+      if (counter && const {'AI-ACT-382','AI-ACT-383'}.contains(action)) return null;
+    } else {
+      // One actual native editor owns its unsaved fields. Never clone or replace it.
+      final counter = _counterKey.currentState;
+      if (counter != null && (!_salesCounterOwnerActive(counter) || !counter._canAdoptAssistant(action))) return null;
+      await source.workspaceCounterDraftWrites;
+      if (!current()) return null;
+      if (!source.counterDraftLoaded) await source.loadWorkspaceCounterDraft(shouldRestore: () => false);
+      if (!current() || !source.counterDraftLoaded || !source.workspaceInventoryLoaded || source.counterDraftLoading || source.counterDraftSubmitting) return null;
+      final saved = source.retainedCounterDraft;
+      final active = saved?.stage == WorkspaceCounterDraftStage.retired ? null : saved;
+      if (entity != null && entity != active?.id) return null;
+      if (source.counterDraftError != null && const {'AI-ACT-289','AI-ACT-290'}.contains(action)) return null;
+      if (const {'AI-ACT-290','AI-ACT-291','AI-ACT-292','AI-ACT-386'}.contains(action) && active == null && (source.currentWorkspaceOrderId != null || source.workspaceOrderQuantities.isEmpty)) return null;
+      if (source.counterDraftEditingBlocked && !const {'AI-ACT-288','AI-ACT-386','AI-ACT-292'}.contains(action)) return null;
+    }
+    if (!current()) return null;
+    return MoolAssistantNativeSnapshot(binding: ctx.binding, sourceRevision: _salesAssistantRevision(source, action, entity), permitted: true, entityId: entity);
+  }
+  Future<MoolAssistantReviewResult> _showSalesAssistant(BuildContext hostContext, WorkSession source,
+    MoolAssistantProposal proposal, StoreCounterReviewInitial initial, bool Function() reviewCurrent, Listenable ownerChanges) async {
+    final ctx = _financeAssistantContext(hostContext), action = proposal.actionId;
+    final route = GoRouter.of(hostContext).routerDelegate.currentConfiguration.last;
+    final visit = (_view,_operation,_salesTask,_salesVisitEpoch);
+    final account = widget.accountIdentity;
+    bool owner() => ctx != null && mounted && hostContext.mounted && identical(widget.session, source) &&
+      identical(widget.accountIdentity, account) && _financePermitted(ctx) &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding && reviewCurrent() &&
+      visit == (_view,_operation,_salesTask,_salesVisitEpoch) &&
+      identical(GoRouter.of(hostContext).routerDelegate.currentConfiguration.last, route);
+    if (!owner() || ctx == null || proposal.binding != ctx.binding || _salesAssistantOpen ||
+      proposal.sourceRevision != _salesAssistantRevision(source, action, proposal.entityId)) return MoolAssistantReviewResult.stale;
+    final changes = Listenable.merge([source,ownerChanges,routerDelegateOf(hostContext),hostContext.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+    final expected = _salesAssistantRevision(source, action, proposal.entityId);
+    bool exact() => owner() && expected == _salesAssistantRevision(source, action, proposal.entityId);
+    if (_salesInvoiceAction(action)) {
+      final invoice = _salesAssistantInvoice(source, proposal.entityId);
+      if (invoice == null) return MoolAssistantReviewResult.unavailable;
+      final counter = source.workspaceOrders.any((order) => order.id == invoice.orderId && order.source == 'Counter');
+      final channel = initial.values['channel'];
+      if (counter && (action == 'AI-ACT-382' || action == 'AI-ACT-383' || channel == 'chat' || channel == 'whatsapp')) return MoolAssistantReviewResult.unavailable;
+      _salesAssistantOpen = true;
+      try {
+        if (action == 'AI-ACT-384' || action == 'AI-ACT-295' && (channel == null || channel == 'pdf')) {
+          final order = source.workspaceOrders.where((value) => value.id == invoice.orderId).singleOrNull;
+          final payment = source.workspaceFinance?.payments.where((p) => p.valid && p.invoiceId == invoice.id && p.orderId == invoice.orderId).singleOrNull;
+          final request = WorkInvoicePdfRequest(accountId: source.workspaceFinance?.accountScope ?? '', storeId: source.activeWorkspace!.id,
+            invoice: invoice, items: order?.itemSnapshots ?? const [], paymentStatus: payment == null ? 'Payment status unavailable' : '${payment.label} · Received ${_purchaseAmount(payment.paidMinor)} · Due ${_purchaseAmount(payment.dueMinor)}');
+          await Navigator.of(hostContext).push<void>(MaterialPageRoute(builder: (_) => _StoreSalesOwnerSurface(current: exact,changes: changes,
+            child: WorkInvoicePdfScreen(request: request,source: createWorkInvoicePdfSource(),scopeChanges: changes,isCurrent: exact))));
+        } else {
+          await _showWorkspaceInvoiceSheet(hostContext, source, invoice, ownerCurrent: exact, ownerChanges: changes);
+        }
+      } finally { _salesAssistantOpen = false; }
+      return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+    }
+    final existing = _counterKey.currentState;
+    if (existing != null && (!_salesCounterOwnerActive(existing) || !existing._canAdoptAssistant(action))) return MoolAssistantReviewResult.unavailable;
+    bool nativeOwner() => owner();
+    final retained = source.retainedCounterDraft;
+    final inMemory = source.currentWorkspaceOrderId == null && (source.workspaceOrderCustomer.isNotEmpty || source.workspaceOrderQuantities.isNotEmpty);
+    final quantities = Map<String,int>.of(inMemory ? source.workspaceOrderQuantities : {
+      if (retained?.stage != WorkspaceCounterDraftStage.retired)
+        for (final line in retained?.lines ?? <WorkspaceOrderItemSnapshot>[]) line.productId: line.quantity});
+    for (final entry in initial.quantities.entries) {
+      if (source.workspaceCounterAdjustedQuantity(entry.key,0,entry.value) != entry.value) return MoolAssistantReviewResult.unavailable;
+      quantities[entry.key] = entry.value;
+    }
+    try {
+      final subtotal = source.workspaceCounterSubtotalFor(quantities);
+      if (initial.discount != null && !initial.discount!.validFor(subtotal)) return MoolAssistantReviewResult.unavailable;
+    } on FormatException { return MoolAssistantReviewResult.unavailable; }
+    if (existing != null) {
+      final sourceOwner = (source.counterDraftIdentity,source.navigationScopeRevision,source.publicationPreferencesContext);
+      bool transferredOwner() => mounted && hostContext.mounted && identical(widget.session,source) &&
+        identical(widget.accountIdentity,account) && _financePermitted(ctx) &&
+        _financeAssistantContext(hostContext)?.binding == ctx.binding && _salesCounterOwnerActive(existing) &&
+        sourceOwner == (source.counterDraftIdentity,source.navigationScopeRevision,source.publicationPreferencesContext) &&
+        identical(GoRouter.of(hostContext).routerDelegate.currentConfiguration.last,route);
+      if (!owner() || !existing._adoptAssistant(initial,transferredOwner,Listenable.merge([source,routerDelegateOf(hostContext),
+        hostContext.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]))) return MoolAssistantReviewResult.unavailable;
+      return MoolAssistantReviewResult.returnToOwner;
+    }
+    final key = GlobalKey<_CounterOrderSurfaceState>();
+    String? savedDelivery;
+    _salesAssistantOpen = true;
+    try {
+      await Navigator.of(hostContext).push<void>(MaterialPageRoute(builder: (routeContext) =>
+        _StoreSalesReviewRoute(session: source, initial: initial, surfaceKey: key,
+          ownerCurrent: nativeOwner, ownerChanges: changes,
+          onClose: () => Navigator.of(routeContext).maybePop(),
+          onSavedDelivery: (id) {
+            final saved = source.currentWorkspaceOrder;
+            if (nativeOwner() && source.currentWorkspaceOrderId == id && saved?.id == id && saved!.needsDelivery &&
+              !saved.isCustomerCollection && const ['Own delivery','Mool delivery'].contains(saved.fulfilment) && saved.stage == 'Confirmed') savedDelivery = id;
+          },
+          onOpenCatalogue: () { if (nativeOwner()) source.showNotice('Close this bill to manage Store products.'); })));
+    } finally { _salesAssistantOpen = false; }
+    if (savedDelivery != null && owner() && source.currentWorkspaceOrderId == savedDelivery && source.currentWorkspaceOrder?.id == savedDelivery) {
+      _showOperation(_WorkspaceOperation.orders);
+      return MoolAssistantReviewResult.returnToOwner;
+    }
+    return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+  }
+
+
+
+
+
+
+
+
+
+
+  bool _receivingNativeOpen=false;
+  static const _receivingPrepareActions={'AI-ACT-238','AI-ACT-239','AI-ACT-240','AI-ACT-246','AI-ACT-401'};
+  static const _receivingBillActions={'AI-ACT-245','AI-ACT-248','AI-ACT-249'};
+  String _receivingNativeRevision(WorkSession source,String action,String? entity) {
+    final form=_receivingKey.currentState,invoice=_purchaseEntryKey.currentState;
+    final copy=source.workspacePurchaseCopies.where((c)=>c.id==entity).singleOrNull;
+    return 'receiving-native:${assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+      source.workspaceSupplierScope?.$1,source.workspaceSupplierScope?.$2,source.workspaceSupplierScope?.$3,
+      source.navigationScopeRevision,action,entity,source.workspacePurchaseEntryRevision,source.workspaceInventoryRevision,
+      source.workspaceSuppliers.map((p)=>p.toJson()).toList(),source.workspaceCatalogueItems.map((p)=>p.toInventoryJson()).toList(),
+      source.workspaceGoodsReceiptDrafts.map((r)=>r.toJson()).toList(),source.workspaceGoodsReceiptCancellations.map((r)=>r.toJson()).toList(),
+      if(copy!=null)copy.toJson(),
+      if(copy!=null)source.workspaceSupplierLedger(copy.supplier.id)?.toJson(),
+      if(form!=null)[form._supplierId,form._arrivalId,form._input,form._copyType,form._draft?.revision,
+        form._documents.map((a)=>a.toJson()).toList(),form._frozen?.toJson(),form._restockOriginal?.toJson()],
+      if(action=='AI-ACT-403'&&invoice!=null)[invoice._draftId,invoice._input,invoice._revision,invoice._attachments.map((a)=>a.toJson()).toList()],
+      if(action=='AI-ACT-243')_receivingPurchaseSource(source,entity,exact:true),
+      if(action=='AI-ACT-251')[identityHashCode(source.restockReceivingReviewOwner),source.originalPurchaseRealm,source.originalPurchaseReader?.isCurrent],
+    ])))}';
+  }
+  String _receivingPurchaseSource(WorkSession source,String? id,{required bool exact}) {
+    final p=source.workspacePurchases.where((p)=>p.shipmentId==id).singleOrNull;
+    return jsonEncode(p==null?null:[p.accountScope,p.workspaceId,p.supplierId,p.orderId,p.shipmentId,p.purchaseId,
+      p.createdAt.toUtc().toIso8601String(),
+      if(exact)[identityHashCode(p),p.revision,p.updatedAt.toUtc().toIso8601String(),p.stage.name,p.receiptState.name,p.receiptReference],
+      for(final line in p.lines)[line.id,line.productId,line.name,line.pack,line.orderedPacks,line.unitPriceMinor,
+        if(exact)line.receivedPacks]]);
+  }
+  WorkspaceSupplierGoodsReceiptDraft? _receivingSavedReceipt(WorkSession source,String? id)=>
+    source.workspaceGoodsReceiptDrafts.where((r)=>r.receipt.id==id).singleOrNull;
+  Future<MoolAssistantNativeSnapshot?> _receivingNativeSnapshot(BuildContext hostContext,WorkSession source,
+    String action,MoolAssistantContext context,String? entity) async {
+    bool current()=>mounted&&hostContext.mounted&&identical(widget.session,source)&&!_receivingNativeOpen&&
+      _financePermitted(context)&&_financeAssistantContext(hostContext)?.binding==context.binding;
+    if(!current()||entity==null||_supplierAdjustmentOpen(source)||_supplierMoneyFormOpen(source))return null;
+    final state=_receivingKey.currentState;
+    if(state!=null&&!_assistantReceivingOwnerActive(state))return null;
+    if(_receivingPrepareActions.contains(action)) {
+      if(action=='AI-ACT-238') {
+        if(!source.workspaceSuppliersLoaded||!source.workspaceInventoryLoaded||source.workspacePurchaseEntryRevision==null||
+          !source.workspaceSuppliers.any((p)=>p.id==entity)||state!=null&&(state._supplierId!=entity||!state._receivingCanPrepare))return null;
+        final key=source.supplierReceivingInputFormKey(entity);if(key==null)return null;
+        final saved=await source.readLedgerForm(key);
+        if(!current()||state==null&&saved?.fields.isNotEmpty==true)return null;
+      } else if(state==null||state._arrivalId!=entity||!state._receivingCanPrepare||action=='AI-ACT-239'&&state._restockOriginal!=null)return null;
+    } else if(action=='AI-ACT-402'||action=='AI-ACT-404') {
+      if(state==null||!state._assistantReceiptImportReady||!state._documents.any((a)=>a.digest==entity&&a.valid))return null;
+    } else if(action=='AI-ACT-403') {
+      final bill=_purchaseEntryKey.currentState;
+      if(bill==null||!_assistantInvoiceOwnerActive(bill)||!bill._assistantDocumentReady||
+        !bill._attachments.any((a)=>a.digest==entity&&a.valid))return null;
+    } else if(_receivingBillActions.contains(action)) {
+      if(!source.workspaceInvoiceHistoryLoaded||!source.workspaceSuppliersLoaded)return null;
+      final copy=source.workspacePurchaseCopies.where((c)=>c.id==entity).singleOrNull;
+      if(copy==null||jsonEncode(source.workspaceSupplierLedger(copy.supplier.id)?.purchaseBills[copy.draft.id]?.copy.toJson())!=jsonEncode(copy.toJson()))return null;
+      if(action=='AI-ACT-248'&&source.supplierShortageFormKey(copy)==null)return null;
+      if(action=='AI-ACT-249') {
+        final key=source.supplierShortageRecoveryFormKey(copy);if(key==null)return null;
+        final draft=await source.readLedgerForm(key);if(!current()||draft?.fields['attempt']?.isNotEmpty!=true)return null;
+      }
+    } else if(action=='AI-ACT-243') {
+      final purchase=source.workspacePurchases.where((p)=>p.shipmentId==entity).singleOrNull;
+      if(purchase==null)return null;
+      await source.loadWorkspaceReceiptDraft(purchase);
+      if(!current()||!source.workspaceReceiptDraftLoaded(purchase)||source.workspaceReceiptDraft(purchase)?.matchesSnapshot(purchase)!=true)return null;
+    } else {
+      final saved=_receivingSavedReceipt(source,entity);if(saved==null)return null;
+      if(action=='AI-ACT-247'||action=='AI-ACT-250') {
+        if(!source.workspaceInvoiceHistoryLoaded||source.supplierGoodsReturnFormKey(saved.supplierId,saved.receipt.id)==null)return null;
+        if(action=='AI-ACT-250') {
+          final key=source.supplierGoodsReturnFormKey(saved.supplierId,saved.receipt.id)!;
+          final draft=await source.readLedgerForm(key);if(!current()||draft?.fields['attempt']?.isNotEmpty!=true)return null;
+        }
+      }
+      if(action=='AI-ACT-251'&&(saved.receipt.restockOriginal==null||source.workspaceRestockAttempt(entity)==null))return null;
+      if(action=='AI-ACT-244'&&(!source.workspaceSuppliersLoaded||!source.workspaceInventoryLoaded))return null;
+    }
+    if(!current())return null;
+    return MoolAssistantNativeSnapshot(binding:context.binding,permitted:true,entityId:entity,
+      sourceRevision:_receivingNativeRevision(source,action,entity));
+  }
+  Future<MoolAssistantReviewResult> _openReceivingNative(BuildContext hostContext,WorkSession source,
+    MoolAssistantProposal proposal,StoreReceivingReviewInitial initial,bool Function() proposalCurrent,Listenable ownerChanges,
+    {(Route<void>,NavigatorState)? assistantOwner}) async {
+    final context=_financeAssistantContext(hostContext),entity=proposal.entityId;
+    if(context==null||context.binding!=proposal.binding||entity==null||!proposalCurrent()||_receivingNativeOpen||
+      (await _receivingNativeSnapshot(hostContext,source,initial.actionId,context,entity))?.sourceRevision!=proposal.sourceRevision)return MoolAssistantReviewResult.stale;
+    if(_receivingNativeOpen)return MoolAssistantReviewResult.stale;
+    _receivingNativeOpen=true;
+    try {
+    if(_receivingPrepareActions.contains(initial.actionId)&&initial.items.any((row)=>row.containsKey('lineId')||
+      !source.workspaceCatalogueItems.any((p)=>p.id==row['productId']&&p.stockMode==WorkspaceStockMode.exactQuantity)))return MoolAssistantReviewResult.unavailable;
+    if(initial.text('productId') case final id?) {
+      if(!source.workspaceCatalogueItems.any((p)=>p.id==id&&p.stockMode==WorkspaceStockMode.exactQuantity))return MoolAssistantReviewResult.unavailable;
+    }
+    final account=widget.accountIdentity,scope=source.workspaceSupplierScope,navigation=source.navigationScopeRevision;
+    final route=GoRouter.of(hostContext).routerDelegate.currentConfiguration.last;
+    final visit=(_view,_operation,_focusedFinance);
+    // Physical receiving source is exact SKU/unit/original identity. Mutable
+    // Stock/post revisions remain guarded by each original native CAS operation.
+    final targetCopy=source.workspacePurchaseCopies.where((c)=>c.id==entity).singleOrNull;
+    final targetReceipt=_receivingSavedReceipt(source,entity);
+    final supplierId=initial.actionId=='AI-ACT-403'?_purchaseEntryKey.currentState?._supplierId:initial.actionId=='AI-ACT-238'?entity:targetCopy?.supplier.id??targetReceipt?.supplierId??_receivingKey.currentState?._supplierId;
+    final skuIds=<String>{
+      if(_receivingPrepareActions.contains(initial.actionId))...?_receivingKey.currentState?._lines.map((line)=>line.productId).where((id)=>id.isNotEmpty),
+      if(_receivingPrepareActions.contains(initial.actionId))for(final row in initial.items)if(row['productId'] case final id?)id,
+      if(initial.text('productId') case final id?)id,
+    };
+    // Preparation checks exact loaded sources. After transfer, immutable native
+    // identity and original per-operation CAS own mutable contact/Stock/result
+    // revisions; unrelated changes and native acknowledgements are not grants.
+    String sourceIdentity()=>jsonEncode([
+      if(supplierId!=null)source.workspaceSuppliers.where((p)=>p.id==supplierId).map((p)=>[p.id,p.createdAt.toUtc().toIso8601String()]).toList(),
+      for(final id in skuIds)source.workspaceCatalogueItems.where((p)=>p.id==id).map((p)=>Map<String,Object?>.of(p.toInventoryJson())..remove('stock')..remove('available')).toList(),
+      if(const {'AI-ACT-244','AI-ACT-247','AI-ACT-250','AI-ACT-251'}.contains(initial.actionId))_receivingSavedReceipt(source,entity)?.toJson(),
+      if(_receivingBillActions.contains(initial.actionId))source.workspacePurchaseCopies.where((c)=>c.id==entity).map((c)=>c.toJson()).toList(),
+      if(_receivingBillActions.contains(initial.actionId))source.workspaceSupplierLedger(targetCopy!.supplier.id)?.openingRecord?.toJson(),
+      if(initial.actionId=='AI-ACT-245')source.workspaceSupplierLedger(targetCopy!.supplier.id)?.goodsReceipts[initial.text('receiptId')]?.toJson(),
+      if(initial.actionId=='AI-ACT-243')_receivingPurchaseSource(source,entity,exact:true),
+      if(initial.actionId=='AI-ACT-251')source.workspaceRestockAttempt(entity)?.command.toJson(),
+    ]);
+    final restockOwner=source.restockReceivingReviewOwner;
+    final originalSource=sourceIdentity();
+    bool nativeOwner()=>mounted&&hostContext.mounted&&identical(widget.session,source)&&identical(widget.accountIdentity,account)&&
+      scope==source.workspaceSupplierScope&&navigation==source.navigationScopeRevision&&_financePermitted(context)&&
+      _financeAssistantContext(hostContext)?.binding==context.binding&&visit==(_view,_operation,_focusedFinance)&&
+      identical(GoRouter.of(hostContext).routerDelegate.currentConfiguration.last,route)&&sourceIdentity()==originalSource&&
+      (initial.actionId!='AI-ACT-251'||identical(source.restockReceivingReviewOwner,restockOwner));
+    final nativeChanges=Listenable.merge([source,routerDelegateOf(hostContext),hostContext.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+    final state=_receivingKey.currentState;
+    if(_receivingPrepareActions.contains(initial.actionId)&&state!=null) {
+      bool current()=>nativeOwner()&&_assistantReceivingOwnerActive(state);
+      final lease=_ReceivingNativeLease(current,nativeChanges);
+      if(!proposalCurrent()||!state._adoptReceiving(initial,lease)){lease.dispose();return MoolAssistantReviewResult.unavailable;}
+      return MoolAssistantReviewResult.returnToOwner;
+    }
+    WorkspaceGoodsReceivingRead? receivingRead;
+    if(initial.actionId=='AI-ACT-251') {
+      final original=targetReceipt?.receipt.restockOriginal;
+      if(original==null)return MoolAssistantReviewResult.unavailable;
+      receivingRead=await source.readWorkspaceRestockReceivingForReview(original,inputCurrent:()=>nativeOwner()&&proposalCurrent());
+      if(!nativeOwner()||!proposalCurrent())return MoolAssistantReviewResult.stale;
+      if(receivingRead==null||receivingRead.group!=null&&receivingRead.group!.supplierId!=targetReceipt!.supplierId)return MoolAssistantReviewResult.unavailable;
+    }
+    if(const {'AI-ACT-244','AI-ACT-251'}.contains(initial.actionId)&&state!=null) {
+      if(!_assistantReceivingOwnerActive(state)||!state._assistantReceiptReviewReady||state._frozen?.id!=entity)return MoolAssistantReviewResult.unavailable;
+      final lease=_ReceivingNativeLease(()=>nativeOwner()&&_assistantReceivingOwnerActive(state),nativeChanges);
+      if(!proposalCurrent()||!lease.current){lease.dispose();return MoolAssistantReviewResult.stale;}
+      if(!state._adoptReceivingRead(initial,lease,receivingRead:receivingRead)){lease.dispose();return MoolAssistantReviewResult.stale;}
+      return MoolAssistantReviewResult.returnToOwner;
+    }
+    if(initial.actionId=='AI-ACT-245') {
+      final copy=source.workspacePurchaseCopies.singleWhere((c)=>c.id==entity);
+      if(!_receivingMatchTargetValid(source,copy,initial))return MoolAssistantReviewResult.unavailable;
+      final invoice=_purchaseEntryKey.currentState,match=_purchaseEntryKey.currentState?._billGoodsKey.currentState;
+      if(match!=null){
+        if(invoice==null||!_assistantInvoiceOwnerActive(invoice)||match.widget.copy.id!=copy.id||!match._canAdoptReceivingMatch(initial))return MoolAssistantReviewResult.unavailable;
+        final lease=_ReceivingNativeLease(()=>nativeOwner()&&_assistantInvoiceOwnerActive(invoice),nativeChanges);
+        if(!proposalCurrent()||!await invoice._openBillPanel(copy,'goods')||!nativeOwner()||!proposalCurrent()||!match._adoptReceivingMatch(initial,lease)){
+          lease.dispose();return MoolAssistantReviewResult.unavailable;
+        }
+        invoice._billPanelController(copy,'goods').expand();return MoolAssistantReviewResult.returnToOwner;
+      }
+    }
+    if(initial.actionId=='AI-ACT-403') {
+      final invoice=_purchaseEntryKey.currentState!;
+      final copy=invoice._attachments.where((a)=>a.digest==entity&&a.valid).singleOrNull;
+      if(copy==null)return MoolAssistantReviewResult.unavailable;
+      try {await source.workspacePurchaseInvoiceCapture.read(invoice._scope!,invoice._draftId,copy);}
+      on Object{return MoolAssistantReviewResult.unavailable;}
+      if(!nativeOwner()||!proposalCurrent())return MoolAssistantReviewResult.stale;
+      final lease=_ReceivingNativeLease(()=>nativeOwner()&&_assistantInvoiceOwnerActive(invoice),nativeChanges);
+      if(!proposalCurrent()||!invoice._appendReceivingTaxEvidence(entity,initial,lease)){lease.dispose();return MoolAssistantReviewResult.unavailable;}
+      return MoolAssistantReviewResult.returnToOwner;
+    }
+    if(initial.actionId=='AI-ACT-247'||initial.actionId=='AI-ACT-248') {
+      final saved=_receivingSavedReceipt(source,entity);
+      final copy=source.workspacePurchaseCopies.where((c)=>c.id==entity).singleOrNull;
+      if(initial.actionId=='AI-ACT-247'&&(saved==null||initial.items.any((row)=>!saved.receipt.lines.any((line)=>line.sourceLineId==row['receiptLineId']))))return MoolAssistantReviewResult.unavailable;
+      if(initial.actionId=='AI-ACT-248') {
+        final ledger=copy==null?null:source.workspaceSupplierLedger(copy.supplier.id);
+        if(copy==null||ledger==null||!_supplierShortageOptions(copy,ledger).any((option)=>option.$1==initial.values['billLineIndex']&&
+          option.$2.expectedDeliveryId==initial.text('deliveryId')&&option.$3.sourceLineId==initial.text('receiptLineId')))return MoolAssistantReviewResult.unavailable;
+      }
+      final key=initial.actionId=='AI-ACT-247'&&saved!=null?source.supplierGoodsReturnFormKey(saved.supplierId,saved.receipt.id):
+        copy==null?null:source.supplierShortageFormKey(copy);
+      if(key==null)return MoolAssistantReviewResult.unavailable;
+      final original=await source.readLedgerForm(key);
+      if(!nativeOwner()||!proposalCurrent())return MoolAssistantReviewResult.stale;
+      if(original?.fields.isNotEmpty==true)return MoolAssistantReviewResult.unavailable;
+    }
+    final changes=Listenable.merge([nativeChanges,ownerChanges]);
+    final lease=_ReceivingNativeLease(()=>nativeOwner()&&proposalCurrent(),changes);
+    try {
+      if(initial.actionId=='AI-ACT-402'||initial.actionId=='AI-ACT-404') {
+        if(state==null||!_assistantReceivingOwnerActive(state))return MoolAssistantReviewResult.unavailable;
+        return await state._receivingDocumentPreparation(initial,entity,()=>lease.current,changes,nativeOwner:nativeOwner,nativeOwnerChanges:nativeChanges,assistantOwner:assistantOwner);
+      }
+      if(_receivingBillActions.contains(initial.actionId)) {
+        final copy=source.workspacePurchaseCopies.singleWhere((c)=>c.id==entity);
+        if(initial.actionId=='AI-ACT-245') {
+          await _showReceivingBillMatch(hostContext,source,copy,initial,lease);
+        } else {
+          await _showSupplierShortage(hostContext,source,copy,ownerCurrent:()=>lease.current,
+            receivingInitial:initial,ownerChanges:changes,assistantReadOnlyOpen:true);
+        }
+      } else if(initial.actionId=='AI-ACT-247'||initial.actionId=='AI-ACT-250') {
+        final saved=_receivingSavedReceipt(source,entity)!;
+        await _showSupplierGoodsReturn(hostContext,source,saved.supplierId,saved.receipt,
+          ownerCurrent:()=>lease.current,receivingInitial:initial,ownerChanges:changes);
+      } else if(initial.actionId=='AI-ACT-243') {
+        await Navigator.of(hostContext,rootNavigator:true).push<void>(MaterialPageRoute(builder:(_)=>
+          Scaffold(appBar:AppBar(title:const Text('Check delivery')),body:_ReceivingOwnerSurface(current:()=>lease.current,changes:changes,
+            child:AnimatedBuilder(animation:source,builder:(context,_) {
+              final purchase=source.workspacePurchases.where((p)=>p.shipmentId==entity).singleOrNull;
+              if(purchase==null)return const Center(child:Text('This original delivery is unavailable.'));
+              return SingleChildScrollView(padding:const EdgeInsets.all(16),child:_StoreReceiptEditor(key:ValueKey(entity),
+                session:source,purchase:purchase,ownerCurrent:()=>lease.current,assistantContinue:true));
+            })))));
+      } else {
+        final saved=_receivingSavedReceipt(source,entity);
+        await Navigator.of(hostContext,rootNavigator:true).push<void>(MaterialPageRoute(builder:(_)=>
+          _ReceivingReviewRoute(session:source,initial:initial,entity:entity,
+            supplierId:initial.actionId=='AI-ACT-238'?entity:saved!.supplierId,lease:lease,receivingRead:receivingRead)));
+      }
+      return lease.current?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    } finally {lease.dispose();}
+    } finally {_receivingNativeOpen=false;}
+  }
+
+  bool _financePermitted(MoolAssistantContext ctx) => mounted &&
+      ctx.signedIn && ctx.inWorkspace && ctx.storeWorkspace &&
+      widget.accountAuthenticated && widget.accountIdentity?.firebasePrincipal != null &&
+      session.workspaceStoreAuthoringAvailable &&
+      session.workspaceAccountCurrent(accountReady: _accountRecoveryReady) &&
+      !session.workspaceAccountRecoveryPending && !session.workspaceAccountRecoveryFailed &&
+      ctx.workspaceId == session.activeWorkspace?.id &&
+      ctx.workspaceRevision == session.navigationScopeRevision;
+
+
+
+  final Map<Object, (String, int)> _defaultsAssistantVersions = {};
+  Object? _defaultsAssistantVersionOwner;
+  int _defaultsAssistantVersion = 0;
+  String _defaultsAssistantRevision(WorkSession source, MoolAssistantContext ctx) {
+    final owner = (source, widget.accountIdentity, widget.accountAuthenticated, ctx.binding,
+      source.activeWorkspace?.id, source.navigationScopeRevision, source.tradingPreferencesContext);
+    if (_defaultsAssistantVersionOwner != owner) {
+      _defaultsAssistantVersions.clear();
+      _defaultsAssistantVersionOwner = owner;
+    }
+    final inputs = _defaultsEditors[source]?.where((state) => state.mounted && state._current).map(
+      (state) => (identityHashCode(state), state._editRevision, state._dirty, state._saving).toString()).join('|') ?? '';
+    final signature = '${jsonEncode(source.workspaceProductDefaults.toJson())}|$inputs';
+    if (_defaultsAssistantVersions[owner]?.$1 != signature) {
+      _defaultsAssistantVersions[owner] = (signature, ++_defaultsAssistantVersion);
+    }
+    return 'store-product-defaults:${_defaultsAssistantVersions[owner]!.$2}';
+  }
+
+  Future<MoolAssistantNativeSnapshot?> _defaultsAssistantSnapshot(BuildContext hostContext,
+    WorkSession source, MoolAssistantContext ctx, String? entityId) async {
+    bool current() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx) &&
+      !_defaultsEditorBusy(source) && !source.workspaceTradingPreferencesSaving &&
+      !_financeSheetOpen && !_couponsSheetOpen;
+    final store = source.activeWorkspace?.id;
+    if (store == null || entityId != null && entityId != store || !current()) return null;
+    if (!await source.loadWorkspaceProductDefaults(expectedStoreId: store) || !current()) return null;
+    return MoolAssistantNativeSnapshot(binding: ctx.binding, permitted: true, entityId: entityId,
+      sourceRevision: _defaultsAssistantRevision(source, ctx));
+  }
+
+  Future<MoolAssistantReviewResult> _showDefaultsAssistantReview(BuildContext hostContext,
+    WorkSession source, MoolAssistantProposal proposal, bool Function() reviewCurrent) async {
+    final trusted = _financeAssistantContext(hostContext);
+    if (trusted == null || !reviewCurrent() || !identical(widget.session, source) ||
+        trusted.binding != proposal.binding || !_financePermitted(trusted) ||
+        proposal.entityId != null && proposal.entityId != source.activeWorkspace?.id ||
+        proposal.sourceRevision != _defaultsAssistantRevision(source, trusted) ||
+        _financeSheetOpen || _couponsSheetOpen) return MoolAssistantReviewResult.stale;
+    bool owner() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == trusted.binding && _financePermitted(trusted);
+    return showStoreProductDefaultsReview(context, source,
+      readOnly: proposal.actionId == 'AI-ACT-218',
+      initialData: proposal.actionId == 'AI-ACT-218' ? null
+        : StoreProductDefaultsInitialData.fromFields(proposal.fields),
+      isCurrent: reviewCurrent, ownerCurrent: owner,
+      ownerChanges: hostContext.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges);
+  }
+
+  void _refreshProductAssistantVersionOwner() {
+    final owner = (session, widget.accountIdentity, widget.accountAuthenticated,
+      _financeAssistantContext(context)?.binding,
+      session.activeWorkspace?.id, session.navigationScopeRevision,
+      session.publicationPreferencesContext, session.tradingPreferencesContext);
+    if (_productAssistantVersionOwner != owner) {
+      _productAssistantVersions.clear();
+      _productAssistantVersionOwner = owner;
+    }
+  }
+
+  String? _productAssistantSourceRevision(WorkSession source, String actionId,
+    MoolAssistantContext ctx, String? entityId) {
+    _refreshProductAssistantVersionOwner();
+    final product = _assistantProductTarget(source, actionId == 'AI-ACT-213', entityId);
+    if (product == null) return null;
+    final key = (source, actionId, entityId, ctx.binding,
+      source.publicationPreferencesContext, source.tradingPreferencesContext);
+    final signature = _assistantProductSignature(source, product);
+    if (_productAssistantVersions[key]?.$1 != signature) {
+      _productAssistantVersions[key] = (signature, ++_productAssistantVersion);
+    }
+    return 'store-product:${_productAssistantVersions[key]!.$2}';
+  }
+
+  Future<MoolAssistantNativeSnapshot?> _productAssistantSnapshot(
+    BuildContext hostContext, WorkSession source, String actionId,
+    MoolAssistantContext ctx, String? entityId,
+  ) async {
+    bool current() => mounted && hostContext.mounted && identical(widget.session, source) &&
+        _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx) &&
+        !_financeSheetOpen && !_couponsSheetOpen && !_productEditorOpen(source);
+    if (entityId == null || !current()) return null;
+    // Native Load/Recover may queue a durable Stock report. AI snapshots use
+    // only a checkpoint already admitted by the original native owner.
+    if (source.localInventoryEnabled && (!source.workspaceInventoryLoaded ||
+        source.workspaceInventoryError != null || source.workspaceGoodsReceiptBusy ||
+        source.workspaceGoodsReceiptRecoveryPending)) return null;
+    if (actionId == 'AI-ACT-213') {
+      final storeId = source.activeWorkspace?.id;
+      final ready = storeId != null && await source.loadWorkspaceProductDefaults(expectedStoreId: storeId);
+      if (!ready || !current()) return null;
+    }
+    final adding = actionId == 'AI-ACT-213';
+    final product = _assistantProductTarget(source, adding, entityId);
+    if (product == null || adding && source.workspaceCatalogueItems.any((item) =>
+        item.id == product.id || item.sku.trim().toLowerCase() == product.sku.trim().toLowerCase())) return null;
+    final revision = _productAssistantSourceRevision(source, actionId, ctx, entityId);
+    return revision == null ? null : MoolAssistantNativeSnapshot(binding: ctx.binding,
+      sourceRevision: revision, entityId: entityId, permitted: true);
+  }
+
+  Future<MoolAssistantReviewResult> _showProductAssistantInitial(
+    BuildContext hostContext, WorkSession source, StoreProductInitialData initial,
+    MoolAssistantProposal proposal, bool Function() reviewCurrent,
+  ) async {
+    final trusted = _financeAssistantContext(hostContext);
+    if (trusted == null || proposal.entityId == null || !reviewCurrent() ||
+        !identical(widget.session, source) || !_financePermitted(trusted) ||
+        trusted.binding != proposal.binding || _financeSheetOpen || _couponsSheetOpen ||
+        proposal.sourceRevision != _productAssistantSourceRevision(
+          source, proposal.actionId, trusted, proposal.entityId)) {
+      return MoolAssistantReviewResult.stale;
+    }
+    bool ownerCurrent() => mounted && hostContext.mounted && identical(widget.session, source) &&
+        _financeAssistantContext(hostContext)?.binding == trusted.binding && _financePermitted(trusted);
+    return showStoreProductInitialReview(context, source,
+      adding: proposal.actionId == 'AI-ACT-213', entityId: proposal.entityId!, initialData: initial,
+      isCurrent: () => reviewCurrent() && ownerCurrent(), ownerCurrent: ownerCurrent);
+  }
+
+
+  String? _supplierMoneyAssistantRevision(WorkSession source, String actionId,
+    MoolAssistantContext ctx, String? entityId) {
+    final target = _assistantSupplierMoneyTarget(source, actionId, entityId);
+    if (target == null) return null;
+    final signature = _assistantSupplierMoneySignature(source, target);
+    if (signature == null) return null;
+    final owner = (source, actionId, entityId, ctx.binding, source.workspaceSupplierScope,
+      source.publicationPreferencesContext);
+    if (_supplierMoneyAssistantOwner != owner || _supplierMoneyAssistantDigest != signature) {
+      _supplierMoneyAssistantOwner = owner;
+      _supplierMoneyAssistantDigest = signature;
+      _supplierMoneyAssistantVersion++;
+    }
+    return 'supplier-money:$_supplierMoneyAssistantVersion';
+  }
+
+  Future<MoolAssistantNativeSnapshot?> _supplierMoneyAssistantSnapshot(
+    BuildContext hostContext, WorkSession source, String actionId,
+    MoolAssistantContext ctx, String? entityId,
+  ) async {
+    bool current() => mounted && hostContext.mounted && identical(widget.session, source) &&
+        _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx) &&
+        !_supplierMoneyFormOpen(source) && !_financeSheetOpen && !_couponsSheetOpen;
+    if (entityId == null || !current()) return null;
+    if (!_assistantFinancialLedgerAdmitted(source) || !current()) return null;
+    final target = _assistantSupplierMoneyTarget(source, actionId, entityId);
+    if (target == null) return null;
+    final key = _assistantSupplierMoneyKey(source, target);
+    final signature = _assistantSupplierMoneySignature(source, target);
+    if (key == null || signature == null) return null;
+    try {
+      final saved = await source.readLedgerForm(key);
+      if (!current() || saved != null || _assistantSupplierMoneySignature(source, target) != signature) return null;
+    } on Object { return null; }
+    final revision = _supplierMoneyAssistantRevision(source, actionId, ctx, entityId);
+    return revision == null ? null : MoolAssistantNativeSnapshot(binding: ctx.binding,
+      sourceRevision: revision, entityId: entityId, permitted: true);
+  }
+
+  Future<MoolAssistantReviewResult> _showSupplierMoneyAssistantInitial(
+    BuildContext hostContext, WorkSession source, StoreSupplierMoneyInitialData initial,
+    MoolAssistantProposal proposal, bool Function() reviewCurrent, {StoreSupplierSelectedDocumentInput? selectedDocument}
+  ) async {
+    final trusted = _financeAssistantContext(hostContext);
+    if (trusted == null || !reviewCurrent() || proposal.entityId == null ||
+        !identical(widget.session, source) || !_financePermitted(trusted) ||
+        proposal.binding != trusted.binding || _financeSheetOpen || _couponsSheetOpen ||
+        proposal.sourceRevision != _supplierMoneyAssistantRevision(source,
+          proposal.actionId, trusted, proposal.entityId)) return MoolAssistantReviewResult.stale;
+    bool ownerCurrent() => mounted && hostContext.mounted && identical(widget.session, source) &&
+        _financeAssistantContext(hostContext)?.binding == trusted.binding && _financePermitted(trusted);
+    return showStoreSupplierMoneyInitialReview(context, source,
+      actionId: proposal.actionId, entityId: proposal.entityId!, initialData: initial,
+      isCurrent: () => reviewCurrent() && ownerCurrent(), ownerCurrent: ownerCurrent, selectedDocument: selectedDocument);
+  }
+
+  String _supplierAllocationAssistantRevision(WorkSession source, String actionId,
+    MoolAssistantContext ctx, String entityId, String signature) {
+    final owner = (source, actionId, entityId, ctx.binding, source.workspaceSupplierScope,
+      source.publicationPreferencesContext);
+    if (_supplierAllocationAssistantOwner != owner || _supplierAllocationAssistantDigest != signature) {
+      _supplierAllocationAssistantOwner = owner;
+      _supplierAllocationAssistantDigest = signature;
+      _supplierAllocationAssistantVersion++;
+    }
+    return 'supplier-allocation:$_supplierAllocationAssistantVersion';
+  }
+  Future<MoolAssistantNativeSnapshot?> _supplierAllocationAssistantSnapshot(BuildContext hostContext,
+    WorkSession source, String actionId, MoolAssistantContext ctx, String? entityId) async {
+    bool current() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx) &&
+      !_financeSheetOpen && !_couponsSheetOpen && !_supplierMoneyFormOpen(source);
+    if (entityId == null || !current()) return null;
+    final read = await _readAssistantSupplierAllocation(source, entityId, current);
+    if (read == null || !current() || (actionId == 'AI-ACT-262' ? read.saved != null :
+        read.saved?.valid != true || read.saved?.supplierAllocationIntent == null)) return null;
+    return MoolAssistantNativeSnapshot(binding: ctx.binding, entityId: entityId, permitted: true,
+      sourceRevision: _supplierAllocationAssistantRevision(source, actionId, ctx, entityId, read.signature));
+  }
+  Future<MoolAssistantReviewResult> _showSupplierAllocationAssistant(BuildContext hostContext,
+    WorkSession source, MoolAssistantProposal proposal, bool Function() reviewCurrent, {StoreSupplierSelectedDocumentInput? selectedDocument}) async {
+    final trusted = _financeAssistantContext(hostContext);
+    if (trusted == null || proposal.entityId == null || trusted.binding != proposal.binding) {
+      return MoolAssistantReviewResult.stale;
+    }
+    bool owner() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == trusted.binding && _financePermitted(trusted) &&
+      !_financeSheetOpen && !_couponsSheetOpen;
+    final read = await _readAssistantSupplierAllocation(source, proposal.entityId!, () => owner() && reviewCurrent());
+    if (read == null || !owner() || !reviewCurrent() || proposal.sourceRevision !=
+        _supplierAllocationAssistantRevision(source, proposal.actionId, trusted, proposal.entityId!, read.signature)) {
+      return MoolAssistantReviewResult.stale;
+    }
+    return showStoreSupplierAllocationReview(hostContext, source,
+      actionId: proposal.actionId, entityId: proposal.entityId!,
+      initialData: proposal.actionId == 'AI-ACT-262'
+        ? StoreSupplierAllocationInitialData.fromFields(proposal.fields) : null,
+      operationId: proposal.fields['operationId'] as String?, expectedSignature: read.signature,
+      isCurrent: () => owner() && reviewCurrent(), ownerCurrent: owner, selectedDocument: selectedDocument);
+  }
+
+
+  String? _supplierAdjustmentSignature(WorkSession source, String actionId, String entityId) {
+    if (actionId == 'AI-ACT-266') {
+      final target = _assistantRefundTarget(source, entityId);
+      return target == null ? null : _assistantRefundSignature(source, target);
+    }
+    final copy = source.workspacePurchaseCopies.where((copy) => copy.id == entityId).singleOrNull;
+    return copy == null ? null : _assistantCreditSignature(source, copy);
+  }
+  WorkspaceLedgerFormKey? _supplierAdjustmentKey(WorkSession source, String actionId, String entityId) {
+    if (actionId == 'AI-ACT-266') return _assistantRefundTarget(source, entityId)?.key(source);
+    final copy = source.workspacePurchaseCopies.where((copy) => copy.id == entityId).singleOrNull;
+    return copy == null ? null : source.supplierCreditFormKey(copy);
+  }
+  String? _supplierAdjustmentRevision(WorkSession source, String actionId,
+    MoolAssistantContext ctx, String entityId) {
+    final digest = _supplierAdjustmentSignature(source, actionId, entityId);
+    if (digest == null) return null;
+    final owner = (source, actionId, entityId, ctx.binding, source.workspaceSupplierScope,
+      source.publicationPreferencesContext);
+    if (_supplierAdjustmentAssistantOwner != owner || _supplierAdjustmentAssistantDigest != digest) {
+      _supplierAdjustmentAssistantOwner = owner;
+      _supplierAdjustmentAssistantDigest = digest;
+      _supplierAdjustmentAssistantVersion++;
+    }
+    return 'supplier-credit-refund:$_supplierAdjustmentAssistantVersion';
+  }
+  Future<MoolAssistantNativeSnapshot?> _supplierAdjustmentAssistantSnapshot(
+    BuildContext hostContext, WorkSession source, String actionId,
+    MoolAssistantContext ctx, String? entityId) async {
+    bool current() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx) &&
+      !_supplierAdjustmentOpen(source) && !_financeSheetOpen && !_couponsSheetOpen;
+    if (entityId == null || !current()) return null;
+    if (!_assistantFinancialLedgerAdmitted(source) || !current()) return null;
+    final key = _supplierAdjustmentKey(source, actionId, entityId);
+    final digest = _supplierAdjustmentSignature(source, actionId, entityId);
+    if (key == null || digest == null) return null;
+    try {
+      final saved = await source.readLedgerForm(key);
+      if (!current() || saved != null || _supplierAdjustmentSignature(source, actionId, entityId) != digest) return null;
+    } on Object { return null; }
+    final revision = _supplierAdjustmentRevision(source, actionId, ctx, entityId);
+    return revision == null ? null : MoolAssistantNativeSnapshot(binding: ctx.binding,
+      entityId: entityId, sourceRevision: revision, permitted: true);
+  }
+  Future<MoolAssistantReviewResult> _showSupplierAdjustmentAssistantInitial(
+    BuildContext hostContext, WorkSession source, MoolAssistantProposal proposal,
+    bool Function() reviewCurrent, {StoreSupplierSelectedDocumentInput? selectedDocument}) async {
+    final trusted = _financeAssistantContext(hostContext);
+    if (trusted == null || !reviewCurrent() || proposal.entityId == null ||
+        !identical(widget.session, source) || !_financePermitted(trusted) || proposal.binding != trusted.binding ||
+        proposal.sourceRevision != _supplierAdjustmentRevision(source, proposal.actionId, trusted, proposal.entityId!)) {
+      return MoolAssistantReviewResult.stale;
+    }
+    bool ownerCurrent() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == trusted.binding && _financePermitted(trusted);
+    if (proposal.actionId == 'AI-ACT-266') return showStoreSupplierRefundInitialReview(context, source,
+      entityId: proposal.entityId!, initialData: StoreSupplierRefundInitialData.fromFields(proposal.fields),
+      isCurrent: () => ownerCurrent() && reviewCurrent(), ownerCurrent: ownerCurrent, selectedDocument: selectedDocument);
+    return showStoreSupplierCreditInitialReview(context, source,
+      actionId: proposal.actionId, entityId: proposal.entityId!,
+      initialData: StoreSupplierCreditInitialData.fromFields(proposal.fields),
+      isCurrent: () => ownerCurrent() && reviewCurrent(), ownerCurrent: ownerCurrent, selectedDocument: selectedDocument);
+  }
+
+  String _supplierAdjustmentRecoveryRevision(WorkSession source, String actionId,
+    MoolAssistantContext ctx, String entityId, String signature) {
+    final owner = (source, actionId, entityId, ctx.binding, source.workspaceSupplierScope,
+      source.publicationPreferencesContext);
+    if (_supplierAdjustmentRecoveryOwner != owner || _supplierAdjustmentRecoveryDigest != signature) {
+      _supplierAdjustmentRecoveryOwner = owner;
+      _supplierAdjustmentRecoveryDigest = signature;
+      _supplierAdjustmentRecoveryVersion++;
+    }
+    return 'supplier-adjustment-recovery:$_supplierAdjustmentRecoveryVersion';
+  }
+  Future<MoolAssistantNativeSnapshot?> _supplierAdjustmentRecoverySnapshot(BuildContext hostContext,
+    WorkSession source, String actionId, MoolAssistantContext ctx, String? entityId) async {
+    bool current() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx) &&
+      !_financeSheetOpen && !_couponsSheetOpen;
+    if (entityId == null || !current()) return null;
+    final read = await _readAssistantAdjustmentRecovery(source, actionId, entityId, current);
+    if (read == null || !current()) return null;
+    return MoolAssistantNativeSnapshot(binding: ctx.binding, entityId: entityId, permitted: true,
+      sourceRevision: _supplierAdjustmentRecoveryRevision(source, actionId, ctx, entityId, read.signature));
+  }
+  Future<MoolAssistantReviewResult> _showSupplierAdjustmentRecoveryAssistant(BuildContext hostContext,
+    WorkSession source, MoolAssistantProposal proposal, bool Function() reviewCurrent) async {
+    final trusted = _financeAssistantContext(hostContext);
+    if (trusted == null || proposal.entityId == null || trusted.binding != proposal.binding) {
+      return MoolAssistantReviewResult.stale;
+    }
+    bool owner() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == trusted.binding && _financePermitted(trusted) &&
+      !_financeSheetOpen && !_couponsSheetOpen;
+    final read = await _readAssistantAdjustmentRecovery(source, proposal.actionId, proposal.entityId!,
+      () => owner() && reviewCurrent());
+    if (read == null || !owner() || !reviewCurrent() || proposal.sourceRevision !=
+        _supplierAdjustmentRecoveryRevision(source, proposal.actionId, trusted, proposal.entityId!, read.signature)) {
+      return MoolAssistantReviewResult.stale;
+    }
+    return showStoreSupplierAdjustmentRecoveryReview(hostContext, source, actionId: proposal.actionId,
+      entityId: proposal.entityId!, operationId: proposal.fields['operationId']! as String,
+      expectedSignature: read.signature, isCurrent: () => owner() && reviewCurrent(), ownerCurrent: owner);
+  }
+
+  Future<MoolAssistantNativeSnapshot?> _supplierAccountAssistantSnapshot(BuildContext hostContext,
+    WorkSession source, String actionId, MoolAssistantContext ctx, String? entityId) async {
+    bool current() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx) &&
+      !_financeSheetOpen && !_couponsSheetOpen && !_supplierOpeningFormOpen(source) &&
+      !_supplierMoneyFormOpen(source) && !source.workspaceSupplierSaving;
+    if (!current() || (actionId == 'AI-ACT-270' ? entityId != null : entityId == null)) return null;
+    final scope = source.workspaceSupplierScope;
+    if (actionId != 'AI-ACT-270' && !_assistantFinancialBookAdmitted(source) || !current() || source.workspaceSupplierScope != scope) return null;
+    final signature = _supplierAccountAssistantSignature(source, actionId, entityId);
+    if (signature == null) return null;
+    return MoolAssistantNativeSnapshot(binding: ctx.binding, sourceRevision: signature,
+      entityId: entityId, permitted: true);
+  }
+
+  Future<MoolAssistantReviewResult> _showSupplierAccountAssistant(BuildContext hostContext,
+    WorkSession source, MoolAssistantProposal proposal, bool Function() reviewCurrent,{Listenable? reviewChanges}) async {
+    final trusted = _financeAssistantContext(hostContext);
+    if (trusted == null || trusted.binding != proposal.binding || !reviewCurrent() ||
+        !identical(widget.session, source) || !_financePermitted(trusted) ||
+        _financeSheetOpen || _couponsSheetOpen ||
+        _supplierAccountAssistantSignature(source, proposal.actionId, proposal.entityId) != proposal.sourceRevision) {
+      return MoolAssistantReviewResult.stale;
+    }
+    bool ownerCurrent() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == trusted.binding && _financePermitted(trusted);
+    return showStoreSupplierAccountReview(context, source, actionId: proposal.actionId,
+      entityId: proposal.entityId, fields: proposal.fields, expectedSignature: proposal.sourceRevision,
+      isCurrent: () => ownerCurrent() && reviewCurrent(), ownerCurrent: ownerCurrent,
+      ownerChanges:Listenable.merge([hostContext.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges,reviewChanges]),
+      validUntil:proposal.actionId=='AI-ACT-271'?proposal.validUntil:null);
+  }
+
+  Object? _orderStatusAssistantOwner;String? _orderStatusAssistantFingerprint;int _orderStatusAssistantRevision=0;
+  String _orderStatusSource(WorkSession source)=>jsonEncode([
+    source.workspaceOrderFilter,source.currentWorkspaceOrderId,source.workspaceOrderStage,source.workspaceOrderCustomer,
+    source.workspaceOrderItems,source.workspaceOrderQuantities,source.workspaceOrderAmount,source.workspaceOrderSource,
+    source.workspaceOrderFulfilment,source.workspaceOrderPayment,source.workspaceOrderAddress,
+    source.workspaceOrderNeedsDelivery,source.workspaceOrderActionDeadline?.toIso8601String(),
+    [for(final order in source.workspaceOrders)order.toLedgerJson()],
+    source.workspaceOperationalFeedAvailable,source.workspaceOperationalFeedError,source.workspaceOperationalFeedBusy,
+    source.workspaceOperationalFeedHasMore,source.workspaceOperationalPending,
+  ]);
+  String _orderStatusRevision(WorkSession source,MoolAssistantContext ctx){
+    final owner=(source,widget.accountIdentity,widget.accountAuthenticated,source.navigationScopeRevision,
+      source.publicationPreferencesContext,ctx.binding);
+    final fingerprint=_orderStatusSource(source);
+    if(_orderStatusAssistantOwner!=owner||_orderStatusAssistantFingerprint!=fingerprint){
+      _orderStatusAssistantOwner=owner;_orderStatusAssistantFingerprint=fingerprint;_orderStatusAssistantRevision++;
+    }
+    return 'native-order-status:$_orderStatusAssistantRevision';
+  }
+  MoolAssistantNativeSnapshot? _orderStatusSnapshot(BuildContext host,WorkSession source,MoolAssistantContext ctx,String? entity){
+    if(entity!=null||!mounted||!host.mounted||!identical(widget.session,source)||!_stockAssistantNavigationReady||
+      !_financePermitted(ctx)||_financeAssistantContext(host)?.binding!=ctx.binding)return null;
+    return MoolAssistantNativeSnapshot(binding:ctx.binding,permitted:true,sourceRevision:_orderStatusRevision(source,ctx));
+  }
+  Future<MoolAssistantReviewResult> _openOrderStatusNative(BuildContext host,WorkSession source,MoolAssistantProposal proposal,
+    bool Function() current)async{
+    final ctx=_financeAssistantContext(host);
+    if(ctx==null||!current()||!proposal.validUntil.isAfter(DateTime.now())||proposal.binding!=ctx.binding||
+      _orderStatusSnapshot(host,source,ctx,proposal.entityId)?.sourceRevision!=proposal.sourceRevision)
+      return MoolAssistantReviewResult.stale;
+    final status=proposal.fields['status'];
+    if(status is! String||!_StoreOrderStatusNativeAdapter.statuses.contains(status))return MoolAssistantReviewResult.unavailable;
+    // Original in-memory filter setter; no business save, transition, draft,
+    // posting or invented period. The original board owns any subsequent read.
+    source.setWorkspaceOrderFilter(status);
+    if(!mounted||!host.mounted||!current()||!identical(widget.session,source)||!_financePermitted(ctx)||
+      _financeAssistantContext(host)?.binding!=ctx.binding)return MoolAssistantReviewResult.stale;
+    _showOperation(_WorkspaceOperation.orders);
+    return MoolAssistantReviewResult.returnToOwner;
+  }
+
+  Object _orderEffectFacts(WorkspaceOrderRecord order){
+    final exact=order.operational;
+    if(exact==null)return order.toLedgerJson();
+    return {'realm':exact.realm,'viewerRole':exact.viewerRole.name,'viewerUserId':exact.viewerUserId,
+      'reference':exact.reference.toJson(),'operationalSourceRevision':exact.operationalSourceRevision,'revision':exact.revision,
+      'stage':exact.stage,'fulfilment':exact.fulfilment,'placedAt':exact.placedAt.toUtc().toIso8601String(),
+      'acceptanceDeadline':exact.acceptanceDeadline?.toUtc().toIso8601String(),'fulfilmentDeadline':exact.fulfilmentDeadline?.toUtc().toIso8601String(),
+      'permittedActions':exact.permittedActions.toList()..sort(),'customerLabel':exact.customerLabel,'address':exact.address,'rejectionReason':exact.rejectionReason,
+      'original':{'storeId':exact.original.storeId,'orderId':exact.original.orderId,'originalFingerprint':exact.original.originalFingerprint,
+        'factsVersion':exact.original.factsVersion,'lines':exact.original.lines.map((line)=>line.toJson()).toList(),'totals':exact.original.totals}};
+  }
+
+  Object? _orderEffectOwner;String? _orderEffectFingerprint;int _orderEffectRevision=0;bool _orderEffectOpen=false;
+  WorkspaceOrderRecord? _orderEffectTarget(WorkSession source,String? entity)=>
+    entity==null?null:source.workspaceOrders.where((row)=>row.id==entity).singleOrNull;
+  bool _orderEffectAvailable(WorkSession source,String action,WorkspaceOrderRecord? order){
+    final exact=order?.operational;
+    if(order==null)return false;
+    if(exact==null)return !order.isClosed&&!order.isCustomerCollection&&!source.hasPendingOrderTime&&
+      !source.busy&&!source.workspaceOperationsSyncing&&!source.workspaceHandoverBusy&&
+      (action=='AI-ACT-275'?order.stage=='Confirmed'&&order.actionDeadline?.isAfter(DateTime.now())!=false:
+        action=='AI-ACT-281'&&(order.stage=='Preparing'||order.stage=='Ready'&&order.needsDelivery&&!source.hasScopedWorkspaceOrder(order.id)));
+    if(exact.viewerRole!=WorkspaceOrderIdentityRole.seller||exact.reference.storeId!=source.activeWorkspace?.id||
+      exact.viewerUserId!=source.contactDraftStore?.accountScope)return false;
+    return action=='AI-ACT-275'?exact.stage=='Confirmed'&&
+      (source.workspaceOrderCanAct(order.id,WorkOrderAction.accept)||source.workspaceOrderCanAct(order.id,WorkOrderAction.reject)):
+      action=='AI-ACT-281'&&exact.stage=='Preparing'&&source.workspaceOrderCanAct(order.id,WorkOrderAction.ready);
+  }
+  String _orderEffectVersion(WorkSession source,MoolAssistantContext ctx,String action,WorkspaceOrderRecord order){
+    final owner=(source,widget.accountIdentity,ctx.binding,source.navigationScopeRevision,action,order.id);
+    final fingerprint=jsonEncode([_orderEffectFacts(order),source.workspaceOrderOperationState(order.id)?.name]);
+    if(_orderEffectOwner!=owner||_orderEffectFingerprint!=fingerprint){_orderEffectOwner=owner;_orderEffectFingerprint=fingerprint;_orderEffectRevision++;}
+    return 'native-order-action:$_orderEffectRevision';
+  }
+  MoolAssistantNativeSnapshot? _orderEffectSnapshot(BuildContext host,WorkSession source,String action,MoolAssistantContext ctx,String? entity){
+    final order=_orderEffectTarget(source,entity);
+    if(!mounted||!host.mounted||!identical(widget.session,source)||_orderEffectOpen||!_stockAssistantNavigationReady||
+      _financeAssistantContext(host)?.binding!=ctx.binding||!_financePermitted(ctx)||!_orderEffectAvailable(source,action,order))return null;
+    return MoolAssistantNativeSnapshot(binding:ctx.binding,entityId:entity,permitted:true,sourceRevision:_orderEffectVersion(source,ctx,action,order!));
+  }
+  Future<MoolAssistantReviewResult> _openOrderEffectNative(BuildContext host,WorkSession source,MoolAssistantProposal p,
+    bool Function() requestCurrent,Listenable? authorityChanges)async{
+    final ctx=_financeAssistantContext(host),order=_orderEffectTarget(source,p.entityId);
+    if(ctx==null||order==null||!requestCurrent()||p.binding!=ctx.binding||!p.validUntil.isAfter(DateTime.now())||
+      _orderEffectSnapshot(host,source,p.actionId,ctx,p.entityId)?.sourceRevision!=p.sourceRevision)return MoolAssistantReviewResult.stale;
+    if(p.actionId=='AI-ACT-281'&&order.operational==null&&order.stage=='Ready'&&order.needsDelivery){
+      // The original exact order desk is already a populated review form. Its
+      // existing Arrange delivery confirmation remains the only booking action.
+      if(!requestCurrent()||!source.selectWorkspaceOrder(order.id)||!requestCurrent()||
+        !identical(_orderEffectTarget(source,p.entityId),order)||!_financePermitted(ctx)||_financeAssistantContext(host)?.binding!=ctx.binding)
+        return MoolAssistantReviewResult.stale;
+      _showOperation(_WorkspaceOperation.orders,focusedOrderId:order.id);
+      return MoolAssistantReviewResult.returnToOwner;
+    }
+    final operation=p.actionId=='AI-ACT-281'?'ready':p.fields['operation'] as String;
+    if(order.operational!=null&&!source.workspaceOrderCanAct(order.id,operation=='accept'?WorkOrderAction.accept:operation=='reject'?WorkOrderAction.reject:WorkOrderAction.ready))
+      return MoolAssistantReviewResult.unavailable;
+    final router=GoRouter.of(host),uri=GoRouter.of(host).state.uri,page=GoRouter.of(host).state.pageKey;
+    bool actor()=>mounted&&host.mounted&&requestCurrent()&&p.validUntil.isAfter(DateTime.now())&&identical(widget.session,source)&&
+      _financeAssistantContext(host)?.binding==ctx.binding&&_financePermitted(ctx)&&router.state.uri==uri&&router.state.pageKey==page;
+    final originalLedger=jsonEncode(_orderEffectFacts(order));
+    bool current()=>actor()&&(order.operational!=null?
+      identical(_orderEffectTarget(source,p.entityId)?.operational,order.operational):
+      identical(_orderEffectTarget(source,p.entityId),order)&&jsonEncode(_orderEffectFacts(order))==originalLedger);
+    Future<void>? issued;_orderEffectOpen=true;
+    try{await Navigator.of(host,rootNavigator:true).push<void>(MaterialPageRoute(builder:(_)=>_StoreOrderEffectReview(
+      session:source,order:order,operation:operation,current:current,validUntil:p.validUntil,
+      changes:Listenable.merge([source,_financeOwner,router.routerDelegate,?authorityChanges,
+        host.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]),track:(future)=>issued=future)));
+      if(issued!=null)await issued;
+      // An explicitly issued native attempt owns its acknowledgement/unknown
+      // cleanup; a newer valid order is not silently restored to this source.
+      return (issued!=null?actor():current())?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    }finally{_orderEffectOpen=false;}
+  }
+
+  Object? _orderTimeSnapshotOwner;String? _orderTimeSnapshotFingerprint;int _orderTimeSnapshotRevision=0;bool _orderTimeReviewOpen=false;
+  String _orderTimeSource(WorkSession source,WorkspaceOrderRecord order)=>jsonEncode([order.toLedgerJson(),
+    source.workspaceOrderOperationState(order.id)?.name,source.workspaceOrderHasTimeRequest(order.id),
+    source.hasPendingOrderTime,source.hasPendingOrderTime?source.currentWorkspaceOrderId:null,source.pendingOrderTimeMinutes]);
+  MoolAssistantNativeSnapshot? _orderTimeSnapshot(BuildContext host,WorkSession source,MoolAssistantContext ctx,String? entity){
+    final order=_orderEffectTarget(source,entity);
+    if(!mounted||!host.mounted||!identical(widget.session,source)||_orderTimeReviewOpen||!_stockAssistantNavigationReady||
+      !_financePermitted(ctx)||_financeAssistantContext(host)?.binding!=ctx.binding||order==null||order.isOperationalProjection||
+      order.stage!='Confirmed'||order.isCustomerCollection||!source.workspaceOrderTimeServiceFor(order.id)||
+      order.actionDeadline==null||!order.actionDeadline!.isAfter(DateTime.now())&& !source.workspaceOrderHasTimeRequest(order.id))return null;
+    final owner=(source,widget.accountIdentity,ctx.binding,source.navigationScopeRevision,order.id),fingerprint=_orderTimeSource(source,order);
+    if(_orderTimeSnapshotOwner!=owner||_orderTimeSnapshotFingerprint!=fingerprint){
+      _orderTimeSnapshotOwner=owner;_orderTimeSnapshotFingerprint=fingerprint;_orderTimeSnapshotRevision++;
+    }
+    return MoolAssistantNativeSnapshot(binding:ctx.binding,entityId:entity,permitted:true,sourceRevision:'native-order-time:$_orderTimeSnapshotRevision');
+  }
+  Future<MoolAssistantReviewResult> _openOrderTimeNative(BuildContext host,WorkSession source,MoolAssistantProposal p,
+    bool Function() requestCurrent,Listenable? authorityChanges)async{
+    final ctx=_financeAssistantContext(host),order=_orderEffectTarget(source,p.entityId);
+    if(ctx==null||order==null||!requestCurrent()||p.binding!=ctx.binding||!p.validUntil.isAfter(DateTime.now())||
+      _orderTimeSnapshot(host,source,ctx,p.entityId)?.sourceRevision!=p.sourceRevision)return MoolAssistantReviewResult.stale;
+    final facts=jsonEncode(order.toLedgerJson()),router=GoRouter.of(host),uri=GoRouter.of(host).state.uri,page=GoRouter.of(host).state.pageKey;
+    bool expired=false;final expiryChanges=ValueNotifier<int>(0);
+    final expiry=Timer(p.validUntil.difference(DateTime.now()),(){expired=true;expiryChanges.value++;});
+    bool actor()=>!expired&&mounted&&host.mounted&&requestCurrent()&&p.validUntil.isAfter(DateTime.now())&&identical(widget.session,source)&&
+      _financeAssistantContext(host)?.binding==ctx.binding&&_financePermitted(ctx)&&router.state.uri==uri&&router.state.pageKey==page;
+    bool inputCurrent()=>actor()&&jsonEncode(_orderEffectTarget(source,p.entityId)?.toLedgerJson())==facts;
+    if(!inputCurrent()||!source.selectWorkspaceOrder(order.id)||!inputCurrent()){expiry.cancel();expiryChanges.dispose();return MoolAssistantReviewResult.stale;}
+    bool issued=false;
+    bool displayed()=>actor()&&(issued||inputCurrent());
+    _orderTimeReviewOpen=true;
+    try{await _showOrderTimeRequest(host,source,initialMinutes:p.fields['minutes'] as int,
+      inputCurrent:inputCurrent,displayCurrent:displayed,onRequest:()=>issued=true,
+      ownerChanges:Listenable.merge([source,_financeOwner,expiryChanges,router.routerDelegate,?authorityChanges,
+        host.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]));
+      return (issued?actor():inputCurrent())?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    }finally{expiry.cancel();expiryChanges.dispose();_orderTimeReviewOpen=false;}
+  }
+
+  Object? _orderIssueOwner;String? _orderIssueFingerprint;int _orderIssueRevision=0;bool _orderIssueOpen=false;
+  WorkspaceIssueRecord? _orderIssueTarget(WorkSession source,String? entity)=>entity==null?null:
+    [for(final order in source.workspaceOrders)...source.workspaceIssuesFor(WorkspaceIssueTarget.customerOrder,order.id)]
+      .where((issue)=>issue.id==entity).singleOrNull;
+  String _orderIssueVersion(WorkSession source,MoolAssistantContext ctx,WorkspaceIssueRecord issue){
+    final owner=(source,widget.accountIdentity,ctx.binding,source.navigationScopeRevision,issue.draftKey);
+    final fingerprint=jsonEncode([issue.accountScope,issue.workspaceId,issue.id,issue.referenceId,issue.target.name,issue.kind.name,
+      issue.state.name,issue.revision,issue.updatedAt.toUtc().toIso8601String(),issue.reason,issue.nextStep,issue.resolution,
+      issue.permittedResponses.map((response)=>response.name).toList(),issue.purchaseContext?.toJson(),
+      issue.lines.map((line)=>[line.lineId,line.name,line.pack,line.affectedQuantity,line.orderedQuantity]).toList(),
+      source.workspaceIssueDraft(issue)?.toJson(),source.workspaceIssueResponse(issue)?.toJson()]);
+    if(_orderIssueOwner!=owner||_orderIssueFingerprint!=fingerprint){_orderIssueOwner=owner;_orderIssueFingerprint=fingerprint;_orderIssueRevision++;}
+    return 'native-order-issue:$_orderIssueRevision';
+  }
+  MoolAssistantNativeSnapshot? _orderIssueSnapshot(BuildContext host,WorkSession source,String action,MoolAssistantContext ctx,String? entity){
+    final issue=_orderIssueTarget(source,entity);
+    if(!mounted||!host.mounted||!identical(widget.session,source)||_orderIssueOpen||!_stockAssistantNavigationReady||
+      !_financePermitted(ctx)||_financeAssistantContext(host)?.binding!=ctx.binding||issue==null||source.workspaceIssueStale(issue)||
+      source.workspaceIssueResponseBusy(issue)||action=='AI-ACT-279'&&source.workspaceIssueResponse(issue)?.pending!=true)return null;
+    return MoolAssistantNativeSnapshot(binding:ctx.binding,entityId:entity,permitted:true,sourceRevision:_orderIssueVersion(source,ctx,issue));
+  }
+  Future<MoolAssistantReviewResult> _openOrderIssueNative(BuildContext host,WorkSession source,MoolAssistantProposal p,
+    bool Function() requestCurrent,Listenable? authorityChanges)async{
+    final ctx=_financeAssistantContext(host),issue=_orderIssueTarget(source,p.entityId);
+    if(ctx==null||issue==null||!requestCurrent()||p.binding!=ctx.binding||!p.validUntil.isAfter(DateTime.now())||
+      _orderIssueSnapshot(host,source,p.actionId,ctx,p.entityId)?.sourceRevision!=p.sourceRevision)return MoolAssistantReviewResult.stale;
+    if(p.fields['response'] case final String response when !issue.permittedResponses.any((value)=>value.name==response))return MoolAssistantReviewResult.unavailable;
+    final router=GoRouter.of(host),uri=GoRouter.of(host).state.uri,page=GoRouter.of(host).state.pageKey;
+    bool owner()=>mounted&&host.mounted&&requestCurrent()&&p.validUntil.isAfter(DateTime.now())&&identical(widget.session,source)&&
+      _financeAssistantContext(host)?.binding==ctx.binding&&_financePermitted(ctx)&&router.state.uri==uri&&router.state.pageKey==page&&
+      identical(_orderIssueTarget(source,p.entityId),issue)&&!source.workspaceIssueStale(issue);
+    _orderIssueOpen=true;
+    try{await Navigator.of(host,rootNavigator:true).push<void>(MaterialPageRoute(builder:(_)=>_StoreIssueNativeReview(
+      session:source,issue:issue,action:p.actionId,current:owner,until:p.validUntil,initialFields:p.fields,
+      changes:Listenable.merge([source,_financeOwner,router.routerDelegate,?authorityChanges,
+        host.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]))));
+      return owner()?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    }finally{_orderIssueOpen=false;}
+  }
+
+  Object? _orderPhysicalOwner;String? _orderPhysicalFingerprint;int _orderPhysicalRevision=0;bool _orderPhysicalOpen=false;
+  bool _orderPhysicalAvailable(WorkSession source,String action,WorkspaceOrderRecord? order){
+    if(order==null||order.operational!=null||order.isCustomerCollection||order.isClosed||source.workspaceHandoverBusy||source.busy||
+      source.workspaceOperationsSyncing||source.currentCollection?.needsReconciliation==true)return false;
+    if(action=='AI-ACT-282')return order.stage=='Ready for pickup';
+    final assignment=source.workspaceDeliveryAssignmentForOrder(order.id);
+    return action=='AI-ACT-283'&&order.needsDelivery&&order.fulfilment=='Own delivery'&&
+      assignment?.orderId==order.id&&const [WorkspaceDeliveryStage.pickedUp,WorkspaceDeliveryStage.outForDelivery].contains(assignment?.deliveryStage);
+  }
+  MoolAssistantNativeSnapshot? _orderPhysicalSnapshot(BuildContext host,WorkSession source,String action,MoolAssistantContext ctx,String? entity){
+    final order=_orderEffectTarget(source,entity);
+    if(!mounted||!host.mounted||!identical(widget.session,source)||_orderPhysicalOpen||!_stockAssistantNavigationReady||
+      !_financePermitted(ctx)||_financeAssistantContext(host)?.binding!=ctx.binding||!_orderPhysicalAvailable(source,action,order))return null;
+    final owner=(source,widget.accountIdentity,ctx.binding,source.navigationScopeRevision,action,order!.id);
+    final assignment=source.workspaceDeliveryAssignmentForOrder(order.id);
+    final fingerprint=jsonEncode([order.toLedgerJson(),assignment==null?null:[assignment.orderId,assignment.partnerName,
+      assignment.vehicleLabel,assignment.eta.toUtc().toIso8601String(),assignment.stage,assignment.updatedAt?.toUtc().toIso8601String()]]);
+    if(_orderPhysicalOwner!=owner||_orderPhysicalFingerprint!=fingerprint){_orderPhysicalOwner=owner;_orderPhysicalFingerprint=fingerprint;_orderPhysicalRevision++;}
+    return MoolAssistantNativeSnapshot(binding:ctx.binding,entityId:entity,permitted:true,sourceRevision:'native-physical-order:$_orderPhysicalRevision');
+  }
+  Future<MoolAssistantReviewResult> _openOrderPhysicalNative(BuildContext host,WorkSession source,MoolAssistantProposal p,
+    bool Function() requestCurrent,Listenable? authorityChanges)async{
+    final ctx=_financeAssistantContext(host),order=_orderEffectTarget(source,p.entityId);
+    if(ctx==null||order==null||!requestCurrent()||p.binding!=ctx.binding||!p.validUntil.isAfter(DateTime.now())||
+      _orderPhysicalSnapshot(host,source,p.actionId,ctx,p.entityId)?.sourceRevision!=p.sourceRevision)return MoolAssistantReviewResult.stale;
+    final router=GoRouter.of(host),uri=GoRouter.of(host).state.uri,page=GoRouter.of(host).state.pageKey;
+    final facts=jsonEncode(order.toLedgerJson()),assignment=source.workspaceDeliveryAssignmentForOrder(order.id);
+    bool owner()=>mounted&&host.mounted&&requestCurrent()&&p.validUntil.isAfter(DateTime.now())&&identical(widget.session,source)&&
+      _financeAssistantContext(host)?.binding==ctx.binding&&_financePermitted(ctx)&&router.state.uri==uri&&router.state.pageKey==page;
+    bool current()=>owner()&&jsonEncode(_orderEffectTarget(source,p.entityId)?.toLedgerJson())==facts&&
+      identical(source.workspaceDeliveryAssignmentForOrder(order.id),assignment);
+    if(!current()||!source.selectWorkspaceOrder(order.id)||!current())return MoolAssistantReviewResult.stale;
+    final changes=Listenable.merge([source,_financeOwner,router.routerDelegate,?authorityChanges,
+      host.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+    _orderPhysicalOpen=true;
+    try{
+      if(p.actionId=='AI-ACT-282')await _showWorkspacePickupSheet(host,source,inputCurrent:current,displayCurrent:owner,ownerChanges:changes);
+      else await _showWorkspaceHandoverSheet(host,source,inputCurrent:current,displayCurrent:owner,ownerChanges:changes);
+      return owner()?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    }finally{_orderPhysicalOpen=false;}
+  }
+
+  Object? _packingSnapshotOwner;String? _packingSnapshotFacts;int _packingSnapshotRevision=0;bool _packingNativeOpen=false;
+  MoolAssistantNativeSnapshot? _orderPackingSnapshot(BuildContext host,WorkSession source,MoolAssistantContext ctx,String? entity){
+    final order=_orderEffectTarget(source,entity);
+    if(!mounted||!host.mounted||!identical(widget.session,source)||_packingNativeOpen||!_stockAssistantNavigationReady||
+      !_financePermitted(ctx)||_financeAssistantContext(host)?.binding!=ctx.binding||order==null||order.stage!='Preparing'||order.isCustomerCollection||
+      source.workspacePackingLinesForOrder(order).isEmpty||source.workspaceOrderOperationState(order.id)!=null)return null;
+    final owner=(source,widget.accountIdentity,ctx.binding,source.navigationScopeRevision,order.id);
+    final facts=jsonEncode([_orderEffectFacts(order),source.workspacePackingLinesForOrder(order).map((line)=>[line.id,line.quantity,line.packed]).toList()]);
+    if(_packingSnapshotOwner!=owner||_packingSnapshotFacts!=facts){_packingSnapshotOwner=owner;_packingSnapshotFacts=facts;_packingSnapshotRevision++;}
+    return MoolAssistantNativeSnapshot(binding:ctx.binding,entityId:entity,permitted:true,sourceRevision:'native-order-packing:$_packingSnapshotRevision');
+  }
+  Future<MoolAssistantReviewResult> _openOrderPackingNative(BuildContext host,WorkSession source,MoolAssistantProposal p,
+    bool Function() requestCurrent,Listenable? authorityChanges)async{
+    final ctx=_financeAssistantContext(host),order=_orderEffectTarget(source,p.entityId);
+    if(ctx==null||order==null||!requestCurrent()||p.binding!=ctx.binding||!p.validUntil.isAfter(DateTime.now())||
+      _orderPackingSnapshot(host,source,ctx,p.entityId)?.sourceRevision!=p.sourceRevision)return MoolAssistantReviewResult.stale;
+    final lines=source.workspacePackingLinesForOrder(order),line=source.workspacePackingLinesForOrder(order).where((line)=>line.id==p.fields['lineId']).singleOrNull;
+    if(line==null||line.quantity!=p.fields['quantity'])return MoolAssistantReviewResult.unavailable;
+    final router=GoRouter.of(host),uri=GoRouter.of(host).state.uri,page=GoRouter.of(host).state.pageKey;
+    bool actor()=>mounted&&host.mounted&&requestCurrent()&&p.validUntil.isAfter(DateTime.now())&&identical(widget.session,source)&&
+      _financeAssistantContext(host)?.binding==ctx.binding&&_financePermitted(ctx)&&router.state.uri==uri&&router.state.pageKey==page;
+    Future<void>? issued;bool retired=false;
+    bool current(){final valid=actor()&&identical(_orderEffectTarget(source,p.entityId),order)&&
+      listEquals(source.workspacePackingLinesForOrder(order).map((line)=>(line.id,line.quantity)).toList(),lines.map((line)=>(line.id,line.quantity)).toList())&&
+      (issued!=null||listEquals(source.workspacePackingLinesForOrder(order).map((line)=>line.packed).toList(),lines.map((line)=>line.packed).toList()));
+      if(!valid)retired=true;return valid&&!retired;}
+    _packingNativeOpen=true;
+    try{await Navigator.of(host,rootNavigator:true).push<void>(MaterialPageRoute(builder:(_)=>_StoreOrderEffectReview(
+      session:source,order:order,operation:'packing',packingLineId:line.id,packingQuantity:line.quantity,packingValue:p.fields['packed'] as bool,
+      current:current,validUntil:p.validUntil,changes:Listenable.merge([source,_financeOwner,router.routerDelegate,?authorityChanges,
+        host.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]),track:(future)=>issued=future)));
+      if(issued!=null)await issued;return actor()&&!retired?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    }finally{_packingNativeOpen=false;}
+  }
+
+  Object? _orderFollowupOwner;String? _orderFollowupFacts;int _orderFollowupRevision=0;bool _orderFollowupOpen=false;
+  Object? _orderPendingFacts(WorkOrderCommand? value)=>value==null?null:[value.accountScope,value.workspaceId,value.orderId,value.operationId,
+    value.expectedRevision,value.action.name,value.reason,value.additionalMinutes,value.expectedAcceptanceDeadline?.toUtc().toIso8601String(),
+    value.version,value.purchaseReference?.toJson(),value.purchaseRealm];
+  WorkspaceOrderRecord? _repeatSource(WorkSession source,String customer)=>source.workspaceRepeatOrderSource(customerId:customer);
+  bool _orderFollowupAvailable(WorkSession source,String action,WorkspaceOrderRecord? order){
+    if(order==null||source.busy||source.workspaceHandoverBusy||source.workspaceOperationsSyncing)return false;
+    return switch(action){
+      'AI-ACT-284'=>order.operational==null&&!source.hasScopedWorkspaceOrder(order.id)&&!order.isCustomerCollection&&order.stage=='Delivery requested',
+      'AI-ACT-285'=>order.stage=='Confirmed'&&!order.isCustomerCollection&&!source.hasPendingOrderTime&&
+        (order.operational==null||source.workspaceOrderCanAct(order.id,WorkOrderAction.reject)),
+      'AI-ACT-286'=>source.workspacePendingOrderCommand(order.id)!=null&&source.workspaceOrderOperationState(order.id)==WorkOrderOperationState.uncertain,
+      'AI-ACT-287'=>identical(_repeatSource(source,source.workspaceCustomerId(order.customer)),order)&&source.workspaceCatalogueItems.isNotEmpty,
+      _=>false};
+  }
+  String _orderFollowupVersion(WorkSession source,MoolAssistantContext ctx,String action,WorkspaceOrderRecord order){
+    final owner=(source,widget.accountIdentity,ctx.binding,source.navigationScopeRevision,action,order.id);
+    final assignment=source.workspaceDeliveryAssignmentForOrder(order.id);
+    final facts=jsonEncode([_orderEffectFacts(order),source.workspaceOrderOperationState(order.id)?.name,_orderPendingFacts(source.workspacePendingOrderCommand(order.id)),
+      assignment==null?null:[assignment.orderId,assignment.stage,assignment.eta.toUtc().toIso8601String(),assignment.partnerName,assignment.vehicleLabel],
+      action=='AI-ACT-287'?source.workspaceCatalogueItems.map((item)=>item.toInventoryJson()).toList():null]);
+    if(_orderFollowupOwner!=owner||_orderFollowupFacts!=facts){_orderFollowupOwner=owner;_orderFollowupFacts=facts;_orderFollowupRevision++;}
+    return 'native-order-followup:$_orderFollowupRevision';
+  }
+  MoolAssistantNativeSnapshot? _orderFollowupSnapshot(BuildContext host,WorkSession source,String action,MoolAssistantContext ctx,String? entity){
+    final order=_orderEffectTarget(source,entity);
+    if(!mounted||!host.mounted||!identical(widget.session,source)||_orderFollowupOpen||!_stockAssistantNavigationReady||
+      !_financePermitted(ctx)||_financeAssistantContext(host)?.binding!=ctx.binding||!_orderFollowupAvailable(source,action,order))return null;
+    return MoolAssistantNativeSnapshot(binding:ctx.binding,entityId:entity,permitted:true,sourceRevision:_orderFollowupVersion(source,ctx,action,order!));
+  }
+  Future<MoolAssistantReviewResult> _openOrderFollowupNative(BuildContext host,WorkSession source,MoolAssistantProposal p,
+    bool Function() requestCurrent,Listenable? authorityChanges)async{
+    final ctx=_financeAssistantContext(host),order=_orderEffectTarget(source,p.entityId);
+    if(ctx==null||order==null||!requestCurrent()||p.binding!=ctx.binding||!p.validUntil.isAfter(DateTime.now())||
+      _orderFollowupSnapshot(host,source,p.actionId,ctx,p.entityId)?.sourceRevision!=p.sourceRevision)return MoolAssistantReviewResult.stale;
+    final router=GoRouter.of(host),uri=GoRouter.of(host).state.uri,page=GoRouter.of(host).state.pageKey;
+    final originalFacts=jsonEncode(_orderEffectFacts(order)),pending=source.workspacePendingOrderCommand(order.id),assignment=source.workspaceDeliveryAssignmentForOrder(order.id);
+    final catalogue=p.actionId=='AI-ACT-287'?jsonEncode(source.workspaceCatalogueItems.map((item)=>item.toInventoryJson()).toList()):null;
+    bool expired=false;final expiryChanges=ValueNotifier<int>(0);
+    final expiry=Timer(p.validUntil.difference(DateTime.now()),(){expired=true;expiryChanges.value++;});
+    bool owner()=>!expired&&mounted&&host.mounted&&requestCurrent()&&p.validUntil.isAfter(DateTime.now())&&identical(widget.session,source)&&
+      _financeAssistantContext(host)?.binding==ctx.binding&&_financePermitted(ctx)&&router.state.uri==uri&&router.state.pageKey==page;
+    Future<void>? issued;bool repeated=false;
+    bool inputCurrent(){final currentOrder=_orderEffectTarget(source,p.entityId);return owner()&&currentOrder!=null&&jsonEncode(_orderEffectFacts(currentOrder))==originalFacts&&
+      (p.actionId!='AI-ACT-286'||identical(source.workspacePendingOrderCommand(order.id),pending))&&
+      (p.actionId!='AI-ACT-284'||identical(source.workspaceDeliveryAssignmentForOrder(order.id),assignment)&&
+        source.workspaceOrderAddress==order.address)&&
+      (catalogue==null||catalogue==jsonEncode(source.workspaceCatalogueItems.map((item)=>item.toInventoryJson()).toList()));}
+    bool current()=>owner()&&(issued!=null||inputCurrent());
+    final changes=Listenable.merge([source,_financeOwner,expiryChanges,router.routerDelegate,?authorityChanges,
+      host.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+    if(p.actionId!='AI-ACT-287'&&(!source.selectWorkspaceOrder(order.id)||!current())){expiry.cancel();expiryChanges.dispose();return MoolAssistantReviewResult.stale;}
+    _orderFollowupOpen=true;
+    try{
+      if(p.actionId=='AI-ACT-285'){
+        await _showRejectOrderSheet(host,source,inputCurrent:inputCurrent,ownerChanges:changes,initialReason:p.fields['reason'] as String?,onConfirm:()=>issued=Future.value());
+      }else{
+        await Navigator.of(host,rootNavigator:true).push<void>(MaterialPageRoute(builder:(_)=>_StoreOrderEffectReview(
+          session:source,order:order,operation:p.actionId=='AI-ACT-284'?'assignment':p.actionId=='AI-ACT-286'?'status':'repeat',
+          current:current,validUntil:p.validUntil,changes:changes,track:(future)=>issued=future,
+          contentBuilder:(context){final captured=_StoreOrderEffectScope.of(context)!;
+            if(p.actionId=='AI-ACT-284')return ListView(padding:const EdgeInsets.all(16),children:[
+              _DeliveryActivityCard(session:source,nativeReturnUri:uri.toString(),assignmentReview:true,ownerCurrent:()=>captured.current()&&inputCurrent(),
+                reviewPerform:(original)=>captured.perform(original),reviewForeground:captured.foreground)]);
+            if(p.actionId=='AI-ACT-286')return ListView(padding:const EdgeInsets.all(16),children:[
+              Text(order.id,style:Theme.of(context).textTheme.titleMedium),Text(order.customer),Text(order.items),
+              _OrderOperationStatus(session:source,orderId:order.id,inputCurrent:()=>captured.current()&&inputCurrent(),foreground:captured.foreground,perform:captured.perform)]);
+            return _CustomersDestinationSurface(session:source,customerId:source.workspaceCustomerId(order.customer),repeatOnly:true,
+              preparedRepeatCurrent:captured.current,preparedRepeatChanges:captured.changes,onOffer:(){},
+              onRepeatBasket:(customer){if(customer!=source.workspaceCustomerId(order.customer)||!captured.permits('repeat')||
+                !identical(_repeatSource(source,customer),order))return;
+                unawaited(captured.perform(()async{if(!inputCurrent()||!identical(_repeatSource(source,customer),order))return;
+                  if(source.prepareRepeatWorkspaceOrderFor(customerId:customer)){repeated=true;_showOperation(_WorkspaceOperation.counterOrder);}}));});
+          })));
+        if(issued!=null)await issued;
+      }
+      return repeated&&owner()?MoolAssistantReviewResult.returnToOwner:owner()?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    }finally{expiry.cancel();expiryChanges.dispose();_orderFollowupOpen=false;}
+  }
+
+  bool get _stockAssistantNavigationReady => !_financeSheetOpen && !_couponsSheetOpen &&
+    !_productEditorOpen(session) && _purchaseEntryKey.currentState == null && _receivingKey.currentState == null &&
+    !(_view == _WorkspaceControlView.operation && _operation == _WorkspaceOperation.counterOrder);
+  String? _stockAssistantRevision(WorkSession source, String actionId, MoolAssistantContext ctx, String? entityId) {
+    final signature = _assistantStockSignature(source, actionId, entityId);
+    if (signature == null) return null;
+    final owner = (source, actionId, entityId, ctx.binding, source.publicationPreferencesContext,
+      source.tradingPreferencesContext);
+    if (_stockAssistantOwner != owner || _stockAssistantDigest != signature) {
+      _stockAssistantOwner = owner; _stockAssistantDigest = signature; _stockAssistantVersion++;
+    }
+    return 'native-stock:$_stockAssistantVersion';
+  }
+  Future<MoolAssistantNativeSnapshot?> _stockAssistantSnapshot(BuildContext hostContext, WorkSession source,
+    String actionId, MoolAssistantContext ctx, String? entityId) async {
+    bool current() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx) && _stockAssistantNavigationReady;
+    if (!current()) return null;
+    // Opening Stock/export controls never refreshes or publishes a Stock report.
+    final revision = _stockAssistantRevision(source, actionId, ctx, entityId);
+    return revision == null ? null : MoolAssistantNativeSnapshot(binding: ctx.binding, entityId: entityId,
+      sourceRevision: revision, permitted: true);
+  }
+  Future<MoolAssistantReviewResult> _showStockAssistant(BuildContext hostContext, WorkSession source,
+    MoolAssistantProposal proposal, bool Function() reviewCurrent) async {
+    final trusted = _financeAssistantContext(hostContext);
+    if (trusted == null || !reviewCurrent() || !identical(widget.session, source) || !_financePermitted(trusted) ||
+        trusted.binding != proposal.binding || !_stockAssistantNavigationReady ||
+        proposal.sourceRevision != _stockAssistantRevision(source, proposal.actionId, trusted, proposal.entityId)) {
+      return MoolAssistantReviewResult.stale;
+    }
+    bool owner() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == trusted.binding && _financePermitted(trusted);
+    if (proposal.actionId == 'AI-ACT-233') {
+      if (proposal.entityId == null) return MoolAssistantReviewResult.stale;
+      return showStoreStockAdjustmentReview(hostContext, source, entityId: proposal.entityId!,
+        initialData: StoreStockAdjustmentInitialData.fromFields(proposal.fields),
+        isCurrent: () => owner() && reviewCurrent(), ownerCurrent: owner);
+    }
+    if (!owner() || !reviewCurrent()) return MoolAssistantReviewResult.stale;
+    if (proposal.actionId == 'AI-ACT-231') {
+      _showOperation(_WorkspaceOperation.catalogue);
+    } else {
+      final view = _stockStatementViews.putIfAbsent(source.workspaceStockHistoryScope()?.key ?? source.activeWorkspace!.id,
+        _StockStatementBookmark.new);
+      view..history = proposal.actionId == 'AI-ACT-232'..offset = 0..localRows = null..productIds = null;
+      if (proposal.actionId == 'AI-ACT-232') {
+        final initial = StoreStockHistoryInitialData.fromFields(proposal.fields);
+        final query = source.workspaceStockHistoryScope(from: initial.from, until: initial.until, productId: proposal.entityId);
+        if (query == null || !query.valid) return MoolAssistantReviewResult.unavailable;
+        view..from = initial.from..until = initial.until..productId = proposal.entityId;
+      } else {
+        view..from = null..until = null..productId = null;
+      }
+      _showOperation(_WorkspaceOperation.stockStatement);
+    }
+    // Reveal original read/export controls. No file saver, print or mutation call.
+    return owner() ? MoolAssistantReviewResult.returnToOwner : MoolAssistantReviewResult.stale;
+  }
+
+  String? _purchaseAssistantRevision(WorkSession source, String actionId, MoolAssistantContext ctx, String? entityId) {
+    final signature = _assistantPurchaseSourceSignature(source, actionId, entityId);
+    if (signature == null) return null;
+    final owner = (source, actionId, entityId, ctx.binding, source.workspaceSupplierScope,
+      source.publicationPreferencesContext);
+    if (_purchaseAssistantOwner != owner || _purchaseAssistantDigest != signature) {
+      _purchaseAssistantOwner = owner; _purchaseAssistantDigest = signature; _purchaseAssistantVersion++;
+    }
+    return 'native-purchase:$_purchaseAssistantVersion';
+  }
+  Future<MoolAssistantNativeSnapshot?> _purchaseAssistantSnapshot(BuildContext hostContext,
+    WorkSession source, String actionId, MoolAssistantContext ctx, String? entityId) async {
+    bool current() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx) &&
+      !_financeSheetOpen && !_couponsSheetOpen && !_purchaseAssistantEditorOpen(source);
+    // These native admission methods can project/persist inventory and reports.
+    // AI snapshots inspect only sources already admitted by the original UI.
+    if (!current() || !source.workspaceSuppliersLoaded || source.workspaceSupplierSaving ||
+        source.workspaceSupplierRecoveryRequired) return null;
+    if (actionId == 'AI-ACT-256' && !source.workspaceInvoiceHistoryLoaded) return null;
+    if (actionId == 'AI-ACT-272' && !_assistantPurchaseInventoryAdmitted(source)) return null;
+    final revision = _purchaseAssistantRevision(source, actionId, ctx, entityId);
+    return revision == null ? null : MoolAssistantNativeSnapshot(binding: ctx.binding,
+      sourceRevision: revision, entityId: entityId, permitted: true);
+  }
+  Future<MoolAssistantReviewResult> _showPurchaseAssistant(BuildContext hostContext,
+    WorkSession source, MoolAssistantProposal proposal, bool Function() reviewCurrent) async {
+    final trusted = _financeAssistantContext(hostContext);
+    if (trusted == null || !reviewCurrent() || !identical(widget.session, source) || !_financePermitted(trusted) ||
+        proposal.binding != trusted.binding || _financeSheetOpen || _couponsSheetOpen ||
+        proposal.sourceRevision != _purchaseAssistantRevision(source, proposal.actionId, trusted, proposal.entityId)) {
+      return MoolAssistantReviewResult.stale;
+    }
+    bool owner() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      _financeAssistantContext(hostContext)?.binding == trusted.binding && _financePermitted(trusted);
+    return showStorePurchaseAssistantReview(hostContext, source, actionId: proposal.actionId,
+      entityId: proposal.entityId,
+      initialData: proposal.actionId == 'AI-ACT-252' ? StorePurchaseEntryInitialData.fromFields(proposal.fields) : null,
+      query: proposal.fields['query'] as String?,
+      expectedSignature: _assistantPurchaseSourceSignature(source, proposal.actionId, proposal.entityId),
+      isCurrent: () => owner() && reviewCurrent(), ownerCurrent: owner);
+  }
+
+  bool _supplierAssistantPermitted(WorkSession source, MoolAssistantContext ctx) {
+    final scope = source.workspaceSupplierScope;
+    // The assistant uses the authenticated persistence identity record. The
+    // directory uses its private String namespace; they are different types.
+    // Trusted approved-Workspace binding and native account recovery bridge
+    // those owners; never compare their storage keys as account identifiers.
+    return identical(widget.session, source) && _financePermitted(ctx) &&
+        scope != null && ctx.workspaceId == scope.$2;
+  }
+
+  Future<MoolAssistantNativeSnapshot?> _supplierAssistantSnapshot(
+    BuildContext hostContext, WorkSession source,
+    MoolAssistantContext ctx, String? entityId,
+  ) async {
+    bool current() => mounted && hostContext.mounted &&
+        _financeAssistantContext(hostContext)?.binding == ctx.binding &&
+        _supplierAssistantPermitted(source, ctx) && !source.workspaceSupplierSaving &&
+        !_financeSheetOpen && !_couponsSheetOpen &&
+        _openSupplierSelectors[source] != true;
+    if (entityId != null || !current()) return null;
+    final scope = source.workspaceSupplierScope;
+    final loaded = await source.loadWorkspaceSuppliers(retry: true);
+    if (!loaded || !current() || source.workspaceSupplierScope != scope) return null;
+    return MoolAssistantNativeSnapshot(binding: ctx.binding, permitted: true,
+      sourceRevision: _supplierSourceRevision(source));
+  }
+
+  Future<MoolAssistantReviewResult> _showSupplierAssistantAdd(
+    BuildContext hostContext, WorkSession source, StoreSupplierInitialData initial,
+    MoolAssistantProposal proposal, bool Function() reviewCurrent,
+  ) async {
+    final trusted = _financeAssistantContext(hostContext);
+    final scope = source.workspaceSupplierScope;
+    if (!reviewCurrent() || trusted == null || scope == null ||
+        trusted.binding != proposal.binding || proposal.entityId != null ||
+        !_supplierAssistantPermitted(source, trusted) || source.workspaceSupplierSaving ||
+        _financeSheetOpen || _couponsSheetOpen ||
+        proposal.sourceRevision != _supplierSourceRevision(source)) {
+      return MoolAssistantReviewResult.stale;
+    }
+    // Native form ownership remains independent of proposal cancellation.
+    // This full trusted binding/permission guard also protects the form's Save.
+    bool ownerCurrent() => mounted && hostContext.mounted &&
+        _financeAssistantContext(hostContext)?.binding == trusted.binding &&
+        _supplierAssistantPermitted(source, trusted) &&
+        source.workspaceSupplierScope == scope;
+    return showStoreSupplierAddReview(context, source,
+      initialData: initial, expectedScope: scope,
+      expectedRevision: source.workspacePurchaseEntryRevision,
+      isCurrent: () => reviewCurrent() && ownerCurrent(), ownerCurrent: ownerCurrent);
+  }
+
+
+  Future<MoolAssistantNativeSnapshot?> _supplierEditAssistantSnapshot(
+    BuildContext hostContext, WorkSession source, MoolAssistantContext ctx, String? entityId,
+  ) async {
+    bool current() => mounted && hostContext.mounted &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding &&
+      _supplierAssistantPermitted(source, ctx) && !source.workspaceSupplierSaving &&
+      !_financeSheetOpen && !_couponsSheetOpen && _openSupplierSelectors[source] != true;
+    if (entityId == null || !current()) return null;
+    final scope = source.workspaceSupplierScope;
+    if (!await source.loadWorkspaceSuppliers(retry: true) || !current() || source.workspaceSupplierScope != scope) return null;
+    final profile = source.workspaceSuppliers.where((p) => p.id == entityId).singleOrNull;
+    return profile == null ? null : MoolAssistantNativeSnapshot(binding: ctx.binding,
+      sourceRevision: _supplierEditSourceRevision(source, profile), entityId: entityId, permitted: true);
+  }
+
+  Future<MoolAssistantReviewResult> _showSupplierExistingAssistant(
+    BuildContext hostContext, WorkSession source, MoolAssistantProposal proposal, bool Function() reviewCurrent,
+  ) async {
+    final trusted = _financeAssistantContext(hostContext), scope = source.workspaceSupplierScope;
+    if (trusted == null || scope == null || !reviewCurrent() || proposal.binding != trusted.binding ||
+        !_supplierAssistantPermitted(source, trusted) || source.workspaceSupplierSaving ||
+        _financeSheetOpen || _couponsSheetOpen) return MoolAssistantReviewResult.stale;
+    bool ownerCurrent() => mounted && hostContext.mounted &&
+      _financeAssistantContext(hostContext)?.binding == trusted.binding &&
+      _supplierAssistantPermitted(source, trusted) && source.workspaceSupplierScope == scope;
+    if (proposal.actionId == 'AI-ACT-236') {
+      if (proposal.entityId != null || proposal.sourceRevision != _supplierSourceRevision(source)) return MoolAssistantReviewResult.stale;
+      return showStoreSupplierLookupReview(context, source, query: proposal.fields['query']! as String,
+        expectedScope: scope, expectedRevision: source.workspacePurchaseEntryRevision,
+        isCurrent: () => ownerCurrent() && reviewCurrent(), ownerCurrent: ownerCurrent);
+    }
+    final original = source.workspaceSuppliers.where((p) => p.id == proposal.entityId).singleOrNull;
+    if (original == null || proposal.sourceRevision != _supplierEditSourceRevision(source, original)) return MoolAssistantReviewResult.stale;
+    return showStoreSupplierEditReview(context, source, originalProfile: original,
+      initialData: StoreSupplierEditInitialData.fromFields(proposal.fields), expectedScope: scope,
+      expectedRevision: source.workspacePurchaseEntryRevision,
+      isCurrent: () => ownerCurrent() && reviewCurrent(), ownerCurrent: ownerCurrent);
+  }
+
+  MoolAssistantNativeSnapshot? _financeSnapshot(
+    BuildContext hostContext, MoolAssistantContext ctx, String? entityId,
+  ) {
+    final trusted = _financeAssistantContext(hostContext);
+    if (entityId != null || trusted == null || trusted.binding != ctx.binding ||
+        !_financePermitted(ctx) || _financeSheetOpen || _couponsSheetOpen) return null;
+    // A local form-owner version, never catalogue, loan or funding truth.
+    final key = (session, widget.accountIdentity, widget.accountAuthenticated,
+      _financeOwner.value, session.activeWorkspace?.id,
+      session.publicationPreferencesContext, session.navigationScopeRevision,
+      _financeFormRevision);
+    if (_financeSnapshotOwner != key) {
+      _financeSnapshotOwner = key;
+      _financeSnapshotRevision++;
+    }
+    return MoolAssistantNativeSnapshot(
+      binding: ctx.binding, permitted: true,
+      sourceRevision: '$moolBusinessFinanceFormRevision:$_financeSnapshotRevision',
+    );
+  }
+
+  Future<MoolAssistantReviewResult> _showBusinessFinance({
+    MoolBusinessFinancePrefill? prefill,
+    bool Function()? reviewCurrent,
+  }) async {
+    if (reviewCurrent?.call() == false) return MoolAssistantReviewResult.stale;
+    if (_financeSheetOpen || _couponsSheetOpen) return MoolAssistantReviewResult.unavailable;
     final source = session, epoch = _financeOwner.value;
     final store = source.activeWorkspace;
-    if (store == null) return;
+    if (store == null) return MoolAssistantReviewResult.unavailable;
     final owner = source.publicationPreferencesContext;
     final navigation = source.navigationScopeRevision;
     final identity = widget.accountIdentity;
@@ -3009,7 +8065,9 @@ class _WorkWorkspaceDashboardScreenState
     bool current() => mounted && identical(widget.session, source) &&
         _financeOwner.value == epoch && identical(widget.accountIdentity, identity) &&
         widget.accountAuthenticated == authenticated && source.activeWorkspace?.id == store.id &&
-        source.publicationPreferencesContext == owner && source.navigationScopeRevision == navigation;
+        source.publicationPreferencesContext == owner && source.navigationScopeRevision == navigation &&
+        (reviewCurrent?.call() ?? true);
+    if (!current()) return MoolAssistantReviewResult.stale;
     _financeSheetOpen = true;
     try {
       await showMoolBusinessFinanceSheet(context,
@@ -3018,12 +8076,107 @@ class _WorkWorkspaceDashboardScreenState
         storeName: store.name,
         contactName: ownContact?.displayName,
         callbackNumber: ownContact?.phoneNumber,
+        prefill: prefill,
         origin: 'store', buyingStoreId: store.id,
       );
+      return current() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
     } finally {
       _financeSheetOpen = false;
+      _financeFormRevision++;
     }
   }
+
+  String _couponNativeReferences(WorkSession source) => assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    source.workspaceInventoryRevision,
+    [for (final item in source.workspaceCatalogueItems) item.toInventoryJson()],
+    [for (final buyer in source.workspaceCustomerBook) [buyer.id, buyer.name, buyer.mobile]],
+  ]))).toString();
+  String _couponNativeSource(WorkSession source, String action, String? entity) {
+    final campaign = source.workspaceStoreCouponCampaigns.where((value) => value.id == entity).singleOrNull;
+    final publisher = action == 'AI-ACT-310' ? source.workspaceStoreCoupons : null;
+    return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+      action, entity, source.navigationScopeRevision, source.workspaceOfferDraft,
+      if (campaign != null) campaign.toJson(),
+      if (action == 'AI-ACT-309') _couponNativeReferences(source),
+      if (publisher != null) [publisher.active, publisher.pending?.fingerprint,
+        publisher.currentRecord?.revision, publisher.currentRecord?.input.fingerprint, publisher.loadedCouponId],
+    ]))).toString();
+  }
+  Future<MoolAssistantNativeSnapshot?> _couponNativeSnapshot(BuildContext hostContext,
+    MoolAssistantContext ctx, String action, String? entity) async {
+    final source = session, identity = widget.accountIdentity, publication = source.publicationPreferencesContext;
+    bool current() => mounted && hostContext.mounted && identical(widget.session, source) &&
+      identical(widget.accountIdentity, identity) && source.publicationPreferencesContext == publication &&
+      _financePermitted(ctx) && _financeAssistantContext(hostContext)?.binding == ctx.binding &&
+      !_couponsSheetOpen && !_financeSheetOpen && !storeCouponNativeEditorOpen(source);
+    if (!current() || action == 'AI-ACT-308' && entity != null) return null;
+    final store = source.activeWorkspace?.id;
+    if (store == null) return null;
+    final loaded = await source.loadWorkspaceOfferDraft(expectedStoreId: store);
+    if (!current() || action != 'AI-ACT-308' && (!loaded || source.workspaceOfferDraftSaving || source.workspaceStoreCouponRecoveryRequired)) return null;
+    if (entity != null && source.workspaceStoreCouponCampaigns.where((value) => value.id == entity).length != 1 ||
+        action == 'AI-ACT-310' && entity == null) return null;
+    if (action == 'AI-ACT-310') {
+      final publisher = source.workspaceStoreCoupons;
+      if (publisher != null && (!await publisher.restore() || !current() || publisher.busy ||
+          publisher.pending != null && publisher.pending!.couponId != entity)) return null;
+      // Actual accepted lookup only. A held original is never replaced/retried.
+      if (publisher != null && publisher.pending == null) {
+        await publisher.refresh(entity!, inputCurrent: current);
+        if (!current()) return null;
+      }
+    }
+    if (!current()) return null;
+    return MoolAssistantNativeSnapshot(binding: ctx.binding, sourceRevision: _couponNativeSource(source, action, entity),
+      permitted: true, entityId: entity);
+  }
+  Future<MoolAssistantReviewResult> _openCouponNative(BuildContext hostContext, MoolAssistantProposal proposal,
+    bool Function() reviewCurrent, Listenable authorityChanges) async {
+    final source = session, ctx = _financeAssistantContext(hostContext), epoch = _financeOwner.value;
+    final router = GoRouter.of(hostContext), navigation = source.navigationScopeRevision;
+    final uri = router.state.uri, page = router.state.pageKey;
+    final publication = source.publicationPreferencesContext, identity = widget.accountIdentity;
+    bool owner() => mounted && hostContext.mounted && identical(widget.session, source) && ctx != null &&
+      identical(widget.accountIdentity, identity) && _financeOwner.value == epoch &&
+      source.navigationScopeRevision == navigation && source.publicationPreferencesContext == publication &&
+      router.state.uri == uri && router.state.pageKey == page &&
+      _financePermitted(ctx) && _financeAssistantContext(hostContext)?.binding == ctx.binding && reviewCurrent();
+    if (!owner() || ctx!.binding != proposal.binding || _couponsSheetOpen || _financeSheetOpen ||
+        storeCouponNativeEditorOpen(source) || proposal.sourceRevision != _couponNativeSource(source, proposal.actionId, proposal.entityId)) return MoolAssistantReviewResult.stale;
+    final campaign = source.workspaceStoreCouponCampaigns.where((value) => value.id == proposal.entityId).singleOrNull;
+    if (proposal.entityId != null && campaign == null || proposal.actionId == 'AI-ACT-310' && campaign == null) return MoolAssistantReviewResult.unavailable;
+    final initial = proposal.actionId == 'AI-ACT-309' ? StoreCouponReviewInitial.fromFields(proposal.fields) : null;
+    if (initial != null && !initial.referencesCurrent(source)) {
+      source.showError('A selected Store product or buyer is unavailable. Review the original selection.');
+      return MoolAssistantReviewResult.unavailable;
+    }
+    final problem = initial?.problemFor(campaign);
+    if (problem != null) { source.showError(problem); return MoolAssistantReviewResult.unavailable; }
+    final references = initial == null ? null : _couponNativeReferences(source);
+    final original = campaign == null ? null : encodeStoreCouponCampaigns([campaign]);
+    bool campaignCurrent() => owner() && (campaign == null || source.workspaceStoreCouponCampaigns.any((saved) =>
+      saved.id == campaign.id && encodeStoreCouponCampaigns([saved]) == original));
+    final changes = Listenable.merge([source, _financeOwner, routerDelegateOf(hostContext), authorityChanges,
+      hostContext.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+    _couponsSheetOpen = true;
+    try {
+      if (proposal.actionId == 'AI-ACT-308') {
+        await showStoreCouponsManager(hostContext, session: source, scopeOwner: changes, isCurrent: owner,
+          initialQuery: proposal.fields['query'] as String?);
+      } else if (initial != null) {
+        final applied = await showStoreCouponEditorReview(hostContext, session: source, initial: initial, campaign: campaign,
+          owner: changes, current: owner, sourceCurrent: () => campaignCurrent() &&
+            references == _couponNativeReferences(source) && initial.referencesCurrent(source));
+        if (!applied) return MoolAssistantReviewResult.stale;
+      } else {
+        await showStoreCouponPublicationReview(hostContext, session: source, campaign: campaign!,
+          operation: proposal.fields['operation'] as String, owner: changes, current: campaignCurrent);
+      }
+      return owner() && (proposal.actionId != 'AI-ACT-310' || campaignCurrent())
+        ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+    } finally { _couponsSheetOpen = false; }
+  }
+
 
   Future<void> _showCoupons() async {
     if (_couponsSheetOpen || _financeSheetOpen) return;
@@ -3117,6 +8270,7 @@ class _WorkWorkspaceDashboardScreenState
 
   Future<bool> _confirmDiscardCounterOrder() async {
     if (!await _confirmPurchaseNavigation()) return false;
+    if (_counterKey.currentState?._assistantClosed == true || _counterKey.currentState?._assistantMode == true || _counterKey.currentState?._transferredOwner != null && !_counterKey.currentState!._nativeOwnerCurrent) return await _counterKey.currentState!.flushForNavigation();
     if ((_operation == _WorkspaceOperation.counterOrder || _counterKey.currentState != null) &&
         !await (_counterKey.currentState?.flushForNavigation() ??
             Future.value(true))) {
@@ -3219,7 +8373,7 @@ class _WorkWorkspaceDashboardScreenState
           salesExitIdentity() != salesExit) return;
       // A completed invoice owns its records; clear only the retained composer.
       // Ordinary unfinished bills still leave and resume without a reset.
-      if (task == 'counter' && (counter?.hasCompletedInvoice ?? false) &&
+      if (task == 'counter' && (counter?.hasCompletedInvoice ?? false) && counter?._assistantClosed != true &&
           (session.counterDraftNeedsReconciliation ||
               !(counter?._startNextSale() ?? false))) return;
       _salesKey.currentState?.showSalesHome();
@@ -3341,15 +8495,26 @@ class _WorkWorkspaceDashboardScreenState
 
   Future<void> _openProfile(BuildContext context, WorkWorkspace workspace) async {
     if (!await _confirmPurchaseNavigation() || !context.mounted) return;
+    var profileApproved = false;
+    try {
+      final approved = context.getInheritedWidgetOfExactType<MoolAssistantWorkspaceScope>()?.readWorkspace();
+      profileApproved = widget.accountAuthenticated && approved?.approved == true &&
+          approved?.isStore == true && approved?.approvalAccountScope != null &&
+          approved?.id == workspace.id && approved?.profile == workspace.profileId &&
+          approved?.revision == session.navigationScopeRevision;
+    } on Object {
+      // A failed or absent approval readback must leave personal Profile usable
+      // without exposing retained Store controls as an activated Workspace.
+    }
     showGlobalProfilePanelV2(
       context,
       accountAuthenticated: widget.accountAuthenticated,
-      activeWorkspace: GlobalProfileWorkspaceContext(
+      activeWorkspace: !profileApproved ? null : GlobalProfileWorkspaceContext(
         name: workspace.name,
         roleLabel: workspace.profileLabel,
         area: workspace.area,
       ),
-      contextAction: GlobalProfileContextAction(
+      contextAction: !profileApproved ? null : GlobalProfileContextAction(
         id: 'store-settings',
         title: 'Store tools',
         detail: 'Business settings, customers and records',
@@ -3360,7 +8525,7 @@ class _WorkWorkspaceDashboardScreenState
         onPressed: () => _showOperation(_WorkspaceOperation.settings),
       ),
       onOpenRoute: (route) {
-        if (route == '/app/work/my-work') {
+        if (route == '/app/work/my-work' && profileApproved) {
           _showOperation(_WorkspaceOperation.settings);
         } else if (Uri.tryParse(route)?.path == '/app/account/security') {
           // A pushed Store can differ from the router's displayed base URI.
@@ -3384,13 +8549,14 @@ class _WorkWorkspaceDashboardScreenState
     );
   }
 
-  Future<void> _showWorkspaceSwitcher(BuildContext context) async {
+  Future<void> _showWorkspaceSwitcher(BuildContext context, {StoreSettingsReviewScope? reviewScope, String? selectedId}) async {
+    if (reviewScope?.mayApply == false) return;
     final current = session.activeWorkspace;
     if (current == null) return;
-    session.retainWorkspaceApplication();
+    if (reviewScope == null) session.retainWorkspaceApplication();
     final applications = session.savedWorkspaceApplications;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
-    final choices = [current, ...session.otherWorkspaces];
+    final choices = [current, ...session.otherWorkspaces].where((store) => selectedId == null || store.id == selectedId).toList();
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -3403,106 +8569,24 @@ class _WorkWorkspaceDashboardScreenState
           constraints: BoxConstraints(
             maxHeight: MediaQuery.sizeOf(sheetContext).height * .76,
           ),
-          child: ListView(
-            key: const Key('work-workspace-switcher-sheet'),
-            shrinkWrap: true,
-            padding: EdgeInsets.zero,
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text(
-                  'Choose your Workspace',
-                  style: TextStyle(
-                    color: MoolColors.navy,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              for (final workspace in choices)
-                ListTile(
-                  key: ValueKey('work-switch-${workspace.id}'),
-                  leading: Icon(
-                    workspace.id == current.id
-                        ? Icons.check_circle_rounded
-                        : Icons.storefront_outlined,
-                    color: MoolColors.navy,
-                  ),
-                  title: Text(workspace.name),
-                  subtitle: Text(
-                    '${workspace.profileLabel} · ${workspace.area}',
-                  ),
-                  selected: workspace.id == current.id,
-                  onTap: workspace.id == current.id
-                      ? null
-                      : () async {
-                          if (!await _confirmPurchaseNavigation() ||
-                              !mounted || !sheetContext.mounted) { return; }
-                          session.activateWorkspace(workspace);
-                          Navigator.of(sheetContext).pop();
-                          _showDashboard();
-                        },
-                ),
-              if (applications.isNotEmpty) ...[
-                const Divider(),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
-                  child: Text(
-                    'Applications',
-                    style: TextStyle(
-                      color: MoolColors.navy,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                for (final application in applications)
-                  ListTile(
-                    key: ValueKey('work-resume-${application.id}'),
-                    leading: const Icon(
-                      Icons.description_outlined,
-                      color: MoolColors.navy,
-                    ),
-                    title: Text(application.name),
-                    subtitle: Text(
-                      '${application.profileLabel} · ${application.status}',
-                    ),
-                    onTap: () async {
-                      if (!await _confirmPurchaseNavigation() ||
-                          !mounted || !sheetContext.mounted) { return; }
-                      if (!session.resumeWorkspaceApplication(application.id)) {
-                        return;
-                      }
-                      Navigator.of(sheetContext).pop();
-                      context.push(session.workspaceApplicationRoute);
-                    },
-                  ),
-              ],
-              const Divider(height: 16),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'Create content anytime from Social.',
-                  style: TextStyle(color: MoolColors.muted, fontSize: 12),
-                ),
-              ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, bottomInset + 12),
-                child: OutlinedButton.icon(
-                  key: const Key('work-switch-add-workspace'),
-                  onPressed: () async {
-                    if (!await _confirmPurchaseNavigation() ||
-                        !mounted || !sheetContext.mounted) { return; }
-                    if (session.startAnotherWork()) {
-                      Navigator.of(sheetContext).pop();
-                      context.push('/app/work/workspace/choose');
-                    }
-                  },
-                  icon: const Icon(Icons.add_business_outlined, size: 18),
-                  label: const Text('Request another Workspace'),
-                ),
-              ),
-            ],
-          ),
+          child: WorkWorkspaceApplicationChooserBody(choices: choices,
+            applications: reviewScope == null ? applications : const [], currentId: current.id, bottomInset: bottomInset,
+            onWorkspace: (workspace) async {
+              if (reviewScope?.mayApply == false || !await _confirmPurchaseNavigation() ||
+                  reviewScope?.mayApply == false || !mounted || !sheetContext.mounted) return;
+              if (reviewScope != null && !session.otherWorkspaces.any((store) => store.id == workspace.id)) return;
+              session.activateWorkspace(workspace);
+              Navigator.of(sheetContext).pop(); _showDashboard();
+            },
+            onApplication: (application) async {
+              if (!await _confirmPurchaseNavigation() || !mounted || !sheetContext.mounted) return;
+              if (!session.resumeWorkspaceApplication(application.id)) return;
+              Navigator.of(sheetContext).pop(); context.push(session.workspaceApplicationRoute);
+            },
+            onRequest: () async {
+              if (!await _confirmPurchaseNavigation() || !mounted || !sheetContext.mounted) return;
+              if (session.startAnotherWork()) { Navigator.of(sheetContext).pop(); context.push('/app/work/workspace/choose'); }
+            }),
         ),
       ),
     );
@@ -3544,9 +8628,11 @@ class _WorkWorkspaceDashboardScreenState
     }
   }
 
-  Future<void> _saveAvailability() async {
+  Future<void> _saveAvailability({StoreSettingsReviewScope? reviewScope, bool Function()? current}) async {
+    if (current?.call() == false || reviewScope?.mayApply == false) { session.showError('These settings changed. Your entries are kept. Reopen this task.'); return; }
     if (_settingsSaving || session.workspaceTradingPreferencesSaving) return;
     final owner = session, scope = session.tradingPreferencesContext;
+    final expectedStore = _settingsStoreId, expectedNavigation = _settingsScopeRevision;
     if (_settingsStoreId != (session.activeWorkspace?.id ?? session.workspaceId) ||
         _settingsScopeRevision != session.navigationScopeRevision) {
       session.showError('Your Store changed. Reopen these settings in the correct Store. Your entries are kept.');
@@ -3573,32 +8659,50 @@ class _WorkWorkspaceDashboardScreenState
       session.setWorkspaceVisibility(true); // Existing truthful refusal copy.
       return;
     }
+    final desired = <String, Object?>{
+      'acceptingOrders': _draftAcceptingOrders, 'visibleToCustomers': _draftVisibleToCustomers,
+      'fulfilmentMode': _draftFulfilmentMode, 'busyMinutes': _draftBusyMinutes,
+      'reopensAt': availabilityChanged && _draftAcceptingOrders ? '' : _draftReopensAt,
+      'openingTime': _draftOpeningTime.trim(), 'closingTime': _draftClosingTime.trim(),
+      'maximumActiveOrders': _draftMaximumActiveOrders, 'alertSound': _draftOrderAlertSound, 'alertVibration': _draftOrderAlertVibration};
+    final tradingKeys = {'openingTime', 'closingTime', 'maximumActiveOrders', 'alertSound', 'alertVibration'};
+    final readinessKeys = {'busyMinutes', 'fulfilmentMode'};
+    final availabilityKeys = {'acceptingOrders', 'visibleToCustomers', 'busyMinutes', 'fulfilmentMode', 'reopensAt'};
+    if (reviewScope?.beginAttempt(desired, intermediate: [
+      {for (final key in tradingKeys) key: desired[key]},
+      {for (final key in {...tradingKeys, ...readinessKeys}) key: desired[key]},
+      {'visibleToCustomers': desired['visibleToCustomers']},
+      {for (final key in {...tradingKeys, ...readinessKeys, 'visibleToCustomers'}) key: desired[key]},
+      {for (final key in availabilityKeys) key: desired[key]},
+    ]) == false) { session.showError('Check the original settings attempt. Your entries are kept.'); return; }
     bool applyOtherPreferences() {
-      if (_draftVisibleToCustomers != session.workspaceVisibleToCustomers &&
-          !session.setWorkspaceVisibility(_draftVisibleToCustomers)) { return false; }
+      if (current?.call() == false || reviewScope?.current() == false || reviewScope?.sourceCurrent() == false) return false;
+      if ((desired['visibleToCustomers'] as bool) != session.workspaceVisibleToCustomers &&
+          !session.setWorkspaceVisibility((desired['visibleToCustomers'] as bool))) { return false; }
       return !availabilityChanged || session.saveWorkspaceAvailability(
-        acceptingOrders: _draftAcceptingOrders,
-        fulfilmentMode: _draftFulfilmentMode,
-        busyMinutes: _draftBusyMinutes,
-        reopensAt: _draftReopensAt,
-        expectedStoreId: _settingsStoreId,
-        expectedNavigationRevision: _settingsScopeRevision,
+        acceptingOrders: desired['acceptingOrders'] as bool,
+        fulfilmentMode: desired['fulfilmentMode'] as String,
+        busyMinutes: desired['busyMinutes'] as int,
+        reopensAt: desired['reopensAt'] as String,
+        expectedStoreId: expectedStore,
+        expectedNavigationRevision: expectedNavigation,
       );
     }
     if (!durableTrading && !applyOtherPreferences()) return;
     if (tradingControlsChanged || session.tradingPreferencesPersistenceAvailable &&
         (!session.workspaceTradingPreferencesSaved || !session.workspaceReadinessPreferencesSaved ||
           session.workspaceTradingPreferencesError != null)) {
+      if (current?.call() == false || reviewScope?.sourceCurrent() == false) return;
       final saved = session.saveWorkspaceTradingControls(
-        openingTime: _draftOpeningTime,
-        closingTime: _draftClosingTime,
-        maximumActiveOrders: _draftMaximumActiveOrders,
-        alertSound: _draftOrderAlertSound,
-        alertVibration: _draftOrderAlertVibration,
-        preparationMinutes: _draftBusyMinutes,
-        fulfilmentPreference: _draftFulfilmentMode,
-        expectedStoreId: _settingsStoreId,
-        expectedNavigationRevision: _settingsScopeRevision,
+        openingTime: desired['openingTime'] as String,
+        closingTime: desired['closingTime'] as String,
+        maximumActiveOrders: desired['maximumActiveOrders'] as int,
+        alertSound: desired['alertSound'] as bool,
+        alertVibration: desired['alertVibration'] as bool,
+        preparationMinutes: desired['busyMinutes'] as int,
+        fulfilmentPreference: desired['fulfilmentMode'] as String,
+        expectedStoreId: expectedStore,
+        expectedNavigationRevision: expectedNavigation,
       );
       if (!saved) return;
       if (session.tradingPreferencesPersistenceAvailable) {
@@ -3606,7 +8710,7 @@ class _WorkWorkspaceDashboardScreenState
         final confirmed = await session.workspaceTradingPreferencesWrite;
         if (!mounted) return;
         setState(() => _settingsSaving = false);
-        if (!identical(owner, session) || scope != session.tradingPreferencesContext ||
+        if (current?.call() == false || reviewScope?.current() == false || !identical(owner, session) || scope != session.tradingPreferencesContext ||
             _view != _WorkspaceControlView.status) { return; }
         if (!confirmed || !session.workspaceTradingPreferencesSaved) {
           session.showError(session.workspaceTradingPreferencesError ?? 'Device save could not be confirmed. Your entries are kept. Try again.');
@@ -3616,6 +8720,9 @@ class _WorkWorkspaceDashboardScreenState
       }
     }
     if (durableTrading && !applyOtherPreferences()) return;
+    reviewScope?.completeAttempt();
+    if (current?.call() == false) return;
+    reviewScope?.dispose();
     setState(() => _view = _WorkspaceControlView.dashboard);
   }
 
@@ -5137,10 +10244,14 @@ class _StoreOperatingBoard extends StatefulWidget {
     required this.onDues,
     required this.onPurchase,
     required this.onReviewFinance,
-    this.scrollController,
+    this.scrollController, this.initialPeriodDays, this.initialReport, this.reviewCurrent, this.readOnlyPreparedSource = false,
     super.key,
   });
   final WorkSession session;
+  final int? initialPeriodDays;
+  final String? initialReport;
+  final bool Function()? reviewCurrent;
+  final bool readOnlyPreparedSource;
   final VoidCallback onSales, onStock, onOrders, onSettlement, onDues;
   final ValueChanged<WorkspacePurchaseRecord> onPurchase;
   final ValueChanged<_WorkspaceFinanceFocus> onReviewFinance;
@@ -5160,6 +10271,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
   Object? _operationalViewScope;
 
   void _loadOperationalPositions({bool refresh = false}) {
+    if (widget.readOnlyPreparedSource || widget.reviewCurrent?.call() == false) return;
     final session = widget.session;
     final scope = (session, session.originalPurchaseReader, session.originalPurchaseRealm,
       session.activeWorkspace?.id, session.navigationScopeRevision);
@@ -5182,6 +10294,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     super.didChangeDependencies();
     if (_periodRestored) return;
     _periodRestored = true;
+    if (widget.initialPeriodDays != null) { _periodDays = widget.initialPeriodDays!; return; }
     final scope = widget.session.workspaceStockHistoryScope()?.key;
     if (scope == null) return;
     final saved = PageStorage.maybeOf(context)?.readState(context,
@@ -5196,7 +10309,8 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     }
   }
 
-  void _rememberPeriod() {
+  void _rememberPeriod({bool explicitNative = false}) {
+    if (widget.reviewCurrent?.call() == false || widget.readOnlyPreparedSource && !explicitNative) return;
     final scope = widget.session.workspaceStockHistoryScope()?.key;
     if (scope != null) {
       PageStorage.maybeOf(context)?.writeState(context,
@@ -5218,6 +10332,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     _startOrderClock();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (widget.readOnlyPreparedSource || widget.reviewCurrent?.call() == false) return;
       // Hydrate the same scoped records used by Stock and Sales. Missing
       // adapters remain unavailable; Home never supplies replacement data.
       unawaited(widget.session.loadWorkspaceInventory());
@@ -5227,6 +10342,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
 
   void _scheduleDayBoundary() {
     _dayBoundary?.cancel();
+    if (widget.readOnlyPreparedSource || widget.reviewCurrent?.call() == false) return;
     final now = DateTime.now();
     final day = DateUtils.dateOnly(now);
     if (day != _today && mounted) {
@@ -5241,8 +10357,9 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
 
   void _startOrderClock() {
     _orderClock?.cancel();
+    if (widget.readOnlyPreparedSource || widget.reviewCurrent?.call() == false) return;
     _orderClock = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) {
+      if (mounted && !widget.readOnlyPreparedSource && widget.reviewCurrent?.call() != false && ModalRoute.of(context)?.isCurrent == true) {
         setState(() {});
         unawaited(widget.session.loadWorkspaceCommodityPriceAttention());
       }
@@ -5251,6 +10368,10 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (widget.readOnlyPreparedSource || widget.reviewCurrent?.call() == false) {
+      if (state == AppLifecycleState.paused) { _dayBoundary?.cancel(); _orderClock?.cancel(); }
+      return;
+    }
     if (state == AppLifecycleState.resumed) {
       _scheduleDayBoundary();
       _startOrderClock();
@@ -5278,9 +10399,9 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     builder: (context, _) {
       final session = widget.session;
       _loadOperationalPositions();
-      if (session.workspaceCommodityPriceAttentionConfigured) {
+      if (!widget.readOnlyPreparedSource && widget.reviewCurrent?.call() != false && ModalRoute.of(context)?.isCurrent == true && session.workspaceCommodityPriceAttentionConfigured) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && identical(widget.session, session)) unawaited(session.loadWorkspaceCommodityPriceAttention());
+          if (mounted && !widget.readOnlyPreparedSource && widget.reviewCurrent?.call() != false && ModalRoute.of(context)?.isCurrent == true && identical(widget.session, session)) unawaited(session.loadWorkspaceCommodityPriceAttention());
         });
       }
       final periodEnd = _periodEnd;
@@ -5477,7 +10598,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
         if (session.workspaceCommodityPriceAttentionError != null)
           _OperatingAttention(id: 'commodity-price-check-unavailable', title: 'Trade price reminders need checking',
             detail: session.workspaceCommodityPriceAttentionError!, action: 'Check price reminders',
-            onTap: () => unawaited(session.loadWorkspaceCommodityPriceAttention(force: true)),
+            onTap: () { if (widget.reviewCurrent?.call() != false) unawaited(session.loadWorkspaceCommodityPriceAttention(force: true)); },
             color: _OperatingPalette.warning, expanded: _expandedCategories.contains('stock')),
         if (unavailable > 0)
           _OperatingAttention(id: 'unavailable',
@@ -5568,17 +10689,19 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
         exportRow('Working capital', 'Stock days', '—', 'Complete historical quantities and turnover unavailable'),
       ];
       return _StoreAnalyticsPresentation(
-        session: session,
+        session: session, initialReport: widget.initialReport, reviewCurrent: widget.reviewCurrent,
         exportRows: List.unmodifiable(exportRows),
         periodDays: _periodDays, periodStart: periodStart, periodEnd: periodEnd,
         onPeriod: (days) {
+          if (widget.reviewCurrent?.call() == false) return;
           if (!const {1, 7, 30}.contains(days)) return;
-          setState(() { _periodDays = days; _periodEnd = DateTime.now(); });
-          _rememberPeriod();
+          setState(() { _periodDays = days; _periodEnd = DateTime.now(); if (widget.readOnlyPreparedSource) _today = DateUtils.dateOnly(_periodEnd); });
+          _rememberPeriod(explicitNative: true);
         },
         onRefresh: () {
-          setState(() => _periodEnd = DateTime.now());
-          _rememberPeriod();
+          if (widget.reviewCurrent?.call() == false) return;
+          setState(() { _periodEnd = DateTime.now(); if (widget.readOnlyPreparedSource) _today = DateUtils.dateOnly(_periodEnd); });
+          _rememberPeriod(explicitNative: true);
           _loadOperationalPositions(refresh: true);
         },
         scrollController: widget.scrollController,
@@ -5957,9 +11080,11 @@ class _StoreAnalyticsPresentation extends StatefulWidget {
     required this.periodStart, required this.periodEnd, required this.onPeriod,
     required this.onRefresh,
     this.compactVisuals = const {}, this.detailVisuals = const {}, this.overviewVisuals = const {},
-    this.scrollController, this.exportRows = const [],
+    this.scrollController, this.exportRows = const [], this.initialReport, this.reviewCurrent,
   });
   final WorkSession session;
+  final String? initialReport;
+  final bool Function()? reviewCurrent;
   final int periodDays;
   final DateTime periodStart, periodEnd;
   final ValueChanged<int> onPeriod;
@@ -6015,9 +11140,9 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
 
   Future<void> _exportAnalytics(WorkspaceAnalyticsSnapshot? provider) async {
     final request = _request;
-    if (_exportBusy || request == null) { return; }
+    if (widget.reviewCurrent?.call() == false || _exportBusy || request == null) { return; }
     final session = widget.session;
-    bool current() => mounted && identical(_request, request) &&
+    bool current() => widget.reviewCurrent?.call() != false && mounted && identical(_request, request) &&
       identical(widget.session, session) && session.analyticsRequest(
         start: request.start, end: request.end)?.sameScope(request) == true;
     setState(() { _exportBusy = true; _exportNotice = null; });
@@ -6098,11 +11223,12 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
     super.didChangeDependencies();
     if (_reportRestored) return;
     _reportRestored = true;
-    _restoreReport();
+    if (widget.initialReport != null) _expanded = widget.initialReport; else _restoreReport();
     _load();
   }
 
   void _load() {
+    if (widget.reviewCurrent?.call() == false) return;
     _scopeIdentity = widget.session.workspaceStockHistoryScope()?.key ?? widget.session.activeWorkspace?.id;
     _request = widget.session.analyticsRequest(
       start: widget.periodStart, end: widget.periodEnd);
@@ -6129,6 +11255,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
   }
 
   void _toggle(String id) {
+    if (widget.reviewCurrent?.call() == false) return;
     final generation = ++_transition;
     final closing = _expanded == id;
     if (_expanded == null && _scroll.hasClients) _summaryOffset = _scroll.offset;
@@ -8758,9 +13885,10 @@ void _advanceDeskOrder(WorkSession session, {String? expectedOrderId}) {
 }
 
 class _OrderOperationStatus extends StatelessWidget {
-  const _OrderOperationStatus({required this.session, required this.orderId});
+  const _OrderOperationStatus({required this.session, required this.orderId,this.inputCurrent,this.foreground,this.perform});
   final WorkSession session;
   final String orderId;
+  final bool Function()? inputCurrent,foreground;final Future<void> Function(Future<void> Function())? perform;
 
   @override
   Widget build(BuildContext context) {
@@ -8789,7 +13917,11 @@ class _OrderOperationStatus extends StatelessWidget {
               ? TextButton(
                   key: Key('work-order-operation-retry-$orderId'),
                   style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-                  onPressed: () => session.retryWorkspaceOrderAction(orderId),
+                  onPressed: () {
+                    if(inputCurrent?.call()==false||foreground?.call()==false||!context.mounted||ModalRoute.of(context)?.isCurrent!=true)return;
+                    Future<void> run()async{await session.retryWorkspaceOrderAction(orderId,inputCurrent:inputCurrent);}
+                    if(perform!=null){unawaited(perform!(run));}else{unawaited(run());}
+                  },
                   child: const Text('Check status'),
                 )
               : const SizedBox(
@@ -9057,15 +14189,18 @@ class _IncomingOrderActivityCard extends StatelessWidget {
   }
 }
 
-Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
+Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session,{
+  int? initialMinutes,bool Function()? inputCurrent,bool Function()? displayCurrent,Listenable? ownerChanges,VoidCallback? onRequest,
+}) {
+  if(inputCurrent?.call()==false)return Future.value();
   final orderId = session.currentWorkspaceOrderId;
   final storeId = session.activeWorkspace?.id ?? session.workspaceId;
-  bool sameOrder() =>
+  bool sameOrder() => (displayCurrent??inputCurrent)?.call()!=false &&
       storeId == (session.activeWorkspace?.id ?? session.workspaceId) &&
       orderId != null &&
       orderId == session.currentWorkspaceOrderId &&
       session.currentWorkspaceOrder?.stage == 'Confirmed';
-  var minutes = session.pendingOrderTimeMinutes ?? 2;
+  var minutes = session.pendingOrderTimeMinutes ?? initialMinutes ?? 2;
   String? feedback;
   var confirmed = false;
   return showModalBottomSheet<void>(
@@ -9074,7 +14209,7 @@ Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
     isScrollControlled: true,
     backgroundColor: Colors.white,
     builder: (sheetContext) => StatefulBuilder(
-      builder: (context, setSheetState) => AnimatedBuilder(
+      builder: (context, setSheetState) => _purchaseCapturedOwnerPage(context,sheetContext,session,displayCurrent??inputCurrent,AnimatedBuilder(
         animation: session,
         builder: (context, _) => _OrderDeadlineBoundary(
           deadline: session.currentWorkspaceOrder?.actionDeadline,
@@ -9171,7 +14306,7 @@ Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
                                 label: Text('+$choice min'),
                                 selected: minutes == choice,
                                 onSelected:
-                                    expired ||
+                                    inputCurrent?.call()==false || expired ||
                                         session.orderTimeRequestBusy ||
                                         session.hasPendingCurrentOrderTime
                                     ? null
@@ -9220,7 +14355,7 @@ Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
                             disabledBackgroundColor: const Color(0xFFE6E9F2),
                           ),
                           onPressed:
-                              session.orderTimeRequestBusy ||
+                              inputCurrent?.call()==false || session.orderTimeRequestBusy ||
                                   !sameOrder() ||
                                   !session.orderTimeServiceAvailable ||
                                   (expired &&
@@ -9228,10 +14363,13 @@ Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
                                   orderId == null
                               ? null
                               : () async {
+                                  if(inputCurrent?.call()==false||!sheetContext.mounted||ModalRoute.of(sheetContext)?.isCurrent!=true)return;
+                                  onRequest?.call();
                                   final result = await session
                                       .requestWorkspaceOrderTime(
                                         orderId,
                                         minutes,
+                                        inputCurrent:inputCurrent,
                                       );
                                   if (!sheetContext.mounted) return;
                                   if (!sameOrder()) {
@@ -9263,7 +14401,7 @@ Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
             ),
           ),
         ),
-      ),
+      ),ownerChanges:ownerChanges),
     ),
   );
 }
@@ -9473,7 +14611,7 @@ class _DeviceCaseSourceListenable implements Listenable {
   @override void removeListener(VoidCallback listener) => source.removeListener(listener);
 }
 
-Future<bool> _openReceivedDeviceCase(BuildContext context, WorkSession session, WorkspaceDeviceCaseHandoff handoff) async {
+Future<bool> _openReceivedDeviceCase(BuildContext context, WorkSession session, WorkspaceDeviceCaseHandoff handoff, {bool captureNativeRoute=false}) async {
   if (!context.mounted || !handoff.current) return false;
   final navigation = session.navigationScopeRevision, reader = session.originalPurchaseReader;
   bool ownerCurrent() => handoff.current && session.navigationScopeRevision == navigation &&
@@ -9481,7 +14619,10 @@ Future<bool> _openReceivedDeviceCase(BuildContext context, WorkSession session, 
     session.activeWorkspace?.id == handoff.target.reference.storeId && session.originalPurchaseRealm == handoff.target.realm;
   if (!ownerCurrent() || !session.admitWorkspacePurchaseIssue(issue: handoff.issue, target: handoff.target,
     original: handoff.original, ownerCurrent: ownerCurrent)) { return false; }
-  await showDialog<void>(context: context, builder: (dialogContext) => AnimatedBuilder(
+  BuildContext? nativeDialog;
+  bool nativeInputCurrent()=>nativeDialog?.mounted==true&&ModalRoute.of(nativeDialog!)?.isCurrent==true;
+  await showDialog<void>(context: context, builder: (dialogContext) {
+    nativeDialog=dialogContext;return AnimatedBuilder(
     animation: Listenable.merge([session, _DeviceCaseSourceListenable(handoff.source)]),
     builder: (context, _) => _OrderDeadlineBoundary(deadline: handoff.ownerAccess.expiresAt, builder: (_) {
       final issue = ownerCurrent() ? session.workspaceCurrentIssue(handoff.issue) : null;
@@ -9489,11 +14630,12 @@ Future<bool> _openReceivedDeviceCase(BuildContext context, WorkSession session, 
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         title: const Text('Buyer device report', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         content: issue == null ? const Text('Current Store owner access is unavailable. Reopen the report after access is restored.') :
-          _StoreIssueReview(key: ValueKey(issue.draftKey), issue: issue, session: session, initiallyExpanded: true),
+          _StoreIssueReview(key: ValueKey(issue.draftKey), issue: issue, session: session, initiallyExpanded: true,
+            ownerCurrent:captureNativeRoute?nativeInputCurrent:null),
         actions: [TextButton(onPressed: () {
           if (dialogContext.mounted && ModalRoute.of(dialogContext)?.isCurrent == true) Navigator.of(dialogContext).pop();
         }, child: const Text('Done'))]);
-    })));
+    }));});
   return true;
 }
 
@@ -9503,7 +14645,9 @@ class _StoreIssueReviews extends StatelessWidget {
     required this.target,
     required this.referenceId,
     this.initiallyExpanded = false,
+    this.ownerCurrent,
   });
+  final bool Function()? ownerCurrent;
   final WorkSession session;
   final WorkspaceIssueTarget target;
   final String referenceId;
@@ -9531,7 +14675,7 @@ class _StoreIssueReviews extends StatelessWidget {
             issue: issue,
             session: session,
             initiallyExpanded: initiallyExpanded,
-          ),
+           ownerCurrent: ownerCurrent),
       ],
     );
   }
@@ -9543,7 +14687,9 @@ class _StoreIssueReview extends StatefulWidget {
     required this.issue,
     required this.session,
     required this.initiallyExpanded,
+    this.ownerCurrent,
   });
+  final bool Function()? ownerCurrent;
   final WorkspaceIssueRecord issue;
   final WorkSession session;
   final bool initiallyExpanded;
@@ -9643,7 +14789,7 @@ class _StoreIssueReviewState extends State<_StoreIssueReview> {
               key: ValueKey(issue.draftKey),
               session: widget.session,
               issue: issue,
-            ),
+             ownerCurrent: widget.ownerCurrent),
             if (issue.state == WorkspaceIssueState.resolved)
               const Text(
                 'Check the linked payment and stock records for any adjustments.',
@@ -9662,7 +14808,11 @@ class _StoreIssueResponseEditor extends StatefulWidget {
     super.key,
     required this.session,
     required this.issue,
+    this.ownerCurrent,
+    this.stagedFields,this.stagedAction,this.ownerChanges,
   });
+  final bool Function()? ownerCurrent;
+  final Listenable? ownerChanges;final Map<String,Object?>? stagedFields;final String? stagedAction;
   final WorkSession session;
   final WorkspaceIssueRecord issue;
 
@@ -9673,7 +14823,24 @@ class _StoreIssueResponseEditor extends StatefulWidget {
 
 class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
   final _note = TextEditingController();
-  bool _restored = false;
+  bool _restored = false,_stagedBusy=false;
+  WorkspaceIssueResponse? _localResponse;String? _stagedBaseline,_localMessage;
+  bool get _staged=>widget.stagedFields!=null;
+  bool get _foreground=>_capturedOwnerCurrent&&ModalRoute.of(context)?.isCurrent==true;
+  Future<bool> _keepPrepared()async{
+    if(!_staged||!_foreground||_stagedBusy||widget.stagedAction=='AI-ACT-279')return false;
+    final source=widget.session,issue=widget.issue;
+    if(jsonEncode(source.workspaceIssueDraft(issue)?.toJson())!=_stagedBaseline){
+      setState(()=>_localMessage='The saved response changed. Close and review it again.');return false;
+    }
+    setState(()=>_stagedBusy=true);
+    try{
+      await source.saveWorkspaceIssueDraft(issue,response:_localResponse,note:_note.text,inputCurrent:()=>_foreground);
+      if(!_capturedOwnerCurrent)return false;
+      _stagedBaseline=jsonEncode(source.workspaceIssueDraft(issue)?.toJson());
+      return source.workspaceIssueDraftMessage(issue)=='Draft saved on this device. Not sent.';
+    }finally{if(mounted)setState(()=>_stagedBusy=false);}
+  }
 
   @override
   void initState() {
@@ -9681,20 +14848,30 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
     unawaited(_restore());
   }
 
+  bool get _capturedOwnerCurrent => mounted && widget.ownerCurrent?.call() != false;
   Future<void> _restore() async {
+    if (!_capturedOwnerCurrent) return;
     await Future.wait([
       widget.session.loadWorkspaceIssueDraft(widget.issue),
       widget.session.loadWorkspaceIssueResponse(widget.issue),
     ]);
-    if (!mounted) return;
+    if (!_capturedOwnerCurrent) return;
     final draft = widget.session.workspaceIssueDraft(widget.issue);
-    if (!_restored) _note.text = draft?.note ?? '';
+    if (!_restored){
+      _note.text = _staged?(widget.stagedFields!['note'] as String? ?? draft?.note ?? ''):draft?.note ?? '';
+      _localResponse=_staged && widget.stagedFields!['response'] is String ?
+        widget.issue.permittedResponses.where((value)=>value.name==widget.stagedFields!['response']).singleOrNull:draft?.response;
+      _stagedBaseline=jsonEncode(draft?.toJson());
+    }
     setState(
       () => _restored = widget.session.workspaceIssueDraftLoaded(widget.issue),
     );
   }
 
   Future<void> _send() async {
+    if (!_foreground || widget.stagedAction=='AI-ACT-277' || widget.stagedAction=='AI-ACT-279') return;
+    if(_staged&&!await _keepPrepared())return;
+    if(!_foreground)return;
     final session = widget.session;
     final issue = widget.issue;
     final draft = session.workspaceIssueDraft(issue);
@@ -9705,7 +14882,8 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
       confirmed =
           await showDialog<bool>(
             context: context,
-            builder: (context) => AlertDialog(
+            builder: (context) => _OwnedIssueDeclineDialog(ownerCurrent:()=>_capturedOwnerCurrent,
+              changes:Listenable.merge([widget.session,?widget.ownerChanges]),builder:(finish)=>AlertDialog(
               key: const Key('work-issue-decline-confirmation'),
               scrollable: true,
               insetPadding: const EdgeInsets.symmetric(
@@ -9726,7 +14904,7 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
                     minimumSize: const Size(0, 48),
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
-                  onPressed: () => Navigator.pop(context, false),
+                  onPressed:()=>finish(false),
                   child: const Text('Keep editing'),
                 ),
                 FilledButton(
@@ -9734,24 +14912,25 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
                     minimumSize: const Size(0, 48),
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
-                  onPressed: () => Navigator.pop(context, true),
+                  onPressed:()=>finish(true),
                   child: const Text('Send decline'),
                 ),
               ],
-            ),
+            )),
           ) ??
           false;
       if (!confirmed || !mounted) return;
     }
-    if (!mounted) return;
+    if (!_foreground) return;
     // Keep this case in the lazy order list when its form becomes a summary.
     // Only the retailer's Send action moves focus; background updates do not.
     await Scrollable.ensureVisible(context, alignment: 0);
-    if (!mounted) return;
+    if (!_foreground) return;
     await session.sendWorkspaceIssueResponse(
       issue,
       expectedDraft: draft,
       declineConfirmed: confirmed,
+      inputCurrent:()=>_foreground,
     );
   }
 
@@ -9802,12 +14981,15 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
           !session.workspaceIssueStale(issue) &&
           loaded &&
           !changed &&
-          !locked;
-      final choice = issue.permittedResponses.contains(draft?.response)
-          ? draft?.response
+          !locked && !_stagedBusy && widget.stagedAction!='AI-ACT-279';
+      final chosenResponse=_staged?_localResponse:draft?.response;
+      final choice = issue.permittedResponses.contains(chosenResponse)
+          ? chosenResponse
           : null;
       final message = session.workspaceIssueDraftMessage(issue);
       void save(WorkspaceIssueResponse? response, {bool reviewed = false}) {
+        if (!_foreground) return;
+        if(_staged){setState(()=>_localResponse=response);return;}
         unawaited(
           session.saveWorkspaceIssueDraft(
             issue,
@@ -9934,6 +15116,9 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
                     child: const Text('Retry save'),
                   ),
                 ),
+              if(_localMessage!=null)Text(_localMessage!),
+              if(_staged&&widget.stagedAction!='AI-ACT-279'&&!pending&&!sent)Align(alignment:Alignment.centerRight,
+                child:TextButton(key:Key('work-issue-keep-draft-${issue.id}'),onPressed:available?()async{await _keepPrepared();}:null,child:const Text('Save response draft'))),
               const SizedBox(height: 8),
               if (sent)
                 Text(
@@ -9967,12 +15152,10 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
                     key: Key('work-issue-check-response-${issue.id}'),
                     onPressed: busy
                         ? null
-                        : () => session.checkWorkspaceIssueResponse(
-                            issue,
-                            retrySend: session.workspaceIssueMayRetrySend(
-                              issue,
-                            ),
-                          ),
+                        : () {if(!_foreground)return;
+                            unawaited(session.checkWorkspaceIssueResponse(issue,
+                              retrySend:session.workspaceIssueMayRetrySend(issue),inputCurrent:()=>_foreground));
+                          },
                     child: Text(
                       busy
                           ? 'Please wait…'
@@ -9995,7 +15178,9 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
                   alignment: Alignment.centerRight,
                   child: FilledButton(
                     key: Key('work-issue-send-response-${issue.id}'),
-                    onPressed: session.workspaceIssueCanSend(issue)
+                    onPressed: (widget.stagedAction==null?session.workspaceIssueCanSend(issue):
+                        widget.stagedAction=='AI-ACT-278'&&available&&choice!=null&&
+                        (choice==WorkspaceIssueResponse.acceptRequest||_note.text.trim().isNotEmpty))
                         ? _send
                         : null,
                     child: const Text('Send response'),
@@ -10484,8 +15669,10 @@ class _PickupReadyActivityCard extends StatelessWidget {
 
 Future<void> _showWorkspacePickupSheet(
   BuildContext context,
-  WorkSession session,
-) async {
+  WorkSession session, {
+  bool Function()? inputCurrent, bool Function()? displayCurrent,Listenable? ownerChanges,
+}) async {
+  if(inputCurrent?.call()==false)return;
   if (session.currentWorkspaceOrder?.isCustomerCollection == true) {
     context.go('/app/work/workspace/dashboard');
     return;
@@ -10499,7 +15686,7 @@ Future<void> _showWorkspacePickupSheet(
     useSafeArea: true,
     showDragHandle: true,
     builder: (sheetContext) => StatefulBuilder(
-      builder: (context, setSheetState) => AnimatedPadding(
+      builder: (context, setSheetState) => _purchaseCapturedOwnerPage(context,sheetContext,session,displayCurrent??inputCurrent,AnimatedPadding(
         duration: const Duration(milliseconds: 180),
         padding: EdgeInsets.fromLTRB(
           18,
@@ -10551,20 +15738,23 @@ Future<void> _showWorkspacePickupSheet(
                 onPressed: session.workspaceHandoverBusy
                     ? null
                     : () async {
+                        if(!sheetContext.mounted||ModalRoute.of(sheetContext)?.isCurrent!=true||inputCurrent?.call()==false)return;
                         final success = await session.verifyWorkspacePickup(
                           pickupCode,
+                          inputCurrent:inputCurrent,
                         );
-                        if (!sheetContext.mounted) return;
+                        if (!sheetContext.mounted||displayCurrent?.call()==false) return;
                         if (!success) {
                           setSheetState(() => error = session.errorMessage);
                           return;
                         }
                         final invoice = session.latestWorkspaceInvoice;
+                        if(ModalRoute.of(sheetContext)?.isCurrent!=true)return;
                         Navigator.of(sheetContext).pop();
                         await Future<void>.delayed(
                           const Duration(milliseconds: 260),
                         );
-                        if (invoice != null && pageContext.mounted) {
+                        if (invoice != null && pageContext.mounted && displayCurrent?.call()!=false) {
                           await _showWorkspaceInvoiceSheet(
                             pageContext,
                             session,
@@ -10578,7 +15768,7 @@ Future<void> _showWorkspacePickupSheet(
             ],
           ),
         ),
-      ),
+      ),ownerChanges:ownerChanges),
     ),
   );
 }
@@ -10627,8 +15817,9 @@ String _workspaceInvoiceMessage(
 Future<void> _showWorkspaceInvoiceSheet(
   BuildContext context,
   WorkSession session,
-  WorkspaceCustomerInvoice invoice,
+  WorkspaceCustomerInvoice invoice, {bool Function()? ownerCurrent,Listenable? ownerChanges}
 ) async {
+  if (ownerCurrent?.call() == false) return;
   final router = GoRouter.of(context);
   final returnRoute = GoRouterState.of(context).uri.toString();
   final account = session.workspaceFinance?.accountScope;
@@ -10644,17 +15835,18 @@ Future<void> _showWorkspaceInvoiceSheet(
     showDragHandle: true,
     builder: (sheetContext) {
       route = ModalRoute.of<bool>(sheetContext);
-      return _StoreInvoiceSurface(
+      final surface = _StoreInvoiceSurface(
         session: session,
-        invoice: invoice,
+        invoice: invoice,ownerCurrent: ownerCurrent,ownerChanges: ownerChanges,
         onClose: () => Navigator.pop(sheetContext),
         onOpenChat: () => Navigator.pop(sheetContext, true),
       );
+      return ownerCurrent == null ? surface : _StoreSalesOwnerSurface(current: ownerCurrent,changes: Listenable.merge([session,ownerChanges]),child: surface);
     },
   );
-  if (chat != true) return;
+  if (chat != true || ownerCurrent?.call() == false) return;
   await route?.completed;
-  if (!context.mounted ||
+  if (!context.mounted || ownerCurrent?.call() == false ||
       session.activeWorkspace?.id != store ||
       session.workspaceFinance?.accountScope != account) {
     return;
@@ -10690,6 +15882,7 @@ class _StoreInvoiceSurface extends StatefulWidget {
     this.counterAppearance = false,
     this.orderDetails = false,
     this.salesPresentation = false,
+    this.ownerCurrent,this.ownerChanges,
     super.key,
   });
   final WorkSession session;
@@ -10702,6 +15895,8 @@ class _StoreInvoiceSurface extends StatefulWidget {
   final bool counterAppearance;
   final bool orderDetails;
   final bool salesPresentation;
+  final bool Function()? ownerCurrent;
+  final Listenable? ownerChanges;
   @override
   State<_StoreInvoiceSurface> createState() => _StoreInvoiceSurfaceState();
 }
@@ -10798,7 +15993,13 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
       ),
     );
   }
+  void _closeOwned() {
+    if (widget.ownerCurrent != null && ModalRoute.of(context)?.isCurrent != true) return;
+    widget.onClose();
+  }
   void _openPdf() {
+    if (widget.ownerCurrent != null && ModalRoute.of(context)?.isCurrent != true) return;
+    if (widget.ownerCurrent?.call() == false) return;
     if (session.activeWorkspace?.id != invoiceStore ||
         session.workspaceFinance?.accountScope != invoiceAccount) {
       return;
@@ -10825,14 +16026,13 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => WorkInvoicePdfScreen(
-          request: request,
-          source: createWorkInvoicePdfSource(),
-          scopeChanges: session,
-          isCurrent: () =>
-              session.activeWorkspace?.id == invoiceStore &&
-              session.workspaceFinance?.accountScope == invoiceAccount,
-        ),
+        builder: (_) {
+          final screen = WorkInvoicePdfScreen(request: request,source: createWorkInvoicePdfSource(),
+            scopeChanges: Listenable.merge([session,widget.ownerChanges]),isCurrent: () => widget.ownerCurrent?.call() != false &&
+              session.activeWorkspace?.id == invoiceStore && session.workspaceFinance?.accountScope == invoiceAccount);
+          return widget.ownerCurrent == null ? screen : _StoreSalesOwnerSurface(current: widget.ownerCurrent!,
+            changes: Listenable.merge([session,widget.ownerChanges]),child: screen);
+        },
       ),
     );
   }
@@ -11143,6 +16343,8 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
   }
 
   void _openChat(BuildContext context) {
+    if (widget.ownerCurrent != null && ModalRoute.of(context)?.isCurrent != true) return;
+    if (widget.ownerCurrent?.call() == false) return;
     if (widget.onOpenChat != null) {
       widget.onOpenChat!();
       return;
@@ -11228,7 +16430,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
             style: const TextStyle(fontSize: 11, color: MoolColors.ink)),
         const SizedBox(height: 4),
         _InvoiceCollectionSummary(session: session, invoice: invoice,
-            accountScope: invoiceAccount, storeId: invoiceStore, orderDetails: true),
+            accountScope: invoiceAccount, storeId: invoiceStore, orderDetails: true, allowActions: widget.ownerCurrent == null),
         const Divider(height: 12),
         _invoiceItemRows(),
         _invoiceTotal(),
@@ -11263,6 +16465,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.ownerCurrent?.call() == false) return const SizedBox.shrink();
     if (session.activeWorkspace?.id == invoiceStore &&
         session.workspaceFinance == null && invoiceAccount != null) {
       return const Center(child: Text('Payment records are unavailable. Close and reopen this invoice after records have loaded.'));
@@ -11300,7 +16503,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
           (ledger) => ledger.customerId == payment?.customerId &&
               (ledger.invoiceBalance(invoice.id)?.creditedMinor ?? 0) > 0,
         ) ?? false);
-    final canAdjust = payment != null &&
+    final canAdjust = widget.ownerCurrent == null && payment != null &&
         (session.workspaceOrders.any((order) => order.id == invoice.orderId &&
             order.isCompleted && order.hasCompleteItemSnapshot) ||
         (finance?.customerLedgers.any((ledger) => ledger.customerId == payment.customerId &&
@@ -11368,7 +16571,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     if (!widget.embedded)
                       IconButton(
                         tooltip: 'Close invoice',
-                        onPressed: widget.onClose,
+                        onPressed: _closeOwned,
                         icon: const Icon(Icons.close_rounded),
                       ),
                   ],
@@ -11481,6 +16684,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                       _InvoiceCollectionSummary(
                     session: session,
                     invoice: invoice,
+                    allowActions: widget.ownerCurrent == null,
                     accountScope: invoiceAccount,
                     storeId: invoiceStore,
                     onRecord: widget.onRecord,
@@ -11588,6 +16792,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                       onPressed: openingWhatsApp
                           ? null
                           : () async {
+                              if (widget.ownerCurrent?.call() == false || widget.ownerCurrent != null && ModalRoute.of(sheetContext)?.isCurrent != true) return;
                               final digits = invoice.customer.replaceAll(
                                 RegExp(r'\D'),
                                 '',
@@ -11613,7 +16818,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                                   }),
                                   mode: LaunchMode.externalApplication,
                                 );
-                                if (!sheetContext.mounted) return;
+                                if (!sheetContext.mounted || widget.ownerCurrent?.call() == false || ModalRoute.of(sheetContext)?.isCurrent != true) return;
                                 if (opened) {
                                   widget.onClose();
                                   session.showNotice(
@@ -11681,8 +16886,9 @@ class _OrderAttentionActivityCard extends StatelessWidget {
 }
 
 class _DeliveryActivityCard extends StatelessWidget {
-  const _DeliveryActivityCard({required this.session});
-  final WorkSession session;
+  const _DeliveryActivityCard({required this.session,this.assignmentReview=false,this.ownerCurrent,this.reviewPerform,this.reviewForeground,this.nativeReturnUri});
+  final WorkSession session;final String? nativeReturnUri;
+  final bool assignmentReview;final bool Function()? ownerCurrent,reviewForeground;final Future<void> Function(Future<void> Function())? reviewPerform;
 
   @override
   Widget build(BuildContext context) {
@@ -11692,9 +16898,9 @@ class _DeliveryActivityCard extends StatelessWidget {
     final address = session.workspaceOrderAddress;
     final renderedStage = session.workspaceOrderStage;
     final storeName = session.activeWorkspace?.name ?? 'Store';
-    final returnRoute = GoRouterState.of(context).uri.toString();
+    final returnRoute = nativeReturnUri??GoRouterState.of(context).uri.toString();
     bool sameOrder() =>
-        context.mounted &&
+        context.mounted && ownerCurrent?.call()!=false &&
         storeId == (session.activeWorkspace?.id ?? session.workspaceId) &&
         orderId == (session.currentWorkspaceOrderId ?? 'current-store-order') &&
         customer == session.workspaceOrderCustomer &&
@@ -11902,7 +17108,11 @@ class _DeliveryActivityCard extends StatelessWidget {
                     key: const Key('work-delivery-retry'),
                     onPressed: session.workspaceOperationsSyncing
                         ? null
-                        : session.retryWorkspaceDeliveryAssignment,
+                        : () {
+                            if(!sameOrder()||reviewForeground?.call()==false||ModalRoute.of(context)?.isCurrent!=true)return;
+                            Future<void> retry()async{await session.retryWorkspaceDeliveryAssignment(inputCurrent:ownerCurrent);}
+                            if(reviewPerform!=null){unawaited(reviewPerform!(retry));}else{unawaited(retry());}
+                          },
                     child: const Text('Try again'),
                   ),
                 ],
@@ -11915,7 +17125,7 @@ class _DeliveryActivityCard extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Flex(
+              if(!assignmentReview)Flex(
                 direction: stackContacts ? Axis.vertical : Axis.horizontal,
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: stackContacts
@@ -12042,7 +17252,7 @@ class _DeliveryActivityCard extends StatelessWidget {
                   ),
                 ],
               ),
-              if (canConfirmOwnDelivery)
+              if (canConfirmOwnDelivery&&!assignmentReview)
                 FilledButton.icon(
                   key: const Key('work-activity-confirm-handover'),
                   onPressed: session.workspaceHandoverBusy
@@ -12182,8 +17392,10 @@ class _DeliveryProgressTrack extends StatelessWidget {
 
 Future<void> _showWorkspaceHandoverSheet(
   BuildContext context,
-  WorkSession session,
-) async {
+  WorkSession session, {
+  bool Function()? inputCurrent,bool Function()? displayCurrent,Listenable? ownerChanges,
+}) async {
+  if(inputCurrent?.call()==false)return;
   // Freeze the order at entry, not when the sheet rebuilds or submits. The
   // model's in-flight response checks remain separate from this UI boundary.
   final account = session.contactDraftStore?.accountScope ??
@@ -12209,7 +17421,7 @@ Future<void> _showWorkspaceHandoverSheet(
       order != null && session.currentWorkspaceOrder?.id == order.id &&
       customer == session.workspaceOrderCustomer &&
       address == session.workspaceOrderAddress;
-  bool canSubmit() => sameContext() &&
+  bool canSubmit() => inputCurrent?.call()!=false && sameContext() &&
       identical(order, session.currentWorkspaceOrder) &&
       originalLedger == jsonEncode(session.currentWorkspaceOrder!.toLedgerJson()) &&
       order!.customer == customer && order.address == address &&
@@ -12238,18 +17450,19 @@ Future<void> _showWorkspaceHandoverSheet(
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (_) => _WorkspaceHandoverSheet(session: session,
+    builder: (sheetContext) => _purchaseCapturedOwnerPage(sheetContext,sheetContext,session,displayCurrent??inputCurrent,_WorkspaceHandoverSheet(session: session,
         canSubmit: canSubmit, sameContext: sameContext,
-        completedAsExpected: completedAsExpected),
+        completedAsExpected: completedAsExpected,inputCurrent:inputCurrent),ownerChanges:ownerChanges),
   );
 }
 
 class _WorkspaceHandoverSheet extends StatefulWidget {
   const _WorkspaceHandoverSheet({required this.session,
       required this.canSubmit, required this.sameContext,
-      required this.completedAsExpected});
+      required this.completedAsExpected,this.inputCurrent});
 
   final WorkSession session;
+  final bool Function()? inputCurrent;
   final bool Function() canSubmit, sameContext, completedAsExpected;
 
   @override
@@ -12319,7 +17532,7 @@ class _WorkspaceHandoverSheetState extends State<_WorkspaceHandoverSheet> {
                       return;
                     }
                     final success = await widget.session
-                        .verifyWorkspaceHandover(_controller.text);
+                        .verifyWorkspaceHandover(_controller.text,inputCurrent:widget.inputCurrent);
                     if (!mounted) return;
                     if (ModalRoute.of(this.context)?.isCurrent != true ||
                         !widget.sameContext()) {
@@ -13126,8 +18339,10 @@ class _LiveCountdownTextState extends State<_LiveCountdownText>
 
 Future<void> _showRejectOrderSheet(
   BuildContext context,
-  WorkSession session,
-) async {
+  WorkSession session, {
+  bool Function()? inputCurrent,Listenable? ownerChanges,String? initialReason,VoidCallback? onConfirm,
+}) async {
+  if(inputCurrent?.call()==false)return;
   final storeId = session.activeWorkspace?.id ?? session.workspaceId;
   final orderId = session.currentWorkspaceOrderId;
   final stage = session.workspaceOrderStage;
@@ -13160,7 +18375,7 @@ Future<void> _showRejectOrderSheet(
       if ((capturedQuantities[product.id] ?? 0) > 0) product.toInventoryJson()],
   });
   final capturedPromotion = anonymous ? promotionInputs() : null;
-  bool sameIdentity() => context.mounted &&
+  bool sameIdentity() => context.mounted && inputCurrent?.call()!=false &&
       storeId == (session.activeWorkspace?.id ?? session.workspaceId) &&
       accountScope == (session.contactDraftStore?.accountScope ??
           session.pendingProofStore?.accountScope);
@@ -13194,11 +18409,11 @@ Future<void> _showRejectOrderSheet(
   if (!eligible()) {
     return;
   }
-  String? selectedReason;
+  String? selectedReason=initialReason;
   final reason = await showDialog<String>(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setDialogState) => AlertDialog(
+      builder: (context, setDialogState) => _purchaseCapturedOwnerPage(context,dialogContext,session,inputCurrent,AlertDialog(
         key: const Key('work-reject-order-dialog'),
         scrollable: true,
         backgroundColor: const Color(0xFFFFFDFD),
@@ -13305,7 +18520,7 @@ Future<void> _showRejectOrderSheet(
             ],
           ),
         ),
-      ),
+      ),ownerChanges:ownerChanges),
     ),
   );
   if (reason == null || !context.mounted) return;
@@ -13316,7 +18531,10 @@ Future<void> _showRejectOrderSheet(
     session.showNotice('This order changed. Review its latest status.');
     return;
   }
-  session.cancelWorkspaceOrder(reason: reason);
+  onConfirm?.call();
+  if(inputCurrent!=null&&orderId!=null&&session.hasScopedWorkspaceOrder(orderId)){
+    await session.submitWorkspaceOrderAction(orderId,WorkOrderAction.reject,reason:reason,inputCurrent:inputCurrent);
+  }else{session.cancelWorkspaceOrder(reason: reason);}
 }
 
 class _DashboardSyncBanner extends StatelessWidget {
@@ -14462,7 +19680,9 @@ class _StoreReceiptEditor extends StatefulWidget {
     super.key,
     required this.session,
     required this.purchase,
+    this.ownerCurrent,this.assistantContinue=false,
   });
+  final bool Function()? ownerCurrent;final bool assistantContinue;
   final WorkSession session;
   final WorkspacePurchaseRecord purchase;
   @override
@@ -14477,15 +19697,19 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
   final _note = TextEditingController();
   final _noteKey = GlobalKey();
 
-  Future<void> _start({bool issue = false}) async {
+  @override void initState(){super.initState();if(widget.assistantContinue)WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)unawaited(_start(readOnly:true));});}
+
+  bool get _capturedOwnerCurrent => mounted && widget.ownerCurrent?.call() != false;
+  Future<void> _start({bool issue = false,bool readOnly=false}) async {
+    if (!_capturedOwnerCurrent) return;
     setState(() {
       _open = true;
       _loading = true;
     });
     final session = widget.session;
     await session.loadWorkspaceReceiptDraft(widget.purchase);
-    if (!mounted) return;
-    if (session.workspaceReceiptDraftLoaded(widget.purchase) &&
+    if (!_capturedOwnerCurrent) return;
+    if (!readOnly && session.workspaceReceiptDraftLoaded(widget.purchase) &&
         session.workspaceReceiptDraft(widget.purchase) == null) {
       // Bind even an empty draft to the lines currently being checked.
       await session.saveWorkspaceReceiptDraft(
@@ -14495,7 +19719,7 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
         note: '',
       );
     }
-    if (!mounted) return;
+    if (!_capturedOwnerCurrent) return;
     final draft = session.workspaceReceiptDraft(widget.purchase);
     if (!_restored && draft != null) {
       for (final line in draft.lines) {
@@ -14522,6 +19746,7 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
   }
 
   Future<void> _save() async {
+    if (!_capturedOwnerCurrent) return;
     await widget.session.saveWorkspaceReceiptDraft(
       widget.purchase,
       countedPacks: _counts.map(
@@ -14753,6 +19978,7 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
                       setState(() => _loading = true);
                       try {
                         await _save();
+                        if (!_capturedOwnerCurrent) return;
                         await session.confirmStoreReviewReceipt(purchase);
                       } finally {
                         if (mounted) {
@@ -14776,6 +20002,7 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
                       setState(() => _loading = true);
                       try {
                         await _save();
+                        if (!_capturedOwnerCurrent) return;
                         await session.confirmStoreReviewSupplierReturn(
                           purchase,
                         );
@@ -14845,7 +20072,9 @@ Widget _purchaseBillTaskSummary(Widget label, Widget value) => Row(
 
 class _StoreBillGoodsMatch extends StatefulWidget {
   const _StoreBillGoodsMatch({super.key, required this.session, required this.copy,
-    required this.onOpenCopy, this.summary, this.actions, this.onBeforeOpen, this.headerBuilder});
+    required this.onOpenCopy, this.summary, this.actions, this.onBeforeOpen, this.headerBuilder, this.ownerCurrent, this.assistantReadOnlyOpen = false,this.receivingInitial});
+  final bool Function()? ownerCurrent;
+  final bool assistantReadOnlyOpen;final StoreReceivingReviewInitial? receivingInitial;
   final WorkSession session;
   final WorkspacePurchaseSavedCopy copy;
   final Future<void> Function(WorkspacePurchaseSavedCopy copy) onOpenCopy;
@@ -14861,6 +20090,44 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
     with AutomaticKeepAliveClientMixin<_StoreBillGoodsMatch> {
   @override
   bool get wantKeepAlive => true;
+  bool _receivingMatchInitialAttempted=false,_receivingMatchRetired=false;
+  StoreReceivingReviewInitial? _receivingMatchInitial;
+  _ReceivingNativeLease? _receivingMatchLease;String? _receivingMatchCopy;
+  bool get _receivingMatchCurrent {
+    if(_receivingMatchLease==null)return true;
+    if(!_receivingMatchLease!.current||jsonEncode(widget.copy.toJson())!=_receivingMatchCopy)_receivingMatchRetired=true;
+    return !_receivingMatchRetired;
+  }
+  bool _canAdoptReceivingMatch(StoreReceivingReviewInitial initial)=>_current&&_loaded&&!_busy&&_frozen==null&&
+    _otherReview==null&&!_uncertain&&!_dirty&&_receivingMatchTargetValid(session,widget.copy,initial);
+  bool _adoptReceivingMatch(StoreReceivingReviewInitial initial,_ReceivingNativeLease lease) {
+    if(!lease.current||!_canAdoptReceivingMatch(initial))return false;
+    _receivingMatchLease?.dispose();_receivingMatchLease=lease;_receivingMatchCopy=jsonEncode(widget.copy.toJson());
+    _receivingMatchInitial=initial;_receivingMatchInitialAttempted=false;_applyReceivingMatchInitial();return true;
+  }
+  void _applyReceivingMatchInitial() {
+    final initial=_receivingMatchInitial??widget.receivingInitial;
+    if(initial==null||_receivingMatchInitialAttempted)return;
+    _receivingMatchInitialAttempted=true;
+    final index=initial.values['billLineIndex'] as int?;
+    if(!_current||!_loaded||_busy||_frozen!=null||_otherReview!=null||_uncertain||_dirty||
+      index==null||index<0||index>=widget.copy.draft.goods.length) {
+      setState(()=>_error='Original reconciliation input is kept. Resolve its saved review before applying new values.');return;
+    }
+    final receipt=_ledger?.goodsReceipts[initial.text('receiptId')];
+    final line=receipt?.lines.where((line)=>line.sourceLineId==initial.text('receiptLineId')).singleOrNull;
+    if(receipt==null||line==null||widget.copy.draft.goods[index]['productId']!=line.productId||
+      !session.workspaceGoodsReceiptDrafts.any((r)=>r.supplierId==widget.copy.supplier.id&&jsonEncode(r.receipt.toJson())==jsonEncode(receipt.toJson()))) {
+      setState(()=>_error='Choose an original matching bill item and recorded receipt line.');return;
+    }
+    setState((){
+      _opened=true;_item=index;_chooseReceipt((receipt.id,line.sourceLineId));
+      final controls={'quantity':_quantity,'free':_free,'accepted':_accepted,'damaged':_damaged,'numerator':_numerator,'denominator':_denominator};
+      for(final entry in controls.entries){if(initial.text(entry.key) case final value?)entry.value.text=value;}
+      _conversion=false; // Only the original native checkbox records user review.
+    });
+  }
+
   late final _scope = widget.session.workspaceSupplierScope;
   final _quantity = TextEditingController(), _free = TextEditingController(text: '0');
   final _accepted = TextEditingController(), _damaged = TextEditingController(text: '0');
@@ -14875,7 +20142,7 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
   final _savedReviewAnchor = GlobalKey();
   String? _error, _notice;
   WorkSession get session => widget.session;
-  bool get _current => mounted && _scope != null && _scope == session.workspaceSupplierScope;
+  bool get _current => mounted && _scope != null && _scope == session.workspaceSupplierScope && widget.ownerCurrent?.call() != false && _receivingMatchCurrent;
   WorkspaceSupplierLedger? get _ledger => session.workspaceInvoiceHistoryLoaded
     ? session.workspaceSupplierLedger(widget.copy.supplier.id) : null;
   bool get _committed => _frozen != null &&
@@ -14903,9 +20170,10 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
     return label.contains('\n') ? label : receipt.reference;
   }
   @override
-  void initState() { super.initState(); unawaited(_recover()); }
+  void initState() { super.initState(); unawaited(_recover(readOnlyOpen: widget.assistantReadOnlyOpen)); }
   @override
   void dispose() {
+    _receivingMatchLease?.dispose();
     for (final c in [_quantity, _free, _accepted, _damaged, _numerator, _denominator]) { c.dispose(); }
     super.dispose();
   }
@@ -14930,10 +20198,11 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
     setState(() => _opened = false);
     return true;
   }
-  Future<void> _recover() async {
+  Future<void> _recover({bool readOnlyOpen = false}) async {
     if (!_current) return;
     setState(() { _busy = true; _error = null; });
-    final ready = await session.loadWorkspaceSuppliers(retry: true) && await session.recoverCustomerLedger();
+    final ready = readOnlyOpen ? session.workspaceSuppliersLoaded && session.workspaceInvoiceHistoryLoaded
+      : await session.loadWorkspaceSuppliers(retry: true) && await session.recoverCustomerLedger();
     if (!_current) return;
     final ledger = _ledger;
     final exact = ledger != null && jsonEncode(ledger.purchaseBills[widget.copy.draft.id]?.copy.toJson()) ==
@@ -14991,6 +20260,7 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
     if (_opened && widget.onBeforeOpen != null) await widget.onBeforeOpen!();
     if (!_current) return;
     setState(() { _busy = false; });
+    _applyReceivingMatchInitial();
   }
   void _clear() {
     _knownUnstored = false; _uncertain = false; _error = null; _notice = null;
@@ -15085,7 +20355,10 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
       decoration: const InputDecoration(), onChanged: (_) => setState(() {})));
   @override
   Widget build(BuildContext context) {
-    super.build(context);
+    super.build(context);final body=_buildReceivingMatch(context);
+    return _receivingMatchLease==null?body:_ReceivingOwnerSurface(current:()=>_current,changes:_receivingMatchLease!.changes,child:body);
+  }
+  Widget _buildReceivingMatch(BuildContext context) {
     final ledger = _ledger;
     final pair = _receipt;
     final links = ledger?.billGoodsAllocations.values ?? const <WorkspaceSupplierBillGoodsAllocation>[];
@@ -15322,7 +20595,14 @@ class _PurchaseAdditionalInput {
 
 class _StoreRecordPurchaseSurface extends StatefulWidget {
   const _StoreRecordPurchaseSurface({super.key, required this.session, required this.onBack, this.savedCopy,
-    this.startNew = false, this.openingOnly = false, this.onReceiveGoods});
+    this.startNew = false, this.openingOnly = false, this.onReceiveGoods,
+    this.assistantInitialData, this.assistantSourceSignature, this.assistantPrefillCurrent,
+    this.assistantOwnerCurrent, this.assistantActionId, this.assistantOwnerChanges, this.assistantReadOnlyOpen = false});
+  final bool assistantReadOnlyOpen;
+  final Listenable? assistantOwnerChanges;
+  final StorePurchaseEntryInitialData? assistantInitialData;
+  final String? assistantSourceSignature, assistantActionId;
+  final bool Function()? assistantPrefillCurrent, assistantOwnerCurrent;
   final WorkSession session;
   final VoidCallback onBack;
   final ValueChanged<WorkspacePurchaseSavedCopy>? onReceiveGoods;
@@ -15333,6 +20613,9 @@ class _StoreRecordPurchaseSurface extends StatefulWidget {
 }
 
 class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
+  final Object _assistantEditorToken = Object();
+  late final WorkSession _assistantEditorOwner;
+  bool _assistantInitialAttempted = false, _assistantPrefillRejected = false;
   final _openingKey = GlobalKey<_StoreSupplierOpeningState>();
   final _billGoodsKey = GlobalKey<_StoreBillGoodsMatchState>();
   bool _billGoodsWasAccepted = false;
@@ -15402,6 +20685,10 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   void setState(VoidCallback fn) {
     super.setState(fn);
     if (_fullScreenPreview) _previewChanges.value++;
+    if (_receivingTaxLease != null) {
+      _receivingTaxCurrent;
+      _receivingTaxEdits.value++;
+    }
   }
 
   Future<void> _openFullScreenPreview() async {
@@ -15430,7 +20717,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     try {
       final route = DialogRoute<void>(context: context, useSafeArea: true, barrierDismissible: false,
         builder: (previewContext) => Dialog.fullscreen(child: SafeArea(
-          child: AnimatedBuilder(animation: Listenable.merge([_previewChanges, widget.session]),
+          child: AnimatedBuilder(animation: Listenable.merge([_previewChanges, widget.session, _receivingPurchaseChanges]),
             builder: (_, _) => Column(
               key: const Key('purchase-full-screen-preview'), children: [
                 Row(children: [Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -15488,6 +20775,40 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       _address = TextEditingController(), _gstin = TextEditingController(),
       _reference = TextEditingController(), _date = TextEditingController();
   final _supplierFocus = FocusNode(debugLabel: 'purchase-supplier');
+  _ReceivingNativeLease? _receivingTaxLease;
+  final _receivingTaxEdits=ValueNotifier<int>(0);
+  String? _receivingTaxDraft,_receivingTaxDigest,_receivingTaxSupplier;
+  bool _receivingTaxRetired=false;
+  bool get _receivingTaxCurrent {
+    if(_receivingTaxLease==null)return true;
+    if(!_receivingTaxLease!.current||_draftId!=_receivingTaxDraft||_supplierId!=_receivingTaxSupplier||
+      !_attachments.any((a)=>a.digest==_receivingTaxDigest))_receivingTaxRetired=true;
+    return !_receivingTaxRetired;
+  }
+  bool Function()? get _receivingPurchaseOwner=>_receivingTaxLease==null?widget.assistantOwnerCurrent:()=>_current;
+  Listenable? get _receivingPurchaseChanges=>_receivingTaxLease==null?widget.assistantOwnerChanges:
+    Listenable.merge([widget.assistantOwnerChanges,_receivingTaxLease!.changes,_receivingTaxEdits]);
+  Listenable? get _receivingTaxChanges=>_receivingTaxLease==null?null:_receivingPurchaseChanges;
+  bool _appendReceivingTaxEvidence(String digest,StoreReceivingReviewInitial initial,_ReceivingNativeLease lease) {
+    if(!lease.current||!_assistantDocumentReady||_taxRows.length>=100)return false;
+    final copy=_attachments.where((a)=>a.digest==digest&&a.valid).singleOrNull;
+    final row=initial.values['taxRow'] as Map<String,String>?;
+    if(copy==null||row==null||row.values.every((v)=>v.isEmpty))return false;
+    final index=_taxRows.length;
+    final evidence=WorkspacePurchaseAdditionalField(id:'manual-${DateTime.now().microsecondsSinceEpoch}',
+      label:'Printed tax row',value:jsonEncode(row),section:'tax',summaryIndex:index,sourceDigest:copy.digest,
+      sourcePage:copy.contentType=='application/pdf'?null:1);
+    if(!evidence.valid)return false;
+    _receivingTaxLease?.dispose();_receivingTaxLease=lease;_receivingTaxDraft=_draftId;_receivingTaxDigest=digest;_receivingTaxSupplier=_supplierId;
+    setState((){
+      _taxRows.add({for(final key in WorkspacePurchaseEntryDraft.printedTaxKeys)key:TextEditingController(text:row[key]??'')});
+      _additional.add(_PurchaseAdditionalInput(evidence));
+      _expandedSections.addAll({'work-purchase-tax-details','work-purchase-printed-tax-table'});
+    });
+    // Original baseline, unsaved fields and native Save/Discard remain intact.
+    return true;
+  }
+
   final _goods = <_PurchaseGoodsInput>[];
   final _details = {for (final key in WorkspacePurchaseEntryDraft.detailKeys) key: TextEditingController()};
   final _attachments = <WorkspacePurchaseInvoiceAttachment>[];
@@ -15595,7 +20916,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         const Text('These checks do not verify GST registration, IRN, electronic signatures or tax-credit eligibility.', style: TextStyle(fontSize: 12)),
       ]);
   }
-  bool get _current => mounted && _scope != null && _scope == widget.session.workspaceSupplierScope;
+  bool get _current => mounted && _scope != null && _scope == widget.session.workspaceSupplierScope &&
+    widget.assistantOwnerCurrent?.call() != false && _receivingTaxCurrent;
   String get _input => jsonEncode([_name.text, _phone.text, _address.text, _gstin.text,
     _reference.text, _date.text, _goods.map((line) => line.fields).toList(), _supplierId,
     {for (final e in _details.entries) if (e.value.text.isNotEmpty) e.key: e.value.text},
@@ -15603,12 +20925,19 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     _additional.map((f) => f.field.toJson()).toList(), _printedTaxRows]);
   bool get _dirty => !_loading && _baseline != _input;
   @override
-  void initState() { super.initState(); unawaited(_load()); }
+  void initState() {
+    super.initState();
+    _assistantEditorOwner = widget.session;
+    (_openPurchaseAssistantEditors[_assistantEditorOwner] ??= <Object>{}).add(_assistantEditorToken);
+    unawaited(_load());
+  }
   Future<void> _load({bool retry = false}) async {
     final generation = ++_shortageReadGeneration;
     setState(() { _shortageDraftKnown = false; _shortageDraftPresent = false; });
     final session = widget.session;
-    final opened = await session.loadWorkspaceSuppliers(retry: retry);
+    final opened = widget.assistantReadOnlyOpen && !retry
+      ? session.workspaceSuppliersLoaded && !session.workspaceSupplierSaving && !session.workspaceSupplierRecoveryRequired
+      : await session.loadWorkspaceSuppliers(retry: retry);
     if (!mounted || generation != _shortageReadGeneration) return;
     if (!_current || !opened) {
       setState(() { _loading = false; _error = session.workspaceSupplierError ??
@@ -15621,7 +20950,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       setState(() { _loading = false; _error = 'This saved purchase copy is unavailable. Return to Purchases and retry.'; });
       return;
     }
-    if (copy != null) {
+    if (copy != null && (!widget.assistantReadOnlyOpen || retry)) {
       await session.recoverCustomerLedger();
       if (!mounted || !_current || generation != _shortageReadGeneration) return;
     }
@@ -15654,9 +20983,46 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       ..clear()
       ..addAll((_original?.goods ?? [<String, String>{}]).map(_PurchaseGoodsInput.new));
     _baseline = _input;
+    final initial = widget.assistantInitialData;
+    if (initial != null && !_assistantInitialAttempted) {
+      _assistantInitialAttempted = true;
+      if (copy != null || _original != null || _copyAttempt != null || _sourceSaving || _sourceLoading ||
+          widget.assistantPrefillCurrent?.call() == false ||
+          widget.assistantSourceSignature != _assistantPurchaseSourceSignature(session, 'AI-ACT-252', null) ||
+          !initial.referencesCurrent(session)) {
+        _assistantPrefillRejected = true;
+      } else {
+        final supplier = session.workspaceSuppliers.singleWhere((supplier) => supplier.id == initial.supplierId);
+        _supplier = supplier; _supplierId = supplier.id;
+        _name.text = initial.header['name'] ?? supplier.name;
+        _phone.text = initial.header['phone'] ?? supplier.phone;
+        _address.text = initial.header['address'] ?? supplier.address;
+        _gstin.text = initial.header['gstin'] ?? supplier.gstin;
+        if (initial.header.containsKey('invoiceReference')) _reference.text = initial.header['invoiceReference']!;
+        if (initial.header.containsKey('invoiceDate')) _date.text = initial.header['invoiceDate']!;
+        for (final entry in initial.details.entries) { _details[entry.key]!.text = entry.value; }
+        if (initial.nativeGoods case final goods?) {
+          for (final line in _goods) { line.dispose(); }
+          _goods..clear()..addAll(goods.map(_PurchaseGoodsInput.new));
+        }
+        if (initial.printedTaxRows case final rows?) {
+          for (final row in _taxRows) { for (final controller in row.values) { controller.dispose(); } }
+          _taxRows..clear()..addAll([for (final row in rows)
+            {for (final key in WorkspacePurchaseEntryDraft.printedTaxKeys) key: TextEditingController(text: row[key] ?? '')}]);
+        }
+        // Existing baseline precedes proposed input, so native discard remains.
+        // No draft save, confirm, selected-document/OCR or receipt mutation.
+        _expandedSections.addAll({'work-purchase-supplier-section', 'work-purchase-invoice-section',
+          'work-purchase-items-section', 'work-purchase-tax-details'});
+      }
+    }
     _copyVerified = copy != null;
     if (_readOnly) _reviewFocused = true;
-    setState(() { _loading = false; _error = null; });
+    setState(() { _loading = false; _error = _assistantPrefillRejected
+      ? 'Suggestion was not applied. Original purchase input is kept; reopen Purchases.' : null; });
+    if (copy != null && widget.assistantActionId == 'AI-ACT-254') {
+      WidgetsBinding.instance.addPostFrameCallback((_) { if (_current) unawaited(_readBillInvoice(zoom: true)); });
+    }
     if (copy != null) unawaited(_readShortageActionDraft(copy, generation));
   }
   Future<void> _readShortageActionDraft(WorkspacePurchaseSavedCopy copy, int generation) async {
@@ -15695,7 +21061,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     setState(() => _busy = true);
     final String? selected;
     try {
-      selected = await _showStoreSupplierSelector(context, session, selectedId: _supplier?.id);
+      selected = await _showStoreSupplierSelector(context, session, selectedId: _supplier?.id, ownerCurrent: _receivingPurchaseOwner);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -15770,14 +21136,14 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     setState(() => _busy = true);
     try {
       final savedId = await Navigator.of(context).push<String>(MaterialPageRoute(
-        builder: (pageContext) => Scaffold(
+        builder: (pageContext) => _purchaseCapturedOwnerPage(context, pageContext, widget.session, _receivingPurchaseOwner, Scaffold(
           appBar: AppBar(title: const Text('Add product')),
           body: SafeArea(child: _CatalogueProductEditor(
             session: widget.session, product: product, embeddedPage: true,
             purchaseScope: _scope,
             onSaved: () => Navigator.of(pageContext).pop(product.id),
-          )),
-        ),
+           ownerCurrent: _receivingPurchaseOwner)),
+        ),ownerChanges:_receivingTaxChanges),
       ));
       if (!mounted || savedId == null) return;
       if (!_current) {
@@ -15795,7 +21161,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     }
   }
   Future<void> _save({bool reviewed = false}) async {
-    if (_readOnly || _busy || !_current || _scope == null) return;
+    if (_readOnly || _busy || !_current || _scope == null || _assistantPrefillRejected) return;
     final now = DateTime.now();
     var profile = WorkspaceSupplierProfile(id: _supplierId, name: _name.text.trim(),
       phone: _phone.text.trim().replaceAll(RegExp(r'[\s()-]'), ''),
@@ -15911,6 +21277,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   @override
   void dispose() {
+    _receivingTaxLease?.dispose();_receivingTaxEdits.dispose();
+    _openPurchaseAssistantEditors[_assistantEditorOwner]?.remove(_assistantEditorToken);
     for (final controller in _billPanelControllers.values) { controller.dispose(); }
     _savedBillScroll.dispose();
     _purchaseEntryScroll.dispose();
@@ -17033,6 +22401,72 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             (field.keyboardType.index == TextInputType.number.index || field.keyboardType == TextInputType.datetime)
           ? fitted.clamp(0, 190).toDouble() : fitted, child: field)]);
     });
+  Object? _assistantDocumentOwner;
+  List<WorkspacePurchaseInvoiceAttachment> _assistantDocumentCopies = const [];
+  int _assistantDocumentRevision = 0;
+  bool get _assistantDocumentReady => _current && !_readOnly && !_busy &&
+      !_loading && !_leaving && !_sourceSaving && _scope != null;
+
+  MoolAssistantNativeSnapshot? _assistantDocumentSnapshot(
+    MoolAssistantContext context, String? entityId,
+  ) {
+    if (entityId != null || !_assistantDocumentReady) return null;
+    final owner = (_scope, _draftId, widget.session.navigationScopeRevision, _sourceEpoch);
+    if (_assistantDocumentOwner != owner || !listEquals(_assistantDocumentCopies, _attachments)) {
+      _assistantDocumentOwner = owner;
+      _assistantDocumentCopies = List.of(_attachments);
+      _assistantDocumentRevision++;
+    }
+    return MoolAssistantNativeSnapshot(binding: context.binding, permitted: true,
+      sourceRevision: 'purchase-document-form-v1:$_assistantDocumentRevision');
+  }
+
+  Future<MoolAssistantReviewResult> _attachAssistantDocument(
+    MoolAssistantSelectedDocument selected, bool Function() reviewCurrent,
+  ) async {
+    if (!reviewCurrent()) return MoolAssistantReviewResult.stale;
+    if (!_assistantDocumentReady) return MoolAssistantReviewResult.unavailable;
+    final scope = _scope!, draft = _draftId, navigation = widget.session.navigationScopeRevision;
+    final copiesBefore = List<WorkspacePurchaseInvoiceAttachment>.of(_attachments);
+    bool current() => mounted && _current && !_readOnly && _scope == scope &&
+        !_loading && !_leaving && !_sourceSaving && _draftId == draft &&
+        widget.session.navigationScopeRevision == navigation && reviewCurrent();
+    if (_attachments.any((copy) => copy.digest == selected.sourceDigest)) {
+      setState(() => _error = 'This invoice page is already attached.');
+      return MoolAssistantReviewResult.unavailable;
+    }
+    if (_attachments.length >= 3 ||
+        _attachments.fold<int>(0, (size, copy) => size + copy.byteLength) +
+            selected.proof.bytes.length > 20 * 1024 * 1024) {
+      setState(() => _error = 'Keep up to 3 invoice copies within 20 MB in total.');
+      return MoolAssistantReviewResult.unavailable;
+    }
+    WorkspacePurchaseInvoiceAttachment? retained;
+    setState(() { _busy = true; _error = null; });
+    try {
+      retained = await widget.session.workspacePurchaseInvoiceCapture.retainSelectedForDraft(
+        scope, draft, selected.proof, source: selected.reference.source,
+        canRetain: (candidate) => current() && listEquals(_attachments, copiesBefore) &&
+          candidate.digest == selected.sourceDigest &&
+          _attachments.length < 3 && !_attachments.any((copy) => copy.digest == candidate.digest) &&
+          _attachments.fold<int>(0, (size, copy) => size + copy.byteLength) + candidate.byteLength <= 20 * 1024 * 1024,
+      );
+      if (!current() || !listEquals(_attachments, copiesBefore)) return MoolAssistantReviewResult.stale;
+      setState(() => _attachments.add(retained!));
+    } on Object catch (error) {
+      if (!current()) return MoolAssistantReviewResult.stale;
+      setState(() => _error = error is WorkGatewayException ? error.message :
+        'The selected document could not be attached. Your entries are kept.');
+      return MoolAssistantReviewResult.unavailable;
+    } finally { if (mounted) setState(() => _busy = false); }
+    if (!current()) return MoolAssistantReviewResult.stale;
+    final attached = retained;
+    await _openSource(attached);
+    if (!current()) return MoolAssistantReviewResult.stale;
+    return _sourceAttachment?.digest == attached.digest && _sourceError == null
+        ? MoolAssistantReviewResult.returnToOwner : MoolAssistantReviewResult.unavailable;
+  }
+
   Future<void> _capture(WorkProofSource source) async {
     if (_busy || !_current || _scope == null) return;
     if (_attachments.length >= 3) { setState(() => _error = 'Keep up to 3 invoice pages or files.'); return; }
@@ -17317,8 +22751,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     ? sections : [Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: sections)];
   @override
   Widget build(BuildContext context) {
+    final body=_buildPurchaseReceiving(context);
+    return _receivingTaxLease==null?body:_ReceivingOwnerSurface(current:()=>_current,changes:_receivingPurchaseChanges!,child:body);
+  }
+  Widget _buildPurchaseReceiving(BuildContext context) {
     if (widget.openingOnly) {
-      return _StoreSupplierOpeningSurface(key: _openingKey, session: widget.session, onBack: widget.onBack);
+      return _StoreSupplierOpeningSurface(key: _openingKey, session: widget.session, onBack: widget.onBack, ownerCurrent: _receivingPurchaseOwner);
     }
     final suppliers = widget.session.workspaceSuppliers.where((p) =>
       '${p.name} ${p.phone} ${p.gstin}'.toLowerCase().contains(_name.text.trim().toLowerCase())).take(5);
@@ -17749,7 +23187,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         TextButton.icon(
           key: const Key('work-purchase-review-shortage'), onPressed: _busy ? null : () async {
             if (!await confirmLeave() || !mounted) return;
-            await _showSupplierShortage(context, session, copy);
+            await _showSupplierShortage(context, session, copy, ownerCurrent: _receivingPurchaseOwner);
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.inventory_2_outlined, size: 18),
           label: Text(shortageUnverified ? 'Recover shortages'
@@ -17771,7 +23209,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               }
               await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(
                 supplierId: copy.supplier.id,
-                copy: currentLedger!.manualBillRemainingMinor(copy.draft.id) == null ? null : copy));
+                copy: currentLedger!.manualBillRemainingMinor(copy.draft.id) == null ? null : copy), ownerCurrent: _receivingPurchaseOwner);
               if (mounted && _current) await _load(retry: true);
             }, icon: const Icon(Icons.payments_outlined, size: 18),
             label: Text(ledger!.manualBillRemainingMinor(copy.draft.id) == null
@@ -17787,7 +23225,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                   return;
                 }
                 await _showSupplierMoneyEntry(context, session,
-                  _StoreSupplierMoneyTarget(supplierId: copy.supplier.id, advance: true));
+                  _StoreSupplierMoneyTarget(supplierId: copy.supplier.id, advance: true), ownerCurrent: _receivingPurchaseOwner);
                 if (mounted && _current) await _load(retry: true);
               }, icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
               label: const Text('Record advance paid')),
@@ -17797,7 +23235,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
           onPressed: _busy ? null : () async {
             if (!await confirmLeave() || !mounted) return;
-            await _showSupplierAllocation(context, session, copy);
+            await _showSupplierAllocation(context, session, copy, ownerCurrent: _receivingPurchaseOwner);
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.link_outlined, size: 18),
           label: const Text('Allocate payment / credit')),
@@ -17808,7 +23246,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         TextButton.icon(
           key: const Key('work-purchase-record-credit'), onPressed: _busy ? null : () async {
             if (!await confirmLeave() || !mounted) return;
-            await _showSupplierCredit(context, session, copy);
+            await _showSupplierCredit(context, session, copy, ownerCurrent: _receivingPurchaseOwner);
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.receipt_long_outlined, size: 18),
           label: const Text('Supplier credit note')),
@@ -17819,7 +23257,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             await _showSupplierRefund(context, session, _StoreSupplierRefundTarget(
               supplierId: copy.supplier.id, sourceKind: WorkspaceSupplierRefundSourceKind.manualBillSurplus,
               sourceId: copy.draft.id, label: 'Bill ${copy.draft.invoiceReference}', copy: copy,
-              opening: session.workspaceSupplierOpeningRecord(copy.supplier.id)!));
+              opening: session.workspaceSupplierOpeningRecord(copy.supplier.id)!), ownerCurrent: _receivingPurchaseOwner);
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.call_received_outlined, size: 18),
           label: const Text('Refund received')),
@@ -17926,7 +23364,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                   session: session, savedCopy: other, onBack: finishPop))));
             })));
           if (mounted && _current) await _load(retry: true);
-        })
+        }, ownerCurrent: _receivingPurchaseOwner, assistantReadOnlyOpen: widget.assistantReadOnlyOpen)
       else actionGrid(null),
       if (!(same || (_billGoodsWasAccepted && !ready))) goodsActions,
       if (same && !(progress != null && progress.totalItems > 0 &&
@@ -17936,7 +23374,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           key: const Key('work-purchase-next-step'), style: const TextStyle(fontSize: 11, color: _paperMuted)),
       if (same) _StoreSupplierLedgerSummary(session: session, ledger: ledger, billId: copy.draft.id,
         compact: true, hideCompactHeader: true, controller: _billPanelController(copy, 'account'),
-        onExpansionChanged: (expanded) { if (expanded) unawaited(_openBillPanel(copy, 'account')); }),
+        onExpansionChanged: (expanded) { if (expanded) unawaited(_openBillPanel(copy, 'account')); }, ownerCurrent: _receivingPurchaseOwner, ownerChanges: _receivingPurchaseChanges),
       if (session.workspaceSupplierOpeningConfirmationAvailable && !ready)
         TextButton(key: const Key('work-purchase-bill-recover'),
           onPressed: _busy ? null : () => _load(retry: true), child: const Text('Retry supplier account')),
@@ -18139,11 +23577,14 @@ class _StoreSupplierOpeningSurface extends StatefulWidget {
     super.key,
     required this.session,
     required this.onBack,
-    this.initialSupplierId,
+    this.initialSupplierId, this.initialData, this.initialActionId, this.ownerCurrent, this.sourceCurrent, this.readOnlyOpen = false,
   });
+  final bool readOnlyOpen;
   final WorkSession session;
   final VoidCallback onBack;
-  final String? initialSupplierId;
+  final String? initialSupplierId, initialActionId;
+  final StoreSupplierOpeningInitialData? initialData;
+  final bool Function()? ownerCurrent, sourceCurrent;
   @override
   State<_StoreSupplierOpeningSurface> createState() =>
       _StoreSupplierOpeningState();
@@ -18164,11 +23605,13 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
       _busy = false,
       _leaving = false;
   String _baseline = '';
+  bool _assistantCommitted = false;
+  bool get _assistantSourceCurrent => _assistantCommitted || widget.sourceCurrent?.call() != false;
   bool _postingRecovered = false;
   WorkspaceSupplierOpeningRecord? _viewed, _attempt;
   WorkSession get session => widget.session;
   bool get _current =>
-      _scope != null && _scope == session.workspaceSupplierScope;
+      _scope != null && _scope == session.workspaceSupplierScope && widget.ownerCurrent?.call() != false;
   String get _input => jsonEncode([
     _supplierId,
     _date.text,
@@ -18182,18 +23625,34 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
   @override
   void initState() {
     super.initState();
+    (_openSupplierOpeningForms[session] ??= <Object>{}).add(this);
     _scope = session.workspaceSupplierScope;
     _revision = session.workspacePurchaseEntryRevision;
     _baseline = _input;
     final supplier = widget.initialSupplierId;
     if (supplier != null && session.workspaceSuppliers.any((p) => p.id == supplier)) _show(supplier);
+    final initial = widget.initialData;
+    if (initial != null) {
+      if (!_current || !_assistantSourceCurrent || supplier == null ||
+          !initial.matches(session, widget.initialActionId ?? '', supplier)) {
+        _error = 'Suggestion was not applied. Saved opening records are kept.';
+      } else {
+        _editing = true;
+        _date.text = initial.asOfDate;
+        _amount.text = initial.amount;
+        _note.text = initial.sourceNote;
+        _known = initial.amountKnown;
+        _credit = initial.supplierCredit;
+        _relations.addAll(initial.relations);
+      }
+    }
     if (session.workspaceSupplierOpeningConfirmationAvailable) {
-      unawaited(_recoverPosting());
+      unawaited(_recoverPosting(readOnlyOpen: widget.readOnlyOpen));
     }
   }
 
-  Future<void> _recoverPosting() async {
-    final recovered = await session.recoverCustomerLedger();
+  Future<void> _recoverPosting({bool readOnlyOpen = false}) async {
+    final recovered = readOnlyOpen ? session.workspaceInvoiceHistoryLoaded : await session.recoverCustomerLedger();
     if (!mounted || !_current) {
       return;
     }
@@ -18209,7 +23668,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
     });
   }
 
-  bool get _accountReady => _current && _postingRecovered &&
+  bool get _accountReady => _current && _postingRecovered && (!widget.readOnlyOpen || session.workspaceInvoiceHistoryLoaded) &&
       !session.workspaceSupplierRecoveryRequired;
   bool get _posted {
     final proof = _supplierId == null ? null :
@@ -18220,7 +23679,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
 
   Future<void> _confirmOpening() async {
     final record = _viewed;
-    if (_busy || _editing || !_accountReady || record == null || _revision == null ||
+    if (_busy || _editing || !_accountReady || !_assistantSourceCurrent || record == null || _revision == null ||
         !session.workspaceSupplierOpeningConfirmationAvailable) {
       return;
     }
@@ -18241,7 +23700,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
               child: const Text('Confirm balance')),
           ],
         ));
-      if (confirmed != true || !mounted || !_current) {
+      if (confirmed != true || !mounted || !_current || !_assistantSourceCurrent) {
         return;
       }
       final saved = await session.confirmWorkspaceSupplierOpeningRecord(record,
@@ -18263,6 +23722,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
 
   @override
   void dispose() {
+    _openSupplierOpeningForms[session]?.remove(this);
     _date.dispose();
     _amount.dispose();
     _note.dispose();
@@ -18313,7 +23773,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
     setState(() => _busy = true);
     String? selected;
     try {
-      selected = await _showStoreSupplierSelector(context, session, selectedId: original);
+      selected = await _showStoreSupplierSelector(context, session, selectedId: original, ownerCurrent: widget.ownerCurrent);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -18365,7 +23825,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
   }
 
   Future<void> _save() async {
-    if (_busy || !_editing || !_current || _supplierId == null) return;
+    if (_busy || !_editing || !_current || !_assistantSourceCurrent || _supplierId == null) return;
     final amount = _known
         ? WorkspacePurchaseEntryDraft.printedPaise(_amount.text)
         : null;
@@ -18416,6 +23876,11 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
     if (session.workspaceSupplierRecoveryError != null) {
       await session.loadWorkspaceSuppliers(retry: true);
     }
+    // Recheck the captured owner after native recovery and before the original Save.
+    if (!mounted || !_current || !_assistantSourceCurrent) {
+      if (mounted) setState(() { _busy = false; _error = 'Return to the Store where you started. Your entries are kept.'; });
+      return;
+    }
     final saved = await session.saveWorkspaceSupplierOpeningRecord(
       _attempt!,
       scope: scope,
@@ -18425,6 +23890,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
     setState(() {
       _busy = false;
       if (saved && _current) {
+        _assistantCommitted = true;
         _show(_supplierId!);
       } else {
         _error =
@@ -18546,23 +24012,23 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
             TextButton.icon(key: const Key('work-opening-record-payment'),
               onPressed: _busy || !_current
                 ? null : () async {
-                  await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(supplierId: _supplierId!));
+                  await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(supplierId: _supplierId!), ownerCurrent: widget.ownerCurrent);
                   if (mounted && _current) await _recoverPosting();
                 }, icon: const Icon(Icons.payments_outlined, size: 18),
                 label: const Text('Record account payment')),
             TextButton.icon(key: const Key('work-opening-record-advance'),
               onPressed: _busy || !_current ? null : () async {
-                await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(supplierId: _supplierId!, advance: true));
+                await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(supplierId: _supplierId!, advance: true), ownerCurrent: widget.ownerCurrent);
                 if (mounted && _current) await _recoverPosting();
               }, icon: const Icon(Icons.account_balance_wallet_outlined, size: 18), label: const Text('Record advance paid')),
           ]),
         ],
         if (_posted && _supplierId != null)
-          _StoreSupplierLedgerSummary(session: session, ledger: session.workspaceSupplierLedger(_supplierId!)),
+          _StoreSupplierLedgerSummary(session: session, ledger: session.workspaceSupplierLedger(_supplierId!), ownerCurrent: widget.ownerCurrent),
         if (_posted && _supplierId != null && session.workspaceSupplierOpeningRecord(_supplierId!) != null)
           Align(alignment: Alignment.centerLeft, child: TextButton.icon(
             key: const Key('work-opening-record-refund'), onPressed: _busy || !_current ? null : () async {
-              await _chooseSupplierRefund(context, session, _supplierId!);
+              await _chooseSupplierRefund(context, session, _supplierId!, ownerCurrent: widget.ownerCurrent);
               if (mounted && _current) await _recoverPosting();
             }, icon: const Icon(Icons.call_received_outlined, size: 18),
             label: const Text('Refund received / saved requests'))),
@@ -18843,6 +24309,207 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
   }
 }
 
+@immutable
+class StoreReceivingReviewInitial {
+  StoreReceivingReviewInitial._(this.actionId,Map<String,Object?> values) : values=Map.unmodifiable(values);
+  final String actionId;
+  final Map<String,Object?> values;
+  static const mappedLineFields={'expected','delivered','damaged','short','batch','manufactured','expiry','mrp'};
+  static bool canMapLineField(String field,{required bool arrives,required bool inherited,required bool restockLinked}) =>
+    mappedLineFields.contains(field)&&arrives&&(field!='expected'||!inherited&&!restockLinked);
+  static const actions={'AI-ACT-238','AI-ACT-239','AI-ACT-240','AI-ACT-243','AI-ACT-244','AI-ACT-245','AI-ACT-246','AI-ACT-247','AI-ACT-248','AI-ACT-249','AI-ACT-250','AI-ACT-251','AI-ACT-401','AI-ACT-402','AI-ACT-403','AI-ACT-404'};
+  static const lineFields={'lineId','productId','unit','factor','expected','delivered','damaged','short','batch','manufactured','expiry','mrp'};
+  static const fieldsByAction=<String,Set<String>>{
+    'AI-ACT-238':{'reference','date','items'}, 'AI-ACT-239':{'items'},
+    'AI-ACT-240':{'lineId','productId'}, 'AI-ACT-243':{},'AI-ACT-244':{},
+    'AI-ACT-245':{'billLineIndex','receiptId','receiptLineId','quantity','free','accepted','damaged','numerator','denominator'},
+    'AI-ACT-246':{'lineId','unit','factor','batch','manufactured','expiry','mrp'},
+    'AI-ACT-247':{'reference','reason','returnedOn','items'},
+    'AI-ACT-248':{'billLineIndex','deliveryId','receiptLineId','quantity'},
+    'AI-ACT-249':{},'AI-ACT-250':{},'AI-ACT-251':{},
+    'AI-ACT-401':{'documentType'},'AI-ACT-402':{'heading','value','page'},
+    'AI-ACT-403':{'taxRow'},'AI-ACT-404':{'fieldId','heading','value','receiptField','lineId'},
+  };
+  factory StoreReceivingReviewInitial.fromFields(String action,Map<String,Object?> raw) {
+    final allowed=fieldsByAction[action];
+    if(allowed==null||!raw.keys.every(allowed.contains)||allowed.isNotEmpty&&raw.isEmpty) throw const FormatException('Use supplied original receiving fields.');
+    final result=<String,Object?>{};
+    for(final entry in raw.entries) {
+      if(entry.key=='items') {
+        if(entry.value is! List||(entry.value! as List).isEmpty) throw const FormatException('Supply receiving lines.');
+        final rows=<Map<String,String>>[];final ids=<String>{};
+        for(final value in entry.value! as List) {
+          final keys=action=='AI-ACT-247'?const {'receiptLineId','accepted','damaged'}:lineFields;
+          if(value is! Map||value.isEmpty||!value.keys.every(keys.contains)||!value.values.every((v)=>v is String)) throw const FormatException('Use original line references and raw native inputs.');
+          final row=Map<String,String>.from(value);
+          final id=row[action=='AI-ACT-247'?'receiptLineId':'lineId'];
+          if(id!=null&&(id.trim().isEmpty||!ids.add(id))) throw const FormatException('Use distinct original line references.');
+          rows.add(Map.unmodifiable(row));
+        }
+        result[entry.key]=List<Map<String,String>>.unmodifiable(rows);
+      } else if(entry.key=='taxRow') {
+        final value=entry.value;
+        if(value is! Map||value.isEmpty||!value.keys.every(WorkspacePurchaseEntryDraft.printedTaxKeys.contains)||!value.values.every((v)=>v is String)) throw const FormatException('Use the native printed tax-row fields.');
+        result[entry.key]=Map<String,String>.unmodifiable(Map<String,String>.from(value));
+      } else if(entry.key=='billLineIndex'||entry.key=='page') {
+        if(entry.value is! int||(entry.value! as int)<(entry.key=='page'?1:0)) throw const FormatException('Use an original item/page reference.');
+        result[entry.key]=entry.value;
+      } else {
+        if(entry.value is! String) throw const FormatException('Keep native field values as raw text.');
+        result[entry.key]=entry.value;
+      }
+    }
+    void need(Set<String> keys) { if(!keys.every((k)=>result.containsKey(k)&&result[k]!=null&&result[k]!='')) throw const FormatException('An exact original target and supplied values are required.'); }
+    if(action=='AI-ACT-240') need({'lineId','productId'});
+    if(action=='AI-ACT-246') {need({'lineId'});if(result.length==1) throw const FormatException('Supply printed lot/pack fields.');}
+    if(action=='AI-ACT-245') need({'billLineIndex','receiptId','receiptLineId'});
+    if(action=='AI-ACT-248') need({'billLineIndex','deliveryId','receiptLineId','quantity'});
+    if(action=='AI-ACT-401') {need({'documentType'});if(!WorkspacePurchaseInvoiceAttachment.receivingDocumentTypes.contains(result['documentType'])) throw const FormatException('Choose a native receiving document type.');}
+    if(action=='AI-ACT-402') need({'heading','value'});
+    if(action=='AI-ACT-404') {
+      need({'fieldId'});
+      if(result.containsKey('receiptField')) {
+        if(!const {'reference','date','expected','delivered','damaged','short','batch','manufactured','expiry','mrp'}.contains(result['receiptField']) ||
+          result.containsKey('heading')||result.containsKey('value')) throw const FormatException('Choose an existing receipt field and keep the original printed value.');
+        if(!const {'reference','date'}.contains(result['receiptField'])) need({'lineId'});
+        else if(result.containsKey('lineId')) throw const FormatException('Receipt headings do not have an item reference.');
+      } else if(result.containsKey('lineId')) throw const FormatException('Choose the receipt field for this item.');
+    }
+    return StoreReceivingReviewInitial._(action,result);
+  }
+  List<Map<String,String>> get items=>values['items'] as List<Map<String,String>>? ?? const [];
+  String? text(String key)=>values[key] as String?;
+}
+class _StoreReceivingNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter, MoolAssistantRouteBoundNativeAdapter {
+  _StoreReceivingNativeAdapter({required this.actionId,required this.read,required this.open});
+  (Route<void>,NavigatorState)? _assistantOwner;
+  bool _invalidAssistantOwner=false;
+  @override void bindAssistantRoute(Route<void> route,NavigatorState navigator) {
+    if(_assistantOwner case final previous?) {
+      if(!identical(previous.$1,route)||!identical(previous.$2,navigator))_invalidAssistantOwner=true;
+    } else {_assistantOwner=(route,navigator);}
+  }
+  @override final String actionId;
+  @override Set<String> get allowedFields=>StoreReceivingReviewInitial.fieldsByAction[actionId]??const {};
+  @override String? validateFields(Map<String,Object?> fields) {
+    try {StoreReceivingReviewInitial.fromFields(actionId,fields);return null;}
+    on FormatException catch(error){return error.message.toString();}
+  }
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,StoreReceivingReviewInitial,bool Function(),Listenable,(Route<void>,NavigatorState)?) open;
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId)=>read(context,entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal,bool Function() isCurrent) async=>MoolAssistantReviewResult.unavailable;
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,{required bool Function() isCurrent,required Listenable ownerChanges}) async {
+    if(_invalidAssistantOwner)return MoolAssistantReviewResult.stale;
+    if(actionId=='AI-ACT-404'&&proposal.fields.containsKey('receiptField')) {
+      if(_assistantOwner case final owner?) {
+        if(!owner.$1.isCurrent||!identical(owner.$1.navigator,owner.$2))return MoolAssistantReviewResult.stale;
+      }
+    }
+    try {return await open(proposal,StoreReceivingReviewInitial.fromFields(actionId,proposal.fields),isCurrent,ownerChanges,_assistantOwner);}
+    on FormatException {return MoolAssistantReviewResult.unavailable;}
+  }
+}
+// Notification is not authority: every callback also rechecks this predicate.
+// The latch observes departure synchronously, including change/restore before a frame.
+class _ReceivingNativeLease {
+  _ReceivingNativeLease(this.owner,this.changes) {changes.addListener(_changed);_changed();}
+  final bool Function() owner;
+  final Listenable changes;
+  bool _retired=false,_disposed=false;
+  bool get current {
+    if(_disposed||_retired)return false;
+    if(!owner())_retired=true;return !_retired;
+  }
+  void _changed() {if(!owner()) _retired=true;}
+  void dispose(){if(_disposed)return;_disposed=true;changes.removeListener(_changed);}
+}
+
+class _ReceivingOwnerSurface extends StatelessWidget {
+  const _ReceivingOwnerSurface({required this.current,required this.changes,required this.child,this.onClose,
+    this.retiredMessage = 'This original receiving source is no longer available. Close this review.'});
+  final bool Function() current;final Listenable changes;final Widget child;final VoidCallback? onClose;final String retiredMessage;
+  @override Widget build(BuildContext context)=>AnimatedBuilder(animation:changes,builder:(context,_) {
+    final active=current();
+    if(!active)WidgetsBinding.instance.addPostFrameCallback((_){if(context.mounted&&!current())FocusScope.of(context).unfocus();});
+    return Stack(children:[Offstage(offstage:!active,child:ExcludeFocus(excluding:!active,child:child)),
+      if(!active)Center(child:SingleChildScrollView(padding:const EdgeInsets.all(16),
+        child:DefaultTextStyle(style:Theme.of(context).textTheme.bodyMedium ?? const TextStyle(fontSize:14,color:MoolColors.ink),
+          child:Column(mainAxisSize:MainAxisSize.min,children:[
+            Text(retiredMessage),
+            if(onClose!=null)TextButton(key:const Key('receiving-native-retired-close'),onPressed:onClose,child:const Text('Close'))]))))]);
+  });
+}
+class _ReceivingReviewRoute extends StatefulWidget {
+  const _ReceivingReviewRoute({required this.session,required this.initial,required this.entity,required this.supplierId,required this.lease,this.receivingRead});
+  final WorkSession session;final StoreReceivingReviewInitial initial;final String entity,supplierId;final _ReceivingNativeLease lease;final WorkspaceGoodsReceivingRead? receivingRead;
+  @override State<_ReceivingReviewRoute> createState()=>_ReceivingReviewRouteState();
+}
+class _ReceivingReviewRouteState extends State<_ReceivingReviewRoute> {
+  final key=GlobalKey<_StoreReceiveGoodsState>();bool allowingPop=false,closing=false;
+  Future<void> close() async {
+    if(closing||!mounted||ModalRoute.of(context)?.isCurrent!=true)return;closing=true;
+    try {
+      final leave=await(key.currentState?.confirmLeave()??Future.value(false));
+      if(!leave||!mounted||ModalRoute.of(context)?.isCurrent!=true)return;
+      setState(()=>allowingPop=true);await WidgetsBinding.instance.endOfFrame;
+      if(mounted&&ModalRoute.of(context)?.isCurrent==true)Navigator.pop(context);
+    }finally{closing=false;}
+  }
+  @override Widget build(BuildContext context)=>PopScope(canPop:allowingPop,onPopInvokedWithResult:(didPop,_){if(!didPop)unawaited(close());},
+    child:Scaffold(appBar:AppBar(title:const Text('Receive goods'),leading:BackButton(onPressed:close)),body:
+      _ReceivingOwnerSurface(current:()=>widget.lease.current,changes:widget.lease.changes,
+        child:_StoreReceiveGoodsSurface(key:key,session:widget.session,onBack:close,initialSupplierId:widget.supplierId,
+          assistantInitial:widget.initial,assistantEntity:widget.entity,assistantLease:widget.lease,assistantReceivingRead:widget.receivingRead))));
+}
+Future<bool> _confirmReceivingPreparedLeave(BuildContext context) async=>await showDialog<bool>(context:context,builder:(dialog)=>AlertDialog(
+  key:const Key('receiving-local-preparation-leave'),title:const Text('Discard field changes?'),
+  content:const Text('These fields have not been saved. Your original records and any unconfirmed operation will be kept.'),
+  actions:[TextButton(onPressed:(){if(dialog.mounted&&ModalRoute.of(dialog)?.isCurrent==true)Navigator.pop(dialog,false);},child:const Text('Keep editing')),
+    TextButton(onPressed:(){if(dialog.mounted&&ModalRoute.of(dialog)?.isCurrent==true)Navigator.pop(dialog,true);},child:const Text('Discard changes'))]))==true;
+bool _receivingMatchTargetValid(WorkSession session,WorkspacePurchaseSavedCopy copy,StoreReceivingReviewInitial initial) {
+  final index=initial.values['billLineIndex'] as int?;
+  if(index==null||index<0||index>=copy.draft.goods.length)return false;
+  final receipt=session.workspaceSupplierLedger(copy.supplier.id)?.goodsReceipts[initial.text('receiptId')];
+  final line=receipt?.lines.where((line)=>line.sourceLineId==initial.text('receiptLineId')).singleOrNull;
+  return receipt!=null&&line!=null&&copy.draft.goods[index]['productId']==line.productId&&
+    session.workspaceGoodsReceiptDrafts.any((r)=>r.supplierId==copy.supplier.id&&jsonEncode(r.receipt.toJson())==jsonEncode(receipt.toJson()));
+}
+Future<void> _showReceivingBillMatch(BuildContext context,WorkSession session,WorkspacePurchaseSavedCopy copy,
+  StoreReceivingReviewInitial initial,_ReceivingNativeLease lease) async {
+  await Navigator.of(context,rootNavigator:true).push<void>(MaterialPageRoute(builder:(_)=>
+    _ReceivingBillMatchRoute(session:session,copy:copy,initial:initial,lease:lease)));
+}
+class _ReceivingBillMatchRoute extends StatefulWidget {
+  const _ReceivingBillMatchRoute({required this.session,required this.copy,required this.initial,required this.lease});
+  final WorkSession session;final WorkspacePurchaseSavedCopy copy;final StoreReceivingReviewInitial initial;final _ReceivingNativeLease lease;
+  @override State<_ReceivingBillMatchRoute> createState()=>_ReceivingBillMatchRouteState();
+}
+class _ReceivingBillMatchRouteState extends State<_ReceivingBillMatchRoute> {
+  final key=GlobalKey<_StoreBillGoodsMatchState>();bool allowingPop=false,closing=false;
+  Future<void> close() async {
+    if(closing||!mounted||ModalRoute.of(context)?.isCurrent!=true)return;closing=true;
+    try {
+      if(!await(key.currentState?.confirmLeave()??Future.value(false))||!mounted||ModalRoute.of(context)?.isCurrent!=true)return;
+      setState(()=>allowingPop=true);await WidgetsBinding.instance.endOfFrame;
+      if(mounted&&ModalRoute.of(context)?.isCurrent==true)Navigator.pop(context);
+    }finally{closing=false;}
+  }
+  Future<void> openCopy(WorkspacePurchaseSavedCopy copy) async {
+    if(!widget.lease.current||!mounted)return;
+    final signature=_assistantPurchaseSourceSignature(widget.session,'AI-ACT-254',copy.id);if(signature==null)return;
+    await Navigator.of(context).push<void>(MaterialPageRoute(builder:(_)=>_PurchaseAssistantReviewPage(ownerContext:context,session:widget.session,actionId:'AI-ACT-254',copy:copy,
+        initialData:null,query:null,linkedShipment:null,signature:signature,owner:()=>widget.lease.current,
+        prefillCurrent:()=>widget.lease.current&&_assistantPurchaseSourceSignature(widget.session,'AI-ACT-254',copy.id)==signature,
+        changes:widget.lease.changes)));
+  }
+  @override Widget build(BuildContext context)=>PopScope(canPop:allowingPop,onPopInvokedWithResult:(didPop,_){if(!didPop)unawaited(close());},
+    child:Scaffold(appBar:AppBar(title:const Text('Reconcile goods receipt'),leading:BackButton(onPressed:close)),body:
+      _ReceivingOwnerSurface(current:()=>widget.lease.current,changes:widget.lease.changes,child:SingleChildScrollView(padding:const EdgeInsets.all(16),
+        child:_StoreBillGoodsMatch(key:key,session:widget.session,copy:widget.copy,onOpenCopy:openCopy,
+          ownerCurrent:()=>widget.lease.current,assistantReadOnlyOpen:true,receivingInitial:widget.initial)))));
+}
+
 class _ReceivingLineInput {
   _ReceivingLineInput(this.id, {WorkspaceSupplierGoodsReceiptLine? saved, bool restoreLot = false})
     : original = saved, productId = saved?.productId ?? '', unit = TextEditingController(text: saved?.purchaseUnit ?? ''),
@@ -18886,24 +24553,197 @@ class _ReceivingLineInput {
   void dispose() { for (final c in [unit, factor, expected, delivered, damaged, short, ...lotControllers, ...prior.values]) { c.dispose(); } }
 }
 
+@immutable
+class StoreSupplierInitialData {
+  const StoreSupplierInitialData({required this.name, this.phone = '',
+    this.address = '', this.gstin = ''});
+  final String name, phone, address, gstin;
+  static const allowedFields = {'name', 'phone', 'address', 'gstin'};
+
+  factory StoreSupplierInitialData.fromFields(Map<String, Object?> fields) {
+    if (!fields.keys.every(allowedFields.contains)) {
+      throw const FormatException('Unsupported supplier details.');
+    }
+    String read(String key) {
+      if (!fields.containsKey(key)) return '';
+      final value = fields[key];
+      if (value is! String) throw const FormatException('Use text supplier details.');
+      return value.trim();
+    }
+    final value = StoreSupplierInitialData(name: read('name'),
+      phone: read('phone').replaceAll(RegExp(r'[\s()-]'), ''),
+      address: read('address'), gstin: read('gstin').toUpperCase());
+    if (value.validationError case final error?) throw FormatException(error);
+    return value;
+  }
+
+  String? get validationError {
+    final at = DateTime.utc(2000);
+    // Validation only: no identity allocation, save or purchase operation.
+    return WorkspaceSupplierProfile(id: 'prefill-validation', name: name,
+      phone: phone, address: address, gstin: gstin,
+      createdAt: at, updatedAt: at).validationError;
+  }
+}
+
+/// Partial changes only. Original ID/createdAt always come from the native list.
+@immutable
+class StoreSupplierEditInitialData {
+  StoreSupplierEditInitialData._(Map<String, String> fields) : fields = Map.unmodifiable(fields);
+  final Map<String, String> fields;
+  static const allowedFields = StoreSupplierInitialData.allowedFields;
+  factory StoreSupplierEditInitialData.fromFields(Map<String, Object?> values) {
+    if (values.isEmpty || !values.keys.every(allowedFields.contains) ||
+        !values.values.every((value) => value is String)) {
+      throw const FormatException('Supply only the native supplier fields to change.');
+    }
+    return StoreSupplierEditInitialData._(Map<String, String>.from(values));
+  }
+  StoreSupplierInitialData merge(WorkspaceSupplierProfile original) =>
+    StoreSupplierInitialData.fromFields({
+      'name': fields['name'] ?? original.name, 'phone': fields['phone'] ?? original.phone,
+      'address': fields['address'] ?? original.address, 'gstin': fields['gstin'] ?? original.gstin,
+    });
+}
+
+String _supplierEditSourceRevision(WorkSession session, WorkspaceSupplierProfile profile) =>
+  'supplier-edit:${assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    session.workspacePurchaseEntryRevision, profile.toJson(),
+  ])))}';
+
+Future<MoolAssistantReviewResult> showStoreSupplierLookupReview(BuildContext context, WorkSession session, {
+  required String query, required (String, String, bool) expectedScope,
+  required int? expectedRevision, required bool Function() isCurrent,
+  bool Function()? ownerCurrent,
+}) async {
+  if (!context.mounted || !isCurrent() || ownerCurrent?.call() == false ||
+      session.workspaceSupplierScope != expectedScope || !session.workspaceSuppliersLoaded ||
+      session.workspaceSupplierSaving || session.workspacePurchaseEntryRevision != expectedRevision ||
+      _openSupplierSelectors[session] == true) return MoolAssistantReviewResult.stale;
+  await _showStoreSupplierSelector(context, session, initialQuery: query,
+    initialRevision: expectedRevision, prefillCurrent: () => isCurrent() &&
+      session.workspaceSupplierScope == expectedScope, ownerCurrent: ownerCurrent);
+  // A lookup never assigns the selected supplier to a purchase or Counter draft.
+  return ownerCurrent?.call() == false ? MoolAssistantReviewResult.stale : MoolAssistantReviewResult.opened;
+}
+
+Future<MoolAssistantReviewResult> showStoreSupplierEditReview(BuildContext context, WorkSession session, {
+  required WorkspaceSupplierProfile originalProfile, required StoreSupplierEditInitialData initialData,
+  required (String, String, bool) expectedScope, required int? expectedRevision,
+  required bool Function() isCurrent, bool Function()? ownerCurrent,
+}) async {
+  final current = session.workspaceSuppliers.where((p) => p.id == originalProfile.id).singleOrNull;
+  if (!context.mounted || !isCurrent() || ownerCurrent?.call() == false ||
+      session.workspaceSupplierScope != expectedScope || !session.workspaceSuppliersLoaded ||
+      session.workspaceSupplierSaving || session.workspacePurchaseEntryRevision != expectedRevision ||
+      _openSupplierSelectors[session] == true || current == null ||
+      jsonEncode(current.toJson()) != jsonEncode(originalProfile.toJson())) return MoolAssistantReviewResult.stale;
+  late final StoreSupplierInitialData merged;
+  try { merged = initialData.merge(current); }
+  on FormatException { return MoolAssistantReviewResult.stale; }
+  await _showStoreSupplierSelector(context, session, initialData: merged,
+    initialProfile: current, initialRevision: expectedRevision,
+    prefillCurrent: () => isCurrent() && session.workspaceSupplierScope == expectedScope,
+    ownerCurrent: ownerCurrent);
+  // Original Edit Save updates the contact; it does not select/assign a supplier.
+  return ownerCurrent?.call() == false ? MoolAssistantReviewResult.stale : MoolAssistantReviewResult.opened;
+}
+
+class _StoreSupplierExistingAdapter implements MoolAssistantNativeAdapter {
+  const _StoreSupplierExistingAdapter({required this.actionId, required this.readContext,
+    required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function()) open;
+  @override Set<String> get allowedFields => actionId == 'AI-ACT-236'
+    ? const {'query'} : StoreSupplierEditInitialData.allowedFields;
+  @override String? validateFields(Map<String, Object?> fields) {
+    if (actionId == 'AI-ACT-236') return fields.length == 1 && fields['query'] is String
+      ? null : 'Supply a native supplier search query.';
+    try { StoreSupplierEditInitialData.fromFields(fields); return null; }
+    on FormatException catch (error) { return error.message.toString(); }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entityId) =>
+    readSnapshot(ctx, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) async {
+    final trusted = readContext();
+    if (!isCurrent() || trusted == null || trusted.binding != proposal.binding ||
+        validateFields(proposal.fields) != null) return MoolAssistantReviewResult.stale;
+    return open(proposal, isCurrent);
+  }
+}
+
+// UI ownership guard: do not open another supplier sheet over an existing one,
+// including a dirty Add entry. All existing callers retain their current entry.
+final _openSupplierSelectors = Expando<bool>('supplier-sheet-open');
+
 /// Receiving is independent of entering a supplier bill. Persist the reviewed
 /// operation before posting and always resume its exact immutable snapshot.
 Future<String?> _showStoreSupplierSelector(BuildContext context, WorkSession session, {
   String? selectedId, String? lockedSupplierId, Set<String>? eligibleSupplierIds,
   String? purposeGuide, String? emptyMessage,
-}) => showModalBottomSheet<String>(context: context, isScrollControlled: true,
-  useSafeArea: true, isDismissible: false, enableDrag: false,
-  builder: (_) => _StoreSupplierSelector(session: session,
-    selectedId: selectedId, lockedSupplierId: lockedSupplierId,
-    eligibleSupplierIds: eligibleSupplierIds, purposeGuide: purposeGuide, emptyMessage: emptyMessage));
+  StoreSupplierInitialData? initialData, int? initialRevision,
+  String? initialQuery, WorkspaceSupplierProfile? initialProfile,
+  bool Function()? prefillCurrent, bool Function()? ownerCurrent,
+}) async {
+  if (_openSupplierSelectors[session] == true || ownerCurrent?.call() == false) return null;
+  _openSupplierSelectors[session] = true;
+  try {
+    return await showModalBottomSheet<String>(context: context,
+      isScrollControlled: true, useSafeArea: true,
+      isDismissible: false, enableDrag: false,
+      builder: (sheetContext) => _supplierCapturedOwnerSheet(context, sheetContext, session, ownerCurrent, _StoreSupplierSelector(session: session,
+        selectedId: selectedId, lockedSupplierId: lockedSupplierId,
+        eligibleSupplierIds: eligibleSupplierIds, purposeGuide: purposeGuide,
+        emptyMessage: emptyMessage, initialData: initialData, initialQuery: initialQuery,
+        initialProfile: initialProfile, initialRevision: initialRevision, prefillCurrent: prefillCurrent,
+        ownerCurrent: ownerCurrent)));
+  } finally { _openSupplierSelectors[session] = false; }
+}
+
+String _supplierSourceRevision(WorkSession session) =>
+    'supplier-directory:${session.workspacePurchaseEntryRevision ?? 'empty'}';
+
+/// Opens an unsaved native Add form; intentionally ignores its selected ID.
+Future<MoolAssistantReviewResult> showStoreSupplierAddReview(
+  BuildContext context, WorkSession session, {
+  required StoreSupplierInitialData initialData,
+  required (String, String, bool) expectedScope,
+  required int? expectedRevision,
+  required bool Function() isCurrent,
+  bool Function()? ownerCurrent,
+}) async {
+  if (!context.mounted || !isCurrent() || ownerCurrent?.call() == false ||
+      session.workspaceSupplierScope != expectedScope ||
+      !session.workspaceSuppliersLoaded || session.workspaceSupplierSaving ||
+      session.workspacePurchaseEntryRevision != expectedRevision ||
+      _openSupplierSelectors[session] == true || initialData.validationError != null) {
+    return MoolAssistantReviewResult.stale;
+  }
+  await _showStoreSupplierSelector(context, session,
+    initialData: initialData, initialRevision: expectedRevision,
+    prefillCurrent: () => isCurrent() && session.workspaceSupplierScope == expectedScope,
+    ownerCurrent: ownerCurrent);
+  // Presentation result only, never a save/select/purchase outcome.
+  return ownerCurrent?.call() == false
+      ? MoolAssistantReviewResult.stale : MoolAssistantReviewResult.opened;
+}
 
 class _StoreSupplierSelector extends StatefulWidget {
   const _StoreSupplierSelector({required this.session, this.selectedId, this.lockedSupplierId,
-    this.eligibleSupplierIds, this.purposeGuide, this.emptyMessage});
+    this.eligibleSupplierIds, this.purposeGuide, this.emptyMessage,
+    this.initialData, this.initialRevision, this.prefillCurrent, this.ownerCurrent,
+    this.initialQuery, this.initialProfile});
   final WorkSession session;
   final String? selectedId, lockedSupplierId;
   final String? purposeGuide, emptyMessage;
   final Set<String>? eligibleSupplierIds;
+  final StoreSupplierInitialData? initialData;
+  final String? initialQuery;
+  final WorkspaceSupplierProfile? initialProfile;
+  final int? initialRevision;
+  final bool Function()? prefillCurrent, ownerCurrent;
   @override
   State<_StoreSupplierSelector> createState() => _StoreSupplierSelectorState();
 }
@@ -18914,11 +24754,32 @@ class _StoreSupplierSelectorState extends State<_StoreSupplierSelector> {
   final _form = GlobalKey<FormState>();
   late final _scope = widget.session.workspaceSupplierScope;
   bool _adding = false, _busy = false, _uncertain = false, _loading = true, _directoryReady = false;
+  bool _initialApplied = false, _initialQueryApplied = false;
+  WorkspaceSupplierProfile? _editingOriginal;
+  String? _prefillError;
   String? _error;
   WorkspaceSupplierProfile? _attempt;
   int? _revision;
-  bool get _current => mounted && _scope != null && widget.session.workspaceSupplierScope == _scope;
-  bool get _dirty => [_name, _phone, _address, _gstin].any((c) => c.text.isNotEmpty);
+  bool get _current => mounted && _scope != null &&
+      widget.session.workspaceSupplierScope == _scope && widget.ownerCurrent?.call() != false;
+  bool get _dirty {
+    final original = _editingOriginal;
+    return original == null ? [_name, _phone, _address, _gstin].any((c) => c.text.isNotEmpty)
+      : _name.text != original.name || _phone.text != original.phone ||
+        _address.text != original.address || _gstin.text != original.gstin;
+  }
+  void _startEdit(WorkspaceSupplierProfile profile) {
+    if (!_current || _busy || _adding || widget.session.workspaceSupplierSaving ||
+        widget.lockedSupplierId != null || widget.eligibleSupplierIds != null) return;
+    final latest = widget.session.workspaceSuppliers.where((p) => p.id == profile.id).singleOrNull;
+    if (latest == null) return;
+    setState(() {
+      _editingOriginal = latest; _revision = widget.session.workspacePurchaseEntryRevision;
+      _name.text = latest.name; _phone.text = latest.phone;
+      _address.text = latest.address; _gstin.text = latest.gstin;
+      _adding = true; _attempt = null; _uncertain = false; _error = null;
+    });
+  }
   @override
   void initState() { super.initState(); unawaited(_loadDirectory()); }
   Future<void> _loadDirectory() async {
@@ -18926,7 +24787,45 @@ class _StoreSupplierSelectorState extends State<_StoreSupplierSelector> {
     setState(() { _loading = true; _directoryReady = false; });
     final ready = await widget.session.loadWorkspaceSuppliers(retry: true);
     if (!_current) return;
-    setState(() { _loading = false; _directoryReady = ready; });
+    setState(() {
+      _loading = false;
+      _directoryReady = ready;
+      if (ready && widget.initialQuery != null && !_initialQueryApplied && _prefillError == null) {
+        if (widget.prefillCurrent?.call() == false ||
+            widget.session.workspacePurchaseEntryRevision != widget.initialRevision ||
+            _search.text.isNotEmpty || _adding || _dirty || _attempt != null) {
+          _prefillError = 'Supplier details changed. Close and ask again.';
+          return;
+        }
+        _search.text = widget.initialQuery!;
+        _initialQueryApplied = true;
+      }
+      final initial = widget.initialData;
+      if (!ready || initial == null || _initialApplied || _prefillError != null) return;
+      if (widget.prefillCurrent?.call() == false ||
+          widget.session.workspacePurchaseEntryRevision != widget.initialRevision ||
+          _adding || _dirty || _attempt != null || widget.lockedSupplierId != null ||
+          widget.eligibleSupplierIds != null || initial.validationError != null) {
+        _prefillError = 'Supplier details changed. Close and ask again.';
+        return;
+      }
+      final original = widget.initialProfile;
+      if (original != null) {
+        final latest = widget.session.workspaceSuppliers.where((p) => p.id == original.id).singleOrNull;
+        if (latest == null || jsonEncode(latest.toJson()) != jsonEncode(original.toJson())) {
+          _prefillError = 'Supplier details changed. Close and ask again.';
+          return;
+        }
+        _editingOriginal = latest;
+      }
+      _name.text = initial.name;
+      _phone.text = initial.phone;
+      _address.text = initial.address;
+      _gstin.text = initial.gstin;
+      _revision = widget.session.workspacePurchaseEntryRevision;
+      _adding = true;
+      _initialApplied = true;
+    });
   }
   @override
   void dispose() {
@@ -18946,7 +24845,7 @@ class _StoreSupplierSelectorState extends State<_StoreSupplierSelector> {
     }
     if (_adding && _current) {
       for (final c in [_name, _phone, _address, _gstin]) { c.clear(); }
-      setState(() { _adding = false; _attempt = null; _uncertain = false; _error = null; });
+      setState(() { _adding = false; _editingOriginal = null; _attempt = null; _uncertain = false; _error = null; });
       await _loadDirectory();
     } else if (mounted) { Navigator.pop(context); }
   }
@@ -18954,15 +24853,23 @@ class _StoreSupplierSelectorState extends State<_StoreSupplierSelector> {
     if (!_current || _busy || !_form.currentState!.validate()) return;
     final session = widget.session;
     final now = DateTime.now().toUtc();
-    final proposed = _attempt ?? WorkspaceSupplierProfile(id: session.newWorkspaceSupplierId(),
+    final proposed = _attempt ?? WorkspaceSupplierProfile(id: _editingOriginal?.id ?? session.newWorkspaceSupplierId(),
       name: _name.text.trim(), phone: _phone.text.trim().replaceAll(RegExp(r'[\s()-]'), ''),
       address: _address.text.trim(), gstin: _gstin.text.trim().toUpperCase(),
-      createdAt: now, updatedAt: now);
+      createdAt: _editingOriginal?.createdAt ?? now, updatedAt: now);
     setState(() { _busy = true; _error = null; _attempt = proposed; });
     final saved = await session.saveWorkspaceSupplierProfile(proposed, scope: _scope!, expectedRevision: _revision);
     if (!mounted) return;
     if (!_current) { setState(() => _busy = false); return; }
-    if (saved) { Navigator.pop(context, proposed.id); return; }
+    if (saved) {
+      if (_editingOriginal == null) { Navigator.pop(context, proposed.id); return; }
+      // Updating a contact never changes the caller's selected supplier link.
+      for (final c in [_name, _phone, _address, _gstin]) { c.clear(); }
+      setState(() { _adding = false; _editingOriginal = null; _attempt = null;
+        _busy = false; _uncertain = false; _error = null; });
+      await _loadDirectory();
+      return;
+    }
     setState(() {
       _busy = false;
       _uncertain = session.workspaceSupplierRecoveryError != null;
@@ -18994,14 +24901,16 @@ class _StoreSupplierSelectorState extends State<_StoreSupplierSelector> {
         padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(padding: const EdgeInsets.only(left: 16, right: 4), child: Row(children: [
-            Expanded(child: Text(_adding ? 'Add supplier' : 'Select supplier',
+            Expanded(child: Text(_adding ? _editingOriginal == null ? 'Add supplier' : 'Edit supplier' : 'Select supplier',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: MoolColors.navy))),
             IconButton(tooltip: _adding ? 'Back to suppliers' : 'Close supplier list',
               onPressed: _busy ? null : _close, icon: const Icon(Icons.close, size: 20)),
           ])),
           if (!_current) ...[
             const Padding(padding: EdgeInsets.all(16), child: Text('Store changed. Close and reopen the supplier list.')),
-          ] else if (!_directoryReady) Expanded(child: Center(child: Padding(padding: const EdgeInsets.all(16),
+          ] else if (_prefillError != null) Expanded(child: Center(child: Padding(
+            padding: const EdgeInsets.all(16), child: Text(_prefillError!))))
+          else if (!_directoryReady) Expanded(child: Center(child: Padding(padding: const EdgeInsets.all(16),
             child: _loading ? const CircularProgressIndicator() : Column(mainAxisSize: MainAxisSize.min, children: [
               const Text('Supplier list could not be opened. Saved details are kept.'),
               TextButton(key: const Key('work-supplier-retry'), onPressed: _loadDirectory, child: const Text('Retry supplier list')),
@@ -19030,7 +24939,7 @@ class _StoreSupplierSelectorState extends State<_StoreSupplierSelector> {
                 key: const Key('work-add-supplier-error'), style: const TextStyle(fontSize: 12, color: Color(0xffa52a2a)))),
               const SizedBox(height: 8),
               FilledButton(key: const Key('work-add-supplier-save'), onPressed: _busy ? null : _save,
-                child: Text(_busy ? 'Saving…' : _uncertain ? 'Check saved supplier' : 'Save & select')),
+                child: Text(_busy ? 'Saving…' : _uncertain ? 'Check saved supplier' : _editingOriginal == null ? 'Save & select' : 'Save changes')),
             ]))) else Expanded(child: CustomScrollView(key: const Key('work-supplier-results'), slivers: [
             SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: TextField(
               key: const Key('work-supplier-search'), controller: _search,
@@ -19059,7 +24968,13 @@ class _StoreSupplierSelectorState extends State<_StoreSupplierSelector> {
                     enabled: widget.lockedSupplierId == null || widget.lockedSupplierId == p.id,
                     title: Text(p.name, style: const TextStyle(fontSize: 13, color: MoolColors.ink)),
                     subtitle: details.isEmpty ? null : Text(details, style: const TextStyle(fontSize: 11)),
-                    trailing: p.id == widget.selectedId ? const Icon(Icons.check, size: 18) : null,
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (p.id == widget.selectedId) const Icon(Icons.check, size: 18),
+                      if (widget.lockedSupplierId == null && widget.eligibleSupplierIds == null)
+                        IconButton(key: ValueKey('work-supplier-edit-${p.id}'), tooltip: 'Edit supplier',
+                          onPressed: session.workspaceSupplierSaving ? null : () => _startEdit(p),
+                          icon: const Icon(Icons.edit_outlined, size: 18)),
+                    ]),
                     onTap: () => Navigator.pop(context, p.id));
                 }, childCount: suppliers.length)),
           ])),
@@ -19210,7 +25125,9 @@ class _TradeDocumentDetailsEditorState extends State<_TradeDocumentDetailsEditor
 
 class _StoreReceiveGoodsSurface extends StatefulWidget {
   const _StoreReceiveGoodsSurface({super.key, required this.session, required this.onBack,
-    this.initialSupplierId, this.initialBill, this.initialRestockOriginal, this.initialRestockOrder});
+    this.initialSupplierId, this.initialBill, this.initialRestockOriginal, this.initialRestockOrder, this.ownerCurrent, this.assistantInitial,this.assistantEntity,this.assistantLease,this.assistantReceivingRead});
+  final bool Function()? ownerCurrent;
+  final StoreReceivingReviewInitial? assistantInitial;final String? assistantEntity;final _ReceivingNativeLease? assistantLease;final WorkspaceGoodsReceivingRead? assistantReceivingRead;
   final WorkSession session;
   final VoidCallback onBack;
   final String? initialSupplierId;
@@ -19222,6 +25139,268 @@ class _StoreReceiveGoodsSurface extends StatefulWidget {
 }
 
 class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
+  WorkspaceGoodsReceivingRead? _receivingStatusRead;
+  _ReceivingNativeLease? _receivingLease;
+  final _receivingEdits=ValueNotifier<int>(0);
+  String? _receivingCapturedArrival,_receivingCapturedSupplier;
+  bool _receivingRetired=false;
+  bool get _receivingRawOwnerCurrent=>!_receivingClosed&&(_receivingLease?.current??true)&&
+    (_receivingCapturedArrival==null||_receivingCapturedArrival==_arrivalId&&_receivingCapturedSupplier==_supplierId);
+  void _receivingOwnerChanged(){if(_receivingLease==null)return;if(!_receivingRawOwnerCurrent)_receivingRetired=true;if(mounted)setState((){});}
+  void _setReceivingLease(_ReceivingNativeLease lease) {
+    if(identical(_receivingLease,lease))return;
+    _receivingLease?.changes.removeListener(_receivingOwnerChanged);_receivingLease?.dispose();
+    if(_receivingLease==null)_receivingEdits.addListener(_receivingOwnerChanged);
+    _receivingLease=lease;lease.changes.addListener(_receivingOwnerChanged);
+  }
+  bool _receivingPreparing=false,_receivingDirty=false,_receivingExplicitSave=false,_receivingClosed=false;
+  bool get _receivingOwned=>_receivingLease!=null;
+  bool Function()? get _receivingEffectiveOwner=>_receivingOwned?()=>_current:widget.ownerCurrent;
+  Listenable? get _receivingEffectiveChanges=>_receivingOwned?Listenable.merge([_receivingLease!.changes,_receivingEdits]):null;
+  bool get _receivingOwnerCurrent=>!_receivingRetired&&_receivingRawOwnerCurrent;
+  bool get _receivingCanPrepare=>_current&&!_busy&&_loaded&&!_discarding&&_frozen==null&&
+    _draft?.ready==true&&_draft?.busy==false&&_draft?.pending==null&&_draft?.error==null&&
+    _lastQueuedInput!=null&&mapEquals(_lastQueuedInput,_draftFields)&&!_receivingDirty;
+  bool _receivingCanApply(StoreReceivingReviewInitial initial) {
+    if(!_receivingCanPrepare)return false;
+    if(initial.items.isNotEmpty&&const {'AI-ACT-239','AI-ACT-238'}.contains(initial.actionId)&&_restockOriginal!=null)return false;
+    if(const {'AI-ACT-240','AI-ACT-246'}.contains(initial.actionId)) {
+      final line=_lines.where((line)=>line.id==initial.text('lineId')).singleOrNull;
+      if(line==null||initial.actionId=='AI-ACT-240'&&_mappingLocked(line))return false;
+      if(initial.values.containsKey('unit')&&(_restockOriginal!=null||_mappingLocked(line)))return false;
+      if(initial.values.containsKey('factor')&&_mappingLocked(line))return false;
+    }
+    for(final row in initial.items) {
+      if(row.containsKey('lineId'))return false; // Only the native owner allocates new ordinary lines.
+      final product=session.workspaceCatalogueItems.where((p)=>p.id==row['productId']&&p.stockMode==WorkspaceStockMode.exactQuantity).singleOrNull;
+      if(product==null)return false;
+    }
+    if(initial.text('productId') case final id?) {
+      if(!session.workspaceCatalogueItems.any((p)=>p.id==id&&p.stockMode==WorkspaceStockMode.exactQuantity))return false;
+    }
+    return true;
+  }
+  void _receivingApplyLine(_ReceivingLineInput line,Map<String,String> values) {
+    if(values['productId'] case final id?) _prepareStockSelection(line,id);
+    final controls=<String,TextEditingController>{'unit':line.unit,'factor':line.factor,'expected':line.expected,
+      'delivered':line.delivered,'damaged':line.damaged,'short':line.short,'batch':line.batch,
+      'manufactured':line.manufactured,'expiry':line.expiry,'mrp':line.mrp};
+    for(final entry in values.entries) {if(controls[entry.key] case final controller?)controller.text=entry.value;}
+  }
+  bool _adoptReceiving(StoreReceivingReviewInitial initial,_ReceivingNativeLease lease) {
+    if(!lease.current||!_receivingCanApply(initial))return false;
+    _setReceivingLease(lease);_receivingCapturedArrival=_arrivalId;_receivingCapturedSupplier=_supplierId;_receivingPreparing=true;
+    final action=initial.actionId;
+    if(initial.text('reference') case final value?)_reference.text=value;
+    if(initial.text('date') case final value?)_day.text=_isoReceivedDate(value)??value;
+    if(action=='AI-ACT-238'||action=='AI-ACT-239') {
+      if(action=='AI-ACT-238'&&initial.items.isNotEmpty) {
+        final empty=_lines.where((line)=>line.original==null&&line.productId.isEmpty&&line.delivered.text.isEmpty&&line.expected.text.isEmpty&&line.lotControllers.every((c)=>c.text.isEmpty)).toList();
+        for(final line in empty){_lines.remove(line);line.dispose();}
+      }
+      for(final values in initial.items) {
+        final line=_ReceivingLineInput(session.newWorkspaceDeliveryLineId());
+        _receivingApplyLine(line,values);_lines.add(line);
+      }
+    }
+    if(action=='AI-ACT-240'||action=='AI-ACT-246') {
+      final line=_lines.singleWhere((line)=>line.id==initial.text('lineId'));
+      _receivingApplyLine(line,{for(final e in initial.values.entries)if(e.value is String)e.key:e.value! as String});
+    }
+    if(action=='AI-ACT-401')_copyType=initial.text('documentType')!;
+    _receivingDirty=true;setState((){});return true;
+  }
+  Future<void> _startReceivingAssistant() async {
+    try {
+    final initial=widget.assistantInitial!,lease=widget.assistantLease!;
+    _setReceivingLease(lease);_receivingPreparing=true;_receivingStatusRead=widget.assistantReceivingRead;
+    if(!lease.current||_scope==null||!session.workspaceSuppliersLoaded||!session.workspaceInventoryLoaded)return;
+    _supplierId=widget.initialSupplierId;
+    if(_supplierId==null||!session.workspaceSuppliers.any((p)=>p.id==_supplierId))return;
+    _bookRevision=session.workspacePurchaseEntryRevision;
+    _draft=_LedgerFormAutosave(session,session.supplierReceivingInputFormKey(_supplierId!))..addListener(_draftChanged);
+    final fields=await _draft!.load();
+    if(!_current||fields==null||!_draft!.ready)return;
+    final saved=session.workspaceGoodsReceiptDrafts.where((r)=>r.supplierId==_supplierId&&r.receipt.id==widget.assistantEntity).singleOrNull;
+    if(saved!=null) {
+      _restore(saved.receipt);_loaded=true;_busy=false;_receivingPreparing=false;
+      _postResult=_closed?WorkspaceGoodsReceiptSaveResult.closed:_committed?session.workspaceGoodsReceiptRecoveryPending
+        ?WorkspaceGoodsReceiptSaveResult.stockRecoveryPending:WorkspaceGoodsReceiptSaveResult.saved
+        :session.workspaceRestockAttempt(_frozen!.id)!=null?WorkspaceGoodsReceiptSaveResult.statusUnknown:WorkspaceGoodsReceiptSaveResult.notPosted;
+      _lastQueuedInput=Map.of(_draftFields);_receivingCapturedArrival=_arrivalId;_receivingCapturedSupplier=_supplierId;setState((){});return;
+    }
+    if(fields.isNotEmpty) {
+      if(initial.actionId=='AI-ACT-238'||fields['arrivalId']!=widget.assistantEntity) {
+        setState((){_busy=false;_error='Another original receiving draft is saved. Keep it and open that exact arrival.';});return;
+      }
+      try {_resumeSupplierInput(fields);_lastQueuedInput=Map.of(_draftFields);}
+      on Object {setState((){_busy=false;_error='Saved input needs original recovery. Do not re-enter this delivery.';});return;}
+    } else if(initial.actionId=='AI-ACT-238') {
+      _prepareNewArrival();_lastQueuedInput=Map.of(_draftFields);
+    } else {setState((){_busy=false;_error='The exact original arrival is unavailable.';});return;}
+    _loaded=true;_busy=false;
+    // Read-only init above creates no draft revision, attachment or Stock effect.
+    final ownLease=_receivingLease!;
+    if(!_adoptReceiving(initial,ownLease)) {
+      _receivingLease=ownLease;setState(()=>_error='Original receiving input changed. Supplied values were not applied.');
+    }
+    } on Object {
+      if(mounted)setState(()=>_error='Original receiving input could not be read. Your saved records were not replaced.');
+    } finally {if(mounted)setState(()=>_busy=false);}
+  }
+  Future<bool> _leaveReceivingPreparation() async {
+    if(_busy||_draft?.busy==true||_draft?.pending!=null)return false;
+    if(!_receivingDirty){_receivingClosed=true;return true;}
+    final close=await showDialog<bool>(context:context,builder:(dialog)=>AlertDialog(
+      key:const Key('work-receiving-preparation-leave'),title:const Text('Discard receiving field changes?'),
+      content:const Text('These entries have not been saved. Your original saved arrival and any unconfirmed receiving operation will be kept.'),
+      actions:[TextButton(onPressed:(){if(dialog.mounted&&ModalRoute.of(dialog)?.isCurrent==true)Navigator.pop(dialog,false);},child:const Text('Keep editing')),
+        TextButton(onPressed:(){if(dialog.mounted&&ModalRoute.of(dialog)?.isCurrent==true)Navigator.pop(dialog,true);},child:const Text('Discard changes'))]));
+    if(!mounted||ModalRoute.of(context)?.isCurrent!=true||close!=true)return false;
+    _receivingDirty=false;_receivingClosed=true;return true;
+  }
+  Future<MoolAssistantReviewResult> _receivingDocumentPreparation(StoreReceivingReviewInitial initial,String digest,
+      bool Function() current,Listenable changes,{required bool Function() nativeOwner,required Listenable nativeOwnerChanges,(Route<void>,NavigatorState)? assistantOwner}) async {
+    final copy=_documents.where((a)=>a.digest==digest).singleOrNull;
+    if(copy==null||!copy.valid||!_assistantReceiptImportReady||!current())return MoolAssistantReviewResult.unavailable;
+    if(!const {'AI-ACT-402','AI-ACT-404'}.contains(initial.actionId))return MoolAssistantReviewResult.unavailable;
+    WorkspacePurchaseInvoiceAttachment prepared;
+    if(initial.actionId=='AI-ACT-404') {
+      final field=copy.extractedFields.where((field)=>field.id==initial.text('fieldId')&&field.sourceDigest==copy.digest&&
+        field.valid&&!copy.dismissedFieldIds.contains(field.id)).singleOrNull;
+      if(field==null)return MoolAssistantReviewResult.unavailable;
+      if(initial.text('receiptField')!=null) {
+        return _copyPrintedFieldToReceipt(initial,copy,field,current,changes,nativeOwner:nativeOwner,nativeOwnerChanges:nativeOwnerChanges,assistantOwner:assistantOwner);
+      }
+      final changed=initial.values.containsKey('heading')||initial.values.containsKey('value');
+      final edited=changed?WorkspacePurchaseAdditionalField.fromJson({...field.toJson(),
+        if(initial.text('heading') case final value?)'label':value,if(initial.text('value') case final value?)'value':value,'reviewed':false}):field;
+      prepared=copy.withExtractedFields([for(final old in copy.extractedFields)old.id==field.id?edited:old],overflow:copy.extractionOverflow,dismissed:copy.dismissedFieldIds);
+      if(!prepared.valid)return MoolAssistantReviewResult.unavailable;
+    } else {
+    final requestedPage=initial.values['page'] as int?;
+    final page=copy.contentType=='application/pdf'?requestedPage:1;
+    if(requestedPage!=null&&(copy.contentType!='application/pdf'&&requestedPage!=1||
+      copy.contentType=='application/pdf'&&(copy.pageTextLengths.isEmpty||requestedPage>copy.pageTextLengths.length)))return MoolAssistantReviewResult.unavailable;
+    final field=WorkspacePurchaseAdditionalField(id:'manual-${DateTime.now().microsecondsSinceEpoch}',
+      label:initial.text('heading')!,value:initial.text('value')!,section:'receipt',sourceDigest:copy.digest,sourcePage:page);
+    if(!field.valid)return MoolAssistantReviewResult.unavailable;
+    prepared=copy.withExtractedFields([...copy.extractedFields,field],overflow:copy.extractionOverflow);
+    if(!prepared.valid)return MoolAssistantReviewResult.unavailable;
+    }
+    final guarded=_ReceivingNativeLease(_assistantReceiptGuard(current),Listenable.merge([changes,_draft,_receivingEdits]));
+    try {await session.workspacePurchaseInvoiceCapture.read(_scope!,_captureId,copy);}
+    on Object {guarded.dispose();return MoolAssistantReviewResult.unavailable;}
+    if(!guarded.current){guarded.dispose();return MoolAssistantReviewResult.stale;}
+    try{return await _assistantReceiptFields(prepared,()=>guarded.current,existing:copy,reviewCurrent:current,ownerChanges:guarded.changes,beforeKeep:(candidate) async {
+      try {await session.workspacePurchaseInvoiceCapture.read(_scope!,_captureId,copy);return guarded.current;}on Object{return false;}
+    });}
+    finally{guarded.dispose();}
+  }
+  Future<MoolAssistantReviewResult> _copyPrintedFieldToReceipt(
+    StoreReceivingReviewInitial initial, WorkspacePurchaseInvoiceAttachment copy,
+    WorkspacePurchaseAdditionalField field, bool Function() proposalCurrent,
+    Listenable changes, {required bool Function() nativeOwner,required Listenable nativeOwnerChanges,(Route<void>,NavigatorState)? assistantOwner}
+  ) async {
+    final target=initial.text('receiptField');
+    final line=_lines.where((value)=>value.id==initial.text('lineId')).singleOrNull;
+    if(target==null||_frozen!=null||!_receivingCanPrepare)return MoolAssistantReviewResult.unavailable;
+    // Targets are the existing receipt inputs. No OCR label heuristic selects an
+    // item, converts its unit, changes a supplier or treats a tax value as money.
+    final controls=<String,TextEditingController>{
+      'reference':_reference,'date':_day,
+      if(line!=null)...{'expected':line.expected,'delivered':line.delivered,
+        'damaged':line.damaged,'short':line.short,'batch':line.batch,
+        'manufactured':line.manufactured,'expiry':line.expiry,'mrp':line.mrp},
+    };
+    final controller=controls[target];
+    if(controller==null||line!=null&&(!session.workspaceCatalogueItems.any((p)=>p.id==line.productId)||
+      !_receivingLineFieldEditable(line,target)))
+      return MoolAssistantReviewResult.unavailable;
+    const labels={'reference':'Receipt / challan no.','date':'Received on',
+      'expected':'Quantity expected','delivered':'Quantity received','damaged':'Damaged quantity',
+      'short':'Short quantity','batch':'Batch number','manufactured':'Manufacturing date',
+      'expiry':'Expiry / best before','mrp':'Pack MRP'};
+    final original=controller.text;
+    final value=target=='date'?_isoReceivedDate(field.value):field.value;
+    if(value==null||value.trim().isEmpty)return MoolAssistantReviewResult.unavailable;
+    final navigator=Navigator.of(context,rootNavigator:true);
+    if(assistantOwner!=null&&!identical(assistantOwner.$2,navigator))return MoolAssistantReviewResult.stale;
+    final ownerRoute=assistantOwner?.$1??ModalRoute.of(context);
+    final lease=_ReceivingNativeLease(_assistantReceiptGuard(proposalCurrent),
+      Listenable.merge([changes,_draft,_receivingEdits]));
+    bool current()=>lease.current&&controller.text==original&&
+      (line==null||_receivingLineFieldEditable(line,target))&&
+      (line==null||_lines.contains(line))&&_documents.contains(copy);
+    Future<bool> originalReadable() async {
+      try {await session.workspacePurchaseInvoiceCapture.read(_scope!,_captureId,copy);}
+      on Object {return false;}
+      return current();
+    }
+    try {
+      if(!await originalReadable())return MoolAssistantReviewResult.unavailable;
+      if(!current()||ownerRoute?.isCurrent!=true)return MoolAssistantReviewResult.stale;
+      final use=await showDialog<bool>(context:context,builder:(dialog) {
+        bool dialogCurrent()=>dialog.mounted&&ModalRoute.of(dialog)?.isCurrent==true;
+        return _ReceivingOwnerSurface(current:current,changes:lease.changes,child:AlertDialog(
+          key:const Key('work-receive-map-review'),title:Text('Copy to receipt',style:Theme.of(dialog).textTheme.titleMedium?.copyWith(fontSize:18,fontWeight:FontWeight.w600)),
+          content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,
+            crossAxisAlignment:CrossAxisAlignment.start,children:[
+              Text(field.label,style:Theme.of(dialog).textTheme.labelMedium),
+              SelectableText(field.value,key:const Key('work-receive-map-source')),
+              const SizedBox(height:12),Text(labels[target]!),
+              if(line!=null)Text(session.workspaceCatalogueItems.where((p)=>p.id==line.productId).singleOrNull?.title??'Selected receipt item'),
+              if(original.isNotEmpty)...[const SizedBox(height:8),Text('Replace: $original')],
+              const SizedBox(height:8),
+              Text(target=='date'?'Use this date only if it is when the goods were received.':
+                'Review this detail against the goods received before recording.'),
+            ])),actions:[
+              TextButton(key:const Key('work-receive-map-cancel'),onPressed:(){if(dialogCurrent())Navigator.pop(dialog,false);},child:const Text('Cancel')),
+              TextButton(key:const Key('work-receive-map-use'),onPressed:(){if(dialogCurrent()&&current())Navigator.pop(dialog,true);},child:const Text('Copy')),
+            ]));
+      });
+      if(use!=true)return current()?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+      if(!current()||ownerRoute?.isCurrent!=true)return MoolAssistantReviewResult.stale;
+      if(!await originalReadable())return MoolAssistantReviewResult.unavailable;
+      if(!current()||ownerRoute?.isCurrent!=true)return MoolAssistantReviewResult.stale;
+      // Explicit preparation only: original final receipt controls own saving,
+      // quantity confirmation and Stock. Keep the original copy unchanged.
+      final scope=_scope,arrival=_arrivalId,supplier=_supplierId,draft=_draft,navigation=session.navigationScopeRevision;
+      final accepted=_ReceivingNativeLease(()=>mounted&&_scope==scope&&scope==session.workspaceSupplierScope&&
+        _arrivalId==arrival&&_supplierId==supplier&&identical(_draft,draft)&&
+        session.navigationScopeRevision==navigation&&widget.ownerCurrent?.call()!=false&&
+        _documents.contains(copy)&&nativeOwner(),nativeOwnerChanges);
+      _setReceivingLease(accepted);_receivingCapturedArrival=arrival;_receivingCapturedSupplier=supplier;
+      setState(() {_receivingPreparing=true;controller.text=value;_receivingDirty=true;});
+      return MoolAssistantReviewResult.returnToOwner;
+    } finally {lease.dispose();}
+  }
+  bool _adoptReceivingRead(StoreReceivingReviewInitial initial,_ReceivingNativeLease lease,{WorkspaceGoodsReceivingRead? receivingRead}) {
+    if(!lease.current||!_assistantReceiptReviewReady||_frozen==null)return false;
+    _setReceivingLease(lease);_receivingCapturedArrival=_arrivalId;_receivingCapturedSupplier=_supplierId;_receivingStatusRead=receivingRead;setState((){});return true;
+  }
+  WorkspaceLedgerFormDraft? _receivingRetainedInput;
+  bool _receivingPostDispatched=false;
+  void _retainReceivingInput() {
+    if(!_receivingOwned)return;
+    final draft=_draft,key=_draft?.key,revision=_draft?.revision;
+    if(draft==null||key==null||revision==null||!draft.ready||draft.busy||draft.pending!=null||draft.error!=null||
+      !mapEquals(_lastQueuedInput,_draftFields))return;
+    final value=WorkspaceLedgerFormDraft(key:key,revision:revision,fields:Map.of(_draftFields));
+    if(value.valid)_receivingRetainedInput=value;
+  }
+  bool get _receivingDurableInputForLeave {
+    final retained=_receivingRetainedInput,draft=_draft;
+    // This proof is only an acknowledged pre-review input save. It never
+    // authorizes an unresolved physical POST or reads another actor's ledger.
+    return !_receivingPostDispatched&&retained!=null&&draft!=null&&draft.key==retained.key&&
+      draft.revision==retained.revision&&draft.ready&&!draft.busy&&draft.pending==null&&draft.error==null&&
+      mapEquals(retained.fields,_draftFields)&&mapEquals(_lastQueuedInput,retained.fields);
+  }
+  bool get _receivingRetainedForLeave=>!_busy&&!_discarding&&
+    _draft?.busy!=true&&_draft?.pending==null&&_draft?.error==null&&
+    (_frozen!=null&&_reviewVerified||_receivingDurableInputForLeave);
+
   late final _scope = widget.session.workspaceSupplierScope;
   final _reference = TextEditingController(), _day = TextEditingController(), _displayDay = TextEditingController();
   final _lines = <_ReceivingLineInput>[];
@@ -19246,7 +25425,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   Future<bool>? _leaveDecision;
   String? _error, _notice;
   WorkSession get session => widget.session;
-  bool get _current => mounted && _scope != null && _scope == session.workspaceSupplierScope;
+  bool get _current => mounted && _scope != null && _scope == session.workspaceSupplierScope && widget.ownerCurrent?.call() != false && _receivingOwnerCurrent;
   WorkspaceSupplierLedger? get _ledger => _supplierId == null ? null : session.workspaceSupplierLedger(_supplierId!);
   bool _receiptRecorded(WorkspaceSupplierGoodsReceipt receipt) => session.workspaceGoodsReceiptUsesServer(receipt)
     ? session.workspaceRestockAttempt(receipt.id)?.recorded != null : _ledger?.goodsReceipts.containsKey(receipt.id) == true;
@@ -19258,7 +25437,10 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       !session.workspaceRestockUsesLegacyReceipts((_restockOriginal ?? widget.initialRestockOriginal)!);
   WorkspaceGoodsReceivingGroup? get _serverGroup {
     final source = _restockOriginal ?? widget.initialRestockOriginal;
-    return source == null ? null : session.workspaceRestockReceiving(source)?.group;
+    if(source==null)return null;
+    final live=session.workspaceRestockReceiving(source)?.group,read=_receivingStatusRead;
+    final local=read!=null&&jsonEncode(read.original.toJson())==jsonEncode(source.toJson())?read.group:null;
+    return live!=null&&(local==null||live.revision>=local.revision)?live:local;
   }
   bool get _committed => _frozen != null && _receiptRecorded(_frozen!);
   bool get _billContextValid => widget.initialBill == null ||
@@ -19290,9 +25472,14 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       {for (final e in line.prior.entries) if (e.value.text.isNotEmpty) e.key: e.value.text},
       if (line.lotControllers.any((c) => c.text.isNotEmpty)) [for (final c in line.lotControllers) c.text]]]);
   @override
-  void initState() { super.initState(); _day.addListener(_syncDisplayDay); unawaited(_recover()); }
+  void initState() {
+    super.initState();_day.addListener(_syncDisplayDay);
+    if(widget.assistantInitial!=null) {
+      WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)unawaited(_startReceivingAssistant());});
+    } else {unawaited(_recover());}
+  }
   @override
-  void dispose() { _receivingEntryScroll.dispose(); _draft?.removeListener(_draftChanged); _draft?.dispose(); _reference.dispose(); _day.removeListener(_syncDisplayDay); _day.dispose(); _displayDay.dispose(); for (final line in _lines) { line.dispose(); } super.dispose(); }
+  void dispose() { _receivingLease?.changes.removeListener(_receivingOwnerChanged);_receivingLease?.dispose();_receivingEdits.removeListener(_receivingOwnerChanged);_receivingEdits.dispose(); _receivingEntryScroll.dispose(); _draft?.removeListener(_draftChanged); _draft?.dispose(); _reference.dispose(); _day.removeListener(_syncDisplayDay); _day.dispose(); _displayDay.dispose(); for (final line in _lines) { line.dispose(); } super.dispose(); }
   String? _isoReceivedDate(String value) {
     final text = value.trim();
     final match = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$').firstMatch(text);
@@ -19321,16 +25508,16 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
             Navigator.pop(routeContext);
           }
         }
-        return Scaffold(body: SafeArea(child: PopScope(canPop: false,
+        return Scaffold(body: SafeArea(child: _purchaseCapturedOwnerPage(context, routeContext, session, _receivingEffectiveOwner, PopScope(canPop: false,
           onPopInvokedWithResult: (didPop, _) { if (!didPop) unawaited(close()); },
           child: _StoreSupplierOpeningSurface(key: openingKey, session: session,
-            initialSupplierId: _supplierId, onBack: () => Navigator.pop(routeContext)))));
+            initialSupplierId: _supplierId, onBack: () => Navigator.pop(routeContext), ownerCurrent: _receivingEffectiveOwner)),ownerChanges:_receivingEffectiveChanges)));
       }));
     } else {
-      await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) =>
-        _WorkspaceCatalogueSurface(session: session, entryOnly: true)));
+      await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (catalogueContext) =>
+        _purchaseCapturedOwnerPage(context, catalogueContext, session, _receivingEffectiveOwner, _WorkspaceCatalogueSurface(session: session, entryOnly: true, ownerCurrent: _receivingEffectiveOwner),ownerChanges:_receivingEffectiveChanges)));
     }
-    if (_current) await _recover();
+    if(_current){if(_receivingPreparing)setState((){_busy=false;_bookRevision=session.workspacePurchaseEntryRevision;});else await _recover();}
   }
   void _draftChanged() { if (_current) setState(() {}); }
   Map<String, String> get _draftFields => {'arrivalId': _arrivalId, 'groupId': _groupId, 'input': _input,
@@ -19340,6 +25527,9 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   bool get _showingOtherDelivery => widget.initialRestockOriginal != null && _arrivalId.isNotEmpty &&
     jsonEncode(widget.initialRestockOriginal!.toJson()) != jsonEncode(_restockOriginal?.toJson());
   void _saveInput() {
+    if(mounted&&_receivingOwned)_receivingEdits.value++;
+    if(!_current)return;
+    if(_receivingPreparing&&!_receivingExplicitSave){_receivingDirty=true;return;}
     if (!_current || _frozen != null || _arrivalId.isEmpty || _draft?.key == null ||
         _draft?.ready != true) { return; }
     final fields = _draftFields;
@@ -19353,6 +25543,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     _draft!.save(fields);
   }
   Future<bool> _flushInput() async {
+    if(_receivingPreparing&&!_receivingExplicitSave)return _current;
     if (_supplierId == null || _frozen != null) return true;
     if (_discarding) {
       if (_current) setState(() => _error = 'Draft discard is not verified. Retry discard before leaving.');
@@ -19578,7 +25769,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   }
   Future<void> _pickSupplier() async {
     final selected = await _showStoreSupplierSelector(context, session,
-      selectedId: _supplierId, lockedSupplierId: _sourceSupplierId);
+      selectedId: _supplierId, lockedSupplierId: _sourceSupplierId, ownerCurrent: widget.ownerCurrent);
     if (!_current) return;
     // A contact-only save advances the book, but never reloads dirty receipt inputs.
     _bookRevision = session.workspacePurchaseEntryRevision;
@@ -19646,13 +25837,16 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     setState(() => _newArrival(previous: previous));
   }
   void _newArrival({WorkspaceSupplierGoodsReceipt? previous}) {
+    if(_prepareNewArrival(previous:previous))_saveInput();
+  }
+  bool _prepareNewArrival({WorkspaceSupplierGoodsReceipt? previous}) {
     final source = previous != null ? previous.restockOriginal : widget.initialRestockOriginal;
     final groupId = source?.deliveryGroupId ?? previous?.expectedDeliveryId;
     final server = source != null && !session.workspaceRestockUsesLegacyReceipts(source);
     final serverRead = source == null ? null : session.workspaceRestockReceiving(source);
     if (server && (serverRead == null || session.workspaceGoodsReceiptRecoveryPending)) {
       _error = 'Recover this purchase’s receiving status before starting another arrival.';
-      return;
+      return false;
     }
     final serverGroup = serverRead?.group;
     final receipts = _ledger?.goodsReceipts.values.where((receipt) => receipt.expectedDeliveryId == groupId).toList() ??
@@ -19662,7 +25856,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         : receipts.expand((receipt) => receipt.lines).where((line) => line.sourceLineId == entry.key)
           .fold<int>(0, (sum, line) => sum + line.deliveredMilli)) >= entry.value.quantityMilli)) {
       _error = 'All ordered quantities for this purchase are already recorded. Saved goods are kept.';
-      return;
+      return false;
     }
     _billReceiptChosen = true;
     for (final line in _lines) { line.dispose(); }
@@ -19706,7 +25900,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     _day.text = DateTime.now().toIso8601String().substring(0, 10);
     _frozen = null; _reviewVerified = false; _cancelAttempt = null; _postResult = null;
     _error = null; _notice = null;
-    _saveInput();
+    return true;
   }
   WorkspaceSupplierGoodsReceipt? _snapshot() {
     final values = <WorkspaceSupplierGoodsReceiptLine>[];
@@ -19751,6 +25945,154 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   }
   bool get _canEnter => _current && !_busy && _loaded && !_discarding && _draft?.ready == true && _frozen == null;
   String get _captureId => WorkspaceSupplierGoodsReceiptDraft.captureId(_supplierId!, _arrivalId);
+  Object? _assistantReceiptOwner;
+  List<WorkspacePurchaseInvoiceAttachment> _assistantReceiptCopies = const [];
+  int _assistantReceiptRevision = 0;
+  bool get _assistantReceiptReviewReady => _current && !_busy && _loaded && !_discarding &&
+      _supplierId != null && _arrivalId.isNotEmpty && (_frozen == null || _savedStatusResolved);
+  bool get _assistantReceiptImportReady => _assistantReceiptReviewReady && _canEnter;
+
+  MoolAssistantNativeSnapshot? _assistantReceiptSnapshot(
+    MoolAssistantContext context, String? entity, String action,
+  ) {
+    if (!_assistantReceiptReviewReady) return null;
+    if (action == 'AI-ACT-241') {
+      if (!_assistantReceiptImportReady || entity != null) return null;
+    } else {
+      final copy = _documents.where((value) => value.digest == entity).firstOrNull;
+      if (copy == null || !copy.valid ||
+          action == 'AI-ACT-242' && copy.extractedFields.isEmpty ||
+          action == 'AI-ACT-406' && copy.detectedText.trim().isEmpty ||
+          !const {'AI-ACT-242', 'AI-ACT-405', 'AI-ACT-406'}.contains(action)) return null;
+    }
+    final owner = (_scope, _supplierId, _arrivalId, _captureId,
+      session.navigationScopeRevision, _draft?.revision, _bookRevision,
+      _input, _copyType, _frozen);
+    if (_assistantReceiptOwner != owner || !listEquals(_assistantReceiptCopies, _documents)) {
+      _assistantReceiptOwner = owner;
+      _assistantReceiptCopies = List.of(_documents);
+      _assistantReceiptRevision++;
+    }
+    return MoolAssistantNativeSnapshot(binding: context.binding, permitted: true,
+      entityId: entity, sourceRevision: 'receiving-document-form-v1:$_assistantReceiptRevision');
+  }
+
+  bool Function() _assistantReceiptGuard(bool Function() reviewCurrent) {
+    final supplier = _supplierId, arrival = _arrivalId, capture = _captureId,
+      navigation = session.navigationScopeRevision, input = _input,
+      type = _copyType, draft = _draft, revision = _draft?.revision, frozen = _frozen,
+      book = _bookRevision, sourceBook = session.workspacePurchaseEntryRevision;
+    final copies = List<WorkspacePurchaseInvoiceAttachment>.of(_documents);
+    return () => _current && !_discarding && _loaded && reviewCurrent() &&
+      _supplierId == supplier && _arrivalId == arrival && _captureId == capture &&
+      session.navigationScopeRevision == navigation && identical(_draft, draft) &&
+      _draft?.revision == revision && _input == input && _copyType == type &&
+      _bookRevision == book && session.workspacePurchaseEntryRevision == sourceBook &&
+      identical(_frozen, frozen) && (_frozen == null || _savedStatusResolved) && listEquals(_documents, copies);
+  }
+
+  Future<MoolAssistantReviewResult> _assistantReceiptFields(
+    WorkspacePurchaseInvoiceAttachment copy, bool Function() current, {
+    WorkspacePurchaseInvoiceAttachment? existing,
+    required bool Function() reviewCurrent,Listenable? ownerChanges,Future<bool> Function(WorkspacePurchaseInvoiceAttachment)? beforeKeep,
+  }) async {
+    if (!current()) return MoolAssistantReviewResult.stale;
+    final arrival = _arrivalId, supplier = _supplierId,
+      navigation = session.navigationScopeRevision, capture = _captureId;
+    final readOnly = _frozen != null;
+    // No _flushInput before navigation: staged proposal data is not autosaved.
+    final edited = await Navigator.of(context, rootNavigator: true)
+      .push<WorkspacePurchaseInvoiceAttachment>(MaterialPageRoute(builder: (_) {
+        final fieldsKey=GlobalKey<_ReceivingScannedFieldsState>();
+        final screen=_ReceivingScannedFieldsScreen(key:fieldsKey,session: session, scope: _scope!, captureId: capture,
+          attachment: copy, readOnly: readOnly, isCurrent: current,
+          beforeKeep:beforeKeep,canKeep: (value) => current() && WorkspaceSupplierGoodsReceiptDraft.validDocuments([
+            for (final old in _documents) if (!identical(old, existing)) old, value,
+          ]));
+        return ownerChanges==null?screen:_ReceivingOwnerSurface(current:current,changes:ownerChanges,child:screen,onClose:(){if(fieldsKey.currentState case final state?)unawaited(state._close());});
+      }));
+    if (!current()) return MoolAssistantReviewResult.stale;
+    if (edited == null || readOnly) return MoolAssistantReviewResult.opened;
+    // A non-null result comes only from the ORIGINAL explicit Save printed
+    // details action. Only this user action may change the receipt draft.
+    final copies = [for (final old in _documents) if (!identical(old, existing)) old, edited];
+    if (!WorkspaceSupplierGoodsReceiptDraft.validDocuments(copies))
+      return MoolAssistantReviewResult.unavailable;
+    setState(() { _documents..clear()..addAll(copies); });
+    final saved = await _flushInput();
+    if (!_current || !reviewCurrent() || _arrivalId != arrival || _supplierId != supplier ||
+        session.navigationScopeRevision != navigation) return MoolAssistantReviewResult.stale;
+    return saved ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.unavailable;
+  }
+
+  Future<MoolAssistantReviewResult> _assistantImportReceiptDocument(
+    MoolAssistantSelectedDocument selected, bool Function() reviewCurrent,
+  ) async {
+    if (!reviewCurrent()) return MoolAssistantReviewResult.stale;
+    if (!_assistantReceiptImportReady) return MoolAssistantReviewResult.unavailable;
+    final current = _assistantReceiptGuard(reviewCurrent);
+    final capture = _captureId, scope = _scope!, type = _copyType;
+    if (_documents.any((copy) => copy.digest == selected.sourceDigest))
+      return MoolAssistantReviewResult.unavailable;
+    WorkspacePurchaseInvoiceAttachment? retained, scanned;
+    setState(() { _busy = true; _error = null; });
+    try {
+      retained = await session.workspacePurchaseInvoiceCapture.retainSelectedForDraft(
+        scope, capture, selected.proof, source: selected.reference.source,
+        canRetain: (candidate) => current() && candidate.digest == selected.sourceDigest &&
+          !_documents.any((copy) => copy.digest == candidate.digest) &&
+          WorkspaceSupplierGoodsReceiptDraft.validDocuments([..._documents,
+            type.isEmpty ? candidate : candidate.withDocumentDetails({'type': type})]),
+      );
+      if (!current()) return MoolAssistantReviewResult.stale;
+      if (type.isNotEmpty) retained = retained.withDocumentDetails({'type': type});
+      // Reuse native OCR; do not call _readDocument because it flushes input.
+      scanned = await session.workspacePurchaseInvoiceCapture.scan(scope, capture, retained);
+      if (!current()) return MoolAssistantReviewResult.stale;
+      if (!WorkspaceSupplierGoodsReceiptDraft.validDocuments([..._documents, scanned])) {
+        scanned = null;
+        setState(() => _error = 'The read details exceed the copy limit. Your earlier copies and entries are kept.');
+      }
+    } on Object catch (error) {
+      if (!current()) return MoolAssistantReviewResult.stale;
+      setState(() => _error = error is WorkGatewayException ? error.message :
+        'Text could not be read. The selected copy is kept; enter details manually.');
+    } finally { if (mounted) setState(() => _busy = false); }
+    if (!current()) return MoolAssistantReviewResult.stale;
+    final ready = scanned;
+    if (ready != null) return _assistantReceiptFields(ready, current, reviewCurrent: reviewCurrent);
+    final original = retained;
+    if (original != null) {
+      // Actual visible original, never a covered underlying form-state change.
+      await Navigator.of(context, rootNavigator: true).push<void>(MaterialPageRoute(builder: (_) =>
+        _GoodsReceiptCopyScreen(session: session, scope: scope, captureId: capture,
+          attachment: original, isCurrent: current)));
+    }
+    return current() ? MoolAssistantReviewResult.unavailable : MoolAssistantReviewResult.stale;
+  }
+
+  Future<MoolAssistantReviewResult> _assistantReviewReceiptDocument(
+    String action, String digest, bool Function() reviewCurrent,
+  ) async {
+    if (!reviewCurrent()) return MoolAssistantReviewResult.stale;
+    if (!_assistantReceiptReviewReady) return MoolAssistantReviewResult.unavailable;
+    final copy = _documents.where((value) => value.digest == digest).firstOrNull;
+    if (copy == null) return MoolAssistantReviewResult.unavailable;
+    final current = _assistantReceiptGuard(reviewCurrent);
+    if (action == 'AI-ACT-242') {
+      if (copy.extractedFields.isEmpty) return MoolAssistantReviewResult.unavailable;
+      return _assistantReceiptFields(copy, current, existing: copy, reviewCurrent: reviewCurrent);
+    }
+    if (action == 'AI-ACT-405') {
+      await Navigator.of(context, rootNavigator: true).push<void>(MaterialPageRoute(builder: (_) =>
+        _GoodsReceiptCopyScreen(session: session, scope: _scope!, captureId: _captureId,
+          attachment: copy, isCurrent: current)));
+    } else if (action == 'AI-ACT-406' && copy.detectedText.trim().isNotEmpty) {
+      await _viewDetectedText(copy, reviewCurrent: current);
+    } else { return MoolAssistantReviewResult.unavailable; }
+    return current() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+  }
+
   Future<void> _captureDocument(WorkProofSource source) async {
     if (!_canEnter || _documents.length >= 3) return;
     final arrival = _arrivalId, supplier = _supplierId, captureId = _captureId,
@@ -19805,11 +26147,13 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => _GoodsReceiptCopyScreen(
       session: session, scope: _scope!, captureId: _captureId, attachment: attachment)));
   }
-  Future<void> _viewDetectedText(WorkspacePurchaseInvoiceAttachment attachment) async {
-    if (!_current || _busy || !_documents.contains(attachment)) return;
+  Future<void> _viewDetectedText(WorkspacePurchaseInvoiceAttachment attachment, {
+    bool Function()? reviewCurrent,
+  }) async {
+    if (!_current || _busy || !_documents.contains(attachment) || reviewCurrent?.call() == false) return;
     await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
       title: const Text('Read from copy'),
-      content: AnimatedBuilder(animation: session, builder: (context, _) => !_current || !_documents.contains(attachment)
+      content: AnimatedBuilder(animation: session, builder: (context, _) => !_current || !_documents.contains(attachment) || reviewCurrent?.call() == false
         ? const Text('Return to the same receiving record to view this text.')
         : SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -19918,8 +26262,9 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           style: TextStyle(fontSize: 11, color: MoolColors.ink)),
       ]),
   ]);
-  void _selectStock(_ReceivingLineInput line, String id) {
-    if (line.productId == id) return;
+  void _selectStock(_ReceivingLineInput line,String id) {if(_prepareStockSelection(line,id))_saveInput();}
+  bool _prepareStockSelection(_ReceivingLineInput line,String id) {
+    if (line.productId == id) return false;
     line.productId = id;
     for (final c in line.prior.values) { c.dispose(); } line.prior.clear();
     if (_restockOriginal == null) {
@@ -19927,7 +26272,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       line.factor.text = '1';
     } else { line.factor.clear(); }
     for (final controller in line.lotControllers) { controller.clear(); }
-    _saveInput();
+    return true;
   }
   bool _mappingLocked(_ReceivingLineInput line) => line.original != null ||
     (_serverReceiving && (_serverGroup?.lines.any((saved) => saved.sourceLineId == line.id) ?? false)) ||
@@ -19957,9 +26302,13 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     if (selected != null && current()) setState(() => _selectStock(line, selected!));
   }
   Future<void> _review() async {
+    if(_receivingOwned&&(_busy||ModalRoute.of(context)?.isCurrent!=true))return;
+    try {
+    _receivingExplicitSave=true;
     if (_frozen == null) {
       setState(() => _busy = true);
       final saved = await _flushInput();
+      if(saved){_retainReceivingInput();if(_receivingPreparing){_receivingPreparing=false;_receivingDirty=false;}}
       if (!_current) return;
       if (saved) {
         try {
@@ -19987,9 +26336,13 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     setState(() { _busy = false; _reviewVerified = saved; _bookRevision = session.workspacePurchaseEntryRevision;
       if (!saved && !session.workspaceSupplierRecoveryRequired) _frozen = null;
       if (!saved) _error = session.workspaceSupplierError ?? 'Review status needs recovery. Keep this delivery reference and retry recovery.'; });
+    } finally {_receivingExplicitSave=false;if(_receivingOwned&&mounted)setState(()=>_busy=false);}
   }
   Future<void> _post() async {
+    if(_receivingOwned&&(_busy||ModalRoute.of(context)?.isCurrent!=true))return;
+    try {
     if (!_current || !_loaded || !_reviewVerified || _frozen == null || (!_serverReceiving && _ledger == null) || _bookRevision == null) return;
+    if(_receivingOwned)_receivingPostDispatched=true;
     setState(() { _busy = true; _error = null; });
     final result = await session.confirmWorkspaceSupplierGoodsReceipt(_frozen!, supplierId: _supplierId!,
       scope: _scope!, expectedPurchaseRevision: _bookRevision!, expectedSupplierRevision: _ledger?.revision ?? 0,
@@ -19999,8 +26352,10 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       _notice = result == WorkspaceGoodsReceiptSaveResult.saved
       ? 'Goods recorded. Supplier bill and payment are separate.' : null;
       if (result != WorkspaceGoodsReceiptSaveResult.saved) _error = session.workspaceSupplierError ?? 'Receiving status needs recovery. Do not add these goods again.'; });
+    } finally {if(_receivingOwned&&mounted)setState(()=>_busy=false);}
   }
   Future<void> _cancel() async {
+    try {
     if (!_current || _frozen == null || _bookRevision == null || _committed) return;
     _cancelAttempt ??= WorkspaceGoodsReceiptReviewCancellation(receiptId: _frozen!.id, supplierId: _supplierId!,
       revision: _bookRevision! + 1, cancelledAt: DateTime.now().toUtc(), reason: 'Retailer cancelled receiving review to correct goods');
@@ -20011,8 +26366,10 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     if (!_current) return;
     setState(() { _busy = false; _bookRevision = session.workspacePurchaseEntryRevision;
       if (!saved) _error = session.workspaceSupplierError ?? 'Cancellation is unverified. Retry recovery before replacing this review.'; });
+    } finally {if(_receivingOwned&&mounted)setState(()=>_busy=false);}
   }
   Future<void> _closeUnrecordedReceipt() async {
+    try {
     final receipt = _frozen, supplier = _supplierId;
     if (!_current || _busy || receipt == null || supplier == null || !_serverReceiving || _committed || _closed ||
         session.workspaceRestockAttempt(receipt.id) == null) { return; }
@@ -20041,6 +26398,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         _error = session.workspaceSupplierError ?? 'Closing status is unverified. Recover or retry closing this receipt before entering another arrival.';
       }
     });
+    } finally {if(_receivingOwned&&mounted)setState(()=>_busy=false);}
   }
   Future<bool> confirmLeave() {
     final active = _leaveDecision;
@@ -20051,7 +26409,33 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       if (identical(_leaveDecision, decision)) _leaveDecision = null;
     });
   }
+  // Only AI retirement uses this path. It reads original local state and
+  // never flushes under a different owner or consults a new ledger/account.
+  bool get _assistantRetiredInputRetained {
+    if (!mounted || widget.ownerCurrent == null || widget.ownerCurrent!.call() ||
+        _busy || _discarding || _frozen != null || _cancelAttempt != null ||
+        _stockRecoverySource != null || _restockOriginal != null || widget.initialRestockOriginal != null ||
+        _postResult == WorkspaceGoodsReceiptSaveResult.statusUnknown) return false;
+    final draft = _draft;
+    if (_supplierId == null && draft == null) {
+      return _reference.text.isEmpty && _day.text.isEmpty && _lines.isEmpty &&
+        _documents.isEmpty && _copyType.isEmpty;
+    }
+    // The exact last queued/restored snapshot is known durable only after its
+    // original write completed, with no pending/error/busy/unknown state.
+    return _scope != null && _supplierId != null && draft != null && !draft.closed &&
+      draft.ready && !draft.busy && draft.error == null && draft.pending == null && draft.revision != null &&
+      draft.key?.account == _scope!.$1 && draft.key?.store == _scope!.$2 &&
+      draft.key?.customer == _supplierId && _lastQueuedInput != null &&
+      mapEquals(_lastQueuedInput, _draftFields);
+  }
+
   Future<bool> _confirmLeave() async {
+    if(_receivingOwned&&_receivingPreparing)return _leaveReceivingPreparation();
+    if(_receivingOwned&&!_receivingOwnerCurrent) {
+      if(_receivingRetainedForLeave){_receivingClosed=true;return true;}return false;
+    }
+    if (widget.ownerCurrent?.call() == false) return _assistantRetiredInputRetained;
     if (_busy) return false;
     if (_frozen != null && !_reviewVerified) {
       setState(() { _error = 'Review save is unverified. Recover saved status or retry this exact review before closing.'; });
@@ -20067,7 +26451,8 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     return _current;
   }
   Future<void> _close() async {
-    if (await confirmLeave() && _current) widget.onBack();
+    if(_receivingOwned&&ModalRoute.of(context)?.isCurrent!=true)return;
+    if (await confirmLeave() && mounted && (_current||_receivingOwned&&_receivingClosed)) widget.onBack();
   }
   void _addReceivingItem() {
     if (!_canEnter || _restockOriginal != null) { return; }
@@ -20155,6 +26540,11 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     });
   @override
   Widget build(BuildContext context) {
+    final body=_buildReceiving(context);
+    return !_receivingOwned?body:_ReceivingOwnerSurface(current:()=>_current,
+      changes:Listenable.merge([_receivingLease!.changes,_receivingEdits,_draft]),child:body,onClose:()=>unawaited(_close()));
+  }
+  Widget _buildReceiving(BuildContext context) {
     final editable = !_busy && _loaded && !_discarding && _frozen == null && (_supplierId == null || _draft?.ready == true);
     final bill = widget.initialBill;
     final linkedReceiptIds = bill == null ? const <String>{} : _ledger?.billGoodsAllocations.values
@@ -20346,11 +26736,15 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         if (_notice != null) Text(_notice!, style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
       ]);
   }
+  bool _receivingLineInherited(_ReceivingLineInput line,{bool? serverLinked}) =>
+    (serverLinked??(_serverReceiving&&(_serverGroup?.lines.any((saved)=>saved.sourceLineId==line.id)??false)))||
+    (_ledger?.goodsReceipts.values.any((r)=>r.expectedDeliveryId==_groupId&&r.lines.any((l)=>l.sourceLineId==line.id))??false);
+  bool _receivingLineFieldEditable(_ReceivingLineInput line,String field) => StoreReceivingReviewInitial.canMapLineField(field,
+    arrives:line.arrives,inherited:_receivingLineInherited(line),restockLinked:_restockOriginal!=null);
   Widget _lineView(_ReceivingLineInput line, int index) {
     final product = session.workspaceCatalogueItems.where((p) => p.id == line.productId).singleOrNull;
     final serverLine = _serverReceiving ? _serverGroup?.lines.where((saved) => saved.sourceLineId == line.id).singleOrNull : null;
-    final inherited = serverLine != null ||
-      (_ledger?.goodsReceipts.values.any((r) => r.expectedDeliveryId == _groupId && r.lines.any((l) => l.sourceLineId == line.id)) ?? false);
+    final inherited = _receivingLineInherited(line,serverLinked:serverLine!=null);
     final prior = session.workspaceReceiptPriorStock(line.productId);
     for (final entry in prior.entries) { line.prior.putIfAbsent(entry.key.id, TextEditingController.new); }
     final delivered = _ReceivingLineInput.milli(line.delivered.text), damage = _ReceivingLineInput.milli(line.damaged.text);
@@ -20439,7 +26833,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         _field('Received qty', line.delivered, 'work-receive-delivered-$index', fullWidth: true),
         _field('Damaged qty', line.damaged, 'work-receive-damaged-$index', fullWidth: true,
           errorText: damage != null && delivered != null && damage > delivered ? 'Cannot exceed received qty' : null),
-        _field('Expected qty · optional', line.expected, 'work-receive-expected-$index', enabled: !inherited && _restockOriginal == null, fullWidth: true,
+        _field('Expected qty · optional', line.expected, 'work-receive-expected-$index', enabled: _receivingLineFieldEditable(line,'expected'), fullWidth: true,
           errorText: expected == null && line.expected.text.trim().isNotEmpty ? 'Enter a complete qty' : null),
         _field('Short qty', line.short, 'work-receive-short-$index', fullWidth: true),
       ]),
@@ -20556,10 +26950,15 @@ class _GoodsReceiptStockPickerState extends State<_GoodsReceiptStockPicker> {
 }
 
 class _ReceivingScannedFieldsScreen extends StatefulWidget {
-  const _ReceivingScannedFieldsScreen({required this.session, required this.scope, required this.captureId,
+  const _ReceivingScannedFieldsScreen({super.key,required this.session, required this.scope, required this.captureId,
     required this.attachment, required this.readOnly, required this.isCurrent, required this.canKeep,
-    this.copyDescription = 'receiving copy', this.limitDescription = 'delivery'});
-  final String copyDescription, limitDescription;
+    this.copyDescription = 'receiving copy', this.limitDescription = 'delivery',this.beforeKeep,
+    this.title = 'Copy fields', this.saveLabel = 'Save', this.onOriginalRoute, this.ownerChanges, this.capturedRoute});
+  final String copyDescription, limitDescription, title, saveLabel;
+  final Listenable? ownerChanges;
+  final Route<WorkspacePurchaseInvoiceAttachment>? capturedRoute;
+  final void Function(Route<void>)? onOriginalRoute;
+  final Future<bool> Function(WorkspacePurchaseInvoiceAttachment)? beforeKeep;
   final WorkSession session;
   final (String, String, bool) scope;
   final String captureId;
@@ -20575,21 +26974,25 @@ class _ReceivingScannedFieldsState extends State<_ReceivingScannedFieldsScreen> 
   late final _fields = widget.attachment.extractedFields.map(_PurchaseAdditionalInput.new).toList();
   late final _dismissed = widget.attachment.dismissedFieldIds.toSet();
   String? _error;
-  bool _allowPop = false, _confirmingLeave = false;
+  bool _allowPop = false, _confirmingLeave = false,_validatingKeep=false;
   bool get _current => mounted && widget.isCurrent() && widget.session.workspaceSupplierScope == widget.scope;
-  bool get _editable => _current && !widget.readOnly;
+  bool get _editable => _current && !widget.readOnly && !_validatingKeep;
   bool get _dirty => !widget.readOnly && (jsonEncode(_fields.map((f) => f.field.toJson()).toList()) !=
     jsonEncode(widget.attachment.extractedFields.map((f) => f.toJson()).toList()) ||
     !setEquals(_dismissed, widget.attachment.dismissedFieldIds.toSet()));
   @override
   void dispose() { for (final input in _fields) { input.dispose(); } super.dispose(); }
   void _finish([WorkspacePurchaseInvoiceAttachment? value]) {
-    if (!mounted || _allowPop) return;
+    if (!mounted || widget.capturedRoute?.isActive == false || _allowPop || widget.beforeKeep!=null&&ModalRoute.of(context)?.isCurrent!=true) return;
     setState(() => _allowPop = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) Navigator.pop(context, value); });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if(!mounted || widget.capturedRoute?.isActive == false)return;
+      if(widget.beforeKeep!=null&&ModalRoute.of(context)?.isCurrent!=true){setState(()=>_allowPop=false);return;}
+      Navigator.pop(context,value);
+    });
   }
   Future<void> _close() async {
-    if (_confirmingLeave) return;
+    if (_confirmingLeave||_validatingKeep) return;
     if (!_current || !_dirty) { _finish(); return; }
     _confirmingLeave = true;
     final discard = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
@@ -20600,7 +27003,7 @@ class _ReceivingScannedFieldsState extends State<_ReceivingScannedFieldsScreen> 
     _confirmingLeave = false;
     if (mounted && (discard == true || !_current)) _finish();
   }
-  void _save() {
+  Future<void> _save() async {
     if (!_editable) return;
     final value = widget.attachment.withExtractedFields(_fields.map((f) => f.field).toList(),
       overflow: widget.attachment.extractionOverflow, dismissed: _dismissed.toList());
@@ -20612,17 +27015,26 @@ class _ReceivingScannedFieldsState extends State<_ReceivingScannedFieldsScreen> 
       setState(() => _error = 'These details exceed this ${widget.limitDescription}’s total saved-copy limit. Your edits remain here; shorten them or split the copy.');
       return;
     }
+    final validate=widget.beforeKeep;
+    if(validate!=null){
+      if(ModalRoute.of(context)?.isCurrent!=true)return;
+      setState(()=>_validatingKeep=true);bool verified=false;
+      try{verified=await validate(value);}on Object{verified=false;}
+      if(!mounted)return;setState(()=>_validatingKeep=false);
+      if(!_current||ModalRoute.of(context)?.isCurrent!=true)return;
+      if(!verified){setState(()=>_error='This original saved copy could not be verified. Your field edits are kept.');return;}
+    }
     _finish(value);
   }
   @override
   Widget build(BuildContext context) => AnimatedBuilder(animation: widget.session, builder: (context, _) => PopScope<WorkspacePurchaseInvoiceAttachment>(
-    canPop: _allowPop || !_current || !_dirty,
+    canPop: !_validatingKeep&&(_allowPop || !_current || !_dirty),
     onPopInvokedWithResult: (didPop, _) { if (!didPop) unawaited(_close()); },
     child: Scaffold(
     appBar: AppBar(leading: BackButton(onPressed: _close),
-      title: const Text('Copy fields', style: TextStyle(fontSize: 16)), actions: [
+      title: Text(widget.title, style: const TextStyle(fontSize: 16)), actions: [
       if (_editable) TextButton(key: const Key('work-receive-fields-keep'), onPressed: _save,
-        child: const Text('Save', semanticsLabel: 'Save printed details', style: TextStyle(fontSize: 12))),
+        child: Text(widget.saveLabel, semanticsLabel: widget.saveLabel == 'Save' ? 'Save printed details' : widget.saveLabel, style: const TextStyle(fontSize: 12))),
     ]),
     body: !_current ? const Center(child: Text('Return to the same receiving record to view these details.')) :
       ListView(key: const Key('work-receive-fields-list'), padding: const EdgeInsets.all(12), children: [
@@ -20630,9 +27042,14 @@ class _ReceivingScannedFieldsState extends State<_ReceivingScannedFieldsScreen> 
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
           Text('${_fields.length} fields${widget.attachment.contentType == 'application/pdf' ? '' : ' · Page 1'}', style: const TextStyle(fontSize: 12)),
-          TextButton(onPressed: () => Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) =>
-            _GoodsReceiptCopyScreen(session: widget.session, scope: widget.scope, captureId: widget.captureId,
-              attachment: widget.attachment))), child: const Text('View original')),
+          TextButton(onPressed: () {
+            if (!_current || _validatingKeep || ModalRoute.of(context)?.isCurrent != true) return;
+            final route = MaterialPageRoute<void>(builder: (_) =>
+              _GoodsReceiptCopyScreen(session: widget.session, scope: widget.scope, captureId: widget.captureId,
+                attachment: widget.attachment, isCurrent: widget.isCurrent, ownerChanges: widget.ownerChanges));
+            widget.onOriginalRoute?.call(route);
+            unawaited(Navigator.of(context).push<void>(route));
+          }, child: const Text('View original')),
         ]),
         const Text('Check against the copy. Goods and payment amounts stay unchanged.',
           style: TextStyle(fontSize: 12)),
@@ -20682,62 +27099,23 @@ class _ReceivingScannedFieldsState extends State<_ReceivingScannedFieldsScreen> 
       ]))));
 }
 
-class _GoodsReceiptCopyScreen extends StatefulWidget {
+class _GoodsReceiptCopyScreen extends StatelessWidget {
   const _GoodsReceiptCopyScreen({required this.session, required this.scope, required this.captureId, required this.attachment,
-    this.title = 'Receiving copy', this.isCurrent});
+    this.title = 'Receiving copy', this.isCurrent, this.ownerChanges});
   final String title;
   final bool Function()? isCurrent;
+  final Listenable? ownerChanges;
   final WorkSession session;
   final (String, String, bool) scope;
   final String captureId;
   final WorkspacePurchaseInvoiceAttachment attachment;
   @override
-  State<_GoodsReceiptCopyScreen> createState() => _GoodsReceiptCopyScreenState();
-}
-
-class _GoodsReceiptCopyScreenState extends State<_GoodsReceiptCopyScreen> {
-  final _pdf = WorkPdfPreview();
-  Uint8List? _bytes, _pageBytes;
-  int _page = 0, _pages = 1;
-  bool _loading = true;
-  String? _error;
-  bool get _current => mounted && widget.session.workspaceSupplierScope == widget.scope && (widget.isCurrent?.call() ?? true);
-  @override
-  void initState() { super.initState(); unawaited(_load(0)); }
-  @override
-  void dispose() { _pdf.dispose(); super.dispose(); }
-  Future<void> _load(int page) async {
-    if (!_current) return;
-    setState(() { _loading = true; _error = null; });
-    try {
-      final bytes = await widget.session.workspacePurchaseInvoiceCapture.read(widget.scope, widget.captureId, widget.attachment);
-      if (!_current) return;
-      if (widget.attachment.contentType == 'application/pdf') {
-        final rendered = await _pdf.render(bytes, page: page);
-        if (!_current) return;
-        _pageBytes = rendered.bytes; _pages = rendered.pageCount; _page = page;
-      }
-      _bytes = bytes;
-    } on Object {
-      if (_current) _error = 'Copy could not be opened. The saved link is kept; retry or reattach the original.';
-    } finally { if (_current) setState(() => _loading = false); }
-  }
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(animation: widget.session, builder: (context, _) => Scaffold(
-    appBar: AppBar(title: Text(widget.title)),
-    body: !_current ? const Center(child: Text('Return to the same Store to view this copy.')) : Column(children: [
-      Padding(padding: const EdgeInsets.all(8), child: Text(widget.attachment.fileName, maxLines: 2, overflow: TextOverflow.ellipsis)),
-      if (_loading) const LinearProgressIndicator(),
-      if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Column(children: [
-        Text(_error!), TextButton(onPressed: _loading ? null : () => _load(_page), child: const Text('Retry copy'))])),
-      if (_bytes != null && _error == null) Expanded(child: InteractiveViewer(minScale: .5, maxScale: 8,
-        child: Center(child: Image.memory(_pageBytes ?? _bytes!, fit: BoxFit.contain)))),
-      if (_bytes != null && _pages > 1) Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
-        TextButton(onPressed: _loading || _page == 0 ? null : () => _load(_page - 1), child: const Text('Previous page')),
-        Text('${_page + 1} / $_pages'),
-        TextButton(onPressed: _loading || _page + 1 >= _pages ? null : () => _load(_page + 1), child: const Text('Next page')),
-      ]),
-    ])));
+  Widget build(BuildContext context) => WorkspaceOriginalCopyViewer(title: title,
+    fileName: attachment.fileName, contentType: attachment.contentType, owner: ownerChanges == null ? session : Listenable.merge([session, ownerChanges]),
+    isCurrent: () => session.workspaceSupplierScope == scope && (isCurrent?.call() ?? true),
+    read: () => session.workspacePurchaseInvoiceCapture.read(scope, captureId, attachment),
+    unavailableText: 'Return to the same Store to view this copy.',
+    errorText: 'Copy could not be opened. The saved link is kept; retry or reattach the original.');
 }
 
 class _PurchaseCategoryHeader extends SliverPersistentHeaderDelegate {
@@ -20773,6 +27151,33 @@ class _PurchaseCategoryHeader extends SliverPersistentHeaderDelegate {
     title != oldDelegate.title || extent != oldDelegate.extent || expanded != oldDelegate.expanded;
 }
 
+Future<void> _showStoreReceivingMovementReference(BuildContext context, WorkSession session,
+  WorkspaceStockMovement movement, {bool Function()? ownerCurrent, Listenable? ownerChanges}) async {
+  final scope = session.workspaceSupplierScope, epoch = session.navigationScopeRevision;
+  if (ownerCurrent?.call() == false || session.workspaceReceivingForStockMovement(movement) == null) return;
+  await showDialog<void>(context: context, builder: (dialogContext) => Dialog.fullscreen(child: SafeArea(
+              child: AnimatedBuilder(animation: Listenable.merge([session, ownerChanges]), builder: (context, _) {
+                final record = session.workspaceSupplierScope == scope && session.navigationScopeRevision == epoch && ownerCurrent?.call() != false
+                  ? session.workspaceReceivingForStockMovement(movement) : null;
+                return Column(children: [ListTile(title: const Text('Receiving details'),
+                  trailing: IconButton(tooltip: 'Close receiving details', onPressed: () {
+                    if (dialogContext.mounted && ModalRoute.of(dialogContext)?.isCurrent == true) Navigator.pop(dialogContext);
+                  }, icon: const Icon(Icons.close))),
+                  Expanded(child: ListView(padding: const EdgeInsets.all(16), children: record == null
+                    ? [const Text('This receiving record is no longer available in the current Store. Close and reopen it.')]
+                    : [Text(record.$1.reference, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      Text('${record.$3} · ${record.$1.deliveredOn}'),
+                      const SizedBox(height: 12), Text(record.$2.productLabel),
+                      Text('Accepted ${_ReceivingLineInput._quantity(record.$2.acceptedMilli)} ${record.$2.purchaseUnit}'),
+                      Text('Added to Stock ${record.$2.newStockUnits} ${record.$2.stockUnit}'),
+                      if (record.$2.lotDetails == null) const Text('Batch and pack details were not recorded.')
+                      else ...[const SizedBox(height: 12), const Text('Recorded from this arrival · private'),
+                        for (final label in record.$2.lotDetails!.labels) Text(label)],
+                    ])),
+                ]);
+              }))));
+}
+
 class _PurchaseRegisterBookmark {
   Object? scope, owner;
   List<String>? history;
@@ -20791,7 +27196,14 @@ class _StorePurchasesSurface extends StatefulWidget {
     this.receivingKey,
     this.onOpenStock,
     this.registerBookmark,
+    this.assistantInitialQuery, this.assistantOpenActions = false, this.assistantShipmentId,
+    this.assistantSourceCurrent, this.assistantOwnerCurrent,
+    this.assistantOwnerChanges, this.assistantReadOnlyOpen = false,
   });
+  final String? assistantInitialQuery, assistantShipmentId;
+  final bool assistantOpenActions, assistantReadOnlyOpen;
+  final Listenable? assistantOwnerChanges;
+  final bool Function()? assistantSourceCurrent, assistantOwnerCurrent;
   final WorkSession session;
   final _PurchaseRegisterBookmark? registerBookmark;
   final bool statement;
@@ -20869,6 +27281,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     },
   );
   bool _newPurchase = false;
+  bool _assistantRegisterApplied = false, _assistantRegisterRejected = false;
   WorkspacePurchaseSavedCopy? _savedCopy;
 
   void _scheduleRegisterRestoration(ScrollPosition position, int epoch, Object? scope) {
@@ -20956,7 +27369,15 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     _registerView.owner = _registerOwner;
     _purchaseSearchFocus.addListener(_refreshPurchaseSearch);
     if (!statement) {
-      unawaited(_loadEntry());
+      if (widget.assistantReadOnlyOpen) {
+        // The original register binds its scope during its first build. A
+        // read-only AI entry has no asynchronous admission to defer hydration.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) unawaited(_loadEntry());
+        });
+      } else {
+        unawaited(_loadEntry());
+      }
     }
   }
 
@@ -20973,7 +27394,24 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   }
 
   Future<void> _loadEntry() async {
-    await session.loadWorkspaceSuppliers();
+    final loaded = widget.assistantReadOnlyOpen
+      ? session.workspaceSuppliersLoaded && !session.workspaceSupplierSaving && !session.workspaceSupplierRecoveryRequired
+      : await session.loadWorkspaceSuppliers();
+    if (!mounted || widget.assistantOwnerCurrent?.call() == false) return;
+    final initial = widget.assistantInitialQuery != null || widget.assistantOpenActions || widget.assistantShipmentId != null;
+    if (initial && !_assistantRegisterApplied && loaded && widget.assistantSourceCurrent?.call() != false &&
+        !_registerBindingChanged && _ownsRegisterView && !_recordPurchase && !_receiveGoods && _savedCopy == null &&
+        _purchaseSearch.text.isEmpty && !_centreVisible && !_actionCentreOpen) {
+      _assistantRegisterApplied = true;
+      if (widget.assistantShipmentId case final shipment?) {
+        session.selectWorkspacePurchase(shipment); // Existing native read/navigation only.
+      } else {
+        session.clearWorkspacePurchaseSelection();
+        if (widget.assistantInitialQuery case final query?) _purchaseSearch.text = query;
+      }
+      if (widget.assistantOpenActions) await _openActionCentre(readOnlyOpen: widget.assistantReadOnlyOpen);
+    }
+    if (initial && !_assistantRegisterApplied) _assistantRegisterRejected = true;
     if (mounted) setState(() {});
   }
 
@@ -21027,7 +27465,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   Future<T?> _chooseActionRecord<T>(String title, List<(T, String, String)> rows, {String? supplierName}) {
     if (supplierName != null) {
       return showDialog<T>(context: context, useRootNavigator: true, useSafeArea: true,
-        builder: (sheetContext) => Dialog(insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24), child: ConstrainedBox(
+        builder: (sheetContext) => _purchaseCapturedOwnerPage(context, sheetContext, session, widget.assistantOwnerCurrent, Dialog(insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24), child: ConstrainedBox(
           key: const Key('supplier-payment-purpose-sheet'),
           constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheetContext).height * .8),
           child: SafeArea(top: false, child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -21047,9 +27485,9 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                   subtitle: Text(row.$3, style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
                   trailing: const Icon(Icons.chevron_right, size: 20), onTap: () => Navigator.pop(sheetContext, row.$1)),
               ])))),
-          ])))));
+          ]))))));
     }
-    return showDialog<T>(context: context, useSafeArea: true, builder: (dialogContext) => Dialog.fullscreen(
+    return showDialog<T>(context: context, useSafeArea: true, builder: (dialogContext) => _purchaseCapturedOwnerPage(context, dialogContext, session, widget.assistantOwnerCurrent, Dialog.fullscreen(
       child: SafeArea(child: Column(children: [
         ListTile(title: Text(title), trailing: IconButton(tooltip: 'Close',
           onPressed: () => Navigator.pop(dialogContext), icon: const Icon(Icons.close))),
@@ -21059,7 +27497,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           for (final row in rows) ListTile(title: Text(row.$2), subtitle: Text(row.$3),
             trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.pop(dialogContext, row.$1)),
         ])),
-      ]))));
+      ])))));
   }
 
   Future<void> _purchaseAction(String action) async {
@@ -21067,6 +27505,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     final scope = session.workspaceSupplierScope;
     final epoch = _centreEpoch;
     bool current() => mounted && epoch == _centreEpoch && scope != null &&
+      widget.assistantOwnerCurrent?.call() != false &&
       scope == session.workspaceSupplierScope && ModalRoute.of(context)?.isCurrent != false;
     if (!current()) return;
     if (action == 'record-bill' || action == 'continue-bill') {
@@ -21110,7 +27549,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           ? 'Choose the supplier for the delivery entry you want to continue.'
           : 'Choose the supplier for the goods already added to Stock.',
         emptyMessage: action == 'continue-receive'
-          ? 'No unfinished delivery entries are available.' : 'No suppliers are available to link these goods.');
+          ? 'No unfinished delivery entries are available.' : 'No suppliers are available to link these goods.', ownerCurrent: widget.assistantOwnerCurrent);
       if (!current() || selected == null || !eligible.contains(selected) ||
           !session.workspaceSuppliers.any((p) => p.id == selected)) {
         return;
@@ -21131,7 +27570,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       final supplier = session.workspaceSuppliers.where((s) => s.id == review.supplierId).firstOrNull;
       final ledger = session.workspaceSupplierLedger(review.supplierId);
       final verified = jsonEncode(ledger?.goodsReceipts[receipt.id]?.toJson()) == jsonEncode(receipt.toJson());
-      await showDialog<void>(context: context, builder: (dialogContext) => Dialog.fullscreen(child: SafeArea(
+      await showDialog<void>(context: context, builder: (dialogContext) => _purchaseCapturedOwnerPage(context, dialogContext, session, widget.assistantOwnerCurrent, Dialog.fullscreen(child: SafeArea(
         child: Column(children: [ListTile(title: Text(receipt.reference), subtitle: Text('${supplier?.name ?? 'Supplier unavailable'} · ${receipt.deliveredOn}'),
           trailing: IconButton(tooltip: 'Close', onPressed: () => Navigator.pop(dialogContext), icon: const Icon(Icons.close))),
           Expanded(child: ListView(padding: const EdgeInsets.all(16), children: [
@@ -21145,11 +27584,11 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
               if (returned.receiptId == receipt.id) ListTile(title: Text('Return ${returned.reference}'),
                 subtitle: Text('${returned.returnedOn} · ${returned.reason}\n${returned.lines.map((l) => '${l.productLabel}: ${l.stockUnits}').join(', ')}')),
           ])),
-        ]))));
+        ])))));
       return;
     }
     if (action == 'accounts' || action == 'statement' || action == 'money-history' || action == 'money' || action == 'refund' || action == 'return') {
-      final selected = await _showStoreSupplierSelector(context, session);
+      final selected = await _showStoreSupplierSelector(context, session, ownerCurrent: widget.assistantOwnerCurrent);
       if (!mounted || !current() || selected == null) return;
       final supplier = session.workspaceSuppliers.where((p) => p.id == selected).singleOrNull;
       if (!mounted || !current() || supplier == null || !session.workspaceSuppliers.any((p) => p.id == supplier.id)) return;
@@ -21163,14 +27602,14 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
         if (!mounted || !current() || purpose == null) return;
         if (purpose != 'bill') {
           await _showSupplierMoneyEntry(context, session,
-            _StoreSupplierMoneyTarget(supplierId: supplier.id, advance: purpose == 'advance'));
+            _StoreSupplierMoneyTarget(supplierId: supplier.id, advance: purpose == 'advance'), ownerCurrent: widget.assistantOwnerCurrent);
           return;
         }
         final copy = await _chooseActionBill('Choose the bill paid', supplierId: supplier.id, acceptedOnly: true, paymentSelection: true);
         if (!mounted || !current() || copy == null) return;
-        await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(supplierId: supplier.id, copy: copy));
+        await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(supplierId: supplier.id, copy: copy), ownerCurrent: widget.assistantOwnerCurrent);
       } else if (action == 'refund') {
-        await _chooseSupplierRefund(context, session, supplier.id);
+        await _chooseSupplierRefund(context, session, supplier.id, ownerCurrent: widget.assistantOwnerCurrent);
       } else if (action == 'return') {
         final receipt = await _chooseActionRecord<WorkspaceSupplierGoodsReceipt>('Choose received goods to return', [
           for (final receipt in ledger?.goodsReceipts.values ?? <WorkspaceSupplierGoodsReceipt>[])
@@ -21178,9 +27617,9 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
         ]);
         if (!mounted || !current() || receipt == null ||
             jsonEncode(session.workspaceSupplierLedger(supplier.id)?.goodsReceipts[receipt.id]?.toJson()) != jsonEncode(receipt.toJson())) { return; }
-        await _showSupplierGoodsReturn(context, session, supplier.id, receipt);
+        await _showSupplierGoodsReturn(context, session, supplier.id, receipt, ownerCurrent: widget.assistantOwnerCurrent);
       } else if (ledger != null) {
-        await _showSupplierStatement(context, session, ledger);
+        await _showSupplierStatement(context, session, ledger, ownerCurrent: widget.assistantOwnerCurrent, ownerChanges: widget.assistantOwnerChanges);
       } else {
         await _chooseActionRecord<String>('Supplier account unavailable', const []);
       }
@@ -21194,11 +27633,11 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
         : action == 'credit' ? 'Choose the bill covered by your supplier’s credit note.' : null);
     if (!mounted || !current() || copy == null) return;
     if (action == 'allocate') {
-      await _showSupplierAllocation(context, session, copy);
+      await _showSupplierAllocation(context, session, copy, ownerCurrent: widget.assistantOwnerCurrent);
     } else if (action == 'credit') {
-      await _showSupplierCredit(context, session, copy);
+      await _showSupplierCredit(context, session, copy, ownerCurrent: widget.assistantOwnerCurrent);
     } else if (action == 'shortage') {
-      await _showSupplierShortage(context, session, copy);
+      await _showSupplierShortage(context, session, copy, ownerCurrent: widget.assistantOwnerCurrent);
     } else {
       setState(() => _savedCopy = copy);
     }
@@ -21216,11 +27655,11 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     final copy = editableOnly && eligible.length == 1 ? eligible.single.$1
       : paymentSelection
       ? await showDialog<WorkspacePurchaseSavedCopy>(context: context, useSafeArea: true,
-          builder: (_) => _StorePaymentBillSelector(title: title,
+          builder: (paymentContext) => _purchaseCapturedOwnerPage(context, paymentContext, session, widget.assistantOwnerCurrent, _StorePaymentBillSelector(title: title,
             purposeGuide: purposeGuide ?? 'Choose the supplier bill you have paid.',
             supplierName: supplierId == null ? null
               : session.workspaceSuppliers.where((s) => s.id == supplierId).firstOrNull?.name ?? 'Supplier unavailable',
-            copies: eligible.map((row) => row.$1).toList()))
+            copies: eligible.map((row) => row.$1).toList())))
       : await _chooseActionRecord<WorkspacePurchaseSavedCopy>(title, eligible);
     if (!mounted || scope != session.workspaceSupplierScope || copy == null ||
         !session.workspacePurchaseCopies.any((c) => jsonEncode(c.toJson()) == jsonEncode(copy.toJson()))) { return null; }
@@ -21228,7 +27667,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     return copy;
   }
 
-  Future<void> _openActionCentre() async {
+  Future<void> _openActionCentre({bool readOnlyOpen = false}) async {
     _purchaseSearchFocus.unfocus();
     if (_centreVisible) { backWithinPurchases(); return; }
     if (_actionCentreOpen || _purchaseActionPending) return;
@@ -21237,8 +27676,8 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     try {
     final scope = session.workspaceSupplierScope;
     _receivingResumeIds.clear(); _receivingResumeUnknown = false;
-    final recovered = await session.recoverCustomerLedger();
-    if (!mounted || epoch != _centreEpoch || scope != session.workspaceSupplierScope) return;
+    final recovered = readOnlyOpen ? session.workspaceInvoiceHistoryLoaded : await session.recoverCustomerLedger();
+    if (!mounted || widget.assistantOwnerCurrent?.call() == false || epoch != _centreEpoch || scope != session.workspaceSupplierScope) return;
     _receivingResumeUnknown = !recovered;
     for (final supplier in session.workspaceSuppliers) {
       final key = session.supplierReceivingInputFormKey(supplier.id);
@@ -21273,6 +27712,31 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     ++_centreEpoch;
     setState(() { _centreVisible = false; _actionCentreOpen = false; _expandedCategories.clear(); });
     return true;
+  }
+
+  // Returns true when an original inner surface handled Back, including a
+  // refused dirty/pending leave. A refusal must never pop the outer AI route.
+  Future<bool> _assistantBackWithin() async {
+    final receiving = widget.receivingKey?.currentState;
+    if (receiving != null) {
+      final permitted = await receiving.confirmLeave();
+      if (!permitted) return true;
+      // A retired, proven-retained child may leave the outer route directly.
+      // Its safe retired check is read-only; do not rebuild another old form.
+      if (widget.assistantOwnerCurrent?.call() == false) return false;
+      if (mounted) receiving.widget.onBack();
+      return true;
+    }
+    final entry = widget.purchaseEntryKey?.currentState;
+    if (entry != null) {
+      if (await entry.confirmLeave() && mounted) entry.widget.onBack();
+      return true;
+    }
+    if (session.focusedWorkspacePurchaseId != null) {
+      session.clearWorkspacePurchaseSelection(); return true;
+    }
+    if (_purchaseActionPending || _actionCentreOpen) return true;
+    return backWithinPurchases();
   }
 
   void cancelPendingAction() {
@@ -21472,6 +27936,10 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
 
   @override
   Widget build(BuildContext context) {
+    if (_assistantRegisterRejected && widget.assistantOwnerCurrent?.call() != false) {
+      return const Center(child: Padding(padding: EdgeInsets.all(16), child:
+        Text('Purchase details changed. Close and reopen Purchases in the original Store.')));
+    }
     final storeId = session.activeWorkspace?.id;
     final history = session.workspaceRecentSearches('purchases');
     if (_storeId != storeId || _surfaceScope != session.workspaceSupplierScope ||
@@ -21514,18 +27982,19 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           if (!mounted || scope != session.workspaceSupplierScope) return;
           setState(() { _receiveGoods = false; _receivingSupplierId = null;
             _savedCopy = _returnReceivingCopy; _returnReceivingCopy = null; });
-        });
+        }, ownerCurrent: widget.assistantOwnerCurrent);
     }
     if ((_recordPurchase || _savedCopy != null) && !statement) {
       return _StoreRecordPurchaseSurface(
         key: widget.purchaseEntryKey ?? ValueKey(('record-purchase', session.workspaceSupplierScope, _savedCopy?.id)), session: session,
         savedCopy: _savedCopy,
+        assistantOwnerCurrent: widget.assistantOwnerCurrent,
         openingOnly: _openingOnly,
         startNew: _newPurchase,
         onReceiveGoods: (copy) => setState(() { _returnReceivingCopy = copy;
           _receivingSupplierId = copy.supplier.id; _savedCopy = null;
           _recordPurchase = false; _openingOnly = false; _newPurchase = false; _receiveGoods = true; }),
-        onBack: () => setState(() { _recordPurchase = false; _openingOnly = false; _newPurchase = false; _savedCopy = null; }));
+        onBack: () => setState(() { _recordPurchase = false; _openingOnly = false; _newPurchase = false; _savedCopy = null; }), assistantReadOnlyOpen: widget.assistantReadOnlyOpen, assistantOwnerChanges: widget.assistantOwnerChanges);
     }
     final selected = session.focusedWorkspacePurchase;
     final returning =
@@ -21632,7 +28101,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
             session: session,
             ledger: session.workspaceSupplierLedger(selected.supplierId),
             orderId: selected.orderId,
-          ),
+           ownerCurrent: widget.assistantOwnerCurrent, ownerChanges: widget.assistantOwnerChanges),
           if (selected.paymentTermLabel?.isNotEmpty == true)
             Text('Agreed terms · ${selected.paymentTermLabel}'),
           if (selected.balanceDueLabel?.isNotEmpty == true)
@@ -21651,8 +28120,8 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                 context: context,
                 isScrollControlled: true,
                 useSafeArea: true,
-                builder: (_) =>
-                    _StoreMoneyEntrySheet(session: session, purchase: selected),
+                builder: (sheetContext) => _supplierCapturedOwnerSheet(context, sheetContext, session,
+                    widget.assistantOwnerCurrent, _StoreMoneyEntrySheet(session: session, purchase: selected, ownerCurrent: widget.assistantOwnerCurrent)),
               ),
             ),
           const SizedBox(height: 14),
@@ -21681,7 +28150,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
             session: session,
             target: WorkspaceIssueTarget.supplierShipment,
             referenceId: selected.shipmentId,
-          ),
+           ownerCurrent: widget.assistantOwnerCurrent),
           const Divider(height: 24),
           Text(
             selected.receiptState.label,
@@ -21708,7 +28177,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
               )),
               session: session,
               purchase: selected,
-            ),
+             ownerCurrent: widget.assistantOwnerCurrent),
         ],
       );
     }
@@ -22031,9 +28500,9 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
 }
 
 Future<void> _showSupplierStatement(BuildContext context, WorkSession session,
-    WorkspaceSupplierLedger ledger) async {
+    WorkspaceSupplierLedger ledger, {bool Function()? ownerCurrent, Listenable? ownerChanges}) async {
   final scope = session.workspaceSupplierScope;
-  if (scope == null || scope.$1 != ledger.accountScope || scope.$2 != ledger.workspaceId) return;
+  if (ownerCurrent?.call() == false || scope == null || scope.$1 != ledger.accountScope || scope.$2 != ledger.workspaceId) return;
   final identity = jsonEncode(ledger.toJson());
   try {
     final now = DateTime.now();
@@ -22045,8 +28514,8 @@ Future<void> _showSupplierStatement(BuildContext context, WorkSession session,
     if (!context.mounted) return;
     await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true, showDragHandle: false,
       builder: (_) => FractionallySizedBox(heightFactor: .95, child: StoreSupplierStatementPanel(
-        statement: statement, changes: session,
-        isCurrent: () => session.workspaceSupplierScope == scope &&
+        statement: statement, changes: Listenable.merge([session, ownerChanges]),
+        isCurrent: () => ownerCurrent?.call() != false && session.workspaceSupplierScope == scope &&
           jsonEncode(session.workspaceSupplierLedger(ledger.supplierId)?.toJson()) == identity)));
   } on Object {
     if (context.mounted) {
@@ -22066,7 +28535,10 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
     this.controller,
     this.onExpansionChanged,
     this.hideCompactHeader = false,
+    this.ownerCurrent, this.ownerChanges,
   });
+  final bool Function()? ownerCurrent;
+  final Listenable? ownerChanges;
   final WorkSession session;
   final WorkspaceSupplierLedger? ledger;
   final String? orderId, billId;
@@ -22076,7 +28548,7 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final current = ledger;
+    final current = ownerCurrent != null && !session.workspaceInvoiceHistoryLoaded ? null : ledger;
     if (current == null) {
       return const Text('Supplier account balance unavailable');
     }
@@ -22089,7 +28561,9 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
     final detailWidgets = <Widget>[
         Align(alignment: Alignment.centerLeft, child: TextButton.icon(
           key: ValueKey('supplier-statement-open-${current.supplierId}'),
-          onPressed: () => _showSupplierStatement(context, session, current),
+          onPressed: () => _showSupplierStatement(context, session, current, ownerCurrent: ownerCurrent == null ? null :
+            () => ownerCurrent?.call() != false && session.workspaceInvoiceHistoryLoaded, ownerChanges: ownerChanges ??
+              context.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges),
           icon: const Icon(Icons.receipt_long_outlined, size: 18), label: const Text('Supplier statement'))),
         if (!current.historyComplete || current.openingBalanceMinor == null)
           const Text(
@@ -22207,8 +28681,8 @@ class _StoreStatementSurface extends StatefulWidget {
     this.showNewSaleAction = true,
     this.counterContent,
     this.onSalesTaskChanged,
-    this.initialSalesTask = 'home',
-    this.beforeSalesViewChange,
+    this.initialSalesTask = 'home', this.initialReport, this.reportCurrent, this.reportChanges,
+    this.beforeSalesViewChange,this.preparedExchangeInvoiceId,this.customerReviewScope,this.preparedExchangeFields,this.capturedExchangeDraft,this.onExchangePreparedDraft,this.onPreparedExit,
     this.onPrepareCounter,
     this.onNewSale,
     this.onOpenOperation,
@@ -22216,6 +28690,15 @@ class _StoreStatementSurface extends StatefulWidget {
     super.key,
   });
   final WorkSession session;
+  final StoreReportInitialData? initialReport;
+  final String? preparedExchangeInvoiceId;
+  final StoreCustomerActionReviewScope? customerReviewScope;
+  final Map<String,String>? preparedExchangeFields;
+  final WorkspaceLedgerFormDraft? capturedExchangeDraft;
+  final ValueChanged<Map<String,String>>? onExchangePreparedDraft;
+  final VoidCallback? onPreparedExit;
+  final bool Function()? reportCurrent;
+  final Listenable? reportChanges;
   final bool salesOnly;
   final bool showNewSaleAction;
   final Widget? counterContent;
@@ -22232,7 +28715,9 @@ class _StoreStatementSurface extends StatefulWidget {
 
 class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   bool _openingExchange = false;
+  bool _preparedExchangeCurrent()=>widget.customerReviewScope==null||mounted&&widget.customerReviewScope!.current()&&ModalRoute.of(context)?.isCurrent==true;
   Future<void> _resumeExchangeBill({bool returnSaved = false}) async {
+    if(!_preparedExchangeCurrent())return;
     final account = widget.session.workspaceFinance?.accountScope;
     final store = widget.session.activeWorkspace?.id;
     final resume = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
@@ -22242,11 +28727,11 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         ? 'Your return is saved. Resume or finish the existing bill before choosing replacement items. Nothing in that bill will be cleared.'
         : 'Resume or finish the existing bill before starting an exchange. This return has not been recorded; your saved bill will not be cleared.'),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Close')),
+        TextButton(onPressed: () => _closeCapturedCustomerReview(dialogContext,widget.customerReviewScope,false), child: const Text('Close')),
         TextButton(key: const Key('exchange-resume-sale'),
-          onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Resume sale')),
+          onPressed: () => _closeCapturedCustomerReview(dialogContext,widget.customerReviewScope,true), child: const Text('Resume sale')),
       ]));
-    if (!mounted || resume != true) return;
+    if (!mounted || !_preparedExchangeCurrent() || resume != true) return;
     if (widget.session.workspaceFinance?.accountScope != account || widget.session.activeWorkspace?.id != store) {
       widget.session.showNotice('Store changed. Open the saved sale in the current Store.');
       return;
@@ -22254,8 +28739,9 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
     widget.onNewSale?.call();
   }
 
-  Future<bool> _exchangeSteps({bool returnSaved = false}) async =>
-    await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+  Future<bool> _exchangeSteps({bool returnSaved = false}) async {
+    if(!_preparedExchangeCurrent())return false;
+    return await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
       scrollable: true,
       title: Text(returnSaved ? 'Return saved · Choose replacements' : 'How exchange works'),
       content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min,
@@ -22272,20 +28758,21 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           ],
         ])),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(returnSaved ? 'Later' : 'Close')),
+        TextButton(onPressed: () => _closeCapturedCustomerReview(dialogContext,widget.customerReviewScope,false), child: Text(returnSaved ? 'Later' : 'Close')),
         if (returnSaved) TextButton(key: const Key('exchange-choose-replacements'),
-          onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Choose replacements')),
+          onPressed: () => _closeCapturedCustomerReview(dialogContext,widget.customerReviewScope,true), child: const Text('Choose replacements')),
       ])) == true;
+  }
 
   Future<void> _openExchange(WorkspaceCustomerInvoice invoice, WorkspacePaymentRecord payment) async {
-    if (_openingExchange) return;
+    if (!_preparedExchangeCurrent() || _openingExchange) return;
     _openingExchange = true;
     final session = widget.session;
     final account = session.workspaceFinance?.accountScope;
     final store = session.activeWorkspace?.id;
     try {
       await session.loadWorkspaceCounterDraft();
-      if (!mounted || account == null || store == null ||
+      if (!mounted || !_preparedExchangeCurrent() || account == null || store == null ||
           !_exchangeSelection || session.workspaceFinance?.accountScope != account ||
           session.activeWorkspace?.id != store) { return; }
       if (session.currentWorkspaceOrderId == null &&
@@ -22318,13 +28805,18 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         useSafeArea: true, isDismissible: false, enableDrag: false,
         builder: (sheetContext) {
           returnRoute = ModalRoute.of(sheetContext);
-          return _CustomerReturnSheet(session: session, payment: payment, order: order,
-            account: account, store: store, onRecorded: () => recorded = true);
+          final body=_CustomerReturnSheet(session:session,payment:payment,order:order,
+            account:account,store:store,onRecorded:()=>recorded=true,
+            reviewScope:widget.customerReviewScope,preparedFields:widget.preparedExchangeFields,
+            capturedDraft:widget.capturedExchangeDraft,onPreparedDraft:widget.onExchangePreparedDraft);
+          return widget.customerReviewScope==null?body:SizedBox(height:MediaQuery.sizeOf(sheetContext).height*.9,
+            child:_StoreCustomerActionFrame(scope:widget.customerReviewScope!,child:body,
+              onRetiredClose:()=>_closeCapturedCustomerReview(sheetContext,widget.customerReviewScope)));
         });
       await returnRoute?.completed;
-      if (!mounted || !recorded || session.workspaceFinance?.accountScope != account ||
+      if (!mounted || !_preparedExchangeCurrent() || !recorded || session.workspaceFinance?.accountScope != account ||
           session.activeWorkspace?.id != store) { return; }
-      if (!await _exchangeSteps(returnSaved: true) || !mounted) return;
+      if (!await _exchangeSteps(returnSaved: true) || !mounted || !_preparedExchangeCurrent()) return;
       await _startCustomerSale(account: account, store: store,
         customerId: payment.customerId, customerName: invoice.customer, requireEmptyBill: true);
     } finally {
@@ -22334,9 +28826,10 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
 
   Future<bool> _startCustomerSale({required String account, required String store,
       required String customerId, required String customerName, bool requireEmptyBill = false}) async {
+    if(!_preparedExchangeCurrent())return false;
     final session = widget.session;
     await session.loadWorkspaceCounterDraft();
-    if (!mounted || widget.onNewSale == null || session.workspaceFinance?.accountScope != account ||
+    if (!mounted || !_preparedExchangeCurrent() || widget.onNewSale == null || session.workspaceFinance?.accountScope != account ||
         session.activeWorkspace?.id != store) { return false; }
     if (requireEmptyBill && session.currentWorkspaceOrderId == null &&
         (session.workspaceOrderQuantities.isNotEmpty || session.workspaceOrderCustomer.trim().isNotEmpty)) {
@@ -22348,11 +28841,14 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       session.showNotice('Resume or finish the existing customer bill before starting this sale.');
       return false;
     }
-    if (!session.prepareWorkspaceOrder(source: 'Counter', fulfilment: 'At the shop')) return false;
+    if (!_preparedExchangeCurrent() || !session.prepareWorkspaceOrder(source: 'Counter', fulfilment: 'At the shop')) return false;
+    if(!_preparedExchangeCurrent())return false;
     session.updateWorkspaceCounterDetails(customer: customerName);
     if (workspaceCustomerMobile(session.workspaceOrderCustomer) != customerId) {
+      if(!_preparedExchangeCurrent())return false;
       session.updateWorkspaceCounterDetails(customer: customerId);
     }
+    if(!_preparedExchangeCurrent())return false;
     widget.onNewSale?.call();
     return true;
   }
@@ -22361,9 +28857,9 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   Future<bool> _retryCustomerCredit(String message) async => mounted &&
       await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
         title: const Text('Customer credit'), content: Text(message), actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Close')),
+          TextButton(onPressed: () => _closeCapturedCustomerReview(dialogContext,widget.customerReviewScope,false), child: const Text('Close')),
           TextButton(key: const Key('customer-credit-retry'),
-            onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Retry')),
+            onPressed: () => _closeCapturedCustomerReview(dialogContext,widget.customerReviewScope,true), child: const Text('Retry')),
         ])) == true;
 
   Future<void> _openCustomerCredit() async {
@@ -22441,6 +28937,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   }
 
   String _book = 'Sales';
+  bool _reportStatementPrepared = false;
   String _invoicePeriod = 'Today';
   DateTimeRange? _invoiceRange;
   final _invoiceSearch = TextEditingController();
@@ -22457,6 +28954,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   String _salesQueryBeforeReturns = '';
   bool _salesActionsBeforeReturns = false;
   void _toggleReturnSelection({bool exchange = false}) {
+    if(widget.preparedExchangeInvoiceId!=null){widget.onPreparedExit?.call();return;}
     FocusScope.of(context).unfocus();
     setState(() {
       if (_returnSelection) {
@@ -22617,6 +29115,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   }
 
   Future<void> _openSalesStatement() async {
+    if (widget.reportCurrent?.call() == false) return;
     final session = widget.session;
     final scope = session.workspaceStockHistoryScope();
     if (scope == null || !session.workspaceInvoiceHistoryLoaded) {
@@ -22639,14 +29138,14 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         until: DateTime(last.year, last.month, last.day + 1), generatedAt: now,
         invoices: session.workspaceInvoices,
         finance: !session.workspaceFinanceStale && !session.workspaceFinanceUsesLegacyReview ? session.workspaceFinance : null);
-      if (!mounted) return;
+      if (!mounted || widget.reportCurrent?.call() == false) return;
       await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true,
         showDragHandle: false,
         builder: (sheetContext) => SizedBox(height: MediaQuery.sizeOf(sheetContext).height *
             (MediaQuery.orientationOf(sheetContext) == Orientation.landscape ? 1 : .78),
           child: StoreSalesStatementPanel(statement: statement,
             onClose: () => Navigator.pop(sheetContext),
-            changes: session, isCurrent: () => mounted && session.workspaceStockHistoryScope()?.key == scope.key)));
+            changes: Listenable.merge([session, widget.reportChanges]), isCurrent: () => mounted && widget.reportCurrent?.call() != false && session.workspaceStockHistoryScope()?.key == scope.key)));
     } on FormatException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
@@ -22675,6 +29174,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         session.workspaceInvoices
             .where(
               (invoice) =>
+                  (widget.preparedExchangeInvoiceId==null||invoice.id==widget.preparedExchangeInvoiceId) &&
                   (_returnSelection || start == null || !invoice.issuedAt.isBefore(start)) &&
                   (_returnSelection || invoice.issuedAt.isBefore(end)),
             )
@@ -22956,6 +29456,21 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         _invoicePeriod = saved.period;
         _invoiceRange = saved.range;
         _salesActionsExpanded = saved.expanded;
+      }
+      if(widget.preparedExchangeInvoiceId!=null){
+        _returnSelection=true;_exchangeSelection=true;_salesManageOpen=false;
+        _invoiceSearch.text=widget.preparedExchangeInvoiceId!;
+      }
+      if (!_reportStatementPrepared && widget.initialReport != null && widget.reportCurrent?.call() != false) {
+        _reportStatementPrepared = true;
+        final fields = widget.initialReport!.fields;
+        if (fields['period'] != null) _invoicePeriod = fields['period'] as String;
+        if (_invoicePeriod == 'Custom range' && fields['from'] != null && fields['to'] != null) {
+          _invoiceRange = DateTimeRange(start: DateTime.parse(fields['from'] as String), end: DateTime.parse(fields['to'] as String));
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && widget.reportCurrent?.call() != false) unawaited(_openSalesStatement());
+        });
       }
     }
     if (_selectedInvoice != null) {
@@ -23296,6 +29811,7 @@ class _StoreVoucherRegister extends StatefulWidget {
     this.rowKeys = const [],
     this.amountColumns = const {},
     this.onOpen,
+    this.openableRows,
     this.footer,
   });
   final Object identity;
@@ -23305,6 +29821,7 @@ class _StoreVoucherRegister extends StatefulWidget {
   final String total, notice, empty;
   final Set<int> amountColumns;
   final ValueChanged<int>? onOpen;
+  final Set<int>? openableRows;
   final List<String>? footer;
   @override
   State<_StoreVoucherRegister> createState() => _StoreVoucherRegisterState();
@@ -23415,7 +29932,7 @@ class _StoreVoucherRegisterState extends State<_StoreVoucherRegister> {
                           ? Colors.white
                           : const Color(0xFFF8F9FC),
                       child: InkWell(
-                        onTap: widget.onOpen == null
+                        onTap: widget.onOpen == null || widget.openableRows?.contains(index)==false
                             ? null
                             : () => widget.onOpen!(index),
                         child: ConstrainedBox(
@@ -24174,32 +30691,11 @@ class _WorkspaceOperationSurface extends StatelessWidget {
             );
           } else if (movement.referenceKind == WorkspaceStockReferenceKind.manualSupplierReceipt ||
               movement.referenceKind == WorkspaceStockReferenceKind.restockGoodsArrival) {
-            final scope = session.workspaceSupplierScope, epoch = session.navigationScopeRevision;
             if (session.workspaceReceivingForStockMovement(movement) == null) {
               session.showNotice('Saved receiving details are unavailable. Recover Purchases before opening this receipt.');
               return;
             }
-            showDialog<void>(context: context, builder: (dialogContext) => Dialog.fullscreen(child: SafeArea(
-              child: AnimatedBuilder(animation: session, builder: (context, _) {
-                final record = session.workspaceSupplierScope == scope && session.navigationScopeRevision == epoch
-                  ? session.workspaceReceivingForStockMovement(movement) : null;
-                return Column(children: [ListTile(title: const Text('Receiving details'),
-                  trailing: IconButton(tooltip: 'Close receiving details', onPressed: () {
-                    if (dialogContext.mounted && ModalRoute.of(dialogContext)?.isCurrent == true) Navigator.pop(dialogContext);
-                  }, icon: const Icon(Icons.close))),
-                  Expanded(child: ListView(padding: const EdgeInsets.all(16), children: record == null
-                    ? [const Text('This receiving record is no longer available in the current Store. Close and reopen it.')]
-                    : [Text(record.$1.reference, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      Text('${record.$3} · ${record.$1.deliveredOn}'),
-                      const SizedBox(height: 12), Text(record.$2.productLabel),
-                      Text('Accepted ${_ReceivingLineInput._quantity(record.$2.acceptedMilli)} ${record.$2.purchaseUnit}'),
-                      Text('Added to Stock ${record.$2.newStockUnits} ${record.$2.stockUnit}'),
-                      if (record.$2.lotDetails == null) const Text('Batch and pack details were not recorded.')
-                      else ...[const SizedBox(height: 12), const Text('Recorded from this arrival · private'),
-                        for (final label in record.$2.lotDetails!.labels) Text(label)],
-                    ])),
-                ]);
-              }))));
+            unawaited(_showStoreReceivingMovementReference(context, session, movement));
           } else {
             final purchase = session.workspacePurchaseForStockMovement(
               movement,
@@ -24585,6 +31081,7 @@ class _WorkspaceCatalogueSurface extends StatefulWidget {
   const _WorkspaceCatalogueSurface({
     required this.session,
     this.entryOnly = false,
+    this.ownerCurrent,
     this.actionsExpanded,
     this.onToggleActions,
     this.onBuyStock,
@@ -24596,6 +31093,7 @@ class _WorkspaceCatalogueSurface extends StatefulWidget {
 
   final WorkSession session;
   final bool entryOnly;
+  final bool Function()? ownerCurrent;
   final bool? actionsExpanded;
   final VoidCallback? onToggleActions;
   final VoidCallback? onBuyStock, onPurchases, onGroupBuying, onStatement;
@@ -24693,7 +31191,7 @@ class _WorkspaceCatalogueSurfaceState
   late final Object _entryInputContext = widget.session.tradingPreferencesContext;
   late final String? _entryStoreId = widget.session.activeWorkspace?.id;
   late Future<bool> _entryDefaultsLoad = _loadEntryDefaults();
-  bool get _entryCurrent => identical(widget.session, _entryOwner) &&
+  bool get _entryCurrent => widget.ownerCurrent?.call() != false && identical(widget.session, _entryOwner) &&
       _entryInputContext == widget.session.tradingPreferencesContext;
   Future<bool> _loadEntryDefaults() async {
     final id = _entryStoreId;
@@ -24866,7 +31364,7 @@ class _WorkspaceCatalogueSurfaceState
                 guardRouteExit: false,
                 onDone: () => setPageState(() => catalogueProduct = null),
                 onSaved: () => Navigator.of(pageContext).pop(true),
-              )
+               ownerCurrent: widget.ownerCurrent)
             else
               const SizedBox.shrink(),
           ],
@@ -24884,7 +31382,7 @@ class _WorkspaceCatalogueSurfaceState
             manualEditorKey = GlobalKey<_CatalogueProductEditorState>();
             tab = 0;
           }),
-        ),
+         ownerCurrent: widget.ownerCurrent),
         importCsv: () async {
           if (!storeUnchanged()) {
             return 'Your store changed. Open Add product again.';
@@ -24905,34 +31403,57 @@ class _WorkspaceCatalogueSurfaceState
     );
   }
 
-  Future<void> _edit(WorkspaceCatalogueItem product, {String? field}) async {
+  Future<void> _edit(WorkspaceCatalogueItem product, {String? field, bool Function()? reviewCurrent, Listenable? reviewChanges}) async {
+    if (widget.ownerCurrent != null) {
+      reviewCurrent ??= widget.ownerCurrent;
+      reviewChanges ??= Listenable.merge([widget.session,
+        context.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+    }
+    if (reviewCurrent?.call() == false) return;
+    final saved = widget.session.workspaceCatalogueItems.any((item) => item.id == product.id);
+    final signature = _assistantProductSignature(widget.session, product);
+    bool sourceCurrent() {
+      if (reviewCurrent?.call() == false) return false;
+      final latest = _assistantProductTarget(widget.session, false, product.id);
+      return saved ? latest != null && _assistantProductSignature(widget.session, latest) == signature : latest == null;
+    }
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (pageContext) => Scaffold(
+        builder: (pageContext) => _StoreProductOwnerSurface(current: () => reviewCurrent?.call() != false,
+          changes: reviewChanges ?? widget.session, child: Scaffold(
           appBar: AppBar(title: const Text('Edit product')),
           body: SafeArea(
             child: _CatalogueProductEditor(
               session: widget.session,
               product: product,
               embeddedPage: true,
+              ownerCurrent: reviewCurrent,
+              sourceCurrent: reviewCurrent == null ? null : sourceCurrent,
+              reviewChanges: reviewChanges,
               initialField: field,
               onDone: () => Navigator.of(pageContext).pop(),
               onSaved: () => Navigator.of(pageContext).pop(),
             ),
           ),
-        ),
+        )),
       ),
     );
     if (mounted) {
       setState(() {});
-      _restoreStockAction(product.id);
+      if (reviewCurrent == null) _restoreStockAction(product.id);
     }
   }
 
-  Future<bool> _scan() async {
+  Future<bool> _scan({bool Function()? reviewCurrent, Listenable? reviewChanges}) async {
+    if (widget.ownerCurrent != null) {
+      reviewCurrent ??= widget.ownerCurrent;
+      reviewChanges ??= Listenable.merge([widget.session,
+        context.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+    }
+    if (reviewCurrent?.call() == false) return false;
     final inputContext = widget.session.tradingPreferencesContext;
-    final code = await showStoreProductScanner(context);
-    if (!mounted || inputContext != widget.session.tradingPreferencesContext ||
+    final code = await showStoreProductScanner(context, ownerCurrent: reviewCurrent, ownerChanges: reviewChanges);
+    if (reviewCurrent?.call() == false || !mounted || inputContext != widget.session.tradingPreferencesContext ||
         code == null || code.trim().isEmpty) { return false; }
     final normalized = code.trim().toLowerCase();
     final products = [
@@ -24951,7 +31472,7 @@ class _WorkspaceCatalogueSurfaceState
     if (!savedProduct) {
       final id = widget.session.activeWorkspace?.id;
       final loaded = id != null && await widget.session.loadWorkspaceProductDefaults(expectedStoreId: id);
-      if (!mounted || inputContext != widget.session.tradingPreferencesContext) return false;
+      if (reviewCurrent?.call() == false || !mounted || inputContext != widget.session.tradingPreferencesContext) return false;
       if (!loaded) {
         widget.session.showError(widget.session.workspaceTradingPreferencesError ?? 'Saved product defaults could not be opened. Try again.');
         return false;
@@ -24959,7 +31480,7 @@ class _WorkspaceCatalogueSurfaceState
     }
     final draft = product == null ? _blankProduct(barcode: code.trim()) : savedProduct
         ? product : widget.session.workspaceProductDefaults.applyToNew(product);
-    await _edit(draft);
+    await _edit(draft, reviewCurrent: reviewCurrent, reviewChanges: reviewChanges);
     return true;
   }
 
@@ -25034,10 +31555,17 @@ class _WorkspaceCatalogueSurfaceState
   }
 
   Future<String?> _importCatalogue({
+    WorkPickedProof? selectedInput,
     bool csvOnly = false,
     WorkspaceProductDefaults? defaults,
     VoidCallback? onSaved,
+    bool Function()? reviewCurrent, Listenable? reviewChanges, VoidCallback? onReviewShown,
   }) async {
+    if (widget.ownerCurrent != null) {
+      reviewCurrent ??= widget.ownerCurrent;
+      reviewChanges ??= Listenable.merge([widget.session,
+        context.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+    }
     final identity = widget.session.counterDraftIdentity;
     final storeId =
         widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
@@ -25046,6 +31574,7 @@ class _WorkspaceCatalogueSurfaceState
     var invalidated = false;
     bool current() =>
         !invalidated &&
+        reviewCurrent?.call() != false &&
         mounted &&
         identity == widget.session.counterDraftIdentity &&
         inputContext == widget.session.tradingPreferencesContext &&
@@ -25056,6 +31585,10 @@ class _WorkspaceCatalogueSurfaceState
     void trackScope() {
       if (!current()) invalidated = true;
     }
+    // Preserve the exact manual route shape; only captured AI reviews gain
+    // an outer cover for the original editor Scaffold and private controls.
+    Widget protectImportEditor(Widget child) => reviewCurrent == null ? child
+      : _StoreProductOwnerSurface(current: current, changes: reviewChanges ?? widget.session, child: child);
 
     widget.session.addListener(trackScope);
     try {
@@ -25065,23 +31598,35 @@ class _WorkspaceCatalogueSurfaceState
       final importDefaults = defaults ?? widget.session.workspaceProductDefaults;
       final importFamilies = List<WorkspaceVariantFamily>.unmodifiable(widget.session.workspaceVariantFamilies);
       familyFingerprint = jsonEncode(importFamilies.map((f) => f.toJson()).toList());
-      final picked = await FilePicker.pickFile(
-        type: FileType.custom,
-        allowedExtensions: csvOnly ? const ['csv'] : const ['csv', 'json'],
-      );
-      if (!current()) return 'Your store changed. Import the file again.';
-      if (picked == null) return null;
-      if (await picked.length() > 10 * 1024 * 1024) {
-        return 'Choose a file smaller than 10 MB.';
+      final String fileName;
+      final Uint8List bytes;
+      if (selectedInput != null) {
+        // Actual copied original file: no repick, model CSV, path or new rows.
+        if (!_storeSelectedCatalogueInputValid(selectedInput, csvOnly: csvOnly)) {
+          return 'Choose a CSV or JSON file smaller than 10 MB.';
+        }
+        fileName = selectedInput.fileName;
+        bytes = selectedInput.bytes;
+      } else {
+        final picked = await FilePicker.pickFile(
+          type: FileType.custom,
+          allowedExtensions: csvOnly ? const ['csv'] : const ['csv', 'json'],
+        );
+        if (!current()) return 'Your store changed. Import the file again.';
+        if (picked == null) return null;
+        if (await picked.length() > 10 * 1024 * 1024) {
+          return 'Choose a file smaller than 10 MB.';
+        }
+        bytes = await picked.readAsBytes();
+        fileName = picked.name;
       }
-      final bytes = await picked.readAsBytes();
       if (!current()) return 'Your store changed. Import the file again.';
       if (bytes.length > 10 * 1024 * 1024) {
         return 'Choose a file smaller than 10 MB.';
       }
       final review = WorkspaceProductImport.parse(
         utf8.decode(bytes),
-        json: picked.name.toLowerCase().endsWith('.json'),
+        json: fileName.toLowerCase().endsWith('.json'),
         catalogue: widget.session.referenceCatalogue,
         owned: List.of(widget.session.workspaceCatalogueItems),
         defaults: importDefaults,
@@ -25091,13 +31636,14 @@ class _WorkspaceCatalogueSurfaceState
       if (!mounted) return null;
       var savedCount = 0;
       Map<String, String>? attemptedReview, attemptedStock;
+      onReviewShown?.call();
       final saved = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
-          builder: (reviewContext) => StoreProductImportReviewScreen(
+          builder: (reviewContext) => _StoreProductOwnerSurface(current: current, changes: reviewChanges ?? widget.session, child: StoreProductImportReviewScreen(
             recentSearches: widget.session.workspaceRecentSearches(
-              'csv:${picked.name}',
+              'csv:$fileName',
             ),
-            fileName: picked.name,
+            fileName: fileName,
             review: review,
             correctRow: (row, readyProducts) async {
               if (!current() || !row.canCorrect) return null;
@@ -25127,7 +31673,7 @@ class _WorkspaceCatalogueSurfaceState
               final corrected = await Navigator.of(reviewContext)
                   .push<WorkspaceProductImportRow>(
                     MaterialPageRoute(
-                      builder: (editorContext) => Scaffold(
+                      builder: (editorContext) => protectImportEditor(Scaffold(
                         appBar: AppBar(
                           toolbarHeight: 48,
                           titleSpacing: 0,
@@ -25145,6 +31691,9 @@ class _WorkspaceCatalogueSurfaceState
                             session: widget.session,
                             product: seed,
                             embeddedPage: true,
+                            ownerCurrent: current,
+                            sourceCurrent: reviewCurrent == null ? null : current,
+                            reviewChanges: reviewCurrent == null ? reviewChanges : reviewChanges ?? widget.session,
                             importRow: row,
                             onDone: () => Navigator.of(editorContext).pop(),
                             validateImport: (values, clearedContentFields) {
@@ -25166,20 +31715,21 @@ class _WorkspaceCatalogueSurfaceState
                                 clearedContentFields: clearedContentFields,
                               );
                             },
-                            onImportReviewed: (result) =>
-                                Navigator.of(editorContext).pop(result),
+                            onImportReviewed: (result) {
+                              if (reviewCurrent == null || current()) Navigator.of(editorContext).pop(result);
+                            },
                           ),
                         ),
-                      ),
+                      )),
                     ),
                   );
               return current() ? corrected : null;
             },
             editProduct: (product) async {
               if (!current()) return null;
-              return Navigator.of(reviewContext).push<WorkspaceCatalogueItem>(
+              final edited = await Navigator.of(reviewContext).push<WorkspaceCatalogueItem>(
                 MaterialPageRoute(
-                  builder: (editorContext) => Scaffold(
+                  builder: (editorContext) => protectImportEditor(Scaffold(
                     appBar: AppBar(
                       toolbarHeight: 48,
                       titleSpacing: 0,
@@ -25198,13 +31748,17 @@ class _WorkspaceCatalogueSurfaceState
                         product: product,
                         embeddedPage: true,
                         onDone: () => Navigator.of(editorContext).pop(),
-                        onDraftReviewed: (edited) =>
-                            Navigator.of(editorContext).pop(edited),
-                      ),
+                        onDraftReviewed: (edited) {
+                          if (reviewCurrent == null || current()) Navigator.of(editorContext).pop(edited);
+                        },
+                        ownerCurrent: reviewCurrent == null ? widget.ownerCurrent : current,
+                        sourceCurrent: reviewCurrent == null ? null : current,
+                        reviewChanges: reviewCurrent == null ? null : reviewChanges ?? widget.session),
                     ),
-                  ),
+                  )),
                 ),
               );
+              return reviewCurrent == null || current() ? edited : null;
             },
             saveProducts: (products) async {
               if (!current()) {
@@ -25289,9 +31843,14 @@ class _WorkspaceCatalogueSurfaceState
                 return widget.session.workspaceInventoryError ??
                     'Stock was not saved. Keep this review open and retry.';
               }
+              // Original Save may already be committed. A retired AI review
+              // must report its changed owner rather than pop another route.
+              if (reviewCurrent != null && !current()) {
+                return 'Your store changed. Close this review and import again.';
+              }
               return null;
             },
-          ),
+          )),
         ),
       );
       if (!current()) {
@@ -27946,7 +34505,9 @@ class _StoreEmptyPanel extends StatelessWidget {
 }
 
 class _StoreGuidedDetailsDialog extends StatefulWidget {
-  const _StoreGuidedDetailsDialog({required this.original, required this.labels, this.allowProductGuides = false});
+  const _StoreGuidedDetailsDialog({required this.original, required this.labels, this.allowProductGuides = false, this.initialGuide = 'general', this.current});
+  final String initialGuide;
+  final bool Function()? current;
   final WorkspaceProductContent original;
   final List<String> labels;
   final bool allowProductGuides;
@@ -27966,7 +34527,7 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
   late final _labelKeys = {for (final label in _allLabels) label: GlobalKey()};
   bool _revealPending = false;
   double? _viewportDimension;
-  String _guide = 'general';
+  late String _guide = widget.allowProductGuides && const {'electronics','appliances','warranty'}.contains(widget.initialGuide) ? widget.initialGuide : 'general';
   List<String> get _visibleLabels => switch (_guide) {
     'electronics' => WorkspaceProductContent.electronicsGuideLabels,
     'appliances' => WorkspaceProductContent.applianceGuideLabels,
@@ -28077,6 +34638,7 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
         onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
       FilledButton(key: const Key('work-product-guided-apply'),
         style: FilledButton.styleFrom(minimumSize: const Size(48,48)), onPressed: () {
+        if (!mounted || widget.current?.call() == false) return;
         try {
           final next = widget.original.withGuidedDetails({for (final e in _controllers.entries) e.key: e.value.text});
           Navigator.pop(context, next);
@@ -28229,6 +34791,307 @@ class _SavedStoreProductPreviewSource implements BuyV2CataloguePageSource, BuyV2
           sourceId: 'saved-store-preview');
 }
 
+// External insertion in work_workspace_dashboard_screen.dart, before its State.
+// SKU references reuse the admitted original213/214 reference contract.
+class StoreProductVariantInitialDimension {
+  const StoreProductVariantInitialDimension({this.dimensionId, required this.label,
+    required this.kind, required this.options});
+  final String? dimensionId;
+  final String label, options;
+  final BuyV2VariantDimensionKind kind;
+}
+class StoreProductNativeInitial {
+  StoreProductNativeInitial._(this.actionId, this.references, this.dimensions,
+    this.warranty, this.attachmentRef, this.visible, this.validityMinutes,
+    this.originalRequestId, this.sourcePhotoSha256);
+  final String actionId;
+  final Map<String, Object?> references;
+  final List<StoreProductVariantInitialDimension> dimensions;
+  final Map<String, String> warranty;
+  final String? attachmentRef, validityMinutes, originalRequestId, sourcePhotoSha256;
+  final bool? visible;
+  static const catalogueActions = {'AI-ACT-228', 'AI-ACT-369', 'AI-ACT-372'};
+  static const actions = {'AI-ACT-215', 'AI-ACT-216', 'AI-ACT-217', 'AI-ACT-220',
+    'AI-ACT-222', 'AI-ACT-223', 'AI-ACT-224', 'AI-ACT-225', 'AI-ACT-226', 'AI-ACT-227',
+    'AI-ACT-228', 'AI-ACT-369', 'AI-ACT-370', 'AI-ACT-371', 'AI-ACT-372', 'AI-ACT-373', 'AI-ACT-374'};
+  static Set<String> allowedFields(String action) => {
+    if (!catalogueActions.contains(action)) ...StoreProductInitialData.referenceKeys,
+    if (action == 'AI-ACT-215') 'dimensions',
+    if (action == 'AI-ACT-216' || action == 'AI-ACT-228') 'attachmentRef',
+    if (action == 'AI-ACT-217') 'sourcePhotoSha256',
+    if (action == 'AI-ACT-220') 'validityMinutes',
+    if (action == 'AI-ACT-222' || action == 'AI-ACT-371') 'visible',
+    if (action == 'AI-ACT-370') 'warranty',
+    if (const {'AI-ACT-225','AI-ACT-373','AI-ACT-374'}.contains(action)) 'originalRequestId',
+  };
+  factory StoreProductNativeInitial.fromFields(String action, Map<String, Object?> fields) {
+    if (!actions.contains(action) || fields.keys.any((key) => !allowedFields(action).contains(key))) {
+      throw const FormatException('Use the exact original product review fields.');
+    }
+    final references = <String, Object?>{};
+    if (!catalogueActions.contains(action)) {
+      for (final key in StoreProductInitialData.referenceKeys) {
+        final value = fields[key];
+        if (const {'sourceRetailEnabled','sourceWholesaleEnabled'}.contains(key)
+            ? value is! bool : value is! String || value.trim().isEmpty) {
+          throw const FormatException('Keep the original canonical, SKU, pack and channel references.');
+        }
+        references[key] = value;
+      }
+    }
+    final dimensions = <StoreProductVariantInitialDimension>[];
+    if (action == 'AI-ACT-215') {
+      final raw = fields['dimensions'];
+      if (raw is! List || raw.isEmpty) throw const FormatException('Supply the native dimension and option text.');
+      final seen = <String>{};
+      for (final item in raw) {
+        if (item is! Map || item.keys.any((key) => !const {'dimensionId','label','kind','options'}.contains(key)) ||
+            item['label'] is! String || (item['label'] as String).trim().isEmpty ||
+            item['options'] is! String || (item['options'] as String).trim().isEmpty || item['kind'] is! String ||
+            item.containsKey('dimensionId') && (item['dimensionId'] is! String ||
+              (item['dimensionId'] as String).trim().isEmpty || !seen.add(item['dimensionId'] as String))) {
+          throw const FormatException('Use native dimension names, types and one option per line.');
+        }
+        final kind = BuyV2VariantDimensionKind.values.where((value) => value.name == item['kind']).singleOrNull;
+        if (kind == null) throw const FormatException('Choose an existing native option type.');
+        dimensions.add(StoreProductVariantInitialDimension(dimensionId: item['dimensionId'] as String?,
+          label: item['label'] as String, kind: kind, options: item['options'] as String));
+      }
+    }
+    final warranty = <String, String>{};
+    if (action == 'AI-ACT-370') {
+      final raw = fields['warranty'];
+      if (raw is! Map || raw.isEmpty || raw.entries.any((entry) => entry.key is! String ||
+          !WorkspaceProductContent.warrantyGuideLabels.contains(entry.key) || entry.value is! String) ||
+          !raw.values.any((value) => (value as String).trim().isNotEmpty)) {
+        throw const FormatException('Supply descriptive source text for the original warranty guide.');
+      }
+      warranty.addAll(raw.cast<String, String>());
+    }
+    String? text(String key, {bool mustProvide = false}) {
+      final value = fields[key];
+      if (value == null && !mustProvide) return null;
+      if (value is! String || value.trim().isEmpty) throw FormatException('Supply $key from the original source.');
+      return value;
+    }
+    final attachment = text('attachmentRef', mustProvide: action == 'AI-ACT-216' || action == 'AI-ACT-228' && fields.containsKey('attachmentRef'));
+    if (attachment != null && !RegExp(r'^att-[a-f0-9]{32}$').hasMatch(attachment)) {
+      throw FormatException(action == 'AI-ACT-228' ? 'Choose an actual selected CSV or JSON file.' : 'Choose an actual selected product image.');
+    }
+    final photo = text('sourcePhotoSha256', mustProvide: action == 'AI-ACT-217');
+    if (photo != null && !RegExp(r'^[a-f0-9]{64}$').hasMatch(photo)) throw const FormatException('Keep the saved private-photo reference.');
+    final validity = text('validityMinutes');
+    if (validity != null) {
+      final minutes = int.tryParse(validity.trim());
+      if (minutes == null || minutes < 1 || minutes > 525600) throw const FormatException('Enter whole minutes from 1 to 525600.');
+    }
+    bool? visible;
+    if (action == 'AI-ACT-222' || action == 'AI-ACT-371') {
+      if (fields['visible'] is! bool) throw const FormatException('Supply the requested native visibility choice.');
+      visible = fields['visible'] as bool;
+    }
+    final original = text('originalRequestId', mustProvide: const {'AI-ACT-225','AI-ACT-373','AI-ACT-374'}.contains(action));
+    return StoreProductNativeInitial._(action, Map.unmodifiable(references), List.unmodifiable(dimensions),
+      Map.unmodifiable(warranty), attachment, visible, validity, original, photo);
+  }
+  bool matches(WorkspaceCatalogueItem product) => mapEquals(references, StoreProductInitialData.referenceFields(product));
+}
+
+class _StorePublishedProductAssistantAdapter implements MoolAssistantOwnerAwareNativeAdapter, MoolAssistantRouteBoundNativeAdapter {
+  _StorePublishedProductAssistantAdapter({required this.readSnapshot, required this.open, required this.nativeRoute, required this.navigator});
+  final ModalRoute<dynamic>? nativeRoute;
+  final NavigatorState navigator;
+  Route<void>? _assistantRoute;
+  bool _invalidRoute = false;
+  @override void bindAssistantRoute(Route<void> route, NavigatorState owner) {
+    if (!identical(owner, navigator) || _assistantRoute != null && !identical(_assistantRoute, route)) { _invalidRoute = true; return; }
+    _assistantRoute = route;
+  }
+  bool get _routeCurrent => !_invalidRoute && navigator.mounted && nativeRoute?.isActive == true &&
+    (nativeRoute!.isCurrent || _assistantRoute?.isCurrent == true && identical(_assistantRoute?.navigator, navigator));
+  @override String get actionId => 'AI-ACT-230';
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function(), Listenable?) open;
+  @override Set<String> get allowedFields => {...StoreProductInitialData.referenceKeys, 'channel'};
+  @override String? validateFields(Map<String, Object?> fields) {
+    if (fields.keys.any((key) => !allowedFields.contains(key)) ||
+        !const {'retail', 'wholesale', 'bulk'}.contains(fields['channel'])) return 'Choose the original product and selling channel.';
+    if(!StoreProductInitialData.referenceKeys.every(fields.containsKey)||
+      !const ['sourceCanonicalId','sourceSku','sourcePack'].every((key)=>fields[key] is String&&(fields[key]! as String).trim().isNotEmpty)||
+      fields['sourceRetailEnabled'] is! bool||fields['sourceWholesaleEnabled'] is! bool)
+      return 'Use the original SKU, pack and selling-channel references.';
+    return null;
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entity) => readSnapshot(ctx, entity);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) => _open(proposal, isCurrent, null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,
+      {required bool Function() isCurrent, required Listenable ownerChanges}) => _open(proposal, isCurrent, ownerChanges);
+  Future<MoolAssistantReviewResult> _open(MoolAssistantProposal proposal, bool Function() current, Listenable? changes) async {
+    if (proposal.actionId != actionId || validateFields(proposal.fields) != null) return MoolAssistantReviewResult.unavailable;
+    var retired = false;
+    bool active() { if (!retired && (!current() || !_routeCurrent)) retired = true; return !retired; }
+    final lifetime = Listenable.merge([changes, nativeRoute?.secondaryAnimation, if (_assistantRoute is TransitionRoute<void>) (_assistantRoute as TransitionRoute<void>).secondaryAnimation]);
+    void changed() { active(); }
+    lifetime.addListener(changed);
+    try { return active() ? await open(proposal, active, lifetime) : MoolAssistantReviewResult.stale; }
+    finally { lifetime.removeListener(changed); }
+  }
+}
+
+class _StoreProductNativeAdapter implements MoolAssistantNativeAdapter {
+  const _StoreProductNativeAdapter({required this.actionId, required this.readContext,
+    required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(StoreProductNativeInitial,
+    MoolAssistantProposal, bool Function(), MoolAssistantSelectedDocument?) open;
+  @override Set<String> get allowedFields => StoreProductNativeInitial.allowedFields(actionId);
+  @override String? validateFields(Map<String, Object?> fields) {
+    try { StoreProductNativeInitial.fromFields(actionId, fields); return null; }
+    on FormatException catch (error) { return error.message; }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entity) => readSnapshot(ctx, entity);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) async {
+    if (actionId == 'AI-ACT-216' || actionId == 'AI-ACT-228' && proposal.fields.containsKey('attachmentRef')) return MoolAssistantReviewResult.unavailable;
+    final context = readContext();
+    if (!isCurrent() || context?.binding != proposal.binding || proposal.actionId != actionId ||
+        validateFields(proposal.fields) != null) return MoolAssistantReviewResult.stale;
+    return open(StoreProductNativeInitial.fromFields(actionId, proposal.fields), proposal, isCurrent, null);
+  }
+}
+// ACT228 resolves only a controller-minted reference to actual selected bytes.
+class _StoreProductSelectedImportAdapter extends _StoreProductNativeAdapter implements MoolAssistantSelectedDocumentAdapter {
+  const _StoreProductSelectedImportAdapter({required super.readContext, required super.readSnapshot, required super.open})
+    : super(actionId: 'AI-ACT-228');
+  @override Future<MoolAssistantReviewResult> openSelectedDocumentReview(MoolAssistantProposal proposal,
+    bool Function() isCurrent, MoolAssistantSelectedDocument? Function(String) resolve) async {
+    final context = readContext();
+    if (!isCurrent() || context?.binding != proposal.binding || proposal.actionId != actionId ||
+        validateFields(proposal.fields) != null) return MoolAssistantReviewResult.stale;
+    final initial = StoreProductNativeInitial.fromFields(actionId, proposal.fields);
+    final reference = initial.attachmentRef;
+    // No reference preserves the existing native manual picker.
+    if (reference == null) return open(initial, proposal, isCurrent, null);
+    final selected = resolve(reference);
+    if (selected == null || !_storeSelectedCatalogueInputValid(selected.proof) ||
+        selected.reference.fileName != selected.proof.fileName ||
+        selected.reference.contentType != selected.proof.contentType ||
+        selected.reference.byteLength != selected.proof.bytes.length ||
+        assistant_hash.sha256.convert(selected.proof.bytes).toString() != selected.sourceDigest) {
+      return MoolAssistantReviewResult.unavailable;
+    }
+    bool current() => isCurrent() && identical(resolve(reference), selected);
+    if (!current()) return MoolAssistantReviewResult.stale;
+    return open(initial, proposal, current, selected);
+  }
+}
+
+bool _storeSelectedCatalogueInputValid(WorkPickedProof proof, {bool csvOnly = false}) {
+  final name = proof.fileName.toLowerCase();
+  return proof.bytes.isNotEmpty && proof.bytes.length <= 10 * 1024 * 1024 &&
+    (proof.contentType == 'text/csv' && name.endsWith('.csv') ||
+      !csvOnly && proof.contentType == 'application/json' && name.endsWith('.json'));
+}
+
+class _StoreProductSelectedPhotoAdapter extends _StoreProductNativeAdapter implements MoolAssistantSelectedDocumentAdapter {
+  const _StoreProductSelectedPhotoAdapter({required super.readContext, required super.readSnapshot, required super.open})
+    : super(actionId: 'AI-ACT-216');
+  @override Future<MoolAssistantReviewResult> openSelectedDocumentReview(MoolAssistantProposal proposal,
+    bool Function() isCurrent, MoolAssistantSelectedDocument? Function(String) resolve) async {
+    final context = readContext();
+    if (!isCurrent() || context?.binding != proposal.binding || proposal.actionId != actionId ||
+        validateFields(proposal.fields) != null) return MoolAssistantReviewResult.stale;
+    final initial = StoreProductNativeInitial.fromFields(actionId, proposal.fields);
+    final selected = resolve(initial.attachmentRef!);
+    if (selected == null || !isCurrent() || !const {'image/jpeg','image/png','image/webp'}.contains(selected.proof.contentType) ||
+        assistant_hash.sha256.convert(selected.proof.bytes).toString() != selected.sourceDigest) {
+      return MoolAssistantReviewResult.unavailable;
+    }
+    return open(initial, proposal, isCurrent, selected);
+  }
+}
+
+// Original editor in a visible route above AI. Native Save/Use image/Use options/
+// supplier Confirm/Counter confirm/publication controls keep their own effects.
+Future<MoolAssistantReviewResult> showStoreProductNativeReview(BuildContext context, WorkSession session, {
+  required WorkspaceCatalogueItem product, required StoreProductNativeInitial initial,
+  MoolAssistantSelectedDocument? selected, required bool Function() prefillCurrent,
+  required bool Function() ownerCurrent, required Listenable ownerChanges,
+  bool Function()? originalCurrent,
+}) async {
+  if (!context.mounted || !ownerCurrent() || !prefillCurrent() || _productEditorOpen(session) || !initial.matches(product)) {
+    return MoolAssistantReviewResult.stale;
+  }
+  final signature = _assistantProductSignature(session, product);
+  bool sourceCurrent() {
+    final latest = _assistantProductTarget(session, false, product.id);
+    return latest != null && _assistantProductSignature(session, latest) == signature && originalCurrent?.call() != false;
+  }
+  await Navigator.of(context, rootNavigator: true).push<void>(MaterialPageRoute<void>(builder: (_) =>
+    _StoreProductNativeReviewPage(session: session, product: product, initial: initial, selected: selected,
+      ownerCurrent: ownerCurrent, sourceCurrent: sourceCurrent, prefillCurrent: prefillCurrent,
+      changes: Listenable.merge([session, ownerChanges]))));
+  return ownerCurrent() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+}
+class _StoreProductNativeReviewPage extends StatefulWidget {
+  const _StoreProductNativeReviewPage({required this.session, required this.product, required this.initial,
+    required this.selected, required this.ownerCurrent, required this.sourceCurrent,
+    required this.prefillCurrent, required this.changes});
+  final WorkSession session;
+  final WorkspaceCatalogueItem product;
+  final StoreProductNativeInitial initial;
+  final MoolAssistantSelectedDocument? selected;
+  final bool Function() ownerCurrent, sourceCurrent, prefillCurrent;
+  final Listenable changes;
+  @override State<_StoreProductNativeReviewPage> createState() => _StoreProductNativeReviewPageState();
+}
+class _StoreProductNativeReviewPageState extends State<_StoreProductNativeReviewPage> {
+  final editor = GlobalKey<_CatalogueProductEditorState>();
+  bool _ownerWasCurrent = true;
+  bool _ownerReady() {
+    final current = widget.ownerCurrent();
+    if (!current && _ownerWasCurrent) WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !widget.ownerCurrent()) FocusScope.of(context).unfocus();
+    });
+    _ownerWasCurrent = current;
+    return current;
+  }
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: widget.changes, builder: (context, _) {
+    final current = _ownerReady();
+    return Scaffold(
+    appBar: AppBar(title: const Text('Review product'), leading: BackButton(onPressed: () => editor.currentState?._requestEditorExit())),
+    body: SafeArea(child: Stack(children: [
+      Offstage(offstage: !current, child: ExcludeFocus(excluding: !current, child: _CatalogueProductEditor(key: editor,
+        session: widget.session, product: widget.product, embeddedPage: true,
+        nativeReview: widget.initial, selectedPhoto: widget.selected,
+        reviewChanges: widget.changes,
+        prefillCurrent: widget.prefillCurrent, ownerCurrent: widget.ownerCurrent, sourceCurrent: widget.sourceCurrent,
+        onDone: () => Navigator.pop(context), onSaved: () => Navigator.pop(context)))),
+      if (!current) const Center(child: Text('Your Store or account changed. Close this product review. Your entries are kept here.')),
+    ])),
+  ); });
+}
+
+// Top-level wrapper keeps original entered controls mounted while hiding private
+// content after owner retirement. Original form exit/save controls stay intact.
+class _StoreProductOwnerSurface extends StatelessWidget {
+  const _StoreProductOwnerSurface({required this.current, required this.changes, required this.child});
+  final bool Function() current;
+  final Listenable changes;
+  final Widget child;
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: changes, builder: (context, _) {
+    final active = current();
+    if (!active) WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted && !current()) FocusScope.of(context).unfocus();
+    });
+    return Stack(children: [
+    Offstage(offstage: !active, child: ExcludeFocus(excluding: !active, child: child)),
+    if (!active) Scaffold(appBar: AppBar(title: const Text('Product review')),
+      body: const Center(child: Text('Your Store or account changed. Close this review.'))),
+  ]); });
+}
+
 class _CatalogueProductEditor extends StatefulWidget {
   const _CatalogueProductEditor({
     super.key,
@@ -28245,8 +35108,18 @@ class _CatalogueProductEditor extends StatefulWidget {
     this.onImportReviewed,
     this.purchaseScope,
     this.stockEntryMethod,
+    this.initialData, this.prefillCurrent, this.ownerCurrent, this.sourceCurrent,
+    this.nativeReview, this.selectedPhoto, this.reviewChanges,
+    this.stockAdjustmentInitial, this.stockAdjustmentCurrent,
   });
+  final StoreStockAdjustmentInitialData? stockAdjustmentInitial;
+  final bool Function()? stockAdjustmentCurrent;
 
+  final StoreProductInitialData? initialData;
+  final StoreProductNativeInitial? nativeReview;
+  final MoolAssistantSelectedDocument? selectedPhoto;
+  final Listenable? reviewChanges;
+  final bool Function()? prefillCurrent, ownerCurrent, sourceCurrent;
   final WorkSession session;
   final WorkspaceCatalogueItem product;
   final bool embeddedPage;
@@ -28271,8 +35144,86 @@ class _CatalogueProductEditor extends StatefulWidget {
 class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   late final String? _storeId;
   late final Object _reviewEditorContext;
-  bool get _reviewEditorCurrent => mounted && widget.session.publicationPreferencesContext == _reviewEditorContext;
-  bool get _mediaEditorCurrent => _reviewEditorCurrent && (ModalRoute.of(context)?.isCurrent ?? true);
+  bool get _reviewEditorCurrent => mounted && widget.session.publicationPreferencesContext == _reviewEditorContext &&
+      widget.ownerCurrent?.call() != false;
+// Insert inside _CatalogueProductEditorState; all mutating operations remain
+// original native controls. No photo picker, publisher, scanner or price engine.
+bool _nativeReviewStarted = false;
+final _nativeReviewTargetKey = GlobalKey();
+bool get _hasCapturedReview => widget.nativeReview != null || widget.initialData != null || widget.sourceCurrent != null;
+bool Function()? get _capturedRequestCurrent => _hasCapturedReview
+    ? () => _reviewEditorCurrent && _assistantInputCurrent : null;
+bool Function()? get _capturedOwnerCurrent => _hasCapturedReview
+    ? () => _reviewEditorCurrent : null;
+bool _nativeControlReady() {
+  if (_reviewEditorCurrent && (!_hasCapturedReview || _assistantInputCurrent)) return true;
+  if (mounted) _reject('Product or original request details changed. Close and reopen this review.');
+  return false;
+}
+Future<T?> _showProductOwnerDialog<T>({required WidgetBuilder builder}) async {
+  if (!_hasCapturedReview) {
+    return showDialog<T>(context: context, builder: builder);
+  }
+  if (!_reviewEditorCurrent || !_assistantInputCurrent) return null;
+  final navigator = Navigator.of(context, rootNavigator: true);
+  late final DialogRoute<T> route;
+  route = DialogRoute<T>(context: context, builder: builder);
+  void changed() {
+    if ((!_reviewEditorCurrent || !_assistantInputCurrent) && route.isActive) navigator.removeRoute(route);
+  }
+  final changes = widget.reviewChanges ?? Listenable.merge([widget.session,
+    context.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+  changes.addListener(changed);
+  try { return await navigator.push<T>(route); }
+  finally { changes.removeListener(changed); }
+}
+void _startNativeReview() {
+  if (_nativeReviewStarted || widget.nativeReview == null) return;
+  _nativeReviewStarted = true;
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    final initial = widget.nativeReview;
+    if (!mounted || initial == null || widget.prefillCurrent?.call() == false || !_reviewEditorCurrent ||
+        !_assistantInputCurrent || !initial.matches(widget.product)) {
+      if (mounted) setState(() => _assistantPrefillRejected = true);
+      return;
+    }
+    final action = initial.actionId;
+    final section = switch (action) {
+      'AI-ACT-215' || 'AI-ACT-224' || 'AI-ACT-374' => 'variants',
+      'AI-ACT-370' => 'facts', 'AI-ACT-371' || 'AI-ACT-220' => 'selling', _ => 'summary',
+    };
+    setState(() {
+      _expanded[section] = true;
+      if (action == 'AI-ACT-222') { _public = initial.visible!; _listingIntentChanged = true; }
+    });
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || !_reviewEditorCurrent || !_assistantInputCurrent || widget.prefillCurrent?.call() == false) return;
+    switch (action) {
+      case 'AI-ACT-215':
+        await _editVariantOptions(create: _variantFamily == null, initialDimensions: initial.dimensions);
+        break;
+      case 'AI-ACT-216':
+        final selected = widget.selectedPhoto;
+        if (selected != null) await _chooseProductPhoto(selected: selected.proof,
+          reviewCurrent: () => _reviewEditorCurrent && _assistantInputCurrent && widget.prefillCurrent?.call() != false);
+        break;
+      case 'AI-ACT-220': await _confirmTradePrice(initialValidity: initial.validityMinutes); break;
+      case 'AI-ACT-226': case 'AI-ACT-227': await _confirmRetirement(); break;
+      case 'AI-ACT-370': await _editGuidedDetails(warrantyInitial: initial.warranty, initialGuide: 'warranty'); break;
+      default:
+        final target = _nativeReviewTargetKey.currentContext ?? _sectionKeys[section]?.currentContext;
+        if (target != null) await Scrollable.ensureVisible(target, alignment: .1);
+    }
+  });
+}
+
+  final Object _productEditorToken = Object();
+  late final WorkSession _productEditorOwner;
+  bool _assistantPrefillRejected = false;
+  bool get _assistantInputCurrent => (!_hasCapturedReview) ||
+      !_assistantPrefillRejected && _reviewEditorCurrent &&
+      (_pendingInventorySave || widget.sourceCurrent?.call() != false);
+  bool get _mediaEditorCurrent => _reviewEditorCurrent && ((!_hasCapturedReview) || _assistantInputCurrent) && (ModalRoute.of(context)?.isCurrent ?? true);
   late final bool _wasOwned;
   bool _saved = false;
   bool _savingInventory = false;
@@ -28296,7 +35247,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       (entry) => entry.value.text != _initialEditValues[entry.key]) ||
     _public != widget.product.publicListing ||
     _available != widget.product.available ||
-    _privatePhoto != widget.product.privatePhoto || _variantState != _initialVariantState);
+    _privatePhoto != widget.product.privatePhoto || _variantState != _initialVariantState ||
+    widget.stockAdjustmentInitial != null && _stockAdjustmentReason.text.isNotEmpty);
   late WorkspacePrivateProductPhoto? _privatePhoto =
       widget.product.privatePhoto;
 
@@ -28313,7 +35265,9 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   WorkspacePrivateProductPhoto? get _matchingPhoto =>
       _privatePhoto?.matches(_photoIdentity) == true ? _privatePhoto : null;
 
-  Future<void> _chooseProductPhoto() async {
+  Future<void> _chooseProductPhoto({WorkPickedProof? selected, bool Function()? reviewCurrent}) async {
+    bool current() => _reviewEditorCurrent && (!_hasCapturedReview || _assistantInputCurrent) && reviewCurrent?.call() != false;
+    if (!current()) return;
     if (_choosingPhoto ||
         _savingInventory ||
         _saved ||
@@ -28330,7 +35284,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     setState(() => _choosingPhoto = true);
     try {
       String? selectedName;
-      final picked = await NativeWorkProofPicker(
+      final picked = selected ?? await NativeWorkProofPicker(
         documentFileName: () => selectedName,
         documentPicker: () async {
           final selected = await FilePicker.pickFile(type: FileType.image);
@@ -28338,12 +35292,11 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           return selected?.xFile;
         },
       ).pick(WorkProofSource.upload);
-      if (picked == null || !mounted || !store.isCurrent()) return;
+      if (picked == null || !current() || !store.isCurrent()) return;
       final photo = await store.save(product: product, picked: picked);
       final bytes = await store.read(product.copyWith(privatePhoto: photo));
-      if (!mounted || !store.isCurrent()) return;
-      final accepted = await showDialog<bool>(
-        context: context,
+      if (!current() || !store.isCurrent()) return;
+      final accepted = await _showProductOwnerDialog<bool>(
         builder: (dialogContext) => AlertDialog(
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 20,
@@ -28402,13 +35355,13 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              onPressed: () => Navigator.pop(dialogContext, true),
+              onPressed: () { if (current()) Navigator.pop(dialogContext, true); },
               child: const Text('Use image'),
             ),
           ],
         ),
       );
-      if (!mounted || !store.isCurrent()) return;
+      if (!current() || !store.isCurrent()) return;
       if (accepted == true) {
         if (!photo.matches(_photoIdentity)) {
           _reject(
@@ -28435,11 +35388,10 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   }
 
   Future<void> _confirmRetirement() async {
-    if (_savingInventory || _choosingPhoto) return;
+    if (!_nativeControlReady() || _savingInventory || _choosingPhoto || (_hasCapturedReview && _hasUnsavedEdits)) return;
     final restore = !widget.product.counterSaleAllowed;
     FocusManager.instance.primaryFocus?.unfocus();
-    final confirmed = await showDialog<bool>(
-      context: context,
+    final confirmed = await _showProductOwnerDialog<bool>(
       builder: (dialogContext) => AlertDialog(
         scrollable: true,
         titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -28470,7 +35422,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           )),
           Flexible(fit: FlexFit.loose, child: TextButton(
             key: const Key('work-product-retire-confirm'),
-            onPressed: () => Navigator.pop(dialogContext, true),
+            onPressed: () { if (_nativeControlReady()) Navigator.pop(dialogContext, true); },
             child: Text(restore ? 'Resume' : 'Pause'),
           )),
             ],
@@ -28478,7 +35430,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         ],
       ),
     );
-    if (!mounted || confirmed != true) return;
+    if (!mounted || confirmed != true || !_nativeControlReady()) return;
     if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
         _storeId) {
       _reject('Your store changed. Open this product in the correct store.');
@@ -28560,6 +35512,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   @override
   void initState() {
     super.initState();
+    _productEditorOwner = widget.session;
+    (_openProductEditors[_productEditorOwner] ??= <Object>{}).add(_productEditorToken);
     _storeId = widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
     _reviewEditorContext = widget.session.publicationPreferencesContext;
     _wasOwned =
@@ -28617,12 +35571,36 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       for (final entry in _importControllers.entries) entry.key: entry.value.text,
     };
     _initialVariantState = _variantState;
+    if (widget.stockAdjustmentInitial case final initial?) {
+      if (widget.initialData != null || widget.importRow != null || widget.purchaseScope != null ||
+          widget.onDraftReviewed != null || widget.prefillCurrent?.call() == false || !_reviewEditorCurrent ||
+          widget.stockAdjustmentCurrent?.call() == false || !initial.matches(widget.session, widget.product)) {
+        _assistantPrefillRejected = true;
+        _error = 'Stock changed. Close and reopen this exact SKU before adjusting.';
+      } else {
+        _stock.text = initial.quantity;
+        _stockAdjustmentReason.text = initial.reason;
+      }
+    }
+    if (widget.initialData case final initial?) {
+      final controllers = _importControllers;
+      if (widget.importRow != null || widget.purchaseScope != null || widget.onDraftReviewed != null ||
+          widget.prefillCurrent?.call() == false || !_assistantInputCurrent ||
+          !initial.matches(widget.product) || !initial.inputs.keys.every(controllers.containsKey)) {
+        _assistantPrefillRejected = true;
+        _error = 'Product details changed. Close and ask again.';
+      } else {
+        // Baseline was captured above, so proposed changes remain unsaved edits.
+        for (final entry in initial.inputs.entries) { controllers[entry.key]!.text = entry.value; }
+      }
+    }
     if (_wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (_reviewEditorCurrent) { await widget.session.workspaceProductSubmission(widget.product.id)?.restore(); }
         if (_reviewEditorCurrent) { await widget.session.workspaceProductMedia(widget.product.id)?.restore(); }
       });
     }
+    _startNativeReview();
     if (_listingRecoveryRequired) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(_restoreListing());
@@ -28761,11 +35739,11 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     }
     return ListenableBuilder(listenable: Listenable.merge([publisher, widget.session, ..._importControllers.values]),
       builder: (context, _) {
-        final busy = !_reviewEditorCurrent || !publisher.active || _savingInventory || widget.session.workspaceVariantFamilyBusy(family.id);
+        final busy = !_reviewEditorCurrent || (_hasCapturedReview && !_assistantInputCurrent) || !publisher.active || _savingInventory || widget.session.workspaceVariantFamilyBusy(family.id);
         final pending = publisher.pending != null;
         final actionStyle = TextButton.styleFrom(minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 8));
-        return Padding(padding: const EdgeInsets.only(top: 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+        return Padding(key: const {'AI-ACT-224','AI-ACT-374'}.contains(widget.nativeReview?.actionId) ? _nativeReviewTargetKey : null, padding: const EdgeInsets.only(top: 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start,
           key: const Key('work-product-family-submission'), children: [
             Text(publisher.message ?? 'Save stays private. Submit the saved combinations for review separately.',
               style: Theme.of(context).textTheme.bodySmall),
@@ -28775,24 +35753,24 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
               TextButton.icon(key: const Key('work-product-family-check-status'),
                 style: actionStyle,
                 onPressed: busy ? null : () async {
-                  if (!_reviewEditorCurrent) return;
-                  await widget.session.checkWorkspaceVariantFamily(family.id, original: pending);
+                  if (!_nativeControlReady()) return;
+                  await widget.session.checkWorkspaceVariantFamily(family.id, original: pending, current: _capturedOwnerCurrent, inputCurrent: _capturedRequestCurrent);
                   if (_reviewEditorCurrent) setState(() {});
                 }, icon: Icon(pending ? Icons.history : Icons.refresh, size: 18),
                 label: Text(busy ? 'Checking…' : pending ? 'Check original submission' : 'Check review status')),
               if (!pending && publisher.headLoaded) TextButton.icon(key: const Key('work-product-family-submit'),
                 style: actionStyle,
                 onPressed: busy || _hasUnsavedEdits || !publisher.canSubmit ? null : () async {
-                  if (!_reviewEditorCurrent) return;
+                  if (!_nativeControlReady()) return;
                   await widget.session.submitWorkspaceVariantFamily(family.id,
-                    inputCurrent: () => _reviewEditorCurrent && !_hasUnsavedEdits && !_savingInventory && _variantFamily?.id == family.id);
+                    inputCurrent: () => _reviewEditorCurrent && (!_hasCapturedReview || _assistantInputCurrent) && !_hasUnsavedEdits && !_savingInventory && _variantFamily?.id == family.id);
                   if (_reviewEditorCurrent) setState(() {});
                 }, icon: const Icon(Icons.send_outlined, size: 18), label: const Text('Submit group for review')),
               if (pending && publisher.canRetryOriginal) TextButton.icon(key: const Key('work-product-family-retry-original'),
                 style: actionStyle,
                 onPressed: busy ? null : () async {
-                  if (!_reviewEditorCurrent) return;
-                  await widget.session.checkWorkspaceVariantFamily(family.id, retry: true);
+                  if (!_nativeControlReady()) return;
+                  await widget.session.checkWorkspaceVariantFamily(family.id, retry: true, current: _capturedOwnerCurrent, inputCurrent: _capturedRequestCurrent);
                   if (_reviewEditorCurrent) setState(() {});
                 }, icon: const Icon(Icons.replay, size: 18), label: const Text('Retry original submission')),
             ]),
@@ -28807,13 +35785,13 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     final media = widget.session.workspaceProductMedia(widget.product.id);
     return ListenableBuilder(listenable: Listenable.merge([controller, ?media, widget.session, ..._importControllers.values]),
       builder: (context, _) {
-        final busy = !_reviewEditorCurrent || !controller.active || _savingInventory || widget.session.workspaceProductSubmissionBusy(widget.product.id) ||
+        final busy = !_reviewEditorCurrent || (_hasCapturedReview && !_assistantInputCurrent) || !controller.active || _savingInventory || widget.session.workspaceProductSubmissionBusy(widget.product.id) ||
           widget.session.workspaceCatalogueListingBusy;
         final pending = controller.pending != null;
         final photoProcessed = media?.fresh == true && media?.result?.processed == true && media?.result?.current == true &&
           media?.original?.submissionFingerprint == controller.head?.fingerprint;
         final reviewedPhoto = controller.review?.candidate?.mediaProof != null;
-        return Padding(padding: const EdgeInsets.only(top: 8), child: Column(
+        return Padding(key: const {'AI-ACT-217','AI-ACT-223','AI-ACT-225','AI-ACT-373'}.contains(widget.nativeReview?.actionId) ? _nativeReviewTargetKey : null, padding: const EdgeInsets.only(top: 8), child: Column(
           key: const Key('work-product-review-submission'), crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(photoProcessed && !reviewedPhoto
               ? media!.message!
@@ -28835,7 +35813,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                   label: Text(media.original == null ? 'Upload saved photo for review' : 'Retry saved photo request')),
               if (media?.original != null) TextButton.icon(key: const Key('work-product-photo-check'),
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48)), onPressed: busy ? null : () async {
-                  if (!_reviewEditorCurrent) return;
+                  if (!_nativeControlReady()) return;
                   await widget.session.checkWorkspaceProductMedia(widget.product.id, current: () => _mediaEditorCurrent);
                   if (_reviewEditorCurrent) setState(() {});
                 }, icon: const Icon(Icons.history, size: 18), label: const Text('Check original photo')),
@@ -28844,46 +35822,46 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                 itemBuilder: (_) => [for (final entry in media.history.where((entry) => entry.result?.processed != true))
                   PopupMenuItem(value: entry.original.idempotencyKey, child: Text('Earlier photo · saved version ${entry.original.submissionRevision}'))],
                 onSelected: (key) async {
-                  if (!_reviewEditorCurrent) return;
+                  if (!_nativeControlReady()) return;
                   await widget.session.checkWorkspaceProductMedia(widget.product.id, current: () => _mediaEditorCurrent, earlier: true, earlierKey: key);
                   if (_reviewEditorCurrent) setState(() {});
                 }, child: const Padding(padding: EdgeInsets.all(12), child: Text('Check earlier photo requests'))),
               if (controller.review?.state == 'ready') TextButton.icon(key: const Key('work-product-review-publish'),
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                 onPressed: busy || _choosingPhoto || _hasUnsavedEdits || !widget.session.canPublishReviewedWorkspaceProduct(widget.product.id) ? null : () async {
-                  if (!_reviewEditorCurrent) return;
+                  if (!_nativeControlReady()) return;
                   await widget.session.publishReviewedWorkspaceProduct(widget.product.id,
-                    inputCurrent: () => _reviewEditorCurrent && !_savingInventory && !_choosingPhoto && !_hasUnsavedEdits);
+                    inputCurrent: () => _reviewEditorCurrent && (!_hasCapturedReview || _assistantInputCurrent) && !_savingInventory && !_choosingPhoto && !_hasUnsavedEdits);
                   if (_reviewEditorCurrent) setState(() {});
                 }, icon: const Icon(Icons.publish_outlined, size: 18), label: const Text('Publish reviewed product')),
               if (widget.session.workspaceCatalogueListingPending) TextButton.icon(key: const Key('work-product-review-binding-recover'),
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                 onPressed: busy ? null : () async {
-                  if (!_reviewEditorCurrent) return;
-                  await widget.session.reconcileWorkspaceCatalogueListing();
+                  if (!_nativeControlReady()) return;
+                  await widget.session.reconcileWorkspaceCatalogueListing(current: _capturedOwnerCurrent, inputCurrent: _capturedRequestCurrent);
                   if (_reviewEditorCurrent) setState(() {});
                 }, icon: const Icon(Icons.history, size: 18), label: const Text('Check saved listing update')),
               TextButton.icon(key: const Key('work-product-review-check'),
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                 onPressed: busy ? null : () async {
-                  if (!_reviewEditorCurrent) return;
-                  await widget.session.checkWorkspaceProductSubmission(widget.product.id);
+                  if (!_nativeControlReady()) return;
+                  await widget.session.checkWorkspaceProductSubmission(widget.product.id, current: _capturedOwnerCurrent, inputCurrent: _capturedRequestCurrent);
                   if (_reviewEditorCurrent) setState(() {});
                 }, icon: Icon(pending ? Icons.history : Icons.refresh, size: 18),
                 label: Text(busy ? 'Checking…' : pending ? 'Check original submission' : 'Check review status')),
               if (!pending && controller.headLoaded && !widget.session.workspaceSavedProductAlreadySubmitted(widget.product.id)) TextButton.icon(key: const Key('work-product-review-submit'),
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                 onPressed: busy || _choosingPhoto || _hasUnsavedEdits || !controller.canSubmit ? null : () async {
-                  if (!_reviewEditorCurrent) return;
+                  if (!_nativeControlReady()) return;
                   await widget.session.submitWorkspaceProduct(widget.product.id,
-                    inputCurrent: () => _reviewEditorCurrent && !_savingInventory && !_choosingPhoto && !_hasUnsavedEdits);
+                    inputCurrent: () => _reviewEditorCurrent && (!_hasCapturedReview || _assistantInputCurrent) && !_savingInventory && !_choosingPhoto && !_hasUnsavedEdits);
                   if (_reviewEditorCurrent) setState(() {});
                 }, icon: const Icon(Icons.send_outlined, size: 18), label: const Text('Submit saved product for review')),
               if (pending && controller.canRetryOriginal) TextButton.icon(key: const Key('work-product-review-retry'),
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                 onPressed: busy ? null : () async {
-                  if (!_reviewEditorCurrent) return;
-                  await widget.session.checkWorkspaceProductSubmission(widget.product.id, retry: true);
+                  if (!_nativeControlReady()) return;
+                  await widget.session.checkWorkspaceProductSubmission(widget.product.id, retry: true, current: _capturedOwnerCurrent, inputCurrent: _capturedRequestCurrent);
                   if (_reviewEditorCurrent) setState(() {});
                 }, icon: const Icon(Icons.replay, size: 18), label: const Text('Retry original submission')),
             ]),
@@ -28910,7 +35888,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       work: widget.session, saved: saved, channel: channel)));
   }
 
-  Future<void> _editVariantOptions({bool create = false}) async {
+  Future<void> _editVariantOptions({bool create = false, List<StoreProductVariantInitialDimension>? initialDimensions}) async {
+    if (!_nativeControlReady()) return;
     if (_savingInventory || _saved) return;
     if (_title.text.trim().isEmpty) { _reject('Enter the product name before creating its group.', field: 'title'); return; }
     final base = create ? null : _variantFamily;
@@ -28924,6 +35903,15 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     ];
     void addDimension() => dimensions.add((id: 'dimension-$stamp-${counter++}', label: '',
       kind: BuyV2VariantDimensionKind.other, values: ''));
+    if (initialDimensions != null) {
+      for (final initial in initialDimensions) {
+        final index = dimensions.indexWhere((dimension) => dimension.id == initial.dimensionId);
+        if (initial.dimensionId != null && index < 0) return;
+        final next = (id: initial.dimensionId ?? 'dimension-$stamp-${counter++}',
+          label: initial.label, kind: initial.kind, values: initial.options);
+        if (index < 0) { dimensions.add(next); } else { dimensions[index] = next; }
+      }
+    }
     if (dimensions.isEmpty) addDimension();
     final members = [if (base != null) for (final p in widget.session.workspaceCatalogueItems)
       if (p.variantMembership?.familyId == base.id) p];
@@ -28966,8 +35954,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       },
       child: input,
     ));
-    final result = await showDialog<({WorkspaceVariantFamily family, Map<String, Map<String, String>> selections})>(
-      context: context, builder: (dialogContext) => StatefulBuilder(builder: (context, update) => NotificationListener<ScrollMetricsNotification>(
+    final result = await _showProductOwnerDialog<({WorkspaceVariantFamily family, Map<String, Map<String, String>> selections})>(
+      builder: (dialogContext) => StatefulBuilder(builder: (context, update) => NotificationListener<ScrollMetricsNotification>(
           onNotification: (notification) {
             if (notification.depth == 0 && notification.metrics.axis == Axis.vertical &&
                 inputViewportDimension != notification.metrics.viewportDimension) {
@@ -29028,6 +36016,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         ])),
         actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
           FilledButton(onPressed: () {
+            if (!_nativeControlReady()) return;
             try {
               final options = <BuyV2VariantAttribute>[];
               for (final dimension in dimensions) {
@@ -29060,7 +36049,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
             } on FormatException catch (failure) { update(() => error = failure.message); }
           }, child: const Text('Use these options'))],
       ))));
-    if (!mounted || result == null) return;
+    if (!mounted || result == null || !_nativeControlReady()) return;
     setState(() {
       if (create) { _variantSelections.clear(); _siblingVariantSelections.clear(); }
       _variantFamily = result.family;
@@ -29413,6 +36402,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
 
   @override
   void dispose() {
+    _openProductEditors[_productEditorOwner]?.remove(_productEditorToken);
     _title.dispose();
     _brand.dispose();
     _variant.dispose();
@@ -29423,6 +36413,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     _purchase.dispose();
     _selling.dispose();
     _mrp.dispose();
+    _stockAdjustmentReason.dispose();
     _stock.dispose();
     _lowStockThreshold.dispose();
     _delivery.dispose();
@@ -29451,8 +36442,78 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     super.dispose();
   }
 
+  final _stockAdjustmentReason = TextEditingController();
+  bool _stockAdjustmentCommitted = false;
+  String? _stockAdjustmentCommittedInput;
+  bool get _stockAdjustmentOnlyEdits => _importControllers.entries.every((entry) =>
+      entry.key == 'stock' || entry.value.text == _initialEditValues[entry.key]) &&
+    _public == widget.product.publicListing && _available == widget.product.available &&
+    _privatePhoto == widget.product.privatePhoto && _variantState == _initialVariantState;
+
+  Future<void> _saveStockAdjustment() async {
+    final initial = widget.stockAdjustmentInitial!;
+    if (!_reviewEditorCurrent || _assistantPrefillRejected || !_stockAdjustmentOnlyEdits) {
+      _reject('Stock source or other product fields changed. Reopen Stock; use Edit product for other changes.', field: 'stock');
+      return;
+    }
+    final input = jsonEncode([_stock.text, _stockAdjustmentReason.text]);
+    if (_stockAdjustmentCommitted && input != _stockAdjustmentCommittedInput) {
+      _reject('An earlier Stock adjustment is retained. Check its saved quantity before another change.', field: 'stock');
+      return;
+    }
+    if (!_stockAdjustmentCommitted && (widget.stockAdjustmentCurrent?.call() == false ||
+        !initial.matches(widget.session, widget.product))) {
+      _reject('Stock changed. Close and reopen this exact SKU before adjusting.', field: 'stock');
+      return;
+    }
+    final quantity = int.tryParse(_stock.text.trim());
+    if (quantity == null || quantity < 0) {
+      _reject('Enter the available stock.', field: 'stock'); return;
+    }
+    if (_stockAdjustmentReason.text.trim().isEmpty) {
+      _reject('Choose why the quantity changed.', field: 'stockAdjustmentReason'); return;
+    }
+    setState(() => _savingInventory = true);
+    try {
+      if (!_stockAdjustmentCommitted) {
+        if (!_reviewEditorCurrent || widget.stockAdjustmentCurrent?.call() == false ||
+            !initial.matches(widget.session, widget.product)) return;
+        // The original quantity/reason operation owns the movement. Never use
+        // generic product editing here or call this again after it returns true.
+        if (!widget.session.updateWorkspaceStock(productId: widget.product.id, quantity: quantity,
+            reason: _stockAdjustmentReason.text)) {
+          _reject(widget.session.errorMessage ?? 'Stock is unavailable. Keep this adjustment and recover the original Store.');
+          return;
+        }
+        _stockAdjustmentCommitted = true;
+        _stockAdjustmentCommittedInput = input;
+      }
+      if (widget.session.localInventoryEnabled) {
+        final saved = _pendingInventorySave ? await widget.session.retryWorkspaceInventorySave()
+          : await widget.session.workspaceInventorySaved;
+        if (!mounted) return;
+        if (!saved) {
+          _pendingInventorySave = true;
+          _reject(widget.session.workspaceInventoryError ?? 'The original Stock save needs recovery. Retry this same adjustment.');
+          return;
+        }
+        _pendingInventorySave = false;
+      }
+      if (!_reviewEditorCurrent) {
+        _reject('Store access changed. Check the original Stock adjustment before another change.'); return;
+      }
+      _saved = true;
+      _finish(afterExit: widget.onSaved);
+    } finally { if (mounted) setState(() => _savingInventory = false); }
+  }
+
   Future<void> _save() async {
     if (_saved || _savingInventory || _choosingPhoto) return;
+    if (widget.stockAdjustmentInitial != null) { await _saveStockAdjustment(); return; }
+    if (!_assistantInputCurrent) {
+      _reject('Product details changed. Close and reopen this product before saving.');
+      return;
+    }
     final listingRequested = _public, listingWasChanged = _listingIntentChanged;
     if (listingWasChanged && _listingRecoveryRequired &&
         (!widget.session.workspaceCatalogueListingReady ||
@@ -29480,7 +36541,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           widget.onDraftReviewed == null) {
         final ready = await widget.session.loadWorkspaceInventory(retry: true);
         if (!mounted) return;
-        if (!ready ||
+        if (!ready || !_assistantInputCurrent ||
             (widget.session.activeWorkspace?.id ??
                     widget.session.workspaceId) !=
                 _storeId || (widget.purchaseScope != null &&
@@ -29697,6 +36758,10 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           reviewedProduct.copyWith(publicListing: false)));
         return;
       }
+      if (!_assistantInputCurrent) {
+        _reject('Product details changed. Close and reopen this product before saving.');
+        return;
+      }
       if (!widget.session.addOrUpdateWorkspaceProduct(
         reviewedProduct, stockEntryMethod: widget.stockEntryMethod,
         variantFamily: _variantDefinitionForSave(content),
@@ -29727,7 +36792,13 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         }
       }
       if (listingWasChanged && widget.purchaseScope == null && widget.onDraftReviewed == null) {
-        await widget.session.requestWorkspaceProductListing(reviewedProduct.id, listed: listingRequested);
+        // Inventory already belongs to its original native save. A follow-on
+        // listing request needs the same assistant form owner, not a new actor.
+        if (_hasCapturedReview && !_reviewEditorCurrent) {
+          _reject('Store access changed. Check saved stock in the original Store before changing listing.');
+          return;
+        }
+        await widget.session.requestWorkspaceProductListing(reviewedProduct.id, listed: listingRequested, current: _capturedOwnerCurrent);
         if (!mounted || (widget.session.activeWorkspace?.id ?? widget.session.workspaceId) != _storeId) return;
       }
       _saved = true;
@@ -29859,7 +36930,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           TextField(
             key: Key(keyName),
             controller: controller,
-            readOnly: _importFamilyReview && const {'title', 'brand', 'variant'}.contains(id),
+            readOnly: _importFamilyReview && const {'title', 'brand', 'variant'}.contains(id) ||
+              widget.stockAdjustmentInitial != null && _stockAdjustmentCommitted,
             focusNode: _fieldFocus.putIfAbsent(id, () => FocusNode()),
             // Replace the initial zero on entry without clearing valid existing
             // prices/quantities or changing the stored value merely on focus.
@@ -30048,13 +37120,14 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     ),
   );
 
-  Future<void> _confirmTradePrice() async {
+  Future<void> _confirmTradePrice({String? initialValidity}) async {
+    if (!_nativeControlReady()) return;
     if (_hasUnsavedEdits || widget.session.workspaceCatalogueListingBusy) return;
     final trade = widget.product.wholesaleOffer;
-    if (trade?.enabled != true || trade?.valid != true) return;
-    var input = trade!.priceValidityMinutes?.toString() ?? '';
+    if (trade == null || trade.enabled != true || trade.valid != true) return;
+    var input = initialValidity ?? trade.priceValidityMinutes?.toString() ?? '';
     String? error;
-    final minutes = await showDialog<int>(context: context, builder: (dialogContext) => StatefulBuilder(
+    final minutes = await _showProductOwnerDialog<int>(builder: (dialogContext) => StatefulBuilder(
       builder: (context, refresh) => AlertDialog(title: const Text('Confirm supplier price'),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('₹${workspacePriceInputFromMinor(trade.priceAtMinor(trade.minimumPacks))} per ${widget.product.pack} · minimum ${trade.minimumPacks} packs.'),
@@ -30067,13 +37140,14 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         ])),
         actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
           FilledButton(key: const Key('work-confirm-price-submit'), onPressed: () {
+            if (!_nativeControlReady()) return;
             final parsed = int.tryParse(input.trim());
             if (parsed == null || parsed < 1 || parsed > 525600) { refresh(() => error = 'Enter whole minutes from 1 to 525600.'); return; }
             Navigator.pop(dialogContext, parsed);
           }, child: const Text('Confirm price'))],
       )));
-    if (minutes == null || !mounted || !_reviewEditorCurrent) return;
-    await widget.session.confirmWorkspaceCommodityPrice(widget.product.id, validityMinutes: minutes);
+    if (minutes == null || !mounted || !_nativeControlReady()) return;
+    await widget.session.confirmWorkspaceCommodityPrice(widget.product.id, validityMinutes: minutes, current: _capturedOwnerCurrent, inputCurrent: _capturedRequestCurrent);
     if (mounted) setState(() {});
   }
 
@@ -30127,7 +37201,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     ],
   );
 
-  Future<void> _editGuidedDetails() async {
+  Future<void> _editGuidedDetails({Map<String, String>? warrantyInitial, String initialGuide = 'general'}) async {
+    if (!_nativeControlReady()) return;
     final labels = WorkspaceProductContent.guidedLabelsForCategory(_category.text);
     final allowProductGuides = _category.text == 'other';
     if ((labels.isEmpty && !allowProductGuides) || _savingInventory) return;
@@ -30140,9 +37215,18 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       _revealImportIssue('specifications');
       return;
     }
-    final result = await showDialog<WorkspaceProductContent>(context: context,
-      builder: (_) => _StoreGuidedDetailsDialog(original: original, labels: labels, allowProductGuides: allowProductGuides));
-    if (!mounted || result == null) return;
+    if (warrantyInitial != null) {
+      if (!allowProductGuides) return;
+      final merged = {...original.specifications};
+      for (final entry in warrantyInitial.entries) {
+        merged.removeWhere((key, _) => key.toLowerCase() == entry.key.toLowerCase());
+        merged[entry.key] = entry.value;
+      }
+      original = WorkspaceProductContent.parse({'specifications': merged.entries.map((entry) => '${entry.key}: ${entry.value}').join('\n')});
+    }
+    final result = await _showProductOwnerDialog<WorkspaceProductContent>(
+      builder: (_) => _StoreGuidedDetailsDialog(original: original, labels: labels, allowProductGuides: allowProductGuides, initialGuide: initialGuide, current: _nativeControlReady));
+    if (!mounted || result == null || !_nativeControlReady()) return;
     setState(() => _contentFields['specifications']!.text = result.inputValues['specifications']!);
     _clearFieldError('specifications');
   }
@@ -30366,6 +37450,10 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                   _stock,
                                   numeric: true,
                                 ),
+                              if (widget.stockAdjustmentInitial != null)
+                                _field('stockAdjustmentReason', 'work-stock-adjustment-reason',
+                                  'Why the Stock quantity changed', _stockAdjustmentReason, lines: 2,
+                                  hint: 'Only quantity and reason are saved in this adjustment'),
                               _field(
                                 'lowStockThreshold',
                                 'work-product-low-stock-threshold',
@@ -30381,9 +37469,14 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                 numeric: true,
                               ),
                             ]),
-                            if (_wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null)
+                            if (widget.stockAdjustmentInitial == null && _wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null)
                               if (widget.session.workspaceStockVisibility(widget.product.id) case final visibility?)
-                                StoreStockQuantityVisibility(controller: visibility),
+                                StoreStockQuantityVisibility(
+                                  key: widget.nativeReview?.actionId == 'AI-ACT-371' ? _nativeReviewTargetKey : null,
+                                  controller: visibility,
+                                  loadOnOpen: !_hasCapturedReview,
+                                  reviewCurrent: _hasCapturedReview ? () => _reviewEditorCurrent && _assistantInputCurrent && !_hasUnsavedEdits : null,
+                                  requestedVisible: widget.nativeReview?.actionId == 'AI-ACT-371' ? widget.nativeReview!.visible : null),
                             if (widget.purchaseScope == null && widget.importRow == null &&
                                 _stockMode ==
                                     WorkspaceStockMode.availabilityOnly)
@@ -30431,7 +37524,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                     if (!widget.session.workspaceCatalogueListingReady) {
                                       await _restoreListing();
                                     } else {
-                                      await widget.session.reconcileWorkspaceCatalogueListing();
+                                      await widget.session.reconcileWorkspaceCatalogueListing(current: _capturedOwnerCurrent, inputCurrent: _capturedRequestCurrent);
                                     }
                                     if (mounted) setState(() {});
                                   }),
@@ -30461,7 +37554,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                               ),
                             if (_wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null)
                               _productSubmissionControls(),
-                            if (kDebugMode && widget.session.gateway is ReviewWorkGateway && widget.session.localInventoryEnabled &&
+                            if (!_hasCapturedReview && kDebugMode && widget.session.gateway is ReviewWorkGateway && widget.session.localInventoryEnabled &&
                                 _wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null)
                               TextButton.icon(key: const Key('work-product-customer-preview'),
                                 onPressed: !_reviewEditorCurrent || _hasUnsavedEdits || _savingInventory ? null : _openSavedCustomerPreview,
@@ -33566,21 +40659,26 @@ class _LiveOrderTicket extends StatelessWidget {
 
   Widget _operationalTicket(BuildContext context) {
     final exact = order.operational!;
+    final captured=_StoreOrderEffectScope.of(context);
     final storeId = session.activeWorkspace?.id ?? session.workspaceId;
     final scopeRevision = session.navigationScopeRevision;
-    bool current() => context.mounted && storeId == (session.activeWorkspace?.id ?? session.workspaceId) &&
+    bool current() => context.mounted && captured?.current()!=false && storeId == (session.activeWorkspace?.id ?? session.workspaceId) &&
         scopeRevision == session.navigationScopeRevision &&
         exact.reference.storeId == storeId &&
         exact.viewerUserId == (session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope) &&
         identical(session.workspaceOrders.where((row) => row.id == order.id).firstOrNull?.operational, exact);
-    bool can(WorkOrderAction action) => current() && session.workspaceOrderCanAct(order.id, action);
+    bool can(WorkOrderAction action) => current() && captured?.permits(action.name)!=false && session.workspaceOrderCanAct(order.id, action);
     Future<void> act(WorkOrderAction action) async {
-      if (!can(action) || !session.selectWorkspaceOrder(order.id)) return;
-      if (action == WorkOrderAction.reject) {
-        await _showRejectOrderSheet(context, session);
-      } else {
-        await session.submitWorkspaceOrderAction(order.id, action);
+      if(!can(action))return;
+      Future<void> original()async{
+        if(!current() || !session.selectWorkspaceOrder(order.id) || !current())return;
+        if(action==WorkOrderAction.reject){
+          await _showRejectOrderSheet(context,session,inputCurrent:captured?.current,ownerChanges:captured?.changes);
+        }else{
+          await session.submitWorkspaceOrderAction(order.id,action,inputCurrent:captured?.current);
+        }
       }
+      if(captured==null){await original();}else{await captured.perform(original);}
     }
     final lines = exact.stage == 'Preparing' && exact.fulfilment != 'collection'
         ? session.workspacePackingLinesForOrder(order) : const <WorkspacePackingLine>[];
@@ -33596,10 +40694,10 @@ class _LiveOrderTicket extends StatelessWidget {
           Text(order.id, style: const TextStyle(color: MoolColors.muted, fontSize: 11)),
           if (!detailed) const Text('Payment status unavailable', style: TextStyle(color: MoolColors.muted, fontSize: 12)),
           if (exact.rejectionReason case final reason?) Text(reason),
-          if (detailed) _ExactOrderInformation(order: order, showItems: lines.isEmpty),
+          if (detailed) _ExactOrderInformation(order: order, showItems: captured!=null || lines.isEmpty),
           if (lines.isNotEmpty) ...[
             Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text('$packed/${lines.length} lines packed')),
-            for (final line in lines) ...[
+            if(captured==null||captured.operation=='packing')for (final line in lines.where((line)=>captured==null||line.id==captured.packingLineId)) ...[
               CheckboxListTile(key: Key('work-operational-pack-${line.id}'),
                 contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.trailing,
                 value: line.packed, title: Text('${line.label} · ${line.quantityLabel}'),
@@ -33607,6 +40705,12 @@ class _LiveOrderTicket extends StatelessWidget {
                   'Line total ${_ExactOrderInformation._price(originals[line.id]!.lineTotalMinor)}'),
                 onChanged: !current() || session.workspaceOrderOperationState(order.id) != null ? null : (value) {
                   if (!current()) return;
+                  if(captured!=null){
+                    if(!captured.permits('packing')||captured.packingLineId!=line.id||captured.packingQuantity!=line.quantity||captured.packingValue!=(value==true))return;
+                    unawaited(captured.perform(()async{if(!current()||!captured.current())return;
+                      session.setWorkspaceOrderPackingLine(storeId:storeId,orderId:order.id,lineId:line.id,quantity:line.quantity,
+                        packed:value==true,expectedOperational:exact);}));return;
+                  }
                   session.setWorkspaceOrderPackingLine(storeId: storeId, orderId: order.id,
                     lineId: line.id, quantity: line.quantity, packed: value == true, expectedOperational: exact);
                 }),
@@ -33644,6 +40748,13 @@ class _LiveOrderTicket extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (order.operational != null) return _operationalTicket(context);
+    final packingIntent=_StoreOrderEffectScope.of(context);
+    final effectIntent=packingIntent?.operation=='packing'?null:packingIntent;
+    Future<void> runEffect(String operation,Future<void> Function() original)async{
+      if(effectIntent==null){await original();return;}
+      if(!effectIntent.permits(operation))return;
+      await effectIntent.perform(()async{if(effectIntent.current())await original();});
+    }
     final stage = order.stage;
     final storeId = session.activeWorkspace?.id ?? session.workspaceId;
     final invoiceAccount = session.workspaceFinance?.accountScope;
@@ -33686,7 +40797,7 @@ class _LiveOrderTicket extends StatelessWidget {
     final legacyContactAtBuild = selectedOrderIdAtBuild == null &&
         session.workspaceOrders.isEmpty && order.id == 'current-store-order';
     bool currentContactFactsAreValid() {
-      if (!context.mounted ||
+      if (packingIntent?.current()==false || !context.mounted ||
           storeId != (session.activeWorkspace?.id ?? session.workspaceId) ||
           reviewAccountAtBuild != (session.contactDraftStore?.accountScope ??
               session.pendingProofStore?.accountScope) ||
@@ -33764,7 +40875,7 @@ class _LiveOrderTicket extends StatelessWidget {
           current.actionDeadline == order.actionDeadline;
     }
     bool currentActionIsValid({bool allowLegacyPacking = false}) {
-      if (!sameStore() ||
+      if (packingIntent?.current()==false || !sameStore() ||
           session.currentWorkspaceOrderId != selectedOrderIdAtBuild ||
           session.busy ||
           session.workspaceOperationsSyncing ||
@@ -33843,7 +40954,7 @@ class _LiveOrderTicket extends StatelessWidget {
       _ when order.isDeliveryInProgress => 'Track delivery',
       _ => 'Review',
     };
-    Future<void> markReadyAndOpenDelivery() async {
+    Future<void> originalMarkReadyAndOpenDelivery() async {
       if (stage != 'Preparing' || !currentContactFactsAreValid() ||
           (legacyPreparingAtBuild && promotionInputs() != legacyPromotionAtBuild) ||
           !currentActionIsValid(allowLegacyPacking: true) ||
@@ -33886,7 +40997,7 @@ class _LiveOrderTicket extends StatelessWidget {
       final capturedAssignmentFacts = assignmentFacts(legacyAssignmentAtBuild);
       if (scopedCommand) {
         // Await the existing authority, never dispatch readiness a second time.
-        if (!await session.submitWorkspaceOrderAction(targetId, WorkOrderAction.ready)) {
+        if (!await session.submitWorkspaceOrderAction(targetId, WorkOrderAction.ready,inputCurrent:effectIntent?.current)) {
           return;
         }
       } else {
@@ -33913,6 +41024,7 @@ class _LiveOrderTicket extends StatelessWidget {
       // Ready opens its working desk only; booking remains an explicit action.
       onOpenDelivery();
     }
+    Future<void> markReadyAndOpenDelivery()=>runEffect('ready',originalMarkReadyAndOpenDelivery);
     bool keyboardVisible() => MediaQuery.viewInsetsOf(context).bottom > 0 ||
         View.of(context).viewInsets.bottom > 0;
     bool confirmedCommandIsValid() {
@@ -33927,16 +41039,22 @@ class _LiveOrderTicket extends StatelessWidget {
       return currentActionIsValid();
     }
     void acceptConfirmedOrder() {
-      if (confirmedCommandIsValid()) {
-        _advanceDeskOrder(session, expectedOrderId: order.id);
-      }
+      if(!confirmedCommandIsValid())return;
+      unawaited(runEffect('accept',()async{
+        if(!confirmedCommandIsValid())return;
+        if(effectIntent!=null&&session.hasScopedWorkspaceOrder(order.id)){
+          await session.submitWorkspaceOrderAction(order.id,WorkOrderAction.accept,inputCurrent:effectIntent.current);
+        }else{_advanceDeskOrder(session,expectedOrderId:order.id);}
+      }));
     }
-    void rejectConfirmedOrder() {
-      if (confirmedCommandIsValid()) {
-        _showRejectOrderSheet(context, session);
-      }
+    Future<void> rejectConfirmedOrder()async {
+      if(!confirmedCommandIsValid())return;
+      await runEffect('reject',()async{
+        if(confirmedCommandIsValid())await _showRejectOrderSheet(context,session,
+          inputCurrent:effectIntent?.current,ownerChanges:effectIntent?.changes);
+      });
     }
-    final showContactActions = (active || detailed) && !order.isClosed &&
+    final showContactActions = packingIntent==null && (active || detailed) && !order.isClosed &&
         !order.isCustomerCollection &&
         (stage == 'Confirmed' || stage == 'Preparing');
     final contactActions = _DeskCustomerActions(
@@ -34122,7 +41240,7 @@ class _LiveOrderTicket extends StatelessWidget {
               if (detailed && inlineInvoice == null && linkedInvoices.isEmpty)
                 const Text('No linked invoice in the saved records.',
                     style: TextStyle(color: MoolColors.muted, fontSize: 11)),
-              _StoreIssueReviews(
+              if(packingIntent==null)_StoreIssueReviews(
                 session: session,
                 target: WorkspaceIssueTarget.customerOrder,
                 referenceId: order.id,
@@ -34136,7 +41254,8 @@ class _LiveOrderTicket extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-              if (packingLines.isNotEmpty) ...[
+              if(effectIntent!=null)_ExactOrderInformation(order:order,showItems:true),
+              if (effectIntent==null&&packingLines.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -34159,7 +41278,7 @@ class _LiveOrderTicket extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 5),
-                for (final line in packingLines)
+                for (final line in packingLines.where((line)=>packingIntent==null||line.id==packingIntent.packingLineId))
                   Material(
                     color: const Color(0xFFF4F6FF),
                     borderRadius: BorderRadius.circular(12),
@@ -34180,6 +41299,11 @@ class _LiveOrderTicket extends StatelessWidget {
                             (active && !currentActionIsValid(
                                 allowLegacyPacking: true))) {
                           return;
+                        }
+                        if(packingIntent!=null){
+                          if(!packingIntent.permits('packing')||packingIntent.packingLineId!=line.id||packingIntent.packingQuantity!=line.quantity||packingIntent.packingValue!=(value==true))return;
+                          unawaited(packingIntent.perform(()async{if(!sameStore()||!packingIntent.current())return;
+                            session.setWorkspaceOrderPackingLine(storeId:storeId,orderId:order.id,lineId:line.id,quantity:line.quantity,packed:value==true);}));return;
                         }
                         session.setWorkspaceOrderPackingLine(
                           storeId: storeId,
@@ -34213,7 +41337,7 @@ class _LiveOrderTicket extends StatelessWidget {
                     ),
                   ),
               ],
-              if (stage == 'Confirmed' && order.actionDeadline != null && !keyboardVisible())
+              if (packingIntent==null && stage == 'Confirmed' && order.actionDeadline != null && !keyboardVisible())
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -34259,7 +41383,7 @@ class _LiveOrderTicket extends StatelessWidget {
                   spacing: 12,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    if (stage == 'Confirmed')
+                    if (packingIntent==null && stage == 'Confirmed')
                       TextButton(
                         key: const Key('work-activity-order-review'),
                         onPressed: currentContactFactsAreValid() ? () {
@@ -34278,7 +41402,7 @@ class _LiveOrderTicket extends StatelessWidget {
                             expired ||
                                 session.hasPendingOrderTime ||
                                 session.busy ||
-                                session.workspaceOperationsSyncing
+                                session.workspaceOperationsSyncing || effectIntent?.permits('reject')==false
                             ? null
                             : rejectConfirmedOrder,
                         child: const Text('Reject'),
@@ -34286,7 +41410,7 @@ class _LiveOrderTicket extends StatelessWidget {
                     FilledButton.icon(
                       key: stage == 'Confirmed' ? const Key('work-activity-order-accept') : null,
                       onPressed:
-                          expired ||
+                          expired || effectIntent?.permits(stage=='Confirmed'?'accept':'ready')==false ||
                               (stage == 'Confirmed' && session.hasPendingOrderTime) ||
                               session.busy ||
                               session.workspaceOperationsSyncing ||
@@ -34376,13 +41500,13 @@ class _LiveOrderTicket extends StatelessWidget {
                     ),
                   ],
                 ),
-              ] else if (stage == 'Preparing') ...[
+              ] else if (stage == 'Preparing' && (packingIntent==null||effectIntent?.operation=='ready')) ...[
                 Align(
                   alignment: Alignment.centerRight,
                   child: FilledButton(
                     key: Key('work-order-ready-${order.id}'),
                     onPressed:
-                        session.busy ||
+                        effectIntent?.permits('ready')==false || session.busy ||
                             session.workspaceOperationsSyncing ||
                             session.workspaceHandoverBusy ||
                             packingLines.isEmpty ||
@@ -34589,13 +41713,15 @@ class _CustomersDestinationSurface extends StatefulWidget {
     required this.session,
     required this.onRepeatBasket,
     required this.onOffer,
-    this.customerId,
+    this.customerId,this.preparedSearch,this.reviewScope,this.repeatOnly=false,this.preparedRepeatCurrent,this.preparedRepeatChanges,
   });
 
   final WorkSession session;
   final ValueChanged<String> onRepeatBasket;
   final VoidCallback onOffer;
-  final String? customerId;
+  final String? customerId,preparedSearch;
+  final bool repeatOnly;final bool Function()? preparedRepeatCurrent;final Listenable? preparedRepeatChanges;
+  final StoreCustomerActionReviewScope? reviewScope;
 
   @override
   State<_CustomersDestinationSurface> createState() =>
@@ -34605,9 +41731,12 @@ class _CustomersDestinationSurface extends StatefulWidget {
 class _CustomersDestinationSurfaceState
     extends State<_CustomersDestinationSurface> {
   late final TextEditingController _search = TextEditingController(
-    text: widget.session.workspaceCustomerSearch,
+    text: widget.preparedSearch??widget.session.workspaceCustomerSearch,
   );
 
+  late String _preparedFilter=widget.session.workspaceCustomerFilter;
+  void _changeSearch(String value){if(widget.reviewScope==null){widget.session.updateWorkspaceCustomerSearch(value);}else if(widget.reviewScope!.current()){setState((){});}}
+  void _changeFilter(String value){if(widget.reviewScope==null){widget.session.setWorkspaceCustomerFilter(value);}else if(widget.reviewScope!.current()){setState(()=>_preparedFilter=value);}}
   @override
   void dispose() {
     _search.dispose();
@@ -34615,7 +41744,8 @@ class _CustomersDestinationSurfaceState
   }
 
   bool _sameCustomer(String storeId, WorkspaceCustomerRecord customer) =>
-      mounted &&
+      mounted && widget.preparedRepeatCurrent?.call()!=false &&
+      (widget.reviewScope==null||widget.reviewScope!.current()&&ModalRoute.of(context)?.isCurrent==true) &&
       storeId == widget.session.activeWorkspace?.id &&
       widget.session.workspaceCustomerBook.any(
         (current) =>
@@ -34723,6 +41853,7 @@ class _CustomersDestinationSurfaceState
       });
     }
 
+    final inheritedOwnerChanges=context.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges;
     final largeAmounts =
         customer.totalSpend >= 10000000 ||
         customer.amountDueMinor.abs() >= 1000000000 ||
@@ -34732,7 +41863,9 @@ class _CustomersDestinationSurfaceState
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (sheetContext) => FractionallySizedBox(
+      builder: (sheetContext) {
+        final ownSheetRoute=ModalRoute.of(sheetContext),ownSheetNavigator=Navigator.of(sheetContext);
+        return _purchaseCapturedOwnerPage(context,sheetContext,widget.session,widget.preparedRepeatCurrent,FractionallySizedBox(
         heightFactor: .72,
         child: CustomScrollView(
           slivers: [
@@ -34816,14 +41949,14 @@ class _CustomersDestinationSurfaceState
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: _CustomerActionBar(
                       children: [
-                        _CustomerAction(
+                        if(!widget.repeatOnly)_CustomerAction(
                           icon: Icons.call_outlined,
                           label: 'Call',
                           onTap: customer.mobile.isEmpty
                               ? null
                               : () => contact(() => _call(storeId, customer)),
                         ),
-                        _CustomerAction(
+                        if(!widget.repeatOnly)_CustomerAction(
                           icon: Icons.chat_bubble_outline_rounded,
                           label: 'Chat',
                           onTap: () {
@@ -34831,7 +41964,7 @@ class _CustomersDestinationSurfaceState
                             _chat(context, storeId, customer);
                           },
                         ),
-                        _CustomerAction(
+                        if(!widget.repeatOnly)_CustomerAction(
                           icon: Icons.message_outlined,
                           label: 'WhatsApp',
                           onTap: customer.mobile.isEmpty
@@ -34843,17 +41976,22 @@ class _CustomersDestinationSurfaceState
                           keyName: 'work-customer-repeat',
                           icon: Icons.repeat_rounded,
                           label: 'Repeat',
-                          onTap: () {
-                            Navigator.pop(sheetContext);
-                            widget.onRepeatBasket(customer.id);
+                          onTap: ()async {
+                            if(!sheetContext.mounted||ownSheetRoute?.isActive!=true||ownSheetRoute?.isCurrent!=true||!_sameCustomer(storeId,customer))return;
+                            final repeat=widget.onRepeatBasket,waitForOwnedClose=widget.repeatOnly;
+                            ownSheetNavigator.pop();
+                            // The captured AI owner can switch to the counter desk.
+                            // Let only its own native sheet finish before that handoff.
+                            if(waitForOwnedClose){await ownSheetRoute!.completed;if(!mounted||!_sameCustomer(storeId,customer))return;}
+                            repeat(customer.id);
                           },
                         ),
-                        _CustomerAction(
+                        if(!widget.repeatOnly)_CustomerAction(
                           icon: Icons.receipt_long_outlined,
                           label: 'Invoice',
                           onTap: () => _invoice(sheetContext, customer),
                         ),
-                        _CustomerAction(
+                        if(!widget.repeatOnly)_CustomerAction(
                           icon: Icons.local_offer_outlined,
                           label: customer.messagesAllowed
                               ? 'Send offer'
@@ -34962,7 +42100,8 @@ class _CustomersDestinationSurfaceState
             ),
           ],
         ),
-      ),
+      ),ownerChanges:widget.preparedRepeatChanges,capturedContextChanges:inheritedOwnerChanges,useCapturedContextChanges:true);
+      },
     );
   }
 
@@ -35003,7 +42142,7 @@ class _CustomersDestinationSurfaceState
         )
         .toList(growable: false);
     final customers = widget.customerId == null
-        ? widget.session.visibleWorkspaceCustomers
+        ? widget.reviewScope==null?widget.session.visibleWorkspaceCustomers:widget.session.workspaceCustomerSearchResults(search:_search.text,filter:_preparedFilter)
         : allCustomers;
     final storeId = widget.session.activeWorkspace?.id ?? '';
     final repeat = allCustomers
@@ -35017,6 +42156,9 @@ class _CustomersDestinationSurfaceState
     final duesKnown = allCustomers.every(
       (customer) => customer.balanceAvailable,
     );
+    if(widget.repeatOnly)return ListView(padding:const EdgeInsets.all(16),children:[
+      for(final customer in customers)_CustomerBookRow(customer:customer,
+        onOpen:()=>_showCustomer(context,storeId,customer),onCall:null,onChat:(){},showContactActions:false)]);
     return Container(
       key: const Key('work-customers-destination'),
       decoration: const BoxDecoration(
@@ -35060,11 +42202,11 @@ class _CustomersDestinationSurfaceState
             StoreRecentSearches(
               controller: _search,
               history: widget.session.workspaceRecentSearches('customers'),
-              onChanged: widget.session.updateWorkspaceCustomerSearch,
+              onChanged: _changeSearch,
               child: TextField(
                 key: const Key('work-customer-search'),
                 controller: _search,
-                onChanged: widget.session.updateWorkspaceCustomerSearch,
+                onChanged: _changeSearch,
                 textInputAction: TextInputAction.search,
                 decoration: const InputDecoration(
                   hintText: 'Search name or mobile',
@@ -35101,9 +42243,9 @@ class _CustomersDestinationSurfaceState
                       'work-customer-filter-${filter.toLowerCase().replaceAll(' ', '-')}',
                     ),
                     label: Text(filter),
-                    selected: widget.session.workspaceCustomerFilter == filter,
+                    selected: (widget.reviewScope==null?widget.session.workspaceCustomerFilter:_preparedFilter) == filter,
                     onSelected: (_) =>
-                        widget.session.setWorkspaceCustomerFilter(filter),
+                        _changeFilter(filter),
                   );
                 },
               ),
@@ -35211,13 +42353,13 @@ class _CustomerBookRow extends StatelessWidget {
     required this.customer,
     required this.onOpen,
     required this.onCall,
-    required this.onChat,
+    required this.onChat,this.showContactActions=true,
   });
 
   final WorkspaceCustomerRecord customer;
   final VoidCallback onOpen;
   final VoidCallback? onCall;
-  final VoidCallback onChat;
+  final VoidCallback onChat;final bool showContactActions;
 
   @override
   Widget build(BuildContext context) {
@@ -35298,14 +42440,14 @@ class _CustomerBookRow extends StatelessWidget {
                       ],
                     ),
                   ),
-                  IconButton(
+                  if(showContactActions)IconButton(
                     key: Key('work-customer-call-${customer.id}'),
                     tooltip: 'Call ${customer.name}',
                     visualDensity: VisualDensity.compact,
                     onPressed: onCall,
                     icon: const Icon(Icons.call_outlined, size: 19),
                   ),
-                  IconButton(
+                  if(showContactActions)IconButton(
                     key: Key('work-customer-chat-${customer.id}'),
                     tooltip: 'Chat with ${customer.name}',
                     visualDensity: VisualDensity.compact,
@@ -35973,13 +43115,16 @@ class _StoreFinanceSurface extends StatelessWidget {
     this.section = 'settlement',
     this.focus,
     this.onOpenInvoice,
-    this.returnsOnly = false,
+    this.returnsOnly = false,this.reviewScope,this.preparedPeriodStart,
   });
   final WorkSession session;
   final String section;
   final _WorkspaceFinanceFocus? focus;
   final ValueChanged<WorkspaceCustomerInvoice>? onOpenInvoice;
   final bool returnsOnly;
+  final StoreCustomerActionReviewScope? reviewScope;
+  final DateTime? preparedPeriodStart;
+  bool _preparedCurrent(BuildContext context)=>reviewScope==null||context.mounted&&reviewScope!.current()&&ModalRoute.of(context)?.isCurrent==true;
 
   @override
   Widget build(BuildContext context) {
@@ -36036,7 +43181,7 @@ class _StoreFinanceSurface extends StatelessWidget {
       );
     }
     final start = target == null && section == 'payments'
-        ? session.workspaceMoneyPeriodStart
+        ? reviewScope==null?session.workspaceMoneyPeriodStart:preparedPeriodStart
         : null;
     final settlementCheck = finance.settlementPaidReconciliation;
     final payments =
@@ -36110,7 +43255,7 @@ class _StoreFinanceSurface extends StatelessWidget {
                 TextButton(
                   onPressed: session.customerCollectionBusy
                       ? null
-                      : () => session.reconcileCustomerReturn(),
+                      : reviewScope==null?()=>session.reconcileCustomerReturn():()async{if(!_preparedCurrent(context))return;await reviewScope!.runNative(()=>session.reconcileCustomerReturn(reviewOwnerCurrent:reviewScope!.ownerCurrent,reviewInputCurrent:()=>_preparedCurrent(context),onReviewNativeChange:reviewScope!.acceptNativeChange));},
                   child: Text(
                     session.customerReturnSaved
                         ? 'Check return status'
@@ -36128,7 +43273,7 @@ class _StoreFinanceSurface extends StatelessWidget {
                 TextButton(
                   onPressed: session.customerCollectionBusy
                       ? null
-                      : session.reconcileCustomerRefund,
+                      : reviewScope==null?session.reconcileCustomerRefund:()async{if(!_preparedCurrent(context))return;await reviewScope!.runNative(()=>session.reconcileCustomerRefund(reviewOwnerCurrent:reviewScope!.ownerCurrent,reviewInputCurrent:()=>_preparedCurrent(context),onReviewNativeChange:reviewScope!.acceptNativeChange));},
                   child: Text(
                     session.customerRefundSaved
                         ? 'Check refund status'
@@ -36143,7 +43288,7 @@ class _StoreFinanceSurface extends StatelessWidget {
                 TextButton(
                   onPressed: session.customerCollectionBusy
                       ? null
-                      : session.reconcileCustomerCollection,
+                      : reviewScope==null?session.reconcileCustomerCollection:()async{if(!_preparedCurrent(context))return;await reviewScope!.runNative(()=>session.reconcileCustomerCollection(reviewOwnerCurrent:reviewScope!.ownerCurrent,reviewInputCurrent:()=>_preparedCurrent(context),onReviewNativeChange:reviewScope!.acceptNativeChange));},
                   child: const Text('Check collection status'),
                 ),
               ],
@@ -36349,7 +43494,7 @@ class _StoreFinanceSurface extends StatelessWidget {
                     child: const Text('View invoice'),
                   ),
                 ),
-              if (!returnsOnly && payment.dueMinor > 0 &&
+              if (reviewScope==null && !returnsOnly && payment.dueMinor > 0 &&
                   payment.invoiceId != null &&
                   (section == 'dues' || section == 'payments'))
                 Align(
@@ -36382,7 +43527,7 @@ class _StoreFinanceSurface extends StatelessWidget {
                     child: const Text('Record collection'),
                   ),
                 ),
-              if (payment.invoiceId != null &&
+              if (reviewScope==null && payment.invoiceId != null &&
                   finance.customerLedgers.any(
                     (ledger) =>
                         ledger.customerId == payment.customerId &&
@@ -36417,7 +43562,7 @@ class _StoreFinanceSurface extends StatelessWidget {
                     child: const Text('Record refund'),
                   ),
                 ),
-              if (remainingReturnUnits != null && remainingReturnUnits > 0)
+              if (reviewScope==null && remainingReturnUnits != null && remainingReturnUnits > 0)
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton(
@@ -36484,8 +43629,12 @@ class _CustomerReturnSheet extends StatefulWidget {
     required this.order,
     required this.account,
     required this.store,
-    this.onRecorded,
+    this.onRecorded, this.reviewScope,this.preparedFields,this.capturedDraft,this.onPreparedDraft,
   });
+  final StoreCustomerActionReviewScope? reviewScope;
+  final Map<String,String>? preparedFields;
+  final WorkspaceLedgerFormDraft? capturedDraft;
+  final ValueChanged<Map<String,String>>? onPreparedDraft;
   final WorkSession session;
   final WorkspacePaymentRecord payment;
   final WorkspaceOrderRecord order;
@@ -36496,6 +43645,9 @@ class _CustomerReturnSheet extends StatefulWidget {
 }
 
 class _CustomerReturnSheetState extends State<_CustomerReturnSheet> with WidgetsBindingObserver {
+  bool _preparedCompleted=false;
+  bool _preparedCurrent()=>widget.reviewScope==null || mounted&&widget.reviewScope!.current()&&ModalRoute.of(context)?.isCurrent==true;
+  Future<bool> _runPreparedNative(Future<bool> Function() run)=>widget.reviewScope?.runNative(run)??run();
   final quantities = <String, TextEditingController>{};
   final sellableQuantities = <String, TextEditingController>{};
   final selectedProducts = <String>{};
@@ -36505,7 +43657,7 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> with Widgets
   void _revealReason() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final target = _reasonAnchor.currentContext;
-      if (mounted && target != null) {
+      if (mounted && widget.reviewScope?.current()!=false && target != null) {
         Scrollable.ensureVisible(target, alignment: .2);
       }
     });
@@ -36538,6 +43690,7 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> with Widgets
     draft = _LedgerFormAutosave(
       widget.session,
       widget.session.ledgerFormKey(widget.payment, 'return'),
+      inputOwnerCurrent:widget.reviewScope?.current,preparedFields:widget.preparedFields,capturedDraft:widget.capturedDraft,onPreparedDraft:widget.onPreparedDraft,
     );
     draft.addListener(refreshDraft);
     unawaited(loadDraft());
@@ -36551,7 +43704,7 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> with Widgets
 
   Future<void> loadDraft() async {
     final fields = await draft.load();
-    if (!mounted || fields == null) {
+    if (!mounted || widget.reviewScope?.current()==false || fields == null) {
       return;
     }
     final savedItems = fields['items'];
@@ -36596,6 +43749,10 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> with Widgets
     setState(() {});
   }
 
+  Map<String,String> get _preparedFieldsNow=>{
+      'items':jsonEncode({for(final id in selectedProducts)id:[quantities[id]!.text,sellableQuantities[id]!.text]}),
+      'reason':reason.text,if(reasonCode!=null)'reasonCode':reasonCode!,
+    };
   void saveDraft() {
     draft.save({
       'items': jsonEncode({
@@ -36609,6 +43766,7 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> with Widgets
 
   @override
   void dispose() {
+    if(widget.preparedFields!=null)widget.onPreparedDraft?.call(_preparedFieldsNow);
     WidgetsBinding.instance.removeObserver(this);
     _reasonFocus.dispose();
     draft.removeListener(refreshDraft);
@@ -36678,7 +43836,7 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> with Widgets
   }
 
   Future<void> submit() async {
-    if (!await draft.flush() || !mounted) {
+    if (_preparedCompleted || !_preparedCurrent() || !await draft.flush() || !mounted || !_preparedCurrent()) {
       return;
     }
     final amount = renderedCredit;
@@ -36698,18 +43856,20 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> with Widgets
       saving = true;
       error = null;
     });
-    final success = await widget.session.recordCustomerReturn(
+    final success = await _runPreparedNative(()=>widget.session.recordCustomerReturn(
       invoiceId: widget.payment.invoiceId!,
       lines: lines,
       reason: reason.text,
       reasonCode: reasonCode,
       expectedCreditMinor: amount,
-      expectedLedgerRevision: revision,
-    );
+      expectedLedgerRevision: revision, reviewOwnerCurrent:widget.reviewScope?.ownerCurrent,reviewInputCurrent:widget.reviewScope==null?null:_preparedCurrent,onReviewNativeChange:widget.reviewScope?.acceptNativeChange,
+    ));
     if (!mounted) return;
     if (success) {
+      if(widget.reviewScope!=null)setState((){_preparedCompleted=true;saving=false;});
       widget.onRecorded?.call();
-      Navigator.pop(context);
+      if(widget.reviewScope!=null && (!widget.reviewScope!.current() || ModalRoute.of(context)?.isCurrent!=true))return;
+      _closeCapturedCustomerReview(context,widget.reviewScope);
       return;
     }
     setState(() {
@@ -36722,13 +43882,14 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> with Widgets
 
   @override
   Widget build(BuildContext context) {
+    if(widget.reviewScope!=null&&_preparedCompleted)return _customerCompletedReview(context,widget.reviewScope!,"Return recorded");
     renderedCredit = credit;
     renderedRevision = ledger?.revision;
     return PopScope(
-      canPop: !saving && !draft.busy && (!draft.ready || draft.error == null),
+      canPop: widget.reviewScope?.current()==false || !saving && !draft.busy && (!draft.ready || draft.error == null),
       onPopInvokedWithResult: (didPop, result) async {
         if (!didPop && !saving && await draft.flush() && context.mounted) {
-          Navigator.pop(context);
+          _closeCapturedCustomerReview(context,widget.reviewScope);
         }
       },
       child: SafeArea(
@@ -36919,7 +44080,12 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> with Widgets
 }
 
 class _LedgerFormAutosave extends ChangeNotifier {
-  _LedgerFormAutosave(this.session, this.key);
+  _LedgerFormAutosave(this.session, this.key, {this.inputOwnerCurrent,this.preparedFields,this.capturedDraft,this.onPreparedDraft});
+  final Map<String,String>? preparedFields;
+  final WorkspaceLedgerFormDraft? capturedDraft;
+  final ValueChanged<Map<String,String>>? onPreparedDraft;
+  bool _preparedDraftRetired=false;
+  final bool Function()? inputOwnerCurrent;
   final WorkSession session;
   final WorkspaceLedgerFormKey? key;
   int? revision;
@@ -36934,6 +44100,10 @@ class _LedgerFormAutosave extends ChangeNotifier {
   }
 
   Future<Map<String, String>?> load() async {
+    if(preparedFields!=null){
+      if(inputOwnerCurrent?.call()==false)return null;
+      revision=capturedDraft?.revision;ready=true;error=null;changed();return Map.of(preparedFields!);
+    }
     try {
       if (key == null) {
         throw StateError('Invoice unavailable');
@@ -36952,7 +44122,10 @@ class _LedgerFormAutosave extends ChangeNotifier {
   }
 
   void save(Map<String, String> fields) {
-    if (!ready || key == null) {
+    if(preparedFields!=null){if(inputOwnerCurrent?.call()!=false)onPreparedDraft?.call(Map.of(fields));return;}
+    // Refuse only a new edit after captured-owner retirement. Existing queued
+    // native writes, pending snapshots and flush/leave recovery remain intact.
+    if (!ready || key == null || inputOwnerCurrent?.call() == false) {
       return;
     }
     final snapshot = Map<String, String>.of(fields);
@@ -36990,6 +44163,17 @@ class _LedgerFormAutosave extends ChangeNotifier {
   }
 
   Future<bool> flush() async {
+    if(preparedFields!=null){
+      if(_preparedDraftRetired || inputOwnerCurrent?.call()==false || key==null)return false;
+      try{
+        final actual=await session.readLedgerForm(key!);
+        if(inputOwnerCurrent?.call()==false)return false;
+        if(actual?.revision!=capturedDraft?.revision || !mapEquals(actual?.fields,capturedDraft?.fields)){
+          _preparedDraftRetired=true;error='Saved input changed. Your entries are kept. Reopen this form to review both drafts.';changed();return false;
+        }
+        error=null;changed();return ready;
+      }catch(_){error='Saved input could not be checked. Your entries are kept. Try again.';changed();return false;}
+    }
     await writes;
     return ready && pending == null && error == null;
   }
@@ -37045,6 +44229,13 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
               .firstOrNull;
     final rows = <List<String>>[];
     final keys = <Key>[];
+    final entryEntities=<int,String>{},entrySignatures=<int,String>{};
+    final capturedSelection=_registerId,capturedPeriod=session.workspaceMoneyPeriod;
+    void bindEntry(String entity) {
+      final view=_storeMoneyEntryView(session,entity);
+      if(view!=null){entryEntities[rows.length]=entity;entrySignatures[rows.length]=view.signature;}
+    }
+
     var debit = 0, credit = 0;
     String balanceText(int? minor) => minor == null
         ? 'Unavailable'
@@ -37075,6 +44266,7 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
           credit -= entry.deltaMinor;
         }
         if (running != null) running += entry.deltaMinor;
+        bindEntry(jsonEncode(['register',selected.registerId,entry.id]));
         rows.add([
           _registerDate(entry.occurredAt),
           entry.reference,
@@ -37103,6 +44295,7 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
             credit += entry.amountMinor;
           }
         }
+        bindEntry(entry.id);
         rows.add([
           _registerDate(entry.occurredAt),
           entry.party,
@@ -37188,6 +44381,16 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
                   ],
             rows: rows,
             rowKeys: keys,
+            openableRows:entryEntities.keys.toSet(),
+            onOpen:(index) {
+              if(!mounted||ModalRoute.of(context)?.isCurrent!=true||_registerId!=capturedSelection||session.workspaceMoneyPeriod!=capturedPeriod)return;
+              final entity=entryEntities[index],signature=entrySignatures[index];
+              if(entity==null||signature==null||_storeMoneyEntryView(session,entity)?.signature!=signature)return;
+              unawaited(showStoreMoneyEntryDetails(context,session,entity,expectedSignature:signature,
+                ownerCurrent:()=>mounted&&_registerId==capturedSelection&&session.workspaceMoneyPeriod==capturedPeriod,
+                ownerChanges:session));
+            },
+
             amountColumns: const {4, 5, 6},
             total: '',
             footer: [
@@ -37421,11 +44624,11 @@ class _StoreSupplierRefundSourceSelectorState extends State<_StoreSupplierRefund
   })));
 }
 
-Future<void> _chooseSupplierRefund(BuildContext context, WorkSession session, String supplierId) async {
+List<_StoreSupplierRefundTarget> _supplierRefundTargets(WorkSession session, String supplierId) {
   final opening = session.workspaceSupplierOpeningRecord(supplierId);
-  if (opening == null) return;
+  if (opening == null) return const [];
   final ledger = session.workspaceSupplierLedger(supplierId);
-  final sources = <_StoreSupplierRefundTarget>[
+  return <_StoreSupplierRefundTarget>[
     if (opening.supplierCredit) _StoreSupplierRefundTarget(supplierId: supplierId,
       sourceKind: WorkspaceSupplierRefundSourceKind.openingAdvance, sourceId: opening.id,
       label: 'Starting advance · ${_supplierRefundPrintedDate(opening.asOfDate)}', opening: opening),
@@ -37439,20 +44642,41 @@ Future<void> _chooseSupplierRefund(BuildContext context, WorkSession session, St
         sourceId: copy.draft.id, label: 'Bill ${copy.draft.invoiceReference} · ${copy.draft.invoiceDate}',
         opening: opening, copy: copy),
   ];
+}
+
+Future<void> _chooseSupplierRefund(BuildContext context, WorkSession session, String supplierId, {bool Function()? ownerCurrent}) async {
+  if (ownerCurrent?.call() == false) return;
+  if (session.workspaceSupplierOpeningRecord(supplierId) == null) return;
+  final sources = _supplierRefundTargets(session, supplierId);
   final target = await showDialog<_StoreSupplierRefundTarget>(context: context, useSafeArea: true,
-    builder: (_) => _StoreSupplierRefundSourceSelector(
+    builder: (dialogContext) => _purchaseCapturedOwnerPage(context, dialogContext, session, ownerCurrent, _StoreSupplierRefundSourceSelector(
       supplierName: session.workspaceSuppliers.where((supplier) => supplier.id == supplierId).firstOrNull?.name ?? 'Supplier unavailable',
-      sources: sources));
-  if (target != null && context.mounted) await _showSupplierRefund(context, session, target);
+      sources: sources)));
+  if (target != null && context.mounted && ownerCurrent?.call() != false) await _showSupplierRefund(context, session, target, ownerCurrent: ownerCurrent);
 }
 
 Future<void> _showSupplierRefund(BuildContext context, WorkSession session,
-    _StoreSupplierRefundTarget target) => showModalBottomSheet<void>(context: context,
+    _StoreSupplierRefundTarget target, {StoreSupplierRefundInitialData? initialData,
+    WorkspaceLedgerFormDraft? recoveryDraft,
+    WorkspaceLedgerFormKey? prefillKey, String? prefillSignature,
+    bool Function()? prefillCurrent, bool Function()? ownerCurrent, bool readOnlyOpen = false, StoreSupplierSelectedDocumentInput? selectedDocument}) => showModalBottomSheet<void>(context: context,
       isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
-      builder: (_) => _StoreSupplierRefundSheet(session: session, target: target));
+      builder: (sheetContext) => _supplierCapturedOwnerSheet(
+        context, sheetContext, session, ownerCurrent, _StoreSupplierRefundSheet(session: session, target: target,
+        initialData: initialData, recoveryDraft: recoveryDraft,
+        prefillKey: prefillKey, prefillSignature: prefillSignature,
+        prefillCurrent: prefillCurrent, ownerCurrent: ownerCurrent, readOnlyOpen: readOnlyOpen, selectedDocument: selectedDocument)));
 
 class _StoreSupplierRefundSheet extends StatefulWidget {
-  const _StoreSupplierRefundSheet({required this.session, required this.target});
+  const _StoreSupplierRefundSheet({required this.session, required this.target,
+    this.initialData, this.recoveryDraft, this.prefillKey, this.prefillSignature, this.prefillCurrent, this.ownerCurrent, this.readOnlyOpen = false, this.selectedDocument});
+  final StoreSupplierRefundInitialData? initialData;
+  final WorkspaceLedgerFormDraft? recoveryDraft;
+  final WorkspaceLedgerFormKey? prefillKey;
+  final String? prefillSignature;
+  final bool Function()? prefillCurrent, ownerCurrent;
+  final bool readOnlyOpen;
+  final StoreSupplierSelectedDocumentInput? selectedDocument;
   final WorkSession session;
   final _StoreSupplierRefundTarget target;
   @override
@@ -37460,6 +44684,10 @@ class _StoreSupplierRefundSheet extends StatefulWidget {
 }
 
 class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
+  final Object _nativeAdjustmentToken = Object();
+  late final WorkSession _nativeAdjustmentOwner;
+  bool _initialAttempted = false;
+  bool _recoveryReadChecked = false;
   late final _LedgerFormAutosave draft;
   final formFocus = FocusScopeNode();
   final amount = TextEditingController(), reference = TextEditingController(), date = TextEditingController();
@@ -37475,7 +44703,7 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
     confirmedAttempt == jsonEncode(frozen!.toJson());
   String? error;
   WorkspaceSupplierLedger? get ledger => widget.session.workspaceSupplierLedger(widget.target.supplierId);
-  bool get current => draft.key != null && widget.target.key(widget.session) == draft.key;
+  bool get current => draft.key != null && widget.ownerCurrent?.call() != false && widget.target.key(widget.session) == draft.key;
   String printedDate(String day) => '${day.substring(8)}/${day.substring(5, 7)}/${day.substring(0, 4)}';
   String? get occurredOn {
     final m = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$').firstMatch(date.text.trim());
@@ -37511,8 +44739,10 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
   @override
   void initState() {
     super.initState();
-    draft = _LedgerFormAutosave(widget.session, widget.target.key(widget.session));
-    draft.addListener(refresh); FocusManager.instance.addListener(refresh); unawaited(load());
+    _nativeAdjustmentOwner = widget.session;
+    (_openSupplierAdjustmentForms[_nativeAdjustmentOwner] ??= <Object>{}).add(_nativeAdjustmentToken);
+    draft = _LedgerFormAutosave(widget.session, widget.target.key(widget.session), inputOwnerCurrent: widget.ownerCurrent);
+    draft.addListener(refresh); FocusManager.instance.addListener(refresh); unawaited(load(readOnlyOpen: widget.readOnlyOpen));
   }
   void refresh() { if (mounted) setState(() {}); }
   Future<void> verify() async {
@@ -37527,13 +44757,21 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
     confirmedAttempt = proof != null ? jsonEncode(reviewed.toJson()) : null;
     statusVerified = true;
   }
-  Future<void> load() async {
+  Future<void> load({bool readOnlyOpen = false}) async {
     if (busy || draft.busy) return;
     setState(() { _busy = true; error = null; });
     try {
       if (!await flushPending() || !mounted || !current) return;
       final saved = await draft.load();
       if (!mounted || saved == null || !current) throw StateError('Saved request unavailable');
+      final expected = widget.recoveryDraft;
+      if (expected != null && !_recoveryReadChecked) {
+        if (draft.key != expected.key || draft.revision != expected.revision ||
+            !mapEquals(saved, expected.fields)) {
+          throw StateError('Original saved adjustment changed before restoration');
+        }
+        _recoveryReadChecked = true;
+      }
       final copies = WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision ?? 1,
         fields: saved).supplierRefundCopies;
       if (copies != null && copies.qa != widget.session.workspaceSupplierScope?.$3) {
@@ -37547,9 +44785,25 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
       date.text = frozen == null ? saved['occurredOn'] ?? printedDate(DateTime.now().toIso8601String().substring(0, 10))
         : printedDate(frozen!.occurredOn);
       if (frozen != null) await verify();
-      recovered = await widget.session.recoverCustomerLedger();
+      recovered = readOnlyOpen ? widget.session.workspaceInvoiceHistoryLoaded : await widget.session.recoverCustomerLedger();
       if (!current) throw StateError('Store changed');
       if (!recovered) error = confirmed ? 'Refund recorded; account refresh pending.' : 'Account unavailable. Keep the saved request and retry recovery.';
+      final initial = widget.initialData;
+      if (initial != null && !_initialAttempted) {
+        _initialAttempted = true;
+        final pristine = saved.isEmpty && draft.revision == null && draft.pending == null &&
+          !draft.busy && draft.error == null && frozen == null && supportingCopies == null &&
+          resetAttempt == null && !confirmed && amount.text.isEmpty && reference.text.isEmpty;
+        if (!current || !recovered || widget.prefillCurrent?.call() == false || !pristine ||
+            widget.prefillKey != draft.key || !initial.matches(widget.target) ||
+            widget.prefillSignature != _assistantRefundSignature(widget.session, widget.target)) {
+          error = 'Suggestion was not applied. Existing refund input and saved attempts are kept.';
+        } else {
+          amount.text = initial.inputs['amount']!; reference.text = initial.inputs['reference']!;
+          channel = initial.inputs['channel']!; date.text = initial.inputs['occurredOn']!;
+          // No draft.save or flush; no money is recorded by Review.
+        }
+      }
     } on Object {
       recovered = false;
       error = confirmed ? 'Refund recorded; account refresh pending.' : 'Saved refund status is unverified. Keep these details and retry.';
@@ -37621,6 +44875,7 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
   }
   @override
   void dispose() {
+    _openSupplierAdjustmentForms[_nativeAdjustmentOwner]?.remove(_nativeAdjustmentToken);
     draft.removeListener(refresh); draft.dispose();
     FocusManager.instance.removeListener(refresh); formFocus.dispose();
     amount.dispose(); reference.dispose(); date.dispose(); super.dispose();
@@ -37733,6 +44988,10 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
             if (draft.ready && recovered && current && widget.session.workspaceSupplierScope != null &&
                 (frozen == null || supportingCopies?.active.isNotEmpty == true ||
                   supportingCopies?.previous.isNotEmpty == true)) _SupplierPaymentDraftCopies(
+              sourceRevision: () => jsonEncode([draft.revision, fields]),
+              selectedDocument: widget.selectedDocument,
+              canStageSelected: (lease) => draft.ready && recovered && current && !_busy && frozen == null && !draft.busy && draft.error == null &&
+                (_copyBusyLease == null || identical(_copyBusyLease, lease)),
               session: widget.session, value: supportingCopies ?? WorkspaceSupplierMoneyCopies(
                 key: draft.key!, qa: widget.session.workspaceSupplierScope!.$3),
               editable: editable && !draft.busy && draft.error == null,
@@ -37853,18 +45112,56 @@ class _StoreSupplierMoneyTarget {
   final bool advance;
 }
 
+// Manual callers return their original sheet directly, with no added observer
+// or layout owner. A captured AI owner keeps the same native state while hidden.
+Widget _supplierCapturedOwnerSheet(BuildContext ownerContext, BuildContext sheetContext,
+    WorkSession session, bool Function()? ownerCurrent, Widget child,{Listenable? ownerChanges}) {
+  final readOwner = ownerCurrent;
+  if (readOwner == null) return child;
+  return AnimatedBuilder(
+    animation: Listenable.merge([session,ownerChanges,
+      ownerContext.mounted
+        ? ownerContext.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges : null]),
+    child: child,
+    builder: (context, child) {
+      final current = readOwner();
+      return Stack(children: [
+        Offstage(offstage: !current,
+          child: ExcludeFocus(excluding: !current, child: child!)),
+        if (!current) Padding(padding: const EdgeInsets.all(16),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Return to the Store where you started. Saved and unsaved input is kept.'),
+            // maybePop retains the original form's pending-write PopScope.
+            TextButton(onPressed: () { if(ownerChanges!=null&&(!sheetContext.mounted||ModalRoute.of(sheetContext)?.isCurrent!=true))return;unawaited(Navigator.of(sheetContext).maybePop()); },
+              child: const Text('Close')),
+          ])),
+      ]);
+    });
+}
+
 Future<void> _showSupplierMoneyEntry(BuildContext context, WorkSession session,
-    _StoreSupplierMoneyTarget target) => showModalBottomSheet<void>(context: context,
+    _StoreSupplierMoneyTarget target, {StoreSupplierMoneyInitialData? initialData,
+    WorkspaceLedgerFormKey? prefillKey, String? prefillSignature,
+    bool Function()? prefillCurrent, bool Function()? ownerCurrent, bool readOnlyOpen = false, StoreSupplierSelectedDocumentInput? selectedDocument}) => showModalBottomSheet<void>(context: context,
       isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
-      builder: (_) => _StoreMoneyEntrySheet(session: session, supplierMoney: target));
+      builder: (sheetContext) => _supplierCapturedOwnerSheet(
+        context, sheetContext, session, ownerCurrent, _StoreMoneyEntrySheet(session: session, supplierMoney: target,
+        initialData: initialData, prefillKey: prefillKey, prefillSignature: prefillSignature,
+        prefillCurrent: prefillCurrent, ownerCurrent: ownerCurrent, readOnlyOpen: readOnlyOpen, selectedDocument: selectedDocument)));
 
 Future<void> _showSupplierGoodsReturn(BuildContext context, WorkSession session,
-    String supplierId, WorkspaceSupplierGoodsReceipt receipt) => showModalBottomSheet<void>(
+    String supplierId, WorkspaceSupplierGoodsReceipt receipt, {WorkspaceLedgerFormDraft? recoveryDraft,
+    bool Function()? ownerCurrent,StoreReceivingReviewInitial? receivingInitial,Listenable? ownerChanges}) => showModalBottomSheet<void>(
       context: context, isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
-      builder: (_) => _StoreSupplierGoodsReturnSheet(session: session, supplierId: supplierId, receipt: receipt));
+      builder: (sheetContext) => _supplierCapturedOwnerSheet(
+        context, sheetContext, session, ownerCurrent, _StoreSupplierGoodsReturnSheet(session: session, supplierId: supplierId, receipt: receipt,
+        recoveryDraft: recoveryDraft, ownerCurrent: ownerCurrent,receivingInitial:receivingInitial),ownerChanges:ownerChanges));
 
 class _StoreSupplierGoodsReturnSheet extends StatefulWidget {
-  const _StoreSupplierGoodsReturnSheet({required this.session, required this.supplierId, required this.receipt});
+  const _StoreSupplierGoodsReturnSheet({required this.session, required this.supplierId, required this.receipt,
+    this.recoveryDraft, this.ownerCurrent,this.receivingInitial});
+  final WorkspaceLedgerFormDraft? recoveryDraft;final StoreReceivingReviewInitial? receivingInitial;
+  final bool Function()? ownerCurrent;
   final WorkSession session;
   final String supplierId;
   final WorkspaceSupplierGoodsReceipt receipt;
@@ -37873,6 +45170,40 @@ class _StoreSupplierGoodsReturnSheet extends StatefulWidget {
 }
 
 class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsReturnSheet> {
+  bool _receivingPrepared=false,_receivingLeaveAllowed=false,_receivingInitialAttempted=false;
+  void _receivingReturnChanged(){if(!_returnOwnerCurrent)return;if(_receivingPrepared){setState((){});}else{draft.save(fields);}}
+  void _applyReceivingReturnInitial(Map<String,String> saved) {
+    final initial=widget.receivingInitial;
+    if(initial==null||initial.actionId!='AI-ACT-247'||_receivingInitialAttempted)return;
+    _receivingInitialAttempted=true;
+    if(saved.isNotEmpty||frozen!=null||draft.pending!=null||!_returnOwnerCurrent){error='Original return input is kept. Recover or finish it before preparing another return.';return;}
+    if(initial.items.any((row)=>!accepted.containsKey(row['receiptLineId']))){error='Use an original receipt line for this return.';return;}
+    if(initial.text('reference') case final value?)reference.text=value;
+    if(initial.text('reason') case final value?)reason.text=value;
+    if(initial.text('returnedOn') case final value?)day.text=value;
+    for(final row in initial.items) {
+      final id=row['receiptLineId']!;
+      if(row['accepted'] case final value?)accepted[id]!.text=value;
+      if(row['damaged'] case final value?)damaged[id]!.text=value;
+    }
+    _receivingPrepared=true;
+  }
+  Future<void> _closeReceivingReturn() async {
+    if(busy||conflict||draft.busy||!mounted||ModalRoute.of(context)?.isCurrent!=true)return;
+    if(_receivingPrepared) {
+      if(!await _confirmReceivingPreparedLeave(context)||!mounted||ModalRoute.of(context)?.isCurrent!=true)return;
+      setState(()=>_receivingLeaveAllowed=true);await WidgetsBinding.instance.endOfFrame;
+      if(mounted&&ModalRoute.of(context)?.isCurrent==true)Navigator.pop(context);return;
+    }
+    setState(()=>busy=true);
+    if(await draft.flush()&&mounted&&ModalRoute.of(context)?.isCurrent==true)Navigator.pop(context);
+    else if(mounted)setState(()=>busy=false);
+  }
+
+  final Object _nativeReturnToken = Object();
+  late final WorkSession _nativeReturnOwner;
+  bool _recoveryReadChecked = false;
+  bool get _returnOwnerCurrent => widget.ownerCurrent?.call() != false;
   late final _LedgerFormAutosave draft;
   final reference = TextEditingController(), reason = TextEditingController(), day = TextEditingController();
   final accepted = <String, TextEditingController>{}, damaged = <String, TextEditingController>{};
@@ -37891,25 +45222,36 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
   @override
   void initState() {
     super.initState();
+    _nativeReturnOwner = widget.session;
+    (_openSupplierAdjustmentForms[_nativeReturnOwner] ??= <Object>{}).add(_nativeReturnToken);
     day.text = DateTime.now().toIso8601String().substring(0, 10);
     for (final line in widget.receipt.lines) {
       accepted[line.sourceLineId] = TextEditingController(text: '0');
       damaged[line.sourceLineId] = TextEditingController(text: '0');
     }
     draft = _LedgerFormAutosave(widget.session,
-      widget.session.supplierGoodsReturnFormKey(widget.supplierId, widget.receipt.id));
+      widget.session.supplierGoodsReturnFormKey(widget.supplierId, widget.receipt.id),
+      inputOwnerCurrent: widget.ownerCurrent);
     draft.addListener(refresh);
     unawaited(load(initial: true));
   }
   void refresh() { if (mounted) setState(() {}); }
   Future<void> load({bool initial = false}) async {
-    if (!initial && (busy || draft.busy)) return;
+    if (!_returnOwnerCurrent || !initial && (busy || draft.busy)) return;
     setState(() => busy = true);
     try {
       if (draft.pending != null) { draft.save(fields); await draft.flush(); }
       final retained = draft.pending;
       final saved = await draft.load();
-      if (!mounted || saved == null) return;
+      if (!mounted || !_returnOwnerCurrent || saved == null) return;
+      final expected = widget.recoveryDraft;
+      if (expected != null && !_recoveryReadChecked) {
+        if (draft.key != expected.key || draft.revision != expected.revision ||
+            !mapEquals(saved, expected.fields)) {
+          throw StateError('Original saved goods return changed before restoration');
+        }
+        _recoveryReadChecked = true;
+      }
       if (retained != null && jsonEncode(retained.fields) != jsonEncode(saved)) {
         conflict = true; error = 'Saved return differs from this input. Both are kept; do not replace either.';
         return;
@@ -37945,15 +45287,16 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
           }
         }
       }
+      _applyReceivingReturnInitial(saved);
     } on Object { conflict = true; statusUnverified = true;
       error = 'Saved goods return could not be verified. Keep the request and retry recovery.'; }
     finally { if (mounted) setState(() => busy = false); }
   }
   Future<void> submit() async {
-    if (busy || conflict || !draft.ready || draft.key == null) return;
+    if (!_returnOwnerCurrent || busy || conflict || !draft.ready || draft.key == null) return;
     setState(() { busy = true; error = null; });
     try {
-      if (!await draft.flush() || !mounted) return;
+      if (!await draft.flush() || !mounted || !_returnOwnerCurrent) return;
       if (confirmed && complete) {
         resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1, fields: const {});
         if (await widget.session.resetConfirmedWorkspaceSupplierGoodsReturnDraft(resetAttempt!, expectedRevision: draft.revision!)) {
@@ -37990,11 +45333,12 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
           requestedAt: DateTime.now().toUtc(), lines: lines);
         if (!intent.valid) { error = 'Enter return reference, date, reason and at least one item quantity.'; return; }
         reference.text = intent.reference; reason.text = intent.reason; day.text = intent.returnedOn;
-        frozen = intent; draft.save(fields);
+        frozen = intent;_receivingPrepared=false; draft.save(fields);
         if (!await draft.flush()) error = 'Return is not submitted. Retry saving this same review.';
         return;
       }
       statusUnverified = true;
+      if (!_returnOwnerCurrent) return;
       complete = await widget.session.recordWorkspaceSupplierGoodsReturnDraft(draft.key!, frozen!);
       confirmed = await widget.session.readWorkspaceSupplierGoodsReturnStatus(draft.key!, frozen!) != null;
       statusUnverified = false;
@@ -38006,7 +45350,7 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
     finally { if (mounted) setState(() => busy = false); }
   }
   Future<void> correctReview() async {
-    if (busy || conflict || draft.busy || draft.pending != null || draft.error != null ||
+    if (!_returnOwnerCurrent || busy || conflict || draft.busy || draft.pending != null || draft.error != null ||
         !draft.ready || draft.key == null || draft.revision == null || frozen == null || confirmed) {
       return;
     }
@@ -38033,6 +45377,7 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
   }
   @override
   void dispose() {
+    _openSupplierAdjustmentForms[_nativeReturnOwner]?.remove(_nativeReturnToken);
     draft.removeListener(refresh); draft.dispose(); reference.dispose(); reason.dispose(); day.dispose();
     for (final controller in [...accepted.values, ...damaged.values]) { controller.dispose(); }
     super.dispose();
@@ -38040,7 +45385,7 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
   @override
   Widget build(BuildContext context) {
     final newReturnBlocked = frozen == null && widget.session.workspaceGoodsReceiptRecoveryPending;
-    final editable = draft.ready && !busy && !conflict && frozen == null && !newReturnBlocked;
+    final editable = _returnOwnerCurrent && draft.ready && !busy && !conflict && frozen == null && !newReturnBlocked;
     final impacts = <(String, String), int>{};
     for (final line in frozen?.lines ?? <WorkspaceSupplierGoodsReturnLine>[]) {
       impacts.update((line.productId, line.stockUnit), (units) => units + line.stockUnits,
@@ -38059,18 +45404,15 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
         keyboardType: quantity ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
         decoration: InputDecoration(labelText: label, hintText: hint,
           floatingLabelBehavior: FloatingLabelBehavior.always),
-        onChanged: (_) => draft.save(fields))));
-    return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null && !conflict,
+        onChanged: (_) => _receivingReturnChanged())));
+    return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null && !conflict && (!_receivingPrepared||_receivingLeaveAllowed),
+      onPopInvokedWithResult:(didPop,_){if(!didPop&&_receivingPrepared)unawaited(_closeReceivingReturn());},
       child: SafeArea(top: false, child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
             Text('Return goods to supplier', style: Theme.of(context).textTheme.titleMedium),
-            TextButton(key: const Key('supplier-return-close'), onPressed: busy || conflict || draft.busy ? null : () async {
-              setState(() => busy = true);
-              if (await draft.flush() && context.mounted) { Navigator.pop(context); }
-              else if (mounted) { setState(() => busy = false); }
-            }, child: const Text('Close'))]),
+            TextButton(key: const Key('supplier-return-close'), onPressed: busy || conflict || draft.busy ? null : _closeReceivingReturn, child: const Text('Close'))]),
           Text('${ledger?.supplierName ?? ''} · ${widget.receipt.reference}'),
           const Text('Record goods handed back. Supplier credit and money received are recorded separately.'),
           if (newReturnBlocked) const Text('Recover the saved return before recording another goods return.'),
@@ -38112,12 +45454,14 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
 }
 
 Future<void> _showSupplierShortage(BuildContext context, WorkSession session,
-    WorkspacePurchaseSavedCopy copy) => showModalBottomSheet<void>(context: context,
+    WorkspacePurchaseSavedCopy copy, {bool Function()? ownerCurrent,StoreReceivingReviewInitial? receivingInitial,Listenable? ownerChanges,bool assistantReadOnlyOpen=false}) => showModalBottomSheet<void>(context: context,
       isScrollControlled: true, isDismissible: false, enableDrag: false,
-      builder: (_) => _StoreSupplierShortageSheet(session: session, copy: copy));
+      builder: (sheetContext) => _supplierCapturedOwnerSheet(context, sheetContext, session, ownerCurrent,
+        _StoreSupplierShortageSheet(session: session, copy: copy, ownerCurrent: ownerCurrent,receivingInitial:receivingInitial,assistantReadOnlyOpen:assistantReadOnlyOpen),ownerChanges:ownerChanges));
 
 class _StoreSupplierShortageSheet extends StatefulWidget {
-  const _StoreSupplierShortageSheet({required this.session, required this.copy});
+  const _StoreSupplierShortageSheet({required this.session, required this.copy, this.ownerCurrent,this.receivingInitial,this.assistantReadOnlyOpen=false});
+  final bool Function()? ownerCurrent;final StoreReceivingReviewInitial? receivingInitial;final bool assistantReadOnlyOpen;
   final WorkSession session;
   final WorkspacePurchaseSavedCopy copy;
   @override
@@ -38125,6 +45469,21 @@ class _StoreSupplierShortageSheet extends StatefulWidget {
 }
 
 class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet> {
+  final Object _receivingShortageToken=Object();
+  bool _receivingPrepared=false,_receivingLeaveAllowed=false,_receivingInitialAttempted=false;
+  void _applyReceivingShortageInitial(Map<String,String> saved) {
+    final initial=widget.receivingInitial;
+    if(initial==null||initial.actionId!='AI-ACT-248'||_receivingInitialAttempted)return;
+    _receivingInitialAttempted=true;
+    final index=initial.values['billLineIndex'] as int?,delivery=initial.text('deliveryId'),line=initial.text('receiptLineId');
+    if(saved.isNotEmpty||frozen!=null||draft.pending!=null||!current){error='Original shortage input is kept. Resolve its saved review before preparing another.';return;}
+    if(index==null||!options.any((option)=>option.$1==index&&option.$2.expectedDeliveryId==delivery&&option.$3.sourceLineId==line)) {
+      error='Use the original matching bill item and received-delivery line.';return;
+    }
+    billLine=index;deliveryId=delivery;sourceLine=line;quantity.text=initial.text('quantity')!;
+    reviewed=false;_receivingPrepared=true;
+  }
+
   late final _LedgerFormAutosave draft;
   final quantity = TextEditingController();
   int? billLine;
@@ -38133,7 +45492,7 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
   WorkspaceSupplierShortageIntent? frozen;
   WorkspaceLedgerFormDraft? resetAttempt;
   String? error;
-  bool get current => draft.key != null &&
+  bool get current => widget.ownerCurrent?.call() != false && draft.key != null &&
     widget.session.supplierShortageRecoveryFormKey(widget.copy) == draft.key;
   WorkspaceSupplierLedger? get ledger => widget.session.workspaceSupplierLedger(widget.copy.supplier.id);
   Map<String, String> get fields => {
@@ -38145,13 +45504,14 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
     if (frozen != null) 'attempt': jsonEncode(frozen!.toJson()),
   };
   void refresh() { if (mounted) setState(() {}); }
-  void changed() { setState(() {}); draft.save(fields); }
+  void changed() { if (!current) return; setState(() {}); if(!_receivingPrepared)draft.save(fields); }
   @override
   void initState() {
     super.initState();
-    draft = _LedgerFormAutosave(widget.session, widget.session.supplierShortageRecoveryFormKey(widget.copy))
+    (_openSupplierAdjustmentForms[widget.session]??=<Object>{}).add(_receivingShortageToken);
+    draft = _LedgerFormAutosave(widget.session, widget.session.supplierShortageRecoveryFormKey(widget.copy),inputOwnerCurrent:widget.ownerCurrent)
       ..addListener(refresh);
-    unawaited(load());
+    unawaited(load(readOnlyOpen:widget.assistantReadOnlyOpen));
   }
   void restore(Map<String, String> saved) {
     final attempt = saved['attempt'];
@@ -38172,7 +45532,7 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
     if (!mounted || !current) throw StateError('Original Store is unavailable');
     confirmed = proof != null;
   }
-  Future<void> load() async {
+  Future<void> load({bool readOnlyOpen=false}) async {
     if (busy || draft.busy) return;
     setState(() { busy = true; error = null; });
     try {
@@ -38186,7 +45546,8 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
       if (saved == null || !mounted || !current) throw StateError('Saved review is unavailable');
       restore(saved);
       await verify();
-      recovered = await widget.session.recoverCustomerLedger();
+      recovered = readOnlyOpen?widget.session.workspaceInvoiceHistoryLoaded&&ledger!=null:await widget.session.recoverCustomerLedger();
+      _applyReceivingShortageInitial(saved);
       if (!mounted || !current) throw StateError('Original Store is unavailable');
       if (!recovered) {
         error = confirmed ? 'Shortage recorded. Supplier account refresh is pending.'
@@ -38234,7 +45595,7 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
           error = 'Choose the matching bill item and delivery, confirm the match, and enter a valid missing quantity.';
           return;
         }
-        frozen = intent;
+        frozen = intent;_receivingPrepared=false;
         draft.save(fields);
         if (!await draft.flush()) throw StateError('Review is not saved yet');
         if (!mounted || !current) throw StateError('Original Store is unavailable');
@@ -38253,11 +45614,18 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
     } finally { if (mounted) setState(() => busy = false); }
   }
   Future<void> close() async {
-    if (busy || draft.busy) return;
-    if (await draft.flush() && mounted) Navigator.of(context).pop();
+    if(busy||draft.busy||!mounted)return;
+    if(widget.receivingInitial!=null&&ModalRoute.of(context)?.isCurrent!=true)return;
+    if(_receivingPrepared) {
+      if(!await _confirmReceivingPreparedLeave(context)||!mounted||ModalRoute.of(context)?.isCurrent!=true)return;
+      setState(()=>_receivingLeaveAllowed=true);await WidgetsBinding.instance.endOfFrame;
+      if(mounted&&ModalRoute.of(context)?.isCurrent==true)Navigator.pop(context);return;
+    }
+    if(await draft.flush()&&mounted&&(widget.receivingInitial==null||ModalRoute.of(context)?.isCurrent==true))Navigator.of(context).pop();
   }
   @override
   void dispose() {
+    _openSupplierAdjustmentForms[widget.session]?.remove(_receivingShortageToken);
     draft.removeListener(refresh); draft.dispose(); quantity.dispose(); super.dispose();
   }
   @override
@@ -38272,7 +45640,8 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
     final selected = billLine == null || deliveryId == null || sourceLine == null ? null
       : optionId(billLine!, deliveryId!, sourceLine!);
     final visibleSelection = choices.any((o) => optionId(o.$1, o.$2.expectedDeliveryId, o.$3.sourceLineId) == selected);
-    return PopScope(canPop: !busy && !draft.busy && draft.ready && draft.pending == null && draft.error == null,
+    return PopScope(canPop: !busy && !draft.busy && draft.ready && draft.pending == null && draft.error == null && (!_receivingPrepared||_receivingLeaveAllowed),
+      onPopInvokedWithResult:(didPop,_){if(!didPop&&_receivingPrepared)unawaited(close());},
       child: SafeArea(child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.viewInsetsOf(context).bottom + 16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
@@ -38347,12 +45716,27 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
 }
 
 Future<void> _showSupplierCredit(BuildContext context, WorkSession session,
-    WorkspacePurchaseSavedCopy copy) => showModalBottomSheet<void>(context: context,
+    WorkspacePurchaseSavedCopy copy, {StoreSupplierCreditInitialData? initialData,
+    WorkspaceLedgerFormDraft? recoveryDraft,
+    WorkspaceLedgerFormKey? prefillKey, String? prefillSignature,
+    bool Function()? prefillCurrent, bool Function()? ownerCurrent, bool readOnlyOpen = false, StoreSupplierSelectedDocumentInput? selectedDocument}) => showModalBottomSheet<void>(context: context,
       isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
-      builder: (_) => _StoreSupplierCreditSheet(session: session, copy: copy));
+      builder: (sheetContext) => _supplierCapturedOwnerSheet(
+        context, sheetContext, session, ownerCurrent, _StoreSupplierCreditSheet(session: session, copy: copy,
+        initialData: initialData, recoveryDraft: recoveryDraft,
+        prefillKey: prefillKey, prefillSignature: prefillSignature,
+        prefillCurrent: prefillCurrent, ownerCurrent: ownerCurrent, readOnlyOpen: readOnlyOpen, selectedDocument: selectedDocument)));
 
 class _StoreSupplierCreditSheet extends StatefulWidget {
-  const _StoreSupplierCreditSheet({required this.session, required this.copy});
+  const _StoreSupplierCreditSheet({required this.session, required this.copy,
+    this.initialData, this.recoveryDraft, this.prefillKey, this.prefillSignature, this.prefillCurrent, this.ownerCurrent, this.readOnlyOpen = false, this.selectedDocument});
+  final StoreSupplierCreditInitialData? initialData;
+  final WorkspaceLedgerFormDraft? recoveryDraft;
+  final WorkspaceLedgerFormKey? prefillKey;
+  final String? prefillSignature;
+  final bool Function()? prefillCurrent, ownerCurrent;
+  final bool readOnlyOpen;
+  final StoreSupplierSelectedDocumentInput? selectedDocument;
   final WorkSession session;
   final WorkspacePurchaseSavedCopy copy;
   @override
@@ -38360,6 +45744,10 @@ class _StoreSupplierCreditSheet extends StatefulWidget {
 }
 
 class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
+  final Object _nativeAdjustmentToken = Object();
+  late final WorkSession _nativeAdjustmentOwner;
+  bool _initialAttempted = false;
+  bool _recoveryReadChecked = false;
   late final _LedgerFormAutosave draft;
   final formFocus = FocusScopeNode();
   final reference = TextEditingController(), amount = TextEditingController(),
@@ -38411,7 +45799,7 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
   bool get busy => _busy || _copyBusyLease != null;
   String? error;
   WorkspaceSupplierLedger? get ledger => widget.session.workspaceSupplierLedger(widget.copy.supplier.id);
-  bool get current => draft.key != null &&
+  bool get current => draft.key != null && widget.ownerCurrent?.call() != false &&
     widget.session.supplierCreditFormKey(widget.copy) == draft.key;
   String identity(WorkspaceSupplierCreditSupport support) => jsonEncode([
     support.kind.name, support.receiptId, support.receiptLineId, support.billLineIndex,
@@ -38439,10 +45827,12 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
   @override
   void initState() {
     super.initState();
-    draft = _LedgerFormAutosave(widget.session, widget.session.supplierCreditFormKey(widget.copy));
+    _nativeAdjustmentOwner = widget.session;
+    (_openSupplierAdjustmentForms[_nativeAdjustmentOwner] ??= <Object>{}).add(_nativeAdjustmentToken);
+    draft = _LedgerFormAutosave(widget.session, widget.session.supplierCreditFormKey(widget.copy), inputOwnerCurrent: widget.ownerCurrent);
     draft.addListener(refresh);
     FocusManager.instance.addListener(refresh);
-    unawaited(load());
+    unawaited(load(readOnlyOpen: widget.readOnlyOpen));
   }
   void refresh() { if (mounted) setState(() {}); }
   void clearSelections() {
@@ -38516,7 +45906,7 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
       confirmed = proof != null;
     }
   }
-  Future<void> load() async {
+  Future<void> load({bool readOnlyOpen = false}) async {
     if (busy || draft.busy) return;
     setState(() { _busy = true; recovered = false; confirmed = false; });
     try {
@@ -38528,13 +45918,52 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
         }
       }
       if (!mounted || !current) { throw StateError('Original supplier bill unavailable'); }
-      recovered = await widget.session.recoverCustomerLedger();
+      recovered = readOnlyOpen ? widget.session.workspaceInvoiceHistoryLoaded : await widget.session.recoverCustomerLedger();
       if (!mounted || !current || !recovered) { throw StateError('Saved supplier account unavailable'); }
       final saved = await draft.load();
-      if (!mounted || saved == null) { throw StateError('Saved input unavailable'); }
+      if (!mounted || saved == null || !current) { throw StateError('Saved input unavailable'); }
+      final expected = widget.recoveryDraft;
+      if (expected != null && !_recoveryReadChecked) {
+        if (draft.key != expected.key || draft.revision != expected.revision ||
+            !mapEquals(saved, expected.fields)) {
+          throw StateError('Original saved adjustment changed before restoration');
+        }
+        _recoveryReadChecked = true;
+      }
       restore(saved);
       conflict = false; error = null; resetAttempt = null;
       await verifyStatus();
+      final initial = widget.initialData;
+      if (initial != null && !_initialAttempted) {
+        _initialAttempted = true;
+        final options = ledger?.availableCreditSupports(widget.copy.draft.id) ?? const [];
+        final resolved = <(WorkspaceSupplierCreditSupport, String)>[];
+        for (final proposal in initial.supports) {
+          final option = options.where((o) => _assistantCreditSupportId(o.$1) == proposal.$1).singleOrNull;
+          if (option == null) { error = 'Original credited goods changed. Suggestion was not applied.'; return; }
+          resolved.add((option.$1, proposal.$2));
+        }
+        final pristine = saved.isEmpty && draft.revision == null && draft.pending == null &&
+          !draft.busy && draft.error == null && frozen == null && supportingCopies == null &&
+          resetAttempt == null && !confirmed && !conflict && selected.isEmpty && taxRows.isEmpty &&
+          reference.text.isEmpty && amount.text.isEmpty && reason.text.isEmpty && date.text.isEmpty &&
+          treatment.isEmpty && reasonCode.isEmpty && particulars.values.every((c) => c.text.isEmpty);
+        if (!current || !recovered || widget.prefillCurrent?.call() == false || !pristine ||
+            widget.prefillKey != draft.key || !initial.matches(widget.session, widget.copy) ||
+            widget.prefillSignature != _assistantCreditSignature(widget.session, widget.copy)) {
+          error = 'Suggestion was not applied. Existing credit input and saved attempts are kept.';
+        } else {
+          reference.text = initial.inputs['reference']!; amount.text = initial.inputs['amount']!;
+          reason.text = initial.inputs['reason']!; date.text = initial.inputs['occurredOn']!;
+          treatment = initial.documentInput.treatment; reasonCode = initial.documentInput.reasonCode;
+          for (final entry in particulars.entries) { entry.value.text = initial.documentInput.particulars[entry.key] ?? ''; }
+          taxRows.addAll(initial.documentInput.taxRows.map(taxRow));
+          for (final support in resolved) {
+            selected[_assistantCreditSupportId(support.$1)] = (support.$1, TextEditingController(text: support.$2));
+          }
+          // No changed(), draft.save or flush: native user actions own saving.
+        }
+      }
     } on Object {
       recovered = false; conflict = true;
       error = 'Credit-note status could not be verified. Keep these details and retry recovery.';
@@ -38626,6 +46055,7 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
   }
   @override
   void dispose() {
+    _openSupplierAdjustmentForms[_nativeAdjustmentOwner]?.remove(_nativeAdjustmentToken);
     draft.removeListener(refresh); draft.dispose(); clearSelections(); clearTaxRows();
     FocusManager.instance.removeListener(refresh); formFocus.dispose();
     for (final controller in particulars.values) { controller.dispose(); }
@@ -38796,6 +46226,10 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
               widget.session.workspaceSupplierScope != null &&
               (frozen == null || supportingCopies?.active.isNotEmpty == true ||
                 supportingCopies?.previous.isNotEmpty == true)) _SupplierPaymentDraftCopies(
+            sourceRevision: () => jsonEncode([draft.revision, fields]),
+              selectedDocument: widget.selectedDocument,
+              canStageSelected: (lease) => draft.ready && recovered && current && !_busy && !conflict && frozen == null && !draft.busy && draft.error == null && inputError == null &&
+                (_copyBusyLease == null || identical(_copyBusyLease, lease)),
             session: widget.session, value: supportingCopies ?? WorkspaceSupplierMoneyCopies(
               key: draft.key!, qa: widget.session.workspaceSupplierScope!.$3),
             editable: editable && !draft.busy && draft.error == null && inputError == null,
@@ -38892,40 +46326,13 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
   }
 }
 
-Future<void> _showSupplierAllocation(BuildContext context, WorkSession session,
-    WorkspacePurchaseSavedCopy copy) => showModalBottomSheet<void>(context: context,
-      isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
-      builder: (_) => _StoreSupplierAllocationSheet(session: session, copy: copy));
-
-class _StoreSupplierAllocationSheet extends StatefulWidget {
-  const _StoreSupplierAllocationSheet({required this.session, required this.copy});
-  final WorkSession session;
-  final WorkspacePurchaseSavedCopy copy;
-  @override
-  State<_StoreSupplierAllocationSheet> createState() => _StoreSupplierAllocationSheetState();
-}
-
-class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationSheet> {
-  late final _LedgerFormAutosave draft;
-  final amount = TextEditingController();
-  final amountFocus = FocusNode();
-  WorkspaceSupplierMoneySourceKind? sourceKind;
-  String sourceId = '';
-  WorkspaceSupplierMoneyAllocationIntent? frozen;
-  WorkspaceLedgerFormDraft? resetAttempt;
-  WorkspaceSupplierMoneyCopies? supportingCopies;
-  bool _busy = false, recovered = false, confirmed = false, conflict = false;
-  Object? _copyBusyLease;
-  bool get busy => _busy || _copyBusyLease != null;
-  String? error;
-  WorkspaceSupplierLedger? get ledger => widget.session.workspaceSupplierLedger(widget.copy.supplier.id);
-  List<(WorkspaceSupplierMoneySourceKind, String, String, int)> get sources {
-    final current = ledger;
+List<(WorkspaceSupplierMoneySourceKind, String, String, int)> _supplierAllocationSources(
+  WorkspaceSupplierLedger? current, WorkspacePurchaseSavedCopy copy, {bool includeExhausted = false}) {
     if (current == null || !current.valid) return const [];
     final list = <(WorkspaceSupplierMoneySourceKind, String, String, int)>[];
     void add(WorkspaceSupplierMoneySourceKind kind, String id, String label) {
       final remaining = current.unallocatedMoneyMinor(kind, id);
-      if (remaining != null && (remaining > 0 || frozen != null)) {
+      if (remaining != null && (remaining > 0 || includeExhausted)) {
         list.add((kind, id, label, remaining));
       }
     }
@@ -38940,7 +46347,7 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
         '${entry.kind == WorkspaceSupplierEntryKind.advance ? 'Advance' : 'Account payment'} · ${entry.reference}'
         ' · ${entry.moneyReview!.occurredOn} · ${entry.paymentMethod ?? 'Method not recorded'}');
     }
-    for (final bill in current.purchaseBills.values.where((b) => b.billId != widget.copy.draft.id)) {
+    for (final bill in current.purchaseBills.values.where((b) => b.billId != copy.draft.id)) {
       add(WorkspaceSupplierMoneySourceKind.manualBillSurplus, bill.billId,
         'Bill credit · ${bill.copy.draft.invoiceReference} · ${bill.copy.draft.invoiceDate}');
     }
@@ -38949,7 +46356,59 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
         list.where((source) => source.$3 == list[index].$3).length > 1
           ? '${list[index].$3} · Record ${index + 1}' : list[index].$3,
         list[index].$4)];
-  }
+}
+
+Future<void> _showSupplierAllocation(BuildContext context, WorkSession session,
+    WorkspacePurchaseSavedCopy copy, {StoreSupplierAllocationInitialData? initialData,
+    WorkspaceLedgerFormDraft? recoveryDraft,
+    WorkspaceLedgerFormKey? prefillKey, String? prefillSignature,
+    bool Function()? prefillCurrent, bool Function()? ownerCurrent, bool readOnlyOpen = false, StoreSupplierSelectedDocumentInput? selectedDocument}) => showModalBottomSheet<void>(context: context,
+      isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
+      builder: (sheetContext) => _supplierCapturedOwnerSheet(
+        context, sheetContext, session, ownerCurrent, _StoreSupplierAllocationSheet(session: session, copy: copy,
+        initialData: initialData, recoveryDraft: recoveryDraft,
+        prefillKey: prefillKey, prefillSignature: prefillSignature,
+        prefillCurrent: prefillCurrent, ownerCurrent: ownerCurrent, readOnlyOpen: readOnlyOpen, selectedDocument: selectedDocument)));
+
+class _StoreSupplierAllocationSheet extends StatefulWidget {
+  const _StoreSupplierAllocationSheet({required this.session, required this.copy,
+    this.initialData, this.recoveryDraft, this.prefillKey, this.prefillSignature, this.prefillCurrent, this.ownerCurrent, this.readOnlyOpen = false, this.selectedDocument});
+  final StoreSupplierAllocationInitialData? initialData;
+  final WorkspaceLedgerFormDraft? recoveryDraft;
+  final WorkspaceLedgerFormKey? prefillKey;
+  final String? prefillSignature;
+  final bool Function()? prefillCurrent, ownerCurrent;
+  final bool readOnlyOpen;
+  final StoreSupplierSelectedDocumentInput? selectedDocument;
+  final WorkSession session;
+  final WorkspacePurchaseSavedCopy copy;
+  @override
+  State<_StoreSupplierAllocationSheet> createState() => _StoreSupplierAllocationSheetState();
+}
+
+class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationSheet> {
+  final Object _nativeAllocationToken = Object();
+  late final WorkSession _nativeAllocationOwner;
+  bool _initialAttempted = false;
+  bool _recoveryReadChecked = false;
+  bool get _ownerCurrent => widget.ownerCurrent?.call() != false;
+  bool get _sourceCurrent => widget.initialData == null ||
+    _assistantSupplierAllocationSignature(widget.session, widget.copy, null) == widget.prefillSignature;
+  late final _LedgerFormAutosave draft;
+  final amount = TextEditingController();
+  final amountFocus = FocusNode();
+  WorkspaceSupplierMoneySourceKind? sourceKind;
+  String sourceId = '';
+  WorkspaceSupplierMoneyAllocationIntent? frozen;
+  WorkspaceLedgerFormDraft? resetAttempt;
+  WorkspaceSupplierMoneyCopies? supportingCopies;
+  bool _busy = false, recovered = false, confirmed = false, conflict = false;
+  Object? _copyBusyLease;
+  bool get busy => _busy || _copyBusyLease != null;
+  String? error;
+  WorkspaceSupplierLedger? get ledger => widget.session.workspaceSupplierLedger(widget.copy.supplier.id);
+  List<(WorkspaceSupplierMoneySourceKind, String, String, int)> get sources =>
+    _supplierAllocationSources(ledger, widget.copy, includeExhausted: frozen != null);
   String sourceValue(WorkspaceSupplierMoneySourceKind kind, String id) => jsonEncode([kind.name, id]);
   Map<String, String> get fields => {'amount': amount.text, 'sourceKind': sourceKind?.name ?? '',
     'sourceId': sourceId, if (frozen != null) 'attempt': jsonEncode(frozen!.intentToJson()),
@@ -38958,10 +46417,12 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
   @override
   void initState() {
     super.initState();
-    draft = _LedgerFormAutosave(widget.session, widget.session.supplierAllocationFormKey(widget.copy));
+    _nativeAllocationOwner = widget.session;
+    (_openSupplierMoneyForms[_nativeAllocationOwner] ??= <Object>{}).add(_nativeAllocationToken);
+    draft = _LedgerFormAutosave(widget.session, widget.session.supplierAllocationFormKey(widget.copy), inputOwnerCurrent: widget.ownerCurrent);
     draft.addListener(refresh);
     amountFocus.addListener(refresh);
-    unawaited(load());
+    unawaited(load(readOnlyOpen: widget.readOnlyOpen));
   }
   void refresh() { if (mounted) setState(() {}); }
   void inspect() {
@@ -38975,14 +46436,15 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
   }
   Future<void> recordMoney(bool advance) async {
     final session = widget.session;
-    if (busy || conflict || frozen != null || !draft.ready || !recovered ||
+    if (!_ownerCurrent || busy || conflict || frozen != null || !draft.ready || !recovered ||
         session.supplierAllocationFormKey(widget.copy) != draft.key) { return; }
     setState(() => _busy = true);
     try {
-      if (!await draft.flush() || !mounted ||
+      if (!await draft.flush() || !mounted || !_ownerCurrent ||
           session.supplierAllocationFormKey(widget.copy) != draft.key) { return; }
       await _showSupplierMoneyEntry(context, session,
-        _StoreSupplierMoneyTarget(supplierId: widget.copy.supplier.id, advance: advance));
+        _StoreSupplierMoneyTarget(supplierId: widget.copy.supplier.id, advance: advance),
+        ownerCurrent: widget.ownerCurrent);
     } finally { if (mounted) setState(() => _busy = false); }
     if (mounted && session.supplierAllocationFormKey(widget.copy) == draft.key) {
       await load();
@@ -38990,8 +46452,11 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
       setState(() { conflict = true; error = 'Return to the original Store to recover this allocation.'; });
     }
   }
-  Future<void> load() async {
-    if (busy || draft.busy) return;
+  Future<void> load({bool readOnlyOpen = false}) async {
+    if (!_ownerCurrent || busy || draft.busy) return;
+    final pristineAtStart = amount.text.isEmpty && sourceKind == null && sourceId.isEmpty &&
+      draft.revision == null && draft.pending == null && draft.error == null &&
+      frozen == null && supportingCopies == null && resetAttempt == null && !confirmed && !conflict;
     setState(() => _busy = true);
     try {
       var pendingConflict = false;
@@ -38999,10 +46464,20 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
         draft.save(conflict ? draft.pending!.fields : fields);
         pendingConflict = !await draft.flush();
       }
-      if (!mounted || draft.key == null) return;
-      recovered = await widget.session.recoverWorkspaceSupplierAllocationStatus(draft.key!);
+      if (!mounted || !_ownerCurrent || draft.key == null) return;
+      recovered = readOnlyOpen ? await widget.session.inspectWorkspaceSupplierAllocationCheckpoint(draft.key!)
+        : await widget.session.recoverWorkspaceSupplierAllocationStatus(draft.key!);
+      if (!mounted || !_ownerCurrent) return;
       final saved = await draft.load();
-      if (!mounted || saved == null) return;
+      if (!mounted || !_ownerCurrent || saved == null) return;
+      final expected = widget.recoveryDraft;
+      if (expected != null && !_recoveryReadChecked) {
+        if (draft.key != expected.key || draft.revision != expected.revision ||
+            !mapEquals(saved, expected.fields)) {
+          throw StateError('Original saved allocation changed before restoration');
+        }
+        _recoveryReadChecked = true;
+      }
       final copies = WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision ?? 1,
         fields: saved).supplierAllocationCopies;
       if (copies != null && copies.qa != widget.session.workspaceSupplierScope?.$3) {
@@ -39025,15 +46500,36 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
         }
       }
       inspect();
+      final initial = widget.initialData;
+      if (initial != null && !_initialAttempted) {
+        _initialAttempted = true;
+        final pristine = pristineAtStart && saved.isEmpty && draft.revision == null &&
+          draft.pending == null && draft.error == null && !pendingConflict &&
+          frozen == null && supportingCopies == null && resetAttempt == null && !confirmed && !conflict;
+        if (!pristine || !recovered || !_ownerCurrent || !_sourceCurrent ||
+            widget.prefillCurrent?.call() == false || widget.prefillKey != draft.key ||
+            !initial.matches(widget.session, widget.copy)) {
+          error = 'Suggestion was not applied. Existing allocation input and saved attempts are kept.';
+        } else {
+          // No autosave callback, flush or posting on Review.
+          amount.text = initial.amount;
+          sourceKind = initial.sourceKind;
+          sourceId = initial.sourceId;
+        }
+      }
     } on Object {
       if (mounted) setState(() { conflict = true; error = 'Saved allocation could not be read. Keep the request and retry recovery.'; });
     } finally { if (mounted) setState(() => _busy = false); }
   }
   Future<void> submit() async {
-    if (busy || conflict || !recovered || !draft.ready || draft.key == null) return;
+    if (!_ownerCurrent || busy || conflict || !recovered || !draft.ready || draft.key == null) return;
+    if (frozen == null && !_sourceCurrent) {
+      setState(() => error = 'Allocation source changed. Close and reopen this bill before applying.');
+      return;
+    }
     setState(() { _busy = true; error = null; });
     try {
-      if (!await draft.flush() || !mounted) return;
+      if (!await draft.flush() || !mounted || !_ownerCurrent || frozen == null && !_sourceCurrent) return;
       if (confirmed) {
         resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1,
           fields: {'amount': '', 'sourceKind': '', 'sourceId': '',
@@ -39069,6 +46565,7 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
         draft.save(fields);
         if (!await draft.flush() || !mounted) { error = 'Request is not submitted. Save and retry this same request.'; return; }
       }
+      if (!_ownerCurrent) return;
       final saved = await widget.session.recordWorkspaceSupplierAllocationDraft(draft.key!, frozen!);
       if (!mounted) return;
       recovered = await widget.session.recoverWorkspaceSupplierAllocationStatus(draft.key!);
@@ -39084,6 +46581,7 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
   }
   @override
   void dispose() {
+    _openSupplierMoneyForms[_nativeAllocationOwner]?.remove(_nativeAllocationToken);
     draft.removeListener(refresh); draft.dispose(); amount.dispose();
     amountFocus.removeListener(refresh); amountFocus.dispose(); super.dispose();
   }
@@ -39193,11 +46691,15 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
           if (draft.ready && accountReady && !conflict && widget.session.workspaceSupplierScope != null &&
               ((frozen == null && !settled) || supportingCopies?.active.isNotEmpty == true ||
                 supportingCopies?.previous.isNotEmpty == true)) _SupplierPaymentDraftCopies(
+            sourceRevision: () => jsonEncode([draft.revision, fields]),
+              selectedDocument: widget.selectedDocument,
+              canStageSelected: (lease) => draft.ready && accountReady && _ownerCurrent && !_busy && !conflict && frozen == null && !settled && !draft.busy && draft.error == null &&
+                (_copyBusyLease == null || identical(_copyBusyLease, lease)),
             session: widget.session, value: supportingCopies ?? WorkspaceSupplierMoneyCopies(
               key: draft.key!, qa: widget.session.workspaceSupplierScope!.$3),
             editable: editable && !settled && !draft.busy && draft.error == null,
             saved: draft.pending == null && !draft.busy && draft.error == null,
-            isCurrent: () => mounted && widget.session.supplierAllocationFormKey(widget.copy) == draft.key,
+            isCurrent: () => mounted && _ownerCurrent && widget.session.supplierAllocationFormKey(widget.copy) == draft.key,
             beforeChange: draft.flush,
             onBusy: (lease, active) {
               if (mounted && (active || identical(_copyBusyLease, lease))) {
@@ -39205,7 +46707,7 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
               }
             },
             onChanged: (value) async {
-              if (!mounted || widget.session.supplierAllocationFormKey(widget.copy) != draft.key ||
+              if (!mounted || !_ownerCurrent || widget.session.supplierAllocationFormKey(widget.copy) != draft.key ||
                   frozen != null || conflict) { return false; }
               setState(() => supportingCopies = value);
               draft.save(fields);
@@ -39227,9 +46729,12 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
 class _SupplierPaymentDraftCopies extends StatefulWidget {
   const _SupplierPaymentDraftCopies({required this.session, required this.value,
     required this.editable, required this.saved, required this.isCurrent, required this.beforeChange,
-    required this.onBusy, required this.onChanged});
+    required this.onBusy, required this.onChanged, required this.sourceRevision, required this.canStageSelected, this.selectedDocument});
   final WorkSession session;
   final WorkspaceSupplierMoneyCopies value;
+  final String Function() sourceRevision;
+  final StoreSupplierSelectedDocumentInput? selectedDocument;
+  final bool Function(Object lease) canStageSelected;
   final bool editable, saved;
   final bool Function() isCurrent;
   final Future<bool> Function() beforeChange;
@@ -39247,6 +46752,15 @@ class _SupplierPaymentDraftCopiesState extends State<_SupplierPaymentDraftCopies
   late String _type;
   String? _error;
   String? _unsavedValue;
+  bool get _selectedReady => _editable && widget.saved && _unsavedValue == null;
+  final _selectionChanges = ValueNotifier<int>(0);
+  bool _selectedStarted = false, _selectedScheduled = false;
+  bool _selectionDisposed = false;
+  String? _lastSelectedSource;
+  ModalRoute<dynamic>? _selectedOwnerRoute;
+  NavigatorState? _selectedNavigator;
+  bool get _selectedAllowed => !_selectionDisposed && _current && widget.canStageSelected(_busyLease);
+  String get _selectedSource => assistant_hash.sha256.convert(utf8.encode(jsonEncode([widget.sourceRevision(), widget.value.toJson(), _type]))).toString();
   bool get _credit => widget.value.key.kind == 'supplierCredit';
   bool get _refund => widget.value.key.kind == 'supplierRefund';
   bool get _allocation => widget.value.key.kind == 'supplierAllocation';
@@ -39264,8 +46778,23 @@ class _SupplierPaymentDraftCopiesState extends State<_SupplierPaymentDraftCopies
     widget.session.addListener(_scopeChanged);
   }
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _selectedOwnerRoute = ModalRoute.of(context);
+    _selectedNavigator = Navigator.of(context, rootNavigator: true);
+    _queueSelectedOriginal();
+  }
+  @override
   void didUpdateWidget(_SupplierPaymentDraftCopies oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _queueSelectedOriginal();
+    final next = _selectedSource;
+    if (_lastSelectedSource != next) {
+      _lastSelectedSource = next;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_selectionDisposed) _selectionChanges.value++;
+      });
+    }
     if (_unsavedValue != null && widget.saved &&
         jsonEncode(widget.value.toJson()) == _unsavedValue) {
       _unsavedValue = null;
@@ -39300,6 +46829,8 @@ class _SupplierPaymentDraftCopiesState extends State<_SupplierPaymentDraftCopies
   }
   @override
   void dispose() {
+    _selectionDisposed = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) { _selectionChanges.value++; _selectionChanges.dispose(); });
     widget.session.removeListener(_scopeChanged);
     final release = widget.onBusy;
     final lease = _busyLease;
@@ -39319,6 +46850,62 @@ class _SupplierPaymentDraftCopiesState extends State<_SupplierPaymentDraftCopies
         _error = _unsavedWarning;
       });
     }
+  }
+  void _queueSelectedOriginal() {
+    if(_selectedStarted||_selectedScheduled||widget.selectedDocument==null)return;
+    _selectedScheduled=true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _selectedScheduled=false;
+      final input=widget.selectedDocument;
+      if(!mounted||_selectedStarted||input==null||!_selectedReady||!input.current())return;
+      _selectedStarted=true;
+      unawaited(_stageSupportingCopyInput(this,input));
+    });
+  }
+  Future<MoolAssistantReviewResult> _addSelectedOriginal(MoolAssistantSelectedDocument selected,
+      bool Function() current, Listenable ownerChanges, NavigatorState navigator,
+      void Function(Route<WorkspacePurchaseInvoiceAttachment>) bindReview,
+      void Function(Route<void>) bindOriginal) async {
+    if (!mounted || !navigator.mounted || !current() || !_selectedReady) return MoolAssistantReviewResult.stale;
+    if (widget.value.active.any((copy) => copy.digest == selected.sourceDigest)) return MoolAssistantReviewResult.unavailable;
+    final baseline = _selectedSource;
+    bool ready() => mounted && navigator.mounted && current() && _selectedAllowed && _selectedSource == baseline;
+    var result = MoolAssistantReviewResult.unavailable;
+    await _run(() async {
+      final retained = await widget.session.workspacePurchaseInvoiceCapture.retainSelectedForDraft(
+        _scope, widget.value.captureId, selected.proof, source: selected.reference.source,
+        canRetain: (candidate) => ready() && candidate.digest == selected.sourceDigest &&
+          !widget.value.active.any((copy) => copy.digest == candidate.digest) &&
+          widget.value.withActive([...widget.value.active,
+            candidate.withDocumentDetails({if (_type.isNotEmpty) 'type': _type})]).valid);
+      if (!ready()) { result = MoolAssistantReviewResult.stale; return; }
+      final candidate = retained.withDocumentDetails({if (_type.isNotEmpty) 'type': _type});
+      // Retention is private-file IO only. No draft save, scan or financial
+      // effect occurs before this original native Add copy control.
+      late final MaterialPageRoute<WorkspacePurchaseInvoiceAttachment> route;
+      route = MaterialPageRoute<WorkspacePurchaseInvoiceAttachment>(builder: (_) =>
+        _ReceivingOwnerSurface(current: ready, changes: ownerChanges,
+          retiredMessage: 'This supporting-copy review is no longer available.',
+          child: _ReceivingScannedFieldsScreen(session: widget.session, scope: _scope,
+          captureId: widget.value.captureId, attachment: candidate, readOnly: false,
+          isCurrent: () => ready() && route.isActive, canKeep: (value) => ready() && widget.value.withActive([...widget.value.active, value]).valid,
+          copyDescription: 'supporting copy', limitDescription: 'draft',
+          title: 'Add supporting copy', saveLabel: 'Add copy', ownerChanges: ownerChanges, capturedRoute: route,
+          onOriginalRoute: bindOriginal, beforeKeep: (value) async {
+            if (!ready() || value.digest != candidate.digest) return false;
+            try { await widget.session.workspacePurchaseInvoiceCapture.read(_scope, widget.value.captureId, candidate); }
+            on Object { return false; }
+            return ready();
+          })));
+      bindReview(route);
+      final accepted = await navigator.push(route);
+      if (!ready()) { result = MoolAssistantReviewResult.stale; return; }
+      if (accepted == null) { result = MoolAssistantReviewResult.cancelled; return; }
+      if (accepted.digest != candidate.digest || !widget.value.withActive([...widget.value.active, accepted]).valid) return;
+      await _keep(widget.value.withActive([...widget.value.active, accepted]));
+      result = _current && _unsavedValue == null ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.unavailable;
+    });
+    return result;
   }
   Future<void> _capture(WorkProofSource source) => _run(() async {
     final value = await widget.session.workspacePurchaseInvoiceCapture.captureForDraft(_scope, widget.value.captureId, source,
@@ -39446,8 +47033,16 @@ class _SupplierPaymentDraftCopiesState extends State<_SupplierPaymentDraftCopies
 }
 
 class _StoreMoneyEntrySheet extends StatefulWidget {
-  const _StoreMoneyEntrySheet({required this.session, this.purchase, this.supplierMoney})
+  const _StoreMoneyEntrySheet({required this.session, this.purchase, this.supplierMoney,
+    this.initialData, this.expenseInitialData, this.prefillKey, this.prefillSignature, this.prefillCurrent, this.ownerCurrent, this.readOnlyOpen = false, this.selectedDocument})
     : assert(purchase == null || supplierMoney == null);
+  final StoreSupplierMoneyInitialData? initialData;
+  final StoreExpenseInitialData? expenseInitialData;
+  final WorkspaceLedgerFormKey? prefillKey;
+  final String? prefillSignature;
+  final bool Function()? prefillCurrent, ownerCurrent;
+  final bool readOnlyOpen;
+  final StoreSupplierSelectedDocumentInput? selectedDocument;
   final WorkSession session;
   final WorkspacePurchaseRecord? purchase;
   final _StoreSupplierMoneyTarget? supplierMoney;
@@ -39456,6 +47051,10 @@ class _StoreMoneyEntrySheet extends StatefulWidget {
 }
 
 class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
+  final Object _nativeMoneyToken = Object();
+  late final WorkSession _nativeMoneyOwner;
+  bool _initialAttempted = false;
+  bool get _inputOwnerCurrent => widget.ownerCurrent?.call() != false;
   bool get expense => widget.purchase == null && widget.supplierMoney == null;
   bool get manualMoney => widget.supplierMoney != null;
   WorkspaceSupplierLedger? get moneyLedger => widget.session.workspaceSupplierLedger(widget.supplierMoney?.supplierId ?? '');
@@ -39514,6 +47113,8 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   @override
   void initState() {
     super.initState();
+    _nativeMoneyOwner = widget.session;
+    (_openSupplierMoneyForms[_nativeMoneyOwner] ??= <Object>{}).add(_nativeMoneyToken);
     draft = _LedgerFormAutosave(
       widget.session,
       manualMoney ? widget.session.supplierMoneyFormKey(widget.supplierMoney!.supplierId,
@@ -39521,11 +47122,12 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
       : expense
           ? widget.session.expenseFormKey()
           : widget.session.supplierPaymentFormKey(widget.purchase!),
+      inputOwnerCurrent: widget.ownerCurrent,
     );
     draft.addListener(refresh);
     amountFocus.addListener(refresh);
     referenceFocus.addListener(refresh);
-    unawaited(load());
+    unawaited(load(readOnlyOpen: widget.readOnlyOpen));
   }
 
   void refresh() {
@@ -39534,26 +47136,30 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     }
   }
 
-  Future<void> load() async {
+  Future<void> load({bool readOnlyOpen = false}) async {
     if (saving || draft.busy) return;
     setState(() => _saving = true);
     try {
-      await _loadMoneyInputLocked();
+      await _loadMoneyInputLocked(readOnlyOpen: readOnlyOpen);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  Future<void> _loadMoneyInputLocked() async {
+  Future<void> _loadMoneyInputLocked({bool readOnlyOpen = false}) async {
+    if (!_inputOwnerCurrent) return;
+    final pristineAtStart = amount.text.isEmpty && reference.text.isEmpty &&
+      draft.revision == null && draft.pending == null && !draft.busy && draft.error == null &&
+      frozen == null && supportingCopies == null && resetAttempt == null && !confirmed && !conflict;
     var pendingConflict = false;
     if (manualMoney && draft.pending != null) {
       draft.save(fields);
       pendingConflict = !await draft.flush();
       if (!mounted) return;
     }
-    if (manualMoney) moneyRecovered = await widget.session.recoverCustomerLedger();
+    if (manualMoney) moneyRecovered = readOnlyOpen ? widget.session.workspaceInvoiceHistoryLoaded : await widget.session.recoverCustomerLedger();
     final saved = await draft.load();
-    if (!mounted || saved == null) {
+    if (!mounted || saved == null || !_inputOwnerCurrent) {
       return;
     }
     amount.text = saved['amount'] ?? '';
@@ -39593,6 +47199,48 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
         }
       }
     }
+    final expenseInitial = widget.expenseInitialData;
+    if (expenseInitial != null && !_initialAttempted) {
+      _initialAttempted = true;
+      final pristine = pristineAtStart && saved.isEmpty && draft.revision == null &&
+        draft.pending == null && !draft.busy && draft.error == null && !pendingConflict &&
+        amount.text.isEmpty && reference.text.isEmpty && note.text.isEmpty;
+      if (!expense || !pristine || !_inputOwnerCurrent || widget.prefillCurrent?.call() == false ||
+          widget.prefillKey != draft.key || widget.prefillSignature !=
+            _supplierAccountAssistantSignature(widget.session, 'AI-ACT-270', null)) {
+        error = 'Suggestion was not applied. Existing expense input is kept.';
+      } else {
+        // Programmatic raw input only; the original controls own every save.
+        amount.text = expenseInitial.inputs['amount']!;
+        reference.text = expenseInitial.inputs['reference']!;
+        method = expenseInitial.inputs['channel']!;
+        category = expenseInitial.inputs['category']!;
+        note.text = expenseInitial.inputs['note']!;
+      }
+    }
+    final initial = widget.initialData;
+    if (initial != null && !_initialAttempted) {
+      _initialAttempted = true;
+      final target = widget.supplierMoney;
+      final pristine = pristineAtStart && saved.isEmpty && draft.revision == null &&
+        draft.pending == null && !draft.busy && draft.error == null && !pendingConflict &&
+        frozen == null && supportingCopies == null && resetAttempt == null &&
+        !confirmed && !conflict && amount.text.isEmpty && reference.text.isEmpty;
+      if (!manualMoney || target == null || !moneyRecovered || !_inputOwnerCurrent ||
+          widget.prefillCurrent?.call() == false || !pristine ||
+          widget.prefillKey != draft.key || !initial.matches(widget.session, target) ||
+          widget.prefillSignature != _assistantSupplierMoneySignature(widget.session, target)) {
+        error = 'Suggestion was not applied. Existing supplier input and saved attempts are kept.';
+      } else {
+        // Programmatic assignment does not invoke TextField onChanged.
+        // No draft.save or flush here; original user actions own persistence.
+        amount.text = initial.inputs['amount']!;
+        reference.text = initial.inputs['reference']!;
+        method = initial.inputs['channel']!;
+        occurredOn = initial.inputs['occurredOn']!;
+        // Do not tick the original opening-balance confirmation for the user.
+      }
+    }
     setState(() {});
   }
 
@@ -39609,7 +47257,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   }
 
   Future<void> submitManualMoney() async {
-    if (saving || confirmed || conflict || !moneyRecovered) return;
+    if (saving || confirmed || conflict || !moneyRecovered || !_inputOwnerCurrent) return;
     setState(() => _saving = true);
     try {
       await _submitManualMoneyLocked();
@@ -39619,7 +47267,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   }
 
   Future<void> _submitManualMoneyLocked() async {
-    if (!await draft.flush() || !mounted) return;
+    if (!await draft.flush() || !mounted || !_inputOwnerCurrent) return;
     final ledger = moneyLedger;
     final opening = ledger?.openingRecord;
     final minor = WorkspacePurchaseEntryDraft.printedPaise(amount.text);
@@ -39656,6 +47304,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     } else {
       setState(() { _saving = true; error = null; });
     }
+    if (!_inputOwnerCurrent) return;
     final saved = await widget.session.recordWorkspaceSupplierMoneyDraft(draft.key!, frozen!);
     if (!mounted) return;
     moneyRecovered = await widget.session.recoverCustomerLedger();
@@ -39668,7 +47317,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   }
 
   Future<void> recordAnother() async {
-    if (saving || !confirmed || draft.revision == null) return;
+    if (!_inputOwnerCurrent || saving || !confirmed || draft.revision == null) return;
     setState(() => _saving = true);
     try {
       await _recordAnotherLocked();
@@ -39678,14 +47327,15 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   }
 
   Future<void> _recordAnotherLocked() async {
-    if (!await draft.flush() || !mounted) return;
+    if (!_inputOwnerCurrent || !await draft.flush() || !mounted || !_inputOwnerCurrent) return;
     resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1,
       fields: {'amount': '', 'reference': '', 'channel': method,
         'occurredOn': DateTime.now().toIso8601String().substring(0, 10), 'notIncludedInOpening': 'false',
         if (supportingCopies != null) 'supportingCopies': jsonEncode(supportingCopies!.archive(frozen!).toJson())});
     setState(() { _saving = true; error = null; });
+    if (!_inputOwnerCurrent) return;
     final reset = await widget.session.resetConfirmedWorkspaceSupplierMoneyDraft(resetAttempt!, expectedRevision: draft.revision!);
-    if (!mounted) return;
+    if (!mounted || !_inputOwnerCurrent) return;
     if (reset) {
       draft.revision = resetAttempt!.revision;
       draft.pending = null;
@@ -39713,7 +47363,10 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
 
   Future<void> submit() async {
     if (manualMoney) { await submitManualMoney(); return; }
-    if (saving || !await draft.flush() || !mounted) {
+    if (saving || !_inputOwnerCurrent ||
+        (widget.expenseInitialData != null && widget.prefillSignature !=
+          _supplierAccountAssistantSignature(widget.session, 'AI-ACT-270', null)) ||
+        !await draft.flush() || !mounted || !_inputOwnerCurrent) {
       return;
     }
     final text = amount.text.trim();
@@ -39775,6 +47428,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
 
   @override
   void dispose() {
+    _openSupplierMoneyForms[_nativeMoneyOwner]?.remove(_nativeMoneyToken);
     draft.removeListener(refresh);
     draft.dispose();
     amount.dispose();
@@ -40009,11 +47663,15 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                 widget.session.workspaceSupplierScope != null &&
                 ((frozen == null && !_settledBillInput) || supportingCopies?.active.isNotEmpty == true ||
                   supportingCopies?.previous.isNotEmpty == true)) _SupplierPaymentDraftCopies(
+              sourceRevision: () => jsonEncode([draft.revision, fields]),
+              selectedDocument: widget.selectedDocument,
+              canStageSelected: (lease) => manualMoney && draft.ready && moneyRecovered && !conflict && !_saving && !draft.busy && draft.error == null && frozen == null && !_settledBillInput &&
+                (_copyBusyLease == null || identical(_copyBusyLease, lease)),
               session: widget.session, value: supportingCopies ?? WorkspaceSupplierMoneyCopies(
                 key: draft.key!, qa: widget.session.workspaceSupplierScope!.$3),
               editable: !saving && !draft.busy && draft.error == null && frozen == null && !_settledBillInput,
               saved: draft.pending == null && !draft.busy && draft.error == null,
-              isCurrent: () => mounted && widget.session.supplierMoneyFormKey(widget.supplierMoney!.supplierId,
+              isCurrent: () => mounted && _inputOwnerCurrent && widget.session.supplierMoneyFormKey(widget.supplierMoney!.supplierId,
                 copy: widget.supplierMoney!.copy, advance: widget.supplierMoney!.advance) == draft.key,
               beforeChange: draft.flush,
               onBusy: (lease, busy) {
@@ -40022,7 +47680,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                 }
               },
               onChanged: (value) async {
-                if (!mounted || frozen != null || conflict ||
+                if (!mounted || !_inputOwnerCurrent || frozen != null || conflict ||
                     widget.session.supplierMoneyFormKey(widget.supplierMoney!.supplierId,
                       copy: widget.supplierMoney!.copy, advance: widget.supplierMoney!.advance) != draft.key) { return false; }
                 setState(() => supportingCopies = value);
@@ -40076,8 +47734,12 @@ class _CustomerCollectionSheet extends StatefulWidget {
     required this.storeId,
     this.refund = false,
     this.counterSaleReceipt = false,
-    this.onClose,
+    this.onClose, this.reviewScope,this.preparedFields,this.capturedDraft,this.onPreparedDraft,
   });
+  final StoreCustomerActionReviewScope? reviewScope;
+  final Map<String,String>? preparedFields;
+  final WorkspaceLedgerFormDraft? capturedDraft;
+  final ValueChanged<Map<String,String>>? onPreparedDraft;
   final bool refund;
   final bool counterSaleReceipt;
   final VoidCallback? onClose;
@@ -40091,6 +47753,9 @@ class _CustomerCollectionSheet extends StatefulWidget {
 
 class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
     with WidgetsBindingObserver {
+  bool _preparedCompleted=false;
+  bool _preparedCurrent()=>widget.reviewScope==null || mounted&&widget.reviewScope!.current()&&ModalRoute.of(context)?.isCurrent==true;
+  Future<bool> _runPreparedNative(Future<bool> Function() run)=>widget.reviewScope?.runNative(run)??run();
   Future<bool> flushForNavigation() async =>
       !saving && !confirming && await draft.flush();
   final amount = TextEditingController();
@@ -40132,7 +47797,8 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
   bool get _bankTransfer => channel == WorkspacePaymentChannel.bankTransfer;
   bool get _needsReference =>
       _bankTransfer || channel == WorkspacePaymentChannel.directUpi;
-  String get _referenceLabel => widget.refund ? 'Refund transaction reference' : _bankTransfer
+  bool get _showPreparedReference=>_needsReference||widget.preparedFields?.containsKey("reference")==true;
+  String get _referenceLabel => widget.preparedFields!=null&&channel==WorkspacePaymentChannel.cash ? (widget.refund?'Refund receipt reference (optional)':'Receipt reference (optional)') : widget.refund ? 'Refund transaction reference' : _bankTransfer
       ? 'Bank transaction reference'
       : 'UPI transaction reference';
   bool saving = false;
@@ -40191,6 +47857,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
         widget.payment,
         widget.refund ? 'refund' : 'collection',
       ),
+      inputOwnerCurrent:widget.reviewScope?.current,preparedFields:widget.preparedFields,capturedDraft:widget.capturedDraft,onPreparedDraft:widget.onPreparedDraft,
     );
     draft.addListener(refreshDraft);
     unawaited(loadDraft());
@@ -40247,7 +47914,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
 
   Future<void> loadDraft() async {
     final fields = await draft.load();
-    if (!mounted || fields == null) {
+    if (!mounted || widget.reviewScope?.current()==false || fields == null) {
       return;
     }
     amount.text = fields['amount'] ?? amount.text;
@@ -40256,6 +47923,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
       channel = switch (fields['channel']) {
         'directUpi' => WorkspacePaymentChannel.directUpi,
         'cash' => WorkspacePaymentChannel.cash,
+        'bankTransfer' when widget.preparedFields!=null => WorkspacePaymentChannel.bankTransfer,
         _ => channel,
       };
     }
@@ -40275,6 +47943,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
 
   @override
   void dispose() {
+    if(widget.preparedFields!=null)widget.onPreparedDraft?.call(draftFields);
     WidgetsBinding.instance.removeObserver(this);
     amountFocus.removeListener(_scheduleReceiptReveal);
     referenceFocus.removeListener(_scheduleReceiptReveal);
@@ -40297,7 +47966,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
   }
 
   Future<void> submit() async {
-    if (saving || confirming || !draft.ready || draft.error != null) return;
+    if (_preparedCompleted || !_preparedCurrent() || saving || confirming || !draft.ready || draft.error != null) return;
     setState(() => confirming = true);
     try {
       await _submitCollection();
@@ -40310,7 +47979,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
   }
 
   Future<void> _submitCollection() async {
-    if (!await draft.flush() || !mounted) {
+    if (!await draft.flush() || !mounted || !_preparedCurrent()) {
       return;
     }
     setState(() {
@@ -40363,28 +48032,30 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
       saving = true;
       error = null;
     });
-    final recorded = widget.refund
-        ? await widget.session.recordCustomerRefund(
+    final recorded = await _runPreparedNative(()=>widget.refund
+        ? widget.session.recordCustomerRefund(
             customerId: widget.payment.customerId,
             invoiceId: widget.payment.invoiceId!,
             amountMinor: minor,
             channel: channel,
             reference: reference.text,
-            sourceCollectionId: sourceCollectionId,
+            sourceCollectionId: sourceCollectionId, reviewOwnerCurrent:widget.reviewScope?.ownerCurrent,reviewInputCurrent:widget.reviewScope==null?null:_preparedCurrent,onReviewNativeChange:widget.reviewScope?.acceptNativeChange,
           )
-        : await widget.session.recordCustomerCollection(
+        : widget.session.recordCustomerCollection(
       customerId: widget.payment.customerId,
       invoiceId: widget.payment.invoiceId!,
       amountMinor: minor,
       channel: channel,
-      reference: reference.text,
-    );
+      reference: reference.text, reviewOwnerCurrent:widget.reviewScope?.ownerCurrent,reviewInputCurrent:widget.reviewScope==null?null:_preparedCurrent,onReviewNativeChange:widget.reviewScope?.acceptNativeChange,
+    ));
     if (!mounted) return;
     if (recorded) {
+      if(widget.reviewScope!=null)setState((){_preparedCompleted=true;saving=false;});
+      if(widget.reviewScope!=null && (!widget.reviewScope!.current() || ModalRoute.of(context)?.isCurrent!=true))return;
       if (widget.onClose != null) {
         widget.onClose!();
       } else {
-        Navigator.pop(context);
+        _closeCapturedCustomerReview(context,widget.reviewScope);
       }
       return;
     }
@@ -40496,7 +48167,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
             );
           },
         ),
-        if (_needsReference) ...[
+        if (_showPreparedReference) ...[
           const SizedBox(height: 12),
           TextField(
             key: const Key('collection-reference'),
@@ -40558,12 +48229,13 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
   );
 
   @override
-  Widget build(BuildContext context) =>
-      widget.counterSaleReceipt && widget.onClose != null
+  Widget build(BuildContext context) {
+    if(widget.reviewScope!=null&&_preparedCompleted)return _customerCompletedReview(context,widget.reviewScope!,widget.refund?"Refund recorded":"Receipt recorded");
+    return widget.counterSaleReceipt && widget.onClose != null
       ? _inlineReceipt()
       : PopScope(
           canPop:
-              !saving &&
+              widget.reviewScope?.current()==false || !saving &&
               !confirming &&
               !draft.busy &&
               (!draft.ready || draft.error == null),
@@ -40576,7 +48248,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
               if (widget.onClose != null) {
                 widget.onClose!();
               } else {
-                Navigator.pop(context);
+                _closeCapturedCustomerReview(context,widget.reviewScope);
               }
             }
           },
@@ -40798,7 +48470,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
                       ),
                     if (widget.refund && _needsReference)
                       const SizedBox(height: 16),
-                    if (_needsReference)
+                    if (_showPreparedReference)
                       TextField(
                         key: Key(
                           widget.refund
@@ -40848,6 +48520,7 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet>
             ),
           ),
         );
+  }
 }
 
 class _MoneyDestinationSurface extends StatelessWidget {
@@ -41146,20 +48819,32 @@ String _settlementExpectedDateLabel() {
   return '${date.day}/${date.month}/${date.year}';
 }
 
+Widget _settlementPreparedFrame(BuildContext context,WorkSession session,StoreSettingsReviewScope? scope,Widget child){
+  if(scope==null)return child;
+  return SizedBox(height:MediaQuery.sizeOf(context).height*0.85,child:Column(children:[
+    Align(alignment:Alignment.centerRight,child:IconButton(tooltip:'Close settlement review',icon:const Icon(Icons.close),onPressed:(){
+      if(!context.mounted || ModalRoute.of(context)?.isCurrent!=true)return;Navigator.of(context).pop();})),
+    Expanded(child:StoreSettingsReviewFrame(session:session,scope:scope,child:child)),
+  ]));
+}
+
 Future<void> _showWorkspaceSettlementReview(
   BuildContext context,
-  WorkSession session,
-) async {
+  WorkSession session, {
+  StoreSettlementInitialData? initialData, StoreSettingsReviewScope? reviewScope, ValueChanged<String>? onPreparedDraft,
+}) async {
   final controller = TextEditingController(
-    text: '${session.workspaceSettlementEligible}',
+    text: initialData?.amount ?? '${session.workspaceSettlementEligible}',
   );
+  void rememberDraft(){onPreparedDraft?.call(controller.text);}
+  if(onPreparedDraft!=null)controller.addListener(rememberDraft);
   String? error;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (sheetContext) => StatefulBuilder(
+    builder: (sheetContext) => _settlementPreparedFrame(sheetContext,session,reviewScope,StatefulBuilder(
       builder: (context, setSheetState) => SafeArea(
         top: false,
         child: SingleChildScrollView(
@@ -41184,11 +48869,12 @@ Future<void> _showWorkspaceSettlementReview(
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const Text(
-                'Confirm the amount and payout details before sending.',
+              Text(
+                reviewScope == null ? 'Confirm the amount and payout details before sending.' : 'Review the amount you want MoolSocial to pay to this Store.',
                 style: TextStyle(color: MoolColors.muted),
               ),
               const SizedBox(height: 12),
+              if(reviewScope!=null) const Padding(padding:EdgeInsets.only(bottom:8),child:Text('Saved review details · not a verified payout balance')),
               _MoneyField(
                 keyName: 'work-settlement-request-amount',
                 controller: controller,
@@ -41202,7 +48888,7 @@ Future<void> _showWorkspaceSettlementReview(
                 child: Column(
                   children: [
                     _ProductPreviewLine(
-                      label: 'Receiving account',
+                      label: reviewScope==null?'Receiving account':'Saved receiving account',
                       value: session.workspacePayoutBankName.isEmpty
                           ? 'Bank details required'
                           : '${session.workspacePayoutBankName} · •••• ${session.workspacePayoutAccountEnding}',
@@ -41229,12 +48915,12 @@ Future<void> _showWorkspaceSettlementReview(
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: controller,
                       builder: (context, input, _) => _ProductPreviewLine(
-                        label: 'Net payout requested',
+                        label: reviewScope==null?'Net payout requested':'Proposed request amount',
                         value:
                             '₹${_formatStoreAmount(int.tryParse(input.text.trim()) ?? 0)}',
                       ),
                     ),
-                    _ProductPreviewLine(
+                    if(reviewScope==null) _ProductPreviewLine(
                       label: 'Expected by',
                       value: _settlementExpectedDateLabel(),
                     ),
@@ -41253,12 +48939,14 @@ Future<void> _showWorkspaceSettlementReview(
                   ),
                 ),
               const SizedBox(height: 12),
+              if(reviewScope!=null) const Padding(padding:EdgeInsets.only(bottom:8),child:Text('Payout requests are currently unavailable. No request has been sent.')),
               FilledButton.icon(
                 key: const Key('work-settlement-confirm'),
                 onPressed:
-                    session.busy || session.workspacePayoutBankName.isEmpty
+                    reviewScope!=null || session.busy || session.workspacePayoutBankName.isEmpty
                     ? null
                     : () async {
+                        if(reviewScope?.current()==false)return;
                         final amount = int.tryParse(controller.text.trim());
                         if (amount == null ||
                             amount <= 0 ||
@@ -41284,8 +48972,10 @@ Future<void> _showWorkspaceSettlementReview(
           ),
         ),
       ),
-    ),
+    )),
   );
+  onPreparedDraft?.call(controller.text);
+  if(onPreparedDraft!=null)controller.removeListener(rememberDraft);
   unawaited(
     Future<void>.delayed(const Duration(milliseconds: 320), controller.dispose),
   );
@@ -41317,8 +49007,13 @@ class _MoneyDestinationLine extends StatelessWidget {
   }
 }
 
+final _deliverySettingsEditors = <_WorkspaceDeliverySettingsSurfaceState>{};
+final _staffSettingsEditors = <_WorkspaceStaffSettingsSurfaceState>{};
+
 class _WorkspaceDeliverySettingsSurface extends StatefulWidget {
-  const _WorkspaceDeliverySettingsSurface({required this.session});
+  const _WorkspaceDeliverySettingsSurface({required this.session, this.initialData, this.reviewScope});
+  final StoreSettingsInitialData? initialData;
+  final StoreSettingsReviewScope? reviewScope;
 
   final WorkSession session;
 
@@ -41336,6 +49031,7 @@ class _WorkspaceDeliverySettingsSurfaceState
   @override
   void initState() {
     super.initState();
+    _deliverySettingsEditors.add(this);
     _storeId = widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
     _scopeRevision = widget.session.navigationScopeRevision;
     _city = TextEditingController(text: widget.session.workspaceDeliveryCity);
@@ -41356,18 +49052,24 @@ class _WorkspaceDeliverySettingsSurfaceState
 
   Future<bool> _loadPickupPreferences() async {
     final loaded = await widget.session.loadWorkspacePickupPreferences(expectedStoreId: _storeId ?? '');
-    if (!mounted || _pickupContext != widget.session.pickupPreferencesContext) return false;
+    if (!mounted || widget.reviewScope?.mayApply == false || _pickupContext != widget.session.pickupPreferencesContext) return false;
     if (loaded) {
       _city.text = widget.session.workspaceDeliveryCity;
       _area.text = widget.session.workspaceDeliveryArea;
       _pincode.text = widget.session.workspaceDeliveryPincode;
       _pickupEnabled = widget.session.workspacePickupEnabled;
+      final fields = widget.initialData?.fields ?? const <String, Object?>{};
+      _city.text = fields['city'] as String? ?? _city.text;
+      _area.text = fields['area'] as String? ?? _area.text;
+      _pincode.text = fields['pincode'] as String? ?? _pincode.text;
+      _pickupEnabled = fields['pickupEnabled'] as bool? ?? _pickupEnabled;
     }
     return loaded;
   }
 
   @override
   void dispose() {
+    _deliverySettingsEditors.remove(this);
     _city.dispose();
     _area.dispose();
     _pincode.dispose();
@@ -41377,7 +49079,7 @@ class _WorkspaceDeliverySettingsSurfaceState
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<bool>(future: _pickupLoad, builder: (context, snapshot) {
-      if (_pickupContext != widget.session.pickupPreferencesContext) {
+      if (widget.reviewScope?.current() == false || _pickupContext != widget.session.pickupPreferencesContext) {
         return const Center(child: Text('Your Store or account changed. Reopen pickup settings. Your entries are kept.'));
       }
       if (snapshot.connectionState != ConnectionState.done) {
@@ -41472,11 +49174,14 @@ class _WorkspaceDeliverySettingsSurfaceState
           widget.session.pickupPreferencesPersistenceAvailable ? 'Save on this device' : 'Apply pickup preferences',
       saveEnabled: !widget.session.workspacePickupPreferencesSaving,
       onSave: () {
-        if (_pickupContext != widget.session.pickupPreferencesContext) {
+        if (widget.reviewScope?.mayApply == false || _pickupContext != widget.session.pickupPreferencesContext) {
           widget.session.showError('Your Store or account changed. Your entries are kept.');
           return;
         }
-        widget.session.saveWorkspaceDeliverySettings(
+        final attempt = <String, Object?>{'city': _city.text.trim(), 'area': _area.text.trim(),
+          'pincode': _pincode.text.trim(), 'pickupEnabled': _pickupEnabled};
+        if (widget.reviewScope?.beginAttempt(attempt) == false) return;
+        final accepted = widget.session.saveWorkspaceDeliverySettings(
           city: _city.text,
           area: _area.text,
           pincode: _pincode.text,
@@ -41484,6 +49189,13 @@ class _WorkspaceDeliverySettingsSurfaceState
           expectedStoreId: _storeId,
           expectedNavigationRevision: _scopeRevision,
         );
+        final scope = widget.reviewScope;
+        if (accepted && scope != null) {
+          if (!widget.session.pickupPreferencesPersistenceAvailable) { scope.completeAttempt(); }
+          else { unawaited(widget.session.workspacePickupPreferencesWrite.then((confirmed) {
+            if (mounted && scope.current() && confirmed && widget.session.workspacePickupPreferencesSaved) scope.completeAttempt();
+          })); }
+        }
       },
     ));
     });
@@ -41494,10 +49206,13 @@ class _WorkspaceStaffSettingsSurface extends StatefulWidget {
   const _WorkspaceStaffSettingsSurface({
     required this.session,
     this.embedded = false,
+    this.initialData, this.reviewScope,
   });
 
   final WorkSession session;
   final bool embedded;
+  final StoreSettingsInitialData? initialData;
+  final StoreSettingsReviewScope? reviewScope;
 
   @override
   State<_WorkspaceStaffSettingsSurface> createState() =>
@@ -41511,8 +49226,19 @@ class _WorkspaceStaffSettingsSurfaceState
     text: '${widget.session.workspaceCounterCount}',
   );
 
+  late final _store = widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
+  late final _navigation = widget.session.navigationScopeRevision;
+  bool get _dirty => _enabled != widget.session.workspaceStaffAccessEnabled ||
+    _counters.text != '${widget.session.workspaceCounterCount}';
+  @override void initState() {
+    super.initState(); _staffSettingsEditors.add(this);
+    final fields = widget.initialData?.fields ?? const <String, Object?>{};
+    _enabled = fields['staffAccessEnabled'] as bool? ?? _enabled;
+    if (fields['counterCount'] != null) _counters.text = '${fields['counterCount']}';
+  }
   @override
   void dispose() {
+    _staffSettingsEditors.remove(this);
     _counters.dispose();
     super.dispose();
   }
@@ -41548,10 +49274,15 @@ class _WorkspaceStaffSettingsSurfaceState
       saveKey: 'work-staff-settings-save',
       saveLabel: 'Save staff controls',
       onSave: () {
+        if (widget.reviewScope != null && (!widget.reviewScope!.mayApply ||
+            _store != (widget.session.activeWorkspace?.id ?? widget.session.workspaceId) ||
+            _navigation != widget.session.navigationScopeRevision)) return;
+        if (widget.reviewScope?.beginAttempt({'staffAccessEnabled': _enabled, 'counterCount': int.parse(_counters.text.trim())}) == false) return;
         widget.session.saveWorkspaceStaffSettings(
           staffAccessEnabled: _enabled,
           counterCount: int.parse(_counters.text.trim()),
         );
+        widget.reviewScope?.completeAttempt();
       },
     );
   }
@@ -41560,9 +49291,153 @@ class _WorkspaceStaffSettingsSurfaceState
 /// Inline Store-owned information. Verification is supplied, never inferred from
 /// document count. Updates use the existing request draft; nothing is sent here.
 /// One inline Settings editor. Stock management keeps its own existing screen.
-class StoreProductDefaultsSection extends StatefulWidget {
-  const StoreProductDefaultsSection({super.key, required this.session});
+
+/// Supplied facts only; unspecified controls retain the recovered native value.
+class StoreProductDefaultsInitialData {
+  StoreProductDefaultsInitialData._(this.fields);
+  final Map<String, Object?> fields;
+  static const allowedFields = <String>{
+    'stockMode', 'lowStockThreshold', 'customerListingRequested',
+  };
+  factory StoreProductDefaultsInitialData.fromFields(Map<String, Object?> fields) {
+    if (fields.isEmpty || fields.keys.any((key) => !allowedFields.contains(key))) {
+      throw const FormatException('Supply an existing product default.');
+    }
+    if (fields.containsKey('stockMode') &&
+        fields['stockMode'] != 'exactQuantity' && fields['stockMode'] != 'availabilityOnly') {
+      throw const FormatException('Choose an existing stock mode.');
+    }
+    if (fields.containsKey('customerListingRequested') && fields['customerListingRequested'] is! bool) {
+      throw const FormatException('Supply the customer listing choice.');
+    }
+    if (fields.containsKey('lowStockThreshold')) {
+      final raw = fields['lowStockThreshold'];
+      final count = raw is String ? int.tryParse(raw.trim()) : null;
+      if (count == null || count < 0 || count > 999999999) {
+        throw const FormatException('Enter a whole count from 0 to 999999999.');
+      }
+    }
+    return StoreProductDefaultsInitialData._(Map.unmodifiable(fields));
+  }
+}
+
+final _defaultsEditors = Expando<Set<_StoreProductDefaultsSectionState>>();
+bool _defaultsEditorBusy(WorkSession session) => _defaultsEditors[session]?.any(
+  (state) => state.mounted && state._current &&
+      (!state._initialized || state._dirty || state._saving || state.widget.reviewOwnerCurrent != null),
+) == true;
+
+class _StoreProductDefaultsAdapter implements MoolAssistantNativeAdapter {
+  const _StoreProductDefaultsAdapter({required this.actionId, required this.readContext,
+    required this.readSnapshot, required this.open});
+  @override final String actionId;
+  final MoolAssistantContext? Function() readContext;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function()) open;
+  @override Set<String> get allowedFields => actionId == 'AI-ACT-218'
+      ? const <String>{} : StoreProductDefaultsInitialData.allowedFields;
+  @override String? validateFields(Map<String, Object?> fields) {
+    if (actionId == 'AI-ACT-218') return fields.isEmpty ? null : 'Viewing defaults takes no changes.';
+    try { StoreProductDefaultsInitialData.fromFields(fields); return null; }
+    on FormatException catch (error) { return error.message.toString(); }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entityId) =>
+      readSnapshot(ctx, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(
+    MoolAssistantProposal proposal, bool Function() isCurrent,
+  ) async {
+    final trusted = readContext();
+    if (!isCurrent() || trusted == null || trusted.binding != proposal.binding ||
+        proposal.actionId != actionId || validateFields(proposal.fields) != null) {
+      return MoolAssistantReviewResult.stale;
+    }
+    return open(proposal, isCurrent);
+  }
+}
+
+/// The existing controls, in a native route above AI; opening never saves.
+Future<MoolAssistantReviewResult> showStoreProductDefaultsReview(
+  BuildContext context, WorkSession session, {
+  StoreProductDefaultsInitialData? initialData, required bool readOnly,
+  required bool Function() isCurrent, required bool Function() ownerCurrent,
+  Listenable? ownerChanges,
+}) async {
+  final trading = session.tradingPreferencesContext;
+  final navigation = session.navigationScopeRevision;
+  bool owner() => context.mounted && ownerCurrent() &&
+      session.tradingPreferencesContext == trading && session.navigationScopeRevision == navigation;
+  if (!owner() || !isCurrent() || _defaultsEditorBusy(session) || session.workspaceTradingPreferencesSaving) {
+    return MoolAssistantReviewResult.stale;
+  }
+  await Navigator.of(context).push<void>(MaterialPageRoute<void>(builder: (_) =>
+    _StoreProductDefaultsReviewPage(session: session, initialData: initialData,
+      readOnly: readOnly, ownerCurrent: owner, prefillCurrent: () => owner() && isCurrent(),
+      ownerChanges: Listenable.merge([session, ownerChanges]))));
+  return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+}
+
+class _StoreProductDefaultsReviewPage extends StatefulWidget {
+  const _StoreProductDefaultsReviewPage({required this.session, required this.initialData,
+    required this.readOnly, required this.ownerCurrent, required this.prefillCurrent,
+    required this.ownerChanges});
   final WorkSession session;
+  final StoreProductDefaultsInitialData? initialData;
+  final bool readOnly;
+  final bool Function() ownerCurrent, prefillCurrent;
+  final Listenable ownerChanges;
+  @override State<_StoreProductDefaultsReviewPage> createState() => _StoreProductDefaultsReviewPageState();
+}
+class _StoreProductDefaultsReviewPageState extends State<_StoreProductDefaultsReviewPage> {
+  final _section = GlobalKey<_StoreProductDefaultsSectionState>();
+  bool _allowPop = false, _closing = false;
+  void _finish() {
+    if (!mounted || _allowPop) return;
+    setState(() => _allowPop = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) Navigator.pop(context); });
+  }
+  Future<void> _close() async {
+    if (_closing) return;
+    if (_section.currentState?._saving == true) return;
+    if (!widget.ownerCurrent() || widget.readOnly || _section.currentState?._dirty != true) {
+      _finish(); return;
+    }
+    _closing = true;
+    final discard = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Discard default changes?'),
+      content: const Text('Your entries have not been saved. Keep editing or discard these changes.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard changes'))]));
+    _closing = false;
+    if (mounted && (discard == true || !widget.ownerCurrent())) _finish();
+  }
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: widget.ownerChanges,
+    builder: (context, _) {
+      final current = widget.ownerCurrent();
+      return PopScope<void>(canPop: _allowPop || !current || widget.readOnly,
+        onPopInvokedWithResult: (didPop, _) { if (!didPop) unawaited(_close()); },
+        child: Scaffold(appBar: AppBar(leading: BackButton(onPressed: _close),
+          title: Text(widget.readOnly ? 'Product defaults' : 'Review product defaults')),
+          body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.all(16),
+            child: Column(children: [
+              // Keep original controllers alive for explicit native discard;
+              // stale account/Store contents are never visible or actionable.
+              Offstage(offstage: !current, child: StoreSettingsStyle(child: StoreProductDefaultsSection(
+                key: _section, session: widget.session, initialData: widget.initialData,
+                readOnly: widget.readOnly, initiallyExpanded: true,
+                reviewOwnerCurrent: widget.ownerCurrent, prefillCurrent: widget.prefillCurrent))),
+              if (!current) const Text('Your Store or account changed. Close this review and reopen Product controls. Your entries are kept here.'),
+            ])))));
+    });
+}
+
+class StoreProductDefaultsSection extends StatefulWidget {
+  const StoreProductDefaultsSection({super.key, required this.session,
+    this.initialData, this.readOnly = false, this.initiallyExpanded = false,
+    this.reviewOwnerCurrent, this.prefillCurrent});
+  final WorkSession session;
+  final StoreProductDefaultsInitialData? initialData;
+  final bool readOnly, initiallyExpanded;
+  final bool Function()? reviewOwnerCurrent, prefillCurrent;
   @override
   State<StoreProductDefaultsSection> createState() =>
       _StoreProductDefaultsSectionState();
@@ -41579,25 +49454,47 @@ class _StoreProductDefaultsSectionState
   final _low = TextEditingController();
   String? _error;
   bool _saved = false;
+  bool _prefillRejected = false;
+  int _editRevision = 0;
+  (bool, bool, String)? _baseline;
+  String? _sourceDefaults;
+  bool get _dirty => _initialized && _baseline != (_count, _listing, _low.text);
   @override
   void initState() {
     super.initState();
     _scope = widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
     _inputContext = widget.session.tradingPreferencesContext;
     _owner = widget.session;
+    (_defaultsEditors[_owner] ??= <_StoreProductDefaultsSectionState>{}).add(this);
+    _low.addListener(() { _editRevision++; });
     if (!widget.session.tradingPreferencesPersistenceAvailable) {
       _initializeInputs();
       _load = Future.value(true);
     } else { _load = _loadInputs(); }
   }
   bool get _current => identical(widget.session, _owner) &&
-      _inputContext == widget.session.tradingPreferencesContext;
+      _inputContext == widget.session.tradingPreferencesContext &&
+      widget.reviewOwnerCurrent?.call() != false;
   void _initializeInputs() {
+    if (widget.prefillCurrent?.call() == false) {
+      _prefillRejected = true;
+      return;
+    }
     final defaults = widget.session.workspaceProductDefaults;
     _count = defaults.stockMode == WorkspaceStockMode.exactQuantity;
     _listing = defaults.customerListingRequested;
     _low.text = '${defaults.lowStockThreshold}';
     _saved = widget.session.workspaceProductDefaultsSaved;
+    _sourceDefaults = jsonEncode(defaults.toJson());
+    _baseline = (_count, _listing, _low.text);
+    if (widget.initialData != null && widget.prefillCurrent?.call() != false) {
+      final supplied = widget.initialData!.fields;
+      if (supplied.containsKey('stockMode')) _count = supplied['stockMode'] == 'exactQuantity';
+      if (supplied.containsKey('customerListingRequested')) _listing = supplied['customerListingRequested'] as bool;
+      if (supplied.containsKey('lowStockThreshold')) _low.text = supplied['lowStockThreshold'] as String;
+      _saved = false;
+      _editRevision++;
+    }
     _initialized = true;
   }
   Future<bool> _loadInputs() async {
@@ -41608,12 +49505,18 @@ class _StoreProductDefaultsSectionState
   }
   @override
   void dispose() {
+    _defaultsEditors[_owner]?.remove(this);
     _low.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    if (_saving || widget.session.workspaceTradingPreferencesSaving) return;
+    if (widget.readOnly || _saving || widget.session.workspaceTradingPreferencesSaving) return;
+    if (widget.reviewOwnerCurrent != null &&
+        _sourceDefaults != jsonEncode(widget.session.workspaceProductDefaults.toJson())) {
+      setState(() => _error = 'Saved defaults changed. Reopen Product controls. Your entries are kept.');
+      return;
+    }
     final low = int.tryParse(_low.text.trim());
     if (!_current) {
       setState(() => _error = 'Your Store changed. Reopen Product controls.');
@@ -41638,6 +49541,9 @@ class _StoreProductDefaultsSectionState
       setState(() { _error = widget.session.errorMessage ?? 'Defaults could not be updated.'; _saved = false; });
       return;
     }
+    // Native Save accepted the local value. Preserve its existing retry path if
+    // the device write fails; another owner's later change still fails above.
+    _sourceDefaults = jsonEncode(widget.session.workspaceProductDefaults.toJson());
     setState(() { _saving = true; _saved = false; _error = null; });
     final confirmed = !widget.session.tradingPreferencesPersistenceAvailable ||
         await widget.session.workspaceTradingPreferencesWrite;
@@ -41650,6 +49556,7 @@ class _StoreProductDefaultsSectionState
       _saving = false;
       _error = confirmed ? null : widget.session.workspaceTradingPreferencesError ?? 'Device save could not be confirmed. Your entries are kept. Try again.';
       _saved = confirmed;
+      if (confirmed) _baseline = (_count, _listing, _low.text);
     });
     if (confirmed) FocusScope.of(context).unfocus();
   }
@@ -41657,7 +49564,7 @@ class _StoreProductDefaultsSectionState
   @override
   Widget build(BuildContext context) => FutureBuilder<bool>(future: _load,
     initialData: _initialized ? true : null, builder: (context, snapshot) {
-      if (!_current) return const Text('Your Store or account changed. Reopen Product controls. Your entries are kept.');
+      if (_prefillRejected || !_current) return const Text('Your Store or account changed. Reopen Product controls. Your entries are kept.');
       if (snapshot.data != true || !_initialized) {
         return ExpansionTile(title: const Text('Product controls'), children: [
           if (snapshot.connectionState != ConnectionState.done)
@@ -41674,6 +49581,7 @@ class _StoreProductDefaultsSectionState
     });
 
   Widget _editor(BuildContext context) => ExpansionTile(
+    initiallyExpanded: widget.initiallyExpanded,
     leading: const Icon(Icons.inventory_2_outlined),
     title: const Text('Product controls'),
     childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -41691,7 +49599,8 @@ class _StoreProductDefaultsSectionState
           Switch(
             key: const Key('work-default-stock-count'),
             value: _count,
-            onChanged: (v) => setState(() {
+            onChanged: widget.readOnly ? null : (v) => setState(() {
+              _editRevision++;
               _count = v;
               _saved = false;
             }),
@@ -41704,7 +49613,8 @@ class _StoreProductDefaultsSectionState
           Switch(
             key: const Key('work-default-customer-listing'),
             value: _listing,
-            onChanged: (v) => setState(() {
+            onChanged: widget.readOnly ? null : (v) => setState(() {
+              _editRevision++;
               _listing = v;
               _saved = false;
             }),
@@ -41736,7 +49646,7 @@ class _StoreProductDefaultsSectionState
             child: TextField(
               key: const Key('work-default-low-stock'),
               controller: _low,
-              enabled: _count,
+              enabled: _count && !widget.readOnly,
               keyboardType: TextInputType.number,
               textInputAction: TextInputAction.done,
               decoration: const InputDecoration(
@@ -41747,7 +49657,7 @@ class _StoreProductDefaultsSectionState
                 _error = null;
                 _saved = false;
               }),
-              onSubmitted: (_) => _save(),
+              onSubmitted: widget.readOnly ? null : (_) => _save(),
             ),
           );
           if (constraints.maxWidth - width < 130 ||
@@ -41790,7 +49700,7 @@ class _StoreProductDefaultsSectionState
         alignment: Alignment.centerRight,
         child: FilledButton(
           key: const Key('work-defaults-save'),
-          onPressed: _saving || widget.session.workspaceTradingPreferencesSaving ? null : _save,
+          onPressed: widget.readOnly || _saving || widget.session.workspaceTradingPreferencesSaving ? null : _save,
           child: Text(_saving ? 'Saving…' : 'Save defaults'),
         ),
       ),
@@ -43732,7 +51642,10 @@ int _availableCustomerCredit(WorkspaceCustomerLedger ledger) => !ledger.valid ||
         (sum, id) => sum + (ledger.invoiceBalance(id)?.availableCreditMinor ?? 0));
 
 class _CustomerCreditApplication extends StatefulWidget {
-  const _CustomerCreditApplication({required this.session, required this.ledger, required this.payment});
+  const _CustomerCreditApplication({required this.session, required this.ledger, required this.payment,this.reviewScope,this.preparedFields,this.onPreparedDraft});
+  final StoreCustomerActionReviewScope? reviewScope;
+  final Map<String,String>? preparedFields;
+  final ValueChanged<Map<String,String>>? onPreparedDraft;
   final WorkSession session;
   final WorkspaceCustomerLedger ledger;
   final WorkspacePaymentRecord payment;
@@ -43741,12 +51654,19 @@ class _CustomerCreditApplication extends StatefulWidget {
 }
 
 class _CustomerCreditApplicationState extends State<_CustomerCreditApplication> {
+  bool _preparedCompleted=false;
+  bool _preparedCurrent()=>widget.reviewScope==null || mounted&&widget.reviewScope!.current()&&ModalRoute.of(context)?.isCurrent==true;
+  Future<bool> _runPreparedNative(Future<bool> Function() run)=>widget.reviewScope?.runNative(run)??run();
   final amount = TextEditingController();
   String? source;
   String? error;
   bool saving = false;
   bool needsReview = false;
-  bool get _sameStore => widget.session.activeWorkspace?.id == widget.ledger.workspaceId &&
+  @override void initState(){super.initState();
+    source=widget.preparedFields?['sourceInvoiceId'];amount.text=widget.preparedFields?['amount']??'';
+  }
+  Map<String,String> get _preparedFieldsNow=>{'amount':amount.text,if(source!=null)'sourceInvoiceId':source!};
+  bool get _sameStore => widget.reviewScope?.current()!=false && widget.session.activeWorkspace?.id == widget.ledger.workspaceId &&
       widget.session.workspaceFinance?.accountScope == widget.ledger.accountScope;
   Future<void> _reviewSavedInvoice() async {
     if (!_sameStore) {
@@ -43755,9 +51675,9 @@ class _CustomerCreditApplicationState extends State<_CustomerCreditApplication> 
     }
     setState(() { saving = true; error = null; });
     final recovered = await widget.session.recoverCustomerLedger();
-    if (!mounted) return;
+    if (!mounted || widget.reviewScope?.current()==false) return;
     if (recovered && _sameStore) {
-      Navigator.pop(context);
+      _closeCapturedCustomerReview(context,widget.reviewScope);
       return;
     }
     setState(() {
@@ -43778,17 +51698,18 @@ class _CustomerCreditApplicationState extends State<_CustomerCreditApplication> 
     return '$label · Original invoice ${_purchaseAmount(original.amountMinor)}';
   }
   @override
-  void dispose() { amount.dispose(); super.dispose(); }
+  void dispose() {if(widget.preparedFields!=null)widget.onPreparedDraft?.call(_preparedFieldsNow);amount.dispose();super.dispose();}
   @override
   Widget build(BuildContext context) {
+    if(widget.reviewScope!=null&&_preparedCompleted)return _customerCompletedReview(context,widget.reviewScope!,"Credit applied");
     final candidates = widget.ledger.entries.map((e) => e.invoiceId).toSet().where((id) =>
       id != widget.payment.invoiceId && (widget.ledger.invoiceBalance(id)?.availableCreditMinor ?? 0) > 0);
-    return PopScope(canPop: !saving, child: SafeArea(top: false, child: Padding(
+    return PopScope(canPop: widget.reviewScope?.current()==false || !saving, child: SafeArea(top: false, child: Padding(
       padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.viewInsetsOf(context).bottom + 16),
       child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [const Expanded(child: Text('Use customer credit', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-            IconButton(tooltip: 'Close', onPressed: saving ? null : () => Navigator.pop(context), icon: const Icon(Icons.close))]),
+            IconButton(tooltip: 'Close', onPressed: saving ? null : () => _closeCapturedCustomerReview(context,widget.reviewScope), icon: const Icon(Icons.close))]),
           Text('Invoice due ${_purchaseAmount(widget.payment.dueMinor)}'),
           for (final id in candidates)
             ListTile(dense: true, contentPadding: EdgeInsets.zero,
@@ -43818,6 +51739,7 @@ class _CustomerCreditApplicationState extends State<_CustomerCreditApplication> 
           Align(alignment: Alignment.centerLeft, child: TextButton.icon(
             key: const Key('customer-credit-confirm'), icon: const Icon(Icons.check, size: 18),
             label: Text(saving && !needsReview ? 'Applying…' : 'Apply credit'), onPressed: saving || needsReview ? null : () async {
+              if(_preparedCompleted||!_preparedCurrent())return;
               final text = amount.text.trim();
               if (source == null || !RegExp(r'^\d{1,12}(\.\d{1,2})?$').hasMatch(text)) {
                 setState(() => error = 'Select a credit and enter a valid amount.'); return;
@@ -43832,11 +51754,14 @@ class _CustomerCreditApplicationState extends State<_CustomerCreditApplication> 
                 setState(() => error = 'Store changed. Reopen the invoice.'); return;
               }
               setState(() { saving = true; error = null; });
-              final done = await widget.session.applyCustomerCredit(customerId: widget.ledger.customerId,
+              final done = await _runPreparedNative(()=>widget.session.applyCustomerCredit(customerId: widget.ledger.customerId,
                 sourceInvoiceId: source!, targetInvoiceId: widget.payment.invoiceId!, amountMinor: minor,
-                expectedRevision: widget.ledger.revision);
-              if (!mounted || !context.mounted) return;
-              if (done) { Navigator.pop(context); } else {
+                expectedRevision: widget.ledger.revision, reviewOwnerCurrent:widget.reviewScope?.ownerCurrent,reviewInputCurrent:widget.reviewScope==null?null:_preparedCurrent,onReviewNativeChange:widget.reviewScope?.acceptNativeChange,));
+              if (!mounted || !context.mounted || widget.reviewScope?.current()==false) return;
+              if (done) {
+                if(widget.reviewScope!=null){setState((){_preparedCompleted=true;saving=false;});if(ModalRoute.of(context)?.isCurrent!=true)return;}
+                _closeCapturedCustomerReview(context,widget.reviewScope);
+              } else {
                 setState(() { saving = false; needsReview = true;
                   error = 'Credit update not confirmed. Review the saved invoice before trying again.'; });
               }
@@ -43897,6 +51822,7 @@ class _InvoiceCollectionSummary extends StatelessWidget {
     this.receiptEditor,
     this.orderDetails = false,
     this.salesPresentation = false,
+    this.allowActions = true,
   });
 
   final WorkSession session;
@@ -43904,6 +51830,7 @@ class _InvoiceCollectionSummary extends StatelessWidget {
   final Widget? receiptEditor;
   final bool orderDetails;
   final bool salesPresentation;
+  final bool allowActions;
   final WorkspaceCustomerInvoice invoice;
   final String? accountScope, storeId;
 
@@ -43935,7 +51862,7 @@ class _InvoiceCollectionSummary extends StatelessWidget {
           style: TextStyle(color: MoolColors.muted),
         );
       }
-      final canRecord =
+      final canRecord = allowActions &&
           (!orderDetails || !session.workspaceFinanceStale) &&
           session.customerCollectionAvailable &&
           payment.dueMinor > 0 &&
@@ -43946,7 +51873,7 @@ class _InvoiceCollectionSummary extends StatelessWidget {
           );
       final creditLedger = finance?.customerLedgers.where((l) => l.customerId == payment.customerId).firstOrNull;
       final balance = creditLedger?.invoiceBalance(invoice.id);
-      final creditAction = creditLedger != null && payment.dueMinor > 0 && _availableCustomerCredit(creditLedger) > 0
+      final creditAction = allowActions && creditLedger != null && payment.dueMinor > 0 && _availableCustomerCredit(creditLedger) > 0
           ? Align(alignment: Alignment.centerLeft, child: TextButton.icon(
               key: const Key('work-invoice-use-credit'), icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
               style: salesPresentation ? TextButton.styleFrom(minimumSize: const Size(48, 48),
@@ -44141,6 +52068,147 @@ ThemeData _counterSaleTheme(ThemeData base) => base.copyWith(
   ),
 );
 
+// Frontend-only raw values for the original Counter form. No prices, tax, Stock,
+// payment result, invoice identity or source revisions can come from a proposal.
+class StoreCounterReviewInitial {
+  StoreCounterReviewInitial._(this.actionId, this.values, this.quantities, this.discount);
+  final String actionId;
+  final Map<String, Object?> values;
+  final Map<String, int> quantities;
+  final WorkspaceBillDiscount? discount;
+  static const detailFields = {'customer', 'name', 'address', 'source', 'fulfilment', 'payment', 'items', 'query'};
+  static Set<String> fieldsFor(String action) => switch (action) {
+    'AI-ACT-289' => detailFields,
+    'AI-ACT-290' => const {'kind', 'value'},
+    'AI-ACT-295' => const {'channel'},
+    _ => const {},
+  };
+  static StoreCounterReviewInitial fromFields(String action, Map<String, Object?> fields) {
+    if (fields.keys.any((key) => !fieldsFor(action).contains(key))) throw const FormatException('Use only the original bill fields.');
+    if ((action == 'AI-ACT-289' || action == 'AI-ACT-290') && fields.isEmpty) throw const FormatException('Supply the bill details to review.');
+    final copy = Map<String, Object?>.of(fields), quantities = <String, int>{};
+    for (final key in fields.keys.where((key) => key != 'items')) {
+      if (fields[key] is! String) throw const FormatException('Check the supplied bill details.');
+    }
+    if (fields['customer'] case final String mobile) {
+      if (normalizeWorkspaceMobile(mobile) == null) throw const FormatException('Enter a valid customer mobile number.');
+    }
+    for (final entry in <String, Set<String>>{
+      'source': {'Counter', 'Phone', 'Chat'},
+      'fulfilment': {'At the shop', 'Own delivery', 'Mool delivery'},
+      'payment': {'Cash', 'UPI', 'Bank Transfer', 'Pay request', 'On delivery', 'Customer due'},
+      'channel': {'chat', 'whatsapp', 'pdf'},
+    }.entries) {
+      if (fields.containsKey(entry.key) && !entry.value.contains(fields[entry.key])) throw const FormatException('Choose an original bill option.');
+    }
+    if (fields.containsKey('items')) {
+      if (fields['items'] is! List || (fields['items'] as List).isEmpty) throw const FormatException('Choose the exact Store products.');
+      for (final raw in fields['items'] as List) {
+        if (raw is! Map || raw.length != 2 || raw['skuId'] is! String || (raw['skuId'] as String).trim().isEmpty || raw['quantity'] is! int || (raw['quantity'] as int) <= 0 || quantities.containsKey(raw['skuId'])) throw const FormatException('Use each exact Store product once with a positive quantity.');
+        quantities[raw['skuId'] as String] = raw['quantity'] as int;
+      }
+      copy['items'] = List.unmodifiable(quantities.entries.map((e) => Map<String, Object?>.unmodifiable({'skuId': e.key, 'quantity': e.value})));
+    }
+    WorkspaceBillDiscount? discount;
+    if (action == 'AI-ACT-290') {
+      if (fields.length != 2 || fields['kind'] is! String || fields['value'] is! String) throw const FormatException('Supply the original discount kind and value.');
+      discount = WorkspaceBillDiscount.parse(fields['kind'] as String, fields['value'] as String);
+    }
+    return StoreCounterReviewInitial._(action, Map.unmodifiable(copy), Map.unmodifiable(quantities), discount);
+  }
+}
+
+class _StoreSalesAssistantAdapter implements MoolAssistantOwnerAwareNativeAdapter {
+  const _StoreSalesAssistantAdapter({required this.actionId, required this.read, required this.open});
+  @override final String actionId;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, StoreCounterReviewInitial, bool Function(), Listenable) open;
+  @override Set<String> get allowedFields => StoreCounterReviewInitial.fieldsFor(actionId);
+  @override String? validateFields(Map<String, Object?> fields) {
+    try { StoreCounterReviewInitial.fromFields(actionId, fields); return null; }
+    on FormatException catch (error) { return error.message.toString(); }
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context, String? entityId) => read(context, entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) async => MoolAssistantReviewResult.unavailable;
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,
+    {required bool Function() isCurrent, required Listenable ownerChanges}) async {
+    if (!isCurrent() || validateFields(proposal.fields) != null) return MoolAssistantReviewResult.stale;
+    return open(proposal, StoreCounterReviewInitial.fromFields(actionId, proposal.fields), isCurrent, ownerChanges);
+  }
+}
+
+class _StoreSalesOwnerSurface extends StatelessWidget {
+  const _StoreSalesOwnerSurface({required this.current, required this.changes, required this.child});
+  final bool Function() current;
+  final Listenable changes;
+  final Widget child;
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: changes, builder: (context, _) {
+    final active = current();
+    if (!active) WidgetsBinding.instance.addPostFrameCallback((_) { if (context.mounted && !current()) FocusScope.of(context).unfocus(); });
+    return Stack(children: [
+      Offstage(offstage: !active, child: ExcludeFocus(excluding: !active, child: child)),
+      if (!active) const Scaffold(body: SafeArea(child: Center(child: Text('This bill is no longer available. Close this review.')))),
+    ]);
+  });
+}
+String _counterReviewSource(WorkSession source) => jsonEncode([
+  source.counterDraftScopeForReview?.account,source.counterDraftScopeForReview?.store,source.counterSaleGeneration,source.currentWorkspaceOrderId,
+  source.retainedCounterDraft?.toJson(),source.counterBillReviewSignature,source.workspaceOrderAddress,
+  source.workspaceOrderSource,source.workspaceOrderFulfilment,source.workspaceOrderPayment,
+  source.counterCustomerInput,source.counterDraftError,source.counterDraftLoaded,
+  source.counterDraftNeedsReconciliation,source.counterDraftCatalogueChanged]);
+String _counterReviewCatalogue(WorkSession source) => source.counterCatalogueReviewSignature;
+
+class _StoreSalesReviewRoute extends StatefulWidget {
+  const _StoreSalesReviewRoute({required this.session,required this.initial,required this.surfaceKey,
+    required this.ownerCurrent,required this.ownerChanges,required this.onClose,required this.onOpenCatalogue,required this.onSavedDelivery});
+  final WorkSession session;
+  final StoreCounterReviewInitial initial;
+  final GlobalKey<_CounterOrderSurfaceState> surfaceKey;
+  final bool Function() ownerCurrent;
+  final Listenable ownerChanges;
+  final VoidCallback onClose,onOpenCatalogue;
+  final ValueChanged<String> onSavedDelivery;
+  @override State<_StoreSalesReviewRoute> createState() => _StoreSalesReviewRouteState();
+}
+class _StoreSalesReviewRouteState extends State<_StoreSalesReviewRoute> {
+  bool _allowPop = false, _closing = false;
+  Future<void> _close() async {
+    if (_closing) return;
+    final state = widget.surfaceKey.currentState;
+    if (state?._saving == true || widget.session.counterDraftSubmitting) return;
+    _closing = true;
+    try {
+      if (state?._assistantDirty == true) {
+        // Same native unsaved-sale choice; discarding this ephemeral preparation
+        // never discards the saved original or resets an uncertain submission.
+        final discard = await _confirmCounterReviewLeave(context);
+        if (discard != true || !mounted) return;
+      }
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      setState(() => _allowPop = true);
+      await WidgetsBinding.instance.endOfFrame;
+      if (mounted && ModalRoute.of(context)?.isCurrent == true) Navigator.of(context).pop();
+    } finally { _closing = false; }
+  }
+  @override Widget build(BuildContext context) => PopScope(canPop: _allowPop,
+    onPopInvokedWithResult: (didPop,result) { if (!didPop) unawaited(_close()); },
+    child: Scaffold(appBar: AppBar(title: const Text('Counter sale'),leading: BackButton(onPressed: _close)),
+      body: _StoreSalesOwnerSurface(current: () => widget.ownerCurrent() && (widget.surfaceKey.currentState?._assistantCurrent ?? true),
+        changes: widget.ownerChanges, child: AnimatedBuilder(animation: widget.ownerChanges,builder: (context,_) =>
+          _CounterOrderSurface(key: widget.surfaceKey,session: widget.session,query: '',fullScreen: true,
+            assistantInitial: widget.initial,ownerCurrent: widget.ownerCurrent,ownerChanges: widget.ownerChanges,
+            onExit: () => unawaited(_close()),onOpenCatalogue: widget.onOpenCatalogue,
+            onArrangeDelivery: (id) { if (widget.ownerCurrent()) { widget.onSavedDelivery(id); unawaited(_close()); } })))));
+}
+Future<bool> _confirmCounterReviewLeave(BuildContext context) async => await showDialog<bool>(context: context,
+  builder: (dialog) => AlertDialog(key: const Key('work-order-discard-dialog'),title: const Text('Draft not saved'),
+    content: const Text('Keep editing, or close these unsaved entries. Your saved original and any unconfirmed bill will be kept.'),actions: [
+      TextButton(key: const Key('work-order-keep-editing'),onPressed: () { if (dialog.mounted && ModalRoute.of(dialog)?.isCurrent == true) Navigator.pop(dialog,false); },child: const Text('Keep editing')),
+      TextButton(key: const Key('work-order-discard'),onPressed: () { if (dialog.mounted && ModalRoute.of(dialog)?.isCurrent == true) Navigator.pop(dialog,true); },child: const Text('Discard sale')),
+    ])) == true;
+
+
 class _CounterOrderSurface extends StatefulWidget {
   const _CounterOrderSurface({
     required this.session,
@@ -44149,6 +52217,7 @@ class _CounterOrderSurface extends StatefulWidget {
     required this.onOpenCatalogue,
     required this.onExit,
     this.fullScreen = false,
+    this.assistantInitial,this.ownerCurrent,this.ownerChanges,
     super.key,
   });
 
@@ -44158,6 +52227,9 @@ class _CounterOrderSurface extends StatefulWidget {
   final VoidCallback onOpenCatalogue;
   final VoidCallback onExit;
   final bool fullScreen;
+  final StoreCounterReviewInitial? assistantInitial;
+  final bool Function()? ownerCurrent;
+  final Listenable? ownerChanges;
 
   @override
   State<_CounterOrderSurface> createState() => _CounterOrderSurfaceState();
@@ -44170,16 +52242,242 @@ String? _storedCounterCustomerMobile(String customer) {
 }
 
 class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
+// The existing Counter surface owns these ephemeral fields. Manual callers leave
+// assistantInitial null and retain the original autosave/recovery behavior.
+  final _assistantEdits = ValueNotifier<int>(0);
+  Map<String,int>? _assistantQuantities;
+  WorkspaceBillingDetails? _assistantBilling;
+  String? _assistantBillingCustomer;
+  WorkspaceBillDiscount? _assistantDiscount;
+  String? _assistantSource, _assistantCatalogue, _assistantEditorId, _assistantBaseRetiredId;
+  int? _assistantGeneration;
+  bool _assistantDirty = false, _assistantFinalStarted = false, _assistantCommitted = false;
+  bool get _assistantMode => _initial != null;
+  bool get _assistantCurrent => !_assistantRetired && !_assistantClosed && _nativeOwnerCurrent && _assistantCatalogueCurrent &&
+    (!_assistantMode || _assistantFinalStarted && _assistantGeneration == widget.session.counterSaleGeneration &&
+      (widget.session.currentWorkspaceOrderId == null || widget.session.currentWorkspaceOrderId == widget.session.retainedCounterDraft?.submissionOrderId) &&
+      (_assistantEditorId == null || (widget.session.counterDraftEditorId == _assistantEditorId || widget.session.counterDraftEditorId == null && widget.session.retainedCounterDraft?.id == _assistantEditorId) &&
+        (widget.session.retainedCounterDraft == null || widget.session.retainedCounterDraft!.id == _assistantEditorId || widget.session.retainedCounterDraft!.id == _assistantBaseRetiredId)) ||
+      _assistantSource == _counterReviewSource(widget.session) && _assistantCatalogue == _counterReviewCatalogue(widget.session));
+  Map<String,int> get _quantities => _assistantQuantities ?? widget.session.workspaceOrderQuantities;
+  WorkspaceBillingDetails get _billing => _assistantBilling ?? widget.session.workspaceOrderBillingDetails;
+  String get _billingCustomer => _assistantBillingCustomer ?? widget.session.workspaceOrderBillingCustomer;
+  WorkspaceBillDiscount get _discount => _assistantDiscount ?? widget.session.workspaceCounterDiscount;
+  int get _subtotal => widget.session.workspaceCounterSubtotalFor(_quantities);
+  String? get _discountError => _discount.validFor(_subtotal) ? null : 'Reduce or remove the discount. The bill must have an amount to pay.';
+  int get _payable => _subtotal - _discount.amountFor(_subtotal);
+  String get _billSignature => !_assistantMode ? widget.session.counterBillReviewSignature : jsonEncode([
+    _quantities, _customer.text, _billing.toJson(), _billingCustomer, _discount.toJson(), _address.text, _source, _fulfilment, _payment, _assistantCatalogue]);
+  void _adjustQuantity(String id, int change) {
+    if (!_assistantCurrent || !_detailsEditable) return;
+    if (!_assistantMode) { widget.session.adjustWorkspaceOrderQuantity(id, change); return; }
+    final before = _quantities[id] ?? 0;
+    final next = widget.session.workspaceCounterAdjustedQuantity(id, before, change);
+    if (next == null || next == before) return;
+    setState(() { if (next == 0) { _assistantQuantities!.remove(id); } else { _assistantQuantities![id] = next; } _assistantDirty = true; });
+    _assistantEdits.value++;
+  }
+  void _hydrateAssistant() {
+    final initial = _initial!;
+    _assistantSource = _counterReviewSource(widget.session);
+    _assistantCatalogue = _counterReviewCatalogue(widget.session);
+    _assistantGeneration = widget.session.counterSaleGeneration;
+    _assistantEditorId = widget.session.counterDraftEditorId;
+    final saved = widget.session.retainedCounterDraft;
+    _assistantBaseRetiredId = saved?.stage == WorkspaceCounterDraftStage.retired ? saved?.id : null;
+    final retained = saved?.stage == WorkspaceCounterDraftStage.retired ? null : saved;
+    final selected = widget.session.currentWorkspaceOrderId != null, empty = widget.session.workspaceCounterEmptyFields;
+    final inMemory = !selected && (widget.session.workspaceOrderCustomer.isNotEmpty || widget.session.workspaceOrderQuantities.isNotEmpty);
+    _assistantQuantities = Map.of(inMemory ? widget.session.workspaceOrderQuantities : {for (final line in retained?.lines ?? <WorkspaceOrderItemSnapshot>[]) line.productId: line.quantity});
+    _restoring = true;
+    _customer.text = initial.values['customer'] as String? ?? (inMemory ? widget.session.workspaceOrderCustomer : retained?.customer) ?? (selected ? empty.customer : widget.session.workspaceOrderCustomer);
+    _customerInput = null;
+    _assistantBilling = inMemory ? widget.session.workspaceOrderBillingDetails : retained?.billingDetails ?? (selected ? empty.billing : widget.session.workspaceOrderBillingDetails);
+    _assistantBillingCustomer = inMemory ? widget.session.workspaceOrderBillingCustomer : retained?.billingCustomer ?? widget.session.workspaceOrderBillingCustomer;
+    if (initial.values.containsKey('customer')) {
+      final oldMobile = normalizeWorkspaceMobile(_assistantBillingCustomer ?? '') ??
+        _storedCounterCustomerMobile((inMemory ? widget.session.workspaceOrderCustomer : retained?.customer) ?? '');
+      final nextMobile = normalizeWorkspaceMobile(_customer.text);
+      // Match the original customer editor's _switchBillingTo: a changed phone
+      // cannot inherit the previous customer's retained billing identity.
+      if (oldMobile != null && nextMobile != oldMobile) _assistantBilling = const WorkspaceBillingDetails();
+      _assistantBillingCustomer = nextMobile ?? '';
+    }
+    if (initial.values['name'] case final String name) {
+      final old = _billing;
+      _assistantBilling = WorkspaceBillingDetails(business: old.business,name: name,businessName: old.businessName,gst: old.gst,address: old.address);
+    }
+    _assistantDiscount = initial.discount ?? (inMemory ? widget.session.workspaceCounterDiscount : retained?.discount) ?? (selected ? empty.discount : widget.session.workspaceCounterDiscount);
+    _address.text = initial.values['address'] as String? ?? (inMemory ? widget.session.workspaceOrderAddress : retained?.address) ?? (selected ? empty.address : widget.session.workspaceOrderAddress);
+    _source = initial.values['source'] as String? ?? (inMemory ? widget.session.workspaceOrderSource : retained?.source) ?? (selected ? empty.source : widget.session.workspaceOrderSource);
+    _fulfilment = initial.values['fulfilment'] as String? ?? (inMemory ? widget.session.workspaceOrderFulfilment : retained?.fulfilment) ?? (selected ? empty.fulfilment : widget.session.workspaceOrderFulfilment);
+    _payment = initial.values['payment'] as String? ?? (inMemory ? widget.session.workspaceOrderPayment : retained?.payment) ?? (selected ? empty.payment : widget.session.workspaceOrderPayment);
+    _productSearch.text = initial.values['query'] as String? ?? (_transferredOwner != null ? _productSearch.text : widget.query);
+    String? problem;
+    for (final entry in initial.quantities.entries) {
+      final native = widget.session.workspaceCounterAdjustedQuantity(entry.key, 0, entry.value);
+      if (native != entry.value) { problem = 'Store products or quantities changed. Reopen this task.'; break; }
+      _assistantQuantities![entry.key] = entry.value;
+    }
+    if (!_discount.validFor(_subtotal)) problem = 'Review the discount against this bill subtotal.';
+    _stage = _storedCounterCustomerMobile(_customer.text) == null ? 'customer' : 'items';
+    if (problem == null && const {'AI-ACT-290','AI-ACT-291'}.contains(initial.actionId) && _quantities.isNotEmpty && _storedCounterCustomerMobile(_customer.text) != null) {
+      _stage = 'review'; _reviewedOrderId = widget.session.currentWorkspaceOrderId; _reviewedBill = _billSignature;
+    }
+    _error = problem;
+    _assistantDirty = initial.values.isNotEmpty;
+    _openingDraft = false;
+    _restoring = false;
+  }
+  Future<void> _saveAssistant({String? expectedReview}) async {
+    if (!_assistantCurrent || _assistantCommitted || _stage != 'review' || _saving || _openingDraft || widget.session.counterDraftEditingBlocked || expectedReview != _billSignature) return;
+    if (_storedCounterCustomerMobile(_customer.text) == null || _quantities.isEmpty || _discountError != null || _fulfilment != 'At the shop' && _address.text.trim().isEmpty) return;
+    // This is reached only by the original Create invoice button. From here the
+    // original journal owns partial/unknown writes; never roll them back/replay.
+    final identity = _currentDraftIdentity;
+    final nativeCustomer = _initial?.values.containsKey('customer') == true ? normalizeWorkspaceMobile(_customer.text)! : _customer.text;
+    setState(() => _saving = true);
+    Object? stockObservation;
+    try {
+    if (widget.session.currentWorkspaceOrderId != null) {
+      // Explicit original Create invoice is the first point that may start a
+      // new native draft. Review keeps the selected saved order unchanged.
+      // The original synchronous start emits after incrementing its generation.
+      // Admit only that next generation before its notification is delivered.
+      _assistantFinalStarted = true;
+      _assistantGeneration = widget.session.counterSaleGeneration + 1;
+      if (!widget.session.startNewWorkspaceOrder()) { setState(() { _saving = false; _error = widget.session.noticeMessage ?? 'Wait for this order update before starting another bill.'; }); return; }
+      _assistantGeneration = widget.session.counterSaleGeneration;
+      _assistantEditorId = widget.session.counterDraftEditorId;
+    }
+    _assistantFinalStarted = true;
+      if (!_assistantCurrent) return;
+      widget.session.updateWorkspaceCounterDetails(customer: nativeCustomer, billingDetails: _billing,
+        billingCustomer: _billingCustomer, source: _source, fulfilment: _fulfilment, payment: _payment, address: _address.text);
+      _assistantEditorId = widget.session.counterDraftEditorId;
+      if (!_assistantCurrent) return;
+      final ids = {...widget.session.workspaceOrderQuantities.keys,..._quantities.keys};
+      for (final id in ids) {
+        if (!_assistantCurrent) return;
+        widget.session.adjustWorkspaceOrderQuantity(id, (_quantities[id] ?? 0) - (widget.session.workspaceOrderQuantities[id] ?? 0));
+      }
+      if (!_assistantCurrent) return;
+      final matches = widget.session.workspaceOrderQuantities.length == _quantities.length && _quantities.entries.every((e) => widget.session.workspaceOrderQuantities[e.key] == e.value) &&
+        widget.session.workspaceOrderCustomer == nativeCustomer && widget.session.workspaceOrderAddress == _address.text &&
+        widget.session.workspaceOrderSource == _source && widget.session.workspaceOrderFulfilment == _fulfilment &&
+        widget.session.workspaceOrderPayment == _payment && widget.session.workspaceOrderBillingCustomer == _billingCustomer && jsonEncode(widget.session.workspaceOrderBillingDetails.toJson()) == jsonEncode(_billing.toJson());
+      if (!matches || !widget.session.updateWorkspaceCounterDiscount(_discount)) {
+        if (mounted) setState(() => _error = 'The bill could not be fully saved. Keep these entries and check the original draft before trying again.');
+        return;
+      }
+      stockObservation=widget.session.observeCounterReviewStock();
+      final result = await widget.session.submitWorkspaceCounterBill(expectedReview: widget.session.counterBillReviewSignature);
+      if (!mounted || !_assistantCurrent || identity != _currentDraftIdentity) return;
+      if (result != null) { _assistantDirty = false; _assistantCommitted = true; setState(() => _saving = false); _finishSavedBill(result, identity); }
+      else { setState(() => _error = widget.session.counterDraftError ?? 'Check this bill’s saved status before trying again.'); }
+    } on Object {
+      if (mounted) setState(() => _error = 'The saved status could not be confirmed. Keep this bill and check its original saved status.');
+    } finally {
+      if(stockObservation!=null)widget.session.endCounterReviewStockObservation(stockObservation);
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+
+
+
+
+
+
+
+  StoreCounterReviewInitial? _assistantInitialOverride;
+  StoreCounterReviewInitial? get _initial => _assistantInitialOverride ?? widget.assistantInitial;
+  bool Function()? _transferredOwner;
+  Listenable? _transferredChanges;
+  Listenable? get _ownerChanges => _transferredChanges ?? widget.ownerChanges;
+  bool get _nativeOwnerCurrent => _transferredOwner?.call() ?? widget.ownerCurrent?.call() ?? true;
+  bool _assistantDiscardRequested = false, _assistantClosed = false, _assistantRetired = false;
+  bool get _assistantCatalogueCurrent {
+    final before = _assistantCatalogue;
+    if (before == null) return true; // Original manual-null owner.
+    final actual = _counterReviewCatalogue(widget.session);
+    if (actual == before) return true;
+    final own = widget.session.counterReviewStockTransition;
+    return _assistantFinalStarted && own != null && own.before == before && own.after == actual &&
+      own.draftId == _assistantEditorId && own.orderId == widget.session.retainedCounterDraft?.submissionOrderId &&
+      _assistantGeneration == widget.session.counterSaleGeneration;
+  }
+  void _assistantAuthorityChanged() {
+    // Observe synchronously: an external actor/source departure cannot be
+    // undone by restoring its previous value before the next Flutter frame.
+    if (!_assistantCurrent) _assistantRetired = true;
+    if (mounted) setState(() {});
+  }
+  String get _nativeAssistantSignature => jsonEncode([_stage,_openingDraft,_saving,_editingDiscount,
+    _productSearch.text,_customer.text,_customerInput,_address.text,_source,_fulfilment,_payment,_billing.toJson(),_billingCustomer,
+    _quantities,_discount.toJson(),_assistantDirty,_assistantMode]);
+  bool _canAdoptAssistant(String action) => mounted && _assistantCurrent && !_saving && !_openingDraft &&
+    !hasCompletedInvoice && (!const {'AI-ACT-289','AI-ACT-290'}.contains(action) ||
+      !_assistantDirty && !_editingDiscount && (_customerInput == null || _customerInput == _customer.text) &&
+        !widget.session.counterDraftEditingBlocked);
+  void _transferredChanged() => _assistantAuthorityChanged();
+  bool _adoptAssistant(StoreCounterReviewInitial initial,bool Function() owner,Listenable changes) {
+    if (!_canAdoptAssistant(initial.actionId) || !owner()) return false;
+    if (initial.actionId == 'AI-ACT-291' && (_storedCounterCustomerMobile(_customer.text) == null || _quantities.isEmpty)) return false;
+    _transferredChanges?.removeListener(_transferredChanged);
+    _transferredOwner = owner; _transferredChanges = changes;
+    _assistantCatalogue = _counterReviewCatalogue(widget.session);
+    _assistantGeneration = widget.session.counterSaleGeneration;
+    _assistantEditorId = widget.session.counterDraftEditorId ?? widget.session.retainedCounterDraft?.id;
+    changes.addListener(_transferredChanged);
+    if (initial.actionId == 'AI-ACT-289' || initial.actionId == 'AI-ACT-290') {
+      _assistantInitialOverride = initial;
+      _hydrateAssistant();
+      // Rebuild the existing discount editor from the supplied raw value; its
+      // original controllers are replaced only after the pristine-owner check.
+      if (_stage == 'review') {
+        _stage = 'items';
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _assistantCurrent) setState(() => _stage = 'review');
+        });
+      }
+    } else if (initial.actionId == 'AI-ACT-291') {
+      if (_storedCounterCustomerMobile(_customer.text) == null || _quantities.isEmpty) return false;
+      _stage = 'review'; _reviewedBill = _billSignature; _reviewedOrderId = widget.session.currentWorkspaceOrderId;
+    } else if (initial.actionId == 'AI-ACT-292') {
+      _assistantDiscardRequested = true;
+    } else if (initial.actionId == 'AI-ACT-385') {
+      _stage = 'items';
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        // The assistant first returns to this original owner. Only then open
+        // its actual physical scanner; do not scan a model-supplied string.
+        await WidgetsBinding.instance.endOfFrame;
+        if (mounted && _assistantCurrent && ModalRoute.of(context)?.isCurrent == true) await _scanProduct();
+      });
+    }
+    setState(() {});
+    return true;
+  }
+
+
   final _collectionKey = GlobalKey<_CustomerCollectionSheetState>();
   bool get hasCompletedInvoice =>
       _invoice != null && (_stage == 'invoice' || _stage == 'payment');
-  Future<bool> flushForNavigation() async {
+  Future<bool> flushForNavigation({bool leaving = true}) async {
+    if (_assistantClosed) return true;
+    if (leaving && (_assistantMode && _assistantDirty || _transferredOwner != null && (_editingDiscount || _customerInput != null && _customerInput != _customer.text))) {
+      if (_saving || widget.session.counterDraftSubmitting) return false;
+      if (!await _confirmCounterReviewLeave(context) || !mounted) return false;
+      _assistantDirty = false;
+    }
     if (_saving) return false;
-    return await (_collectionKey.currentState?.flushForNavigation() ??
-        Future.value(true));
+    final ready = await (_collectionKey.currentState?.flushForNavigation() ?? Future.value(true));
+    if (ready && leaving && (_assistantMode || _transferredOwner != null)) _assistantClosed = true;
+    return ready;
   }
 
   Future<bool> backWithinSale() async {
+    if (!_assistantCurrent) return false;
     if (_stage == 'invoice') return false;
     if (_stage == 'items') {
       await _editCustomer(returnToItems: false);
@@ -44189,7 +52487,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     final identity = (_currentDraftIdentity, widget.session.counterSaleGeneration,
         widget.session.currentWorkspaceOrderId, widget.session.currentWorkspaceOrder,
         _stage, _invoice);
-    if (!await flushForNavigation() || !mounted) return true;
+    if (!await flushForNavigation(leaving: false) || !mounted) return true;
     if (identity != (_currentDraftIdentity, widget.session.counterSaleGeneration,
         widget.session.currentWorkspaceOrderId, widget.session.currentWorkspaceOrder,
         _stage, _invoice)) return true;
@@ -44238,6 +52536,15 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   void initState() {
     super.initState();
     _draftIdentity = _currentDraftIdentity;
+    if (_assistantMode) {
+      _hydrateAssistant();
+      _ownerChanges?.addListener(_assistantAuthorityChanged);
+      _address.addListener(_rememberDetails);
+      if (_initial!.actionId == 'AI-ACT-385') {
+        _stage = 'items'; WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted && _assistantCurrent) unawaited(_scanProduct()); });
+      }
+      return;
+    }
     _openingDraft = widget.session.counterDraftIdentity != null;
     _address.addListener(_rememberDetails);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -44248,6 +52555,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   @override
   void didUpdateWidget(covariant _CounterOrderSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_assistantMode || _transferredOwner != null && !_nativeOwnerCurrent) return;
     if (oldWidget.query != widget.query) _productSearch.text = widget.query;
     if (_draftIdentity != _currentDraftIdentity) {
       _draftIdentity = _currentDraftIdentity;
@@ -44269,6 +52577,8 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   Future<void> _openDraft({bool retry = false}) async {
+    if (!_assistantCurrent) return;
+    if (_assistantMode && retry) _assistantFinalStarted = true;
     final identity = _currentDraftIdentity;
     var recovered = false;
     if (retry) {
@@ -44281,7 +52591,15 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         shouldRestore: () => mounted && identity == _currentDraftIdentity,
       );
     }
-    if (!mounted || identity != _currentDraftIdentity) return;
+    if (!mounted || identity != _currentDraftIdentity || !_assistantCurrent) return;
+    if (_assistantMode) {
+      _assistantSource = _counterReviewSource(widget.session);
+      _assistantCatalogue = _counterReviewCatalogue(widget.session);
+      setState(() => _openingDraft = false);
+      final saved = widget.session.recoveredCounterSubmission;
+      if (recovered && saved != null && _assistantCurrent) { _assistantDirty = false; _finishSavedBill(saved,identity); }
+      return;
+    }
     _restoring = true;
     setState(() {
       _customer.text = widget.session.workspaceOrderCustomer;
@@ -44303,7 +52621,8 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   void _rememberDetails() {
-    if (_restoring || !_detailsEditable || !mounted) return;
+    if (_restoring || !_detailsEditable || !mounted || !_assistantCurrent) return;
+    if (_assistantMode) { _assistantDirty = true; return; }
     widget.session.updateWorkspaceCounterDetails(
       customer: _customerInput == null ? _customer.text : null,
       source: _source,
@@ -44313,7 +52632,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     );
   }
 
-  bool get _detailsEditable => !_saving && !_openingDraft &&
+  bool get _detailsEditable => _assistantCurrent && !_saving && !_openingDraft &&
       !widget.session.counterDraftEditingBlocked && !widget.session.busy &&
       !widget.session.workspaceOperationsSyncing &&
       !widget.session.workspaceHandoverBusy && !widget.session.hasPendingOrderTime &&
@@ -44322,6 +52641,9 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
 
   @override
   void dispose() {
+    widget.ownerChanges?.removeListener(_assistantAuthorityChanged);
+    _transferredChanges?.removeListener(_transferredChanged);
+    _assistantEdits.dispose();
     _address.removeListener(_rememberDetails);
     _customer.dispose();
     _productSearch.dispose();
@@ -44348,16 +52670,22 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         .toList(growable: false);
   }
 
-  int get _selectedUnits => widget.session.workspaceOrderQuantities.values
+  int get _selectedUnits => _quantities.values
       .fold<int>(0, (total, quantity) => total + quantity);
 
   Future<void> _save({String? expectedReview}) async {
+    if (_assistantMode) { await _saveAssistant(expectedReview: expectedReview); return; }
+    if (!_assistantCurrent) return;
+    if (_transferredOwner != null) {
+      _assistantFinalStarted = true;
+      _assistantEditorId = widget.session.counterDraftEditorId ?? widget.session.retainedCounterDraft?.id;
+    }
     if (_saving || _openingDraft || widget.session.counterDraftEditingBlocked) {
       return;
     }
     final error = _storedCounterCustomerMobile(_customer.text) == null
         ? 'Enter a valid 10-digit customer mobile number.'
-        : widget.session.workspaceOrderItemCount == 0
+        : _selectedUnits == 0
         ? 'Add at least one product from your store catalogue.'
         : _fulfilment != 'At the shop' && _address.text.trim().isEmpty
         ? 'Add the confirmed customer delivery address.'
@@ -44369,11 +52697,16 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     _rememberDetails();
     setState(() => _saving = true);
     final identity = _currentDraftIdentity;
-    final submitted = await widget.session.submitWorkspaceCounterBill(
-      expectedReview: expectedReview,
-    );
-    if (!mounted || identity != _currentDraftIdentity) return;
+    final stockObservation=_transferredOwner==null?null:widget.session.observeCounterReviewStock();
+    final ({String orderId,WorkspaceCustomerInvoice? invoice})? submitted;
+    try {
+      submitted=await widget.session.submitWorkspaceCounterBill(expectedReview:expectedReview);
+    } finally {
+      if(stockObservation!=null)widget.session.endCounterReviewStockObservation(stockObservation);
+    }
+    if (!mounted) return;
     setState(() => _saving = false);
+    if (identity != _currentDraftIdentity || !_assistantCurrent) return;
     if (submitted == null) {
       setState(
         () => _error =
@@ -44393,6 +52726,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     ({String orderId, WorkspaceCustomerInvoice? invoice}) submitted,
     Object identity,
   ) {
+    if (_assistantMode) { _assistantCommitted = true; _assistantDirty = false; }
     setState(() => _error = null);
     // The central invoice is the confirmation; a duplicate global banner can
     // crowd its payment controls out of a compact, enlarged-text viewport.
@@ -44420,11 +52754,13 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   void _nextSale() {
+    if (_assistantMode) { widget.onExit(); return; }
     _startNextSale();
   }
 
   bool _startNextSale() {
-    if (!mounted || !widget.session.startNewWorkspaceOrder()) return false;
+    if (_assistantMode) return false;
+    if (!mounted || !_assistantCurrent || !widget.session.startNewWorkspaceOrder()) return false;
     _restoring = true;
     setState(() {
       _invoice = null;
@@ -44447,6 +52783,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   Future<void> _review() async {
+    if (!_assistantCurrent) return;
     if (_saving || _openingDraft || widget.session.counterDraftEditingBlocked) {
       return;
     }
@@ -44458,7 +52795,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     }
     _rememberDetails();
     setState(() {
-      _reviewedBill = widget.session.counterBillReviewSignature;
+      _reviewedBill = _billSignature;
       _reviewedOrderId = widget.session.currentWorkspaceOrderId;
       _stage = 'review';
       _editingDiscount = false;
@@ -44466,6 +52803,12 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   void _applyDiscount(WorkspaceBillDiscount discount) {
+    if (!_assistantCurrent) return;
+    if (_assistantMode) {
+      if (_stage != 'review' || _saving || !discount.validFor(_subtotal)) return;
+      setState(() { _assistantDiscount = discount; _reviewedBill = _billSignature; _editingDiscount = false; _assistantDirty = true; _error = null; });
+      return;
+    }
     if (_saving ||
         _stage != 'review' ||
         widget.session.counterDraftEditingBlocked ||
@@ -44474,7 +52817,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     }
     if (widget.session.updateWorkspaceCounterDiscount(discount)) {
       setState(() {
-        _reviewedBill = widget.session.counterBillReviewSignature;
+        _reviewedBill = _billSignature;
         _error = null;
         _editingDiscount = false;
       });
@@ -44493,7 +52836,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     final products = widget.session.workspaceCatalogueItems
         .where(
           (product) =>
-              (widget.session.workspaceOrderQuantities[product.id] ?? 0) > 0,
+              (_quantities[product.id] ?? 0) > 0,
         )
         .toList(growable: false);
     final groups = <String, List<WorkspaceCatalogueItem>>{};
@@ -44523,7 +52866,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       final painter = TextPainter(
         text: TextSpan(
           text:
-              '₹${_formatStoreMinorAmount(product.sellingPriceMinor * widget.session.workspaceOrderQuantities[product.id]!)}',
+              '₹${_formatStoreMinorAmount(product.sellingPriceMinor * _quantities[product.id]!)}',
           style: DefaultTextStyle.of(
             context,
           ).style.copyWith(fontSize: 12, fontWeight: FontWeight.w700),
@@ -44554,11 +52897,11 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (widget.session.workspaceOrderBillingDetails.name
+                            if (_billing.name
                                 .trim()
                                 .isNotEmpty)
                               Text(
-                                widget.session.workspaceOrderBillingDetails.name
+                                _billing.name
                                     .trim(),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w700,
@@ -44620,7 +52963,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                     (sum, item) =>
                         sum +
                         item.sellingPriceMinor *
-                            widget.session.workspaceOrderQuantities[item.id]!,
+                            _quantities[item.id]!,
                   );
                   final label =
                       categoryLabels[categoryId] ??
@@ -44684,7 +53027,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                 }
                 final product = row.product!;
                 final quantity =
-                    widget.session.workspaceOrderQuantities[product.id]!;
+                    _quantities[product.id]!;
                 return Container(
                   key: ValueKey('work-review-item-${product.id}'),
                   padding: const EdgeInsets.symmetric(vertical: 6),
@@ -44811,14 +53154,14 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               style: const TextStyle(fontSize: 12),
             ),
             value: _purchaseAmount(
-              widget.session.workspaceCounterSubtotalMinor,
+              _subtotal,
             ),
           ),
           const SizedBox(height: 4),
           _CounterBillDiscountEditor(
             key: const Key('work-counter-discount-editor'),
-            subtotalMinor: widget.session.workspaceCounterSubtotalMinor,
-            initial: widget.session.workspaceCounterDiscount,
+            subtotalMinor: _subtotal,
+            initial: _discount,
             onApply: _applyDiscount,
             onInvalid: () => setState(() => _editingDiscount = true),
             enabled: !_saving && !widget.session.counterDraftEditingBlocked,
@@ -44830,8 +53173,8 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
             leading: const Text('Amount due'),
             value:
                 !_editingDiscount &&
-                    widget.session.workspaceCounterDiscountError == null
-                ? '₹${_formatStoreMinorAmount(widget.session.workspaceCounterPayableMinor)}'
+                    _discountError == null
+                ? '₹${_formatStoreMinorAmount(_payable)}'
                 : '—',
             style: const TextStyle(
               fontSize: 16,
@@ -44845,7 +53188,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               'Apply your discount to update the total.',
               style: TextStyle(fontSize: 11, color: MoolColors.muted),
             ),
-          if (widget.session.workspaceCounterDiscountError case final error?)
+          if (_discountError case final error?)
             Text(
               error,
               key: const Key('work-counter-discount-error'),
@@ -44876,11 +53219,11 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
           ),
           if (_payment == 'UPI' &&
               !_editingDiscount &&
-              widget.session.workspaceCounterDiscountError == null)
+              _discountError == null)
             _CounterUpiPanel(
               key: ValueKey(widget.session.storeUpiScope),
               session: widget.session,
-              amountPaise: widget.session.workspaceCounterPayableMinor,
+              amountPaise: _payable,
               reference: widget.session.retainedCounterDraft?.id,
               viewportHeight: paymentViewportHeight,
             ),
@@ -44907,10 +53250,11 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
             onPressed:
                 _saving ||
                     _editingDiscount ||
-                    widget.session.workspaceCounterDiscountError != null
+                    _discountError != null
                 ? null
                 : () {
-                    final current = widget.session.counterBillReviewSignature;
+                    if (!_assistantCurrent || _assistantMode && (_assistantCommitted || _stage != "review")) return;
+                    final current = _billSignature;
                     if (_reviewedOrderId !=
                             widget.session.currentWorkspaceOrderId ||
                         current != _reviewedBill) {
@@ -44978,6 +53322,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   Future<void> _openProduct(WorkspaceCatalogueItem product) async {
+    if (!_assistantCurrent) return;
     if (_saving || _openingDraft || widget.session.counterDraftEditingBlocked) {
       return;
     }
@@ -44991,8 +53336,11 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
           child: _CounterStoreProductPage(
             session: widget.session,
             productId: product.id,
+            quantity: _assistantMode ? () => _quantities[product.id] ?? 0 : null,
+            adjust: _assistantMode ? (change) => _adjustQuantity(product.id,change) : null,
+            ownerChanges: Listenable.merge([_ownerChanges,_assistantEdits]),
             isCurrent: () =>
-                mounted &&
+                mounted && _assistantCurrent &&
                 identity == _currentDraftIdentity &&
                 saleGeneration == widget.session.counterSaleGeneration &&
                 !widget.session.counterDraftEditingBlocked,
@@ -45003,13 +53351,14 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   Future<void> _scanProduct() async {
+    if (!_assistantCurrent) return;
     if (_saving || _openingDraft || widget.session.counterDraftEditingBlocked) {
       return;
     }
     final identity = _currentDraftIdentity;
     final saleGeneration = widget.session.counterSaleGeneration;
-    final code = await showStoreProductScanner(context);
-    if (!mounted || code == null || code.trim().isEmpty) return;
+    final code = await showStoreProductScanner(context,ownerCurrent: _assistantMode || _transferredOwner != null ? () => _assistantCurrent : null,ownerChanges: _ownerChanges);
+    if (!mounted || !_assistantCurrent || code == null || code.trim().isEmpty) return;
     if (identity != _currentDraftIdentity ||
         saleGeneration != widget.session.counterSaleGeneration) {
       return;
@@ -45018,6 +53367,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   void _toggleUsbScanner() {
+    if (!_assistantCurrent) return;
     _clearScannerBuffer();
     final enable = !_usbScanMode || !_barcodeFocus.hasPrimaryFocus;
     setState(() => _usbScanMode = enable);
@@ -45038,7 +53388,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   KeyEventResult _handleScannerKey(FocusNode node, KeyEvent event) {
-    if (!_usbScanMode || !node.hasPrimaryFocus || _stage != 'items') {
+    if (!_assistantCurrent || !_usbScanMode || !node.hasPrimaryFocus || _stage != 'items') {
       return KeyEventResult.ignored;
     }
     if (event is KeyRepeatEvent) return KeyEventResult.handled;
@@ -45078,6 +53428,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   void _addScannedProduct(String code) {
+    if (!_assistantCurrent) return;
     if (_saving ||
         _openingDraft ||
         widget.session.counterDraftEditingBlocked ||
@@ -45108,10 +53459,11 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       );
       return;
     }
-    widget.session.adjustWorkspaceOrderQuantity(product.id, 1);
+    _adjustQuantity(product.id, 1);
   }
 
   Future<void> _editCustomer({bool returnToItems = true}) async {
+    if (!_assistantCurrent) return;
     if (_openingDraft || _saving || widget.session.counterDraftEditingBlocked) {
       return;
     }
@@ -45123,18 +53475,19 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   Widget _customerPanel() => _StoreSaleCustomerSheet(
-    key: ValueKey(_currentDraftIdentity),
+    key: _assistantMode ? ValueKey((_currentDraftIdentity,'assistant',_assistantSource)) : ValueKey(_currentDraftIdentity),
     initialValue:
         _customerInput ?? widget.session.counterCustomerInput ?? _customer.text,
     recentCustomers: _recentCustomers,
-    billingDetails: widget.session.workspaceOrderBillingDetails,
-    billingCustomer: widget.session.workspaceOrderBillingCustomer,
-    onBillingChanged: (details, mobile) =>
-        widget.session.updateWorkspaceCounterDetails(
-          billingDetails: details,
-          billingCustomer: mobile ?? '',
-        ),
+    billingDetails: _billing,
+    billingCustomer: _billingCustomer,
+    onBillingChanged: (details, mobile) {
+      if (!_assistantCurrent) return;
+      if (_assistantMode) { _assistantBilling = details; _assistantBillingCustomer = mobile ?? ''; _assistantDirty = true; }
+      else { widget.session.updateWorkspaceCounterDetails(billingDetails: details,billingCustomer: mobile ?? ''); }
+    },
     onClose: () {
+      if (!_assistantCurrent) return;
       if (_storedCounterCustomerMobile(_customer.text) == null) {
         widget.onExit();
       } else {
@@ -45142,6 +53495,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       }
     },
     onConfirmed: (selected) {
+      if (!_assistantCurrent) return;
       setState(() {
         _customer.text = selected;
         _customerInput = null;
@@ -45151,13 +53505,19 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       _rememberDetails();
     },
     onDraftChanged: (value) {
+      if (!_assistantCurrent) return;
       _customerInput = value;
-      widget.session.retainWorkspaceCounterCustomerInput(value);
+      if (_assistantMode) { _assistantDirty = true; } else { widget.session.retainWorkspaceCounterCustomerInput(value); }
     },
   );
 
   @override
   Widget build(BuildContext context) {
+    final body = _buildCounter(context);
+    return _transferredOwner == null ? body : _StoreSalesOwnerSurface(current: () => _assistantCurrent,
+      changes: _transferredChanges!,child: body);
+  }
+  Widget _buildCounter(BuildContext context) {
     final validPhone = _storedCounterCustomerMobile(_customer.text) != null;
     if (_openingDraft || widget.session.counterDraftLoading) {
       return const Center(
@@ -45166,7 +53526,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         ),
       );
     }
-    if (widget.session.counterDraftEditingBlocked && !_saving) {
+    if ((widget.session.counterDraftEditingBlocked || (_initial?.actionId == 'AI-ACT-292' || _assistantDiscardRequested)) && !_saving) {
       final draft = widget.session.retainedCounterDraft;
       return ListView(
         key: const Key('work-counter-draft-recovery'),
@@ -45204,10 +53564,15 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                 ),
               ),
           ],
-          if (widget.session.counterDraftCatalogueChanged)
+          if (widget.session.counterDraftCatalogueChanged ||
+              (_initial?.actionId == 'AI-ACT-292' || _assistantDiscardRequested) && _assistantCurrent &&
+              draft != null && draft.stage != WorkspaceCounterDraftStage.retired &&
+              widget.session.counterDraftLoaded && !widget.session.counterDraftLoading &&
+              !widget.session.counterDraftSubmitting && !widget.session.counterDraftNeedsReconciliation)
             TextButton(
               key: const Key('work-counter-draft-discard'),
               onPressed: () async {
+                if (!_assistantCurrent) return;
                 final discard = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -45227,10 +53592,18 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                     ],
                   ),
                 );
+                if (_assistantMode) {
+                  if (discard != true || !mounted || !_assistantCurrent) return;
+                  _assistantFinalStarted = true;
+                  final removed = await widget.session.discardWorkspaceCounterDraft();
+                  if (!mounted || !_nativeOwnerCurrent) return;
+                  if (removed) { _assistantDirty = false; widget.session.startNewWorkspaceOrder(); widget.onExit(); }
+                  return;
+                }
                 if (discard == true &&
-                    mounted &&
+                    mounted && _assistantCurrent &&
                     await widget.session.discardWorkspaceCounterDraft() &&
-                    mounted) {
+                    mounted && _assistantCurrent) {
                   widget.session.startNewWorkspaceOrder();
                   await _openDraft();
                 }
@@ -45250,6 +53623,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               counterAppearance: true,
               session: widget.session,
               invoice: _invoice!,
+              ownerCurrent: _assistantMode || _transferredOwner != null ? () => _assistantCurrent : null,ownerChanges: _ownerChanges,
               onClose: _nextSale,
               receiptEditor:
                   _stage == 'payment' &&
@@ -45335,12 +53709,12 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
           ),
         )
         .toList(growable: false);
-    final enteredName = widget.session.workspaceOrderBillingDetails.name.trim();
+    final enteredName = _billing.name.trim();
     final selectedCustomer = enteredName.isNotEmpty
         ? enteredName
         : _RecentCounterCustomer(
             _customer.text.trim(),
-            widget.session.workspaceOrderBillingDetails,
+            _billing,
           ).label;
     final mobile = _storedCounterCustomerMobile(_customer.text.trim());
     final customerName =
@@ -45560,7 +53934,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         border: Border(top: BorderSide(color: _counterSaleLine), bottom: BorderSide(color: _counterSaleLine)),
       ),
       child: _StoreScaledPair(
-        forceStack: widget.session.workspaceCounterSubtotalMinor >= 1000000000,
+        forceStack: _subtotal >= 1000000000,
         first: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -45570,8 +53944,8 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               style: const TextStyle(color: MoolColors.muted, fontSize: 12),
             ),
             _StoreMoneyText(
-              widget.session.workspaceCounterDiscountError == null
-                  ? '₹${_formatStoreMinorAmount(widget.session.workspaceCounterPayableMinor)}'
+              _discountError == null
+                  ? '₹${_formatStoreMinorAmount(_payable)}'
                   : 'Review discount',
               style: const TextStyle(
                 color: MoolColors.navy,
@@ -45646,6 +54020,9 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                             : _SaleProductTile(
                                 product: products[index ~/ 2],
                                 session: widget.session,
+                                reviewQuantity: _assistantMode ? _quantities[products[index ~/ 2].id] ?? 0 : null,
+                                reviewAdjust: _assistantMode ? (change) => _adjustQuantity(products[index ~/ 2].id,change) : null,
+                                isCurrent: _assistantMode || _transferredOwner != null ? () => _assistantCurrent : null,
                                 onOpen: () =>
                                     _openProduct(products[index ~/ 2]),
                               ),
@@ -46133,12 +54510,18 @@ class _SaleProductTile extends StatelessWidget {
     required this.product,
     required this.session,
     required this.onOpen,
+    this.reviewQuantity,this.reviewAdjust,this.isCurrent,
   });
   final WorkspaceCatalogueItem product;
   final WorkSession session;
   final VoidCallback onOpen;
+  final int? reviewQuantity;
+  final ValueChanged<int>? reviewAdjust;
+  final bool Function()? isCurrent;
 
   void _adjustQuantity(int change) {
+    if (isCurrent?.call() == false) return;
+    if (reviewAdjust != null) { reviewAdjust!(change); return; }
     final before = session.workspaceOrderQuantities[product.id] ?? 0;
     session.adjustWorkspaceOrderQuantity(product.id, change);
     final after = session.workspaceOrderQuantities[product.id] ?? 0;
@@ -46148,7 +54531,7 @@ class _SaleProductTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final quantity = session.workspaceOrderQuantities[product.id] ?? 0;
+    final quantity = reviewQuantity ?? session.workspaceOrderQuantities[product.id] ?? 0;
     final availableForSale = product.canSellAtCounter &&
         (product.stockMode == WorkspaceStockMode.availabilityOnly || product.stock > 0);
     final facts = Text(
@@ -46303,10 +54686,14 @@ class _CounterStoreProductPage extends StatefulWidget {
     required this.session,
     required this.productId,
     required this.isCurrent,
+    this.quantity,this.adjust,this.ownerChanges,
   });
   final WorkSession session;
   final String productId;
   final bool Function() isCurrent;
+  final int Function()? quantity;
+  final ValueChanged<int>? adjust;
+  final Listenable? ownerChanges;
   @override
   State<_CounterStoreProductPage> createState() =>
       _CounterStoreProductPageState();
@@ -46316,14 +54703,14 @@ class _CounterStoreProductPageState extends State<_CounterStoreProductPage> {
   String? error;
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: widget.session,
+    animation: Listenable.merge([widget.session,widget.ownerChanges]),
     builder: (context, _) {
       final product = widget.session.workspaceCatalogueItems
           .where((p) => p.id == widget.productId)
           .firstOrNull;
       final current = widget.isCurrent();
       final quantity =
-          widget.session.workspaceOrderQuantities[widget.productId] ?? 0;
+          widget.quantity?.call() ?? widget.session.workspaceOrderQuantities[widget.productId] ?? 0;
       final canAdd =
           current &&
           product != null &&
@@ -46437,13 +54824,9 @@ class _CounterStoreProductPageState extends State<_CounterStoreProductPage> {
                 ? null
                 : () {
                     if (!widget.isCurrent()) return;
-                    widget.session.adjustWorkspaceOrderQuantity(
-                      widget.productId,
-                      1,
-                    );
-                    if ((widget.session.workspaceOrderQuantities[widget
-                                .productId] ??
-                            0) ==
+                    if (widget.adjust != null) { widget.adjust!(1); }
+                    else { widget.session.adjustWorkspaceOrderQuantity(widget.productId,1); }
+                    if ((widget.quantity?.call() ?? widget.session.workspaceOrderQuantities[widget.productId] ?? 0) ==
                         quantity + 1) {
                       Navigator.of(context).pop();
                     } else {
@@ -47632,6 +56015,12 @@ class _WorkspaceStatusSurface extends StatelessWidget {
                   onTap: onPaymentControls,
                 ),
                 const Divider(height: 1, indent: 16, endIndent: 16),
+                ListTile(key: const Key('work-settings-upi-destination'),
+                  leading: const Icon(Icons.qr_code_rounded), title: const Text('Store UPI details'),
+                  trailing: const Icon(Icons.chevron_right_rounded), onTap: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Store UPI details')),
+                      body: StoreUpiDestinationEditor(session: session))))),
+                const Divider(height: 1, indent: 16, endIndent: 16),
                 _StoreInvoiceDeliveryPreferenceView(
                   key: ValueKey(session.storeInvoiceDeliveryScope),
                   session: session,
@@ -47680,11 +56069,14 @@ class _StoreInvoiceDeliveryPreferenceView extends StatefulWidget {
     required this.session,
     required this.scope,
     this.settings = false,
+    this.initialData, this.reviewScope,
     super.key,
   });
   final WorkSession session;
   final ({String account, String store})? scope;
   final bool settings;
+  final StoreSettingsInitialData? initialData;
+  final StoreSettingsReviewScope? reviewScope;
 
   @override
   State<_StoreInvoiceDeliveryPreferenceView> createState() =>
@@ -47694,10 +56086,11 @@ class _StoreInvoiceDeliveryPreferenceView extends StatefulWidget {
 class _StoreInvoiceDeliveryPreferenceViewState
     extends State<_StoreInvoiceDeliveryPreferenceView> {
   WorkspaceInvoiceDeliveryPreference? _preference;
+  WorkspaceInvoiceDeliveryMode? _proposedMode;
   bool _busy = true;
   String? _error;
   bool get _current =>
-      mounted &&
+      mounted && widget.reviewScope?.current() != false &&
       widget.scope != null &&
       widget.scope == widget.session.storeInvoiceDeliveryScope;
 
@@ -47717,6 +56110,10 @@ class _StoreInvoiceDeliveryPreferenceViewState
       final value = await widget.session.loadInvoiceDeliveryPreference(
         widget.scope!,
       );
+      if (widget.reviewScope?.invoiceMode != null && _preference == null && value.mode.name != widget.reviewScope!.invoiceMode) {
+        if (_current) setState(() => _error = 'Saved invoice preference changed. Reopen this task.');
+        return;
+      }
       if (_current) setState(() => _preference = value);
     } on Object {
       if (_current) {
@@ -47731,19 +56128,29 @@ class _StoreInvoiceDeliveryPreferenceViewState
   }
 
   Future<void> _save(WorkspaceInvoiceDeliveryMode? mode) async {
-    if (!_current || _busy || _preference == null || mode == null) return;
+    if (!_current || widget.reviewScope?.mayApply == false || _busy || _preference == null || mode == null) return;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
       final scope = widget.scope!;
+      if (widget.reviewScope != null) {
+        final latest = await widget.session.loadInvoiceDeliveryPreference(scope);
+        if (!_current || !widget.reviewScope!.mayApply) return;
+        if (latest.mode != _preference!.mode) {
+          setState(() => _error = 'Saved invoice preference changed. Your choice is kept. Reopen this task.');
+          return;
+        }
+      }
       await widget.session.saveInvoiceDeliveryPreference(
         WorkspaceInvoiceDeliveryPreference(
           account: scope.account,
           store: scope.store,
           mode: mode,
         ),
+        current: widget.reviewScope == null ? null : () => _current && widget.reviewScope!.mayApply,
+        expectedOriginalMode: widget.reviewScope == null ? null : _preference!.mode,
       );
       // Read back the actual persisted choice, including after leaving/reopening.
       if (_current) await _load();
@@ -47813,6 +56220,20 @@ class _StoreInvoiceDeliveryPreferenceViewState
         ),
       );
     }
+    if (widget.initialData != null) {
+      _proposedMode ??= WorkspaceInvoiceDeliveryMode.values.singleWhere((value) => value.name == widget.initialData!.fields['mode']);
+      return Column(key: const Key('work-invoice-delivery-settings'), children: [
+        DropdownButtonFormField<WorkspaceInvoiceDeliveryMode>(key: const Key('work-invoice-proposed-mode'),
+          initialValue: _proposedMode, decoration: const InputDecoration(labelText: 'Invoice delivery preference'),
+          items: [for (final value in WorkspaceInvoiceDeliveryMode.values) DropdownMenuItem(value: value, child: Text(value.label))],
+          onChanged: _busy ? null : (value) => setState(() => _proposedMode = value)),
+        feedback,
+        FilledButton(key: const Key('work-invoice-apply-proposal'),
+          onPressed: _busy || _preference == null || _error != null ? null : () => _save(_proposedMode),
+          child: const Text('Apply preference')),
+        const Text('Saved on this device. Invoice sending is separate.'),
+      ]);
+    }
     return Column(
       key: const Key('work-invoice-delivery-settings'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -47877,8 +56298,12 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
     required this.onOpenOrders,
     required this.onOpenStatus,
     required this.onDismiss,
+    this.onlyAlertId, this.reviewScope, this.onReviewCompleted,
   });
   final WorkSession session;
+  final String? onlyAlertId;
+  final VoidCallback? onReviewCompleted;
+  final StoreSettingsReviewScope? reviewScope;
   final ScrollController scrollController;
   final ValueChanged<String> onOpen;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
@@ -47888,7 +56313,8 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final alerts = _workspaceAlerts(session);
+    if (reviewScope?.current() == false) return const Center(child: Text('Your Store or account changed. Reopen alerts.'));
+    final alerts = _workspaceAlerts(session).where((alert) => onlyAlertId == null || alert.id == onlyAlertId).toList();
     final storeId = session.activeWorkspace?.id ?? session.workspaceId;
     if (alerts.isEmpty) {
       return WorkEmptyState(
@@ -47992,10 +56418,11 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
                         key: Key('work-alert-dismiss-${alert.id}'),
                         tooltip: 'Dismiss ${alert.title}',
                         onPressed: () {
-                          if (storeId ==
+                          if ((reviewScope == null || reviewScope!.mayApply && _workspaceAlerts(session).any((item) => item.id == alert.id && !item.requiredAction)) && storeId ==
                               (session.activeWorkspace?.id ??
                                   session.workspaceId)) {
                             onDismiss(alert.id);
+                            if (onlyAlertId == alert.id && !_workspaceAlerts(session).any((item) => item.id == alert.id)) { reviewScope?.dispose(); onReviewCompleted?.call(); }
                           }
                         },
                         icon: const Icon(Icons.close_rounded, size: 19),

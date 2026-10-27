@@ -174,6 +174,12 @@ abstract interface class StoreFeedbackPendingStore {
   Future<void> removePending(StoreFeedbackCommand original);
 }
 
+/// Optional frontend admission at the existing queued device write boundary.
+abstract interface class StoreFeedbackOwnerGuardedPendingStore implements StoreFeedbackPendingStore {
+  Future<void> savePendingCurrent(StoreFeedbackCommand command,{required bool Function() current});
+  Future<void> removePendingCurrent(StoreFeedbackCommand original,{required bool Function() current});
+}
+
 /// Session-owned per-account/Store presentation state. No local review database,
 /// optimistic rating edits, report hiding or provider-success fallback.
 class StoreFeedbackController extends ChangeNotifier {
@@ -371,8 +377,10 @@ class StoreFeedbackController extends ChangeNotifier {
   Future<void> submit(
     StoreFeedbackBinding binding,
     StoreFeedbackAction action,
-    StoreFeedbackAudience audience,
-  ) async {
+    StoreFeedbackAudience audience, {
+    bool Function()? reviewOwnerCurrent,bool Function()? reviewInputCurrent,VoidCallback? onReviewNativeChange,
+  }) async {
+    if(reviewOwnerCurrent?.call()==false||reviewInputCurrent?.call()==false)return;
     final id = binding.reviewId;
     if (bindingFor(id) != binding || !canAct(id, action)) return;
     final entry = _entries[id]!;
@@ -399,10 +407,12 @@ class StoreFeedbackController extends ChangeNotifier {
       content: content,
     );
     _pending = command; // Before calling the adapter, never after the await.
-    await _execute(command, reconcile: false);
+    onReviewNativeChange?.call();
+    await _execute(command,reconcile:false,reviewOwnerCurrent:reviewOwnerCurrent,reviewInputCurrent:reviewInputCurrent,onReviewNativeChange:onReviewNativeChange);
   }
 
-  Future<void> reconcile() async {
+  Future<void> reconcile({bool Function()? reviewOwnerCurrent,bool Function()? reviewInputCurrent,VoidCallback? onReviewNativeChange}) async {
+    if(reviewOwnerCurrent?.call()==false||reviewInputCurrent?.call()==false)return;
     final command = _pending;
     if (_disposed ||
         context() == null ||
@@ -412,14 +422,14 @@ class StoreFeedbackController extends ChangeNotifier {
         adapter?.commandRecoveryReady != true) {
       return;
     }
-    await _execute(command, reconcile: true);
+    await _execute(command,reconcile:true,reviewOwnerCurrent:reviewOwnerCurrent,reviewInputCurrent:reviewInputCurrent,onReviewNativeChange:onReviewNativeChange);
   }
 
   bool _matches(Object origin) => !_disposed && context() == origin;
 
   Future<void> _execute(
     StoreFeedbackCommand command, {
-    required bool reconcile,
+    required bool reconcile,bool Function()? reviewOwnerCurrent,bool Function()? reviewInputCurrent,VoidCallback? onReviewNativeChange,
   }) async {
     final origin = context();
     if (origin == null || _commandInFlight) return;
@@ -427,39 +437,48 @@ class StoreFeedbackController extends ChangeNotifier {
     message = null;
     try {
       notifyListeners();
-      if (!_matches(origin)) {
+      if (!_matches(origin)||reviewOwnerCurrent?.call()==false||reviewInputCurrent?.call()==false) {
         // No external call was made. Do not create an unknown result for an
         // undispatched submission; an existing reconciliation hold stays held.
         if (!_disposed && !reconcile && identical(_pending, command)) {
           _pending = null;
+          onReviewNativeChange?.call();
         }
         return;
       }
       if (!reconcile && pendingStore != null) {
         try {
-          await pendingStore!.savePending(command)
+          if(reviewOwnerCurrent?.call()==false||reviewInputCurrent?.call()==false)return;
+          final store=pendingStore!;
+          await (store is StoreFeedbackOwnerGuardedPendingStore && (reviewOwnerCurrent!=null||reviewInputCurrent!=null)
+            ? store.savePendingCurrent(command,current:()=>reviewOwnerCurrent?.call()!=false&&reviewInputCurrent?.call()!=false)
+            : store.savePending(command))
               .timeout(const Duration(seconds: 20));
         } catch (_) {
           if (_matches(origin)) {
             // A native write may still finish after timeout. Restore is queued
             // behind it; never dispatch or erase uncertain journal bytes.
+            reviewInputCurrent?.call();
             _restored = false;
+            onReviewNativeChange?.call();
             message = 'Could not safely save this request. It was not sent. Refresh to recover.';
           }
           return;
         }
-        if (!_matches(origin)) return;
+        if (!_matches(origin)||reviewOwnerCurrent?.call()==false||reviewInputCurrent?.call()==false) return;
       }
       if (adapter?.commandRecoveryReady != true) {
         message = 'Request checking is unavailable. The original request is kept; do not send it again.';
         return;
       }
+      if(reviewOwnerCurrent?.call()==false||reviewInputCurrent?.call()==false)return;
       final result =
           await (reconcile
                   ? adapter!.reconcile(command)
                   : adapter!.submit(command))
               .timeout(const Duration(seconds: 20));
-      if (!_matches(origin)) return;
+      if (!_matches(origin)||reviewOwnerCurrent?.call()==false) return;
+      reviewInputCurrent?.call();
       if (!result.matches(command) ||
           result.outcome == StoreFeedbackOutcome.unknown) {
         message =
@@ -468,7 +487,11 @@ class StoreFeedbackController extends ChangeNotifier {
       }
       if (pendingStore != null) {
         try {
-          await pendingStore!.removePending(command)
+          if(reviewOwnerCurrent?.call()==false)return;
+          final store=pendingStore!;
+          await (store is StoreFeedbackOwnerGuardedPendingStore && reviewOwnerCurrent!=null
+            ? store.removePendingCurrent(command,current:reviewOwnerCurrent)
+            : store.removePending(command))
               .timeout(const Duration(seconds: 20));
         } catch (_) {
           if (_matches(origin)) {
@@ -476,7 +499,7 @@ class StoreFeedbackController extends ChangeNotifier {
           }
           return;
         }
-        if (!_matches(origin)) return;
+        if (!_matches(origin)||reviewOwnerCurrent?.call()==false) return;
       }
       _pending = null;
       if (result.outcome == StoreFeedbackOutcome.accepted) {
@@ -493,8 +516,9 @@ class StoreFeedbackController extends ChangeNotifier {
             'Request was not accepted. Your text is kept; refresh before retrying.';
         _pageContext = null;
       }
+      onReviewNativeChange?.call();
     } catch (_) {
-      if (_matches(origin)) {
+      if (_matches(origin)&&reviewOwnerCurrent?.call()!=false) {
         message =
             'Result not confirmed. Check the original request before trying again.';
       }

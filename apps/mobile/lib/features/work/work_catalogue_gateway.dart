@@ -1106,41 +1106,42 @@ class WorkspaceStockVisibilityController extends ChangeNotifier {
   bool get active => !_closed && _lifetime != null && context() == _lifetime;
   bool get supported => active && gateway.stockQuantityVisibilitySupported;
   void _notify() { if (active) notifyListeners(); }
-  Future<void> _readHead() async {
-    final result = await gateway.readStockVisibility(scope, current: () => active).timeout(const Duration(seconds: 25));
-    if (!active) return;
+  bool _current(bool Function()? requestCurrent) => active && requestCurrent?.call() != false;
+  Future<void> _readHead({bool Function()? requestCurrent}) async {
+    final result = await gateway.readStockVisibility(scope, current: () => _current(requestCurrent)).timeout(const Duration(seconds: 25));
+    if (!_current(requestCurrent)) return;
     final verified = WorkspaceStockVisibilityHead.decode(result.toJson(), scope);
     if (verified.revision < _revision || verified.revision == _revision && verified.visible != _visibleAtRevision) {
       throw const FormatException('Check the latest visibility setting.');
     }
     _revision = verified.revision; _visibleAtRevision = verified.visible; head = verified;
   }
-  Future<void> _restore() async {
+  Future<void> _restore({bool Function()? requestCurrent}) async {
     var saved = await journal.readPending(scope).timeout(const Duration(seconds: 10));
-    if (!active) return;
+    if (!_current(requestCurrent)) return;
     if (saved != null && (saved.scope != scope || pending != null && saved.serverFingerprint != pending!.serverFingerprint)) {
       throw const FormatException();
     }
     if (pending != null && (saved == null || pending!.closing && !saved.closing)) {
       await journal.savePending(pending!).timeout(const Duration(seconds: 10)); saved = pending;
     }
-    if (active) pending = saved;
+    if (_current(requestCurrent)) pending = saved;
   }
-  Future<bool> _send({bool reconcile = false}) async {
+  Future<bool> _send({bool reconcile = false, bool Function()? requestCurrent}) async {
     final original = pending!;
-    final result = await gateway.writeStockVisibility(original, current: () => active, reconcile: reconcile && !original.closing)
+    final result = await gateway.writeStockVisibility(original, current: () => _current(requestCurrent), reconcile: reconcile && !original.closing)
       .timeout(const Duration(seconds: 25));
-    if (!active) return false;
+    if (!_current(requestCurrent)) return false;
     if (result.fingerprint != original.serverFingerprint ||
         result.state == WorkspaceStockVisibilityWriteState.saved &&
           (result.revision != original.expectedRevision + 1 || result.visible != original.visible) ||
         result.state == WorkspaceStockVisibilityWriteState.closed && (result.revision != null || result.visible != null)) { return false; }
     if (!{WorkspaceStockVisibilityWriteState.saved, WorkspaceStockVisibilityWriteState.closed}.contains(result.state)) return false;
     await journal.removePending(original).timeout(const Duration(seconds: 10));
-    if (!active) return false;
+    if (!_current(requestCurrent)) return false;
     pending = null;
     // A receipt describes a historical command, never the current public state.
-    await _readHead();
+    await _readHead(requestCurrent: requestCurrent);
     return true;
   }
   Future<bool> _run(Future<bool> Function() operation) async {
@@ -1155,15 +1156,30 @@ class WorkspaceStockVisibilityController extends ChangeNotifier {
       return false;
     } finally { busy = false; _notify(); }
   }
-  Future<bool> load() => _run(() async {
-    await _restore(); if (!active) return false;
-    if (pending != null && !await _send(reconcile: true)) { await _readHead(); return false; }
-    if (pending == null) await _readHead();
-    return active;
+  /// Inspects existing evidence only: no repair, reconciliation, intent or send.
+  Future<bool> readOnlyForReview({required bool Function() current}) => _run(() async {
+    if (!_current(current)) return false;
+    final saved = await journal.readPending(scope).timeout(const Duration(seconds: 10));
+    if (!_current(current)) return false;
+    if (saved != null && (saved.scope != scope || pending != null && saved.serverFingerprint != pending!.serverFingerprint)) {
+      throw const FormatException();
+    }
+    // Keep an in-memory original if the durable write is still unconfirmed.
+    if (pending == null || saved?.closing == true) pending = saved;
+    await _readHead(requestCurrent: current);
+    return _current(current);
   });
-  Future<bool> setVisible(bool visible) => _run(() async {
-    await _restore(); if (!active || pending != null) return false;
-    await _readHead(); if (!active) return false;
+  Future<bool> load({bool Function()? current}) => _run(() async {
+    final requestCurrent = current;
+    await _restore(requestCurrent: requestCurrent); if (!_current(requestCurrent)) return false;
+    if (pending != null && !await _send(reconcile: true, requestCurrent: requestCurrent)) { await _readHead(requestCurrent: requestCurrent); return false; }
+    if (pending == null) await _readHead(requestCurrent: requestCurrent);
+    return _current(requestCurrent);
+  });
+  Future<bool> setVisible(bool visible, {bool Function()? current}) => _run(() async {
+    final requestCurrent = current;
+    await _restore(requestCurrent: requestCurrent); if (!_current(requestCurrent) || pending != null) return false;
+    await _readHead(requestCurrent: requestCurrent); if (!_current(requestCurrent)) return false;
     if (head!.visible == visible && (!visible || head!.effectiveVisible)) return true;
     final source = head!.enableSource;
     if (visible && source == null) { error = 'Save and sync current exact Stock for this published product first.'; return false; }
@@ -1172,18 +1188,20 @@ class WorkspaceStockVisibilityController extends ChangeNotifier {
       visible: visible, binding: visible ? _map(source!['binding']) : null, stockRevision: visible ? source!['stockRevision'] as int : null);
     pending = original;
     await journal.savePending(original).timeout(const Duration(seconds: 10));
-    return active && await _send();
+    return _current(requestCurrent) && await _send(requestCurrent: requestCurrent);
   });
-  Future<bool> retry() => _run(() async {
-    await _restore(); if (!active) return false;
-    if (pending == null) { await _readHead(); return active; }
-    return _send();
+  Future<bool> retry({bool Function()? current}) => _run(() async {
+    final requestCurrent = current;
+    await _restore(requestCurrent: requestCurrent); if (!_current(requestCurrent)) return false;
+    if (pending == null) { await _readHead(requestCurrent: requestCurrent); return _current(requestCurrent); }
+    return _send(requestCurrent: requestCurrent);
   });
-  Future<bool> cancelPending() => _run(() async {
-    await _restore(); if (!active || pending == null) return false;
+  Future<bool> cancelPending({bool Function()? current}) => _run(() async {
+    final requestCurrent = current;
+    await _restore(requestCurrent: requestCurrent); if (!_current(requestCurrent) || pending == null) return false;
     pending = pending!.forClosure();
     await journal.savePending(pending!).timeout(const Duration(seconds: 10));
-    return active && await _send();
+    return _current(requestCurrent) && await _send(requestCurrent: requestCurrent);
   });
   @override void dispose() { _closed = true; super.dispose(); }
 }
@@ -2014,6 +2032,7 @@ class WorkspaceProductSubmissionController extends ChangeNotifier {
   WorkspaceProductSubmissionIntent? pending;
   Future<bool>? _restoring;
   bool get active => !_closed && _lifetime != null && context() == _lifetime;
+  bool _requestCurrent(bool Function()? current) => active && current?.call() != false;
   bool get canSubmit => active && gateway.productSubmissionSupported && ready && headLoaded && !busy && pending == null;
   bool get canRetryOriginal => active && gateway.productSubmissionSupported && ready && !busy && pending != null && originalNotFound;
   void _notify() { if (active) notifyListeners(); }
@@ -2035,17 +2054,18 @@ class WorkspaceProductSubmissionController extends ChangeNotifier {
       return false;
     } finally { _notify(); }
   }
-  Future<bool> refresh() async {
-    if (!active || busy || !gateway.productSubmissionSupported) return false;
+  Future<bool> refresh({bool Function()? current, bool Function()? inputCurrent}) async {
+    if ((!_requestCurrent(current) || inputCurrent?.call() == false) || busy || !gateway.productSubmissionSupported) return false;
     busy = true; headLoaded = false; review = null; _notify();
     try {
-      if (!await restore() || !active) return false;
+      if (!await restore() || (!_requestCurrent(current) || inputCurrent?.call() == false)) return false;
       if (pending != null) { message = 'Check the original request before another submission.'; return false; }
       final source = gateway;
       final nextReview = source is WorkspaceReviewedProductSubmissionGateway && (source as WorkspaceReviewedProductSubmissionGateway).reviewedProductSubmissionSupported
-        ? await (source as WorkspaceReviewedProductSubmissionGateway).readReviewedProductSubmission(scope, current: () => active).timeout(const Duration(seconds: 25)) : null;
-      final next = nextReview == null ? await gateway.readProductSubmission(scope, current: () => active).timeout(const Duration(seconds: 25)) : nextReview.record;
-      if (!active) return false;
+        ? await (source as WorkspaceReviewedProductSubmissionGateway).readReviewedProductSubmission(scope, current: () => _requestCurrent(current) && inputCurrent?.call() != false).timeout(const Duration(seconds: 25)) : null;
+      if ((!_requestCurrent(current) || inputCurrent?.call() == false)) return false;
+      final next = nextReview == null ? await gateway.readProductSubmission(scope, current: () => _requestCurrent(current) && inputCurrent?.call() != false).timeout(const Duration(seconds: 25)) : nextReview.record;
+      if ((!_requestCurrent(current) || inputCurrent?.call() == false)) return false;
       final revision = next?.revision ?? 0, bytes = next == null ? null : jsonEncode(_sorted(next.toJson()));
       if (revision < _revision || revision == _revision && _headBytes != bytes) throw const FormatException();
       final candidate = nextReview?.candidate;
@@ -2069,7 +2089,7 @@ class WorkspaceProductSubmissionController extends ChangeNotifier {
       }
       return true;
     } catch (_) {
-      if (active) message = 'Product review status could not be confirmed. Your saved details are kept.';
+      if (_requestCurrent(current)) message = 'Product review status could not be confirmed. Your saved details are kept.';
       return false;
     } finally { busy = false; _notify(); }
   }
@@ -2097,29 +2117,29 @@ class WorkspaceProductSubmissionController extends ChangeNotifier {
       return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
     } finally { busy = false; _notify(); }
   }
-  Future<WorkspaceProductSubmissionWriteResult> reconcile() => _recover(retry: false);
-  Future<WorkspaceProductSubmissionWriteResult> retryOriginal() => _recover(retry: true);
-  Future<WorkspaceProductSubmissionWriteResult> _recover({required bool retry}) async {
-    if (!active || busy || !gateway.productSubmissionSupported || retry && !canRetryOriginal) {
+  Future<WorkspaceProductSubmissionWriteResult> reconcile({bool Function()? current, bool Function()? inputCurrent}) => _recover(retry: false, current: current, inputCurrent: inputCurrent);
+  Future<WorkspaceProductSubmissionWriteResult> retryOriginal({bool Function()? current, bool Function()? inputCurrent}) => _recover(retry: true, current: current, inputCurrent: inputCurrent);
+  Future<WorkspaceProductSubmissionWriteResult> _recover({required bool retry, bool Function()? current, bool Function()? inputCurrent}) async {
+    if (!_requestCurrent(current) || inputCurrent?.call() == false || busy || !gateway.productSubmissionSupported || retry && !canRetryOriginal) {
       return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
     }
     busy = true; _notify();
     try {
-      if (!await restore() || !active || pending == null) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+      if (!await restore() || !_requestCurrent(current) || inputCurrent?.call() == false || pending == null) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
       final original = pending!; originalNotFound = false;
       if (retry) await journal.savePending(original).timeout(const Duration(seconds: 10));
-      if (!active) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
-      final result = await gateway.writeProductSubmission(original, current: () => active, reconcile: !retry).timeout(const Duration(seconds: 25));
-      if (!active) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+      if (!_requestCurrent(current) || inputCurrent?.call() == false) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+      final result = await gateway.writeProductSubmission(original, current: () => _requestCurrent(current) && inputCurrent?.call() != false, reconcile: !retry).timeout(const Duration(seconds: 25));
+      if (!_requestCurrent(current)) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
       if (!retry && result.state == WorkspaceProductSubmissionWriteState.notFound) originalNotFound = true;
-      return await _finish(original, result, recovery: true);
+      return await _finish(original, result, recovery: true, current: current);
     } catch (_) {
-      if (active) message = 'The original product submission is still unconfirmed. It is kept for checking.';
+      if (_requestCurrent(current)) message = 'The original product submission is still unconfirmed. It is kept for checking.';
       return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
     } finally { busy = false; _notify(); }
   }
   Future<WorkspaceProductSubmissionWriteResult> _finish(WorkspaceProductSubmissionIntent original,
-      WorkspaceProductSubmissionWriteResult result, {required bool recovery}) async {
+      WorkspaceProductSubmissionWriteResult result, {required bool recovery, bool Function()? current}) async {
     final record = result.record;
     final submitted = result.state == WorkspaceProductSubmissionWriteState.submitted && record != null && record.matches(original);
     final definitive = submitted || !recovery && {WorkspaceProductSubmissionWriteState.notSent, WorkspaceProductSubmissionWriteState.rejected}.contains(result.state);
@@ -2128,8 +2148,9 @@ class WorkspaceProductSubmissionController extends ChangeNotifier {
         : 'Product submission is not confirmed. Check the original request.';
       return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
     }
+    if (!_requestCurrent(current)) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
     await journal.removePending(original).timeout(const Duration(seconds: 10));
-    if (!active) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+    if (!_requestCurrent(current)) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
     pending = null; originalNotFound = false; headLoaded = false;
     if (submitted && record.revision >= _revision) { _revision = record.revision; _headBytes = jsonEncode(_sorted(record.toJson())); }
     message = submitted ? 'Product details received privately—not approval or public publication.' : 'The product was not submitted. Saved details are unchanged.';
@@ -2320,6 +2341,7 @@ class WorkspaceVariantFamilyController extends ChangeNotifier {
   String? message;
   Future<bool>? _restoring;
   bool get active => !_closed && _lifetime != null && context() == _lifetime;
+  bool _requestCurrent(bool Function()? current) => active && current?.call() != false;
   bool get canSubmit => active && gateway.variantFamilySubmissionSupported && ready && headLoaded && !busy && pending == null;
   bool get canRetryOriginal => active && ready && !busy && pending != null && originalNotFound;
   void _notify() { if (active) notifyListeners(); }
@@ -2343,14 +2365,14 @@ class WorkspaceVariantFamilyController extends ChangeNotifier {
       return false;
     } finally { _notify(); }
   }
-  Future<bool> refresh() async {
-    if (!active || busy || !gateway.variantFamilySubmissionSupported) return false;
+  Future<bool> refresh({bool Function()? current, bool Function()? inputCurrent}) async {
+    if ((!_requestCurrent(current) || inputCurrent?.call() == false) || busy || !gateway.variantFamilySubmissionSupported) return false;
     busy = true; headLoaded = false; _notify();
     try {
-      if (!await restore() || !active) return false;
+      if (!await restore() || (!_requestCurrent(current) || inputCurrent?.call() == false)) return false;
       if (pending != null) { message = 'Check the original request before another submission.'; return false; }
-      final next = await gateway.readVariantFamily(scope, current: () => active).timeout(const Duration(seconds: 25));
-      if (!active) return false;
+      final next = await gateway.readVariantFamily(scope, current: () => _requestCurrent(current) && inputCurrent?.call() != false).timeout(const Duration(seconds: 25));
+      if ((!_requestCurrent(current) || inputCurrent?.call() == false)) return false;
       final candidate = next.candidate, bytes = candidate == null ? null : jsonEncode(_sorted(candidate.toJson()));
       if ((candidate?.revision ?? 0) < _candidateRevision || next.reviewRevision < _reviewRevision ||
           candidate != null && candidate.revision == _candidateRevision && _candidateBytes != bytes ||
@@ -2364,7 +2386,7 @@ class WorkspaceVariantFamilyController extends ChangeNotifier {
         : 'Review requested changes. Update and save the group before submitting again.';
       return true;
     } catch (_) {
-      if (active) message = 'Group review status could not be confirmed. Your saved options are kept.';
+      if (_requestCurrent(current)) message = 'Group review status could not be confirmed. Your saved options are kept.';
       return false;
     } finally { busy = false; _notify(); }
   }
@@ -2396,31 +2418,31 @@ class WorkspaceVariantFamilyController extends ChangeNotifier {
       return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
     } finally { busy = false; _notify(); }
   }
-  Future<WorkspaceVariantFamilyWriteResult> reconcile() => _recover(retry: false);
-  Future<WorkspaceVariantFamilyWriteResult> retryOriginal() => _recover(retry: true);
-  Future<WorkspaceVariantFamilyWriteResult> _recover({required bool retry}) async {
-    if (!active || busy || !gateway.variantFamilySubmissionSupported || retry && !canRetryOriginal) {
+  Future<WorkspaceVariantFamilyWriteResult> reconcile({bool Function()? current, bool Function()? inputCurrent}) => _recover(retry: false, current: current, inputCurrent: inputCurrent);
+  Future<WorkspaceVariantFamilyWriteResult> retryOriginal({bool Function()? current, bool Function()? inputCurrent}) => _recover(retry: true, current: current, inputCurrent: inputCurrent);
+  Future<WorkspaceVariantFamilyWriteResult> _recover({required bool retry, bool Function()? current, bool Function()? inputCurrent}) async {
+    if (!_requestCurrent(current) || inputCurrent?.call() == false || busy || !gateway.variantFamilySubmissionSupported || retry && !canRetryOriginal) {
       return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
     }
     busy = true; _notify();
     try {
-      if (!await restore() || !active || pending == null) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+      if (!await restore() || !_requestCurrent(current) || inputCurrent?.call() == false || pending == null) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
       final original = pending!;
       originalNotFound = false;
       if (retry) await journal.savePending(original).timeout(const Duration(seconds: 10));
-      if (!active) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
-      final result = await gateway.writeVariantFamily(original, current: () => active, reconcile: !retry)
+      if (!_requestCurrent(current) || inputCurrent?.call() == false) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+      final result = await gateway.writeVariantFamily(original, current: () => _requestCurrent(current) && inputCurrent?.call() != false, reconcile: !retry)
         .timeout(const Duration(seconds: 25));
-      if (!active) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+      if (!_requestCurrent(current)) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
       if (!retry && result.state == WorkspaceVariantFamilyWriteState.notFound) originalNotFound = true;
-      return await _finish(original, result, recovery: true);
+      return await _finish(original, result, recovery: true, current: current);
     } catch (_) {
-      if (active) message = 'The original submission is still unconfirmed. It is kept for checking.';
+      if (_requestCurrent(current)) message = 'The original submission is still unconfirmed. It is kept for checking.';
       return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
     } finally { busy = false; _notify(); }
   }
   Future<WorkspaceVariantFamilyWriteResult> _finish(WorkspaceVariantFamilyIntent original,
-      WorkspaceVariantFamilyWriteResult result, {required bool recovery}) async {
+      WorkspaceVariantFamilyWriteResult result, {required bool recovery, bool Function()? current}) async {
     final candidate = result.candidate;
     final submitted = result.state == WorkspaceVariantFamilyWriteState.submitted && candidate != null && candidate.matches(original);
     final definitive = submitted || !recovery &&
@@ -2430,8 +2452,9 @@ class WorkspaceVariantFamilyController extends ChangeNotifier {
         : 'Group submission is not confirmed. Check the original request.';
       return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
     }
+    if (!_requestCurrent(current)) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
     await journal.removePending(original).timeout(const Duration(seconds: 10));
-    if (!active) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+    if (!_requestCurrent(current)) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
     pending = null; originalNotFound = false; headLoaded = false;
     if (submitted && candidate.revision >= _candidateRevision) {
       _candidateRevision = candidate.revision; _candidateBytes = jsonEncode(_sorted(candidate.toJson()));
@@ -2577,58 +2600,61 @@ class WorkspacePublicDetailsController extends ChangeNotifier {
     } finally { busy = false; _notify(); }
   }
   Future<WorkspacePublicDetailsWriteResult> publish(WorkspacePublicDetailsFields fields,
-    {required bool Function() inputCurrent}) async {
-    if (!canPublish || !inputCurrent()) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.notSent);
+    {required bool Function() inputCurrent, bool Function()? current, bool Function(WorkspacePublicDetailsIntent)? admitOriginal, void Function(WorkspacePublicDetailsIntent)? onOriginalResolved}) async {
+    if (current?.call() == false || !canPublish || !inputCurrent()) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.notSent);
     busy = true; _notify();
     try {
       final original = WorkspacePublicDetailsIntent(ownerAccountId: scope.account, realm: scope.realm, storeId: scope.store,
         expectedRevision: published?.revision ?? 0,
         idempotencyKey: 'details-${List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join()}',
         details: WorkspacePublicDetailsFields.fromJson(fields.toJson()));
+      if (admitOriginal?.call(original) == false) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.notSent);
       pending = original; originalNotFound = false;
       await journal.savePending(original).timeout(const Duration(seconds: 10));
-      if (!active || !inputCurrent()) {
+      if (!active || current?.call() == false || !inputCurrent()) {
         if (active) message = 'Your saved details changed. The original request is kept for checking, not replaced.';
         return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
       }
-      final result = await gateway.writePublicDetails(original, current: () => active && inputCurrent())
+      final result = await gateway.writePublicDetails(original, current: () => active && current?.call() != false && inputCurrent())
         .timeout(const Duration(seconds: 25));
       if (!active) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
-      return await _finish(original, result, recovery: false);
+      return await _finish(original, result, recovery: false, current: current, onOriginalResolved: onOriginalResolved);
     } catch (_) {
       if (active) { ready = false; message = 'The public update is not confirmed. Your original request and device entries are kept.'; }
       return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
     } finally { busy = false; _notify(); }
   }
-  Future<WorkspacePublicDetailsWriteResult> reconcile() => _recover(retry: false);
+  Future<WorkspacePublicDetailsWriteResult> reconcile({bool Function()? current, bool Function()? inputCurrent, void Function(WorkspacePublicDetailsIntent)? onOriginalResolved}) => _recover(retry: false, current: current, inputCurrent: inputCurrent, onOriginalResolved: onOriginalResolved);
   /// Explicit owner choice only. Absence is NOT proof of non-application. This
   /// repeats exactly the persisted idempotent request, never current form inputs.
-  Future<WorkspacePublicDetailsWriteResult> retryOriginal() => _recover(retry: true);
-  Future<WorkspacePublicDetailsWriteResult> _recover({required bool retry}) async {
-    if (!active || busy || (retry && !canRetryOriginal)) {
+  Future<WorkspacePublicDetailsWriteResult> retryOriginal({bool Function()? current, bool Function()? inputCurrent, void Function(WorkspacePublicDetailsIntent)? onOriginalResolved}) => _recover(retry: true, current: current, inputCurrent: inputCurrent, onOriginalResolved: onOriginalResolved);
+  Future<WorkspacePublicDetailsWriteResult> _recover({required bool retry, bool Function()? current, bool Function()? inputCurrent, void Function(WorkspacePublicDetailsIntent)? onOriginalResolved}) async {
+    bool ownerCurrent() => active && current?.call() != false;
+    bool requestCurrent() => ownerCurrent() && inputCurrent?.call() != false;
+    if (!requestCurrent() || busy || (retry && !canRetryOriginal)) {
       return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
     }
     busy = true; _notify();
     try {
-      if (!await restore() || !active || pending == null) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
+      if (!await restore() || !requestCurrent() || pending == null) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
       final original = pending!;
       originalNotFound = false;
       // Also repairs a journal save that timed out before the first send. It
       // cannot replace another original or overtake a late native write.
       if (retry) await journal.savePending(original).timeout(const Duration(seconds: 10));
-      if (!active) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
-      final result = await gateway.writePublicDetails(original, current: () => active, reconcile: !retry)
+      if (!requestCurrent()) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
+      final result = await gateway.writePublicDetails(original, current: requestCurrent, reconcile: !retry)
         .timeout(const Duration(seconds: 25));
-      if (!active) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
+      if (!ownerCurrent()) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
       if (!retry && result.state == WorkspacePublicDetailsWriteState.notFound) originalNotFound = true;
-      return await _finish(original, result, recovery: true);
+      return await _finish(original, result, recovery: true, current: ownerCurrent, onOriginalResolved: onOriginalResolved);
     } catch (_) {
-      if (active) message = 'The original update is still unconfirmed. It is kept for checking.';
+      if (ownerCurrent()) message = 'The original update is still unconfirmed. It is kept for checking.';
       return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
     } finally { busy = false; _notify(); }
   }
   Future<WorkspacePublicDetailsWriteResult> _finish(WorkspacePublicDetailsIntent original,
-    WorkspacePublicDetailsWriteResult result, {required bool recovery}) async {
+    WorkspacePublicDetailsWriteResult result, {required bool recovery, bool Function()? current, void Function(WorkspacePublicDetailsIntent)? onOriginalResolved}) async {
     final record = result.record;
     final exact = record != null && _validRecord(record) && record.revision == original.expectedRevision + 1 &&
       jsonEncode(_sorted(record.details.toJson())) == jsonEncode(_sorted(original.details.toJson()));
@@ -2640,8 +2666,10 @@ class WorkspacePublicDetailsController extends ChangeNotifier {
         : 'The original public update is not confirmed. Your device entries are kept.';
       return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
     }
+    if (!active || current?.call() == false) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
     await journal.removePending(original).timeout(const Duration(seconds: 10));
-    if (!active) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
+    if (!active || current?.call() == false) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.unknown);
+    onOriginalResolved?.call(original);
     pending = null; originalNotFound = false; headLoaded = false;
     if (saved) {
       lastAcknowledged = record;
@@ -3075,8 +3103,8 @@ class WorkspaceCatalogueListingController extends ChangeNotifier {
     }
   }
 
-  Future<WorkspaceCatalogueBindingResult> reconcile() async {
-    if (_closed || busy) {
+  Future<WorkspaceCatalogueBindingResult> reconcile({bool Function()? current, bool Function()? inputCurrent}) async {
+    if (_closed || busy || current?.call() == false || inputCurrent?.call() == false) {
       return const WorkspaceCatalogueBindingResult(
         WorkspaceCatalogueBindingState.unknown,
       );
@@ -3085,12 +3113,12 @@ class WorkspaceCatalogueListingController extends ChangeNotifier {
     busy = true;
     _notify();
     try {
-      if (!await restore() || !_current(owner) || pending == null) {
+      if (!await restore() || !_current(owner) || current?.call() == false || inputCurrent?.call() == false || pending == null) {
         return const WorkspaceCatalogueBindingResult(
           WorkspaceCatalogueBindingState.unknown,
         );
       }
-      return await _send(pending!, owner, recovery: true);
+      return await _send(pending!, owner, recovery: true, requestCurrent: current, inputCurrent: inputCurrent);
     } on Object {
       if (_current(owner)) {
         ready = false;
@@ -3110,9 +3138,11 @@ class WorkspaceCatalogueListingController extends ChangeNotifier {
     Object? owner, {
     required bool recovery,
     bool Function()? inputCurrent,
+    bool Function()? requestCurrent,
   }) async {
+    bool requestOwnerCurrent() => _current(owner) && requestCurrent?.call() != false;
     bool current() =>
-        _current(owner) && (recovery || inputCurrent?.call() == true);
+        requestOwnerCurrent() && (recovery ? inputCurrent?.call() != false : inputCurrent?.call() == true);
     final result =
         await (recovery
                 ? gateway.reconcileBinding(original, current: current)
@@ -3122,7 +3152,7 @@ class WorkspaceCatalogueListingController extends ChangeNotifier {
                     recoveringUnknown: false,
                   ))
             .timeout(const Duration(seconds: 25));
-    if (!_current(owner)) {
+    if (!requestOwnerCurrent()) {
       return const WorkspaceCatalogueBindingResult(
         WorkspaceCatalogueBindingState.unknown,
       );
@@ -3150,15 +3180,16 @@ class WorkspaceCatalogueListingController extends ChangeNotifier {
     }
     if (result.state == WorkspaceCatalogueBindingState.saved && exact && original.body.containsKey('reviewCandidate')) {
       final complete = completeReviewedBinding;
-      if (complete == null || saved == null || !await complete(original, saved, () => _current(owner)).timeout(const Duration(seconds: 10)) || !_current(owner)) {
+      if (complete == null || saved == null || !await complete(original, saved, requestOwnerCurrent).timeout(const Duration(seconds: 10)) || !requestOwnerCurrent()) {
         error = 'The reviewed listing result is kept. Finish restoring this product before another update.';
         return const WorkspaceCatalogueBindingResult(WorkspaceCatalogueBindingState.unknown);
       }
     }
+    if (!requestOwnerCurrent()) return const WorkspaceCatalogueBindingResult(WorkspaceCatalogueBindingState.unknown);
     await pendingStore
         .removePending(original)
         .timeout(const Duration(seconds: 10));
-    if (!_current(owner)) {
+    if (!requestOwnerCurrent()) {
       return const WorkspaceCatalogueBindingResult(
         WorkspaceCatalogueBindingState.unknown,
       );

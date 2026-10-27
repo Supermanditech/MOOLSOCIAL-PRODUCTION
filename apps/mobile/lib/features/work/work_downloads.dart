@@ -1155,6 +1155,58 @@ StoreTabularReport customerOutstandingReport({
   );
 }
 
+// Frontend-only preparation for the existing native report owners.
+class StoreReportInitialData {
+  StoreReportInitialData._(this.actionId, Map<String, Object?> fields) : fields = Map.unmodifiable(fields);
+  final String actionId;
+  final Map<String, Object?> fields;
+  static const sections = {'public', 'journey', 'supply', 'receiving', 'orders', 'stock', 'sales', 'money'};
+  factory StoreReportInitialData.fromFields(String action, Map<String, Object?> fields) {
+    final allowed = switch (action) {
+      'AI-ACT-312' || 'AI-ACT-412' => <String>{},
+      'AI-ACT-313' || 'AI-ACT-314' => {'periodDays'},
+      'AI-ACT-315' => {'statementKind', 'customerId', 'period', 'from', 'to'},
+      'AI-ACT-409' || 'AI-ACT-410' => {'customerId', 'period', 'from', 'to'},
+      'AI-ACT-411' => {'sectionId', 'periodDays'},
+      _ => throw const FormatException('This report task is unavailable.'),
+    };
+    if (fields.keys.any((key) => !allowed.contains(key))) throw const FormatException('Unsupported report field.');
+    if (fields.containsKey('periodDays') && (fields['periodDays'] is! int || !const {1, 7, 30}.contains(fields['periodDays']))) {
+      throw const FormatException('Choose Today, Last 7 days or Last 30 days.');
+    }
+    if (action == 'AI-ACT-313' && !fields.containsKey('periodDays')) throw const FormatException('Choose a report period.');
+    if (action == 'AI-ACT-411' && !sections.contains(fields['sectionId'])) throw const FormatException('Choose a current report section.');
+    if (fields.containsKey('customerId') && (fields['customerId'] is! String || (fields['customerId'] as String).trim().isEmpty)) {
+      throw const FormatException('Choose a customer.');
+    }
+    if (fields.containsKey('statementKind') && !const {'sales', 'outstanding'}.contains(fields['statementKind'])) {
+      throw const FormatException('Choose Sales or Customer outstanding.');
+    }
+    final sales = action == 'AI-ACT-315' && (fields['statementKind'] ?? 'sales') == 'sales';
+    final periods = sales ? const {'Today', 'Week', 'Month', 'Year', 'Custom range'} : const {'Recorded history', 'Today', 'This week', 'This month', 'Custom dates'};
+    if (fields.containsKey('period') && !periods.contains(fields['period'])) {
+      throw const FormatException('Choose an available statement period.');
+    }
+    DateTime? date(Object? value) {
+      if (value is! String || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) return null;
+      final parsed = DateTime.tryParse(value);
+      if (parsed == null || '${parsed.year.toString().padLeft(4, '0')}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}' != value) return null;
+      return parsed;
+    }
+    if (fields.containsKey('from') || fields.containsKey('to') || const {'Custom dates', 'Custom range'}.contains(fields['period'])) {
+      final from = date(fields['from']), to = date(fields['to']);
+      if (from == null || to == null || to.isBefore(from) || !const {'Custom dates', 'Custom range'}.contains(fields['period'])) {
+        throw const FormatException('Enter a valid start and end date.');
+      }
+    }
+    if (action == 'AI-ACT-315' && (fields['statementKind'] ?? 'sales') == 'sales' &&
+        (fields.containsKey('customerId') || fields['period'] == 'Recorded history')) {
+      throw const FormatException('Sales statement uses the existing dated sales period.');
+    }
+    return StoreReportInitialData._(action, fields);
+  }
+}
+
 class StoreCustomerReportsPanel extends StatefulWidget {
   const StoreCustomerReportsPanel({
     super.key,
@@ -1167,9 +1219,10 @@ class StoreCustomerReportsPanel extends StatefulWidget {
     this.coverageStarts = const {},
     this.saveFile = saveStoreStockFile,
     this.scopeChanges,
-    this.recentSearches,
+    this.recentSearches, this.initialData,
   });
   final String accountId, storeId, storeName;
+  final StoreReportInitialData? initialData;
   final List<String>? recentSearches;
   final List<WorkspaceCustomerLedger> ledgers;
   final Map<String, DateTime> coverageStarts;
@@ -1197,6 +1250,19 @@ class _StoreCustomerReportsPanelState extends State<StoreCustomerReportsPanel> {
   void initState() {
     super.initState();
     widget.scopeChanges?.addListener(_printScopeChanged);
+    final initial = widget.initialData?.fields;
+    if (initial != null) {
+      final id = initial['customerId'] as String?;
+      if (id != null && widget.ledgers.any((row) => row.customerId == id)) _customer = id;
+      _outstanding = initial['statementKind'] == 'outstanding';
+      _period = initial['period'] as String? ?? _period;
+      String nativeDate(Object? value) {
+        if (value is! String) return '';
+        final date = DateTime.parse(value);
+        return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year.toString().padLeft(4, '0')}';
+      }
+      _from.text = nativeDate(initial['from']); _to.text = nativeDate(initial['to']);
+    }
   }
 
   void _printScopeChanged() {

@@ -637,7 +637,7 @@ class _ChangingCheckoutCommitFixture extends BuyV2Session {
   int get checkoutAmountDueNowMinor => updatedAmount ?? super.checkoutAmountDueNowMinor;
 
   @override
-  Future<bool> submitOrder() async {
+  Future<bool> submitOrder({bool Function()? isCurrent}) async {
     await Future<void>.delayed(Duration.zero);
     if (change == 'amount') updatedAmount = checkoutAmountDueNowMinor + 100;
     if (change == 'paise') updatedAmount = checkoutAmountDueNowMinor + 1;
@@ -650,7 +650,7 @@ class _ChangingCheckoutCommitFixture extends BuyV2Session {
   }
 
   @override
-  Future<bool> continuePayment(BuyV2PaymentHandoff handoff) async {
+  Future<bool> continuePayment(BuyV2PaymentHandoff handoff, {bool Function()? isCurrent}) async {
     handoffs++;
     return false;
   }

@@ -2285,6 +2285,7 @@ void r669SharedProductTests() {
 }
 
 void main() {
+  registerShop04ControllerGuardTests();
   for (final state in ['browsing only', 'Cart item', 'source failure', 'financial recovery']) {
     test('CARTRECOVERY absent saved listing preserves $state', () async {
       final source = _PagingRecoverySource()..resolutionProducts = {};
@@ -19411,4 +19412,80 @@ class _StoreScopedExactBookingTerms extends _StoreScopedTermsFixture
         balanceDueMinor: quotedTotalsMinorByFulfilmentKey[group.key]! - dueMinor,
         balanceDueLabel: 'On delivery', sourceId: 'host-exact-booking-source', advancePercent: 5,
         upiTransactionLimitMinor: limitMinor, acceptedPaymentMethods: const {'UPI'})]);
+}
+
+// Existing isolated collection contracts, with only an observable held read.
+class _Shop04CollectionGuardHarness extends _CollectionPurchaseHarness {
+  int reads=0;
+  Completer<void>? readGate;
+  @override Future<BuyV2CollectionPurchaseIntent?> read(String accountId)async{
+    reads++;await readGate?.future;return super.read(accountId);
+  }
+}
+void registerShop04ControllerGuardTests(){
+  test('FE-SHOP-04 collection retained-read retirement cannot request a fresh quote',()async{
+    final h=_Shop04CollectionGuardHarness();
+    final c=h.controller();var current=true;Future<bool>? pending;
+    try{
+      final basket=h.basket();expect(await c.prepare(basket),isTrue);final quotes=h.quotes;
+      h.readGate=Completer<void>();pending=c.prepare(basket,isCurrent:()=>current);
+      await Future<void>.delayed(Duration.zero);current=false;h.readGate!.complete();
+      expect(await pending,isFalse);expect(h.quotes,quotes);expect(h.placements,0);
+      expect(c.busy,isFalse);expect(c.quote,isNull);expect(h.pending,isNull);
+    }finally{
+      if(h.readGate?.isCompleted==false)h.readGate!.complete();
+      if(pending!=null)await pending;
+      c.dispose();h.identity.dispose();
+    }
+  });
+  test('FE-SHOP-04 collection begin notification retirement dispatches no storage read or quote',()async{
+    final h=_Shop04CollectionGuardHarness(),c=h.controller();var current=true;
+    void retire(){if(c.busy)current=false;}
+    try{
+      c.addListener(retire);
+      expect(await c.prepare(h.basket(),isCurrent:()=>current),isFalse);
+      expect(h.reads,0);expect(h.quotes,0);expect(h.placements,0);expect(h.pending,isNull);
+      expect(c.busy,isFalse);
+    }finally{c.removeListener(retire);c.dispose();h.identity.dispose();}
+  });
+  test('FE-SHOP-04 held durable collection reservation keeps exact original recovery without placement',()async{
+    final h=_Shop04CollectionGuardHarness(),c=h.controller();var current=true;Future<bool>? pending;
+    try{
+      final basket=h.basket();expect(await c.prepare(basket),isTrue);
+      h.reservationGate=Completer<bool>();pending=c.place(basket,isCurrent:()=>current);
+      await Future<void>.delayed(Duration.zero);final original=c.intent!;
+      current=false;h.reservationGate!.complete(true);
+      expect(await pending,isFalse);expect(h.placements,0);expect(h.settlements,0);
+      expect(h.pending,same(original));expect(c.intent,same(original));expect(c.unresolved,isTrue);expect(c.busy,isFalse);
+      expect(await c.place(basket,isCurrent:()=>true),isFalse);expect(h.placements,0);
+    }finally{
+      if(h.reservationGate?.isCompleted==false)h.reservationGate!.complete(false);
+      if(pending!=null)await pending;c.dispose();h.identity.dispose();
+    }
+  });
+  test('FE-SHOP-04 collection retirement after native placement preserves original verified settlement',()async{
+    final h=_Shop04CollectionGuardHarness(),c=h.controller();var current=true;Future<bool>? pending;
+    try{
+      final basket=h.basket();expect(await c.prepare(basket),isTrue);
+      h.placementGate=Completer<void>();pending=c.place(basket,isCurrent:()=>current);
+      await Future<void>.delayed(Duration.zero);expect(h.placements,1);final original=c.intent!;
+      current=false;h.placementGate!.complete();
+      expect(await pending,isTrue);expect(h.lastRequest,same(original));expect(h.placements,1);
+      expect(h.settlements,1);expect(h.pending,isNull);expect(c.paidOrder,isNotNull);expect(c.busy,isFalse);
+    }finally{
+      if(h.placementGate?.isCompleted==false)h.placementGate!.complete();
+      if(pending!=null)await pending;c.dispose();h.identity.dispose();
+    }
+  });
+  test('FE-SHOP-04 collection handoff rechecks current after its synchronous native notification',()async{
+    final h=_Shop04CollectionGuardHarness(),c=h.controller();var current=true;var handoffs=0;
+    void retire(){if(c.busy)current=false;}
+    try{
+      h.outcome=BuyV2CollectionPurchaseState.actionRequired;
+      final basket=h.basket();expect(await c.prepare(basket),isTrue);expect(await c.place(basket),isFalse);
+      final original=c.intent!;c.addListener(retire);
+      expect(await c.continuePayment((uri)async{handoffs++;return true;},isCurrent:()=>current),isFalse);
+      expect(handoffs,0);expect(h.reconciliations,0);expect(h.pending,same(original));expect(c.unresolved,isTrue);expect(c.busy,isFalse);
+    }finally{c.removeListener(retire);c.dispose();h.identity.dispose();}
+  });
 }

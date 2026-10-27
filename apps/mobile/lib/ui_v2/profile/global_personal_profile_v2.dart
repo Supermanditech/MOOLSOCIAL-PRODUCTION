@@ -7,28 +7,29 @@ import 'global_profile_panel_v2.dart';
 
 const _profileNavy = Color(0xFF000080);
 const _profileViolet = Color(0xFF4D46A8);
-const _profileGreen = Color(0xFF138808);
 
 class GlobalPersonalProfileV2 extends StatelessWidget {
   const GlobalPersonalProfileV2({
     required this.session,
     this.gstDetails,
+    this.onOpenAddresses,
     this.surfaceTone = GlobalProfileSurfaceTone.light,
     super.key,
   });
 
   final JourneySession session;
   final Widget? gstDetails;
+  final VoidCallback? onOpenAddresses;
   final GlobalProfileSurfaceTone surfaceTone;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: session,
     builder: (context, _) {
-      final identity = session.accountIdentity;
-      final displayName =
-          _present(session.profileDisplayName) ??
-          _present(identity?.displayName);
+      final identity = session.isAuthenticated ? session.accountIdentity : null;
+      // The legacy device alias has no account owner. Never present it as the
+      // identity of a newly signed-in account (PROFILE-B01 owns durable edits).
+      final displayName = _present(identity?.displayName);
       final email = _present(identity?.emailAddress);
       final phone = _present(identity?.phoneNumber);
       final area =
@@ -65,7 +66,7 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
             appBar: AppBar(
               backgroundColor: palette.canvas,
               surfaceTintColor: Colors.transparent,
-              toolbarHeight: 64,
+              toolbarHeight: 56,
               leadingWidth: 56,
               leading: Padding(
                 padding: const EdgeInsets.only(left: MoolSpacing.xs),
@@ -81,23 +82,27 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Personal profile',
+                    surfaceTone == GlobalProfileSurfaceTone.light
+                        ? 'My details'
+                        : 'Personal profile',
                     style: TextStyle(
                       color: palette.ink,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: -.2,
                     ),
                   ),
-                  const SizedBox(height: 1),
-                  Text(
-                    'Your MoolSocial identity',
-                    style: TextStyle(
-                      color: palette.muted,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
+                  if (surfaceTone == GlobalProfileSurfaceTone.socialDark) ...[
+                    const SizedBox(height: 1),
+                    Text(
+                      'Your MoolSocial identity',
+                      style: TextStyle(
+                        color: palette.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -116,20 +121,58 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
                       MoolSpacing.xl,
                     ),
                     children: [
-                      _ProfileHero(
-                        name: heroName,
-                        detail: heroDetail,
-                        completed: completed,
-                        status: accountActive ? 'Active' : 'Sign in',
-                        progressDetail: missing.isEmpty
-                            ? 'Your essential profile details are complete.'
-                            : 'Next: ${missing.join(' · ')}',
-                        dark:
-                            surfaceTone == GlobalProfileSurfaceTone.socialDark,
-                      ),
+                      if (surfaceTone == GlobalProfileSurfaceTone.socialDark)
+                        _ProfileHero(
+                          name: heroName,
+                          detail: heroDetail,
+                          completed: completed,
+                          status: accountActive ? 'Active' : 'Sign in',
+                          progressDetail: missing.isEmpty
+                              ? 'Your essential profile details are complete.'
+                              : 'Next: ${missing.join(' · ')}',
+                          dark:
+                              surfaceTone ==
+                              GlobalProfileSurfaceTone.socialDark,
+                        )
+                      else
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const CircleAvatar(
+                            backgroundColor: Color(0xFFF0F2FF),
+                            child: Icon(
+                              Icons.person_outline_rounded,
+                              color: Color(0xFF0000FF),
+                            ),
+                          ),
+                          title: Text(
+                            accountActive ? heroName : 'Your account',
+                            key: const Key('global-personal-profile-hero-name'),
+                            style: TextStyle(
+                              color: palette.ink,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          subtitle: Text(
+                            accountActive
+                                ? heroDetail
+                                : 'Sign in with email or mobile OTP',
+                            style: TextStyle(
+                              color: palette.muted,
+                              fontSize: 13,
+                            ),
+                          ),
+                          onTap: () => _openAccountRoute(
+                            context,
+                            '/app/account/security',
+                          ),
+                          trailing: accountActive
+                              ? null
+                              : const Icon(Icons.chevron_right_rounded),
+                        ),
                       const SizedBox(height: MoolSpacing.md),
                       _ProfileSection(
-                        title: 'Personal details',
+                        title: 'Identity',
                         children: [
                           _ProfileDetail(
                             keyName: 'global-personal-profile-name',
@@ -138,7 +181,9 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
                             value: displayName ?? 'Not added',
                             onTap: () => _openAccountRoute(
                               context,
-                              '/app/account/identity/name',
+                              accountActive
+                                  ? '/app/account/identity/name'
+                                  : '/app/account/security',
                             ),
                           ),
                           _ProfileDetail(
@@ -165,69 +210,131 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
                       ),
                       const SizedBox(height: MoolSpacing.md),
                       if (gstDetails != null) ...[
-                        gstDetails!,
+                        _ProfileSection(
+                          title: 'Buying details',
+                          children: [
+                            if (onOpenAddresses != null)
+                              _ProfileDetail(
+                                keyName: 'global-personal-profile-addresses',
+                                icon: Icons.location_on_outlined,
+                                label: 'Delivery addresses',
+                                value: 'Choose or edit an address',
+                                onTap: onOpenAddresses!,
+                              ),
+                            ExpansionTile(
+                              key: const Key(
+                                'global-personal-profile-invoice-details',
+                              ),
+                              shape: const Border(),
+                              collapsedShape: const Border(),
+                              iconColor: palette.accent,
+                              leading: const Icon(
+                                Icons.receipt_long_outlined,
+                                size: 22,
+                              ),
+                              title: const Text(
+                                'Invoice details',
+                                style: TextStyle(fontSize: 15),
+                              ),
+                              subtitle: const Text(
+                                'Personal or business billing',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              children: [gstDetails!],
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: MoolSpacing.md),
                       ],
-                      _ProfileSection(
-                        title: 'Preferences',
-                        children: [
-                          _ProfileDetail(
-                            keyName: 'global-personal-profile-language',
-                            icon: Icons.language_rounded,
-                            label: 'Language preference',
-                            value: session.languageCode == 'hi'
-                                ? 'Hindi preferred · App screens: English'
-                                : 'English',
-                            onTap: () => _openAccountRoute(
-                              context,
-                              '/app/account/workspaces/preferences',
+                      if (surfaceTone ==
+                          GlobalProfileSurfaceTone.socialDark) ...[
+                        _ProfileSection(
+                          title: 'Plans & Workspaces',
+                          children: [
+                            _ProfileDetail(
+                              keyName: 'global-personal-profile-plans',
+                              icon: Icons.workspace_premium_outlined,
+                              label: 'Plans & billing',
+                              value: 'Upgrade plan',
+                              onTap: () => _openAccountRoute(
+                                context,
+                                '/app/account/plans?scope=account',
+                              ),
                             ),
-                          ),
-                          _ProfileDetail(
-                            keyName: 'global-personal-profile-area',
-                            icon: Icons.location_on_outlined,
-                            label: 'Service area',
-                            value: area,
-                            onTap: () => _openAccountRoute(
-                              context,
-                              '/app/account/workspaces/preferences',
+                            _ProfileDetail(
+                              keyName: 'global-personal-profile-workspaces',
+                              icon: Icons.storefront_outlined,
+                              label: 'My Workspaces',
+                              value: 'Application or Store access',
+                              onTap: () => _openAccountRoute(
+                                context,
+                                '/app/account/workspaces',
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: MoolSpacing.md),
-                      _ProfileSection(
-                        title: 'Account access',
-                        children: [
-                          _ProfileDetail(
-                            keyName: 'global-personal-profile-status',
-                            icon: Icons.verified_user_outlined,
-                            label: 'Account status',
-                            value: accountActive ? 'Active' : 'Not signed in',
-                            valueColor: accountActive
-                                ? _profileGreen
-                                : palette.muted,
-                            onTap: () => _openAccountRoute(
-                              context,
-                              '/app/account/security',
+                          ],
+                        ),
+                        const SizedBox(height: MoolSpacing.md),
+                        _ProfileSection(
+                          title: 'Account settings',
+                          children: [
+                            _ProfileDetail(
+                              keyName: 'global-personal-profile-language',
+                              icon: Icons.language_rounded,
+                              label: 'Communication preference',
+                              value: session.languageCode == 'hi'
+                                  ? 'Hindi preferred · App screens: English'
+                                  : 'English',
+                              onTap: () => _openAccountRoute(
+                                context,
+                                '/app/account/workspaces/preferences',
+                              ),
                             ),
-                          ),
-                          _ProfileDetail(
-                            keyName: 'global-personal-profile-methods',
-                            icon: Icons.key_outlined,
-                            label: 'Sign-in methods',
-                            value: methods.isEmpty
-                                ? accountActive
-                                      ? 'MoolSocial sign-in'
-                                      : 'Add a sign-in method'
-                                : methods.join(' · '),
-                            onTap: () => _openAccountRoute(
-                              context,
-                              '/app/account/security',
+                            _ProfileDetail(
+                              keyName: 'global-personal-profile-area',
+                              icon: Icons.location_on_outlined,
+                              label: 'Service area',
+                              value: area,
+                              onTap: () => _openAccountRoute(
+                                context,
+                                '/app/account/workspaces/preferences',
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                        const SizedBox(height: MoolSpacing.md),
+                        _ProfileSection(
+                          title: 'Account access',
+                          children: [
+                            _ProfileDetail(
+                              keyName: 'global-personal-profile-status',
+                              icon: Icons.verified_user_outlined,
+                              label: 'Account status',
+                              value: accountActive ? 'Active' : 'Not signed in',
+                              valueColor: accountActive
+                                  ? palette.accent
+                                  : palette.muted,
+                              onTap: () => _openAccountRoute(
+                                context,
+                                '/app/account/security',
+                              ),
+                            ),
+                            _ProfileDetail(
+                              keyName: 'global-personal-profile-methods',
+                              icon: Icons.key_outlined,
+                              label: 'Sign-in methods',
+                              value: methods.isEmpty
+                                  ? accountActive
+                                        ? 'MoolSocial sign-in'
+                                        : 'Add a sign-in method'
+                                  : methods.join(' · '),
+                              onTap: () => _openAccountRoute(
+                                context,
+                                '/app/account/security',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -241,10 +348,12 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
 
   static void _openAccountRoute(BuildContext context, String route) {
     final profileLocation = GoRouterState.of(context).uri;
+    final target = Uri.parse(route);
     context.push(
       Uri(
-        path: route,
+        path: target.path,
         queryParameters: {
+          ...target.queryParameters,
           'return': profileLocation.toString(),
           if (profileLocation.queryParameters['surface'] == 'social')
             'surface': 'social',
@@ -273,9 +382,17 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
 }
 
 class GlobalPersonalProfileNameEditorV2 extends StatefulWidget {
-  const GlobalPersonalProfileNameEditorV2({required this.session, super.key});
+  const GlobalPersonalProfileNameEditorV2({
+    required this.session,
+    this.onSaveDisplayName,
+    super.key,
+  });
 
   final JourneySession session;
+
+  /// PROFILE-B01 must supply an account/revision-bound writer. True means a
+  /// confirmed write/readback, never an optimistic local device-snapshot save.
+  final Future<bool> Function(String name)? onSaveDisplayName;
 
   @override
   State<GlobalPersonalProfileNameEditorV2> createState() =>
@@ -286,11 +403,25 @@ class _GlobalPersonalProfileNameEditorV2State
     extends State<GlobalPersonalProfileNameEditorV2> {
   late final TextEditingController _controller = TextEditingController(
     text:
-        widget.session.profileDisplayName ??
-        widget.session.accountIdentity?.displayName ??
+        (widget.session.isAuthenticated
+            ? widget.session.accountIdentity?.displayName
+            : null) ??
         '',
   );
   bool _saving = false;
+  String? _nameError;
+  late final int? _openingGeneration =
+      widget.session.navigationAuthenticationGeneration;
+  late final Object? _openingIdentity = widget.session.accountIdentity;
+  late final Object? _openingAccountScope =
+      widget.session.authenticatedBuyPersistenceIdentity;
+  bool get _sameAccount =>
+      widget.session.isAuthenticated &&
+      widget.session.navigationAuthenticationGeneration == _openingGeneration &&
+      (_openingAccountScope != null
+          ? widget.session.authenticatedBuyPersistenceIdentity ==
+                _openingAccountScope
+          : identical(widget.session.accountIdentity, _openingIdentity));
 
   @override
   void dispose() {
@@ -299,13 +430,31 @@ class _GlobalPersonalProfileNameEditorV2State
   }
 
   Future<void> _save() async {
-    if (_saving) return;
-    setState(() => _saving = true);
-    final saved = await widget.session.updateProfileDisplayName(
-      _controller.text,
-    );
-    if (!mounted) return;
-    setState(() => _saving = false);
+    if (_saving || !_sameAccount || widget.onSaveDisplayName == null) return;
+    final name = _controller.text.trim();
+    if (name.length < 2 || name.length > 60) {
+      setState(
+        () => _nameError = 'Enter a display name from 2 to 60 characters.',
+      );
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _nameError = null;
+    });
+    var saved = false;
+    try {
+      saved = await widget.onSaveDisplayName!(name);
+    } on Object {
+      saved = false;
+    }
+    if (!mounted || !_sameAccount) return;
+    setState(() {
+      _saving = false;
+      if (!saved)
+        _nameError =
+            'Could not save your name. Check your account and try again.';
+    });
     if (saved) _leave();
   }
 
@@ -324,62 +473,80 @@ class _GlobalPersonalProfileNameEditorV2State
   }
 
   @override
-  Widget build(BuildContext context) => PopScope<Object?>(
-    canPop: false,
-    onPopInvokedWithResult: (didPop, _) {
-      if (!didPop) _leave();
-    },
-    child: Scaffold(
-      key: const Key('global-personal-profile-name-editor'),
-      appBar: AppBar(
-        leading: IconButton(
-          key: const Key('global-personal-profile-name-back'),
-          tooltip: 'Back',
-          onPressed: _leave,
-          icon: const Icon(Icons.arrow_back_rounded),
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.session,
+    builder: (context, _) => PopScope<Object?>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _leave();
+      },
+      child: Scaffold(
+        key: const Key('global-personal-profile-name-editor'),
+        appBar: AppBar(
+          leading: IconButton(
+            key: const Key('global-personal-profile-name-back'),
+            tooltip: 'Back',
+            onPressed: _leave,
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
+          title: const Text('Display name'),
         ),
-        title: const Text('Display name'),
-      ),
-      body: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.all(MoolSpacing.md),
-          child: LayoutBuilder(
-            builder: (context, constraints) => SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text(
-                        'This is how people will see you across MoolSocial.',
-                        style: TextStyle(color: Color(0xFF5E6378)),
-                      ),
-                      const SizedBox(height: MoolSpacing.md),
-                      TextField(
-                        key: const Key('global-personal-profile-name-field'),
-                        controller: _controller,
-                        autofocus: true,
-                        textCapitalization: TextCapitalization.words,
-                        textInputAction: TextInputAction.done,
-                        maxLength: 60,
-                        onSubmitted: (_) => _save(),
-                        decoration: InputDecoration(
-                          labelText: 'Display name',
-                          hintText: 'Enter your name',
-                          error: widget.session.errorMessage == null
-                              ? null
-                              : Text(widget.session.errorMessage!),
+        body: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(MoolSpacing.md),
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: IntrinsicHeight(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          widget.onSaveDisplayName == null
+                              ? 'Account name updates are not available right now.'
+                              : 'Use the name you want on your account.',
+                          style: TextStyle(color: Color(0xFF5E6378)),
                         ),
-                      ),
-                      const Spacer(),
-                      FilledButton(
-                        key: const Key('global-personal-profile-name-save'),
-                        onPressed: _saving ? null : _save,
-                        child: Text(_saving ? 'Saving…' : 'Save display name'),
-                      ),
-                    ],
+                        const SizedBox(height: MoolSpacing.md),
+                        TextField(
+                          key: const Key('global-personal-profile-name-field'),
+                          controller: _controller,
+                          enabled: !_saving && _sameAccount,
+                          readOnly: widget.onSaveDisplayName == null,
+                          autofocus: widget.onSaveDisplayName != null,
+                          textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.done,
+                          maxLength: 60,
+                          onSubmitted: (_) => _save(),
+                          decoration: InputDecoration(
+                            labelText: 'Display name',
+                            hintText: 'Enter your name',
+                            error: _nameError == null
+                                ? null
+                                : Text(_nameError!),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (!_sameAccount)
+                          const Text(
+                            'Your account changed. Reopen Profile to edit your name.',
+                          ),
+                        FilledButton(
+                          key: const Key('global-personal-profile-name-save'),
+                          onPressed:
+                              _saving ||
+                                  !_sameAccount ||
+                                  widget.onSaveDisplayName == null
+                              ? null
+                              : _save,
+                          child: Text(
+                            _saving ? 'Saving…' : 'Save display name',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -643,53 +810,54 @@ class _ProfileDetail extends StatelessWidget {
     return InkWell(
       key: ValueKey(keyName),
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: MoolSpacing.sm,
-          vertical: MoolSpacing.xs,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: palette.control,
-                borderRadius: BorderRadius.circular(11),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: MoolSpacing.sm,
+            vertical: MoolSpacing.xs,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: palette.control,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, color: palette.ink, size: 22),
               ),
-              child: Icon(icon, color: palette.ink, size: 17),
-            ),
-            const SizedBox(width: MoolSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: palette.muted,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
+              const SizedBox(width: MoolSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: palette.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    value,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: valueColor ?? palette.ink,
-                      fontSize: 12,
-                      height: 1.2,
-                      fontWeight: FontWeight.w800,
+                    const SizedBox(height: 2),
+                    Text(
+                      value,
+                      style: TextStyle(
+                        color: valueColor ?? palette.ink,
+                        fontSize: 15,
+                        height: 1.2,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: palette.muted),
-          ],
+              Icon(Icons.chevron_right_rounded, color: palette.muted),
+            ],
+          ),
         ),
       ),
     );

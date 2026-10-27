@@ -45,7 +45,9 @@ class GlobalSecurityV2 extends StatelessWidget {
             appBar: AppBar(
               backgroundColor: palette.canvas,
               surfaceTintColor: Colors.transparent,
-              toolbarHeight: 64,
+              toolbarHeight: surfaceTone == GlobalProfileSurfaceTone.light
+                  ? 56
+                  : 64,
               leadingWidth: 56,
               leading: Padding(
                 padding: const EdgeInsets.only(left: MoolSpacing.xs),
@@ -64,20 +66,22 @@ class GlobalSecurityV2 extends StatelessWidget {
                     'Security',
                     style: TextStyle(
                       color: palette.ink,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: -.2,
                     ),
                   ),
-                  const SizedBox(height: 1),
-                  Text(
-                    'Sign-in, recovery and device access',
-                    style: TextStyle(
-                      color: palette.muted,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
+                  if (surfaceTone == GlobalProfileSurfaceTone.socialDark) ...[
+                    const SizedBox(height: 1),
+                    Text(
+                      'Sign-in, recovery and device access',
+                      style: TextStyle(
+                        color: palette.muted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -96,11 +100,22 @@ class GlobalSecurityV2 extends StatelessWidget {
                       MoolSpacing.xl,
                     ),
                     children: [
-                      _SecurityHero(
-                        authenticated: session.isAuthenticated,
-                        name: identity?.primaryLabel ?? 'MoolSocial account',
-                        palette: palette,
-                      ),
+                      if (surfaceTone == GlobalProfileSurfaceTone.socialDark)
+                        _SecurityHero(
+                          authenticated: session.isAuthenticated,
+                          name: identity?.primaryLabel ?? 'MoolSocial account',
+                          palette: palette,
+                        ),
+                      if (surfaceTone == GlobalProfileSurfaceTone.light &&
+                          session.isAuthenticated)
+                        Text(
+                          identity?.primaryLabel ?? 'Your account',
+                          style: TextStyle(
+                            color: palette.ink,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       const SizedBox(height: MoolSpacing.md),
                       _SecuritySection(
                         title: 'Account access',
@@ -115,15 +130,17 @@ class GlobalSecurityV2 extends StatelessWidget {
                               valueColor: const Color(0xFF138808),
                               palette: palette,
                             ),
-                            _SecurityDetail(
-                              keyName: 'global-security-methods',
-                              icon: Icons.key_outlined,
-                              label: 'Sign-in methods',
-                              value: methods.isEmpty
-                                  ? 'MoolSocial sign-in'
-                                  : methods.join(' · '),
-                              palette: palette,
-                            ),
+                            if (surfaceTone ==
+                                GlobalProfileSurfaceTone.socialDark)
+                              _SecurityDetail(
+                                keyName: 'global-security-methods',
+                                icon: Icons.key_outlined,
+                                label: 'Sign-in methods',
+                                value: methods.isEmpty
+                                    ? 'MoolSocial sign-in'
+                                    : methods.join(' · '),
+                                palette: palette,
+                              ),
                             _SecurityDetail(
                               keyName: 'global-security-recovery',
                               icon: Icons.contact_mail_outlined,
@@ -136,8 +153,7 @@ class GlobalSecurityV2 extends StatelessWidget {
                               keyName: 'global-security-sign-in',
                               icon: Icons.login_rounded,
                               title: 'Sign in',
-                              detail:
-                                  'Manage account recovery and access methods',
+                              detail: 'Use email or mobile to sign in',
                               palette: palette,
                               onTap: () => _beginSignIn(context),
                             ),
@@ -167,7 +183,7 @@ class GlobalSecurityV2 extends StatelessWidget {
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFFB42318),
                             side: const BorderSide(color: Color(0xFFF0B6B2)),
-                            minimumSize: const Size.fromHeight(44),
+                            minimumSize: const Size.fromHeight(48),
                           ),
                           icon: const Icon(Icons.logout_rounded, size: 18),
                           label: const Text('Sign out'),
@@ -414,18 +430,16 @@ class _SecurityDetail extends StatelessWidget {
                 label,
                 style: TextStyle(
                   color: palette.muted,
-                  fontSize: 9,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 value,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: valueColor ?? palette.ink,
-                  fontSize: 12,
+                  fontSize: 15,
                   height: 1.2,
                   fontWeight: FontWeight.w800,
                 ),
@@ -465,15 +479,15 @@ class _SecurityAction extends StatelessWidget {
       title,
       style: TextStyle(
         color: palette.ink,
-        fontSize: 12,
-        fontWeight: FontWeight.w900,
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
       ),
     ),
     subtitle: Text(
       detail,
       style: TextStyle(
         color: palette.muted,
-        fontSize: 9.5,
+        fontSize: 12,
         fontWeight: FontWeight.w600,
       ),
     ),

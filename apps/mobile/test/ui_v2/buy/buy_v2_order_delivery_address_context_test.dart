@@ -41,6 +41,7 @@ void main() {
           session: session,
           initialDestination: session.destination,
           initialView: session.view,
+          orderId: session.selectedOrderId,
           onOpenChat: onOpenChat,
         ),
       ),
@@ -64,12 +65,24 @@ void main() {
     );
     await tester.pumpAndSettle();
     final address = find.byKey(const ValueKey('buy-tracking-address'));
-    await tester.scrollUntilVisible(
-      address,
-      240,
-      scrollable: find.byType(Scrollable).last,
+    final trackingScroll = find
+        .descendant(
+          of: find.byKey(
+            PageStorageKey('buy-tracking-${session.selectedOrderId}'),
+          ),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    expect(
+      trackingScroll,
+      findsOneWidget,
+      reason:
+          'Restore the original tracking order before scrolling its address.',
     );
+    await tester.scrollUntilVisible(address, 240, scrollable: trackingScroll);
+    await Scrollable.ensureVisible(tester.element(address), alignment: .5);
     await tester.pumpAndSettle();
+    expect(address.hitTestable(), findsOneWidget);
     await tester.tap(address);
     await tester.pumpAndSettle();
     expect(
@@ -83,8 +96,9 @@ void main() {
       testWidgets('R66 order address remains complete at $width / $scale', (
         tester,
       ) async {
-        await tester.binding.setSurfaceSize(Size(width, 844));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = Size(width, 844);
+        addTearDown(tester.view.reset);
         for (final wholesale in [false, true]) {
           const captureFamily = String.fromEnvironment(
             'BUY_R66_ADDRESS_FAMILY',
@@ -245,7 +259,9 @@ void main() {
       }
       expect(find.text(order.destinationLabel), findsWidgets);
       expect(
-        find.text('Last recorded estimate · ${buyV2OrderPromiseSummary(order)}'),
+        find.text(
+          'Last recorded estimate · ${buyV2OrderPromiseSummary(order)}',
+        ),
         findsWidgets,
       );
       expect(find.text(buyV2OrderPromiseSummary(order)), findsNothing);

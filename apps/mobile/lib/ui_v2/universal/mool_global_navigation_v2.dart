@@ -9,6 +9,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/design/mool_design_system.dart';
 import '../../core/design/mool_theme.dart';
+import '../assistant/mool_assistant_v2.dart';
+import 'mool_android_semantics.dart';
+
+export 'mool_android_semantics.dart' show moolAndroidExportedSemanticsClearance;
 
 @immutable
 class PersonalMoolActionSpec {
@@ -333,19 +337,6 @@ const Duration moolDestinationFamilyWaveDuration = Duration(milliseconds: 200);
 const double moolDestinationFamilyBridgeOverlap = 8;
 const double moolDestinationFamilyBridgeHeight =
     moolDestinationFamilyRailHeight + moolDestinationFamilyBridgeOverlap;
-
-double moolAndroidExportedSemanticsClearance({
-  required EdgeInsets viewPadding,
-  required TargetPlatform platform,
-}) {
-  if (platform != TargetPlatform.android) return 0;
-  const minimumExportedTarget = MoolMetrics.minimumTapTarget;
-  final availableOverflow =
-      MoolLocalNavigationTokens.destinationRailHeight - minimumExportedTarget;
-  return (viewPadding.top - availableOverflow)
-      .clamp(0, double.infinity)
-      .toDouble();
-}
 
 double moolAndroidExportedHorizontalSemanticsClearance({
   required EdgeInsets viewPadding,
@@ -816,15 +807,21 @@ class MoolMainDomainMenu extends StatelessWidget {
     required this.keyPrefix,
     required this.onOpenFamily,
     this.selectedFamilyId,
+    this.onOpenAssistant,
     super.key,
   });
 
   final String keyPrefix;
   final String? selectedFamilyId;
   final ValueChanged<MoolActionFamilySpec> onOpenFamily;
+  final VoidCallback? onOpenAssistant;
 
   @override
   Widget build(BuildContext context) {
+    final assistant = MoolAssistantHost.maybeOf(context);
+    final openAssistant =
+        onOpenAssistant ??
+        (assistant == null ? null : () => assistant.open(context));
     return Semantics(
       container: true,
       explicitChildNodes: true,
@@ -833,6 +830,22 @@ class MoolMainDomainMenu extends StatelessWidget {
         key: ValueKey('$keyPrefix-main-actions-only'),
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (openAssistant != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: TextButton.icon(
+                key: ValueKey('$keyPrefix-ai-mode'),
+                style: TextButton.styleFrom(
+                  foregroundColor: MoolColors.ink,
+                  alignment: Alignment.centerLeft,
+                  minimumSize: const Size.fromHeight(48),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                onPressed: openAssistant,
+                icon: const Icon(Icons.auto_awesome_outlined, size: 20),
+                label: const Text('Mool AI', style: TextStyle(fontSize: 13)),
+              ),
+            ),
           for (final family in moolActionFamilies)
             SizedBox(
               height: MoolLocalNavigationTokens.switcherRowHeight,
@@ -1481,6 +1494,13 @@ class _MoolConnectedActionNavigatorState
                     selectedFamilyId: widget.initialFamilyId,
                     keyPrefix: 'mool-navigator',
                     onOpenFamily: widget.onOpenFamily,
+                    onOpenAssistant: MoolAssistantHost.maybeOf(context) == null
+                        ? null
+                        : () {
+                            final host = MoolAssistantHost.maybeOf(context)!;
+                            widget.onDismiss();
+                            host.open(context);
+                          },
                   ),
                 ),
               ),

@@ -595,7 +595,89 @@ WorkspaceReceiptDraft _receiptDraft({
   note: note,
 );
 
+void registerOcrSelectedRetentionTests() {
+  test('FE-OCR-01 retaining the selected photo preserves bytes source and digest without repicking or OCR', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final directory = await Directory.systemTemp.createTemp('mool-selected-invoice-fixture-');
+    addTearDown(() => directory.delete(recursive: true));
+    final recorder = ui.PictureRecorder();
+    ui.Canvas(recorder).drawPaint(ui.Paint()..color = const ui.Color(0xffffffff));
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(2, 2);
+    final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+    image.dispose();
+    picture.dispose();
+    final expectedBytes = Uint8List.fromList(bytes);
+    final expectedDigest = contract_hash.sha256.convert(expectedBytes).toString();
+    var picks = 0, reads = 0;
+    final picker = _PurchaseInvoicePickerFixture(null)..afterPick = () => picks++;
+    const scope = ('account-A', 'store-A', true);
+    final capture = WorkPurchaseInvoiceCapture(
+      currentScope: () => scope, picker: picker,
+      supportDirectory: () async => directory,
+      recognize: (_) async { reads++; return 'Must not be read during retention'; },
+    );
+    final retained = await capture.retainSelectedForDraft(
+      scope, 'selected-draft',
+      WorkPickedProof(fileName: '../selected.png', contentType: 'wrong/type',
+        bytes: bytes, recoveryPath: '/not-an-input-to-native-retention'),
+      source: WorkProofSource.gallery,
+      canRetain: (candidate) => candidate.digest == expectedDigest,
+    );
+    bytes.fillRange(0, bytes.length, 0);
+    expect(picks, 0);
+    expect(reads, 0);
+    expect(retained.source, 'gallery');
+    expect(retained.contentType, 'image/png');
+    expect(retained.digest, expectedDigest);
+    expect(retained.fileName.contains('/'), isFalse);
+    expect(retained.detectedText, isEmpty);
+    expect(retained.extractedFields, isEmpty);
+    expect(await capture.read(scope, 'selected-draft', retained), orderedEquals(expectedBytes));
+  });
+
+  test('FE-OCR-01 selected input rejects unsupported stale or unretainable candidates before publication', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final directory = await Directory.systemTemp.createTemp('mool-selected-reject-fixture-');
+    addTearDown(() => directory.delete(recursive: true));
+    const scope = ('account-A', 'store-A', true);
+    (String, String, bool)? active = scope;
+    var picks = 0, mayRetain = false, retireDuringStorage = false;
+    final picker = _PurchaseInvoicePickerFixture(null)..afterPick = () => picks++;
+    final capture = WorkPurchaseInvoiceCapture(
+      currentScope: () => active, picker: picker,
+      supportDirectory: () async {
+        if (retireDuringStorage) active = ('account-A', 'other-store', true);
+        return directory;
+      },
+    );
+    final pdf = WorkPickedProof(fileName: 'selected.pdf', contentType: 'application/pdf',
+      bytes: Uint8List.fromList('%PDF-HOST-RETENTION-ONLY'.codeUnits));
+    await expectLater(capture.retainSelectedForDraft(scope, 'selected-draft', pdf,
+      source: WorkProofSource.upload, canRetain: (_) => mayRetain),
+      throwsA(isA<WorkGatewayException>()));
+    expect((await directory.list(recursive: true).toList()).whereType<File>(), isEmpty);
+    mayRetain = true;
+    retireDuringStorage = true;
+    await expectLater(capture.retainSelectedForDraft(scope, 'selected-draft', pdf,
+      source: WorkProofSource.upload, canRetain: (_) => mayRetain),
+      throwsA(isA<WorkGatewayException>()));
+    expect((await directory.list(recursive: true).toList()).whereType<File>(), isEmpty);
+    retireDuringStorage = false;
+    active = scope;
+    for (final bytes in [Uint8List(0), Uint8List(10 * 1024 * 1024 + 1), Uint8List.fromList([1, 2, 3])]) {
+      await expectLater(capture.retainSelectedForDraft(scope, 'selected-draft',
+        WorkPickedProof(fileName: 'claimed.pdf', contentType: 'application/pdf', bytes: bytes),
+        source: WorkProofSource.upload, canRetain: (_) => true),
+        throwsA(isA<WorkGatewayException>()));
+    }
+    expect(picks, 0);
+    expect((await directory.list(recursive: true).toList()).whereType<File>(), isEmpty);
+  });
+}
+
 void main() {
+  registerOcrSelectedRetentionTests();
   group('PF08 INBOX canonical case response', () {
     Future<({identity_fixtures.DeviceInboxFixture source, AuthenticatedWorkspaceOrderIdentityGateway reader,
       WorkspaceReceivedDeviceReports record, WorkspaceDeviceCaseHandoff handoff})> readCase() async {

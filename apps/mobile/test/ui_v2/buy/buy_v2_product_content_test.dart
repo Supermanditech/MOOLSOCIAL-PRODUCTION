@@ -19,12 +19,21 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart'
     show showBuyV2ShoppingHelp, showBuyV2RecentlyViewed;
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart'
-    show buyV2BuyerDeliveryPromise, BuyV2ActionStyle, BuyV2ThemeScope, BuyV2ThemeSpec,
-      BuyV2ProductPackshot, BuyV2ProductPhotoUnavailable;
+    show
+        buyV2BuyerDeliveryPromise,
+        BuyV2ActionStyle,
+        BuyV2ThemeScope,
+        BuyV2ThemeSpec,
+        BuyV2ProductPackshot,
+        BuyV2ProductPhotoUnavailable;
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 import 'buy_v2_qualified_provider_fixture.dart'
-    show TestPaymentCommerce, TestPaymentQuote, testPaymentSnapshot,
-      TestLegacyRecoveryCommerce, TestGroupedPaymentCommerce;
+    show
+        TestPaymentCommerce,
+        TestPaymentQuote,
+        testPaymentSnapshot,
+        TestLegacyRecoveryCommerce,
+        TestGroupedPaymentCommerce;
 import 'buy_v2_discovery_refinement_test.dart' show BuyTestEligibilityFacts;
 
 // Isolated presentation facts; this does not supply live delivery evidence.
@@ -34,237 +43,780 @@ class _RecentlyViewedDeliveryCopyFacts implements BuyV2ProductFactsAdapter {
 
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
-      const BuyV2CatalogueProductFactsAdapter().snapshotFor(product).copyWith(
-        deliveryPromise: promise,
-      );
+      const BuyV2CatalogueProductFactsAdapter()
+          .snapshotFor(product)
+          .copyWith(deliveryPromise: promise);
 }
 
 class _ProcurementRecentCopySession extends BuyV2Session {
-  _ProcurementRecentCopySession() : super(
-    core: BuySession(),
-    procurementIdentity: ValueNotifier<BuyV2ProcurementContext?>(
-      const BuyV2ProcurementContext(accountId: 'isolated-copy-account',
-        storeId: 'isolated-copy-store', purpose: BuyV2ProcurementPurpose.restock,
-        originOperationId: 'isolated-copy-operation'),
-    ),
-  );
+  _ProcurementRecentCopySession()
+    : super(
+        core: BuySession(),
+        procurementIdentity: ValueNotifier<BuyV2ProcurementContext?>(
+          const BuyV2ProcurementContext(
+            accountId: 'isolated-copy-account',
+            storeId: 'isolated-copy-store',
+            purpose: BuyV2ProcurementPurpose.restock,
+            originOperationId: 'isolated-copy-operation',
+          ),
+        ),
+      );
   @override
   List<BuyV2Product> recentlyViewedProductsFor(
-    BuyV2Destination destination, {int limit = 10}
-  ) =>
-      [BuyV2Catalogue.products.firstWhere((p) => p.id == 'w-rice')];
+    BuyV2Destination destination, {
+    int limit = 10,
+  }) => [BuyV2Catalogue.products.firstWhere((p) => p.id == 'w-rice')];
   @override
   BuyV2ProductFactsSnapshot productFactsFor(BuyV2Product product) =>
-      const _RecentlyViewedDeliveryCopyFacts('Delivery time confirmed at checkout')
-          .snapshotFor(product);
+      const _RecentlyViewedDeliveryCopyFacts(
+        'Delivery time confirmed at checkout',
+      ).snapshotFor(product);
+}
+
+void registerMoolFinancePrefillTests() {
+  String repeat(String value, int count) => List.filled(count, value).join();
+
+  Future<void> mountFinance(
+    WidgetTester tester, {
+    required ValueNotifier<int> scope,
+    required bool Function() current,
+    MoolBusinessFinancePrefill? prefill,
+    BuyV2FinanceCallbackSubmit? receiver,
+  }) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => Column(
+              children: [
+                TextButton(
+                  onPressed: () => unawaited(
+                    showMoolBusinessFinanceSheet(
+                      context,
+                      scopeOwner: scope,
+                      isCurrent: current,
+                      storeName: 'Isolated finance Store',
+                      contactName: '  Existing contact  ',
+                      callbackNumber: '  9876543210  ',
+                      origin: 'store',
+                      buyingStoreId: 'isolated-finance-store',
+                      prefill: prefill,
+                      onRequestCallback: receiver,
+                    ),
+                  ),
+                  child: const Text('Open prefilled finance'),
+                ),
+                TextButton(
+                  onPressed: () => unawaited(
+                    showMoolBusinessFinanceSheet(
+                      context,
+                      scopeOwner: scope,
+                      isCurrent: current,
+                      storeName: 'Isolated finance Store',
+                      contactName: '  Existing contact  ',
+                      callbackNumber: '  9876543210  ',
+                      origin: 'store',
+                      buyingStoreId: 'isolated-finance-store',
+                    ),
+                  ),
+                  child: const Text('Open manual finance'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  Finder field(String name) => find.byKey(Key('business-finance-$name'));
+  String fieldText(WidgetTester tester, String name) =>
+      tester.widget<TextFormField>(field(name)).controller!.text;
+  Finder purpose(String label) =>
+      find.byKey(ValueKey('business-finance-purpose-$label'));
+  void expectPurpose(String label, {required bool selected}) {
+    expect(
+      find.descendant(
+        of: purpose(label),
+        matching: find.byIcon(
+          selected ? Icons.check_box_outlined : Icons.check_box_outline_blank,
+        ),
+      ),
+      findsOneWidget,
+    );
+  }
+
+  test(
+    'FE-FINANCE-01 prefill parser preserves exact typed fields and Unicode text',
+    () {
+      final purposes = <String>['working-capital', 'machinery-equipment'];
+      final prefill = MoolBusinessFinancePrefill.fromFields({
+        'purposeIds': purposes,
+        'contactName': '  आरती शाह  ',
+        'callbackNumber': '+91 (98765) 43210',
+        'note': 'मशीन के लिए 🙂',
+      });
+      expect(
+        MoolBusinessFinancePrefill.allowedFields,
+        unorderedEquals([
+          'purposeIds',
+          'contactName',
+          'callbackNumber',
+          'note',
+        ]),
+      );
+      expect(prefill.purposeIds, ['working-capital', 'machinery-equipment']);
+      expect(prefill.contactName, '  आरती शाह  ');
+      expect(prefill.callbackNumber, '+91 (98765) 43210');
+      expect(prefill.note, 'मशीन के लिए 🙂');
+      purposes.clear();
+      expect(prefill.purposeIds, ['working-capital', 'machinery-equipment']);
+      expect(() => prefill.purposeIds!.add('purchase'), throwsUnsupportedError);
+
+      final partial = MoolBusinessFinancePrefill.fromFields({'note': ''});
+      expect(partial.purposeIds, isNull);
+      expect(partial.contactName, isNull);
+      expect(partial.callbackNumber, isNull);
+      expect(partial.note, '');
+      expect(
+        MoolBusinessFinancePrefill.fromFields({
+          'contactName': repeat('A', 100),
+          'callbackNumber': '+123456789012345',
+          'note': repeat('N', 500),
+        }).note,
+        hasLength(500),
+      );
+    },
+  );
+
+  test(
+    'FE-FINANCE-01 prefill rejects empty maps invalid types Unicode digits and duplicate purposes',
+    () {
+      final invalid = <String, Map<String, Object?>>{
+        'empty map': {},
+        'unknown field': {'amount': 100},
+        'present null': {'note': null},
+        'wrong text type': {'contactName': 123},
+        'blank name': {'contactName': '   '},
+        'overlong name': {'contactName': repeat('A', 101)},
+        'Unicode name over code-unit limit': {'contactName': repeat('🙂', 51)},
+        'invalid number': {'callbackNumber': 'phone'},
+        'short number': {'callbackNumber': '1234567'},
+        'long number': {'callbackNumber': '1234567890123456'},
+        'Unicode digits': {'callbackNumber': '९८७६५४३२१०'},
+        'fullwidth plus': {'callbackNumber': '＋919876543210'},
+        'invisible number separator': {'callbackNumber': '98765\u200B43210'},
+        'raw number over form limit': {
+          'callbackNumber': '12345678${repeat(' ', 17)}',
+        },
+        'overlong note': {'note': repeat('N', 501)},
+        'Unicode note over code-unit limit': {'note': repeat('🙂', 251)},
+        'purpose is not a list': {'purposeIds': 'purchase'},
+        'empty purposes': {'purposeIds': <String>[]},
+        'duplicate purpose': {
+          'purposeIds': ['purchase', 'purchase'],
+        },
+        'non-string purpose': {
+          'purposeIds': ['purchase', 123],
+        },
+        'unknown purpose': {
+          'purposeIds': ['not-a-purpose'],
+        },
+        'legacy purpose': {
+          'purposeIds': ['inventory-dealer'],
+        },
+        'purpose is not normalized': {
+          'purposeIds': ['working-capital '],
+        },
+        'invisible purpose separator': {
+          'purposeIds': ['working\u200B-capital'],
+        },
+      };
+      for (final entry in invalid.entries) {
+        expect(
+          () => MoolBusinessFinancePrefill.fromFields(entry.value),
+          throwsFormatException,
+          reason: entry.key,
+        );
+      }
+    },
+  );
+
+  testWidgets(
+    'FE-FINANCE-01 prefill populates actual editable controls without a callback receiver',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 900);
+      addTearDown(tester.view.reset);
+      final scope = ValueNotifier<int>(0);
+      addTearDown(scope.dispose);
+      final prefill = MoolBusinessFinancePrefill.fromFields({
+        'purposeIds': ['working-capital', 'machinery-equipment'],
+        'contactName': 'आरती शाह',
+        'callbackNumber': '+91 (98765) 43210',
+        'note': 'Discuss machinery finance',
+      });
+      await mountFinance(
+        tester,
+        scope: scope,
+        current: () => true,
+        prefill: prefill,
+      );
+      await tester.tap(find.text('Open prefilled finance'));
+      await tester.pumpAndSettle();
+      expect(fieldText(tester, 'name'), 'आरती शाह');
+      expect(fieldText(tester, 'number'), '+91 (98765) 43210');
+      expect(fieldText(tester, 'note'), 'Discuss machinery finance');
+      expectPurpose('Purchase / dealer finance', selected: false);
+      expectPurpose('Working capital (CC / OD)', selected: true);
+      expectPurpose('Machinery / equipment finance', selected: true);
+      expect(
+        find.byKey(const Key('business-finance-unavailable')),
+        findsOneWidget,
+      );
+      expect(tester.widget<FilledButton>(field('request')).onPressed, isNull);
+      expect(find.byKey(const Key('business-finance-confirmed')), findsNothing);
+
+      await tester.ensureVisible(field('note'));
+      await tester.enterText(field('note'), 'User changed this note');
+      await tester.pumpAndSettle();
+      scope.value = 1; // A harmless owner notification, still current.
+      await tester.pumpAndSettle();
+      expect(fieldText(tester, 'note'), 'User changed this note');
+      expect(tester.widget<FilledButton>(field('request')).onPressed, isNull);
+      await tester.tap(field('close'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('business-finance-confirmed')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'FE-FINANCE-01 manual opening retains original contact purchase and empty-note defaults',
+    (tester) async {
+      final scope = ValueNotifier<int>(0);
+      addTearDown(scope.dispose);
+      await mountFinance(tester, scope: scope, current: () => true);
+      await tester.tap(find.text('Open manual finance'));
+      await tester.pumpAndSettle();
+      expect(fieldText(tester, 'name'), 'Existing contact');
+      expect(fieldText(tester, 'number'), '9876543210');
+      expect(fieldText(tester, 'note'), isEmpty);
+      expectPurpose('Purchase / dealer finance', selected: true);
+      expectPurpose('Working capital (CC / OD)', selected: false);
+      expect(
+        find.byKey(const Key('business-finance-unavailable')),
+        findsOneWidget,
+      );
+      expect(tester.widget<FilledButton>(field('request')).onPressed, isNull);
+      await tester.tap(field('close'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'FE-FINANCE-01 stale finance opening and A-B-A retirement never submit a callback',
+    (tester) async {
+      final scope = ValueNotifier<int>(0);
+      addTearDown(scope.dispose);
+      var current = false;
+      var callbacks = 0;
+      final prefill = MoolBusinessFinancePrefill.fromFields({
+        'purposeIds': ['working-capital'],
+        'contactName': 'Host contact',
+        'callbackNumber': '9876543210',
+        'note': 'Editable host enquiry',
+      });
+      await mountFinance(
+        tester,
+        scope: scope,
+        current: () => current,
+        prefill: prefill,
+        receiver: (_) async {
+          callbacks++;
+          throw StateError('This test must never submit');
+        },
+      );
+      await tester.tap(find.text('Open prefilled finance'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('business-finance-sheet')), findsNothing);
+      expect(callbacks, 0);
+
+      current = true;
+      await tester.tap(find.text('Open prefilled finance'));
+      await tester.pumpAndSettle();
+      expect(fieldText(tester, 'note'), 'Editable host enquiry');
+      expect(
+        tester.widget<FilledButton>(field('request')).onPressed,
+        isNotNull,
+      );
+      expect(callbacks, 0); // Rendering/review does not invoke the receiver.
+      current = false;
+      scope.value = 1;
+      current = true;
+      scope.value =
+          2; // Return to A before rendering; retirement is irreversible.
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('business-finance-owner-changed')),
+        findsOneWidget,
+      );
+      expect(field('name'), findsNothing);
+      expect(field('number'), findsNothing);
+      expect(field('note'), findsNothing);
+      expect(field('request'), findsNothing);
+      expect(find.byKey(const Key('business-finance-confirmed')), findsNothing);
+      expect(callbacks, 0);
+      await tester.tap(field('close'));
+      await tester.pumpAndSettle();
+      expect(callbacks, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 void main() {
+  registerMoolFinancePrefillTests();
   for (final review in [true, false]) {
     for (final scale in [1.0, 2.0]) {
-      testWidgets('DEMODATA provenance follows review catalogue $review text$scale', (tester) async {
-        tester.view.devicePixelRatio = 1;
-        tester.view.physicalSize = const Size(320, 800);
-        tester.platformDispatcher.textScaleFactorTestValue = scale;
-        addTearDown(tester.view.reset);
-        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-        final core = BuySession();
-        final session = BuyV2Session(core: core, reviewDataEnabled: review,
-          commerceAdapter: TestPaymentCommerce()..snapshot = testPaymentSnapshot(null));
-        addTearDown(core.dispose);
-        addTearDown(session.dispose);
-        await session.restoreCommerce();
-        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
-          home: BuyV2Screen(session: session)));
-        await tester.pumpAndSettle();
-        // Host-only presentation coverage: no order/payment result is supplied.
-        for (final view in [BuyV2View.catalogue, BuyV2View.cart, BuyV2View.checkout,
-          BuyV2View.product]) {
-          if (view == BuyV2View.product) session.openProduct('s-milk');
-          session.view = view;
-          session.notifyListeners();
+      testWidgets(
+        'DEMODATA provenance follows review catalogue $review text$scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(320, 800);
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.view.reset);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            reviewDataEnabled: review,
+            commerceAdapter: TestPaymentCommerce()
+              ..snapshot = testPaymentSnapshot(null),
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          await session.restoreCommerce();
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              home: BuyV2Screen(session: session),
+            ),
+          );
           await tester.pumpAndSettle();
-          expect(find.text('Demo catalogue · Not live inventory'),
-            review ? findsOneWidget : findsNothing, reason: view.name);
-          if (review) {
-            final bounds = tester.getRect(find.byKey(const ValueKey('buy-demo-catalogue-label')));
-            expect(bounds.left, greaterThanOrEqualTo(0));
-            expect(bounds.right, lessThanOrEqualTo(320));
+          // Host-only presentation coverage: no order/payment result is supplied.
+          for (final view in [
+            BuyV2View.catalogue,
+            BuyV2View.cart,
+            BuyV2View.checkout,
+            BuyV2View.product,
+          ]) {
+            if (view == BuyV2View.product) session.openProduct('s-milk');
+            session.view = view;
+            session.notifyListeners();
+            await tester.pumpAndSettle();
+            expect(
+              find.text('Demo catalogue · Not live inventory'),
+              review ? findsOneWidget : findsNothing,
+              reason: view.name,
+            );
+            if (review) {
+              final bounds = tester.getRect(
+                find.byKey(const ValueKey('buy-demo-catalogue-label')),
+              );
+              expect(bounds.left, greaterThanOrEqualTo(0));
+              expect(bounds.right, lessThanOrEqualTo(320));
+            }
+            expect(tester.takeException(), isNull, reason: view.name);
           }
-          expect(tester.takeException(), isNull, reason: view.name);
-        }
-        await tester.pumpWidget(const SizedBox.shrink());
-      });
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
     }
   }
   test('PUBLICMAP Store address never crosses supplier identity', () {
-    const product = BuyV2Product(id: 'host-product', canonicalId: 'host-canonical',
-      storeId: 'host-supplier', destination: BuyV2Destination.shop,
-      categoryId: 'instant-foods', brand: 'HOST', title: 'HOST exact cup', variant: '',
-      pack: '75 g cup', priceMinor: 6000, unitPrice: '', badge: '', seller: 'HOST supplier',
-      sellerType: 'Store', deliveryPromise: '', origin: 'Product provenance',
-      confirmedOn: '', visualLabel: '', visualKind: '');
+    const product = BuyV2Product(
+      id: 'host-product',
+      canonicalId: 'host-canonical',
+      storeId: 'host-supplier',
+      destination: BuyV2Destination.shop,
+      categoryId: 'instant-foods',
+      brand: 'HOST',
+      title: 'HOST exact cup',
+      variant: '',
+      pack: '75 g cup',
+      priceMinor: 6000,
+      unitPrice: '',
+      badge: '',
+      seller: 'HOST supplier',
+      sellerType: 'Store',
+      deliveryPromise: '',
+      origin: 'Product provenance',
+      confirmedOn: '',
+      visualLabel: '',
+      visualKind: '',
+    );
     for (final mismatch in ['id', 'name', 'none', 'error', 'matching']) {
-      final adapter = BuyV2CatalogueMarketplaceTrustAdapter(storeSource: (_) {
-        if (mismatch == 'none') return null;
-        if (mismatch == 'error') throw StateError('HOST source unavailable');
-        return BuyV2StoreListing(id: mismatch == 'id' ? 'other-store' : 'host-supplier',
-          name: mismatch == 'name' ? 'Other supplier' : product.seller,
-          area: '', address: 'HOST public address', regionId: '');
-      });
+      final adapter = BuyV2CatalogueMarketplaceTrustAdapter(
+        storeSource: (_) {
+          if (mismatch == 'none') return null;
+          if (mismatch == 'error') throw StateError('HOST source unavailable');
+          return BuyV2StoreListing(
+            id: mismatch == 'id' ? 'other-store' : 'host-supplier',
+            name: mismatch == 'name' ? 'Other supplier' : product.seller,
+            area: '',
+            address: 'HOST public address',
+            regionId: '',
+          );
+        },
+      );
       final value = adapter.snapshotFor(product);
-      expect(value.partnerLocation, mismatch == 'matching' ? 'HOST public address' : null);
-      expect(value.partnerRating, isNull); expect(value.partnerOrderCount, isNull);
+      expect(
+        value.partnerLocation,
+        mismatch == 'matching' ? 'HOST public address' : null,
+      );
+      expect(value.partnerRating, isNull);
+      expect(value.partnerOrderCount, isNull);
     }
   });
-  testWidgets('PUBLICMAP pending supplier photo never borrows category artwork', (tester) async {
-    const product = BuyV2Product(id: 'host-pending-photo', canonicalId: 'host-noodles',
-      storeId: 'host-supplier', destination: BuyV2Destination.shop,
-      categoryId: 'instant-foods', brand: 'HOST', title: 'HOST exact cup', variant: '',
-      pack: '75 g cup', priceMinor: 6000, unitPrice: '', badge: '', seller: 'HOST supplier', sellerType: 'Store',
-      deliveryPromise: '', origin: '', confirmedOn: '', visualLabel: '', visualKind: '');
-    expect(const BuyV2CatalogueProductContentAdapter().snapshotFor(product).media, isEmpty,
-      reason: 'A category illustration is not an exact supplier photo or an authored media reference');
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SizedBox(width: 320, height: 240,
-      child: BuyV2ProductPackshot(product: product)))));
+  testWidgets('PUBLICMAP pending supplier photo never borrows category artwork', (
+    tester,
+  ) async {
+    const product = BuyV2Product(
+      id: 'host-pending-photo',
+      canonicalId: 'host-noodles',
+      storeId: 'host-supplier',
+      destination: BuyV2Destination.shop,
+      categoryId: 'instant-foods',
+      brand: 'HOST',
+      title: 'HOST exact cup',
+      variant: '',
+      pack: '75 g cup',
+      priceMinor: 6000,
+      unitPrice: '',
+      badge: '',
+      seller: 'HOST supplier',
+      sellerType: 'Store',
+      deliveryPromise: '',
+      origin: '',
+      confirmedOn: '',
+      visualLabel: '',
+      visualKind: '',
+    );
+    expect(
+      const BuyV2CatalogueProductContentAdapter().snapshotFor(product).media,
+      isEmpty,
+      reason:
+          'A category illustration is not an exact supplier photo or an authored media reference',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 320,
+            height: 240,
+            child: BuyV2ProductPackshot(product: product),
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.byType(BuyV2ProductPhotoUnavailable), findsOneWidget);
     expect(find.text('Illustration'), findsNothing);
     expect(tester.takeException(), isNull);
   });
   test('PUBLICMAP product origin is not a supplier address', () {
-    final product = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-milk')
-      .copyWith(origin: 'HOST product provenance');
-    expect(const BuyV2CatalogueMarketplaceTrustAdapter().snapshotFor(product).partnerLocation, isNull);
+    final product = BuyV2Catalogue.products
+        .firstWhere((p) => p.id == 's-milk')
+        .copyWith(origin: 'HOST product provenance');
+    expect(
+      const BuyV2CatalogueMarketplaceTrustAdapter()
+          .snapshotFor(product)
+          .partnerLocation,
+      isNull,
+    );
   });
   for (final scale in [1.0, 2.0]) {
-    testWidgets('FINANCE02 shared form retires Store scope without sending $scale', (tester) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(320, 700);
-      addTearDown(tester.view.reset);
-      final scope = ValueNotifier<int>(0);
-      addTearDown(scope.dispose);
-      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
-        builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(
-          textScaler: TextScaler.linear(scale)), child: child!),
-        home: Scaffold(body: Builder(builder: (context) => TextButton(
-          onPressed: () => unawaited(showMoolBusinessFinanceSheet(context,
-            scopeOwner: scope, isCurrent: () => scope.value == 0,
-            storeName: 'Isolated buying Store')),
-          child: const Text('Open finance'))))));
-      await tester.tap(find.text('Open finance'));
-      await tester.pumpAndSettle();
-      expect(find.text('For Isolated buying Store'), findsOneWidget);
-      expect(tester.widget<TextFormField>(find.byKey(const Key('business-finance-name'))).controller!.text, isEmpty);
-      expect(tester.widget<TextFormField>(find.byKey(const Key('business-finance-number'))).controller!.text, isEmpty);
-      expect(find.byKey(const Key('business-finance-purpose-Invoice / bill discounting')), findsOneWidget);
-      for (final purpose in ['Working capital (CC / OD)', 'Invoice / bill discounting',
-          'Unsecured business loan', 'Other finance requirement']) {
-        final option = find.byKey(ValueKey('business-finance-purpose-$purpose'));
-        await tester.ensureVisible(option);
-        await tester.tap(option);
+    testWidgets(
+      'FINANCE02 shared form retires Store scope without sending $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 700);
+        addTearDown(tester.view.reset);
+        final scope = ValueNotifier<int>(0);
+        addTearDown(scope.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!,
+            ),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => unawaited(
+                    showMoolBusinessFinanceSheet(
+                      context,
+                      scopeOwner: scope,
+                      isCurrent: () => scope.value == 0,
+                      storeName: 'Isolated buying Store',
+                    ),
+                  ),
+                  child: const Text('Open finance'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Open finance'));
         await tester.pumpAndSettle();
-        expect(find.descendant(of: option, matching: find.byIcon(Icons.check_box_outlined)), findsOneWidget);
-      }
-      final working = find.byKey(const Key('business-finance-purpose-Working capital (CC / OD)'));
-      final invoices = find.byKey(const Key('business-finance-purpose-Invoice / bill discounting'));
-      expect(find.descendant(of: working, matching: find.byIcon(Icons.check_box_outlined)), findsOneWidget);
-      expect(find.descendant(of: invoices, matching: find.byIcon(Icons.check_box_outlined)), findsOneWidget);
-      await tester.ensureVisible(working);
-      await tester.tap(working);
-      await tester.pumpAndSettle();
-      expect(find.descendant(of: working, matching: find.byIcon(Icons.check_box_outline_blank)), findsOneWidget);
-      expect(find.descendant(of: invoices, matching: find.byIcon(Icons.check_box_outlined)), findsOneWidget);
-      final name = find.byKey(const Key('business-finance-name'));
-      await tester.ensureVisible(name);
-      await tester.enterText(name, 'Own test name');
-      await tester.enterText(name, '');
-      await tester.pumpAndSettle();
-      expect(find.text('Enter your name'), findsOneWidget);
-      expect(tester.widget<FilledButton>(find.byKey(const Key('business-finance-request'))).onPressed, isNull);
-      scope.value = 1;
-      scope.value = 0;
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('business-finance-owner-changed')), findsOneWidget);
-      expect(name, findsNothing);
-      expect(find.byKey(const Key('business-finance-request')), findsNothing);
-      await tester.tap(find.byKey(const Key('business-finance-close')));
-      await tester.pumpAndSettle();
-      expect(find.text('Open finance'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
+        expect(find.text('For Isolated buying Store'), findsOneWidget);
+        expect(
+          tester
+              .widget<TextFormField>(
+                find.byKey(const Key('business-finance-name')),
+              )
+              .controller!
+              .text,
+          isEmpty,
+        );
+        expect(
+          tester
+              .widget<TextFormField>(
+                find.byKey(const Key('business-finance-number')),
+              )
+              .controller!
+              .text,
+          isEmpty,
+        );
+        expect(
+          find.byKey(
+            const Key('business-finance-purpose-Invoice / bill discounting'),
+          ),
+          findsOneWidget,
+        );
+        for (final purpose in [
+          'Working capital (CC / OD)',
+          'Invoice / bill discounting',
+          'Unsecured business loan',
+          'Other finance requirement',
+        ]) {
+          final option = find.byKey(
+            ValueKey('business-finance-purpose-$purpose'),
+          );
+          await tester.ensureVisible(option);
+          await tester.tap(option);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: option,
+              matching: find.byIcon(Icons.check_box_outlined),
+            ),
+            findsOneWidget,
+          );
+        }
+        final working = find.byKey(
+          const Key('business-finance-purpose-Working capital (CC / OD)'),
+        );
+        final invoices = find.byKey(
+          const Key('business-finance-purpose-Invoice / bill discounting'),
+        );
+        expect(
+          find.descendant(
+            of: working,
+            matching: find.byIcon(Icons.check_box_outlined),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: invoices,
+            matching: find.byIcon(Icons.check_box_outlined),
+          ),
+          findsOneWidget,
+        );
+        await tester.ensureVisible(working);
+        await tester.tap(working);
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: working,
+            matching: find.byIcon(Icons.check_box_outline_blank),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: invoices,
+            matching: find.byIcon(Icons.check_box_outlined),
+          ),
+          findsOneWidget,
+        );
+        final name = find.byKey(const Key('business-finance-name'));
+        await tester.ensureVisible(name);
+        await tester.enterText(name, 'Own test name');
+        await tester.enterText(name, '');
+        await tester.pumpAndSettle();
+        expect(find.text('Enter your name'), findsOneWidget);
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const Key('business-finance-request')),
+              )
+              .onPressed,
+          isNull,
+        );
+        scope.value = 1;
+        scope.value = 0;
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('business-finance-owner-changed')),
+          findsOneWidget,
+        );
+        expect(name, findsNothing);
+        expect(find.byKey(const Key('business-finance-request')), findsNothing);
+        await tester.tap(find.byKey(const Key('business-finance-close')));
+        await tester.pumpAndSettle();
+        expect(find.text('Open finance'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final refined in [false, true]) {
     for (final scale in [1.0, 2.0]) {
-      for (final promise in ['Delivery time confirmed at checkout', 'Delivery in 2 hours']) {
-        testWidgets('T14 recent delivery copy caller$refined text$scale $promise', (tester) async {
-          tester.view.devicePixelRatio = 1;
-          tester.view.physicalSize = const Size(320, 800);
-          addTearDown(tester.view.reset);
-          final session = BuyV2Session(
-            core: BuySession(),
-            productFactsAdapter: _RecentlyViewedDeliveryCopyFacts(promise),
-          );
-          addTearDown(session.dispose);
-          session.openDestination(BuyV2Destination.wholesale);
-          expect(session.openProduct('w-rice'), isTrue);
-          session.goBack();
-          await tester.pumpWidget(MaterialApp(
-            theme: MoolTheme.light(),
-            builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
-              child: child!,
-            ),
-            home: Scaffold(body: BuyV2ThemeScope(
-              spec: BuyV2ThemeSpec.resolve(BuyV2Destination.wholesale, BuyV2View.catalogue),
-              refinedCommerce: refined,
-              child: Builder(builder: (context) => TextButton(
-                onPressed: () => unawaited(showBuyV2RecentlyViewed(context, session)),
-                child: const Text('Open recently viewed'),
-              )),
-            )),
-          ));
-          await tester.tap(find.text('Open recently viewed'));
-          await tester.pumpAndSettle();
-          final label = tester.widget<Text>(find.byKey(
-            const ValueKey('buy-recently-viewed-availability-w-rice'),
-          ));
-          expect(label.data, promise.contains('at checkout')
-              ? 'Delivery schedule unavailable' : promise);
-          expect(session.productFactsFor(session.product('w-rice')).deliveryPromise, promise);
-          expect(find.byKey(const ValueKey('buy-product-illustration-w-rice')),
+      for (final promise in [
+        'Delivery time confirmed at checkout',
+        'Delivery in 2 hours',
+      ]) {
+        testWidgets(
+          'T14 recent delivery copy caller$refined text$scale $promise',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = const Size(320, 800);
+            addTearDown(tester.view.reset);
+            final session = BuyV2Session(
+              core: BuySession(),
+              productFactsAdapter: _RecentlyViewedDeliveryCopyFacts(promise),
+            );
+            addTearDown(session.dispose);
+            session.openDestination(BuyV2Destination.wholesale);
+            expect(session.openProduct('w-rice'), isTrue);
+            session.goBack();
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: MoolTheme.light(),
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(textScaler: TextScaler.linear(scale)),
+                  child: child!,
+                ),
+                home: Scaffold(
+                  body: BuyV2ThemeScope(
+                    spec: BuyV2ThemeSpec.resolve(
+                      BuyV2Destination.wholesale,
+                      BuyV2View.catalogue,
+                    ),
+                    refinedCommerce: refined,
+                    child: Builder(
+                      builder: (context) => TextButton(
+                        onPressed: () => unawaited(
+                          showBuyV2RecentlyViewed(context, session),
+                        ),
+                        child: const Text('Open recently viewed'),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.tap(find.text('Open recently viewed'));
+            await tester.pumpAndSettle();
+            final label = tester.widget<Text>(
+              find.byKey(
+                const ValueKey('buy-recently-viewed-availability-w-rice'),
+              ),
+            );
+            expect(
+              label.data,
+              promise.contains('at checkout')
+                  ? 'Delivery schedule unavailable'
+                  : promise,
+            );
+            expect(
+              session
+                  .productFactsFor(session.product('w-rice'))
+                  .deliveryPromise,
+              promise,
+            );
+            expect(
+              find.byKey(const ValueKey('buy-product-illustration-w-rice')),
               findsOneWidget,
-              reason: 'Recently viewed must fit visible illustration disclosure.');
-          expect(find.byKey(const ValueKey('buy-product-photo-unavailable-w-rice')),
-              findsNothing);
-          expect(session.itemCount, 0);
-          expect(tester.takeException(), isNull);
-          await tester.tap(find.byTooltip('Close Recently viewed'));
-          await tester.pumpAndSettle();
-          expect(find.text('Open recently viewed'), findsOneWidget);
-        });
+              reason:
+                  'Recently viewed must fit visible illustration disclosure.',
+            );
+            expect(
+              find.byKey(
+                const ValueKey('buy-product-photo-unavailable-w-rice'),
+              ),
+              findsNothing,
+            );
+            expect(session.itemCount, 0);
+            expect(tester.takeException(), isNull);
+            await tester.tap(find.byTooltip('Close Recently viewed'));
+            await tester.pumpAndSettle();
+            expect(find.text('Open recently viewed'), findsOneWidget);
+          },
+        );
       }
     }
   }
 
-  testWidgets('T14 recent delivery copy preserves procurement presentation', (tester) async {
+  testWidgets('T14 recent delivery copy preserves procurement presentation', (
+    tester,
+  ) async {
     final session = _ProcurementRecentCopySession();
     addTearDown(session.dispose);
     expect(session.procurementContext, isNotNull);
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: BuyV2ThemeScope(
-      spec: BuyV2ThemeSpec.resolve(BuyV2Destination.wholesale, BuyV2View.catalogue),
-      refinedCommerce: true,
-      child: Builder(builder: (context) => TextButton(
-        onPressed: () => unawaited(showBuyV2RecentlyViewed(context, session)),
-        child: const Text('Open procurement history'),
-      )),
-    ))));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BuyV2ThemeScope(
+            spec: BuyV2ThemeSpec.resolve(
+              BuyV2Destination.wholesale,
+              BuyV2View.catalogue,
+            ),
+            refinedCommerce: true,
+            child: Builder(
+              builder: (context) => TextButton(
+                onPressed: () =>
+                    unawaited(showBuyV2RecentlyViewed(context, session)),
+                child: const Text('Open procurement history'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
     await tester.tap(find.text('Open procurement history'));
     await tester.pumpAndSettle();
-    expect(tester.widget<Text>(find.byKey(
-      const ValueKey('buy-recently-viewed-availability-w-rice'),
-    )).data, 'Delivery time confirmed at checkout');
+    expect(
+      tester
+          .widget<Text>(
+            find.byKey(
+              const ValueKey('buy-recently-viewed-availability-w-rice'),
+            ),
+          )
+          .data,
+      'Delivery time confirmed at checkout',
+    );
     expect(session.itemCount, 0);
     expect(tester.takeException(), isNull);
   });
@@ -336,70 +888,103 @@ void main() {
 
     for (final grouped in [false, true]) {
       for (final change in ['body', 'missing', 'expired', 'unchanged']) {
-        test('LF08 policy before new dispatch grouped=$grouped change=$change', () async {
-          final isolatedCore = BuySession();
-          final connector = grouped ? TestGroupedPaymentCommerce() : TestLegacyRecoveryCommerce();
-          connector.snapshot = (session.commerceAdapter as TestPaymentCommerce).snapshot;
-          final isolatedQuote = TestPaymentQuote();
-          if (grouped) {
-            isolatedQuote.groupsFor = (lines, method) => [
-              for (var i = 0; i < lines.length; i++) BuyV2CheckoutPaymentGroup(
-                id: 'policy-group-$i', fulfilmentKeys: {lines[i].fulfilmentKey},
-                paymentMethod: method, total: lines[i].total, amountDueNow: lines[i].total),
-            ];
-          }
-          final isolated = BuyV2Session(core: isolatedCore,
-            commerceAdapter: connector, customerStateStore: store,
-            productContentAdapter: content, checkoutQuoteAdapter: isolatedQuote,
-            reviewDataEnabled: false, productFactsAdapter: const BuyTestEligibilityFacts());
-          addTearDown(isolated.dispose);
-          addTearDown(isolatedCore.dispose);
-          await isolated.restoreCommerce();
-          await isolated.restoreCustomerState();
-          expect(isolated.addProduct('s-milk', quantity: 2), isFalse);
-          expect(await isolated.acceptSupplierPolicyAndAdd(isolated.pendingSupplierPolicyAdd), isTrue);
-          isolated.openCart();
-          expect(isolated.openCheckout(), isTrue, reason: isolated.notice);
-          expect(await isolated.refreshCheckoutQuote(), isTrue);
-          await isolated.retainedAccountState();
-          final writes = store.writes.length, hold = Completer<void>();
-          store.pending = hold;
-          final placing = isolated.submitOrder();
-          for (var i = 0; i < 100 && store.writes.length == writes; i++) {
-            await Future<void>.delayed(const Duration(milliseconds: 1));
-          }
-          expect(store.writes.length, greaterThan(writes));
-          expect(connector.requests, isEmpty);
-          if (change == 'body') content.body = 'Changed while saving the new order.';
-          if (change == 'missing' || change == 'expired') content.mode = change;
-          hold.complete();
-          await placing;
-          expect(connector.requests, hasLength(change == 'unchanged' ? 1 : 0));
-          expect(isolated.quantityFor('s-milk'), 2);
-          if (change != 'unchanged') {
+        test(
+          'LF08 policy before new dispatch grouped=$grouped change=$change',
+          () async {
+            final isolatedCore = BuySession();
+            final connector = grouped
+                ? TestGroupedPaymentCommerce()
+                : TestLegacyRecoveryCommerce();
+            connector.snapshot =
+                (session.commerceAdapter as TestPaymentCommerce).snapshot;
+            final isolatedQuote = TestPaymentQuote();
             if (grouped) {
-              expect(isolated.currentCheckoutPaymentGroup!.state, BuyV2CheckoutSubmissionState.idle);
-            } else {
-              expect(isolated.legacyCheckoutAttempt, isNull);
+              isolatedQuote.groupsFor = (lines, method) => [
+                for (var i = 0; i < lines.length; i++)
+                  BuyV2CheckoutPaymentGroup(
+                    id: 'policy-group-$i',
+                    fulfilmentKeys: {lines[i].fulfilmentKey},
+                    paymentMethod: method,
+                    total: lines[i].total,
+                    amountDueNow: lines[i].total,
+                  ),
+              ];
             }
-            if (change == 'body') {
+            final isolated = BuyV2Session(
+              core: isolatedCore,
+              commerceAdapter: connector,
+              customerStateStore: store,
+              productContentAdapter: content,
+              checkoutQuoteAdapter: isolatedQuote,
+              reviewDataEnabled: false,
+              productFactsAdapter: const BuyTestEligibilityFacts(),
+            );
+            addTearDown(isolated.dispose);
+            addTearDown(isolatedCore.dispose);
+            await isolated.restoreCommerce();
+            await isolated.restoreCustomerState();
+            expect(isolated.addProduct('s-milk', quantity: 2), isFalse);
+            expect(
+              await isolated.acceptSupplierPolicyAndAdd(
+                isolated.pendingSupplierPolicyAdd,
+              ),
+              isTrue,
+            );
+            isolated.openCart();
+            expect(isolated.openCheckout(), isTrue, reason: isolated.notice);
+            expect(await isolated.refreshCheckoutQuote(), isTrue);
+            await isolated.retainedAccountState();
+            final writes = store.writes.length, hold = Completer<void>();
+            store.pending = hold;
+            final placing = isolated.submitOrder();
+            for (var i = 0; i < 100 && store.writes.length == writes; i++) {
+              await Future<void>.delayed(const Duration(milliseconds: 1));
+            }
+            expect(store.writes.length, greaterThan(writes));
+            expect(connector.requests, isEmpty);
+            if (change == 'body')
+              content.body = 'Changed while saving the new order.';
+            if (change == 'missing' || change == 'expired')
+              content.mode = change;
+            hold.complete();
+            await placing;
+            expect(
+              connector.requests,
+              hasLength(change == 'unchanged' ? 1 : 0),
+            );
+            expect(isolated.quantityFor('s-milk'), 2);
+            if (change != 'unchanged') {
               if (grouped) {
-                expect(isolated.pendingSupplierPolicyAdd, isNull);
-                expect(isolated.reviewRemainingGroupedCheckout(), isTrue);
-                expect(await isolated.refreshCheckoutQuote(), isTrue);
+                expect(
+                  isolated.currentCheckoutPaymentGroup!.state,
+                  BuyV2CheckoutSubmissionState.idle,
+                );
+              } else {
+                expect(isolated.legacyCheckoutAttempt, isNull);
               }
-              expect(await isolated.submitOrder(), isFalse);
-              final review = isolated.pendingSupplierPolicyAdd;
-              expect(review, isNotNull);
-              expect(await isolated.acceptSupplierPolicyAndAdd(review), isTrue,
-                reason: 'Use normal consent after explicit remaining-checkout review.');
-              expect(connector.requests, isEmpty);
-              expect(isolated.quantityFor('s-milk'), 2);
-              await isolated.submitOrder();
-              expect(connector.requests, hasLength(1));
+              if (change == 'body') {
+                if (grouped) {
+                  expect(isolated.pendingSupplierPolicyAdd, isNull);
+                  expect(isolated.reviewRemainingGroupedCheckout(), isTrue);
+                  expect(await isolated.refreshCheckoutQuote(), isTrue);
+                }
+                expect(await isolated.submitOrder(), isFalse);
+                final review = isolated.pendingSupplierPolicyAdd;
+                expect(review, isNotNull);
+                expect(
+                  await isolated.acceptSupplierPolicyAndAdd(review),
+                  isTrue,
+                  reason:
+                      'Use normal consent after explicit remaining-checkout review.',
+                );
+                expect(connector.requests, isEmpty);
+                expect(isolated.quantityFor('s-milk'), 2);
+                await isolated.submitOrder();
+                expect(connector.requests, hasLength(1));
+              }
             }
-          }
-        });
+          },
+        );
       }
     }
 
@@ -1361,140 +1946,271 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
-    testWidgets('FRONTENDRECOVERY failed Cart read makes no content-preservation promise $scale', (tester) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = scale == 1 ? const Size(360, 800) : const Size(320, 568);
-      tester.platformDispatcher.textScaleFactorTestValue = scale;
-      addTearDown(tester.view.reset);
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      final product = BuyV2Catalogue.products.first;
-      final retained = BuyV2CustomerStateSnapshot(cartQuantities: {product.id: 2});
-      final state = _SupplierPolicyState()..snapshot = retained ..throwRead = true;
-      final core = BuySession();
-      final session = BuyV2Session(core: core, reviewDataEnabled: false, customerStateStore: state,
-        commerceAdapter: _SingleProductCommerceAdapter(product));
-      addTearDown(session.dispose); addTearDown(core.dispose);
-      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
-        home: BuyV2Screen(session: session, initialDestination: product.destination)));
-      await tester.pumpAndSettle();
-      expect(find.text('Your Cart needs recovery'), findsOneWidget);
-      expect(find.textContaining('still retained'), findsNothing);
-      expect(session.customerStateRecoveryPending, isTrue);
-      expect(session.cartChangesBlocked, isTrue);
-      final retry = find.byKey(const ValueKey('buy-catalogue-retry'));
-      await tester.ensureVisible(retry); await tester.pumpAndSettle();
-      expect(retry.hitTestable(), findsOneWidget);
-      await tester.tap(retry); await tester.pumpAndSettle();
-      expect(session.cartChangesBlocked, isTrue);
-      expect(state.snapshot, same(retained));
-      expect(state.writes, isEmpty, reason: 'Failed recovery cannot replace retained input with an empty Cart.');
-      expect(tester.takeException(), isNull);
-    });
+    testWidgets(
+      'FRONTENDRECOVERY failed Cart read makes no content-preservation promise $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = scale == 1
+            ? const Size(360, 800)
+            : const Size(320, 568);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final product = BuyV2Catalogue.products.first;
+        final retained = BuyV2CustomerStateSnapshot(
+          cartQuantities: {product.id: 2},
+        );
+        final state = _SupplierPolicyState()
+          ..snapshot = retained
+          ..throwRead = true;
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: false,
+          customerStateStore: state,
+          commerceAdapter: _SingleProductCommerceAdapter(product),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: BuyV2Screen(
+              session: session,
+              initialDestination: product.destination,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Your Cart needs recovery'), findsOneWidget);
+        expect(find.textContaining('still retained'), findsNothing);
+        expect(session.customerStateRecoveryPending, isTrue);
+        expect(session.cartChangesBlocked, isTrue);
+        final retry = find.byKey(const ValueKey('buy-catalogue-retry'));
+        await tester.ensureVisible(retry);
+        await tester.pumpAndSettle();
+        expect(retry.hitTestable(), findsOneWidget);
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+        expect(session.cartChangesBlocked, isTrue);
+        expect(state.snapshot, same(retained));
+        expect(
+          state.writes,
+          isEmpty,
+          reason:
+              'Failed recovery cannot replace retained input with an empty Cart.',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
-  test('FRONTENDALERT quiet restore preserves an existing Cart notice', () async {
-    final product = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-milk');
-    for (final outcome in ['ready', 'unavailable', 'failure']) {
-      final adapter = _SingleProductCommerceAdapter(product)
-        ..alertsAvailable = outcome == 'ready' ..failAlerts = outcome == 'failure';
+  test(
+    'FRONTENDALERT quiet restore preserves an existing Cart notice',
+    () async {
+      final product = BuyV2Catalogue.products.firstWhere(
+        (p) => p.id == 's-milk',
+      );
+      for (final outcome in ['ready', 'unavailable', 'failure']) {
+        final adapter = _SingleProductCommerceAdapter(product)
+          ..alertsAvailable = outcome == 'ready'
+          ..failAlerts = outcome == 'failure';
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: false,
+          customerStateStore: _SupplierPolicyState(),
+          commerceAdapter: adapter,
+        );
+        session.notice = 'HOST original Cart needs review';
+        try {
+          await session.restoreOrderAlerts(showNotice: false);
+          expect(session.notice, 'HOST original Cart needs review');
+          expect(session.trackingAlertsAvailable, outcome == 'ready');
+          expect(session.trackingAlertsBusy, isFalse);
+        } finally {
+          session.dispose();
+          core.dispose();
+        }
+      }
+    },
+  );
+  test(
+    'FRONTENDALERT retired Store response cannot overwrite current recovery',
+    () async {
+      const context = BuyV2ProcurementContext(
+        accountId: 'host-alert-buyer',
+        storeId: 'host-alert-store',
+        purpose: BuyV2ProcurementPurpose.restock,
+        originOperationId: 'host-alert-operation',
+      );
+      final identity = ValueNotifier<BuyV2ProcurementContext?>(context);
+      final adapter = _SingleProductCommerceAdapter(
+        BuyV2Catalogue.products.first,
+      )..pendingAlerts = Completer<BuyV2OrderAlertsResult>();
       final core = BuySession();
-      final session = BuyV2Session(core: core, reviewDataEnabled: false,
-        customerStateStore: _SupplierPolicyState(), commerceAdapter: adapter);
-      session.notice = 'HOST original Cart needs review';
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: false,
+        procurementIdentity: identity,
+        customerStateStore: _SupplierPolicyState()
+          ..ownerScope = context.customerStateOwnerScope,
+        commerceAdapter: adapter,
+      );
       try {
-        await session.restoreOrderAlerts(showNotice: false);
-        expect(session.notice, 'HOST original Cart needs review');
-        expect(session.trackingAlertsAvailable, outcome == 'ready');
+        final restoring = session.restoreOrderAlerts(showNotice: false);
+        identity.value = null;
+        identity.value = context;
+        final retirementNotice = session.notice;
+        adapter.pendingAlerts!.complete(
+          const BuyV2OrderAlertsResult(
+            available: true,
+            enabled: true,
+            customerMessage: 'HOST old scope alerts',
+          ),
+        );
+        await restoring;
+        expect(session.trackingAlertsAvailable, isFalse);
+        expect(session.trackingAlertsEnabled, isFalse);
         expect(session.trackingAlertsBusy, isFalse);
-      } finally { session.dispose(); core.dispose(); }
-    }
-  });
-  test('FRONTENDALERT retired Store response cannot overwrite current recovery', () async {
-    const context = BuyV2ProcurementContext(accountId: 'host-alert-buyer', storeId: 'host-alert-store',
-      purpose: BuyV2ProcurementPurpose.restock, originOperationId: 'host-alert-operation');
-    final identity = ValueNotifier<BuyV2ProcurementContext?>(context);
-    final adapter = _SingleProductCommerceAdapter(BuyV2Catalogue.products.first)
-      ..pendingAlerts = Completer<BuyV2OrderAlertsResult>();
-    final core = BuySession();
-    final session = BuyV2Session(core: core, reviewDataEnabled: false, procurementIdentity: identity,
-      customerStateStore: _SupplierPolicyState()..ownerScope = context.customerStateOwnerScope,
-      commerceAdapter: adapter);
-    try {
+        expect(session.notice, retirementNotice);
+      } finally {
+        session.dispose();
+        core.dispose();
+        identity.dispose();
+      }
+    },
+  );
+  test(
+    'FRONTENDALERT disposed session ignores a delayed optional result',
+    () async {
+      final adapter = _SingleProductCommerceAdapter(
+        BuyV2Catalogue.products.first,
+      )..pendingAlerts = Completer<BuyV2OrderAlertsResult>();
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: false,
+        customerStateStore: _SupplierPolicyState(),
+        commerceAdapter: adapter,
+      );
       final restoring = session.restoreOrderAlerts(showNotice: false);
-      identity.value = null; identity.value = context;
-      final retirementNotice = session.notice;
-      adapter.pendingAlerts!.complete(const BuyV2OrderAlertsResult(available: true, enabled: true,
-        customerMessage: 'HOST old scope alerts'));
+      session.dispose();
+      adapter.pendingAlerts!.complete(
+        const BuyV2OrderAlertsResult(
+          available: true,
+          enabled: true,
+          customerMessage: 'HOST delayed alerts',
+        ),
+      );
       await restoring;
       expect(session.trackingAlertsAvailable, isFalse);
-      expect(session.trackingAlertsEnabled, isFalse);
-      expect(session.trackingAlertsBusy, isFalse);
-      expect(session.notice, retirementNotice);
-    } finally { session.dispose(); core.dispose(); identity.dispose(); }
-  });
-  test('FRONTENDALERT disposed session ignores a delayed optional result', () async {
-    final adapter = _SingleProductCommerceAdapter(BuyV2Catalogue.products.first)
-      ..pendingAlerts = Completer<BuyV2OrderAlertsResult>();
-    final core = BuySession();
-    final session = BuyV2Session(core: core, reviewDataEnabled: false,
-      customerStateStore: _SupplierPolicyState(), commerceAdapter: adapter);
-    final restoring = session.restoreOrderAlerts(showNotice: false);
-    session.dispose();
-    adapter.pendingAlerts!.complete(const BuyV2OrderAlertsResult(available: true, enabled: true,
-      customerMessage: 'HOST delayed alerts'));
-    await restoring;
-    expect(session.trackingAlertsAvailable, isFalse);
-    core.dispose();
-  });
+      core.dispose();
+    },
+  );
   for (final outcome in ['unavailable', 'failure']) {
-    testWidgets('FRONTENDALERT automatic product load keeps optional alerts local $outcome', (tester) async {
-      final product = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-milk');
-      final adapter = _SingleProductCommerceAdapter(product)
-        ..alertsAvailable = false ..failAlerts = outcome == 'failure';
-      final core = BuySession();
-      final session = BuyV2Session(core: core, reviewDataEnabled: false,
-        customerStateStore: _SupplierPolicyState(), commerceAdapter: adapter);
-      addTearDown(session.dispose); addTearDown(core.dispose);
-      final notices = <String>[];
-      session.addListener(() { if (session.notice case final value?) notices.add(value); });
-      await session.restoreCommerce();
-      await mountReferenceGallery(tester, session, product.id);
-      expect(session.trackingAlertsAvailable, isFalse);
-      expect(session.trackingAlertsEnabled, isFalse);
-      expect(session.trackingAlertsBusy, isFalse);
-      expect(notices.where((value) => value.startsWith('Order alerts')), isEmpty,
-        reason: 'Automatic optional hydration must not show an unrelated global message on a product.');
-      expect(session.selectedProductId, product.id);
-      expect(session.cartLines, isEmpty);
-      await session.restoreOrderAlerts();
-      expect(session.notice, outcome == 'failure' ? 'Order alerts could not load. Try again.' : 'Order alerts unavailable');
-      expect(tester.takeException(), isNull);
-    });
+    testWidgets(
+      'FRONTENDALERT automatic product load keeps optional alerts local $outcome',
+      (tester) async {
+        final product = BuyV2Catalogue.products.firstWhere(
+          (p) => p.id == 's-milk',
+        );
+        final adapter = _SingleProductCommerceAdapter(product)
+          ..alertsAvailable = false
+          ..failAlerts = outcome == 'failure';
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: false,
+          customerStateStore: _SupplierPolicyState(),
+          commerceAdapter: adapter,
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        final notices = <String>[];
+        session.addListener(() {
+          if (session.notice case final value?) notices.add(value);
+        });
+        await session.restoreCommerce();
+        await mountReferenceGallery(tester, session, product.id);
+        expect(session.trackingAlertsAvailable, isFalse);
+        expect(session.trackingAlertsEnabled, isFalse);
+        expect(session.trackingAlertsBusy, isFalse);
+        expect(
+          notices.where((value) => value.startsWith('Order alerts')),
+          isEmpty,
+          reason:
+              'Automatic optional hydration must not show an unrelated global message on a product.',
+        );
+        expect(session.selectedProductId, product.id);
+        expect(session.cartLines, isEmpty);
+        await session.restoreOrderAlerts();
+        expect(
+          session.notice,
+          outcome == 'failure'
+              ? 'Order alerts could not load. Try again.'
+              : 'Order alerts unavailable',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final scale in [1.0, 2.0]) {
-    testWidgets('PUBLICMAP unavailable photo stays compact $scale', (tester) async {
-      const product = BuyV2Product(id: 'host-unavailable-photo', canonicalId: 'host-cup',
-        storeId: 'host-supplier', destination: BuyV2Destination.shop,
-        categoryId: 'instant-foods', brand: 'HOST', title: 'HOST exact cup', variant: '',
-        pack: '75 g cup', priceMinor: 6000, unitPrice: '', badge: '', seller: 'HOST supplier',
-        sellerType: 'Store', deliveryPromise: '', origin: '', confirmedOn: '', visualLabel: '', visualKind: '');
+    testWidgets('PUBLICMAP unavailable photo stays compact $scale', (
+      tester,
+    ) async {
+      const product = BuyV2Product(
+        id: 'host-unavailable-photo',
+        canonicalId: 'host-cup',
+        storeId: 'host-supplier',
+        destination: BuyV2Destination.shop,
+        categoryId: 'instant-foods',
+        brand: 'HOST',
+        title: 'HOST exact cup',
+        variant: '',
+        pack: '75 g cup',
+        priceMinor: 6000,
+        unitPrice: '',
+        badge: '',
+        seller: 'HOST supplier',
+        sellerType: 'Store',
+        deliveryPromise: '',
+        origin: '',
+        confirmedOn: '',
+        visualLabel: '',
+        visualKind: '',
+      );
       final core = BuySession();
-      final session = BuyV2Session(core: core, reviewDataEnabled: false,
-        customerStateStore: _SupplierPolicyState(), commerceAdapter: _SingleProductCommerceAdapter(product));
-      addTearDown(session.dispose); addTearDown(core.dispose);
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: false,
+        customerStateStore: _SupplierPolicyState(),
+        commerceAdapter: _SingleProductCommerceAdapter(product),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
       tester.platformDispatcher.textScaleFactorTestValue = scale;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      await session.restoreCommerce(); await mountReferenceGallery(tester, session, product.id);
+      await session.restoreCommerce();
+      await mountReferenceGallery(tester, session, product.id);
       final photo = find.byKey(ValueKey('buy-product-packshot-${product.id}'));
-      expect(tester.getSize(photo).height, lessThanOrEqualTo(96),
-        reason: 'Missing media should not occupy a full photographic gallery');
+      expect(
+        tester.getSize(photo).height,
+        lessThanOrEqualTo(96),
+        reason: 'Missing media should not occupy a full photographic gallery',
+      );
       expect(find.byType(BuyV2ProductPhotoUnavailable), findsOneWidget);
       await captureR66Visual(tester, 'public-photo-unavailable-text$scale');
-      await tester.tap(find.byType(BuyV2ProductPhotoUnavailable)); await tester.pumpAndSettle();
-      expect(find.byType(BuyV2ProductPhotoUnavailable), findsOneWidget,
-        reason: 'There is no image to open in a full-screen zoom viewer');
-      expect(session.cartLines, isEmpty); expect(tester.takeException(), isNull);
+      await tester.tap(find.byType(BuyV2ProductPhotoUnavailable));
+      await tester.pumpAndSettle();
+      expect(
+        find.byType(BuyV2ProductPhotoUnavailable),
+        findsOneWidget,
+        reason: 'There is no image to open in a full-screen zoom viewer',
+      );
+      expect(session.cartLines, isEmpty);
+      expect(tester.takeException(), isNull);
     });
   }
 
@@ -1525,92 +2241,206 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
-    for (final offer in [BuyV2OfferClass.retail, BuyV2OfferClass.wholesale, BuyV2OfferClass.bulk]) {
-      testWidgets('PUBLICMAP descriptive fields fit ${offer.name} text$scale', (tester) async {
-        const nutrition = 'Energy 443 kcal. Protein 8.3 g. Carbohydrate 59.2 g. '
-          'Total sugars 3.2 g. Fibre 3.3 g. Fat 19.2 g. Saturated fat 11.2 g. '
-          'Trans fat 0.11 g. Sodium 1355.8 mg. Values are supplied per 100 g.';
-        final base = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-milk');
-        final product = BuyV2Product(id: 'host-public-map', storeId: 'host-public-map-store',
-          destination: offer == BuyV2OfferClass.retail ? BuyV2Destination.shop : BuyV2Destination.wholesale,
-          categoryId: base.categoryId, brand: base.brand, title: base.title, variant: base.variant,
-          pack: base.pack, priceMinor: base.priceMinor, unitPrice: base.unitPrice,
-          badge: '', seller: 'HOST supplied Store', sellerType: 'Manufacturer',
-          deliveryPromise: '', confirmedOn: '', visualLabel: base.visualLabel, visualKind: base.visualKind,
-          offerClass: offer, origin: 'HOST public product origin',
-          compliance: const BuyV2ProductCompliance(countryOfOrigin: 'HOST country'));
+    for (final offer in [
+      BuyV2OfferClass.retail,
+      BuyV2OfferClass.wholesale,
+      BuyV2OfferClass.bulk,
+    ]) {
+      testWidgets('PUBLICMAP descriptive fields fit ${offer.name} text$scale', (
+        tester,
+      ) async {
+        const nutrition =
+            'Energy 443 kcal. Protein 8.3 g. Carbohydrate 59.2 g. '
+            'Total sugars 3.2 g. Fibre 3.3 g. Fat 19.2 g. Saturated fat 11.2 g. '
+            'Trans fat 0.11 g. Sodium 1355.8 mg. Values are supplied per 100 g.';
+        final base = BuyV2Catalogue.products.firstWhere(
+          (p) => p.id == 's-milk',
+        );
+        final product = BuyV2Product(
+          id: 'host-public-map',
+          storeId: 'host-public-map-store',
+          destination: offer == BuyV2OfferClass.retail
+              ? BuyV2Destination.shop
+              : BuyV2Destination.wholesale,
+          categoryId: base.categoryId,
+          brand: base.brand,
+          title: base.title,
+          variant: base.variant,
+          pack: base.pack,
+          priceMinor: base.priceMinor,
+          unitPrice: base.unitPrice,
+          badge: '',
+          seller: 'HOST supplied Store',
+          sellerType: 'Manufacturer',
+          deliveryPromise: '',
+          confirmedOn: '',
+          visualLabel: base.visualLabel,
+          visualKind: base.visualKind,
+          offerClass: offer,
+          origin: 'HOST public product origin',
+          compliance: const BuyV2ProductCompliance(
+            countryOfOrigin: 'HOST country',
+          ),
+        );
         final core = BuySession();
-        final adapter = _ContentAdapter()..highlights = []..omitDescription = true
+        final adapter = _ContentAdapter()
+          ..highlights = []
+          ..omitDescription = true
           ..specifications = const [
-            BuyV2ProductSpecification(label: 'Nutrition basis', value: 'Per 100 g'),
-            BuyV2ProductSpecification(label: 'Nutrition details', value: nutrition),
+            BuyV2ProductSpecification(
+              label: 'Nutrition basis',
+              value: 'Per 100 g',
+            ),
+            BuyV2ProductSpecification(
+              label: 'Nutrition details',
+              value: nutrition,
+            ),
           ];
-        final session = BuyV2Session(core: core, reviewDataEnabled: false,
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: false,
           customerStateStore: _SupplierPolicyState(),
-          marketplaceTrustAdapter: const _PricingTrustAdapter(partnerLocation: 'HOST supplied Store address'),
-          commerceAdapter: _SingleProductCommerceAdapter(product), productContentAdapter: adapter);
-        addTearDown(session.dispose); addTearDown(core.dispose);
+          marketplaceTrustAdapter: const _PricingTrustAdapter(
+            partnerLocation: 'HOST supplied Store address',
+          ),
+          commerceAdapter: _SingleProductCommerceAdapter(product),
+          productContentAdapter: adapter,
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
         tester.platformDispatcher.textScaleFactorTestValue = scale;
         addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
         await session.restoreCommerce();
         await mountReferenceGallery(tester, session, product.id);
-        if (scale > 1) { tester.view.physicalSize = const Size(320, 800); await tester.pumpAndSettle(); }
-        await revealProductControl(tester, session, find.text('Nutrition details'));
+        if (scale > 1) {
+          tester.view.physicalSize = const Size(320, 800);
+          await tester.pumpAndSettle();
+        }
+        await revealProductControl(
+          tester,
+          session,
+          find.text('Nutrition details'),
+        );
         final text = find.text(nutrition);
         expect(text, findsOneWidget);
-        final tab = find.byKey(PageStorageKey('buy-product-details-tabs-${product.id}'));
-        expect(tester.getSize(text).width, greaterThan(tester.getSize(tab).width * .9),
-          reason: 'Long supplied content should use the card width rather than a narrow value column');
+        final tab = find.byKey(
+          PageStorageKey('buy-product-details-tabs-${product.id}'),
+        );
+        expect(
+          tester.getSize(text).width,
+          greaterThan(tester.getSize(tab).width * .9),
+          reason:
+              'Long supplied content should use the card width rather than a narrow value column',
+        );
         expect(find.text('Product origin'), findsOneWidget);
         expect(find.text('HOST public product origin'), findsOneWidget);
-        expect(find.byKey(ValueKey('buy-product-store-full-address-${product.id}')), findsOneWidget);
+        expect(
+          find.byKey(ValueKey('buy-product-store-full-address-${product.id}')),
+          findsOneWidget,
+        );
         expect(find.text('HOST supplied Store address'), findsOneWidget);
         expect(find.text('Description'), findsNothing);
-        expect(find.text('Price checked'), findsNothing,
-          reason: 'No confirmation stamp was supplied; an empty price-check row must be omitted');
+        expect(
+          find.text('Price checked'),
+          findsNothing,
+          reason:
+              'No confirmation stamp was supplied; an empty price-check row must be omitted',
+        );
         await captureR66Visual(tester, 'public-map-${offer.name}-text$scale');
-        final manufacturer = find.byKey(ValueKey('buy-product-details-tab-2-${product.id}'));
+        final manufacturer = find.byKey(
+          ValueKey('buy-product-details-tab-2-${product.id}'),
+        );
         await revealProductControl(tester, session, manufacturer);
-        tester.widget<TextButton>(manufacturer).onPressed!(); await tester.pumpAndSettle();
+        tester.widget<TextButton>(manufacturer).onPressed!();
+        await tester.pumpAndSettle();
         expect(find.text('HOST country'), findsOneWidget);
-        expect(session.cartLines, isEmpty); expect(tester.takeException(), isNull);
+        expect(session.cartLines, isEmpty);
+        expect(tester.takeException(), isNull);
       });
     }
     for (final trade in [false, true]) {
-      testWidgets('PF06 supplied appliance details render without empty fields trade$trade text$scale', (tester) async {
-        final product = BuyV2Product(id: 'host-appliance', canonicalId: 'host-appliance-canonical',
-          storeId: 'host-appliance-store', destination: trade ? BuyV2Destination.wholesale : BuyV2Destination.shop,
-          categoryId: 'other', brand: 'Host maker', title: 'Host appliance', variant: 'Exact supplied model',
-          pack: '1 unit', priceMinor: 5000000, unitPrice: '', badge: '', seller: 'Host Store', sellerType: 'Retailer',
-          deliveryPromise: '', origin: '', confirmedOn: '', visualLabel: '', visualKind: '',
-          offerClass: trade ? BuyV2OfferClass.wholesale : BuyV2OfferClass.retail);
-        final core = BuySession(), adapter = _ContentAdapter()
-          ..highlights = []..omitDescription = true
-          ..specifications = const [
-            BuyV2ProductSpecification(label: 'Capacity', value: 'Host supplied 7 kg'),
-            BuyV2ProductSpecification(label: 'Electrical supply', value: 'Host supplied voltage and frequency'),
-            BuyV2ProductSpecification(label: 'Installation requirements', value: 'Host supplied clearance instructions'),
-          ];
-        final session = BuyV2Session(core: core, commerceAdapter: _SingleProductCommerceAdapter(product),
-          productContentAdapter: adapter, reviewDataEnabled: false);
-        addTearDown(core.dispose); addTearDown(session.dispose);
-        tester.platformDispatcher.textScaleFactorTestValue = scale;
-        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-        await session.restoreCommerce();
-        await mountReferenceGallery(tester, session, product.id);
-        tester.view.physicalSize = const Size(320, 800); await tester.pumpAndSettle();
-        final tab = find.byKey(ValueKey('buy-product-details-tab-0-${product.id}'));
-        await revealProductControl(tester, session, tab); await tester.tap(tab.hitTestable()); await tester.pumpAndSettle();
-        for (final value in ['Host supplied 7 kg', 'Host supplied voltage and frequency', 'Host supplied clearance instructions']) {
-          await revealProductControl(tester, session, find.text(value));
-          expect(find.text(value), findsOneWidget);
-        }
-        expect(find.text('Energy label'), findsNothing);
-        expect(find.text('Certified'), findsNothing);
-        expect(session.itemCount, 0);
-        expect(session.product(product.id).priceMinor, 5000000);
-        expect(tester.takeException(), isNull);
-      });
+      testWidgets(
+        'PF06 supplied appliance details render without empty fields trade$trade text$scale',
+        (tester) async {
+          final product = BuyV2Product(
+            id: 'host-appliance',
+            canonicalId: 'host-appliance-canonical',
+            storeId: 'host-appliance-store',
+            destination: trade
+                ? BuyV2Destination.wholesale
+                : BuyV2Destination.shop,
+            categoryId: 'other',
+            brand: 'Host maker',
+            title: 'Host appliance',
+            variant: 'Exact supplied model',
+            pack: '1 unit',
+            priceMinor: 5000000,
+            unitPrice: '',
+            badge: '',
+            seller: 'Host Store',
+            sellerType: 'Retailer',
+            deliveryPromise: '',
+            origin: '',
+            confirmedOn: '',
+            visualLabel: '',
+            visualKind: '',
+            offerClass: trade
+                ? BuyV2OfferClass.wholesale
+                : BuyV2OfferClass.retail,
+          );
+          final core = BuySession(),
+              adapter = _ContentAdapter()
+                ..highlights = []
+                ..omitDescription = true
+                ..specifications = const [
+                  BuyV2ProductSpecification(
+                    label: 'Capacity',
+                    value: 'Host supplied 7 kg',
+                  ),
+                  BuyV2ProductSpecification(
+                    label: 'Electrical supply',
+                    value: 'Host supplied voltage and frequency',
+                  ),
+                  BuyV2ProductSpecification(
+                    label: 'Installation requirements',
+                    value: 'Host supplied clearance instructions',
+                  ),
+                ];
+          final session = BuyV2Session(
+            core: core,
+            commerceAdapter: _SingleProductCommerceAdapter(product),
+            productContentAdapter: adapter,
+            reviewDataEnabled: false,
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await session.restoreCommerce();
+          await mountReferenceGallery(tester, session, product.id);
+          tester.view.physicalSize = const Size(320, 800);
+          await tester.pumpAndSettle();
+          final tab = find.byKey(
+            ValueKey('buy-product-details-tab-0-${product.id}'),
+          );
+          await revealProductControl(tester, session, tab);
+          await tester.tap(tab.hitTestable());
+          await tester.pumpAndSettle();
+          for (final value in [
+            'Host supplied 7 kg',
+            'Host supplied voltage and frequency',
+            'Host supplied clearance instructions',
+          ]) {
+            await revealProductControl(tester, session, find.text(value));
+            expect(find.text(value), findsOneWidget);
+          }
+          expect(find.text('Energy label'), findsNothing);
+          expect(find.text('Certified'), findsNothing);
+          expect(session.itemCount, 0);
+          expect(session.product(product.id).priceMinor, 5000000);
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
   }
   testWidgets(
@@ -1812,13 +2642,14 @@ void main() {
       }
     });
 
-    testWidgets('PUBLICMAP assurance controls fit card $scale', (
-      tester,
-    ) async {
+    testWidgets('PUBLICMAP assurance controls fit card $scale', (tester) async {
       tester.platformDispatcher.textScaleFactorTestValue = scale;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       final core = BuySession();
-      final session = BuyV2Session(core: core, customerStateStore: _SupplierPolicyState());
+      final session = BuyV2Session(
+        core: core,
+        customerStateStore: _SupplierPolicyState(),
+      );
       addTearDown(core.dispose);
       addTearDown(session.dispose);
       await mountReferenceGallery(tester, session, 's-milk');
@@ -1829,12 +2660,16 @@ void main() {
           find.byKey(ValueKey('buy-product-assurance-$id-s-milk')),
       ];
       final rects = controls.map(tester.getRect).toList();
-      final bounds = tester.getRect(find.byKey(
-        const ValueKey('buy-product-assurance-scroll-s-milk')));
+      final bounds = tester.getRect(
+        find.byKey(const ValueKey('buy-product-assurance-scroll-s-milk')),
+      );
       if (scale == 1) {
         expect(rects[1].top, closeTo(rects[0].top, .1));
-        expect(rects[2].top, closeTo(rects[0].top, .1),
-          reason: 'At normal text all three actions fit one compact row');
+        expect(
+          rects[2].top,
+          closeTo(rects[0].top, .1),
+          reason: 'At normal text all three actions fit one compact row',
+        );
       }
       for (final rect in rects) {
         expect(rect.width, greaterThanOrEqualTo(48));
@@ -1961,8 +2796,14 @@ void main() {
         const ValueKey('buy-product-assurance-payment-s-milk'),
       );
       await revealProductControl(tester, session, payment);
-      expect(find.descendant(of: payment, matching: find.text('Payment terms')), findsOneWidget);
-      expect(find.descendant(of: payment, matching: find.text('Cash on Delivery')), findsNothing);
+      expect(
+        find.descendant(of: payment, matching: find.text('Payment terms')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: payment, matching: find.text('Cash on Delivery')),
+        findsNothing,
+      );
       await tester.tap(payment.hitTestable());
       await tester.pumpAndSettle();
       expect(
@@ -2235,92 +3076,89 @@ void main() {
     );
   }
 
-  testWidgets(
-    'reference similar rail follows assurance and shows source facts',
-    (tester) async {
-      final core = BuySession();
-      final product = _pricedProduct(null);
-      final alternative = _pricedProduct(100).copyWith(
-        id: 'similar-a',
-        canonicalId: 'other-product',
-        storeId: 'other-store',
-        title: 'Alternative milk',
-      );
-      final adapter = _SingleProductCommerceAdapter(product)
-        ..extraProducts = [alternative];
-      final facts = _PricingFactsAdapter();
-      final session = BuyV2Session(
-        core: core,
-        commerceAdapter: adapter,
-        marketplaceTrustAdapter: const _PricingTrustAdapter(),
-        productFactsAdapter: facts,
-        reviewDataEnabled: false,
-      );
-      addTearDown(core.dispose);
-      addTearDown(session.dispose);
-      final now = DateTime.now();
-      facts.eligibility = BuyV2OfferEligibility(
-        productId: alternative.id,
-        storeId: alternative.storeId!,
-        sourceRevision: 'similar-source-facts-1',
-        customerLocationKey: session.eligibilityLocationKey,
-        observedAt: now.subtract(const Duration(minutes: 1)),
-        expiresAt: now.add(const Duration(hours: 1)),
-        offerClass: alternative.offerClass!,
-        channelEnabled: true,
-        storeReady: true,
-        fleetAvailable: true,
-        customerLocationConfirmed: true,
-        options: {BuyV2DeliveryOption.courier},
-      );
-      await session.restoreCommerce();
-      await mountReferenceGallery(tester, session, product.id);
-      final rail = find.byKey(
-        ValueKey('buy-product-continuations-${product.id}'),
-      );
-      await revealProductControl(tester, session, rail);
-      final assurance = find.byKey(
-        ValueKey('buy-product-assurance-${product.id}'),
-      );
-      expect(
-        tester.getTopLeft(rail).dy,
-        greaterThan(tester.getTopLeft(assurance).dy),
-      );
-      expect(find.text('Similar products'), findsOneWidget);
-      expect(find.text('You may also like'), findsNothing);
-      final card = find.byKey(
-        const ValueKey('buy-product-continuation-similar-a'),
-      );
-      expect(
-        tester.getSize(card).width,
-        closeTo(tester.getSize(rail).width, 1),
-      );
-      expect(
-        find.descendant(of: card, matching: find.textContaining('4.2 stars')),
-        findsNothing,
-        reason: 'MVP purchased-item stars stay private even when a legacy trust adapter supplies ratings.',
-      );
-      expect(
-        find.descendant(of: card, matching: find.textContaining('MRP')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: card,
-          matching: find.text(
-            buyV2BuyerDeliveryPromise(
-              session.productFactsFor(alternative),
-              confirmAfterStoreAcceptance: true,
-            ),
+  testWidgets('reference similar rail follows assurance and shows source facts', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final product = _pricedProduct(null);
+    final alternative = _pricedProduct(100).copyWith(
+      id: 'similar-a',
+      canonicalId: 'other-product',
+      storeId: 'other-store',
+      title: 'Alternative milk',
+    );
+    final adapter = _SingleProductCommerceAdapter(product)
+      ..extraProducts = [alternative];
+    final facts = _PricingFactsAdapter();
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: adapter,
+      marketplaceTrustAdapter: const _PricingTrustAdapter(),
+      productFactsAdapter: facts,
+      reviewDataEnabled: false,
+    );
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    final now = DateTime.now();
+    facts.eligibility = BuyV2OfferEligibility(
+      productId: alternative.id,
+      storeId: alternative.storeId!,
+      sourceRevision: 'similar-source-facts-1',
+      customerLocationKey: session.eligibilityLocationKey,
+      observedAt: now.subtract(const Duration(minutes: 1)),
+      expiresAt: now.add(const Duration(hours: 1)),
+      offerClass: alternative.offerClass!,
+      channelEnabled: true,
+      storeReady: true,
+      fleetAvailable: true,
+      customerLocationConfirmed: true,
+      options: {BuyV2DeliveryOption.courier},
+    );
+    await session.restoreCommerce();
+    await mountReferenceGallery(tester, session, product.id);
+    final rail = find.byKey(
+      ValueKey('buy-product-continuations-${product.id}'),
+    );
+    await revealProductControl(tester, session, rail);
+    final assurance = find.byKey(
+      ValueKey('buy-product-assurance-${product.id}'),
+    );
+    expect(
+      tester.getTopLeft(rail).dy,
+      greaterThan(tester.getTopLeft(assurance).dy),
+    );
+    expect(find.text('Similar products'), findsOneWidget);
+    expect(find.text('You may also like'), findsNothing);
+    final card = find.byKey(
+      const ValueKey('buy-product-continuation-similar-a'),
+    );
+    expect(tester.getSize(card).width, closeTo(tester.getSize(rail).width, 1));
+    expect(
+      find.descendant(of: card, matching: find.textContaining('4.2 stars')),
+      findsNothing,
+      reason:
+          'MVP purchased-item stars stay private even when a legacy trust adapter supplies ratings.',
+    );
+    expect(
+      find.descendant(of: card, matching: find.textContaining('MRP')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: card,
+        matching: find.text(
+          buyV2BuyerDeliveryPromise(
+            session.productFactsFor(alternative),
+            confirmAfterStoreAcceptance: true,
           ),
         ),
-        findsOneWidget,
-      );
-      expect(session.deliveryOptionsFor(alternative), isNotEmpty);
-      await captureR66Visual(tester, 'pdp04-similar-source-facts');
-      expect(tester.takeException(), isNull);
-    },
-  );
+      ),
+      findsOneWidget,
+    );
+    expect(session.deliveryOptionsFor(alternative), isNotEmpty);
+    await captureR66Visual(tester, 'pdp04-similar-source-facts');
+    expect(tester.takeException(), isNull);
+  });
 
   test(
     'reference similar alternatives preserve exact Store SKU and pack identity',
@@ -2410,96 +3248,99 @@ void main() {
     },
   );
 
-  testWidgets(
-    'similar rail shows distinct families after unavailable filtering',
-    (tester) async {
-      final core = BuySession();
-      final current = _pricedProduct(null);
-      final available = current.copyWith(
-        id: 'available-alternative',
-        canonicalId: 'alternative-family',
-        price: 55,
+  testWidgets('similar rail shows distinct families after unavailable filtering', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final current = _pricedProduct(null);
+    final available = current.copyWith(
+      id: 'available-alternative',
+      canonicalId: 'alternative-family',
+      price: 55,
+    );
+    final unavailable = available.copyWith(
+      id: 'unavailable-alternative',
+      price: 0,
+    );
+    final duplicate = available.copyWith(
+      id: 'duplicate-alternative',
+      storeId: 'other-store',
+      price: 65,
+    );
+    final sameTitle = available.copyWith(
+      id: 'distinct-family',
+      canonicalId: 'different-family',
+      price: 70,
+    );
+    final sameFamily = current.copyWith(
+      id: 'current-family-pack',
+      pack: 'Different pack',
+      variant: 'Different option',
+    );
+    final adapter = _SingleProductCommerceAdapter(current)
+      ..extraProducts = [
+        unavailable,
+        available,
+        duplicate,
+        sameTitle,
+        sameFamily,
+      ];
+    final facts = _PricingFactsAdapter();
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: adapter,
+      productFactsAdapter: facts,
+      reviewDataEnabled: false,
+    );
+    final now = DateTime.now();
+    for (final item in [current, ...adapter.extraProducts]) {
+      facts.eligibilityByProduct[item.id] = BuyV2OfferEligibility(
+        productId: item.id,
+        storeId: item.storeId!,
+        sourceRevision: 'similar-dedup-1',
+        customerLocationKey: session.eligibilityLocationKey,
+        observedAt: now.subtract(const Duration(minutes: 1)),
+        expiresAt: now.add(const Duration(hours: 1)),
+        offerClass: item.offerClass!,
+        channelEnabled: true,
+        storeReady: true,
+        fleetAvailable: true,
+        customerLocationConfirmed: true,
+        options: {BuyV2DeliveryOption.courier},
       );
-      final unavailable = available.copyWith(
-        id: 'unavailable-alternative',
-        price: 0,
-      );
-      final duplicate = available.copyWith(
-        id: 'duplicate-alternative',
-        storeId: 'other-store',
-        price: 65,
-      );
-      final sameTitle = available.copyWith(
-        id: 'distinct-family',
-        canonicalId: 'different-family',
-        price: 70,
-      );
-      final sameFamily = current.copyWith(
-        id: 'current-family-pack',
-        pack: 'Different pack',
-        variant: 'Different option',
-      );
-      final adapter = _SingleProductCommerceAdapter(current)
-        ..extraProducts = [
-          unavailable,
-          available,
-          duplicate,
-          sameTitle,
-          sameFamily,
-        ];
-      final facts = _PricingFactsAdapter();
-      final session = BuyV2Session(
-        core: core,
-        commerceAdapter: adapter,
-        productFactsAdapter: facts,
-        reviewDataEnabled: false,
-      );
-      final now = DateTime.now();
-      for (final item in [current, ...adapter.extraProducts]) {
-        facts.eligibilityByProduct[item.id] = BuyV2OfferEligibility(
-          productId: item.id,
-          storeId: item.storeId!,
-          sourceRevision: 'similar-dedup-1',
-          customerLocationKey: session.eligibilityLocationKey,
-          observedAt: now.subtract(const Duration(minutes: 1)),
-          expiresAt: now.add(const Duration(hours: 1)),
-          offerClass: item.offerClass!,
-          channelEnabled: true,
-          storeReady: true,
-          fleetAvailable: true,
-          customerLocationConfirmed: true,
-          options: {BuyV2DeliveryOption.courier},
-        );
-      }
-      addTearDown(core.dispose);
-      addTearDown(session.dispose);
-      await session.restoreCommerce();
-      expect(session.productFactsFor(available).stale, isFalse,
-        reason: 'Configured similar-product fixture must supply valid current facts: '
+    }
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    await session.restoreCommerce();
+    expect(
+      session.productFactsFor(available).stale,
+      isFalse,
+      reason:
+          'Configured similar-product fixture must supply valid current facts: '
           '${facts.snapshotFor(available).deliveryPromise}/${facts.snapshotFor(available).sourceId}/'
-          '${session.productFactsFor(available).orderabilityLabel}');
-      await mountReferenceGallery(tester, session, current.id);
-      final rail = find.byKey(
-        ValueKey('buy-product-continuations-${current.id}'),
-      );
-      await revealProductControl(tester, session, rail);
-      Finder card(String id) => find.descendant(
-        of: rail,
-        matching: find.byKey(ValueKey('buy-product-continuation-$id')),
-      );
-      expect(card(available.id), findsOneWidget);
-      expect(card(sameTitle.id), findsOneWidget);
-      expect(
-        tester.getSize(card(available.id)).width * 2 + 8,
-        closeTo(tester.getSize(rail).width, 1),
-      );
-      expect(card(unavailable.id), findsNothing);
-      expect(card(duplicate.id), findsNothing);
-      expect(card(sameFamily.id), findsNothing);
-      expect(session.cartLines, isEmpty);
-      expect(tester.takeException(), isNull);
-    },
-  );
+          '${session.productFactsFor(available).orderabilityLabel}',
+    );
+    await mountReferenceGallery(tester, session, current.id);
+    final rail = find.byKey(
+      ValueKey('buy-product-continuations-${current.id}'),
+    );
+    await revealProductControl(tester, session, rail);
+    Finder card(String id) => find.descendant(
+      of: rail,
+      matching: find.byKey(ValueKey('buy-product-continuation-$id')),
+    );
+    expect(card(available.id), findsOneWidget);
+    expect(card(sameTitle.id), findsOneWidget);
+    expect(
+      tester.getSize(card(available.id)).width * 2 + 8,
+      closeTo(tester.getSize(rail).width, 1),
+    );
+    expect(card(unavailable.id), findsNothing);
+    expect(card(duplicate.id), findsNothing);
+    expect(card(sameFamily.id), findsNothing);
+    expect(session.cartLines, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'reference similar navigation preserves both product shell origins and cart',
@@ -4137,9 +4978,7 @@ void main() {
         expect(
           find.descendant(
             of: fulfilment,
-            matching: find.textContaining(
-              'Delivery schedule unavailable',
-            ),
+            matching: find.textContaining('Delivery schedule unavailable'),
           ),
           findsOneWidget,
         );
@@ -4256,94 +5095,198 @@ void main() {
 
   for (final scale in [1.0, 1.4]) {
     for (final summary in ['', '   ', 'Host supplied structured returns']) {
-      testWidgets('PF07 supplied returns survive warranty-only protection summary=$summary scale=$scale', (tester) async {
-        tester.view.devicePixelRatio = 1;
-        tester.view.physicalSize = const Size(320, 700);
-        tester.platformDispatcher.textScaleFactorTestValue = scale;
-        addTearDown(tester.view.reset);
-        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-        final original = BuyV2Catalogue.products.firstWhere((p) =>
-          p.destination == BuyV2Destination.shop && (p.returnPolicy?.trim().isNotEmpty ?? false));
-        final product = original.copyWith(purchaseProtection: BuyV2PurchaseProtection(
-          summary: summary, warrantyLabel: 'Host supplied manufacturer warranty'));
-        final core = BuySession();
-        final session = BuyV2Session(core: core, commerceAdapter: _SingleProductCommerceAdapter(product), reviewDataEnabled: false);
-        addTearDown(session.dispose); addTearDown(core.dispose);
-        await session.restoreCommerce();
-        expect(session.openProduct(product.id), isTrue);
-        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: BuyV2Screen(
-          session: session, initialDestination: product.destination,
-          initialView: BuyV2View.product, productId: product.id)));
-        await tester.pumpAndSettle();
-        final returns = find.byKey(ValueKey('buy-product-assurance-returns-${product.id}'));
-        final scroll = find.descendant(of: find.byKey(PageStorageKey('buy-product-${product.id}')),
-          matching: find.byType(Scrollable)).first;
-        await tester.scrollUntilVisible(returns, 220, scrollable: scroll);
-        await Scrollable.ensureVisible(tester.element(returns), alignment: .4);
-        await tester.pumpAndSettle();
-        await tester.tap(returns.hitTestable()); await tester.pumpAndSettle();
-        final sheet = find.byType(BottomSheet);
-        final expected = summary.trim().isEmpty ? original.returnPolicy! : summary;
-        expect(find.descendant(of: sheet, matching: find.text(expected)), findsOneWidget,
-          reason: 'A separate supplied warranty must not suppress the Store return disclosure');
-        expect(find.descendant(of: sheet, matching: find.text('Warranty: Host supplied manufacturer warranty')), findsOneWidget);
-        if (summary.trim().isNotEmpty) {
-          expect(find.descendant(of: sheet, matching: find.text(original.returnPolicy!)), findsNothing,
-            reason: 'A nonblank structured summary remains authoritative, not a duplicate return rule');
-        }
-        expect(session.countForDestination(product.destination), 0);
-        expect(tester.takeException(), isNull);
-      });
+      testWidgets(
+        'PF07 supplied returns survive warranty-only protection summary=$summary scale=$scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(320, 700);
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.view.reset);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final original = BuyV2Catalogue.products.firstWhere(
+            (p) =>
+                p.destination == BuyV2Destination.shop &&
+                (p.returnPolicy?.trim().isNotEmpty ?? false),
+          );
+          final product = original.copyWith(
+            purchaseProtection: BuyV2PurchaseProtection(
+              summary: summary,
+              warrantyLabel: 'Host supplied manufacturer warranty',
+            ),
+          );
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            commerceAdapter: _SingleProductCommerceAdapter(product),
+            reviewDataEnabled: false,
+          );
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          await session.restoreCommerce();
+          expect(session.openProduct(product.id), isTrue);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              home: BuyV2Screen(
+                session: session,
+                initialDestination: product.destination,
+                initialView: BuyV2View.product,
+                productId: product.id,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final returns = find.byKey(
+            ValueKey('buy-product-assurance-returns-${product.id}'),
+          );
+          final scroll = find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(returns, 220, scrollable: scroll);
+          await Scrollable.ensureVisible(
+            tester.element(returns),
+            alignment: .4,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(returns.hitTestable());
+          await tester.pumpAndSettle();
+          final sheet = find.byType(BottomSheet);
+          final expected = summary.trim().isEmpty
+              ? original.returnPolicy!
+              : summary;
+          expect(
+            find.descendant(of: sheet, matching: find.text(expected)),
+            findsOneWidget,
+            reason:
+                'A separate supplied warranty must not suppress the Store return disclosure',
+          );
+          expect(
+            find.descendant(
+              of: sheet,
+              matching: find.text(
+                'Warranty: Host supplied manufacturer warranty',
+              ),
+            ),
+            findsOneWidget,
+          );
+          if (summary.trim().isNotEmpty) {
+            expect(
+              find.descendant(
+                of: sheet,
+                matching: find.text(original.returnPolicy!),
+              ),
+              findsNothing,
+              reason:
+                  'A nonblank structured summary remains authoritative, not a duplicate return rule',
+            );
+          }
+          expect(session.countForDestination(product.destination), 0);
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
   }
 
-  testWidgets('PF07 original purchased return disclosure survives cache and changed catalogue', (tester) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(320, 700);
-    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
-    addTearDown(tester.view.reset);
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-    final original = BuyV2Catalogue.products.firstWhere((p) =>
-      p.destination == BuyV2Destination.shop && (p.returnPolicy?.trim().isNotEmpty ?? false))
-      .copyWith(purchaseProtection: const BuyV2PurchaseProtection(
-        summary: '  ', warrantyLabel: 'Original supplied warranty'));
-    final order = BuyV2Order.minor(id: 'host-pf07-original-order', destination: original.destination,
-      title: 'Host original purchase', itemSummary: '1 purchased pack', totalMinor: original.priceMinor,
-      partner: original.seller, partnerType: original.sellerType, promise: 'Host original delivery',
-      destinationLabel: 'Host address', progress: 1, status: BuyV2OrderStatus.delivered,
-      productIds: [original.id], lines: [BuyV2CartLine(product: original, quantity: 1)],
-      invoiceAvailable: false);
-    final preferences = _SupplierPolicyPreferences();
-    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-pf07-buyer');
-    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [order])), isTrue);
-    final restored = (await store.read())!.orders.single;
-    expect(restored.lines.single.product.returnPolicy, original.returnPolicy);
-    expect(restored.lines.single.product.purchaseProtection!.warrantyLabel, 'Original supplied warranty');
-    final changed = original.copyWith(purchaseProtection: const BuyV2PurchaseProtection(
-      summary: 'Changed current catalogue terms', warrantyLabel: 'Changed current warranty'));
-    final core = BuySession();
-    final session = BuyV2Session(core: core, commerceAdapter: _SingleProductCommerceAdapter(changed),
-      customerStateStore: store, reviewDataEnabled: false);
-    addTearDown(session.dispose); addTearDown(core.dispose);
-    await session.restoreCommerce(); await session.restoreCustomerState();
-    expect(session.openOrderItems(order.id), isTrue);
-    // Isolate the restored original-order consumer; a fresh authoritative empty
-    // feed from the single-product fixture is not an order-retention contract.
-    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
-      home: Scaffold(body: BuyV2OrderItemsView(session: session))));
-    await tester.pumpAndSettle();
-    final policy = find.byKey(ValueKey('buy-order-item-policy-${original.id}'));
-    await tester.scrollUntilVisible(policy, 180, scrollable: find.byType(Scrollable).first);
-    await tester.pumpAndSettle();
-    expect(policy, findsOneWidget);
-    final text = tester.widget<Text>(policy).data!;
-    expect(text, contains(original.returnPolicy!));
-    expect(text, contains('Warranty: Original supplied warranty'));
-    expect(text, isNot(contains('Changed current')));
-    expect(tester.widget<Text>(policy).maxLines, isNull);
-    expect(session.cartLines, isEmpty);
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'PF07 original purchased return disclosure survives cache and changed catalogue',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 700);
+      tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final original = BuyV2Catalogue.products
+          .firstWhere(
+            (p) =>
+                p.destination == BuyV2Destination.shop &&
+                (p.returnPolicy?.trim().isNotEmpty ?? false),
+          )
+          .copyWith(
+            purchaseProtection: const BuyV2PurchaseProtection(
+              summary: '  ',
+              warrantyLabel: 'Original supplied warranty',
+            ),
+          );
+      final order = BuyV2Order.minor(
+        id: 'host-pf07-original-order',
+        destination: original.destination,
+        title: 'Host original purchase',
+        itemSummary: '1 purchased pack',
+        totalMinor: original.priceMinor,
+        partner: original.seller,
+        partnerType: original.sellerType,
+        promise: 'Host original delivery',
+        destinationLabel: 'Host address',
+        progress: 1,
+        status: BuyV2OrderStatus.delivered,
+        productIds: [original.id],
+        lines: [BuyV2CartLine(product: original, quantity: 1)],
+        invoiceAvailable: false,
+      );
+      final preferences = _SupplierPolicyPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(
+        preferences,
+        ownerScope: 'host-pf07-buyer',
+      );
+      expect(
+        await store.write(BuyV2CustomerStateSnapshot(orders: [order])),
+        isTrue,
+      );
+      final restored = (await store.read())!.orders.single;
+      expect(restored.lines.single.product.returnPolicy, original.returnPolicy);
+      expect(
+        restored.lines.single.product.purchaseProtection!.warrantyLabel,
+        'Original supplied warranty',
+      );
+      final changed = original.copyWith(
+        purchaseProtection: const BuyV2PurchaseProtection(
+          summary: 'Changed current catalogue terms',
+          warrantyLabel: 'Changed current warranty',
+        ),
+      );
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: _SingleProductCommerceAdapter(changed),
+        customerStateStore: store,
+        reviewDataEnabled: false,
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await session.restoreCommerce();
+      await session.restoreCustomerState();
+      expect(session.openOrderItems(order.id), isTrue);
+      // Isolate the restored original-order consumer; a fresh authoritative empty
+      // feed from the single-product fixture is not an order-retention contract.
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: Scaffold(body: BuyV2OrderItemsView(session: session)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final policy = find.byKey(
+        ValueKey('buy-order-item-policy-${original.id}'),
+      );
+      await tester.scrollUntilVisible(
+        policy,
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(policy, findsOneWidget);
+      final text = tester.widget<Text>(policy).data!;
+      expect(text, contains(original.returnPolicy!));
+      expect(text, contains('Warranty: Original supplied warranty'));
+      expect(text, isNot(contains('Changed current')));
+      expect(tester.widget<Text>(policy).maxLines, isNull);
+      expect(session.cartLines, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'published protection fields remain complete at compact large text',
@@ -4691,15 +5634,16 @@ void main() {
   );
 
   for (final scale in [1.0, 2.0]) {
-    testWidgets('PUBLICMAP pack tabs fit card $scale', (
-      tester,
-    ) async {
+    testWidgets('PUBLICMAP pack tabs fit card $scale', (tester) async {
       final core = BuySession();
       final adapter = _ContentAdapter();
       adapter.specifications = [
         ...adapter.specifications,
-        const BuyV2ProductSpecification(attributeId: 'manufacturer_name',
-          label: 'Manufacturer', value: 'Host supplied manufacturer'),
+        const BuyV2ProductSpecification(
+          attributeId: 'manufacturer_name',
+          label: 'Manufacturer',
+          value: 'Host supplied manufacturer',
+        ),
       ];
       final session = BuyV2Session(
         core: core,
@@ -4720,12 +5664,20 @@ void main() {
         const PageStorageKey('buy-product-details-tabs-s-milk'),
       );
       await revealProductControl(tester, session, viewport);
-      for (final label in ['Specifications', 'Description', 'Pack information']) {
+      for (final label in [
+        'Specifications',
+        'Description',
+        'Pack information',
+      ]) {
         final text = tester.getRect(find.text(label));
         final bounds = tester.getRect(viewport);
         expect(text.left, greaterThanOrEqualTo(bounds.left - .5));
-        expect(text.right, lessThanOrEqualTo(bounds.right + .5),
-          reason: 'Every detail tab must be readable before selection, without sideways scrolling');
+        expect(
+          text.right,
+          lessThanOrEqualTo(bounds.right + .5),
+          reason:
+              'Every detail tab must be readable before selection, without sideways scrolling',
+        );
       }
       await captureR66Visual(tester, 'public-tabs-visible-text$scale');
       // Activate without ensureVisible(tab) hiding the original clipping defect.
@@ -4940,9 +5892,15 @@ void main() {
         ..specifications = [];
       // This case requires genuinely empty public details, including the
       // separately supplied Product origin now rendered by the shared view.
-      final emptyProduct = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-milk').copyWith(origin: '');
-      final session = BuyV2Session(core: core, productContentAdapter: adapter,
-        commerceAdapter: _SingleProductCommerceAdapter(emptyProduct), reviewDataEnabled: false);
+      final emptyProduct = BuyV2Catalogue.products
+          .firstWhere((p) => p.id == 's-milk')
+          .copyWith(origin: '');
+      final session = BuyV2Session(
+        core: core,
+        productContentAdapter: adapter,
+        commerceAdapter: _SingleProductCommerceAdapter(emptyProduct),
+        reviewDataEnabled: false,
+      );
       addTearDown(core.dispose);
       addTearDown(session.dispose);
       await session.restoreCommerce();
@@ -5366,8 +6324,13 @@ final class _SingleProductCommerceAdapter implements BuyV2CommerceAdapter {
   Future<BuyV2OrderAlertsResult> loadOrderAlerts() async {
     if (pendingAlerts case final pending?) return pending.future;
     if (failAlerts) throw StateError('HOST optional alerts unavailable');
-    return BuyV2OrderAlertsResult(available: alertsAvailable, enabled: false,
-      customerMessage: alertsAvailable ? 'Order alerts are off' : 'Order alerts unavailable');
+    return BuyV2OrderAlertsResult(
+      available: alertsAvailable,
+      enabled: false,
+      customerMessage: alertsAvailable
+          ? 'Order alerts are off'
+          : 'Order alerts unavailable',
+    );
   }
 
   @override

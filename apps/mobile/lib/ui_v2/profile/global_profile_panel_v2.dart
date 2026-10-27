@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -61,6 +60,29 @@ class GlobalProfileWorkspaceContext {
   final String area;
 }
 
+/// Profile-only readback. It never changes Shopping/Store AI chat context or
+/// grants authority; original destination controllers still authorise actions.
+class GlobalProfileAccountScope extends InheritedWidget {
+  const GlobalProfileAccountScope({
+    required this.changes,
+    required this.readAuthenticated,
+    required this.readApprovedWorkspace,
+    required this.readApplicationInProgress,
+    required super.child,
+    super.key,
+  });
+  final Listenable changes;
+  final bool Function() readAuthenticated;
+  final GlobalProfileWorkspaceContext? Function() readApprovedWorkspace;
+  final bool Function() readApplicationInProgress;
+  @override
+  bool updateShouldNotify(GlobalProfileAccountScope oldWidget) =>
+      changes != oldWidget.changes ||
+      readAuthenticated != oldWidget.readAuthenticated ||
+      readApprovedWorkspace != oldWidget.readApprovedWorkspace ||
+      readApplicationInProgress != oldWidget.readApplicationInProgress;
+}
+
 class _GlobalProfilePanelResult {
   const _GlobalProfilePanelResult.route(this.route)
     : contextActionSelected = false;
@@ -85,33 +107,72 @@ Future<void> showGlobalProfilePanelV2(
   final router = GoRouter.maybeOf(context);
   final returnLocation =
       router?.routeInformationProvider.value.uri.toString() ?? '/app/mool';
+  final accountScope = context
+      .getInheritedWidgetOfExactType<GlobalProfileAccountScope>();
   final result = await showGeneralDialog<_GlobalProfilePanelResult>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Close global profile',
     barrierColor: Colors.black.withValues(alpha: .38),
-    transitionDuration: MoolMotion.quick,
-    pageBuilder: (dialogContext, _, _) => Align(
-      alignment: Alignment.centerRight,
-      child: GlobalProfilePanelV2(
-        accountAuthenticated: accountAuthenticated,
-        activeWorkspace: activeWorkspace,
-        applicationInProgress: applicationInProgress,
-        surfaceTone: surfaceTone,
-        contextAction: contextAction,
-        onClose: () => Navigator.pop(dialogContext),
-        onOpenRoute: (route) => Navigator.pop(
-          dialogContext,
-          _GlobalProfilePanelResult.route(route),
-        ),
-        onContextAction: contextAction == null
-            ? null
-            : () => Navigator.pop(
-                dialogContext,
-                const _GlobalProfilePanelResult.contextAction(),
-              ),
-      ),
-    ),
+    transitionDuration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : MoolMotion.quick,
+    pageBuilder: (dialogContext, _, _) {
+      Widget panel() {
+        var authenticated = accountAuthenticated;
+        var workspace = activeWorkspace;
+        var application = applicationInProgress;
+        if (accountScope != null) {
+          try {
+            authenticated = accountScope.readAuthenticated();
+          } on Object {
+            authenticated = false;
+          }
+          workspace = null;
+          application = false;
+          if (authenticated) {
+            try {
+              workspace = accountScope.readApprovedWorkspace();
+            } on Object {
+              /* Keep personal account usable. */
+            }
+            try {
+              application = accountScope.readApplicationInProgress();
+            } on Object {
+              /* No invented application state. */
+            }
+          }
+        }
+        return Align(
+          alignment: Alignment.centerRight,
+          child: GlobalProfilePanelV2(
+            accountAuthenticated: authenticated,
+            activeWorkspace: workspace,
+            applicationInProgress: application,
+            surfaceTone: surfaceTone,
+            contextAction: contextAction,
+            onClose: () => Navigator.pop(dialogContext),
+            onOpenRoute: (route) => Navigator.pop(
+              dialogContext,
+              _GlobalProfilePanelResult.route(route),
+            ),
+            onContextAction: contextAction == null
+                ? null
+                : () => Navigator.pop(
+                    dialogContext,
+                    const _GlobalProfilePanelResult.contextAction(),
+                  ),
+          ),
+        );
+      }
+
+      return accountScope == null
+          ? panel()
+          : ListenableBuilder(
+              listenable: accountScope.changes,
+              builder: (_, _) => panel(),
+            );
+    },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final curved = CurvedAnimation(
         parent: animation,
@@ -146,6 +207,8 @@ Future<void> showGlobalProfilePanelV2(
         returnLocation,
         surfaceTone: surfaceTone,
       ),
+      '/app/account/plans' when surfaceTone == GlobalProfileSurfaceTone.light =>
+        '/app/account/plans?scope=account',
       _ => route,
     });
   } else if (result.contextActionSelected) {
@@ -328,33 +391,26 @@ class GlobalProfilePanelV2 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final effectiveScale = media.textScaler.scale(1).clamp(.9, 1.15);
-    final width = math.min(media.size.width * .74, 320.0);
+    final visibleWorkspace = accountAuthenticated ? activeWorkspace : null;
+    final width = math.min(media.size.width - 24, 360.0);
     final palette = GlobalProfileSurfacePalette.forTone(surfaceTone);
     final view = View.of(context);
     final viewPadding = EdgeInsets.fromViewPadding(
       view.viewPadding,
       view.devicePixelRatio,
     );
-    const exportedTargetOverflow = 14.0;
-    final exportedBottomClearance = math.max(
-      24.0,
-      math.max(
-        viewPadding.bottom,
-        defaultTargetPlatform == TargetPlatform.android
-            ? (viewPadding.top - exportedTargetOverflow)
-                  .clamp(0, double.infinity)
-                  .toDouble()
-            : 0.0,
-      ),
-    );
     return _GlobalProfilePaletteScope(
       palette: palette,
       child: MediaQuery(
-        data: media.copyWith(textScaler: TextScaler.linear(effectiveScale)),
+        data: media,
         child: SafeArea(
           key: const Key('global-profile-bottom-safe-area'),
-          minimum: EdgeInsets.fromLTRB(0, MoolSpacing.xs, 0, 0),
+          minimum: EdgeInsets.fromLTRB(
+            0,
+            MoolSpacing.xs,
+            0,
+            viewPadding.bottom,
+          ),
           child: Material(
             key: const Key('global-profile-panel-v2'),
             color: palette.canvas,
@@ -370,87 +426,107 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                 children: [
                   _ProfileHeader(
                     onClose: onClose,
-                    workspaceRoleLabel: activeWorkspace?.roleLabel,
+                    onAccountAccess: () => onOpenRoute('/app/account/security'),
+                    workspaceRoleLabel:
+                        surfaceTone == GlobalProfileSurfaceTone.socialDark
+                        ? visibleWorkspace?.roleLabel
+                        : null,
                     accountAuthenticated: accountAuthenticated,
+                    authenticatedStatusLabel:
+                        surfaceTone == GlobalProfileSurfaceTone.light
+                        ? 'Signed in'
+                        : 'Active',
                   ),
                   Expanded(
                     child: CustomScrollView(
                       key: const Key('global-profile-panel-content'),
                       slivers: [
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(
-                            MoolSpacing.sm,
-                            MoolSpacing.sm,
-                            MoolSpacing.sm,
-                            0,
-                          ),
-                          sliver: SliverToBoxAdapter(
-                            child: switch (activeWorkspace) {
-                              final workspace? => Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _ActiveWorkspaceCard(workspace: workspace),
-                                  const SizedBox(height: MoolSpacing.md),
-                                  _ProfileQuickActions(
-                                    onOpenRoute: onOpenRoute,
-                                  ),
-                                ],
-                              ),
-                              null => _PersonalAccountSection(
+                        if (surfaceTone == GlobalProfileSurfaceTone.light)
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+                            sliver: SliverToBoxAdapter(
+                              child: _CommerceProfileAccountMenu(
+                                authenticated: accountAuthenticated,
+                                workspace: visibleWorkspace,
+                                applicationInProgress: applicationInProgress,
                                 onOpenRoute: onOpenRoute,
                               ),
-                            },
-                          ),
-                        ),
-                        SliverLayoutBuilder(
-                          builder: (context, constraints) => SliverToBoxAdapter(
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                minHeight: math.max(
-                                  0,
-                                  constraints.viewportMainAxisExtent -
-                                      constraints.precedingScrollExtent,
-                                ),
-                              ),
-                              child: Padding(
-                                padding: EdgeInsets.fromLTRB(
-                                  MoolSpacing.sm,
-                                  MoolSpacing.md,
-                                  MoolSpacing.sm,
-                                  MoolSpacing.md + exportedBottomClearance,
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  mainAxisAlignment: MainAxisAlignment.end,
+                            ),
+                          )
+                        else ...[
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(
+                              MoolSpacing.sm,
+                              MoolSpacing.sm,
+                              MoolSpacing.sm,
+                              0,
+                            ),
+                            sliver: SliverToBoxAdapter(
+                              child: switch (visibleWorkspace) {
+                                final workspace? => Column(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    if (activeWorkspace != null)
-                                      _PersonalAccountSection(
-                                        onOpenRoute: onOpenRoute,
-                                      )
-                                    else if (contextAction case final action?)
-                                      _GlobalProfileContextCard(
-                                        action: action,
-                                        onPressed:
-                                            onContextAction ??
-                                            () {
-                                              onClose();
-                                              action.onPressed();
-                                            },
-                                      )
-                                    else
-                                      _ProfileAccessCard(
-                                        applicationInProgress:
-                                            applicationInProgress,
-                                        onOpenRoute: onOpenRoute,
-                                      ),
+                                    _ActiveWorkspaceCard(workspace: workspace),
+                                    const SizedBox(height: MoolSpacing.md),
+                                    _ProfileQuickActions(
+                                      onOpenRoute: onOpenRoute,
+                                    ),
                                   ],
                                 ),
-                              ),
+                                null => _PersonalAccountSection(
+                                  onOpenRoute: onOpenRoute,
+                                ),
+                              },
                             ),
                           ),
-                        ),
+                          SliverLayoutBuilder(
+                            builder: (context, constraints) =>
+                                SliverToBoxAdapter(
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(minHeight: 0),
+                                    child: Padding(
+                                      padding: EdgeInsets.fromLTRB(
+                                        MoolSpacing.sm,
+                                        MoolSpacing.md,
+                                        MoolSpacing.sm,
+                                        32,
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          if (visibleWorkspace != null)
+                                            _PersonalAccountSection(
+                                              onOpenRoute: onOpenRoute,
+                                            )
+                                          else if (accountAuthenticated &&
+                                              contextAction != null)
+                                            _GlobalProfileContextCard(
+                                              action: contextAction!,
+                                              onPressed:
+                                                  onContextAction ??
+                                                  () {
+                                                    onClose();
+                                                    contextAction!.onPressed();
+                                                  },
+                                            )
+                                          else
+                                            _ProfileAccessCard(
+                                              applicationInProgress:
+                                                  applicationInProgress,
+                                              onOpenRoute: onOpenRoute,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -488,14 +564,14 @@ class GlobalProfileSurfacePalette {
   static GlobalProfileSurfacePalette forTone(GlobalProfileSurfaceTone tone) =>
       switch (tone) {
         GlobalProfileSurfaceTone.light => const GlobalProfileSurfacePalette(
-          canvas: MoolColors.canvas,
+          canvas: Color(0xFFF8F9FC),
           card: Colors.white,
           border: Color(0xFFE4E7EC),
-          ink: MoolColors.ink,
-          muted: MoolColors.muted,
+          ink: Color(0xFF23252B),
+          muted: Color(0xFF666A73),
           control: Color(0xFFF4F5FA),
-          accent: _profileNavy,
-          accentSecondary: Color(0xFF4D46A8),
+          accent: Color(0xFF0000FF),
+          accentSecondary: Color(0xFF0000FF),
         ),
         GlobalProfileSurfaceTone.socialDark =>
           const GlobalProfileSurfacePalette(
@@ -531,13 +607,17 @@ class _GlobalProfilePaletteScope extends InheritedWidget {
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({
     required this.onClose,
+    required this.onAccountAccess,
     required this.workspaceRoleLabel,
     required this.accountAuthenticated,
+    required this.authenticatedStatusLabel,
   });
 
   final VoidCallback onClose;
+  final VoidCallback onAccountAccess;
   final String? workspaceRoleLabel;
   final bool accountAuthenticated;
+  final String authenticatedStatusLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -597,11 +677,11 @@ class _ProfileHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Your MoolSocial profile',
+                  'MoolSocial',
                   maxLines: 2,
                   style: TextStyle(
                     color: palette.ink,
-                    fontSize: 14,
+                    fontSize: 18,
                     height: 1.05,
                     fontWeight: FontWeight.w900,
                   ),
@@ -616,7 +696,7 @@ class _ProfileHeader extends StatelessWidget {
                       'Personal account',
                       style: TextStyle(
                         color: palette.muted,
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -627,7 +707,7 @@ class _ProfileHeader extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: palette.muted,
-                          fontSize: 9,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -645,14 +725,28 @@ class _ProfileHeader extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          accountAuthenticated ? 'Active' : 'Sign in',
-                          style: TextStyle(
-                            color: accountAuthenticated
-                                ? _profileGreen
-                                : palette.muted,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
+                        InkWell(
+                          key: const Key('global-profile-sign-in'),
+                          onTap: accountAuthenticated ? null : onAccountAccess,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minWidth: 48,
+                              minHeight: accountAuthenticated ? 0 : 48,
+                            ),
+                            child: Center(
+                              child: Text(
+                                accountAuthenticated
+                                    ? authenticatedStatusLabel
+                                    : 'Sign in',
+                                style: TextStyle(
+                                  color: accountAuthenticated
+                                      ? _profileGreen
+                                      : palette.muted,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -678,6 +772,75 @@ class _ProfileHeader extends StatelessWidget {
   }
 }
 
+class _CommerceProfileAccountMenu extends StatelessWidget {
+  const _CommerceProfileAccountMenu({
+    required this.authenticated,
+    required this.workspace,
+    required this.applicationInProgress,
+    required this.onOpenRoute,
+  });
+  final bool authenticated;
+  final GlobalProfileWorkspaceContext? workspace;
+  final bool applicationInProgress;
+  final ValueChanged<String> onOpenRoute;
+  @override
+  Widget build(BuildContext context) => _ProfileSection(
+    title: 'Your account',
+    items: [
+      const _ProfileDestination(
+        id: 'identity',
+        title: 'My details',
+        detail: 'Name, contact and buying details',
+        icon: Icons.person_outline_rounded,
+        route: '/app/account/identity',
+      ),
+      const _ProfileDestination(
+        id: 'plans',
+        title: 'Plans & billing',
+        detail: 'Upgrade or manage your plan',
+        icon: Icons.workspace_premium_outlined,
+        route: '/app/account/plans',
+      ),
+      _ProfileDestination(
+        id: 'workspaces',
+        title: 'My Workspaces',
+        detail: workspace != null
+            ? '${workspace!.name} · Approved'
+            : applicationInProgress
+            ? 'View your application'
+            : 'Business setup and access',
+        approvedWorkspace: workspace != null,
+        icon: Icons.storefront_outlined,
+        route: '/app/account/workspaces',
+      ),
+      const _ProfileDestination(
+        id: 'preferences',
+        title: 'Privacy & preferences',
+        detail: 'Language, shopping area and privacy',
+        icon: Icons.tune_rounded,
+        route: '/app/account/workspaces/preferences',
+      ),
+      const _ProfileDestination(
+        id: 'security',
+        title: 'Security',
+        detail: 'Sign-in, recovery and device access',
+        icon: Icons.shield_outlined,
+        route: '/app/account/security',
+      ),
+    ],
+    onOpenRoute: (route) => onOpenRoute(
+      !authenticated &&
+              {
+                '/app/account/identity',
+                '/app/account/plans',
+                '/app/account/workspaces',
+              }.contains(route)
+          ? '/app/account/security'
+          : route,
+    ),
+  );
+}
+
 class _PersonalAccountSection extends StatelessWidget {
   const _PersonalAccountSection({required this.onOpenRoute});
 
@@ -687,13 +850,6 @@ class _PersonalAccountSection extends StatelessWidget {
   Widget build(BuildContext context) => _ProfileSection(
     title: 'Account settings',
     items: [
-      const _ProfileDestination(
-        id: 'downloads',
-        title: 'Downloads',
-        detail: 'Purchase invoices and order documents',
-        icon: Icons.download_outlined,
-        route: '/app/account/downloads',
-      ),
       const _ProfileDestination(
         id: 'identity',
         title: 'Personal profile',
@@ -774,7 +930,7 @@ class _ActiveWorkspaceCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: MoolColors.muted,
-                    fontSize: 9,
+                    fontSize: 12,
                     height: 1.3,
                     fontWeight: FontWeight.w600,
                   ),
@@ -793,7 +949,7 @@ class _ActiveWorkspaceCard extends StatelessWidget {
               'Active',
               style: TextStyle(
                 color: _profileGreen,
-                fontSize: 8.5,
+                fontSize: 12,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -864,7 +1020,7 @@ class _GlobalProfileContextCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: palette.muted,
-                          fontSize: 9,
+                          fontSize: 12,
                           height: 1.3,
                           fontWeight: FontWeight.w600,
                         ),
@@ -965,21 +1121,21 @@ class _ProfileAccessCard extends StatelessWidget {
                     Text(
                       applicationInProgress
                           ? 'Workspace application'
-                          : 'Become a MoolSocial Partner',
+                          : 'Create a Workspace',
                       style: const TextStyle(
                         color: MoolColors.ink,
                         fontSize: 13,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       applicationInProgress
                           ? 'Partner controls stay locked until approval and activation.'
-                          : 'Choose how you work and submit one workspace application.',
+                          : 'Submit documents for MoolSocial approval.',
                       style: const TextStyle(
                         color: MoolColors.muted,
-                        fontSize: 9,
+                        fontSize: 12,
                         height: 1.3,
                         fontWeight: FontWeight.w600,
                       ),
@@ -994,11 +1150,7 @@ class _ProfileAccessCard extends StatelessWidget {
             width: double.infinity,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [_profileNavy, Color(0xFF4D46A8), Color(0xFF6D4BC3)],
-                ),
+                color: const Color(0xFF0000FF),
                 borderRadius: BorderRadius.circular(MoolRadii.control),
                 boxShadow: const [
                   BoxShadow(
@@ -1019,7 +1171,7 @@ class _ProfileAccessCard extends StatelessWidget {
                   backgroundColor: Colors.transparent,
                   foregroundColor: Colors.white,
                   shadowColor: Colors.transparent,
-                  minimumSize: const Size.fromHeight(44),
+                  minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(MoolRadii.control),
                   ),
@@ -1033,10 +1185,8 @@ class _ProfileAccessCard extends StatelessWidget {
                         applicationInProgress
                             ? 'View application'
                             : 'Explore workspaces',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 13,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -1118,7 +1268,7 @@ class _ProfileQuickActions extends StatelessWidget {
           const gap = MoolSpacing.xs;
           const labelStyle = TextStyle(
             color: MoolColors.ink,
-            fontSize: 10,
+            fontSize: 13,
             fontWeight: FontWeight.w900,
           );
           var minimumTileWidth = 0.0;
@@ -1167,7 +1317,7 @@ class _ProfileQuickActions extends StatelessWidget {
                           children: [
                             Container(
                               width: 30,
-                              height: 30,
+                              height: 32,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: action.accent.withValues(alpha: .1),
@@ -1176,7 +1326,7 @@ class _ProfileQuickActions extends StatelessWidget {
                               child: Icon(
                                 action.icon,
                                 color: action.accent,
-                                size: 17,
+                                size: 22,
                               ),
                             ),
                             const SizedBox(width: MoolSpacing.xs),
@@ -1225,6 +1375,7 @@ class _ProfileDestination {
     required this.detail,
     required this.icon,
     required this.route,
+    this.approvedWorkspace = false,
   });
 
   final String id;
@@ -1232,6 +1383,7 @@ class _ProfileDestination {
   final String detail;
   final IconData icon;
   final String route;
+  final bool approvedWorkspace;
 }
 
 class _ProfileSection extends StatelessWidget {
@@ -1296,45 +1448,50 @@ class _ProfileDestinationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = _GlobalProfilePaletteScope.of(context);
-    return ListTile(
-      key: Key('global-profile-${item.id}'),
-      contentPadding: const EdgeInsets.symmetric(horizontal: MoolSpacing.xs),
-      minVerticalPadding: 6,
-      visualDensity: const VisualDensity(vertical: -1),
-      leading: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          color: palette.control,
-          borderRadius: BorderRadius.circular(MoolRadii.control),
+    return KeyedSubtree(
+      key: item.approvedWorkspace
+          ? const Key('global-profile-approved-workspace')
+          : null,
+      child: ListTile(
+        key: Key('global-profile-${item.id}'),
+        contentPadding: const EdgeInsets.symmetric(horizontal: MoolSpacing.xs),
+        minVerticalPadding: 6,
+        visualDensity: const VisualDensity(vertical: -1),
+        leading: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: palette.control,
+            borderRadius: BorderRadius.circular(MoolRadii.control),
+          ),
+          child: Icon(item.icon, color: palette.accent, size: 22),
         ),
-        child: Icon(item.icon, color: palette.accent, size: 18),
-      ),
-      title: Text(
-        item.title,
-        style: TextStyle(
-          color: palette.ink,
-          fontSize: 12,
-          fontWeight: FontWeight.w900,
+        title: Text(
+          item.title,
+          style: TextStyle(
+            color: palette.ink,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-      ),
-      subtitle: Text(
-        item.detail,
-        style: TextStyle(
-          color: palette.muted,
-          fontSize: 9.5,
-          height: 1.3,
-          fontWeight: FontWeight.w600,
+        subtitle: Text(
+          item.detail,
+          style: TextStyle(
+            color: palette.muted,
+            fontSize: 12,
+            height: 1.3,
+            fontWeight: FontWeight.w600,
+          ),
         ),
+        trailing: Icon(
+          Icons.chevron_right_rounded,
+          color: palette.accent,
+          size: 19,
+        ),
+        splashColor: palette.accent.withValues(alpha: .08),
+        hoverColor: palette.accent.withValues(alpha: .04),
+        onTap: onTap,
       ),
-      trailing: Icon(
-        Icons.chevron_right_rounded,
-        color: palette.accent,
-        size: 19,
-      ),
-      splashColor: palette.accent.withValues(alpha: .08),
-      hoverColor: palette.accent.withValues(alpha: .04),
-      onTap: onTap,
     );
   }
 }

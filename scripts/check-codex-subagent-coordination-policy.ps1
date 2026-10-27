@@ -7927,6 +7927,22 @@ function Test-Lf27PublicationDelta([string]$Head, [string[]]$Parents, [string[]]
   return @($Owners | Where-Object { $_ -cnotin $metadata }).Count -eq 0
 }
 
+function Get-Lf27ThinAssistantF01Owners($Continuation) {
+  if ($null -eq $Continuation.PSObject.Properties['thinAssistantF01']) { return @() }
+  $entry = $Continuation.thinAssistantF01
+  $literal = @('apps/mobile/lib/features/assistant/mool_assistant.dart',
+    'apps/mobile/lib/ui_v2/assistant/mool_assistant_v2.dart',
+    'apps/mobile/lib/ui_v2/universal/mool_android_semantics.dart',
+    'apps/mobile/test/mool_assistant_test.dart')
+  Assert-Coordination ($entry.ticket -ceq 'THIN-F01' -and
+    $entry.state -ceq 'founder_authorized_frontend_implementation' -and
+    (@($entry.owners | Sort-Object) -join '|') -ceq (@($literal | Sort-Object) -join '|')) 'THIN-F01 requires its literal four frontend owners.'
+  foreach ($flag in @('backendAuthorized','buildAuthorized','financialPostingAuthorized','publicationAuthorized')) {
+    Assert-Coordination ($entry.$flag -is [bool] -and -not $entry.$flag) 'THIN-F01 cannot grant service, build or business-effect authority.'
+  }
+  return $literal
+}
+
 function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
   if ($null -eq $Continuation -or $Continuation -isnot [pscustomobject]) { return $false }
   foreach ($key in @('id','state','publishedCheckpoint','batch','classification',
@@ -7959,6 +7975,50 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     'scripts/test-cross-agent-incremental-ticket-gate.ps1',
     'docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.json')
   $allowedOwners=@($exactOwners)
+  $allowedOwners += @(Get-Lf27ThinAssistantF01Owners $Continuation)
+  if ($null -ne $Continuation.PSObject.Properties['profileFrontend20261027']) {
+    $profileOwners = @(
+      'apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart',
+      'apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart',
+      'apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart',
+      'apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart',
+      'apps/mobile/lib/ui_v2/profile/global_account_plans_v2.dart',
+      'apps/mobile/test/ui_v2/profile/global_account_plans_v2_test.dart')
+    if ($Continuation.profileFrontend20261027.state -cne 'founder_approved_exact_six_file_admission_reconciliation' -or
+        (@($Continuation.profileFrontend20261027.owners | Sort-Object) -join '|') -cne
+        (@($profileOwners | Sort-Object) -join '|')) { return $false }
+    $allowedOwners += $profileOwners
+    if ($null -ne $Continuation.profileFrontend20261027.PSObject.Properties['mvpPrivacyCleanupOwners']) {
+      $privacyOwners = @('apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart',
+        'apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart')
+      if ((@($Continuation.profileFrontend20261027.mvpPrivacyCleanupOwners | Sort-Object) -join '|') -cne
+          (@($privacyOwners | Sort-Object) -join '|')) { return $false }
+      $allowedOwners += $privacyOwners
+    }
+    if ($null -ne $Continuation.profileFrontend20261027.PSObject.Properties['mvpSecurityCleanupOwners']) {
+      $securityOwners = @('apps/mobile/lib/ui_v2/profile/global_security_v2.dart',
+        'apps/mobile/test/ui_v2/profile/global_security_v2_test.dart')
+      if ((@($Continuation.profileFrontend20261027.mvpSecurityCleanupOwners | Sort-Object) -join '|') -cne
+          (@($securityOwners | Sort-Object) -join '|')) { return $false }
+      $allowedOwners += $securityOwners
+    }
+    if ($null -ne $Continuation.profileFrontend20261027.PSObject.Properties['legacyFixtureOwner']) {
+      if ($Continuation.profileFrontend20261027.legacyFixtureApproved -ne $true -or
+          $Continuation.profileFrontend20261027.legacyFixtureOwner -cne
+          'apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart') { return $false }
+      $allowedOwners += 'apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart'
+    }
+  }
+  if ($null -ne $Continuation.PSObject.Properties['thinAssistantF01']) {
+    # Founder-approved reconciliation of existing frontend admissions only.
+    $allowedOwners += @(
+      'apps/mobile/lib/features/work/screens/work_onboarding_screens.dart',
+      'apps/mobile/lib/features/work/widgets/store_settings_widgets.dart',
+      'apps/mobile/lib/features/work/widgets/work_widgets.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
+      'apps/mobile/test/work_production_gateway_test.dart')
+  }
   if ($null -ne $Continuation.PSObject.Properties['supplierStatementReview20261023']) {
     $statement = $Continuation.supplierStatementReview20261023
     $statementOwners = @('apps/mobile/lib/features/work/work_downloads.dart',
@@ -8552,6 +8612,7 @@ function Invoke-Lf01Admission {
   })) 'LF-01 requires its exact authorized feature identity; only accepted LF27 publication adds handoff, not build/device/closure.'
   $record = Get-Content -Raw -LiteralPath (Join-Path $root $recordOwner) | ConvertFrom-Json
   if ($null -ne $record.PSObject.Properties['frontendContinuation']) {
+    $owners += @(Get-Lf27ThinAssistantF01Owners $record.frontendContinuation)
     $continuationBase='88aae0282aa555ad5c665286907ca6558197342d'
     Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$continuationBase,'HEAD') | Out-Null
     $continuationDelta=@(@(Get-OctoberCompatibilityGitLines @('diff','--no-renames','--name-only',$continuationBase)) +
@@ -8632,6 +8693,61 @@ function Invoke-Lf01Admission {
   }
   $admission = $record.ticket.frontendAdmission
   $admittedOwners = @($admission.owners)
+  if ($null -ne $record.frontendContinuation.PSObject.Properties['profileFrontend20261027']) {
+    $profileOwners = @(
+      'apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart',
+      'apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart',
+      'apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart',
+      'apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart',
+      'apps/mobile/lib/ui_v2/profile/global_account_plans_v2.dart',
+      'apps/mobile/test/ui_v2/profile/global_account_plans_v2_test.dart')
+    Assert-Coordination ((@($record.frontendContinuation.profileFrontend20261027.owners | Sort-Object) -join '|') -ceq
+      (@($profileOwners | Sort-Object) -join '|')) 'Profile reconciliation must retain the exact six founder-approved frontend owners.'
+    foreach ($profileOwner in $profileOwners) {
+      if ($profileOwner -cnotin $owners) { $owners += $profileOwner }
+      if ($profileOwner -cnotin $admittedOwners) { $admittedOwners += $profileOwner }
+    }
+    if ($null -ne $record.frontendContinuation.profileFrontend20261027.PSObject.Properties['mvpPrivacyCleanupOwners']) {
+      $privacyOwners = @('apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart',
+        'apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart')
+      Assert-Coordination ((@($record.frontendContinuation.profileFrontend20261027.mvpPrivacyCleanupOwners | Sort-Object) -join '|') -ceq
+        (@($privacyOwners | Sort-Object) -join '|')) 'MVP Preferences cleanup exceeds its exact source/test pair.'
+      foreach ($privacyOwner in $privacyOwners) {
+        if ($privacyOwner -cnotin $owners) { $owners += $privacyOwner }
+        if ($privacyOwner -cnotin $admittedOwners) { $admittedOwners += $privacyOwner }
+      }
+    }
+    if ($null -ne $record.frontendContinuation.profileFrontend20261027.PSObject.Properties['mvpSecurityCleanupOwners']) {
+      $securityOwners = @('apps/mobile/lib/ui_v2/profile/global_security_v2.dart',
+        'apps/mobile/test/ui_v2/profile/global_security_v2_test.dart')
+      Assert-Coordination ((@($record.frontendContinuation.profileFrontend20261027.mvpSecurityCleanupOwners | Sort-Object) -join '|') -ceq
+        (@($securityOwners | Sort-Object) -join '|')) 'MVP Security cleanup exceeds its exact source/test pair.'
+      foreach ($securityOwner in $securityOwners) {
+        if ($securityOwner -cnotin $owners) { $owners += $securityOwner }
+        if ($securityOwner -cnotin $admittedOwners) { $admittedOwners += $securityOwner }
+      }
+    }
+    if ($null -ne $record.frontendContinuation.profileFrontend20261027.PSObject.Properties['legacyFixtureOwner']) {
+      $fixtureOwner = 'apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart'
+      Assert-Coordination ($record.frontendContinuation.profileFrontend20261027.legacyFixtureApproved -eq $true -and
+        $record.frontendContinuation.profileFrontend20261027.legacyFixtureOwner -ceq $fixtureOwner) 'Profile fixture reconciliation exceeds its single approved test owner.'
+      if ($fixtureOwner -cnotin $owners) { $owners += $fixtureOwner }
+      if ($fixtureOwner -cnotin $admittedOwners) { $admittedOwners += $fixtureOwner }
+    }
+  }
+  $admittedOwners += @(Get-Lf27ThinAssistantF01Owners $record.frontendContinuation)
+  if ($null -ne $record.frontendContinuation.PSObject.Properties['thinAssistantF01']) {
+    foreach ($reconciledOwner in @(
+        'apps/mobile/lib/features/work/screens/work_onboarding_screens.dart',
+        'apps/mobile/lib/features/work/widgets/store_settings_widgets.dart',
+        'apps/mobile/lib/features/work/widgets/work_widgets.dart',
+        'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart',
+        'apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
+        'apps/mobile/test/work_production_gateway_test.dart')) {
+      if ($reconciledOwner -cnotin $owners) { $owners += $reconciledOwner }
+      if ($reconciledOwner -cnotin $admittedOwners) { $admittedOwners += $reconciledOwner }
+    }
+  }
   $runtimeRegressionAuthorized = $null -ne $record.PSObject.Properties['frontendContinuation'] -and
     $null -ne $record.frontendContinuation.PSObject.Properties['runtimeRegressionGate']
   if ($runtimeRegressionAuthorized) { $admittedOwners += @($record.frontendContinuation.runtimeRegressionGate.owners) }

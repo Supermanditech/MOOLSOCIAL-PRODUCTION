@@ -219,17 +219,19 @@ class BuyV2AdvertisedBenefitRows extends StatelessWidget {
 /// Compact product/Cart disclosure from already admitted exact publications.
 /// No fetch, selection, coupon or quote mutation is performed by opening it.
 class BuyV2AdvertisedOfferLink extends StatelessWidget {
-  const BuyV2AdvertisedOfferLink({super.key, required this.session, required this.product});
+  const BuyV2AdvertisedOfferLink({super.key, required this.session, required this.product, this.capturedCurrent, this.useRootNavigator = true});
   final BuyV2Session session;
   final BuyV2Product product;
+  final bool Function()? capturedCurrent;
+  final bool useRootNavigator;
   @override Widget build(BuildContext context) => AnimatedBuilder(animation: session, builder: (context, _) {
     if (session.advertisedOffersFor(product).isEmpty) return const SizedBox.shrink();
     return Align(alignment: Alignment.centerLeft, child: TextButton.icon(
       key: ValueKey('buy-advertised-offer-terms-${product.id}'),
       style: TextButton.styleFrom(minimumSize: const Size(48, 48)), icon: const Icon(Icons.local_offer_outlined, size: 16),
       label: const Text('Store offer terms'), onPressed: () {
-        if (session.advertisedOffersFor(product).isEmpty) return;
-        unawaited(showDialog<void>(context: context, builder: (dialog) => AnimatedBuilder(animation: session,
+        if (!context.mounted || capturedCurrent?.call() == false || session.advertisedOffersFor(product).isEmpty) return;
+        unawaited(showDialog<void>(context: context, useRootNavigator: useRootNavigator, builder: (dialog) => AnimatedBuilder(animation: session,
           builder: (context, _) {
             final offers = session.advertisedOffersFor(product);
             return AlertDialog(scrollable: true, title: const Text('Current Store offer terms'),
@@ -244,7 +246,7 @@ class BuyV2AdvertisedOfferLink extends StatelessWidget {
                     ])),
                   const Text('Advertised terms only. No discount is applied here; eligibility and final savings require Checkout confirmation.'),
                 ],
-              ]), actions: [TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Close'))]);
+              ]), actions: [TextButton(onPressed: () { if (dialog.mounted && capturedCurrent?.call() != false) Navigator.pop(dialog); }, child: const Text('Close'))]);
           })));
       }));
   });
@@ -1627,6 +1629,86 @@ bool _matchesPublishedOffer(String query, List<String> values) {
 }
 
 /// Bounded source pages rendered with the existing compact product cards.
+typedef BuyV2BrowseReviewEffect = bool Function(bool Function() effect);
+final _buyBrowseCategoryForms = Expando<Set<_CatalogueCategorySheetState>>('native-category-inputs');
+final _buyBrowseAreaForms = Expando<Set<_CurrentShoppingAreaSheetState>>('native-area-inputs');
+bool buyV2BrowseCategoryFormOpen(BuyV2Session session) => _buyBrowseCategoryForms[session]?.any(
+  (state) => state.mounted && identical(state.widget.session, session) && state.widget.browseReviewClose == null) == true;
+bool buyV2BrowseAreaFormOpen(BuyV2Session session) => _buyBrowseAreaForms[session]?.any(
+  (state) => state.mounted && identical(state.widget.session, session) && state.widget.browseReviewCurrent == null) == true;
+final _buyBrowseStorePages = Expando<Set<_PagedFullStoreCatalogueState>>('native-store-search-owners');
+
+Object? buyV2BrowseStoreOwner(BuyV2Session session, BuyV2Product product) =>
+  _buyBrowseStorePages[session]?.where((state) => state.mounted && state.widget.browseReviewCurrent == null &&
+    state.widget.product.id == product.id && state.widget.product.storeId == product.storeId &&
+    !state.widget.product.requiresPrescription && state.widget.product.destination == product.destination &&
+    ModalRoute.of(state.context)?.isActive == true && !state._searching && !state._searchFocus.hasFocus).singleOrNull;
+bool buyV2BrowseStoreOwnerCurrent(BuyV2Session session, BuyV2Product product, Object owner) =>
+  owner is _PagedFullStoreCatalogueState && owner.mounted && identical(owner.widget.session, session) &&
+  _buyBrowseStorePages[session]?.contains(owner) == true && owner.widget.browseReviewCurrent == null &&
+  ModalRoute.of(owner.context)?.isActive == true && !owner._searching && !owner._searchFocus.hasFocus &&
+  owner.widget.product.id == product.id && owner.widget.product.storeId == product.storeId &&
+  !owner.widget.product.requiresPrescription && owner.widget.product.destination == product.destination &&
+  owner.widget.product.publicListingIdentity == product.publicListingIdentity;
+String? buyV2BrowseStoreOwnerSource(BuyV2Session session, BuyV2Product product, Object owner) {
+  if (!buyV2BrowseStoreOwnerCurrent(session, product, owner) || owner is! _PagedFullStoreCatalogueState) return null;
+  return jsonEncode([
+    owner._search.text, owner._category,
+    owner._savedOnly, owner._maximumPrice, owner._sort.name,
+    product.id, product.publicListingIdentity?.toJson(),
+  ]);
+}
+
+/// Reuses original native widgets; callbacks are the only mutation boundary.
+Widget buyV2BrowseNativeBody({required String actionId, required BuyV2Session session,
+  required Map<String, Object?> fields, required bool Function() isCurrent,
+  required BuyV2BrowseReviewEffect effect, required VoidCallback close, BuyV2Product? product, Object? storeOwner,
+}) {
+  final destination = session.destination;
+  switch (actionId) {
+    case 'AI-ACT-002':
+      return _CatalogueCategorySheet(session: session, keyPrefix: 'buy-category',
+        selectedCategoryId: fields['categoryId']! as String, browseReviewClose: close,
+        onSelected: (id) { effect(() { session.chooseCategory(id); return true; }); });
+    case 'AI-ACT-004':
+      return Padding(padding: const EdgeInsets.all(16), child: _CatalogueSaleTypeSelector(session: session,
+        browseReviewSaleType: fields['saleType']! as String, browseReviewEffect: effect));
+    case 'AI-ACT-005':
+      return _CurrentShoppingAreaSheet(session: session, browseReviewAutoLocate: false,
+        browseReviewInitialQuery: fields['query']! as String,
+        browseReviewCurrent: isCurrent, browseReviewEffect: effect, browseReviewClose: close);
+    case 'AI-ACT-010':
+      return _SavedProductsSheet(session: session, destination: destination, onClose: close,
+        browseReviewCurrent: isCurrent, browseReviewEffect: effect,
+        onOpenProduct: (id) { effect(() => session.openProduct(id)); });
+    case 'AI-ACT-011':
+      return _SavedClearDecisionSheet(destination: destination, savedTitle: 'saved products',
+        productLabel: 'products', productCount: session.savedCountFor(destination), onKeep: close,
+        onClear: () { effect(() { session.clearSavedProducts(destination); return true; }); });
+    case 'AI-ACT-012':
+    case 'AI-ACT-013':
+      final searches = actionId == 'AI-ACT-013';
+      return AlertDialog(title: Text(searches ? 'Clear recent searches?' : 'Clear recently viewed?'),
+        content: Text(searches ? 'Recent searches in ${destination.label} will be removed from this device.'
+          : 'Products you viewed in ${destination.label} will be removed from this device.'),
+        actions: [TextButton(onPressed: close, child: const Text('Keep')),
+          Align(widthFactor: 1, heightFactor: 1, child: FilledButton(style: BuyV2ActionStyle.button(),
+            key: ValueKey(searches ? 'buy-recent-searches-confirm' : 'buy-settings-recently-viewed-confirm'),
+            onPressed: () { effect(() {
+              if (searches) { session.clearRecentSearches(destination); }
+              else { session.clearRecentlyViewed(destination); }
+              return true;
+            }); }, child: const Text('Clear')))]);
+    case 'AI-ACT-338':
+      return _PagedFullStoreCatalogue(session: session, product: product!, storefront: true,
+        browseReviewInitialQuery: fields['query']! as String, browseReviewCurrent: isCurrent,
+        browseReviewOriginalOwner: storeOwner,
+        onClose: close, onOpenProduct: (value) { effect(() => session.openProduct(value.id)); });
+    default:
+      return const SizedBox.shrink();
+  }
+}
+
 class BuyV2PagedProductCatalogue extends StatefulWidget {
   const BuyV2PagedProductCatalogue({
     super.key,
@@ -2786,7 +2868,7 @@ class _CataloguePageNotice extends StatelessWidget {
 
 Future<void> showBuyV2CatalogueArea(
   BuildContext context,
-  BuyV2Session session,
+  BuyV2Session session, {String? initialQuery}
 ) async {
   FocusManager.instance.primaryFocus?.unfocus();
   await showModalBottomSheet<void>(
@@ -2795,13 +2877,19 @@ Future<void> showBuyV2CatalogueArea(
     useSafeArea: true,
     backgroundColor: Colors.white,
     constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
-    builder: (_) => _CurrentShoppingAreaSheet(session: session),
+    builder: (_) => _CurrentShoppingAreaSheet(session: session, browseReviewInitialQuery: initialQuery),
   );
 }
 
 class _CurrentShoppingAreaSheet extends StatefulWidget {
-  const _CurrentShoppingAreaSheet({required this.session});
+  const _CurrentShoppingAreaSheet({required this.session, this.browseReviewAutoLocate = true,
+    this.browseReviewInitialQuery, this.browseReviewCurrent, this.browseReviewEffect, this.browseReviewClose});
   final BuyV2Session session;
+  final bool browseReviewAutoLocate;
+  final String? browseReviewInitialQuery;
+  final bool Function()? browseReviewCurrent;
+  final BuyV2BrowseReviewEffect? browseReviewEffect;
+  final VoidCallback? browseReviewClose;
   @override
   State<_CurrentShoppingAreaSheet> createState() =>
       _CurrentShoppingAreaSheetState();
@@ -2809,6 +2897,7 @@ class _CurrentShoppingAreaSheet extends StatefulWidget {
 
 class _CurrentShoppingAreaSheetState extends State<_CurrentShoppingAreaSheet> {
   bool _loading = true;
+  late BuyV2Session _browseAreaOwner;
   bool _openingMap = false;
   int _request = 0;
   BuyV2ShoppingArea? _area;
@@ -2816,19 +2905,81 @@ class _CurrentShoppingAreaSheetState extends State<_CurrentShoppingAreaSheet> {
   @override
   void initState() {
     super.initState();
-    _locate();
+    _browseAreaOwner = widget.session;
+    (_buyBrowseAreaForms[_browseAreaOwner] ??= <_CurrentShoppingAreaSheetState>{}).add(this);
+    _areaQuery.addListener(_areaQueryChanged);
+    if (widget.browseReviewInitialQuery case final query?) {
+      _areaQuery.text = query; _loading = false; unawaited(_searchAreas());
+    } else if (widget.browseReviewAutoLocate) { _locate(); } else { _loading = false; }
   }
 
+  final _areaQuery = TextEditingController();
+  List<BuyV2ShoppingArea> _areaChoices = const [];
+  bool _areaSearchActive = false;
+  String _activeAreaQuery = '';
+  void _areaQueryChanged() {
+    final query = _areaQuery.text;
+    if (!mounted || query == _activeAreaQuery) return;
+    _activeAreaQuery = query; _request++;
+    setState(() { _loading = false; _areaSearchActive = false; _area = null; _areaChoices = const []; _failure = null; });
+  }
+  Future<void> _searchAreas() async {
+    if (!mounted || _loading || widget.browseReviewCurrent?.call() == false) return;
+    final query = _areaQuery.text;
+    if (query.trim().length < 2 || query.trim().length > 80) {
+      setState(() => _failure = 'Enter between 2 and 80 characters to search for an area.');
+      return;
+    }
+    final request = ++_request;
+    setState(() { _loading = true; _areaSearchActive = true; _area = null; _areaChoices = const []; _failure = null; });
+    try {
+      final values = await widget.session.searchShoppingAreas(query);
+      if (!mounted || widget.browseReviewCurrent?.call() == false || request != _request) return;
+      setState(() {
+        _loading = false; _areaSearchActive = false; _areaChoices = values;
+        // A single source-resolved record can be staged; only original Use
+        // this location commits it. Multiple records require an exact choice.
+        _area = values.length == 1 ? values.single : null;
+        _failure = values.isEmpty ? 'No matching shopping area was found. Try another search.' : null;
+      });
+    } on Object catch (error) {
+      if (!mounted || widget.browseReviewCurrent?.call() == false || request != _request) return;
+      setState(() {
+        _loading = false; _areaSearchActive = false;
+        _failure = error == BuyV2ShoppingAreaFailure.offline ? 'Area search could not connect. Try again.'
+          : 'Shopping area search is unavailable right now. Your shopping area has not changed.';
+      });
+    }
+  }
+  @override void dispose() { _buyBrowseAreaForms[_browseAreaOwner]?.remove(this); _request++; _areaQuery.removeListener(_areaQueryChanged); _areaQuery.dispose(); super.dispose(); }
+
+  Widget _areaSearchControls() => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    TextField(key: const ValueKey('buy-area-search-query'), controller: _areaQuery,
+      enabled: !_loading, maxLength: 80, decoration: const InputDecoration(labelText: 'Search shopping area'),
+      onSubmitted: (_) { unawaited(_searchAreas()); }),
+    Align(alignment: Alignment.centerLeft, child: TextButton.icon(key: const ValueKey('buy-area-search-submit'),
+      onPressed: _loading ? null : () { unawaited(_searchAreas()); },
+      icon: const Icon(Icons.search_rounded), label: const Text('Search areas'))),
+    for (final candidate in _areaChoices) ListTile(key: ValueKey('buy-area-search-result-${candidate.googlePlaceId}'),
+      title: Text(candidate.label), selected: identical(_area, candidate),
+      onTap: _loading ? null : () {
+        if (widget.browseReviewCurrent?.call() == false ||
+            !_areaChoices.any((current) => identical(current, candidate))) return;
+        setState(() { _area = candidate; _failure = null; });
+      }),
+  ]);
+
   Future<void> _locate() async {
+    if (!mounted || widget.browseReviewCurrent?.call() == false || widget.browseReviewCurrent != null && _loading) return;
     final request = ++_request;
     setState(() {
-      _loading = true;
+      _loading = true; _areaSearchActive = false; _areaChoices = const [];
       _area = null;
       _failure = null;
     });
     try {
       final areas = await widget.session.locateShoppingArea();
-      if (!mounted || request != _request) return;
+      if (!mounted || widget.browseReviewCurrent?.call() == false || request != _request) return;
       setState(() {
         _loading = false;
         _area = areas.firstOrNull;
@@ -2837,7 +2988,7 @@ class _CurrentShoppingAreaSheetState extends State<_CurrentShoppingAreaSheet> {
         }
       });
     } on Object catch (error) {
-      if (!mounted || request != _request) return;
+      if (!mounted || widget.browseReviewCurrent?.call() == false || request != _request) return;
       setState(() {
         _loading = false;
         _failure = switch (error) {
@@ -2854,7 +3005,7 @@ class _CurrentShoppingAreaSheetState extends State<_CurrentShoppingAreaSheet> {
 
   Future<void> _openMap() async {
     final area = _area;
-    if (area == null || _openingMap) return;
+    if (area == null || _openingMap || widget.browseReviewCurrent?.call() == false) return;
     setState(() => _openingMap = true);
     var opened = false;
     try {
@@ -2878,12 +3029,11 @@ class _CurrentShoppingAreaSheetState extends State<_CurrentShoppingAreaSheet> {
 
   void _confirm() {
     final area = _area;
-    if (area == null) return;
-    if (widget.session.chooseShoppingArea(
-      area,
-      BuyV2CatalogueAreaScope.regional,
-    )) {
-      Navigator.of(context).pop();
+    if (area == null || widget.browseReviewCurrent?.call() == false) return;
+    bool choose() => widget.session.chooseShoppingArea(area, BuyV2CatalogueAreaScope.regional);
+    if (widget.browseReviewEffect?.call(choose) ?? choose()) {
+      if (widget.browseReviewClose != null) { widget.browseReviewClose!(); }
+      else { Navigator.of(context).pop(); }
     } else {
       setState(() {
         _area = null;
@@ -2930,13 +3080,14 @@ class _CurrentShoppingAreaSheetState extends State<_CurrentShoppingAreaSheet> {
                 ),
                 IconButton(
                   tooltip: 'Close shopping location',
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: widget.browseReviewClose ?? () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close_rounded),
                 ),
               ],
             ),
+            if (widget.browseReviewInitialQuery != null) _areaSearchControls(),
             if (_loading)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 20),
                 child: Row(
                   children: [
@@ -2945,7 +3096,7 @@ class _CurrentShoppingAreaSheetState extends State<_CurrentShoppingAreaSheet> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                     SizedBox(width: 12),
-                    Expanded(child: Text('Finding your current location...')),
+                    Expanded(child: Text(_areaSearchActive ? 'Searching shopping areas...' : 'Finding your current location...')),
                   ],
                 ),
               ),
@@ -3017,7 +3168,7 @@ class _CurrentShoppingAreaSheetState extends State<_CurrentShoppingAreaSheet> {
                   onPressed: _locate,
                   icon: const Icon(Icons.my_location_rounded, size: 18),
                   label: Text(
-                    _area == null ? 'Try again' : 'Refresh current location',
+                    widget.browseReviewInitialQuery != null ? 'Use current position' : _area == null ? 'Try again' : 'Refresh current location',
                   ),
                 ),
               ),
@@ -3026,8 +3177,12 @@ class _CurrentShoppingAreaSheetState extends State<_CurrentShoppingAreaSheet> {
               child: TextButton.icon(
                 key: const ValueKey('buy-area-browse-all'),
                 onPressed: () {
-                  widget.session.chooseCatalogueArea(null, BuyV2CatalogueAreaScope.allAreas);
-                  Navigator.of(context).pop();
+                  if (widget.browseReviewCurrent?.call() == false) return;
+                  bool choose() { widget.session.chooseCatalogueArea(null, BuyV2CatalogueAreaScope.allAreas); return true; }
+                  if (widget.browseReviewEffect?.call(choose) ?? choose()) {
+                    if (widget.browseReviewClose != null) { widget.browseReviewClose!(); }
+                    else { Navigator.of(context).pop(); }
+                  }
                 },
                 icon: const Icon(Icons.public_rounded, size: 18),
                 label: const Text('Browse any area'),
@@ -3150,9 +3305,11 @@ class BuyV2CatalogueView extends StatelessWidget {
 }
 
 class _CatalogueSaleTypeSelector extends StatelessWidget {
-  const _CatalogueSaleTypeSelector({required this.session});
+  const _CatalogueSaleTypeSelector({required this.session, this.browseReviewSaleType, this.browseReviewEffect});
 
   final BuyV2Session session;
+  final String? browseReviewSaleType;
+  final BuyV2BrowseReviewEffect? browseReviewEffect;
 
   static double minimumHorizontalWidth(
     BuildContext context,
@@ -3204,8 +3361,10 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
         ? 0
         : 1;
 
+    final displayIndex = browseReviewSaleType == null ? selectedIndex : browseReviewSaleType == 'bulk' ? 1 : 0;
     void select(int index) {
       if (index == selectedIndex) return;
+      void apply() {
       HapticFeedback.selectionClick();
       if (shop) {
         session.chooseShopSaleType(
@@ -3220,6 +3379,9 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
               : BuyV2WholesaleSaleType.bulk,
         );
       }
+      }
+      if (browseReviewEffect != null) { browseReviewEffect!(() { apply(); return true; }); }
+      else { apply(); }
     }
 
     return Semantics(
@@ -3261,9 +3423,9 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                       BuyV2Motion.contentChange,
                     ),
                     curve: Curves.easeOutQuart,
-                    left: vertical || selectedIndex == 0 ? 0 : segmentWidth,
-                    top: vertical ? selectedIndex * 44.0 : 0,
-                    bottom: vertical ? (1 - selectedIndex) * 44.0 : 0,
+                    left: vertical || displayIndex == 0 ? 0 : segmentWidth,
+                    top: vertical ? displayIndex * 44.0 : 0,
+                    bottom: vertical ? (1 - displayIndex) * 44.0 : 0,
                     width: segmentWidth,
                     child: DecoratedBox(
                       key: ValueKey(
@@ -3287,7 +3449,7 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                             ),
                             title: options[index].title,
                             icon: options[index].icon,
-                            selected: selectedIndex == index,
+                            selected: displayIndex == index,
                             showIcon: showIcons,
                             labelStyleKey: ValueKey(
                               'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
@@ -4646,10 +4808,11 @@ class _CatalogueCategorySheet extends StatefulWidget {
     this.title,
     this.onSelected,
     this.keyPrefix,
-    this.allLabel,
+    this.allLabel, this.browseReviewClose,
   });
 
   final String? allLabel;
+  final VoidCallback? browseReviewClose;
   final String? keyPrefix;
   final BuyV2Session session;
   final List<BuyV2Category>? categories;
@@ -4664,6 +4827,7 @@ class _CatalogueCategorySheet extends StatefulWidget {
 
 class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
   final TextEditingController _controller = TextEditingController();
+  late BuyV2Session _browseCategoryOwner;
   final FocusNode _searchFocus = FocusNode(debugLabel: 'buy-category-search');
   String _query = '';
   final _sheetController = DraggableScrollableController();
@@ -4671,6 +4835,8 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
   @override
   void initState() {
     super.initState();
+    _browseCategoryOwner = widget.session;
+    (_buyBrowseCategoryForms[_browseCategoryOwner] ??= <_CatalogueCategorySheetState>{}).add(this);
     _searchFocus.addListener(_handleSearchFocusChanged);
   }
 
@@ -4703,6 +4869,7 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
 
   @override
   void dispose() {
+    _buyBrowseCategoryForms[_browseCategoryOwner]?.remove(this);
     _searchFocus.removeListener(_handleSearchFocusChanged);
     _searchFocus.dispose();
     _sheetController.dispose();
@@ -4859,7 +5026,7 @@ class _CatalogueCategorySheetState extends State<_CatalogueCategorySheet> {
                                   IconButton(
                                     key: const ValueKey('buy-category-close'),
                                     tooltip: 'Close categories',
-                                    onPressed: () =>
+                                    onPressed: widget.browseReviewClose ?? () =>
                                         Navigator.of(context).pop(),
                                     style: IconButton.styleFrom(
                                       tapTargetSize:
@@ -8326,7 +8493,7 @@ class _PagedFullStoreCatalogue extends StatefulWidget {
     required this.product,
     required this.onOpenProduct,
     required this.onClose,
-    this.storefront = false,
+    this.storefront = false, this.browseReviewInitialQuery, this.browseReviewCurrent, this.browseReviewOriginalOwner,
     this.onAskStore,
     this.onOpenOtherStore,
   });
@@ -8335,6 +8502,9 @@ class _PagedFullStoreCatalogue extends StatefulWidget {
   final ValueChanged<BuyV2Product> onOpenProduct;
   final VoidCallback onClose;
   final bool storefront;
+  final String? browseReviewInitialQuery;
+  final bool Function()? browseReviewCurrent;
+  final Object? browseReviewOriginalOwner;
   final VoidCallback? onAskStore;
   final ValueChanged<BuyV2Product>? onOpenOtherStore;
 
@@ -8345,6 +8515,9 @@ class _PagedFullStoreCatalogue extends StatefulWidget {
 
 class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
   late TextEditingController _search;
+  late BuyV2Session _browseRegistryOwner;
+  bool get _browseCurrent => mounted && widget.browseReviewCurrent?.call() != false;
+  void _browseSetState(VoidCallback change) { if (_browseCurrent) setState(change); }
   BuyV2CataloguePager<BuyV2StoreListing>? _relatedStores;
   String get _relatedScope => "$_scope-related-stores";
 
@@ -8355,12 +8528,13 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
   final _searchFocus = FocusNode();
   bool _searching = false;
   void _searchFocusChanged() {
-    if (_searchFocus.hasFocus && !_searching) {
+    if (_browseCurrent && _searchFocus.hasFocus && !_searching) {
       setState(() => _searching = true);
     }
   }
 
   void _finishStoreSearch() {
+    if (!_browseCurrent) return;
     _searchFocus.unfocus();
     setState(() => _searching = false);
   }
@@ -8370,22 +8544,30 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
   int? _maximumPrice;
   BuyV2ProductSort _sort = BuyV2ProductSort.relevance;
   String get _scope =>
-      'store-${widget.product.destination.name}-${widget.product.storeId}';
+      'store-${widget.product.destination.name}-${widget.product.storeId}'
+      '${widget.browseReviewCurrent == null ? '' : '-assistant-${identityHashCode(this)}'}';
 
   @override
   void initState() {
     super.initState();
+    _browseRegistryOwner = widget.session;
+    (_buyBrowseStorePages[_browseRegistryOwner] ??= <_PagedFullStoreCatalogueState>{}).add(this);
     _searchFocus.addListener(_searchFocusChanged);
     final retained = widget.session.retainedCatalogueQuery(_scope);
+    final sourceOwner = widget.browseReviewOriginalOwner;
+    final original = sourceOwner is _PagedFullStoreCatalogueState &&
+      buyV2BrowseStoreOwnerCurrent(widget.session, widget.product, sourceOwner) ? sourceOwner : null;
     final sameStore = retained?.storeId == widget.product.storeId;
-    _category = sameStore ? retained?.categoryId ?? 'all' : 'all';
-    _maximumPrice = sameStore ? retained?.maximumPrice : null;
-    _sort = sameStore
+    _category = original?._category ?? (sameStore ? retained?.categoryId ?? 'all' : 'all');
+    _maximumPrice = original?._maximumPrice ?? (sameStore ? retained?.maximumPrice : null);
+    _savedOnly = original?._savedOnly ?? false;
+    _sort = original?._sort ?? (sameStore
         ? retained?.sort ?? BuyV2ProductSort.relevance
-        : BuyV2ProductSort.relevance;
+        : BuyV2ProductSort.relevance);
     _search = TextEditingController(
-      text: sameStore ? retained?.query ?? '' : '',
+      text: widget.browseReviewInitialQuery ?? (sameStore ? retained?.query ?? '' : ''),
     );
+    _searching = widget.browseReviewInitialQuery?.isNotEmpty == true;
     if (widget.onOpenOtherStore != null) {
       final pager = widget.session.acquireCatalogueStores(_relatedScope);
       _relatedStores = pager;
@@ -8409,7 +8591,17 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
   }
 
   @override
+  void didUpdateWidget(covariant _PagedFullStoreCatalogue oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(_browseRegistryOwner, widget.session)) {
+      _buyBrowseStorePages[_browseRegistryOwner]?.remove(this);
+      _browseRegistryOwner = widget.session;
+      (_buyBrowseStorePages[_browseRegistryOwner] ??= <_PagedFullStoreCatalogueState>{}).add(this);
+    }
+  }
+  @override
   void dispose() {
+    _buyBrowseStorePages[_browseRegistryOwner]?.remove(this);
     _relatedStores?.removeListener(_relatedChanged);
     if (_relatedStores != null) {
       widget.session.releaseCatalogueStores(_relatedScope);
@@ -9013,7 +9205,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                                       'buy-store-product-search-clear',
                                     ),
                                     tooltip: 'Clear store search',
-                                    onPressed: () => setState(_search.clear),
+                                    onPressed: () => _browseSetState(_search.clear),
                                     icon: const Icon(Icons.close_rounded),
                                   ),
                             border: InputBorder.none,
@@ -9028,7 +9220,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                               vertical: 10,
                             ),
                           ),
-                          onChanged: (_) => setState(() {}),
+                          onChanged: (_) => _browseSetState(() {}),
                           onSubmitted: (_) => _finishStoreSearch(),
                           onTapOutside: (_) => _searchFocus.unfocus(),
                         ),
@@ -9693,11 +9885,13 @@ class _SavedProductsSheet extends StatelessWidget {
     required this.session,
     required this.destination,
     required this.onClose,
-    required this.onOpenProduct,
+    required this.onOpenProduct, this.browseReviewCurrent, this.browseReviewEffect,
   });
 
   final BuyV2Session session;
   final BuyV2Destination destination;
+  final bool Function()? browseReviewCurrent;
+  final BuyV2BrowseReviewEffect? browseReviewEffect;
   final VoidCallback onClose;
   final ValueChanged<String> onOpenProduct;
 
@@ -9774,8 +9968,12 @@ class _SavedProductsSheet extends StatelessWidget {
                                   return _SavedProductInfoRow(
                                     product: product,
                                     onOpen: () => onOpenProduct(product.id),
-                                    onRemove: () =>
-                                        session.toggleSaved(product.id),
+                                    onRemove: () {
+                                      if (browseReviewCurrent?.call() == false) return;
+                                      bool remove() { session.toggleSaved(product.id); return true; }
+                                      if (browseReviewEffect != null) { browseReviewEffect!(remove); }
+                                      else { remove(); }
+                                    },
                                   );
                                 },
                               ),
@@ -10368,6 +10566,10 @@ class _SavedProductInfoRow extends StatelessWidget {
     );
   }
 }
+
+Widget buyV2CartMonthlyBasket({required BuyV2Session session, required VoidCallback onClose,
+  required VoidCallback onSeeProducts, required VoidCallback onAddToCart}) => _HouseholdBasket(
+    session:session,onClose:onClose,onSeeProducts:onSeeProducts,onAddToCart:onAddToCart);
 
 class _HouseholdBasket extends StatelessWidget {
   const _HouseholdBasket({

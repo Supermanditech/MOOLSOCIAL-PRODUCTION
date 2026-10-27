@@ -1484,6 +1484,7 @@ class StoreAddProductSheet extends StatefulWidget {
     this.onSelected,
     this.onAdd,
     this.stockOnly = false,
+    this.stockEmptyMessage,
     this.onStockStatement,
     this.onlyLowStock = false,
     this.stockExportBuilder,
@@ -1504,6 +1505,7 @@ class StoreAddProductSheet extends StatefulWidget {
   final ValueChanged<WorkspaceCatalogueItem>? onSelected;
   final ValueChanged<WorkspaceCatalogueItem>? onAdd;
   final bool stockOnly;
+  final String? stockEmptyMessage;
   final VoidCallback? onStockStatement;
   final bool onlyLowStock;
   // Store-scoped state is supplied by the existing session, not inventory.
@@ -2333,7 +2335,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                                 Text(
                                   widget.stockOnly
                                       ? (widget.ownedProducts.isEmpty
-                                            ? 'No products saved yet. Open Quick actions → Add products to add your stock.'
+                                            ? widget.stockEmptyMessage ?? 'No products saved yet. Open Quick actions → Add products to add your stock.'
                                             : 'No matching stock. Try another search or filter.')
                                       : _savedOnly && _saved.isEmpty
                                       ? 'Your shortlist is empty. Tap the bookmark on a product, then review it before adding to Store.'
