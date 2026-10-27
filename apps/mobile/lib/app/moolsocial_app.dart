@@ -384,6 +384,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
       routerConfig: _router,
       builder: (context, child) => MoolAssistantHost(
         entitlements: _session.accountPlansAssistantEntitlements,
+        readModelSource: () => _session.assistantModelGateway,
         readContext: () => MoolAssistantContext(
           accountScope: _session.authenticatedBuyPersistenceIdentity,
           authenticationRevision: _session.navigationAuthenticationGeneration,

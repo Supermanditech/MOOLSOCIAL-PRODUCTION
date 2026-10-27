@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'model_gateway.dart';
 
 import 'package:crypto/crypto.dart' as crypto;
 
@@ -2056,6 +2057,7 @@ class MoolAssistantController extends ChangeNotifier {
     required MoolAssistantContext Function() currentContext,
     required this.contextChanges,
     this.entitlements,
+    this.readModelSource,
     this.attachments,
     this.mediaPicker,
     this.voiceRecorder,
@@ -2074,6 +2076,102 @@ class MoolAssistantController extends ChangeNotifier {
   final MoolAssistantContext Function() _currentContext;
   final Listenable contextChanges;
   final MoolAssistantEntitlementSource? entitlements;
+  final AssistantModelSource? Function()? readModelSource;
+  bool modelBusy = false;
+  int _modelAttempt = 0;
+  AssistantModelInput? _modelInput;
+  AssistantModelSource? _modelSource;
+  Object? _modelBinding;
+  bool get modelReady {
+    final source = readModelSource?.call();
+    return !_disposed && _foreground && paidAccessCurrent &&
+      source != null && source.available && source.owner == context.accountScope;
+  }
+  bool get canSend => modelReady && hasInput && canChangeConversation &&
+      !modelBusy && _proposal == null && _preparationBatch == null && _selected.isEmpty;
+  void _retireModel() {
+    _modelAttempt++;
+    modelBusy = false;
+    final input = _modelInput, source = _modelSource;
+    _modelInput = null; _modelSource = null; _modelBinding = null;
+    if (input != null && source != null && source.available && source.owner == context.accountScope) {
+      unawaited(source.cancel(input).then<void>((_) {}, onError: (Object _) {}));
+    }
+  }
+  void cancelPreparation() {
+    if (_disposed) return;
+    _retireModel(); notice = 'Preparation cancelled. Your draft is unchanged.';
+    notifyListeners();
+  }
+  Future<bool> sendRequest() async {
+    synchronize();
+    if (!canSend) return false;
+    final source = readModelSource!.call()!;
+    final binding = context.binding, revision = _requestRevision;
+    final entitlement = _entitlement!.revision;
+    final attempt = ++_modelAttempt;
+    final statusOnly = _modelInput != null && _modelBinding == binding;
+    final random = math.Random.secure();
+    final input = statusOnly ? _modelInput! : AssistantModelInput(
+      scope: (audience: context.inWorkspace ? 'workspace' : 'personal', storeId: context.inWorkspace ? context.workspaceId : null),
+      requestId: 'req-${List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}',
+      requestRevision: revision, message: _draft, language: language,
+      expectedEntitlementRevision: entitlement,
+      history: messages.map((m) => {'role': m.$1 ? 'user' : 'assistant', 'text': m.$2}).toList(growable: false),
+      actionId: taskId?.replaceFirst(RegExp(r'^store\.'), ''),
+    );
+    _modelInput = input; _modelSource = source; _modelBinding = binding;
+    modelBusy = true; notice = null; notifyListeners();
+    bool current() => !_disposed && _foreground && attempt == _modelAttempt &&
+      binding == _currentContext().binding && revision == _requestRevision &&
+      paidAccessCurrent && entitlement == _entitlement?.revision;
+    try {
+      final reply = await (statusOnly ? source.status(input, current) : source.prepare(input, current));
+      if (!current()) return false;
+      modelBusy = false;
+      if (reply.state == 'pending') {
+        notice = 'Still preparing. Tap Send to check this request.'; return false;
+      }
+      _modelInput = null; _modelSource = null; _modelBinding = null;
+      if (reply.state != 'ready' || reply.requestId != input.requestId ||
+          reply.requestRevision != revision || reply.entitlementRevision != entitlement ||
+          reply.validUntil?.isAfter(_clock()) != true || reply.outcome == null) {
+        notice = 'This request could not be prepared. Your draft is unchanged.'; return false;
+      }
+      final outcome = reply.outcome!;
+      if (outcome['kind'] == 'clarification') {
+        messages = List.unmodifiable([...messages, (true, input.message), (false, outcome['text'] as String)]);
+        _draft = ''; _requestRevision++;
+        return true;
+      }
+      final accepted = receiveProposal(MoolAssistantProposal(
+        id: outcome['id'] as String, actionId: outcome['actionId'] as String,
+        binding: binding, requestRevision: revision, entitlementRevision: entitlement,
+        sourceRevision: outcome['sourceRevision'] as String, validUntil: reply.validUntil!,
+        title: outcome['title'] as String, summary: outcome['summary'] as String,
+        entityId: outcome['entityId'] as String?, fields: Map<String,Object?>.from(outcome['fields'] as Map),
+      ));
+      if (!accepted) notice = 'This suggestion could not be used. Your draft is unchanged.';
+      return accepted;
+    } on Object catch (error) {
+      if (current()) {
+        final confirmedRejection = error is AssistantModelFailure && const {
+          'invalid_request', 'request_not_found', 'request_identity_conflict',
+          'stale_preparation', 'stale_entitlement', 'ai_access_required',
+        }.contains(error.code);
+        if (confirmedRejection) {
+          _modelInput = null; _modelSource = null; _modelBinding = null;
+          notice = 'This request is no longer active. Review your draft and send again.';
+        } else {
+          notice = 'Could not confirm preparation. Tap Send to check the original request.';
+        }
+      }
+      return false;
+    } finally {
+      if (!_disposed && attempt == _modelAttempt) { modelBusy = false; notifyListeners(); }
+    }
+  }
+
   final WorkProofPicker? attachments;
   final ChatAttachmentPicker? mediaPicker;
   final ChatVoiceRecorder? voiceRecorder;
@@ -2115,6 +2213,7 @@ class MoolAssistantController extends ChangeNotifier {
   void setForeground(bool value) {
     if (_disposed || _foreground == value) return;
     _foreground = value;
+    if (!value) _retireModel();
     if (!value && (_proposal != null || _preparationBatch != null)) {
       _retireProposal(requestChanged: false);
       proposalNotice = 'Review paused. Please ask again when you return.';
@@ -2234,6 +2333,7 @@ class MoolAssistantController extends ChangeNotifier {
       _preparationBatch=null;_selectedPreparationItems.clear();
     }
     if (requestChanged) {
+      _retireModel();
       _requestRevision++;
       _receivedProposalIds.clear();
       _receivedPreparationIds.clear();
@@ -2707,6 +2807,7 @@ class MoolAssistantController extends ChangeNotifier {
   }
 
   void _retirePrivateInput() {
+    _retireModel();
     _retireProposal();
     _epoch++;
     _historyRead++;
@@ -2998,6 +3099,7 @@ class MoolAssistantController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _retireModel();
     _retireProposal(requestChanged: false);
     _receivedProposalIds.clear();
     _disposed = true;

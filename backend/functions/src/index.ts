@@ -16,6 +16,8 @@ import { handleAccountProfileRequest } from "./account/profile_http.js";
 import {AccountPlansService} from "./account/plans_service.js";
 import {DataConnectAccountPlansRepository} from "./account/plans_dataconnect_store.js";
 import {handleAccountPlansRequest} from "./account/plans_http.js";
+import {AssistantPreparationService} from "./assistant/model_service.js";
+import {handleAssistantModelRequest} from "./assistant/model_http.js";
 
 import {
   FetchXProviderTransport,
@@ -2578,6 +2580,42 @@ export const moolSocialAccountPlans = onRequest(
       response.status(reply.status).json(reply.body);
     } catch {
       response.status(503).json({ok: false, error: {code: "plans_unavailable", message: "Plans are not available right now. Try again later."}});
+    }
+  },
+);
+
+// AI-B01 is source-connected but unavailable until the separately deferred
+// credential/model, usage/request-store and trusted context sources are qualified.
+// No in-memory authority, fake provider, client key or billing fallback.
+let assistantPreparationRuntimeService: AssistantPreparationService | undefined;
+export const moolSocialAssistantPreparation = onRequest(
+  {region: "asia-south1", timeoutSeconds: 60, memory: "256MiB", minInstances: 0,
+    maxInstances: 4, concurrency: 20, serviceAccount: publicAuthRuntimeServiceAccount},
+  async (request, response) => {
+    response.setHeader("cache-control", "no-store");
+    response.setHeader("x-content-type-options", "nosniff");
+    response.setHeader("x-request-id", requestId(request.headers));
+    try {
+      const projectId = publicAuthProjectId();
+      accountPlansRuntimeService ??= new AccountPlansService(
+        new DataConnectAccountPlansRepository(getDataConnect({location: "asia-south1", serviceId: "moolsocial-core", connector: "mobile"})),
+        {projectId, readWorkspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)});
+      assistantPreparationRuntimeService ??= new AssistantPreparationService({projectId, plans: accountPlansRuntimeService});
+      const reply = await handleAssistantModelRequest({method: request.method, headers: request.headers,
+        body: request.body, bodyBytes: request.rawBody.byteLength}, {projectId,
+        enabled: process.env.MOOLSOCIAL_ASSISTANT_PREPARATION_QUALIFIED === "true" &&
+          process.env.MOOLSOCIAL_ACCOUNT_PLANS_STORAGE_QUALIFIED === "true",
+        service: assistantPreparationRuntimeService,
+        verifyAppCheck: async (token, consume) => getAppCheck().verifyToken(token, consume ? {consume: true} : undefined),
+        verifyIdToken: async token => {
+          const verified = await getAuth().verifyIdToken(token, true);
+          return {uid: verified.uid, projectId: verified.aud,
+            ...(verified.firebase?.tenant ? {tenantId: verified.firebase.tenant} : {}),
+            anonymous: verified.firebase?.sign_in_provider === "anonymous"};
+        }});
+      response.status(reply.status).json(reply.body);
+    } catch {
+      response.status(503).json({ok: false, error: {code: "assistant_unavailable", message: "Mool AI is unavailable right now. Your records are unchanged."}});
     }
   },
 );

@@ -1,0 +1,329 @@
+import 'dart:convert';
+import '../journey01/account_profile_gateway.dart' show AccountProfileOwner;
+import '../shared/social_content_gateway.dart';
+
+typedef AssistantModelScope = ({String audience, String? storeId});
+
+class AssistantModelFailure implements Exception {
+  const AssistantModelFailure(this.code);
+  final String code;
+}
+
+class AssistantModelInput {
+  const AssistantModelInput({
+    required this.scope,
+    required this.requestId,
+    required this.requestRevision,
+    required this.message,
+    required this.language,
+    required this.expectedEntitlementRevision,
+    this.actionId,
+    this.entityId,
+    this.history = const [],
+  });
+  final AssistantModelScope scope;
+  final String requestId, message, language, expectedEntitlementRevision;
+  final int requestRevision;
+  final String? actionId, entityId;
+  final List<Map<String, String>> history;
+  Map<String, Object?> toJson() => {
+    'scope': {'audience': scope.audience, 'storeId': scope.storeId},
+    'requestId': requestId,
+    'requestRevision': requestRevision,
+    'message': message,
+    'expectedEntitlementRevision': expectedEntitlementRevision,
+    'language': language,
+    'history': history,
+    'actionId': actionId,
+    'entityId': entityId,
+  };
+}
+
+class AssistantModelReply {
+  const AssistantModelReply({
+    required this.state,
+    this.requestId,
+    this.requestRevision,
+    this.entitlementRevision,
+    this.validUntil,
+    this.outcome,
+  });
+  final String state;
+  final String? requestId, entitlementRevision;
+  final int? requestRevision;
+  final DateTime? validUntil;
+  final Map<String, Object?>? outcome;
+}
+
+abstract interface class AssistantModelSource {
+  Object get owner;
+  bool get available;
+  Future<AssistantModelReply> prepare(
+    AssistantModelInput input,
+    bool Function() current,
+  );
+  Future<AssistantModelReply> status(
+    AssistantModelInput input,
+    bool Function() current,
+  );
+  Future<AssistantModelReply> cancel(AssistantModelInput input);
+}
+
+abstract interface class AssistantModelGatewaySource {
+  AssistantModelGateway? assistantModelGateway(
+    AccountProfileOwner owner,
+    bool Function() current,
+  );
+}
+
+/// Owner-bound transport only. No model key, entitlement issuance or domain writes.
+class AssistantModelGateway implements AssistantModelSource {
+  AssistantModelGateway({
+    required this.owner,
+    required this.isCurrent,
+    required SocialContentCredentials credentials,
+    SocialContentTransport? transport,
+    DateTime Function()? clock,
+  }) : _credentials = credentials,
+       _transport =
+           transport ??
+           IoSocialContentTransport(
+             followRedirects: false,
+             maximumResponseBytes: 1024 * 1024,
+           ),
+       _clock = clock ?? DateTime.now {
+    if (owner.tenantId != null ||
+        owner.userId.isEmpty ||
+        !RegExp(r'^[a-z][a-z0-9-]{4,62}$').hasMatch(owner.projectId)) {
+      throw const AssistantModelFailure('account_scope_mismatch');
+    }
+  }
+  @override
+  final AccountProfileOwner owner;
+  final bool Function() isCurrent;
+  final SocialContentCredentials _credentials;
+  final SocialContentTransport _transport;
+  final DateTime Function() _clock;
+  Future<void> Function(AssistantModelScope)? refreshAuthority;
+  bool _disposed = false, _denied = false;
+  @override
+  bool get available => !_disposed && !_denied && isCurrent();
+  void dispose() {
+    _disposed = true;
+    refreshAuthority = null;
+  }
+
+  void _check(bool Function() current) {
+    if (!available || !current())
+      throw const AssistantModelFailure('retired_request');
+  }
+
+  @override
+  Future<AssistantModelReply> prepare(
+    AssistantModelInput input,
+    bool Function() current,
+  ) => _post('prepare', input, current);
+  @override
+  Future<AssistantModelReply> status(
+    AssistantModelInput input,
+    bool Function() current,
+  ) => _post('status', input, current);
+  @override
+  Future<AssistantModelReply> cancel(AssistantModelInput input) =>
+      _post('cancel', input, () => true);
+
+  Future<AssistantModelReply> _post(
+    String operation,
+    AssistantModelInput input,
+    bool Function() current,
+  ) async {
+    _check(current);
+    if (input.scope.audience != 'personal' &&
+            input.scope.audience != 'workspace' ||
+        (input.scope.audience == 'personal'
+            ? input.scope.storeId != null
+            : input.scope.storeId?.isNotEmpty != true) ||
+        !_id(input.requestId) ||
+        input.requestRevision < 0 ||
+        input.message.trim().isEmpty ||
+        input.message.length > 8000 ||
+        input.language.trim().isEmpty ||
+        input.language.length > 80 ||
+        input.expectedEntitlementRevision.isEmpty ||
+        input.expectedEntitlementRevision.length > 256) {
+      throw const AssistantModelFailure('invalid_request');
+    }
+    final elapsed = Stopwatch()..start();
+    try {
+      final token = await _credentials.firebaseIdToken();
+      _check(current);
+      final proof = await _credentials.appCheckToken(
+        SocialAppCheckTokenMode.standard,
+      );
+      _check(current);
+      if (token.trim().isEmpty || proof.trim().isEmpty)
+        throw const AssistantModelFailure('authentication_required');
+      final response = await _transport.postJson(
+        Uri.https(
+          'asia-south1-${owner.projectId}.cloudfunctions.net',
+          '/moolSocialAssistantPreparation',
+        ),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'X-Firebase-AppCheck': proof,
+        },
+        body: {
+          'operation': operation,
+          'payload': operation == 'prepare'
+              ? input.toJson()
+              : {
+                  'scope': {
+                    'audience': input.scope.audience,
+                    'storeId': input.scope.storeId,
+                  },
+                  'requestId': input.requestId,
+                },
+        },
+      );
+      _check(current);
+      if (utf8.encode(response.body).length > 1024 * 1024) {
+        throw const AssistantModelFailure('invalid_response');
+      }
+      if (response.statusCode != 200) {
+        var code = 'assistant_unavailable';
+        try {
+          final error = _map(jsonDecode(response.body));
+          final item = _map(error['error']);
+          if (const {
+            'ai_access_required',
+            'authentication_required',
+            'account_scope_mismatch',
+            'account_restricted',
+            'stale_preparation',
+            'stale_entitlement',
+            'request_not_found',
+            'request_identity_conflict',
+          }.contains(item['code'])) {
+            code = item['code'] as String;
+          }
+        } on Object {
+          /* Never expose arbitrary provider/server messages. */
+        }
+        if (response.statusCode == 401 ||
+            response.statusCode == 403 &&
+                const {
+                  'account_scope_mismatch',
+                  'account_restricted',
+                }.contains(code))
+          _denied = true;
+        if (const {'stale_entitlement', 'ai_access_required'}.contains(code) &&
+            available) {
+          try {
+            await refreshAuthority?.call(input.scope);
+          } on Object {
+            /* Remain unavailable; never grant from a failed refresh. */
+          }
+        }
+        throw AssistantModelFailure(code);
+      }
+      final envelope = _map(jsonDecode(response.body), {'ok', 'data'});
+      if (envelope['ok'] != true)
+        throw const AssistantModelFailure('assistant_unavailable');
+      final data = _map(envelope['data']);
+      final state = data['state'];
+      if (state is! String ||
+          !{'pending', 'cancelled', 'failed', 'ready'}.contains(state))
+        throw const AssistantModelFailure('invalid_response');
+      if (state != 'ready') {
+        _map(data, {'state'});
+        return AssistantModelReply(state: state);
+      }
+      _map(data, {'state', 'reply'});
+      final r = _map(data['reply'], {
+        'requestId',
+        'requestRevision',
+        'scope',
+        'entitlementRevision',
+        'checkedAt',
+        'validUntil',
+        'outcome',
+      });
+      final scope = _map(r['scope'], {'audience', 'storeId'});
+      final checked = _stamp(r['checkedAt']), until = _stamp(r['validUntil']);
+      final remaining = until.difference(checked) - elapsed.elapsed;
+      if (r['requestRevision'] is! int ||
+          r['requestId'] != input.requestId ||
+          r['requestRevision'] != input.requestRevision ||
+          scope['audience'] != input.scope.audience ||
+          scope['storeId'] != input.scope.storeId ||
+          remaining <= Duration.zero ||
+          until.difference(checked) > const Duration(minutes: 1) ||
+          r['entitlementRevision'] is! String ||
+          (r['entitlementRevision'] as String).isEmpty)
+        throw const AssistantModelFailure('stale_preparation');
+      final outcome = _map(r['outcome']);
+      if (outcome['kind'] == 'clarification') {
+        _map(outcome, {'kind', 'text'});
+        _text(outcome['text'], 2000);
+      } else if (outcome['kind'] == 'proposal') {
+        _map(outcome, {
+          'kind',
+          'id',
+          'actionId',
+          'entityId',
+          'sourceRevision',
+          'title',
+          'summary',
+          'fields',
+        });
+        if (!_id(outcome['id']) ||
+            !_id(outcome['actionId']) ||
+            outcome['entityId'] != null && !_id(outcome['entityId']))
+          throw const AssistantModelFailure('invalid_response');
+        _text(outcome['sourceRevision'], 256);
+        _text(outcome['title'], 1000);
+        _text(outcome['summary'], 2000);
+        _map(outcome['fields']);
+      } else {
+        throw const AssistantModelFailure('invalid_response');
+      }
+      return AssistantModelReply(
+        state: state,
+        requestId: input.requestId,
+        requestRevision: input.requestRevision,
+        entitlementRevision: r['entitlementRevision'] as String,
+        validUntil: _clock().add(remaining),
+        outcome: outcome,
+      );
+    } on AssistantModelFailure {
+      rethrow;
+    } on Object {
+      throw const AssistantModelFailure('assistant_unavailable');
+    }
+  }
+}
+
+Map<String, Object?> _map(Object? value, [Set<String>? keys]) {
+  if (value is! Map ||
+      value.keys.any((k) => k is! String) ||
+      keys != null &&
+          (value.length != keys.length || !value.keys.every(keys.contains)))
+    throw const AssistantModelFailure('invalid_response');
+  return Map<String, Object?>.from(value);
+}
+
+bool _id(Object? value) =>
+    value is String &&
+    RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$').hasMatch(value);
+void _text(Object? value, int max) {
+  if (value is! String || value.trim().isEmpty || value.length > max)
+    throw const AssistantModelFailure('invalid_response');
+}
+
+DateTime _stamp(Object? value) {
+  if (value is! String) throw const AssistantModelFailure('invalid_response');
+  final parsed = DateTime.tryParse(value);
+  if (parsed == null || !parsed.isUtc || parsed.toIso8601String() != value)
+    throw const AssistantModelFailure('invalid_response');
+  return parsed;
+}

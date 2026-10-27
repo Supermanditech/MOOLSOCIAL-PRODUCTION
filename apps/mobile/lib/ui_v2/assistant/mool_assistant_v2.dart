@@ -8,6 +8,7 @@ import '../../core/design/mool_design_system.dart' show MoolMotion;
 
 import '../../core/design/mool_theme.dart';
 import '../../features/assistant/mool_assistant.dart';
+import '../../features/assistant/model_gateway.dart';
 import '../../features/work/work_services.dart'
     show NativeWorkProofPicker, WorkProofSource, WorkPickedProof;
 import '../../features/chat/chat_models.dart' show ChatAttachmentKind;
@@ -89,6 +90,7 @@ class MoolAssistantHost extends InheritedWidget {
     required this.contextChanges,
     required super.child,
     this.entitlements,
+    this.readModelSource,
     this.historySource,
     super.key,
   });
@@ -96,6 +98,7 @@ class MoolAssistantHost extends InheritedWidget {
   final MoolAssistantContext Function() readContext;
   final Listenable contextChanges;
   final MoolAssistantEntitlementSource? entitlements;
+  final AssistantModelSource? Function()? readModelSource;
   final MoolAssistantHistorySource? historySource;
 
   static MoolAssistantHost? maybeOf(BuildContext context) =>
@@ -117,6 +120,7 @@ class MoolAssistantHost extends InheritedWidget {
       currentContext: () => readContext().withWorkspace(workspace?.call()),
       contextChanges: contextChanges,
       entitlements: entitlements,
+      readModelSource: readModelSource,
       historySource: historySource,
       nativeAdapters: nativeAdapters,
       attachments: NativeWorkProofPicker(),
@@ -148,6 +152,7 @@ class MoolAssistantHost extends InheritedWidget {
   bool updateShouldNotify(MoolAssistantHost oldWidget) =>
       oldWidget.readContext != readContext ||
       oldWidget.entitlements != entitlements ||
+      oldWidget.readModelSource != readModelSource ||
       oldWidget.historySource != historySource;
 }
 
@@ -951,6 +956,8 @@ class _MoolAssistantPageState extends State<MoolAssistantPage>
     MoolAssistantAccess.revoked => 'AI inactive',
     MoolAssistantAccess.purchasePending => 'Confirmation pending',
     MoolAssistantAccess.expired => 'Access expired',
+    MoolAssistantAccess.active when c.modelBusy => 'Preparing…',
+    MoolAssistantAccess.active when c.modelReady => 'Ready',
     _ => 'AI unavailable',
   };
 
@@ -1050,11 +1057,11 @@ class _MoolAssistantPageState extends State<MoolAssistantPage>
               : null,
           icon: Icon(Icons.language, size: 20, color: c.canChangeConversation ? _AssistantColors.muted : Theme.of(context).disabledColor),
         ),
-        const IconButton(
-          key: Key('mool-assistant-send'),
-          tooltip: 'AI is unavailable right now',
-          onPressed: null,
-          icon: Icon(Icons.arrow_upward, size: 20),
+        IconButton(
+          key: const Key('mool-assistant-send'),
+          tooltip: c.modelBusy ? 'Cancel preparation' : c.canSend ? 'Send request' : 'AI is unavailable right now',
+          onPressed: c.modelBusy ? c.cancelPreparation : c.canSend ? () => unawaited(c.sendRequest()) : null,
+          icon: Icon(c.modelBusy ? Icons.stop_rounded : Icons.arrow_upward, size: 20),
           constraints: BoxConstraints(minWidth: 48, minHeight: 48),
         ),
       ],
@@ -1324,7 +1331,8 @@ class _MoolAssistantPageState extends State<MoolAssistantPage>
           'AI access is awaiting confirmation.',
         MoolAssistantAccess.expired => 'AI access has expired.',
         MoolAssistantAccess.revoked => 'AI access is inactive.',
-        MoolAssistantAccess.active => 'AI is unavailable right now.',
+        MoolAssistantAccess.active => controller.modelBusy ? 'Preparing your request…'
+            : controller.modelReady ? 'Ready to prepare your request.' : 'AI is unavailable right now.',
         MoolAssistantAccess.unavailable => 'AI is unavailable right now.',
       };
 
