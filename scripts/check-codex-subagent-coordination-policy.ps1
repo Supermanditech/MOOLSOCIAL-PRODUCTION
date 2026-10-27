@@ -8885,6 +8885,14 @@ function Invoke-Lf01Admission {
   Write-Output "LF-01 admission passed: phase=$ProductionPhase; owners=$($owners.Count); baseline=$base; no APK/provider/acceptance authority."
 }
 
+# Founder-approved AI-B01: bounded local typed model preparation only.
+if ($ProductionTicketId -ceq 'AI-B01' -or $ProductionWorkId -ceq 'ai-b01-20261027' -or
+    $root.Replace('\','/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-b01-20261027') {
+  . (Join-Path $root 'scripts/ai-b01-admission.ps1')
+  Invoke-AiB01Admission
+  return
+}
+
 # Founder-approved PROFILE-B02: exact local catalogue/entitlement continuation only.
 if ($ProductionTicketId -ceq 'PROFILE-B02' -or $ProductionWorkId -ceq 'profile-b02-20261027' -or
     $root.Replace('\','/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-profile-b02-20261027') {

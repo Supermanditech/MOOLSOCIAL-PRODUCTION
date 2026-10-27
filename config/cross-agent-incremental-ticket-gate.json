@@ -16,6 +16,12 @@
         "uiCommit": "955f793dcfc593b603797d9e960925f774a6c2c2",
         "contractPath": "docs/quality/PROFILE-B02-CONTRACT-20261027.md",
         "contractSha256": "44233B52F1FE9371D37BDE8476D8B6FA18305E5CCD2B9F20AC110514B22E2F9A"
+      },
+      {
+        "id": "assistant.model_preparation",
+        "uiCommit": "88e53a271dafe8eec839c80eaa9e96ee56cf9466",
+        "contractPath": "docs/quality/AI-B01-CONTRACT-20261027.md",
+        "contractSha256": "310A623C6C83603918C00FA73971A1C8C86AE8C50131DBE3912DF0B6D7B3787E"
       }
     ],
     "reachableBuyDestinations": [

@@ -136,3 +136,6 @@ docs/quality/PROFILE-B02-SOURCE-SEAL-20261027.json text eol=lf
 docs/quality/PROFILE-B02-SOURCE-SEAL-SCOPE-20261027.md text eol=lf
 docs/quality/PROFILE-B02-SOURCE-RESULT-20261027.json text eol=lf
 docs/quality/PROFILE-B02-SOURCE-RESULT-20261027.md text eol=lf
+
+# Pin the approved AI-B01 local orchestration contract.
+docs/quality/AI-B01-CONTRACT-20261027.md text eol=lf

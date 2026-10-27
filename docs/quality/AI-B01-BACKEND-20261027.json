@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "AI-B01",
+    "selectedTicketAssessment": {
+      "ticketId": "AI-B01",
+      "customerOutcome": "Paid Mool AI prepares validated typed proposals through the original composer and native Review using current actor/Store/source authority; no domain posting or fabricated model success.",
+      "necessityProof": "Model service is absent and existing Send control is permanently disabled; reuse paid readback and original typed native adapters.",
+      "implementationDisposition": [
+        "reuse",
+        "new_necessary_work"
+      ],
+      "sharedImplementationOwners": [
+        "backend/functions/src/assistant/model_contract.ts",
+        "backend/functions/src/assistant/model_contract.test.ts",
+        "backend/functions/src/assistant/model_service.ts",
+        "backend/functions/src/assistant/model_service.test.ts",
+        "backend/functions/src/assistant/model_http.ts",
+        "backend/functions/src/assistant/model_http.test.ts",
+        "backend/functions/src/assistant/responses_transport.ts",
+        "backend/functions/src/assistant/responses_transport.test.ts",
+        "backend/functions/src/index.ts",
+        "apps/mobile/lib/features/assistant/mool_assistant.dart",
+        "apps/mobile/lib/features/assistant/model_gateway.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/journey01/review_journey_services.dart",
+        "apps/mobile/lib/app/moolsocial_app.dart",
+        "apps/mobile/lib/ui_v2/assistant/mool_assistant_v2.dart",
+        "apps/mobile/test/assistant_model_gateway_test.dart",
+        "apps/mobile/test/assistant_model_flow_test.dart",
+        "apps/mobile/test/mool_assistant_test.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [
+        "backend/functions/src/assistant/model_contract.ts",
+        "backend/functions/src/assistant/model_contract.test.ts",
+        "backend/functions/src/assistant/model_service.ts",
+        "backend/functions/src/assistant/model_service.test.ts",
+        "backend/functions/src/assistant/model_http.ts",
+        "backend/functions/src/assistant/model_http.test.ts",
+        "backend/functions/src/assistant/responses_transport.ts",
+        "backend/functions/src/assistant/responses_transport.test.ts"
+      ],
+      "robustnessCoverage": [
+        "Actual local mobile gateway/HTTP/service/model transport seam/controller proposal parity with explicit host fixtures.",
+        "Zero model/tool calls unpaid/expired/revoked/unauthorized; strict schemas, missing context, malformed outputs, cancellation/timeouts/stale/duplicate/owner A-B-A recovery.",
+        "Native final confirmation retained; language input preserved; reachable OPPO guards and protected saved fingerprints."
+      ],
+      "adjustments": [
+        "Reuse B02 entitlement and B03 source authority; bounded existing THIN-B02 gateway, no duplicate domain controllers."
+      ],
+      "explicitExclusions": [
+        "No Google/API credentials/model network calls/deployment, billing rules, domain execution/publication, real voice/OCR, durable History, APK, source feature commit/push or unrelated feature.",
+        "No fake entitlement/provider sources in OPPO and no live model or production acceptance claim."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder approved exact baseline, AI-B01 contract/admissions and one local metadata admission commit.",
+        "Credentials/model availability, trusted domain context, usage/durable status and authentic cloud/device services remain deferred."
+      ],
+      "manifestPath": "docs/quality/AI-B01-CONTRACT-20261027.md",
+      "manifestSha256": "310A623C6C83603918C00FA73971A1C8C86AE8C50131DBE3912DF0B6D7B3787E",
+      "evidencePath": "docs/quality/AI-B01-ACCEPTANCE-20261027.json",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "AI-B01",
+    "customerOutcome": "Paid Mool AI prepares validated typed proposals through the original composer and native Review using current actor/Store/source authority; no domain posting or fabricated model success.",
+    "classification": "mvp_supporting",
+    "classificationReason": "Existing Buy/Store paid-assistant model/preparation connection.",
+    "minimumCompleteScope": [
+      "Implement and locally qualify the exact approved CONTRACT with existing native review; record dependencies and stop."
+    ],
+    "explicitExclusions": [
+      "No Google/API credentials/model network calls/deployment, billing rules, domain execution/publication, real voice/OCR, durable History, APK, source feature commit/push or unrelated feature.",
+      "No fake entitlement/provider sources in OPPO and no live model or production acceptance claim."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder approved exact baseline, AI-B01 contract/admissions and one local metadata admission commit.",
+      "Credentials/model availability, trusted domain context, usage/durable status and authentic cloud/device services remain deferred."
+    ],
+    "testAndEvidencePlan": [
+      "Actual local mobile gateway/HTTP/service/model transport seam/controller proposal parity with explicit host fixtures.",
+      "Zero model/tool calls unpaid/expired/revoked/unauthorized; strict schemas, missing context, malformed outputs, cancellation/timeouts/stale/duplicate/owner A-B-A recovery.",
+      "Native final confirmation retained; language input preserved; reachable OPPO guards and protected saved fingerprints."
+    ]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/AI-B01-CONTRACT-20261027.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/AI-B01-ACCEPTANCE-20261027.json",
+    "beyondMvpExplicitlyAuthorized": false
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": true,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "backendAdmission": {
+    "binding": {
+      "id": "ai_b01_20261027",
+      "state": "founder_authorized_2026_10_27",
+      "lane": "codex_backend",
+      "role": "primary",
+      "task": "/root/codex_backend_ai_b01",
+      "workId": "ai-b01-20261027",
+      "ticketId": "AI-B01",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-b01-20261027",
+      "branch": "work/codex-backend/ai-b01-20261027",
+      "baselineHead": "88e53a271dafe8eec839c80eaa9e96ee56cf9466",
+      "bootstrapCommitSubject": "coordination(ai-b01-20261027): record exact model gateway admission",
+      "bootstrapOwners": [
+        ".gitattributes",
+        "config/codex-subagent-coordination-policy.json",
+        "config/cross-agent-incremental-ticket-gate.json",
+        "docs/quality/AI-B01-BACKEND-20261027.json",
+        "docs/quality/AI-B01-ACCEPTANCE-20261027.json",
+        "docs/quality/AI-B01-CONTRACT-20261027.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/ai-b01-admission.ps1",
+        "scripts/test-ai-b01-admission.ps1"
+      ]
+    },
+    "runtimeOwners": [
+      "backend/functions/src/assistant/model_contract.ts",
+      "backend/functions/src/assistant/model_contract.test.ts",
+      "backend/functions/src/assistant/model_service.ts",
+      "backend/functions/src/assistant/model_service.test.ts",
+      "backend/functions/src/assistant/model_http.ts",
+      "backend/functions/src/assistant/model_http.test.ts",
+      "backend/functions/src/assistant/responses_transport.ts",
+      "backend/functions/src/assistant/responses_transport.test.ts",
+      "backend/functions/src/index.ts",
+      "apps/mobile/lib/features/assistant/mool_assistant.dart",
+      "apps/mobile/lib/features/assistant/model_gateway.dart",
+      "apps/mobile/lib/features/journey01/journey_session.dart",
+      "apps/mobile/lib/features/journey01/review_journey_services.dart",
+      "apps/mobile/lib/app/moolsocial_app.dart",
+      "apps/mobile/lib/ui_v2/assistant/mool_assistant_v2.dart",
+      "apps/mobile/test/assistant_model_gateway_test.dart",
+      "apps/mobile/test/assistant_model_flow_test.dart",
+      "apps/mobile/test/mool_assistant_test.dart"
+    ],
+    "acceptedUiCommit": "88e53a271dafe8eec839c80eaa9e96ee56cf9466",
+    "contractSha256": "310A623C6C83603918C00FA73971A1C8C86AE8C50131DBE3912DF0B6D7B3787E",
+    "sqlProvisioning": false,
+    "sqlMigration": false,
+    "deployment": false,
+    "backendBranchPush": false,
+    "timelineDisclosure": "The historical 4\u00e2\u20ac\u201c19 October delivery window has elapsed; scope stays bounded and robustness is not waived. The zero incremental timeline value is not a claim of on-time MVP delivery.",
+    "sourceSnapshots": []
+  }
+}
