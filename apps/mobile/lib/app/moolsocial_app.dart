@@ -383,6 +383,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
       theme: MoolTheme.light(),
       routerConfig: _router,
       builder: (context, child) => MoolAssistantHost(
+        entitlements: _session.accountPlansAssistantEntitlements,
         readContext: () => MoolAssistantContext(
           accountScope: _session.authenticatedBuyPersistenceIdentity,
           authenticationRevision: _session.navigationAuthenticationGeneration,

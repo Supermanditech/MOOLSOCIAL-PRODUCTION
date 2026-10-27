@@ -8527,6 +8527,8 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       onOpenRoute: (route) {
         if (route == '/app/work/my-work' && profileApproved) {
           _showOperation(_WorkspaceOperation.settings);
+        } else if (Uri.tryParse(route)?.path == '/app/account/plans' && profileApproved) {
+          context.push('/app/account/plans?scope=workspace');
         } else if (Uri.tryParse(route)?.path == '/app/account/security') {
           // A pushed Store can differ from the router's displayed base URI.
           // Retain its actual destination when sign-in replaces the stack.

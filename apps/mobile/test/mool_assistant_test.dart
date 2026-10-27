@@ -65,6 +65,17 @@ class _Entitlements extends ChangeNotifier
   void invalidate() => notifyListeners();
 }
 
+class _ScopedPlansEntitlements extends ChangeNotifier implements MoolAssistantScopedEntitlementSource {
+  _ScopedPlansEntitlements(this.response);
+  final Future<MoolAssistantEntitlement> Function(MoolAssistantContext) response;
+  final contexts = <MoolAssistantContext>[];
+  @override Future<MoolAssistantEntitlement> read(Object accountScope) =>
+    throw StateError('B02 connected sources must receive the full context');
+  @override Future<MoolAssistantEntitlement> readForContext(MoolAssistantContext context) {
+    contexts.add(context); return response(context);
+  }
+}
+
 class _Voice implements ChatVoiceRecorder {
   int starts = 0, stops = 0, cancels = 0;
   bool disposed = false;
@@ -1869,6 +1880,27 @@ void registerOwnerAwareHandoffTests() {
 
 
 void main() {
+  test('B02 assistant dispatches context-aware reads and retires Personal authority on Store switch', () async {
+    final context = _Context();
+    final personal = Completer<MoolAssistantEntitlement>();
+    final now = DateTime.utc(2026,10,27,8);
+    final source = _ScopedPlansEntitlements((value) async => value.inWorkspace
+      ? MoolAssistantEntitlement(accountScope: value.accountScope!, access: MoolAssistantAccess.subscriptionRequired, revision: 'store:1')
+      : personal.future);
+    final controller = MoolAssistantController(currentContext: () => context.value,
+      contextChanges: context, entitlements: source, clock: () => now);
+    addTearDown(controller.dispose); addTearDown(source.dispose); addTearDown(context.dispose);
+    context.change(_context('a', 2, store: 'store-a'));
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.access, MoolAssistantAccess.subscriptionRequired);
+    personal.complete(MoolAssistantEntitlement(accountScope: 'a', access: MoolAssistantAccess.active,
+      revision: 'personal:1', validUntil: now.add(const Duration(minutes:1))));
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.access, MoolAssistantAccess.subscriptionRequired);
+    expect(controller.paidAccessCurrent, false);
+    expect(source.contexts.map((value) => value.workspaceId), [null,'store-a']);
+  });
+
   testWidgets('POLISH05-V2 compact default composer leaves more content space', (tester) async {
     tester.view.physicalSize = const Size(360,806); tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);

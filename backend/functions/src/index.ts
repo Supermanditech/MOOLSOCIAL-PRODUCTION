@@ -13,6 +13,9 @@ import { onRequest } from "firebase-functions/v2/https";
 import { AccountProfileService } from "./account/profile_service.js";
 import { DataConnectAccountProfileRepository } from "./account/profile_dataconnect_store.js";
 import { handleAccountProfileRequest } from "./account/profile_http.js";
+import {AccountPlansService} from "./account/plans_service.js";
+import {DataConnectAccountPlansRepository} from "./account/plans_dataconnect_store.js";
+import {handleAccountPlansRequest} from "./account/plans_http.js";
 
 import {
   FetchXProviderTransport,
@@ -2548,6 +2551,37 @@ export const youtubeProvider = onRequest(
 
 // B01 source integration only. Keep closed until schema, erasure and actual
 // runtime qualification are recorded; no local fixture can enable this flag.
+let accountPlansRuntimeService: AccountPlansService | undefined;
+export const moolSocialAccountPlans = onRequest(
+  {region: "asia-south1", timeoutSeconds: 30, memory: "256MiB", minInstances: 0,
+    maxInstances: 4, concurrency: 20, serviceAccount: publicAuthRuntimeServiceAccount},
+  async (request, response) => {
+    response.setHeader("cache-control", "no-store");
+    response.setHeader("x-content-type-options", "nosniff");
+    response.setHeader("x-request-id", requestId(request.headers));
+    try {
+      const projectId = publicAuthProjectId();
+      accountPlansRuntimeService ??= new AccountPlansService(
+        new DataConnectAccountPlansRepository(getDataConnect({location: "asia-south1", serviceId: "moolsocial-core", connector: "mobile"})),
+        {projectId, readWorkspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)});
+      const reply = await handleAccountPlansRequest({method: request.method, headers: request.headers,
+        body: request.body, bodyBytes: request.rawBody.byteLength}, {projectId,
+        storageQualified: process.env.MOOLSOCIAL_ACCOUNT_PLANS_STORAGE_QUALIFIED === "true",
+        service: accountPlansRuntimeService,
+        verifyAppCheck: async (token, consume) => getAppCheck().verifyToken(token, consume ? {consume: true} : undefined),
+        verifyIdToken: async token => {
+          const verified = await getAuth().verifyIdToken(token, true);
+          return {uid: verified.uid, projectId: verified.aud,
+            ...(verified.firebase?.tenant ? {tenantId: verified.firebase.tenant} : {}),
+            anonymous: verified.firebase?.sign_in_provider === "anonymous"};
+        }});
+      response.status(reply.status).json(reply.body);
+    } catch {
+      response.status(503).json({ok: false, error: {code: "plans_unavailable", message: "Plans are not available right now. Try again later."}});
+    }
+  },
+);
+
 let accountProfileRuntimeService: AccountProfileService | undefined;
 export const moolSocialAccountProfile = onRequest(
   {region:"asia-south1",timeoutSeconds:30,memory:"256MiB",minInstances:0,

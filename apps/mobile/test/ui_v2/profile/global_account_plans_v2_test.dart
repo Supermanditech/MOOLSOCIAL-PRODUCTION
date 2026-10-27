@@ -64,7 +64,7 @@ void main() {
       expect(find.text('Free'), findsNothing);
       expect(find.text('Current plan'), findsNothing);
       expect(find.text('Review plan'), findsNothing);
-      await tester.tap(find.text('Business'));
+      await tester.tap(find.text('Workspace'));
       await tester.pump();
       expect(
         find.text(
@@ -368,6 +368,96 @@ void main() {
     });
   }
 
+  testWidgets(
+    'B02 full catalogue expands lazily without a fixed plan-count limit',
+    (tester) async {
+      final offers = List.generate(
+        151,
+        (i) => GlobalAccountPlanOffer(
+          id: 'fixture-$i',
+          name: 'Fixture offer $i',
+          priceLabel: 'Host fixture price',
+          features: const ['Host fixture benefit'],
+          eligible: true,
+        ),
+      );
+      await pump(tester, snapshot: data(offers: offers));
+      expect(find.byType(Card).evaluate().length, lessThanOrEqualTo(3));
+      final scroll = find.descendant(
+        of: find.byKey(const Key('account-plans-list')),
+        matching: find.byType(Scrollable),
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('account-plans-view-all')),
+        300,
+        scrollable: scroll,
+      );
+      await tester.tap(find.byKey(const Key('account-plans-view-all')));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Fixture offer 150'),
+        500,
+        scrollable: scroll,
+        maxScrolls: 200,
+      );
+      expect(find.text('Fixture offer 150'), findsOneWidget);
+      expect(find.byType(Card).evaluate().length, lessThan(15));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'B02 retired assigned version does not mark a different offer version current',
+    (tester) async {
+      await pump(
+        tester,
+        snapshot: GlobalAccountPlansViewData(
+          accountScope: 'owner-a',
+          revision: 'r2',
+          audience: GlobalAccountPlanAudience.personal,
+          status: GlobalAccountPlansStatus.ready,
+          offers: [
+            GlobalAccountPlanOffer(
+              id: offer.id,
+              version: 'v2',
+              name: offer.name,
+              priceLabel: offer.priceLabel,
+              features: offer.features,
+              eligible: true,
+            ),
+          ],
+          currentPlanId: offer.id,
+          currentPlanVersion: 'v1',
+        ),
+      );
+      expect(find.text('Current plan'), findsNothing);
+      expect(find.text('Review plan'), findsOneWidget);
+    },
+  );
+
+  testWidgets('B02 signed-out state hides even a retained Store caption', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlobalAccountPlansV2(
+          accountScope: 'owner-a',
+          accountAuthenticated: false,
+          storeId: 'fixture-store',
+          storeName: 'Retained private Store',
+          onClose: () {},
+        ),
+      ),
+    );
+    await tester.tap(find.text('Workspace'));
+    await tester.pump();
+    expect(find.textContaining('Retained private Store'), findsNothing);
+    expect(
+      find.text('Sign in to view plans for your account.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('catalogue remains readable at320 and enlarged text', (
     tester,
   ) async {
@@ -375,7 +465,11 @@ void main() {
     tester.view.physicalSize = const Size(320, 568);
     addTearDown(tester.view.reset);
     await pump(tester, snapshot: data(), scale: 2);
-    await tester.ensureVisible(find.text('Review plan'));
+    await tester.scrollUntilVisible(
+      find.text('Review plan'),
+      160,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(tester.takeException(), isNull);
     expect(find.text(offer.name), findsOneWidget);
   });

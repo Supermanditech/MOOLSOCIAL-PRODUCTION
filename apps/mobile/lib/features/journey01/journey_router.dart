@@ -651,7 +651,8 @@ GoRouter createJourneyRouter(
             return '/app/work/workspace/proof';
           }
           if (workSession.workspaceRequiresMembershipReadback &&
-              (location == '/app/work/workspace/dashboard' || location == '/app/work/retailer/setup')) {
+              (location == '/app/work/workspace/dashboard' || location == '/app/work/retailer/setup' ||
+               (location == '/app/account/plans' && state.uri.queryParameters['scope'] == 'workspace'))) {
             final allowed = await workSession.revalidateWorkspaceAccess();
             if (authentication != session.navigationAuthenticationGeneration) return '/app/buy?sub=shop';
             if (!allowed || !profileApprovedWorkspace()) {
@@ -2075,17 +2076,58 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/account/plans',
+        redirect: (context, state) {
+          if (state.uri.queryParameters['scope'] != 'workspace') return null;
+          if (!session.isAuthenticated) return '/app/account/security';
+          if (!profileApprovedWorkspace()) return '/app/account/workspaces';
+          return null;
+        },
         builder: (context, state) =>
-            state.uri.queryParameters['scope'] == 'account'
+            {'account', 'workspace'}.contains(state.uri.queryParameters['scope'])
             ? AnimatedBuilder(
-                animation: session,
-                builder: (context, _) => GlobalAccountPlansV2(
-                  accountScope: session.authenticatedBuyPersistenceIdentity,
-                  accountAuthenticated: session.isAuthenticated,
-                  onClose: () => context.canPop()
-                      ? context.pop()
-                      : context.go('/app/account/identity'),
-                ),
+                animation: Listenable.merge([session, workSession]),
+                builder: (context, _) {
+                  final storePlans = state.uri.queryParameters['scope'] == 'workspace';
+                  final approved = profileApprovedWorkspace();
+                  final application = profileOwnedApplication();
+                  final applicationApproved = application &&
+                    {'approved','live'}.contains(workSession.remoteReviewStatus?.name);
+                  final workspace = workSession.activeWorkspace;
+                  final page = GlobalAccountPlansConnected(
+                    accountScope: session.authenticatedBuyPersistenceIdentity,
+                    accountAuthenticated: session.isAuthenticated,
+                    gateway: storePlans && !approved ? null : session.accountPlansGateway,
+                    workspaceOnly: storePlans,
+                    workspaceAccessConfirmed: storePlans && approved,
+                    workspaceGuide: approved || applicationApproved
+                      ? GlobalWorkspacePlanGuide.approved
+                      : application ? GlobalWorkspacePlanGuide.application
+                      : profileWorkspaceReadReady() ? GlobalWorkspacePlanGuide.available
+                      : GlobalWorkspacePlanGuide.unknown,
+                    applicationLabel: application ? switch(workSession.remoteReviewStatus?.name) {
+                      'rejected' => 'Your application needs attention. View it for the reason and available next steps.',
+                      'suspended' => 'Workspace access is suspended. View your application for details.',
+                      _ => 'Your Workspace application is awaiting review.',
+                    } : null,
+                    onOpenWorkspace: () => context.push('/app/account/workspaces'),
+                    storeId: storePlans && approved ? workspace?.id : null,
+                    storeName: storePlans && approved ? workspace?.name : null,
+                    onClose: () => context.canPop() ? context.pop()
+                      : context.go(storePlans ? '/app/work/workspace/dashboard' : '/app/account/identity'),
+                  );
+                  return profileAccountScope(MoolAssistantWorkspaceScope(
+                    readWorkspace: () {
+                      if (!storePlans || !profileApprovedWorkspace()) return null;
+                      final current = workSession.activeWorkspace;
+                      final revision = workSession.navigationScopeRevision;
+                      if (current == null || revision == null) return null;
+                      return MoolAssistantWorkspace(id: current.id, name: current.name,
+                        profile: current.profileId, revision: revision, isStore: true,
+                        approved: true, approvalAccountScope: session.authenticatedBuyPersistenceIdentity);
+                    },
+                    child: page,
+                  ));
+                },
               )
             : SocialPlansV2Screen(
                 sharedSession: sharedSession,

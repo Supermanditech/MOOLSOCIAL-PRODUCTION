@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'journey_services.dart';
 import 'account_profile_gateway.dart';
+import 'account_plans_gateway.dart';
 
 const _deviceReviewMode = bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');
 
@@ -126,6 +127,32 @@ class JourneySession extends ChangeNotifier {
   AccountProfileGateway? _profileGateway;
   int? _profileGatewayGeneration;
   AccountProfileOwner? _profileGatewayOwner;
+  AccountPlansGateway? _plansGateway;
+  int? _plansGatewayGeneration;
+  AccountProfileOwner? _plansGatewayOwner;
+  AccountPlansAssistantEntitlements? _plansAssistantEntitlements;
+
+  AccountPlansAssistantEntitlements get accountPlansAssistantEntitlements =>
+      _plansAssistantEntitlements ??= AccountPlansAssistantEntitlements(
+        readGateway: () => accountPlansGateway,
+      );
+
+  AccountPlansGateway? get accountPlansGateway {
+    final owner = authenticatedBuyPersistenceIdentity;
+    final generation = navigationAuthenticationGeneration;
+    final source = _accountIdentityGateway;
+    if (_disposed || owner == null || generation == null ||
+        owner.tenantId != null || source is! AccountPlansGatewaySource) return null;
+    if (_plansGatewayOwner != owner || _plansGatewayGeneration != generation) {
+      _plansGateway?.dispose();
+      _plansGatewayOwner = owner;
+      _plansGatewayGeneration = generation;
+      _plansGateway = (source as AccountPlansGatewaySource).plansGateway(owner,
+        () => !_disposed && navigationAuthenticationGeneration == generation &&
+            authenticatedBuyPersistenceIdentity == owner);
+    }
+    return _plansGateway;
+  }
 
   AccountProfileGateway? get accountProfileGateway {
     final owner = authenticatedBuyPersistenceIdentity;
@@ -2304,6 +2331,8 @@ class JourneySession extends ChangeNotifier {
   void dispose() {
     if (!_disposed) {
       _disposed = true;
+      _plansAssistantEntitlements?.dispose();
+      _plansGateway?.dispose();
       _authenticationGeneration += 1;
       final subscription = _firebasePrincipalSubscription;
       _firebasePrincipalSubscription = null;

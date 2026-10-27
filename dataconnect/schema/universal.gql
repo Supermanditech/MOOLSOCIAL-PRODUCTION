@@ -29,6 +29,24 @@ type AppUser @table(key: "uid") {
   updatedAt: Timestamp! @default(expr: "request.time")
 }
 
+# B02 source contract only. Provisioning and billing/admin writers are deferred.
+# No client mutation is exposed. A catalogue may have any supported plan count;
+# its versioned document is validated by the privileged read service.
+type AccountPlanCatalogue @table(name: "account_plan_catalogue", key: "audience") {
+  audience: String! @col(dataType: "varchar(16)")
+  documentJson: String!
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+# One account-and-audience/Store-bound assigned subscription document. Future
+# verified billing writers must preserve assigned-version benefits and dates.
+type AccountPlanSubscription @table(name: "account_plan_subscription", key: "scopeKey") {
+  scopeKey: String! @col(dataType: "varchar(64)")
+  owner: AppUser!
+  documentJson: String!
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
 type UserPreference @table {
   user: AppUser!
   languageCode: String! @col(dataType: "varchar(12)")

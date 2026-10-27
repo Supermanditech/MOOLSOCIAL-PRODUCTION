@@ -1750,6 +1750,12 @@ abstract interface class MoolAssistantEntitlementSource implements Listenable {
   Future<MoolAssistantEntitlement> read(Object accountScope);
 }
 
+/// Connected billing sources must also bind the current Personal/Store context.
+abstract interface class MoolAssistantScopedEntitlementSource
+    implements MoolAssistantEntitlementSource {
+  Future<MoolAssistantEntitlement> readForContext(MoolAssistantContext context);
+}
+
 @immutable
 class MoolAssistantAction {
   const MoolAssistantAction(
@@ -2758,7 +2764,10 @@ class MoolAssistantController extends ChangeNotifier {
     notifyListeners();
     if (!context.signedIn || entitlements == null || account == null) return;
     try {
-      final result = await entitlements!.read(account);
+      final source = entitlements!;
+      final result = source is MoolAssistantScopedEntitlementSource
+          ? await source.readForContext(context)
+          : await source.read(account);
       if (_disposed || attempt != _readAttempt) return;
       if (binding != _currentContext().binding) {
         synchronize();

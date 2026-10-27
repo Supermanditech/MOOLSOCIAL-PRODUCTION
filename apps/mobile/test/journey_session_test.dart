@@ -8,6 +8,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/journey01/account_plans_gateway.dart';
+import 'package:moolsocial/features/journey01/account_profile_gateway.dart' show AccountProfileOwner;
 import 'package:moolsocial/features/journey01/review_journey_services.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
 import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
@@ -63,6 +65,16 @@ class _LfDelayedIdentity extends ReviewAuthenticatedAccountIdentityGateway {
   Future<AuthenticatedAccountIdentity?> currentIdentity() {
     started.complete();
     return reply.future;
+  }
+}
+
+class _B02PlansIdentity extends FirebaseAuthenticatedAccountIdentityGateway {
+  _B02PlansIdentity(super.auth);
+  int calls = 0;
+  bool Function()? current;
+  AccountProfileOwner? owner;
+  @override AccountPlansGateway? plansGateway(AccountProfileOwner owner, bool Function() isCurrent) {
+    calls++; this.owner = owner; current = isCurrent; return null;
   }
 }
 
@@ -171,6 +183,28 @@ void main() {
     otpGateway: ReviewOtpGateway(signedIn: true), accountIdentityGateway: gateway);
   const hostIdentity = AuthenticatedAccountIdentity(firebaseUserId: 'host-user-a',
     firebaseProjectId: 'host-project');
+  test('B02 Plans factory is generation-bound and cannot retain a changed SDK actor', () async {
+    final auth = _LfIdentityAuth()..user = _LfIdentityUser('host-user-a');
+    final source = _B02PlansIdentity(auth);
+    final current = principalFixture(source);
+    addTearDown(current.dispose); addTearDown(auth.changes.close);
+    await current.start();
+    expect(current.accountPlansGateway, isNull);
+    expect(source.calls, 1); expect(source.owner, current.authenticatedBuyPersistenceIdentity);
+    final guard = source.current!; expect(guard(), true);
+    expect(current.accountPlansGateway, isNull); expect(source.calls, 1);
+    auth.user = _LfIdentityUser('host-user-b'); auth.changes.add(auth.user);
+    expect(guard(), false); expect(current.accountPlansGateway, isNull);
+  });
+  test('B02 production Plans connection remains disabled until Google qualification', () async {
+    final auth = _LfIdentityAuth()..user = _LfIdentityUser('host-user-a');
+    final session = principalFixture(FirebaseAuthenticatedAccountIdentityGateway(auth));
+    addTearDown(session.dispose); addTearDown(auth.changes.close);
+    await session.start(); expect(session.authenticatedBuyPersistenceIdentity, isNotNull);
+    expect(session.accountPlansGateway, isNull);
+    final access = await session.accountPlansAssistantEntitlements.read(session.authenticatedBuyPersistenceIdentity!);
+    expect(access.access.name, 'unavailable');
+  });
   test('LF account storage rejects live SDK change after accepted identity', () async {
     final auth = _LfIdentityAuth()..user = _LfIdentityUser('host-user-a');
     final session = principalFixture(FirebaseAuthenticatedAccountIdentityGateway(auth));

@@ -8,6 +8,23 @@ query GetMyAccount @auth(level: USER) {
   }
 }
 
+# B02 privileged read only. Account/Store ownership is checked in the HTTP
+# service before this projection; direct client use is intentionally forbidden.
+query ReadScopedAccountPlansSnapshot($uid: String!, $audience: String!, $scopeKey: String!)
+  @auth(level: NO_ACCESS) {
+  rows: _executeQuery(
+    sql: """
+      SELECT a.uid AS "ownerUid", a.status AS "accountStatus",
+             c.document_json AS catalogue, s.document_json AS subscription
+      FROM app_user a
+      LEFT JOIN account_plan_catalogue c ON c.audience = $2
+      LEFT JOIN account_plan_subscription s ON s.scope_key = $3 AND s.owner_uid = a.uid
+      WHERE a.uid = $1
+    """
+    params: [$uid, $audience, $scopeKey]
+  )
+}
+
 mutation UpsertMyAccount($displayName: String)
   @auth(level: USER)
   @transaction {

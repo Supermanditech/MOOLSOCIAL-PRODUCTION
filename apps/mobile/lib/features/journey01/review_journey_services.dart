@@ -23,6 +23,7 @@ import '../../core/auth/x_oauth2_pkce_network_adapter.dart';
 import '../../data/generated/mobile.dart';
 import 'journey_services.dart';
 import 'account_profile_gateway.dart';
+import 'account_plans_gateway.dart';
 import '../shared/social_content_gateway.dart';
 
 const reviewAuthenticatedUserPreferenceKey =
@@ -1027,10 +1028,22 @@ class FirebaseAuthSocialClient implements FirebaseSocialAuthClient {
 
 class FirebaseAuthenticatedAccountIdentityGateway
     implements AuthenticatedAccountIdentityGateway, AuthenticatedAccountPrincipalSource,
-        AccountProfileGatewaySource {
+        AccountProfileGatewaySource, AccountPlansGatewaySource {
   FirebaseAuthenticatedAccountIdentityGateway(this._auth);
 
   final FirebaseAuth _auth;
+
+  @override
+  AccountPlansGateway? plansGateway(AccountProfileOwner owner, bool Function() isCurrent) {
+    if (!const bool.fromEnvironment('MOOLSOCIAL_ACCOUNT_PLANS_ENABLED') ||
+        const bool.fromEnvironment('MOOLSOCIAL_USE_EMULATORS') ||
+        owner.environment != 'firebase-service' || owner.tenantId != null ||
+        owner.projectId != _auth.app.options.projectId ||
+        currentFirebasePrincipal != (projectId: owner.projectId,
+          tenantId: owner.tenantId, userId: owner.userId)) return null;
+    return AccountPlansGateway(owner: owner, isCurrent: isCurrent,
+      credentials: FirebaseSocialContentCredentials(auth: _auth));
+  }
 
   @override
   AccountProfileGateway? profileGateway(AccountProfileOwner owner, bool Function() isCurrent) {
