@@ -16,6 +16,7 @@ import 'package:moolsocial/features/work/work_document_preview.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  _b03ReadbackTests();
   _work02GatewayTests();
   group('r6614 workspace contact mobile format', () {
     WorkSession contacts(ReviewWorkGateway gateway) =>
@@ -3915,6 +3916,218 @@ void main() {
       ),
     );
   });
+}
+
+Map<String, Object?> _b03Review({String status = 'approved', String account = 'review-account',
+    String store = 'store-001', String access = 'active', int version = 1, String plan = 'free', DateTime? expiry}) {
+  final checked = DateTime.now().toUtc().subtract(const Duration(seconds: 1));
+  return {'caseId': 'case-$store', 'status': status, 'plan': plan, 'workspaceId': store,
+    'profileId': 'retailer-grocery', 'name': 'Host-only test Store', 'area': 'Host test area',
+    'primaryActivity': 'Groceries', 'access': {'schemaVersion': 1, 'state': access,
+      'accountId': account, 'caseId': 'case-$store', 'workspaceId': store, 'profileId': 'retailer-grocery',
+      'applicationUpdatedAt': checked.subtract(const Duration(seconds: 10)).toIso8601String(),
+      'checkedAt': checked.toIso8601String(), 'membership': {'schemaVersion': 1,
+        'membershipId': 'member-$store', 'workspaceId': store, 'workspaceProfileId': 'retailer-grocery',
+        'state': 'active', 'version': version,
+        'effectiveFrom': checked.subtract(const Duration(days: 1)).toIso8601String(),
+        'expiresAt': (expiry ?? checked.add(const Duration(hours: 1))).toIso8601String()}}};
+}
+
+void _b03ReadbackTests() {
+  AuthenticatedWorkGateway gateway(_RecordingTransport transport) => AuthenticatedWorkGateway(
+    endpoint: Uri.parse('https://example.test/moolSocialWorkspace'),
+    credentials: _RecordingCredentials(), transport: transport);
+
+  test('B03 production service responses cross the actual mobile decoder', () async {
+    const receiptPath = String.fromEnvironment('B03_SERVICE_RECEIPT');
+    final receipt = jsonDecode(await File(receiptPath).readAsString()) as Map;
+    expect(receipt['hostFixture'], isTrue);
+    final transport = _RecordingTransport([_ok(receipt['active']), _ok(receipt['denied']), _ok(receipt['unavailable'])]);
+    final work = WorkSession(gateway: gateway(transport), contactDraftStore: _PendingProofMemory());
+    addTearDown(work.dispose);
+    await work.refreshFeed();
+    expect(work.hasVerifiedWorkspace, isTrue);
+    expect(work.subscriptionPlan, 'free');
+    await work.refreshFeed(); expect(work.hasVerifiedWorkspace, isFalse);
+    await work.refreshFeed(); expect(work.hasVerifiedWorkspace, isFalse);
+  }, skip: const String.fromEnvironment('B03_SERVICE_RECEIPT') == ''
+    ? 'Run with the captured production-service host receipt; never fabricate device data.' : false);
+
+  test('B03 approved free Store access is independent of subscription plan', () async {
+    final transport = _RecordingTransport([_ok({'workspaces': [_b03Review()]})]);
+    final memory = _PendingProofMemory();
+    final work = WorkSession(gateway: gateway(transport), contactDraftStore: memory);
+    addTearDown(work.dispose);
+    await work.refreshFeed();
+    expect(work.hasVerifiedWorkspace, isTrue);
+    expect(work.subscriptionPlan, 'free');
+    const account = (environment: 'firebase-service', projectId: 'moolsocial-dev-503018', tenantId: null, userId: 'review-account');
+    // A default host build has no connected Workspace URL and must not grant
+    // route authority. The configured pass exercises this same test positively.
+    const configured = String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL') != '';
+    expect(work.workspaceApprovalMatchesAccount(account), configured);
+    expect(work.workspaceApprovalMatchesAccount((environment: account.environment,
+      projectId: 'other-project', tenantId: null, userId: account.userId)), isFalse);
+    expect(work.workspaceApprovalMatchesAccount((environment: account.environment,
+      projectId: account.projectId, tenantId: 'other-tenant', userId: account.userId)), isFalse);
+    expect(work.workspaceStoreAuthoringAvailable, isTrue);
+    // A separate application is not the authority for this already-approved Store.
+    work.reviewCaseId = 'case-pending-other';
+    work.workspaceId = null;
+    work.remoteReviewStatus = WorkRemoteReviewStatus.pending;
+    work.reviewStage = WorkReviewStage.drafting;
+    expect(work.workspaceApprovalMatchesAccount(account), configured);
+    expect(work.hasVerifiedWorkspace, isTrue);
+    work.reviewCaseId = 'case-store-001';
+    work.workspaceId = 'store-001';
+    work.remoteReviewStatus = WorkRemoteReviewStatus.approved;
+    work.reviewStage = WorkReviewStage.approved;
+    transport.responses.add(_ok({'workspaces': [_b03Review(plan: 'paid')]}));
+    await work.refreshFeed();
+    expect(work.hasVerifiedWorkspace, isTrue);
+    expect(work.subscriptionPlan, 'paid');
+    memory.accountScope = 'other-account';
+    expect(work.hasVerifiedWorkspace, isFalse);
+    expect(work.workspaceApprovalMatchesAccount(account), isFalse);
+  });
+
+  for (final state in ['pending', 'rejected', 'suspended']) {
+    test('B03 paid $state application cannot grant Store access', () async {
+      final transport = _RecordingTransport([_ok({'workspaces': [_b03Review(status: state, plan: 'paid')]})]);
+      final work = WorkSession(gateway: gateway(transport), contactDraftStore: _PendingProofMemory());
+      addTearDown(work.dispose);
+      await work.refreshFeed();
+      expect(work.hasVerifiedWorkspace, isFalse);
+      expect(work.workspaceStoreAuthoringAvailable, isFalse);
+    });
+  }
+
+  for (final mode in ['absent', 'unavailable', 'expired', 'foreign', 'duplicate', 'revision']) {
+    test('B03 $mode authority cannot create a verified Workspace', () async {
+      final row = _b03Review(account: mode == 'foreign' ? 'other-account' : 'review-account',
+        version: mode == 'revision' ? 0 : 1,
+        expiry: mode == 'expired' ? DateTime.now().toUtc().subtract(const Duration(seconds: 1)) : null);
+      if (mode == 'absent') row.remove('access');
+      if (mode == 'unavailable') row['access'] = {'schemaVersion': 1, 'state': 'unavailable'};
+      final transport = _RecordingTransport([_ok({'workspaces': [row, if (mode == 'duplicate') row]})]);
+      final work = WorkSession(gateway: gateway(transport), contactDraftStore: _PendingProofMemory());
+      addTearDown(work.dispose);
+      await work.refreshFeed();
+      expect(work.hasVerifiedWorkspace, isFalse);
+    });
+  }
+
+  test('B03 revoked/unavailable refresh removes previous access, then recovers', () async {
+    final transport = _RecordingTransport([_ok({'workspaces': [_b03Review()]}),
+      _ok({'workspaces': [_b03Review(access: 'denied')]}), _ok({'workspaces': [_b03Review(version: 2)]})]);
+    final work = WorkSession(gateway: gateway(transport), contactDraftStore: _PendingProofMemory());
+    addTearDown(work.dispose);
+    await work.refreshFeed(); expect(work.hasVerifiedWorkspace, isTrue);
+    await work.refreshFeed(); expect(work.hasVerifiedWorkspace, isFalse);
+    await work.refreshFeed(); expect(work.hasVerifiedWorkspace, isTrue);
+  });
+
+  test('B03 rejects lower membership revision after a current read', () async {
+    final initial = _b03Review(version: 3), stale = Map<String, Object?>.from(initial);
+    final access = Map<String, Object?>.from(initial['access']! as Map);
+    access['membership'] = {...access['membership']! as Map, 'version': 2};
+    stale['access'] = access;
+    final transport = _RecordingTransport([_ok({'workspaces': [initial]}), _ok({'workspaces': [stale]})]);
+    final work = WorkSession(gateway: gateway(transport), contactDraftStore: _PendingProofMemory());
+    addTearDown(work.dispose);
+    await work.refreshFeed(); expect(work.hasVerifiedWorkspace, isTrue);
+    await work.refreshFeed(); expect(work.hasVerifiedWorkspace, isFalse);
+  });
+
+  test('B03 denial HTTP status cannot carry a successful application envelope', () async {
+    final transport = _RecordingTransport([SocialContentResponse(statusCode: 403,
+      body: jsonEncode({'ok': true, 'data': {'workspaces': [_b03Review()]}}))]);
+    await expectLater(gateway(transport).loadFeed(), throwsA(isA<WorkGatewayException>()));
+  });
+
+  test('B03 switching rechecks destination authority before selecting the Store', () async {
+    final transport = _RecordingTransport([
+      _ok({'workspaces': [_b03Review(), _b03Review(store: 'store-002')]}),
+      _ok({'workspaces': [_b03Review(), _b03Review(store: 'store-002', access: 'denied')]}),
+      _ok({'workspaces': [_b03Review(), _b03Review(store: 'store-002', version: 2)]}),
+    ]);
+    final work = WorkSession(gateway: gateway(transport), contactDraftStore: _PendingProofMemory());
+    addTearDown(work.dispose);
+    await work.refreshFeed();
+    final destination = work.otherWorkspaces.single;
+    expect(await work.activateWorkspace(destination), isFalse);
+    expect(work.activeWorkspace?.id, 'store-001');
+    expect(await work.activateWorkspace(destination), isTrue);
+    expect(work.activeWorkspace?.id, 'store-002');
+    expect(work.reviewCaseId, 'case-store-002');
+    expect(work.hasVerifiedWorkspace, isTrue);
+    expect(transport.bodies.length, 3);
+  });
+
+  test('B03 revocation never silently selects a different authorized Store', () async {
+    final transport = _RecordingTransport([
+      _ok({'workspaces': [_b03Review(), _b03Review(store: 'store-002')]}),
+      _ok({'workspaces': [_b03Review(access: 'denied'), _b03Review(store: 'store-002')]}),
+    ]);
+    final work = WorkSession(gateway: gateway(transport), contactDraftStore: _PendingProofMemory());
+    addTearDown(work.dispose);
+    await work.refreshFeed(); expect(work.activeWorkspace?.id, 'store-001');
+    await work.refreshFeed();
+    expect(work.activeWorkspace, isNull);
+    expect(work.hasVerifiedWorkspace, isFalse);
+    expect(work.otherWorkspaces.single.id, 'store-002');
+  });
+
+  test('B03 failed read removes access without deleting original Store inputs', () async {
+    final transport = _RecordingTransport([_ok({'workspaces': [_b03Review()]}),
+      SocialContentResponse(statusCode: 401, body: '{}')]);
+    final work = WorkSession(gateway: gateway(transport), contactDraftStore: _PendingProofMemory());
+    addTearDown(work.dispose);
+    await work.refreshFeed();
+    work.retailerQuantity = 7;
+    await work.refreshFeed();
+    expect(work.hasVerifiedWorkspace, isFalse);
+    expect(work.retailerQuantity, 7);
+    expect(work.errorMessage, isNotNull);
+  });
+
+  test('B03 proof time and identity bounds cannot be bypassed by a valid plan', () {
+    final row = _b03Review(plan: 'paid');
+    final access = WorkWorkspaceAccess.decode(row)!;
+    expect(access.current(account: access.accountId, application: access.caseId,
+      workspace: access.workspaceId, profile: access.profileId, at: access.expiresAt), isFalse);
+    expect(access.current(account: access.accountId, application: 'case-other',
+      workspace: access.workspaceId, profile: access.profileId, at: access.checkedAt), isFalse);
+    expect(access.current(account: access.accountId, application: access.caseId,
+      workspace: access.workspaceId, profile: access.profileId,
+      at: access.checkedAt.subtract(const Duration(seconds: 1))), isFalse);
+  });
+
+  test('B03 late feed from previous account cannot activate its Store', () async {
+    final transport = _B03DeferredTransport();
+    final memory = _PendingProofMemory();
+    final work = WorkSession(gateway: AuthenticatedWorkGateway(
+      endpoint: Uri.parse('https://example.test/moolSocialWorkspace'),
+      credentials: _RecordingCredentials(), transport: transport), contactDraftStore: memory);
+    addTearDown(work.dispose);
+    final pending = work.refreshFeed();
+    await transport.started.future;
+    memory.accountScope = 'other-account';
+    transport.reply.complete(_ok({'workspaces': [_b03Review()]}));
+    await pending;
+    expect(work.activeWorkspace, isNull);
+    expect(work.hasVerifiedWorkspace, isFalse);
+  });
+}
+
+class _B03DeferredTransport implements SocialContentTransport {
+  final started = Completer<void>();
+  final reply = Completer<SocialContentResponse>();
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {
+    required Map<String, String> headers, required Map<String, Object?> body}) {
+    started.complete();
+    return reply.future;
+  }
 }
 
 Map<String, Object?> _cameraDraft() => {

@@ -3,6 +3,13 @@ import { createHash } from "node:crypto";
 import type { DocumentData, Firestore } from "firebase-admin/firestore";
 
 import type { WorkspaceProofStore } from "./workspace_proof_store.js";
+import { projectActiveWorkspaceMemberships, type WorkspaceMembershipRecord } from "./workspace_membership_contract.js";
+
+/** Server-side read authority only. A profile status cannot manufacture a grant.
+ * No canonical persistence/issuer is connected yet; omission fails closed. */
+export interface WorkspaceMembershipReader {
+  readAccount(accountId: string): Promise<readonly WorkspaceMembershipRecord[]>;
+}
 
 export type WorkspaceProfileStatus =
   | "pending"
@@ -85,6 +92,7 @@ export class WorkspaceProfileService {
     private readonly repository: WorkspaceProfileRepository,
     private readonly now: () => Date = () => new Date(),
     private readonly proofStore?: WorkspaceProofStore,
+    private readonly memberships?: WorkspaceMembershipReader,
   ) {}
 
   async prepareProofUpload(
@@ -118,9 +126,11 @@ export class WorkspaceProfileService {
   }
 
   async listWorkspaces(ownerUserId: string): Promise<{ workspaces: object[] }> {
-    const records = await this.repository.list(identifier(ownerUserId, "owner"));
+    const owner = identifier(ownerUserId, "owner");
+    const records = await this.repository.list(owner);
+    if (records.some(record => record.ownerUserId !== owner)) throw notFound();
     return {
-      workspaces: records.map(publicReview),
+      workspaces: await Promise.all(records.map(record => this.reviewReadback(record))),
     };
   }
 
@@ -178,12 +188,37 @@ export class WorkspaceProfileService {
         409,
       );
     }
-    return publicReview(record);
+    return this.reviewReadback(record);
   }
 
   async reviewStatus(ownerUserId: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const record = await this.ownerRecord(ownerUserId, stringField(body, "caseId", 8, 80));
-    return publicReview(record);
+    return this.reviewReadback(record);
+  }
+
+  private async reviewReadback(record: WorkspaceProfileRecord): Promise<object> {
+    const base = publicReview(record);
+    const denied = (state: "denied" | "unavailable") => ({...base, access: {schemaVersion: 1, state}});
+    if (!["approved", "live"].includes(record.status)) return denied("denied");
+    if (!this.memberships || !record.workspaceId || record.familyId !== "products-trade") return denied("unavailable");
+    try {
+      const source = await this.memberships.readAccount(record.ownerUserId);
+      const checkedAt = this.now().toISOString();
+      const active = projectActiveWorkspaceMemberships({accountId: record.ownerUserId, at: checkedAt, memberships: source});
+      const member = active.find(value => value.workspaceId === record.workspaceId);
+      if (!member || member.workspaceProfileId !== record.profileId) return denied("denied");
+      // The application may have been suspended/reassigned while authority was read.
+      const fresh = await this.repository.read(record.caseId);
+      if (!fresh || ["ownerUserId", "workspaceId", "profileId", "status", "updatedAt"].some(
+        key => fresh[key as keyof WorkspaceProfileRecord] !== record[key as keyof WorkspaceProfileRecord])) return denied("unavailable");
+      if (new Date(record.updatedAt).toISOString() !== record.updatedAt || record.updatedAt > checkedAt) return denied("unavailable");
+      return {...base, access: {schemaVersion: 1, state: "active", accountId: record.ownerUserId,
+        caseId: record.caseId, workspaceId: record.workspaceId, profileId: record.profileId,
+        applicationUpdatedAt: record.updatedAt, checkedAt, membership: member}};
+    } catch {
+      // Application status remains viewable during missing/malformed authority.
+      return denied("unavailable");
+    }
   }
 
   async submitGst(ownerUserId: string, body: Readonly<Record<string, unknown>>): Promise<object> {

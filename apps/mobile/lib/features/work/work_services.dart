@@ -4458,6 +4458,60 @@ class WorkProfileSubmission {
 
 enum WorkRemoteReviewStatus { pending, approved, rejected, suspended, live }
 
+/// Ephemeral server readback. Never persisted as an approval or generated from
+/// a local Workspace, subscription, or application status.
+class WorkWorkspaceAccess {
+  const WorkWorkspaceAccess({required this.accountId, required this.caseId,
+    required this.workspaceId, required this.profileId, required this.version,
+    required this.membershipId, required this.applicationUpdatedAt,
+    required this.checkedAt, required this.effectiveFrom, this.expiresAt});
+  final String accountId, caseId, workspaceId, profileId, membershipId;
+  final int version;
+  final DateTime applicationUpdatedAt, checkedAt, effectiveFrom;
+  final DateTime? expiresAt;
+
+  bool current({required String? account, required String? application,
+      required String? workspace, required String? profile, DateTime? at}) {
+    final time = (at ?? DateTime.now()).toUtc();
+    return account == accountId && application == caseId && workspace == workspaceId &&
+      profile == profileId && !time.isBefore(checkedAt) && !checkedAt.isBefore(applicationUpdatedAt) &&
+      !checkedAt.isBefore(effectiveFrom) && (expiresAt == null || time.isBefore(expiresAt!));
+  }
+
+  static WorkWorkspaceAccess? decode(Map<String, Object?> review) {
+    try {
+      final raw = _map(review['access']);
+      if (raw['schemaVersion'] != 1 || raw['state'] != 'active' ||
+          !{'approved', 'live'}.contains(review['status'])) return null;
+      final member = _map(raw['membership']);
+      String id(Object? value) {
+        if (value is! String || !RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(value)) {
+          throw const FormatException();
+        }
+        return value;
+      }
+      DateTime timestamp(Object? value) {
+        if (value is! String) throw const FormatException();
+        final parsed = DateTime.parse(value);
+        if (!parsed.isUtc || parsed.toIso8601String() != value) throw const FormatException();
+        return parsed;
+      }
+      final workspace = id(raw['workspaceId']), profile = id(raw['profileId']), application = id(raw['caseId']);
+      final version = member['version'];
+      if (member['schemaVersion'] != 1 || member['state'] != 'active' || version is! int || version < 1 ||
+          workspace != review['workspaceId'] || profile != review['profileId'] || application != review['caseId'] ||
+          member['workspaceId'] != workspace || member['workspaceProfileId'] != profile) return null;
+      final result = WorkWorkspaceAccess(accountId: id(raw['accountId']), caseId: application,
+        workspaceId: workspace, profileId: profile, version: version, membershipId: id(member['membershipId']),
+        applicationUpdatedAt: timestamp(raw['applicationUpdatedAt']), checkedAt: timestamp(raw['checkedAt']),
+        effectiveFrom: timestamp(member['effectiveFrom']),
+        expiresAt: member['expiresAt'] == null ? null : timestamp(member['expiresAt']));
+      return result.current(account: result.accountId, application: application,
+        workspace: workspace, profile: profile, at: result.checkedAt) ? result : null;
+    } catch (_) { return null; }
+  }
+}
+
 class WorkReviewResult {
   const WorkReviewResult({
     required this.caseId,
@@ -4469,6 +4523,7 @@ class WorkReviewResult {
     this.name,
     this.area,
     this.primaryActivity,
+    this.access,
   });
   final String caseId;
   final WorkRemoteReviewStatus status;
@@ -4479,6 +4534,7 @@ class WorkReviewResult {
   final String? name;
   final String? area;
   final String? primaryActivity;
+  final WorkWorkspaceAccess? access;
 }
 
 /// Version 2 adds authoritative time requests; commands exclude payment, stock posting and
@@ -6619,6 +6675,12 @@ class AuthenticatedWorkGateway implements WorkGateway {
       },
       body: {'operation': operation, ...body},
     );
+    // Retire stale reads. A known original mutation ACK must still reach its
+    // existing recovery owner after the presentation closes.
+    if (!mutation) _ensureNativeCurrent(current);
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw const WorkGatewayException('Workspace access could not be verified. Sign in again.');
+    }
     Object? decoded;
     try {
       decoded = jsonDecode(response.body);
@@ -6629,7 +6691,12 @@ class AuthenticatedWorkGateway implements WorkGateway {
       );
     }
     final envelope = _map(decoded);
-    if (envelope['ok'] == true) return envelope['data'];
+    if (envelope['ok'] == true) {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw const WorkGatewayException('Workspace access could not be verified. Try again.', retryable: true);
+      }
+      return envelope['data'];
+    }
     final error = _map(envelope['error']);
     throw WorkGatewayException(
       _requiredString(error['message']),
@@ -9101,6 +9168,7 @@ String _requiredString(Object? value) {
 }
 
 WorkReviewResult _decodeReview(Map<String, Object?> data) => WorkReviewResult(
+  access: WorkWorkspaceAccess.decode(data),
   caseId: _requiredString(data['caseId']),
   status: switch (_requiredString(data['status'])) {
     'approved' => WorkRemoteReviewStatus.approved,

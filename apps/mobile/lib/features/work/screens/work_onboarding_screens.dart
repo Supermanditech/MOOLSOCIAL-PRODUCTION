@@ -5148,8 +5148,8 @@ class _WorkspaceSetupAdapter implements MoolAssistantOwnerAwareNativeAdapter {
                   } : null,
                   onWorkspace: (selected) async {
                     if (!scope.current() || !_workspaces.any((value) => identical(value, selected))) return;
-                    if (selected.id != session.activeWorkspace?.id) session.activateWorkspace(selected, current: scope.current,
-                      storageCurrent: () => actorCurrent() && session.activeWorkspace?.id == selected.id, onKnownChange: scope.acceptNativeChange);
+                    if (selected.id != session.activeWorkspace?.id && !await session.activateWorkspace(selected, current: scope.current,
+                      storageCurrent: () => actorCurrent() && session.activeWorkspace?.id == selected.id, onKnownChange: scope.acceptNativeChange)) return;
                     if (scope.current() && session.activeWorkspace?.id == selected.id) nativeRoute('/app/work/workspace/dashboard');
                   },
                   onApplication: (selected) async {

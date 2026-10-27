@@ -8575,7 +8575,8 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
               if (reviewScope?.mayApply == false || !await _confirmPurchaseNavigation() ||
                   reviewScope?.mayApply == false || !mounted || !sheetContext.mounted) return;
               if (reviewScope != null && !session.otherWorkspaces.any((store) => store.id == workspace.id)) return;
-              session.activateWorkspace(workspace);
+              if (!await session.activateWorkspace(workspace) || !mounted || !sheetContext.mounted ||
+                  session.activeWorkspace?.id != workspace.id) return;
               Navigator.of(sheetContext).pop(); _showDashboard();
             },
             onApplication: (application) async {

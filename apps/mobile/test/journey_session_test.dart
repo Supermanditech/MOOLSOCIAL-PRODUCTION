@@ -67,6 +67,48 @@ class _LfDelayedIdentity extends ReviewAuthenticatedAccountIdentityGateway {
 }
 
 void main() {
+  test('B01 bootstrap preserves existing account without a write',() async {
+    var writes=0,reads=0;
+    await ensureOwnedAccountBootstrap(ownerUid:'owner-a',isCurrent:()=>true,
+      read:() async {reads++;return (uid:'owner-a',status:'ACTIVE');},
+      create:() async {writes++;});
+    expect(reads,1);expect(writes,0);
+  });
+  for (final status in ['RESTRICTED','DELETED','UNKNOWN']) {
+    test('B01 bootstrap never reactivates $status',() async {
+      var writes=0;
+      await expectLater(ensureOwnedAccountBootstrap(ownerUid:'owner-a',isCurrent:()=>true,
+        read:() async => (uid:'owner-a',status:status),create:() async {writes++;}),throwsStateError);
+      expect(writes,0);
+    });
+  }
+  test('B01 bootstrap confirms create through original owner readback',() async {
+    var reads=0,writes=0;
+    await ensureOwnedAccountBootstrap(ownerUid:'owner-a',isCurrent:()=>true,
+      read:() async => ++reads==1 ? null : (uid:'owner-a',status:'ACTIVE'),
+      create:() async {writes++;});
+    expect(reads,2);expect(writes,1);
+  });
+  test('B01 bootstrap resolves a lost create response without a second create',() async {
+    var reads=0,writes=0;
+    await ensureOwnedAccountBootstrap(ownerUid:'owner-a',isCurrent:()=>true,
+      read:() async => ++reads==1 ? null : (uid:'owner-a',status:'ACTIVE'),
+      create:() async {writes++;throw StateError('fixture response lost');});
+    expect(reads,2);expect(writes,1);
+  });
+  test('B01 bootstrap does not accept an unconfirmed create',() async {
+    await expectLater(ensureOwnedAccountBootstrap(ownerUid:'owner-a',isCurrent:()=>true,
+      read:() async => null,create:() async {}),throwsStateError);
+  });
+  test('B01 bootstrap cannot accept a foreign account or changed owner',() async {
+    var writes=0,current=true;
+    await expectLater(ensureOwnedAccountBootstrap(ownerUid:'owner-a',isCurrent:()=>current,
+      read:() async => (uid:'owner-b',status:'ACTIVE'),create:() async {writes++;}),throwsStateError);
+    expect(writes,0);
+    await expectLater(ensureOwnedAccountBootstrap(ownerUid:'owner-a',isCurrent:()=>current,
+      read:() async {current=false;return null;},create:() async {writes++;}),throwsStateError);
+    expect(writes,0);
+  });
   test('LF identity gateway drops an old account after optional claims await', () async {
     final token = Completer<IdTokenResult>();
     final auth = _LfIdentityAuth()..user = _LfIdentityUser('host-user-a', token: token);

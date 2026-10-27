@@ -1148,6 +1148,19 @@ class _BuyOriginalReviewPageState extends State<_BuyOriginalReviewPage> {
     }
     return accepted;
   }
+  Future<void> _addressEffect(Future<bool> Function() effect) async {
+    if (!mounted || _closing || _committing || _accepted || !widget.isCurrent() ||
+        ModalRoute.of(context)?.isCurrent != true) return;
+    _committing=true;
+    var accepted=false;
+    try {accepted=await effect();} finally {_committing=false;}
+    if (!mounted || _closing) return;
+    if (accepted) {_accepted=true;_finish(true);} else {
+      final notice=widget.session.notice;
+      if (notice!=null) ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content:Text(notice)));
+      _changed();
+    }
+  }
   void _finish([bool accepted = false]) {
     if (!mounted || _closing) return;
     _closing = true;
@@ -1166,7 +1179,7 @@ class _BuyOriginalReviewPageState extends State<_BuyOriginalReviewPage> {
       onRoute: (route) => _removalRoute = route); }
     finally { _removalOpen = false; }
     if (!mounted) return;
-    if (remove == true) _effect(() => widget.session.removeAddress(address.id));
+    if (remove == true) await _addressEffect(() => widget.session.removeAddressConfirmed(address.id));
     else _finish();
   }
   Future<void> _close() async {
@@ -1191,7 +1204,7 @@ class _BuyOriginalReviewPageState extends State<_BuyOriginalReviewPage> {
         'AI-ACT-024' || 'AI-ACT-027' => _BuyV2AddressChoice(address: widget.address!,
           selected: widget.session.selectedAddressId == widget.address!.id,
           onTap: widget.actionId == 'AI-ACT-027' ? _removeAddress
-            : () => _effect(() => widget.session.chooseAddress(widget.address!.id)),
+            : () => _addressEffect(() => widget.session.chooseAddressConfirmed(widget.address!.id)),
           onEdit: () => showBuyV2AddressInitialReview(context, widget.session,
             existingAddress: widget.address,
             initialData: BuyV2AddressInitialData.fromFields({'recipient': widget.address!.recipient}),
@@ -14112,10 +14125,10 @@ class _CheckoutAddressStageState extends State<_CheckoutAddressStage> {
               _CheckoutAddressChoice(
                 address: address,
                 selected: selectedId == address.id,
-                onSelect: () {
+                onSelect: () async {
                   if (locked) return;
-                  session.chooseAddress(address.id);
-                  setState(() => _choosingAddress = false);
+                  final saved=await session.chooseAddressConfirmed(address.id);
+                  if (mounted && saved) setState(() => _choosingAddress = false);
                 },
                 onEdit: _BuyShop04Scope.callback(context, _BuyShop04Intent.unrelated, () => _showAddAddressSheet(
                   context,
@@ -22365,6 +22378,15 @@ Future<void> showBuyV2AddressSheet(
   BuyV2Session session, {
   bool continueToCheckoutAfterSelection = false,
 }) async {
+  if (session.accountProfileAddressesEnabled) {
+    final loaded=await session.refreshAccountProfileAddresses();
+    if (!context.mounted) return;
+    if (!loaded) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content:Text(
+        session.notice ?? 'Delivery addresses are unavailable. Please try again.')));
+      return;
+    }
+  }
   final destination = session.destination;
   final view = session.view;
   final selectedAddressId = session.selectedAddressId;
@@ -22415,7 +22437,8 @@ Future<void> showBuyV2AddressSheet(
         !session.addresses.any((address) => address.id == addressId)) {
       return;
     }
-    if (session.chooseAddress(addressId) && continueToCheckoutAfterSelection) {
+    if (await session.chooseAddressConfirmed(addressId) && continueToCheckoutAfterSelection &&
+        context.mounted && scopeCurrent() && ModalRoute.of(context)?.isCurrent == true) {
       session.openCheckout();
     }
   }
@@ -22558,7 +22581,7 @@ Future<void> showBuyV2AddressSheet(
                           isCurrent: () => scopeCurrent() && !session.cartChangesBlocked);
                         if (remove != true || !sheetContext.mounted) return;
                         if (!canUseAddressContext(sheetContext)) return;
-                        if (session.removeAddress(address.id)) {
+                        if (await session.removeAddressConfirmed(address.id) && sheetContext.mounted) {
                           Navigator.of(sheetContext).pop();
                         }
                       },
@@ -22969,6 +22992,15 @@ Future<void> _showAddAddressSheet(
   bool Function()? isCurrent,
 }) async {
   if (buyV2AddressFormOpen(session) || isCurrent?.call() == false) return;
+  if (session.accountProfileAddressesEnabled) {
+    final editingId=existingAddress?.id;
+    if (!await session.refreshAccountProfileAddresses() || !context.mounted ||
+        isCurrent?.call() == false) return;
+    if (editingId != null) {
+      existingAddress=session.addresses.where((a)=>a.id==editingId).firstOrNull;
+      if (existingAddress == null) return;
+    }
+  }
   final destination = session.destination;
   final view = session.view;
   final selectedAddressId = session.selectedAddressId;
@@ -22987,7 +23019,7 @@ Future<void> _showAddAddressSheet(
       session.destination == destination && session.view == view &&
       session.selectedAddressId == selectedAddressId && listEquals(session.addresses, addresses) &&
       (existingAddress == null || session.addresses.any((value) => identical(value, existingAddress)));
-  bool saveToExistingOwner(BuyV2Address address) {
+  Future<bool> saveToExistingOwner(BuyV2Address address) async {
     if (!scopeCurrent() || session.cartChangesBlocked ||
         session.customerStateStore?.ownerScope != owner ||
         session.collectionIdentity?.value?.accountId != buyer?.accountId ||
@@ -23000,12 +23032,10 @@ Future<void> _showAddAddressSheet(
       return false;
     }
     if (existingAddress == null) {
-      session.addAddress(address);
-      return session.selectedAddressId == address.id &&
-          session.addresses.any((saved) => identical(saved, address));
+      return session.saveAddressConfirmed(address);
     }
     if (existingAddress.id != address.id) return false;
-    return session.updateAddress(address);
+    return session.saveAddressConfirmed(address,existing:true);
   }
 
   _buyAddressForms[session] = true;
@@ -23281,7 +23311,7 @@ class _BuyV2AddAddressForm extends StatefulWidget {
   final BuyV2AddressInitialData? initialData;
   final Listenable? scopeOwner;
   final bool Function()? isCurrent;
-  final bool Function(BuyV2Address address) onSubmit;
+  final FutureOr<bool> Function(BuyV2Address address) onSubmit;
   final BuyV2Session session;
   final BuyV2Address? existingAddress;
   final String initialRecipient;
@@ -23337,7 +23367,8 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
     super.dispose();
   }
 
-  void submit() {
+  Future<void> submit() async {
+    if (_submitting) return;
     FocusScope.of(context).unfocus();
     if (_retired || widget.isCurrent?.call() == false) {
       setState(() => _retired = true);
@@ -23377,10 +23408,14 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
       BuyV2AddressKind.other => 'Other place',
     };
     final existingAddress = widget.existingAddress;
-    _submitting = true;
-    final bool added;
+    final saveOwner = widget.session.customerStateStore?.ownerScope;
+    final saveBuyer = widget.session.collectionIdentity?.value;
+    final saveProcurement = widget.session.procurementContext?.customerStateOwnerScope;
+    final saveRoute = ModalRoute.of(context);
+    setState(() => _submitting = true);
+    bool added = false;
     try {
-    added = widget.onSubmit(
+    added = await widget.onSubmit(
       BuyV2Address(
         id:
             existingAddress?.id ??
@@ -23395,7 +23430,22 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
         landmark: landmark.isEmpty ? 'No nearby landmark' : landmark,
       ),
     );
-    } finally { _submitting = false; }
+    } on Object {
+      if (mounted) {
+        setState(() => validationMessage =
+            'Your address save could not be confirmed. Check it before trying again.');
+      }
+      return;
+    } finally { if (mounted) setState(() => _submitting = false); }
+    if (!mounted) return;
+    if (saveRoute?.isCurrent != true ||
+        widget.session.customerStateStore?.ownerScope != saveOwner ||
+        widget.session.collectionIdentity?.value?.accountId != saveBuyer?.accountId ||
+        widget.session.collectionIdentity?.value?.sessionId != saveBuyer?.sessionId ||
+        widget.session.procurementContext?.customerStateOwnerScope != saveProcurement) {
+      setState(() => _retired = true);
+      return;
+    }
     if (!added) {
       setState(() {
         validationMessage =
@@ -23624,7 +23674,7 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
                           minimumSize: const Size(0, BuyV2Metrics.minimumTap),
                         ),
                       ),
-                      onPressed: submit,
+                      onPressed: _submitting ? null : submit,
                       child: Text(
                         editingAddress == null
                             ? 'Save and deliver here'

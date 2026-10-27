@@ -11,7 +11,10 @@ query GetMyAccount @auth(level: USER) {
 mutation UpsertMyAccount($displayName: String)
   @auth(level: USER)
   @transaction {
-  appUser_upsert(
+  # Keep the existing SDK result key while making bootstrap create-only.
+  # Repeated sign-in must never overwrite name, status or Profile revision.
+  # Deploy only with the coordinated read-before-create client qualification.
+  appUser_upsert: appUser_insert(
     data: {
       uid_expr: "auth.uid"
       displayName: $displayName

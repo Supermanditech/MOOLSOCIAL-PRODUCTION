@@ -901,20 +901,57 @@ class WorkSession extends ChangeNotifier {
       (catalogueGateway as AuthenticatedWorkspaceCatalogueGateway).supplierPublishersVersionSupported);
   /// Presentation access only. The server still verifies live profile, owner,
   /// producer capabilities and reviewed SKU bindings before publication.
-  bool get workspaceStoreAuthoringAvailable => _storeAuthoringProfile(activeWorkspace?.profileId);
+  bool get workspaceStoreAuthoringAvailable => hasVerifiedWorkspace && _storeAuthoringProfile(activeWorkspace?.profileId);
+  bool get workspaceRequiresMembershipReadback => gateway is! ReviewWorkGateway;
+  final workspaceAccessRevision = ValueNotifier<int>(0);
+  final Map<String, WorkWorkspaceAccess> _workspaceAccess = {};
+  final Map<String, WorkWorkspaceAccess> _workspaceAccessHighWater = {};
+  String? _workspaceAccessOwner;
+  Timer? _workspaceAccessExpiry;
+  int _workspaceAccessGeneration = 0;
+
+  bool _recordAccessValid(WorkReviewResult record) => !workspaceRequiresMembershipReadback ||
+    record.access?.current(account: _contactAccountScope, application: record.caseId,
+      workspace: record.workspaceId, profile: record.profileId) == true;
+
+  bool _currentWorkspaceAccess(String? id, String? profile) {
+    if (!workspaceRequiresMembershipReadback) return true;
+    final proof = _workspaceAccess[id];
+    return proof != null && proof.current(account: _contactAccountScope,
+      application: proof.caseId, workspace: id, profile: profile);
+  }
+
+  void _scheduleWorkspaceAccessExpiry() {
+    _workspaceAccessExpiry?.cancel();
+    final expiries = _workspaceAccess.values.map((proof) => proof.expiresAt).whereType<DateTime>().toList()..sort();
+    if (expiries.isEmpty || _disposed) return;
+    final delay = expiries.first.difference(DateTime.now().toUtc());
+    _workspaceAccessExpiry = Timer(delay.isNegative ? Duration.zero : delay, () {
+      if (_disposed) return;
+      _workspaceAccess.removeWhere((_, proof) => proof.expiresAt?.isAfter(DateTime.now().toUtc()) == false);
+      workspaceAccessRevision.value++;
+      _scheduleWorkspaceAccessExpiry();
+      notifyListeners();
+    });
+  }
   /// Reads existing reviewed, account-bound state; registration/profile alone
   /// is never approval. Domain services must still authorise each operation.
   bool workspaceApprovalMatchesAccount(
       ({String environment, String projectId, String? tenantId, String userId})? account) =>
       !_disposed && account != null && account.environment.isNotEmpty &&
       account.projectId.isNotEmpty && account.userId == _contactAccountScope &&
+      account.tenantId == null &&
+      (!workspaceRequiresMembershipReadback || workspacePrincipalMatchesConnection(
+        environment: account.environment, projectId: account.projectId, tenantId: account.tenantId, realm: 'evaluation')) &&
       !_contactDraftRecoveryBusy && !_contactDraftRecoveryFailed &&
-      activeWorkspace?.verified == true && workspaceId != null &&
-      activeWorkspace?.id == workspaceId && !reviewStatusNeedsRefresh &&
+      activeWorkspace?.verified == true &&
+      (workspaceRequiresMembershipReadback
+        ? _currentWorkspaceAccess(activeWorkspace?.id, activeWorkspace?.profileId)
+        : workspaceId != null && activeWorkspace?.id == workspaceId && !reviewStatusNeedsRefresh &&
       {WorkRemoteReviewStatus.approved, WorkRemoteReviewStatus.live}
           .contains(remoteReviewStatus) &&
       {WorkReviewStage.approved, WorkReviewStage.setup, WorkReviewStage.live}
-          .contains(reviewStage);
+          .contains(reviewStage));
   WorkspacePublicDetailsController? get workspacePublicDetailsPublisher {
     final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
     if (_disposed || account == null || account.isEmpty || store == null ||
@@ -11795,7 +11832,8 @@ class WorkSession extends ChangeNotifier {
       .where((proof) => proof.required)
       .every((proof) => addedProofs.containsKey(proof.id));
 
-  bool get hasVerifiedWorkspace => activeWorkspace?.verified == true;
+  bool get hasVerifiedWorkspace => activeWorkspace?.verified == true &&
+    _currentWorkspaceAccess(activeWorkspace?.id, activeWorkspace?.profileId);
 
   bool takeWorkspaceApprovalWelcome() {
     final welcome = _approvalWelcome;
@@ -11983,34 +12021,53 @@ class WorkSession extends ChangeNotifier {
     return true;
   }
 
-  void activateWorkspace(WorkWorkspace workspace, {bool Function()? current, bool Function()? storageCurrent, VoidCallback? onKnownChange}) {
-    if (current?.call() == false) return;
+  Future<bool> activateWorkspace(WorkWorkspace workspace, {bool Function()? current, bool Function()? storageCurrent, VoidCallback? onKnownChange}) async {
+    if (_disposed || current?.call() == false) return false;
+    var selectedWorkspace = workspace;
     if (hasPendingOrderTime) {
       showNotice('Confirm the time request before switching stores.');
-      return;
+      return false;
     }
     final previousWorkspace = activeWorkspace;
-    if (previousWorkspace == null || previousWorkspace.id == workspace.id) return;
+    if (previousWorkspace == null) return false;
     if (_collection?.needsReconciliation == true) {
       showNotice('Confirming this collection. Please wait for the update.');
-      return;
+      return false;
     }
     if (busy ||
         workspaceOperationsSyncing ||
         workspaceHandoverBusy ||
         _collection?.busy == true) {
       showNotice('Finishing this store update. Please wait before switching.');
-      return;
+      return false;
     }
+    if (workspaceRequiresMembershipReadback) {
+      final account = _contactAccountScope;
+      final generation = _workspaceAccessGeneration;
+      await refreshFeed();
+      if (_disposed || current?.call() == false || account != _contactAccountScope ||
+          generation == _workspaceAccessGeneration ||
+          !_currentWorkspaceAccess(workspace.id, workspace.profileId)) {
+        if (!_disposed) showNotice('Store access could not be verified. Check again.');
+        return false;
+      }
+      final fresh = [if (activeWorkspace != null) activeWorkspace!, ...otherWorkspaces]
+        .where((value) => value.id == workspace.id && value.profileId == workspace.profileId).firstOrNull;
+      if (fresh == null) return false;
+      selectedWorkspace = fresh;
+    }
+    if (activeWorkspace?.id == workspace.id) return true;
     _rememberWorkspaceApplication();
     _clearWorkspaceApplication();
     _clearCollection();
     otherWorkspaces.removeWhere((item) => item.id == workspace.id);
-    otherWorkspaces.add(previousWorkspace);
-    activeWorkspace = workspace;
+    if (_currentWorkspaceAccess(previousWorkspace.id, previousWorkspace.profileId) &&
+        otherWorkspaces.every((value) => value.id != previousWorkspace.id)) otherWorkspaces.add(previousWorkspace);
+    activeWorkspace = selectedWorkspace;
     workspaceId = workspace.id;
-    workName = workspace.name;
-    workArea = workspace.area;
+    if (workspaceRequiresMembershipReadback) reviewCaseId = _workspaceAccess[workspace.id]?.caseId;
+    workName = selectedWorkspace.name;
+    workArea = selectedWorkspace.area;
     selectedProfile = workProfiles
         .where((profile) => profile.id == workspace.profileId)
         .firstOrNull;
@@ -12021,6 +12078,7 @@ class WorkSession extends ChangeNotifier {
     onKnownChange?.call();
     clearMessages();
     notifyListeners();
+    return true;
   }
 
   Map<String, Object?> _operationalState() => {
@@ -14574,6 +14632,8 @@ class WorkSession extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _workspaceAccessExpiry?.cancel();
+    workspaceAccessRevision.dispose();
     _bulkQuoteAccess?.dispose(); _bulkQuoteAccess = null; _bulkQuoteSource = null;
     for (final publisher in _publicDetailsPublishers.values) { publisher.dispose(); }
     _publicDetailsPublishers.clear();
@@ -14636,7 +14696,15 @@ class WorkSession extends ChangeNotifier {
   Future<void> refreshFeed() async {
     if (_workspaceEntryOperationBlocked) return;
     final requestedScope = _contactAccountScope;
-    bool current() => !_disposed && requestedScope == _contactAccountScope;
+    if (_workspaceAccessOwner != requestedScope) {
+      _workspaceAccessOwner = requestedScope;
+      _workspaceAccess.clear();
+      _workspaceAccessHighWater.clear();
+    }
+    final generation = ++_workspaceAccessGeneration;
+    final previousAccess = Map<String, WorkWorkspaceAccess>.from(_workspaceAccessHighWater);
+    if (workspaceRequiresMembershipReadback) _workspaceAccess.clear();
+    bool current() => !_disposed && requestedScope == _contactAccountScope && generation == _workspaceAccessGeneration;
     final completion = Completer<bool>();
     _workspaceFeedRefresh = completion.future;
     var succeeded = false;
@@ -14646,6 +14714,22 @@ class WorkSession extends ChangeNotifier {
     try {
       final records = await gateway.loadFeed();
       if (!current()) return;
+      if (workspaceRequiresMembershipReadback) {
+        final counts = <String, int>{};
+        for (final record in records) {
+          if (record.workspaceId != null) counts.update(record.workspaceId!, (value) => value + 1, ifAbsent: () => 1);
+        }
+        for (final record in records) {
+          final proof = record.access, previous = previousAccess[record.workspaceId];
+          if (proof == null || !_recordAccessValid(record) || counts[record.workspaceId] != 1 ||
+              previous != null && (proof.applicationUpdatedAt.isBefore(previous.applicationUpdatedAt) ||
+                proof.checkedAt.isBefore(previous.checkedAt) ||
+                proof.membershipId == previous.membershipId && proof.version < previous.version)) continue;
+          _workspaceAccess[proof.workspaceId] = proof;
+          _workspaceAccessHighWater[proof.workspaceId] = proof;
+        }
+        _scheduleWorkspaceAccessExpiry();
+      }
       _lastWorkspaceFeedEmpty = records.isEmpty;
       _restoreWorkspaceState(records);
       initialWorkspaceStateLoaded = true;
@@ -14661,6 +14745,21 @@ class WorkSession extends ChangeNotifier {
       completion.complete(succeeded);
       if (!_disposed) notifyListeners();
     }
+  }
+
+  Future<bool> revalidateWorkspaceAccess() async {
+    if (!workspaceRequiresMembershipReadback) return hasVerifiedWorkspace;
+    final account = _contactAccountScope;
+    final pending = _workspaceFeedRefresh;
+    if (pending != null) {
+      final succeeded = await pending;
+      return succeeded && !_disposed && account == _contactAccountScope &&
+        hasVerifiedWorkspace && errorMessage == null;
+    }
+    final generation = _workspaceAccessGeneration;
+    await refreshFeed();
+    return !_disposed && account == _contactAccountScope &&
+      _workspaceAccessGeneration > generation && hasVerifiedWorkspace && errorMessage == null;
   }
 
   Future<void> loadInitialWorkspaceState() async {
@@ -15376,6 +15475,10 @@ class WorkSession extends ChangeNotifier {
         _busyStoreOperation = null;
         busy = false;
         otherWorkspaces.clear();
+        _workspaceAccess.clear();
+        _workspaceAccessHighWater.clear();
+        _workspaceAccessGeneration++;
+        _workspaceAccessExpiry?.cancel();
         initialWorkspaceStateLoaded = false;
         reviewCaseId = workspaceId = reviewReason = null;
         remoteReviewStatus = null;
@@ -16578,6 +16681,8 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     if (busy) return false;
+    final priorWorkspaceProof = _workspaceAccessHighWater[workspaceId];
+    if (workspaceRequiresMembershipReadback) _workspaceAccess.remove(workspaceId);
     final nativeOperation = Object(); _workspaceApplicationNativeOperation = nativeOperation;
     busy = true;
     clearMessages();
@@ -16633,6 +16738,24 @@ class WorkSession extends ChangeNotifier {
           return false;
         case WorkRemoteReviewStatus.approved:
         case WorkRemoteReviewStatus.live:
+          if (workspaceRequiresMembershipReadback && !_recordAccessValid(result)) {
+            _workspaceAccess.remove(result.workspaceId);
+            errorMessage = 'Store access could not be verified. Check again.';
+            return false;
+          }
+          if (result.access != null) {
+            final previous = priorWorkspaceProof;
+            if (previous != null && (result.access!.applicationUpdatedAt.isBefore(previous.applicationUpdatedAt) ||
+                result.access!.checkedAt.isBefore(previous.checkedAt) ||
+                previous.membershipId == result.access!.membershipId && result.access!.version < previous.version)) {
+              _workspaceAccess.remove(result.workspaceId);
+              errorMessage = 'Workspace access changed. Check again.';
+              return false;
+            }
+            _workspaceAccess[result.workspaceId!] = result.access!;
+            _workspaceAccessHighWater[result.workspaceId!] = result.access!;
+            _scheduleWorkspaceAccessExpiry();
+          }
           final approvedWorkspaceId = result.workspaceId!;
           workspaceId = approvedWorkspaceId;
           _workspaceApplications.removeWhere(
@@ -17327,13 +17450,18 @@ class WorkSession extends ChangeNotifier {
   }
 
   void _restoreWorkspaceState(List<WorkReviewResult> records) {
+    final preferredStore = activeWorkspace?.id;
+    if (workspaceRequiresMembershipReadback && !_currentWorkspaceAccess(activeWorkspace?.id, activeWorkspace?.profileId)) {
+      activeWorkspace = null;
+      otherWorkspaces.clear();
+    }
     if (records.isEmpty) return;
     _rememberWorkspaceApplication();
     final currentApplication = _workspaceApplicationId;
     for (final record in records) {
       if (record.caseId.trim().isEmpty) continue;
-      if (record.status == WorkRemoteReviewStatus.approved ||
-          record.status == WorkRemoteReviewStatus.live) {
+      if ((record.status == WorkRemoteReviewStatus.approved ||
+          record.status == WorkRemoteReviewStatus.live) && _recordAccessValid(record)) {
         // Only the gateway's approved records can create accessible Workspaces.
         if (record.workspaceId?.trim().isNotEmpty == true &&
             record.name != null &&
@@ -17378,7 +17506,7 @@ class WorkSession extends ChangeNotifier {
         reason: record.reason,
       );
     }
-    _restoreWorkspaceRecords(records);
+    _restoreWorkspaceRecords(records, preferredStore: preferredStore);
     final application =
         _workspaceApplications[currentApplication] ??
         (activeWorkspace == null
@@ -17394,14 +17522,18 @@ class WorkSession extends ChangeNotifier {
     _queueContactDraft();
   }
 
-  void _restoreWorkspaceRecords(List<WorkReviewResult> records) {
+  void _restoreWorkspaceRecords(List<WorkReviewResult> records, {String? preferredStore}) {
     if (records.isEmpty) return;
-    final preferredId = activeWorkspace?.id;
+    final preferredId = preferredStore ?? activeWorkspace?.id;
     WorkWorkspace? restoredActive;
     final restoredOthers = <WorkWorkspace>[];
     WorkReviewResult? pending;
     WorkReviewResult? stopped;
     for (final record in records) {
+      if (workspaceRequiresMembershipReadback && !_currentWorkspaceAccess(record.workspaceId, record.profileId)) {
+        stopped ??= record;
+        continue;
+      }
       if (record.status == WorkRemoteReviewStatus.pending) {
         pending ??= record;
         continue;
@@ -17434,6 +17566,10 @@ class WorkSession extends ChangeNotifier {
         area: area,
         verified: true,
       );
+      if (workspaceRequiresMembershipReadback && preferredId != null && id != preferredId) {
+        restoredOthers.add(workspace);
+        continue;
+      }
       if (restoredActive == null ||
           id == preferredId ||
           (restoredActive.id != preferredId &&
@@ -17466,6 +17602,10 @@ class WorkSession extends ChangeNotifier {
         ..clear()
         ..addAll(restoredOthers);
       return;
+    }
+    if (workspaceRequiresMembershipReadback) {
+      activeWorkspace = null;
+      otherWorkspaces..clear()..addAll(restoredOthers);
     }
     if (pending != null) {
       final option = workProfiles

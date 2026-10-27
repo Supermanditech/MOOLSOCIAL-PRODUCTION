@@ -10,6 +10,9 @@ import { getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
+import { AccountProfileService } from "./account/profile_service.js";
+import { DataConnectAccountProfileRepository } from "./account/profile_dataconnect_store.js";
+import { handleAccountProfileRequest } from "./account/profile_http.js";
 
 import {
   FetchXProviderTransport,
@@ -2543,6 +2546,40 @@ export const youtubeProvider = onRequest(
   },
 );
 
+// B01 source integration only. Keep closed until schema, erasure and actual
+// runtime qualification are recorded; no local fixture can enable this flag.
+let accountProfileRuntimeService: AccountProfileService | undefined;
+export const moolSocialAccountProfile = onRequest(
+  {region:"asia-south1",timeoutSeconds:30,memory:"256MiB",minInstances:0,
+    maxInstances:4,concurrency:20,serviceAccount:publicAuthRuntimeServiceAccount},
+  async (request,response)=>{
+    response.setHeader("cache-control","no-store");
+    response.setHeader("x-content-type-options","nosniff");
+    response.setHeader("x-request-id",requestId(request.headers));
+    try {
+      const projectId=publicAuthProjectId();
+      accountProfileRuntimeService ??= new AccountProfileService(
+        new DataConnectAccountProfileRepository(getDataConnect({location:"asia-south1",
+          serviceId:"moolsocial-core",connector:"mobile"})),projectId);
+      const reply=await handleAccountProfileRequest({method:request.method,headers:request.headers,
+      body:request.body,bodyBytes:request.rawBody.byteLength},{projectId,
+      storageQualified:process.env.MOOLSOCIAL_ACCOUNT_PROFILE_STORAGE_QUALIFIED === "true",
+      service:accountProfileRuntimeService,
+      verifyAppCheck:async(token,consume)=>getAppCheck().verifyToken(token,consume?{consume:true}:undefined),
+      verifyIdToken:async token=>{
+        const verified=await getAuth().verifyIdToken(token,true);
+        return {uid:verified.uid,projectId:verified.aud,
+          ...(verified.firebase?.tenant?{tenantId:verified.firebase.tenant}:{}),
+          anonymous:verified.firebase?.sign_in_provider === "anonymous"};
+      }});
+      response.status(reply.status).json(reply.body);
+    } catch {
+      response.status(503).json({ok:false,error:{code:"profile_service_unavailable",
+        message:"Profile is unavailable right now. Try again later.",uncertain:false}});
+    }
+  },
+);
+
 export const moolSocialContent = onRequest(
   {
     region: "asia-south1",
@@ -3014,7 +3051,7 @@ export const moolSocialWorkspace = onRequest(
             ),
           verifyIdToken: async (token) => {
             const verified = await getAuth().verifyIdToken(token);
-            if (purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || goodsArrivalOperation || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
+            if (["listWorkspaces", "reviewStatus", "submitProfile"].includes(operation) || purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || goodsArrivalOperation || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
               requireDefaultPurchaseTenant(verified.firebase?.tenant);
             }
             return verified;

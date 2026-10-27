@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../work/scan_and_pick_contract.dart';
 import '../work/work_order_identity_gateway.dart';
 import '../work/work_catalogue_gateway.dart';
+import '../journey01/account_profile_gateway.dart';
 import 'buy_session.dart';
 import 'buy_v2_cart_contracts.dart';
 import 'buy_v2_content_contracts.dart';
@@ -3845,7 +3846,7 @@ class BuyV2Session extends ChangeNotifier {
            (buyV2DeviceReviewBenefitSeedsEnabled
                ? createBuyV2DeviceReviewCustomerStateStore()
                : null),
-       gstInvoiceProfileStore =
+       _localGstInvoiceProfileStore =
            gstInvoiceProfileStore ??
            ((reviewDataEnabled ??
                    (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
@@ -6139,7 +6140,109 @@ class BuyV2Session extends ChangeNotifier {
     return _consumerPendingSnapshot ??
       (_pendingAccountStateImported ? null : inherited);
   }
-  final BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore;
+  final BuyV2GstInvoiceProfileStore? _localGstInvoiceProfileStore;
+  AccountProfileGateway? _accountProfileGateway;
+  AccountProfileInvoiceStore? _accountInvoiceStore;
+  bool _profileAddressesBusy = false;
+  int? _profileAddressRevision;
+  BuyV2GstInvoiceProfileStore? get gstInvoiceProfileStore =>
+      _accountInvoiceStore ?? _localGstInvoiceProfileStore;
+
+  void synchronizeAccountProfile(AccountProfileGateway? gateway) {
+    final accepted = !isStoreProcurement && gateway?.ownerScope != null &&
+        gateway!.ownerScope == customerStateStore?.ownerScope ? gateway : null;
+    if (identical(accepted,_accountProfileGateway)) return;
+    _accountProfileGateway = accepted;
+    _profileAddressRevision = null;
+    _accountInvoiceStore = accepted == null ? null : AccountProfileInvoiceStore(accepted);
+  }
+
+  bool get accountProfileAddressesEnabled => _accountProfileGateway != null;
+  String _profileAddressSignature(Iterable<BuyV2Address> addresses) => jsonEncode(
+    addresses.map((a)=>[a.id,a.kind.name,a.label,a.recipient,a.phone,a.line,a.area,a.pinCode,a.landmark]).toList());
+  void _applyProfileAddresses(AccountProfileSnapshot saved) {
+    _profileAddressRevision=saved.revision;
+    if (_selectedAddressId == saved.selectedAddressId &&
+        _profileAddressSignature(_addresses)==_profileAddressSignature(saved.deliveryAddresses)) return;
+    _addresses..clear()..addAll(saved.deliveryAddresses);
+    _selectedAddressId = saved.selectedAddressId;
+    _shoppingAreaRevision++;
+    _invalidateAndRefreshCheckoutPricingContracts();
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  Future<bool> refreshAccountProfileAddresses() async {
+    final gateway = _accountProfileGateway;
+    if (gateway == null) return true;
+    await restoreCustomerState();
+    if (_collectionDisposed || !identical(gateway,_accountProfileGateway) ||
+        gateway.ownerScope != customerStateStore?.ownerScope || cartChangesBlocked) return false;
+    try {
+      final saved = await gateway.read();
+      if (_collectionDisposed || !identical(gateway,_accountProfileGateway) ||
+          gateway.ownerScope != customerStateStore?.ownerScope || cartChangesBlocked) return false;
+      _applyProfileAddresses(saved);
+      return true;
+    } on Object {
+      notice='Your delivery addresses could not be loaded. Please try again.';
+      notifyListeners();return false;
+    }
+  }
+
+  Future<bool> _saveProfileAddresses(List<BuyV2Address> addresses, String? selectedId) async {
+    final gateway = _accountProfileGateway;
+    if (gateway == null || _profileAddressesBusy || _holdCartForPaymentResolution()) return false;
+    if (_profileAddressRevision == null || _profileAddressRevision != gateway.snapshot?.revision) {
+      notice='Your delivery addresses changed. Reopen them before saving.';
+      notifyListeners();return false;
+    }
+    _profileAddressesBusy=true;
+    notifyListeners();
+    try {
+      final saved=await gateway.saveDelivery(addresses,selectedId);
+      if (_collectionDisposed || !identical(gateway,_accountProfileGateway) ||
+          gateway.ownerScope != customerStateStore?.ownerScope) return false;
+      _applyProfileAddresses(saved);
+      final matches=selectedId==saved.selectedAddressId &&
+          _profileAddressSignature(addresses)==_profileAddressSignature(saved.deliveryAddresses);
+      notice=matches ? 'Delivery addresses saved.' : 'Your delivery addresses changed. Review the latest details.';
+      return matches;
+    } on Object {
+      if (!_collectionDisposed && identical(gateway,_accountProfileGateway)) {
+        notice='Your address save is not confirmed. Check it before making another change.';
+      }
+      return false;
+    } finally {
+      _profileAddressesBusy=false;
+      if (!_collectionDisposed) notifyListeners();
+    }
+  }
+
+  Future<bool> saveAddressConfirmed(BuyV2Address address, {bool existing=false}) async {
+    if (_accountProfileGateway == null) {
+      if (existing) return updateAddress(address);
+      addAddress(address);return _selectedAddressId == address.id && _addresses.contains(address);
+    }
+    final index=_addresses.indexWhere((a)=>a.id==address.id);
+    if (existing ? index<0 : index>=0) return false;
+    final next=List<BuyV2Address>.of(_addresses);
+    if (existing) {next[index]=address;} else {next.add(address);}
+    return _saveProfileAddresses(next,existing ? _selectedAddressId : address.id);
+  }
+
+  Future<bool> chooseAddressConfirmed(String id) async {
+    if (_accountProfileGateway == null) return chooseAddress(id);
+    if (!_addresses.any((a)=>a.id==id)) return false;
+    return _saveProfileAddresses(List.of(_addresses),id);
+  }
+
+  Future<bool> removeAddressConfirmed(String id) async {
+    if (_accountProfileGateway == null) return removeAddress(id);
+    if (!_addresses.any((a)=>a.id==id)) return false;
+    final next=_addresses.where((a)=>a.id!=id).toList();
+    return _saveProfileAddresses(next,_selectedAddressId==id ? next.firstOrNull?.id : _selectedAddressId);
+  }
 
   /// Review data is discarded at identity transitions. Real account storage
   /// must provide its own authenticated owner scope and persistence.
@@ -17242,7 +17345,7 @@ class BuyV2Session extends ChangeNotifier {
 
   bool get cartChangesBlocked => _cartChangesBlocked();
   bool _cartChangesBlocked({bool allowCheckoutPreflight = false}) =>
-      (customerStateRecoveryPending &&
+      _profileAddressesBusy || (customerStateRecoveryPending &&
           (!_customerStateSnapshotLoaded || !_customerStateRestoreInFlight)) ||
       !procurementScopeCurrent ||
       checkoutRequiresResolution ||
@@ -18272,6 +18375,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool chooseAddress(String id) {
+    if (_accountProfileGateway != null) return false;
     if (_holdCartForPaymentResolution()) return false;
     if (!_addresses.any((address) => address.id == id)) {
       notice = 'This saved address could not be found.';
@@ -18289,6 +18393,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void addAddress(BuyV2Address address) {
+    if (_accountProfileGateway != null) return;
     if (_holdCartForPaymentResolution()) return;
     _shoppingAreaRevision++;
     _addresses.add(address);
@@ -18300,6 +18405,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool updateAddress(BuyV2Address address) {
+    if (_accountProfileGateway != null) return false;
     if (_holdCartForPaymentResolution()) return false;
     final index = _addresses.indexWhere(
       (candidate) => candidate.id == address.id,
@@ -18319,6 +18425,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool removeAddress(String id) {
+    if (_accountProfileGateway != null) return false;
     if (_holdCartForPaymentResolution()) return false;
     final index = _addresses.indexWhere((address) => address.id == id);
     if (index < 0) {

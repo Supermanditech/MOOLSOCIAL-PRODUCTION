@@ -589,8 +589,10 @@ GoRouter createJourneyRouter(
       session,
       launchPresentationGate,
       launchInterruptionGuard,
+      workSession.workspaceAccessRevision,
     ]),
     redirect: (context, state) async {
+      buyV2Session.synchronizeAccountProfile(session.accountProfileGateway);
       buyV2Session.synchronizeReviewGstOwner(
         session.isAuthenticated ? (session.accountIdentity ?? session) : null,
       );
@@ -647,6 +649,14 @@ GoRouter createJourneyRouter(
             accountReady: session.isAuthenticated || uiReviewOnly,
           )) {
             return '/app/work/workspace/proof';
+          }
+          if (workSession.workspaceRequiresMembershipReadback &&
+              (location == '/app/work/workspace/dashboard' || location == '/app/work/retailer/setup')) {
+            final allowed = await workSession.revalidateWorkspaceAccess();
+            if (authentication != session.navigationAuthenticationGeneration) return '/app/buy?sub=shop';
+            if (!allowed || !profileApprovedWorkspace()) {
+              return profileOwnedApplication() ? '/app/work/workspace/proof' : '/app/work/workspace/choose?entry=workspaces';
+            }
           }
           final containment = legacyPresentationForTestsOnly
               ? null
@@ -2014,7 +2024,9 @@ GoRouter createJourneyRouter(
       GoRoute(
         path: '/app/account/identity/name',
         builder: (context, state) =>
-            GlobalPersonalProfileNameEditorV2(session: session),
+            GlobalPersonalProfileNameEditorV2(session: session,
+              onSaveDisplayName: session.accountProfileGateway == null
+                  ? null : session.saveAccountProfileName),
       ),
       GoRoute(
         path: '/app/ask',

@@ -22,6 +22,8 @@ import '../../core/auth/public_auth_failure.dart';
 import '../../core/auth/x_oauth2_pkce_network_adapter.dart';
 import '../../data/generated/mobile.dart';
 import 'journey_services.dart';
+import 'account_profile_gateway.dart';
+import '../shared/social_content_gateway.dart';
 
 const reviewAuthenticatedUserPreferenceKey =
     'journey01.review_authenticated_user';
@@ -1024,10 +1026,26 @@ class FirebaseAuthSocialClient implements FirebaseSocialAuthClient {
 }
 
 class FirebaseAuthenticatedAccountIdentityGateway
-    implements AuthenticatedAccountIdentityGateway, AuthenticatedAccountPrincipalSource {
+    implements AuthenticatedAccountIdentityGateway, AuthenticatedAccountPrincipalSource,
+        AccountProfileGatewaySource {
   FirebaseAuthenticatedAccountIdentityGateway(this._auth);
 
   final FirebaseAuth _auth;
+
+  @override
+  AccountProfileGateway? profileGateway(AccountProfileOwner owner, bool Function() isCurrent) {
+    // Activated only in the later coordinated Google integration phase. An
+    // emulator identity must never be sent to the real-service endpoint.
+    if (!const bool.fromEnvironment('MOOLSOCIAL_ACCOUNT_PROFILE_ENABLED') ||
+        const bool.fromEnvironment('MOOLSOCIAL_USE_EMULATORS') ||
+        owner.environment != 'firebase-service' || owner.tenantId != null ||
+        owner.projectId != _auth.app.options.projectId ||
+        currentFirebasePrincipal != (projectId:owner.projectId,
+          tenantId:owner.tenantId,userId:owner.userId)) return null;
+    return AccountProfileGateway(owner:owner,isCurrent:isCurrent,
+      credentials:FirebaseSocialContentCredentials(auth:_auth),
+      pendingStore:PreferencesAccountProfilePendingStore());
+  }
 
   @override
   ({String projectId, String? tenantId, String userId})? get currentFirebasePrincipal {
@@ -2125,5 +2143,45 @@ class DataConnectAccountBootstrapGateway implements AccountBootstrapGateway {
 Future<void> _noOpInvalidation() async {}
 
 Future<void> _executeDataConnectAccountUpsert() async {
-  await MobileConnector.instance.upsertMyAccount().execute();
+  final auth=FirebaseAuth.instance;
+  final user=auth.currentUser;
+  final project=auth.app.options.projectId;
+  if (user==null || user.isAnonymous || user.tenantId!=null || auth.tenantId!=null) {
+    throw StateError('Authenticated account is unavailable.');
+  }
+  bool current() => auth.currentUser?.uid==user.uid &&
+      auth.currentUser?.tenantId==null && auth.tenantId==null &&
+      auth.app.options.projectId==project;
+  await ensureOwnedAccountBootstrap(ownerUid:user.uid,isCurrent:current,
+    read:() async {
+      final result=await MobileConnector.instance.getMyAccount().execute();
+      final row=result.data.appUser;
+      return row==null ? null : (uid:row.uid,status:row.status.stringValue);
+    },create:() async {await MobileConnector.instance.upsertMyAccount().execute();});
+}
+
+/// Reuses the existing account connector. Successful authentication alone
+/// cannot reset a restriction or establish a successful database create.
+@visibleForTesting
+Future<void> ensureOwnedAccountBootstrap({required String ownerUid,
+  required bool Function() isCurrent,
+  required Future<({String uid,String status})?> Function() read,
+  required Future<void> Function() create}) async {
+  void current() {if (!isCurrent()) throw StateError('Account changed during setup.');}
+  bool accepted(({String uid,String status})? value) {
+    if (value==null) return false;
+    if (value.uid!=ownerUid || value.status!='ACTIVE') {
+      throw StateError('Account setup is unavailable.');
+    }
+    return true;
+  }
+  current();
+  final existing=await read();current();
+  if (accepted(existing)) return;
+  // A same-account competing create or a lost acknowledgement may succeed.
+  // Only an authoritative readback can resolve either outcome.
+  try {await create();} on Object {current();}
+  current();
+  final created=await read();current();
+  if (!accepted(created)) throw StateError('Account setup is not confirmed.');
 }

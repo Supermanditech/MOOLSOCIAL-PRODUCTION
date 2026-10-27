@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'journey_services.dart';
+import 'account_profile_gateway.dart';
 
 const _deviceReviewMode = bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');
 
@@ -122,6 +123,59 @@ class JourneySession extends ChangeNotifier {
   String? errorMessage;
   String? noticeMessage;
   AuthenticatedAccountIdentity? accountIdentity;
+  AccountProfileGateway? _profileGateway;
+  int? _profileGatewayGeneration;
+  AccountProfileOwner? _profileGatewayOwner;
+
+  AccountProfileGateway? get accountProfileGateway {
+    final owner = authenticatedBuyPersistenceIdentity;
+    final generation = navigationAuthenticationGeneration;
+    final source = _accountIdentityGateway;
+    if (_disposed || owner == null || generation == null ||
+        owner.tenantId != null || source is! AccountProfileGatewaySource) return null;
+    if (_profileGatewayOwner != owner || _profileGatewayGeneration != generation) {
+      _profileGatewayOwner = owner;
+      _profileGatewayGeneration = generation;
+      _profileGateway = (source as AccountProfileGatewaySource).profileGateway(owner,
+        () => !_disposed && navigationAuthenticationGeneration == generation &&
+            authenticatedBuyPersistenceIdentity == owner);
+    }
+    return _profileGateway;
+  }
+
+  bool _applyCanonicalProfile(AccountProfileGateway gateway, AccountProfileSnapshot profile) {
+    final old = accountIdentity;
+    if (_disposed || !gateway.isCurrent() || old == null ||
+        authenticatedFirebasePrincipal?.userId != profile.ownerUid) return false;
+    accountIdentity = AuthenticatedAccountIdentity(
+      firebaseUserId:old.firebaseUserId,firebaseProjectId:old.firebaseProjectId,
+      firebaseTenantId:old.firebaseTenantId,displayName:profile.displayName,
+      emailAddress:old.emailAddress,phoneNumber:old.phoneNumber,
+      providerAccountLabel:old.providerAccountLabel,signInMethods:old.signInMethods);
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> refreshAccountProfile() async {
+    final gateway = accountProfileGateway;
+    if (gateway == null) return false;
+    try {return _applyCanonicalProfile(gateway, await gateway.read());}
+    on Object {return false;}
+  }
+
+  Future<bool> saveAccountProfileName(String name) async {
+    final gateway = accountProfileGateway;
+    if (gateway == null) return false;
+    final normalised=name.trim().replaceAll(RegExp(r'\s+'),' ');
+    if (normalised.length<2 || normalised.length>60) return false;
+    try {
+      if (gateway.snapshot == null) await gateway.read();
+      final current=gateway.snapshot;
+      if (current?.displayName==normalised) return _applyCanonicalProfile(gateway,current!);
+      final saved = await gateway.save({'kind':'name','displayName':normalised});
+      return _applyCanonicalProfile(gateway,saved);
+    } on Object {return false;}
+  }
   ({String projectId, String? tenantId, String userId})? _firebasePrincipal;
   int? _firebasePrincipalGeneration;
   StreamSubscription<void>? _firebasePrincipalSubscription;

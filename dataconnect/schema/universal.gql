@@ -19,6 +19,11 @@ enum RouteStatus {
 type AppUser @table(key: "uid") {
   uid: String! @default(expr: "auth.uid")
   displayName: String @col(dataType: "varchar(120)")
+  # B01 global account Profile only. No order, payment or Workspace authority.
+  # Local source contract; provisioning/migration remain separately held.
+  profileRevision: Int! @default(value: 0)
+  profileDataJson: String
+  profileReceiptsJson: String
   status: AccountStatus!
   createdAt: Timestamp! @default(expr: "request.time")
   updatedAt: Timestamp! @default(expr: "request.time")

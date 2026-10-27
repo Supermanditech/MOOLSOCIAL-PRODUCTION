@@ -75641,6 +75641,23 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
     expect(find.textContaining('Create content anytime from Social'), findsOne);
   });
 
+  testWidgets('B03 existing chooser awaits Store switch before closing', (tester) async {
+    final work = liveStore()..seedMultipleWorkspaces();
+    final destination = work.otherWorkspaces.first;
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-store-orders')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-dashboard-workspace-switcher')));
+    await tester.pumpAndSettle();
+    final choice = find.text(destination.name).last;
+    await tester.ensureVisible(choice);
+    await tester.tap(choice);
+    await tester.pumpAndSettle();
+    expect(work.activeWorkspace?.id, destination.id);
+    expect(find.byKey(const Key('work-switch-add-workspace')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final width in [320.0, 412.0]) {
     testWidgets(
       'full store name and content-sized Workspace picker at $width',

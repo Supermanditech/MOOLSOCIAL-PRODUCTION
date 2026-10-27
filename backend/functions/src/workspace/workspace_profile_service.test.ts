@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { WorkspaceMembershipRecord } from "./workspace_membership_contract.js";
 
 import {
   InMemoryWorkspaceProfileRepository,
@@ -13,6 +14,12 @@ import type {
 } from "./workspace_proof_store.js";
 
 const now = () => new Date("2026-08-29T09:00:00.000Z");
+
+const accessMember: WorkspaceMembershipRecord = {
+  schemaVersion: 1, membershipId: "member.owner-001", accountId: "owner-1",
+  workspaceId: "store-001", workspaceProfileId: "retailer-grocery", state: "active",
+  version: 1, grantedAt: "2026-08-28T09:00:00.000Z", expiresAt: "2026-08-29T10:00:00.000Z",
+};
 class ProofStore implements WorkspaceProofStore {
   prepared?: WorkspaceProofInput;
   confirmed?: WorkspaceProofInput & { uploadId: string };
@@ -60,6 +67,77 @@ function validSubmission(overrides: Readonly<Record<string, unknown>> = {}) {
     ...overrides,
   };
 }
+
+async function accessFixture(members: readonly WorkspaceMembershipRecord[] = [accessMember]) {
+  const repository = new InMemoryWorkspaceProfileRepository();
+  const subject = new WorkspaceProfileService(repository, now, new ProofStore(), {readAccount: async () => members});
+  const created = await subject.submitProfile("owner-1", validSubmission()) as {caseId: string};
+  await repository.update(created.caseId, "owner-1", {status: "approved", workspaceId: "store-001"});
+  return {repository, subject, caseId: created.caseId};
+}
+
+test("B03 approval readback binds current membership and application revision without granting anything", async () => {
+  const {subject, repository, caseId} = await accessFixture();
+  const before = structuredClone([...repository.records.values()]);
+  const result = await subject.reviewStatus("owner-1", {caseId}) as {access: Record<string, unknown>};
+  assert.equal(result.access.state, "active");
+  assert.equal(result.access.accountId, "owner-1");
+  assert.equal(result.access.caseId, caseId);
+  assert.equal(result.access.checkedAt, now().toISOString());
+  assert.deepEqual(result.access.membership, {schemaVersion: 1, membershipId: accessMember.membershipId,
+    workspaceId: "store-001", workspaceProfileId: "retailer-grocery", state: "active", version: 1,
+    effectiveFrom: accessMember.grantedAt, expiresAt: accessMember.expiresAt});
+  assert.deepEqual([...repository.records.values()], before);
+  const listed = await subject.listWorkspaces("owner-1") as {workspaces: Array<{access: {state: string}}>};
+  assert.equal(listed.workspaces[0]?.access.state, "active");
+  await assert.rejects(subject.reviewStatus("owner-2", {caseId}), WorkspaceProfileError);
+});
+
+for (const [name, patch, state] of [
+  ["pending membership", {state: "pending"}, "denied"],
+  ["revoked membership", {state: "revoked", revokedAt: "2026-08-29T08:00:00.000Z"}, "denied"],
+  ["expired membership", {expiresAt: "2026-08-29T09:00:00.000Z"}, "denied"],
+  ["future membership", {effectiveFrom: "2026-08-29T09:01:00.000Z"}, "denied"],
+  ["foreign owner", {accountId: "owner-2"}, "unavailable"],
+  ["foreign profile", {workspaceProfileId: "manufacturer"}, "denied"],
+  ["foreign Store", {workspaceId: "store-002"}, "denied"],
+  ["invalid revision", {version: 0}, "unavailable"],
+] as const) {
+  test(`B03 ${name} cannot authorize Store access`, async () => {
+    const {subject, caseId} = await accessFixture([{...accessMember, ...patch}]);
+    const result = await subject.reviewStatus("owner-1", {caseId}) as {access: {state: string}};
+    assert.equal(result.access.state, state);
+  });
+}
+
+test("B03 absent, failed and conflicting authority never becomes approval authority", async () => {
+  const {subject, repository, caseId} = await accessFixture([accessMember, {...accessMember, version: 2}]);
+  for (const service of [subject, new WorkspaceProfileService(repository, now),
+    new WorkspaceProfileService(repository, now, undefined, {readAccount: async () => {throw new Error("offline");}})]) {
+    const result = await service.reviewStatus("owner-1", {caseId}) as {status: string; access: {state: string}};
+    assert.equal(result.status, "approved");
+    assert.equal(result.access.state, "unavailable");
+  }
+});
+
+test("B03 pending/rejected/suspended and paid subscriptions cannot grant access", async () => {
+  const {subject, repository, caseId} = await accessFixture();
+  for (const status of ["pending", "rejected", "suspended"]) {
+    await repository.update(caseId, "owner-1", {status, plan: "paid"});
+    const result = await subject.reviewStatus("owner-1", {caseId}) as {access: {state: string}};
+    assert.equal(result.access.state, "denied");
+  }
+});
+
+test("B03 suspension during membership lookup invalidates the original response", async () => {
+  const {repository, caseId} = await accessFixture();
+  const subject = new WorkspaceProfileService(repository, now, undefined, {readAccount: async () => {
+    await repository.update(caseId, "owner-1", {status: "suspended"});
+    return [accessMember];
+  }});
+  const result = await subject.reviewStatus("owner-1", {caseId}) as {access: {state: string}};
+  assert.equal(result.access.state, "unavailable");
+});
 
 test("submission is server-assigned to Free and remains pending", async () => {
   const repository = new InMemoryWorkspaceProfileRepository();
@@ -188,6 +266,7 @@ test("approved review returns only its authoritative Workspace", async () => {
       caseId: created.caseId,
       status: "approved",
       plan: "free",
+      access: {schemaVersion: 1, state: "unavailable"},
       profileId: "retailer-grocery",
       name: "Mahadev Fresh Mart",
       area: "Sardarpura, Jodhpur",
@@ -200,6 +279,7 @@ test("approved review returns only its authoritative Workspace", async () => {
       caseId: created.caseId,
       status: "approved",
       plan: "free",
+      access: {schemaVersion: 1, state: "unavailable"},
       profileId: "retailer-grocery",
       name: "Mahadev Fresh Mart",
       area: "Sardarpura, Jodhpur",

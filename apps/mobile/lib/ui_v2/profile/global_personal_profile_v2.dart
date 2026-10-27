@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -8,7 +10,7 @@ import 'global_profile_panel_v2.dart';
 const _profileNavy = Color(0xFF000080);
 const _profileViolet = Color(0xFF4D46A8);
 
-class GlobalPersonalProfileV2 extends StatelessWidget {
+class GlobalPersonalProfileV2 extends StatefulWidget {
   const GlobalPersonalProfileV2({
     required this.session,
     this.gstDetails,
@@ -23,13 +25,43 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
   final GlobalProfileSurfaceTone surfaceTone;
 
   @override
+  State<GlobalPersonalProfileV2> createState() => _GlobalPersonalProfileV2State();
+}
+
+class _GlobalPersonalProfileV2State extends State<GlobalPersonalProfileV2> {
+  JourneySession get session => widget.session;
+  Widget? get gstDetails => widget.gstDetails;
+  VoidCallback? get onOpenAddresses => widget.onOpenAddresses;
+  GlobalProfileSurfaceTone get surfaceTone => widget.surfaceTone;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(session.refreshAccountProfile());
+    });
+  }
+
+  @override
+  void didUpdateWidget(GlobalPersonalProfileV2 oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.session, session)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(session.refreshAccountProfile());
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: session,
     builder: (context, _) {
       final identity = session.isAuthenticated ? session.accountIdentity : null;
       // The legacy device alias has no account owner. Never present it as the
       // identity of a newly signed-in account (PROFILE-B01 owns durable edits).
-      final displayName = _present(identity?.displayName);
+      final source = session.accountProfileGateway;
+      final canonicalUnavailable = source != null && source.snapshot == null;
+      final displayName = canonicalUnavailable ? null : _present(identity?.displayName);
       final email = _present(identity?.emailAddress);
       final phone = _present(identity?.phoneNumber);
       final area =
@@ -178,7 +210,7 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
                             keyName: 'global-personal-profile-name',
                             icon: Icons.person_outline_rounded,
                             label: 'Display name',
-                            value: displayName ?? 'Not added',
+                              value: displayName ?? (canonicalUnavailable ? 'Not available' : 'Not added'),
                             onTap: () => _openAccountRoute(
                               context,
                               accountActive
@@ -409,12 +441,11 @@ class _GlobalPersonalProfileNameEditorV2State
         '',
   );
   bool _saving = false;
+  bool _loadingCanonical = false, _canonicalLoadFailed = false;
   String? _nameError;
-  late final int? _openingGeneration =
-      widget.session.navigationAuthenticationGeneration;
-  late final Object? _openingIdentity = widget.session.accountIdentity;
-  late final Object? _openingAccountScope =
-      widget.session.authenticatedBuyPersistenceIdentity;
+  late final int? _openingGeneration;
+  late final Object? _openingIdentity;
+  late final Object? _openingAccountScope;
   bool get _sameAccount =>
       widget.session.isAuthenticated &&
       widget.session.navigationAuthenticationGeneration == _openingGeneration &&
@@ -424,13 +455,37 @@ class _GlobalPersonalProfileNameEditorV2State
           : identical(widget.session.accountIdentity, _openingIdentity));
 
   @override
+  void initState() {
+    super.initState();
+    _openingGeneration=widget.session.navigationAuthenticationGeneration;
+    _openingIdentity=widget.session.accountIdentity;
+    _openingAccountScope=widget.session.authenticatedBuyPersistenceIdentity;
+    if (widget.session.accountProfileGateway != null) {
+      _loadingCanonical = true;
+      _controller.clear();
+      unawaited(_loadCanonical());
+    }
+  }
+
+  Future<void> _loadCanonical() async {
+    final loaded=await widget.session.refreshAccountProfile();
+    if (!mounted || !_sameAccount) return;
+    setState(() {
+      _loadingCanonical=false;
+      _canonicalLoadFailed=!loaded;
+      if (loaded) _controller.text=widget.session.accountIdentity?.displayName ?? '';
+    });
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    if (_saving || !_sameAccount || widget.onSaveDisplayName == null) return;
+    if (_saving || _loadingCanonical || _canonicalLoadFailed ||
+        !_sameAccount || widget.onSaveDisplayName == null) return;
     final name = _controller.text.trim();
     if (name.length < 2 || name.length > 60) {
       setState(
@@ -504,6 +559,8 @@ class _GlobalPersonalProfileNameEditorV2State
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
+                          _loadingCanonical ? 'Loading your account name…' :
+                          _canonicalLoadFailed ? 'Your name could not be loaded. Reopen Profile to try again.' :
                           widget.onSaveDisplayName == null
                               ? 'Account name updates are not available right now.'
                               : 'Use the name you want on your account.',
@@ -514,8 +571,8 @@ class _GlobalPersonalProfileNameEditorV2State
                           key: const Key('global-personal-profile-name-field'),
                           controller: _controller,
                           enabled: !_saving && _sameAccount,
-                          readOnly: widget.onSaveDisplayName == null,
-                          autofocus: widget.onSaveDisplayName != null,
+                          readOnly: widget.onSaveDisplayName == null || _loadingCanonical || _canonicalLoadFailed,
+                          autofocus: widget.onSaveDisplayName != null && !_loadingCanonical,
                           textCapitalization: TextCapitalization.words,
                           textInputAction: TextInputAction.done,
                           maxLength: 60,
@@ -537,6 +594,7 @@ class _GlobalPersonalProfileNameEditorV2State
                           key: const Key('global-personal-profile-name-save'),
                           onPressed:
                               _saving ||
+                                  _loadingCanonical || _canonicalLoadFailed ||
                                   !_sameAccount ||
                                   widget.onSaveDisplayName == null
                               ? null
