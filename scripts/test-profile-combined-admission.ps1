@@ -62,4 +62,15 @@ Check (!$record.execution.buildAuthorized -and !$record.execution.deviceInstallA
   !$record.execution.externalServiceWriteAuthorized -and !$record.backendAdmission.sqlProvisioning -and
   !$record.backendAdmission.sqlMigration -and !$record.backendAdmission.deployment -and
   !$record.backendAdmission.backendBranchPush) 'commercial/release/provisioning exclusions retained'
+foreach($step in 0..2){
+  $subject=@('coordination(profile-combined-20261027): admit exact source sealing',
+    'codex_backend(profile-combined-20261027): seal tested B01 B03 source',
+    'evidence(profile-combined-20261027): bind source checkpoint and limits')[$step]
+  $owners=switch($step){0{Get-ProfileCombinedSealingMetadata};1{Get-ProfileCombinedRuntimeOwners};2{'docs/quality/PROFILE-INTEGRATION-01-20261027.json'}}
+  Check (Test-ProfileCombinedSealingDelta $step $subject $owners) "exact sealing step $step"
+  Check (!(Test-ProfileCombinedSealingDelta $step 'foreign' $owners)) "sealing subject $step isolation"
+  Check (!(Test-ProfileCombinedSealingDelta $step $subject @($owners+'apps/mobile/lib/main.dart'))) "sealing owner $step isolation"
+  Check (!(Test-ProfileCombinedSealingDelta $step $subject @($owners|Select-Object -Skip 1))) "sealing omission $step refused"
+}
+Check (!(Test-ProfileCombinedSealingDelta 3 'foreign' @())) 'extra sealing commit refused'
 Write-Output "PROFILE-INTEGRATION-01 admission regression checks passed: $cases. No backend behaviour or device qualification is claimed."

@@ -1,5 +1,6 @@
 # Exact founder-authorised COMBINED admission. This file grants no deployment,
-# provisioning, APK, backend-branch publication or feature-commit authority.
+# provisioning or APK authority. The later exact source-sealing amendment is
+# validated separately below; the original qualification approval is retained.
 function Get-ProfileCombinedBinding {
   [ordered]@{
     id='profile_combined_20261027'; state='founder_authorized_2026_10_27'
@@ -152,11 +153,14 @@ function Invoke-ProfileCombinedAdmission {
     Assert-ProfileCombinedOwners $ClaimedOwners $owners
   }
   $commits=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"$base..$head"))
-  Assert-Coordination ($commits.Count -le 1) 'COMBINED permits one exact local admission commit only; no feature commit.'
-  if($head -ceq $base){
+  $sealing=$record.PSObject.Properties['sourceSealing']
+  if($null -ne $sealing){
+    Assert-ProfileCombinedSealing $record $commits $head $metadata
+  }elseif($head -ceq $base){
     Assert-Coordination ($ProductionPhase -cin @('coordination_bootstrap','pre_commit')) 'COMBINED needs its admission checkpoint before implementation.'
     Assert-ProfileCombinedOwners $changed $metadata
   }else{
+    Assert-Coordination ($commits.Count -eq 1) 'COMBINED original admission permits one metadata commit only.'
     $parent=@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$head))[0]
     $subject=@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',$head))[0]
     Assert-Coordination ($parent -ceq $base -and $subject -ceq $binding.bootstrapCommitSubject) 'COMBINED admission commit identity changed.'
@@ -167,7 +171,7 @@ function Invoke-ProfileCombinedAdmission {
   if($ProductionPhase -ceq 'task_start'){
     Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('status','--porcelain')).Count -eq 0) 'COMBINED task start is not clean.'
   }
-  if($ProductionPhase -ceq 'pre_commit'){
+  if($ProductionPhase -ceq 'pre_commit' -and $null -eq $sealing){
     Assert-Coordination ($head -ceq $base -and
       @(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')).Count -gt 0 -and
       @(Get-OctoberCompatibilityGitLines @('diff','--name-only')).Count -eq 0 -and
@@ -177,5 +181,67 @@ function Invoke-ProfileCombinedAdmission {
   & (Join-Path $root 'scripts/check-cross-agent-incremental-ticket-gate.ps1') -RepositoryRoot $root -Phase $(if($ProductionPhase -ceq 'task_start'){'ticket_start'}else{'implementation'}) -Lane codex_backend -TicketId PROFILE-INTEGRATION-01 -UiScope account.profile_workspace_combined -CandidateVersionName '1.0.0-r67.8' -CandidateVersionCode 2026102704 -PackageId com.moolsocial.app.runtime -AcceptedUiCommit $base -UiContractPath $contract -UiContractSha256 $expectedContract
   Assert-ProductionSecretSafe -BaseCommit $base -HeadCommit $head
   Assert-ProductionSecretSafe -BaseCommit $base -HeadCommit $head -IndexOnly
-  Write-Output "PROFILE-INTEGRATION-01 admission passed: phase=$ProductionPhase; owners=$($owners.Count); no deployment/provisioning/APK/feature-commit/branch-push authority."
+  Write-Output "PROFILE-INTEGRATION-01 admission passed: phase=$ProductionPhase; owners=$($owners.Count); no deployment/provisioning/APK or production acceptance. Source sealing, if present, is branch-exact only."
+}
+
+# Founder activated source/evidence commits and only the named combined branch
+# push after local qualification. This is not ticket acceptance or release.
+function Get-ProfileCombinedSealingMetadata {
+  @('scripts/profile-combined-admission.ps1',
+    'scripts/test-profile-combined-admission.ps1',
+    'docs/quality/PROFILE-INTEGRATION-01-20261027.json')
+}
+function Test-ProfileCombinedSealingDelta([int]$Step,[string]$Subject,[string[]]$Actual) {
+  $subjects=@('coordination(profile-combined-20261027): admit exact source sealing',
+    'codex_backend(profile-combined-20261027): seal tested B01 B03 source',
+    'evidence(profile-combined-20261027): bind source checkpoint and limits')
+  if($Step -lt 0 -or $Step -gt 2 -or $Subject -cne $subjects[$Step]){return $false}
+  $allowed=switch($Step){0{Get-ProfileCombinedSealingMetadata};1{Get-ProfileCombinedRuntimeOwners};2{'docs/quality/PROFILE-INTEGRATION-01-20261027.json'}}
+  return (@($Actual|Sort-Object)-join '|') -ceq (@($allowed|Sort-Object)-join '|')
+}
+function Assert-ProfileCombinedSealing($Record,[string[]]$Commits,[string]$Head,[string[]]$Metadata) {
+  $checkpoint='1c5582ec98c226f95014b0c6d6a25ba4bb8cfdc1'
+  $s=$Record.sourceSealing
+  Assert-Coordination ($s.authorization -ceq 'Founder activated the annotated combined source-sealing scope on 2026-10-27' -and
+    $s.branch -ceq 'work/codex-backend/profile-combined-20261027' -and
+    $s.remote -ceq 'https://github.com/Supermanditech/MOOLSOCIAL-PRODUCTION.git' -and
+    !$s.productionAcceptance -and !$s.deployment -and !$s.apkBuildOrInstall) 'COMBINED sealing authority mismatch.'
+  $original=(@(Get-OctoberCompatibilityGitLines @('show',"${checkpoint}:docs/quality/PROFILE-INTEGRATION-01-20261027.json"))-join "`n")|ConvertFrom-Json
+  $copy=($Record|ConvertTo-Json -Depth 100)|ConvertFrom-Json
+  $copy.PSObject.Properties.Remove('sourceSealing')
+  Assert-Coordination (($copy|ConvertTo-Json -Depth 100 -Compress) -ceq ($original|ConvertTo-Json -Depth 100 -Compress)) 'COMBINED sealing rewrote historical qualification.'
+  Assert-Coordination ($Commits.Count -ge 1 -and $Commits.Count -le 4 -and $Commits[0] -ceq $checkpoint) 'COMBINED sealing history exceeds exact checkpoint sequence.'
+  for($i=1;$i -lt $Commits.Count;$i++){
+    $parent=@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$Commits[$i]))[0]
+    $subject=@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',$Commits[$i]))[0]
+    $delta=@(Get-OctoberCompatibilityGitLines @('diff','--no-renames','--name-only',$parent,$Commits[$i]))
+    Assert-Coordination ($parent -ceq $Commits[$i-1] -and (Test-ProfileCombinedSealingDelta ($i-1) $subject $delta)) 'COMBINED sealing commit changed unrelated source/history.'
+  }
+  foreach($owner in @($Metadata|Where-Object {$_ -cnotin @(Get-ProfileCombinedSealingMetadata)})){
+    Get-OctoberCompatibilityGitLines @('diff','--exit-code',$checkpoint,'--',$owner)|Out-Null
+  }
+  $runtime=@(Get-ProfileCombinedRuntimeOwners)
+  Assert-Coordination ((@($s.gitBlobHashes.PSObject.Properties.Name|Sort-Object)-join '|') -ceq (@($runtime|Sort-Object)-join '|')) 'COMBINED source manifest omitted an owner.'
+  $canonical=[ordered]@{}
+  foreach($property in @($s.gitBlobHashes.PSObject.Properties|Sort-Object Name)){$canonical[$property.Name]=[string]$property.Value}
+  $manifestBytes=[Text.Encoding]::UTF8.GetBytes(($canonical|ConvertTo-Json -Compress))
+  $manifestHash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($manifestBytes))
+  Assert-Coordination ($manifestHash -ceq '3E34509DD774DE9F0E24F241C7220C11D472A2041C182A1CBEEB482458A0A510') 'COMBINED tested Git blob manifest changed.'
+  foreach($owner in $runtime){
+    $expected=[string]$s.gitBlobHashes.$owner
+    $actual=@(Get-OctoberCompatibilityGitLines @('hash-object',"--path=$owner",$owner))[0]
+    Assert-Coordination ($expected -cmatch '^[0-9a-f]{40}$' -and $actual -ceq $expected) 'COMBINED source differs from tested manifest.'
+    if($Commits.Count -ge 3){
+      Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($Commits[2]):$owner"))[0] -ceq $expected) 'COMBINED source commit differs from tested manifest.'
+    }
+  }
+  if($ProductionPhase -ceq 'pre_commit'){
+    $subjects=@('coordination(profile-combined-20261027): admit exact source sealing',
+      'codex_backend(profile-combined-20261027): seal tested B01 B03 source',
+      'evidence(profile-combined-20261027): bind source checkpoint and limits')
+    $step=$Commits.Count-1
+    $staged=@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only'))
+    Assert-Coordination ($step -le 2 -and (Test-ProfileCombinedSealingDelta $step $subjects[$step] $staged)) 'COMBINED sealing staged scope is not exact.'
+    foreach($owner in $staged){Get-OctoberCompatibilityGitLines @('diff','--exit-code','--',$owner)|Out-Null}
+  }
 }
