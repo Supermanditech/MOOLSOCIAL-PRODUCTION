@@ -18,7 +18,7 @@
     "selectedTicketAssessment": {
       "ticketId": "AI-DOMAIN-BATCH-20",
       "customerOutcome": "Use existing Buy/Store tasks through original authorised source reads and exact native reviews; preserve missing-source boundaries.",
-      "necessityProof": "History has no production receiver; existing draft-only save signature does not persist completed conversation messages.",
+      "necessityProof": "Existing Buy and approved-Store native adapters need original authorised per-domain source reads and typed preparation handoffs; missing domain authorities must remain explicit dependencies.",
       "implementationDisposition": [
         "reuse",
         "new_necessary_work"
@@ -68,15 +68,15 @@
         "backend/functions/src/assistant/history_http.test.ts"
       ],
       "robustnessCoverage": [
-        "Durable SQL revision/duplicate/receipt/paging/isolation/erasure and disk restart tests.",
-        "Actual client-handler-repository/controller text History integration, lost acknowledgement and new-draft preservation.",
-        "Existing AI/Profile regressions, exact current-source OPPO guard/navigation/keyboard checks and108 saved fingerprints."
+        "Original account, paid-AI, Workspace membership, source revisions and native-ready target intersection; stale, duplicate, cancelled and unavailable recovery.",
+        "Per-scope original-service to mobile/native form integration, supplied-field mapping and final confirmation; no invented provider, catalogue, ledger or successful effect.",
+        "Existing shared AI/Profile/request/History regressions plus current-source OPPO reachable-screen inspection and protected saved-data fingerprints."
       ],
       "adjustments": [
-        "Reuse existing History UI and original Plans/Workspace/account/erasure services; restore inert text only; no business action replay."
+        "Reuse existing forms, controllers, domain services and sealed request/History recovery; no replacement manual screens, masters or ledgers."
       ],
       "explicitExclusions": [
-        "No cloud/model activation, new billing/retention rules, admin, media/OCR/voice processing, commerce/financial execution, APK, publication or source feature commit/push."
+        "No cloud/model activation, new business or billing rules, admin, BE-06 media/OCR/voice processing, live commerce/financial execution, APK or publication. Qualified source/evidence checkpoint and normal named-batch-branch push only under standing authority."
       ],
       "dependenciesAndApprovals": [
         "Founder explicitly delegated next existing-ticket selection and standing admission/implementation/testing acceptance; not represented as a separate exact-hash review.",
@@ -96,7 +96,7 @@
     "id": "AI-DOMAIN-BATCH-20",
     "customerOutcome": "Use existing Buy/Store tasks through original authorised source reads and exact native reviews; preserve missing-source boundaries.",
     "classification": "mvp_supporting",
-    "classificationReason": "Completes the existing paid Buy/approved-Workspace assistant History requirement using current authorities and UI.",
+    "classificationReason": "Integrates the 20 approved existing paid-assistant Buy/Store source-read and native-handoff scopes without adding domain features.",
     "minimumCompleteScope": [
       "Execute only the20 already prepared work packages with explicit per-scope qualification/blocked results.",
       "First reconcile sources and register exact tools; do not recreate completed manual features or missing domain authorities."
@@ -115,9 +115,9 @@
       "Private media persistence remains BE-06; reject unsupported saves without losing input."
     ],
     "testAndEvidencePlan": [
-      "Durable SQL revision/duplicate/receipt/paging/isolation/erasure and disk restart tests.",
-      "Actual client-handler-repository/controller text History integration, lost acknowledgement and new-draft preservation.",
-      "Existing AI/Profile regressions, exact current-source OPPO guard/navigation/keyboard checks and108 saved fingerprints."
+      "Original account, paid-AI, Workspace membership, source revisions and native-ready target intersection; stale, duplicate, cancelled and unavailable recovery.",
+      "Per-scope original-service to mobile/native form integration, supplied-field mapping and final confirmation; no invented provider, catalogue, ledger or successful effect.",
+      "Existing shared AI/Profile/request/History regressions plus current-source OPPO reachable-screen inspection and protected saved-data fingerprints."
     ]
   },
   "founderDisclosure": {
@@ -140,8 +140,8 @@
   },
   "backendAdmission": {
     "binding": {
-      "id": "thin_b07_b04_20261027",
-      "state": "founder_authorized_2026_10_27",
+      "id": "ai_domain_batch_20261028",
+      "state": "founder_authorized_2026_10_28",
       "lane": "codex_backend",
       "role": "primary",
       "task": "/root/codex_backend_ai_domain_batch",

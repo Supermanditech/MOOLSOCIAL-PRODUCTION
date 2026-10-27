@@ -21,4 +21,25 @@ Check ((Get-FileHash (Join-Path $root 'docs/quality/AI-DOMAIN-CATALOGUE-SELECTOR
 Check (@(Get-AiDomainBatchRecurrenceOwners).Count -eq 6) 'exact six recurrence owners'
 Check (@(Get-AiDomainBatchProviderTestOwners).Count -eq 7) 'exact seven original-provider metadata owners'
 Check ((Get-FileHash (Join-Path $root 'docs/quality/AI-DOMAIN-ORIGINAL-PROVIDER-TEST-20261028.md')).Hash -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22') 'exact original-provider test boundary'
+Check (@(Get-AiDomainScopeOneSealOwners).Count -eq 5) 'only five existing metadata owners for the discovery checkpoint'
+$approval=Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json
+$manifest=$approval.scope01Checkpoint.manifest
+Check (Test-AiDomainScopeOneManifest $manifest) 'exact qualified discovery source manifest'
+foreach($property in @('scope','baseline','metadataHead','branch')) {
+ $bad=($manifest|ConvertTo-Json -Depth 30)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'scope'){2}else{'foreign'}
+ Check (!(Test-AiDomainScopeOneManifest $bad)) "reject changed manifest $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($manifest|ConvertTo-Json -Depth 30)|ConvertFrom-Json
+ $bad.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainScopeOneManifest $bad)) "reject changed qualified $property"
+}
+$bad=($manifest|ConvertTo-Json -Depth 30)|ConvertFrom-Json
+$bad.changedOwners[0]='backend/functions/src/foreign.ts'
+Check (!(Test-AiDomainScopeOneManifest $bad)) 'reject unrelated source owner'
+$bad=($manifest|ConvertTo-Json -Depth 30)|ConvertFrom-Json
+$bad.owners=@($bad.owners)+@($bad.owners[0])
+Check (!(Test-AiDomainScopeOneManifest $bad)) 'reject duplicate or expanded runtime manifest'
+Check (!$approval.sourceFeatureCommits -and !$approval.backendBranchPush -and !$approval.deployment -and !$approval.productionAcceptance) 'no broad source/push/deployment or production authority'
 Write-Output "AI domain batch admission checks passed: $n."
