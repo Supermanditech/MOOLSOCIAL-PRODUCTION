@@ -329,8 +329,28 @@
     "productionAcceptance": false,
     "deployment": false,
     "apkBuildOrInstall": false,
-    "state": "SOURCE_SEALING_AUTHORIZED_NOT_YET_COMMITTED",
-    "sourceCommit": null,
-    "disclosure": "Source checkpoint only; no formal ticket acceptance/close or production readiness. Raw evidence remains local at outputs/profile-combined-integration-20261027-v1; Git preserves sanitized results and hashes."
+    "state": "LOCAL_SOURCE_COMMITTED_REMOTE_VERIFICATION_PENDING",
+    "sourceCommit": "2472db6c6a83595a3c91207af964fc9fbf66398f",
+    "disclosure": "Source checkpoint only; this evidence commit records facts before push. A later local receipt records exact remote readback without a self-referential commit hash. No formal ticket acceptance/close, deployment or production readiness. Prior qualification fields describe the earlier test snapshot, not newly executed cloud/device tests.",
+    "sealingAdmissionCommit": "5e8f2a65eec1a3e205f75356d2516a82a1ca01b8",
+    "audit": {
+      "testedSourceFilesMatched": 27,
+      "committedGitBlobsMatched": 27,
+      "originalSourceFilesPreserved": 29,
+      "evidenceReceiptHashesMatched": 17,
+      "unexpectedChangedOwners": 0,
+      "stagedSecretGatePassed": true,
+      "generatedArtifactsStaged": 0,
+      "rawDebugOrNativeDataCommitted": false,
+      "admissionRegressionChecksPassed": 61,
+      "runtimeCodeChangedDuringSealing": false
+    },
+    "remoteVerification": {
+      "state": "PENDING_AFTER_EVIDENCE_COMMIT",
+      "ref": "refs/heads/work/codex-backend/profile-combined-20261027",
+      "expectedCommit": "the evidence-only commit directly following sourceCommit",
+      "localReceipt": "outputs/profile-combined-integration-20261027-v1/SOURCE-SEAL-RESULT.json"
+    },
+    "formalTicketAcceptanceOrClose": false
   }
 }
