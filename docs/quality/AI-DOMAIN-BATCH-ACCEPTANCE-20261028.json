@@ -41,7 +41,7 @@
     "authority": "Existing EXECUTE and standing qualified source/evidence seal authorization; exact discovery slice only.",
     "namedBranchPushAuthorized": true,
     "productionAcceptance": false,
-    "sourceCommit": null,
+    "sourceCommit": "5f1d3b65c4258196449760f779f6dc0fa0ed2871",
     "manifest": {
       "scope": 1,
       "recordedAt": "2026-10-27T23:22:04.108326+00:00",
@@ -402,6 +402,23 @@
     ],
     "scopeLabelCorrection": "Stale copied Profile/History purpose and binding labels are corrected in existing metadata. Original four commits remain immutable; no implementation scope or owner claim widened.",
     "remainingGoal": "Original scopes02-20 remain active and uncompleted. This checkpoint does not close the20-scope goal.",
-    "remoteReadback": "Exact normal named-branch remote verification follows source/evidence commits; no self-referential closure SHA or production qualification claimed."
+    "remoteReadback": "Exact normal named-branch remote verification follows source/evidence commits; no self-referential closure SHA or production qualification claimed.",
+    "codeReviewNotes": {
+      "check": "git diff --check",
+      "result": "one nonblocking test-source trailing-space finding retained",
+      "owner": "backend/functions/src/assistant/model_service.test.ts",
+      "line": 264,
+      "functionalImpact": "None; test source only. This check is not reported as passing. No runtime, security, permission, financial or provider gate is waived. Existing static informational findings remain separately recorded.",
+      "qualifiedSourcePreserved": true,
+      "requiredFunctionalRegression": "259 passing backend cases plus original-provider/mobile/native evidence",
+      "evidenceSha256": "A1548AF198B18785FCBFE37029E08CE694667D07DFAFF0C3F52B9FD4887D6779"
+    },
+    "sourceCheckpointRecorded": {
+      "sourceCommit": "5f1d3b65c4258196449760f779f6dc0fa0ed2871",
+      "sourceOwners": 27,
+      "qualification": "Original-source preparation and current-source reachable OPPO UI within named limits; partial scope01, not live model/domain completion.",
+      "remainingScopes": 19,
+      "goalStillActive": true
+    }
   }
 }
