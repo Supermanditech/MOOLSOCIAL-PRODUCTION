@@ -19,7 +19,8 @@ const assistantStoreStockOwnerContextActions={'AI-ACT-231','AI-ACT-232','AI-ACT-
 const assistantStoreRestockOwnerContextActions={'AI-ACT-234'};
 const assistantStoreOrderOriginalContextActions={'AI-ACT-274'};
 const assistantStoreSupplierDraftContextActions={'AI-ACT-235','AI-ACT-236'};
-const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions,...assistantStoreSupplierDraftContextActions};
+const assistantStorePurchaseRootContextActions={'AI-ACT-253','AI-ACT-269'};
+const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions,...assistantStoreSupplierDraftContextActions,...assistantStorePurchaseRootContextActions};
 const assistantDomainContextActions = {'AI-ACT-001', 'AI-ACT-002', 'AI-ACT-003', 'AI-ACT-004', 'AI-ACT-005',
   ...assistantDomainProductContextActions, ...assistantDomainPreferenceContextActions,
   ...assistantDomainAddressContextActions,...assistantPrivateStarsContextActions,
@@ -155,6 +156,9 @@ class AssistantDomainContextGateway {
       if (assistantStoreSupplierDraftContextActions.contains(action) &&
           (!context.workspaceApproved || !context.storeWorkspace ||
            !RegExp(r'^store-supplier-draft-owner:[a-f0-9]{64}$').hasMatch(revision))) _invalid();
+      if (assistantStorePurchaseRootContextActions.contains(action) &&
+          (!context.workspaceApproved || !context.storeWorkspace ||
+           !RegExp(r'^store-purchase-root-owner:[a-f0-9]{64}$').hasMatch(revision))) _invalid();
       if (assistantStoreOrderOriginalContextActions.contains(action) && (!context.inWorkspace ||
           !context.storeWorkspace || !context.workspaceApproved || entity == null ||
           !RegExp(r'^store-order-original:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision))) _invalid();

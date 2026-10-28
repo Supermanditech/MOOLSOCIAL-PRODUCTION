@@ -3219,7 +3219,7 @@ class _WorkWorkspaceDashboardScreenState
   int _financeSnapshotRevision = 0;
   int _financeFormRevision = 0;
   Object? _purchaseAssistantOwner;
-  String? _purchaseAssistantDigest;
+  final _purchaseAssistantAnchors = <(String, String?), ({String signature, int version})>{};
   int _purchaseAssistantVersion = 0;
   Object? _stockAssistantOwner;
   final _stockAssistantVersions=<(String,String?),(String,int)>{};
@@ -8641,14 +8641,23 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
   }
 
   String? _purchaseAssistantRevision(WorkSession source, String actionId, MoolAssistantContext ctx, String? entityId) {
-    final signature = _assistantPurchaseSourceSignature(source, actionId, entityId);
-    if (signature == null) return null;
-    final owner = (source, actionId, entityId, ctx.binding, source.workspaceSupplierScope,
-      source.publicationPreferencesContext);
-    if (_purchaseAssistantOwner != owner || _purchaseAssistantDigest != signature) {
-      _purchaseAssistantOwner = owner; _purchaseAssistantDigest = signature; _purchaseAssistantVersion++;
+    final owner = (source, ctx.binding, source.workspaceSupplierScope, source.publicationPreferencesContext);
+    if (_purchaseAssistantOwner != owner) {
+      _purchaseAssistantOwner = owner;
+      _purchaseAssistantAnchors.clear();
     }
-    return 'native-purchase:$_purchaseAssistantVersion';
+    final key = (actionId, entityId);
+    final signature = _assistantPurchaseSourceSignature(source, actionId, entityId);
+    if (signature == null) {
+      _purchaseAssistantAnchors.remove(key);
+      return null;
+    }
+    var anchor = _purchaseAssistantAnchors[key];
+    if (anchor == null || anchor.signature != signature) {
+      anchor = (signature: signature, version: ++_purchaseAssistantVersion);
+      _purchaseAssistantAnchors[key] = anchor;
+    }
+    return 'native-purchase:${anchor.version}';
   }
   Future<MoolAssistantNativeSnapshot?> _purchaseAssistantSnapshot(BuildContext hostContext,
     WorkSession source, String actionId, MoolAssistantContext ctx, String? entityId) async {
@@ -8658,9 +8667,16 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
     // These native admission methods can project/persist inventory and reports.
     // AI snapshots inspect only sources already admitted by the original UI.
     if (!current() || !source.workspaceSuppliersLoaded || source.workspaceSupplierSaving ||
-        source.workspaceSupplierRecoveryRequired) return null;
-    if (actionId == 'AI-ACT-256' && !source.workspaceInvoiceHistoryLoaded) return null;
-    if (actionId == 'AI-ACT-272' && !_assistantPurchaseInventoryAdmitted(source)) return null;
+        source.workspaceSupplierRecoveryRequired) {
+      _purchaseAssistantOwner = null;
+      _purchaseAssistantAnchors.clear();
+      return null;
+    }
+    if (actionId == 'AI-ACT-256' && !source.workspaceInvoiceHistoryLoaded ||
+        actionId == 'AI-ACT-272' && !_assistantPurchaseInventoryAdmitted(source)) {
+      _purchaseAssistantAnchors.remove((actionId, entityId));
+      return null;
+    }
     final revision = _purchaseAssistantRevision(source, actionId, ctx, entityId);
     return revision == null ? null : MoolAssistantNativeSnapshot(binding: ctx.binding,
       sourceRevision: revision, entityId: entityId, permitted: true);

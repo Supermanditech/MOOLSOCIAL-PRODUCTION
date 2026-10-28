@@ -40,7 +40,7 @@ function supplierDraftFixture() {
   }}, {projectId: actor.projectId, now: () => clock, readWorkspaces: workspaces});
   const original = new ProfileWorkspacePreparationContext({profile: {async read() { throw Error('No personal or supplier master read'); }},
     plans, workspaces, now: () => clock});
-  const source = new CompositePreparationContext({original, nativeSupplierFormsEnabled: true, now: () => clock});
+  const source = new CompositePreparationContext({original, nativeSupplierFormsEnabled: true, nativePurchaseFormsEnabled: true, now: () => clock});
   const input = {scope: {audience: 'workspace' as const, storeId}, requestId: 'HOST-supplier-preparation', requestRevision: 1,
     expectedEntitlementRevision: `workspace:${storeId}:1:1`, message: 'Add the supplier I named', language: 'Hindi', history: [],
     actionId: 'AI-ACT-235', entityId: null};
@@ -80,17 +80,18 @@ test('Supplier optional root does not break catalogue-selected combined contexts
   for (const selection of [{catalogueListingIds: ['HOST-listing']}]) {
     const source = await f.source.read(actor, {...f.input, actionId: null, ...selection});
     assert(source.tools.some(tool => tool.actionId === 'AI-ACT-317'));
-    assert(!source.tools.some(tool => ['AI-ACT-235', 'AI-ACT-236'].includes(tool.actionId)));
+    assert(!source.tools.some(tool => ['AI-ACT-235', 'AI-ACT-236', 'AI-ACT-253', 'AI-ACT-269'].includes(tool.actionId)));
   }
 });
 
-for (const actionId of ['AI-ACT-235', 'AI-ACT-236']) test(`Supplier generic composer ${actionId} actual preparation and status survive service restart without duplicate usage`, async () => {
+for (const actionId of ['AI-ACT-235', 'AI-ACT-236', 'AI-ACT-253', 'AI-ACT-269']) test(`Native Store root ${actionId} actual preparation and status survive service restart without duplicate usage`, async () => {
   const f = supplierDraftFixture(), requests = new HostRequests(); let models = 0, reservations = 0;
   const service = () => new AssistantPreparationService({projectId: actor.projectId, plans: f.plans, context: f.source, requests, now: () => at,
     usage: {async reserve() {reservations++; return {id: 'HOST-supplier-permit', validUntil: '2026-10-28T08:01:00.000Z'};}, async settle() {}},
     model: {async prepare(_input, tools) {models++; assert.equal(tools.length, 1); assert.equal(tools[0]!.actionId, actionId);
       return {kind: 'tool', name: tools[0]!.name, arguments: actionId === 'AI-ACT-235'
-        ? {name: 'HOST supplied supplier', phone: null, address: null, gstin: null} : {query: 'HOST supplied query'}};}}});
+        ? {name: 'HOST supplied supplier', phone: null, address: null, gstin: null}
+        : actionId === 'AI-ACT-269' ? {} : {query: 'HOST supplied query'}};}}});
   const payload = {...f.input, actionId: null, nativeTargets: [{actionId, entityId: null}]};
   const result = await service().handle(actor, {operation: 'prepare', payload});
   assert.equal(result.state, 'ready');
@@ -98,6 +99,30 @@ for (const actionId of ['AI-ACT-235', 'AI-ACT-236']) test(`Supplier generic comp
   assert.deepEqual(await service().handle(actor, {operation: 'prepare', payload}), result);
   assert.equal(models, 1); assert.equal(reservations, 1);
   f.member(false); await assert.rejects(service().handle(actor, {operation: 'status', payload: {scope: payload.scope, requestId: payload.requestId}}));
+});
+
+test('Purchase roots expose no supplier invoice identity or posting capability and reject stale recovery', async () => {
+  const f = supplierDraftFixture();
+  for (const actionId of ['AI-ACT-253', 'AI-ACT-269']) {
+    const input = {...f.input, actionId}, source = await f.source.read(actor, input), tool = source.tools[0]!;
+    assert.equal(source.tools.length, 1); assert.equal(tool.entityId, null);
+    assert.match(tool.sourceRevision, /^store-purchase-root-owner:[a-f0-9]{64}$/u);
+    const fields = actionId === 'AI-ACT-253' ? {query: 'મૂળ bill'} : {};
+    const target = tool.resolveTarget!(fields);
+    assert.equal(target.entityId, null); assert.deepEqual(target.fields, fields);
+    assert.throws(() => tool.resolveTarget!({...fields, supplierId: 'invented'}));
+    assert.throws(() => tool.resolveTarget!({...fields, billId: 'invented'}));
+    await assert.rejects(f.source.read(actor, {...input, entityId: 'invented'}));
+    await assert.rejects(f.source.read(actor, {...input, catalogueListingIds: []}));
+    const proposal = {kind: 'proposal' as const, id: 'HOST-root-recovery', actionId, entityId: null,
+      sourceRevision: target.sourceRevision, fields: target.fields, title: 'Review purchases', summary: 'Host only'};
+    assert.equal((await f.source.readPrepared(actor, input, proposal)).tools[0]!.sourceRevision, target.sourceRevision);
+    await assert.rejects(f.source.readPrepared(actor, input, {...proposal, sourceRevision: 'forged'}));
+    f.bump(); await assert.rejects(f.source.readPrepared(actor, input, proposal));
+  }
+  for (const actionId of ['AI-ACT-252', 'AI-ACT-254', 'AI-ACT-255', 'AI-ACT-256']) {
+    await assert.rejects(f.source.read(actor, {...f.input, actionId}));
+  }
 });
 
 test('Supplier draft rejects invented identity unknown fields invalid inputs and specific-record joins', async () => {
@@ -112,12 +137,15 @@ test('Supplier draft rejects invented identity unknown fields invalid inputs and
 });
 
 test('Supplier draft ownership rejects wrong account project tenant Store pending revoked and unpaid states', async () => {
+  for (const actionId of ['AI-ACT-235', 'AI-ACT-253', 'AI-ACT-269']) {
   for (const fault of ['account', 'project', 'tenant', 'store', 'personal', 'pending', 'revoked', 'unpaid']) {
     const f = supplierDraftFixture();
     if (fault === 'pending') f.approved(false); if (fault === 'revoked') f.member(false); if (fault === 'unpaid') f.paid(false);
     const who = fault === 'account' ? {...actor, uid: 'foreign'} : fault === 'project' ? {...actor, projectId: 'foreign-project'} : fault === 'tenant' ? {...actor, tenantId: 'foreign'} : actor;
-    const input = fault === 'store' ? {...f.input, scope: {...f.input.scope, storeId: 'foreign-store'}} : fault === 'personal' ? {...f.input, scope: {audience: 'personal' as const, storeId: null}} : f.input;
+    const base = {...f.input, actionId};
+    const input = fault === 'store' ? {...base, scope: {...base.scope, storeId: 'foreign-store'}} : fault === 'personal' ? {...base, scope: {audience: 'personal' as const, storeId: null}} : base;
     await assert.rejects(f.source.read(who, input), Error, fault);
+  }
   }
 });
 

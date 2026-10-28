@@ -5,7 +5,7 @@ import type {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService
 import type {PreparationContextSource} from "./model_service.js";
 import {AssistantModelError, canonical, digest, fail, id, object,
   catalogueListingSelection, preparationNativeTargetLimit, type PreparationReply, type PreparationTool, type PreparationContext, type PreparationRequest} from "./model_contract.js";
-import {canonicalContextProjection, catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeSupplierDraftActions, searchSuggestion} from "./domain_context_contract.js";
+import {canonicalContextProjection, catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeSupplierDraftActions,storePurchaseRootActions, searchSuggestion} from "./domain_context_contract.js";
 
 const paidRevision = (p: PlansReadback) => canonical([p.owner, p.scope, p.catalogueRevision, p.subscriptionRevision]);
 const searchSchema = {type: "object", properties: {query: {type: "string"}},
@@ -1154,7 +1154,39 @@ export class CompositePreparationContext implements PreparationContextSource {
     catalogue?: OriginalCataloguePreparationContext; storeProducts?: OriginalStoreProductPreparationContext;
     storeOrders?: OriginalStoreOrderPreparationContext;
     privateStars?: OriginalPurchasedStarsPreparationContext;
-    nativePreferencesEnabled?: boolean; nativeBuyerFormsEnabled?: boolean; nativeSupplierFormsEnabled?: boolean; now?: () => Date}) {}
+    nativePreferencesEnabled?: boolean; nativeBuyerFormsEnabled?: boolean; nativeSupplierFormsEnabled?: boolean;
+    nativePurchaseFormsEnabled?: boolean; now?: () => Date}) {}
+  private async readPurchaseRoots(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
+    if (!this.deps.original || !this.deps.nativePurchaseFormsEnabled || actor.tenantId !== undefined ||
+        !actor.uid || !actor.projectId || input.scope.audience !== 'workspace' || !input.scope.storeId ||
+        input.entityId !== null || input.catalogueListingIds !== undefined ||
+        input.actionId !== null && !storePurchaseRootActions.has(input.actionId)) return fail('context_unavailable');
+    const now = () => (this.deps.now?.() ?? new Date()).getTime(), started = now();
+    const before = await approvedWorkspacePreparationAuthority(this.deps.original, actor, input, started);
+    const after = await approvedWorkspacePreparationAuthority(this.deps.original, actor, input, now());
+    if (before.revision !== after.revision) return fail('stale_preparation', 409);
+    const until = Math.min(started + 60_000, Date.parse(before.validUntil), Date.parse(after.validUntil));
+    if (until <= now()) return fail('stale_preparation', 409);
+    const revision = 'store-purchase-root-owner:' + digest([actor.projectId, actor.uid, input.scope.storeId, after.revision]);
+    const tools: PreparationTool[] = [...storePurchaseRootActions].filter(action => input.actionId === null || action === input.actionId).map(actionId => {
+      const search = actionId === 'AI-ACT-253';
+      const validate = (fields: Readonly<Record<string, unknown>>) => search
+        ? Object.keys(fields).length === 1 && typeof fields.query === 'string' && fields.query.length <= 2000 &&
+          !/[\u0000-\u001f\u007f]/u.test(fields.query) && Buffer.from(fields.query, 'utf8').toString('utf8') === fields.query
+        : Object.keys(fields).length === 0;
+      return {name: search ? 'store_prepare_purchase_search' : 'store_review_purchase_controls', actionId, entityId: null, sourceRevision: revision,
+        description: search ? 'Open the existing native Purchase register with only the supplied search query. The current account/Store saved bill book is read natively; no supplier or bill has been selected, read or verified here.'
+          : 'Review the existing native Manage purchases controls. Native source readiness determines which actions are available. This tool does not select a supplier, create or confirm a bill, receive Stock, record money or perform any posting.',
+        parameters: {type: 'object', properties: search ? {query: {type: 'string'}} : {}, required: search ? ['query'] : [], additionalProperties: false},
+        validate, resolveTarget: args => {
+          if (!validate(args)) return fail('invalid_model_result');
+          return {entityId: null, sourceRevision: revision, fields: args, title: search ? 'Search purchase bills' : 'Manage purchases',
+            summary: search ? 'Find a saved bill in your Store.' : 'Choose an available purchase action in your Store.'};
+        }};
+    });
+    return {revision, validUntil: new Date(until).toISOString(), tools, modelContext: {audience: 'workspace', storeId: input.scope.storeId,
+      sourceKind: 'native-purchase-root-owner-v1', purpose: 'Preparation permission only. No purchase records, supplier identities, invoice originals, tax decisions or ledger balances have been read. The original current native book, record selection and final confirmation remain required.'}};
+  }
   private async readSupplierDrafts(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (!this.deps.original || !this.deps.nativeSupplierFormsEnabled || actor.tenantId !== undefined ||
         !actor.uid || !actor.projectId || input.scope.audience !== 'workspace' || !input.scope.storeId ||
@@ -1271,6 +1303,12 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async readPrepared(actor: AccountProfileActor, input: PreparationRequest,
     proposal: Extract<PreparationReply["outcome"], {kind: "proposal"}>): Promise<PreparationContext> {
+    if (storePurchaseRootActions.has(proposal.actionId)) {
+      if (proposal.actionId !== input.actionId || proposal.entityId !== null || input.entityId !== null) return fail('stale_preparation', 409);
+      const source = await this.readPurchaseRoots(actor, input);
+      if (!source.tools.some(tool => tool.actionId === proposal.actionId && tool.sourceRevision === proposal.sourceRevision && tool.validate(proposal.fields))) return fail('stale_preparation', 409);
+      return source;
+    }
     if (storeSupplierDraftActions.has(proposal.actionId)) {
       if (proposal.actionId !== input.actionId || proposal.entityId !== null || input.entityId !== null) return fail('stale_preparation', 409);
       const source = await this.readSupplierDrafts(actor, input);
@@ -1311,6 +1349,7 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (input.actionId !== null) {
+      if (storePurchaseRootActions.has(input.actionId)) return this.readPurchaseRoots(actor, input);
       if (storeSupplierDraftActions.has(input.actionId)) return this.readSupplierDrafts(actor, input);
       if(input.actionId==='AI-ACT-055'){
         if(!this.deps.privateStars)return fail('context_unavailable');
@@ -1361,6 +1400,10 @@ export class CompositePreparationContext implements PreparationContextSource {
     if (this.deps.nativeSupplierFormsEnabled && input.scope.audience === 'workspace' &&
         input.entityId === null && input.catalogueListingIds === undefined) {
       values.push(await this.readSupplierDrafts(actor, input));
+    }
+    if (this.deps.nativePurchaseFormsEnabled && input.scope.audience === 'workspace' &&
+        input.entityId === null && input.catalogueListingIds === undefined) {
+      values.push(await this.readPurchaseRoots(actor, input));
     }
     if (this.deps.storeOrders && input.scope.audience === 'workspace') {
       try {

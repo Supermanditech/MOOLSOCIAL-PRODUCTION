@@ -28742,6 +28742,78 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
     return result;
   }
 
+  testWidgets('SCOPE12 independent purchase actions retain unchanged native capture anchors', (tester) async {
+    final h = _PurchaseColdOwnerHarness();
+    try {
+      await h.ready(tester);
+      final adapters = {for (final adapter in h.native.adapters(tester)) adapter.actionId: adapter};
+      final ctx = h.native.readContext(), writes = h.writes;
+      final first = <String, scope_contract.MoolAssistantNativeSnapshot>{};
+      for (final action in ['AI-ACT-253', 'AI-ACT-269']) {
+        first[action] = (await adapters[action]!.snapshot(ctx, null))!;
+      }
+      for (final action in ['AI-ACT-269', 'AI-ACT-253', 'AI-ACT-253', 'AI-ACT-269']) {
+        final current = await adapters[action]!.snapshot(ctx, null);
+        expect(current!.sourceRevision, first[action]!.sourceRevision,
+          reason: 'Capturing another native purchase action must not invalidate an unchanged source.');
+      }
+      final book = h.book.value!;
+      h.book.value = WorkspacePurchaseEntryBook(account: book.account, store: book.store, qa: book.qa,
+        revision: book.revision + 1, profiles: book.profiles, draft: book.draft, copies: book.copies,
+        openingRecords: book.openingRecords, goodsReceiptDrafts: book.goodsReceiptDrafts,
+        goodsReceiptCancellations: book.goodsReceiptCancellations, billGoodsReviews: book.billGoodsReviews,
+        billGoodsCancellations: book.billGoodsCancellations, restockGoodsAttempts: book.restockGoodsAttempts);
+      expect(await h.work.loadWorkspaceSuppliers(retry: true), isTrue);
+      for (final action in first.keys) {
+        expect((await adapters[action]!.snapshot(ctx, null))!.sourceRevision, isNot(first[action]!.sourceRevision));
+      }
+      expect(h.writes, writes);
+      await h.retirePrincipal(tester);
+      for (final action in first.keys) {expect(await adapters[action]!.snapshot(ctx, null), isNull);}
+      expect(h.writes, writes);
+    } finally {await h.dispose(tester);}
+  });
+
+  for (final action in ['AI-ACT-253', 'AI-ACT-269']) {
+    testWidgets('SCOPE12 interleaved $action captures open original read-only Review without writes', (tester) async {
+      final h = _PurchaseColdOwnerHarness();
+      try {
+        await h.ready(tester);
+        final adapters = {for (final adapter in h.native.adapters(tester)) adapter.actionId: adapter};
+        final ctx = h.native.readContext(), writes = h.writes;
+        final initial = (await adapters[action]!.snapshot(ctx, null))!;
+        for (final other in ['AI-ACT-269', 'AI-ACT-253']) {expect(await adapters[other]!.snapshot(ctx, null), isNotNull);}
+        scope_contract.MoolAssistantProposal proposal(String source) => scope_contract.MoolAssistantProposal(
+          id: 'HOST-scope12-$action', actionId: action, binding: ctx.binding, requestRevision: 0,
+          entitlementRevision: 'HOST-native-owner-fixture', sourceRevision: source,
+          validUntil: DateTime.now().add(const Duration(minutes: 1)), title: 'Review original purchases',
+          summary: 'HOST original captured source', fields: action == 'AI-ACT-253' ? const {'query': 'HOST'} : const {});
+        Future<void> closeReview(Future<MoolAssistantReviewResult> result) async {
+          var closed = false; unawaited(result.then((_) {closed = true;}));
+          for (var i = 0; i < 3 && !closed; i++) {
+            await tester.tap(find.byTooltip('Back to AI request')); await tester.pumpAndSettle();
+          }
+          expect(closed, isTrue); expect(await result, MoolAssistantReviewResult.opened);
+        }
+        final original = proposal(initial.sourceRevision);
+        final opened = adapters[action]!.openReview(original, () => true); unawaited(opened);
+        await tester.pumpAndSettle();
+        expect(find.byTooltip('Back to AI request'), findsOneWidget);
+        if (action == 'AI-ACT-253') {
+          expect(tester.widget<TextField>(find.byKey(const Key('work-purchase-search'))).controller!.text, 'HOST');
+        } else {expect(find.byKey(const ValueKey('purchase-category-group-Supplier bills')), findsOneWidget);}
+        expect((await adapters[action]!.snapshot(ctx, null))!.sourceRevision, initial.sourceRevision);
+        expect(h.writes, writes);
+        await closeReview(opened);
+        final fresh = (await adapters[action]!.snapshot(ctx, null))!;
+        expect(fresh.sourceRevision, initial.sourceRevision);
+        final reopened = adapters[action]!.openReview(proposal(fresh.sourceRevision), () => true); unawaited(reopened);
+        await tester.pumpAndSettle(); await closeReview(reopened);
+        expect(h.writes, writes); expect(tester.takeException(), isNull);
+      } finally {await h.dispose(tester);}
+    });
+  }
+
   test('FE-PURCHASE-01 closed raw bill input retains deep immutable original values', () {
     final row = <String, Object?>{'name': 'મૂળ માલ', 'quantity': '02.500', 'cost': '0012.50'};
     final details = <String, Object?>{'invoiceTotal': '0031.25', 'paymentMethod': 'UPI'};
